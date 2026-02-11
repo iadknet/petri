@@ -140,6 +140,89 @@ body,
   transform-origin: 0 0;
 }
 
+.paint-toggle-btn {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 6;
+  border: 1px solid #3d5562;
+  background: rgba(21, 29, 34, 0.92);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+.paint-toggle-btn.active {
+  border-color: #57d997;
+  box-shadow: 0 0 0 1px rgba(87, 217, 151, 0.4);
+}
+
+.paint-toggle-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.paint-toolbar {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  z-index: 6;
+  width: min(560px, calc(100% - 96px));
+  background: rgba(16, 23, 28, 0.92);
+  border: 1px solid rgba(69, 89, 103, 0.9);
+  border-radius: 12px;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.paint-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.paint-label {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.paint-stats {
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.pill-btn {
+  border: 1px solid #3d5562;
+  background: #273640;
+  color: var(--text);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.pill-btn.active {
+  border-color: #57d997;
+  color: #ceffe8;
+}
+
+.pill-btn.danger {
+  border-color: #8d4c4c;
+  background: #492f2f;
+}
+
+.brush-overlay {
+  position: absolute;
+  border: 1px solid rgba(87, 217, 151, 0.95);
+  background: rgba(87, 217, 151, 0.2);
+  pointer-events: none;
+  z-index: 5;
+}
+
 .idle-placeholder {
   position: absolute;
   inset: 0;
@@ -163,5 +246,9 @@ body,
   .app-root {
     grid-template-columns: 1fr;
     grid-template-rows: auto minmax(300px, 1fr);
+  }
+
+  .paint-toolbar {
+    width: calc(100% - 24px);
   }
 }

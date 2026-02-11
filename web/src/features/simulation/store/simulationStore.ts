@@ -3,6 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import {
   ConfigPatch,
   CreatureDetail,
+  IdlePreviewMode,
+  PaintPoint,
+  PaintStats,
+  PaintTool,
   SimulationStatus,
   StartupDraft,
   StartupDraftPatch,
@@ -69,6 +73,11 @@ export function useSimulationStore() {
   const [wsConnected, setWsConnected] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
+  const [paintModeEnabled, setPaintModeEnabled] = useState(false);
+  const [paintTool, setPaintTool] = useState<PaintTool>("food");
+  const [brushHalfExtent, setBrushHalfExtent] = useState<0 | 1 | 2>(0);
+  const [idlePreviewMode, setIdlePreviewMode] = useState<IdlePreviewMode>("paint_layer");
+  const [lastPaintStats, setLastPaintStats] = useState<PaintStats | null>(null);
 
   const transport = useMemo(() => resolveTransportEndpoints(), []);
   const apiClient = useMemo(() => new SimulationApiClient(transport.apiBase), [transport.apiBase]);
@@ -226,10 +235,84 @@ export function useSimulationStore() {
   }
 
   const phase = status?.phase ?? "idle";
+  const paintAllowed = phase === "idle" || phase === "paused";
   const tick = frame?.tick ?? status?.tick ?? 0;
   const population = frame?.population ?? status?.population ?? 0;
   const averageEnergy = frame?.average_energy ?? status?.average_energy ?? 0;
   const startDisabled = phase !== "idle" || busyAction !== null || status?.startup_viable === false;
+
+  async function sendPaintRequest(payload: {
+    action: "stroke" | "clear_all" | "preview";
+    tool?: PaintTool;
+    brush_half_extent?: 0 | 1 | 2;
+    points?: PaintPoint[];
+    idle_preview_mode?: IdlePreviewMode;
+  }): Promise<void> {
+    const response = await apiClient.paintWorld(payload);
+    setFrame(response.frame);
+    setLastPaintStats(response.stats);
+    setError(null);
+  }
+
+  async function commitPaintStroke(points: PaintPoint[]): Promise<void> {
+    if (!paintAllowed || points.length === 0) {
+      return;
+    }
+    try {
+      await sendPaintRequest({
+        action: "stroke",
+        tool: paintTool,
+        brush_half_extent: brushHalfExtent,
+        points,
+        idle_preview_mode: phase === "idle" ? idlePreviewMode : undefined
+      });
+    } catch (paintError) {
+      setError((paintError as Error).message || "Failed to apply paint stroke.");
+    }
+  }
+
+  async function clearPaint(): Promise<void> {
+    if (!paintAllowed) {
+      return;
+    }
+    try {
+      await sendPaintRequest({
+        action: "clear_all",
+        idle_preview_mode: phase === "idle" ? idlePreviewMode : undefined
+      });
+    } catch (paintError) {
+      setError((paintError as Error).message || "Failed to clear paint.");
+    }
+  }
+
+  async function refreshPaintPreview(): Promise<void> {
+    if (phase !== "idle") {
+      return;
+    }
+    try {
+      await sendPaintRequest({
+        action: "preview",
+        idle_preview_mode: idlePreviewMode
+      });
+    } catch (paintError) {
+      setError((paintError as Error).message || "Failed to refresh paint preview.");
+    }
+  }
+
+  useEffect(() => {
+    if (!paintModeEnabled || phase !== "idle") {
+      return;
+    }
+    void refreshPaintPreview();
+  }, [paintModeEnabled, phase, idlePreviewMode, startupDraft?.width, startupDraft?.height]);
+
+  useEffect(() => {
+    if (paintAllowed) {
+      return;
+    }
+    setPaintModeEnabled(false);
+    setLastPaintStats(null);
+  }, [paintAllowed]);
 
   return {
     frame,
@@ -240,6 +323,12 @@ export function useSimulationStore() {
     wsConnected,
     error,
     busyAction,
+    paintModeEnabled,
+    paintAllowed,
+    paintTool,
+    brushHalfExtent,
+    idlePreviewMode,
+    lastPaintStats,
     phase,
     tick,
     population,
@@ -254,6 +343,13 @@ export function useSimulationStore() {
     updateRuntimeField,
     exportSnapshot,
     importSnapshot,
-    fetchCreatureDetail
+    fetchCreatureDetail,
+    setPaintModeEnabled,
+    setPaintTool,
+    setBrushHalfExtent,
+    setIdlePreviewMode,
+    commitPaintStroke,
+    clearPaint,
+    refreshPaintPreview
   };
 }

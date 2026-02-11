@@ -150,6 +150,30 @@ export default function App() {
         phase={simulation.phase}
         frame={simulation.frame}
         zoom={zoom}
+        paintModeEnabled={simulation.paintModeEnabled}
+        paintAllowed={simulation.paintAllowed}
+        paintTool={simulation.paintTool}
+        brushHalfExtent={simulation.brushHalfExtent}
+        idlePreviewMode={simulation.idlePreviewMode}
+        lastPaintStats={simulation.lastPaintStats}
+        onTogglePaintMode={(enabled) => {
+          simulation.setPaintModeEnabled(enabled);
+        }}
+        onSetPaintTool={(tool) => {
+          simulation.setPaintTool(tool);
+        }}
+        onSetBrushHalfExtent={(extent) => {
+          simulation.setBrushHalfExtent(extent);
+        }}
+        onSetIdlePreviewMode={(mode) => {
+          simulation.setIdlePreviewMode(mode);
+        }}
+        onClearPaint={() => {
+          void simulation.clearPaint();
+        }}
+        onCommitPaintStroke={(points) => {
+          void simulation.commitPaintStroke(points);
+        }}
         onSelectCreature={(creature) => setSelectedCreatureId(creature?.id ?? null)}
       />
     </div>

@@ -69,4 +69,74 @@ describe("SimulationApiClient", () => {
 
     await expect(client.getCreatureDetail(99)).rejects.toThrow("creature 99 not found");
   });
+
+  it("posts paint requests and returns world paint response", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(
+        JSON.stringify({
+          phase: "idle",
+          stats: {
+            affected_cells: 1,
+            food_set_cells: 1,
+            food_cleared_cells: 0,
+            barrier_set_cells: 0,
+            barrier_cleared_cells: 0,
+            creatures_removed: 0
+          },
+          frame: {
+            tick: 0,
+            width: 4,
+            height: 4,
+            food: [255, 0, 0, 0],
+            barrier_bits: [0, 0],
+            creatures: [],
+            population: 0,
+            average_energy: 0
+          }
+        }),
+        { status: 200, headers: { "content-type": "application/json" } }
+      )
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new SimulationApiClient("http://127.0.0.1:4000");
+    const response = await client.paintWorld({
+      action: "stroke",
+      tool: "food",
+      brush_half_extent: 0,
+      points: [{ x: 1, y: 2 }]
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith("http://127.0.0.1:4000/simulation/world/paint", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        action: "stroke",
+        tool: "food",
+        brush_half_extent: 0,
+        points: [{ x: 1, y: 2 }]
+      })
+    });
+    expect(response.stats.food_set_cells).toBe(1);
+    expect(response.phase).toBe("idle");
+  });
+
+  it("surfaces paint API error messages", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ message: "painting not allowed while running" }), {
+        status: 409,
+        headers: { "content-type": "application/json" }
+      })
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const client = new SimulationApiClient("http://127.0.0.1:4000");
+
+    await expect(
+      client.paintWorld({
+        action: "preview",
+        idle_preview_mode: "paint_layer"
+      })
+    ).rejects.toThrow("painting not allowed while running");
+  });
 });
