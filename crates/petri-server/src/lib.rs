@@ -12,7 +12,7 @@ mod tests {
     use serde_json::json;
     use tower::ServiceExt;
 
-    use petri_core::WorldConfig;
+    use petri_core::{World, WorldConfig};
 
     use crate::{build_router, AppState};
 
@@ -76,5 +76,17 @@ mod tests {
         let cfg: WorldConfig = serde_json::from_slice(&bytes).unwrap();
         assert!(cfg.paused);
         assert_eq!(cfg.ticks_per_second, 12);
+    }
+
+    #[test]
+    fn frame_payload_size_stays_below_threshold_for_default_world() {
+        let world = World::new(WorldConfig::default(), 7);
+        let frame = world.frame();
+        let payload = rmp_serde::to_vec_named(&frame).expect("frame should serialize");
+        assert!(
+            payload.len() < 120_000,
+            "frame payload unexpectedly large: {} bytes",
+            payload.len()
+        );
     }
 }

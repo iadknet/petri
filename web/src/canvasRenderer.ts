@@ -29,7 +29,8 @@ export class CanvasRenderer {
     const pixels = this.imageData.data;
 
     for (let i = 0; i < frame.food.length; i += 1) {
-      const food = Math.max(0, Math.min(frame.food[i], 1));
+      const rawFood = frame.food[i] ?? 0;
+      const food = Math.max(0, Math.min(rawFood / 255, 1));
       const base = i * 4;
       pixels[base + 0] = 8;
       pixels[base + 1] = 24 + Math.floor(food * 220);

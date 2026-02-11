@@ -250,7 +250,7 @@ impl World {
             .creatures
             .iter()
             .map(|(id, c)| CreatureSnapshot {
-                id: id.data().as_ffi() as u64,
+                id: id.data().as_ffi(),
                 x: c.x,
                 y: c.y,
                 energy: c.energy,
@@ -270,7 +270,11 @@ impl World {
             tick: self.tick,
             width: self.config.width,
             height: self.config.height,
-            food: self.cells.iter().map(|c| c.food).collect(),
+            food: self
+                .cells
+                .iter()
+                .map(|c| quantize_food(c.food, self.config.food_max_density))
+                .collect(),
             population: creatures.len(),
             average_energy,
             creatures,
@@ -293,7 +297,7 @@ impl World {
         self.creatures
             .iter()
             .map(|(id, c)| CreatureView {
-                id: id.data().as_ffi() as u64,
+                id: id.data().as_ffi(),
                 x: c.x,
                 y: c.y,
                 energy: c.energy,
@@ -304,11 +308,17 @@ impl World {
     }
 
     fn spawn_random_creature(&mut self, generation: u32) -> Option<CreatureId> {
-        for _ in 0..64 {
-            let x = self.rng.gen_range(0..self.config.width);
-            let y = self.rng.gen_range(0..self.config.height);
-            let idx = self.idx(x, y);
+        let total_cells = self.cells.len();
+        if total_cells == 0 {
+            return None;
+        }
+        let start_idx = self.rng.gen_range(0..total_cells);
+
+        for offset in 0..total_cells {
+            let idx = (start_idx + offset) % total_cells;
             if self.creature_at[idx].is_none() {
+                let x = (idx as u32) % self.config.width;
+                let y = (idx as u32) / self.config.width;
                 let seed = self.rng.gen::<u64>();
                 let mut controller = ComputationGraph::founder(self.palette);
                 // Add slight startup diversity so founders are viable but not identical clones.
@@ -337,13 +347,18 @@ impl World {
 
     fn update_food(&mut self) {
         let total_cells = self.cells.len();
+        if total_cells == 0 {
+            return;
+        }
+
         let spawn_attempts = (total_cells as f32 * self.config.food_spawn_rate).round() as usize;
+        let growth_per_spawn = self.config.food_growth_rate.max(0.0);
+        let max_density = self.config.food_max_density.max(0.0);
 
         for _ in 0..spawn_attempts {
             let idx = self.rng.gen_range(0..total_cells);
             let cell = &mut self.cells[idx];
-            cell.food = (cell.food + self.config.food_growth_rate.max(0.05))
-                .min(self.config.food_max_density);
+            cell.food = (cell.food + growth_per_spawn).min(max_density);
         }
     }
 
@@ -384,6 +399,12 @@ fn wrap_axis(v: i32, max: u32) -> u32 {
     (((v % m) + m) % m) as u32
 }
 
+fn quantize_food(food: f32, max_density: f32) -> u8 {
+    let max_density = max_density.max(f32::EPSILON);
+    let normalized = (food.clamp(0.0, max_density) / max_density).clamp(0.0, 1.0);
+    (normalized * 255.0).round() as u8
+}
+
 fn push_event(creature: &mut Creature, kind: CreatureEventKind, tick: u64) {
     if creature.events.len() == EVENT_LOG_CAPACITY {
         creature.events.pop_front();
@@ -393,7 +414,7 @@ fn push_event(creature: &mut Creature, kind: CreatureEventKind, tick: u64) {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
+    use std::collections::{BTreeSet, HashSet};
 
     use crate::ControllerPalette;
 
@@ -598,6 +619,80 @@ mod tests {
             .collect::<BTreeSet<_>>();
 
         assert!(signatures.len() > 1);
+    }
+
+    #[test]
+    fn food_growth_rate_zero_prevents_spawn_growth() {
+        let cfg = WorldConfig {
+            width: 10,
+            height: 10,
+            initial_creatures: 0,
+            max_creatures: 10,
+            food_spawn_rate: 1.0,
+            food_growth_rate: 0.0,
+            ..WorldConfig::default()
+        };
+
+        let mut world = World::new(cfg, 1234);
+        world.tick();
+
+        let total_food: f32 = world.cells.iter().map(|c| c.food).sum();
+        assert_eq!(total_food, 0.0);
+    }
+
+    #[test]
+    fn spawn_random_creature_finds_free_cell_beyond_random_attempt_window() {
+        let seed = 9001_u64;
+        let cfg = WorldConfig {
+            width: 20,
+            height: 20,
+            initial_creatures: 0,
+            max_creatures: 400,
+            ..WorldConfig::default()
+        };
+        let mut world = World::new_with_palette(cfg, seed, ControllerPalette::Hybrid);
+
+        let mut probe_rng = SmallRng::seed_from_u64(seed);
+        let first_window = (0..64)
+            .map(|_| {
+                (
+                    probe_rng.gen_range(0..world.config.width),
+                    probe_rng.gen_range(0..world.config.height),
+                )
+            })
+            .collect::<HashSet<_>>();
+
+        let free_cell = (0..world.config.height)
+            .flat_map(|y| (0..world.config.width).map(move |x| (x, y)))
+            .find(|coord| !first_window.contains(coord))
+            .expect("grid should contain at least one unsampled cell");
+
+        let mut creature_seed = 1_u64;
+        for y in 0..world.config.height {
+            for x in 0..world.config.width {
+                if (x, y) == free_cell {
+                    continue;
+                }
+                let idx = world.idx(x, y);
+                let creature = Creature {
+                    x,
+                    y,
+                    energy: 1.0,
+                    age: 0,
+                    generation: 0,
+                    controller: ComputationGraph::founder(ControllerPalette::Hybrid),
+                    rng: SmallRng::seed_from_u64(creature_seed),
+                    events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
+                };
+                creature_seed += 1;
+                let id = world.creatures.insert(creature);
+                world.creature_at[idx] = Some(id);
+            }
+        }
+
+        let spawned = world.spawn_random_creature(0);
+        assert!(spawned.is_some());
+        assert!(world.creature_at[world.idx(free_cell.0, free_cell.1)].is_some());
     }
 
     #[test]
