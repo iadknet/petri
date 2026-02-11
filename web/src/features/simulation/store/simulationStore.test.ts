@@ -10,6 +10,20 @@ describe("STARTUP_LIMITS", () => {
     expect((STARTUP_LIMITS as Record<string, { min: number }>).food_spread_threshold.min).toBe(0);
     expect((STARTUP_LIMITS as Record<string, { min: number }>).food_spawn_floor_density.min).toBe(0);
   });
+
+  it("uses much higher max thresholds for startup and advanced tuning controls", () => {
+    expect(STARTUP_LIMITS.initial_creatures.max).toBe(6000);
+    expect(STARTUP_LIMITS.max_creatures.max).toBe(500000);
+    expect(STARTUP_LIMITS.width.max).toBe(1500);
+    expect(STARTUP_LIMITS.height.max).toBe(1500);
+    expect(STARTUP_LIMITS.energy_initial.max).toBe(8.0);
+    expect(STARTUP_LIMITS.food_max_density.max).toBe(8.0);
+    expect(STARTUP_LIMITS.energy_per_tick_decay.max).toBe(0.2);
+    expect(STARTUP_LIMITS.energy_per_move.max).toBe(0.25);
+    expect(STARTUP_LIMITS.energy_max.max).toBe(10.0);
+    expect(STARTUP_LIMITS.min_reproduce_energy.max).toBe(8.0);
+    expect(STARTUP_LIMITS.weight_mutation_magnitude.max).toBe(3.0);
+  });
 });
 
 describe("resolveTransportEndpoints", () => {

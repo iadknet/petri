@@ -25,7 +25,7 @@ export function RuntimeTuningPanel({
             id="tps-slider"
             type="range"
             min={1}
-            max={120}
+            max={360}
             step={1}
             value={runtimeConfig.ticks_per_second}
             disabled={phase === "idle"}

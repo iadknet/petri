@@ -14,10 +14,10 @@ pub struct MutationConfig {
 impl Default for MutationConfig {
     fn default() -> Self {
         Self {
-            weight_mutation_rate: 0.26,
+            weight_mutation_rate: 0.08,
             weight_mutation_magnitude: 0.18,
-            logic_node_mutation_rate: 0.04,
-            structural_mutation_rate: 0.08,
+            logic_node_mutation_rate: 0.01,
+            structural_mutation_rate: 0.02,
         }
     }
 }

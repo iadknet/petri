@@ -181,7 +181,7 @@ impl StartupDraft {
     pub fn viable_default() -> Self {
         Self {
             initial_creatures: 300,
-            max_creatures: 5_000,
+            max_creatures: 500_000,
             width: 400,
             height: 400,
             initial_food_density: 0.15,
@@ -260,12 +260,12 @@ impl StartupDraft {
             "initial_creatures",
             self.initial_creatures as f64,
             1.0,
-            5_000.0,
+            20_000.0,
         )?;
-        validate_range("max_creatures", self.max_creatures as f64, 1.0, 20_000.0)?;
-        validate_range("width", self.width as f64, 50.0, 1_000.0)?;
-        validate_range("height", self.height as f64, 50.0, 1_000.0)?;
-        validate_range("energy_initial", self.energy_initial as f64, 0.01, 5.0)?;
+        validate_range("max_creatures", self.max_creatures as f64, 1.0, 500_000.0)?;
+        validate_range("width", self.width as f64, 50.0, 2_000.0)?;
+        validate_range("height", self.height as f64, 50.0, 2_000.0)?;
+        validate_range("energy_initial", self.energy_initial as f64, 0.01, 20.0)?;
         validate_range(
             "initial_food_density",
             self.initial_food_density as f64,
@@ -290,9 +290,9 @@ impl StartupDraft {
             "energy_per_tick_decay",
             self.energy_per_tick_decay as f64,
             0.0,
-            0.10,
+            0.50,
         )?;
-        validate_range("energy_per_move", self.energy_per_move as f64, 0.0, 0.10)?;
+        validate_range("energy_per_move", self.energy_per_move as f64, 0.0, 0.50)?;
         Ok(())
     }
 }
@@ -724,5 +724,24 @@ fn simulation_status_from_locked(sim: &SimulationState) -> SimulationStatus {
         startup_viability_code: sim.startup_viability.code,
         startup_viability_message: sim.startup_viability.message.clone(),
         startup_draft: sim.startup_draft.clone(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::StartupDraft;
+
+    #[test]
+    fn startup_draft_validation_allows_expanded_upper_bounds() {
+        let mut draft = StartupDraft::viable_default();
+        draft.initial_creatures = 12_000;
+        draft.max_creatures = 450_000;
+        draft.width = 1_400;
+        draft.height = 1_400;
+        draft.energy_initial = 12.0;
+        draft.energy_per_tick_decay = 0.25;
+        draft.energy_per_move = 0.25;
+
+        assert!(draft.validate().is_ok());
     }
 }

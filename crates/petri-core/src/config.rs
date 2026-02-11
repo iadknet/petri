@@ -36,7 +36,7 @@ impl Default for WorldConfig {
             height: 400,
             world_wrap: true,
             initial_creatures: 200,
-            max_creatures: 5_000,
+            max_creatures: 500_000,
             food_spawn_rate: 0.02,
             food_growth_rate: 0.05,
             food_spread_threshold: 0.75,
@@ -51,12 +51,26 @@ impl Default for WorldConfig {
             energy_max: 1.5,
             min_reproduce_energy: 1.0,
             offspring_energy_fraction: 0.45,
-            weight_mutation_rate: 0.26,
+            weight_mutation_rate: 0.08,
             weight_mutation_magnitude: 0.18,
-            logic_node_mutation_rate: 0.04,
-            structural_mutation_rate: 0.08,
+            logic_node_mutation_rate: 0.01,
+            structural_mutation_rate: 0.02,
             ticks_per_second: 30,
             paused: false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::WorldConfig;
+
+    #[test]
+    fn default_mutation_rates_are_lowered() {
+        let cfg = WorldConfig::default();
+        assert_eq!(cfg.max_creatures, 500_000);
+        assert!((cfg.weight_mutation_rate - 0.08).abs() < f32::EPSILON);
+        assert!((cfg.logic_node_mutation_rate - 0.01).abs() < f32::EPSILON);
+        assert!((cfg.structural_mutation_rate - 0.02).abs() < f32::EPSILON);
     }
 }

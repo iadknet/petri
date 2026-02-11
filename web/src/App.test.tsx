@@ -194,10 +194,10 @@ describe("App", () => {
         min_reproduce_energy: 1.0,
         offspring_energy_fraction: 0.45,
         max_creatures: 5000,
-        weight_mutation_rate: 0.26,
+        weight_mutation_rate: 0.08,
         weight_mutation_magnitude: 0.18,
-        logic_node_mutation_rate: 0.04,
-        structural_mutation_rate: 0.08
+        logic_node_mutation_rate: 0.01,
+        structural_mutation_rate: 0.02
       },
       serverReachable: true,
       wsConnected: true,

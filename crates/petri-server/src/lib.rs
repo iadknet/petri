@@ -165,6 +165,7 @@ mod tests {
         let status_json = read_json(response).await;
 
         assert_eq!(status_json["startup_draft"]["initial_food_density"], 0.15);
+        assert_eq!(status_json["startup_draft"]["max_creatures"], 500_000);
         assert_eq!(status_json["startup_draft"]["food_spawn_rate"], 0.05);
         assert_eq!(status_json["startup_draft"]["food_growth_rate"], 0.10);
         assert_eq!(status_json["startup_draft"]["food_spread_threshold"], 0.75);
