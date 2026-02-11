@@ -72,7 +72,7 @@ cargo run -p petri-cli -- run --ticks 1000 --sample-every 25
 Run Stage 1b controller stability ablation:
 
 ```bash
-cargo run -p petri-cli -- ablation --ticks 500
+cargo run -p petri-cli --bin petri-cli -- ablation --ticks 500
 ```
 
 Run Stage 1 throughput benchmark (200x200, 5k creatures):
