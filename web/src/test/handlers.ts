@@ -10,7 +10,8 @@ const defaultStartupDraft: StartupDraft = {
   food_spawn_rate: 0.1,
   food_growth_rate: 0.2,
   energy_per_tick_decay: 0.01,
-  energy_per_move: 0.02
+  energy_per_move: 0.02,
+  world_wrap: true
 };
 
 const defaultRuntimeConfig = {

@@ -39,6 +39,7 @@ export type StartupDraft = {
   food_growth_rate: number;
   energy_per_tick_decay: number;
   energy_per_move: number;
+  world_wrap: boolean;
 };
 
 export type StartupDraftPatch = Partial<StartupDraft>;

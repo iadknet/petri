@@ -155,8 +155,8 @@ impl World {
                 let dx = axis_step(outputs.move_x);
                 let dy = axis_step(outputs.move_y);
                 if dx != 0 || dy != 0 {
-                    let nx = wrap_axis(creature.x as i32 + dx, width);
-                    let ny = wrap_axis(creature.y as i32 + dy, height);
+                    let nx = map_axis(creature.x as i32 + dx, width, self.config.world_wrap);
+                    let ny = map_axis(creature.y as i32 + dy, height, self.config.world_wrap);
                     let next_idx = (ny * width + nx) as usize;
 
                     if self.creature_at[next_idx].is_none() {
@@ -435,11 +435,25 @@ impl World {
 
     fn nearest_food_sensor(&self, x: u32, y: u32) -> (f32, f32) {
         let mut best: Option<(i32, i32, i32)> = None;
+        let width = self.config.width as i32;
+        let height = self.config.height as i32;
 
         for dy in -FOOD_SENSOR_RADIUS..=FOOD_SENSOR_RADIUS {
             for dx in -FOOD_SENSOR_RADIUS..=FOOD_SENSOR_RADIUS {
-                let nx = wrap_axis(x as i32 + dx, self.config.width);
-                let ny = wrap_axis(y as i32 + dy, self.config.height);
+                let raw_x = x as i32 + dx;
+                let raw_y = y as i32 + dy;
+                let Some((nx, ny)) = (if self.config.world_wrap {
+                    Some((
+                        wrap_axis(raw_x, self.config.width),
+                        wrap_axis(raw_y, self.config.height),
+                    ))
+                } else if raw_x < 0 || raw_x >= width || raw_y < 0 || raw_y >= height {
+                    None
+                } else {
+                    Some((raw_x as u32, raw_y as u32))
+                }) else {
+                    continue;
+                };
                 let idx = self.idx(nx, ny);
                 if self.cells[idx].food <= 0.0 {
                     continue;
@@ -490,13 +504,27 @@ impl World {
     }
 
     fn find_empty_neighbor(&self, x: u32, y: u32) -> Option<(u32, u32)> {
+        let width = self.config.width as i32;
+        let height = self.config.height as i32;
         for dx in -1_i32..=1 {
             for dy in -1_i32..=1 {
                 if dx == 0 && dy == 0 {
                     continue;
                 }
-                let nx = wrap_axis(x as i32 + dx, self.config.width);
-                let ny = wrap_axis(y as i32 + dy, self.config.height);
+                let raw_x = x as i32 + dx;
+                let raw_y = y as i32 + dy;
+                let Some((nx, ny)) = (if self.config.world_wrap {
+                    Some((
+                        wrap_axis(raw_x, self.config.width),
+                        wrap_axis(raw_y, self.config.height),
+                    ))
+                } else if raw_x < 0 || raw_x >= width || raw_y < 0 || raw_y >= height {
+                    None
+                } else {
+                    Some((raw_x as u32, raw_y as u32))
+                }) else {
+                    continue;
+                };
                 let idx = self.idx(nx, ny);
                 if self.creature_at[idx].is_none() {
                     return Some((nx, ny));
@@ -518,6 +546,17 @@ fn axis_step(value: f32) -> i32 {
         -1
     } else {
         0
+    }
+}
+
+fn map_axis(v: i32, max: u32, wrap: bool) -> u32 {
+    if max == 0 {
+        return 0;
+    }
+    if wrap {
+        wrap_axis(v, max)
+    } else {
+        v.clamp(0, max as i32 - 1) as u32
     }
 }
 
@@ -544,6 +583,7 @@ mod tests {
     use std::collections::{BTreeSet, HashSet};
 
     use crate::ControllerPalette;
+    use petri_graph::{Edge, NodeKind};
 
     use super::*;
 
@@ -726,6 +766,22 @@ mod tests {
             .map(|e| (e.weight * 1000.0) as i64)
             .sum::<i64>();
         node_sum + edge_sum
+    }
+
+    fn move_right_controller() -> ComputationGraph {
+        ComputationGraph {
+            palette: ControllerPalette::Hybrid,
+            nodes: vec![
+                NodeKind::Constant(1.0), // 0
+                NodeKind::OutputMoveX,   // 1
+                NodeKind::OutputMoveY,   // 2
+            ],
+            edges: vec![Edge {
+                from: 0,
+                to: 1,
+                weight: 1.0,
+            }],
+        }
     }
 
     #[test]
@@ -1019,6 +1075,78 @@ mod tests {
             .get(&parent.id)
             .expect("lineage tree should track parent-child relation");
         assert!(children.contains(&child.id));
+    }
+
+    #[test]
+    fn world_wrap_true_wraps_movement_across_edge() {
+        let cfg = WorldConfig {
+            width: 6,
+            height: 6,
+            initial_creatures: 1,
+            world_wrap: true,
+            ..WorldConfig::default()
+        };
+        let mut world = World::new_with_palette(cfg, 404, ControllerPalette::Hybrid);
+        let (id, old_x, old_y) = world
+            .creatures
+            .iter()
+            .next()
+            .map(|(id, c)| (id, c.x, c.y))
+            .expect("expected one creature");
+        let old_idx = world.idx(old_x, old_y);
+        let edge_x = world.config.width - 1;
+        let edge_y = old_y;
+        let edge_idx = world.idx(edge_x, edge_y);
+
+        if let Some(creature) = world.creatures.get_mut(id) {
+            creature.controller = move_right_controller();
+            creature.x = edge_x;
+            creature.y = edge_y;
+        }
+        world.creature_at[old_idx] = None;
+        world.creature_at[edge_idx] = Some(id);
+
+        world.tick();
+
+        let creature = world.creatures.get(id).expect("creature should remain alive");
+        assert_eq!(creature.y, edge_y);
+        assert_eq!(creature.x, 0);
+    }
+
+    #[test]
+    fn world_wrap_false_keeps_movement_in_bounds() {
+        let cfg = WorldConfig {
+            width: 6,
+            height: 6,
+            initial_creatures: 1,
+            world_wrap: false,
+            ..WorldConfig::default()
+        };
+        let mut world = World::new_with_palette(cfg, 505, ControllerPalette::Hybrid);
+        let (id, old_x, old_y) = world
+            .creatures
+            .iter()
+            .next()
+            .map(|(id, c)| (id, c.x, c.y))
+            .expect("expected one creature");
+        let old_idx = world.idx(old_x, old_y);
+        let edge_x = world.config.width - 1;
+        let edge_y = old_y;
+        let edge_idx = world.idx(edge_x, edge_y);
+
+        if let Some(creature) = world.creatures.get_mut(id) {
+            creature.controller = move_right_controller();
+            creature.x = edge_x;
+            creature.y = edge_y;
+        }
+        world.creature_at[old_idx] = None;
+        world.creature_at[edge_idx] = Some(id);
+
+        world.tick();
+
+        let creature = world.creatures.get(id).expect("creature should remain alive");
+        assert_eq!(creature.y, edge_y);
+        assert_eq!(creature.x, edge_x);
     }
 
     #[test]

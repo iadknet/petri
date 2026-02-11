@@ -166,6 +166,45 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn startup_draft_patch_updates_world_wrap() {
+        let state = AppState::new_for_tests();
+        let app = build_router(state);
+
+        let patch_payload = json!({
+            "world_wrap": false
+        });
+
+        let patch_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri("/simulation/startup-draft")
+                    .header("content-type", "application/json")
+                    .body(Body::from(patch_payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(patch_response.status(), StatusCode::OK);
+        let patch_json = read_json(patch_response).await;
+        assert_eq!(patch_json["world_wrap"], false);
+
+        let status_response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/simulation/status")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(status_response.status(), StatusCode::OK);
+        let status_json = read_json(status_response).await;
+        assert_eq!(status_json["startup_draft"]["world_wrap"], false);
+    }
+
+    #[tokio::test]
     async fn patch_config_updates_runtime_values() {
         let state = AppState::new_for_tests();
         let app = build_router(state);

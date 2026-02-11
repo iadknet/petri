@@ -91,6 +91,16 @@ export function StartupDraftPanel({ startupDraft, phase, onUpdate }: StartupDraf
             onChange={(event) => onUpdate("energy_per_move", Number(event.target.value))}
           />
 
+          <label className="slider-label" htmlFor="world-wrap-toggle">
+            World wrap
+          </label>
+          <input
+            id="world-wrap-toggle"
+            type="checkbox"
+            checked={startupDraft.world_wrap}
+            onChange={(event) => onUpdate("world_wrap", event.target.checked)}
+          />
+
           {phase !== "idle" ? (
             <p className="muted">Startup draft updates apply on Restart Simulation.</p>
           ) : null}

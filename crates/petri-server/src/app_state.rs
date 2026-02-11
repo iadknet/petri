@@ -23,6 +23,7 @@ pub struct StartupDraft {
     pub food_growth_rate: f32,
     pub energy_per_tick_decay: f32,
     pub energy_per_move: f32,
+    pub world_wrap: bool,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
@@ -33,6 +34,7 @@ pub struct StartupDraftPatch {
     pub food_growth_rate: Option<f32>,
     pub energy_per_tick_decay: Option<f32>,
     pub energy_per_move: Option<f32>,
+    pub world_wrap: Option<bool>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -160,6 +162,7 @@ impl StartupDraft {
             food_growth_rate: 0.20,
             energy_per_tick_decay: 0.01,
             energy_per_move: 0.02,
+            world_wrap: true,
         }
     }
 
@@ -189,6 +192,10 @@ impl StartupDraft {
         if let Some(v) = patch.energy_per_move {
             changed |= (self.energy_per_move - v).abs() > f32::EPSILON;
             self.energy_per_move = v;
+        }
+        if let Some(v) = patch.world_wrap {
+            changed |= self.world_wrap != v;
+            self.world_wrap = v;
         }
 
         changed
@@ -520,6 +527,7 @@ fn build_world_config(base: &WorldConfig, draft: &StartupDraft) -> WorldConfig {
     let mut cfg = base.clone();
     cfg.width = 200;
     cfg.height = 200;
+    cfg.world_wrap = draft.world_wrap;
     cfg.initial_creatures = draft.initial_creatures;
     cfg.food_spawn_rate = draft.food_spawn_rate;
     cfg.food_growth_rate = draft.food_growth_rate;
@@ -585,6 +593,9 @@ fn startup_probe_seed(draft: &StartupDraft) -> u64 {
     seed = seed
         .wrapping_mul(1_099_511_628_211)
         .wrapping_add(draft.energy_per_move.to_bits() as u64);
+    seed = seed
+        .wrapping_mul(1_099_511_628_211)
+        .wrapping_add(u64::from(draft.world_wrap));
     seed
 }
 

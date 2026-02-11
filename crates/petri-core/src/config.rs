@@ -4,6 +4,7 @@ use serde::{Deserialize, Serialize};
 pub struct WorldConfig {
     pub width: u32,
     pub height: u32,
+    pub world_wrap: bool,
     pub initial_creatures: usize,
     pub max_creatures: usize,
     pub food_spawn_rate: f32,
@@ -31,6 +32,7 @@ impl Default for WorldConfig {
         Self {
             width: 200,
             height: 200,
+            world_wrap: true,
             initial_creatures: 200,
             max_creatures: 5_000,
             food_spawn_rate: 0.02,

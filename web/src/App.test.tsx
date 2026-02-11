@@ -85,4 +85,9 @@ describe("App", () => {
     const weightRate = await screen.findByLabelText(/Weight mutation rate/i);
     expect(weightRate).toBeEnabled();
   });
+
+  it("renders startup world wrap control", async () => {
+    render(<App />);
+    expect(await screen.findByLabelText(/World wrap/i)).toBeInTheDocument();
+  });
 });
