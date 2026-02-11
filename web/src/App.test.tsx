@@ -204,6 +204,12 @@ describe("App", () => {
       wsConnected: true,
       error: null,
       busyAction: null,
+      paintModeEnabled: false,
+      paintAllowed: true,
+      paintTool: "food",
+      brushHalfExtent: 0,
+      idlePreviewMode: "paint_layer",
+      lastPaintStats: null,
       phase: "running",
       tick: 7,
       population: 1,
@@ -218,6 +224,13 @@ describe("App", () => {
       updateRuntimeField: vi.fn(),
       exportSnapshot: vi.fn().mockResolvedValue("{}"),
       importSnapshot: vi.fn(),
+      setPaintModeEnabled: vi.fn(),
+      setPaintTool: vi.fn(),
+      setBrushHalfExtent: vi.fn(),
+      setIdlePreviewMode: vi.fn(),
+      commitPaintStroke: vi.fn(),
+      clearPaint: vi.fn(),
+      refreshPaintPreview: vi.fn(),
       fetchCreatureDetail: vi.fn().mockResolvedValue({
         id: 99,
         lineage_id: 10,
@@ -288,5 +301,143 @@ describe("App", () => {
     expect(await screen.findByRole("button", { name: /Export Snapshot/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Import Snapshot/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/Snapshot JSON/i)).toBeInTheDocument();
+  });
+
+  it("shows paint toolbar controls when paint mode is enabled", async () => {
+    render(<App />);
+    const toggle = await screen.findByRole("button", { name: "Paint" });
+    fireEvent.click(toggle);
+
+    expect(await screen.findByRole("button", { name: "Food" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Erase Barrier" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Clear Paint" })).toBeInTheDocument();
+  });
+
+  it("wires idle preview switch and clear paint actions", async () => {
+    const setIdlePreviewMode = vi.fn();
+    const refreshPaintPreview = vi.fn();
+    const clearPaint = vi.fn();
+    const mockStore = {
+      frame: {
+        tick: 0,
+        width: 20,
+        height: 20,
+        food: new Uint8Array(400),
+        barrier_bits: new Uint8Array(50),
+        creatures: [],
+        population: 0,
+        average_energy: 0
+      },
+      status: {
+        phase: "idle",
+        run_id: null,
+        seed: null,
+        tick: 0,
+        population: 0,
+        average_energy: 0,
+        pending_restart: false,
+        startup_viable: true,
+        startup_viability_code: null,
+        startup_viability_message: null,
+        startup_draft: {
+          initial_creatures: 300,
+          max_creatures: 5000,
+          width: 400,
+          height: 400,
+          initial_food_density: 0.25,
+          energy_initial: 0.7,
+          food_spawn_rate: 0.1,
+          food_growth_rate: 0.2,
+          food_spread_threshold: 0.75,
+          food_spawn_floor_density: 0.03,
+          energy_per_tick_decay: 0.01,
+          energy_per_move: 0.02,
+          world_wrap: true
+        }
+      },
+      startupDraft: {
+        initial_creatures: 300,
+        max_creatures: 5000,
+        width: 400,
+        height: 400,
+        initial_food_density: 0.25,
+        energy_initial: 0.7,
+        food_spawn_rate: 0.1,
+        food_growth_rate: 0.2,
+        food_spread_threshold: 0.75,
+        food_spawn_floor_density: 0.03,
+        energy_per_tick_decay: 0.01,
+        energy_per_move: 0.02,
+        world_wrap: true
+      },
+      runtimeConfig: {
+        paused: false,
+        ticks_per_second: 30,
+        food_spawn_rate: 0.1,
+        food_growth_rate: 0.2,
+        food_spread_threshold: 0.75,
+        food_spawn_floor_density: 0.03,
+        food_max_density: 1.0,
+        food_energy_value: 0.35,
+        energy_per_tick_decay: 0.01,
+        energy_per_move: 0.02,
+        energy_per_compute_node: 0.005,
+        energy_per_reproduce: 0.12,
+        energy_max: 1.5,
+        min_reproduce_energy: 1.0,
+        offspring_energy_fraction: 0.45,
+        max_creatures: 5000,
+        weight_mutation_rate: 0.08,
+        weight_mutation_magnitude: 0.18,
+        logic_node_mutation_rate: 0.01,
+        structural_mutation_rate: 0.02
+      },
+      serverReachable: true,
+      wsConnected: true,
+      error: null,
+      busyAction: null,
+      paintModeEnabled: true,
+      paintAllowed: true,
+      paintTool: "food",
+      brushHalfExtent: 0,
+      idlePreviewMode: "paint_layer",
+      lastPaintStats: null,
+      phase: "idle",
+      tick: 0,
+      population: 0,
+      averageEnergy: 0,
+      startDisabled: false,
+      loadStatus: vi.fn(),
+      setError: vi.fn(),
+      startSimulation: vi.fn(),
+      restartSimulation: vi.fn(),
+      updateStartupField: vi.fn(),
+      togglePause: vi.fn(),
+      updateRuntimeField: vi.fn(),
+      exportSnapshot: vi.fn().mockResolvedValue("{}"),
+      importSnapshot: vi.fn(),
+      fetchCreatureDetail: vi.fn().mockResolvedValue(null),
+      setPaintModeEnabled: vi.fn(),
+      setPaintTool: vi.fn(),
+      setBrushHalfExtent: vi.fn(),
+      setIdlePreviewMode,
+      commitPaintStroke: vi.fn(),
+      clearPaint,
+      refreshPaintPreview
+    };
+
+    const spy = vi
+      .spyOn(simulationStoreModule, "useSimulationStore")
+      .mockReturnValue(mockStore as ReturnType<typeof simulationStoreModule.useSimulationStore>);
+    try {
+      render(<App />);
+      fireEvent.click(await screen.findByRole("button", { name: "Full Startup" }));
+      fireEvent.click(screen.getByRole("button", { name: "Clear Paint" }));
+
+      expect(setIdlePreviewMode).toHaveBeenCalledWith("full_startup");
+      expect(clearPaint).toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });
