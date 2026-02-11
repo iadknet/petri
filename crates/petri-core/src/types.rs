@@ -39,3 +39,11 @@ pub struct WorldFrame {
     pub population: usize,
     pub average_energy: f32,
 }
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
+pub struct WorldDiagnostics {
+    pub moves: u64,
+    pub eats: u64,
+    pub reproductions: u64,
+    pub deaths: u64,
+}

@@ -4,6 +4,7 @@ members = [
   "crates/petri-core",
   "crates/petri-server",
   "crates/petri-cli",
+  "crates/petri-graph",
 ]
 
 [workspace.package]

@@ -540,9 +540,17 @@ dependencies = [
 name = "petri-core"
 version = "0.1.0"
 dependencies = [
+ "petri-graph",
  "rand 0.8.5",
  "serde",
  "slotmap",
+]
+
+[[package]]
+name = "petri-graph"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

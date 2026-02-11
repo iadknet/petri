@@ -1,11 +1,14 @@
 use std::collections::VecDeque;
 
+use petri_graph::{ComputationGraph, ControllerPalette, SensorInputs};
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use slotmap::{Key, SlotMap};
 
 use crate::config::WorldConfig;
-use crate::types::{CreatureEvent, CreatureEventKind, CreatureId, CreatureSnapshot, WorldFrame};
+use crate::types::{
+    CreatureEvent, CreatureEventKind, CreatureId, CreatureSnapshot, WorldDiagnostics, WorldFrame,
+};
 
 const EVENT_LOG_CAPACITY: usize = 8;
 
@@ -31,6 +34,7 @@ struct Creature {
     energy: f32,
     age: u64,
     generation: u32,
+    controller: ComputationGraph,
     rng: SmallRng,
     events: VecDeque<CreatureEvent>,
 }
@@ -42,10 +46,16 @@ pub struct World {
     creatures: SlotMap<CreatureId, Creature>,
     creature_at: Vec<Option<CreatureId>>,
     rng: SmallRng,
+    palette: ControllerPalette,
+    diagnostics: WorldDiagnostics,
 }
 
 impl World {
     pub fn new(config: WorldConfig, seed: u64) -> Self {
+        Self::new_with_palette(config, seed, ControllerPalette::Hybrid)
+    }
+
+    pub fn new_with_palette(config: WorldConfig, seed: u64, palette: ControllerPalette) -> Self {
         let mut world = Self {
             tick: 0,
             cells: vec![Cell { food: 0.0 }; (config.width * config.height) as usize],
@@ -53,6 +63,8 @@ impl World {
             creatures: SlotMap::with_key(),
             rng: SmallRng::seed_from_u64(seed),
             config,
+            palette,
+            diagnostics: WorldDiagnostics::default(),
         };
 
         for _ in 0..world.config.initial_creatures {
@@ -83,8 +95,9 @@ impl World {
             let can_spawn_more = self.creatures.len() < self.config.max_creatures;
 
             let mut dead = false;
-            let mut child_request: Option<(u32, u32, f32, u32, u64)> = None;
+            let mut child_request: Option<(u32, u32, f32, u32, u64, ComputationGraph)> = None;
             let mut reproduce_from: Option<(u32, u32)> = None;
+            let mut reproduce_intent = false;
 
             {
                 let creature = self
@@ -93,21 +106,32 @@ impl World {
                     .expect("id list should only contain live creatures");
 
                 creature.age += 1;
-                creature.energy -=
-                    self.config.energy_per_tick_decay + self.config.energy_per_compute_node;
+
+                let compute_cost =
+                    self.config.energy_per_compute_node * creature.controller.nodes.len() as f32;
+                creature.energy -= self.config.energy_per_tick_decay + compute_cost;
 
                 let current_idx = (creature.y * width + creature.x) as usize;
-                let available_food = self.cells[current_idx].food;
-                if available_food > 0.0 {
-                    let consumed = available_food.min(0.5);
-                    self.cells[current_idx].food -= consumed;
-                    creature.energy += consumed * self.config.food_energy_value;
-                    creature.energy = creature.energy.min(self.config.energy_max);
-                    push_event(creature, CreatureEventKind::AteFood, self.tick);
+                let outputs = creature.controller.evaluate(SensorInputs {
+                    food_here: self.cells[current_idx].food,
+                    energy: (creature.energy / self.config.energy_max).clamp(0.0, 1.0),
+                    random: creature.rng.gen_range(-1.0_f32..=1.0_f32),
+                });
+
+                if outputs.eat > 0.5 {
+                    let available_food = self.cells[current_idx].food;
+                    if available_food > 0.0 {
+                        let consumed = available_food.min(0.5);
+                        self.cells[current_idx].food -= consumed;
+                        creature.energy += consumed * self.config.food_energy_value;
+                        creature.energy = creature.energy.min(self.config.energy_max);
+                        self.diagnostics.eats += 1;
+                        push_event(creature, CreatureEventKind::AteFood, self.tick);
+                    }
                 }
 
-                let dx = creature.rng.gen_range(-1_i32..=1);
-                let dy = creature.rng.gen_range(-1_i32..=1);
+                let dx = axis_step(outputs.move_x);
+                let dy = axis_step(outputs.move_y);
                 if dx != 0 || dy != 0 {
                     let nx = wrap_axis(creature.x as i32 + dx, width);
                     let ny = wrap_axis(creature.y as i32 + dy, height);
@@ -119,21 +143,27 @@ impl World {
                         creature.x = nx;
                         creature.y = ny;
                         creature.energy -= self.config.energy_per_move;
+                        self.diagnostics.moves += 1;
                         push_event(creature, CreatureEventKind::Moved, self.tick);
                     }
                 }
 
-                if can_spawn_more && creature.energy >= self.config.min_reproduce_energy {
+                if outputs.reproduce > 0.5
+                    && can_spawn_more
+                    && creature.energy >= self.config.min_reproduce_energy
+                {
                     reproduce_from = Some((creature.x, creature.y));
+                    reproduce_intent = true;
                 }
 
                 if creature.energy <= 0.0 {
                     dead = true;
+                    self.diagnostics.deaths += 1;
                     push_event(creature, CreatureEventKind::Starved, self.tick);
                 }
             }
 
-            if !dead {
+            if !dead && reproduce_intent {
                 if let Some((px, py)) = reproduce_from {
                     if let Some((cx, cy)) = self.find_empty_neighbor(px, py) {
                         if let Some(creature) = self.creatures.get_mut(id) {
@@ -143,11 +173,19 @@ impl World {
                                     .max(0.0);
                                 creature.energy -= inherited + self.config.energy_per_reproduce;
                                 let seed = creature.rng.gen::<u64>();
-                                child_request =
-                                    Some((cx, cy, inherited, creature.generation + 1, seed));
+                                child_request = Some((
+                                    cx,
+                                    cy,
+                                    inherited,
+                                    creature.generation + 1,
+                                    seed,
+                                    creature.controller.clone(),
+                                ));
+                                self.diagnostics.reproductions += 1;
                                 push_event(creature, CreatureEventKind::Reproduced, self.tick);
                                 if creature.energy <= 0.0 {
                                     dead = true;
+                                    self.diagnostics.deaths += 1;
                                     push_event(creature, CreatureEventKind::Starved, self.tick);
                                 }
                             }
@@ -172,7 +210,7 @@ impl World {
             }
         }
 
-        for (x, y, energy, generation, seed) in offspring {
+        for (x, y, energy, generation, seed, controller) in offspring {
             if self.creatures.len() >= self.config.max_creatures {
                 break;
             }
@@ -187,6 +225,7 @@ impl World {
                 energy: energy.min(self.config.energy_max),
                 age: 0,
                 generation,
+                controller,
                 rng: SmallRng::seed_from_u64(seed),
                 events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
             };
@@ -227,6 +266,10 @@ impl World {
         }
     }
 
+    pub fn diagnostics(&self) -> WorldDiagnostics {
+        self.diagnostics
+    }
+
     pub fn creature_count(&self) -> usize {
         self.creatures.len()
     }
@@ -262,6 +305,7 @@ impl World {
                     energy: self.config.energy_initial,
                     age: 0,
                     generation,
+                    controller: ComputationGraph::from_palette(self.palette),
                     rng: SmallRng::seed_from_u64(seed),
                     events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
                 };
@@ -307,6 +351,16 @@ impl World {
     }
 }
 
+fn axis_step(value: f32) -> i32 {
+    if value > 0.25 {
+        1
+    } else if value < -0.25 {
+        -1
+    } else {
+        0
+    }
+}
+
 fn wrap_axis(v: i32, max: u32) -> u32 {
     let m = max as i32;
     (((v % m) + m) % m) as u32
@@ -321,6 +375,8 @@ fn push_event(creature: &mut Creature, kind: CreatureEventKind, tick: u64) {
 
 #[cfg(test)]
 mod tests {
+    use crate::ControllerPalette;
+
     use super::*;
 
     #[test]
@@ -424,5 +480,63 @@ mod tests {
         assert_eq!(world.creature_count(), 1);
         world.tick();
         assert!(world.creature_count() > 1);
+    }
+
+    #[test]
+    fn world_can_be_created_with_each_controller_palette() {
+        let cfg = WorldConfig {
+            width: 16,
+            height: 16,
+            initial_creatures: 20,
+            max_creatures: 200,
+            ..WorldConfig::default()
+        };
+
+        for palette in [
+            ControllerPalette::NeuralOnly,
+            ControllerPalette::LogicOnly,
+            ControllerPalette::Hybrid,
+        ] {
+            let mut world = World::new_with_palette(cfg.clone(), 99, palette);
+            world.tick();
+            assert!(world.creature_count() > 0);
+        }
+    }
+
+    #[test]
+    fn world_tracks_diagnostics_and_logic_eat_gate() {
+        let cfg = WorldConfig {
+            width: 8,
+            height: 8,
+            initial_creatures: 1,
+            food_energy_value: 1.0,
+            min_reproduce_energy: 10.0,
+            ..WorldConfig::default()
+        };
+
+        let mut world = World::new_with_palette(cfg, 123, ControllerPalette::LogicOnly);
+        let initial_diag = world.diagnostics();
+        assert_eq!(initial_diag.moves, 0);
+        assert_eq!(initial_diag.eats, 0);
+        assert_eq!(initial_diag.reproductions, 0);
+        assert_eq!(initial_diag.deaths, 0);
+
+        let (id, creature) = world.creatures.iter().next().unwrap();
+        let idx = world.idx(creature.x, creature.y);
+        world.cells[idx].food = 0.1;
+        let before = creature.energy;
+
+        world.tick();
+        let after_low_food = world.creatures.get(id).unwrap().energy;
+        assert!(after_low_food <= before);
+
+        let creature_after = world.creatures.get(id).unwrap();
+        let idx2 = world.idx(creature_after.x, creature_after.y);
+        world.cells[idx2].food = 1.0;
+
+        world.tick();
+        let diag = world.diagnostics();
+        assert!(diag.moves > 0);
+        assert!(diag.eats > 0);
     }
 }

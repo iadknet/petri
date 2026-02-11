@@ -46,7 +46,13 @@ The app expects the backend on `127.0.0.1:4000`.
 ## Run the CLI
 
 ```bash
-cargo run -p petri-cli -- --ticks 1000 --sample-every 25
+cargo run -p petri-cli -- run --ticks 1000 --sample-every 25
+```
+
+Run Stage 1b controller stability ablation:
+
+```bash
+cargo run -p petri-cli -- ablation --ticks 500
 ```
 
 ## Verify
