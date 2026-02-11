@@ -19,6 +19,8 @@ Build the Petri simulation incrementally while preserving:
 - `web/`: React + TypeScript canvas client
 - `docs/plans/`: implementation plans and execution notes
 
+For frontend work under `web/`, follow `web/AGENTS.md`.
+
 ## Required Workflow
 
 1. Read `README.md` and relevant crate/module before editing.
