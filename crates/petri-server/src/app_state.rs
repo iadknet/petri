@@ -19,6 +19,8 @@ pub enum SimulationPhase {
 pub struct StartupDraft {
     pub initial_creatures: usize,
     pub max_creatures: usize,
+    pub width: u32,
+    pub height: u32,
     pub initial_food_density: f32,
     pub energy_initial: f32,
     pub food_spawn_rate: f32,
@@ -32,6 +34,8 @@ pub struct StartupDraft {
 pub struct StartupDraftPatch {
     pub initial_creatures: Option<usize>,
     pub max_creatures: Option<usize>,
+    pub width: Option<u32>,
+    pub height: Option<u32>,
     pub initial_food_density: Option<f32>,
     pub energy_initial: Option<f32>,
     pub food_spawn_rate: Option<f32>,
@@ -172,6 +176,8 @@ impl StartupDraft {
         Self {
             initial_creatures: 300,
             max_creatures: 5_000,
+            width: 400,
+            height: 400,
             initial_food_density: 0.15,
             energy_initial: 0.7,
             food_spawn_rate: 0.05,
@@ -192,6 +198,14 @@ impl StartupDraft {
         if let Some(v) = patch.max_creatures {
             changed |= self.max_creatures != v;
             self.max_creatures = v;
+        }
+        if let Some(v) = patch.width {
+            changed |= self.width != v;
+            self.width = v;
+        }
+        if let Some(v) = patch.height {
+            changed |= self.height != v;
+            self.height = v;
         }
         if let Some(v) = patch.initial_food_density {
             changed |= (self.initial_food_density - v).abs() > f32::EPSILON;
@@ -233,6 +247,8 @@ impl StartupDraft {
             5_000.0,
         )?;
         validate_range("max_creatures", self.max_creatures as f64, 1.0, 20_000.0)?;
+        validate_range("width", self.width as f64, 50.0, 1_000.0)?;
+        validate_range("height", self.height as f64, 50.0, 1_000.0)?;
         validate_range("energy_initial", self.energy_initial as f64, 0.01, 5.0)?;
         validate_range(
             "initial_food_density",
@@ -478,8 +494,8 @@ impl AppState {
 
 fn build_world_config(base: &WorldConfig, draft: &StartupDraft) -> WorldConfig {
     let mut cfg = base.clone();
-    cfg.width = 200;
-    cfg.height = 200;
+    cfg.width = draft.width;
+    cfg.height = draft.height;
     cfg.world_wrap = draft.world_wrap;
     cfg.initial_creatures = draft.initial_creatures;
     cfg.max_creatures = draft.max_creatures;
@@ -496,6 +512,8 @@ fn startup_draft_from_config(config: &WorldConfig, initial_food_density: f32) ->
     StartupDraft {
         initial_creatures: config.initial_creatures,
         max_creatures: config.max_creatures,
+        width: config.width,
+        height: config.height,
         initial_food_density,
         energy_initial: config.energy_initial,
         food_spawn_rate: config.food_spawn_rate,
@@ -607,6 +625,12 @@ fn startup_probe_seed(draft: &StartupDraft) -> u64 {
     seed = seed
         .wrapping_mul(1_099_511_628_211)
         .wrapping_add(draft.max_creatures as u64);
+    seed = seed
+        .wrapping_mul(1_099_511_628_211)
+        .wrapping_add(draft.width as u64);
+    seed = seed
+        .wrapping_mul(1_099_511_628_211)
+        .wrapping_add(draft.height as u64);
     seed = seed
         .wrapping_mul(1_099_511_628_211)
         .wrapping_add(draft.initial_food_density.to_bits() as u64);

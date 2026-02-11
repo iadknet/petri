@@ -52,7 +52,7 @@ Source of truth files:
 | Output | World function | Behavior |
 | --- | --- | --- |
 | `move_x`, `move_y` | `axis_step` in `crates/petri-core/src/world.rs` | Each axis maps to `-1`, `0`, `1` via thresholds (`> 0.25`, `< -0.25`); movement also requires destination vacancy |
-| `eat` | Tick action logic in `World::tick` | If `> 0.5`, creature consumes up to `0.5` food in current cell and gains energy scaled by `food_energy_value` |
+| `eat` | Tick action logic in `World::tick` | If `> 0.5`, creature consumes all available food in its current cell and gains energy scaled by `food_energy_value` |
 | `reproduce` | Tick action logic in `World::tick` | If `> 0.5`, reproduction still requires empty neighbor, `min_reproduce_energy`, and `max_creatures` capacity |
 
 ## Mutation Functions

@@ -10,7 +10,7 @@ type StartupDraftPanelProps = {
 export function StartupDraftPanel({ startupDraft, phase, onUpdate }: StartupDraftPanelProps) {
   return (
     <section className="section">
-      <h2>Startup Draft (Core 6)</h2>
+      <h2>Startup Draft</h2>
       {startupDraft ? (
         <>
           <label className="slider-label" htmlFor="initial-creatures-slider">
@@ -24,6 +24,32 @@ export function StartupDraftPanel({ startupDraft, phase, onUpdate }: StartupDraf
             step={STARTUP_LIMITS.initial_creatures.step}
             value={startupDraft.initial_creatures}
             onChange={(event) => onUpdate("initial_creatures", Number(event.target.value))}
+          />
+
+          <label className="slider-label" htmlFor="world-width-slider">
+            World width: {startupDraft.width}
+          </label>
+          <input
+            id="world-width-slider"
+            type="range"
+            min={STARTUP_LIMITS.width.min}
+            max={STARTUP_LIMITS.width.max}
+            step={STARTUP_LIMITS.width.step}
+            value={startupDraft.width}
+            onChange={(event) => onUpdate("width", Number(event.target.value))}
+          />
+
+          <label className="slider-label" htmlFor="world-height-slider">
+            World height: {startupDraft.height}
+          </label>
+          <input
+            id="world-height-slider"
+            type="range"
+            min={STARTUP_LIMITS.height.min}
+            max={STARTUP_LIMITS.height.max}
+            step={STARTUP_LIMITS.height.step}
+            value={startupDraft.height}
+            onChange={(event) => onUpdate("height", Number(event.target.value))}
           />
 
           <label className="slider-label" htmlFor="initial-food-density-slider">

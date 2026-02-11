@@ -92,6 +92,12 @@ describe("App", () => {
     expect(await screen.findByLabelText(/World wrap/i)).toBeInTheDocument();
   });
 
+  it("renders startup world size controls", async () => {
+    render(<App />);
+    expect(await screen.findByLabelText(/World width/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/World height/i)).toBeInTheDocument();
+  });
+
   it("renders advanced stage1 config controls", async () => {
     render(<App />);
     expect(await screen.findByLabelText(/Max creatures/i)).toBeInTheDocument();
@@ -135,6 +141,8 @@ describe("App", () => {
         startup_draft: {
           initial_creatures: 300,
           max_creatures: 5000,
+          width: 400,
+          height: 400,
           initial_food_density: 0.25,
           energy_initial: 0.7,
           food_spawn_rate: 0.1,
@@ -147,6 +155,8 @@ describe("App", () => {
       startupDraft: {
         initial_creatures: 300,
         max_creatures: 5000,
+        width: 400,
+        height: 400,
         initial_food_density: 0.25,
         energy_initial: 0.7,
         food_spawn_rate: 0.1,

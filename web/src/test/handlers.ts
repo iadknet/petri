@@ -7,6 +7,8 @@ const API_BASE = "http://127.0.0.1:4000";
 const defaultStartupDraft: StartupDraft = {
   initial_creatures: 300,
   max_creatures: 5000,
+  width: 400,
+  height: 400,
   initial_food_density: 0.25,
   energy_initial: 0.7,
   food_spawn_rate: 0.1,
@@ -98,8 +100,8 @@ function currentSnapshot() {
   return {
     tick: status.tick,
     config: {
-      width: 200,
-      height: 200,
+      width: startupDraft.width,
+      height: startupDraft.height,
       world_wrap: startupDraft.world_wrap,
       ...runtimeConfig,
       initial_creatures: startupDraft.initial_creatures,

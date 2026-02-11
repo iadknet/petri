@@ -167,6 +167,8 @@ mod tests {
         assert_eq!(status_json["startup_draft"]["initial_food_density"], 0.15);
         assert_eq!(status_json["startup_draft"]["food_spawn_rate"], 0.05);
         assert_eq!(status_json["startup_draft"]["food_growth_rate"], 0.10);
+        assert_eq!(status_json["startup_draft"]["width"], 400);
+        assert_eq!(status_json["startup_draft"]["height"], 400);
     }
 
     #[tokio::test]
@@ -298,6 +300,48 @@ mod tests {
         let status_json = read_json(status_response).await;
         assert_eq!(status_json["startup_draft"]["max_creatures"], 7200);
         assert_eq!(status_json["startup_draft"]["energy_initial"], 0.82);
+    }
+
+    #[tokio::test]
+    async fn startup_draft_patch_updates_world_dimensions() {
+        let state = AppState::new_for_tests();
+        let app = build_router(state);
+
+        let patch_payload = json!({
+            "width": 420,
+            "height": 360
+        });
+
+        let patch_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri("/simulation/startup-draft")
+                    .header("content-type", "application/json")
+                    .body(Body::from(patch_payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(patch_response.status(), StatusCode::OK);
+        let patch_json = read_json(patch_response).await;
+        assert_eq!(patch_json["width"], 420);
+        assert_eq!(patch_json["height"], 360);
+
+        let status_response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/simulation/status")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(status_response.status(), StatusCode::OK);
+        let status_json = read_json(status_response).await;
+        assert_eq!(status_json["startup_draft"]["width"], 420);
+        assert_eq!(status_json["startup_draft"]["height"], 360);
     }
 
     #[tokio::test]
@@ -589,7 +633,7 @@ mod tests {
         let frame = world.frame();
         let payload = rmp_serde::to_vec_named(&frame).expect("frame should serialize");
         assert!(
-            payload.len() < 120_000,
+            payload.len() < 200_000,
             "frame payload unexpectedly large: {} bytes",
             payload.len()
         );

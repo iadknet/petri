@@ -144,7 +144,7 @@ impl World {
                 if outputs.eat > 0.5 {
                     let available_food = self.cells[current_idx].food;
                     if available_food > 0.0 {
-                        let consumed = available_food.min(0.5);
+                        let consumed = available_food;
                         self.cells[current_idx].food -= consumed;
                         creature.energy += consumed * self.config.food_energy_value;
                         creature.energy = creature.energy.min(self.config.energy_max);
@@ -795,6 +795,27 @@ mod tests {
 
         creature = world.creatures.get(id).unwrap();
         assert!(creature.energy > before);
+    }
+
+    #[test]
+    fn creature_eat_action_consumes_all_food_in_cell() {
+        let cfg = WorldConfig {
+            width: 8,
+            height: 8,
+            initial_creatures: 1,
+            food_spawn_rate: 0.0,
+            min_reproduce_energy: 10.0,
+            ..WorldConfig::default()
+        };
+        let mut world = World::new_with_palette(cfg, 77, ControllerPalette::LogicOnly);
+
+        let (_id, creature) = world.creatures.iter().next().unwrap();
+        let idx = world.idx(creature.x, creature.y);
+        world.cells[idx].food = 1.0;
+
+        world.tick();
+
+        assert!(world.cells[idx].food <= f32::EPSILON);
     }
 
     #[test]

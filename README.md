@@ -53,13 +53,15 @@ Open `http://127.0.0.1:5173`.
 The app expects the backend on `127.0.0.1:4000`.
 
 The web control rail now exposes:
-- Startup draft (Core 6): initial creatures, initial food density, food spawn/growth, tick decay, move cost
+- Startup draft: initial creatures, world width/height, initial food density, food spawn/growth, tick decay, move cost, world wrap
 - Runtime controls: pause/resume, ticks-per-second, live food spawn/growth
 - Advanced Stage 1 controls for energy and mutation tuning
 - Creature inspector (click creature in viewport)
 - Live population/average-energy chart
 - Snapshot export/import panel (`GET/POST /simulation/snapshot`)
 - Idle placeholder before first start, plus pending-restart state when startup-only values change during a run
+
+Default simulation world size is `400x400` and can be changed in Startup Draft before starting (or before restarting) a run.
 
 ## Run the CLI
 

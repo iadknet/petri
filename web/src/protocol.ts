@@ -74,6 +74,8 @@ export type ConfigPatch = {
 export type StartupDraft = {
   initial_creatures: number;
   max_creatures: number;
+  width: number;
+  height: number;
   initial_food_density: number;
   energy_initial: number;
   food_spawn_rate: number;

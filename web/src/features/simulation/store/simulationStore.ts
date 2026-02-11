@@ -33,6 +33,8 @@ export function resolveTransportEndpoints(
 export const STARTUP_LIMITS = {
   initial_creatures: { min: 120, max: 1600, step: 10 },
   max_creatures: { min: 500, max: 12000, step: 100 },
+  width: { min: 100, max: 800, step: 20 },
+  height: { min: 100, max: 800, step: 20 },
   initial_food_density: { min: 0.0, max: 0.6, step: 0.01 },
   energy_initial: { min: 0.1, max: 2.0, step: 0.01 },
   food_spawn_rate: { min: 0.0, max: 0.3, step: 0.01 },

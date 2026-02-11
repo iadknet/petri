@@ -30,8 +30,8 @@ pub struct WorldConfig {
 impl Default for WorldConfig {
     fn default() -> Self {
         Self {
-            width: 200,
-            height: 200,
+            width: 400,
+            height: 400,
             world_wrap: true,
             initial_creatures: 200,
             max_creatures: 5_000,
