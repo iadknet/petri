@@ -120,6 +120,7 @@ function currentSnapshot() {
     },
     palette: "Hybrid",
     cells_food: [],
+    cells_barrier: [],
     creatures: [],
     diagnostics: {
       moves: 0,

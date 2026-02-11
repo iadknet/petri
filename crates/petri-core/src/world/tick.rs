@@ -106,7 +106,7 @@ impl World {
                     let ny = map_axis(creature.y as i32 + dy, height, self.config.world_wrap);
                     let next_idx = (ny * width + nx) as usize;
 
-                    if self.creature_at[next_idx].is_none() {
+                    if self.creature_at[next_idx].is_none() && !self.cells[next_idx].barrier {
                         self.creature_at[current_idx] = None;
                         self.creature_at[next_idx] = Some(id);
                         creature.x = nx;
@@ -201,7 +201,7 @@ impl World {
                 break;
             }
             let idx = self.idx(x, y);
-            if self.creature_at[idx].is_some() {
+            if self.creature_at[idx].is_some() || self.cells[idx].barrier {
                 continue;
             }
 

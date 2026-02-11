@@ -17,6 +17,7 @@ export type WorldFrame = {
   width: number;
   height: number;
   food: number[] | Uint8Array;
+  barrier_bits: number[] | Uint8Array;
   creatures: CreatureSnapshot[];
   population: number;
   average_energy: number;
@@ -40,6 +41,7 @@ export type WorldSnapshot = {
   config: Record<string, unknown>;
   palette: string;
   cells_food: number[];
+  cells_barrier?: boolean[];
   creatures: CreatureStateSnapshot[];
   diagnostics: {
     moves: number;

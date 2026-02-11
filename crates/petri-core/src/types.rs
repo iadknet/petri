@@ -43,6 +43,7 @@ pub struct WorldFrame {
     pub width: u32,
     pub height: u32,
     pub food: Vec<u8>,
+    pub barrier_bits: Vec<u8>,
     pub creatures: Vec<CreatureSnapshot>,
     pub population: usize,
     pub average_energy: f32,
@@ -100,6 +101,8 @@ pub struct WorldSnapshot {
     pub config: WorldConfig,
     pub palette: ControllerPalette,
     pub cells_food: Vec<f32>,
+    #[serde(default)]
+    pub cells_barrier: Vec<bool>,
     pub creatures: Vec<CreatureStateSnapshot>,
     pub diagnostics: WorldDiagnostics,
     pub lineage_tree: HashMap<u64, Vec<u64>>,

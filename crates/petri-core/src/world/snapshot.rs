@@ -7,6 +7,12 @@ use super::*;
 
 impl World {
     pub fn snapshot(&self) -> WorldSnapshot {
+        let has_barriers = self.cells.iter().any(|cell| cell.barrier);
+        let cells_barrier = if has_barriers {
+            self.cells.iter().map(|cell| cell.barrier).collect()
+        } else {
+            Vec::new()
+        };
         let creatures = self
             .creatures
             .iter()
@@ -32,6 +38,7 @@ impl World {
             config: self.config.clone(),
             palette: self.palette,
             cells_food: self.cells.iter().map(|cell| cell.food).collect(),
+            cells_barrier,
             creatures,
             diagnostics: self.diagnostics,
             lineage_tree: self.lineage_tree.clone(),
@@ -44,7 +51,13 @@ impl World {
         let mut world = Self {
             config: snapshot.config,
             tick: snapshot.tick,
-            cells: vec![Cell { food: 0.0 }; total_cells],
+            cells: vec![
+                Cell {
+                    food: 0.0,
+                    barrier: false,
+                };
+                total_cells
+            ],
             creature_at: vec![None; total_cells],
             creatures: SlotMap::with_key(),
             rng: SmallRng::seed_from_u64(snapshot.tick ^ 0xA11C_E5EED_u64),
@@ -62,6 +75,14 @@ impl World {
         {
             world.cells[idx].food = food.max(0.0);
         }
+        for (idx, barrier) in snapshot
+            .cells_barrier
+            .into_iter()
+            .enumerate()
+            .take(total_cells)
+        {
+            world.cells[idx].barrier = barrier;
+        }
 
         let mut id_map: HashMap<u64, CreatureId> = HashMap::new();
         let mut pending_parent: Vec<(CreatureId, Option<u64>)> = Vec::new();
@@ -70,6 +91,10 @@ impl World {
             let old_id = creature.id;
             let x = creature.x.min(world.config.width.saturating_sub(1));
             let y = creature.y.min(world.config.height.saturating_sub(1));
+            let idx = world.idx(x, y);
+            if world.cells[idx].barrier || world.creature_at[idx].is_some() {
+                continue;
+            }
             let new_creature = Creature {
                 x,
                 y,
@@ -90,10 +115,7 @@ impl World {
             let new_id = world.creatures.insert(new_creature);
             id_map.insert(old_id, new_id);
             pending_parent.push((new_id, creature.parent_id));
-            let idx = world.idx(x, y);
-            if world.creature_at[idx].is_none() {
-                world.creature_at[idx] = Some(new_id);
-            }
+            world.creature_at[idx] = Some(new_id);
         }
 
         for (new_id, parent_old) in pending_parent {

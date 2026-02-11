@@ -3,6 +3,7 @@ use std::collections::{BTreeSet, HashSet};
 use crate::ControllerPalette;
 use petri_graph::{Edge, NodeKind};
 use rand::Rng;
+use serde_json::Value;
 
 use super::*;
 
@@ -206,6 +207,15 @@ fn controller_checksum(controller: &ComputationGraph) -> i64 {
         .map(|e| (e.weight * 1000.0) as i64)
         .sum::<i64>();
     node_sum + edge_sum
+}
+
+fn barrier_bit_is_set(bytes: &[u8], cell_idx: usize) -> bool {
+    let byte_idx = cell_idx >> 3;
+    let bit_idx = cell_idx & 7;
+    bytes
+        .get(byte_idx)
+        .map(|byte| (byte & (1 << bit_idx)) != 0)
+        .unwrap_or(false)
 }
 
 fn move_right_controller() -> ComputationGraph {
@@ -721,6 +731,52 @@ fn move_blocked_feedback_toggles_for_failed_and_successful_moves() {
 }
 
 #[test]
+fn movement_into_barrier_cell_is_blocked_and_sets_feedback() {
+    let cfg = WorldConfig {
+        width: 6,
+        height: 6,
+        initial_creatures: 1,
+        world_wrap: false,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 31337, ControllerPalette::Hybrid);
+    let (id, old_x, old_y) = world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, c)| (id, c.x, c.y))
+        .expect("expected one creature");
+    let old_idx = world.idx(old_x, old_y);
+
+    if let Some(creature) = world.creatures.get_mut(id) {
+        creature.controller = move_right_controller();
+        creature.x = 2;
+        creature.y = 2;
+    }
+    let placed_idx = world.idx(2, 2);
+    let blocked_idx = world.idx(3, 2);
+    world.cells[blocked_idx].barrier = true;
+    world.creature_at[old_idx] = None;
+    world.creature_at[placed_idx] = Some(id);
+
+    world.tick();
+    let first = world
+        .creatures
+        .get(id)
+        .expect("creature should remain alive after blocked move");
+    assert_eq!(first.x, 2);
+    assert_eq!(first.y, 2);
+    assert!(first.last_move_blocked);
+
+    world.tick();
+    let second = world
+        .creatures
+        .get(id)
+        .expect("creature should remain alive after second blocked move");
+    assert!(second.last_inputs.move_blocked_last_tick > 0.5);
+}
+
+#[test]
 fn spawn_random_creature_finds_free_cell_beyond_random_attempt_window() {
     let seed = 9001_u64;
     let cfg = WorldConfig {
@@ -779,6 +835,93 @@ fn spawn_random_creature_finds_free_cell_beyond_random_attempt_window() {
     let spawned = world.spawn_random_creature(0, None, None);
     assert!(spawned.is_some());
     assert!(world.creature_at[world.idx(free_cell.0, free_cell.1)].is_some());
+}
+
+#[test]
+fn spawn_random_creature_avoids_barrier_cells() {
+    let cfg = WorldConfig {
+        width: 4,
+        height: 4,
+        initial_creatures: 0,
+        max_creatures: 16,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 4242, ControllerPalette::Hybrid);
+    for idx in 0..world.cells.len() {
+        world.cells[idx].barrier = true;
+    }
+    let open = (1, 2);
+    let open_idx = world.idx(open.0, open.1);
+    world.cells[open_idx].barrier = false;
+
+    let spawned = world.spawn_random_creature(0, None, None);
+    assert!(
+        spawned.is_some(),
+        "expected a creature to spawn on the only open cell"
+    );
+    assert_eq!(world.creature_count(), 1);
+    let creature = world
+        .creatures
+        .values()
+        .next()
+        .expect("spawned creature should exist");
+    assert_eq!((creature.x, creature.y), open);
+}
+
+#[test]
+fn reproduction_placement_avoids_barrier_neighbors() {
+    let cfg = WorldConfig {
+        width: 8,
+        height: 8,
+        initial_creatures: 1,
+        max_creatures: 4,
+        world_wrap: false,
+        energy_initial: 1.6,
+        min_reproduce_energy: 0.8,
+        energy_per_reproduce: 0.0,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 6161, ControllerPalette::Hybrid);
+    let (id, old_x, old_y) = world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, c)| (id, c.x, c.y))
+        .expect("expected one creature");
+    let old_idx = world.idx(old_x, old_y);
+    let parent_pos = (3, 3);
+    if let Some(parent) = world.creatures.get_mut(id) {
+        parent.x = parent_pos.0;
+        parent.y = parent_pos.1;
+        parent.controller = always_reproduce_and_eat_controller();
+    }
+    let parent_idx = world.idx(parent_pos.0, parent_pos.1);
+    world.creature_at[old_idx] = None;
+    world.creature_at[parent_idx] = Some(id);
+
+    for dx in -1_i32..=1 {
+        for dy in -1_i32..=1 {
+            if dx == 0 && dy == 0 {
+                continue;
+            }
+            let nx = (parent_pos.0 as i32 + dx) as u32;
+            let ny = (parent_pos.1 as i32 + dy) as u32;
+            let idx = world.idx(nx, ny);
+            world.cells[idx].barrier = true;
+        }
+    }
+    let open_child_cell = (4, 3);
+    let open_child_idx = world.idx(open_child_cell.0, open_child_cell.1);
+    world.cells[open_child_idx].barrier = false;
+
+    world.tick();
+
+    assert_eq!(world.creature_count(), 2);
+    let occupied_child = world.creature_at[world.idx(open_child_cell.0, open_child_cell.1)];
+    assert!(
+        occupied_child.is_some(),
+        "expected offspring on only non-barrier neighbor"
+    );
 }
 
 #[test]
@@ -1050,6 +1193,27 @@ fn frame_creatures_include_controller_node_count() {
 }
 
 #[test]
+fn frame_barrier_bits_are_lsb_packed() {
+    let cfg = WorldConfig {
+        width: 5,
+        height: 2,
+        initial_creatures: 0,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 7171, ControllerPalette::Hybrid);
+    world.cells[0].barrier = true;
+    world.cells[3].barrier = true;
+    world.cells[8].barrier = true;
+
+    let frame = world.frame();
+    assert_eq!(frame.barrier_bits, vec![0b0000_1001, 0b0000_0001]);
+    assert!(barrier_bit_is_set(&frame.barrier_bits, 0));
+    assert!(barrier_bit_is_set(&frame.barrier_bits, 3));
+    assert!(barrier_bit_is_set(&frame.barrier_bits, 8));
+    assert!(!barrier_bit_is_set(&frame.barrier_bits, 4));
+}
+
+#[test]
 fn world_snapshot_round_trip_preserves_core_state() {
     let cfg = WorldConfig {
         width: 32,
@@ -1064,6 +1228,11 @@ fn world_snapshot_round_trip_preserves_core_state() {
     };
     let mut world = World::new_with_palette(cfg, 2026, ControllerPalette::Hybrid);
     world.seed_food_density(0.2);
+    world.cells[0].barrier = true;
+    let barrier_a = world.idx(2, 1);
+    let barrier_b = world.idx(31, 23);
+    world.cells[barrier_a].barrier = true;
+    world.cells[barrier_b].barrier = true;
     for _ in 0..12 {
         world.tick();
     }
@@ -1096,6 +1265,7 @@ fn world_snapshot_round_trip_preserves_core_state() {
         world.config.food_spawn_floor_density
     );
     assert_eq!(restored.frame().food, world.frame().food);
+    assert_eq!(restored.frame().barrier_bits, world.frame().barrier_bits);
     assert_eq!(restored.creature_count(), world.creature_count());
     assert_eq!(restored.diagnostics().moves, world.diagnostics().moves);
     assert_eq!(restored.diagnostics().eats, world.diagnostics().eats);
@@ -1108,6 +1278,57 @@ fn world_snapshot_round_trip_preserves_core_state() {
     let before_links = world.lineage_tree.values().map(Vec::len).sum::<usize>();
     let after_links = restored.lineage_tree.values().map(Vec::len).sum::<usize>();
     assert_eq!(after_links, before_links);
+}
+
+#[test]
+fn world_snapshot_import_defaults_missing_barriers_to_empty() {
+    let cfg = WorldConfig {
+        width: 10,
+        height: 10,
+        initial_creatures: 0,
+        ..WorldConfig::default()
+    };
+    let world = World::new_with_palette(cfg, 2028, ControllerPalette::Hybrid);
+    let snapshot = world.snapshot();
+    let mut json = serde_json::to_value(snapshot).expect("snapshot should serialize");
+    if let Value::Object(map) = &mut json {
+        map.remove("cells_barrier");
+    } else {
+        panic!("snapshot must serialize to object");
+    }
+
+    let legacy_snapshot: WorldSnapshot =
+        serde_json::from_value(json).expect("legacy snapshot should deserialize");
+    let restored = World::from_snapshot(legacy_snapshot);
+    assert!(restored.cells.iter().all(|cell| !cell.barrier));
+    assert!(restored.frame().barrier_bits.iter().all(|byte| *byte == 0));
+}
+
+#[test]
+fn world_snapshot_import_skips_creatures_placed_on_barriers() {
+    let cfg = WorldConfig {
+        width: 8,
+        height: 8,
+        initial_creatures: 1,
+        ..WorldConfig::default()
+    };
+    let world = World::new_with_palette(cfg, 2029, ControllerPalette::Hybrid);
+    let mut snapshot = world.snapshot();
+    let creature = snapshot
+        .creatures
+        .first()
+        .cloned()
+        .expect("expected one creature in snapshot");
+    let creature_idx = (creature.y * snapshot.config.width + creature.x) as usize;
+    snapshot.cells_barrier = vec![false; (snapshot.config.width * snapshot.config.height) as usize];
+    snapshot.cells_barrier[creature_idx] = true;
+
+    let restored = World::from_snapshot(snapshot);
+    assert_eq!(restored.creature_count(), 0);
+    assert!(barrier_bit_is_set(
+        &restored.frame().barrier_bits,
+        creature_idx
+    ));
 }
 
 #[test]

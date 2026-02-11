@@ -54,6 +54,7 @@ pub struct CreatureView {
 #[derive(Clone, Copy, Debug)]
 struct Cell {
     food: f32,
+    barrier: bool,
 }
 
 #[derive(Debug)]
@@ -157,7 +158,13 @@ impl World {
     pub fn new_with_palette(config: WorldConfig, seed: u64, palette: ControllerPalette) -> Self {
         let mut world = Self {
             tick: 0,
-            cells: vec![Cell { food: 0.0 }; (config.width * config.height) as usize],
+            cells: vec![
+                Cell {
+                    food: 0.0,
+                    barrier: false,
+                };
+                (config.width * config.height) as usize
+            ],
             creature_at: vec![None; (config.width * config.height) as usize],
             creatures: SlotMap::with_key(),
             rng: SmallRng::seed_from_u64(seed),
@@ -207,6 +214,7 @@ impl World {
                 .iter()
                 .map(|c| helpers::quantize_food(c.food, self.config.food_max_density))
                 .collect(),
+            barrier_bits: helpers::pack_barrier_bits(&self.cells),
             population: creatures.len(),
             average_energy,
             creatures,
