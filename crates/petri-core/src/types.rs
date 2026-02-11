@@ -22,6 +22,8 @@ pub struct CreatureEvent {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CreatureSnapshot {
     pub id: u64,
+    pub lineage_id: u64,
+    pub parent_id: Option<u64>,
     pub x: u32,
     pub y: u32,
     pub energy: f32,

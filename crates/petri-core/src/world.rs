@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 
 use petri_graph::{ComputationGraph, ControllerPalette, MutationConfig, SensorInputs};
 use rand::rngs::SmallRng;
@@ -38,6 +38,8 @@ struct Creature {
     energy: f32,
     age: u64,
     generation: u32,
+    lineage_id: u64,
+    parent_id: Option<u64>,
     controller: ComputationGraph,
     rng: SmallRng,
     events: VecDeque<CreatureEvent>,
@@ -52,6 +54,8 @@ pub struct World {
     rng: SmallRng,
     palette: ControllerPalette,
     diagnostics: WorldDiagnostics,
+    lineage_tree: HashMap<u64, Vec<u64>>,
+    next_lineage_id: u64,
 }
 
 impl World {
@@ -69,10 +73,12 @@ impl World {
             config,
             palette,
             diagnostics: WorldDiagnostics::default(),
+            lineage_tree: HashMap::new(),
+            next_lineage_id: 1,
         };
 
         for _ in 0..world.config.initial_creatures {
-            world.spawn_random_creature(0);
+            world.spawn_random_creature(0, None, None);
         }
         world
     }
@@ -99,7 +105,8 @@ impl World {
             let can_spawn_more = self.creatures.len() < self.config.max_creatures;
 
             let mut dead = false;
-            let mut child_request: Option<(u32, u32, f32, u32, u64, ComputationGraph)> = None;
+            let mut child_request: Option<(u32, u32, f32, u32, u64, ComputationGraph, u64, u64)> =
+                None;
             let mut reproduce_from: Option<(u32, u32)> = None;
             let mut reproduce_intent = false;
             let (sensor_x, sensor_y) = {
@@ -199,6 +206,8 @@ impl World {
                                     creature.generation + 1,
                                     seed,
                                     child_controller,
+                                    creature.lineage_id,
+                                    id.data().as_ffi(),
                                 ));
                                 self.diagnostics.reproductions += 1;
                                 push_event(creature, CreatureEventKind::Reproduced, self.tick);
@@ -229,7 +238,7 @@ impl World {
             }
         }
 
-        for (x, y, energy, generation, seed, controller) in offspring {
+        for (x, y, energy, generation, seed, controller, lineage_id, parent_id) in offspring {
             if self.creatures.len() >= self.config.max_creatures {
                 break;
             }
@@ -244,12 +253,20 @@ impl World {
                 energy: energy.min(self.config.energy_max),
                 age: 0,
                 generation,
+                lineage_id,
+                parent_id: Some(parent_id),
                 controller,
                 rng: SmallRng::seed_from_u64(seed),
                 events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
             };
             let child_id = self.creatures.insert(child);
             self.creature_at[idx] = Some(child_id);
+            let child_id_u64 = child_id.data().as_ffi();
+            self.lineage_tree
+                .entry(parent_id)
+                .or_default()
+                .push(child_id_u64);
+            self.lineage_tree.entry(child_id_u64).or_default();
         }
     }
 
@@ -259,6 +276,8 @@ impl World {
             .iter()
             .map(|(id, c)| CreatureSnapshot {
                 id: id.data().as_ffi(),
+                lineage_id: c.lineage_id,
+                parent_id: c.parent_id,
                 x: c.x,
                 y: c.y,
                 energy: c.energy,
@@ -345,7 +364,12 @@ impl World {
             .collect()
     }
 
-    fn spawn_random_creature(&mut self, generation: u32) -> Option<CreatureId> {
+    fn spawn_random_creature(
+        &mut self,
+        generation: u32,
+        lineage_id: Option<u64>,
+        parent_id: Option<u64>,
+    ) -> Option<CreatureId> {
         let total_cells = self.cells.len();
         if total_cells == 0 {
             return None;
@@ -362,18 +386,30 @@ impl World {
                 let initial_mutation_cfg = self.initial_mutation_config();
                 // Add slight startup diversity so founders are viable but not identical clones.
                 controller.mutate_with_config(&mut self.rng, initial_mutation_cfg);
+                let lineage_id = lineage_id.unwrap_or_else(|| {
+                    let next = self.next_lineage_id;
+                    self.next_lineage_id += 1;
+                    next
+                });
                 let creature = Creature {
                     x,
                     y,
                     energy: self.config.energy_initial,
                     age: 0,
                     generation,
+                    lineage_id,
+                    parent_id,
                     controller,
                     rng: SmallRng::seed_from_u64(seed),
                     events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
                 };
                 let id = self.creatures.insert(creature);
                 self.creature_at[idx] = Some(id);
+                let id_u64 = id.data().as_ffi();
+                if let Some(parent_id) = parent_id {
+                    self.lineage_tree.entry(parent_id).or_default().push(id_u64);
+                }
+                self.lineage_tree.entry(id_u64).or_default();
                 return Some(id);
             }
         }
@@ -812,6 +848,8 @@ mod tests {
                     energy: 1.0,
                     age: 0,
                     generation: 0,
+                    lineage_id: creature_seed,
+                    parent_id: None,
                     controller: ComputationGraph::founder(ControllerPalette::Hybrid),
                     rng: SmallRng::seed_from_u64(creature_seed),
                     events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
@@ -822,7 +860,7 @@ mod tests {
             }
         }
 
-        let spawned = world.spawn_random_creature(0);
+        let spawned = world.spawn_random_creature(0, None, None);
         assert!(spawned.is_some());
         assert!(world.creature_at[world.idx(free_cell.0, free_cell.1)].is_some());
     }
@@ -906,6 +944,81 @@ mod tests {
             .map(|(_, creature)| controller_checksum(&creature.controller))
             .collect::<BTreeSet<_>>();
         assert_eq!(checksums.len(), 1);
+    }
+
+    #[test]
+    fn founders_have_unique_lineage_ids() {
+        let cfg = WorldConfig {
+            width: 30,
+            height: 30,
+            initial_creatures: 40,
+            max_creatures: 200,
+            ..WorldConfig::default()
+        };
+        let world = World::new(cfg, 5150);
+
+        let lineage_ids = world
+            .creatures
+            .values()
+            .map(|creature| creature.lineage_id)
+            .collect::<BTreeSet<_>>();
+        assert_eq!(lineage_ids.len(), world.creature_count());
+    }
+
+    #[test]
+    fn offspring_inherits_lineage_and_records_parent_link() {
+        let cfg = WorldConfig {
+            width: 16,
+            height: 16,
+            initial_creatures: 1,
+            max_creatures: 12,
+            energy_initial: 1.5,
+            min_reproduce_energy: 0.8,
+            ..WorldConfig::default()
+        };
+        let mut world = World::new_with_palette(cfg, 818, ControllerPalette::Hybrid);
+        world.seed_food_density(1.0);
+
+        let parent_id = world
+            .creatures
+            .iter()
+            .next()
+            .map(|(id, _)| id)
+            .expect("expected one founder");
+        if let Some(parent_mut) = world.creatures.get_mut(parent_id) {
+            parent_mut.controller = ComputationGraph::founder(ControllerPalette::Hybrid);
+        }
+
+        for _ in 0..20 {
+            if world.creature_count() > 1 {
+                break;
+            }
+            world.tick();
+        }
+        assert!(
+            world.creature_count() > 1,
+            "expected at least one offspring"
+        );
+
+        let frame = world.frame();
+        let child = frame
+            .creatures
+            .iter()
+            .find(|c| c.parent_id.is_some())
+            .expect("expected offspring snapshot with parent id");
+        let parent = frame
+            .creatures
+            .iter()
+            .find(|c| c.id == child.parent_id.expect("parent id should be present"))
+            .expect("parent should still be visible in frame");
+        assert_eq!(child.lineage_id, parent.lineage_id);
+        assert_eq!(child.generation, parent.generation + 1);
+
+        let children = world
+            .lineage_tree
+            .get(&parent.id)
+            .expect("lineage tree should track parent-child relation");
+        assert!(children.contains(&child.id));
     }
 
     #[test]

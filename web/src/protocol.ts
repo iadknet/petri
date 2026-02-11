@@ -2,6 +2,8 @@ import { decode } from "@msgpack/msgpack";
 
 export type CreatureSnapshot = {
   id: number;
+  lineage_id: number;
+  parent_id: number | null;
   x: number;
   y: number;
   energy: number;
