@@ -150,7 +150,14 @@ Creatures moving around a food field, consuming energy, reproducing, and dying a
 **Slice 4: Barrier sensors + inspector exposure**
 - Add `SensorBarrierDirection` and `SensorBarrierDistance`.
 - Expose barrier sensing values in creature inspector payload/views.
-
+- 
+**Slice 4.1: Creature container slots (this feature needs more refinement before implementatino)**
+- Add "container slots" as a feature to creatures that can be used to store barriers or food.
+- Number of container slots is evolvable
+- Add ability for creatures to pick up food or barriers and insert them into container slots
+- Add ability for creatures to deposit items from container slots
+- Full container slots multiply movement cost
+  
 **Slice 5: Phenotype color pipeline**
 - Add deterministic phenotype color derived from genome structure.
 - Render phenotype colors in world view and related inspection surfaces.
