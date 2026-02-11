@@ -1,0 +1,11 @@
+[package]
+name = "petri-core"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+rand.workspace = true
+serde.workspace = true
+slotmap.workspace = true

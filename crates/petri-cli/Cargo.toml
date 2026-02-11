@@ -1,0 +1,10 @@
+[package]
+name = "petri-cli"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+clap.workspace = true
+petri-core = { path = "../petri-core" }
