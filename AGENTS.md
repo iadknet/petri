@@ -75,6 +75,18 @@ When changing frame/protocol types:
 - Add payload/perf regression checks when changing frame shape/size.
 - Favor targeted test runs during iteration; run full workspace suite before completion.
 
+## Rust Test Strategy
+
+- Use the narrowest Rust test scope during iteration:
+  - Single regression: `cargo test -p <crate> <test_name> -- --exact`
+  - Touched crate sweep: `cargo test -p <crate>`
+- Keep the full Rust gate before completion: `cargo test --workspace`.
+- Run `cargo test --workspace` earlier when changes touch shared cross-crate behavior (core types, protocol contracts, workspace dependencies, or crate interfaces).
+- Rust tests already run in parallel by default.
+  - Do not use `--test-threads=1` unless debugging ordering/flaky behavior.
+  - Only tune thread count when you have measured evidence it is faster on this machine.
+  - Optional tuning command: `cargo test -p petri-server -- --test-threads=<n>`
+
 ## Completion Gate (Do Not Skip)
 
 Before claiming completion, run and confirm all pass:

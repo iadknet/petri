@@ -23,7 +23,7 @@ mod tests {
 
     #[tokio::test]
     async fn health_endpoint_returns_ok() {
-        let state = AppState::new_for_tests();
+        let state = AppState::new_for_tests_fast();
         let app = build_router(state);
 
         let response = app
@@ -41,7 +41,7 @@ mod tests {
 
     #[tokio::test]
     async fn cors_preflight_allows_vite_dev_origin_for_patch_config() {
-        let state = AppState::new_for_tests();
+        let state = AppState::new_for_tests_fast();
         let app = build_router(state);
 
         let response = app
@@ -73,7 +73,7 @@ mod tests {
 
     #[tokio::test]
     async fn cors_preflight_allows_alternate_vite_dev_origin_for_patch_config() {
-        let state = AppState::new_for_tests();
+        let state = AppState::new_for_tests_fast();
         let app = build_router(state);
 
         let response = app
@@ -105,7 +105,7 @@ mod tests {
 
     #[tokio::test]
     async fn simulation_starts_idle_and_requires_explicit_start() {
-        let state = AppState::new_for_tests();
+        let state = AppState::new_for_tests_fast();
         let app = build_router(state.clone());
 
         let status_before = app
@@ -149,7 +149,7 @@ mod tests {
 
     #[tokio::test]
     async fn default_startup_draft_uses_lower_food_settings() {
-        let state = AppState::new_for_tests();
+        let state = AppState::new_for_tests_fast();
         let app = build_router(state);
 
         let response = app
@@ -179,7 +179,7 @@ mod tests {
 
     #[tokio::test]
     async fn patch_startup_draft_while_running_sets_pending_restart() {
-        let state = AppState::new_for_tests();
+        let state = AppState::new_for_tests_fast();
         let app = build_router(state);
 
         let _ = app
@@ -229,7 +229,7 @@ mod tests {
 
     #[tokio::test]
     async fn startup_draft_patch_updates_world_wrap() {
-        let state = AppState::new_for_tests();
+        let state = AppState::new_for_tests_fast();
         let app = build_router(state);
 
         let patch_payload = json!({
@@ -268,7 +268,7 @@ mod tests {
 
     #[tokio::test]
     async fn startup_draft_patch_updates_restart_required_stage1_knobs() {
-        let state = AppState::new_for_tests();
+        let state = AppState::new_for_tests_fast();
         let app = build_router(state);
 
         let patch_payload = json!({
@@ -319,7 +319,7 @@ mod tests {
 
     #[tokio::test]
     async fn startup_draft_patch_updates_world_dimensions() {
-        let state = AppState::new_for_tests();
+        let state = AppState::new_for_tests_fast();
         let app = build_router(state);
 
         let patch_payload = json!({
@@ -361,7 +361,7 @@ mod tests {
 
     #[tokio::test]
     async fn patch_config_updates_runtime_values() {
-        let state = AppState::new_for_tests();
+        let state = AppState::new_for_tests_fast();
         let app = build_router(state);
 
         let _ = app
@@ -449,7 +449,7 @@ mod tests {
 
     #[tokio::test]
     async fn restart_clears_pending_restart_and_rotates_seed() {
-        let state = AppState::new_for_tests();
+        let state = AppState::new_for_tests_fast();
         let app = build_router(state);
 
         let start_response = app
@@ -505,7 +505,7 @@ mod tests {
 
     #[tokio::test]
     async fn snapshot_endpoints_round_trip_world_state() {
-        let state = AppState::new_for_tests();
+        let state = AppState::new_for_tests_fast();
         let app = build_router(state.clone());
 
         let start_response = app
@@ -559,7 +559,7 @@ mod tests {
 
     #[tokio::test]
     async fn creature_detail_endpoint_returns_last_inputs_outputs_and_events() {
-        let state = AppState::new_for_tests();
+        let state = AppState::new_for_tests_fast();
         let app = build_router(state.clone());
 
         let start_response = app
@@ -614,7 +614,7 @@ mod tests {
 
     #[tokio::test]
     async fn creature_detail_endpoint_returns_not_found_for_unknown_id() {
-        let state = AppState::new_for_tests();
+        let state = AppState::new_for_tests_fast();
         let app = build_router(state);
 
         let response = app

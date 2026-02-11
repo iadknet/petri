@@ -367,6 +367,18 @@ impl AppState {
         Self::new(1, config)
     }
 
+    #[cfg(test)]
+    pub fn new_for_tests_fast() -> Self {
+        let config = WorldConfig::default();
+        Self::new_with_options(
+            1,
+            config,
+            AppStateOptions {
+                viability_probe_enabled: false,
+            },
+        )
+    }
+
     pub async fn simulation_status(&self) -> SimulationStatus {
         let sim = self.simulation.read().await;
         simulation_status_from_locked(&sim)
@@ -919,7 +931,24 @@ fn simulation_status_from_locked(sim: &SimulationState) -> SimulationStatus {
 
 #[cfg(test)]
 mod tests {
-    use super::StartupDraft;
+    use super::{AppState, StartupDraft};
+
+    #[tokio::test]
+    async fn new_for_tests_keeps_viability_probe_enabled() {
+        let state = AppState::new_for_tests();
+        let status = state.simulation_status().await;
+
+        assert!(status.viability_probe_enabled);
+    }
+
+    #[tokio::test]
+    async fn new_for_tests_fast_disables_viability_probe() {
+        let state = AppState::new_for_tests_fast();
+        let status = state.simulation_status().await;
+
+        assert!(!status.viability_probe_enabled);
+        assert!(status.startup_viable);
+    }
 
     #[test]
     fn startup_draft_validation_allows_expanded_upper_bounds() {
