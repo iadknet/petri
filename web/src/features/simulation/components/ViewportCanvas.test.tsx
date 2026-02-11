@@ -29,6 +29,32 @@ function buildFrame() {
 }
 
 describe("ViewportCanvas", () => {
+  it("adds paint-mode class when paint mode is active", () => {
+    const { container } = render(
+      <ViewportCanvas
+        phase="paused"
+        frame={buildFrame()}
+        zoom={1}
+        paintModeEnabled
+        paintAllowed
+        paintTool="food"
+        brushHalfExtent={0}
+        idlePreviewMode="paint_layer"
+        lastPaintStats={null}
+        onTogglePaintMode={vi.fn()}
+        onSetPaintTool={vi.fn()}
+        onSetBrushHalfExtent={vi.fn()}
+        onSetIdlePreviewMode={vi.fn()}
+        onClearPaint={vi.fn()}
+        onCommitPaintStroke={vi.fn()}
+        onSelectCreature={vi.fn()}
+      />
+    );
+
+    const viewport = container.querySelector(".viewport") as HTMLDivElement;
+    expect(viewport.className).toContain("paint-mode");
+  });
+
   it("batches paint points and commits one stroke on pointer-up", () => {
     const onCommitPaintStroke = vi.fn();
     const { container } = render(
