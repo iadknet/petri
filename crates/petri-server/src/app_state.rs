@@ -52,6 +52,9 @@ pub struct SimulationStatus {
     pub population: usize,
     pub average_energy: f32,
     pub pending_restart: bool,
+    pub startup_viable: bool,
+    pub startup_viability_code: Option<&'static str>,
+    pub startup_viability_message: Option<String>,
     pub startup_draft: StartupDraft,
 }
 
@@ -102,10 +105,36 @@ struct SimulationRun {
     world: World,
 }
 
+#[derive(Clone, Debug)]
+struct StartupViability {
+    is_viable: bool,
+    code: Option<&'static str>,
+    message: Option<String>,
+}
+
+impl StartupViability {
+    fn viable() -> Self {
+        Self {
+            is_viable: true,
+            code: None,
+            message: None,
+        }
+    }
+
+    fn from_error(err: SimulationError) -> Self {
+        Self {
+            is_viable: false,
+            code: Some(err.code()),
+            message: Some(err.message()),
+        }
+    }
+}
+
 pub struct SimulationState {
     phase: SimulationPhase,
     run: Option<SimulationRun>,
     startup_draft: StartupDraft,
+    startup_viability: StartupViability,
     pending_restart: bool,
     runtime_config: WorldConfig,
     rng: SmallRng,
@@ -207,10 +236,13 @@ fn validate_range(
 impl AppState {
     pub fn new(seed: u64, config: WorldConfig) -> Self {
         let (frames_tx, _) = broadcast::channel(256);
+        let startup_draft = StartupDraft::viable_default();
+        let startup_viability = evaluate_startup_viability(&config, &startup_draft);
         let state = SimulationState {
             phase: SimulationPhase::Idle,
             run: None,
-            startup_draft: StartupDraft::viable_default(),
+            startup_draft,
+            startup_viability,
             pending_restart: false,
             runtime_config: config,
             rng: SmallRng::seed_from_u64(seed),
@@ -246,6 +278,7 @@ impl AppState {
         let changed = updated.apply_patch(patch);
         updated.validate()?;
         sim.startup_draft = updated.clone();
+        sim.startup_viability = evaluate_startup_viability(&sim.runtime_config, &sim.startup_draft);
         if changed && sim.run.is_some() {
             sim.pending_restart = true;
         }
@@ -341,7 +374,11 @@ impl AppState {
 
         let seed = sim.rng.gen::<u64>();
         let config = build_world_config(&sim.runtime_config, &sim.startup_draft);
-        ensure_viable_start(&config, sim.startup_draft.initial_food_density, seed)?;
+        ensure_viable_start(
+            &config,
+            sim.startup_draft.initial_food_density,
+            startup_probe_seed(&sim.startup_draft),
+        )?;
 
         let mut world = World::new(config.clone(), seed);
         world.seed_food_density(sim.startup_draft.initial_food_density);
@@ -368,7 +405,11 @@ impl AppState {
 
         let seed = sim.rng.gen::<u64>();
         let config = build_world_config(&sim.runtime_config, &sim.startup_draft);
-        ensure_viable_start(&config, sim.startup_draft.initial_food_density, seed)?;
+        ensure_viable_start(
+            &config,
+            sim.startup_draft.initial_food_density,
+            startup_probe_seed(&sim.startup_draft),
+        )?;
 
         let mut world = World::new(config.clone(), seed);
         world.seed_food_density(sim.startup_draft.initial_food_density);
@@ -446,6 +487,45 @@ fn ensure_viable_start(
     Ok(())
 }
 
+fn evaluate_startup_viability(base: &WorldConfig, draft: &StartupDraft) -> StartupViability {
+    if let Err(err) = draft.validate() {
+        return StartupViability::from_error(err);
+    }
+
+    let config = build_world_config(base, draft);
+    match ensure_viable_start(
+        &config,
+        draft.initial_food_density,
+        startup_probe_seed(draft),
+    ) {
+        Ok(()) => StartupViability::viable(),
+        Err(err) => StartupViability::from_error(err),
+    }
+}
+
+fn startup_probe_seed(draft: &StartupDraft) -> u64 {
+    let mut seed = 0xA11C_E5EED_u64;
+    seed = seed
+        .wrapping_mul(1_099_511_628_211)
+        .wrapping_add(draft.initial_creatures as u64);
+    seed = seed
+        .wrapping_mul(1_099_511_628_211)
+        .wrapping_add(draft.initial_food_density.to_bits() as u64);
+    seed = seed
+        .wrapping_mul(1_099_511_628_211)
+        .wrapping_add(draft.food_spawn_rate.to_bits() as u64);
+    seed = seed
+        .wrapping_mul(1_099_511_628_211)
+        .wrapping_add(draft.food_growth_rate.to_bits() as u64);
+    seed = seed
+        .wrapping_mul(1_099_511_628_211)
+        .wrapping_add(draft.energy_per_tick_decay.to_bits() as u64);
+    seed = seed
+        .wrapping_mul(1_099_511_628_211)
+        .wrapping_add(draft.energy_per_move.to_bits() as u64);
+    seed
+}
+
 fn simulation_status_from_locked(sim: &SimulationState) -> SimulationStatus {
     let (run_id, seed, tick, population, average_energy) = if let Some(run) = sim.run.as_ref() {
         (
@@ -467,6 +547,9 @@ fn simulation_status_from_locked(sim: &SimulationState) -> SimulationStatus {
         population,
         average_energy,
         pending_restart: sim.pending_restart,
+        startup_viable: sim.startup_viability.is_viable,
+        startup_viability_code: sim.startup_viability.code,
+        startup_viability_message: sim.startup_viability.message.clone(),
         startup_draft: sim.startup_draft.clone(),
     }
 }

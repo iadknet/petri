@@ -58,6 +58,7 @@ mod tests {
         let status_before_json = read_json(status_before).await;
         assert_eq!(status_before_json["phase"], "idle");
         assert!(status_before_json["run_id"].is_null());
+        assert_eq!(status_before_json["startup_viable"], true);
 
         let (frame, _delay_ms) = run_single_iteration(&state).await;
         assert!(frame.is_none());
@@ -285,6 +286,52 @@ mod tests {
         assert_eq!(start_response.status(), StatusCode::UNPROCESSABLE_ENTITY);
         let err_json = read_json(start_response).await;
         assert_eq!(err_json["code"], "non_viable_startup_config");
+    }
+
+    #[tokio::test]
+    async fn status_reports_non_viable_startup_draft() {
+        let state = AppState::new_for_tests();
+        let app = build_router(state);
+
+        let patch_payload = json!({
+            "initial_creatures": 1,
+            "initial_food_density": 0.0,
+            "food_spawn_rate": 0.0,
+            "food_growth_rate": 0.0,
+            "energy_per_tick_decay": 0.03,
+            "energy_per_move": 0.05
+        });
+
+        let patch_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri("/simulation/startup-draft")
+                    .header("content-type", "application/json")
+                    .body(Body::from(patch_payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(patch_response.status(), StatusCode::OK);
+
+        let status_response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/simulation/status")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(status_response.status(), StatusCode::OK);
+        let status_json = read_json(status_response).await;
+        assert_eq!(status_json["startup_viable"], false);
+        assert_eq!(
+            status_json["startup_viability_code"],
+            "non_viable_startup_config"
+        );
     }
 
     #[test]

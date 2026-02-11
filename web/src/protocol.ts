@@ -47,6 +47,9 @@ export type SimulationStatus = {
   population: number;
   average_energy: number;
   pending_restart: boolean;
+  startup_viable: boolean;
+  startup_viability_code: string | null;
+  startup_viability_message: string | null;
   startup_draft: StartupDraft;
 };
 

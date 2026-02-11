@@ -283,6 +283,7 @@ export default function App() {
   const tick = frame?.tick ?? status?.tick ?? 0;
   const population = frame?.population ?? status?.population ?? 0;
   const averageEnergy = frame?.average_energy ?? status?.average_energy ?? 0;
+  const startDisabled = phase !== "idle" || busyAction !== null || status?.startup_viable === false;
 
   return (
     <div className="app-root">
@@ -315,7 +316,7 @@ export default function App() {
             <button
               className="primary-btn"
               onClick={() => void startSimulation()}
-              disabled={phase !== "idle" || busyAction !== null}
+              disabled={startDisabled}
             >
               {busyAction === "start" ? "Starting..." : "Start Simulation"}
             </button>
@@ -334,6 +335,11 @@ export default function App() {
               {runtimeConfig?.paused ? "Resume" : "Pause"}
             </button>
           </div>
+          {phase === "idle" && status?.startup_viable === false ? (
+            <p className="error">
+              Startup draft is non-viable. {status.startup_viability_message ?? "Adjust controls."}
+            </p>
+          ) : null}
         </section>
 
         <section className="section">
