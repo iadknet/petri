@@ -98,7 +98,7 @@ describe("App", () => {
     expect(await screen.findByLabelText(/Food max density/i)).toBeInTheDocument();
   });
 
-  it("shows creature inspector details after clicking a creature", async () => {
+  it("shows creature inspector details after clicking near a creature", async () => {
     const mockStore = {
       frame: {
         tick: 7,
@@ -215,7 +215,7 @@ describe("App", () => {
         })
       });
 
-      fireEvent.click(canvas, { clientX: 4, clientY: 4 });
+      fireEvent.click(canvas, { clientX: 7, clientY: 7 });
 
       expect(await screen.findByText(/Creature Inspector/i)).toBeInTheDocument();
       expect(screen.getByText("99")).toBeInTheDocument();

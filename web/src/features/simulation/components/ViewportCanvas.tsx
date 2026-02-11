@@ -15,6 +15,35 @@ type ViewportCanvasProps = {
   onSelectCreature?: (creature: CreatureSnapshot | null) => void;
 };
 
+function pickCreatureAtOrNear(
+  frame: WorldFrame,
+  worldX: number,
+  worldY: number
+): CreatureSnapshot | null {
+  const exact = frame.creatures.find((creature) => creature.x === worldX && creature.y === worldY);
+  if (exact) {
+    return exact;
+  }
+
+  let nearest: CreatureSnapshot | null = null;
+  let bestDistanceSq = Number.POSITIVE_INFINITY;
+  for (const creature of frame.creatures) {
+    const dx = creature.x - worldX;
+    const dy = creature.y - worldY;
+    if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+      continue;
+    }
+
+    const distanceSq = dx * dx + dy * dy;
+    if (distanceSq < bestDistanceSq) {
+      bestDistanceSq = distanceSq;
+      nearest = creature;
+    }
+  }
+
+  return nearest;
+}
+
 export function ViewportControls({ zoom, onZoomChange }: ViewportControlsProps) {
   return (
     <section className="section">
@@ -105,9 +134,7 @@ export function ViewportCanvas({ phase, frame, zoom, onSelectCreature }: Viewpor
               return;
             }
 
-            const creature =
-              frame.creatures.find((item) => item.x === worldX && item.y === worldY) ?? null;
-            onSelectCreature(creature);
+            onSelectCreature(pickCreatureAtOrNear(frame, worldX, worldY));
           }}
           style={{
             opacity: phase === "idle" ? 0 : 1,

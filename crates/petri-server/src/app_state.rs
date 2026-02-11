@@ -172,10 +172,10 @@ impl StartupDraft {
         Self {
             initial_creatures: 300,
             max_creatures: 5_000,
-            initial_food_density: 0.25,
+            initial_food_density: 0.15,
             energy_initial: 0.7,
-            food_spawn_rate: 0.10,
-            food_growth_rate: 0.20,
+            food_spawn_rate: 0.05,
+            food_growth_rate: 0.10,
             energy_per_tick_decay: 0.01,
             energy_per_move: 0.02,
             world_wrap: true,

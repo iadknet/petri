@@ -14,13 +14,29 @@ import { FrameStreamClient } from "../ws/frameStreamClient";
 const DEFAULT_API = "http://127.0.0.1:4000";
 const DEFAULT_WS = "ws://127.0.0.1:4000/ws";
 
+type TransportEnv = {
+  VITE_API_BASE?: string;
+  VITE_WS_BASE?: string;
+};
+
+export function resolveTransportEndpoints(
+  env: TransportEnv = import.meta.env as unknown as TransportEnv
+): { apiBase: string; wsBase: string } {
+  const apiBase = (env.VITE_API_BASE ?? DEFAULT_API).replace(/\/+$/, "");
+  const wsBase =
+    env.VITE_WS_BASE ??
+    `${apiBase.replace(/^http/, "ws").replace(/\/+$/, "")}/ws`;
+
+  return { apiBase, wsBase };
+}
+
 export const STARTUP_LIMITS = {
   initial_creatures: { min: 120, max: 1600, step: 10 },
   max_creatures: { min: 500, max: 12000, step: 100 },
-  initial_food_density: { min: 0.08, max: 0.6, step: 0.01 },
+  initial_food_density: { min: 0.0, max: 0.6, step: 0.01 },
   energy_initial: { min: 0.1, max: 2.0, step: 0.01 },
-  food_spawn_rate: { min: 0.05, max: 0.3, step: 0.01 },
-  food_growth_rate: { min: 0.08, max: 0.4, step: 0.01 },
+  food_spawn_rate: { min: 0.0, max: 0.3, step: 0.01 },
+  food_growth_rate: { min: 0.0, max: 0.4, step: 0.01 },
   food_max_density: { min: 0.2, max: 2.0, step: 0.01 },
   food_energy_value: { min: 0.05, max: 2.0, step: 0.01 },
   energy_per_tick_decay: { min: 0.005, max: 0.03, step: 0.001 },
@@ -49,8 +65,9 @@ export function useSimulationStore() {
   const [error, setError] = useState<string | null>(null);
   const [busyAction, setBusyAction] = useState<BusyAction>(null);
 
-  const apiClient = useMemo(() => new SimulationApiClient(DEFAULT_API), []);
-  const frameStreamClient = useMemo(() => new FrameStreamClient(DEFAULT_WS), []);
+  const transport = useMemo(() => resolveTransportEndpoints(), []);
+  const apiClient = useMemo(() => new SimulationApiClient(transport.apiBase), [transport.apiBase]);
+  const frameStreamClient = useMemo(() => new FrameStreamClient(transport.wsBase), [transport.wsBase]);
 
   async function loadStatus(): Promise<void> {
     const nextStatus = await apiClient.getStatus();

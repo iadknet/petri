@@ -49,6 +49,8 @@ fn build_cors_layer() -> CorsLayer {
         .allow_origin([
             HeaderValue::from_static("http://127.0.0.1:5173"),
             HeaderValue::from_static("http://localhost:5173"),
+            HeaderValue::from_static("http://127.0.0.1:5174"),
+            HeaderValue::from_static("http://localhost:5174"),
         ])
         .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::OPTIONS])
         .allow_headers([header::CONTENT_TYPE])
