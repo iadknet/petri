@@ -10,3 +10,6 @@ rand.workspace = true
 serde.workspace = true
 slotmap.workspace = true
 petri-graph = { path = "../petri-graph" }
+
+[dev-dependencies]
+serde_json.workspace = true

@@ -119,6 +119,7 @@ describe("App", () => {
         width: 20,
         height: 20,
         food: new Uint8Array(400),
+        barrier_bits: new Uint8Array(50),
         creatures: [
           {
             id: 99,

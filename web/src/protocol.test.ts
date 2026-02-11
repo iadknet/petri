@@ -10,6 +10,7 @@ describe("protocol", () => {
       width: 200,
       height: 200,
       food: new Uint8Array([0, 128, 255]),
+      barrier_bits: new Uint8Array([1, 0, 2]),
       population: 2,
       average_energy: 0.42,
       creatures: [
@@ -25,6 +26,7 @@ describe("protocol", () => {
     expect(decoded.tick).toBe(12);
     expect(decoded.width).toBe(200);
     expect(decoded.population).toBe(2);
+    expect(decoded.barrier_bits[0]).toBe(1);
     expect(decoded.creatures).toHaveLength(2);
     expect(decoded.average_energy).toBeCloseTo(0.42);
     expect(decoded.creatures[0].lineage_id).toBe(100);

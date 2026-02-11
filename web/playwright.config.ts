@@ -15,7 +15,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `cd .. && PETRI_SERVER_ADDR=127.0.0.1:${E2E_SERVER_PORT} cargo run -p petri-server`,
+      command: `cd .. && PETRI_SERVER_ADDR=127.0.0.1:${E2E_SERVER_PORT} cargo run -p petri-server -- --disable-viability-probe`,
       url: `http://127.0.0.1:${E2E_SERVER_PORT}/health`,
       timeout: 120_000,
       reuseExistingServer: false

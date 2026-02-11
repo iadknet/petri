@@ -22,7 +22,7 @@ impl World {
 
         for offset in 0..total_cells {
             let idx = (start_idx + offset) % total_cells;
-            if self.creature_at[idx].is_none() {
+            if self.creature_at[idx].is_none() && !self.cells[idx].barrier {
                 let x = (idx as u32) % self.config.width;
                 let y = (idx as u32) / self.config.width;
                 let seed = self.rng.gen::<u64>();
@@ -110,7 +110,7 @@ impl World {
                     continue;
                 };
                 let idx = self.idx(nx, ny);
-                if self.creature_at[idx].is_none() {
+                if self.creature_at[idx].is_none() && !self.cells[idx].barrier {
                     return Some((nx, ny));
                 }
             }

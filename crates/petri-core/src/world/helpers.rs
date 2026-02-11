@@ -1,6 +1,6 @@
 use crate::types::CreatureEvent;
 
-use super::{Creature, CreatureEventKind, EVENT_LOG_CAPACITY, FOOD_SENSOR_RADIUS};
+use super::{Cell, Creature, CreatureEventKind, EVENT_LOG_CAPACITY, FOOD_SENSOR_RADIUS};
 
 pub(super) fn sensor_from_best(best: Option<(i32, i32, i32)>) -> (f32, f32) {
     let Some((dist_sq, dx, dy)) = best else {
@@ -45,6 +45,23 @@ pub(super) fn quantize_food(food: f32, max_density: f32) -> u8 {
     let max_density = max_density.max(f32::EPSILON);
     let normalized = (food.clamp(0.0, max_density) / max_density).clamp(0.0, 1.0);
     (normalized * 255.0).round() as u8
+}
+
+pub(super) fn pack_barrier_bits(cells: &[Cell]) -> Vec<u8> {
+    if cells.is_empty() {
+        return Vec::new();
+    }
+
+    let mut bits = vec![0_u8; cells.len().div_ceil(8)];
+    for (idx, cell) in cells.iter().enumerate() {
+        if !cell.barrier {
+            continue;
+        }
+        let byte_idx = idx >> 3;
+        let bit_idx = idx & 7;
+        bits[byte_idx] |= 1 << bit_idx;
+    }
+    bits
 }
 
 pub(super) fn push_event(creature: &mut Creature, kind: CreatureEventKind, tick: u64) {

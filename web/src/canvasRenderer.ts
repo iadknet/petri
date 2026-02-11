@@ -1,5 +1,16 @@
 import { WorldFrame } from "./protocol";
 
+const BARRIER_R = 140;
+const BARRIER_G = 90;
+const BARRIER_B = 60;
+
+function isBarrierCell(barrierBits: number[] | Uint8Array, cellIndex: number): boolean {
+  const byteIndex = cellIndex >> 3;
+  const bitIndex = cellIndex & 7;
+  const byte = barrierBits[byteIndex] ?? 0;
+  return (byte & (1 << bitIndex)) !== 0;
+}
+
 export class CanvasRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -29,9 +40,17 @@ export class CanvasRenderer {
     const pixels = this.imageData.data;
 
     for (let i = 0; i < frame.food.length; i += 1) {
+      const base = i * 4;
+      if (isBarrierCell(frame.barrier_bits, i)) {
+        pixels[base + 0] = BARRIER_R;
+        pixels[base + 1] = BARRIER_G;
+        pixels[base + 2] = BARRIER_B;
+        pixels[base + 3] = 255;
+        continue;
+      }
+
       const rawFood = frame.food[i] ?? 0;
       const food = Math.max(0, Math.min(rawFood / 255, 1));
-      const base = i * 4;
       pixels[base + 0] = 8;
       pixels[base + 1] = 24 + Math.floor(food * 220);
       pixels[base + 2] = 8;
