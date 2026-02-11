@@ -24,6 +24,10 @@ export type ConfigPatch = {
   ticks_per_second?: number;
   food_spawn_rate?: number;
   food_growth_rate?: number;
+  weight_mutation_rate?: number;
+  weight_mutation_magnitude?: number;
+  logic_node_mutation_rate?: number;
+  structural_mutation_rate?: number;
 };
 
 export type StartupDraft = {

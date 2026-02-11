@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use petri_graph::{ComputationGraph, ControllerPalette, SensorInputs};
+use petri_graph::{ComputationGraph, ControllerPalette, MutationConfig, SensorInputs};
 use rand::rngs::SmallRng;
 use rand::seq::index::sample;
 use rand::{Rng, SeedableRng};
@@ -12,11 +12,9 @@ use crate::types::{
 };
 
 const EVENT_LOG_CAPACITY: usize = 8;
-const INITIAL_MUTATION_RATE: f32 = 0.18;
-const INITIAL_MUTATION_MAGNITUDE: f32 = 0.12;
-const OFFSPRING_MUTATION_RATE: f32 = 0.26;
-const OFFSPRING_MUTATION_MAGNITUDE: f32 = 0.18;
 const FOOD_SENSOR_RADIUS: i32 = 12;
+const INITIAL_WEIGHT_MUTATION_SCALE: f32 = 0.7;
+const INITIAL_STRUCTURAL_MUTATION_SCALE: f32 = 0.35;
 
 #[derive(Clone, Copy, Debug)]
 pub struct CreatureView {
@@ -112,6 +110,7 @@ impl World {
                 (creature.x, creature.y)
             };
             let (food_direction, food_distance) = self.nearest_food_sensor(sensor_x, sensor_y);
+            let offspring_mutation_cfg = self.offspring_mutation_config();
 
             {
                 let creature = self
@@ -190,11 +189,8 @@ impl World {
                                 creature.energy -= inherited + self.config.energy_per_reproduce;
                                 let seed = creature.rng.gen::<u64>();
                                 let mut child_controller = creature.controller.clone();
-                                child_controller.mutate_weights(
-                                    &mut creature.rng,
-                                    OFFSPRING_MUTATION_RATE,
-                                    OFFSPRING_MUTATION_MAGNITUDE,
-                                );
+                                child_controller
+                                    .mutate_with_config(&mut creature.rng, offspring_mutation_cfg);
 
                                 child_request = Some((
                                     cx,
@@ -363,12 +359,9 @@ impl World {
                 let y = (idx as u32) / self.config.width;
                 let seed = self.rng.gen::<u64>();
                 let mut controller = ComputationGraph::founder(self.palette);
+                let initial_mutation_cfg = self.initial_mutation_config();
                 // Add slight startup diversity so founders are viable but not identical clones.
-                controller.mutate_weights(
-                    &mut self.rng,
-                    INITIAL_MUTATION_RATE,
-                    INITIAL_MUTATION_MAGNITUDE,
-                );
+                controller.mutate_with_config(&mut self.rng, initial_mutation_cfg);
                 let creature = Creature {
                     x,
                     y,
@@ -434,6 +427,30 @@ impl World {
         let distance = (dist_sq as f32).sqrt() / FOOD_SENSOR_RADIUS as f32;
         let direction = (dy as f32).atan2(dx as f32) / std::f32::consts::PI;
         (direction.clamp(-1.0, 1.0), distance.clamp(0.0, 1.0))
+    }
+
+    fn initial_mutation_config(&self) -> MutationConfig {
+        MutationConfig {
+            weight_mutation_rate: (self.config.weight_mutation_rate
+                * INITIAL_WEIGHT_MUTATION_SCALE)
+                .clamp(0.0, 1.0),
+            weight_mutation_magnitude: self.config.weight_mutation_magnitude.max(0.0),
+            logic_node_mutation_rate: (self.config.logic_node_mutation_rate
+                * INITIAL_STRUCTURAL_MUTATION_SCALE)
+                .clamp(0.0, 1.0),
+            structural_mutation_rate: (self.config.structural_mutation_rate
+                * INITIAL_STRUCTURAL_MUTATION_SCALE)
+                .clamp(0.0, 1.0),
+        }
+    }
+
+    fn offspring_mutation_config(&self) -> MutationConfig {
+        MutationConfig {
+            weight_mutation_rate: self.config.weight_mutation_rate.clamp(0.0, 1.0),
+            weight_mutation_magnitude: self.config.weight_mutation_magnitude.max(0.0),
+            logic_node_mutation_rate: self.config.logic_node_mutation_rate.clamp(0.0, 1.0),
+            structural_mutation_rate: self.config.structural_mutation_rate.clamp(0.0, 1.0),
+        }
     }
 
     fn find_empty_neighbor(&self, x: u32, y: u32) -> Option<(u32, u32)> {
@@ -842,6 +859,53 @@ mod tests {
             .map(|(_, creature)| controller_checksum(&creature.controller))
             .collect::<BTreeSet<_>>();
         assert!(checksums.len() > 1);
+    }
+
+    #[test]
+    fn offspring_mutation_respects_zeroed_mutation_config() {
+        let cfg = WorldConfig {
+            width: 20,
+            height: 20,
+            initial_creatures: 1,
+            max_creatures: 12,
+            energy_initial: 1.5,
+            min_reproduce_energy: 0.8,
+            weight_mutation_rate: 0.0,
+            weight_mutation_magnitude: 0.0,
+            structural_mutation_rate: 0.0,
+            logic_node_mutation_rate: 0.0,
+            ..WorldConfig::default()
+        };
+        let mut world = World::new_with_palette(cfg, 222, ControllerPalette::Hybrid);
+        world.seed_food_density(1.0);
+
+        let parent_id = world
+            .creatures
+            .iter()
+            .next()
+            .map(|(id, _)| id)
+            .expect("world should have one founder");
+        if let Some(parent_mut) = world.creatures.get_mut(parent_id) {
+            parent_mut.controller = ComputationGraph::founder(ControllerPalette::Hybrid);
+        }
+
+        for _ in 0..20 {
+            if world.creature_count() > 1 {
+                break;
+            }
+            world.tick();
+        }
+        assert!(
+            world.creature_count() > 1,
+            "expected reproduction with abundant food"
+        );
+
+        let checksums = world
+            .creatures
+            .iter()
+            .map(|(_, creature)| controller_checksum(&creature.controller))
+            .collect::<BTreeSet<_>>();
+        assert_eq!(checksums.len(), 1);
     }
 
     #[test]

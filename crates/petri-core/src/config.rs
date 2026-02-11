@@ -18,6 +18,10 @@ pub struct WorldConfig {
     pub energy_max: f32,
     pub min_reproduce_energy: f32,
     pub offspring_energy_fraction: f32,
+    pub weight_mutation_rate: f32,
+    pub weight_mutation_magnitude: f32,
+    pub logic_node_mutation_rate: f32,
+    pub structural_mutation_rate: f32,
     pub ticks_per_second: u32,
     pub paused: bool,
 }
@@ -41,6 +45,10 @@ impl Default for WorldConfig {
             energy_max: 1.5,
             min_reproduce_energy: 1.0,
             offspring_energy_fraction: 0.45,
+            weight_mutation_rate: 0.26,
+            weight_mutation_magnitude: 0.18,
+            logic_node_mutation_rate: 0.04,
+            structural_mutation_rate: 0.08,
             ticks_per_second: 30,
             paused: false,
         }

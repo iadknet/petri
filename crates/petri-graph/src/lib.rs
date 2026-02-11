@@ -1,7 +1,7 @@
 mod eval;
 mod types;
 
-pub use eval::ComputationGraph;
+pub use eval::{ComputationGraph, MutationConfig};
 pub use types::{ActionOutputs, ControllerPalette, Edge, NodeKind, SensorInputs};
 
 #[cfg(test)]
@@ -9,6 +9,27 @@ mod tests {
     use super::*;
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
+
+    fn hidden_node_count(graph: &ComputationGraph) -> usize {
+        graph
+            .nodes
+            .iter()
+            .filter(|node| {
+                !matches!(
+                    node,
+                    NodeKind::InputFoodHere
+                        | NodeKind::InputEnergy
+                        | NodeKind::InputRandom
+                        | NodeKind::InputFoodDirection
+                        | NodeKind::InputFoodDistance
+                        | NodeKind::OutputMoveX
+                        | NodeKind::OutputMoveY
+                        | NodeKind::OutputEat
+                        | NodeKind::OutputReproduce
+                )
+            })
+            .count()
+    }
 
     fn parameter_checksum(graph: &ComputationGraph) -> f32 {
         let node_sum = graph
@@ -235,5 +256,116 @@ mod tests {
                 .any(|node| matches!(node, NodeKind::InputFoodDistance)),
             "founder graph should include food-distance sensor node"
         );
+    }
+
+    #[test]
+    fn add_hidden_node_mutation_splices_existing_edge() {
+        let mut graph = ComputationGraph::founder(ControllerPalette::Hybrid);
+        let before_nodes = graph.nodes.len();
+        let before_edges = graph.edges.len();
+        let mut rng = SmallRng::seed_from_u64(13);
+
+        let changed = graph.add_hidden_node_by_splicing_edge(&mut rng);
+        assert!(changed);
+        assert_eq!(graph.nodes.len(), before_nodes + 1);
+        assert_eq!(graph.edges.len(), before_edges + 1);
+        assert!(hidden_node_count(&graph) >= 1);
+    }
+
+    #[test]
+    fn add_edge_mutation_inserts_new_connection_when_possible() {
+        let mut graph = ComputationGraph::founder(ControllerPalette::Hybrid);
+        let before_edges = graph.edges.len();
+        let mut rng = SmallRng::seed_from_u64(17);
+
+        let mut changed = false;
+        for _ in 0..32 {
+            changed = graph.add_edge_mutation(&mut rng);
+            if changed {
+                break;
+            }
+        }
+
+        assert!(changed);
+        assert_eq!(graph.edges.len(), before_edges + 1);
+    }
+
+    #[test]
+    fn remove_edge_mutation_removes_one_edge() {
+        let mut graph = ComputationGraph::founder(ControllerPalette::Hybrid);
+        let before_edges = graph.edges.len();
+        let mut rng = SmallRng::seed_from_u64(19);
+
+        let changed = graph.remove_edge_mutation(&mut rng);
+        assert!(changed);
+        assert_eq!(graph.edges.len(), before_edges - 1);
+    }
+
+    #[test]
+    fn remove_disconnected_hidden_nodes_prunes_orphan_nodes() {
+        let mut graph = ComputationGraph {
+            palette: ControllerPalette::Hybrid,
+            nodes: vec![
+                NodeKind::InputFoodHere,
+                NodeKind::OutputEat,
+                NodeKind::Tanh, // disconnected hidden node
+            ],
+            edges: vec![Edge {
+                from: 0,
+                to: 1,
+                weight: 1.0,
+            }],
+        };
+
+        let removed = graph.remove_disconnected_hidden_nodes();
+        assert_eq!(removed, 1);
+        assert_eq!(graph.nodes.len(), 2);
+        assert_eq!(graph.edges.len(), 1);
+    }
+
+    #[test]
+    fn change_hidden_node_type_mutation_retypes_hidden_node() {
+        let mut graph = ComputationGraph {
+            palette: ControllerPalette::Hybrid,
+            nodes: vec![NodeKind::InputFoodHere, NodeKind::Add, NodeKind::OutputEat],
+            edges: vec![
+                Edge {
+                    from: 0,
+                    to: 1,
+                    weight: 1.0,
+                },
+                Edge {
+                    from: 1,
+                    to: 2,
+                    weight: 1.0,
+                },
+            ],
+        };
+        let mut rng = SmallRng::seed_from_u64(23);
+
+        let changed = graph.change_hidden_node_type(&mut rng);
+        assert!(changed);
+        assert!(!matches!(graph.nodes[1], NodeKind::Add));
+    }
+
+    #[test]
+    fn mutate_with_config_runs_structural_and_logic_operators() {
+        let mut graph = ComputationGraph::founder(ControllerPalette::Hybrid);
+        let before_nodes = graph.nodes.len();
+        let before_edges = graph.edges.len();
+        let mut rng = SmallRng::seed_from_u64(29);
+
+        let changed = graph.mutate_with_config(
+            &mut rng,
+            MutationConfig {
+                weight_mutation_rate: 0.0,
+                weight_mutation_magnitude: 0.0,
+                structural_mutation_rate: 1.0,
+                logic_node_mutation_rate: 1.0,
+            },
+        );
+
+        assert!(changed);
+        assert!(graph.nodes.len() != before_nodes || graph.edges.len() != before_edges);
     }
 }

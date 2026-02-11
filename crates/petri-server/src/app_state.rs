@@ -41,6 +41,10 @@ pub struct RuntimeConfigPatch {
     pub ticks_per_second: Option<u32>,
     pub food_spawn_rate: Option<f32>,
     pub food_growth_rate: Option<f32>,
+    pub weight_mutation_rate: Option<f32>,
+    pub weight_mutation_magnitude: Option<f32>,
+    pub logic_node_mutation_rate: Option<f32>,
+    pub structural_mutation_rate: Option<f32>,
 }
 
 #[derive(Clone, Debug, Serialize)]
@@ -297,12 +301,26 @@ impl AppState {
         let mut sim = self.simulation.write().await;
 
         if sim.run.is_some() {
-            let (cfg, paused_update, tps_update, spawn_update, growth_update) = {
+            let (
+                cfg,
+                paused_update,
+                tps_update,
+                spawn_update,
+                growth_update,
+                weight_rate_update,
+                weight_magnitude_update,
+                logic_rate_update,
+                structural_rate_update,
+            ) = {
                 let run = sim.run.as_mut().expect("checked above");
                 let mut paused_update: Option<bool> = None;
                 let mut tps_update: Option<u32> = None;
                 let mut spawn_update: Option<f32> = None;
                 let mut growth_update: Option<f32> = None;
+                let mut weight_rate_update: Option<f32> = None;
+                let mut weight_magnitude_update: Option<f32> = None;
+                let mut logic_rate_update: Option<f32> = None;
+                let mut structural_rate_update: Option<f32> = None;
 
                 if let Some(paused) = patch.paused {
                     run.world.config.paused = paused;
@@ -321,6 +339,22 @@ impl AppState {
                     run.world.config.food_growth_rate = rate.clamp(0.0, 1.0);
                     growth_update = Some(run.world.config.food_growth_rate);
                 }
+                if let Some(rate) = patch.weight_mutation_rate {
+                    run.world.config.weight_mutation_rate = rate.clamp(0.0, 1.0);
+                    weight_rate_update = Some(run.world.config.weight_mutation_rate);
+                }
+                if let Some(magnitude) = patch.weight_mutation_magnitude {
+                    run.world.config.weight_mutation_magnitude = magnitude.max(0.0);
+                    weight_magnitude_update = Some(run.world.config.weight_mutation_magnitude);
+                }
+                if let Some(rate) = patch.logic_node_mutation_rate {
+                    run.world.config.logic_node_mutation_rate = rate.clamp(0.0, 1.0);
+                    logic_rate_update = Some(run.world.config.logic_node_mutation_rate);
+                }
+                if let Some(rate) = patch.structural_mutation_rate {
+                    run.world.config.structural_mutation_rate = rate.clamp(0.0, 1.0);
+                    structural_rate_update = Some(run.world.config.structural_mutation_rate);
+                }
 
                 (
                     run.world.config.clone(),
@@ -328,6 +362,10 @@ impl AppState {
                     tps_update,
                     spawn_update,
                     growth_update,
+                    weight_rate_update,
+                    weight_magnitude_update,
+                    logic_rate_update,
+                    structural_rate_update,
                 )
             };
 
@@ -348,6 +386,18 @@ impl AppState {
             if let Some(rate) = growth_update {
                 sim.runtime_config.food_growth_rate = rate;
             }
+            if let Some(rate) = weight_rate_update {
+                sim.runtime_config.weight_mutation_rate = rate;
+            }
+            if let Some(magnitude) = weight_magnitude_update {
+                sim.runtime_config.weight_mutation_magnitude = magnitude;
+            }
+            if let Some(rate) = logic_rate_update {
+                sim.runtime_config.logic_node_mutation_rate = rate;
+            }
+            if let Some(rate) = structural_rate_update {
+                sim.runtime_config.structural_mutation_rate = rate;
+            }
             cfg
         } else {
             if let Some(paused) = patch.paused {
@@ -361,6 +411,18 @@ impl AppState {
             }
             if let Some(rate) = patch.food_growth_rate {
                 sim.runtime_config.food_growth_rate = rate.clamp(0.0, 1.0);
+            }
+            if let Some(rate) = patch.weight_mutation_rate {
+                sim.runtime_config.weight_mutation_rate = rate.clamp(0.0, 1.0);
+            }
+            if let Some(magnitude) = patch.weight_mutation_magnitude {
+                sim.runtime_config.weight_mutation_magnitude = magnitude.max(0.0);
+            }
+            if let Some(rate) = patch.logic_node_mutation_rate {
+                sim.runtime_config.logic_node_mutation_rate = rate.clamp(0.0, 1.0);
+            }
+            if let Some(rate) = patch.structural_mutation_rate {
+                sim.runtime_config.structural_mutation_rate = rate.clamp(0.0, 1.0);
             }
             sim.runtime_config.clone()
         }

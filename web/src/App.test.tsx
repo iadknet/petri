@@ -72,4 +72,17 @@ describe("App", () => {
 
     expect(await screen.findByText("status unavailable")).toBeInTheDocument();
   });
+
+  it("renders runtime mutation controls when simulation is active", async () => {
+    setMockStatus({
+      phase: "running",
+      run_id: 1,
+      seed: 42
+    });
+
+    render(<App />);
+
+    const weightRate = await screen.findByLabelText(/Weight mutation rate/i);
+    expect(weightRate).toBeEnabled();
+  });
 });

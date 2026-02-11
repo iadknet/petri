@@ -13,7 +13,11 @@ export const STARTUP_LIMITS = {
   food_spawn_rate: { min: 0.05, max: 0.3, step: 0.01 },
   food_growth_rate: { min: 0.08, max: 0.4, step: 0.01 },
   energy_per_tick_decay: { min: 0.005, max: 0.03, step: 0.001 },
-  energy_per_move: { min: 0.005, max: 0.05, step: 0.001 }
+  energy_per_move: { min: 0.005, max: 0.05, step: 0.001 },
+  weight_mutation_rate: { min: 0.0, max: 1.0, step: 0.01 },
+  weight_mutation_magnitude: { min: 0.0, max: 1.0, step: 0.01 },
+  logic_node_mutation_rate: { min: 0.0, max: 1.0, step: 0.01 },
+  structural_mutation_rate: { min: 0.0, max: 1.0, step: 0.01 }
 } as const;
 
 type BusyAction = "start" | "restart" | null;

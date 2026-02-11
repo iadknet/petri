@@ -43,7 +43,7 @@ pub struct Edge {
     pub weight: f32,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub enum NodeKind {
     InputFoodHere,
     InputEnergy,

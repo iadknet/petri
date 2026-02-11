@@ -17,7 +17,11 @@ const defaultRuntimeConfig = {
   paused: false,
   ticks_per_second: 30,
   food_spawn_rate: 0.1,
-  food_growth_rate: 0.2
+  food_growth_rate: 0.2,
+  weight_mutation_rate: 0.26,
+  weight_mutation_magnitude: 0.18,
+  logic_node_mutation_rate: 0.04,
+  structural_mutation_rate: 0.08
 };
 
 let startupDraft = { ...defaultStartupDraft };

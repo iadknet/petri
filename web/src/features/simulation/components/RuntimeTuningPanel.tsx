@@ -77,6 +77,86 @@ export function RuntimeTuningPanel({
               );
             }}
           />
+
+          <label className="slider-label" htmlFor="runtime-weight-mutation-rate-slider">
+            Weight mutation rate: {runtimeConfig.weight_mutation_rate.toFixed(2)}
+          </label>
+          <input
+            id="runtime-weight-mutation-rate-slider"
+            type="range"
+            min={STARTUP_LIMITS.weight_mutation_rate.min}
+            max={STARTUP_LIMITS.weight_mutation_rate.max}
+            step={STARTUP_LIMITS.weight_mutation_rate.step}
+            value={runtimeConfig.weight_mutation_rate}
+            disabled={phase === "idle"}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              onUpdateRuntimeField(
+                { weight_mutation_rate: value },
+                { ...runtimeConfig, weight_mutation_rate: value }
+              );
+            }}
+          />
+
+          <label className="slider-label" htmlFor="runtime-weight-mutation-magnitude-slider">
+            Weight mutation magnitude: {runtimeConfig.weight_mutation_magnitude.toFixed(2)}
+          </label>
+          <input
+            id="runtime-weight-mutation-magnitude-slider"
+            type="range"
+            min={STARTUP_LIMITS.weight_mutation_magnitude.min}
+            max={STARTUP_LIMITS.weight_mutation_magnitude.max}
+            step={STARTUP_LIMITS.weight_mutation_magnitude.step}
+            value={runtimeConfig.weight_mutation_magnitude}
+            disabled={phase === "idle"}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              onUpdateRuntimeField(
+                { weight_mutation_magnitude: value },
+                { ...runtimeConfig, weight_mutation_magnitude: value }
+              );
+            }}
+          />
+
+          <label className="slider-label" htmlFor="runtime-logic-node-mutation-rate-slider">
+            Logic node mutation rate: {runtimeConfig.logic_node_mutation_rate.toFixed(2)}
+          </label>
+          <input
+            id="runtime-logic-node-mutation-rate-slider"
+            type="range"
+            min={STARTUP_LIMITS.logic_node_mutation_rate.min}
+            max={STARTUP_LIMITS.logic_node_mutation_rate.max}
+            step={STARTUP_LIMITS.logic_node_mutation_rate.step}
+            value={runtimeConfig.logic_node_mutation_rate}
+            disabled={phase === "idle"}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              onUpdateRuntimeField(
+                { logic_node_mutation_rate: value },
+                { ...runtimeConfig, logic_node_mutation_rate: value }
+              );
+            }}
+          />
+
+          <label className="slider-label" htmlFor="runtime-structural-mutation-rate-slider">
+            Structural mutation rate: {runtimeConfig.structural_mutation_rate.toFixed(2)}
+          </label>
+          <input
+            id="runtime-structural-mutation-rate-slider"
+            type="range"
+            min={STARTUP_LIMITS.structural_mutation_rate.min}
+            max={STARTUP_LIMITS.structural_mutation_rate.max}
+            step={STARTUP_LIMITS.structural_mutation_rate.step}
+            value={runtimeConfig.structural_mutation_rate}
+            disabled={phase === "idle"}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              onUpdateRuntimeField(
+                { structural_mutation_rate: value },
+                { ...runtimeConfig, structural_mutation_rate: value }
+              );
+            }}
+          />
         </>
       ) : (
         <p className="muted">Loading runtime config...</p>

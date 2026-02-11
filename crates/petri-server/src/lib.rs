@@ -186,7 +186,11 @@ mod tests {
             "paused": true,
             "ticks_per_second": 12,
             "food_spawn_rate": 0.18,
-            "food_growth_rate": 0.22
+            "food_growth_rate": 0.22,
+            "weight_mutation_rate": 0.31,
+            "weight_mutation_magnitude": 0.27,
+            "logic_node_mutation_rate": 0.06,
+            "structural_mutation_rate": 0.14
         });
 
         let patch_response = app
@@ -219,6 +223,10 @@ mod tests {
         assert_eq!(cfg_json["ticks_per_second"], 12);
         assert_eq!(cfg_json["food_spawn_rate"], 0.18);
         assert_eq!(cfg_json["food_growth_rate"], 0.22);
+        assert_eq!(cfg_json["weight_mutation_rate"], 0.31);
+        assert_eq!(cfg_json["weight_mutation_magnitude"], 0.27);
+        assert_eq!(cfg_json["logic_node_mutation_rate"], 0.06);
+        assert_eq!(cfg_json["structural_mutation_rate"], 0.14);
     }
 
     #[tokio::test]
