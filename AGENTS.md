@@ -34,6 +34,31 @@ For frontend work under `web/`, follow `web/AGENTS.md`.
 6. If asked for code review:
    - run Gemini MCP review first via `gemini-analyze-code`
    - if unavailable, explicitly say it is unavailable and run a local fallback review
+7. For Rust structural refactors (module splits, moving tests, boundary cleanup), include a short "Boundary Impact" note in the plan covering:
+   - crate dependency direction (`petri-graph -> petri-core -> petri-server/petri-cli`) remains unchanged
+   - public API/wire-format changes (expected none unless explicitly requested)
+   - test migration approach (unit vs integration)
+
+## Modularity Rules (Rust)
+
+- Keep `src/lib.rs` export-focused (`mod` + `pub use` surface); avoid placing integration-style tests in `src/lib.rs`.
+- Split oversized modules by responsibility using `module/mod.rs + submodules` when concerns are mixed.
+- Prefer `pub(crate)` or private visibility by default; only expose `pub` items that are part of crate API.
+- Keep transport concerns in `petri-server`, simulation policy in `petri-core`, and graph representation/eval/mutation in `petri-graph`.
+- Separate behavioral refactors from behavior changes whenever practical (first move/split, then modify behavior in follow-up commits).
+
+### Refactor Triggers
+
+- If a production Rust file grows beyond ~400 lines, evaluate splitting it by concern.
+- If a production Rust file exceeds ~600 lines, split is required unless documented with a concrete reason.
+- If one module has multiple independent change reasons (for example lifecycle + serialization + transport mapping), split by concern before adding more logic.
+- If integration-style tests dominate a source file, move them under `crates/<crate>/tests/`.
+
+### Module Layout Pattern
+
+- Use `mod.rs` for public surface + shared types.
+- Put concern-specific logic in focused submodules (for example `tick.rs`, `snapshot.rs`, `perception.rs`).
+- Keep low-level helpers in dedicated helper modules to avoid leaking utility details into API-facing modules.
 
 ## Toolchains
 
@@ -75,6 +100,13 @@ When changing frame/protocol types:
 - Add payload/perf regression checks when changing frame shape/size.
 - Favor targeted test runs during iteration; run full workspace suite before completion.
 
+## Rust Test Placement
+
+- Unit tests for private logic should live near the code (`#[cfg(test)]` in module file or `<module>/tests.rs`).
+- Integration tests should live in `crates/<crate>/tests/*.rs` and use public crate APIs.
+- HTTP/transport, cross-module behavior, and payload-regression tests should be integration tests, not `src/lib.rs` tests.
+- Keep test files grouped by behavior (for example health, CORS, lifecycle, payload regression) to avoid monolithic test modules.
+
 ## Rust Test Strategy
 
 - Use the narrowest Rust test scope during iteration:
@@ -95,6 +127,10 @@ Before claiming completion, run and confirm all pass:
 2. `cargo test --workspace`
 3. `cargo clippy --workspace --all-targets -- -D warnings`
 4. `cd web && npm run build`
+5. For Rust modularity refactors, include a brief size/boundary report in the final handoff:
+   - largest production Rust files and whether they need splitting
+   - confirmation that `src/lib.rs` files are export-focused
+   - confirmation that integration-style tests primarily live under `crates/*/tests/`
 
 ## Git Hygiene
 
