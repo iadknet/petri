@@ -3,59 +3,93 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         State,
     },
+    http::StatusCode,
     response::IntoResponse,
-    routing::get,
+    routing::{get, post},
     Json, Router,
 };
 use futures_util::StreamExt;
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use tokio::sync::broadcast;
 
 use petri_core::WorldConfig;
 
+use crate::app_state::{RuntimeConfigPatch, SimulationError, StartupDraft, StartupDraftPatch};
 use crate::AppState;
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct ConfigPatch {
-    pub paused: Option<bool>,
-    pub ticks_per_second: Option<u32>,
+#[derive(Debug, Serialize)]
+struct ApiErrorResponse {
+    code: &'static str,
+    message: String,
 }
 
-pub fn build_router(_state: AppState) -> Router {
+pub fn build_router(state: AppState) -> Router {
     Router::new()
         .route("/health", get(health))
         .route("/config", get(get_config).patch(patch_config))
+        .route("/simulation/status", get(get_simulation_status))
+        .route(
+            "/simulation/startup-draft",
+            get(get_startup_draft).patch(patch_startup_draft),
+        )
+        .route("/simulation/start", post(start_simulation))
+        .route("/simulation/restart", post(restart_simulation))
         .route("/ws", get(ws_handler))
-        .with_state(_state)
+        .with_state(state)
 }
 
 async fn health() -> &'static str {
     "ok"
 }
 
-async fn get_config(State(_state): State<AppState>) -> Json<WorldConfig> {
-    let cfg = {
-        let world = _state.world.read().await;
-        world.config.clone()
-    };
-    Json(cfg)
+async fn get_config(State(state): State<AppState>) -> Json<WorldConfig> {
+    Json(state.current_runtime_config().await)
 }
 
 async fn patch_config(
-    State(_state): State<AppState>,
-    Json(patch): Json<ConfigPatch>,
+    State(state): State<AppState>,
+    Json(patch): Json<RuntimeConfigPatch>,
 ) -> Json<WorldConfig> {
-    let cfg = {
-        let mut world = _state.world.write().await;
-        if let Some(paused) = patch.paused {
-            world.config.paused = paused;
-        }
-        if let Some(tps) = patch.ticks_per_second {
-            world.config.ticks_per_second = tps.max(1);
-        }
-        world.config.clone()
-    };
-    Json(cfg)
+    Json(state.patch_runtime_config(patch).await)
+}
+
+async fn get_simulation_status(State(state): State<AppState>) -> impl IntoResponse {
+    Json(state.simulation_status().await)
+}
+
+async fn get_startup_draft(State(state): State<AppState>) -> Json<StartupDraft> {
+    Json(state.startup_draft().await)
+}
+
+async fn patch_startup_draft(
+    State(state): State<AppState>,
+    Json(patch): Json<StartupDraftPatch>,
+) -> Result<Json<StartupDraft>, (StatusCode, Json<ApiErrorResponse>)> {
+    state
+        .patch_startup_draft(patch)
+        .await
+        .map(Json)
+        .map_err(map_simulation_error)
+}
+
+async fn start_simulation(
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ApiErrorResponse>)> {
+    state
+        .start_simulation()
+        .await
+        .map(Json)
+        .map_err(map_simulation_error)
+}
+
+async fn restart_simulation(
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ApiErrorResponse>)> {
+    state
+        .restart_simulation()
+        .await
+        .map(Json)
+        .map_err(map_simulation_error)
 }
 
 async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
@@ -85,4 +119,19 @@ async fn websocket_session(mut socket: WebSocket, state: AppState) {
             }
         }
     }
+}
+
+fn map_simulation_error(err: SimulationError) -> (StatusCode, Json<ApiErrorResponse>) {
+    let status = match err {
+        SimulationError::InvalidStartupRange { .. } => StatusCode::BAD_REQUEST,
+        SimulationError::AlreadyRunning | SimulationError::NoActiveRun => StatusCode::CONFLICT,
+        SimulationError::NonViableStartupConfig => StatusCode::UNPROCESSABLE_ENTITY,
+    };
+
+    let body = ApiErrorResponse {
+        code: err.code(),
+        message: err.message(),
+    };
+
+    (status, Json(body))
 }

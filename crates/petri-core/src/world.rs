@@ -2,6 +2,7 @@ use std::collections::VecDeque;
 
 use petri_graph::{ComputationGraph, ControllerPalette, SensorInputs};
 use rand::rngs::SmallRng;
+use rand::seq::index::sample;
 use rand::{Rng, SeedableRng};
 use slotmap::{Key, SlotMap};
 
@@ -289,8 +290,38 @@ impl World {
         self.creatures.len()
     }
 
+    pub fn average_energy(&self) -> f32 {
+        if self.creatures.is_empty() {
+            return 0.0;
+        }
+        let total_energy: f32 = self.creatures.values().map(|c| c.energy).sum();
+        total_energy / self.creatures.len() as f32
+    }
+
     pub fn tick_count(&self) -> u64 {
         self.tick
+    }
+
+    pub fn seed_food_density(&mut self, density: f32) {
+        let total_cells = self.cells.len();
+        if total_cells == 0 {
+            return;
+        }
+
+        for cell in &mut self.cells {
+            cell.food = 0.0;
+        }
+
+        let clamped = density.clamp(0.0, 1.0);
+        let target = ((clamped * total_cells as f32).round() as usize).min(total_cells);
+        if target == 0 {
+            return;
+        }
+
+        let sampled = sample(&mut self.rng, total_cells, target);
+        for idx in sampled.iter() {
+            self.cells[idx].food = self.config.food_max_density;
+        }
     }
 
     pub fn creature_views(&self) -> Vec<CreatureView> {
@@ -746,5 +777,30 @@ mod tests {
             world.tick();
         }
         assert!(world.creature_count() > 0);
+    }
+
+    #[test]
+    fn seed_food_density_sets_expected_occupied_cells() {
+        let cfg = WorldConfig {
+            width: 10,
+            height: 10,
+            initial_creatures: 0,
+            food_max_density: 1.0,
+            ..WorldConfig::default()
+        };
+
+        let mut world = World::new(cfg, 99);
+        world.seed_food_density(0.25);
+
+        let occupied = world
+            .cells
+            .iter()
+            .filter(|cell| (cell.food - world.config.food_max_density).abs() < f32::EPSILON)
+            .count();
+        assert_eq!(occupied, 25);
+        assert_eq!(
+            world.cells.len() - occupied,
+            world.cells.iter().filter(|cell| cell.food == 0.0).count()
+        );
     }
 }

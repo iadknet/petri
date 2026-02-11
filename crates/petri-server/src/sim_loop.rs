@@ -3,26 +3,16 @@ use std::time::Duration;
 
 use crate::AppState;
 
+pub async fn run_single_iteration(state: &AppState) -> (Option<Vec<u8>>, u64) {
+    state.run_single_iteration().await
+}
+
 pub async fn run_simulation_loop(state: AppState) -> Result<()> {
     loop {
-        let (frame, delay_ms) = {
-            let mut world = state.world.write().await;
-            let tps = world.config.ticks_per_second.max(1);
-            let delay_ms = (1000 / tps as u64).max(1);
+        let (frame, delay_ms) = run_single_iteration(&state).await;
 
-            if world.config.paused {
-                (None, delay_ms)
-            } else {
-                world.tick();
-                let frame = world.frame();
-                (Some(frame), delay_ms)
-            }
-        };
-
-        if let Some(frame) = frame {
-            if let Ok(bytes) = rmp_serde::to_vec_named(&frame) {
-                let _ = state.frames_tx.send(bytes);
-            }
+        if let Some(bytes) = frame {
+            let _ = state.frames_tx.send(bytes);
         }
 
         tokio::time::sleep(Duration::from_millis(delay_ms)).await;

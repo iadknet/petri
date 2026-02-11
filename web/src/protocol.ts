@@ -22,6 +22,32 @@ export type WorldFrame = {
 export type ConfigPatch = {
   paused?: boolean;
   ticks_per_second?: number;
+  food_spawn_rate?: number;
+  food_growth_rate?: number;
+};
+
+export type StartupDraft = {
+  initial_creatures: number;
+  initial_food_density: number;
+  food_spawn_rate: number;
+  food_growth_rate: number;
+  energy_per_tick_decay: number;
+  energy_per_move: number;
+};
+
+export type StartupDraftPatch = Partial<StartupDraft>;
+
+export type SimulationPhase = "idle" | "running" | "paused";
+
+export type SimulationStatus = {
+  phase: SimulationPhase;
+  run_id: number | null;
+  seed: number | null;
+  tick: number;
+  population: number;
+  average_energy: number;
+  pending_restart: boolean;
+  startup_draft: StartupDraft;
 };
 
 export function decodeFrame(bytes: ArrayBuffer): WorldFrame {

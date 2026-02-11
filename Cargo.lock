@@ -562,6 +562,7 @@ dependencies = [
  "axum",
  "futures-util",
  "petri-core",
+ "rand 0.8.5",
  "rmp-serde",
  "serde",
  "serde_json",
