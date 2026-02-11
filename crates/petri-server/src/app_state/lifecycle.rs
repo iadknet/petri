@@ -13,7 +13,15 @@ use super::{AppState, SimulationError, SimulationPhase, SimulationStatus};
 
 impl AppState {
     pub async fn start_simulation(&self) -> Result<SimulationStatus, SimulationError> {
-        let (seed, run_id, config, initial_food_density, probe_seed, viability_probe_enabled) = {
+        let (
+            seed,
+            run_id,
+            config,
+            initial_food_density,
+            probe_seed,
+            viability_probe_enabled,
+            startup_paint_layer,
+        ) = {
             let mut sim = self.simulation.write().await;
             if sim.run.is_some() || sim.phase == SimulationPhase::Starting {
                 return Err(SimulationError::AlreadyRunning);
@@ -25,6 +33,7 @@ impl AppState {
             let config = build_world_config(&sim.runtime_config, &sim.startup_draft);
             let initial_food_density = sim.startup_draft.initial_food_density;
             let probe_seed = startup_probe_seed(&sim.startup_draft);
+            let startup_paint_layer = sim.startup_paint_layer.clone();
             sim.phase = SimulationPhase::Starting;
             sim.initialization_stage = Some(if sim.viability_probe_enabled {
                 "viability_probe"
@@ -38,6 +47,7 @@ impl AppState {
                 initial_food_density,
                 probe_seed,
                 sim.viability_probe_enabled,
+                startup_paint_layer,
             )
         };
 
@@ -82,6 +92,7 @@ impl AppState {
         let world_build_begin = Instant::now();
         let mut world = World::new(config.clone(), seed);
         world.seed_food_density(initial_food_density);
+        startup_paint_layer.apply_to_world(&mut world);
         info!(
             run_id,
             world_build_ms = world_build_begin.elapsed().as_millis(),
@@ -116,6 +127,7 @@ impl AppState {
             probe_seed,
             fallback_phase,
             viability_probe_enabled,
+            startup_paint_layer,
         ) = {
             let mut sim = self.simulation.write().await;
             if sim.run.is_none() {
@@ -131,6 +143,7 @@ impl AppState {
             let config = build_world_config(&sim.runtime_config, &sim.startup_draft);
             let initial_food_density = sim.startup_draft.initial_food_density;
             let probe_seed = startup_probe_seed(&sim.startup_draft);
+            let startup_paint_layer = sim.startup_paint_layer.clone();
             let fallback_phase = if sim.runtime_config.paused {
                 SimulationPhase::Paused
             } else {
@@ -150,6 +163,7 @@ impl AppState {
                 probe_seed,
                 fallback_phase,
                 sim.viability_probe_enabled,
+                startup_paint_layer,
             )
         };
 
@@ -186,6 +200,7 @@ impl AppState {
         let world_build_begin = Instant::now();
         let mut world = World::new(config.clone(), seed);
         world.seed_food_density(initial_food_density);
+        startup_paint_layer.apply_to_world(&mut world);
         info!(
             run_id,
             world_build_ms = world_build_begin.elapsed().as_millis(),

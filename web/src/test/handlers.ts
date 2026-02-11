@@ -3,6 +3,10 @@ import { http, HttpResponse } from "msw";
 import {
   ConfigPatch,
   CreatureDetail,
+  IdlePreviewMode,
+  PaintPoint,
+  PaintStats,
+  PaintTool,
   SimulationStatus,
   StartupDraft,
   StartupDraftPatch
@@ -64,6 +68,8 @@ let status: SimulationStatus = {
   startup_viability_message: null,
   startup_draft: { ...defaultStartupDraft }
 };
+let foodPaintLayer = new Map<string, boolean>();
+let barrierPaintLayer = new Map<string, boolean>();
 
 export function resetMockApiState(): void {
   startupDraft = { ...defaultStartupDraft };
@@ -81,6 +87,8 @@ export function resetMockApiState(): void {
     startup_viability_message: null,
     startup_draft: { ...defaultStartupDraft }
   };
+  foodPaintLayer = new Map<string, boolean>();
+  barrierPaintLayer = new Map<string, boolean>();
 }
 
 export function setMockStatus(next: Partial<SimulationStatus>): void {
@@ -168,6 +176,144 @@ function creatureDetailForId(id: number): CreatureDetail {
   };
 }
 
+function pointKey(point: PaintPoint): string {
+  return `${point.x},${point.y}`;
+}
+
+function parsePointKey(key: string): PaintPoint {
+  const [x, y] = key.split(",").map(Number);
+  return { x, y };
+}
+
+function forEachBrushPoint(
+  points: PaintPoint[],
+  brushHalfExtent: number,
+  callback: (point: PaintPoint) => void
+): void {
+  const seen = new Set<string>();
+  for (const point of points) {
+    for (let dy = -brushHalfExtent; dy <= brushHalfExtent; dy += 1) {
+      for (let dx = -brushHalfExtent; dx <= brushHalfExtent; dx += 1) {
+        const x = point.x + dx;
+        const y = point.y + dy;
+        if (x < 0 || y < 0 || x >= startupDraft.width || y >= startupDraft.height) {
+          continue;
+        }
+        const key = `${x},${y}`;
+        if (seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        callback({ x, y });
+      }
+    }
+  }
+}
+
+function applyPaintStroke(tool: PaintTool, brushHalfExtent: number, points: PaintPoint[]): PaintStats {
+  const stats: PaintStats = {
+    affected_cells: 0,
+    food_set_cells: 0,
+    food_cleared_cells: 0,
+    barrier_set_cells: 0,
+    barrier_cleared_cells: 0,
+    creatures_removed: 0
+  };
+
+  forEachBrushPoint(points, brushHalfExtent, (point) => {
+    stats.affected_cells += 1;
+    const key = pointKey(point);
+    if (tool === "food") {
+      const previous = foodPaintLayer.get(key);
+      if (previous !== true) {
+        foodPaintLayer.set(key, true);
+        stats.food_set_cells += 1;
+      }
+    } else if (tool === "barrier") {
+      const previous = barrierPaintLayer.get(key);
+      if (previous !== true) {
+        barrierPaintLayer.set(key, true);
+        stats.barrier_set_cells += 1;
+      }
+    } else if (tool === "erase_food") {
+      const previous = foodPaintLayer.get(key);
+      if (previous !== false) {
+        foodPaintLayer.set(key, false);
+        stats.food_cleared_cells += 1;
+      }
+    } else if (tool === "erase_barrier") {
+      const previous = barrierPaintLayer.get(key);
+      if (previous !== false) {
+        barrierPaintLayer.set(key, false);
+        stats.barrier_cleared_cells += 1;
+      }
+    }
+  });
+
+  return stats;
+}
+
+function clearPaintLayer(): PaintStats {
+  const keys = new Set<string>([...foodPaintLayer.keys(), ...barrierPaintLayer.keys()]);
+  const stats: PaintStats = {
+    affected_cells: keys.size,
+    food_set_cells: 0,
+    food_cleared_cells: foodPaintLayer.size,
+    barrier_set_cells: 0,
+    barrier_cleared_cells: barrierPaintLayer.size,
+    creatures_removed: 0
+  };
+  foodPaintLayer.clear();
+  barrierPaintLayer.clear();
+  return stats;
+}
+
+function packBarrierBits(barriers: boolean[]): Uint8Array {
+  const bytes = new Uint8Array(Math.ceil(barriers.length / 8));
+  barriers.forEach((barrier, idx) => {
+    if (!barrier) {
+      return;
+    }
+    bytes[idx >> 3] |= 1 << (idx & 7);
+  });
+  return bytes;
+}
+
+function buildPaintFrame(mode: IdlePreviewMode, phase: "idle" | "paused") {
+  const width = startupDraft.width;
+  const height = startupDraft.height;
+  const total = width * height;
+  const food = new Uint8Array(total);
+  const barriers = new Array<boolean>(total).fill(false);
+
+  if (mode === "full_startup") {
+    food[0] = 25;
+  }
+
+  for (const [key, setFood] of foodPaintLayer.entries()) {
+    const point = parsePointKey(key);
+    const idx = point.y * width + point.x;
+    food[idx] = setFood ? 255 : 0;
+  }
+
+  for (const [key, setBarrier] of barrierPaintLayer.entries()) {
+    const point = parsePointKey(key);
+    const idx = point.y * width + point.x;
+    barriers[idx] = setBarrier;
+  }
+
+  return {
+    tick: status.tick,
+    width,
+    height,
+    food,
+    barrier_bits: packBarrierBits(barriers),
+    creatures: [],
+    population: phase === "paused" ? status.population : mode === "full_startup" ? startupDraft.initial_creatures : 0,
+    average_energy: status.average_energy
+  };
+}
+
 export const handlers = [
   http.get(`${API_BASE}/simulation/status`, () => HttpResponse.json(status)),
   http.get(`${API_BASE}/simulation/startup-draft`, () => HttpResponse.json(startupDraft)),
@@ -229,6 +375,68 @@ export const handlers = [
     return HttpResponse.json(creatureDetailForId(id));
   }),
   http.get(`${API_BASE}/simulation/snapshot`, () => HttpResponse.json(currentSnapshot())),
+  http.post(`${API_BASE}/simulation/world/paint`, async ({ request }) => {
+    const payload = (await request.json()) as {
+      action: "stroke" | "clear_all" | "preview";
+      tool?: PaintTool;
+      brush_half_extent?: number;
+      points?: PaintPoint[];
+      idle_preview_mode?: IdlePreviewMode;
+    };
+
+    if (status.phase === "running" || status.phase === "starting") {
+      return HttpResponse.json(
+        {
+          code: "paint_phase_not_editable",
+          message: "painting is only allowed in idle or paused"
+        },
+        { status: 409 }
+      );
+    }
+
+    const phase: "idle" | "paused" = status.phase === "paused" ? "paused" : "idle";
+    const mode = payload.idle_preview_mode ?? "paint_layer";
+    let stats: PaintStats = {
+      affected_cells: 0,
+      food_set_cells: 0,
+      food_cleared_cells: 0,
+      barrier_set_cells: 0,
+      barrier_cleared_cells: 0,
+      creatures_removed: 0
+    };
+
+    if (payload.action === "stroke") {
+      if (!payload.tool) {
+        return HttpResponse.json(
+          { code: "invalid_paint_request", message: "tool is required for stroke action" },
+          { status: 400 }
+        );
+      }
+      if (
+        payload.brush_half_extent !== 0 &&
+        payload.brush_half_extent !== 1 &&
+        payload.brush_half_extent !== 2
+      ) {
+        return HttpResponse.json(
+          { code: "invalid_paint_request", message: "brush_half_extent must be 0, 1, or 2" },
+          { status: 400 }
+        );
+      }
+      stats = applyPaintStroke(
+        payload.tool,
+        payload.brush_half_extent,
+        payload.points ?? []
+      );
+    } else if (payload.action === "clear_all") {
+      stats = clearPaintLayer();
+    }
+
+    return HttpResponse.json({
+      phase,
+      stats,
+      frame: buildPaintFrame(mode, phase)
+    });
+  }),
   http.post(`${API_BASE}/simulation/snapshot`, async ({ request }) => {
     const payload = (await request.json()) as { tick?: number };
     status = {

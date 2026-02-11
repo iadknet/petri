@@ -118,6 +118,38 @@ export type ConfigPatch = {
   structural_mutation_rate?: number;
 };
 
+export type PaintTool = "food" | "barrier" | "erase_food" | "erase_barrier";
+export type PaintAction = "stroke" | "clear_all" | "preview";
+export type IdlePreviewMode = "paint_layer" | "full_startup";
+
+export type PaintPoint = {
+  x: number;
+  y: number;
+};
+
+export type PaintStats = {
+  affected_cells: number;
+  food_set_cells: number;
+  food_cleared_cells: number;
+  barrier_set_cells: number;
+  barrier_cleared_cells: number;
+  creatures_removed: number;
+};
+
+export type WorldPaintRequest = {
+  action: PaintAction;
+  tool?: PaintTool;
+  brush_half_extent?: 0 | 1 | 2;
+  points?: PaintPoint[];
+  idle_preview_mode?: IdlePreviewMode;
+};
+
+export type WorldPaintResponse = {
+  phase: "idle" | "paused";
+  stats: PaintStats;
+  frame: WorldFrame;
+};
+
 export type StartupDraft = {
   initial_creatures: number;
   max_creatures: number;

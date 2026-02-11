@@ -3,6 +3,7 @@ use std::collections::{HashMap, VecDeque};
 use petri_graph::{ActionOutputs, ComputationGraph, ControllerPalette, SensorInputs};
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
+use serde::{Deserialize, Serialize};
 use slotmap::{Key, SlotMap};
 
 use crate::config::WorldConfig;
@@ -13,6 +14,7 @@ use crate::types::{
 
 mod food;
 mod helpers;
+mod paint;
 mod perception;
 mod snapshot;
 mod spawn;
@@ -29,6 +31,7 @@ const FOUNDER_MEMORY_REGISTER_BITS: usize = 32;
 const MEMORY_REGISTER_MIN_BITS: usize = 1;
 const MAX_MEMORY_REGISTER_BITS: usize = 1024;
 const MEMORY_REGISTER_MUTATION_STEP_MAX_BITS: usize = 32;
+const MAX_BRUSH_HALF_EXTENT: u8 = 2;
 type OffspringRequest = (
     u32,
     u32,
@@ -49,6 +52,36 @@ pub struct CreatureView {
     pub energy: f32,
     pub age: u64,
     pub generation: u32,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum PaintTool {
+    Food,
+    Barrier,
+    EraseFood,
+    EraseBarrier,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub struct PaintPoint {
+    pub x: u32,
+    pub y: u32,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct PaintStats {
+    pub affected_cells: usize,
+    pub food_set_cells: usize,
+    pub food_cleared_cells: usize,
+    pub barrier_set_cells: usize,
+    pub barrier_cleared_cells: usize,
+    pub creatures_removed: usize,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PaintError {
+    InvalidBrushHalfExtent { received: u8, max: u8 },
 }
 
 #[derive(Clone, Copy, Debug)]

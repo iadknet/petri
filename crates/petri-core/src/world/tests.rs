@@ -1438,3 +1438,135 @@ fn seed_food_density_sets_expected_occupied_cells() {
         world.cells.iter().filter(|cell| cell.food == 0.0).count()
     );
 }
+
+#[test]
+fn paint_square_brush_half_extents_cover_expected_cell_counts() {
+    let cfg = WorldConfig {
+        width: 20,
+        height: 20,
+        initial_creatures: 0,
+        food_max_density: 1.0,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new(cfg, 9001);
+    let point = PaintPoint { x: 10, y: 10 };
+
+    let one = world
+        .apply_paint_stroke(PaintTool::Food, 0, &[point])
+        .expect("extent 0 should be valid");
+    assert_eq!(one.affected_cells, 1);
+
+    world.clear_painted_cells();
+    let three = world
+        .apply_paint_stroke(PaintTool::Food, 1, &[point])
+        .expect("extent 1 should be valid");
+    assert_eq!(three.affected_cells, 9);
+
+    world.clear_painted_cells();
+    let five = world
+        .apply_paint_stroke(PaintTool::Food, 2, &[point])
+        .expect("extent 2 should be valid");
+    assert_eq!(five.affected_cells, 25);
+}
+
+#[test]
+fn paint_food_sets_cells_to_food_max_density() {
+    let cfg = WorldConfig {
+        width: 12,
+        height: 12,
+        initial_creatures: 0,
+        food_max_density: 1.5,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new(cfg, 9002);
+    let point = PaintPoint { x: 5, y: 6 };
+    let stats = world
+        .apply_paint_stroke(PaintTool::Food, 1, &[point])
+        .expect("food paint should succeed");
+
+    assert_eq!(stats.food_set_cells, 9);
+    assert_eq!(stats.food_cleared_cells, 0);
+    for x in 4..=6 {
+        for y in 5..=7 {
+            let idx = world.idx(x, y);
+            assert!((world.cells[idx].food - world.config.food_max_density).abs() < f32::EPSILON);
+        }
+    }
+}
+
+#[test]
+fn paint_erase_food_zeros_targeted_cells() {
+    let cfg = WorldConfig {
+        width: 10,
+        height: 10,
+        initial_creatures: 0,
+        food_max_density: 1.0,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new(cfg, 9003);
+    let idx = world.idx(3, 4);
+    world.cells[idx].food = 0.8;
+
+    let stats = world
+        .apply_paint_stroke(PaintTool::EraseFood, 0, &[PaintPoint { x: 3, y: 4 }])
+        .expect("food erase should succeed");
+
+    assert_eq!(stats.food_cleared_cells, 1);
+    assert_eq!(world.cells[idx].food, 0.0);
+}
+
+#[test]
+fn paint_barrier_removes_creatures_without_counting_starvation_deaths() {
+    let cfg = WorldConfig {
+        width: 8,
+        height: 8,
+        initial_creatures: 1,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new(cfg, 9004);
+    let (_, creature) = world
+        .creatures
+        .iter()
+        .next()
+        .expect("expected one creature");
+    let point = PaintPoint {
+        x: creature.x,
+        y: creature.y,
+    };
+    let idx = world.idx(point.x, point.y);
+    let deaths_before = world.diagnostics().deaths;
+
+    let stats = world
+        .apply_paint_stroke(PaintTool::Barrier, 0, &[point])
+        .expect("barrier paint should succeed");
+
+    assert_eq!(stats.creatures_removed, 1);
+    assert_eq!(world.creature_count(), 0);
+    assert!(world.cells[idx].barrier);
+    assert_eq!(world.diagnostics().deaths, deaths_before);
+}
+
+#[test]
+fn paint_clear_all_resets_food_and_barriers() {
+    let cfg = WorldConfig {
+        width: 10,
+        height: 10,
+        initial_creatures: 0,
+        food_max_density: 1.0,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new(cfg, 9005);
+    world
+        .apply_paint_stroke(PaintTool::Food, 1, &[PaintPoint { x: 4, y: 4 }])
+        .expect("food paint should succeed");
+    world
+        .apply_paint_stroke(PaintTool::Barrier, 1, &[PaintPoint { x: 6, y: 6 }])
+        .expect("barrier paint should succeed");
+
+    let stats = world.clear_painted_cells();
+
+    assert!(stats.food_cleared_cells > 0);
+    assert!(stats.barrier_cleared_cells > 0);
+    assert!(world.cells.iter().all(|cell| !cell.barrier));
+    assert!(world.cells.iter().all(|cell| cell.food == 0.0));
+}

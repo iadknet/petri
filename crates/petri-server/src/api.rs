@@ -15,7 +15,10 @@ use tower_http::cors::CorsLayer;
 
 use petri_core::{WorldConfig, WorldSnapshot};
 
-use crate::app_state::{RuntimeConfigPatch, SimulationError, StartupDraft, StartupDraftPatch};
+use crate::app_state::{
+    RuntimeConfigPatch, SimulationError, StartupDraft, StartupDraftPatch, WorldPaintRequest,
+    WorldPaintResponse,
+};
 use crate::AppState;
 
 #[derive(Debug, Serialize)]
@@ -35,6 +38,7 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/simulation/start", post(start_simulation))
         .route("/simulation/restart", post(restart_simulation))
+        .route("/simulation/world/paint", post(paint_world))
         .route("/simulation/creature/{id}", get(get_creature_detail))
         .route(
             "/simulation/snapshot",
@@ -139,6 +143,17 @@ async fn load_snapshot(
     Json(state.load_simulation_snapshot(snapshot).await)
 }
 
+async fn paint_world(
+    State(state): State<AppState>,
+    Json(request): Json<WorldPaintRequest>,
+) -> Result<Json<WorldPaintResponse>, (StatusCode, Json<ApiErrorResponse>)> {
+    state
+        .paint_world(request)
+        .await
+        .map(Json)
+        .map_err(map_simulation_error)
+}
+
 async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {
     ws.on_upgrade(move |socket| websocket_session(socket, state))
 }
@@ -171,7 +186,9 @@ async fn websocket_session(mut socket: WebSocket, state: AppState) {
 fn map_simulation_error(err: SimulationError) -> (StatusCode, Json<ApiErrorResponse>) {
     let status = match err {
         SimulationError::InvalidStartupRange { .. } => StatusCode::BAD_REQUEST,
+        SimulationError::InvalidPaintRequest { .. } => StatusCode::BAD_REQUEST,
         SimulationError::AlreadyRunning | SimulationError::NoActiveRun => StatusCode::CONFLICT,
+        SimulationError::PaintPhaseNotEditable { .. } => StatusCode::CONFLICT,
         SimulationError::NonViableStartupConfig => StatusCode::UNPROCESSABLE_ENTITY,
     };
 
