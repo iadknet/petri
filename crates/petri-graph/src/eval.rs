@@ -278,6 +278,10 @@ impl ComputationGraph {
                         | NodeKind::InputRandom
                         | NodeKind::InputFoodDirection
                         | NodeKind::InputFoodDistance
+                        | NodeKind::InputCreatureDirection
+                        | NodeKind::InputCreatureDistance
+                        | NodeKind::InputLocalDensity
+                        | NodeKind::InputMoveBlockedLastTick
                         | NodeKind::OutputMoveX
                         | NodeKind::OutputMoveY
                         | NodeKind::OutputEat
@@ -310,6 +314,16 @@ impl ComputationGraph {
                 NodeKind::InputRandom => inputs.random.clamp(-1.0, 1.0),
                 NodeKind::InputFoodDirection => inputs.food_direction.clamp(-1.0, 1.0),
                 NodeKind::InputFoodDistance => inputs.food_distance.clamp(0.0, 1.0),
+                NodeKind::InputCreatureDirection => inputs.creature_direction.clamp(-1.0, 1.0),
+                NodeKind::InputCreatureDistance => inputs.creature_distance.clamp(0.0, 1.0),
+                NodeKind::InputLocalDensity => inputs.local_density.clamp(0.0, 1.0),
+                NodeKind::InputMoveBlockedLastTick => {
+                    if inputs.move_blocked_last_tick > 0.5 {
+                        1.0
+                    } else {
+                        0.0
+                    }
+                }
                 NodeKind::Constant(v) => v,
                 NodeKind::Add => weighted_inputs.iter().sum(),
                 NodeKind::Multiply => {
@@ -318,6 +332,18 @@ impl ComputationGraph {
                     } else {
                         weighted_inputs.iter().copied().product()
                     }
+                }
+                NodeKind::Negate => -weighted_inputs.iter().sum::<f32>(),
+                NodeKind::Abs => weighted_inputs.iter().sum::<f32>().abs(),
+                NodeKind::Min => {
+                    let a = *weighted_inputs.first().unwrap_or(&0.0);
+                    let b = *weighted_inputs.get(1).unwrap_or(&0.0);
+                    a.min(b)
+                }
+                NodeKind::Max => {
+                    let a = *weighted_inputs.first().unwrap_or(&0.0);
+                    let b = *weighted_inputs.get(1).unwrap_or(&0.0);
+                    a.max(b)
                 }
                 NodeKind::Threshold(t) => {
                     if weighted_inputs.iter().sum::<f32>() >= t {
@@ -402,6 +428,10 @@ fn is_input_node(node: &NodeKind) -> bool {
             | NodeKind::InputRandom
             | NodeKind::InputFoodDirection
             | NodeKind::InputFoodDistance
+            | NodeKind::InputCreatureDirection
+            | NodeKind::InputCreatureDistance
+            | NodeKind::InputLocalDensity
+            | NodeKind::InputMoveBlockedLastTick
     )
 }
 
@@ -420,15 +450,19 @@ fn is_hidden_node(node: &NodeKind) -> bool {
 }
 
 fn random_hidden_node<R: Rng>(rng: &mut R) -> NodeKind {
-    match rng.gen_range(0..9) {
+    match rng.gen_range(0..13) {
         0 => NodeKind::Add,
         1 => NodeKind::Multiply,
-        2 => NodeKind::Threshold(rng.gen_range(0.0..=1.0)),
-        3 => NodeKind::GreaterThan,
-        4 => NodeKind::Sigmoid,
-        5 => NodeKind::Tanh,
-        6 => NodeKind::Relu,
-        7 => NodeKind::Select,
+        2 => NodeKind::Negate,
+        3 => NodeKind::Abs,
+        4 => NodeKind::Min,
+        5 => NodeKind::Max,
+        6 => NodeKind::Threshold(rng.gen_range(0.0..=1.0)),
+        7 => NodeKind::GreaterThan,
+        8 => NodeKind::Sigmoid,
+        9 => NodeKind::Tanh,
+        10 => NodeKind::Relu,
+        11 => NodeKind::Select,
         _ => NodeKind::Constant(rng.gen_range(-1.0..=1.0)),
     }
 }
@@ -855,81 +889,133 @@ fn founder_hybrid() -> ComputationGraph {
     ComputationGraph {
         palette: ControllerPalette::Hybrid,
         nodes: vec![
-            NodeKind::InputFoodHere,      // 0
-            NodeKind::InputEnergy,        // 1
-            NodeKind::InputRandom,        // 2
-            NodeKind::Threshold(0.08),    // 3
-            NodeKind::OutputEat,          // 4
-            NodeKind::Threshold(0.9),     // 5
-            NodeKind::Multiply,           // 6
-            NodeKind::OutputReproduce,    // 7
-            NodeKind::Tanh,               // 8
-            NodeKind::OutputMoveX,        // 9
-            NodeKind::Tanh,               // 10
-            NodeKind::OutputMoveY,        // 11
-            NodeKind::InputFoodDirection, // 12
-            NodeKind::InputFoodDistance,  // 13
+            NodeKind::InputFoodHere,            // 0
+            NodeKind::InputEnergy,              // 1
+            NodeKind::InputRandom,              // 2
+            NodeKind::InputFoodDirection,       // 3
+            NodeKind::InputFoodDistance,        // 4
+            NodeKind::InputCreatureDirection,   // 5
+            NodeKind::InputCreatureDistance,    // 6
+            NodeKind::InputLocalDensity,        // 7
+            NodeKind::InputMoveBlockedLastTick, // 8
+            NodeKind::Threshold(0.08),          // 9
+            NodeKind::OutputEat,                // 10
+            NodeKind::Constant(-7.0),           // 11
+            NodeKind::Add,                      // 12
+            NodeKind::Sigmoid,                  // 13
+            NodeKind::OutputReproduce,          // 14
+            NodeKind::Add,                      // 15
+            NodeKind::Tanh,                     // 16
+            NodeKind::OutputMoveX,              // 17
+            NodeKind::Add,                      // 18
+            NodeKind::Tanh,                     // 19
+            NodeKind::OutputMoveY,              // 20
         ],
         edges: vec![
             Edge {
                 from: 0,
-                to: 3,
-                weight: 1.0,
-            },
-            Edge {
-                from: 3,
-                to: 4,
-                weight: 1.0,
-            },
-            Edge {
-                from: 1,
-                to: 5,
-                weight: 1.0,
-            },
-            Edge {
-                from: 3,
-                to: 6,
-                weight: 1.0,
-            },
-            Edge {
-                from: 5,
-                to: 6,
-                weight: 1.0,
-            },
-            Edge {
-                from: 6,
-                to: 7,
-                weight: 1.0,
-            },
-            Edge {
-                from: 2,
-                to: 8,
-                weight: 0.4,
-            },
-            Edge {
-                from: 8,
                 to: 9,
                 weight: 1.0,
             },
             Edge {
-                from: 2,
+                from: 9,
                 to: 10,
-                weight: -0.4,
+                weight: 1.0,
             },
             Edge {
-                from: 10,
-                to: 11,
+                from: 1,
+                to: 12,
+                weight: 8.0,
+            },
+            Edge {
+                from: 0,
+                to: 12,
+                weight: 1.0,
+            },
+            Edge {
+                from: 6,
+                to: 12,
+                weight: 1.0,
+            },
+            Edge {
+                from: 7,
+                to: 12,
+                weight: -2.0,
+            },
+            Edge {
+                from: 11,
+                to: 12,
                 weight: 1.0,
             },
             Edge {
                 from: 12,
-                to: 8,
-                weight: 0.35,
+                to: 13,
+                weight: 1.0,
             },
             Edge {
                 from: 13,
-                to: 10,
+                to: 14,
+                weight: 1.0,
+            },
+            Edge {
+                from: 2,
+                to: 15,
+                weight: 0.4,
+            },
+            Edge {
+                from: 3,
+                to: 15,
+                weight: 0.35,
+            },
+            Edge {
+                from: 5,
+                to: 15,
+                weight: -0.25,
+            },
+            Edge {
+                from: 8,
+                to: 15,
+                weight: -0.8,
+            },
+            Edge {
+                from: 15,
+                to: 16,
+                weight: 1.0,
+            },
+            Edge {
+                from: 16,
+                to: 17,
+                weight: 1.0,
+            },
+            Edge {
+                from: 2,
+                to: 18,
+                weight: -0.4,
+            },
+            Edge {
+                from: 4,
+                to: 18,
                 weight: -0.35,
+            },
+            Edge {
+                from: 6,
+                to: 18,
+                weight: 0.25,
+            },
+            Edge {
+                from: 8,
+                to: 18,
+                weight: 0.8,
+            },
+            Edge {
+                from: 18,
+                to: 19,
+                weight: 1.0,
+            },
+            Edge {
+                from: 19,
+                to: 20,
+                weight: 1.0,
             },
         ],
     }

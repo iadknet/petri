@@ -1,7 +1,7 @@
 import { encode } from "@msgpack/msgpack";
 import { describe, expect, it } from "vitest";
 
-import { decodeFrame } from "./protocol";
+import { CreatureDetail, decodeFrame } from "./protocol";
 
 describe("protocol", () => {
   it("decodes a world frame payload", () => {
@@ -30,5 +30,40 @@ describe("protocol", () => {
     expect(decoded.creatures[0].lineage_id).toBe(100);
     expect(decoded.creatures[1].parent_id).toBe(1);
     expect(decoded.creatures[1].node_count).toBe(9);
+  });
+
+  it("supports creature detail payload typing", () => {
+    const detail: CreatureDetail = {
+      id: 1,
+      lineage_id: 100,
+      parent_id: null,
+      x: 10,
+      y: 11,
+      energy: 0.7,
+      age: 5,
+      generation: 0,
+      node_count: 7,
+      last_move_blocked: false,
+      last_inputs: {
+        food_here: 0,
+        energy: 0.5,
+        random: 0,
+        food_direction: 0,
+        food_distance: 1,
+        creature_direction: 0.25,
+        creature_distance: 0.75,
+        local_density: 0.1,
+        move_blocked_last_tick: 0
+      },
+      last_outputs: {
+        move_x: 0.4,
+        move_y: -0.2,
+        eat: 0.6,
+        reproduce: 0.1
+      },
+      events: [{ kind: "Moved", tick: 12 }]
+    };
+
+    expect(detail.last_outputs.eat).toBeCloseTo(0.6);
   });
 });

@@ -50,6 +50,46 @@ export type WorldSnapshot = {
   next_lineage_id: number;
 };
 
+export type SensorInputs = {
+  food_here: number;
+  energy: number;
+  random: number;
+  food_direction: number;
+  food_distance: number;
+  creature_direction: number;
+  creature_distance: number;
+  local_density: number;
+  move_blocked_last_tick: number;
+};
+
+export type ActionOutputs = {
+  move_x: number;
+  move_y: number;
+  eat: number;
+  reproduce: number;
+};
+
+export type CreatureEvent = {
+  kind: "AteFood" | "Reproduced" | "Starved" | "Moved";
+  tick: number;
+};
+
+export type CreatureDetail = {
+  id: number;
+  lineage_id: number;
+  parent_id: number | null;
+  x: number;
+  y: number;
+  energy: number;
+  age: number;
+  generation: number;
+  node_count: number;
+  last_move_blocked: boolean;
+  last_inputs: SensorInputs;
+  last_outputs: ActionOutputs;
+  events: CreatureEvent[];
+};
+
 export type ConfigPatch = {
   paused?: boolean;
   ticks_per_second?: number;

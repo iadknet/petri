@@ -1,5 +1,6 @@
 import {
   ConfigPatch,
+  CreatureDetail,
   SimulationStatus,
   StartupDraft,
   StartupDraftPatch,
@@ -118,6 +119,14 @@ export class SimulationApiClient {
       throw new Error(await parseError(response));
     }
     return (await response.json()) as WorldSnapshot;
+  }
+
+  async getCreatureDetail(id: number): Promise<CreatureDetail> {
+    const response = await fetch(`${this.apiBase}/simulation/creature/${id}`);
+    if (!response.ok) {
+      throw new Error(await parseError(response));
+    }
+    return (await response.json()) as CreatureDetail;
   }
 
   async loadSnapshot(snapshot: WorldSnapshot): Promise<SimulationStatus> {

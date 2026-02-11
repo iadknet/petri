@@ -1,6 +1,8 @@
 use std::collections::{HashMap, VecDeque};
 
-use petri_graph::{ComputationGraph, ControllerPalette, MutationConfig, SensorInputs};
+use petri_graph::{
+    ActionOutputs, ComputationGraph, ControllerPalette, MutationConfig, SensorInputs,
+};
 use rand::rngs::SmallRng;
 use rand::seq::index::sample;
 use rand::{Rng, SeedableRng};
@@ -8,8 +10,8 @@ use slotmap::{Key, SlotMap};
 
 use crate::config::WorldConfig;
 use crate::types::{
-    CreatureEvent, CreatureEventKind, CreatureId, CreatureSnapshot, CreatureStateSnapshot,
-    WorldDiagnostics, WorldFrame, WorldSnapshot,
+    CreatureDetail, CreatureEvent, CreatureEventKind, CreatureId, CreatureSnapshot,
+    CreatureStateSnapshot, WorldDiagnostics, WorldFrame, WorldSnapshot,
 };
 
 const EVENT_LOG_CAPACITY: usize = 8;
@@ -45,6 +47,18 @@ struct Creature {
     controller: ComputationGraph,
     rng: SmallRng,
     events: VecDeque<CreatureEvent>,
+    last_move_blocked: bool,
+    last_inputs: SensorInputs,
+    last_outputs: ActionOutputs,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct PerceptionScan {
+    food_direction: f32,
+    food_distance: f32,
+    creature_direction: f32,
+    creature_distance: f32,
+    local_density: f32,
 }
 
 pub struct World {
@@ -110,14 +124,14 @@ impl World {
             let mut child_request: Option<OffspringRequest> = None;
             let mut reproduce_from: Option<(u32, u32)> = None;
             let mut reproduce_intent = false;
-            let (sensor_x, sensor_y) = {
+            let (sensor_x, sensor_y, move_blocked_last_tick) = {
                 let creature = self
                     .creatures
                     .get(id)
                     .expect("id list should only contain live creatures");
-                (creature.x, creature.y)
+                (creature.x, creature.y, creature.last_move_blocked)
             };
-            let (food_direction, food_distance) = self.nearest_food_sensor(sensor_x, sensor_y);
+            let perception = self.scan_perception(sensor_x, sensor_y, Some(id));
             let offspring_mutation_cfg = self.offspring_mutation_config();
 
             {
@@ -133,13 +147,20 @@ impl World {
                 creature.energy -= self.config.energy_per_tick_decay + compute_cost;
 
                 let current_idx = (creature.y * width + creature.x) as usize;
-                let outputs = creature.controller.evaluate(SensorInputs {
+                let inputs = SensorInputs {
                     food_here: self.cells[current_idx].food,
                     energy: (creature.energy / self.config.energy_max).clamp(0.0, 1.0),
                     random: creature.rng.gen_range(-1.0_f32..=1.0_f32),
-                    food_direction,
-                    food_distance,
-                });
+                    food_direction: perception.food_direction,
+                    food_distance: perception.food_distance,
+                    creature_direction: perception.creature_direction,
+                    creature_distance: perception.creature_distance,
+                    local_density: perception.local_density,
+                    move_blocked_last_tick: if move_blocked_last_tick { 1.0 } else { 0.0 },
+                };
+                creature.last_inputs = inputs;
+                let outputs = creature.controller.evaluate(inputs);
+                creature.last_outputs = outputs;
 
                 if outputs.eat > 0.5 {
                     let available_food = self.cells[current_idx].food;
@@ -155,7 +176,10 @@ impl World {
 
                 let dx = axis_step(outputs.move_x);
                 let dy = axis_step(outputs.move_y);
+                let mut move_attempted = false;
+                let mut move_succeeded = false;
                 if dx != 0 || dy != 0 {
+                    move_attempted = true;
                     let nx = map_axis(creature.x as i32 + dx, width, self.config.world_wrap);
                     let ny = map_axis(creature.y as i32 + dy, height, self.config.world_wrap);
                     let next_idx = (ny * width + nx) as usize;
@@ -168,8 +192,10 @@ impl World {
                         creature.energy -= self.config.energy_per_move;
                         self.diagnostics.moves += 1;
                         push_event(creature, CreatureEventKind::Moved, self.tick);
+                        move_succeeded = true;
                     }
                 }
+                creature.last_move_blocked = move_attempted && !move_succeeded;
 
                 if outputs.reproduce > 0.5
                     && can_spawn_more
@@ -259,6 +285,9 @@ impl World {
                 controller,
                 rng: SmallRng::seed_from_u64(seed),
                 events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
+                last_move_blocked: false,
+                last_inputs: SensorInputs::default(),
+                last_outputs: ActionOutputs::default(),
             };
             let child_id = self.creatures.insert(child);
             self.creature_at[idx] = Some(child_id);
@@ -366,6 +395,31 @@ impl World {
             .collect()
     }
 
+    pub fn creature_detail(&self, creature_id: u64) -> Option<CreatureDetail> {
+        self.creatures.iter().find_map(|(id, c)| {
+            let id_u64 = id.data().as_ffi();
+            if id_u64 != creature_id {
+                return None;
+            }
+
+            Some(CreatureDetail {
+                id: id_u64,
+                lineage_id: c.lineage_id,
+                parent_id: c.parent_id,
+                x: c.x,
+                y: c.y,
+                energy: c.energy,
+                age: c.age,
+                generation: c.generation,
+                node_count: c.controller.compute_node_count() as u32,
+                last_move_blocked: c.last_move_blocked,
+                last_inputs: c.last_inputs,
+                last_outputs: c.last_outputs,
+                events: c.events.iter().copied().collect(),
+            })
+        })
+    }
+
     pub fn snapshot(&self) -> WorldSnapshot {
         let creatures = self
             .creatures
@@ -380,6 +434,9 @@ impl World {
                 age: c.age,
                 generation: c.generation,
                 controller: c.controller.clone(),
+                last_move_blocked: c.last_move_blocked,
+                last_inputs: c.last_inputs,
+                last_outputs: c.last_outputs,
             })
             .collect::<Vec<_>>();
 
@@ -437,6 +494,9 @@ impl World {
                 controller: creature.controller,
                 rng: SmallRng::seed_from_u64(old_id ^ snapshot.tick.rotate_left(13)),
                 events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
+                last_move_blocked: creature.last_move_blocked,
+                last_inputs: creature.last_inputs,
+                last_outputs: creature.last_outputs,
             };
 
             let new_id = world.creatures.insert(new_creature);
@@ -526,6 +586,9 @@ impl World {
                     controller,
                     rng: SmallRng::seed_from_u64(seed),
                     events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
+                    last_move_blocked: false,
+                    last_inputs: SensorInputs::default(),
+                    last_outputs: ActionOutputs::default(),
                 };
                 let id = self.creatures.insert(creature);
                 self.creature_at[idx] = Some(id);
@@ -624,8 +687,11 @@ impl World {
         }
     }
 
-    fn nearest_food_sensor(&self, x: u32, y: u32) -> (f32, f32) {
-        let mut best: Option<(i32, i32, i32)> = None;
+    fn scan_perception(&self, x: u32, y: u32, self_id: Option<CreatureId>) -> PerceptionScan {
+        let mut food_best: Option<(i32, i32, i32)> = None;
+        let mut creature_best: Option<(i32, i32, i32)> = None;
+        let mut scanned_cells = 0_usize;
+        let mut occupied_cells = 0_usize;
         let width = self.config.width as i32;
         let height = self.config.height as i32;
 
@@ -646,28 +712,55 @@ impl World {
                     continue;
                 };
                 let idx = self.idx(nx, ny);
-                if self.cells[idx].food <= 0.0 {
-                    continue;
+
+                if dx != 0 || dy != 0 {
+                    scanned_cells += 1;
                 }
 
-                let dist_sq = dx * dx + dy * dy;
-                match best {
-                    Some((best_dist_sq, _, _)) if dist_sq >= best_dist_sq => {}
-                    _ => best = Some((dist_sq, dx, dy)),
+                if self.cells[idx].food > 0.0 {
+                    let dist_sq = dx * dx + dy * dy;
+                    match food_best {
+                        Some((best_dist_sq, _, _)) if dist_sq >= best_dist_sq => {}
+                        _ => food_best = Some((dist_sq, dx, dy)),
+                    }
+                }
+
+                if let Some(other_id) = self.creature_at[idx] {
+                    if Some(other_id) != self_id {
+                        if dx != 0 || dy != 0 {
+                            occupied_cells += 1;
+                        }
+                        let dist_sq = dx * dx + dy * dy;
+                        match creature_best {
+                            Some((best_dist_sq, _, _)) if dist_sq >= best_dist_sq => {}
+                            _ => creature_best = Some((dist_sq, dx, dy)),
+                        }
+                    }
                 }
             }
         }
 
-        let Some((dist_sq, dx, dy)) = best else {
-            return (0.0, 1.0);
+        let (food_direction, food_distance) = sensor_from_best(food_best);
+        let (creature_direction, creature_distance) = sensor_from_best(creature_best);
+        let local_density = if scanned_cells == 0 {
+            0.0
+        } else {
+            (occupied_cells as f32 / scanned_cells as f32).clamp(0.0, 1.0)
         };
-        if dist_sq == 0 {
-            return (0.0, 0.0);
-        }
 
-        let distance = (dist_sq as f32).sqrt() / FOOD_SENSOR_RADIUS as f32;
-        let direction = (dy as f32).atan2(dx as f32) / std::f32::consts::PI;
-        (direction.clamp(-1.0, 1.0), distance.clamp(0.0, 1.0))
+        PerceptionScan {
+            food_direction,
+            food_distance,
+            creature_direction,
+            creature_distance,
+            local_density,
+        }
+    }
+
+    #[cfg(test)]
+    fn nearest_food_sensor(&self, x: u32, y: u32) -> (f32, f32) {
+        let scan = self.scan_perception(x, y, None);
+        (scan.food_direction, scan.food_distance)
     }
 
     fn initial_mutation_config(&self) -> MutationConfig {
@@ -728,6 +821,19 @@ impl World {
     fn idx(&self, x: u32, y: u32) -> usize {
         (y * self.config.width + x) as usize
     }
+}
+
+fn sensor_from_best(best: Option<(i32, i32, i32)>) -> (f32, f32) {
+    let Some((dist_sq, dx, dy)) = best else {
+        return (0.0, 1.0);
+    };
+    if dist_sq == 0 {
+        return (0.0, 0.0);
+    }
+
+    let distance = (dist_sq as f32).sqrt() / FOOD_SENSOR_RADIUS as f32;
+    let direction = (dy as f32).atan2(dx as f32) / std::f32::consts::PI;
+    (direction.clamp(-1.0, 1.0), distance.clamp(0.0, 1.0))
 }
 
 fn axis_step(value: f32) -> i32 {
@@ -996,6 +1102,19 @@ mod tests {
         }
     }
 
+    fn idle_controller() -> ComputationGraph {
+        ComputationGraph {
+            palette: ControllerPalette::Hybrid,
+            nodes: vec![
+                NodeKind::OutputMoveX,
+                NodeKind::OutputMoveY,
+                NodeKind::OutputEat,
+                NodeKind::OutputReproduce,
+            ],
+            edges: vec![],
+        }
+    }
+
     #[test]
     fn initial_population_has_founder_variation() {
         let cfg = WorldConfig {
@@ -1199,6 +1318,138 @@ mod tests {
     }
 
     #[test]
+    fn perception_reports_nearest_creature_direction_distance_and_density() {
+        let cfg = WorldConfig {
+            width: 10,
+            height: 10,
+            initial_creatures: 0,
+            world_wrap: false,
+            ..WorldConfig::default()
+        };
+        let mut world = World::new_with_palette(cfg, 424, ControllerPalette::Hybrid);
+
+        let a = Creature {
+            x: 5,
+            y: 5,
+            energy: 1.0,
+            age: 0,
+            generation: 0,
+            lineage_id: 1,
+            parent_id: None,
+            controller: idle_controller(),
+            rng: SmallRng::seed_from_u64(1),
+            events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
+            last_move_blocked: false,
+            last_inputs: SensorInputs::default(),
+            last_outputs: petri_graph::ActionOutputs::default(),
+        };
+        let b = Creature {
+            x: 7,
+            y: 5,
+            energy: 1.0,
+            age: 0,
+            generation: 0,
+            lineage_id: 2,
+            parent_id: None,
+            controller: idle_controller(),
+            rng: SmallRng::seed_from_u64(2),
+            events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
+            last_move_blocked: false,
+            last_inputs: SensorInputs::default(),
+            last_outputs: petri_graph::ActionOutputs::default(),
+        };
+        let id_a = world.creatures.insert(a);
+        let id_b = world.creatures.insert(b);
+        let idx_a = world.idx(5, 5);
+        let idx_b = world.idx(7, 5);
+        world.creature_at[idx_a] = Some(id_a);
+        world.creature_at[idx_b] = Some(id_b);
+
+        world.tick();
+
+        let a_after = world.creatures.get(id_a).expect("a should survive");
+        assert!(
+            a_after.last_inputs.creature_direction.abs() < 0.01,
+            "expected eastward direction, got {}",
+            a_after.last_inputs.creature_direction
+        );
+        assert!(
+            (a_after.last_inputs.creature_distance - (2.0 / FOOD_SENSOR_RADIUS as f32)).abs()
+                < 0.02
+        );
+        assert!(a_after.last_inputs.local_density > 0.0);
+        assert!(a_after.last_inputs.local_density < 0.2);
+    }
+
+    #[test]
+    fn move_blocked_feedback_toggles_for_failed_and_successful_moves() {
+        let cfg = WorldConfig {
+            width: 5,
+            height: 5,
+            initial_creatures: 1,
+            world_wrap: false,
+            ..WorldConfig::default()
+        };
+        let mut world = World::new_with_palette(cfg, 5155, ControllerPalette::Hybrid);
+        let (id, old_x, old_y) = world
+            .creatures
+            .iter()
+            .next()
+            .map(|(id, c)| (id, c.x, c.y))
+            .expect("expected one creature");
+        let old_idx = world.idx(old_x, old_y);
+        let edge_x = world.config.width - 1;
+        let edge_y = old_y;
+        let edge_idx = world.idx(edge_x, edge_y);
+
+        if let Some(creature) = world.creatures.get_mut(id) {
+            creature.controller = move_right_controller();
+            creature.x = edge_x;
+            creature.y = edge_y;
+        }
+        world.creature_at[old_idx] = None;
+        world.creature_at[edge_idx] = Some(id);
+
+        world.tick();
+        let first = world
+            .creatures
+            .get(id)
+            .expect("creature should remain alive after first blocked move");
+        assert!(first.last_move_blocked);
+        assert_eq!(first.last_inputs.move_blocked_last_tick, 0.0);
+
+        world.tick();
+        let second = world
+            .creatures
+            .get(id)
+            .expect("creature should remain alive after second blocked move");
+        assert!(second.last_move_blocked);
+        assert!(second.last_inputs.move_blocked_last_tick > 0.5);
+
+        let current_idx = world.idx(second.x, second.y);
+        let open_idx = world.idx(2, second.y);
+        if let Some(creature) = world.creatures.get_mut(id) {
+            creature.x = 2;
+        }
+        world.creature_at[current_idx] = None;
+        world.creature_at[open_idx] = Some(id);
+
+        world.tick();
+        let third = world
+            .creatures
+            .get(id)
+            .expect("creature should remain alive after successful move");
+        assert!(!third.last_move_blocked);
+
+        world.tick();
+        let fourth = world
+            .creatures
+            .get(id)
+            .expect("creature should remain alive after follow-up move");
+        assert_eq!(fourth.last_inputs.move_blocked_last_tick, 0.0);
+    }
+
+    #[test]
     fn spawn_random_creature_finds_free_cell_beyond_random_attempt_window() {
         let seed = 9001_u64;
         let cfg = WorldConfig {
@@ -1243,6 +1494,9 @@ mod tests {
                     controller: ComputationGraph::founder(ControllerPalette::Hybrid),
                     rng: SmallRng::seed_from_u64(creature_seed),
                     events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
+                    last_move_blocked: false,
+                    last_inputs: SensorInputs::default(),
+                    last_outputs: ActionOutputs::default(),
                 };
                 creature_seed += 1;
                 let id = world.creatures.insert(creature);
@@ -1582,6 +1836,89 @@ mod tests {
         let before_links = world.lineage_tree.values().map(Vec::len).sum::<usize>();
         let after_links = restored.lineage_tree.values().map(Vec::len).sum::<usize>();
         assert_eq!(after_links, before_links);
+    }
+
+    #[test]
+    fn world_snapshot_round_trip_preserves_last_inputs_outputs_and_blocked_feedback() {
+        let cfg = WorldConfig {
+            width: 6,
+            height: 6,
+            initial_creatures: 1,
+            world_wrap: false,
+            ..WorldConfig::default()
+        };
+        let mut world = World::new_with_palette(cfg, 2027, ControllerPalette::Hybrid);
+        let (id, old_x, old_y) = world
+            .creatures
+            .iter()
+            .next()
+            .map(|(id, c)| (id, c.x, c.y))
+            .expect("expected one creature");
+        let old_idx = world.idx(old_x, old_y);
+        let edge_x = world.config.width - 1;
+        let edge_y = old_y;
+        let edge_idx = world.idx(edge_x, edge_y);
+
+        if let Some(creature) = world.creatures.get_mut(id) {
+            creature.controller = move_right_controller();
+            creature.x = edge_x;
+            creature.y = edge_y;
+        }
+        world.creature_at[old_idx] = None;
+        world.creature_at[edge_idx] = Some(id);
+        world.tick();
+        world.tick();
+
+        let snapshot = world.snapshot();
+        let restored = World::from_snapshot(snapshot);
+        let restored_creature = restored
+            .creatures
+            .values()
+            .next()
+            .expect("expected restored creature");
+        assert!(restored_creature.last_move_blocked);
+        assert!(restored_creature.last_inputs.move_blocked_last_tick > 0.5);
+        assert!(restored_creature.last_outputs.move_x > 0.9);
+    }
+
+    #[test]
+    fn creature_detail_exposes_last_inputs_outputs_and_events() {
+        let cfg = WorldConfig {
+            width: 8,
+            height: 8,
+            initial_creatures: 1,
+            world_wrap: false,
+            ..WorldConfig::default()
+        };
+        let mut world = World::new_with_palette(cfg, 616, ControllerPalette::Hybrid);
+        let (id, old_x, old_y) = world
+            .creatures
+            .iter()
+            .next()
+            .map(|(id, c)| (id, c.x, c.y))
+            .expect("expected one creature");
+        let old_idx = world.idx(old_x, old_y);
+
+        if let Some(creature) = world.creatures.get_mut(id) {
+            creature.controller = move_right_controller();
+            creature.x = 2;
+            creature.y = 2;
+        }
+        let placed_idx = world.idx(2, 2);
+        world.creature_at[old_idx] = None;
+        world.creature_at[placed_idx] = Some(id);
+
+        world.tick();
+
+        let detail = world
+            .creature_detail(id.data().as_ffi())
+            .expect("detail should exist for live creature");
+        assert_eq!(detail.id, id.data().as_ffi());
+        assert!(detail.last_outputs.move_x > 0.9);
+        assert!(detail
+            .events
+            .iter()
+            .any(|event| event.kind == CreatureEventKind::Moved));
     }
 
     #[test]

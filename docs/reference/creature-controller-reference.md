@@ -8,6 +8,7 @@ Source of truth files:
 - `crates/petri-core/src/config.rs`
 - `crates/petri-graph/src/types.rs`
 - `crates/petri-graph/src/eval.rs`
+- `crates/petri-server/src/api.rs`
 
 ## Creature and Controller Structure
 
@@ -15,9 +16,10 @@ Source of truth files:
 | --- | --- | --- | --- | --- |
 | `Creature` | Runtime internal struct | `crates/petri-core/src/world.rs` | Per-creature mutable simulation state stored in `World` | `x`, `y`, `energy`, `age`, `generation`, `lineage_id`, `parent_id`, `controller`, `rng`, `events` |
 | `CreatureView` | Lightweight view struct | `crates/petri-core/src/world.rs` | Public read-only projection used by API helpers | `id`, `x`, `y`, `energy`, `age`, `generation` |
+| `CreatureDetail` | API detail struct | `crates/petri-core/src/types.rs` | Per-creature inspector payload with latest sensor/output state | identity fields + `node_count`, `last_move_blocked`, `last_inputs`, `last_outputs`, recent `events` |
 | `CreatureSnapshot` | Frame payload struct | `crates/petri-core/src/types.rs` | Per-tick transport snapshot for clients | `id`, lineage/parent, position, `energy`, `age`, `generation`, `node_count` |
-| `CreatureStateSnapshot` | Full snapshot struct | `crates/petri-core/src/types.rs` | Save/load representation of full creature state | Includes full `controller: ComputationGraph` |
-| `SensorInputs` | Controller input struct | `crates/petri-graph/src/types.rs` | Normalized sensory values fed into graph evaluation | `food_here`, `energy`, `random`, `food_direction`, `food_distance` |
+| `CreatureStateSnapshot` | Full snapshot struct | `crates/petri-core/src/types.rs` | Save/load representation of full creature state | Includes full `controller: ComputationGraph` plus `last_move_blocked`, `last_inputs`, `last_outputs` |
+| `SensorInputs` | Controller input struct | `crates/petri-graph/src/types.rs` | Normalized sensory values fed into graph evaluation | `food_here`, `energy`, `random`, `food_direction`, `food_distance`, `creature_direction`, `creature_distance`, `local_density`, `move_blocked_last_tick` |
 | `ActionOutputs` | Controller output struct | `crates/petri-graph/src/types.rs` | Intent values emitted by graph before world-level action gates | `move_x`, `move_y`, `eat`, `reproduce` |
 | `ComputationGraph` | Controller struct | `crates/petri-graph/src/eval.rs` | Evolvable DAG-like controller graph | `palette`, `nodes: Vec<NodeKind>`, `edges: Vec<Edge>` |
 | `Edge` | Graph edge struct | `crates/petri-graph/src/types.rs` | Weighted directional connection between node indices | `from`, `to`, `weight` |
@@ -33,9 +35,17 @@ Source of truth files:
 | `InputRandom` | Input | Uses `inputs.random.clamp(-1.0, 1.0)` | `-1.0..=1.0` |
 | `InputFoodDirection` | Input | Uses `inputs.food_direction.clamp(-1.0, 1.0)` | `-1.0..=1.0` |
 | `InputFoodDistance` | Input | Uses `inputs.food_distance.clamp(0.0, 1.0)` | `0.0..=1.0` |
+| `InputCreatureDirection` | Input | Uses `inputs.creature_direction.clamp(-1.0, 1.0)` | `-1.0..=1.0` |
+| `InputCreatureDistance` | Input | Uses `inputs.creature_distance.clamp(0.0, 1.0)` | `0.0..=1.0` |
+| `InputLocalDensity` | Input | Uses `inputs.local_density.clamp(0.0, 1.0)` | `0.0..=1.0` |
+| `InputMoveBlockedLastTick` | Input | Converts move-blocked feedback into binary value (`>0.5 => 1.0`) | `0.0` or `1.0` |
 | `Constant(f32)` | Hidden/function | Returns stored constant | Value set by graph/mutation |
 | `Add` | Hidden/function | Sum of weighted inputs | `sum(weighted_inputs)` |
 | `Multiply` | Hidden/function | Product of weighted inputs | Returns `0.0` if no inputs |
+| `Negate` | Hidden/function | Negated sum of weighted inputs | `-sum(weighted_inputs)` |
+| `Abs` | Hidden/function | Absolute value of sum of weighted inputs | `abs(sum(weighted_inputs))` |
+| `Min` | Hidden/function | Minimum of first two weighted inputs (missing input defaults to `0.0`) | `min(input_0, input_1)` |
+| `Max` | Hidden/function | Maximum of first two weighted inputs (missing input defaults to `0.0`) | `max(input_0, input_1)` |
 | `Threshold(f32)` | Hidden/function | `1.0` if sum of weighted inputs `>= threshold`, else `0.0` | Logic-like gate |
 | `GreaterThan` | Hidden/function | Compares first two weighted inputs (`a > b`) | Returns `1.0` or `0.0` |
 | `Sigmoid` | Hidden/function | Logistic activation over sum of weighted inputs | `0.0..=1.0` |
@@ -55,6 +65,12 @@ Source of truth files:
 | `eat` | Tick action logic in `World::tick` | If `> 0.5`, creature consumes all available food in its current cell and gains energy scaled by `food_energy_value` |
 | `reproduce` | Tick action logic in `World::tick` | If `> 0.5`, reproduction still requires empty neighbor, `min_reproduce_energy`, and `max_creatures` capacity |
 
+## Creature Detail Endpoint
+
+| Endpoint | Method | Source | Success payload | Not-found contract |
+| --- | --- | --- | --- | --- |
+| `/simulation/creature/{id}` | `GET` | `crates/petri-server/src/api.rs` | `CreatureDetail` JSON (`last_inputs`, `last_outputs`, recent `events`) | `404` with `code: "creature_not_found"` |
+
 ## Mutation Functions
 
 | Function | Location | What it changes | Constraints / guardrails | Return |
@@ -73,10 +89,10 @@ Source of truth files:
 
 | Field | Default (`WorldConfig`) | Meaning |
 | --- | --- | --- |
-| `weight_mutation_rate` | `0.26` | Per-edge/per-parameter probability for value perturbation |
+| `weight_mutation_rate` | `0.08` | Per-edge/per-parameter probability for value perturbation |
 | `weight_mutation_magnitude` | `0.18` | Max absolute perturbation magnitude for values |
-| `logic_node_mutation_rate` | `0.04` | Chance to run hidden node type-change operator |
-| `structural_mutation_rate` | `0.08` | Independent chance for each structural operator (add node, add edge, remove edge, prune disconnected) |
+| `logic_node_mutation_rate` | `0.01` | Chance to run hidden node type-change operator |
+| `structural_mutation_rate` | `0.02` | Independent chance for each structural operator (add node, add edge, remove edge, prune disconnected) |
 
 ## Other Similar Docs Worth Adding
 

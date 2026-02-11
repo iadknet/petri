@@ -14,6 +14,10 @@ pub struct SensorInputs {
     pub random: f32,
     pub food_direction: f32,
     pub food_distance: f32,
+    pub creature_direction: f32,
+    pub creature_distance: f32,
+    pub local_density: f32,
+    pub move_blocked_last_tick: f32,
 }
 
 impl Default for SensorInputs {
@@ -24,6 +28,10 @@ impl Default for SensorInputs {
             random: 0.0,
             food_direction: 0.0,
             food_distance: 1.0,
+            creature_direction: 0.0,
+            creature_distance: 1.0,
+            local_density: 0.0,
+            move_blocked_last_tick: 0.0,
         }
     }
 }
@@ -50,9 +58,17 @@ pub enum NodeKind {
     InputRandom,
     InputFoodDirection,
     InputFoodDistance,
+    InputCreatureDirection,
+    InputCreatureDistance,
+    InputLocalDensity,
+    InputMoveBlockedLastTick,
     Constant(f32),
     Add,
     Multiply,
+    Negate,
+    Abs,
+    Min,
+    Max,
     Threshold(f32),
     GreaterThan,
     Sigmoid,

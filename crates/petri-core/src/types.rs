@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use petri_graph::{ComputationGraph, ControllerPalette};
+use petri_graph::{ActionOutputs, ComputationGraph, ControllerPalette, SensorInputs};
 use serde::{Deserialize, Serialize};
 use slotmap::new_key_type;
 
@@ -67,6 +67,29 @@ pub struct CreatureStateSnapshot {
     pub age: u64,
     pub generation: u32,
     pub controller: ComputationGraph,
+    #[serde(default)]
+    pub last_move_blocked: bool,
+    #[serde(default)]
+    pub last_inputs: SensorInputs,
+    #[serde(default)]
+    pub last_outputs: ActionOutputs,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct CreatureDetail {
+    pub id: u64,
+    pub lineage_id: u64,
+    pub parent_id: Option<u64>,
+    pub x: u32,
+    pub y: u32,
+    pub energy: f32,
+    pub age: u64,
+    pub generation: u32,
+    pub node_count: u32,
+    pub last_move_blocked: bool,
+    pub last_inputs: SensorInputs,
+    pub last_outputs: ActionOutputs,
+    pub events: Vec<CreatureEvent>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

@@ -1,7 +1,7 @@
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        State,
+        Path, State,
     },
     http::{header, HeaderValue, Method, StatusCode},
     response::IntoResponse,
@@ -35,6 +35,7 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/simulation/start", post(start_simulation))
         .route("/simulation/restart", post(restart_simulation))
+        .route("/simulation/creature/{id}", get(get_creature_detail))
         .route(
             "/simulation/snapshot",
             get(get_snapshot).post(load_snapshot),
@@ -108,6 +109,23 @@ async fn restart_simulation(
         .await
         .map(Json)
         .map_err(map_simulation_error)
+}
+
+async fn get_creature_detail(
+    Path(id): Path<u64>,
+    State(state): State<AppState>,
+) -> Result<impl IntoResponse, (StatusCode, Json<ApiErrorResponse>)> {
+    let Some(detail) = state.creature_detail(id).await else {
+        return Err((
+            StatusCode::NOT_FOUND,
+            Json(ApiErrorResponse {
+                code: "creature_not_found",
+                message: format!("creature {id} not found"),
+            }),
+        ));
+    };
+
+    Ok(Json(detail))
 }
 
 async fn get_snapshot(State(state): State<AppState>) -> Json<WorldSnapshot> {

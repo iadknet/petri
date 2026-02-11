@@ -216,7 +216,37 @@ describe("App", () => {
       togglePause: vi.fn(),
       updateRuntimeField: vi.fn(),
       exportSnapshot: vi.fn().mockResolvedValue("{}"),
-      importSnapshot: vi.fn()
+      importSnapshot: vi.fn(),
+      fetchCreatureDetail: vi.fn().mockResolvedValue({
+        id: 99,
+        lineage_id: 10,
+        parent_id: 3,
+        x: 1,
+        y: 1,
+        energy: 0.75,
+        age: 12,
+        generation: 2,
+        node_count: 11,
+        last_move_blocked: false,
+        last_inputs: {
+          food_here: 0.2,
+          energy: 0.5,
+          random: 0.0,
+          food_direction: 0.1,
+          food_distance: 0.4,
+          creature_direction: -0.2,
+          creature_distance: 0.7,
+          local_density: 0.35,
+          move_blocked_last_tick: 0
+        },
+        last_outputs: {
+          move_x: 0.8,
+          move_y: -0.1,
+          eat: 0.4,
+          reproduce: 0.2
+        },
+        events: [{ kind: "Moved", tick: 7 }]
+      })
     };
 
     const spy = vi
@@ -244,6 +274,7 @@ describe("App", () => {
       expect(await screen.findByText(/Creature Inspector/i)).toBeInTheDocument();
       expect(screen.getByText("99")).toBeInTheDocument();
       expect(screen.getByText("11")).toBeInTheDocument();
+      expect(await screen.findByText(/Creature direction/i)).toBeInTheDocument();
     } finally {
       spy.mockRestore();
     }

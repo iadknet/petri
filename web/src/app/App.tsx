@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { CreatureDetail } from "../protocol";
 import { ControlHeader } from "../features/simulation/components/ControlHeader";
 import { CreatureInspectorPanel } from "../features/simulation/components/CreatureInspectorPanel";
 import { LiveMetricsPanel } from "../features/simulation/components/LiveMetricsPanel";
@@ -15,6 +16,7 @@ import { useSimulationStore } from "../features/simulation/store/simulationStore
 export default function App() {
   const [zoom, setZoom] = useState(3);
   const [selectedCreatureId, setSelectedCreatureId] = useState<number | null>(null);
+  const [selectedCreatureDetail, setSelectedCreatureDetail] = useState<CreatureDetail | null>(null);
   const simulation = useSimulationStore();
   const selectedCreature = useMemo(() => {
     if (!simulation.frame || selectedCreatureId === null) {
@@ -26,6 +28,7 @@ export default function App() {
   useEffect(() => {
     if (!simulation.frame) {
       setSelectedCreatureId(null);
+      setSelectedCreatureDetail(null);
       return;
     }
     if (
@@ -33,8 +36,41 @@ export default function App() {
       !simulation.frame.creatures.some((creature) => creature.id === selectedCreatureId)
     ) {
       setSelectedCreatureId(null);
+      setSelectedCreatureDetail(null);
     }
   }, [simulation.frame, selectedCreatureId]);
+
+  useEffect(() => {
+    if (selectedCreatureId === null) {
+      setSelectedCreatureDetail(null);
+      return;
+    }
+
+    let cancelled = false;
+
+    const loadDetail = async () => {
+      try {
+        const detail = await simulation.fetchCreatureDetail(selectedCreatureId);
+        if (!cancelled) {
+          setSelectedCreatureDetail(detail);
+        }
+      } catch (detailError) {
+        if (!cancelled) {
+          simulation.setError((detailError as Error).message || "Failed to load creature detail.");
+        }
+      }
+    };
+
+    void loadDetail();
+    const id = window.setInterval(() => {
+      void loadDetail();
+    }, 1000);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(id);
+    };
+  }, [selectedCreatureId]);
 
   return (
     <div className="app-root">
@@ -98,7 +134,7 @@ export default function App() {
           averageEnergy={simulation.averageEnergy}
         />
 
-        <CreatureInspectorPanel creature={selectedCreature} />
+        <CreatureInspectorPanel creature={selectedCreature} detail={selectedCreatureDetail} />
 
         <SnapshotPanel
           onExportSnapshot={() => simulation.exportSnapshot()}

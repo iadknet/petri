@@ -1,6 +1,12 @@
 import { http, HttpResponse } from "msw";
 
-import { ConfigPatch, SimulationStatus, StartupDraft, StartupDraftPatch } from "../protocol";
+import {
+  ConfigPatch,
+  CreatureDetail,
+  SimulationStatus,
+  StartupDraft,
+  StartupDraftPatch
+} from "../protocol";
 
 const API_BASE = "http://127.0.0.1:4000";
 
@@ -126,6 +132,39 @@ function currentSnapshot() {
   };
 }
 
+function creatureDetailForId(id: number): CreatureDetail {
+  return {
+    id,
+    lineage_id: 100,
+    parent_id: null,
+    x: 5,
+    y: 5,
+    energy: 0.7,
+    age: 9,
+    generation: 1,
+    node_count: 8,
+    last_move_blocked: false,
+    last_inputs: {
+      food_here: 0.1,
+      energy: 0.6,
+      random: 0,
+      food_direction: 0,
+      food_distance: 1,
+      creature_direction: 0,
+      creature_distance: 1,
+      local_density: 0.2,
+      move_blocked_last_tick: 0
+    },
+    last_outputs: {
+      move_x: 0.2,
+      move_y: -0.1,
+      eat: 0.3,
+      reproduce: 0.1
+    },
+    events: [{ kind: "Moved", tick: 1 }]
+  };
+}
+
 export const handlers = [
   http.get(`${API_BASE}/simulation/status`, () => HttpResponse.json(status)),
   http.get(`${API_BASE}/simulation/startup-draft`, () => HttpResponse.json(startupDraft)),
@@ -178,6 +217,13 @@ export const handlers = [
       status.phase = patch.paused ? "paused" : "running";
     }
     return HttpResponse.json(runtimeConfig);
+  }),
+  http.get(`${API_BASE}/simulation/creature/:id`, ({ params }) => {
+    const id = Number(params.id);
+    if (!Number.isFinite(id)) {
+      return HttpResponse.json({ code: "creature_not_found", message: "invalid creature id" }, { status: 404 });
+    }
+    return HttpResponse.json(creatureDetailForId(id));
   }),
   http.get(`${API_BASE}/simulation/snapshot`, () => HttpResponse.json(currentSnapshot())),
   http.post(`${API_BASE}/simulation/snapshot`, async ({ request }) => {

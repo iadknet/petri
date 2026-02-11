@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import {
   ConfigPatch,
+  CreatureDetail,
   SimulationStatus,
   StartupDraft,
   StartupDraftPatch,
@@ -169,6 +170,18 @@ export function useSimulationStore() {
     setError(null);
   }
 
+  async function fetchCreatureDetail(id: number): Promise<CreatureDetail | null> {
+    try {
+      return await apiClient.getCreatureDetail(id);
+    } catch (detailError) {
+      const message = (detailError as Error).message || "";
+      if (message.toLowerCase().includes("not found")) {
+        return null;
+      }
+      throw detailError;
+    }
+  }
+
   async function updateStartupField<K extends keyof StartupDraft>(
     key: K,
     value: StartupDraft[K]
@@ -240,6 +253,7 @@ export function useSimulationStore() {
     togglePause,
     updateRuntimeField,
     exportSnapshot,
-    importSnapshot
+    importSnapshot,
+    fetchCreatureDetail
   };
 }
