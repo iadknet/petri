@@ -237,13 +237,15 @@ describe("App", () => {
           creature_direction: -0.2,
           creature_distance: 0.7,
           local_density: 0.35,
-          move_blocked_last_tick: 0
+          move_blocked_last_tick: 0,
+          memory_read: 0
         },
         last_outputs: {
           move_x: 0.8,
           move_y: -0.1,
           eat: 0.4,
-          reproduce: 0.2
+          reproduce: 0.2,
+          memory_write: 0
         },
         events: [{ kind: "Moved", tick: 7 }]
       })

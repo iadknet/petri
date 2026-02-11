@@ -20,10 +20,12 @@ fn hidden_node_count(graph: &ComputationGraph) -> usize {
                     | NodeKind::InputCreatureDistance
                     | NodeKind::InputLocalDensity
                     | NodeKind::InputMoveBlockedLastTick
+                    | NodeKind::InputMemoryRead
                     | NodeKind::OutputMoveX
                     | NodeKind::OutputMoveY
                     | NodeKind::OutputEat
                     | NodeKind::OutputReproduce
+                    | NodeKind::OutputMemoryWrite
             )
         })
         .count()
@@ -68,11 +70,13 @@ fn mutation_changes_parameters_without_changing_topology() {
         creature_distance: 1.0,
         local_density: 0.0,
         move_blocked_last_tick: 0.0,
+        memory_read: 0.0,
     });
     assert!((-1.0..=1.0).contains(&outputs.move_x));
     assert!((-1.0..=1.0).contains(&outputs.move_y));
     assert!((0.0..=1.0).contains(&outputs.eat));
     assert!((0.0..=1.0).contains(&outputs.reproduce));
+    assert!((0.0..=1.0).contains(&outputs.memory_write));
 }
 
 #[test]

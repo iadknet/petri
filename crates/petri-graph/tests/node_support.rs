@@ -45,6 +45,7 @@ fn relu_and_food_distance_direction_inputs_are_supported() {
         creature_distance: 1.0,
         local_density: 0.0,
         move_blocked_last_tick: 0.0,
+        memory_read: 0.0,
     });
     assert!(positive.move_x > 0.0);
 
@@ -58,6 +59,7 @@ fn relu_and_food_distance_direction_inputs_are_supported() {
         creature_distance: 1.0,
         local_density: 0.0,
         move_blocked_last_tick: 0.0,
+        memory_read: 0.0,
     });
     assert_eq!(zeroed.move_x, 0.0);
 }
@@ -110,6 +112,7 @@ fn new_input_nodes_are_supported_and_clamped() {
         creature_distance: -0.5,
         local_density: 1.8,
         move_blocked_last_tick: 3.0,
+        memory_read: 0.0,
     });
 
     assert_eq!(outputs.move_x, 1.0);
@@ -203,6 +206,7 @@ fn negate_abs_min_and_max_node_kinds_are_supported() {
         creature_distance: 1.0,
         local_density: 0.0,
         move_blocked_last_tick: 0.0,
+        memory_read: 0.0,
     });
 
     assert_eq!(outputs.move_x, 1.0);
@@ -256,8 +260,53 @@ fn min_and_max_default_missing_inputs_to_zero() {
         creature_distance: 1.0,
         local_density: 0.0,
         move_blocked_last_tick: 0.0,
+        memory_read: 0.0,
     });
 
     assert_eq!(outputs.eat, 0.0);
     assert_eq!(outputs.reproduce, 0.4);
+}
+
+#[test]
+fn memory_io_nodes_are_supported_and_clamped() {
+    let graph = ComputationGraph {
+        palette: ControllerPalette::Hybrid,
+        nodes: vec![
+            NodeKind::InputMemoryRead,   // 0
+            NodeKind::OutputMemoryWrite, // 1
+        ],
+        edges: vec![Edge {
+            from: 0,
+            to: 1,
+            weight: 1.0,
+        }],
+    };
+
+    let high = graph.evaluate(SensorInputs {
+        food_here: 0.0,
+        energy: 0.0,
+        random: 0.0,
+        food_direction: 0.0,
+        food_distance: 1.0,
+        creature_direction: 0.0,
+        creature_distance: 1.0,
+        local_density: 0.0,
+        move_blocked_last_tick: 0.0,
+        memory_read: 2.0,
+    });
+    assert_eq!(high.memory_write, 1.0);
+
+    let low = graph.evaluate(SensorInputs {
+        food_here: 0.0,
+        energy: 0.0,
+        random: 0.0,
+        food_direction: 0.0,
+        food_distance: 1.0,
+        creature_direction: 0.0,
+        creature_distance: 1.0,
+        local_density: 0.0,
+        move_blocked_last_tick: 0.0,
+        memory_read: -1.0,
+    });
+    assert_eq!(low.memory_write, 0.0);
 }

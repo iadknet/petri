@@ -2,7 +2,7 @@ use std::collections::{HashMap, VecDeque};
 
 use petri_graph::{ActionOutputs, ComputationGraph, ControllerPalette, SensorInputs};
 use rand::rngs::SmallRng;
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use slotmap::{Key, SlotMap};
 
 use crate::config::WorldConfig;
@@ -25,7 +25,21 @@ const EVENT_LOG_CAPACITY: usize = 8;
 const FOOD_SENSOR_RADIUS: i32 = 12;
 const INITIAL_WEIGHT_MUTATION_SCALE: f32 = 0.7;
 const INITIAL_STRUCTURAL_MUTATION_SCALE: f32 = 0.35;
-type OffspringRequest = (u32, u32, f32, u32, u64, ComputationGraph, u64, u64);
+const FOUNDER_MEMORY_REGISTER_BITS: usize = 32;
+const MEMORY_REGISTER_MIN_BITS: usize = 1;
+const MAX_MEMORY_REGISTER_BITS: usize = 1024;
+const MEMORY_REGISTER_MUTATION_STEP_MAX_BITS: usize = 32;
+type OffspringRequest = (
+    u32,
+    u32,
+    f32,
+    u32,
+    u64,
+    ComputationGraph,
+    u64,
+    u64,
+    Vec<bool>,
+);
 
 #[derive(Clone, Copy, Debug)]
 pub struct CreatureView {
@@ -52,6 +66,7 @@ struct Creature {
     lineage_id: u64,
     parent_id: Option<u64>,
     controller: ComputationGraph,
+    memory_register: Vec<bool>,
     rng: SmallRng,
     events: VecDeque<CreatureEvent>,
     last_move_blocked: bool,
@@ -66,6 +81,59 @@ struct PerceptionScan {
     creature_direction: f32,
     creature_distance: f32,
     local_density: f32,
+}
+
+fn founder_memory_register() -> Vec<bool> {
+    let founder_bits =
+        FOUNDER_MEMORY_REGISTER_BITS.clamp(MEMORY_REGISTER_MIN_BITS, MAX_MEMORY_REGISTER_BITS);
+    vec![false; founder_bits]
+}
+
+fn normalize_memory_register(mut memory_register: Vec<bool>) -> Vec<bool> {
+    if memory_register.is_empty() {
+        return founder_memory_register();
+    }
+    let bounded_len = memory_register
+        .len()
+        .clamp(MEMORY_REGISTER_MIN_BITS, MAX_MEMORY_REGISTER_BITS);
+    memory_register.resize(bounded_len, false);
+    memory_register
+}
+
+fn maybe_mutate_memory_register_size(
+    memory_register: &mut Vec<bool>,
+    mutation_rate: f32,
+    rng: &mut SmallRng,
+) {
+    if rng.gen::<f32>() > mutation_rate.clamp(0.0, 1.0) {
+        return;
+    }
+
+    let current_len = memory_register
+        .len()
+        .clamp(MEMORY_REGISTER_MIN_BITS, MAX_MEMORY_REGISTER_BITS);
+    memory_register.resize(current_len, false);
+
+    let can_grow = current_len < MAX_MEMORY_REGISTER_BITS;
+    let can_shrink = current_len > MEMORY_REGISTER_MIN_BITS;
+    let grow = match (can_grow, can_shrink) {
+        (true, true) => rng.gen::<bool>(),
+        (true, false) => true,
+        (false, true) => false,
+        (false, false) => return,
+    };
+
+    if grow {
+        let max_delta =
+            (MAX_MEMORY_REGISTER_BITS - current_len).min(MEMORY_REGISTER_MUTATION_STEP_MAX_BITS);
+        let delta = rng.gen_range(1..=max_delta);
+        memory_register.resize(current_len + delta, false);
+    } else {
+        let max_delta =
+            (current_len - MEMORY_REGISTER_MIN_BITS).min(MEMORY_REGISTER_MUTATION_STEP_MAX_BITS);
+        let delta = rng.gen_range(1..=max_delta);
+        memory_register.truncate(current_len - delta);
+    }
 }
 
 pub struct World {

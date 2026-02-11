@@ -18,6 +18,7 @@ pub struct SensorInputs {
     pub creature_distance: f32,
     pub local_density: f32,
     pub move_blocked_last_tick: f32,
+    pub memory_read: f32,
 }
 
 impl Default for SensorInputs {
@@ -32,6 +33,7 @@ impl Default for SensorInputs {
             creature_distance: 1.0,
             local_density: 0.0,
             move_blocked_last_tick: 0.0,
+            memory_read: 0.0,
         }
     }
 }
@@ -42,6 +44,7 @@ pub struct ActionOutputs {
     pub move_y: f32,
     pub eat: f32,
     pub reproduce: f32,
+    pub memory_write: f32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -62,6 +65,7 @@ pub enum NodeKind {
     InputCreatureDistance,
     InputLocalDensity,
     InputMoveBlockedLastTick,
+    InputMemoryRead,
     Constant(f32),
     Add,
     Multiply,
@@ -79,4 +83,5 @@ pub enum NodeKind {
     OutputMoveY,
     OutputEat,
     OutputReproduce,
+    OutputMemoryWrite,
 }

@@ -18,6 +18,7 @@ impl World {
         let ids = self.creatures.keys().collect::<Vec<_>>();
         let mut to_remove = Vec::new();
         let mut offspring = Vec::new();
+        let memory_mutation_rate = self.config.structural_mutation_rate.clamp(0.0, 1.0);
 
         for id in ids {
             if !self.creatures.contains_key(id) {
@@ -50,6 +51,17 @@ impl World {
 
                 creature.age += 1;
 
+                if creature.memory_register.is_empty() {
+                    creature.memory_register.push(false);
+                }
+                let memory_idx =
+                    creature.age.saturating_sub(1) as usize % creature.memory_register.len();
+                let memory_read = if creature.memory_register[memory_idx] {
+                    1.0
+                } else {
+                    0.0
+                };
+
                 let compute_cost = self.config.energy_per_compute_node
                     * creature.controller.compute_node_count() as f32;
                 creature.energy -= self.config.energy_per_tick_decay + compute_cost;
@@ -65,10 +77,12 @@ impl World {
                     creature_distance: perception.creature_distance,
                     local_density: perception.local_density,
                     move_blocked_last_tick: if move_blocked_last_tick { 1.0 } else { 0.0 },
+                    memory_read,
                 };
                 creature.last_inputs = inputs;
                 let outputs = creature.controller.evaluate(inputs);
                 creature.last_outputs = outputs;
+                creature.memory_register[memory_idx] = outputs.memory_write > 0.5;
 
                 if outputs.eat > 0.5 {
                     let available_food = self.cells[current_idx].food;
@@ -131,6 +145,12 @@ impl World {
                                 creature.energy -= inherited + self.config.energy_per_reproduce;
                                 let seed = creature.rng.gen::<u64>();
                                 let mut child_controller = creature.controller.clone();
+                                let mut child_memory_register = creature.memory_register.clone();
+                                maybe_mutate_memory_register_size(
+                                    &mut child_memory_register,
+                                    memory_mutation_rate,
+                                    &mut creature.rng,
+                                );
                                 child_controller
                                     .mutate_with_config(&mut creature.rng, offspring_mutation_cfg);
 
@@ -143,6 +163,7 @@ impl World {
                                     child_controller,
                                     creature.lineage_id,
                                     id.data().as_ffi(),
+                                    child_memory_register,
                                 ));
                                 self.diagnostics.reproductions += 1;
                                 push_event(creature, CreatureEventKind::Reproduced, self.tick);
@@ -173,7 +194,9 @@ impl World {
             }
         }
 
-        for (x, y, energy, generation, seed, controller, lineage_id, parent_id) in offspring {
+        for (x, y, energy, generation, seed, controller, lineage_id, parent_id, memory_register) in
+            offspring
+        {
             if self.creatures.len() >= self.config.max_creatures {
                 break;
             }
@@ -191,6 +214,7 @@ impl World {
                 lineage_id,
                 parent_id: Some(parent_id),
                 controller,
+                memory_register,
                 rng: SmallRng::seed_from_u64(seed),
                 events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
                 last_move_blocked: false,

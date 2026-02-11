@@ -18,6 +18,7 @@ pub(super) fn is_input_node(node: &NodeKind) -> bool {
             | NodeKind::InputCreatureDistance
             | NodeKind::InputLocalDensity
             | NodeKind::InputMoveBlockedLastTick
+            | NodeKind::InputMemoryRead
     )
 }
 
@@ -28,6 +29,7 @@ pub(super) fn is_output_node(node: &NodeKind) -> bool {
             | NodeKind::OutputMoveY
             | NodeKind::OutputEat
             | NodeKind::OutputReproduce
+            | NodeKind::OutputMemoryWrite
     )
 }
 

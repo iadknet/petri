@@ -13,6 +13,7 @@ fn neural_palette_outputs_are_bounded() {
         creature_distance: 1.0,
         local_density: 0.0,
         move_blocked_last_tick: 0.0,
+        memory_read: 0.0,
     });
 
     assert!((-1.0..=1.0).contains(&outputs.move_x));
@@ -35,6 +36,7 @@ fn logic_palette_gates_eat_and_reproduce() {
         creature_distance: 1.0,
         local_density: 0.0,
         move_blocked_last_tick: 0.0,
+        memory_read: 0.0,
     });
     assert!(high.eat > 0.5);
     assert!(high.reproduce > 0.5);
@@ -49,6 +51,7 @@ fn logic_palette_gates_eat_and_reproduce() {
         creature_distance: 1.0,
         local_density: 0.0,
         move_blocked_last_tick: 0.0,
+        memory_read: 0.0,
     });
     assert!(low.eat <= 0.5);
     assert!(low.reproduce <= 0.5);
@@ -68,6 +71,7 @@ fn hybrid_palette_motion_changes_with_random_sensor() {
         creature_distance: 1.0,
         local_density: 0.0,
         move_blocked_last_tick: 0.0,
+        memory_read: 0.0,
     });
     let b = graph.evaluate(SensorInputs {
         food_here: 0.4,
@@ -79,6 +83,7 @@ fn hybrid_palette_motion_changes_with_random_sensor() {
         creature_distance: 1.0,
         local_density: 0.0,
         move_blocked_last_tick: 0.0,
+        memory_read: 0.0,
     });
 
     let delta = (a.move_x - b.move_x).abs() + (a.move_y - b.move_y).abs();
@@ -99,6 +104,7 @@ fn founder_graph_forages_and_delays_reproduction() {
         creature_distance: 1.0,
         local_density: 0.0,
         move_blocked_last_tick: 0.0,
+        memory_read: 0.0,
     });
     assert!(food_low_energy.eat > 0.5);
     assert!(food_low_energy.reproduce <= 0.5);
@@ -113,6 +119,7 @@ fn founder_graph_forages_and_delays_reproduction() {
         creature_distance: 1.0,
         local_density: 0.0,
         move_blocked_last_tick: 0.0,
+        memory_read: 0.0,
     });
     assert!(food_high_energy.reproduce > 0.5);
 
@@ -126,6 +133,7 @@ fn founder_graph_forages_and_delays_reproduction() {
         creature_distance: 1.0,
         local_density: 0.0,
         move_blocked_last_tick: 0.0,
+        memory_read: 0.0,
     });
     assert!(no_food.eat <= 0.5);
 }
@@ -143,6 +151,7 @@ fn founder_graph_has_low_default_motion_cost() {
         creature_distance: 1.0,
         local_density: 0.0,
         move_blocked_last_tick: 0.0,
+        memory_read: 0.0,
     });
     let impulse = outputs.move_x.abs() + outputs.move_y.abs();
     assert!(impulse < 0.6);
@@ -194,6 +203,7 @@ fn founder_hybrid_outputs_change_when_new_sensors_change() {
         creature_distance: 1.0,
         local_density: 0.0,
         move_blocked_last_tick: 0.0,
+        memory_read: 0.0,
     });
     let blocked_and_crowded = graph.evaluate(SensorInputs {
         food_here: 0.0,
@@ -205,6 +215,7 @@ fn founder_hybrid_outputs_change_when_new_sensors_change() {
         creature_distance: 0.0,
         local_density: 1.0,
         move_blocked_last_tick: 1.0,
+        memory_read: 0.0,
     });
 
     let delta = (clear_path.move_x - blocked_and_crowded.move_x).abs()

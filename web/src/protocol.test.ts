@@ -53,13 +53,15 @@ describe("protocol", () => {
         creature_direction: 0.25,
         creature_distance: 0.75,
         local_density: 0.1,
-        move_blocked_last_tick: 0
+        move_blocked_last_tick: 0,
+        memory_read: 0
       },
       last_outputs: {
         move_x: 0.4,
         move_y: -0.2,
         eat: 0.6,
-        reproduce: 0.1
+        reproduce: 0.1,
+        memory_write: 0
       },
       events: [{ kind: "Moved", tick: 12 }]
     };

@@ -36,6 +36,7 @@ impl ComputationGraph {
                         0.0
                     }
                 }
+                NodeKind::InputMemoryRead => inputs.memory_read.clamp(0.0, 1.0),
                 NodeKind::Constant(v) => v,
                 NodeKind::Add => weighted_inputs.iter().sum(),
                 NodeKind::Multiply => {
@@ -92,7 +93,8 @@ impl ComputationGraph {
                 NodeKind::OutputMoveX
                 | NodeKind::OutputMoveY
                 | NodeKind::OutputEat
-                | NodeKind::OutputReproduce => weighted_inputs.iter().sum(),
+                | NodeKind::OutputReproduce
+                | NodeKind::OutputMemoryWrite => weighted_inputs.iter().sum(),
             };
 
             values[idx] = value;
@@ -101,6 +103,7 @@ impl ComputationGraph {
                 NodeKind::OutputMoveY => outputs.move_y = value.clamp(-1.0, 1.0),
                 NodeKind::OutputEat => outputs.eat = value.clamp(0.0, 1.0),
                 NodeKind::OutputReproduce => outputs.reproduce = value.clamp(0.0, 1.0),
+                NodeKind::OutputMemoryWrite => outputs.memory_write = value.clamp(0.0, 1.0),
                 _ => {}
             }
         }

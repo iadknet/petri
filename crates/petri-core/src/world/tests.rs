@@ -237,6 +237,52 @@ fn idle_controller() -> ComputationGraph {
     }
 }
 
+fn always_reproduce_and_eat_controller() -> ComputationGraph {
+    ComputationGraph {
+        palette: ControllerPalette::Hybrid,
+        nodes: vec![
+            NodeKind::Constant(1.0),   // 0
+            NodeKind::OutputEat,       // 1
+            NodeKind::OutputReproduce, // 2
+        ],
+        edges: vec![
+            Edge {
+                from: 0,
+                to: 1,
+                weight: 1.0,
+            },
+            Edge {
+                from: 0,
+                to: 2,
+                weight: 1.0,
+            },
+        ],
+    }
+}
+
+fn invert_memory_controller() -> ComputationGraph {
+    ComputationGraph {
+        palette: ControllerPalette::Hybrid,
+        nodes: vec![
+            NodeKind::InputMemoryRead,   // 0
+            NodeKind::Negate,            // 1
+            NodeKind::OutputMemoryWrite, // 2
+        ],
+        edges: vec![
+            Edge {
+                from: 0,
+                to: 1,
+                weight: 1.0,
+            },
+            Edge {
+                from: 1,
+                to: 2,
+                weight: 1.0,
+            },
+        ],
+    }
+}
+
 #[test]
 fn initial_population_has_founder_variation() {
     let cfg = WorldConfig {
@@ -255,6 +301,108 @@ fn initial_population_has_founder_variation() {
         .collect::<BTreeSet<_>>();
 
     assert!(signatures.len() > 1);
+}
+
+#[test]
+fn founders_start_with_32_bit_memory_register() {
+    let cfg = WorldConfig {
+        width: 20,
+        height: 20,
+        initial_creatures: 25,
+        max_creatures: 200,
+        ..WorldConfig::default()
+    };
+
+    let world = World::new(cfg, 3030);
+    assert!(!world.creatures.is_empty());
+    assert!(world
+        .creatures
+        .values()
+        .all(|creature| creature.memory_register.len() == FOUNDER_MEMORY_REGISTER_BITS));
+}
+
+#[test]
+fn offspring_memory_register_size_evolves_within_bounds() {
+    let cfg = WorldConfig {
+        width: 14,
+        height: 14,
+        initial_creatures: 1,
+        max_creatures: 80,
+        energy_initial: 1.4,
+        min_reproduce_energy: 0.8,
+        structural_mutation_rate: 1.0,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 4040, ControllerPalette::Hybrid);
+    world.seed_food_density(1.0);
+
+    let parent_id = world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, _)| id)
+        .expect("expected one founder");
+    if let Some(parent_mut) = world.creatures.get_mut(parent_id) {
+        parent_mut.controller = always_reproduce_and_eat_controller();
+    }
+
+    for _ in 0..30 {
+        if world.creature_count() > 1 {
+            break;
+        }
+        world.tick();
+    }
+
+    assert!(
+        world.creature_count() > 1,
+        "expected at least one offspring"
+    );
+
+    let sizes = world
+        .creatures
+        .values()
+        .map(|creature| creature.memory_register.len())
+        .collect::<Vec<_>>();
+    assert!(sizes
+        .iter()
+        .all(|size| *size >= MEMORY_REGISTER_MIN_BITS && *size <= MAX_MEMORY_REGISTER_BITS));
+    assert!(sizes
+        .iter()
+        .any(|size| *size != FOUNDER_MEMORY_REGISTER_BITS));
+}
+
+#[test]
+fn memory_write_output_updates_creature_register() {
+    let cfg = WorldConfig {
+        width: 8,
+        height: 8,
+        initial_creatures: 1,
+        min_reproduce_energy: 10.0,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 711, ControllerPalette::Hybrid);
+
+    let id = world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, _)| id)
+        .expect("expected one creature");
+
+    if let Some(creature) = world.creatures.get_mut(id) {
+        creature.controller = invert_memory_controller();
+        creature.memory_register = vec![true];
+    }
+
+    world.tick();
+
+    let creature = world
+        .creatures
+        .get(id)
+        .expect("creature should still exist after one tick");
+    assert_eq!(creature.last_inputs.memory_read, 1.0);
+    assert_eq!(creature.last_outputs.memory_write, 0.0);
+    assert_eq!(creature.memory_register, vec![false]);
 }
 
 #[test]
@@ -459,6 +607,7 @@ fn perception_reports_nearest_creature_direction_distance_and_density() {
         lineage_id: 1,
         parent_id: None,
         controller: idle_controller(),
+        memory_register: founder_memory_register(),
         rng: SmallRng::seed_from_u64(1),
         events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
         last_move_blocked: false,
@@ -474,6 +623,7 @@ fn perception_reports_nearest_creature_direction_distance_and_density() {
         lineage_id: 2,
         parent_id: None,
         controller: idle_controller(),
+        memory_register: founder_memory_register(),
         rng: SmallRng::seed_from_u64(2),
         events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
         last_move_blocked: false,
@@ -613,6 +763,7 @@ fn spawn_random_creature_finds_free_cell_beyond_random_attempt_window() {
                 lineage_id: creature_seed,
                 parent_id: None,
                 controller: ComputationGraph::founder(ControllerPalette::Hybrid),
+                memory_register: founder_memory_register(),
                 rng: SmallRng::seed_from_u64(creature_seed),
                 events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
                 last_move_blocked: false,
