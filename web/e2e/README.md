@@ -31,4 +31,5 @@ npm run test:e2e:debug
 1. `petri-server` on `127.0.0.1:4000`
 2. Vite dev server on `127.0.0.1:5173`
 
-If those services are already running, Playwright reuses them.
+Playwright starts dedicated test servers for both services to guarantee a clean
+idle simulation state at test start.
