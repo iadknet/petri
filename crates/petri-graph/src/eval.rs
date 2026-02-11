@@ -1,3 +1,5 @@
+use rand::Rng;
+
 use crate::types::{ActionOutputs, ControllerPalette, Edge, NodeKind, SensorInputs};
 
 #[derive(Clone, Debug)]
@@ -14,6 +16,61 @@ impl ComputationGraph {
             ControllerPalette::LogicOnly => logic_only(),
             ControllerPalette::Hybrid => hybrid(),
         }
+    }
+
+    pub fn founder(palette: ControllerPalette) -> Self {
+        match palette {
+            ControllerPalette::NeuralOnly => founder_neural_only(),
+            ControllerPalette::LogicOnly => founder_logic_only(),
+            ControllerPalette::Hybrid => founder_hybrid(),
+        }
+    }
+
+    pub fn mutate_weights<R: Rng>(&mut self, rng: &mut R, rate: f32, magnitude: f32) {
+        let rate = rate.clamp(0.0, 1.0);
+        let magnitude = magnitude.abs();
+
+        for edge in &mut self.edges {
+            if rng.gen_bool(rate as f64) {
+                edge.weight = clamp(
+                    edge.weight + rng.gen_range(-magnitude..=magnitude),
+                    -8.0,
+                    8.0,
+                );
+            }
+        }
+
+        for node in &mut self.nodes {
+            if rng.gen_bool(rate as f64) {
+                match node {
+                    NodeKind::Constant(v) => {
+                        *v = clamp(*v + rng.gen_range(-magnitude..=magnitude), -8.0, 8.0)
+                    }
+                    NodeKind::Threshold(t) => {
+                        *t = clamp(*t + rng.gen_range(-magnitude..=magnitude), 0.0, 1.0)
+                    }
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    pub fn compute_node_count(&self) -> usize {
+        self.nodes
+            .iter()
+            .filter(|node| {
+                !matches!(
+                    node,
+                    NodeKind::InputFoodHere
+                        | NodeKind::InputEnergy
+                        | NodeKind::InputRandom
+                        | NodeKind::OutputMoveX
+                        | NodeKind::OutputMoveY
+                        | NodeKind::OutputEat
+                        | NodeKind::OutputReproduce
+                )
+            })
+            .count()
     }
 
     pub fn evaluate(&self, inputs: SensorInputs) -> ActionOutputs {
@@ -95,6 +152,10 @@ impl ComputationGraph {
 
         outputs
     }
+}
+
+fn clamp(value: f32, min: f32, max: f32) -> f32 {
+    value.max(min).min(max)
 }
 
 fn neural_only() -> ComputationGraph {
@@ -335,6 +396,252 @@ fn hybrid() -> ComputationGraph {
             Edge {
                 from: 8,
                 to: 12,
+                weight: 1.0,
+            },
+        ],
+    }
+}
+
+fn founder_neural_only() -> ComputationGraph {
+    ComputationGraph {
+        palette: ControllerPalette::NeuralOnly,
+        nodes: vec![
+            NodeKind::InputFoodHere,   // 0
+            NodeKind::InputEnergy,     // 1
+            NodeKind::InputRandom,     // 2
+            NodeKind::Constant(-2.5),  // 3
+            NodeKind::Add,             // 4
+            NodeKind::Sigmoid,         // 5
+            NodeKind::OutputEat,       // 6
+            NodeKind::Constant(-7.0),  // 7
+            NodeKind::Add,             // 8
+            NodeKind::Sigmoid,         // 9
+            NodeKind::OutputReproduce, // 10
+            NodeKind::Tanh,            // 11
+            NodeKind::OutputMoveX,     // 12
+            NodeKind::Tanh,            // 13
+            NodeKind::OutputMoveY,     // 14
+        ],
+        edges: vec![
+            Edge {
+                from: 0,
+                to: 4,
+                weight: 6.0,
+            },
+            Edge {
+                from: 3,
+                to: 4,
+                weight: 1.0,
+            },
+            Edge {
+                from: 4,
+                to: 5,
+                weight: 1.0,
+            },
+            Edge {
+                from: 5,
+                to: 6,
+                weight: 1.0,
+            },
+            Edge {
+                from: 1,
+                to: 8,
+                weight: 8.0,
+            },
+            Edge {
+                from: 0,
+                to: 8,
+                weight: 1.0,
+            },
+            Edge {
+                from: 7,
+                to: 8,
+                weight: 1.0,
+            },
+            Edge {
+                from: 8,
+                to: 9,
+                weight: 1.0,
+            },
+            Edge {
+                from: 9,
+                to: 10,
+                weight: 1.0,
+            },
+            Edge {
+                from: 2,
+                to: 11,
+                weight: 0.4,
+            },
+            Edge {
+                from: 11,
+                to: 12,
+                weight: 1.0,
+            },
+            Edge {
+                from: 2,
+                to: 13,
+                weight: -0.4,
+            },
+            Edge {
+                from: 13,
+                to: 14,
+                weight: 1.0,
+            },
+        ],
+    }
+}
+
+fn founder_logic_only() -> ComputationGraph {
+    ComputationGraph {
+        palette: ControllerPalette::LogicOnly,
+        nodes: vec![
+            NodeKind::InputFoodHere,   // 0
+            NodeKind::InputEnergy,     // 1
+            NodeKind::InputRandom,     // 2
+            NodeKind::Threshold(0.05), // 3
+            NodeKind::OutputEat,       // 4
+            NodeKind::Threshold(0.9),  // 5
+            NodeKind::Multiply,        // 6
+            NodeKind::OutputReproduce, // 7
+            NodeKind::Threshold(0.7),  // 8
+            NodeKind::Constant(0.0),   // 9
+            NodeKind::Constant(1.0),   // 10
+            NodeKind::Select,          // 11
+            NodeKind::OutputMoveX,     // 12
+            NodeKind::OutputMoveY,     // 13
+        ],
+        edges: vec![
+            Edge {
+                from: 0,
+                to: 3,
+                weight: 1.0,
+            },
+            Edge {
+                from: 3,
+                to: 4,
+                weight: 1.0,
+            },
+            Edge {
+                from: 1,
+                to: 5,
+                weight: 1.0,
+            },
+            Edge {
+                from: 3,
+                to: 6,
+                weight: 1.0,
+            },
+            Edge {
+                from: 5,
+                to: 6,
+                weight: 1.0,
+            },
+            Edge {
+                from: 6,
+                to: 7,
+                weight: 1.0,
+            },
+            Edge {
+                from: 2,
+                to: 8,
+                weight: 1.0,
+            },
+            Edge {
+                from: 8,
+                to: 11,
+                weight: 1.0,
+            },
+            Edge {
+                from: 9,
+                to: 11,
+                weight: 1.0,
+            },
+            Edge {
+                from: 10,
+                to: 11,
+                weight: 1.0,
+            },
+            Edge {
+                from: 11,
+                to: 12,
+                weight: 0.35,
+            },
+            Edge {
+                from: 11,
+                to: 13,
+                weight: 0.0,
+            },
+        ],
+    }
+}
+
+fn founder_hybrid() -> ComputationGraph {
+    ComputationGraph {
+        palette: ControllerPalette::Hybrid,
+        nodes: vec![
+            NodeKind::InputFoodHere,   // 0
+            NodeKind::InputEnergy,     // 1
+            NodeKind::InputRandom,     // 2
+            NodeKind::Threshold(0.08), // 3
+            NodeKind::OutputEat,       // 4
+            NodeKind::Threshold(0.9),  // 5
+            NodeKind::Multiply,        // 6
+            NodeKind::OutputReproduce, // 7
+            NodeKind::Tanh,            // 8
+            NodeKind::OutputMoveX,     // 9
+            NodeKind::Tanh,            // 10
+            NodeKind::OutputMoveY,     // 11
+        ],
+        edges: vec![
+            Edge {
+                from: 0,
+                to: 3,
+                weight: 1.0,
+            },
+            Edge {
+                from: 3,
+                to: 4,
+                weight: 1.0,
+            },
+            Edge {
+                from: 1,
+                to: 5,
+                weight: 1.0,
+            },
+            Edge {
+                from: 3,
+                to: 6,
+                weight: 1.0,
+            },
+            Edge {
+                from: 5,
+                to: 6,
+                weight: 1.0,
+            },
+            Edge {
+                from: 6,
+                to: 7,
+                weight: 1.0,
+            },
+            Edge {
+                from: 2,
+                to: 8,
+                weight: 0.4,
+            },
+            Edge {
+                from: 8,
+                to: 9,
+                weight: 1.0,
+            },
+            Edge {
+                from: 2,
+                to: 10,
+                weight: -0.4,
+            },
+            Edge {
+                from: 10,
+                to: 11,
                 weight: 1.0,
             },
         ],

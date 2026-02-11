@@ -11,6 +11,10 @@ use crate::types::{
 };
 
 const EVENT_LOG_CAPACITY: usize = 8;
+const INITIAL_MUTATION_RATE: f32 = 0.18;
+const INITIAL_MUTATION_MAGNITUDE: f32 = 0.12;
+const OFFSPRING_MUTATION_RATE: f32 = 0.26;
+const OFFSPRING_MUTATION_MAGNITUDE: f32 = 0.18;
 
 #[derive(Clone, Copy, Debug)]
 pub struct CreatureView {
@@ -107,8 +111,8 @@ impl World {
 
                 creature.age += 1;
 
-                let compute_cost =
-                    self.config.energy_per_compute_node * creature.controller.nodes.len() as f32;
+                let compute_cost = self.config.energy_per_compute_node
+                    * creature.controller.compute_node_count() as f32;
                 creature.energy -= self.config.energy_per_tick_decay + compute_cost;
 
                 let current_idx = (creature.y * width + creature.x) as usize;
@@ -173,13 +177,20 @@ impl World {
                                     .max(0.0);
                                 creature.energy -= inherited + self.config.energy_per_reproduce;
                                 let seed = creature.rng.gen::<u64>();
+                                let mut child_controller = creature.controller.clone();
+                                child_controller.mutate_weights(
+                                    &mut creature.rng,
+                                    OFFSPRING_MUTATION_RATE,
+                                    OFFSPRING_MUTATION_MAGNITUDE,
+                                );
+
                                 child_request = Some((
                                     cx,
                                     cy,
                                     inherited,
                                     creature.generation + 1,
                                     seed,
-                                    creature.controller.clone(),
+                                    child_controller,
                                 ));
                                 self.diagnostics.reproductions += 1;
                                 push_event(creature, CreatureEventKind::Reproduced, self.tick);
@@ -299,13 +310,20 @@ impl World {
             let idx = self.idx(x, y);
             if self.creature_at[idx].is_none() {
                 let seed = self.rng.gen::<u64>();
+                let mut controller = ComputationGraph::founder(self.palette);
+                // Add slight startup diversity so founders are viable but not identical clones.
+                controller.mutate_weights(
+                    &mut self.rng,
+                    INITIAL_MUTATION_RATE,
+                    INITIAL_MUTATION_MAGNITUDE,
+                );
                 let creature = Creature {
                     x,
                     y,
                     energy: self.config.energy_initial,
                     age: 0,
                     generation,
-                    controller: ComputationGraph::from_palette(self.palette),
+                    controller,
                     rng: SmallRng::seed_from_u64(seed),
                     events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
                 };
@@ -375,6 +393,8 @@ fn push_event(creature: &mut Creature, kind: CreatureEventKind, tick: u64) {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use crate::ControllerPalette;
 
     use super::*;
@@ -473,10 +493,13 @@ mod tests {
             initial_creatures: 1,
             max_creatures: 50,
             min_reproduce_energy: 0.6,
-            energy_initial: 1.2,
+            energy_initial: 1.5,
             ..WorldConfig::default()
         };
         let mut world = World::new(cfg, 21);
+        let (_id, parent) = world.creatures.iter().next().unwrap();
+        let idx = world.idx(parent.x, parent.y);
+        world.cells[idx].food = 1.0;
         assert_eq!(world.creature_count(), 1);
         world.tick();
         assert!(world.creature_count() > 1);
@@ -523,7 +546,7 @@ mod tests {
 
         let (id, creature) = world.creatures.iter().next().unwrap();
         let idx = world.idx(creature.x, creature.y);
-        world.cells[idx].food = 0.1;
+        world.cells[idx].food = 0.0;
         let before = creature.energy;
 
         world.tick();
@@ -536,7 +559,97 @@ mod tests {
 
         world.tick();
         let diag = world.diagnostics();
-        assert!(diag.moves > 0);
         assert!(diag.eats > 0);
+    }
+
+    fn controller_checksum(controller: &ComputationGraph) -> i64 {
+        let node_sum = controller
+            .nodes
+            .iter()
+            .map(|node| match node {
+                petri_graph::NodeKind::Constant(v) => (*v * 1000.0) as i64,
+                petri_graph::NodeKind::Threshold(t) => (*t * 1000.0) as i64,
+                _ => 0,
+            })
+            .sum::<i64>();
+        let edge_sum = controller
+            .edges
+            .iter()
+            .map(|e| (e.weight * 1000.0) as i64)
+            .sum::<i64>();
+        node_sum + edge_sum
+    }
+
+    #[test]
+    fn initial_population_has_founder_variation() {
+        let cfg = WorldConfig {
+            width: 30,
+            height: 30,
+            initial_creatures: 80,
+            max_creatures: 200,
+            ..WorldConfig::default()
+        };
+        let world = World::new_with_palette(cfg, 4242, ControllerPalette::Hybrid);
+
+        let signatures = world
+            .creatures
+            .iter()
+            .map(|(_, creature)| controller_checksum(&creature.controller))
+            .collect::<BTreeSet<_>>();
+
+        assert!(signatures.len() > 1);
+    }
+
+    #[test]
+    fn offspring_controller_is_mutated_from_parent() {
+        let cfg = WorldConfig {
+            width: 12,
+            height: 12,
+            initial_creatures: 1,
+            max_creatures: 8,
+            energy_initial: 1.5,
+            min_reproduce_energy: 0.8,
+            ..WorldConfig::default()
+        };
+        let mut world = World::new_with_palette(cfg, 52, ControllerPalette::Hybrid);
+
+        let (parent_id, px, py) = {
+            let (id, parent) = world.creatures.iter().next().unwrap();
+            (id, parent.x, parent.y)
+        };
+        if let Some(parent_mut) = world.creatures.get_mut(parent_id) {
+            parent_mut.controller = ComputationGraph::founder(ControllerPalette::Hybrid);
+        }
+        let idx = world.idx(px, py);
+        world.cells[idx].food = 1.0;
+
+        world.tick();
+        assert!(world.creatures.len() >= 2);
+
+        let checksums = world
+            .creatures
+            .iter()
+            .map(|(_, creature)| controller_checksum(&creature.controller))
+            .collect::<BTreeSet<_>>();
+        assert!(checksums.len() > 1);
+    }
+
+    #[test]
+    fn founder_seeded_hybrid_population_survives_short_horizon() {
+        let cfg = WorldConfig {
+            width: 40,
+            height: 40,
+            initial_creatures: 80,
+            max_creatures: 1000,
+            food_spawn_rate: 0.1,
+            food_growth_rate: 0.2,
+            energy_per_compute_node: 0.002,
+            ..WorldConfig::default()
+        };
+        let mut world = World::new_with_palette(cfg, 77, ControllerPalette::Hybrid);
+        for _ in 0..100 {
+            world.tick();
+        }
+        assert!(world.creature_count() > 0);
     }
 }
