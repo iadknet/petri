@@ -64,6 +64,8 @@ impl ComputationGraph {
                     NodeKind::InputFoodHere
                         | NodeKind::InputEnergy
                         | NodeKind::InputRandom
+                        | NodeKind::InputFoodDirection
+                        | NodeKind::InputFoodDistance
                         | NodeKind::OutputMoveX
                         | NodeKind::OutputMoveY
                         | NodeKind::OutputEat
@@ -94,6 +96,8 @@ impl ComputationGraph {
                 NodeKind::InputFoodHere => inputs.food_here.clamp(0.0, 1.0),
                 NodeKind::InputEnergy => inputs.energy.clamp(0.0, 1.0),
                 NodeKind::InputRandom => inputs.random.clamp(-1.0, 1.0),
+                NodeKind::InputFoodDirection => inputs.food_direction.clamp(-1.0, 1.0),
+                NodeKind::InputFoodDistance => inputs.food_distance.clamp(0.0, 1.0),
                 NodeKind::Constant(v) => v,
                 NodeKind::Add => weighted_inputs.iter().sum(),
                 NodeKind::Multiply => {
@@ -124,6 +128,7 @@ impl ComputationGraph {
                     1.0 / (1.0 + (-x).exp())
                 }
                 NodeKind::Tanh => weighted_inputs.iter().sum::<f32>().tanh(),
+                NodeKind::Relu => weighted_inputs.iter().sum::<f32>().max(0.0),
                 NodeKind::Select => {
                     let control = *weighted_inputs.first().unwrap_or(&0.0);
                     let a = *weighted_inputs.get(1).unwrap_or(&0.0);
@@ -580,18 +585,20 @@ fn founder_hybrid() -> ComputationGraph {
     ComputationGraph {
         palette: ControllerPalette::Hybrid,
         nodes: vec![
-            NodeKind::InputFoodHere,   // 0
-            NodeKind::InputEnergy,     // 1
-            NodeKind::InputRandom,     // 2
-            NodeKind::Threshold(0.08), // 3
-            NodeKind::OutputEat,       // 4
-            NodeKind::Threshold(0.9),  // 5
-            NodeKind::Multiply,        // 6
-            NodeKind::OutputReproduce, // 7
-            NodeKind::Tanh,            // 8
-            NodeKind::OutputMoveX,     // 9
-            NodeKind::Tanh,            // 10
-            NodeKind::OutputMoveY,     // 11
+            NodeKind::InputFoodHere,      // 0
+            NodeKind::InputEnergy,        // 1
+            NodeKind::InputRandom,        // 2
+            NodeKind::Threshold(0.08),    // 3
+            NodeKind::OutputEat,          // 4
+            NodeKind::Threshold(0.9),     // 5
+            NodeKind::Multiply,           // 6
+            NodeKind::OutputReproduce,    // 7
+            NodeKind::Tanh,               // 8
+            NodeKind::OutputMoveX,        // 9
+            NodeKind::Tanh,               // 10
+            NodeKind::OutputMoveY,        // 11
+            NodeKind::InputFoodDirection, // 12
+            NodeKind::InputFoodDistance,  // 13
         ],
         edges: vec![
             Edge {
@@ -643,6 +650,16 @@ fn founder_hybrid() -> ComputationGraph {
                 from: 10,
                 to: 11,
                 weight: 1.0,
+            },
+            Edge {
+                from: 12,
+                to: 8,
+                weight: 0.35,
+            },
+            Edge {
+                from: 13,
+                to: 10,
+                weight: -0.35,
             },
         ],
     }

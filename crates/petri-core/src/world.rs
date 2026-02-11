@@ -16,6 +16,7 @@ const INITIAL_MUTATION_RATE: f32 = 0.18;
 const INITIAL_MUTATION_MAGNITUDE: f32 = 0.12;
 const OFFSPRING_MUTATION_RATE: f32 = 0.26;
 const OFFSPRING_MUTATION_MAGNITUDE: f32 = 0.18;
+const FOOD_SENSOR_RADIUS: i32 = 12;
 
 #[derive(Clone, Copy, Debug)]
 pub struct CreatureView {
@@ -103,6 +104,14 @@ impl World {
             let mut child_request: Option<(u32, u32, f32, u32, u64, ComputationGraph)> = None;
             let mut reproduce_from: Option<(u32, u32)> = None;
             let mut reproduce_intent = false;
+            let (sensor_x, sensor_y) = {
+                let creature = self
+                    .creatures
+                    .get(id)
+                    .expect("id list should only contain live creatures");
+                (creature.x, creature.y)
+            };
+            let (food_direction, food_distance) = self.nearest_food_sensor(sensor_x, sensor_y);
 
             {
                 let creature = self
@@ -121,6 +130,8 @@ impl World {
                     food_here: self.cells[current_idx].food,
                     energy: (creature.energy / self.config.energy_max).clamp(0.0, 1.0),
                     random: creature.rng.gen_range(-1.0_f32..=1.0_f32),
+                    food_direction,
+                    food_distance,
                 });
 
                 if outputs.eat > 0.5 {
@@ -391,6 +402,38 @@ impl World {
             let cell = &mut self.cells[idx];
             cell.food = (cell.food + growth_per_spawn).min(max_density);
         }
+    }
+
+    fn nearest_food_sensor(&self, x: u32, y: u32) -> (f32, f32) {
+        let mut best: Option<(i32, i32, i32)> = None;
+
+        for dy in -FOOD_SENSOR_RADIUS..=FOOD_SENSOR_RADIUS {
+            for dx in -FOOD_SENSOR_RADIUS..=FOOD_SENSOR_RADIUS {
+                let nx = wrap_axis(x as i32 + dx, self.config.width);
+                let ny = wrap_axis(y as i32 + dy, self.config.height);
+                let idx = self.idx(nx, ny);
+                if self.cells[idx].food <= 0.0 {
+                    continue;
+                }
+
+                let dist_sq = dx * dx + dy * dy;
+                match best {
+                    Some((best_dist_sq, _, _)) if dist_sq >= best_dist_sq => {}
+                    _ => best = Some((dist_sq, dx, dy)),
+                }
+            }
+        }
+
+        let Some((dist_sq, dx, dy)) = best else {
+            return (0.0, 1.0);
+        };
+        if dist_sq == 0 {
+            return (0.0, 0.0);
+        }
+
+        let distance = (dist_sq as f32).sqrt() / FOOD_SENSOR_RADIUS as f32;
+        let direction = (dy as f32).atan2(dx as f32) / std::f32::consts::PI;
+        (direction.clamp(-1.0, 1.0), distance.clamp(0.0, 1.0))
     }
 
     fn find_empty_neighbor(&self, x: u32, y: u32) -> Option<(u32, u32)> {
@@ -669,6 +712,47 @@ mod tests {
 
         let total_food: f32 = world.cells.iter().map(|c| c.food).sum();
         assert_eq!(total_food, 0.0);
+    }
+
+    #[test]
+    fn nearest_food_sensor_reports_direction_and_distance() {
+        let cfg = WorldConfig {
+            width: 20,
+            height: 20,
+            initial_creatures: 0,
+            ..WorldConfig::default()
+        };
+        let mut world = World::new(cfg, 101);
+
+        let source_x = 10_u32;
+        let source_y = 10_u32;
+        let food_x = 13_u32;
+        let food_y = 10_u32;
+        let food_idx = world.idx(food_x, food_y);
+        world.cells[food_idx].food = world.config.food_max_density;
+
+        let (direction, distance) = world.nearest_food_sensor(source_x, source_y);
+        assert!(
+            direction.abs() < 0.01,
+            "expected east-facing direction, got {direction}"
+        );
+        assert!(distance > 0.0);
+        assert!(distance < 1.0);
+    }
+
+    #[test]
+    fn nearest_food_sensor_defaults_when_no_food_is_visible() {
+        let cfg = WorldConfig {
+            width: 12,
+            height: 12,
+            initial_creatures: 0,
+            ..WorldConfig::default()
+        };
+        let world = World::new(cfg, 202);
+
+        let (direction, distance) = world.nearest_food_sensor(6, 6);
+        assert_eq!(direction, 0.0);
+        assert_eq!(distance, 1.0);
     }
 
     #[test]

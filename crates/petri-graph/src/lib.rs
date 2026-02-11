@@ -31,6 +31,8 @@ mod tests {
             food_here: 1.0,
             energy: 0.8,
             random: 0.2,
+            food_direction: 0.0,
+            food_distance: 1.0,
         });
 
         assert!((-1.0..=1.0).contains(&outputs.move_x));
@@ -47,6 +49,8 @@ mod tests {
             food_here: 1.0,
             energy: 1.0,
             random: 0.0,
+            food_direction: 0.0,
+            food_distance: 1.0,
         });
         assert!(high.eat > 0.5);
         assert!(high.reproduce > 0.5);
@@ -55,6 +59,8 @@ mod tests {
             food_here: 0.0,
             energy: 0.2,
             random: 0.0,
+            food_direction: 0.0,
+            food_distance: 1.0,
         });
         assert!(low.eat <= 0.5);
         assert!(low.reproduce <= 0.5);
@@ -68,11 +74,15 @@ mod tests {
             food_here: 0.4,
             energy: 0.6,
             random: -0.9,
+            food_direction: 0.0,
+            food_distance: 1.0,
         });
         let b = graph.evaluate(SensorInputs {
             food_here: 0.4,
             energy: 0.6,
             random: 0.9,
+            food_direction: 0.0,
+            food_distance: 1.0,
         });
 
         let delta = (a.move_x - b.move_x).abs() + (a.move_y - b.move_y).abs();
@@ -87,6 +97,8 @@ mod tests {
             food_here: 1.0,
             energy: 0.2,
             random: 0.0,
+            food_direction: 0.0,
+            food_distance: 1.0,
         });
         assert!(food_low_energy.eat > 0.5);
         assert!(food_low_energy.reproduce <= 0.5);
@@ -95,6 +107,8 @@ mod tests {
             food_here: 1.0,
             energy: 1.0,
             random: 0.0,
+            food_direction: 0.0,
+            food_distance: 1.0,
         });
         assert!(food_high_energy.reproduce > 0.5);
 
@@ -102,6 +116,8 @@ mod tests {
             food_here: 0.0,
             energy: 1.0,
             random: 0.0,
+            food_direction: 0.0,
+            food_distance: 1.0,
         });
         assert!(no_food.eat <= 0.5);
     }
@@ -113,6 +129,8 @@ mod tests {
             food_here: 0.0,
             energy: 0.5,
             random: 0.0,
+            food_direction: 0.0,
+            food_distance: 1.0,
         });
         let impulse = outputs.move_x.abs() + outputs.move_y.abs();
         assert!(impulse < 0.6);
@@ -137,10 +155,85 @@ mod tests {
             food_here: 1.0,
             energy: 1.0,
             random: 0.25,
+            food_direction: 0.0,
+            food_distance: 1.0,
         });
         assert!((-1.0..=1.0).contains(&outputs.move_x));
         assert!((-1.0..=1.0).contains(&outputs.move_y));
         assert!((0.0..=1.0).contains(&outputs.eat));
         assert!((0.0..=1.0).contains(&outputs.reproduce));
+    }
+
+    #[test]
+    fn relu_and_food_distance_direction_inputs_are_supported() {
+        let graph = ComputationGraph {
+            palette: ControllerPalette::Hybrid,
+            nodes: vec![
+                NodeKind::InputFoodDirection, // 0
+                NodeKind::InputFoodDistance,  // 1
+                NodeKind::Add,                // 2
+                NodeKind::Relu,               // 3
+                NodeKind::OutputMoveX,        // 4
+            ],
+            edges: vec![
+                Edge {
+                    from: 0,
+                    to: 2,
+                    weight: 1.0,
+                },
+                Edge {
+                    from: 1,
+                    to: 2,
+                    weight: -1.0,
+                },
+                Edge {
+                    from: 2,
+                    to: 3,
+                    weight: 1.0,
+                },
+                Edge {
+                    from: 3,
+                    to: 4,
+                    weight: 1.0,
+                },
+            ],
+        };
+
+        let positive = graph.evaluate(SensorInputs {
+            food_here: 0.0,
+            energy: 0.0,
+            random: 0.0,
+            food_direction: 0.9,
+            food_distance: 0.2,
+        });
+        assert!(positive.move_x > 0.0);
+
+        let zeroed = graph.evaluate(SensorInputs {
+            food_here: 0.0,
+            energy: 0.0,
+            random: 0.0,
+            food_direction: -0.4,
+            food_distance: 0.6,
+        });
+        assert_eq!(zeroed.move_x, 0.0);
+    }
+
+    #[test]
+    fn founder_hybrid_references_food_distance_and_direction_sensors() {
+        let graph = ComputationGraph::founder(ControllerPalette::Hybrid);
+        assert!(
+            graph
+                .nodes
+                .iter()
+                .any(|node| matches!(node, NodeKind::InputFoodDirection)),
+            "founder graph should include food-direction sensor node"
+        );
+        assert!(
+            graph
+                .nodes
+                .iter()
+                .any(|node| matches!(node, NodeKind::InputFoodDistance)),
+            "founder graph should include food-distance sensor node"
+        );
     }
 }
