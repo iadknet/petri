@@ -4,6 +4,12 @@
 
 Each stage produces a working, inspectable simulation. No stage is a "setup-only" milestone — every stage should be something you can run and verify. Later stages build on earlier ones without requiring rewrites, because the core architecture (graph-based creatures, energy economics, tick loop) is designed to accommodate all planned features from the start.
 
+## Rebaseline (2026-02-11)
+
+- Stage 1 is complete and remains the baseline for all future stage planning.
+- Already-landed baseline primitives include creature-direction/distance/local-density sensing, move-blocked feedback, memory read/write baseline, and arithmetic helpers (`Negate`, `Abs`, `Min`, `Max`).
+- Stage 2 remains full scope and will be delivered as vertical slices.
+
 ---
 
 ## Stage 1: Minimal Viable Life
@@ -109,36 +115,64 @@ Creatures moving around a food field, consuming energy, reproducing, and dying a
 - [x] Inspector, live metrics chart, and snapshot save/load are implemented
 - [x] 5k-creature throughput benchmark binary is available (`petri-cli --bin stage1_benchmark`)
 
+### Baseline Extensions Already Landed
+- `SensorCreatureDirection`, `SensorCreatureDistance`, `SensorLocalDensity`, `SensorMoveBlockedLastTick`
+- `InputMemoryRead` + `OutputMemoryWrite` baseline single-register read/write loop
+- `Negate`, `Abs`, `Min`, `Max`
+
 ---
 
 ## Stage 2: Rich Environment
 
-**Goal:** Add environment editing and richer inspection tools while preserving stable simulation behavior.
+**Goal:** Add environment editing and richer inspection tools while preserving stable simulation behavior, delivered as full-scope vertical slices.
 
-### New Simulation Features
-- Barriers: impassable cells that creatures cannot enter
-- World painting API: place/remove food and barriers at specific coordinates or paint with a brush (region)
-- Food spawning rules: new food sources appear at random locations; food spreads only to non-barrier, non-creature cells
-- Toroidal world option (wrap-around edges) vs bounded world
-- Configurable sensing radius (how far creatures can "see")
+### Planned Interfaces (Stage 2)
+- `POST /simulation/world/paint`
+- `GET /simulation/lineage/tree`
+- `GET /simulation/creature/{id}/graph`
+- Frame payload additions: barriers, phenotype color, expanded metrics
+- Config addition: `sensor_radius`
 
-### New Frontend Features
-- Painting tools: select food or barrier, click/drag to paint onto the world grid. Eraser tool to remove.
-- Evolutionary tree visualization: layout computed by `d3-hierarchy`, rendered on a custom `<canvas>` for performance at scale. Nodes represent lineage branch points. Color by phenotype or survival duration. Filterable by generation range, minimum descendant count. Level-of-detail filtering progressively hides minor branches as the user zooms out.
-- Creature inspector expanded: show the creature's computation graph via ReactFlow as an interactive node-and-edge diagram. Nodes color-coded by type. Display current activation values. Show genome "source" (list of nodes and edges).
-- Statistics expanded: species diversity metric over time, food availability over time, average genome complexity over time.
+### Vertical Slices
 
-### New Creature Features
-- `SensorBarrierDirection`, `SensorBarrierDistance` — sense nearby barriers
-- Phenotype color derived from genome (hash of genome structure → HSL color). This makes lineage groups visually distinct in the world view.
+**Slice 1: Barrier substrate + frame/render**
+- Add barrier cells as impassable world state.
+- Extend frame payload and frontend renderer to display barriers.
+
+**Slice 2: Paint API + paint UI**
+- Add world painting API for food/barrier placement and erase behavior.
+- Add paint tools in frontend (food, barrier, eraser with brush support).
+
+**Slice 3: Barrier-aware food rules + configurable sensing radius**
+- Ensure food spawn/spread respects barriers and occupied cells.
+- Add `sensor_radius` configuration with frontend controls.
+
+**Slice 4: Barrier sensors + inspector exposure**
+- Add `SensorBarrierDirection` and `SensorBarrierDistance`.
+- Expose barrier sensing values in creature inspector payload/views.
+
+**Slice 5: Phenotype color pipeline**
+- Add deterministic phenotype color derived from genome structure.
+- Render phenotype colors in world view and related inspection surfaces.
+
+**Slice 6: Evolutionary tree API + canvas visualization**
+- Add lineage tree query/filter API.
+- Add scalable tree visualization (`d3-hierarchy` layout + canvas render).
+
+**Slice 7: Graph inspector + expanded metrics**
+- Add interactive computation-graph inspector view (ReactFlow-based).
+- Add expanded metrics: species diversity, food availability, average genome complexity.
 
 ### What You'll See
-With barriers, you can create mazes, islands, and corridors. Painting food and barrier regions should immediately affect movement and resource access. The evolutionary tree and inspector views should render and remain navigable at target event counts.
+With barriers, you can create mazes, islands, and corridors. Painting food and barrier regions immediately affects movement and resource access. The tree and graph-inspector views remain navigable at target event counts, and expanded metrics make population dynamics easier to interpret.
 
 ### Definition of Done
 - Barriers fully functional; creature movement correctly respects blocked cells
 - Painting tools work smoothly in the frontend
+- Barrier-aware food rules and `sensor_radius` controls are fully wired and tested
 - Evolutionary tree renders and is navigable for simulations with 10,000+ birth events
+- Creature graph inspector is interactive and shows current node/edge activation context
+- Expanded statistics (species diversity, food availability, average genome complexity) stream and render correctly
 - Phenotype colors are stable and derived consistently from genome data
 
 ---
@@ -155,8 +189,6 @@ With barriers, you can create mazes, islands, and corridors. Painting food and b
 
 ### New Creature Computation
 Input nodes added:
-- `SensorCreatureDirection` — angle to nearest creature
-- `SensorCreatureDistance` — distance to nearest creature
 - `SensorCreatureEnergy` — energy level of nearest creature (relative to self)
 
 Output nodes added:
@@ -164,7 +196,9 @@ Output nodes added:
 
 Hidden nodes added:
 - `Gate` — conditional signal pass-through (useful for "if big enough to eat, approach; else flee")
-- `Negate`, `Abs`, `Min`, `Max` — more arithmetic primitives to support nuanced decision-making
+
+Baseline note:
+- `SensorCreatureDirection`, `SensorCreatureDistance`, `Negate`, `Abs`, `Min`, and `Max` are already part of the pre-Stage-3 baseline and are not introduced as new Stage 3 primitives.
 
 ### New Configuration Knobs
 - `predation_enabled` — toggle predation globally
@@ -210,24 +244,23 @@ Predation attempts occurring in-world with clear success/failure outcomes, energ
 - Offspring genome is crossover of both parents' graphs (aligned by node historical markers, similar to NEAT), then mutated
 - Offspring kin tag is blend of parents' tags
 
-**Memory:**
-- Creature memory registers (small fixed array of floats, persistent across ticks)
-- `SensorMemory(N)` input nodes to read memory
-- `OutputMemoryWrite(N)` output nodes to write memory
-- Enables creatures to maintain state across ticks without relying solely on recurrent graph connections
+**Memory (upgrade from baseline):**
+- Baseline (already landed): single-register read/write loop via `InputMemoryRead` and `OutputMemoryWrite`.
+- Stage 4 target: indexed multi-slot memory (`SensorMemory(N)`, `OutputMemoryWrite(N)`) with richer semantics and observability.
+- Enables creatures to maintain structured state across ticks without relying solely on recurrent graph connections.
 
 ### New Creature Computation
 Input nodes added:
 - `SensorCreatureKinSimilarity` — how similar nearest creature's kin tag is
 - `SensorSignal(N)` — incoming signal value on channel N
 - `SensorPopulationDensity` — creature count in local area
-- `SensorMemory(N)` — read from memory register N
+- `SensorMemory(N)` — indexed read from memory register slot `N` (beyond baseline single-register behavior)
 
 Output nodes added:
 - `OutputSignal(N)` — emit signal on channel N
 - `OutputShareEnergy` — energy transfer intent
 - `OutputReproduceMode` — asexual/sexual toggle
-- `OutputMemoryWrite(N)` — write to memory register N
+- `OutputMemoryWrite(N)` — indexed write to memory register slot `N` (beyond baseline single-register behavior)
 
 Hidden nodes added:
 - `Accumulator` — running sum across ticks (useful for integrating signals over time)
@@ -312,9 +345,9 @@ These aren't hard deadlines — they're rough estimates of relative complexity t
 | Stage | Relative Effort | Key Risk |
 |-------|----------------|----------|
 | Stage 1 | Large (40%) | This is the foundation — world sim, graph engine, API, frontend. Most of the infrastructure is built here. |
-| Stage 2 | Small (10%) | Mostly UI work (painting tools, evo tree viz). Simulation additions are straightforward. |
-| Stage 3 | Medium (15%) | Predation conflict resolution needs careful design. Balancing predation parameters is iterative. |
-| Stage 4 | Medium-Large (25%) | Sexual reproduction crossover is algorithmically complex. Multiple new systems (signals, kin, memory, sharing). |
+| Stage 2 | Medium-Large (20%) | Full-scope vertical slices span simulation, API, and frontend; sequencing and payload boundaries are the main risk. |
+| Stage 3 | Medium (12%) | Predation conflict resolution needs careful design. Balancing predation parameters is iterative. |
+| Stage 4 | Medium-Large (18%) | Sexual reproduction crossover is algorithmically complex. Multiple new systems (signals, kin, indexed multi-slot memory, sharing). |
 | Stage 5 | Small-Medium (10%) | Mostly tuning, environmental additions, and analysis tooling. Risk is metric complexity and interpretation overhead. |
 
 Stage 1 is the critical path. Once it's working, the remaining stages are incremental additions to a proven foundation.
