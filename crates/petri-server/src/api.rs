@@ -3,7 +3,7 @@ use axum::{
         ws::{Message, WebSocket, WebSocketUpgrade},
         State,
     },
-    http::StatusCode,
+    http::{header, HeaderValue, Method, StatusCode},
     response::IntoResponse,
     routing::{get, post},
     Json, Router,
@@ -11,6 +11,7 @@ use axum::{
 use futures_util::StreamExt;
 use serde::Serialize;
 use tokio::sync::broadcast;
+use tower_http::cors::CorsLayer;
 
 use petri_core::WorldConfig;
 
@@ -35,7 +36,18 @@ pub fn build_router(state: AppState) -> Router {
         .route("/simulation/start", post(start_simulation))
         .route("/simulation/restart", post(restart_simulation))
         .route("/ws", get(ws_handler))
+        .layer(build_cors_layer())
         .with_state(state)
+}
+
+fn build_cors_layer() -> CorsLayer {
+    CorsLayer::new()
+        .allow_origin([
+            HeaderValue::from_static("http://127.0.0.1:5173"),
+            HeaderValue::from_static("http://localhost:5173"),
+        ])
+        .allow_methods([Method::GET, Method::POST, Method::PATCH, Method::OPTIONS])
+        .allow_headers([header::CONTENT_TYPE])
 }
 
 async fn health() -> &'static str {

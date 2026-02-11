@@ -40,6 +40,38 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn cors_preflight_allows_vite_dev_origin_for_patch_config() {
+        let state = AppState::new_for_tests();
+        let app = build_router(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .method("OPTIONS")
+                    .uri("/config")
+                    .header("origin", "http://127.0.0.1:5173")
+                    .header("access-control-request-method", "PATCH")
+                    .header("access-control-request-headers", "content-type")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+
+        assert_eq!(response.status(), StatusCode::OK);
+        assert_eq!(
+            response.headers().get("access-control-allow-origin"),
+            Some(&"http://127.0.0.1:5173".parse().unwrap())
+        );
+        assert!(response
+            .headers()
+            .contains_key("access-control-allow-methods"));
+        assert!(response
+            .headers()
+            .contains_key("access-control-allow-headers"));
+    }
+
+    #[tokio::test]
     async fn simulation_starts_idle_and_requires_explicit_start() {
         let state = AppState::new_for_tests();
         let app = build_router(state.clone());
