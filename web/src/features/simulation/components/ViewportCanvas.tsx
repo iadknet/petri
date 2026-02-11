@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import { CanvasRenderer } from "../../../canvasRenderer";
-import { WorldFrame } from "../../../protocol";
+import { CreatureSnapshot, WorldFrame } from "../../../protocol";
 
 type ViewportControlsProps = {
   zoom: number;
@@ -12,6 +12,7 @@ type ViewportCanvasProps = {
   phase: string;
   frame: WorldFrame | null;
   zoom: number;
+  onSelectCreature?: (creature: CreatureSnapshot | null) => void;
 };
 
 export function ViewportControls({ zoom, onZoomChange }: ViewportControlsProps) {
@@ -35,7 +36,7 @@ export function ViewportControls({ zoom, onZoomChange }: ViewportControlsProps) 
   );
 }
 
-export function ViewportCanvas({ phase, frame, zoom }: ViewportCanvasProps) {
+export function ViewportCanvas({ phase, frame, zoom, onSelectCreature }: ViewportCanvasProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const rendererRef = useRef<CanvasRenderer | null>(null);
   const [panX, setPanX] = useState(0);
@@ -91,6 +92,23 @@ export function ViewportCanvas({ phase, frame, zoom }: ViewportCanvasProps) {
         <canvas
           ref={canvasRef}
           className="world-canvas"
+          onClick={(event) => {
+            if (!frame || !onSelectCreature || !canvasRef.current) {
+              return;
+            }
+
+            const rect = canvasRef.current.getBoundingClientRect();
+            const worldX = Math.floor((event.clientX - rect.left) / zoom);
+            const worldY = Math.floor((event.clientY - rect.top) / zoom);
+            if (worldX < 0 || worldY < 0 || worldX >= frame.width || worldY >= frame.height) {
+              onSelectCreature(null);
+              return;
+            }
+
+            const creature =
+              frame.creatures.find((item) => item.x === worldX && item.y === worldY) ?? null;
+            onSelectCreature(creature);
+          }}
           style={{
             opacity: phase === "idle" ? 0 : 1,
             transform: `translate(${panX}px, ${panY}px) scale(${zoom})`

@@ -1,8 +1,9 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import App from "./App";
+import * as simulationStoreModule from "./features/simulation/store/simulationStore";
 import { getMockStatus, setMockStatus } from "./test/handlers";
 import { server } from "./test/server";
 
@@ -95,5 +96,130 @@ describe("App", () => {
     render(<App />);
     expect(await screen.findByLabelText(/Max creatures/i)).toBeInTheDocument();
     expect(await screen.findByLabelText(/Food max density/i)).toBeInTheDocument();
+  });
+
+  it("shows creature inspector details after clicking a creature", async () => {
+    const mockStore = {
+      frame: {
+        tick: 7,
+        width: 20,
+        height: 20,
+        food: new Uint8Array(400),
+        creatures: [
+          {
+            id: 99,
+            lineage_id: 10,
+            parent_id: 3,
+            x: 1,
+            y: 1,
+            energy: 0.75,
+            age: 12,
+            generation: 2,
+            node_count: 11
+          }
+        ],
+        population: 1,
+        average_energy: 0.75
+      },
+      status: {
+        phase: "running",
+        run_id: 1,
+        seed: 42,
+        tick: 7,
+        population: 1,
+        average_energy: 0.75,
+        pending_restart: false,
+        startup_viable: true,
+        startup_viability_code: null,
+        startup_viability_message: null,
+        startup_draft: {
+          initial_creatures: 300,
+          max_creatures: 5000,
+          initial_food_density: 0.25,
+          energy_initial: 0.7,
+          food_spawn_rate: 0.1,
+          food_growth_rate: 0.2,
+          energy_per_tick_decay: 0.01,
+          energy_per_move: 0.02,
+          world_wrap: true
+        }
+      },
+      startupDraft: {
+        initial_creatures: 300,
+        max_creatures: 5000,
+        initial_food_density: 0.25,
+        energy_initial: 0.7,
+        food_spawn_rate: 0.1,
+        food_growth_rate: 0.2,
+        energy_per_tick_decay: 0.01,
+        energy_per_move: 0.02,
+        world_wrap: true
+      },
+      runtimeConfig: {
+        paused: false,
+        ticks_per_second: 30,
+        food_spawn_rate: 0.1,
+        food_growth_rate: 0.2,
+        food_max_density: 1.0,
+        food_energy_value: 0.35,
+        energy_per_tick_decay: 0.01,
+        energy_per_move: 0.02,
+        energy_per_compute_node: 0.005,
+        energy_per_reproduce: 0.12,
+        energy_max: 1.5,
+        min_reproduce_energy: 1.0,
+        offspring_energy_fraction: 0.45,
+        max_creatures: 5000,
+        weight_mutation_rate: 0.26,
+        weight_mutation_magnitude: 0.18,
+        logic_node_mutation_rate: 0.04,
+        structural_mutation_rate: 0.08
+      },
+      serverReachable: true,
+      wsConnected: true,
+      error: null,
+      busyAction: null,
+      phase: "running",
+      tick: 7,
+      population: 1,
+      averageEnergy: 0.75,
+      startDisabled: false,
+      loadStatus: vi.fn(),
+      setError: vi.fn(),
+      startSimulation: vi.fn(),
+      restartSimulation: vi.fn(),
+      updateStartupField: vi.fn(),
+      togglePause: vi.fn(),
+      updateRuntimeField: vi.fn()
+    };
+
+    const spy = vi
+      .spyOn(simulationStoreModule, "useSimulationStore")
+      .mockReturnValue(mockStore as ReturnType<typeof simulationStoreModule.useSimulationStore>);
+    try {
+      render(<App />);
+      const canvas = document.querySelector("canvas.world-canvas") as HTMLCanvasElement;
+      Object.defineProperty(canvas, "getBoundingClientRect", {
+        value: () => ({
+          left: 0,
+          top: 0,
+          width: 300,
+          height: 300,
+          right: 300,
+          bottom: 300,
+          x: 0,
+          y: 0,
+          toJSON: () => ({})
+        })
+      });
+
+      fireEvent.click(canvas, { clientX: 4, clientY: 4 });
+
+      expect(await screen.findByText(/Creature Inspector/i)).toBeInTheDocument();
+      expect(screen.getByText("99")).toBeInTheDocument();
+      expect(screen.getByText("11")).toBeInTheDocument();
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

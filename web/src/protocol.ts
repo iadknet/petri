@@ -9,6 +9,7 @@ export type CreatureSnapshot = {
   energy: number;
   age: number;
   generation: number;
+  node_count: number;
 };
 
 export type WorldFrame = {

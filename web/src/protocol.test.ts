@@ -13,8 +13,8 @@ describe("protocol", () => {
       population: 2,
       average_energy: 0.42,
       creatures: [
-        { id: 1, x: 10, y: 11, energy: 0.7, age: 5, generation: 0, lineage_id: 100, parent_id: null },
-        { id: 2, x: 12, y: 13, energy: 0.4, age: 3, generation: 1, lineage_id: 100, parent_id: 1 }
+        { id: 1, x: 10, y: 11, energy: 0.7, age: 5, generation: 0, lineage_id: 100, parent_id: null, node_count: 7 },
+        { id: 2, x: 12, y: 13, energy: 0.4, age: 3, generation: 1, lineage_id: 100, parent_id: 1, node_count: 9 }
       ]
     };
 
@@ -29,5 +29,6 @@ describe("protocol", () => {
     expect(decoded.average_energy).toBeCloseTo(0.42);
     expect(decoded.creatures[0].lineage_id).toBe(100);
     expect(decoded.creatures[1].parent_id).toBe(1);
+    expect(decoded.creatures[1].node_count).toBe(9);
   });
 });

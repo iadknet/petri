@@ -283,6 +283,7 @@ impl World {
                 energy: c.energy,
                 age: c.age,
                 generation: c.generation,
+                node_count: c.controller.compute_node_count() as u32,
             })
             .collect::<Vec<_>>();
 
@@ -1166,6 +1167,21 @@ mod tests {
             world.tick();
         }
         assert!(world.creature_count() > 0);
+    }
+
+    #[test]
+    fn frame_creatures_include_controller_node_count() {
+        let cfg = WorldConfig {
+            width: 12,
+            height: 12,
+            initial_creatures: 1,
+            ..WorldConfig::default()
+        };
+        let world = World::new_with_palette(cfg, 919, ControllerPalette::Hybrid);
+
+        let frame = world.frame();
+        assert_eq!(frame.creatures.len(), 1);
+        assert!(frame.creatures[0].node_count > 0);
     }
 
     #[test]

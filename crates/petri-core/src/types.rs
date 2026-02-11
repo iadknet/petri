@@ -29,6 +29,7 @@ pub struct CreatureSnapshot {
     pub energy: f32,
     pub age: u64,
     pub generation: u32,
+    pub node_count: u32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
