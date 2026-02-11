@@ -13,7 +13,7 @@ export type WorldFrame = {
   tick: number;
   width: number;
   height: number;
-  food: number[];
+  food: number[] | Uint8Array;
   creatures: CreatureSnapshot[];
   population: number;
   average_energy: number;

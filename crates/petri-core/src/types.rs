@@ -34,7 +34,7 @@ pub struct WorldFrame {
     pub tick: u64,
     pub width: u32,
     pub height: u32,
-    pub food: Vec<f32>,
+    pub food: Vec<u8>,
     pub creatures: Vec<CreatureSnapshot>,
     pub population: usize,
     pub average_energy: f32,
