@@ -1,4 +1,6 @@
-use petri_graph::{ComputationGraph, ControllerPalette, Edge, MutationConfig, NodeKind, SensorInputs};
+use petri_graph::{
+    ComputationGraph, ControllerPalette, Edge, MutationConfig, NodeKind, SensorInputs,
+};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
@@ -120,11 +122,7 @@ fn remove_edge_mutation_removes_one_edge() {
 fn remove_disconnected_hidden_nodes_prunes_orphan_nodes() {
     let mut graph = ComputationGraph {
         palette: ControllerPalette::Hybrid,
-        nodes: vec![
-            NodeKind::InputFoodHere,
-            NodeKind::OutputEat,
-            NodeKind::Tanh,
-        ],
+        nodes: vec![NodeKind::InputFoodHere, NodeKind::OutputEat, NodeKind::Tanh],
         edges: vec![Edge {
             from: 0,
             to: 1,

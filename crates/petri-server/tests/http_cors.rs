@@ -28,7 +28,11 @@ async fn cors_preflight_allows_vite_dev_origin_for_patch_config() {
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(
         response.headers().get("access-control-allow-origin"),
-        Some(&"http://127.0.0.1:5173".parse().expect("header value should parse"))
+        Some(
+            &"http://127.0.0.1:5173"
+                .parse()
+                .expect("header value should parse")
+        )
     );
     assert!(response
         .headers()
@@ -60,7 +64,11 @@ async fn cors_preflight_allows_alternate_vite_dev_origin_for_patch_config() {
     assert_eq!(response.status(), StatusCode::OK);
     assert_eq!(
         response.headers().get("access-control-allow-origin"),
-        Some(&"http://127.0.0.1:5174".parse().expect("header value should parse"))
+        Some(
+            &"http://127.0.0.1:5174"
+                .parse()
+                .expect("header value should parse")
+        )
     );
     assert!(response
         .headers()
