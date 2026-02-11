@@ -91,6 +91,32 @@ export function StartupDraftPanel({ startupDraft, phase, onUpdate }: StartupDraf
             onChange={(event) => onUpdate("food_growth_rate", Number(event.target.value))}
           />
 
+          <label className="slider-label" htmlFor="startup-food-spread-threshold-slider">
+            Food spread threshold: {startupDraft.food_spread_threshold.toFixed(2)}
+          </label>
+          <input
+            id="startup-food-spread-threshold-slider"
+            type="range"
+            min={STARTUP_LIMITS.food_spread_threshold.min}
+            max={STARTUP_LIMITS.food_spread_threshold.max}
+            step={STARTUP_LIMITS.food_spread_threshold.step}
+            value={startupDraft.food_spread_threshold}
+            onChange={(event) => onUpdate("food_spread_threshold", Number(event.target.value))}
+          />
+
+          <label className="slider-label" htmlFor="startup-food-spawn-floor-density-slider">
+            Food spawn floor density: {startupDraft.food_spawn_floor_density.toFixed(2)}
+          </label>
+          <input
+            id="startup-food-spawn-floor-density-slider"
+            type="range"
+            min={STARTUP_LIMITS.food_spawn_floor_density.min}
+            max={STARTUP_LIMITS.food_spawn_floor_density.max}
+            step={STARTUP_LIMITS.food_spawn_floor_density.step}
+            value={startupDraft.food_spawn_floor_density}
+            onChange={(event) => onUpdate("food_spawn_floor_density", Number(event.target.value))}
+          />
+
           <label className="slider-label" htmlFor="tick-decay-slider">
             Tick decay: {startupDraft.energy_per_tick_decay.toFixed(3)}
           </label>

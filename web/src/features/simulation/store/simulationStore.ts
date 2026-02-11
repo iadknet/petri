@@ -39,6 +39,8 @@ export const STARTUP_LIMITS = {
   energy_initial: { min: 0.1, max: 2.0, step: 0.01 },
   food_spawn_rate: { min: 0.0, max: 0.3, step: 0.01 },
   food_growth_rate: { min: 0.0, max: 0.4, step: 0.01 },
+  food_spread_threshold: { min: 0.0, max: 1.0, step: 0.01 },
+  food_spawn_floor_density: { min: 0.0, max: 1.0, step: 0.01 },
   food_max_density: { min: 0.2, max: 2.0, step: 0.01 },
   food_energy_value: { min: 0.05, max: 2.0, step: 0.01 },
   energy_per_tick_decay: { min: 0.005, max: 0.03, step: 0.001 },

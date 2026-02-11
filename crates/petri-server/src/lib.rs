@@ -167,6 +167,11 @@ mod tests {
         assert_eq!(status_json["startup_draft"]["initial_food_density"], 0.15);
         assert_eq!(status_json["startup_draft"]["food_spawn_rate"], 0.05);
         assert_eq!(status_json["startup_draft"]["food_growth_rate"], 0.10);
+        assert_eq!(status_json["startup_draft"]["food_spread_threshold"], 0.75);
+        assert_eq!(
+            status_json["startup_draft"]["food_spawn_floor_density"],
+            0.03
+        );
         assert_eq!(status_json["startup_draft"]["width"], 400);
         assert_eq!(status_json["startup_draft"]["height"], 400);
     }
@@ -267,7 +272,9 @@ mod tests {
 
         let patch_payload = json!({
             "max_creatures": 7200,
-            "energy_initial": 0.82
+            "energy_initial": 0.82,
+            "food_spread_threshold": 0.62,
+            "food_spawn_floor_density": 0.08
         });
 
         let patch_response = app
@@ -286,6 +293,8 @@ mod tests {
         let patch_json = read_json(patch_response).await;
         assert_eq!(patch_json["max_creatures"], 7200);
         assert_eq!(patch_json["energy_initial"], 0.82);
+        assert_eq!(patch_json["food_spread_threshold"], 0.62);
+        assert_eq!(patch_json["food_spawn_floor_density"], 0.08);
 
         let status_response = app
             .oneshot(
@@ -300,6 +309,11 @@ mod tests {
         let status_json = read_json(status_response).await;
         assert_eq!(status_json["startup_draft"]["max_creatures"], 7200);
         assert_eq!(status_json["startup_draft"]["energy_initial"], 0.82);
+        assert_eq!(status_json["startup_draft"]["food_spread_threshold"], 0.62);
+        assert_eq!(
+            status_json["startup_draft"]["food_spawn_floor_density"],
+            0.08
+        );
     }
 
     #[tokio::test]
@@ -366,6 +380,8 @@ mod tests {
             "ticks_per_second": 12,
             "food_spawn_rate": 0.18,
             "food_growth_rate": 0.22,
+            "food_spread_threshold": 0.66,
+            "food_spawn_floor_density": 0.04,
             "food_max_density": 1.2,
             "food_energy_value": 0.48,
             "energy_per_tick_decay": 0.015,
@@ -412,6 +428,8 @@ mod tests {
         assert_eq!(cfg_json["ticks_per_second"], 12);
         assert_eq!(cfg_json["food_spawn_rate"], 0.18);
         assert_eq!(cfg_json["food_growth_rate"], 0.22);
+        assert_eq!(cfg_json["food_spread_threshold"], 0.66);
+        assert_eq!(cfg_json["food_spawn_floor_density"], 0.04);
         assert_eq!(cfg_json["food_max_density"], 1.2);
         assert_eq!(cfg_json["food_energy_value"], 0.48);
         assert_eq!(cfg_json["energy_per_tick_decay"], 0.015);

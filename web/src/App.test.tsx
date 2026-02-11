@@ -92,6 +92,14 @@ describe("App", () => {
     expect(await screen.findByLabelText(/World wrap/i)).toBeInTheDocument();
   });
 
+  it("renders density-threshold food controls", async () => {
+    render(<App />);
+    expect(await screen.findByLabelText(/Food spread threshold/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/Food spawn floor density/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/Runtime food spread threshold/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/Runtime food spawn floor/i)).toBeInTheDocument();
+  });
+
   it("renders startup world size controls", async () => {
     render(<App />);
     expect(await screen.findByLabelText(/World width/i)).toBeInTheDocument();
@@ -147,6 +155,8 @@ describe("App", () => {
           energy_initial: 0.7,
           food_spawn_rate: 0.1,
           food_growth_rate: 0.2,
+          food_spread_threshold: 0.75,
+          food_spawn_floor_density: 0.03,
           energy_per_tick_decay: 0.01,
           energy_per_move: 0.02,
           world_wrap: true
@@ -161,6 +171,8 @@ describe("App", () => {
         energy_initial: 0.7,
         food_spawn_rate: 0.1,
         food_growth_rate: 0.2,
+        food_spread_threshold: 0.75,
+        food_spawn_floor_density: 0.03,
         energy_per_tick_decay: 0.01,
         energy_per_move: 0.02,
         world_wrap: true
@@ -170,6 +182,8 @@ describe("App", () => {
         ticks_per_second: 30,
         food_spawn_rate: 0.1,
         food_growth_rate: 0.2,
+        food_spread_threshold: 0.75,
+        food_spawn_floor_density: 0.03,
         food_max_density: 1.0,
         food_energy_value: 0.35,
         energy_per_tick_decay: 0.01,

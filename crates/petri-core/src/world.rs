@@ -546,14 +546,81 @@ impl World {
             return;
         }
 
-        let spawn_attempts = (total_cells as f32 * self.config.food_spawn_rate).round() as usize;
-        let growth_per_spawn = self.config.food_growth_rate.max(0.0);
+        let growth_rate = self.config.food_growth_rate.max(0.0);
         let max_density = self.config.food_max_density.max(0.0);
+        if max_density <= 0.0 {
+            return;
+        }
+
+        let spread_threshold = max_density * self.config.food_spread_threshold.clamp(0.0, 1.0);
+        let spawn_floor_density = self.config.food_spawn_floor_density.clamp(0.0, 1.0);
+        let source_food = self
+            .cells
+            .iter()
+            .map(|cell| cell.food.clamp(0.0, max_density))
+            .collect::<Vec<_>>();
+        let total_food: f32 = source_food.iter().sum();
+        let average_density = (total_food / (total_cells as f32 * max_density)).clamp(0.0, 1.0);
+        let width = self.config.width as i32;
+        let height = self.config.height as i32;
+        const NEIGHBOR_OFFSETS: [(i32, i32); 4] = [(0, -1), (1, 0), (0, 1), (-1, 0)];
+
+        for (idx, source) in source_food.iter().copied().enumerate() {
+            let delta = source * growth_rate;
+            if delta > 0.0 {
+                self.cells[idx].food = (self.cells[idx].food + delta).min(max_density);
+            }
+
+            if source < spread_threshold || delta <= 0.0 {
+                continue;
+            }
+
+            let x = (idx as u32 % self.config.width) as i32;
+            let y = (idx as u32 / self.config.width) as i32;
+            let mut neighbors = [0_usize; 4];
+            let mut neighbor_count = 0_usize;
+
+            for (dx, dy) in NEIGHBOR_OFFSETS {
+                let raw_x = x + dx;
+                let raw_y = y + dy;
+                let Some((nx, ny)) = (if self.config.world_wrap {
+                    Some((
+                        wrap_axis(raw_x, self.config.width),
+                        wrap_axis(raw_y, self.config.height),
+                    ))
+                } else if raw_x < 0 || raw_x >= width || raw_y < 0 || raw_y >= height {
+                    None
+                } else {
+                    Some((raw_x as u32, raw_y as u32))
+                }) else {
+                    continue;
+                };
+                neighbors[neighbor_count] = self.idx(nx, ny);
+                neighbor_count += 1;
+            }
+
+            if neighbor_count == 0 {
+                continue;
+            }
+
+            let target_idx = neighbors[self.rng.gen_range(0..neighbor_count)];
+            self.cells[target_idx].food = (self.cells[target_idx].food + delta).min(max_density);
+        }
+
+        if average_density >= spawn_floor_density {
+            return;
+        }
+
+        let spawn_attempts = (total_cells as f32 * self.config.food_spawn_rate).round() as usize;
+        let spawn_delta = max_density * growth_rate;
+        if spawn_attempts == 0 || spawn_delta <= 0.0 {
+            return;
+        }
 
         for _ in 0..spawn_attempts {
             let idx = self.rng.gen_range(0..total_cells);
             let cell = &mut self.cells[idx];
-            cell.food = (cell.food + growth_per_spawn).min(max_density);
+            cell.food = (cell.food + spawn_delta).min(max_density);
         }
     }
 
@@ -969,6 +1036,128 @@ mod tests {
     }
 
     #[test]
+    fn food_growth_is_density_proportional_within_cells() {
+        let cfg = WorldConfig {
+            width: 2,
+            height: 1,
+            initial_creatures: 0,
+            max_creatures: 10,
+            food_spawn_rate: 0.0,
+            food_growth_rate: 0.5,
+            food_max_density: 1.0,
+            ..WorldConfig::default()
+        };
+
+        let mut world = World::new(cfg, 5150);
+        world.cells[0].food = 0.2;
+        world.cells[1].food = 0.4;
+
+        world.tick();
+
+        assert!((world.cells[0].food - 0.3).abs() < 1e-6);
+        assert!((world.cells[1].food - 0.6).abs() < 1e-6);
+    }
+
+    #[test]
+    fn food_below_spread_threshold_does_not_spread_even_if_local_growth_reaches_cap() {
+        let cfg = WorldConfig {
+            width: 2,
+            height: 1,
+            initial_creatures: 0,
+            max_creatures: 10,
+            world_wrap: false,
+            food_spawn_rate: 0.0,
+            food_growth_rate: 0.5,
+            food_max_density: 1.0,
+            ..WorldConfig::default()
+        };
+
+        let mut world = World::new(cfg, 5151);
+        let source_idx = world.idx(0, 0);
+        let neighbor_idx = world.idx(1, 0);
+        world.cells[source_idx].food = 0.74;
+        world.cells[neighbor_idx].food = 0.0;
+
+        world.tick();
+
+        assert!((world.cells[source_idx].food - 1.0).abs() < 1e-6);
+        assert!((world.cells[neighbor_idx].food - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn food_at_spread_threshold_spreads_to_single_neighbor() {
+        let cfg = WorldConfig {
+            width: 2,
+            height: 1,
+            initial_creatures: 0,
+            max_creatures: 10,
+            world_wrap: false,
+            food_spawn_rate: 0.0,
+            food_growth_rate: 0.2,
+            food_max_density: 1.0,
+            ..WorldConfig::default()
+        };
+
+        let mut world = World::new(cfg, 5152);
+        let source_idx = world.idx(0, 0);
+        let neighbor_idx = world.idx(1, 0);
+        world.cells[source_idx].food = 0.75;
+        world.cells[neighbor_idx].food = 0.0;
+
+        world.tick();
+
+        assert!((world.cells[source_idx].food - 0.9).abs() < 1e-6);
+        assert!((world.cells[neighbor_idx].food - 0.15).abs() < 1e-6);
+    }
+
+    #[test]
+    fn fallback_spawn_does_not_run_when_average_density_is_above_floor() {
+        let cfg = WorldConfig {
+            width: 10,
+            height: 10,
+            initial_creatures: 0,
+            max_creatures: 10,
+            food_spawn_rate: 1.0,
+            food_growth_rate: 0.2,
+            food_max_density: 1.0,
+            ..WorldConfig::default()
+        };
+
+        let mut world = World::new(cfg, 5153);
+        for cell in &mut world.cells {
+            cell.food = 0.1;
+        }
+
+        world.tick();
+
+        let total_food: f32 = world.cells.iter().map(|c| c.food).sum();
+        assert!((total_food - 12.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn fallback_spawn_runs_when_average_density_is_below_floor() {
+        let cfg = WorldConfig {
+            width: 10,
+            height: 10,
+            initial_creatures: 0,
+            max_creatures: 10,
+            food_spawn_rate: 1.0,
+            food_growth_rate: 0.2,
+            food_max_density: 1.0,
+            ..WorldConfig::default()
+        };
+
+        let mut world = World::new(cfg, 5154);
+        let idx = world.idx(0, 0);
+        world.cells[idx].food = 0.01;
+
+        world.tick();
+
+        let total_food: f32 = world.cells.iter().map(|c| c.food).sum();
+        assert!(total_food > 0.012);
+    }
+
+    #[test]
     fn nearest_food_sensor_reports_direction_and_distance() {
         let cfg = WorldConfig {
             width: 20,
@@ -1343,6 +1532,8 @@ mod tests {
             max_creatures: 300,
             food_spawn_rate: 0.12,
             food_growth_rate: 0.18,
+            food_spread_threshold: 0.62,
+            food_spawn_floor_density: 0.09,
             ..WorldConfig::default()
         };
         let mut world = World::new_with_palette(cfg, 2026, ControllerPalette::Hybrid);
@@ -1369,6 +1560,14 @@ mod tests {
         assert_eq!(
             restored.config.food_growth_rate,
             world.config.food_growth_rate
+        );
+        assert_eq!(
+            restored.config.food_spread_threshold,
+            world.config.food_spread_threshold
+        );
+        assert_eq!(
+            restored.config.food_spawn_floor_density,
+            world.config.food_spawn_floor_density
         );
         assert_eq!(restored.frame().food, world.frame().food);
         assert_eq!(restored.creature_count(), world.creature_count());

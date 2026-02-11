@@ -55,6 +55,8 @@ export type ConfigPatch = {
   ticks_per_second?: number;
   food_spawn_rate?: number;
   food_growth_rate?: number;
+  food_spread_threshold?: number;
+  food_spawn_floor_density?: number;
   food_max_density?: number;
   food_energy_value?: number;
   energy_per_tick_decay?: number;
@@ -80,6 +82,8 @@ export type StartupDraft = {
   energy_initial: number;
   food_spawn_rate: number;
   food_growth_rate: number;
+  food_spread_threshold: number;
+  food_spawn_floor_density: number;
   energy_per_tick_decay: number;
   energy_per_move: number;
   world_wrap: boolean;

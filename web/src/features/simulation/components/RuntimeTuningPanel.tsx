@@ -78,6 +78,46 @@ export function RuntimeTuningPanel({
             }}
           />
 
+          <label className="slider-label" htmlFor="runtime-food-spread-threshold-slider">
+            Runtime food spread threshold: {runtimeConfig.food_spread_threshold.toFixed(2)}
+          </label>
+          <input
+            id="runtime-food-spread-threshold-slider"
+            type="range"
+            min={STARTUP_LIMITS.food_spread_threshold.min}
+            max={STARTUP_LIMITS.food_spread_threshold.max}
+            step={STARTUP_LIMITS.food_spread_threshold.step}
+            value={runtimeConfig.food_spread_threshold}
+            disabled={phase === "idle"}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              onUpdateRuntimeField(
+                { food_spread_threshold: value },
+                { ...runtimeConfig, food_spread_threshold: value }
+              );
+            }}
+          />
+
+          <label className="slider-label" htmlFor="runtime-food-spawn-floor-density-slider">
+            Runtime food spawn floor: {runtimeConfig.food_spawn_floor_density.toFixed(2)}
+          </label>
+          <input
+            id="runtime-food-spawn-floor-density-slider"
+            type="range"
+            min={STARTUP_LIMITS.food_spawn_floor_density.min}
+            max={STARTUP_LIMITS.food_spawn_floor_density.max}
+            step={STARTUP_LIMITS.food_spawn_floor_density.step}
+            value={runtimeConfig.food_spawn_floor_density}
+            disabled={phase === "idle"}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              onUpdateRuntimeField(
+                { food_spawn_floor_density: value },
+                { ...runtimeConfig, food_spawn_floor_density: value }
+              );
+            }}
+          />
+
           <label className="slider-label" htmlFor="runtime-weight-mutation-rate-slider">
             Weight mutation rate: {runtimeConfig.weight_mutation_rate.toFixed(2)}
           </label>

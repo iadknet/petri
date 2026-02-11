@@ -25,6 +25,8 @@ pub struct StartupDraft {
     pub energy_initial: f32,
     pub food_spawn_rate: f32,
     pub food_growth_rate: f32,
+    pub food_spread_threshold: f32,
+    pub food_spawn_floor_density: f32,
     pub energy_per_tick_decay: f32,
     pub energy_per_move: f32,
     pub world_wrap: bool,
@@ -40,6 +42,8 @@ pub struct StartupDraftPatch {
     pub energy_initial: Option<f32>,
     pub food_spawn_rate: Option<f32>,
     pub food_growth_rate: Option<f32>,
+    pub food_spread_threshold: Option<f32>,
+    pub food_spawn_floor_density: Option<f32>,
     pub energy_per_tick_decay: Option<f32>,
     pub energy_per_move: Option<f32>,
     pub world_wrap: Option<bool>,
@@ -51,6 +55,8 @@ pub struct RuntimeConfigPatch {
     pub ticks_per_second: Option<u32>,
     pub food_spawn_rate: Option<f32>,
     pub food_growth_rate: Option<f32>,
+    pub food_spread_threshold: Option<f32>,
+    pub food_spawn_floor_density: Option<f32>,
     pub food_max_density: Option<f32>,
     pub food_energy_value: Option<f32>,
     pub energy_per_tick_decay: Option<f32>,
@@ -182,6 +188,8 @@ impl StartupDraft {
             energy_initial: 0.7,
             food_spawn_rate: 0.05,
             food_growth_rate: 0.10,
+            food_spread_threshold: 0.75,
+            food_spawn_floor_density: 0.03,
             energy_per_tick_decay: 0.01,
             energy_per_move: 0.02,
             world_wrap: true,
@@ -223,6 +231,14 @@ impl StartupDraft {
             changed |= (self.food_growth_rate - v).abs() > f32::EPSILON;
             self.food_growth_rate = v;
         }
+        if let Some(v) = patch.food_spread_threshold {
+            changed |= (self.food_spread_threshold - v).abs() > f32::EPSILON;
+            self.food_spread_threshold = v;
+        }
+        if let Some(v) = patch.food_spawn_floor_density {
+            changed |= (self.food_spawn_floor_density - v).abs() > f32::EPSILON;
+            self.food_spawn_floor_density = v;
+        }
         if let Some(v) = patch.energy_per_tick_decay {
             changed |= (self.energy_per_tick_decay - v).abs() > f32::EPSILON;
             self.energy_per_tick_decay = v;
@@ -258,6 +274,18 @@ impl StartupDraft {
         )?;
         validate_range("food_spawn_rate", self.food_spawn_rate as f64, 0.0, 1.0)?;
         validate_range("food_growth_rate", self.food_growth_rate as f64, 0.0, 1.0)?;
+        validate_range(
+            "food_spread_threshold",
+            self.food_spread_threshold as f64,
+            0.0,
+            1.0,
+        )?;
+        validate_range(
+            "food_spawn_floor_density",
+            self.food_spawn_floor_density as f64,
+            0.0,
+            1.0,
+        )?;
         validate_range(
             "energy_per_tick_decay",
             self.energy_per_tick_decay as f64,
@@ -502,6 +530,8 @@ fn build_world_config(base: &WorldConfig, draft: &StartupDraft) -> WorldConfig {
     cfg.energy_initial = draft.energy_initial;
     cfg.food_spawn_rate = draft.food_spawn_rate;
     cfg.food_growth_rate = draft.food_growth_rate;
+    cfg.food_spread_threshold = draft.food_spread_threshold;
+    cfg.food_spawn_floor_density = draft.food_spawn_floor_density;
     cfg.energy_per_tick_decay = draft.energy_per_tick_decay;
     cfg.energy_per_move = draft.energy_per_move;
     cfg.paused = false;
@@ -518,6 +548,8 @@ fn startup_draft_from_config(config: &WorldConfig, initial_food_density: f32) ->
         energy_initial: config.energy_initial,
         food_spawn_rate: config.food_spawn_rate,
         food_growth_rate: config.food_growth_rate,
+        food_spread_threshold: config.food_spread_threshold,
+        food_spawn_floor_density: config.food_spawn_floor_density,
         energy_per_tick_decay: config.energy_per_tick_decay,
         energy_per_move: config.energy_per_move,
         world_wrap: config.world_wrap,
@@ -556,6 +588,12 @@ fn apply_runtime_patch(config: &mut WorldConfig, patch: &RuntimeConfigPatch) {
     }
     if let Some(rate) = patch.food_growth_rate {
         config.food_growth_rate = rate.clamp(0.0, 1.0);
+    }
+    if let Some(threshold) = patch.food_spread_threshold {
+        config.food_spread_threshold = threshold.clamp(0.0, 1.0);
+    }
+    if let Some(floor) = patch.food_spawn_floor_density {
+        config.food_spawn_floor_density = floor.clamp(0.0, 1.0);
     }
     if let Some(density) = patch.food_max_density {
         config.food_max_density = density.max(0.01);
@@ -643,6 +681,12 @@ fn startup_probe_seed(draft: &StartupDraft) -> u64 {
     seed = seed
         .wrapping_mul(1_099_511_628_211)
         .wrapping_add(draft.food_growth_rate.to_bits() as u64);
+    seed = seed
+        .wrapping_mul(1_099_511_628_211)
+        .wrapping_add(draft.food_spread_threshold.to_bits() as u64);
+    seed = seed
+        .wrapping_mul(1_099_511_628_211)
+        .wrapping_add(draft.food_spawn_floor_density.to_bits() as u64);
     seed = seed
         .wrapping_mul(1_099_511_628_211)
         .wrapping_add(draft.energy_per_tick_decay.to_bits() as u64);

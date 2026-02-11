@@ -7,6 +7,8 @@ describe("STARTUP_LIMITS", () => {
     expect(STARTUP_LIMITS.initial_food_density.min).toBe(0);
     expect(STARTUP_LIMITS.food_spawn_rate.min).toBe(0);
     expect(STARTUP_LIMITS.food_growth_rate.min).toBe(0);
+    expect((STARTUP_LIMITS as Record<string, { min: number }>).food_spread_threshold.min).toBe(0);
+    expect((STARTUP_LIMITS as Record<string, { min: number }>).food_spawn_floor_density.min).toBe(0);
   });
 });
 
