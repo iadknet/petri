@@ -45,7 +45,7 @@ fn main() {
             }
         }
         Command::Ablation => {
-            let config = WorldConfig::default();
+            let config = founder_survival_config();
             let results = run_ablation(config, args.ticks, args.seed);
             println!("{}", format_ablation_results(&results));
         }
@@ -98,6 +98,19 @@ fn run_ablation(config: WorldConfig, ticks: u64, seed: u64) -> Vec<AblationResul
             }
         })
         .collect()
+}
+
+fn founder_survival_config() -> WorldConfig {
+    WorldConfig {
+        width: 40,
+        height: 40,
+        initial_creatures: 80,
+        max_creatures: 1000,
+        food_spawn_rate: 0.1,
+        food_growth_rate: 0.2,
+        energy_per_compute_node: 0.002,
+        ..WorldConfig::default()
+    }
 }
 
 fn format_ablation_results(results: &[AblationResult]) -> String {
@@ -195,5 +208,15 @@ mod tests {
         assert!(output.contains("NeuralOnly"));
         assert!(output.contains("LogicOnly"));
         assert!(output.contains("Hybrid"));
+    }
+
+    #[test]
+    fn ablation_survival_regression_keeps_hybrid_alive() {
+        let results = run_ablation(founder_survival_config(), 100, 77);
+        let hybrid = results
+            .iter()
+            .find(|r| r.palette == ControllerPalette::Hybrid)
+            .expect("hybrid result should exist");
+        assert!(hybrid.final_population > 0);
     }
 }

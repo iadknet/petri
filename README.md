@@ -55,6 +55,9 @@ Run Stage 1b controller stability ablation:
 cargo run -p petri-cli -- ablation --ticks 500
 ```
 
+Stage 1c note: worlds are seeded from a viable founder controller and lightly mutated on spawn/reproduction.
+The `ablation` command uses a tuned deterministic config (`founder_survival_config`) to keep populations alive long enough for behavior comparison.
+
 ## Verify
 
 ```bash
