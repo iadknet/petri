@@ -558,6 +558,80 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn creature_detail_endpoint_returns_last_inputs_outputs_and_events() {
+        let state = AppState::new_for_tests();
+        let app = build_router(state.clone());
+
+        let start_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/simulation/start")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(start_response.status(), StatusCode::OK);
+
+        let _ = run_single_iteration(&state).await;
+
+        let snapshot_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/simulation/snapshot")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(snapshot_response.status(), StatusCode::OK);
+        let snapshot_json = read_json(snapshot_response).await;
+        let creature_id = snapshot_json["creatures"][0]["id"]
+            .as_u64()
+            .expect("snapshot creature should include id");
+
+        let detail_response = app
+            .oneshot(
+                Request::builder()
+                    .uri(format!("/simulation/creature/{creature_id}"))
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(detail_response.status(), StatusCode::OK);
+        let detail_json = read_json(detail_response).await;
+
+        assert_eq!(detail_json["id"], creature_id);
+        assert!(detail_json["last_inputs"].is_object());
+        assert!(detail_json["last_outputs"].is_object());
+        assert!(detail_json["events"].is_array());
+        assert!(detail_json["node_count"].as_u64().is_some());
+    }
+
+    #[tokio::test]
+    async fn creature_detail_endpoint_returns_not_found_for_unknown_id() {
+        let state = AppState::new_for_tests();
+        let app = build_router(state);
+
+        let response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/simulation/creature/999999")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(response.status(), StatusCode::NOT_FOUND);
+        let err_json = read_json(response).await;
+        assert_eq!(err_json["code"], "creature_not_found");
+    }
+
+    #[tokio::test]
     async fn non_viable_startup_config_is_rejected() {
         let state = AppState::new_for_tests();
         let app = build_router(state);

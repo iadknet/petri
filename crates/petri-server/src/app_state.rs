@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, RwLock};
 use tracing::{info, warn};
 
-use petri_core::{World, WorldConfig, WorldSnapshot};
+use petri_core::{CreatureDetail, World, WorldConfig, WorldSnapshot};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -635,6 +635,13 @@ impl AppState {
         );
         world.seed_food_density(sim.startup_draft.initial_food_density);
         world.snapshot()
+    }
+
+    pub async fn creature_detail(&self, creature_id: u64) -> Option<CreatureDetail> {
+        let sim = self.simulation.read().await;
+        sim.run
+            .as_ref()
+            .and_then(|run| run.world.creature_detail(creature_id))
     }
 
     pub async fn load_simulation_snapshot(&self, snapshot: WorldSnapshot) -> SimulationStatus {
