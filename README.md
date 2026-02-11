@@ -7,6 +7,10 @@ This repository now contains the first runnable vertical slice of the Petri simu
 - `petri-cli`: headless runner with periodic stats output
 - `web/`: React canvas client consuming MessagePack frames
 
+## Reference docs
+
+- `docs/reference/creature-controller-reference.md`: creature/controller structure, node semantics, and mutation operator reference
+
 ## Prerequisites
 
 - `rustup` (recommended) with Rust `1.93.0`
