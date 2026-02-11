@@ -31,6 +31,11 @@ cargo run -p petri-server
 
 Default address: `http://127.0.0.1:4000`
 
+Stage 1e lifecycle note:
+- Server boots in `idle` and does not tick until explicitly started.
+- Use `POST /simulation/start` (or the web Start button) to begin a run.
+- Use `POST /simulation/restart` to rebuild from current startup draft with a new seed.
+
 ## Run the web UI
 
 ```bash
@@ -42,6 +47,11 @@ npm run dev
 Open `http://127.0.0.1:5173`.
 
 The app expects the backend on `127.0.0.1:4000`.
+
+The web control rail now exposes:
+- Startup draft (Core 6): initial creatures, initial food density, food spawn/growth, tick decay, move cost
+- Runtime controls: pause/resume, ticks-per-second, live food spawn/growth
+- Idle placeholder before first start, plus pending-restart state when startup-only values change during a run
 
 ## Run the CLI
 
