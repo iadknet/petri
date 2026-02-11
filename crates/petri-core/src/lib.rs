@@ -8,4 +8,4 @@ pub use types::{
     CreatureDetail, CreatureEvent, CreatureEventKind, CreatureSnapshot, CreatureStateSnapshot,
     WorldDiagnostics, WorldFrame, WorldSnapshot,
 };
-pub use world::{CreatureView, World};
+pub use world::{CreatureView, PaintError, PaintPoint, PaintStats, PaintTool, World};

@@ -56,6 +56,7 @@ The web control rail now exposes:
 - Startup draft: initial creatures, world width/height, initial food density, food spawn/growth, spread threshold, spawn floor density, tick decay, move cost, world wrap
 - Runtime controls: pause/resume, ticks-per-second, live food spawn/growth plus spread threshold and spawn floor density
 - Advanced Stage 1 controls for energy and mutation tuning
+- Viewport paint mode toggle with floating tools (food, barrier, erase food, erase barrier), brush sizes, idle preview mode, and clear paint action (idle/paused only)
 - Creature inspector (click creature in viewport)
 - Live population/average-energy chart
 - Snapshot export/import panel (`GET/POST /simulation/snapshot`)

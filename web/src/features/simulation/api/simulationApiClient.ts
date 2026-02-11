@@ -1,6 +1,8 @@
 import {
   ConfigPatch,
   CreatureDetail,
+  WorldPaintRequest,
+  WorldPaintResponse,
   SimulationStatus,
   StartupDraft,
   StartupDraftPatch,
@@ -139,5 +141,17 @@ export class SimulationApiClient {
       throw new Error(await parseError(response));
     }
     return (await response.json()) as SimulationStatus;
+  }
+
+  async paintWorld(request: WorldPaintRequest): Promise<WorldPaintResponse> {
+    const response = await fetch(`${this.apiBase}/simulation/world/paint`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(request)
+    });
+    if (!response.ok) {
+      throw new Error(await parseError(response));
+    }
+    return (await response.json()) as WorldPaintResponse;
   }
 }

@@ -7,6 +7,7 @@ use tokio::sync::{broadcast, RwLock};
 use petri_core::{CreatureDetail, World, WorldConfig, WorldSnapshot};
 
 mod lifecycle;
+mod paint;
 mod runtime_patch;
 mod startup_draft;
 mod status;
@@ -18,8 +19,9 @@ mod tests;
 
 pub use startup_draft::{StartupDraft, StartupDraftPatch};
 pub use types::{
-    AppState, AppStateOptions, RuntimeConfigPatch, SimulationError, SimulationPhase,
-    SimulationState, SimulationStatus,
+    AppState, AppStateOptions, IdlePreviewMode, RuntimeConfigPatch, SimulationError,
+    SimulationPhase, SimulationState, SimulationStatus, WorldPaintAction, WorldPaintRequest,
+    WorldPaintResponse,
 };
 
 use self::runtime_patch::apply_runtime_patch;
@@ -43,6 +45,7 @@ impl AppState {
             viability_probe_enabled: options.viability_probe_enabled,
             run: None,
             startup_draft,
+            startup_paint_layer: Default::default(),
             startup_viability,
             pending_restart: false,
             runtime_config: config,
@@ -91,6 +94,8 @@ impl AppState {
         let changed = updated.apply_patch(patch);
         updated.validate()?;
         sim.startup_draft = updated.clone();
+        sim.startup_paint_layer
+            .clip_to_bounds(updated.width, updated.height);
         sim.startup_viability = evaluate_startup_viability(
             &sim.runtime_config,
             &sim.startup_draft,
@@ -139,6 +144,7 @@ impl AppState {
             startup_probe_seed(&sim.startup_draft),
         );
         world.seed_food_density(sim.startup_draft.initial_food_density);
+        sim.startup_paint_layer.apply_to_world(&mut world);
         world.snapshot()
     }
 
@@ -164,6 +170,7 @@ impl AppState {
         sim.phase = SimulationPhase::Running;
         sim.initialization_stage = None;
         sim.pending_restart = false;
+        sim.startup_paint_layer = Default::default();
         if let Some(run) = sim.run.as_ref() {
             sim.runtime_config = run.world.config.clone();
             sim.startup_draft = startup_draft_from_config(
