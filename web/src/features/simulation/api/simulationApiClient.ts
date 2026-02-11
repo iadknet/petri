@@ -5,6 +5,16 @@ export type RuntimeConfig = {
   ticks_per_second: number;
   food_spawn_rate: number;
   food_growth_rate: number;
+  food_max_density: number;
+  food_energy_value: number;
+  energy_per_tick_decay: number;
+  energy_per_move: number;
+  energy_per_compute_node: number;
+  energy_per_reproduce: number;
+  energy_max: number;
+  min_reproduce_energy: number;
+  offspring_energy_fraction: number;
+  max_creatures: number;
   weight_mutation_rate: number;
   weight_mutation_magnitude: number;
   logic_node_mutation_rate: number;

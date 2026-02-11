@@ -205,6 +205,48 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn startup_draft_patch_updates_restart_required_stage1_knobs() {
+        let state = AppState::new_for_tests();
+        let app = build_router(state);
+
+        let patch_payload = json!({
+            "max_creatures": 7200,
+            "energy_initial": 0.82
+        });
+
+        let patch_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri("/simulation/startup-draft")
+                    .header("content-type", "application/json")
+                    .body(Body::from(patch_payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(patch_response.status(), StatusCode::OK);
+        let patch_json = read_json(patch_response).await;
+        assert_eq!(patch_json["max_creatures"], 7200);
+        assert_eq!(patch_json["energy_initial"], 0.82);
+
+        let status_response = app
+            .oneshot(
+                Request::builder()
+                    .uri("/simulation/status")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(status_response.status(), StatusCode::OK);
+        let status_json = read_json(status_response).await;
+        assert_eq!(status_json["startup_draft"]["max_creatures"], 7200);
+        assert_eq!(status_json["startup_draft"]["energy_initial"], 0.82);
+    }
+
+    #[tokio::test]
     async fn patch_config_updates_runtime_values() {
         let state = AppState::new_for_tests();
         let app = build_router(state);
@@ -226,6 +268,16 @@ mod tests {
             "ticks_per_second": 12,
             "food_spawn_rate": 0.18,
             "food_growth_rate": 0.22,
+            "food_max_density": 1.2,
+            "food_energy_value": 0.48,
+            "energy_per_tick_decay": 0.015,
+            "energy_per_move": 0.025,
+            "energy_per_compute_node": 0.009,
+            "energy_per_reproduce": 0.18,
+            "energy_max": 1.8,
+            "min_reproduce_energy": 1.2,
+            "offspring_energy_fraction": 0.38,
+            "max_creatures": 4200,
             "weight_mutation_rate": 0.31,
             "weight_mutation_magnitude": 0.27,
             "logic_node_mutation_rate": 0.06,
@@ -262,6 +314,16 @@ mod tests {
         assert_eq!(cfg_json["ticks_per_second"], 12);
         assert_eq!(cfg_json["food_spawn_rate"], 0.18);
         assert_eq!(cfg_json["food_growth_rate"], 0.22);
+        assert_eq!(cfg_json["food_max_density"], 1.2);
+        assert_eq!(cfg_json["food_energy_value"], 0.48);
+        assert_eq!(cfg_json["energy_per_tick_decay"], 0.015);
+        assert_eq!(cfg_json["energy_per_move"], 0.025);
+        assert_eq!(cfg_json["energy_per_compute_node"], 0.009);
+        assert_eq!(cfg_json["energy_per_reproduce"], 0.18);
+        assert_eq!(cfg_json["energy_max"], 1.8);
+        assert_eq!(cfg_json["min_reproduce_energy"], 1.2);
+        assert_eq!(cfg_json["offspring_energy_fraction"], 0.38);
+        assert_eq!(cfg_json["max_creatures"], 4200);
         assert_eq!(cfg_json["weight_mutation_rate"], 0.31);
         assert_eq!(cfg_json["weight_mutation_magnitude"], 0.27);
         assert_eq!(cfg_json["logic_node_mutation_rate"], 0.06);

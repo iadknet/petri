@@ -18,7 +18,9 @@ pub enum SimulationPhase {
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StartupDraft {
     pub initial_creatures: usize,
+    pub max_creatures: usize,
     pub initial_food_density: f32,
+    pub energy_initial: f32,
     pub food_spawn_rate: f32,
     pub food_growth_rate: f32,
     pub energy_per_tick_decay: f32,
@@ -29,7 +31,9 @@ pub struct StartupDraft {
 #[derive(Clone, Debug, Default, Serialize, Deserialize)]
 pub struct StartupDraftPatch {
     pub initial_creatures: Option<usize>,
+    pub max_creatures: Option<usize>,
     pub initial_food_density: Option<f32>,
+    pub energy_initial: Option<f32>,
     pub food_spawn_rate: Option<f32>,
     pub food_growth_rate: Option<f32>,
     pub energy_per_tick_decay: Option<f32>,
@@ -43,6 +47,16 @@ pub struct RuntimeConfigPatch {
     pub ticks_per_second: Option<u32>,
     pub food_spawn_rate: Option<f32>,
     pub food_growth_rate: Option<f32>,
+    pub food_max_density: Option<f32>,
+    pub food_energy_value: Option<f32>,
+    pub energy_per_tick_decay: Option<f32>,
+    pub energy_per_move: Option<f32>,
+    pub energy_per_compute_node: Option<f32>,
+    pub energy_per_reproduce: Option<f32>,
+    pub energy_max: Option<f32>,
+    pub min_reproduce_energy: Option<f32>,
+    pub offspring_energy_fraction: Option<f32>,
+    pub max_creatures: Option<usize>,
     pub weight_mutation_rate: Option<f32>,
     pub weight_mutation_magnitude: Option<f32>,
     pub logic_node_mutation_rate: Option<f32>,
@@ -157,7 +171,9 @@ impl StartupDraft {
     pub fn viable_default() -> Self {
         Self {
             initial_creatures: 300,
+            max_creatures: 5_000,
             initial_food_density: 0.25,
+            energy_initial: 0.7,
             food_spawn_rate: 0.10,
             food_growth_rate: 0.20,
             energy_per_tick_decay: 0.01,
@@ -173,9 +189,17 @@ impl StartupDraft {
             changed |= self.initial_creatures != v;
             self.initial_creatures = v;
         }
+        if let Some(v) = patch.max_creatures {
+            changed |= self.max_creatures != v;
+            self.max_creatures = v;
+        }
         if let Some(v) = patch.initial_food_density {
             changed |= (self.initial_food_density - v).abs() > f32::EPSILON;
             self.initial_food_density = v;
+        }
+        if let Some(v) = patch.energy_initial {
+            changed |= (self.energy_initial - v).abs() > f32::EPSILON;
+            self.energy_initial = v;
         }
         if let Some(v) = patch.food_spawn_rate {
             changed |= (self.food_spawn_rate - v).abs() > f32::EPSILON;
@@ -208,6 +232,8 @@ impl StartupDraft {
             1.0,
             5_000.0,
         )?;
+        validate_range("max_creatures", self.max_creatures as f64, 1.0, 20_000.0)?;
+        validate_range("energy_initial", self.energy_initial as f64, 0.01, 5.0)?;
         validate_range(
             "initial_food_density",
             self.initial_food_density as f64,
@@ -307,130 +333,18 @@ impl AppState {
     pub async fn patch_runtime_config(&self, patch: RuntimeConfigPatch) -> WorldConfig {
         let mut sim = self.simulation.write().await;
 
-        if sim.run.is_some() {
-            let (
-                cfg,
-                paused_update,
-                tps_update,
-                spawn_update,
-                growth_update,
-                weight_rate_update,
-                weight_magnitude_update,
-                logic_rate_update,
-                structural_rate_update,
-            ) = {
-                let run = sim.run.as_mut().expect("checked above");
-                let mut paused_update: Option<bool> = None;
-                let mut tps_update: Option<u32> = None;
-                let mut spawn_update: Option<f32> = None;
-                let mut growth_update: Option<f32> = None;
-                let mut weight_rate_update: Option<f32> = None;
-                let mut weight_magnitude_update: Option<f32> = None;
-                let mut logic_rate_update: Option<f32> = None;
-                let mut structural_rate_update: Option<f32> = None;
-
-                if let Some(paused) = patch.paused {
-                    run.world.config.paused = paused;
-                    paused_update = Some(paused);
-                }
-                if let Some(tps) = patch.ticks_per_second {
-                    let tps = tps.max(1);
-                    run.world.config.ticks_per_second = tps;
-                    tps_update = Some(tps);
-                }
-                if let Some(rate) = patch.food_spawn_rate {
-                    run.world.config.food_spawn_rate = rate.clamp(0.0, 1.0);
-                    spawn_update = Some(run.world.config.food_spawn_rate);
-                }
-                if let Some(rate) = patch.food_growth_rate {
-                    run.world.config.food_growth_rate = rate.clamp(0.0, 1.0);
-                    growth_update = Some(run.world.config.food_growth_rate);
-                }
-                if let Some(rate) = patch.weight_mutation_rate {
-                    run.world.config.weight_mutation_rate = rate.clamp(0.0, 1.0);
-                    weight_rate_update = Some(run.world.config.weight_mutation_rate);
-                }
-                if let Some(magnitude) = patch.weight_mutation_magnitude {
-                    run.world.config.weight_mutation_magnitude = magnitude.max(0.0);
-                    weight_magnitude_update = Some(run.world.config.weight_mutation_magnitude);
-                }
-                if let Some(rate) = patch.logic_node_mutation_rate {
-                    run.world.config.logic_node_mutation_rate = rate.clamp(0.0, 1.0);
-                    logic_rate_update = Some(run.world.config.logic_node_mutation_rate);
-                }
-                if let Some(rate) = patch.structural_mutation_rate {
-                    run.world.config.structural_mutation_rate = rate.clamp(0.0, 1.0);
-                    structural_rate_update = Some(run.world.config.structural_mutation_rate);
-                }
-
-                (
-                    run.world.config.clone(),
-                    paused_update,
-                    tps_update,
-                    spawn_update,
-                    growth_update,
-                    weight_rate_update,
-                    weight_magnitude_update,
-                    logic_rate_update,
-                    structural_rate_update,
-                )
+        if let Some(run) = sim.run.as_mut() {
+            apply_runtime_patch(&mut run.world.config, &patch);
+            let cfg = run.world.config.clone();
+            sim.runtime_config = cfg.clone();
+            sim.phase = if cfg.paused {
+                SimulationPhase::Paused
+            } else {
+                SimulationPhase::Running
             };
-
-            if let Some(paused) = paused_update {
-                sim.phase = if paused {
-                    SimulationPhase::Paused
-                } else {
-                    SimulationPhase::Running
-                };
-                sim.runtime_config.paused = paused;
-            }
-            if let Some(tps) = tps_update {
-                sim.runtime_config.ticks_per_second = tps;
-            }
-            if let Some(rate) = spawn_update {
-                sim.runtime_config.food_spawn_rate = rate;
-            }
-            if let Some(rate) = growth_update {
-                sim.runtime_config.food_growth_rate = rate;
-            }
-            if let Some(rate) = weight_rate_update {
-                sim.runtime_config.weight_mutation_rate = rate;
-            }
-            if let Some(magnitude) = weight_magnitude_update {
-                sim.runtime_config.weight_mutation_magnitude = magnitude;
-            }
-            if let Some(rate) = logic_rate_update {
-                sim.runtime_config.logic_node_mutation_rate = rate;
-            }
-            if let Some(rate) = structural_rate_update {
-                sim.runtime_config.structural_mutation_rate = rate;
-            }
             cfg
         } else {
-            if let Some(paused) = patch.paused {
-                sim.runtime_config.paused = paused;
-            }
-            if let Some(tps) = patch.ticks_per_second {
-                sim.runtime_config.ticks_per_second = tps.max(1);
-            }
-            if let Some(rate) = patch.food_spawn_rate {
-                sim.runtime_config.food_spawn_rate = rate.clamp(0.0, 1.0);
-            }
-            if let Some(rate) = patch.food_growth_rate {
-                sim.runtime_config.food_growth_rate = rate.clamp(0.0, 1.0);
-            }
-            if let Some(rate) = patch.weight_mutation_rate {
-                sim.runtime_config.weight_mutation_rate = rate.clamp(0.0, 1.0);
-            }
-            if let Some(magnitude) = patch.weight_mutation_magnitude {
-                sim.runtime_config.weight_mutation_magnitude = magnitude.max(0.0);
-            }
-            if let Some(rate) = patch.logic_node_mutation_rate {
-                sim.runtime_config.logic_node_mutation_rate = rate.clamp(0.0, 1.0);
-            }
-            if let Some(rate) = patch.structural_mutation_rate {
-                sim.runtime_config.structural_mutation_rate = rate.clamp(0.0, 1.0);
-            }
+            apply_runtime_patch(&mut sim.runtime_config, &patch);
             sim.runtime_config.clone()
         }
     }
@@ -529,6 +443,8 @@ fn build_world_config(base: &WorldConfig, draft: &StartupDraft) -> WorldConfig {
     cfg.height = 200;
     cfg.world_wrap = draft.world_wrap;
     cfg.initial_creatures = draft.initial_creatures;
+    cfg.max_creatures = draft.max_creatures;
+    cfg.energy_initial = draft.energy_initial;
     cfg.food_spawn_rate = draft.food_spawn_rate;
     cfg.food_growth_rate = draft.food_growth_rate;
     cfg.energy_per_tick_decay = draft.energy_per_tick_decay;
@@ -557,6 +473,63 @@ fn ensure_viable_start(
     Ok(())
 }
 
+fn apply_runtime_patch(config: &mut WorldConfig, patch: &RuntimeConfigPatch) {
+    if let Some(paused) = patch.paused {
+        config.paused = paused;
+    }
+    if let Some(tps) = patch.ticks_per_second {
+        config.ticks_per_second = tps.max(1);
+    }
+    if let Some(rate) = patch.food_spawn_rate {
+        config.food_spawn_rate = rate.clamp(0.0, 1.0);
+    }
+    if let Some(rate) = patch.food_growth_rate {
+        config.food_growth_rate = rate.clamp(0.0, 1.0);
+    }
+    if let Some(density) = patch.food_max_density {
+        config.food_max_density = density.max(0.01);
+    }
+    if let Some(value) = patch.food_energy_value {
+        config.food_energy_value = value.max(0.0);
+    }
+    if let Some(value) = patch.energy_per_tick_decay {
+        config.energy_per_tick_decay = value.max(0.0);
+    }
+    if let Some(value) = patch.energy_per_move {
+        config.energy_per_move = value.max(0.0);
+    }
+    if let Some(value) = patch.energy_per_compute_node {
+        config.energy_per_compute_node = value.max(0.0);
+    }
+    if let Some(value) = patch.energy_per_reproduce {
+        config.energy_per_reproduce = value.max(0.0);
+    }
+    if let Some(value) = patch.energy_max {
+        config.energy_max = value.max(0.01);
+    }
+    if let Some(value) = patch.min_reproduce_energy {
+        config.min_reproduce_energy = value.max(0.0);
+    }
+    if let Some(value) = patch.offspring_energy_fraction {
+        config.offspring_energy_fraction = value.clamp(0.0, 1.0);
+    }
+    if let Some(max_creatures) = patch.max_creatures {
+        config.max_creatures = max_creatures.max(1);
+    }
+    if let Some(rate) = patch.weight_mutation_rate {
+        config.weight_mutation_rate = rate.clamp(0.0, 1.0);
+    }
+    if let Some(magnitude) = patch.weight_mutation_magnitude {
+        config.weight_mutation_magnitude = magnitude.max(0.0);
+    }
+    if let Some(rate) = patch.logic_node_mutation_rate {
+        config.logic_node_mutation_rate = rate.clamp(0.0, 1.0);
+    }
+    if let Some(rate) = patch.structural_mutation_rate {
+        config.structural_mutation_rate = rate.clamp(0.0, 1.0);
+    }
+}
+
 fn evaluate_startup_viability(base: &WorldConfig, draft: &StartupDraft) -> StartupViability {
     if let Err(err) = draft.validate() {
         return StartupViability::from_error(err);
@@ -580,7 +553,13 @@ fn startup_probe_seed(draft: &StartupDraft) -> u64 {
         .wrapping_add(draft.initial_creatures as u64);
     seed = seed
         .wrapping_mul(1_099_511_628_211)
+        .wrapping_add(draft.max_creatures as u64);
+    seed = seed
+        .wrapping_mul(1_099_511_628_211)
         .wrapping_add(draft.initial_food_density.to_bits() as u64);
+    seed = seed
+        .wrapping_mul(1_099_511_628_211)
+        .wrapping_add(draft.energy_initial.to_bits() as u64);
     seed = seed
         .wrapping_mul(1_099_511_628_211)
         .wrapping_add(draft.food_spawn_rate.to_bits() as u64);

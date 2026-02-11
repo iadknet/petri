@@ -90,4 +90,10 @@ describe("App", () => {
     render(<App />);
     expect(await screen.findByLabelText(/World wrap/i)).toBeInTheDocument();
   });
+
+  it("renders advanced stage1 config controls", async () => {
+    render(<App />);
+    expect(await screen.findByLabelText(/Max creatures/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/Food max density/i)).toBeInTheDocument();
+  });
 });

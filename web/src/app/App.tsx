@@ -2,6 +2,7 @@ import { useState } from "react";
 
 import { ControlHeader } from "../features/simulation/components/ControlHeader";
 import { LiveMetricsPanel } from "../features/simulation/components/LiveMetricsPanel";
+import { AdvancedConfigPanel } from "../features/simulation/components/AdvancedConfigPanel";
 import { RuntimeTuningPanel } from "../features/simulation/components/RuntimeTuningPanel";
 import { SimulationControls } from "../features/simulation/components/SimulationControls";
 import { StartupDraftPanel } from "../features/simulation/components/StartupDraftPanel";
@@ -45,6 +46,16 @@ export default function App() {
         <RuntimeTuningPanel
           runtimeConfig={simulation.runtimeConfig}
           phase={simulation.phase}
+          onUpdateRuntimeField={(patch, optimistic) =>
+            void simulation.updateRuntimeField(patch, optimistic)
+          }
+        />
+
+        <AdvancedConfigPanel
+          startupDraft={simulation.startupDraft}
+          runtimeConfig={simulation.runtimeConfig}
+          phase={simulation.phase}
+          onUpdateStartupField={(key, value) => void simulation.updateStartupField(key, value)}
           onUpdateRuntimeField={(patch, optimistic) =>
             void simulation.updateRuntimeField(patch, optimistic)
           }
