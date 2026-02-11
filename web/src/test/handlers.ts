@@ -153,13 +153,15 @@ function creatureDetailForId(id: number): CreatureDetail {
       creature_direction: 0,
       creature_distance: 1,
       local_density: 0.2,
-      move_blocked_last_tick: 0
+      move_blocked_last_tick: 0,
+      memory_read: 0
     },
     last_outputs: {
       move_x: 0.2,
       move_y: -0.1,
       eat: 0.3,
-      reproduce: 0.1
+      reproduce: 0.1,
+      memory_write: 0
     },
     events: [{ kind: "Moved", tick: 1 }]
   };

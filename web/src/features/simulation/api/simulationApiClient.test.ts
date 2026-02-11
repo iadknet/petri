@@ -31,13 +31,15 @@ describe("SimulationApiClient", () => {
             creature_direction: 0.2,
             creature_distance: 0.5,
             local_density: 0.3,
-            move_blocked_last_tick: 0
+            move_blocked_last_tick: 0,
+            memory_read: 0
           },
           last_outputs: {
             move_x: 0.1,
             move_y: -0.2,
             eat: 0.5,
-            reproduce: 0.2
+            reproduce: 0.2,
+            memory_write: 0
           },
           events: [{ kind: "Moved", tick: 10 }]
         }),

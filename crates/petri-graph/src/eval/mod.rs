@@ -69,10 +69,12 @@ impl ComputationGraph {
                         | NodeKind::InputCreatureDistance
                         | NodeKind::InputLocalDensity
                         | NodeKind::InputMoveBlockedLastTick
+                        | NodeKind::InputMemoryRead
                         | NodeKind::OutputMoveX
                         | NodeKind::OutputMoveY
                         | NodeKind::OutputEat
                         | NodeKind::OutputReproduce
+                        | NodeKind::OutputMemoryWrite
                 )
             })
             .count()

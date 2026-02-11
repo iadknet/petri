@@ -32,6 +32,7 @@ export type CreatureStateSnapshot = {
   age: number;
   generation: number;
   controller: unknown;
+  memory_register?: boolean[];
 };
 
 export type WorldSnapshot = {
@@ -60,6 +61,7 @@ export type SensorInputs = {
   creature_distance: number;
   local_density: number;
   move_blocked_last_tick: number;
+  memory_read: number;
 };
 
 export type ActionOutputs = {
@@ -67,6 +69,7 @@ export type ActionOutputs = {
   move_y: number;
   eat: number;
   reproduce: number;
+  memory_write: number;
 };
 
 export type CreatureEvent = {

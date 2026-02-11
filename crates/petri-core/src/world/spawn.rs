@@ -44,6 +44,7 @@ impl World {
                     lineage_id,
                     parent_id,
                     controller,
+                    memory_register: founder_memory_register(),
                     rng: SmallRng::seed_from_u64(seed),
                     events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
                     last_move_blocked: false,

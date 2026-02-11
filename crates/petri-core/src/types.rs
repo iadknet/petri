@@ -68,6 +68,8 @@ pub struct CreatureStateSnapshot {
     pub generation: u32,
     pub controller: ComputationGraph,
     #[serde(default)]
+    pub memory_register: Vec<bool>,
+    #[serde(default)]
     pub last_move_blocked: bool,
     #[serde(default)]
     pub last_inputs: SensorInputs,
