@@ -102,6 +102,13 @@ Creatures moving around a food field, consuming energy, reproducing, and dying a
 - All config knobs adjustable at runtime via frontend
 - Full simulation state serializable and loadable (save/load)
 
+### Stage 1 Status (2026-02-11)
+- [x] Core simulation loop and graph-driven lifecycle are implemented
+- [x] Stage 1 sensors/nodes and mutation operators are implemented
+- [x] Lineage tracking, world-wrap toggle, and full config surfaces are implemented
+- [x] Inspector, live metrics chart, and snapshot save/load are implemented
+- [x] 5k-creature throughput benchmark binary is available (`petri-cli --bin stage1_benchmark`)
+
 ---
 
 ## Stage 2: Rich Environment

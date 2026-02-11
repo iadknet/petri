@@ -16,6 +16,7 @@ const EVENT_LOG_CAPACITY: usize = 8;
 const FOOD_SENSOR_RADIUS: i32 = 12;
 const INITIAL_WEIGHT_MUTATION_SCALE: f32 = 0.7;
 const INITIAL_STRUCTURAL_MUTATION_SCALE: f32 = 0.35;
+type OffspringRequest = (u32, u32, f32, u32, u64, ComputationGraph, u64, u64);
 
 #[derive(Clone, Copy, Debug)]
 pub struct CreatureView {
@@ -106,8 +107,7 @@ impl World {
             let can_spawn_more = self.creatures.len() < self.config.max_creatures;
 
             let mut dead = false;
-            let mut child_request: Option<(u32, u32, f32, u32, u64, ComputationGraph, u64, u64)> =
-                None;
+            let mut child_request: Option<OffspringRequest> = None;
             let mut reproduce_from: Option<(u32, u32)> = None;
             let mut reproduce_intent = false;
             let (sensor_x, sensor_y) = {
@@ -410,7 +410,12 @@ impl World {
             next_lineage_id: snapshot.next_lineage_id.max(1),
         };
 
-        for (idx, food) in snapshot.cells_food.into_iter().enumerate().take(total_cells) {
+        for (idx, food) in snapshot
+            .cells_food
+            .into_iter()
+            .enumerate()
+            .take(total_cells)
+        {
             world.cells[idx].food = food.max(0.0);
         }
 
@@ -445,8 +450,8 @@ impl World {
 
         for (new_id, parent_old) in pending_parent {
             if let Some(creature) = world.creatures.get_mut(new_id) {
-                creature.parent_id =
-                    parent_old.and_then(|old| id_map.get(&old).map(|mapped| mapped.data().as_ffi()));
+                creature.parent_id = parent_old
+                    .and_then(|old| id_map.get(&old).map(|mapped| mapped.data().as_ffi()));
             }
         }
 
@@ -479,9 +484,7 @@ impl World {
             .map(|creature| creature.lineage_id)
             .max()
             .unwrap_or(0);
-        world.next_lineage_id = world
-            .next_lineage_id
-            .max(max_lineage.saturating_add(1));
+        world.next_lineage_id = world.next_lineage_id.max(max_lineage.saturating_add(1));
         world
     }
 
@@ -1229,7 +1232,10 @@ mod tests {
 
         world.tick();
 
-        let creature = world.creatures.get(id).expect("creature should remain alive");
+        let creature = world
+            .creatures
+            .get(id)
+            .expect("creature should remain alive");
         assert_eq!(creature.y, edge_y);
         assert_eq!(creature.x, 0);
     }
@@ -1265,7 +1271,10 @@ mod tests {
 
         world.tick();
 
-        let creature = world.creatures.get(id).expect("creature should remain alive");
+        let creature = world
+            .creatures
+            .get(id)
+            .expect("creature should remain alive");
         assert_eq!(creature.y, edge_y);
         assert_eq!(creature.x, edge_x);
     }
@@ -1327,15 +1336,27 @@ mod tests {
         assert_eq!(restored.tick_count(), world.tick_count());
         assert_eq!(restored.config.width, world.config.width);
         assert_eq!(restored.config.height, world.config.height);
-        assert_eq!(restored.config.initial_creatures, world.config.initial_creatures);
+        assert_eq!(
+            restored.config.initial_creatures,
+            world.config.initial_creatures
+        );
         assert_eq!(restored.config.max_creatures, world.config.max_creatures);
-        assert_eq!(restored.config.food_spawn_rate, world.config.food_spawn_rate);
-        assert_eq!(restored.config.food_growth_rate, world.config.food_growth_rate);
+        assert_eq!(
+            restored.config.food_spawn_rate,
+            world.config.food_spawn_rate
+        );
+        assert_eq!(
+            restored.config.food_growth_rate,
+            world.config.food_growth_rate
+        );
         assert_eq!(restored.frame().food, world.frame().food);
         assert_eq!(restored.creature_count(), world.creature_count());
         assert_eq!(restored.diagnostics().moves, world.diagnostics().moves);
         assert_eq!(restored.diagnostics().eats, world.diagnostics().eats);
-        assert_eq!(restored.diagnostics().reproductions, world.diagnostics().reproductions);
+        assert_eq!(
+            restored.diagnostics().reproductions,
+            world.diagnostics().reproductions
+        );
         assert_eq!(restored.diagnostics().deaths, world.diagnostics().deaths);
 
         let before_links = world.lineage_tree.values().map(Vec::len).sum::<usize>();

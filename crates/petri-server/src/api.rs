@@ -35,7 +35,10 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/simulation/start", post(start_simulation))
         .route("/simulation/restart", post(restart_simulation))
-        .route("/simulation/snapshot", get(get_snapshot).post(load_snapshot))
+        .route(
+            "/simulation/snapshot",
+            get(get_snapshot).post(load_snapshot),
+        )
         .route("/ws", get(ws_handler))
         .layer(build_cors_layer())
         .with_state(state)
