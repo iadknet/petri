@@ -387,6 +387,60 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn snapshot_endpoints_round_trip_world_state() {
+        let state = AppState::new_for_tests();
+        let app = build_router(state.clone());
+
+        let start_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/simulation/start")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(start_response.status(), StatusCode::OK);
+
+        let _ = run_single_iteration(&state).await;
+        let _ = run_single_iteration(&state).await;
+
+        let get_snapshot_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .uri("/simulation/snapshot")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(get_snapshot_response.status(), StatusCode::OK);
+        let snapshot_json = read_json(get_snapshot_response).await;
+        assert!(snapshot_json["tick"].as_u64().unwrap() >= 1);
+        assert!(snapshot_json["creatures"].is_array());
+
+        let load_snapshot_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/simulation/snapshot")
+                    .header("content-type", "application/json")
+                    .body(Body::from(snapshot_json.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(load_snapshot_response.status(), StatusCode::OK);
+        let load_json = read_json(load_snapshot_response).await;
+        assert_eq!(load_json["phase"], "running");
+        assert_eq!(load_json["tick"], snapshot_json["tick"]);
+    }
+
+    #[tokio::test]
     async fn non_viable_startup_config_is_rejected() {
         let state = AppState::new_for_tests();
         let app = build_router(state);

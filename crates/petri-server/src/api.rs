@@ -13,7 +13,7 @@ use serde::Serialize;
 use tokio::sync::broadcast;
 use tower_http::cors::CorsLayer;
 
-use petri_core::WorldConfig;
+use petri_core::{WorldConfig, WorldSnapshot};
 
 use crate::app_state::{RuntimeConfigPatch, SimulationError, StartupDraft, StartupDraftPatch};
 use crate::AppState;
@@ -35,6 +35,7 @@ pub fn build_router(state: AppState) -> Router {
         )
         .route("/simulation/start", post(start_simulation))
         .route("/simulation/restart", post(restart_simulation))
+        .route("/simulation/snapshot", get(get_snapshot).post(load_snapshot))
         .route("/ws", get(ws_handler))
         .layer(build_cors_layer())
         .with_state(state)
@@ -102,6 +103,17 @@ async fn restart_simulation(
         .await
         .map(Json)
         .map_err(map_simulation_error)
+}
+
+async fn get_snapshot(State(state): State<AppState>) -> Json<WorldSnapshot> {
+    Json(state.simulation_snapshot().await)
+}
+
+async fn load_snapshot(
+    State(state): State<AppState>,
+    Json(snapshot): Json<WorldSnapshot>,
+) -> Json<crate::app_state::SimulationStatus> {
+    Json(state.load_simulation_snapshot(snapshot).await)
 }
 
 async fn ws_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> impl IntoResponse {

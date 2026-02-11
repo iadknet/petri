@@ -7,6 +7,7 @@ import { AdvancedConfigPanel } from "../features/simulation/components/AdvancedC
 import { PopulationEnergyChart } from "../features/simulation/components/PopulationEnergyChart";
 import { RuntimeTuningPanel } from "../features/simulation/components/RuntimeTuningPanel";
 import { SimulationControls } from "../features/simulation/components/SimulationControls";
+import { SnapshotPanel } from "../features/simulation/components/SnapshotPanel";
 import { StartupDraftPanel } from "../features/simulation/components/StartupDraftPanel";
 import { ViewportCanvas, ViewportControls } from "../features/simulation/components/ViewportCanvas";
 import { useSimulationStore } from "../features/simulation/store/simulationStore";
@@ -96,6 +97,11 @@ export default function App() {
         />
 
         <CreatureInspectorPanel creature={selectedCreature} />
+
+        <SnapshotPanel
+          onExportSnapshot={() => simulation.exportSnapshot()}
+          onImportSnapshot={(snapshot) => simulation.importSnapshot(snapshot)}
+        />
 
         <ViewportControls zoom={zoom} onZoomChange={setZoom} />
 

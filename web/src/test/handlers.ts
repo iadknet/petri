@@ -94,6 +94,32 @@ function applyRuntimePatch(patch: ConfigPatch): void {
   };
 }
 
+function currentSnapshot() {
+  return {
+    tick: status.tick,
+    config: {
+      width: 200,
+      height: 200,
+      world_wrap: startupDraft.world_wrap,
+      ...runtimeConfig,
+      initial_creatures: startupDraft.initial_creatures,
+      max_creatures: startupDraft.max_creatures,
+      energy_initial: startupDraft.energy_initial
+    },
+    palette: "Hybrid",
+    cells_food: [],
+    creatures: [],
+    diagnostics: {
+      moves: 0,
+      eats: 0,
+      reproductions: 0,
+      deaths: 0
+    },
+    lineage_tree: {},
+    next_lineage_id: 1
+  };
+}
+
 export const handlers = [
   http.get(`${API_BASE}/simulation/status`, () => HttpResponse.json(status)),
   http.get(`${API_BASE}/simulation/startup-draft`, () => HttpResponse.json(startupDraft)),
@@ -146,5 +172,17 @@ export const handlers = [
       status.phase = patch.paused ? "paused" : "running";
     }
     return HttpResponse.json(runtimeConfig);
+  }),
+  http.get(`${API_BASE}/simulation/snapshot`, () => HttpResponse.json(currentSnapshot())),
+  http.post(`${API_BASE}/simulation/snapshot`, async ({ request }) => {
+    const payload = (await request.json()) as { tick?: number };
+    status = {
+      ...status,
+      phase: "running",
+      run_id: status.run_id === null ? 1 : status.run_id + 1,
+      seed: status.seed === null ? 77 : status.seed + 1,
+      tick: payload.tick ?? status.tick
+    };
+    return HttpResponse.json(status);
   })
 ];

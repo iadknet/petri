@@ -1,4 +1,10 @@
-import { ConfigPatch, SimulationStatus, StartupDraft, StartupDraftPatch } from "../../../protocol";
+import {
+  ConfigPatch,
+  SimulationStatus,
+  StartupDraft,
+  StartupDraftPatch,
+  WorldSnapshot
+} from "../../../protocol";
 
 export type RuntimeConfig = {
   paused: boolean;
@@ -97,6 +103,26 @@ export class SimulationApiClient {
   async restartSimulation(): Promise<SimulationStatus> {
     const response = await fetch(`${this.apiBase}/simulation/restart`, {
       method: "POST"
+    });
+    if (!response.ok) {
+      throw new Error(await parseError(response));
+    }
+    return (await response.json()) as SimulationStatus;
+  }
+
+  async getSnapshot(): Promise<WorldSnapshot> {
+    const response = await fetch(`${this.apiBase}/simulation/snapshot`);
+    if (!response.ok) {
+      throw new Error(await parseError(response));
+    }
+    return (await response.json()) as WorldSnapshot;
+  }
+
+  async loadSnapshot(snapshot: WorldSnapshot): Promise<SimulationStatus> {
+    const response = await fetch(`${this.apiBase}/simulation/snapshot`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(snapshot)
     });
     if (!response.ok) {
       throw new Error(await parseError(response));

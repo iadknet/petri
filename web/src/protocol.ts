@@ -22,6 +22,34 @@ export type WorldFrame = {
   average_energy: number;
 };
 
+export type CreatureStateSnapshot = {
+  id: number;
+  lineage_id: number;
+  parent_id: number | null;
+  x: number;
+  y: number;
+  energy: number;
+  age: number;
+  generation: number;
+  controller: unknown;
+};
+
+export type WorldSnapshot = {
+  tick: number;
+  config: Record<string, unknown>;
+  palette: string;
+  cells_food: number[];
+  creatures: CreatureStateSnapshot[];
+  diagnostics: {
+    moves: number;
+    eats: number;
+    reproductions: number;
+    deaths: number;
+  };
+  lineage_tree: Record<string, number[]>;
+  next_lineage_id: number;
+};
+
 export type ConfigPatch = {
   paused?: boolean;
   ticks_per_second?: number;

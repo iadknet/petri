@@ -1,8 +1,9 @@
 use rand::Rng;
+use serde::{Deserialize, Serialize};
 
 use crate::types::{ActionOutputs, ControllerPalette, Edge, NodeKind, SensorInputs};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
 pub struct MutationConfig {
     pub weight_mutation_rate: f32,
     pub weight_mutation_magnitude: f32,
@@ -21,7 +22,7 @@ impl Default for MutationConfig {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct ComputationGraph {
     pub palette: ControllerPalette,
     pub nodes: Vec<NodeKind>,

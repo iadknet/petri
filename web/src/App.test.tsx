@@ -190,7 +190,9 @@ describe("App", () => {
       restartSimulation: vi.fn(),
       updateStartupField: vi.fn(),
       togglePause: vi.fn(),
-      updateRuntimeField: vi.fn()
+      updateRuntimeField: vi.fn(),
+      exportSnapshot: vi.fn().mockResolvedValue("{}"),
+      importSnapshot: vi.fn()
     };
 
     const spy = vi
@@ -221,5 +223,12 @@ describe("App", () => {
     } finally {
       spy.mockRestore();
     }
+  });
+
+  it("renders snapshot import export controls", async () => {
+    render(<App />);
+    expect(await screen.findByRole("button", { name: /Export Snapshot/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Import Snapshot/i })).toBeInTheDocument();
+    expect(screen.getByLabelText(/Snapshot JSON/i)).toBeInTheDocument();
   });
 });

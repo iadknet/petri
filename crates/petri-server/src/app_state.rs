@@ -5,7 +5,7 @@ use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, RwLock};
 
-use petri_core::{World, WorldConfig};
+use petri_core::{World, WorldConfig, WorldSnapshot};
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
@@ -411,6 +411,45 @@ impl AppState {
         Ok(simulation_status_from_locked(&sim))
     }
 
+    pub async fn simulation_snapshot(&self) -> WorldSnapshot {
+        let sim = self.simulation.read().await;
+        if let Some(run) = sim.run.as_ref() {
+            return run.world.snapshot();
+        }
+
+        let mut world = World::new(
+            build_world_config(&sim.runtime_config, &sim.startup_draft),
+            startup_probe_seed(&sim.startup_draft),
+        );
+        world.seed_food_density(sim.startup_draft.initial_food_density);
+        world.snapshot()
+    }
+
+    pub async fn load_simulation_snapshot(&self, snapshot: WorldSnapshot) -> SimulationStatus {
+        let mut sim = self.simulation.write().await;
+        let world = World::from_snapshot(snapshot);
+
+        let run_id = sim.next_run_id;
+        sim.next_run_id += 1;
+        let seed = sim.rng.gen::<u64>();
+        sim.run = Some(SimulationRun {
+            run_id,
+            seed,
+            world,
+        });
+        sim.phase = SimulationPhase::Running;
+        sim.pending_restart = false;
+        if let Some(run) = sim.run.as_ref() {
+            sim.runtime_config = run.world.config.clone();
+            sim.startup_draft = startup_draft_from_config(
+                &sim.runtime_config,
+                sim.startup_draft.initial_food_density,
+            );
+        }
+        sim.startup_viability = evaluate_startup_viability(&sim.runtime_config, &sim.startup_draft);
+        simulation_status_from_locked(&sim)
+    }
+
     pub async fn run_single_iteration(&self) -> (Option<Vec<u8>>, u64) {
         let mut sim = self.simulation.write().await;
 
@@ -451,6 +490,20 @@ fn build_world_config(base: &WorldConfig, draft: &StartupDraft) -> WorldConfig {
     cfg.energy_per_move = draft.energy_per_move;
     cfg.paused = false;
     cfg
+}
+
+fn startup_draft_from_config(config: &WorldConfig, initial_food_density: f32) -> StartupDraft {
+    StartupDraft {
+        initial_creatures: config.initial_creatures,
+        max_creatures: config.max_creatures,
+        initial_food_density,
+        energy_initial: config.energy_initial,
+        food_spawn_rate: config.food_spawn_rate,
+        food_growth_rate: config.food_growth_rate,
+        energy_per_tick_decay: config.energy_per_tick_decay,
+        energy_per_move: config.energy_per_move,
+        world_wrap: config.world_wrap,
+    }
 }
 
 fn ensure_viable_start(

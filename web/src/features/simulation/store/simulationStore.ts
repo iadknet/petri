@@ -1,6 +1,13 @@
 import { useEffect, useMemo, useState } from "react";
 
-import { ConfigPatch, SimulationStatus, StartupDraft, StartupDraftPatch, WorldFrame } from "../../../protocol";
+import {
+  ConfigPatch,
+  SimulationStatus,
+  StartupDraft,
+  StartupDraftPatch,
+  WorldFrame,
+  WorldSnapshot
+} from "../../../protocol";
 import { RuntimeConfig, SimulationApiClient } from "../api/simulationApiClient";
 import { FrameStreamClient } from "../ws/frameStreamClient";
 
@@ -130,6 +137,17 @@ export function useSimulationStore() {
     }
   }
 
+  async function exportSnapshot(): Promise<string> {
+    const snapshot = await apiClient.getSnapshot();
+    return JSON.stringify(snapshot, null, 2);
+  }
+
+  async function importSnapshot(snapshot: WorldSnapshot): Promise<void> {
+    await apiClient.loadSnapshot(snapshot);
+    await Promise.all([loadStatus(), loadStartupDraft(), loadRuntimeConfig()]);
+    setError(null);
+  }
+
   async function updateStartupField<K extends keyof StartupDraft>(
     key: K,
     value: StartupDraft[K]
@@ -199,6 +217,8 @@ export function useSimulationStore() {
     restartSimulation,
     updateStartupField,
     togglePause,
-    updateRuntimeField
+    updateRuntimeField,
+    exportSnapshot,
+    importSnapshot
   };
 }
