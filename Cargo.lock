@@ -566,6 +566,7 @@ version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
+ "clap",
  "futures-util",
  "petri-core",
  "rand 0.8.5",

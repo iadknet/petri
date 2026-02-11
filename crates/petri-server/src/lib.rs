@@ -3,7 +3,7 @@ pub mod app_state;
 pub mod sim_loop;
 
 pub use api::build_router;
-pub use app_state::AppState;
+pub use app_state::{AppState, AppStateOptions};
 
 #[cfg(test)]
 mod tests {
@@ -14,7 +14,7 @@ mod tests {
 
     use petri_core::{World, WorldConfig};
 
-    use crate::{build_router, sim_loop::run_single_iteration, AppState};
+    use crate::{build_router, sim_loop::run_single_iteration, AppState, AppStateOptions};
 
     async fn read_json(response: axum::response::Response) -> serde_json::Value {
         let bytes = to_bytes(response.into_body(), usize::MAX).await.unwrap();
@@ -644,6 +644,58 @@ mod tests {
             status_json["startup_viability_code"],
             "non_viable_startup_config"
         );
+    }
+
+    #[tokio::test]
+    async fn non_viable_startup_can_start_when_viability_probe_is_disabled() {
+        let state = AppState::new_with_options(
+            1,
+            WorldConfig::default(),
+            AppStateOptions {
+                viability_probe_enabled: false,
+            },
+        );
+        let app = build_router(state);
+
+        let patch_payload = json!({
+            "initial_creatures": 1,
+            "initial_food_density": 0.0,
+            "food_spawn_rate": 0.0,
+            "food_growth_rate": 0.0,
+            "energy_per_tick_decay": 0.03,
+            "energy_per_move": 0.05
+        });
+
+        let patch_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("PATCH")
+                    .uri("/simulation/startup-draft")
+                    .header("content-type", "application/json")
+                    .body(Body::from(patch_payload.to_string()))
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(patch_response.status(), StatusCode::OK);
+
+        let start_response = app
+            .clone()
+            .oneshot(
+                Request::builder()
+                    .method("POST")
+                    .uri("/simulation/start")
+                    .body(Body::empty())
+                    .unwrap(),
+            )
+            .await
+            .unwrap();
+        assert_eq!(start_response.status(), StatusCode::OK);
+        let start_json = read_json(start_response).await;
+        assert_eq!(start_json["phase"], "running");
+        assert_eq!(start_json["viability_probe_enabled"], false);
+        assert_eq!(start_json["startup_viable"], true);
     }
 
     #[test]

@@ -1,9 +1,11 @@
 use std::sync::Arc;
+use std::time::Instant;
 
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, RwLock};
+use tracing::{info, warn};
 
 use petri_core::{World, WorldConfig, WorldSnapshot};
 
@@ -11,6 +13,7 @@ use petri_core::{World, WorldConfig, WorldSnapshot};
 #[serde(rename_all = "lowercase")]
 pub enum SimulationPhase {
     Idle,
+    Starting,
     Running,
     Paused,
 }
@@ -76,6 +79,8 @@ pub struct RuntimeConfigPatch {
 #[derive(Clone, Debug, Serialize)]
 pub struct SimulationStatus {
     pub phase: SimulationPhase,
+    pub initialization_stage: Option<&'static str>,
+    pub viability_probe_enabled: bool,
     pub run_id: Option<u64>,
     pub seed: Option<u64>,
     pub tick: u64,
@@ -162,6 +167,8 @@ impl StartupViability {
 
 pub struct SimulationState {
     phase: SimulationPhase,
+    initialization_stage: Option<&'static str>,
+    viability_probe_enabled: bool,
     run: Option<SimulationRun>,
     startup_draft: StartupDraft,
     startup_viability: StartupViability,
@@ -175,6 +182,19 @@ pub struct SimulationState {
 pub struct AppState {
     pub simulation: Arc<RwLock<SimulationState>>,
     pub frames_tx: broadcast::Sender<Vec<u8>>,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct AppStateOptions {
+    pub viability_probe_enabled: bool,
+}
+
+impl Default for AppStateOptions {
+    fn default() -> Self {
+        Self {
+            viability_probe_enabled: true,
+        }
+    }
 }
 
 impl StartupDraft {
@@ -316,11 +336,18 @@ fn validate_range(
 
 impl AppState {
     pub fn new(seed: u64, config: WorldConfig) -> Self {
+        Self::new_with_options(seed, config, AppStateOptions::default())
+    }
+
+    pub fn new_with_options(seed: u64, config: WorldConfig, options: AppStateOptions) -> Self {
         let (frames_tx, _) = broadcast::channel(256);
         let startup_draft = StartupDraft::viable_default();
-        let startup_viability = evaluate_startup_viability(&config, &startup_draft);
+        let startup_viability =
+            evaluate_startup_viability(&config, &startup_draft, options.viability_probe_enabled);
         let state = SimulationState {
             phase: SimulationPhase::Idle,
+            initialization_stage: None,
+            viability_probe_enabled: options.viability_probe_enabled,
             run: None,
             startup_draft,
             startup_viability,
@@ -359,8 +386,12 @@ impl AppState {
         let changed = updated.apply_patch(patch);
         updated.validate()?;
         sim.startup_draft = updated.clone();
-        sim.startup_viability = evaluate_startup_viability(&sim.runtime_config, &sim.startup_draft);
-        if changed && sim.run.is_some() {
+        sim.startup_viability = evaluate_startup_viability(
+            &sim.runtime_config,
+            &sim.startup_draft,
+            sim.viability_probe_enabled,
+        );
+        if changed && (sim.run.is_some() || sim.phase == SimulationPhase::Starting) {
             sim.pending_restart = true;
         }
         Ok(updated)
@@ -394,63 +425,200 @@ impl AppState {
     }
 
     pub async fn start_simulation(&self) -> Result<SimulationStatus, SimulationError> {
-        let mut sim = self.simulation.write().await;
-        if sim.run.is_some() {
-            return Err(SimulationError::AlreadyRunning);
+        let (seed, run_id, config, initial_food_density, probe_seed, viability_probe_enabled) = {
+            let mut sim = self.simulation.write().await;
+            if sim.run.is_some() || sim.phase == SimulationPhase::Starting {
+                return Err(SimulationError::AlreadyRunning);
+            }
+
+            let seed = sim.rng.gen::<u64>();
+            let run_id = sim.next_run_id;
+            sim.next_run_id += 1;
+            let config = build_world_config(&sim.runtime_config, &sim.startup_draft);
+            let initial_food_density = sim.startup_draft.initial_food_density;
+            let probe_seed = startup_probe_seed(&sim.startup_draft);
+            sim.phase = SimulationPhase::Starting;
+            sim.initialization_stage = Some(if sim.viability_probe_enabled {
+                "viability_probe"
+            } else {
+                "world_build"
+            });
+            (
+                seed,
+                run_id,
+                config,
+                initial_food_density,
+                probe_seed,
+                sim.viability_probe_enabled,
+            )
+        };
+
+        let startup_begin = Instant::now();
+        info!(
+            run_id,
+            seed,
+            width = config.width,
+            height = config.height,
+            initial_creatures = config.initial_creatures,
+            max_creatures = config.max_creatures,
+            "simulation startup initiated"
+        );
+
+        if viability_probe_enabled {
+            let probe_begin = Instant::now();
+            let survivors = match ensure_viable_start(&config, initial_food_density, probe_seed) {
+                Ok(survivors) => survivors,
+                Err(err) => {
+                    let mut sim = self.simulation.write().await;
+                    sim.phase = SimulationPhase::Idle;
+                    sim.initialization_stage = None;
+                    warn!(run_id, "simulation startup failed viability probe");
+                    return Err(err);
+                }
+            };
+            info!(
+                run_id,
+                survivors,
+                probe_ms = probe_begin.elapsed().as_millis(),
+                "simulation startup viability probe completed"
+            );
+        } else {
+            info!(run_id, "simulation startup viability probe disabled");
         }
 
-        let seed = sim.rng.gen::<u64>();
-        let config = build_world_config(&sim.runtime_config, &sim.startup_draft);
-        ensure_viable_start(
-            &config,
-            sim.startup_draft.initial_food_density,
-            startup_probe_seed(&sim.startup_draft),
-        )?;
+        {
+            let mut sim = self.simulation.write().await;
+            sim.initialization_stage = Some("world_build");
+        }
 
+        let world_build_begin = Instant::now();
         let mut world = World::new(config.clone(), seed);
-        world.seed_food_density(sim.startup_draft.initial_food_density);
+        world.seed_food_density(initial_food_density);
+        info!(
+            run_id,
+            world_build_ms = world_build_begin.elapsed().as_millis(),
+            "simulation startup world build completed"
+        );
 
-        let run_id = sim.next_run_id;
-        sim.next_run_id += 1;
+        let mut sim = self.simulation.write().await;
         sim.run = Some(SimulationRun {
             run_id,
             seed,
             world,
         });
         sim.phase = SimulationPhase::Running;
+        sim.initialization_stage = None;
         sim.pending_restart = false;
         sim.runtime_config = config;
+        info!(
+            run_id,
+            total_startup_ms = startup_begin.elapsed().as_millis(),
+            "simulation startup completed"
+        );
 
         Ok(simulation_status_from_locked(&sim))
     }
 
     pub async fn restart_simulation(&self) -> Result<SimulationStatus, SimulationError> {
-        let mut sim = self.simulation.write().await;
-        if sim.run.is_none() {
-            return Err(SimulationError::NoActiveRun);
+        let (
+            seed,
+            run_id,
+            config,
+            initial_food_density,
+            probe_seed,
+            fallback_phase,
+            viability_probe_enabled,
+        ) = {
+            let mut sim = self.simulation.write().await;
+            if sim.run.is_none() {
+                return Err(SimulationError::NoActiveRun);
+            }
+            if sim.phase == SimulationPhase::Starting {
+                return Err(SimulationError::AlreadyRunning);
+            }
+
+            let seed = sim.rng.gen::<u64>();
+            let run_id = sim.next_run_id;
+            sim.next_run_id += 1;
+            let config = build_world_config(&sim.runtime_config, &sim.startup_draft);
+            let initial_food_density = sim.startup_draft.initial_food_density;
+            let probe_seed = startup_probe_seed(&sim.startup_draft);
+            let fallback_phase = if sim.runtime_config.paused {
+                SimulationPhase::Paused
+            } else {
+                SimulationPhase::Running
+            };
+            sim.phase = SimulationPhase::Starting;
+            sim.initialization_stage = Some(if sim.viability_probe_enabled {
+                "viability_probe"
+            } else {
+                "world_build"
+            });
+            (
+                seed,
+                run_id,
+                config,
+                initial_food_density,
+                probe_seed,
+                fallback_phase,
+                sim.viability_probe_enabled,
+            )
+        };
+
+        let restart_begin = Instant::now();
+        info!(run_id, seed, "simulation restart initiated");
+
+        if viability_probe_enabled {
+            let probe_begin = Instant::now();
+            let survivors = match ensure_viable_start(&config, initial_food_density, probe_seed) {
+                Ok(survivors) => survivors,
+                Err(err) => {
+                    let mut sim = self.simulation.write().await;
+                    sim.phase = fallback_phase;
+                    sim.initialization_stage = None;
+                    warn!(run_id, "simulation restart failed viability probe");
+                    return Err(err);
+                }
+            };
+            info!(
+                run_id,
+                survivors,
+                probe_ms = probe_begin.elapsed().as_millis(),
+                "simulation restart viability probe completed"
+            );
+        } else {
+            info!(run_id, "simulation restart viability probe disabled");
         }
 
-        let seed = sim.rng.gen::<u64>();
-        let config = build_world_config(&sim.runtime_config, &sim.startup_draft);
-        ensure_viable_start(
-            &config,
-            sim.startup_draft.initial_food_density,
-            startup_probe_seed(&sim.startup_draft),
-        )?;
+        {
+            let mut sim = self.simulation.write().await;
+            sim.initialization_stage = Some("world_build");
+        }
 
+        let world_build_begin = Instant::now();
         let mut world = World::new(config.clone(), seed);
-        world.seed_food_density(sim.startup_draft.initial_food_density);
+        world.seed_food_density(initial_food_density);
+        info!(
+            run_id,
+            world_build_ms = world_build_begin.elapsed().as_millis(),
+            "simulation restart world build completed"
+        );
 
-        let run_id = sim.next_run_id;
-        sim.next_run_id += 1;
+        let mut sim = self.simulation.write().await;
         sim.run = Some(SimulationRun {
             run_id,
             seed,
             world,
         });
         sim.phase = SimulationPhase::Running;
+        sim.initialization_stage = None;
         sim.pending_restart = false;
         sim.runtime_config = config;
+        info!(
+            run_id,
+            total_restart_ms = restart_begin.elapsed().as_millis(),
+            "simulation restart completed"
+        );
 
         Ok(simulation_status_from_locked(&sim))
     }
@@ -482,6 +650,7 @@ impl AppState {
             world,
         });
         sim.phase = SimulationPhase::Running;
+        sim.initialization_stage = None;
         sim.pending_restart = false;
         if let Some(run) = sim.run.as_ref() {
             sim.runtime_config = run.world.config.clone();
@@ -490,7 +659,11 @@ impl AppState {
                 sim.startup_draft.initial_food_density,
             );
         }
-        sim.startup_viability = evaluate_startup_viability(&sim.runtime_config, &sim.startup_draft);
+        sim.startup_viability = evaluate_startup_viability(
+            &sim.runtime_config,
+            &sim.startup_draft,
+            sim.viability_probe_enabled,
+        );
         simulation_status_from_locked(&sim)
     }
 
@@ -560,7 +733,7 @@ fn ensure_viable_start(
     config: &WorldConfig,
     initial_food_density: f32,
     seed: u64,
-) -> Result<(), SimulationError> {
+) -> Result<usize, SimulationError> {
     let mut probe = World::new(config.clone(), seed);
     probe.seed_food_density(initial_food_density);
     for _ in 0..100 {
@@ -570,10 +743,11 @@ fn ensure_viable_start(
         }
     }
 
-    if probe.creature_count() == 0 {
+    let survivors = probe.creature_count();
+    if survivors == 0 {
         return Err(SimulationError::NonViableStartupConfig);
     }
-    Ok(())
+    Ok(survivors)
 }
 
 fn apply_runtime_patch(config: &mut WorldConfig, patch: &RuntimeConfigPatch) {
@@ -639,9 +813,16 @@ fn apply_runtime_patch(config: &mut WorldConfig, patch: &RuntimeConfigPatch) {
     }
 }
 
-fn evaluate_startup_viability(base: &WorldConfig, draft: &StartupDraft) -> StartupViability {
+fn evaluate_startup_viability(
+    base: &WorldConfig,
+    draft: &StartupDraft,
+    viability_probe_enabled: bool,
+) -> StartupViability {
     if let Err(err) = draft.validate() {
         return StartupViability::from_error(err);
+    }
+    if !viability_probe_enabled {
+        return StartupViability::viable();
     }
 
     let config = build_world_config(base, draft);
@@ -650,7 +831,7 @@ fn evaluate_startup_viability(base: &WorldConfig, draft: &StartupDraft) -> Start
         draft.initial_food_density,
         startup_probe_seed(draft),
     ) {
-        Ok(()) => StartupViability::viable(),
+        Ok(_) => StartupViability::viable(),
         Err(err) => StartupViability::from_error(err),
     }
 }
@@ -714,6 +895,8 @@ fn simulation_status_from_locked(sim: &SimulationState) -> SimulationStatus {
 
     SimulationStatus {
         phase: sim.phase,
+        initialization_stage: sim.initialization_stage,
+        viability_probe_enabled: sim.viability_probe_enabled,
         run_id,
         seed,
         tick,

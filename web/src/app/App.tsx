@@ -43,6 +43,8 @@ export default function App() {
           serverReachable={simulation.serverReachable}
           wsConnected={simulation.wsConnected}
           phase={simulation.phase}
+          initializationStage={simulation.status?.initialization_stage}
+          viabilityProbeEnabled={simulation.status?.viability_probe_enabled}
           runId={simulation.status?.run_id}
           pendingRestart={simulation.status?.pending_restart}
         />

@@ -91,10 +91,12 @@ export type StartupDraft = {
 
 export type StartupDraftPatch = Partial<StartupDraft>;
 
-export type SimulationPhase = "idle" | "running" | "paused";
+export type SimulationPhase = "idle" | "starting" | "running" | "paused";
 
 export type SimulationStatus = {
   phase: SimulationPhase;
+  initialization_stage?: string | null;
+  viability_probe_enabled?: boolean;
   run_id: number | null;
   seed: number | null;
   tick: number;
