@@ -7,6 +7,8 @@
   --muted: #9db0c2;
   --accent: #2fd07f;
   --error: #ff6f6f;
+  --paintbrush-cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24'%3E%3Cpath fill='%23f5d061' d='M14 3l7 7-3 3-7-7z'/%3E%3Cpath fill='%23c58a3a' d='M4 14l7 7 6-6-7-7z'/%3E%3Cpath fill='%237ec8ff' d='M3 21c3 0 4-1 4-4 0-1 1-2 2-2-1 0-2-1-2-2-1 0-2 1-2 2 0 3-2 4-2 6z'/%3E%3C/svg%3E")
+    3 21, crosshair;
 }
 
 * {
@@ -132,6 +134,19 @@ body,
 }
 
 .viewport:active {
+  cursor: grabbing;
+}
+
+.viewport.paint-mode {
+  cursor: var(--paintbrush-cursor);
+}
+
+.viewport.paint-mode:active {
+  cursor: var(--paintbrush-cursor);
+}
+
+.viewport.paint-mode.paint-panning,
+.viewport.paint-mode.paint-panning:active {
   cursor: grabbing;
 }
 

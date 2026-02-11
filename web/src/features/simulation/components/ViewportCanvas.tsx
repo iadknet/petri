@@ -192,11 +192,18 @@ export function ViewportCanvas({
   }
 
   const showIdlePlaceholder = phase === "idle" && !paintModeEnabled;
+  const viewportClassName = [
+    "viewport",
+    paintModeEnabled ? "paint-mode" : "",
+    paintModeEnabled && isPanning ? "paint-panning" : ""
+  ]
+    .filter(Boolean)
+    .join(" ");
 
   return (
     <main className="viewport-shell">
       <div
-        className="viewport"
+        className={viewportClassName}
         onContextMenu={(event) => {
           if (paintModeEnabled) {
             event.preventDefault();
