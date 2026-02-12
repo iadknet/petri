@@ -46,6 +46,22 @@ fn direction_target(
     }
 }
 
+fn memory_byte_to_signal(value: u8) -> f32 {
+    value as f32 / u8::MAX as f32
+}
+
+fn signal_to_memory_byte(value: f32) -> u8 {
+    (value.clamp(0.0, 1.0) * u8::MAX as f32).round() as u8
+}
+
+fn memory_address_norm(index: usize, len: usize) -> f32 {
+    if len <= 1 {
+        0.0
+    } else {
+        index as f32 / (len - 1) as f32
+    }
+}
+
 impl World {
     pub fn tick(&mut self) {
         if self.config.paused {
@@ -144,14 +160,7 @@ impl World {
                 creature.age += 1;
 
                 if creature.memory_register.is_empty() {
-                    creature.memory_register.push(false);
-                }
-                let memory_idx =
-                    creature.age.saturating_sub(1) as usize % creature.memory_register.len();
-                let memory_read = if creature.memory_register[memory_idx] {
-                    1.0
-                } else {
-                    0.0
+                    creature.memory_register.push(0);
                 };
 
                 let compute_cost = self.config.energy_per_compute_node
@@ -159,10 +168,13 @@ impl World {
                 creature.energy -= self.config.energy_per_tick_decay + compute_cost;
 
                 let current_idx = (creature.y * width + creature.x) as usize;
-                let inputs = SensorInputs {
+                let random_input = creature.rng.gen_range(-1.0_f32..=1.0_f32);
+                let shared_energy_input =
+                    (creature.energy / self.config.energy_max).clamp(0.0, 1.0);
+                let stage_a_inputs = SensorInputs {
                     food_here: self.cells[current_idx].food,
-                    energy: (creature.energy / self.config.energy_max).clamp(0.0, 1.0),
-                    random: creature.rng.gen_range(-1.0_f32..=1.0_f32),
+                    energy: shared_energy_input,
+                    random: random_input,
                     food_direction: perception.food_direction,
                     food_distance: perception.food_distance,
                     creature_direction: perception.creature_direction,
@@ -171,7 +183,8 @@ impl World {
                     barrier_direction: perception.barrier_direction,
                     barrier_distance: perception.barrier_distance,
                     move_blocked_last_tick: if move_blocked_last_tick { 1.0 } else { 0.0 },
-                    memory_read,
+                    memory_read: 0.0,
+                    memory_address_norm: 0.0,
                     touch_exists,
                     touch_food_value,
                     touch_has_barrier,
@@ -181,11 +194,35 @@ impl World {
                     slot_is_barrier,
                     slot_food_value,
                 };
-                creature.last_inputs = inputs;
+                let address_outputs = creature.controller.evaluate(stage_a_inputs);
+                let memory_idx = Self::selector_to_bin(
+                    address_outputs.memory_address_select,
+                    creature.memory_register.len(),
+                );
+                let memory_read_value = creature.memory_register[memory_idx];
+                let memory_read = memory_byte_to_signal(memory_read_value);
+                let memory_address_signal =
+                    memory_address_norm(memory_idx, creature.memory_register.len());
+                let action_inputs = SensorInputs {
+                    memory_read,
+                    memory_address_norm: memory_address_signal,
+                    ..stage_a_inputs
+                };
+                creature.last_inputs = action_inputs;
 
-                let outputs = creature.controller.evaluate(inputs);
+                let outputs = creature.controller.evaluate(action_inputs);
                 creature.last_outputs = outputs;
-                creature.memory_register[memory_idx] = outputs.memory_write > 0.5;
+                let write_value = signal_to_memory_byte(outputs.memory_write_value);
+                let write_applied = outputs.memory_write_enable > 0.5;
+                if write_applied {
+                    creature.memory_register[memory_idx] = write_value;
+                }
+                creature.last_memory_head = MemoryHeadState {
+                    address_index: memory_idx as u16,
+                    read_value: memory_read_value,
+                    write_value,
+                    write_applied,
+                };
 
                 let selected_inventory_action =
                     if outputs.inventory_pickup > 0.5 || outputs.inventory_put > 0.5 {
@@ -608,6 +645,7 @@ impl World {
                 last_move_blocked: false,
                 last_inputs: SensorInputs::default(),
                 last_outputs: ActionOutputs::default(),
+                last_memory_head: MemoryHeadState::default(),
             };
             let child_id = self.creatures.insert(child);
             self.creature_at[idx] = Some(child_id);

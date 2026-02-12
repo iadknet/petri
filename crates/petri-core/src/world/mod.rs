@@ -13,7 +13,7 @@ use crate::config::WorldConfig;
 use crate::types::{
     CreatureDetail, CreatureEvent, CreatureEventKind, CreatureId, CreatureSnapshot,
     CreatureStateSnapshot, IllegalActionAttempt, IllegalActionKind, IllegalActionReason,
-    InventoryItem, WorldDiagnostics, WorldFrame, WorldSnapshot,
+    InventoryItem, MemoryHeadState, WorldDiagnostics, WorldFrame, WorldSnapshot,
 };
 
 mod color;
@@ -51,7 +51,7 @@ type OffspringRequest = (
     u64,
     u64,
     usize,
-    Vec<bool>,
+    Vec<u8>,
     f32,
     f32,
 );
@@ -124,7 +124,8 @@ struct Creature {
     phenotype_color: [u8; 3],
     phenotype_hue: f32,
     phenotype_saturation: f32,
-    memory_register: Vec<bool>,
+    memory_register: Vec<u8>,
+    last_memory_head: MemoryHeadState,
     rng: SmallRng,
     events: VecDeque<CreatureEvent>,
     illegal_attempts: VecDeque<IllegalActionAttempt>,
@@ -146,10 +147,10 @@ struct PerceptionScan {
     barrier_distance: f32,
 }
 
-fn founder_memory_register() -> Vec<bool> {
+fn founder_memory_register() -> Vec<u8> {
     let founder_bits =
         FOUNDER_MEMORY_REGISTER_BITS.clamp(MEMORY_REGISTER_MIN_BITS, MAX_MEMORY_REGISTER_BITS);
-    vec![false; founder_bits]
+    vec![0; founder_bits]
 }
 
 fn founder_slot_capacity() -> usize {
@@ -178,19 +179,19 @@ fn normalize_slots(
     slots
 }
 
-fn normalize_memory_register(mut memory_register: Vec<bool>) -> Vec<bool> {
+fn normalize_memory_register(mut memory_register: Vec<u8>) -> Vec<u8> {
     if memory_register.is_empty() {
         return founder_memory_register();
     }
     let bounded_len = memory_register
         .len()
         .clamp(MEMORY_REGISTER_MIN_BITS, MAX_MEMORY_REGISTER_BITS);
-    memory_register.resize(bounded_len, false);
+    memory_register.resize(bounded_len, 0);
     memory_register
 }
 
 fn maybe_mutate_memory_register_size(
-    memory_register: &mut Vec<bool>,
+    memory_register: &mut Vec<u8>,
     mutation_rate: f32,
     rng: &mut SmallRng,
 ) {
@@ -201,7 +202,7 @@ fn maybe_mutate_memory_register_size(
     let current_len = memory_register
         .len()
         .clamp(MEMORY_REGISTER_MIN_BITS, MAX_MEMORY_REGISTER_BITS);
-    memory_register.resize(current_len, false);
+    memory_register.resize(current_len, 0);
 
     let can_grow = current_len < MAX_MEMORY_REGISTER_BITS;
     let can_shrink = current_len > MEMORY_REGISTER_MIN_BITS;
@@ -216,7 +217,7 @@ fn maybe_mutate_memory_register_size(
         let max_delta =
             (MAX_MEMORY_REGISTER_BITS - current_len).min(MEMORY_REGISTER_MUTATION_STEP_MAX_BITS);
         let delta = rng.gen_range(1..=max_delta);
-        memory_register.resize(current_len + delta, false);
+        memory_register.resize(current_len + delta, 0);
     } else {
         let max_delta =
             (current_len - MEMORY_REGISTER_MIN_BITS).min(MEMORY_REGISTER_MUTATION_STEP_MAX_BITS);
@@ -393,6 +394,7 @@ impl World {
                 last_move_blocked: c.last_move_blocked,
                 last_inputs: c.last_inputs,
                 last_outputs: c.last_outputs,
+                last_memory_head: c.last_memory_head,
                 events: c.events.iter().copied().collect(),
                 slot_capacity: c.slot_capacity as u8,
                 slots: c.slots.clone(),

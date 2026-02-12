@@ -53,6 +53,7 @@ impl World {
                     phenotype_hue,
                     phenotype_saturation,
                     memory_register: founder_memory_register(),
+                    last_memory_head: MemoryHeadState::default(),
                     rng: SmallRng::seed_from_u64(seed),
                     events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
                     illegal_attempts: VecDeque::with_capacity(ILLEGAL_LOG_CAPACITY),

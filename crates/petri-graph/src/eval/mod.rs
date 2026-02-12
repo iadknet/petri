@@ -72,6 +72,7 @@ impl ComputationGraph {
                         | NodeKind::InputBarrierDistance
                         | NodeKind::InputMoveBlockedLastTick
                         | NodeKind::InputMemoryRead
+                        | NodeKind::InputMemoryAddressNorm
                         | NodeKind::InputTouchExists(_)
                         | NodeKind::InputTouchFoodValue(_)
                         | NodeKind::InputTouchHasBarrier(_)
@@ -84,7 +85,9 @@ impl ComputationGraph {
                         | NodeKind::OutputMoveY
                         | NodeKind::OutputEat
                         | NodeKind::OutputReproduce
-                        | NodeKind::OutputMemoryWrite
+                        | NodeKind::OutputMemoryAddressSelect
+                        | NodeKind::OutputMemoryWriteValue
+                        | NodeKind::OutputMemoryWriteEnable
                         | NodeKind::OutputInventoryPickup
                         | NodeKind::OutputInventoryPut
                         | NodeKind::OutputInventorySlotSelect

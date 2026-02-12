@@ -268,6 +268,7 @@ describe("App", () => {
           barrier_distance: 0.6,
           move_blocked_last_tick: 0,
           memory_read: 0,
+          memory_address_norm: 0,
           touch_exists: [1, 1, 1, 1, 1],
           touch_food_value: [0.2, 0.1, 0, 0, 0],
           touch_has_barrier: [0, 0, 0, 0, 0],
@@ -282,11 +283,19 @@ describe("App", () => {
           move_y: -0.1,
           eat: 0.4,
           reproduce: 0.2,
-          memory_write: 0,
+          memory_write_value: 0,
+          memory_write_enable: 0,
+          memory_address_select: 0,
           inventory_pickup: 0,
           inventory_put: 0,
           inventory_slot_select: -1,
           inventory_direction_select: -1
+        },
+        last_memory_head: {
+          address_index: 0,
+          read_value: 0,
+          write_value: 0,
+          write_applied: false
         },
         events: [{ kind: "Moved", tick: 7 }],
         slot_capacity: 1,

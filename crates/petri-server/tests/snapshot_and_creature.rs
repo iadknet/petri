@@ -112,7 +112,16 @@ async fn creature_detail_endpoint_returns_last_inputs_outputs_and_events() {
     assert!(detail_json["last_inputs"].is_object());
     assert!(detail_json["last_inputs"]["barrier_direction"].is_number());
     assert!(detail_json["last_inputs"]["barrier_distance"].is_number());
+    assert!(detail_json["last_inputs"]["memory_address_norm"].is_number());
     assert!(detail_json["last_outputs"].is_object());
+    assert!(detail_json["last_outputs"]["memory_write_value"].is_number());
+    assert!(detail_json["last_outputs"]["memory_write_enable"].is_number());
+    assert!(detail_json["last_outputs"]["memory_address_select"].is_number());
+    assert!(detail_json["last_memory_head"].is_object());
+    assert!(detail_json["last_memory_head"]["address_index"].is_u64());
+    assert!(detail_json["last_memory_head"]["read_value"].is_u64());
+    assert!(detail_json["last_memory_head"]["write_value"].is_u64());
+    assert!(detail_json["last_memory_head"]["write_applied"].is_boolean());
     assert!(detail_json["events"].is_array());
     assert!(detail_json["node_count"].as_u64().is_some());
     assert!(detail_json["phenotype_color"].is_array());

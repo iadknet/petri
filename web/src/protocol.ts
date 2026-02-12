@@ -73,7 +73,7 @@ export type CreatureStateSnapshot = {
   age: number;
   generation: number;
   controller: unknown;
-  memory_register?: boolean[];
+  memory_register?: number[];
   slot_capacity?: number;
   slots?: (InventoryItem | null)[];
   illegal_attempts?: IllegalActionAttempt[];
@@ -110,6 +110,7 @@ export type SensorInputs = {
   barrier_distance: number;
   move_blocked_last_tick: number;
   memory_read: number;
+  memory_address_norm: number;
   touch_exists: number[];
   touch_food_value: number[];
   touch_has_barrier: number[];
@@ -125,11 +126,20 @@ export type ActionOutputs = {
   move_y: number;
   eat: number;
   reproduce: number;
-  memory_write: number;
+  memory_write_value: number;
+  memory_write_enable: number;
+  memory_address_select: number;
   inventory_pickup: number;
   inventory_put: number;
   inventory_slot_select: number;
   inventory_direction_select: number;
+};
+
+export type MemoryHeadState = {
+  address_index: number;
+  read_value: number;
+  write_value: number;
+  write_applied: boolean;
 };
 
 export type CreatureEvent = {
@@ -151,6 +161,7 @@ export type CreatureDetail = {
   last_move_blocked: boolean;
   last_inputs: SensorInputs;
   last_outputs: ActionOutputs;
+  last_memory_head: MemoryHeadState;
   events: CreatureEvent[];
   slot_capacity: number;
   slots: (InventoryItem | null)[];

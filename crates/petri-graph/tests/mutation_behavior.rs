@@ -23,6 +23,7 @@ fn hidden_node_count(graph: &ComputationGraph) -> usize {
                     | NodeKind::InputBarrierDistance
                     | NodeKind::InputMoveBlockedLastTick
                     | NodeKind::InputMemoryRead
+                    | NodeKind::InputMemoryAddressNorm
                     | NodeKind::InputTouchExists(_)
                     | NodeKind::InputTouchFoodValue(_)
                     | NodeKind::InputTouchHasBarrier(_)
@@ -35,7 +36,9 @@ fn hidden_node_count(graph: &ComputationGraph) -> usize {
                     | NodeKind::OutputMoveY
                     | NodeKind::OutputEat
                     | NodeKind::OutputReproduce
-                    | NodeKind::OutputMemoryWrite
+                    | NodeKind::OutputMemoryAddressSelect
+                    | NodeKind::OutputMemoryWriteValue
+                    | NodeKind::OutputMemoryWriteEnable
                     | NodeKind::OutputInventoryPickup
                     | NodeKind::OutputInventoryPut
                     | NodeKind::OutputInventorySlotSelect
@@ -93,7 +96,9 @@ fn mutation_changes_parameters_without_changing_topology() {
     assert!((-1.0..=1.0).contains(&outputs.move_y));
     assert!((0.0..=1.0).contains(&outputs.eat));
     assert!((0.0..=1.0).contains(&outputs.reproduce));
-    assert!((0.0..=1.0).contains(&outputs.memory_write));
+    assert!((-1.0..=1.0).contains(&outputs.memory_address_select));
+    assert!((0.0..=1.0).contains(&outputs.memory_write_value));
+    assert!((0.0..=1.0).contains(&outputs.memory_write_enable));
 }
 
 #[test]

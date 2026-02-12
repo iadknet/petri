@@ -277,6 +277,7 @@ fn insert_idle_creature(world: &mut World, x: u32, y: u32, seed: u64) -> Creatur
         last_move_blocked: false,
         last_inputs: SensorInputs::default(),
         last_outputs: ActionOutputs::default(),
+        last_memory_head: MemoryHeadState::default(),
     };
 
     let id = world.creatures.insert(creature);
@@ -311,9 +312,13 @@ fn invert_memory_controller() -> ComputationGraph {
     ComputationGraph {
         palette: ControllerPalette::Hybrid,
         nodes: vec![
-            NodeKind::InputMemoryRead,   // 0
-            NodeKind::Negate,            // 1
-            NodeKind::OutputMemoryWrite, // 2
+            NodeKind::InputMemoryRead,           // 0
+            NodeKind::Negate,                    // 1
+            NodeKind::OutputMemoryWriteValue,    // 2
+            NodeKind::Constant(1.0),             // 3
+            NodeKind::OutputMemoryWriteEnable,   // 4
+            NodeKind::Constant(1.0),             // 5
+            NodeKind::OutputMemoryAddressSelect, // 6
         ],
         edges: vec![
             Edge {
@@ -324,6 +329,16 @@ fn invert_memory_controller() -> ComputationGraph {
             Edge {
                 from: 1,
                 to: 2,
+                weight: 1.0,
+            },
+            Edge {
+                from: 3,
+                to: 4,
+                weight: 1.0,
+            },
+            Edge {
+                from: 5,
+                to: 6,
                 weight: 1.0,
             },
         ],
@@ -968,7 +983,7 @@ fn initial_population_has_founder_variation() {
 }
 
 #[test]
-fn founders_start_with_32_bit_memory_register() {
+fn founders_start_with_32_byte_memory_register() {
     let cfg = WorldConfig {
         width: 20,
         height: 20,
@@ -1036,7 +1051,7 @@ fn offspring_memory_register_size_evolves_within_bounds() {
 }
 
 #[test]
-fn memory_write_output_updates_creature_register() {
+fn memory_write_output_updates_targeted_creature_register_byte() {
     let cfg = WorldConfig {
         width: 8,
         height: 8,
@@ -1055,7 +1070,7 @@ fn memory_write_output_updates_creature_register() {
 
     if let Some(creature) = world.creatures.get_mut(id) {
         creature.controller = invert_memory_controller();
-        creature.memory_register = vec![true];
+        creature.memory_register = vec![64, 255];
     }
 
     world.tick();
@@ -1065,8 +1080,115 @@ fn memory_write_output_updates_creature_register() {
         .get(id)
         .expect("creature should still exist after one tick");
     assert_eq!(creature.last_inputs.memory_read, 1.0);
-    assert_eq!(creature.last_outputs.memory_write, 0.0);
-    assert_eq!(creature.memory_register, vec![false]);
+    assert_eq!(creature.last_outputs.memory_write_value, 0.0);
+    assert_eq!(creature.last_outputs.memory_write_enable, 1.0);
+    assert_eq!(creature.last_outputs.memory_address_select, 1.0);
+    assert_eq!(creature.memory_register, vec![64, 0]);
+}
+
+#[test]
+fn compute_cost_is_charged_once_per_tick_with_two_stage_memory_evaluation() {
+    let cfg = WorldConfig {
+        width: 6,
+        height: 6,
+        initial_creatures: 1,
+        energy_initial: 1.0,
+        energy_max: 1.0,
+        energy_per_tick_decay: 0.0,
+        energy_per_move: 0.0,
+        energy_per_compute_node: 0.1,
+        food_spawn_rate: 0.0,
+        food_growth_rate: 0.0,
+        min_reproduce_energy: 10.0,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 9811, ControllerPalette::Hybrid);
+    let id = world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, _)| id)
+        .expect("expected one creature");
+
+    if let Some(creature) = world.creatures.get_mut(id) {
+        creature.controller = ComputationGraph {
+            palette: ControllerPalette::Hybrid,
+            nodes: vec![
+                NodeKind::Constant(1.0),             // 0 hidden
+                NodeKind::Add,                       // 1 hidden
+                NodeKind::OutputMemoryAddressSelect, // 2 output
+                NodeKind::OutputMemoryWriteEnable,   // 3 output
+            ],
+            edges: vec![
+                Edge {
+                    from: 0,
+                    to: 1,
+                    weight: 1.0,
+                },
+                Edge {
+                    from: 1,
+                    to: 2,
+                    weight: 1.0,
+                },
+                Edge {
+                    from: 0,
+                    to: 3,
+                    weight: 1.0,
+                },
+            ],
+        };
+        creature.energy = 1.0;
+    }
+
+    world.tick();
+
+    let creature = world
+        .creatures
+        .get(id)
+        .expect("creature should still exist after one tick");
+    assert!((creature.energy - 0.8).abs() < 1e-6);
+}
+
+#[test]
+fn offspring_inherits_parent_memory_bytes() {
+    let cfg = WorldConfig {
+        width: 8,
+        height: 8,
+        initial_creatures: 1,
+        max_creatures: 2,
+        food_spawn_rate: 0.0,
+        food_growth_rate: 0.0,
+        energy_per_tick_decay: 0.0,
+        energy_per_compute_node: 0.0,
+        energy_per_reproduce: 0.0,
+        min_reproduce_energy: 0.2,
+        offspring_energy_fraction: 0.5,
+        structural_mutation_rate: 0.0,
+        world_wrap: false,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 9912, ControllerPalette::Hybrid);
+    let (id, _) = world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, c)| (id, c.x))
+        .expect("expected one creature");
+    let parent_id = id.data().as_ffi();
+    if let Some(creature) = world.creatures.get_mut(id) {
+        creature.controller = reproduce_only_controller();
+        creature.energy = 1.0;
+        creature.memory_register = vec![5, 200, 13];
+    }
+
+    world.tick();
+
+    let child = world
+        .creatures
+        .values()
+        .find(|creature| creature.parent_id == Some(parent_id))
+        .expect("expected offspring");
+    assert_eq!(child.memory_register, vec![5, 200, 13]);
 }
 
 #[test]
@@ -1481,6 +1603,7 @@ fn perception_reports_nearest_creature_direction_distance_and_density() {
         last_move_blocked: false,
         last_inputs: SensorInputs::default(),
         last_outputs: petri_graph::ActionOutputs::default(),
+        last_memory_head: MemoryHeadState::default(),
     };
     let b_controller = idle_controller();
     let b = Creature {
@@ -1504,6 +1627,7 @@ fn perception_reports_nearest_creature_direction_distance_and_density() {
         last_move_blocked: false,
         last_inputs: SensorInputs::default(),
         last_outputs: petri_graph::ActionOutputs::default(),
+        last_memory_head: MemoryHeadState::default(),
     };
     let id_a = world.creatures.insert(a);
     let id_b = world.creatures.insert(b);
@@ -1701,6 +1825,7 @@ fn spawn_random_creature_finds_free_cell_beyond_random_attempt_window() {
                 last_move_blocked: false,
                 last_inputs: SensorInputs::default(),
                 last_outputs: ActionOutputs::default(),
+                last_memory_head: MemoryHeadState::default(),
             };
             creature_seed += 1;
             let id = world.creatures.insert(creature);
@@ -2249,6 +2374,7 @@ fn world_snapshot_round_trip_preserves_last_inputs_outputs_and_blocked_feedback(
     assert!(restored_creature.last_move_blocked);
     assert!(restored_creature.last_inputs.move_blocked_last_tick > 0.5);
     assert!(restored_creature.last_outputs.move_x > 0.9);
+    assert!(restored_creature.last_memory_head.address_index < FOUNDER_MEMORY_REGISTER_BITS as u16);
 }
 
 #[test]
@@ -2291,6 +2417,8 @@ fn creature_detail_exposes_last_inputs_outputs_and_events() {
     assert_eq!(detail.phenotype_color.len(), 3);
     assert!((-1.0..=1.0).contains(&detail.last_inputs.barrier_direction));
     assert!((0.0..=1.0).contains(&detail.last_inputs.barrier_distance));
+    assert!((0.0..=1.0).contains(&detail.last_inputs.memory_address_norm));
+    assert!(detail.last_memory_head.address_index < FOUNDER_MEMORY_REGISTER_BITS as u16);
     assert!(detail
         .events
         .iter()

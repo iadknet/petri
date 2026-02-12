@@ -125,6 +125,14 @@ export function CreatureInspectorPanel({ creature, detail }: CreatureInspectorPa
                 <span>Move blocked input</span>
                 <strong>{formatEnergy(detail.last_inputs.move_blocked_last_tick)}</strong>
               </div>
+              <div className="metric-row">
+                <span>Memory read</span>
+                <strong>{formatEnergy(detail.last_inputs.memory_read)}</strong>
+              </div>
+              <div className="metric-row">
+                <span>Memory address (norm)</span>
+                <strong>{formatEnergy(detail.last_inputs.memory_address_norm)}</strong>
+              </div>
 
               <h3>Touch Sensors</h3>
               {TOUCH_LABELS.map((label, index) => (
@@ -156,6 +164,18 @@ export function CreatureInspectorPanel({ creature, detail }: CreatureInspectorPa
                 <strong>{formatEnergy(detail.last_outputs.reproduce)}</strong>
               </div>
               <div className="metric-row">
+                <span>Memory write value</span>
+                <strong>{formatEnergy(detail.last_outputs.memory_write_value)}</strong>
+              </div>
+              <div className="metric-row">
+                <span>Memory write enable</span>
+                <strong>{formatEnergy(detail.last_outputs.memory_write_enable)}</strong>
+              </div>
+              <div className="metric-row">
+                <span>Memory address select</span>
+                <strong>{formatEnergy(detail.last_outputs.memory_address_select)}</strong>
+              </div>
+              <div className="metric-row">
                 <span>Inventory pickup</span>
                 <strong>{formatEnergy(detail.last_outputs.inventory_pickup)}</strong>
               </div>
@@ -170,6 +190,24 @@ export function CreatureInspectorPanel({ creature, detail }: CreatureInspectorPa
               <div className="metric-row">
                 <span>Inventory direction select</span>
                 <strong>{formatEnergy(detail.last_outputs.inventory_direction_select)}</strong>
+              </div>
+
+              <h3>Memory Head</h3>
+              <div className="metric-row">
+                <span>Address index</span>
+                <strong>{detail.last_memory_head.address_index}</strong>
+              </div>
+              <div className="metric-row">
+                <span>Read byte</span>
+                <strong>{detail.last_memory_head.read_value}</strong>
+              </div>
+              <div className="metric-row">
+                <span>Write byte</span>
+                <strong>{detail.last_memory_head.write_value}</strong>
+              </div>
+              <div className="metric-row">
+                <span>Write applied</span>
+                <strong>{detail.last_memory_head.write_applied ? "Yes" : "No"}</strong>
               </div>
 
               <h3>Illegal Attempts</h3>

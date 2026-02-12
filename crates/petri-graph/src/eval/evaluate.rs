@@ -43,6 +43,7 @@ impl ComputationGraph {
                     }
                 }
                 NodeKind::InputMemoryRead => inputs.memory_read.clamp(0.0, 1.0),
+                NodeKind::InputMemoryAddressNorm => inputs.memory_address_norm.clamp(0.0, 1.0),
                 NodeKind::InputTouchExists(index) => {
                     sensor_at(&inputs.touch_exists, index).clamp(0.0, 1.0)
                 }
@@ -124,7 +125,9 @@ impl ComputationGraph {
                 | NodeKind::OutputMoveY
                 | NodeKind::OutputEat
                 | NodeKind::OutputReproduce
-                | NodeKind::OutputMemoryWrite
+                | NodeKind::OutputMemoryAddressSelect
+                | NodeKind::OutputMemoryWriteValue
+                | NodeKind::OutputMemoryWriteEnable
                 | NodeKind::OutputInventoryPickup
                 | NodeKind::OutputInventoryPut
                 | NodeKind::OutputInventorySlotSelect
@@ -137,7 +140,15 @@ impl ComputationGraph {
                 NodeKind::OutputMoveY => outputs.move_y = value.clamp(-1.0, 1.0),
                 NodeKind::OutputEat => outputs.eat = value.clamp(0.0, 1.0),
                 NodeKind::OutputReproduce => outputs.reproduce = value.clamp(0.0, 1.0),
-                NodeKind::OutputMemoryWrite => outputs.memory_write = value.clamp(0.0, 1.0),
+                NodeKind::OutputMemoryAddressSelect => {
+                    outputs.memory_address_select = value.clamp(-1.0, 1.0)
+                }
+                NodeKind::OutputMemoryWriteValue => {
+                    outputs.memory_write_value = value.clamp(0.0, 1.0)
+                }
+                NodeKind::OutputMemoryWriteEnable => {
+                    outputs.memory_write_enable = value.clamp(0.0, 1.0)
+                }
                 NodeKind::OutputInventoryPickup => outputs.inventory_pickup = value.clamp(0.0, 1.0),
                 NodeKind::OutputInventoryPut => outputs.inventory_put = value.clamp(0.0, 1.0),
                 NodeKind::OutputInventorySlotSelect => {
