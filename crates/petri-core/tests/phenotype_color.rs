@@ -35,7 +35,11 @@ fn snapshot_round_trip_preserves_phenotype_color() {
     let frame_after = restored.frame();
 
     assert_eq!(frame_before.creatures.len(), frame_after.creatures.len());
-    for (before, after) in frame_before.creatures.iter().zip(frame_after.creatures.iter()) {
+    for (before, after) in frame_before
+        .creatures
+        .iter()
+        .zip(frame_after.creatures.iter())
+    {
         assert_eq!(
             before.phenotype_color, after.phenotype_color,
             "phenotype color should survive snapshot round-trip"

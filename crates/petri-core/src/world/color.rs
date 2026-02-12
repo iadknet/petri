@@ -149,7 +149,7 @@ mod tests {
         for _ in 0..100 {
             let child_sat = inherit_saturation(PHENOTYPE_SATURATION_MIN, &mut rng);
             assert!(
-                child_sat >= PHENOTYPE_SATURATION_MIN && child_sat <= PHENOTYPE_SATURATION_MAX,
+                (PHENOTYPE_SATURATION_MIN..=PHENOTYPE_SATURATION_MAX).contains(&child_sat),
                 "child_sat {child_sat} out of bounds [{PHENOTYPE_SATURATION_MIN}, {PHENOTYPE_SATURATION_MAX}]"
             );
         }
@@ -157,7 +157,7 @@ mod tests {
         for _ in 0..100 {
             let child_sat = inherit_saturation(PHENOTYPE_SATURATION_MAX, &mut rng);
             assert!(
-                child_sat >= PHENOTYPE_SATURATION_MIN && child_sat <= PHENOTYPE_SATURATION_MAX,
+                (PHENOTYPE_SATURATION_MIN..=PHENOTYPE_SATURATION_MAX).contains(&child_sat),
                 "child_sat {child_sat} out of bounds [{PHENOTYPE_SATURATION_MIN}, {PHENOTYPE_SATURATION_MAX}]"
             );
         }
@@ -181,7 +181,7 @@ mod tests {
         for _ in 0..100 {
             let sat = random_founder_saturation(&mut rng);
             assert!(
-                sat >= PHENOTYPE_SATURATION_MIN && sat <= PHENOTYPE_SATURATION_MAX,
+                (PHENOTYPE_SATURATION_MIN..=PHENOTYPE_SATURATION_MAX).contains(&sat),
                 "founder saturation {sat} not in [{PHENOTYPE_SATURATION_MIN}, {PHENOTYPE_SATURATION_MAX}]"
             );
         }
