@@ -16,6 +16,7 @@ use crate::types::{
     InventoryItem, WorldDiagnostics, WorldFrame, WorldSnapshot,
 };
 
+mod color;
 mod food;
 mod helpers;
 mod paint;
