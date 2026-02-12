@@ -23,6 +23,7 @@ pub enum SimulationPhase {
 pub struct RuntimeConfigPatch {
     pub paused: Option<bool>,
     pub ticks_per_second: Option<u32>,
+    pub sensor_radius: Option<u32>,
     pub food_spawn_rate: Option<f32>,
     pub food_growth_rate: Option<f32>,
     pub food_spread_threshold: Option<f32>,

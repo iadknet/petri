@@ -26,6 +26,7 @@ fn startup_draft_validation_allows_expanded_upper_bounds() {
     draft.max_creatures = 450_000;
     draft.width = 1_400;
     draft.height = 1_400;
+    draft.sensor_radius = 64;
     draft.energy_initial = 12.0;
     draft.energy_per_tick_decay = 0.25;
     draft.energy_per_move = 0.25;
