@@ -167,6 +167,8 @@ function creatureDetailForId(id: number): CreatureDetail {
       creature_direction: 0,
       creature_distance: 1,
       local_density: 0.2,
+      barrier_direction: 0,
+      barrier_distance: 1,
       move_blocked_last_tick: 0,
       memory_read: 0
     },

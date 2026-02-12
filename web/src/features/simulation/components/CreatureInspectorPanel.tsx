@@ -60,6 +60,14 @@ export function CreatureInspectorPanel({ creature, detail }: CreatureInspectorPa
                 <strong>{formatEnergy(detail.last_inputs.creature_distance)}</strong>
               </div>
               <div className="metric-row">
+                <span>Barrier direction</span>
+                <strong>{formatEnergy(detail.last_inputs.barrier_direction)}</strong>
+              </div>
+              <div className="metric-row">
+                <span>Barrier distance</span>
+                <strong>{formatEnergy(detail.last_inputs.barrier_distance)}</strong>
+              </div>
+              <div className="metric-row">
                 <span>Local density</span>
                 <strong>{formatEnergy(detail.last_inputs.local_density)}</strong>
               </div>

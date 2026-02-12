@@ -256,6 +256,8 @@ describe("App", () => {
           creature_direction: -0.2,
           creature_distance: 0.7,
           local_density: 0.35,
+          barrier_direction: 0.05,
+          barrier_distance: 0.6,
           move_blocked_last_tick: 0,
           memory_read: 0
         },
@@ -296,6 +298,7 @@ describe("App", () => {
       expect(screen.getByText("99")).toBeInTheDocument();
       expect(screen.getByText("11")).toBeInTheDocument();
       expect(await screen.findByText(/Creature direction/i)).toBeInTheDocument();
+      expect(await screen.findByText(/Barrier direction/i)).toBeInTheDocument();
     } finally {
       spy.mockRestore();
     }

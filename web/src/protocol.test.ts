@@ -55,6 +55,8 @@ describe("protocol", () => {
         creature_direction: 0.25,
         creature_distance: 0.75,
         local_density: 0.1,
+        barrier_direction: 0.0,
+        barrier_distance: 1.0,
         move_blocked_last_tick: 0,
         memory_read: 0
       },

@@ -62,6 +62,8 @@ export type SensorInputs = {
   creature_direction: number;
   creature_distance: number;
   local_density: number;
+  barrier_direction: number;
+  barrier_distance: number;
   move_blocked_last_tick: number;
   memory_read: number;
 };
