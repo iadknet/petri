@@ -110,6 +110,8 @@ async fn creature_detail_endpoint_returns_last_inputs_outputs_and_events() {
 
     assert_eq!(detail_json["id"], creature_id);
     assert!(detail_json["last_inputs"].is_object());
+    assert!(detail_json["last_inputs"]["barrier_direction"].is_number());
+    assert!(detail_json["last_inputs"]["barrier_distance"].is_number());
     assert!(detail_json["last_outputs"].is_object());
     assert!(detail_json["events"].is_array());
     assert!(detail_json["node_count"].as_u64().is_some());

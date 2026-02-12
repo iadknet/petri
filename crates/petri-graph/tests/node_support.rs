@@ -44,6 +44,8 @@ fn relu_and_food_distance_direction_inputs_are_supported() {
         creature_direction: 0.0,
         creature_distance: 1.0,
         local_density: 0.0,
+        barrier_direction: 0.0,
+        barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: 0.0,
     });
@@ -58,6 +60,8 @@ fn relu_and_food_distance_direction_inputs_are_supported() {
         creature_direction: 0.0,
         creature_distance: 1.0,
         local_density: 0.0,
+        barrier_direction: 0.0,
+        barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: 0.0,
     });
@@ -111,6 +115,8 @@ fn new_input_nodes_are_supported_and_clamped() {
         creature_direction: 2.0,
         creature_distance: -0.5,
         local_density: 1.8,
+        barrier_direction: 0.0,
+        barrier_distance: 1.0,
         move_blocked_last_tick: 3.0,
         memory_read: 0.0,
     });
@@ -119,6 +125,49 @@ fn new_input_nodes_are_supported_and_clamped() {
     assert_eq!(outputs.eat, 0.0);
     assert_eq!(outputs.reproduce, 1.0);
     assert_eq!(outputs.move_y, -1.0);
+}
+
+#[test]
+fn barrier_input_nodes_are_supported_and_clamped() {
+    let graph = ComputationGraph {
+        palette: ControllerPalette::Hybrid,
+        nodes: vec![
+            NodeKind::InputBarrierDirection, // 0
+            NodeKind::OutputMoveX,           // 1
+            NodeKind::InputBarrierDistance,  // 2
+            NodeKind::OutputEat,             // 3
+        ],
+        edges: vec![
+            Edge {
+                from: 0,
+                to: 1,
+                weight: 1.0,
+            },
+            Edge {
+                from: 2,
+                to: 3,
+                weight: 1.0,
+            },
+        ],
+    };
+
+    let outputs = graph.evaluate(SensorInputs {
+        food_here: 0.0,
+        energy: 0.0,
+        random: 0.0,
+        food_direction: 0.0,
+        food_distance: 1.0,
+        creature_direction: 0.0,
+        creature_distance: 1.0,
+        local_density: 0.0,
+        barrier_direction: 2.3,
+        barrier_distance: -0.4,
+        move_blocked_last_tick: 0.0,
+        memory_read: 0.0,
+    });
+
+    assert_eq!(outputs.move_x, 1.0);
+    assert_eq!(outputs.eat, 0.0);
 }
 
 #[test]
@@ -205,6 +254,8 @@ fn negate_abs_min_and_max_node_kinds_are_supported() {
         creature_direction: 0.0,
         creature_distance: 1.0,
         local_density: 0.0,
+        barrier_direction: 0.0,
+        barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: 0.0,
     });
@@ -259,6 +310,8 @@ fn min_and_max_default_missing_inputs_to_zero() {
         creature_direction: 0.0,
         creature_distance: 1.0,
         local_density: 0.0,
+        barrier_direction: 0.0,
+        barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: 0.0,
     });
@@ -291,6 +344,8 @@ fn memory_io_nodes_are_supported_and_clamped() {
         creature_direction: 0.0,
         creature_distance: 1.0,
         local_density: 0.0,
+        barrier_direction: 0.0,
+        barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: 2.0,
     });
@@ -305,6 +360,8 @@ fn memory_io_nodes_are_supported_and_clamped() {
         creature_direction: 0.0,
         creature_distance: 1.0,
         local_density: 0.0,
+        barrier_direction: 0.0,
+        barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: -1.0,
     });

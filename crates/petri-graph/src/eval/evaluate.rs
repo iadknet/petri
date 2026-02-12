@@ -29,6 +29,8 @@ impl ComputationGraph {
                 NodeKind::InputCreatureDirection => inputs.creature_direction.clamp(-1.0, 1.0),
                 NodeKind::InputCreatureDistance => inputs.creature_distance.clamp(0.0, 1.0),
                 NodeKind::InputLocalDensity => inputs.local_density.clamp(0.0, 1.0),
+                NodeKind::InputBarrierDirection => inputs.barrier_direction.clamp(-1.0, 1.0),
+                NodeKind::InputBarrierDistance => inputs.barrier_distance.clamp(0.0, 1.0),
                 NodeKind::InputMoveBlockedLastTick => {
                     if inputs.move_blocked_last_tick > 0.5 {
                         1.0

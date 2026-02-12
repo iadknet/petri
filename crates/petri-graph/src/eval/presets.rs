@@ -457,6 +457,8 @@ pub(super) fn founder_hybrid() -> ComputationGraph {
             NodeKind::Tanh,                     // 20
             NodeKind::OutputMoveY,              // 21
             NodeKind::OutputMemoryWrite,        // 22
+            NodeKind::InputBarrierDirection,    // 23
+            NodeKind::InputBarrierDistance,     // 24
         ],
         edges: vec![
             Edge {
@@ -563,6 +565,16 @@ pub(super) fn founder_hybrid() -> ComputationGraph {
                 from: 20,
                 to: 21,
                 weight: 1.0,
+            },
+            Edge {
+                from: 23,
+                to: 16,
+                weight: -0.4,
+            },
+            Edge {
+                from: 24,
+                to: 19,
+                weight: -0.6,
             },
         ],
     }

@@ -8,6 +8,7 @@ pub enum ControllerPalette {
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+#[serde(default)]
 pub struct SensorInputs {
     pub food_here: f32,
     pub energy: f32,
@@ -17,6 +18,8 @@ pub struct SensorInputs {
     pub creature_direction: f32,
     pub creature_distance: f32,
     pub local_density: f32,
+    pub barrier_direction: f32,
+    pub barrier_distance: f32,
     pub move_blocked_last_tick: f32,
     pub memory_read: f32,
 }
@@ -32,6 +35,8 @@ impl Default for SensorInputs {
             creature_direction: 0.0,
             creature_distance: 1.0,
             local_density: 0.0,
+            barrier_direction: 0.0,
+            barrier_distance: 1.0,
             move_blocked_last_tick: 0.0,
             memory_read: 0.0,
         }
@@ -64,6 +69,8 @@ pub enum NodeKind {
     InputCreatureDirection,
     InputCreatureDistance,
     InputLocalDensity,
+    InputBarrierDirection,
+    InputBarrierDistance,
     InputMoveBlockedLastTick,
     InputMemoryRead,
     Constant(f32),
