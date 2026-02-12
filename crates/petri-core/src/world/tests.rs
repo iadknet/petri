@@ -267,7 +267,7 @@ fn insert_idle_creature(world: &mut World, x: u32, y: u32, seed: u64) -> Creatur
         controller,
         phenotype_color,
         phenotype_hue: 0.0,
-        phenotype_saturation: 0.0,
+        phenotype_saturation: 0.7,
         memory_register: founder_memory_register(),
         rng: SmallRng::seed_from_u64(seed),
         events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
@@ -1470,7 +1470,7 @@ fn perception_reports_nearest_creature_direction_distance_and_density() {
         parent_id: None,
         phenotype_color: color::phenotype_rgb(0.0, 0.7),
         phenotype_hue: 0.0,
-        phenotype_saturation: 0.0,
+        phenotype_saturation: 0.7,
         controller: a_controller,
         memory_register: founder_memory_register(),
         rng: SmallRng::seed_from_u64(1),
@@ -1493,7 +1493,7 @@ fn perception_reports_nearest_creature_direction_distance_and_density() {
         parent_id: None,
         phenotype_color: color::phenotype_rgb(0.0, 0.7),
         phenotype_hue: 0.0,
-        phenotype_saturation: 0.0,
+        phenotype_saturation: 0.7,
         controller: b_controller,
         memory_register: founder_memory_register(),
         rng: SmallRng::seed_from_u64(2),
@@ -1616,6 +1616,8 @@ fn movement_into_barrier_cell_is_blocked_and_sets_feedback() {
 
     if let Some(creature) = world.creatures.get_mut(id) {
         creature.controller = move_right_controller();
+        creature.phenotype_hue = 0.0;
+        creature.phenotype_saturation = 0.7;
         creature.phenotype_color = color::phenotype_rgb(0.0, 0.7);
         creature.x = 2;
         creature.y = 2;
@@ -1688,7 +1690,7 @@ fn spawn_random_creature_finds_free_cell_beyond_random_attempt_window() {
                 parent_id: None,
                 phenotype_color: color::phenotype_rgb(0.0, 0.7),
                 phenotype_hue: 0.0,
-                phenotype_saturation: 0.0,
+                phenotype_saturation: 0.7,
                 controller,
                 memory_register: founder_memory_register(),
                 rng: SmallRng::seed_from_u64(creature_seed),
@@ -2269,6 +2271,8 @@ fn creature_detail_exposes_last_inputs_outputs_and_events() {
 
     if let Some(creature) = world.creatures.get_mut(id) {
         creature.controller = move_right_controller();
+        creature.phenotype_hue = 0.0;
+        creature.phenotype_saturation = 0.7;
         creature.phenotype_color = color::phenotype_rgb(0.0, 0.7);
         creature.x = 2;
         creature.y = 2;
