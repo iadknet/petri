@@ -116,6 +116,10 @@ pub struct CreatureStateSnapshot {
     pub generation: u32,
     pub controller: ComputationGraph,
     #[serde(default)]
+    pub phenotype_hue: f32,
+    #[serde(default)]
+    pub phenotype_saturation: f32,
+    #[serde(default)]
     pub memory_register: Vec<bool>,
     #[serde(default)]
     pub last_move_blocked: bool,

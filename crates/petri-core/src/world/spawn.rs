@@ -4,6 +4,7 @@ use petri_graph::MutationConfig;
 use rand::{Rng, SeedableRng};
 use slotmap::Key;
 
+use super::color;
 use super::helpers::wrap_axis;
 use super::*;
 
@@ -30,7 +31,9 @@ impl World {
                 let initial_mutation_cfg = self.initial_mutation_config();
                 // Add slight startup diversity so founders are viable but not identical clones.
                 controller.mutate_with_config(&mut self.rng, initial_mutation_cfg);
-                let phenotype_color = controller.phenotype_color();
+                let phenotype_hue = color::random_founder_hue(&mut self.rng);
+                let phenotype_saturation = color::random_founder_saturation(&mut self.rng);
+                let phenotype_color = color::phenotype_rgb(phenotype_hue, phenotype_saturation);
                 let lineage_id = lineage_id.unwrap_or_else(|| {
                     let next = self.next_lineage_id;
                     self.next_lineage_id += 1;
@@ -46,6 +49,8 @@ impl World {
                     parent_id,
                     controller,
                     phenotype_color,
+                    phenotype_hue,
+                    phenotype_saturation,
                     memory_register: founder_memory_register(),
                     rng: SmallRng::seed_from_u64(seed),
                     events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),

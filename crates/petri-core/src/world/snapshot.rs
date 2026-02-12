@@ -3,6 +3,7 @@ use std::collections::{HashMap, VecDeque};
 use rand::SeedableRng;
 use slotmap::Key;
 
+use super::color;
 use super::*;
 
 impl World {
@@ -26,6 +27,8 @@ impl World {
                 age: c.age,
                 generation: c.generation,
                 controller: c.controller.clone(),
+                phenotype_hue: c.phenotype_hue,
+                phenotype_saturation: c.phenotype_saturation,
                 memory_register: c.memory_register.clone(),
                 last_move_blocked: c.last_move_blocked,
                 last_inputs: c.last_inputs,
@@ -99,7 +102,9 @@ impl World {
                 continue;
             }
             let controller = creature.controller;
-            let phenotype_color = controller.phenotype_color();
+            let phenotype_hue = creature.phenotype_hue;
+            let phenotype_saturation = creature.phenotype_saturation;
+            let phenotype_color = color::phenotype_rgb(phenotype_hue, phenotype_saturation);
             let new_creature = Creature {
                 x,
                 y,
@@ -110,6 +115,8 @@ impl World {
                 parent_id: creature.parent_id,
                 controller,
                 phenotype_color,
+                phenotype_hue,
+                phenotype_saturation,
                 memory_register: normalize_memory_register(creature.memory_register),
                 rng: SmallRng::seed_from_u64(old_id ^ snapshot.tick.rotate_left(13)),
                 events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
