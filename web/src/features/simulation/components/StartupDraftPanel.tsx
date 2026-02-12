@@ -156,6 +156,32 @@ export function StartupDraftPanel({ startupDraft, phase, onUpdate }: StartupDraf
             onChange={(event) => onUpdate("energy_per_move", Number(event.target.value))}
           />
 
+          <label className="slider-label" htmlFor="inventory-attempt-cost-slider">
+            Inventory attempt cost: {startupDraft.energy_per_inventory_attempt.toFixed(3)}
+          </label>
+          <input
+            id="inventory-attempt-cost-slider"
+            type="range"
+            min={STARTUP_LIMITS.energy_per_inventory_attempt.min}
+            max={STARTUP_LIMITS.energy_per_inventory_attempt.max}
+            step={STARTUP_LIMITS.energy_per_inventory_attempt.step}
+            value={startupDraft.energy_per_inventory_attempt}
+            onChange={(event) => onUpdate("energy_per_inventory_attempt", Number(event.target.value))}
+          />
+
+          <label className="slider-label" htmlFor="illegal-action-penalty-slider">
+            Illegal action penalty: {startupDraft.illegal_action_energy_penalty.toFixed(3)}
+          </label>
+          <input
+            id="illegal-action-penalty-slider"
+            type="range"
+            min={STARTUP_LIMITS.illegal_action_energy_penalty.min}
+            max={STARTUP_LIMITS.illegal_action_energy_penalty.max}
+            step={STARTUP_LIMITS.illegal_action_energy_penalty.step}
+            value={startupDraft.illegal_action_energy_penalty}
+            onChange={(event) => onUpdate("illegal_action_energy_penalty", Number(event.target.value))}
+          />
+
           <label className="slider-label" htmlFor="world-wrap-toggle">
             World wrap
           </label>

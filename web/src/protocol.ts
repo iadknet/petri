@@ -23,6 +23,45 @@ export type WorldFrame = {
   average_energy: number;
 };
 
+export type InventoryItem =
+  | {
+      kind: "food";
+      value: number;
+    }
+  | {
+      kind: "barrier";
+    };
+
+export type IllegalActionKind =
+  | "move"
+  | "eat"
+  | "reproduce"
+  | "inventory_pickup"
+  | "inventory_put";
+
+export type IllegalActionReason =
+  | "move_blocked"
+  | "move_out_of_bounds"
+  | "eat_no_food"
+  | "reproduce_low_energy"
+  | "reproduce_no_space"
+  | "reproduce_max_creatures"
+  | "slot_missing"
+  | "slot_full"
+  | "slot_empty"
+  | "target_out_of_bounds"
+  | "target_occupied"
+  | "target_has_barrier"
+  | "no_pickupable_material"
+  | "food_overflow"
+  | "target_incompatible";
+
+export type IllegalActionAttempt = {
+  action: IllegalActionKind;
+  reason: IllegalActionReason;
+  tick: number;
+};
+
 export type CreatureStateSnapshot = {
   id: number;
   lineage_id: number;
@@ -34,6 +73,9 @@ export type CreatureStateSnapshot = {
   generation: number;
   controller: unknown;
   memory_register?: boolean[];
+  slot_capacity?: number;
+  slots?: (InventoryItem | null)[];
+  illegal_attempts?: IllegalActionAttempt[];
 };
 
 export type WorldSnapshot = {
@@ -48,6 +90,7 @@ export type WorldSnapshot = {
     eats: number;
     reproductions: number;
     deaths: number;
+    illegal_actions?: number;
   };
   lineage_tree: Record<string, number[]>;
   next_lineage_id: number;
@@ -66,6 +109,14 @@ export type SensorInputs = {
   barrier_distance: number;
   move_blocked_last_tick: number;
   memory_read: number;
+  touch_exists: number[];
+  touch_food_value: number[];
+  touch_has_barrier: number[];
+  touch_occupied: number[];
+  slot_exists: number[];
+  slot_is_empty: number[];
+  slot_is_barrier: number[];
+  slot_food_value: number[];
 };
 
 export type ActionOutputs = {
@@ -74,6 +125,10 @@ export type ActionOutputs = {
   eat: number;
   reproduce: number;
   memory_write: number;
+  inventory_pickup: number;
+  inventory_put: number;
+  inventory_slot_select: number;
+  inventory_direction_select: number;
 };
 
 export type CreatureEvent = {
@@ -95,6 +150,9 @@ export type CreatureDetail = {
   last_inputs: SensorInputs;
   last_outputs: ActionOutputs;
   events: CreatureEvent[];
+  slot_capacity: number;
+  slots: (InventoryItem | null)[];
+  illegal_attempts: IllegalActionAttempt[];
 };
 
 export type ConfigPatch = {
@@ -109,8 +167,10 @@ export type ConfigPatch = {
   food_energy_value?: number;
   energy_per_tick_decay?: number;
   energy_per_move?: number;
+  energy_per_inventory_attempt?: number;
   energy_per_compute_node?: number;
   energy_per_reproduce?: number;
+  illegal_action_energy_penalty?: number;
   energy_max?: number;
   min_reproduce_energy?: number;
   offspring_energy_fraction?: number;
@@ -167,6 +227,8 @@ export type StartupDraft = {
   food_spawn_floor_density: number;
   energy_per_tick_decay: number;
   energy_per_move: number;
+  energy_per_inventory_attempt: number;
+  illegal_action_energy_penalty: number;
   world_wrap: boolean;
 };
 

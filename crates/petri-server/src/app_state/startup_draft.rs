@@ -19,6 +19,8 @@ pub struct StartupDraft {
     pub food_spawn_floor_density: f32,
     pub energy_per_tick_decay: f32,
     pub energy_per_move: f32,
+    pub energy_per_inventory_attempt: f32,
+    pub illegal_action_energy_penalty: f32,
     pub world_wrap: bool,
 }
 
@@ -37,6 +39,8 @@ pub struct StartupDraftPatch {
     pub food_spawn_floor_density: Option<f32>,
     pub energy_per_tick_decay: Option<f32>,
     pub energy_per_move: Option<f32>,
+    pub energy_per_inventory_attempt: Option<f32>,
+    pub illegal_action_energy_penalty: Option<f32>,
     pub world_wrap: Option<bool>,
 }
 impl StartupDraft {
@@ -55,6 +59,8 @@ impl StartupDraft {
             food_spawn_floor_density: 0.03,
             energy_per_tick_decay: 0.01,
             energy_per_move: 0.02,
+            energy_per_inventory_attempt: 0.005,
+            illegal_action_energy_penalty: 0.01,
             world_wrap: true,
         }
     }
@@ -114,6 +120,14 @@ impl StartupDraft {
             changed |= (self.energy_per_move - v).abs() > f32::EPSILON;
             self.energy_per_move = v;
         }
+        if let Some(v) = patch.energy_per_inventory_attempt {
+            changed |= (self.energy_per_inventory_attempt - v).abs() > f32::EPSILON;
+            self.energy_per_inventory_attempt = v;
+        }
+        if let Some(v) = patch.illegal_action_energy_penalty {
+            changed |= (self.illegal_action_energy_penalty - v).abs() > f32::EPSILON;
+            self.illegal_action_energy_penalty = v;
+        }
         if let Some(v) = patch.world_wrap {
             changed |= self.world_wrap != v;
             self.world_wrap = v;
@@ -161,6 +175,18 @@ impl StartupDraft {
             0.50,
         )?;
         validate_range("energy_per_move", self.energy_per_move as f64, 0.0, 0.50)?;
+        validate_range(
+            "energy_per_inventory_attempt",
+            self.energy_per_inventory_attempt as f64,
+            0.0,
+            0.20,
+        )?;
+        validate_range(
+            "illegal_action_energy_penalty",
+            self.illegal_action_energy_penalty as f64,
+            0.0,
+            0.50,
+        )?;
         Ok(())
     }
 }
@@ -196,6 +222,8 @@ pub(super) fn build_world_config(base: &WorldConfig, draft: &StartupDraft) -> Wo
     cfg.food_spawn_floor_density = draft.food_spawn_floor_density;
     cfg.energy_per_tick_decay = draft.energy_per_tick_decay;
     cfg.energy_per_move = draft.energy_per_move;
+    cfg.energy_per_inventory_attempt = draft.energy_per_inventory_attempt;
+    cfg.illegal_action_energy_penalty = draft.illegal_action_energy_penalty;
     cfg.paused = false;
     cfg
 }
@@ -218,6 +246,8 @@ pub(super) fn startup_draft_from_config(
         food_spawn_floor_density: config.food_spawn_floor_density,
         energy_per_tick_decay: config.energy_per_tick_decay,
         energy_per_move: config.energy_per_move,
+        energy_per_inventory_attempt: config.energy_per_inventory_attempt,
+        illegal_action_energy_penalty: config.illegal_action_energy_penalty,
         world_wrap: config.world_wrap,
     }
 }

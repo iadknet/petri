@@ -55,6 +55,52 @@ pub struct WorldDiagnostics {
     pub eats: u64,
     pub reproductions: u64,
     pub deaths: u64,
+    #[serde(default)]
+    pub illegal_actions: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "snake_case", tag = "kind", content = "value")]
+pub enum InventoryItem {
+    Food(f32),
+    Barrier,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum IllegalActionKind {
+    Move,
+    Eat,
+    Reproduce,
+    InventoryPickup,
+    InventoryPut,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum IllegalActionReason {
+    MoveBlocked,
+    MoveOutOfBounds,
+    EatNoFood,
+    ReproduceLowEnergy,
+    ReproduceNoSpace,
+    ReproduceMaxCreatures,
+    SlotMissing,
+    SlotFull,
+    SlotEmpty,
+    TargetOutOfBounds,
+    TargetOccupied,
+    TargetHasBarrier,
+    NoPickupableMaterial,
+    FoodOverflow,
+    TargetIncompatible,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+pub struct IllegalActionAttempt {
+    pub action: IllegalActionKind,
+    pub reason: IllegalActionReason,
+    pub tick: u64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -76,6 +122,12 @@ pub struct CreatureStateSnapshot {
     pub last_inputs: SensorInputs,
     #[serde(default)]
     pub last_outputs: ActionOutputs,
+    #[serde(default)]
+    pub slot_capacity: u8,
+    #[serde(default)]
+    pub slots: Vec<Option<InventoryItem>>,
+    #[serde(default)]
+    pub illegal_attempts: Vec<IllegalActionAttempt>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -93,6 +145,12 @@ pub struct CreatureDetail {
     pub last_inputs: SensorInputs,
     pub last_outputs: ActionOutputs,
     pub events: Vec<CreatureEvent>,
+    #[serde(default)]
+    pub slot_capacity: u8,
+    #[serde(default)]
+    pub slots: Vec<Option<InventoryItem>>,
+    #[serde(default)]
+    pub illegal_attempts: Vec<IllegalActionAttempt>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

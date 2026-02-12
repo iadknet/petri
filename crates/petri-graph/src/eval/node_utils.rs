@@ -21,6 +21,14 @@ pub(super) fn is_input_node(node: &NodeKind) -> bool {
             | NodeKind::InputBarrierDistance
             | NodeKind::InputMoveBlockedLastTick
             | NodeKind::InputMemoryRead
+            | NodeKind::InputTouchExists(_)
+            | NodeKind::InputTouchFoodValue(_)
+            | NodeKind::InputTouchHasBarrier(_)
+            | NodeKind::InputTouchOccupied(_)
+            | NodeKind::InputSlotExists(_)
+            | NodeKind::InputSlotIsEmpty(_)
+            | NodeKind::InputSlotIsBarrier(_)
+            | NodeKind::InputSlotFoodValue(_)
     )
 }
 
@@ -32,6 +40,10 @@ pub(super) fn is_output_node(node: &NodeKind) -> bool {
             | NodeKind::OutputEat
             | NodeKind::OutputReproduce
             | NodeKind::OutputMemoryWrite
+            | NodeKind::OutputInventoryPickup
+            | NodeKind::OutputInventoryPut
+            | NodeKind::OutputInventorySlotSelect
+            | NodeKind::OutputInventoryDirectionSelect
     )
 }
 

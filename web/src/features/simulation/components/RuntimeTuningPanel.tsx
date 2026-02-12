@@ -217,6 +217,46 @@ export function RuntimeTuningPanel({
               );
             }}
           />
+
+          <label className="slider-label" htmlFor="runtime-inventory-attempt-cost-slider">
+            Inventory attempt cost: {runtimeConfig.energy_per_inventory_attempt.toFixed(3)}
+          </label>
+          <input
+            id="runtime-inventory-attempt-cost-slider"
+            type="range"
+            min={STARTUP_LIMITS.energy_per_inventory_attempt.min}
+            max={STARTUP_LIMITS.energy_per_inventory_attempt.max}
+            step={STARTUP_LIMITS.energy_per_inventory_attempt.step}
+            value={runtimeConfig.energy_per_inventory_attempt}
+            disabled={phase === "idle"}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              onUpdateRuntimeField(
+                { energy_per_inventory_attempt: value },
+                { ...runtimeConfig, energy_per_inventory_attempt: value }
+              );
+            }}
+          />
+
+          <label className="slider-label" htmlFor="runtime-illegal-action-penalty-slider">
+            Illegal action penalty: {runtimeConfig.illegal_action_energy_penalty.toFixed(3)}
+          </label>
+          <input
+            id="runtime-illegal-action-penalty-slider"
+            type="range"
+            min={STARTUP_LIMITS.illegal_action_energy_penalty.min}
+            max={STARTUP_LIMITS.illegal_action_energy_penalty.max}
+            step={STARTUP_LIMITS.illegal_action_energy_penalty.step}
+            value={runtimeConfig.illegal_action_energy_penalty}
+            disabled={phase === "idle"}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              onUpdateRuntimeField(
+                { illegal_action_energy_penalty: value },
+                { ...runtimeConfig, illegal_action_energy_penalty: value }
+              );
+            }}
+          />
         </>
       ) : (
         <p className="muted">Loading runtime config...</p>

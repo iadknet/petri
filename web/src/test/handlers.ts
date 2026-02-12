@@ -28,6 +28,8 @@ const defaultStartupDraft: StartupDraft = {
   food_spawn_floor_density: 0.03,
   energy_per_tick_decay: 0.01,
   energy_per_move: 0.02,
+  energy_per_inventory_attempt: 0.005,
+  illegal_action_energy_penalty: 0.01,
   world_wrap: true
 };
 
@@ -43,8 +45,10 @@ const defaultRuntimeConfig = {
   food_energy_value: 0.35,
   energy_per_tick_decay: 0.01,
   energy_per_move: 0.02,
+  energy_per_inventory_attempt: 0.005,
   energy_per_compute_node: 0.005,
   energy_per_reproduce: 0.12,
+  illegal_action_energy_penalty: 0.01,
   energy_max: 1.5,
   min_reproduce_energy: 1.0,
   offspring_energy_fraction: 0.45,
@@ -170,16 +174,31 @@ function creatureDetailForId(id: number): CreatureDetail {
       barrier_direction: 0,
       barrier_distance: 1,
       move_blocked_last_tick: 0,
-      memory_read: 0
+      memory_read: 0,
+      touch_exists: [1, 1, 1, 1, 1],
+      touch_food_value: [0.1, 0.2, 0, 0, 0],
+      touch_has_barrier: [0, 0, 0, 0, 0],
+      touch_occupied: [1, 0, 0, 0, 0],
+      slot_exists: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      slot_is_empty: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      slot_is_barrier: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+      slot_food_value: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
     },
     last_outputs: {
       move_x: 0.2,
       move_y: -0.1,
       eat: 0.3,
       reproduce: 0.1,
-      memory_write: 0
+      memory_write: 0,
+      inventory_pickup: 0,
+      inventory_put: 0,
+      inventory_slot_select: -1,
+      inventory_direction_select: -1
     },
-    events: [{ kind: "Moved", tick: 1 }]
+    events: [{ kind: "Moved", tick: 1 }],
+    slot_capacity: 1,
+    slots: [null],
+    illegal_attempts: []
   };
 }
 

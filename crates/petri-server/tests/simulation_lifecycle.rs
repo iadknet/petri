@@ -182,7 +182,9 @@ async fn startup_draft_patch_updates_restart_required_stage1_knobs() {
         "energy_initial": 0.82,
         "food_spread_threshold": 0.62,
         "food_spawn_floor_density": 0.08,
-        "sensor_radius": 18
+        "sensor_radius": 18,
+        "energy_per_inventory_attempt": 0.017,
+        "illegal_action_energy_penalty": 0.09
     });
 
     let patch_response = app
@@ -204,6 +206,8 @@ async fn startup_draft_patch_updates_restart_required_stage1_knobs() {
     assert_eq!(patch_json["food_spread_threshold"], 0.62);
     assert_eq!(patch_json["food_spawn_floor_density"], 0.08);
     assert_eq!(patch_json["sensor_radius"], 18);
+    assert_eq!(patch_json["energy_per_inventory_attempt"], 0.017);
+    assert_eq!(patch_json["illegal_action_energy_penalty"], 0.09);
 
     let status_response = app
         .oneshot(
@@ -224,6 +228,14 @@ async fn startup_draft_patch_updates_restart_required_stage1_knobs() {
         0.08
     );
     assert_eq!(status_json["startup_draft"]["sensor_radius"], 18);
+    assert_eq!(
+        status_json["startup_draft"]["energy_per_inventory_attempt"],
+        0.017
+    );
+    assert_eq!(
+        status_json["startup_draft"]["illegal_action_energy_penalty"],
+        0.09
+    );
 }
 
 #[tokio::test]
@@ -297,8 +309,10 @@ async fn patch_config_updates_runtime_values() {
         "food_energy_value": 0.48,
         "energy_per_tick_decay": 0.015,
         "energy_per_move": 0.025,
+        "energy_per_inventory_attempt": 0.014,
         "energy_per_compute_node": 0.009,
         "energy_per_reproduce": 0.18,
+        "illegal_action_energy_penalty": 0.07,
         "energy_max": 1.8,
         "min_reproduce_energy": 1.2,
         "offspring_energy_fraction": 0.38,
@@ -346,8 +360,10 @@ async fn patch_config_updates_runtime_values() {
     assert_eq!(cfg_json["food_energy_value"], 0.48);
     assert_eq!(cfg_json["energy_per_tick_decay"], 0.015);
     assert_eq!(cfg_json["energy_per_move"], 0.025);
+    assert_eq!(cfg_json["energy_per_inventory_attempt"], 0.014);
     assert_eq!(cfg_json["energy_per_compute_node"], 0.009);
     assert_eq!(cfg_json["energy_per_reproduce"], 0.18);
+    assert_eq!(cfg_json["illegal_action_energy_penalty"], 0.07);
     assert_eq!(cfg_json["energy_max"], 1.8);
     assert_eq!(cfg_json["min_reproduce_energy"], 1.2);
     assert_eq!(cfg_json["offspring_energy_fraction"], 0.38);

@@ -23,11 +23,23 @@ fn hidden_node_count(graph: &ComputationGraph) -> usize {
                     | NodeKind::InputBarrierDistance
                     | NodeKind::InputMoveBlockedLastTick
                     | NodeKind::InputMemoryRead
+                    | NodeKind::InputTouchExists(_)
+                    | NodeKind::InputTouchFoodValue(_)
+                    | NodeKind::InputTouchHasBarrier(_)
+                    | NodeKind::InputTouchOccupied(_)
+                    | NodeKind::InputSlotExists(_)
+                    | NodeKind::InputSlotIsEmpty(_)
+                    | NodeKind::InputSlotIsBarrier(_)
+                    | NodeKind::InputSlotFoodValue(_)
                     | NodeKind::OutputMoveX
                     | NodeKind::OutputMoveY
                     | NodeKind::OutputEat
                     | NodeKind::OutputReproduce
                     | NodeKind::OutputMemoryWrite
+                    | NodeKind::OutputInventoryPickup
+                    | NodeKind::OutputInventoryPut
+                    | NodeKind::OutputInventorySlotSelect
+                    | NodeKind::OutputInventoryDirectionSelect
             )
         })
         .count()
@@ -75,6 +87,7 @@ fn mutation_changes_parameters_without_changing_topology() {
         barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: 0.0,
+        ..SensorInputs::default()
     });
     assert!((-1.0..=1.0).contains(&outputs.move_x));
     assert!((-1.0..=1.0).contains(&outputs.move_y));

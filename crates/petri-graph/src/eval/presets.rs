@@ -253,27 +253,33 @@ pub(super) fn hybrid() -> ComputationGraph {
 }
 
 pub(super) fn founder_neural_only() -> ComputationGraph {
+    let mut nodes = vec![
+        NodeKind::InputFoodHere,     // 0
+        NodeKind::InputEnergy,       // 1
+        NodeKind::InputRandom,       // 2
+        NodeKind::InputMemoryRead,   // 3
+        NodeKind::Constant(-2.5),    // 4
+        NodeKind::Add,               // 5
+        NodeKind::Sigmoid,           // 6
+        NodeKind::OutputEat,         // 7
+        NodeKind::Constant(-7.0),    // 8
+        NodeKind::Add,               // 9
+        NodeKind::Sigmoid,           // 10
+        NodeKind::OutputReproduce,   // 11
+        NodeKind::Tanh,              // 12
+        NodeKind::OutputMoveX,       // 13
+        NodeKind::Tanh,              // 14
+        NodeKind::OutputMoveY,       // 15
+        NodeKind::OutputMemoryWrite, // 16
+    ];
+    nodes.push(NodeKind::OutputInventoryPickup);
+    nodes.push(NodeKind::OutputInventoryPut);
+    nodes.push(NodeKind::OutputInventorySlotSelect);
+    nodes.push(NodeKind::OutputInventoryDirectionSelect);
+
     ComputationGraph {
         palette: ControllerPalette::NeuralOnly,
-        nodes: vec![
-            NodeKind::InputFoodHere,     // 0
-            NodeKind::InputEnergy,       // 1
-            NodeKind::InputRandom,       // 2
-            NodeKind::InputMemoryRead,   // 3
-            NodeKind::Constant(-2.5),    // 4
-            NodeKind::Add,               // 5
-            NodeKind::Sigmoid,           // 6
-            NodeKind::OutputEat,         // 7
-            NodeKind::Constant(-7.0),    // 8
-            NodeKind::Add,               // 9
-            NodeKind::Sigmoid,           // 10
-            NodeKind::OutputReproduce,   // 11
-            NodeKind::Tanh,              // 12
-            NodeKind::OutputMoveX,       // 13
-            NodeKind::Tanh,              // 14
-            NodeKind::OutputMoveY,       // 15
-            NodeKind::OutputMemoryWrite, // 16
-        ],
+        nodes,
         edges: vec![
             Edge {
                 from: 0,
@@ -345,26 +351,32 @@ pub(super) fn founder_neural_only() -> ComputationGraph {
 }
 
 pub(super) fn founder_logic_only() -> ComputationGraph {
+    let mut nodes = vec![
+        NodeKind::InputFoodHere,     // 0
+        NodeKind::InputEnergy,       // 1
+        NodeKind::InputRandom,       // 2
+        NodeKind::InputMemoryRead,   // 3
+        NodeKind::Threshold(0.05),   // 4
+        NodeKind::OutputEat,         // 5
+        NodeKind::Threshold(0.9),    // 6
+        NodeKind::Multiply,          // 7
+        NodeKind::OutputReproduce,   // 8
+        NodeKind::Threshold(0.7),    // 9
+        NodeKind::Constant(0.0),     // 10
+        NodeKind::Constant(1.0),     // 11
+        NodeKind::Select,            // 12
+        NodeKind::OutputMoveX,       // 13
+        NodeKind::OutputMoveY,       // 14
+        NodeKind::OutputMemoryWrite, // 15
+    ];
+    nodes.push(NodeKind::OutputInventoryPickup);
+    nodes.push(NodeKind::OutputInventoryPut);
+    nodes.push(NodeKind::OutputInventorySlotSelect);
+    nodes.push(NodeKind::OutputInventoryDirectionSelect);
+
     ComputationGraph {
         palette: ControllerPalette::LogicOnly,
-        nodes: vec![
-            NodeKind::InputFoodHere,     // 0
-            NodeKind::InputEnergy,       // 1
-            NodeKind::InputRandom,       // 2
-            NodeKind::InputMemoryRead,   // 3
-            NodeKind::Threshold(0.05),   // 4
-            NodeKind::OutputEat,         // 5
-            NodeKind::Threshold(0.9),    // 6
-            NodeKind::Multiply,          // 7
-            NodeKind::OutputReproduce,   // 8
-            NodeKind::Threshold(0.7),    // 9
-            NodeKind::Constant(0.0),     // 10
-            NodeKind::Constant(1.0),     // 11
-            NodeKind::Select,            // 12
-            NodeKind::OutputMoveX,       // 13
-            NodeKind::OutputMoveY,       // 14
-            NodeKind::OutputMemoryWrite, // 15
-        ],
+        nodes,
         edges: vec![
             Edge {
                 from: 0,
@@ -431,35 +443,53 @@ pub(super) fn founder_logic_only() -> ComputationGraph {
 }
 
 pub(super) fn founder_hybrid() -> ComputationGraph {
+    let mut nodes = vec![
+        NodeKind::InputFoodHere,            // 0
+        NodeKind::InputEnergy,              // 1
+        NodeKind::InputRandom,              // 2
+        NodeKind::InputFoodDirection,       // 3
+        NodeKind::InputFoodDistance,        // 4
+        NodeKind::InputCreatureDirection,   // 5
+        NodeKind::InputCreatureDistance,    // 6
+        NodeKind::InputLocalDensity,        // 7
+        NodeKind::InputMoveBlockedLastTick, // 8
+        NodeKind::InputMemoryRead,          // 9
+        NodeKind::Threshold(0.08),          // 10
+        NodeKind::OutputEat,                // 11
+        NodeKind::Constant(-7.0),           // 12
+        NodeKind::Add,                      // 13
+        NodeKind::Sigmoid,                  // 14
+        NodeKind::OutputReproduce,          // 15
+        NodeKind::Add,                      // 16
+        NodeKind::Tanh,                     // 17
+        NodeKind::OutputMoveX,              // 18
+        NodeKind::Add,                      // 19
+        NodeKind::Tanh,                     // 20
+        NodeKind::OutputMoveY,              // 21
+        NodeKind::OutputMemoryWrite,        // 22
+        NodeKind::InputBarrierDirection,    // 23
+        NodeKind::InputBarrierDistance,     // 24
+    ];
+    for index in 0_u8..5 {
+        nodes.push(NodeKind::InputTouchExists(index));
+        nodes.push(NodeKind::InputTouchFoodValue(index));
+        nodes.push(NodeKind::InputTouchHasBarrier(index));
+        nodes.push(NodeKind::InputTouchOccupied(index));
+    }
+    for index in 0_u8..12 {
+        nodes.push(NodeKind::InputSlotExists(index));
+        nodes.push(NodeKind::InputSlotIsEmpty(index));
+        nodes.push(NodeKind::InputSlotIsBarrier(index));
+        nodes.push(NodeKind::InputSlotFoodValue(index));
+    }
+    nodes.push(NodeKind::OutputInventoryPickup);
+    nodes.push(NodeKind::OutputInventoryPut);
+    nodes.push(NodeKind::OutputInventorySlotSelect);
+    nodes.push(NodeKind::OutputInventoryDirectionSelect);
+
     ComputationGraph {
         palette: ControllerPalette::Hybrid,
-        nodes: vec![
-            NodeKind::InputFoodHere,            // 0
-            NodeKind::InputEnergy,              // 1
-            NodeKind::InputRandom,              // 2
-            NodeKind::InputFoodDirection,       // 3
-            NodeKind::InputFoodDistance,        // 4
-            NodeKind::InputCreatureDirection,   // 5
-            NodeKind::InputCreatureDistance,    // 6
-            NodeKind::InputLocalDensity,        // 7
-            NodeKind::InputMoveBlockedLastTick, // 8
-            NodeKind::InputMemoryRead,          // 9
-            NodeKind::Threshold(0.08),          // 10
-            NodeKind::OutputEat,                // 11
-            NodeKind::Constant(-7.0),           // 12
-            NodeKind::Add,                      // 13
-            NodeKind::Sigmoid,                  // 14
-            NodeKind::OutputReproduce,          // 15
-            NodeKind::Add,                      // 16
-            NodeKind::Tanh,                     // 17
-            NodeKind::OutputMoveX,              // 18
-            NodeKind::Add,                      // 19
-            NodeKind::Tanh,                     // 20
-            NodeKind::OutputMoveY,              // 21
-            NodeKind::OutputMemoryWrite,        // 22
-            NodeKind::InputBarrierDirection,    // 23
-            NodeKind::InputBarrierDistance,     // 24
-        ],
+        nodes,
         edges: vec![
             Edge {
                 from: 0,

@@ -4,6 +4,10 @@ use super::*;
 
 impl ComputationGraph {
     pub fn evaluate(&self, inputs: SensorInputs) -> ActionOutputs {
+        fn sensor_at(sensor: &[f32], index: u8) -> f32 {
+            sensor.get(index as usize).copied().unwrap_or(0.0)
+        }
+
         let mut incoming: Vec<Vec<(usize, f32)>> = vec![Vec::new(); self.nodes.len()];
         for edge in &self.edges {
             if edge.to < incoming.len() && edge.from < self.nodes.len() {
@@ -39,6 +43,30 @@ impl ComputationGraph {
                     }
                 }
                 NodeKind::InputMemoryRead => inputs.memory_read.clamp(0.0, 1.0),
+                NodeKind::InputTouchExists(index) => {
+                    sensor_at(&inputs.touch_exists, index).clamp(0.0, 1.0)
+                }
+                NodeKind::InputTouchFoodValue(index) => {
+                    sensor_at(&inputs.touch_food_value, index).clamp(0.0, 1.0)
+                }
+                NodeKind::InputTouchHasBarrier(index) => {
+                    sensor_at(&inputs.touch_has_barrier, index).clamp(0.0, 1.0)
+                }
+                NodeKind::InputTouchOccupied(index) => {
+                    sensor_at(&inputs.touch_occupied, index).clamp(0.0, 1.0)
+                }
+                NodeKind::InputSlotExists(index) => {
+                    sensor_at(&inputs.slot_exists, index).clamp(0.0, 1.0)
+                }
+                NodeKind::InputSlotIsEmpty(index) => {
+                    sensor_at(&inputs.slot_is_empty, index).clamp(0.0, 1.0)
+                }
+                NodeKind::InputSlotIsBarrier(index) => {
+                    sensor_at(&inputs.slot_is_barrier, index).clamp(0.0, 1.0)
+                }
+                NodeKind::InputSlotFoodValue(index) => {
+                    sensor_at(&inputs.slot_food_value, index).clamp(0.0, 1.0)
+                }
                 NodeKind::Constant(v) => v,
                 NodeKind::Add => weighted_inputs.iter().sum(),
                 NodeKind::Multiply => {
@@ -96,7 +124,11 @@ impl ComputationGraph {
                 | NodeKind::OutputMoveY
                 | NodeKind::OutputEat
                 | NodeKind::OutputReproduce
-                | NodeKind::OutputMemoryWrite => weighted_inputs.iter().sum(),
+                | NodeKind::OutputMemoryWrite
+                | NodeKind::OutputInventoryPickup
+                | NodeKind::OutputInventoryPut
+                | NodeKind::OutputInventorySlotSelect
+                | NodeKind::OutputInventoryDirectionSelect => weighted_inputs.iter().sum(),
             };
 
             values[idx] = value;
@@ -106,6 +138,14 @@ impl ComputationGraph {
                 NodeKind::OutputEat => outputs.eat = value.clamp(0.0, 1.0),
                 NodeKind::OutputReproduce => outputs.reproduce = value.clamp(0.0, 1.0),
                 NodeKind::OutputMemoryWrite => outputs.memory_write = value.clamp(0.0, 1.0),
+                NodeKind::OutputInventoryPickup => outputs.inventory_pickup = value.clamp(0.0, 1.0),
+                NodeKind::OutputInventoryPut => outputs.inventory_put = value.clamp(0.0, 1.0),
+                NodeKind::OutputInventorySlotSelect => {
+                    outputs.inventory_slot_select = value.clamp(-1.0, 1.0)
+                }
+                NodeKind::OutputInventoryDirectionSelect => {
+                    outputs.inventory_direction_select = value.clamp(-1.0, 1.0)
+                }
                 _ => {}
             }
         }
