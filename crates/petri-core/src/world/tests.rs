@@ -763,6 +763,67 @@ fn nearest_food_sensor_distance_normalizes_by_configured_radius() {
 }
 
 #[test]
+fn nearest_barrier_sensor_reports_direction_and_distance() {
+    let cfg = WorldConfig {
+        width: 20,
+        height: 20,
+        initial_creatures: 0,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new(cfg, 301);
+
+    let source_x = 10_u32;
+    let source_y = 10_u32;
+    let barrier_x = 13_u32;
+    let barrier_y = 10_u32;
+    let barrier_idx = world.idx(barrier_x, barrier_y);
+    world.cells[barrier_idx].barrier = true;
+
+    let (direction, distance) = world.nearest_barrier_sensor(source_x, source_y);
+    assert!(
+        direction.abs() < 0.01,
+        "expected east-facing direction, got {direction}"
+    );
+    assert!(distance > 0.0);
+    assert!(distance < 1.0);
+}
+
+#[test]
+fn nearest_barrier_sensor_defaults_when_no_barrier_is_visible() {
+    let cfg = WorldConfig {
+        width: 12,
+        height: 12,
+        initial_creatures: 0,
+        ..WorldConfig::default()
+    };
+    let world = World::new(cfg, 302);
+
+    let (direction, distance) = world.nearest_barrier_sensor(6, 6);
+    assert_eq!(direction, 0.0);
+    assert_eq!(distance, 1.0);
+}
+
+#[test]
+fn nearest_barrier_sensor_respects_configured_radius_cutoff() {
+    let cfg = WorldConfig {
+        width: 20,
+        height: 20,
+        initial_creatures: 0,
+        sensor_radius: 2,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new(cfg, 303);
+    let source = (10_u32, 10_u32);
+    let far_barrier = (13_u32, 10_u32);
+    let far_barrier_idx = world.idx(far_barrier.0, far_barrier.1);
+    world.cells[far_barrier_idx].barrier = true;
+
+    let (direction, distance) = world.nearest_barrier_sensor(source.0, source.1);
+    assert_eq!(direction, 0.0);
+    assert_eq!(distance, 1.0);
+}
+
+#[test]
 fn perception_reports_nearest_creature_direction_distance_and_density() {
     let cfg = WorldConfig {
         width: 10,
@@ -1574,6 +1635,8 @@ fn creature_detail_exposes_last_inputs_outputs_and_events() {
         .expect("detail should exist for live creature");
     assert_eq!(detail.id, id.data().as_ffi());
     assert!(detail.last_outputs.move_x > 0.9);
+    assert!((-1.0..=1.0).contains(&detail.last_inputs.barrier_direction));
+    assert!((0.0..=1.0).contains(&detail.last_inputs.barrier_distance));
     assert!(detail
         .events
         .iter()

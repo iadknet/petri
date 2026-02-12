@@ -68,6 +68,8 @@ impl ComputationGraph {
                         | NodeKind::InputCreatureDirection
                         | NodeKind::InputCreatureDistance
                         | NodeKind::InputLocalDensity
+                        | NodeKind::InputBarrierDirection
+                        | NodeKind::InputBarrierDistance
                         | NodeKind::InputMoveBlockedLastTick
                         | NodeKind::InputMemoryRead
                         | NodeKind::OutputMoveX

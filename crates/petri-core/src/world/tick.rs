@@ -76,6 +76,8 @@ impl World {
                     creature_direction: perception.creature_direction,
                     creature_distance: perception.creature_distance,
                     local_density: perception.local_density,
+                    barrier_direction: perception.barrier_direction,
+                    barrier_distance: perception.barrier_distance,
                     move_blocked_last_tick: if move_blocked_last_tick { 1.0 } else { 0.0 },
                     memory_read,
                 };

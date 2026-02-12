@@ -17,6 +17,8 @@ pub(super) fn is_input_node(node: &NodeKind) -> bool {
             | NodeKind::InputCreatureDirection
             | NodeKind::InputCreatureDistance
             | NodeKind::InputLocalDensity
+            | NodeKind::InputBarrierDirection
+            | NodeKind::InputBarrierDistance
             | NodeKind::InputMoveBlockedLastTick
             | NodeKind::InputMemoryRead
     )

@@ -114,6 +114,8 @@ struct PerceptionScan {
     creature_direction: f32,
     creature_distance: f32,
     local_density: f32,
+    barrier_direction: f32,
+    barrier_distance: f32,
 }
 
 fn founder_memory_register() -> Vec<bool> {

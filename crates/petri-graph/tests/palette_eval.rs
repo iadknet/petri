@@ -12,6 +12,8 @@ fn neural_palette_outputs_are_bounded() {
         creature_direction: 0.0,
         creature_distance: 1.0,
         local_density: 0.0,
+        barrier_direction: 0.0,
+        barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: 0.0,
     });
@@ -35,6 +37,8 @@ fn logic_palette_gates_eat_and_reproduce() {
         creature_direction: 0.0,
         creature_distance: 1.0,
         local_density: 0.0,
+        barrier_direction: 0.0,
+        barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: 0.0,
     });
@@ -50,6 +54,8 @@ fn logic_palette_gates_eat_and_reproduce() {
         creature_direction: 0.0,
         creature_distance: 1.0,
         local_density: 0.0,
+        barrier_direction: 0.0,
+        barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: 0.0,
     });
@@ -70,6 +76,8 @@ fn hybrid_palette_motion_changes_with_random_sensor() {
         creature_direction: 0.0,
         creature_distance: 1.0,
         local_density: 0.0,
+        barrier_direction: 0.0,
+        barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: 0.0,
     });
@@ -82,6 +90,8 @@ fn hybrid_palette_motion_changes_with_random_sensor() {
         creature_direction: 0.0,
         creature_distance: 1.0,
         local_density: 0.0,
+        barrier_direction: 0.0,
+        barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: 0.0,
     });
@@ -103,6 +113,8 @@ fn founder_graph_forages_and_delays_reproduction() {
         creature_direction: 0.0,
         creature_distance: 1.0,
         local_density: 0.0,
+        barrier_direction: 0.0,
+        barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: 0.0,
     });
@@ -118,6 +130,8 @@ fn founder_graph_forages_and_delays_reproduction() {
         creature_direction: 0.0,
         creature_distance: 1.0,
         local_density: 0.0,
+        barrier_direction: 0.0,
+        barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: 0.0,
     });
@@ -132,6 +146,8 @@ fn founder_graph_forages_and_delays_reproduction() {
         creature_direction: 0.0,
         creature_distance: 1.0,
         local_density: 0.0,
+        barrier_direction: 0.0,
+        barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: 0.0,
     });
@@ -150,6 +166,8 @@ fn founder_graph_has_low_default_motion_cost() {
         creature_direction: 0.0,
         creature_distance: 1.0,
         local_density: 0.0,
+        barrier_direction: 0.0,
+        barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: 0.0,
     });
@@ -188,6 +206,20 @@ fn founder_hybrid_references_food_distance_and_direction_sensors() {
             .any(|node| matches!(node, NodeKind::InputMoveBlockedLastTick)),
         "founder graph should include movement-feedback sensor node"
     );
+    assert!(
+        graph
+            .nodes
+            .iter()
+            .any(|node| matches!(node, NodeKind::InputBarrierDirection)),
+        "founder graph should include barrier-direction sensor node"
+    );
+    assert!(
+        graph
+            .nodes
+            .iter()
+            .any(|node| matches!(node, NodeKind::InputBarrierDistance)),
+        "founder graph should include barrier-distance sensor node"
+    );
 }
 
 #[test]
@@ -202,6 +234,8 @@ fn founder_hybrid_outputs_change_when_new_sensors_change() {
         creature_direction: 0.0,
         creature_distance: 1.0,
         local_density: 0.0,
+        barrier_direction: 0.0,
+        barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: 0.0,
     });
@@ -214,6 +248,8 @@ fn founder_hybrid_outputs_change_when_new_sensors_change() {
         creature_direction: 0.0,
         creature_distance: 0.0,
         local_density: 1.0,
+        barrier_direction: 1.0,
+        barrier_distance: 0.0,
         move_blocked_last_tick: 1.0,
         memory_read: 0.0,
     });

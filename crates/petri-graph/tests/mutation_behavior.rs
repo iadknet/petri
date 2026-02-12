@@ -19,6 +19,8 @@ fn hidden_node_count(graph: &ComputationGraph) -> usize {
                     | NodeKind::InputCreatureDirection
                     | NodeKind::InputCreatureDistance
                     | NodeKind::InputLocalDensity
+                    | NodeKind::InputBarrierDirection
+                    | NodeKind::InputBarrierDistance
                     | NodeKind::InputMoveBlockedLastTick
                     | NodeKind::InputMemoryRead
                     | NodeKind::OutputMoveX
@@ -69,6 +71,8 @@ fn mutation_changes_parameters_without_changing_topology() {
         creature_direction: 0.0,
         creature_distance: 1.0,
         local_density: 0.0,
+        barrier_direction: 0.0,
+        barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: 0.0,
     });

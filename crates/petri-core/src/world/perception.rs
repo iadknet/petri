@@ -10,6 +10,7 @@ impl World {
     ) -> PerceptionScan {
         let mut food_best: Option<(i32, i32, i32)> = None;
         let mut creature_best: Option<(i32, i32, i32)> = None;
+        let mut barrier_best: Option<(i32, i32, i32)> = None;
         let mut scanned_cells = 0_usize;
         let mut occupied_cells = 0_usize;
         let width = self.config.width as i32;
@@ -46,6 +47,14 @@ impl World {
                     }
                 }
 
+                if self.cells[idx].barrier {
+                    let dist_sq = dx * dx + dy * dy;
+                    match barrier_best {
+                        Some((best_dist_sq, _, _)) if dist_sq >= best_dist_sq => {}
+                        _ => barrier_best = Some((dist_sq, dx, dy)),
+                    }
+                }
+
                 if let Some(other_id) = self.creature_at[idx] {
                     if Some(other_id) != self_id {
                         if dx != 0 || dy != 0 {
@@ -65,6 +74,8 @@ impl World {
             sensor_from_best(food_best, self.config.sensor_radius);
         let (creature_direction, creature_distance) =
             sensor_from_best(creature_best, self.config.sensor_radius);
+        let (barrier_direction, barrier_distance) =
+            sensor_from_best(barrier_best, self.config.sensor_radius);
         let local_density = if scanned_cells == 0 {
             0.0
         } else {
@@ -77,6 +88,8 @@ impl World {
             creature_direction,
             creature_distance,
             local_density,
+            barrier_direction,
+            barrier_distance,
         }
     }
 
@@ -84,5 +97,11 @@ impl World {
     pub(super) fn nearest_food_sensor(&self, x: u32, y: u32) -> (f32, f32) {
         let scan = self.scan_perception(x, y, None);
         (scan.food_direction, scan.food_distance)
+    }
+
+    #[cfg(test)]
+    pub(super) fn nearest_barrier_sensor(&self, x: u32, y: u32) -> (f32, f32) {
+        let scan = self.scan_perception(x, y, None);
+        (scan.barrier_direction, scan.barrier_distance)
     }
 }
