@@ -12,6 +12,7 @@ import {
 export type RuntimeConfig = {
   paused: boolean;
   ticks_per_second: number;
+  sensor_radius: number;
   food_spawn_rate: number;
   food_growth_rate: number;
   food_spread_threshold: number;
