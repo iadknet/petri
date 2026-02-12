@@ -46,11 +46,15 @@ pub(super) fn phenotype_rgb(hue: f32, saturation: f32) -> [u8; 3] {
 }
 
 /// Generate a random founder hue in \[0.0, 360.0).
+/// Currently unused but kept for potential future flexibility.
+#[allow(dead_code)]
 pub(super) fn random_founder_hue<R: Rng>(rng: &mut R) -> f32 {
     rng.gen_range(0.0..360.0)
 }
 
 /// Generate a random founder saturation in \[PHENOTYPE_SATURATION_MIN, PHENOTYPE_SATURATION_MAX\].
+/// Currently unused but kept for potential future flexibility.
+#[allow(dead_code)]
 pub(super) fn random_founder_saturation<R: Rng>(rng: &mut R) -> f32 {
     rng.gen_range(PHENOTYPE_SATURATION_MIN..=PHENOTYPE_SATURATION_MAX)
 }
