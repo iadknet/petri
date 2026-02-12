@@ -40,6 +40,7 @@ export const STARTUP_LIMITS = {
   max_creatures: { min: 500, max: 500000, step: 100 },
   width: { min: 100, max: 1500, step: 20 },
   height: { min: 100, max: 1500, step: 20 },
+  sensor_radius: { min: 1, max: 64, step: 1 },
   initial_food_density: { min: 0.0, max: 1.0, step: 0.01 },
   energy_initial: { min: 0.1, max: 8.0, step: 0.01 },
   food_spawn_rate: { min: 0.0, max: 1.0, step: 0.01 },

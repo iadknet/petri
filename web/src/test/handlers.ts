@@ -19,6 +19,7 @@ const defaultStartupDraft: StartupDraft = {
   max_creatures: 5000,
   width: 400,
   height: 400,
+  sensor_radius: 12,
   initial_food_density: 0.25,
   energy_initial: 0.7,
   food_spawn_rate: 0.1,
@@ -33,6 +34,7 @@ const defaultStartupDraft: StartupDraft = {
 const defaultRuntimeConfig = {
   paused: false,
   ticks_per_second: 30,
+  sensor_radius: 12,
   food_spawn_rate: 0.1,
   food_growth_rate: 0.2,
   food_spread_threshold: 0.75,
@@ -112,6 +114,9 @@ function applyRuntimePatch(patch: ConfigPatch): void {
     ...runtimeConfig,
     ...patch
   };
+  if (typeof patch.sensor_radius === "number") {
+    runtimeConfig.sensor_radius = Math.min(64, Math.max(1, Math.round(patch.sensor_radius)));
+  }
 }
 
 function currentSnapshot() {

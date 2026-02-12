@@ -58,6 +58,26 @@ export function RuntimeTuningPanel({
             }}
           />
 
+          <label className="slider-label" htmlFor="runtime-sensor-radius-slider">
+            Runtime sensor radius: {runtimeConfig.sensor_radius}
+          </label>
+          <input
+            id="runtime-sensor-radius-slider"
+            type="range"
+            min={STARTUP_LIMITS.sensor_radius.min}
+            max={STARTUP_LIMITS.sensor_radius.max}
+            step={STARTUP_LIMITS.sensor_radius.step}
+            value={runtimeConfig.sensor_radius}
+            disabled={phase === "idle"}
+            onChange={(event) => {
+              const value = Number(event.target.value);
+              onUpdateRuntimeField(
+                { sensor_radius: value },
+                { ...runtimeConfig, sensor_radius: value }
+              );
+            }}
+          />
+
           <label className="slider-label" htmlFor="runtime-food-growth-rate-slider">
             Runtime food growth: {runtimeConfig.food_growth_rate.toFixed(2)}
           </label>

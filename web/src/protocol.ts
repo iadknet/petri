@@ -98,6 +98,7 @@ export type CreatureDetail = {
 export type ConfigPatch = {
   paused?: boolean;
   ticks_per_second?: number;
+  sensor_radius?: number;
   food_spawn_rate?: number;
   food_growth_rate?: number;
   food_spread_threshold?: number;
@@ -155,6 +156,7 @@ export type StartupDraft = {
   max_creatures: number;
   width: number;
   height: number;
+  sensor_radius: number;
   initial_food_density: number;
   energy_initial: number;
   food_spawn_rate: number;

@@ -94,10 +94,12 @@ describe("App", () => {
 
   it("renders density-threshold food controls", async () => {
     render(<App />);
-    expect(await screen.findByLabelText(/Food spread threshold/i)).toBeInTheDocument();
-    expect(await screen.findByLabelText(/Food spawn floor density/i)).toBeInTheDocument();
-    expect(await screen.findByLabelText(/Runtime food spread threshold/i)).toBeInTheDocument();
-    expect(await screen.findByLabelText(/Runtime food spawn floor/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/^Food spread threshold:/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/^Food spawn floor density:/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/^Sensor radius:/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/^Runtime food spread threshold:/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/^Runtime food spawn floor:/i)).toBeInTheDocument();
+    expect(await screen.findByLabelText(/^Runtime sensor radius:/i)).toBeInTheDocument();
   });
 
   it("renders startup world size controls", async () => {
@@ -152,6 +154,7 @@ describe("App", () => {
           max_creatures: 5000,
           width: 400,
           height: 400,
+          sensor_radius: 12,
           initial_food_density: 0.25,
           energy_initial: 0.7,
           food_spawn_rate: 0.1,
@@ -168,6 +171,7 @@ describe("App", () => {
         max_creatures: 5000,
         width: 400,
         height: 400,
+        sensor_radius: 12,
         initial_food_density: 0.25,
         energy_initial: 0.7,
         food_spawn_rate: 0.1,
@@ -181,6 +185,7 @@ describe("App", () => {
       runtimeConfig: {
         paused: false,
         ticks_per_second: 30,
+        sensor_radius: 12,
         food_spawn_rate: 0.1,
         food_growth_rate: 0.2,
         food_spread_threshold: 0.75,
@@ -344,6 +349,7 @@ describe("App", () => {
           max_creatures: 5000,
           width: 400,
           height: 400,
+          sensor_radius: 12,
           initial_food_density: 0.25,
           energy_initial: 0.7,
           food_spawn_rate: 0.1,
@@ -360,6 +366,7 @@ describe("App", () => {
         max_creatures: 5000,
         width: 400,
         height: 400,
+        sensor_radius: 12,
         initial_food_density: 0.25,
         energy_initial: 0.7,
         food_spawn_rate: 0.1,
@@ -373,6 +380,7 @@ describe("App", () => {
       runtimeConfig: {
         paused: false,
         ticks_per_second: 30,
+        sensor_radius: 12,
         food_spawn_rate: 0.1,
         food_growth_rate: 0.2,
         food_spread_threshold: 0.75,

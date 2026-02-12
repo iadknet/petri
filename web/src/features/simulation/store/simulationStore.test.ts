@@ -16,6 +16,9 @@ describe("STARTUP_LIMITS", () => {
     expect(STARTUP_LIMITS.max_creatures.max).toBe(500000);
     expect(STARTUP_LIMITS.width.max).toBe(1500);
     expect(STARTUP_LIMITS.height.max).toBe(1500);
+    expect(STARTUP_LIMITS.sensor_radius.min).toBe(1);
+    expect(STARTUP_LIMITS.sensor_radius.max).toBe(64);
+    expect(STARTUP_LIMITS.sensor_radius.step).toBe(1);
     expect(STARTUP_LIMITS.energy_initial.max).toBe(8.0);
     expect(STARTUP_LIMITS.food_max_density.max).toBe(8.0);
     expect(STARTUP_LIMITS.energy_per_tick_decay.max).toBe(0.2);

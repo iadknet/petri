@@ -52,6 +52,19 @@ export function StartupDraftPanel({ startupDraft, phase, onUpdate }: StartupDraf
             onChange={(event) => onUpdate("height", Number(event.target.value))}
           />
 
+          <label className="slider-label" htmlFor="sensor-radius-slider">
+            Sensor radius: {startupDraft.sensor_radius}
+          </label>
+          <input
+            id="sensor-radius-slider"
+            type="range"
+            min={STARTUP_LIMITS.sensor_radius.min}
+            max={STARTUP_LIMITS.sensor_radius.max}
+            step={STARTUP_LIMITS.sensor_radius.step}
+            value={startupDraft.sensor_radius}
+            onChange={(event) => onUpdate("sensor_radius", Number(event.target.value))}
+          />
+
           <label className="slider-label" htmlFor="initial-food-density-slider">
             Initial food density: {startupDraft.initial_food_density.toFixed(2)}
           </label>
