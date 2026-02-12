@@ -98,6 +98,8 @@ impl World {
             if world.cells[idx].barrier || world.creature_at[idx].is_some() {
                 continue;
             }
+            let controller = creature.controller;
+            let phenotype_color = controller.phenotype_color();
             let new_creature = Creature {
                 x,
                 y,
@@ -106,7 +108,8 @@ impl World {
                 generation: creature.generation,
                 lineage_id: creature.lineage_id,
                 parent_id: creature.parent_id,
-                controller: creature.controller,
+                controller,
+                phenotype_color,
                 memory_register: normalize_memory_register(creature.memory_register),
                 rng: SmallRng::seed_from_u64(old_id ^ snapshot.tick.rotate_left(13)),
                 events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),

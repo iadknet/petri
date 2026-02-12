@@ -20,7 +20,8 @@ function buildFrame() {
         energy: 0.8,
         age: 1,
         generation: 0,
-        node_count: 3
+        node_count: 3,
+        phenotype_color: [200, 140, 60] as [number, number, number]
       }
     ],
     population: 1,

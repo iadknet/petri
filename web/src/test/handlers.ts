@@ -161,6 +161,7 @@ function creatureDetailForId(id: number): CreatureDetail {
     age: 9,
     generation: 1,
     node_count: 8,
+    phenotype_color: [90, 180, 110],
     last_move_blocked: false,
     last_inputs: {
       food_here: 0.1,

@@ -115,6 +115,14 @@ async fn creature_detail_endpoint_returns_last_inputs_outputs_and_events() {
     assert!(detail_json["last_outputs"].is_object());
     assert!(detail_json["events"].is_array());
     assert!(detail_json["node_count"].as_u64().is_some());
+    assert!(detail_json["phenotype_color"].is_array());
+    assert_eq!(
+        detail_json["phenotype_color"]
+            .as_array()
+            .expect("phenotype_color should be rgb array")
+            .len(),
+        3
+    );
 }
 
 #[tokio::test]

@@ -21,7 +21,15 @@ function formatSlot(item: InventoryItem | null): string {
   return `food (${item.value.toFixed(3)})`;
 }
 
+function formatColorHex([r, g, b]: [number, number, number]): string {
+  return `#${[r, g, b].map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
+}
+
 export function CreatureInspectorPanel({ creature, detail }: CreatureInspectorPanelProps) {
+  const phenotypeColor: [number, number, number] =
+    detail?.phenotype_color ?? creature?.phenotype_color ?? [255, 255, 255];
+  const phenotypeHex = formatColorHex(phenotypeColor);
+
   return (
     <section className="section">
       <h2>Creature Inspector</h2>
@@ -46,6 +54,24 @@ export function CreatureInspectorPanel({ creature, detail }: CreatureInspectorPa
           <div className="metric-row">
             <span>Node count</span>
             <strong>{creature.node_count}</strong>
+          </div>
+          <div className="metric-row">
+            <span>Phenotype color</span>
+            <strong>
+              <span
+                aria-label={`Phenotype color ${phenotypeHex}`}
+                style={{
+                  display: "inline-block",
+                  width: "0.85rem",
+                  height: "0.85rem",
+                  backgroundColor: `rgb(${phenotypeColor.join(",")})`,
+                  border: "1px solid rgba(255, 255, 255, 0.4)",
+                  marginRight: "0.45rem",
+                  verticalAlign: "middle"
+                }}
+              />
+              {phenotypeHex.toUpperCase()}
+            </strong>
           </div>
           {detail ? (
             <>

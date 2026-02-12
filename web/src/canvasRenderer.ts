@@ -59,9 +59,9 @@ export class CanvasRenderer {
 
     for (const creature of frame.creatures) {
       const idx = (creature.y * frame.width + creature.x) * 4;
-      pixels[idx + 0] = 255;
-      pixels[idx + 1] = 255;
-      pixels[idx + 2] = 255;
+      pixels[idx + 0] = creature.phenotype_color[0];
+      pixels[idx + 1] = creature.phenotype_color[1];
+      pixels[idx + 2] = creature.phenotype_color[2];
       pixels[idx + 3] = 255;
     }
 

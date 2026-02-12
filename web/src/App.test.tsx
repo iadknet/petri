@@ -132,7 +132,8 @@ describe("App", () => {
             energy: 0.75,
             age: 12,
             generation: 2,
-            node_count: 11
+            node_count: 11,
+            phenotype_color: [42, 168, 225] as [number, number, number]
           }
         ],
         population: 1,
@@ -252,6 +253,7 @@ describe("App", () => {
         age: 12,
         generation: 2,
         node_count: 11,
+        phenotype_color: [42, 168, 225] as [number, number, number],
         last_move_blocked: false,
         last_inputs: {
           food_here: 0.2,

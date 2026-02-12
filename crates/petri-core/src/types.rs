@@ -35,6 +35,7 @@ pub struct CreatureSnapshot {
     pub age: u64,
     pub generation: u32,
     pub node_count: u32,
+    pub phenotype_color: [u8; 3],
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -141,6 +142,7 @@ pub struct CreatureDetail {
     pub age: u64,
     pub generation: u32,
     pub node_count: u32,
+    pub phenotype_color: [u8; 3],
     pub last_move_blocked: bool,
     pub last_inputs: SensorInputs,
     pub last_outputs: ActionOutputs,
