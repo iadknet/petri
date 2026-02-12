@@ -1,6 +1,6 @@
-use crate::types::CreatureEvent;
+use crate::types::{CreatureEvent, IllegalActionAttempt, IllegalActionKind, IllegalActionReason};
 
-use super::{Cell, Creature, CreatureEventKind, EVENT_LOG_CAPACITY};
+use super::{Cell, Creature, CreatureEventKind, EVENT_LOG_CAPACITY, ILLEGAL_LOG_CAPACITY};
 
 pub(super) fn sensor_from_best(best: Option<(i32, i32, i32)>, sensor_radius: u32) -> (f32, f32) {
     let Some((dist_sq, dx, dy)) = best else {
@@ -70,4 +70,20 @@ pub(super) fn push_event(creature: &mut Creature, kind: CreatureEventKind, tick:
         creature.events.pop_front();
     }
     creature.events.push_back(CreatureEvent { kind, tick });
+}
+
+pub(super) fn push_illegal_action(
+    creature: &mut Creature,
+    action: IllegalActionKind,
+    reason: IllegalActionReason,
+    tick: u64,
+) {
+    if creature.illegal_attempts.len() == ILLEGAL_LOG_CAPACITY {
+        creature.illegal_attempts.pop_front();
+    }
+    creature.illegal_attempts.push_back(IllegalActionAttempt {
+        action,
+        reason,
+        tick,
+    });
 }

@@ -23,6 +23,8 @@ describe("STARTUP_LIMITS", () => {
     expect(STARTUP_LIMITS.food_max_density.max).toBe(8.0);
     expect(STARTUP_LIMITS.energy_per_tick_decay.max).toBe(0.2);
     expect(STARTUP_LIMITS.energy_per_move.max).toBe(0.25);
+    expect(STARTUP_LIMITS.energy_per_inventory_attempt.max).toBe(0.2);
+    expect(STARTUP_LIMITS.illegal_action_energy_penalty.max).toBe(0.5);
     expect(STARTUP_LIMITS.energy_max.max).toBe(10.0);
     expect(STARTUP_LIMITS.min_reproduce_energy.max).toBe(8.0);
     expect(STARTUP_LIMITS.weight_mutation_magnitude.max).toBe(3.0);

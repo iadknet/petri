@@ -30,6 +30,9 @@ impl World {
                 last_move_blocked: c.last_move_blocked,
                 last_inputs: c.last_inputs,
                 last_outputs: c.last_outputs,
+                slot_capacity: c.slot_capacity as u8,
+                slots: c.slots.clone(),
+                illegal_attempts: c.illegal_attempts.iter().copied().collect(),
             })
             .collect::<Vec<_>>();
 
@@ -107,6 +110,19 @@ impl World {
                 memory_register: normalize_memory_register(creature.memory_register),
                 rng: SmallRng::seed_from_u64(old_id ^ snapshot.tick.rotate_left(13)),
                 events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
+                illegal_attempts: {
+                    let mut log = VecDeque::with_capacity(ILLEGAL_LOG_CAPACITY);
+                    for attempt in creature
+                        .illegal_attempts
+                        .into_iter()
+                        .take(ILLEGAL_LOG_CAPACITY)
+                    {
+                        log.push_back(attempt);
+                    }
+                    log
+                },
+                slot_capacity: normalize_slot_capacity(creature.slot_capacity as usize),
+                slots: normalize_slots(creature.slots, creature.slot_capacity as usize),
                 last_move_blocked: creature.last_move_blocked,
                 last_inputs: creature.last_inputs,
                 last_outputs: creature.last_outputs,

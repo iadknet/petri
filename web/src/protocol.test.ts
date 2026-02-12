@@ -58,16 +58,31 @@ describe("protocol", () => {
         barrier_direction: 0.0,
         barrier_distance: 1.0,
         move_blocked_last_tick: 0,
-        memory_read: 0
+        memory_read: 0,
+        touch_exists: [1, 1, 1, 1, 1],
+        touch_food_value: [0, 0, 0, 0, 0],
+        touch_has_barrier: [0, 0, 0, 0, 0],
+        touch_occupied: [1, 0, 0, 0, 0],
+        slot_exists: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        slot_is_empty: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        slot_is_barrier: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+        slot_food_value: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
       },
       last_outputs: {
         move_x: 0.4,
         move_y: -0.2,
         eat: 0.6,
         reproduce: 0.1,
-        memory_write: 0
+        memory_write: 0,
+        inventory_pickup: 0,
+        inventory_put: 0,
+        inventory_slot_select: -1,
+        inventory_direction_select: -1
       },
-      events: [{ kind: "Moved", tick: 12 }]
+      events: [{ kind: "Moved", tick: 12 }],
+      slot_capacity: 1,
+      slots: [null],
+      illegal_attempts: []
     };
 
     expect(detail.last_outputs.eat).toBeCloseTo(0.6);

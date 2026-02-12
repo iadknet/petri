@@ -36,11 +36,17 @@ pub(super) fn apply_runtime_patch(config: &mut WorldConfig, patch: &RuntimeConfi
     if let Some(value) = patch.energy_per_move {
         config.energy_per_move = value.max(0.0);
     }
+    if let Some(value) = patch.energy_per_inventory_attempt {
+        config.energy_per_inventory_attempt = value.clamp(0.0, 0.20);
+    }
     if let Some(value) = patch.energy_per_compute_node {
         config.energy_per_compute_node = value.max(0.0);
     }
     if let Some(value) = patch.energy_per_reproduce {
         config.energy_per_reproduce = value.max(0.0);
+    }
+    if let Some(value) = patch.illegal_action_energy_penalty {
+        config.illegal_action_energy_penalty = value.clamp(0.0, 0.50);
     }
     if let Some(value) = patch.energy_max {
         config.energy_max = value.max(0.01);

@@ -151,12 +151,13 @@ Creatures moving around a food field, consuming energy, reproducing, and dying a
 - Add `SensorBarrierDirection` and `SensorBarrierDistance`.
 - Expose barrier sensing values in creature inspector payload/views.
 - 
-**Slice 4.1: Creature container slots (this feature needs more refinement before implementatino)**
-- Add "container slots" as a feature to creatures that can be used to store barriers or food.
-- Number of container slots is evolvable
-- Add ability for creatures to pick up food or barriers and insert them into container slots
-- Add ability for creatures to deposit items from container slots
-- Full container slots multiply movement cost
+**Slice 4.1: Slot-addressed generic inventory + illegal-action penalty**
+- Generic inventory actions with explicit slot addressing (`slot 1..12`) and direction targeting (`self/N/E/S/W`).
+- Evolvable slot capacity (`default=1`, `min=1`, `max=12`, reproduction mutation step `±1`).
+- Touch sensors for `self/N/E/S/W` and per-slot sensors for `slot_1..slot_12`.
+- Value-carrying food items (pickup stores whole cell value in selected slot).
+- Global illegal-action penalty system for failed creature actions.
+- Inspector/API exposure of slot state, inventory signals, and illegal-attempt diagnostics.
   
 **Slice 5: Phenotype color pipeline**
 - Add deterministic phenotype color derived from genome structure.

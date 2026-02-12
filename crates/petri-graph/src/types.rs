@@ -1,5 +1,8 @@
 use serde::{Deserialize, Serialize};
 
+pub const TOUCH_DIRECTION_COUNT: usize = 5;
+pub const SLOT_COUNT_MAX: usize = 12;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ControllerPalette {
     NeuralOnly,
@@ -22,6 +25,14 @@ pub struct SensorInputs {
     pub barrier_distance: f32,
     pub move_blocked_last_tick: f32,
     pub memory_read: f32,
+    pub touch_exists: [f32; TOUCH_DIRECTION_COUNT],
+    pub touch_food_value: [f32; TOUCH_DIRECTION_COUNT],
+    pub touch_has_barrier: [f32; TOUCH_DIRECTION_COUNT],
+    pub touch_occupied: [f32; TOUCH_DIRECTION_COUNT],
+    pub slot_exists: [f32; SLOT_COUNT_MAX],
+    pub slot_is_empty: [f32; SLOT_COUNT_MAX],
+    pub slot_is_barrier: [f32; SLOT_COUNT_MAX],
+    pub slot_food_value: [f32; SLOT_COUNT_MAX],
 }
 
 impl Default for SensorInputs {
@@ -39,6 +50,14 @@ impl Default for SensorInputs {
             barrier_distance: 1.0,
             move_blocked_last_tick: 0.0,
             memory_read: 0.0,
+            touch_exists: [0.0; TOUCH_DIRECTION_COUNT],
+            touch_food_value: [0.0; TOUCH_DIRECTION_COUNT],
+            touch_has_barrier: [0.0; TOUCH_DIRECTION_COUNT],
+            touch_occupied: [0.0; TOUCH_DIRECTION_COUNT],
+            slot_exists: [0.0; SLOT_COUNT_MAX],
+            slot_is_empty: [0.0; SLOT_COUNT_MAX],
+            slot_is_barrier: [0.0; SLOT_COUNT_MAX],
+            slot_food_value: [0.0; SLOT_COUNT_MAX],
         }
     }
 }
@@ -50,6 +69,10 @@ pub struct ActionOutputs {
     pub eat: f32,
     pub reproduce: f32,
     pub memory_write: f32,
+    pub inventory_pickup: f32,
+    pub inventory_put: f32,
+    pub inventory_slot_select: f32,
+    pub inventory_direction_select: f32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -73,6 +96,14 @@ pub enum NodeKind {
     InputBarrierDistance,
     InputMoveBlockedLastTick,
     InputMemoryRead,
+    InputTouchExists(u8),
+    InputTouchFoodValue(u8),
+    InputTouchHasBarrier(u8),
+    InputTouchOccupied(u8),
+    InputSlotExists(u8),
+    InputSlotIsEmpty(u8),
+    InputSlotIsBarrier(u8),
+    InputSlotFoodValue(u8),
     Constant(f32),
     Add,
     Multiply,
@@ -91,4 +122,8 @@ pub enum NodeKind {
     OutputEat,
     OutputReproduce,
     OutputMemoryWrite,
+    OutputInventoryPickup,
+    OutputInventoryPut,
+    OutputInventorySlotSelect,
+    OutputInventoryDirectionSelect,
 }

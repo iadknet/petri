@@ -1,6 +1,9 @@
 use std::collections::{HashMap, VecDeque};
 
-use petri_graph::{ActionOutputs, ComputationGraph, ControllerPalette, SensorInputs};
+use petri_graph::{
+    ActionOutputs, ComputationGraph, ControllerPalette, SensorInputs, SLOT_COUNT_MAX,
+    TOUCH_DIRECTION_COUNT,
+};
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
@@ -9,7 +12,8 @@ use slotmap::{Key, SlotMap};
 use crate::config::WorldConfig;
 use crate::types::{
     CreatureDetail, CreatureEvent, CreatureEventKind, CreatureId, CreatureSnapshot,
-    CreatureStateSnapshot, WorldDiagnostics, WorldFrame, WorldSnapshot,
+    CreatureStateSnapshot, IllegalActionAttempt, IllegalActionKind, IllegalActionReason,
+    InventoryItem, WorldDiagnostics, WorldFrame, WorldSnapshot,
 };
 
 mod food;
@@ -24,13 +28,18 @@ mod tick;
 mod tests;
 
 const EVENT_LOG_CAPACITY: usize = 8;
+const ILLEGAL_LOG_CAPACITY: usize = 8;
 const INITIAL_WEIGHT_MUTATION_SCALE: f32 = 0.7;
 const INITIAL_STRUCTURAL_MUTATION_SCALE: f32 = 0.35;
 const FOUNDER_MEMORY_REGISTER_BITS: usize = 32;
 const MEMORY_REGISTER_MIN_BITS: usize = 1;
 const MAX_MEMORY_REGISTER_BITS: usize = 1024;
 const MEMORY_REGISTER_MUTATION_STEP_MAX_BITS: usize = 32;
+const FOUNDER_SLOT_CAPACITY: usize = 1;
+const SLOT_CAPACITY_MIN: usize = 1;
+const SLOT_CAPACITY_MUTATION_STEP_MAX: usize = 1;
 const MAX_BRUSH_HALF_EXTENT: u8 = 2;
+const MOVE_LOAD_PENALTY_PER_FILLED_SLOT: f32 = 0.35;
 type OffspringRequest = (
     u32,
     u32,
@@ -40,8 +49,18 @@ type OffspringRequest = (
     ComputationGraph,
     u64,
     u64,
+    usize,
     Vec<bool>,
 );
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum TouchDirection {
+    SelfCell = 0,
+    North = 1,
+    East = 2,
+    South = 3,
+    West = 4,
+}
 
 #[derive(Clone, Copy, Debug)]
 pub struct CreatureView {
@@ -102,6 +121,9 @@ struct Creature {
     memory_register: Vec<bool>,
     rng: SmallRng,
     events: VecDeque<CreatureEvent>,
+    illegal_attempts: VecDeque<IllegalActionAttempt>,
+    slot_capacity: usize,
+    slots: Vec<Option<InventoryItem>>,
     last_move_blocked: bool,
     last_inputs: SensorInputs,
     last_outputs: ActionOutputs,
@@ -122,6 +144,32 @@ fn founder_memory_register() -> Vec<bool> {
     let founder_bits =
         FOUNDER_MEMORY_REGISTER_BITS.clamp(MEMORY_REGISTER_MIN_BITS, MAX_MEMORY_REGISTER_BITS);
     vec![false; founder_bits]
+}
+
+fn founder_slot_capacity() -> usize {
+    normalize_slot_capacity(FOUNDER_SLOT_CAPACITY)
+}
+
+fn normalize_slot_capacity(slot_capacity: usize) -> usize {
+    slot_capacity.clamp(SLOT_CAPACITY_MIN, SLOT_COUNT_MAX)
+}
+
+fn empty_slots(slot_capacity: usize) -> Vec<Option<InventoryItem>> {
+    vec![None; normalize_slot_capacity(slot_capacity)]
+}
+
+fn normalize_slots(
+    mut slots: Vec<Option<InventoryItem>>,
+    slot_capacity: usize,
+) -> Vec<Option<InventoryItem>> {
+    let bounded_capacity = normalize_slot_capacity(slot_capacity);
+    if slots.len() > bounded_capacity {
+        slots.truncate(bounded_capacity);
+    }
+    if slots.len() < bounded_capacity {
+        slots.resize(bounded_capacity, None);
+    }
+    slots
 }
 
 fn normalize_memory_register(mut memory_register: Vec<bool>) -> Vec<bool> {
@@ -168,6 +216,35 @@ fn maybe_mutate_memory_register_size(
             (current_len - MEMORY_REGISTER_MIN_BITS).min(MEMORY_REGISTER_MUTATION_STEP_MAX_BITS);
         let delta = rng.gen_range(1..=max_delta);
         memory_register.truncate(current_len - delta);
+    }
+}
+
+fn maybe_mutate_slot_capacity(
+    slot_capacity: usize,
+    mutation_rate: f32,
+    rng: &mut SmallRng,
+) -> usize {
+    let slot_capacity = normalize_slot_capacity(slot_capacity);
+    if rng.gen::<f32>() > mutation_rate.clamp(0.0, 1.0) {
+        return slot_capacity;
+    }
+    let can_grow = slot_capacity < SLOT_COUNT_MAX;
+    let can_shrink = slot_capacity > SLOT_CAPACITY_MIN;
+    let grow = match (can_grow, can_shrink) {
+        (true, true) => rng.gen::<bool>(),
+        (true, false) => true,
+        (false, true) => false,
+        (false, false) => return slot_capacity,
+    };
+
+    if grow {
+        let max_delta = (SLOT_COUNT_MAX - slot_capacity).min(SLOT_CAPACITY_MUTATION_STEP_MAX);
+        let delta = rng.gen_range(1..=max_delta);
+        slot_capacity + delta
+    } else {
+        let max_delta = (slot_capacity - SLOT_CAPACITY_MIN).min(SLOT_CAPACITY_MUTATION_STEP_MAX);
+        let delta = rng.gen_range(1..=max_delta);
+        slot_capacity - delta
     }
 }
 
@@ -309,8 +386,77 @@ impl World {
                 last_inputs: c.last_inputs,
                 last_outputs: c.last_outputs,
                 events: c.events.iter().copied().collect(),
+                slot_capacity: c.slot_capacity as u8,
+                slots: c.slots.clone(),
+                illegal_attempts: c.illegal_attempts.iter().copied().collect(),
             })
         })
+    }
+
+    pub(super) fn selector_to_bin(value: f32, bins: usize) -> usize {
+        if bins <= 1 {
+            return 0;
+        }
+        let clamped = value.clamp(-1.0, 1.0);
+        let normalized = (clamped + 1.0) * 0.5;
+        let scaled = (normalized * bins as f32).floor() as usize;
+        scaled.min(bins - 1)
+    }
+
+    pub(super) fn direction_from_selector(value: f32) -> TouchDirection {
+        match Self::selector_to_bin(value, TOUCH_DIRECTION_COUNT) {
+            0 => TouchDirection::SelfCell,
+            1 => TouchDirection::North,
+            2 => TouchDirection::East,
+            3 => TouchDirection::South,
+            _ => TouchDirection::West,
+        }
+    }
+
+    pub(super) fn slot_index_from_selector(value: f32) -> usize {
+        Self::selector_to_bin(value, SLOT_COUNT_MAX)
+    }
+
+    pub(super) fn touch_target(
+        &self,
+        x: u32,
+        y: u32,
+        direction: TouchDirection,
+    ) -> Option<(u32, u32)> {
+        match direction {
+            TouchDirection::SelfCell => Some((x, y)),
+            TouchDirection::North => self.offset_target(x, y, 0, -1),
+            TouchDirection::East => self.offset_target(x, y, 1, 0),
+            TouchDirection::South => self.offset_target(x, y, 0, 1),
+            TouchDirection::West => self.offset_target(x, y, -1, 0),
+        }
+    }
+
+    fn offset_target(&self, x: u32, y: u32, dx: i32, dy: i32) -> Option<(u32, u32)> {
+        let raw_x = x as i32 + dx;
+        let raw_y = y as i32 + dy;
+        if self.config.world_wrap {
+            Some((
+                helpers::wrap_axis(raw_x, self.config.width),
+                helpers::wrap_axis(raw_y, self.config.height),
+            ))
+        } else if raw_x < 0
+            || raw_y < 0
+            || raw_x >= self.config.width as i32
+            || raw_y >= self.config.height as i32
+        {
+            None
+        } else {
+            Some((raw_x as u32, raw_y as u32))
+        }
+    }
+
+    pub(super) fn touch_direction_index(direction: TouchDirection) -> usize {
+        direction as usize
+    }
+
+    fn filled_slot_count(creature: &Creature) -> usize {
+        creature.slots.iter().filter(|slot| slot.is_some()).count()
     }
 
     fn idx(&self, x: u32, y: u32) -> usize {

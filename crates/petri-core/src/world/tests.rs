@@ -266,6 +266,9 @@ fn insert_idle_creature(world: &mut World, x: u32, y: u32, seed: u64) -> Creatur
         memory_register: founder_memory_register(),
         rng: SmallRng::seed_from_u64(seed),
         events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
+        illegal_attempts: VecDeque::with_capacity(ILLEGAL_LOG_CAPACITY),
+        slot_capacity: founder_slot_capacity(),
+        slots: empty_slots(founder_slot_capacity()),
         last_move_blocked: false,
         last_inputs: SensorInputs::default(),
         last_outputs: ActionOutputs::default(),
@@ -320,6 +323,623 @@ fn invert_memory_controller() -> ComputationGraph {
             },
         ],
     }
+}
+
+fn reproduce_only_controller() -> ComputationGraph {
+    ComputationGraph {
+        palette: ControllerPalette::Hybrid,
+        nodes: vec![
+            NodeKind::Constant(1.0),   // 0
+            NodeKind::OutputReproduce, // 1
+        ],
+        edges: vec![Edge {
+            from: 0,
+            to: 1,
+            weight: 1.0,
+        }],
+    }
+}
+
+fn eat_only_controller() -> ComputationGraph {
+    ComputationGraph {
+        palette: ControllerPalette::Hybrid,
+        nodes: vec![
+            NodeKind::Constant(1.0), // 0
+            NodeKind::OutputEat,     // 1
+        ],
+        edges: vec![Edge {
+            from: 0,
+            to: 1,
+            weight: 1.0,
+        }],
+    }
+}
+
+fn inventory_controller(
+    pickup: f32,
+    put: f32,
+    slot_selector: f32,
+    direction_selector: f32,
+) -> ComputationGraph {
+    ComputationGraph {
+        palette: ControllerPalette::Hybrid,
+        nodes: vec![
+            NodeKind::Constant(pickup),               // 0
+            NodeKind::OutputInventoryPickup,          // 1
+            NodeKind::Constant(put),                  // 2
+            NodeKind::OutputInventoryPut,             // 3
+            NodeKind::Constant(slot_selector),        // 4
+            NodeKind::OutputInventorySlotSelect,      // 5
+            NodeKind::Constant(direction_selector),   // 6
+            NodeKind::OutputInventoryDirectionSelect, // 7
+        ],
+        edges: vec![
+            Edge {
+                from: 0,
+                to: 1,
+                weight: 1.0,
+            },
+            Edge {
+                from: 2,
+                to: 3,
+                weight: 1.0,
+            },
+            Edge {
+                from: 4,
+                to: 5,
+                weight: 1.0,
+            },
+            Edge {
+                from: 6,
+                to: 7,
+                weight: 1.0,
+            },
+        ],
+    }
+}
+
+fn slot_selector(slot_id: usize) -> f32 {
+    assert!((1..=SLOT_COUNT_MAX).contains(&slot_id));
+    let width = 2.0 / SLOT_COUNT_MAX as f32;
+    -1.0 + ((slot_id - 1) as f32 + 0.5) * width
+}
+
+fn direction_selector(direction: TouchDirection) -> f32 {
+    match direction {
+        TouchDirection::SelfCell => -0.8,
+        TouchDirection::North => -0.4,
+        TouchDirection::East => 0.0,
+        TouchDirection::South => 0.4,
+        TouchDirection::West => 0.8,
+    }
+}
+
+#[test]
+fn selector_binning_is_deterministic_at_boundaries() {
+    assert_eq!(World::selector_to_bin(-1.5, SLOT_COUNT_MAX), 0);
+    assert_eq!(World::selector_to_bin(-1.0, SLOT_COUNT_MAX), 0);
+    assert_eq!(
+        World::selector_to_bin(1.0, SLOT_COUNT_MAX),
+        SLOT_COUNT_MAX - 1
+    );
+    assert_eq!(
+        World::selector_to_bin(1.5, SLOT_COUNT_MAX),
+        SLOT_COUNT_MAX - 1
+    );
+
+    assert_eq!(
+        World::direction_from_selector(-0.6001),
+        TouchDirection::SelfCell
+    );
+    assert_eq!(
+        World::direction_from_selector(-0.5999),
+        TouchDirection::North
+    );
+    assert_eq!(
+        World::direction_from_selector(-0.1999),
+        TouchDirection::East
+    );
+    assert_eq!(
+        World::direction_from_selector(0.2001),
+        TouchDirection::South
+    );
+    assert_eq!(World::direction_from_selector(0.6), TouchDirection::West);
+}
+
+#[test]
+fn inventory_actions_use_explicit_slot_addressing_for_pickup_and_put() {
+    let cfg = WorldConfig {
+        width: 5,
+        height: 5,
+        initial_creatures: 1,
+        food_spawn_rate: 0.0,
+        food_growth_rate: 0.0,
+        energy_per_tick_decay: 0.0,
+        energy_per_compute_node: 0.0,
+        min_reproduce_energy: 10.0,
+        world_wrap: false,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 1313, ControllerPalette::Hybrid);
+    let (id, old_x, old_y) = world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, c)| (id, c.x, c.y))
+        .expect("expected one creature");
+    let old_idx = world.idx(old_x, old_y);
+    let center_idx = world.idx(2, 2);
+    let north_idx = world.idx(2, 1);
+    let south_idx = world.idx(2, 3);
+
+    world.cells[north_idx].food = 0.4;
+
+    if let Some(creature) = world.creatures.get_mut(id) {
+        creature.x = 2;
+        creature.y = 2;
+        creature.slot_capacity = 2;
+        creature.slots = vec![None, None];
+        creature.controller = inventory_controller(
+            1.0,
+            0.0,
+            slot_selector(2),
+            direction_selector(TouchDirection::North),
+        );
+    }
+    world.creature_at[old_idx] = None;
+    world.creature_at[center_idx] = Some(id);
+
+    world.tick();
+
+    let creature = world
+        .creatures
+        .get(id)
+        .expect("creature should remain alive");
+    assert!(creature.slots[0].is_none());
+    match &creature.slots[1] {
+        Some(InventoryItem::Food(food_value)) => assert!((*food_value - 0.4).abs() < 1e-6),
+        other => panic!("expected slot 2 food pickup, got {other:?}"),
+    }
+    assert!(world.cells[north_idx].food.abs() < 1e-6);
+
+    if let Some(creature) = world.creatures.get_mut(id) {
+        creature.controller = inventory_controller(
+            0.0,
+            1.0,
+            slot_selector(2),
+            direction_selector(TouchDirection::South),
+        );
+    }
+
+    world.tick();
+
+    let creature = world
+        .creatures
+        .get(id)
+        .expect("creature should remain alive");
+    assert!(creature.slots[1].is_none());
+    assert!((world.cells[south_idx].food - 0.4).abs() < 1e-6);
+}
+
+#[test]
+fn illegal_inventory_attempts_stack_penalties_and_record_reasons() {
+    let cfg = WorldConfig {
+        width: 5,
+        height: 5,
+        initial_creatures: 1,
+        food_spawn_rate: 0.0,
+        food_growth_rate: 0.0,
+        energy_per_tick_decay: 0.0,
+        energy_per_compute_node: 0.0,
+        energy_per_move: 0.0,
+        energy_per_reproduce: 0.0,
+        energy_per_inventory_attempt: 0.05,
+        illegal_action_energy_penalty: 0.1,
+        min_reproduce_energy: 10.0,
+        world_wrap: false,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 1414, ControllerPalette::Hybrid);
+    let (id, old_x, old_y) = world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, c)| (id, c.x, c.y))
+        .expect("expected one creature");
+    let old_idx = world.idx(old_x, old_y);
+    let center_idx = world.idx(2, 2);
+
+    if let Some(creature) = world.creatures.get_mut(id) {
+        creature.x = 2;
+        creature.y = 2;
+        creature.energy = 1.0;
+        creature.slot_capacity = 1;
+        creature.slots = vec![Some(InventoryItem::Barrier)];
+        creature.controller = inventory_controller(
+            1.0,
+            0.0,
+            slot_selector(1),
+            direction_selector(TouchDirection::North),
+        );
+    }
+    world.creature_at[old_idx] = None;
+    world.creature_at[center_idx] = Some(id);
+
+    world.tick();
+
+    if let Some(creature) = world.creatures.get_mut(id) {
+        creature.slots[0] = None;
+        creature.controller = inventory_controller(
+            0.0,
+            1.0,
+            slot_selector(1),
+            direction_selector(TouchDirection::South),
+        );
+    }
+
+    world.tick();
+
+    let creature = world
+        .creatures
+        .get(id)
+        .expect("creature should remain alive");
+    assert!((creature.energy - 0.7).abs() < 1e-6);
+    assert_eq!(world.diagnostics().illegal_actions, 2);
+    let attempts = creature
+        .illegal_attempts
+        .iter()
+        .copied()
+        .collect::<Vec<_>>();
+    assert_eq!(attempts.len(), 2);
+    assert_eq!(attempts[0].action, IllegalActionKind::InventoryPickup);
+    assert_eq!(attempts[0].reason, IllegalActionReason::SlotFull);
+    assert_eq!(attempts[1].action, IllegalActionKind::InventoryPut);
+    assert_eq!(attempts[1].reason, IllegalActionReason::SlotEmpty);
+}
+
+#[test]
+fn illegal_move_cost_includes_load_scaling_and_penalty() {
+    let cfg = WorldConfig {
+        width: 6,
+        height: 6,
+        initial_creatures: 1,
+        food_spawn_rate: 0.0,
+        food_growth_rate: 0.0,
+        energy_per_tick_decay: 0.0,
+        energy_per_compute_node: 0.0,
+        energy_per_move: 0.1,
+        illegal_action_energy_penalty: 0.05,
+        min_reproduce_energy: 10.0,
+        world_wrap: false,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 1515, ControllerPalette::Hybrid);
+    let (id, old_x, old_y) = world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, c)| (id, c.x, c.y))
+        .expect("expected one creature");
+    let old_idx = world.idx(old_x, old_y);
+    let edge_x = world.config.width - 1;
+    let edge_idx = world.idx(edge_x, old_y);
+
+    if let Some(creature) = world.creatures.get_mut(id) {
+        creature.controller = move_right_controller();
+        creature.x = edge_x;
+        creature.energy = 1.0;
+        creature.slot_capacity = 2;
+        creature.slots = vec![
+            Some(InventoryItem::Barrier),
+            Some(InventoryItem::Food(0.25)),
+        ];
+    }
+    world.creature_at[old_idx] = None;
+    world.creature_at[edge_idx] = Some(id);
+
+    world.tick();
+
+    let creature = world
+        .creatures
+        .get(id)
+        .expect("creature should remain alive");
+    assert!((creature.energy - 0.78).abs() < 1e-6);
+    assert_eq!(world.diagnostics().illegal_actions, 1);
+    let last = creature
+        .illegal_attempts
+        .back()
+        .copied()
+        .expect("illegal attempt should be logged");
+    assert_eq!(last.action, IllegalActionKind::Move);
+    assert_eq!(last.reason, IllegalActionReason::MoveOutOfBounds);
+}
+
+#[test]
+fn reproduce_failure_charges_attempt_cost_plus_illegal_penalty() {
+    let cfg = WorldConfig {
+        width: 6,
+        height: 6,
+        initial_creatures: 1,
+        max_creatures: 1,
+        food_spawn_rate: 0.0,
+        food_growth_rate: 0.0,
+        energy_per_tick_decay: 0.0,
+        energy_per_compute_node: 0.0,
+        energy_per_reproduce: 0.2,
+        illegal_action_energy_penalty: 0.1,
+        min_reproduce_energy: 0.0,
+        world_wrap: false,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 1616, ControllerPalette::Hybrid);
+    let (id, _) = world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, c)| (id, c.x))
+        .expect("expected one creature");
+    if let Some(creature) = world.creatures.get_mut(id) {
+        creature.controller = reproduce_only_controller();
+        creature.energy = 1.0;
+    }
+
+    world.tick();
+
+    let creature = world
+        .creatures
+        .get(id)
+        .expect("creature should remain alive");
+    assert!((creature.energy - 0.7).abs() < 1e-6);
+    assert_eq!(world.diagnostics().illegal_actions, 1);
+    let last = creature
+        .illegal_attempts
+        .back()
+        .copied()
+        .expect("illegal attempt should be logged");
+    assert_eq!(last.action, IllegalActionKind::Reproduce);
+    assert_eq!(last.reason, IllegalActionReason::ReproduceMaxCreatures);
+}
+
+#[test]
+fn eat_failure_charges_only_illegal_penalty() {
+    let cfg = WorldConfig {
+        width: 6,
+        height: 6,
+        initial_creatures: 1,
+        food_spawn_rate: 0.0,
+        food_growth_rate: 0.0,
+        energy_per_tick_decay: 0.0,
+        energy_per_compute_node: 0.0,
+        illegal_action_energy_penalty: 0.07,
+        min_reproduce_energy: 10.0,
+        world_wrap: false,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 1717, ControllerPalette::Hybrid);
+    let (id, _) = world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, c)| (id, c.x))
+        .expect("expected one creature");
+    if let Some(creature) = world.creatures.get_mut(id) {
+        creature.controller = eat_only_controller();
+        creature.energy = 1.0;
+    }
+
+    world.tick();
+
+    let creature = world
+        .creatures
+        .get(id)
+        .expect("creature should remain alive");
+    assert!((creature.energy - 0.93).abs() < 1e-6);
+    assert_eq!(world.diagnostics().illegal_actions, 1);
+    let last = creature
+        .illegal_attempts
+        .back()
+        .copied()
+        .expect("illegal attempt should be logged");
+    assert_eq!(last.action, IllegalActionKind::Eat);
+    assert_eq!(last.reason, IllegalActionReason::EatNoFood);
+}
+
+#[test]
+fn offspring_slot_capacity_mutates_within_bounds_and_slots_start_empty() {
+    let cfg = WorldConfig {
+        width: 8,
+        height: 8,
+        initial_creatures: 1,
+        max_creatures: 2,
+        food_spawn_rate: 0.0,
+        food_growth_rate: 0.0,
+        energy_per_tick_decay: 0.0,
+        energy_per_compute_node: 0.0,
+        energy_per_reproduce: 0.0,
+        min_reproduce_energy: 0.2,
+        offspring_energy_fraction: 0.5,
+        structural_mutation_rate: 1.0,
+        world_wrap: false,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 1818, ControllerPalette::Hybrid);
+    let (id, _) = world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, c)| (id, c.x))
+        .expect("expected one creature");
+    let parent_id = id.data().as_ffi();
+    if let Some(creature) = world.creatures.get_mut(id) {
+        creature.controller = reproduce_only_controller();
+        creature.energy = 1.0;
+        creature.slot_capacity = 1;
+        creature.slots = vec![Some(InventoryItem::Food(0.5))];
+    }
+
+    world.tick();
+
+    let child = world
+        .creatures
+        .values()
+        .find(|creature| creature.parent_id == Some(parent_id))
+        .expect("expected offspring");
+    assert_eq!(child.slot_capacity, 2);
+    assert_eq!(child.slots.len(), 2);
+    assert!(child.slots.iter().all(|slot| slot.is_none()));
+}
+
+#[test]
+fn offspring_slot_capacity_shrinks_from_max_boundary() {
+    let cfg = WorldConfig {
+        width: 8,
+        height: 8,
+        initial_creatures: 1,
+        max_creatures: 2,
+        food_spawn_rate: 0.0,
+        food_growth_rate: 0.0,
+        energy_per_tick_decay: 0.0,
+        energy_per_compute_node: 0.0,
+        energy_per_reproduce: 0.0,
+        min_reproduce_energy: 0.2,
+        offspring_energy_fraction: 0.5,
+        structural_mutation_rate: 1.0,
+        world_wrap: false,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 1919, ControllerPalette::Hybrid);
+    let (id, _) = world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, c)| (id, c.x))
+        .expect("expected one creature");
+    let parent_id = id.data().as_ffi();
+    if let Some(creature) = world.creatures.get_mut(id) {
+        creature.controller = reproduce_only_controller();
+        creature.energy = 1.0;
+        creature.slot_capacity = SLOT_COUNT_MAX;
+        creature.slots = vec![None; SLOT_COUNT_MAX];
+    }
+
+    world.tick();
+
+    let child = world
+        .creatures
+        .values()
+        .find(|creature| creature.parent_id == Some(parent_id))
+        .expect("expected offspring");
+    assert_eq!(child.slot_capacity, SLOT_COUNT_MAX - 1);
+    assert_eq!(child.slots.len(), SLOT_COUNT_MAX - 1);
+}
+
+#[test]
+fn death_drop_falls_back_in_self_n_e_s_w_order() {
+    let cfg = WorldConfig {
+        width: 6,
+        height: 6,
+        initial_creatures: 1,
+        food_spawn_rate: 0.0,
+        food_growth_rate: 0.0,
+        energy_per_tick_decay: 0.2,
+        energy_per_compute_node: 0.0,
+        min_reproduce_energy: 10.0,
+        world_wrap: false,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 2020, ControllerPalette::Hybrid);
+    let (dying_id, old_x, old_y) = world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, c)| (id, c.x, c.y))
+        .expect("expected one creature");
+    let old_idx = world.idx(old_x, old_y);
+    let center_idx = world.idx(2, 2);
+    let north_idx = world.idx(2, 1);
+    let east_idx = world.idx(3, 2);
+
+    if let Some(creature) = world.creatures.get_mut(dying_id) {
+        creature.controller = idle_controller();
+        creature.x = 2;
+        creature.y = 2;
+        creature.energy = 0.1;
+        creature.slot_capacity = 1;
+        creature.slots = vec![Some(InventoryItem::Barrier)];
+    }
+    world.creature_at[old_idx] = None;
+    world.creature_at[center_idx] = Some(dying_id);
+    world.cells[center_idx].barrier = true;
+
+    let blocker_id = insert_idle_creature(&mut world, 2, 1, 4242);
+    assert_eq!(world.creature_at[north_idx], Some(blocker_id));
+
+    world.tick();
+
+    assert!(!world.creatures.contains_key(dying_id));
+    assert!(world.cells[east_idx].barrier);
+}
+
+#[test]
+fn snapshot_round_trip_preserves_slots_illegal_attempts_and_illegal_metrics() {
+    let cfg = WorldConfig {
+        width: 6,
+        height: 6,
+        initial_creatures: 1,
+        food_spawn_rate: 0.0,
+        food_growth_rate: 0.0,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 2121, ControllerPalette::Hybrid);
+    let (id, _) = world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, c)| (id, c.x))
+        .expect("expected one creature");
+    if let Some(creature) = world.creatures.get_mut(id) {
+        creature.slot_capacity = 3;
+        creature.slots = vec![
+            Some(InventoryItem::Food(0.45)),
+            Some(InventoryItem::Barrier),
+            None,
+        ];
+        creature.illegal_attempts.push_back(IllegalActionAttempt {
+            action: IllegalActionKind::Move,
+            reason: IllegalActionReason::MoveBlocked,
+            tick: 3,
+        });
+        creature.illegal_attempts.push_back(IllegalActionAttempt {
+            action: IllegalActionKind::InventoryPut,
+            reason: IllegalActionReason::TargetHasBarrier,
+            tick: 4,
+        });
+    }
+    world.diagnostics.illegal_actions = 2;
+
+    let restored = World::from_snapshot(world.snapshot());
+    let restored_creature = restored
+        .creatures
+        .values()
+        .next()
+        .expect("expected restored creature");
+    assert_eq!(restored.diagnostics().illegal_actions, 2);
+    assert_eq!(restored_creature.slot_capacity, 3);
+    assert_eq!(restored_creature.slots.len(), 3);
+    match &restored_creature.slots[0] {
+        Some(InventoryItem::Food(value)) => assert!((*value - 0.45).abs() < 1e-6),
+        other => panic!("expected restored food item in slot 1, got {other:?}"),
+    }
+    assert_eq!(restored_creature.slots[1], Some(InventoryItem::Barrier));
+    assert!(restored_creature.slots[2].is_none());
+    let attempts = restored_creature
+        .illegal_attempts
+        .iter()
+        .copied()
+        .collect::<Vec<_>>();
+    assert_eq!(attempts.len(), 2);
+    assert_eq!(attempts[0].action, IllegalActionKind::Move);
+    assert_eq!(attempts[1].reason, IllegalActionReason::TargetHasBarrier);
 }
 
 #[test]
@@ -846,6 +1466,9 @@ fn perception_reports_nearest_creature_direction_distance_and_density() {
         memory_register: founder_memory_register(),
         rng: SmallRng::seed_from_u64(1),
         events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
+        illegal_attempts: VecDeque::with_capacity(ILLEGAL_LOG_CAPACITY),
+        slot_capacity: founder_slot_capacity(),
+        slots: empty_slots(founder_slot_capacity()),
         last_move_blocked: false,
         last_inputs: SensorInputs::default(),
         last_outputs: petri_graph::ActionOutputs::default(),
@@ -862,6 +1485,9 @@ fn perception_reports_nearest_creature_direction_distance_and_density() {
         memory_register: founder_memory_register(),
         rng: SmallRng::seed_from_u64(2),
         events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
+        illegal_attempts: VecDeque::with_capacity(ILLEGAL_LOG_CAPACITY),
+        slot_capacity: founder_slot_capacity(),
+        slots: empty_slots(founder_slot_capacity()),
         last_move_blocked: false,
         last_inputs: SensorInputs::default(),
         last_outputs: petri_graph::ActionOutputs::default(),
@@ -1049,6 +1675,9 @@ fn spawn_random_creature_finds_free_cell_beyond_random_attempt_window() {
                 memory_register: founder_memory_register(),
                 rng: SmallRng::seed_from_u64(creature_seed),
                 events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
+                illegal_attempts: VecDeque::with_capacity(ILLEGAL_LOG_CAPACITY),
+                slot_capacity: founder_slot_capacity(),
+                slots: empty_slots(founder_slot_capacity()),
                 last_move_blocked: false,
                 last_inputs: SensorInputs::default(),
                 last_outputs: ActionOutputs::default(),

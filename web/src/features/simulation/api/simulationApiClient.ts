@@ -21,8 +21,10 @@ export type RuntimeConfig = {
   food_energy_value: number;
   energy_per_tick_decay: number;
   energy_per_move: number;
+  energy_per_inventory_attempt: number;
   energy_per_compute_node: number;
   energy_per_reproduce: number;
+  illegal_action_energy_penalty: number;
   energy_max: number;
   min_reproduce_energy: number;
   offspring_energy_fraction: number;

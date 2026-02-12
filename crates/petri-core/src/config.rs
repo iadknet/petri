@@ -4,6 +4,14 @@ const fn default_sensor_radius() -> u32 {
     12
 }
 
+const fn default_illegal_action_energy_penalty() -> f32 {
+    0.01
+}
+
+const fn default_energy_per_inventory_attempt() -> f32 {
+    0.005
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WorldConfig {
     pub width: u32,
@@ -21,8 +29,12 @@ pub struct WorldConfig {
     pub food_energy_value: f32,
     pub energy_per_tick_decay: f32,
     pub energy_per_move: f32,
+    #[serde(default = "default_energy_per_inventory_attempt")]
+    pub energy_per_inventory_attempt: f32,
     pub energy_per_compute_node: f32,
     pub energy_per_reproduce: f32,
+    #[serde(default = "default_illegal_action_energy_penalty")]
+    pub illegal_action_energy_penalty: f32,
     pub energy_initial: f32,
     pub energy_max: f32,
     pub min_reproduce_energy: f32,
@@ -52,8 +64,10 @@ impl Default for WorldConfig {
             food_energy_value: 0.35,
             energy_per_tick_decay: 0.01,
             energy_per_move: 0.02,
+            energy_per_inventory_attempt: default_energy_per_inventory_attempt(),
             energy_per_compute_node: 0.005,
             energy_per_reproduce: 0.12,
+            illegal_action_energy_penalty: default_illegal_action_energy_penalty(),
             energy_initial: 0.7,
             energy_max: 1.5,
             min_reproduce_energy: 1.0,
@@ -80,5 +94,7 @@ mod tests {
         assert!((cfg.weight_mutation_rate - 0.08).abs() < f32::EPSILON);
         assert!((cfg.logic_node_mutation_rate - 0.01).abs() < f32::EPSILON);
         assert!((cfg.structural_mutation_rate - 0.02).abs() < f32::EPSILON);
+        assert!((cfg.illegal_action_energy_penalty - 0.01).abs() < f32::EPSILON);
+        assert!((cfg.energy_per_inventory_attempt - 0.005).abs() < f32::EPSILON);
     }
 }
