@@ -53,8 +53,8 @@ Open `http://127.0.0.1:5173`.
 The app expects the backend on `127.0.0.1:4000`.
 
 The web control rail now exposes:
-- Startup draft: initial creatures, world width/height, initial food density, food spawn/growth, spread threshold, spawn floor density, tick decay, move cost, world wrap
-- Runtime controls: pause/resume, ticks-per-second, live food spawn/growth plus spread threshold and spawn floor density
+- Startup draft: initial creatures, world width/height, sensor radius, initial food density, food spawn/growth, spread threshold, spawn floor density, tick decay, move cost, world wrap
+- Runtime controls: pause/resume, ticks-per-second, live sensor radius and food spawn/growth plus spread threshold and spawn floor density
 - Advanced Stage 1 controls for energy and mutation tuning
 - Viewport paint mode toggle with floating tools (food, barrier, erase food, erase barrier), brush sizes, idle preview mode, and clear paint action (idle/paused only)
 - Creature inspector (click creature in viewport)
