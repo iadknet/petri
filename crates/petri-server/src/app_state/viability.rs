@@ -63,6 +63,9 @@ pub(super) fn startup_probe_seed(draft: &StartupDraft) -> u64 {
         .wrapping_add(draft.height as u64);
     seed = seed
         .wrapping_mul(1_099_511_628_211)
+        .wrapping_add(draft.sensor_radius as u64);
+    seed = seed
+        .wrapping_mul(1_099_511_628_211)
         .wrapping_add(draft.initial_food_density.to_bits() as u64);
     seed = seed
         .wrapping_mul(1_099_511_628_211)

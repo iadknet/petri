@@ -78,6 +78,7 @@ async fn default_startup_draft_uses_lower_food_settings() {
         status_json["startup_draft"]["food_spawn_floor_density"],
         0.03
     );
+    assert_eq!(status_json["startup_draft"]["sensor_radius"], 12);
     assert_eq!(status_json["startup_draft"]["width"], 400);
     assert_eq!(status_json["startup_draft"]["height"], 400);
 }
@@ -180,7 +181,8 @@ async fn startup_draft_patch_updates_restart_required_stage1_knobs() {
         "max_creatures": 7200,
         "energy_initial": 0.82,
         "food_spread_threshold": 0.62,
-        "food_spawn_floor_density": 0.08
+        "food_spawn_floor_density": 0.08,
+        "sensor_radius": 18
     });
 
     let patch_response = app
@@ -201,6 +203,7 @@ async fn startup_draft_patch_updates_restart_required_stage1_knobs() {
     assert_eq!(patch_json["energy_initial"], 0.82);
     assert_eq!(patch_json["food_spread_threshold"], 0.62);
     assert_eq!(patch_json["food_spawn_floor_density"], 0.08);
+    assert_eq!(patch_json["sensor_radius"], 18);
 
     let status_response = app
         .oneshot(
@@ -220,6 +223,7 @@ async fn startup_draft_patch_updates_restart_required_stage1_knobs() {
         status_json["startup_draft"]["food_spawn_floor_density"],
         0.08
     );
+    assert_eq!(status_json["startup_draft"]["sensor_radius"], 18);
 }
 
 #[tokio::test]
@@ -288,6 +292,7 @@ async fn patch_config_updates_runtime_values() {
         "food_growth_rate": 0.22,
         "food_spread_threshold": 0.66,
         "food_spawn_floor_density": 0.04,
+        "sensor_radius": 24,
         "food_max_density": 1.2,
         "food_energy_value": 0.48,
         "energy_per_tick_decay": 0.015,
@@ -336,6 +341,7 @@ async fn patch_config_updates_runtime_values() {
     assert_eq!(cfg_json["food_growth_rate"], 0.22);
     assert_eq!(cfg_json["food_spread_threshold"], 0.66);
     assert_eq!(cfg_json["food_spawn_floor_density"], 0.04);
+    assert_eq!(cfg_json["sensor_radius"], 24);
     assert_eq!(cfg_json["food_max_density"], 1.2);
     assert_eq!(cfg_json["food_energy_value"], 0.48);
     assert_eq!(cfg_json["energy_per_tick_decay"], 0.015);
@@ -350,6 +356,44 @@ async fn patch_config_updates_runtime_values() {
     assert_eq!(cfg_json["weight_mutation_magnitude"], 0.27);
     assert_eq!(cfg_json["logic_node_mutation_rate"], 0.06);
     assert_eq!(cfg_json["structural_mutation_rate"], 0.14);
+}
+
+#[tokio::test]
+async fn patch_config_clamps_sensor_radius_to_minimum_one() {
+    let state = common::fast_state();
+    let app = build_router(state);
+
+    let patch_payload = json!({
+        "sensor_radius": 0
+    });
+
+    let patch_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PATCH")
+                .uri("/config")
+                .header("content-type", "application/json")
+                .body(Body::from(patch_payload.to_string()))
+                .expect("request should build"),
+        )
+        .await
+        .expect("request should succeed");
+    assert_eq!(patch_response.status(), StatusCode::OK);
+
+    let get_response = app
+        .oneshot(
+            Request::builder()
+                .uri("/config")
+                .body(Body::empty())
+                .expect("request should build"),
+        )
+        .await
+        .expect("request should succeed");
+    assert_eq!(get_response.status(), StatusCode::OK);
+
+    let cfg_json = common::read_json(get_response).await;
+    assert_eq!(cfg_json["sensor_radius"], 1);
 }
 
 #[tokio::test]

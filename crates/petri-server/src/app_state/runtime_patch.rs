@@ -9,6 +9,9 @@ pub(super) fn apply_runtime_patch(config: &mut WorldConfig, patch: &RuntimeConfi
     if let Some(tps) = patch.ticks_per_second {
         config.ticks_per_second = tps.max(1);
     }
+    if let Some(radius) = patch.sensor_radius {
+        config.sensor_radius = radius.clamp(1, 64);
+    }
     if let Some(rate) = patch.food_spawn_rate {
         config.food_spawn_rate = rate.clamp(0.0, 1.0);
     }

@@ -10,6 +10,7 @@ pub struct StartupDraft {
     pub max_creatures: usize,
     pub width: u32,
     pub height: u32,
+    pub sensor_radius: u32,
     pub initial_food_density: f32,
     pub energy_initial: f32,
     pub food_spawn_rate: f32,
@@ -27,6 +28,7 @@ pub struct StartupDraftPatch {
     pub max_creatures: Option<usize>,
     pub width: Option<u32>,
     pub height: Option<u32>,
+    pub sensor_radius: Option<u32>,
     pub initial_food_density: Option<f32>,
     pub energy_initial: Option<f32>,
     pub food_spawn_rate: Option<f32>,
@@ -44,6 +46,7 @@ impl StartupDraft {
             max_creatures: 500_000,
             width: 400,
             height: 400,
+            sensor_radius: 12,
             initial_food_density: 0.15,
             energy_initial: 0.7,
             food_spawn_rate: 0.05,
@@ -74,6 +77,10 @@ impl StartupDraft {
         if let Some(v) = patch.height {
             changed |= self.height != v;
             self.height = v;
+        }
+        if let Some(v) = patch.sensor_radius {
+            changed |= self.sensor_radius != v;
+            self.sensor_radius = v;
         }
         if let Some(v) = patch.initial_food_density {
             changed |= (self.initial_food_density - v).abs() > f32::EPSILON;
@@ -125,6 +132,7 @@ impl StartupDraft {
         validate_range("max_creatures", self.max_creatures as f64, 1.0, 500_000.0)?;
         validate_range("width", self.width as f64, 50.0, 2_000.0)?;
         validate_range("height", self.height as f64, 50.0, 2_000.0)?;
+        validate_range("sensor_radius", self.sensor_radius as f64, 1.0, 64.0)?;
         validate_range("energy_initial", self.energy_initial as f64, 0.01, 20.0)?;
         validate_range(
             "initial_food_density",
@@ -177,6 +185,7 @@ pub(super) fn build_world_config(base: &WorldConfig, draft: &StartupDraft) -> Wo
     let mut cfg = base.clone();
     cfg.width = draft.width;
     cfg.height = draft.height;
+    cfg.sensor_radius = draft.sensor_radius;
     cfg.world_wrap = draft.world_wrap;
     cfg.initial_creatures = draft.initial_creatures;
     cfg.max_creatures = draft.max_creatures;
@@ -200,6 +209,7 @@ pub(super) fn startup_draft_from_config(
         max_creatures: config.max_creatures,
         width: config.width,
         height: config.height,
+        sensor_radius: config.sensor_radius,
         initial_food_density,
         energy_initial: config.energy_initial,
         food_spawn_rate: config.food_spawn_rate,
