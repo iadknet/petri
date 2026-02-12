@@ -3,6 +3,7 @@ use std::collections::VecDeque;
 use rand::{Rng, SeedableRng};
 use slotmap::Key;
 
+use super::color;
 use super::helpers::{axis_step, map_axis, push_event, push_illegal_action, wrap_axis};
 use super::*;
 
@@ -478,8 +479,17 @@ impl World {
                                     structural_mutation_rate,
                                     &mut creature.rng,
                                 );
-                                child_controller
+                                let was_mutated = child_controller
                                     .mutate_with_config(&mut creature.rng, offspring_mutation_cfg);
+                                let child_hue = color::inherit_hue(
+                                    creature.phenotype_hue,
+                                    was_mutated,
+                                    &mut creature.rng,
+                                );
+                                let child_saturation = color::inherit_saturation(
+                                    creature.phenotype_saturation,
+                                    &mut creature.rng,
+                                );
 
                                 child_request = Some((
                                     cx,
@@ -492,6 +502,8 @@ impl World {
                                     id.data().as_ffi(),
                                     child_slot_capacity,
                                     child_memory_register,
+                                    child_hue,
+                                    child_saturation,
                                 ));
                                 self.diagnostics.reproductions += 1;
                                 push_event(creature, CreatureEventKind::Reproduced, self.tick);
@@ -562,6 +574,8 @@ impl World {
             parent_id,
             slot_capacity,
             memory_register,
+            child_hue,
+            child_saturation,
         ) in offspring
         {
             if self.creatures.len() >= self.config.max_creatures {
@@ -572,7 +586,7 @@ impl World {
                 continue;
             }
 
-            let phenotype_color = controller.phenotype_color();
+            let phenotype_color = color::phenotype_rgb(child_hue, child_saturation);
             let child = Creature {
                 x,
                 y,
@@ -583,6 +597,8 @@ impl World {
                 parent_id: Some(parent_id),
                 controller,
                 phenotype_color,
+                phenotype_hue: child_hue,
+                phenotype_saturation: child_saturation,
                 memory_register,
                 rng: SmallRng::seed_from_u64(seed),
                 events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
