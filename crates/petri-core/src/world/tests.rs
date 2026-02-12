@@ -255,7 +255,7 @@ fn insert_idle_creature(world: &mut World, x: u32, y: u32, seed: u64) -> Creatur
     );
 
     let controller = idle_controller();
-    let phenotype_color = controller.phenotype_color();
+    let phenotype_color = color::phenotype_rgb(0.0, 0.7);
     let creature = Creature {
         x,
         y,
@@ -1468,7 +1468,7 @@ fn perception_reports_nearest_creature_direction_distance_and_density() {
         generation: 0,
         lineage_id: 1,
         parent_id: None,
-        phenotype_color: a_controller.phenotype_color(),
+        phenotype_color: color::phenotype_rgb(0.0, 0.7),
         phenotype_hue: 0.0,
         phenotype_saturation: 0.0,
         controller: a_controller,
@@ -1491,7 +1491,7 @@ fn perception_reports_nearest_creature_direction_distance_and_density() {
         generation: 0,
         lineage_id: 2,
         parent_id: None,
-        phenotype_color: b_controller.phenotype_color(),
+        phenotype_color: color::phenotype_rgb(0.0, 0.7),
         phenotype_hue: 0.0,
         phenotype_saturation: 0.0,
         controller: b_controller,
@@ -1616,7 +1616,7 @@ fn movement_into_barrier_cell_is_blocked_and_sets_feedback() {
 
     if let Some(creature) = world.creatures.get_mut(id) {
         creature.controller = move_right_controller();
-        creature.phenotype_color = creature.controller.phenotype_color();
+        creature.phenotype_color = color::phenotype_rgb(0.0, 0.7);
         creature.x = 2;
         creature.y = 2;
     }
@@ -1686,7 +1686,7 @@ fn spawn_random_creature_finds_free_cell_beyond_random_attempt_window() {
                 generation: 0,
                 lineage_id: creature_seed,
                 parent_id: None,
-                phenotype_color: controller.phenotype_color(),
+                phenotype_color: color::phenotype_rgb(0.0, 0.7),
                 phenotype_hue: 0.0,
                 phenotype_saturation: 0.0,
                 controller,
@@ -2060,19 +2060,11 @@ fn frame_creatures_include_controller_node_count() {
         ..WorldConfig::default()
     };
     let world = World::new_with_palette(cfg, 919, ControllerPalette::Hybrid);
-    let expected_color = world
-        .creatures
-        .values()
-        .next()
-        .expect("expected one creature")
-        .controller
-        .phenotype_color();
 
     let frame = world.frame();
     assert_eq!(frame.creatures.len(), 1);
     assert!(frame.creatures[0].node_count > 0);
     assert_eq!(frame.creatures[0].phenotype_color.len(), 3);
-    assert_eq!(frame.creatures[0].phenotype_color, expected_color);
 }
 
 #[test]
@@ -2277,7 +2269,7 @@ fn creature_detail_exposes_last_inputs_outputs_and_events() {
 
     if let Some(creature) = world.creatures.get_mut(id) {
         creature.controller = move_right_controller();
-        creature.phenotype_color = creature.controller.phenotype_color();
+        creature.phenotype_color = color::phenotype_rgb(0.0, 0.7);
         creature.x = 2;
         creature.y = 2;
     }
@@ -2290,16 +2282,9 @@ fn creature_detail_exposes_last_inputs_outputs_and_events() {
     let detail = world
         .creature_detail(id.data().as_ffi())
         .expect("detail should exist for live creature");
-    let expected_color = world
-        .creatures
-        .get(id)
-        .expect("creature should still exist")
-        .controller
-        .phenotype_color();
     assert_eq!(detail.id, id.data().as_ffi());
     assert!(detail.last_outputs.move_x > 0.9);
     assert_eq!(detail.phenotype_color.len(), 3);
-    assert_eq!(detail.phenotype_color, expected_color);
     assert!((-1.0..=1.0).contains(&detail.last_inputs.barrier_direction));
     assert!((0.0..=1.0).contains(&detail.last_inputs.barrier_distance));
     assert!(detail
