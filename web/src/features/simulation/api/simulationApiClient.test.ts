@@ -35,14 +35,23 @@ describe("SimulationApiClient", () => {
             barrier_direction: 0,
             barrier_distance: 1,
             move_blocked_last_tick: 0,
-            memory_read: 0
+            memory_read: 0,
+            memory_address_norm: 0
           },
           last_outputs: {
             move_x: 0.1,
             move_y: -0.2,
             eat: 0.5,
             reproduce: 0.2,
-            memory_write: 0
+            memory_write_value: 0,
+            memory_write_enable: 0,
+            memory_address_select: 0
+          },
+          last_memory_head: {
+            address_index: 0,
+            read_value: 0,
+            write_value: 0,
+            write_applied: false
           },
           events: [{ kind: "Moved", tick: 10 }]
         }),

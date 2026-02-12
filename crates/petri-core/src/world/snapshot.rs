@@ -30,6 +30,7 @@ impl World {
                 phenotype_hue: c.phenotype_hue,
                 phenotype_saturation: c.phenotype_saturation,
                 memory_register: c.memory_register.clone(),
+                last_memory_head: c.last_memory_head,
                 last_move_blocked: c.last_move_blocked,
                 last_inputs: c.last_inputs,
                 last_outputs: c.last_outputs,
@@ -118,6 +119,7 @@ impl World {
                 phenotype_hue,
                 phenotype_saturation,
                 memory_register: normalize_memory_register(creature.memory_register),
+                last_memory_head: creature.last_memory_head,
                 rng: SmallRng::seed_from_u64(old_id ^ snapshot.tick.rotate_left(13)),
                 events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
                 illegal_attempts: {

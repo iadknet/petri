@@ -24,6 +24,14 @@ pub struct CreatureEvent {
     pub tick: u64,
 }
 
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+pub struct MemoryHeadState {
+    pub address_index: u16,
+    pub read_value: u8,
+    pub write_value: u8,
+    pub write_applied: bool,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CreatureSnapshot {
     pub id: u64,
@@ -120,7 +128,9 @@ pub struct CreatureStateSnapshot {
     #[serde(default)]
     pub phenotype_saturation: f32,
     #[serde(default)]
-    pub memory_register: Vec<bool>,
+    pub memory_register: Vec<u8>,
+    #[serde(default)]
+    pub last_memory_head: MemoryHeadState,
     #[serde(default)]
     pub last_move_blocked: bool,
     #[serde(default)]
@@ -150,6 +160,7 @@ pub struct CreatureDetail {
     pub last_move_blocked: bool,
     pub last_inputs: SensorInputs,
     pub last_outputs: ActionOutputs,
+    pub last_memory_head: MemoryHeadState,
     pub events: Vec<CreatureEvent>,
     #[serde(default)]
     pub slot_capacity: u8,

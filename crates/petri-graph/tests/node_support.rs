@@ -331,14 +331,29 @@ fn memory_io_nodes_are_supported_and_clamped() {
     let graph = ComputationGraph {
         palette: ControllerPalette::Hybrid,
         nodes: vec![
-            NodeKind::InputMemoryRead,   // 0
-            NodeKind::OutputMemoryWrite, // 1
+            NodeKind::InputMemoryRead,           // 0
+            NodeKind::InputMemoryAddressNorm,    // 1
+            NodeKind::OutputMemoryWriteValue,    // 2
+            NodeKind::OutputMemoryWriteEnable,   // 3
+            NodeKind::OutputMemoryAddressSelect, // 4
         ],
-        edges: vec![Edge {
-            from: 0,
-            to: 1,
-            weight: 1.0,
-        }],
+        edges: vec![
+            Edge {
+                from: 0,
+                to: 2,
+                weight: 2.0,
+            },
+            Edge {
+                from: 1,
+                to: 3,
+                weight: 2.0,
+            },
+            Edge {
+                from: 1,
+                to: 4,
+                weight: 3.0,
+            },
+        ],
     };
 
     let high = graph.evaluate(SensorInputs {
@@ -354,9 +369,12 @@ fn memory_io_nodes_are_supported_and_clamped() {
         barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: 2.0,
+        memory_address_norm: 2.0,
         ..SensorInputs::default()
     });
-    assert_eq!(high.memory_write, 1.0);
+    assert_eq!(high.memory_write_value, 1.0);
+    assert_eq!(high.memory_write_enable, 1.0);
+    assert_eq!(high.memory_address_select, 1.0);
 
     let low = graph.evaluate(SensorInputs {
         food_here: 0.0,
@@ -371,9 +389,12 @@ fn memory_io_nodes_are_supported_and_clamped() {
         barrier_distance: 1.0,
         move_blocked_last_tick: 0.0,
         memory_read: -1.0,
+        memory_address_norm: -1.0,
         ..SensorInputs::default()
     });
-    assert_eq!(low.memory_write, 0.0);
+    assert_eq!(low.memory_write_value, 0.0);
+    assert_eq!(low.memory_write_enable, 0.0);
+    assert_eq!(low.memory_address_select, 0.0);
 }
 
 #[test]
@@ -398,7 +419,7 @@ fn touch_slot_inputs_and_inventory_outputs_are_supported_and_clamped() {
             NodeKind::InputSlotFoodValue(0),          // 14
             NodeKind::OutputReproduce,                // 15
             NodeKind::InputSlotFoodValue(99),         // 16
-            NodeKind::OutputMemoryWrite,              // 17
+            NodeKind::OutputMemoryWriteValue,         // 17
         ],
         edges: vec![
             Edge {
@@ -469,5 +490,5 @@ fn touch_slot_inputs_and_inventory_outputs_are_supported_and_clamped() {
     assert_eq!(outputs.eat, 1.0);
     assert_eq!(outputs.inventory_direction_select, -1.0);
     assert_eq!(outputs.reproduce, 1.0);
-    assert_eq!(outputs.memory_write, 0.0);
+    assert_eq!(outputs.memory_write_value, 0.0);
 }
