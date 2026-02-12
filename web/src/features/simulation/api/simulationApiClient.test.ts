@@ -31,6 +31,8 @@ describe("SimulationApiClient", () => {
             creature_direction: 0.2,
             creature_distance: 0.5,
             local_density: 0.3,
+            barrier_direction: 0,
+            barrier_distance: 1,
             move_blocked_last_tick: 0,
             memory_read: 0
           },
