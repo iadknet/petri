@@ -16,13 +16,15 @@ fn small_world(seed: u64) -> World {
 }
 
 #[test]
-fn founder_creatures_have_distinct_colors() {
+fn founder_creatures_have_identical_colors() {
     let world = small_world(42);
     let frame = world.frame();
     assert!(frame.creatures.len() >= 2);
     let colors: Vec<_> = frame.creatures.iter().map(|c| c.phenotype_color).collect();
     let all_same = colors.windows(2).all(|w| w[0] == w[1]);
-    assert!(!all_same, "founders should not all have identical colors");
+    assert!(all_same, "founders should all start with identical colors");
+    // Verify the color is red (hue=0, saturation=0.7, value=0.80)
+    assert_eq!(colors[0], [204, 61, 61], "founder color should be red");
 }
 
 #[test]

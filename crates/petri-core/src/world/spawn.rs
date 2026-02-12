@@ -31,8 +31,9 @@ impl World {
                 let initial_mutation_cfg = self.initial_mutation_config();
                 // Add slight startup diversity so founders are viable but not identical clones.
                 controller.mutate_with_config(&mut self.rng, initial_mutation_cfg);
-                let phenotype_hue = color::random_founder_hue(&mut self.rng);
-                let phenotype_saturation = color::random_founder_saturation(&mut self.rng);
+                // All founders start with the same color (red) - diversity emerges through reproduction.
+                let phenotype_hue = 0.0;
+                let phenotype_saturation = 0.7;
                 let phenotype_color = color::phenotype_rgb(phenotype_hue, phenotype_saturation);
                 let lineage_id = lineage_id.unwrap_or_else(|| {
                     let next = self.next_lineage_id;
