@@ -1,8 +1,8 @@
 use crate::types::CreatureEvent;
 
-use super::{Cell, Creature, CreatureEventKind, EVENT_LOG_CAPACITY, FOOD_SENSOR_RADIUS};
+use super::{Cell, Creature, CreatureEventKind, EVENT_LOG_CAPACITY};
 
-pub(super) fn sensor_from_best(best: Option<(i32, i32, i32)>) -> (f32, f32) {
+pub(super) fn sensor_from_best(best: Option<(i32, i32, i32)>, sensor_radius: u32) -> (f32, f32) {
     let Some((dist_sq, dx, dy)) = best else {
         return (0.0, 1.0);
     };
@@ -10,7 +10,8 @@ pub(super) fn sensor_from_best(best: Option<(i32, i32, i32)>) -> (f32, f32) {
         return (0.0, 0.0);
     }
 
-    let distance = (dist_sq as f32).sqrt() / FOOD_SENSOR_RADIUS as f32;
+    let radius = sensor_radius.max(1) as f32;
+    let distance = (dist_sq as f32).sqrt() / radius;
     let direction = (dy as f32).atan2(dx as f32) / std::f32::consts::PI;
     (direction.clamp(-1.0, 1.0), distance.clamp(0.0, 1.0))
 }

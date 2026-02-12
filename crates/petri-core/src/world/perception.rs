@@ -14,9 +14,10 @@ impl World {
         let mut occupied_cells = 0_usize;
         let width = self.config.width as i32;
         let height = self.config.height as i32;
+        let sensor_radius = self.config.sensor_radius.max(1) as i32;
 
-        for dy in -FOOD_SENSOR_RADIUS..=FOOD_SENSOR_RADIUS {
-            for dx in -FOOD_SENSOR_RADIUS..=FOOD_SENSOR_RADIUS {
+        for dy in -sensor_radius..=sensor_radius {
+            for dx in -sensor_radius..=sensor_radius {
                 let raw_x = x as i32 + dx;
                 let raw_y = y as i32 + dy;
                 let Some((nx, ny)) = (if self.config.world_wrap {
@@ -60,8 +61,10 @@ impl World {
             }
         }
 
-        let (food_direction, food_distance) = sensor_from_best(food_best);
-        let (creature_direction, creature_distance) = sensor_from_best(creature_best);
+        let (food_direction, food_distance) =
+            sensor_from_best(food_best, self.config.sensor_radius);
+        let (creature_direction, creature_distance) =
+            sensor_from_best(creature_best, self.config.sensor_radius);
         let local_density = if scanned_cells == 0 {
             0.0
         } else {

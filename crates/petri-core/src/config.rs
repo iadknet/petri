@@ -1,9 +1,15 @@
 use serde::{Deserialize, Serialize};
 
+const fn default_sensor_radius() -> u32 {
+    12
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WorldConfig {
     pub width: u32,
     pub height: u32,
+    #[serde(default = "default_sensor_radius")]
+    pub sensor_radius: u32,
     pub world_wrap: bool,
     pub initial_creatures: usize,
     pub max_creatures: usize,
@@ -34,6 +40,7 @@ impl Default for WorldConfig {
         Self {
             width: 400,
             height: 400,
+            sensor_radius: default_sensor_radius(),
             world_wrap: true,
             initial_creatures: 200,
             max_creatures: 500_000,
@@ -68,6 +75,7 @@ mod tests {
     #[test]
     fn default_mutation_rates_are_lowered() {
         let cfg = WorldConfig::default();
+        assert_eq!(cfg.sensor_radius, 12);
         assert_eq!(cfg.max_creatures, 500_000);
         assert!((cfg.weight_mutation_rate - 0.08).abs() < f32::EPSILON);
         assert!((cfg.logic_node_mutation_rate - 0.01).abs() < f32::EPSILON);
