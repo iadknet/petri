@@ -247,6 +247,35 @@ fn idle_controller() -> ComputationGraph {
     }
 }
 
+fn insert_idle_creature(world: &mut World, x: u32, y: u32, seed: u64) -> CreatureId {
+    let idx = world.idx(x, y);
+    assert!(
+        world.creature_at[idx].is_none(),
+        "expected target cell to be empty"
+    );
+
+    let creature = Creature {
+        x,
+        y,
+        energy: 1.0,
+        age: 0,
+        generation: 0,
+        lineage_id: seed,
+        parent_id: None,
+        controller: idle_controller(),
+        memory_register: founder_memory_register(),
+        rng: SmallRng::seed_from_u64(seed),
+        events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
+        last_move_blocked: false,
+        last_inputs: SensorInputs::default(),
+        last_outputs: ActionOutputs::default(),
+    };
+
+    let id = world.creatures.insert(creature);
+    world.creature_at[idx] = Some(id);
+    id
+}
+
 fn always_reproduce_and_eat_controller() -> ComputationGraph {
     ComputationGraph {
         palette: ControllerPalette::Hybrid,
@@ -510,6 +539,59 @@ fn food_at_spread_threshold_spreads_to_single_neighbor() {
 }
 
 #[test]
+fn food_spread_skips_barrier_neighbor_cells() {
+    let cfg = WorldConfig {
+        width: 2,
+        height: 1,
+        initial_creatures: 0,
+        max_creatures: 10,
+        world_wrap: false,
+        food_spawn_rate: 0.0,
+        food_growth_rate: 0.2,
+        food_max_density: 1.0,
+        ..WorldConfig::default()
+    };
+
+    let mut world = World::new(cfg, 6151);
+    let source_idx = world.idx(0, 0);
+    let blocked_idx = world.idx(1, 0);
+    world.cells[source_idx].food = 0.75;
+    world.cells[blocked_idx].barrier = true;
+
+    world.tick();
+
+    assert!((world.cells[source_idx].food - 0.9).abs() < 1e-6);
+    assert_eq!(world.cells[blocked_idx].food, 0.0);
+}
+
+#[test]
+fn food_spread_skips_occupied_neighbor_cells() {
+    let cfg = WorldConfig {
+        width: 2,
+        height: 1,
+        initial_creatures: 0,
+        max_creatures: 10,
+        world_wrap: false,
+        food_spawn_rate: 0.0,
+        food_growth_rate: 0.2,
+        food_max_density: 1.0,
+        ..WorldConfig::default()
+    };
+
+    let mut world = World::new(cfg, 6152);
+    let source_idx = world.idx(0, 0);
+    let occupied_idx = world.idx(1, 0);
+    world.cells[source_idx].food = 0.75;
+    insert_idle_creature(&mut world, 1, 0, 77);
+    assert!(world.creature_at[occupied_idx].is_some());
+
+    world.tick();
+
+    assert!((world.cells[source_idx].food - 0.9).abs() < 1e-6);
+    assert_eq!(world.cells[occupied_idx].food, 0.0);
+}
+
+#[test]
 fn fallback_spawn_does_not_run_when_average_density_is_above_floor() {
     let cfg = WorldConfig {
         width: 10,
@@ -557,6 +639,49 @@ fn fallback_spawn_runs_when_average_density_is_below_floor() {
 }
 
 #[test]
+fn fallback_spawn_skips_barrier_cells() {
+    let cfg = WorldConfig {
+        width: 1,
+        height: 1,
+        initial_creatures: 0,
+        max_creatures: 10,
+        food_spawn_rate: 1.0,
+        food_growth_rate: 0.2,
+        food_max_density: 1.0,
+        ..WorldConfig::default()
+    };
+
+    let mut world = World::new(cfg, 6153);
+    let blocked_idx = world.idx(0, 0);
+    world.cells[blocked_idx].barrier = true;
+
+    world.tick();
+
+    assert_eq!(world.cells[blocked_idx].food, 0.0);
+}
+
+#[test]
+fn fallback_spawn_skips_occupied_cells() {
+    let cfg = WorldConfig {
+        width: 1,
+        height: 1,
+        initial_creatures: 0,
+        max_creatures: 10,
+        food_spawn_rate: 1.0,
+        food_growth_rate: 0.2,
+        food_max_density: 1.0,
+        ..WorldConfig::default()
+    };
+
+    let mut world = World::new(cfg, 6154);
+    insert_idle_creature(&mut world, 0, 0, 88);
+
+    world.tick();
+
+    assert_eq!(world.cells[world.idx(0, 0)].food, 0.0);
+}
+
+#[test]
 fn nearest_food_sensor_reports_direction_and_distance() {
     let cfg = WorldConfig {
         width: 20,
@@ -595,6 +720,46 @@ fn nearest_food_sensor_defaults_when_no_food_is_visible() {
     let (direction, distance) = world.nearest_food_sensor(6, 6);
     assert_eq!(direction, 0.0);
     assert_eq!(distance, 1.0);
+}
+
+#[test]
+fn nearest_food_sensor_respects_configured_radius_cutoff() {
+    let cfg = WorldConfig {
+        width: 20,
+        height: 20,
+        initial_creatures: 0,
+        sensor_radius: 2,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new(cfg, 203);
+    let source = (10_u32, 10_u32);
+    let far_food = (13_u32, 10_u32);
+    let far_food_idx = world.idx(far_food.0, far_food.1);
+    world.cells[far_food_idx].food = world.config.food_max_density;
+
+    let (direction, distance) = world.nearest_food_sensor(source.0, source.1);
+    assert_eq!(direction, 0.0);
+    assert_eq!(distance, 1.0);
+}
+
+#[test]
+fn nearest_food_sensor_distance_normalizes_by_configured_radius() {
+    let cfg = WorldConfig {
+        width: 20,
+        height: 20,
+        initial_creatures: 0,
+        sensor_radius: 4,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new(cfg, 204);
+    let source = (10_u32, 10_u32);
+    let food = (12_u32, 10_u32);
+    let food_idx = world.idx(food.0, food.1);
+    world.cells[food_idx].food = world.config.food_max_density;
+
+    let (direction, distance) = world.nearest_food_sensor(source.0, source.1);
+    assert!(direction.abs() < 0.01);
+    assert!((distance - 0.5).abs() < 0.02, "distance was {distance}");
 }
 
 #[test]
@@ -656,7 +821,8 @@ fn perception_reports_nearest_creature_direction_distance_and_density() {
         a_after.last_inputs.creature_direction
     );
     assert!(
-        (a_after.last_inputs.creature_distance - (2.0 / FOOD_SENSOR_RADIUS as f32)).abs() < 0.02
+        (a_after.last_inputs.creature_distance - (2.0 / world.config.sensor_radius as f32)).abs()
+            < 0.02
     );
     assert!(a_after.last_inputs.local_density > 0.0);
     assert!(a_after.last_inputs.local_density < 0.2);

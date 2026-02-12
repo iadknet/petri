@@ -52,6 +52,10 @@ impl World {
         const NEIGHBOR_OFFSETS: [(i32, i32); 4] = [(0, -1), (1, 0), (0, 1), (-1, 0)];
 
         for (idx, source) in source_food.iter().copied().enumerate() {
+            if self.creature_at[idx].is_some() || self.cells[idx].barrier {
+                continue;
+            }
+
             let delta = source * growth_rate;
             if delta > 0.0 {
                 self.cells[idx].food = (self.cells[idx].food + delta).min(max_density);
@@ -81,7 +85,11 @@ impl World {
                 }) else {
                     continue;
                 };
-                neighbors[neighbor_count] = self.idx(nx, ny);
+                let neighbor_idx = self.idx(nx, ny);
+                if self.creature_at[neighbor_idx].is_some() || self.cells[neighbor_idx].barrier {
+                    continue;
+                }
+                neighbors[neighbor_count] = neighbor_idx;
                 neighbor_count += 1;
             }
 
@@ -105,6 +113,9 @@ impl World {
 
         for _ in 0..spawn_attempts {
             let idx = self.rng.gen_range(0..total_cells);
+            if self.creature_at[idx].is_some() || self.cells[idx].barrier {
+                continue;
+            }
             let cell = &mut self.cells[idx];
             cell.food = (cell.food + spawn_delta).min(max_density);
         }
