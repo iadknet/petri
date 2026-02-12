@@ -14,8 +14,30 @@ describe("protocol", () => {
       population: 2,
       average_energy: 0.42,
       creatures: [
-        { id: 1, x: 10, y: 11, energy: 0.7, age: 5, generation: 0, lineage_id: 100, parent_id: null, node_count: 7 },
-        { id: 2, x: 12, y: 13, energy: 0.4, age: 3, generation: 1, lineage_id: 100, parent_id: 1, node_count: 9 }
+        {
+          id: 1,
+          x: 10,
+          y: 11,
+          energy: 0.7,
+          age: 5,
+          generation: 0,
+          lineage_id: 100,
+          parent_id: null,
+          node_count: 7,
+          phenotype_color: [20, 200, 100]
+        },
+        {
+          id: 2,
+          x: 12,
+          y: 13,
+          energy: 0.4,
+          age: 3,
+          generation: 1,
+          lineage_id: 100,
+          parent_id: 1,
+          node_count: 9,
+          phenotype_color: [220, 60, 180]
+        }
       ]
     };
 
@@ -32,6 +54,7 @@ describe("protocol", () => {
     expect(decoded.creatures[0].lineage_id).toBe(100);
     expect(decoded.creatures[1].parent_id).toBe(1);
     expect(decoded.creatures[1].node_count).toBe(9);
+    expect(decoded.creatures[0].phenotype_color).toEqual([20, 200, 100]);
   });
 
   it("supports creature detail payload typing", () => {
@@ -45,6 +68,7 @@ describe("protocol", () => {
       age: 5,
       generation: 0,
       node_count: 7,
+      phenotype_color: [20, 200, 100],
       last_move_blocked: false,
       last_inputs: {
         food_here: 0,

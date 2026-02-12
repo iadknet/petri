@@ -30,6 +30,7 @@ impl World {
                 let initial_mutation_cfg = self.initial_mutation_config();
                 // Add slight startup diversity so founders are viable but not identical clones.
                 controller.mutate_with_config(&mut self.rng, initial_mutation_cfg);
+                let phenotype_color = controller.phenotype_color();
                 let lineage_id = lineage_id.unwrap_or_else(|| {
                     let next = self.next_lineage_id;
                     self.next_lineage_id += 1;
@@ -44,6 +45,7 @@ impl World {
                     lineage_id,
                     parent_id,
                     controller,
+                    phenotype_color,
                     memory_register: founder_memory_register(),
                     rng: SmallRng::seed_from_u64(seed),
                     events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),

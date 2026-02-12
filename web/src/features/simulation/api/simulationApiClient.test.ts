@@ -21,6 +21,7 @@ describe("SimulationApiClient", () => {
           age: 8,
           generation: 3,
           node_count: 12,
+          phenotype_color: [28, 96, 230],
           last_move_blocked: false,
           last_inputs: {
             food_here: 0,

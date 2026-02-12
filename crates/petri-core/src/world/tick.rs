@@ -572,6 +572,7 @@ impl World {
                 continue;
             }
 
+            let phenotype_color = controller.phenotype_color();
             let child = Creature {
                 x,
                 y,
@@ -581,6 +582,7 @@ impl World {
                 lineage_id,
                 parent_id: Some(parent_id),
                 controller,
+                phenotype_color,
                 memory_register,
                 rng: SmallRng::seed_from_u64(seed),
                 events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),

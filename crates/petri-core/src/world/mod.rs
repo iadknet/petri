@@ -118,6 +118,7 @@ struct Creature {
     lineage_id: u64,
     parent_id: Option<u64>,
     controller: ComputationGraph,
+    phenotype_color: [u8; 3],
     memory_register: Vec<bool>,
     rng: SmallRng,
     events: VecDeque<CreatureEvent>,
@@ -306,6 +307,7 @@ impl World {
                 age: c.age,
                 generation: c.generation,
                 node_count: c.controller.compute_node_count() as u32,
+                phenotype_color: c.phenotype_color,
             })
             .collect::<Vec<_>>();
 
@@ -382,6 +384,7 @@ impl World {
                 age: c.age,
                 generation: c.generation,
                 node_count: c.controller.compute_node_count() as u32,
+                phenotype_color: c.phenotype_color,
                 last_move_blocked: c.last_move_blocked,
                 last_inputs: c.last_inputs,
                 last_outputs: c.last_outputs,

@@ -10,6 +10,7 @@ export type CreatureSnapshot = {
   age: number;
   generation: number;
   node_count: number;
+  phenotype_color: [number, number, number];
 };
 
 export type WorldFrame = {
@@ -146,6 +147,7 @@ export type CreatureDetail = {
   age: number;
   generation: number;
   node_count: number;
+  phenotype_color: [number, number, number];
   last_move_blocked: boolean;
   last_inputs: SensorInputs;
   last_outputs: ActionOutputs;

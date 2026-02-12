@@ -72,7 +72,8 @@ describe("CanvasRenderer", () => {
             energy: 1,
             age: 0,
             generation: 0,
-            node_count: 1
+            node_count: 1,
+            phenotype_color: [24, 180, 220]
           }
         ],
         population: 1,
@@ -81,6 +82,6 @@ describe("CanvasRenderer", () => {
     );
 
     const image = putImageData.mock.calls[0][0] as ImageData;
-    expect(Array.from(image.data.slice(0, 4))).toEqual([255, 255, 255, 255]);
+    expect(Array.from(image.data.slice(0, 4))).toEqual([24, 180, 220, 255]);
   });
 });

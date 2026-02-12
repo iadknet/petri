@@ -62,6 +62,8 @@ The web control rail now exposes:
 - Snapshot export/import panel (`GET/POST /simulation/snapshot`)
 - Idle placeholder before first start, plus pending-restart state when startup-only values change during a run
 
+Creatures now render with deterministic phenotype colors derived from controller graph structure, and the inspector surfaces the same phenotype color value for the selected creature.
+
 Default simulation world size is `400x400` and can be changed in Startup Draft before starting (or before restarting) a run.
 
 ## Run the CLI
