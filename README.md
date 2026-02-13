@@ -7,9 +7,15 @@ This repository now contains the first runnable vertical slice of the Petri simu
 - `petri-cli`: headless runner with periodic stats output
 - `web/`: React canvas client consuming MessagePack frames
 
-## Reference docs
+## Project docs
 
+- `docs/README.md`: canonical docs index
+- `docs/strategy/roadmap.md`: implementation roadmap and stage definitions
+- `docs/strategy/architecture.md`: architecture and boundary guidance
+- `docs/strategy/technology-review.md`: technology posture and tradeoffs
 - `docs/reference/creature-controller-reference.md`: creature/controller structure, node semantics, and mutation operator reference
+
+Compatibility note: `petri-roadmap.md`, `petri-architecture.md`, and `petri-technology-review.md` remain as root stubs that point to the canonical `docs/strategy/*` files.
 
 ## Upcoming cognition refactor (planned, not implemented yet)
 
