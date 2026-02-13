@@ -20,6 +20,7 @@ Canonical project documentation lives under `docs/`.
 ## Standards
 
 - [Agent Instruction Layering](standards/agent-instruction-layering.md)
+- [Architecture Lint Policy](standards/architecture-lint-policy.md)
 
 ## Operations
 
