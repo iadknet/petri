@@ -7,6 +7,7 @@ Canonical project documentation lives under `docs/`.
 - [Roadmap](strategy/roadmap.md)
 - [Architecture](strategy/architecture.md)
 - [Technology Review](strategy/technology-review.md)
+- [High-Level Goals Catalog](strategy/goals.md)
 
 ## Reference
 
@@ -21,6 +22,8 @@ Canonical project documentation lives under `docs/`.
 
 - [Agent Instruction Layering](standards/agent-instruction-layering.md)
 - [Architecture Lint Policy](standards/architecture-lint-policy.md)
+- [Plan Quality Gate Policy](standards/plan-quality-gate-policy.md)
+- [Documentation Consistency Policy](standards/documentation-consistency-policy.md)
 
 ## Operations
 

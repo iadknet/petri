@@ -4,9 +4,29 @@
 
 **Goal:** Implement a cognition-first creature lifecycle where per-tick internal deliberation is energy-bounded, haltable, and followed by at most one world interaction (including explicit no-op).
 
+**Goal IDs:** `GP-01`, `GP-02`, `GP-03`, `GP-04`
+
+**Scope:** Tick semantics, controller I/O, diagnostics/protocol wiring, and validation for cognition-first behavior. Out of scope: unrelated feature slices and CI/pipeline policy changes.
+
+**Docs Impact:**
+- Update `README.md`, `docs/reference/creature-controller-reference.md`, and roadmap status wording once implementation lands.
+- Keep `docs/strategy/architecture.md` and `docs/strategy/roadmap.md` synchronized with implemented cognition semantics.
+- No additional root compatibility stubs are introduced in this plan.
+
+**Supersedes:** `none`
+
+**Superseded-By:** `none`
+
 **Architecture:** Extend controller I/O in `petri-graph` for halt/no-op, confidence introspection, and explicit energy-awareness inputs (`energy_start_tick`, `energy_spent_tick`, `energy_remaining`), then refactor `petri-core` tick semantics from multi-action-per-tick to think-loop plus one-action arbitration. Wire config/runtime/protocol updates through server and web contracts, preserving deterministic replay by using per-creature seeded RNG for tie-breaks.
 
 **Tech Stack:** Rust (`petri-core`, `petri-graph`, `petri-server`, `petri-cli`), TypeScript (`web` protocol/tests), Cargo, npm.
+
+## Goal Alignment
+
+- `GP-01`: Prioritizes high-confidence testing of arbitration and think-loop behavior; deterministic tie-break semantics are used where they improve test reliability.
+- `GP-02`: Keeps crate direction and ownership boundaries explicit while refactoring cross-crate interfaces.
+- `GP-03`: Maintains reliable, regression-resistant iteration through explicit contract tests for cognition semantics.
+- `GP-04`: Requires inspector/protocol diagnostics for think-loop and selected-action visibility.
 
 ## Boundary Impact
 
@@ -16,6 +36,22 @@
   - graph contract tests in `crates/petri-graph/tests/*`
   - world lifecycle/arbitration tests in `crates/petri-core/src/world/tests.rs`
   - transport/protocol tests in `crates/petri-server/tests/*` and `web/src/protocol.test.ts`
+
+## Existing Boundary Recheck
+
+| area | decision | rationale |
+| --- | --- | --- |
+| `crates/petri-core/src/world/tick.rs` action resolution path | `change` | Must move from multi-action execution to one-action arbitration while preserving deterministic ordering and penalties. |
+| `crates/petri-server` protocol/detail payload boundary | `change` | Inspector and payload contract must expose cognition diagnostics without leaking server transport logic into `petri-core`. |
+| `crates/petri-graph` node surface (`types.rs`, evaluator) | `change` | New halt/no-op and introspection channels belong in graph representation/eval, not in server or web layers. |
+
+## Open Questions
+
+| question | decision | owner | status |
+| --- | --- | --- | --- |
+| How are equal final action confidences resolved? | Use per-creature seeded RNG tie-break to preserve deterministic replay. | `petri-core` maintainers | `resolved` |
+| Should throughput assertions block this refactor while semantics stabilize? | Keep benchmark informational during stabilization; re-tighten thresholds after profiling. | `petri-cli` maintainers | `resolved` |
+| Where should cognition diagnostics be surfaced for debugging? | Surface in server creature-detail payload and web protocol/tests together. | `petri-server` + `web` maintainers | `resolved` |
 
 ### Task 1: Add graph contract tests for new cognition I/O (RED)
 

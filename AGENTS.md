@@ -52,23 +52,27 @@ Before claiming completion, run and confirm all pass:
 2. `scripts/check-architecture-harness.sh --mode warn` (through February 27, 2026)
 3. `scripts/check-doc-harness.sh --mode strict` (starting February 28, 2026)
 4. `scripts/check-architecture-harness.sh --mode strict` (starting February 28, 2026)
-5. `cargo fmt --all --check`
-6. `cargo test --workspace`
-7. `cargo clippy --workspace --all-targets -- -D warnings`
-8. `cd web && npm run build`
+5. `scripts/check-plan-harness.sh --mode strict` (effective immediately)
+6. `cargo fmt --all --check`
+7. `cargo test --workspace`
+8. `cargo clippy --workspace --all-targets -- -D warnings`
+9. `cd web && npm run build`
 
 ## Doc Touch Policy
 
 - For any non-trivial plan, follow metadata and section requirements in `docs/plans/README.md`.
+- Use `Goal IDs` from `docs/strategy/goals.md` and include explicit `Goal Alignment`, `Existing Boundary Recheck`, and `Open Questions` sections.
 - Include a `Docs Impact` section listing canonical docs touched and stale docs retired/superseded.
+- Prefer references to canonical docs over repeating the same narrative in multiple files.
+- Avoid conflicting invariant statements across docs; update all affected canonical docs together when invariants change.
 - Keep root compatibility stubs (`petri-roadmap.md`, `petri-architecture.md`, `petri-technology-review.md`) short and pointing to canonical docs.
 
 ## Canonical Docs
 
 - Docs index: `docs/README.md`
-- Strategy docs: `docs/strategy/roadmap.md`, `docs/strategy/architecture.md`, `docs/strategy/technology-review.md`
+- Strategy docs: `docs/strategy/goals.md`, `docs/strategy/roadmap.md`, `docs/strategy/architecture.md`, `docs/strategy/technology-review.md`
 - Controller reference: `docs/reference/creature-controller-reference.md`
-- Operations and standards: `docs/operations/doc-hygiene.md`, `docs/standards/agent-instruction-layering.md`, `docs/standards/architecture-lint-policy.md`
+- Operations and standards: `docs/operations/doc-hygiene.md`, `docs/standards/agent-instruction-layering.md`, `docs/standards/architecture-lint-policy.md`, `docs/standards/plan-quality-gate-policy.md`, `docs/standards/documentation-consistency-policy.md`
 
 ## Git Hygiene
 

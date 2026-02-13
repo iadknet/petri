@@ -8,6 +8,38 @@ This document defines:
 
 It intentionally separates **Current Implementation** from **Planned Model** to avoid spec drift.
 
+**Goal IDs:** `GP-01`, `GP-02`, `GP-03`, `GP-04`
+
+## Goal Alignment
+
+- `GP-01`: Keeps architecture choices test-oriented; deterministic mechanics are justified where they improve verification quality.
+- `GP-02`: Documents crate boundaries and dependency ownership to prevent cross-layer coupling drift.
+- `GP-03`: Keeps architecture decisions aligned with high-confidence iteration and safe refactoring.
+- `GP-04`: Defines observability expectations for inspector and diagnostics behavior.
+
+## Boundary Impact
+
+- Crate direction remains `petri-graph -> petri-core -> petri-server/petri-cli`.
+- Simulation policy remains in `petri-core`; graph representation/evaluation remains in `petri-graph`.
+- Transport/runtime payload concerns remain in `petri-server` and synchronized with `web`.
+- Planned cognition semantics intentionally change controller and world boundaries but do not alter crate ownership.
+
+## Existing Boundary Recheck
+
+| area | decision | rationale |
+| --- | --- | --- |
+| `crates/petri-core` world/tick ownership | `keep` | Core should continue to own simulation lifecycle and arbitration policy. |
+| `crates/petri-server` transport and wire contract ownership | `keep` | Protocol and runtime control concerns belong in server boundary, not core/graph crates. |
+| `crates/petri-graph` controller representation/evaluation ownership | `keep` | Graph crate remains the right boundary for controller I/O surface evolution. |
+
+## Open Questions
+
+| question | decision | owner | status |
+| --- | --- | --- | --- |
+| Should cognition-loop diagnostics include every intermediate step payload? | Start with summary diagnostics in stable payloads; consider expanded traces later if needed. | `petri-server` maintainers | `resolved` |
+| Is backward compatibility for old snapshots required through cognition refactor? | No compatibility guarantee; document semantic break and migration expectations explicitly. | Project maintainers | `resolved` |
+| Can Slice 6/7 proceed before Slice 5.5 semantics stabilize? | No. Keep Slice 5.5 as an explicit prerequisite. | Roadmap owners | `resolved` |
+
 ## Repository Architecture (Current)
 
 ```
