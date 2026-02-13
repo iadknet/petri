@@ -7,13 +7,19 @@ use slotmap::new_key_type;
 use crate::config::WorldConfig;
 
 const DEFAULT_PHENOTYPE_COLOR: [u8; 3] = [204, 61, 61];
+const DEFAULT_PHENOTYPE_CHANNEL_WEIGHTS: [f32; 3] = [1.0, 1.0, 1.0];
+const DEFAULT_PHENOTYPE_CHANNEL_POSITIVE_INCREMENT: [bool; 3] = [true, true, true];
 
 fn default_phenotype_color() -> [u8; 3] {
     DEFAULT_PHENOTYPE_COLOR
 }
 
-fn default_phenotype_positive_increment() -> bool {
-    true
+fn default_phenotype_channel_weights() -> [f32; 3] {
+    DEFAULT_PHENOTYPE_CHANNEL_WEIGHTS
+}
+
+fn default_phenotype_channel_positive_increment() -> [bool; 3] {
+    DEFAULT_PHENOTYPE_CHANNEL_POSITIVE_INCREMENT
 }
 
 new_key_type! {
@@ -165,8 +171,10 @@ pub struct CreatureStateSnapshot {
     pub controller: ComputationGraph,
     #[serde(default = "default_phenotype_color")]
     pub phenotype_color: [u8; 3],
-    #[serde(default = "default_phenotype_positive_increment")]
-    pub phenotype_positive_increment: bool,
+    #[serde(default = "default_phenotype_channel_weights")]
+    pub phenotype_channel_weights: [f32; 3],
+    #[serde(default = "default_phenotype_channel_positive_increment")]
+    pub phenotype_channel_positive_increment: [bool; 3],
     #[serde(default)]
     pub memory_register: Vec<u8>,
     #[serde(default)]

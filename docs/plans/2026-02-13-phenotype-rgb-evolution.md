@@ -33,7 +33,7 @@
 | question | decision | owner | status |
 | --- | --- | --- | --- |
 | Should legacy snapshots with HSV phenotype fields still import? | No; explicit non-goal for this task. | user+agent | resolved |
-| What should mutation constants be for channel-step and polarity flip chance? | Use conservative defaults in `world/color.rs` constants and keep them centralized for tuning. | agent | resolved |
+| What should mutation constants be for channel-step, polarity-flip chance, and weight randomization range? | Use conservative defaults in `world/color.rs` constants and keep them centralized for tuning. | agent | resolved |
 
 ### Task 1: Add failing color mutation tests
 
@@ -56,10 +56,10 @@ Files:
 - Modify: `crates/petri-core/src/world/tests.rs`
 
 Steps:
-1. Replace HSV storage fields with `phenotype_rgb` and `phenotype_positive_increment`.
-2. Implement RGB mutation helper that mutates exactly one channel per mutation event and uses polarity bit for sign.
-3. Add rare polarity flip logic during inheritance.
-4. Update snapshot/state structs and constructors to store/load RGB+polarity directly.
+1. Replace HSV storage fields with `phenotype_color`, `phenotype_channel_weights`, and `phenotype_channel_positive_increment`.
+2. Implement RGB mutation helper that mutates exactly one weighted-selected channel per mutation event and uses per-channel polarity bits for sign.
+3. Add rare selected-channel polarity flip logic during inheritance and re-randomize the selected channel weight each mutation.
+4. Update snapshot/state structs and constructors to store/load RGB + channel weights + channel polarity bits directly.
 5. Update world tests/fixtures to compile and assert new behavior.
 
 ### Task 3: Verify and document behavior update
