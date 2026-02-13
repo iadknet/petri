@@ -33,7 +33,7 @@ pub struct RuntimeConfigPatch {
     pub energy_per_tick_decay: Option<f32>,
     pub energy_per_move: Option<f32>,
     pub energy_per_inventory_attempt: Option<f32>,
-    pub energy_per_compute_node: Option<f32>,
+    pub energy_per_think_step: Option<f32>,
     pub energy_per_reproduce: Option<f32>,
     pub illegal_action_energy_penalty: Option<f32>,
     pub energy_max: Option<f32>,

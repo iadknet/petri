@@ -22,6 +22,11 @@ pub(super) fn is_input_node(node: &NodeKind) -> bool {
             | NodeKind::InputMoveBlockedLastTick
             | NodeKind::InputMemoryRead
             | NodeKind::InputMemoryAddressNorm
+            | NodeKind::InputPrevActionConfidence(_)
+            | NodeKind::InputMaxActionConfidence(_)
+            | NodeKind::InputEnergyStartTick
+            | NodeKind::InputEnergySpentTick
+            | NodeKind::InputEnergyRemaining
             | NodeKind::InputTouchExists(_)
             | NodeKind::InputTouchFoodValue(_)
             | NodeKind::InputTouchHasBarrier(_)
@@ -40,6 +45,8 @@ pub(super) fn is_output_node(node: &NodeKind) -> bool {
             | NodeKind::OutputMoveY
             | NodeKind::OutputEat
             | NodeKind::OutputReproduce
+            | NodeKind::OutputNoOp
+            | NodeKind::OutputHalt
             | NodeKind::OutputMemoryAddressSelect
             | NodeKind::OutputMemoryWriteValue
             | NodeKind::OutputMemoryWriteEnable

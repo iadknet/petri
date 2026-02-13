@@ -18,18 +18,15 @@ This repository now contains the first runnable vertical slice of the Petri simu
 
 Compatibility note: `petri-roadmap.md`, `petri-architecture.md`, and `petri-technology-review.md` remain as root stubs that point to the canonical `docs/strategy/*` files.
 
-## Upcoming cognition refactor (planned, not implemented yet)
+## Cognition-first tick lifecycle (implemented)
 
-The next major simulation refactor is documented and planned but **not implemented yet**.
-
-Planned target semantics:
-- creatures can perform energy-bounded internal thinking loops inside a tick
-- controller gains explicit `halt` and `no_op` outputs
-- at most one world interaction is executed per creature per tick
-- action arbitration uses final-thought outputs with explicit no-op support
-- computation-energy tuning shifts toward an `energy_per_think_step` model
-
-During this transition, docs separate current behavior from planned behavior. Runtime/API behavior in code remains unchanged until implementation lands.
+Current semantics:
+- creatures execute an energy-bounded internal think loop inside each tick
+- controller supports explicit `halt` and `no_op` outputs
+- at most one world interaction executes per creature per tick
+- final action arbitration uses final-thought outputs (with explicit no-op competition)
+- cognition energy tuning uses `energy_per_think_step`
+- inspector and snapshot payloads include cognition diagnostics (`think_steps`, `halted`, `selected_action`, `selected_confidence`)
 
 ## Prerequisites
 
@@ -73,11 +70,11 @@ Open `http://127.0.0.1:5173`.
 The app expects the backend on `127.0.0.1:4000`.
 
 The web control rail now exposes:
-- Startup draft: initial creatures, world width/height, sensor radius, initial food density, food spawn/growth, spread threshold, spawn floor density, tick decay, move cost, world wrap
+- Startup draft: initial creatures, world width/height, sensor radius, initial food density, food spawn/growth, spread threshold, spawn floor density, tick decay, think-step cost, move cost, world wrap
 - Runtime controls: pause/resume, ticks-per-second, live sensor radius and food spawn/growth plus spread threshold and spawn floor density
 - Advanced Stage 1 controls for energy and mutation tuning
 - Viewport paint mode toggle with floating tools (food, barrier, erase food, erase barrier), brush sizes, idle preview mode, and clear paint action (idle/paused only)
-- Creature inspector (click creature in viewport)
+- Creature inspector (click creature in viewport), including cognition diagnostics and expanded controller I/O fields
 - Live population/average-energy chart
 - Snapshot export/import panel (`GET/POST /simulation/snapshot`)
 - Idle placeholder before first start, plus pending-restart state when startup-only values change during a run

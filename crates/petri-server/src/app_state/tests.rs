@@ -30,6 +30,7 @@ fn startup_draft_validation_allows_expanded_upper_bounds() {
     draft.energy_initial = 12.0;
     draft.energy_per_tick_decay = 0.25;
     draft.energy_per_move = 0.25;
+    draft.energy_per_think_step = 0.25;
 
     assert!(draft.validate().is_ok());
 }

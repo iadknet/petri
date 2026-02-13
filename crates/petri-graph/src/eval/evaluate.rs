@@ -44,6 +44,15 @@ impl ComputationGraph {
                 }
                 NodeKind::InputMemoryRead => inputs.memory_read.clamp(0.0, 1.0),
                 NodeKind::InputMemoryAddressNorm => inputs.memory_address_norm.clamp(0.0, 1.0),
+                NodeKind::InputPrevActionConfidence(index) => {
+                    sensor_at(&inputs.prev_action_confidence, index).clamp(0.0, 1.0)
+                }
+                NodeKind::InputMaxActionConfidence(index) => {
+                    sensor_at(&inputs.max_action_confidence, index).clamp(0.0, 1.0)
+                }
+                NodeKind::InputEnergyStartTick => inputs.energy_start_tick.clamp(0.0, 1.0),
+                NodeKind::InputEnergySpentTick => inputs.energy_spent_tick.clamp(0.0, 1.0),
+                NodeKind::InputEnergyRemaining => inputs.energy_remaining.clamp(0.0, 1.0),
                 NodeKind::InputTouchExists(index) => {
                     sensor_at(&inputs.touch_exists, index).clamp(0.0, 1.0)
                 }
@@ -121,10 +130,18 @@ impl ComputationGraph {
                         a
                     }
                 }
+                NodeKind::OutputHalt => {
+                    if weighted_inputs.is_empty() {
+                        1.0
+                    } else {
+                        weighted_inputs.iter().sum()
+                    }
+                }
                 NodeKind::OutputMoveX
                 | NodeKind::OutputMoveY
                 | NodeKind::OutputEat
                 | NodeKind::OutputReproduce
+                | NodeKind::OutputNoOp
                 | NodeKind::OutputMemoryAddressSelect
                 | NodeKind::OutputMemoryWriteValue
                 | NodeKind::OutputMemoryWriteEnable
@@ -140,6 +157,8 @@ impl ComputationGraph {
                 NodeKind::OutputMoveY => outputs.move_y = value.clamp(-1.0, 1.0),
                 NodeKind::OutputEat => outputs.eat = value.clamp(0.0, 1.0),
                 NodeKind::OutputReproduce => outputs.reproduce = value.clamp(0.0, 1.0),
+                NodeKind::OutputNoOp => outputs.no_op = value.clamp(0.0, 1.0),
+                NodeKind::OutputHalt => outputs.halt = value.clamp(0.0, 1.0),
                 NodeKind::OutputMemoryAddressSelect => {
                     outputs.memory_address_select = value.clamp(-1.0, 1.0)
                 }

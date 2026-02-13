@@ -32,6 +32,36 @@ pub struct MemoryHeadState {
     pub write_applied: bool,
 }
 
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum SelectedAction {
+    Move,
+    Eat,
+    Reproduce,
+    InventoryPickup,
+    InventoryPut,
+    NoOp,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize)]
+pub struct CognitionDiagnostics {
+    pub think_steps: u16,
+    pub halted: bool,
+    pub selected_action: SelectedAction,
+    pub selected_confidence: f32,
+}
+
+impl Default for CognitionDiagnostics {
+    fn default() -> Self {
+        Self {
+            think_steps: 0,
+            halted: false,
+            selected_action: SelectedAction::NoOp,
+            selected_confidence: 0.0,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CreatureSnapshot {
     pub id: u64,
@@ -137,6 +167,7 @@ pub struct CreatureStateSnapshot {
     pub last_inputs: SensorInputs,
     #[serde(default)]
     pub last_outputs: ActionOutputs,
+    pub cognition: CognitionDiagnostics,
     #[serde(default)]
     pub slot_capacity: u8,
     #[serde(default)]
@@ -161,6 +192,7 @@ pub struct CreatureDetail {
     pub last_inputs: SensorInputs,
     pub last_outputs: ActionOutputs,
     pub last_memory_head: MemoryHeadState,
+    pub cognition: CognitionDiagnostics,
     pub events: Vec<CreatureEvent>,
     #[serde(default)]
     pub slot_capacity: u8,

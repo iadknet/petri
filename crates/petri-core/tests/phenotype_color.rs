@@ -62,7 +62,7 @@ fn offspring_color_is_close_to_parent_color() {
         food_energy_value: 10.0,
         energy_per_tick_decay: 0.01,
         energy_per_move: 0.01,
-        energy_per_compute_node: 0.0,
+        energy_per_think_step: 0.0,
         offspring_energy_fraction: 0.4,
         ..WorldConfig::default()
     };

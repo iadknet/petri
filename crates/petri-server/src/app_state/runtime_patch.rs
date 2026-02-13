@@ -2,6 +2,8 @@ use petri_core::WorldConfig;
 
 use super::RuntimeConfigPatch;
 
+const MIN_ENERGY_PER_THINK_STEP: f32 = 0.0001;
+
 pub(super) fn apply_runtime_patch(config: &mut WorldConfig, patch: &RuntimeConfigPatch) {
     if let Some(paused) = patch.paused {
         config.paused = paused;
@@ -39,8 +41,8 @@ pub(super) fn apply_runtime_patch(config: &mut WorldConfig, patch: &RuntimeConfi
     if let Some(value) = patch.energy_per_inventory_attempt {
         config.energy_per_inventory_attempt = value.clamp(0.0, 0.20);
     }
-    if let Some(value) = patch.energy_per_compute_node {
-        config.energy_per_compute_node = value.max(0.0);
+    if let Some(value) = patch.energy_per_think_step {
+        config.energy_per_think_step = value.max(MIN_ENERGY_PER_THINK_STEP);
     }
     if let Some(value) = patch.energy_per_reproduce {
         config.energy_per_reproduce = value.max(0.0);

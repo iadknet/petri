@@ -126,8 +126,11 @@ fn creatures_can_reproduce_when_energy_is_high() {
         ..WorldConfig::default()
     };
     let mut world = World::new(cfg, 21);
-    let (_id, parent) = world.creatures.iter().next().unwrap();
+    let (id, parent) = world.creatures.iter().next().unwrap();
     let idx = world.idx(parent.x, parent.y);
+    if let Some(parent_mut) = world.creatures.get_mut(id) {
+        parent_mut.controller = reproduce_only_controller();
+    }
     world.cells[idx].food = 1.0;
     assert_eq!(world.creature_count(), 1);
     world.tick();
@@ -278,6 +281,7 @@ fn insert_idle_creature(world: &mut World, x: u32, y: u32, seed: u64) -> Creatur
         last_inputs: SensorInputs::default(),
         last_outputs: ActionOutputs::default(),
         last_memory_head: MemoryHeadState::default(),
+        cognition: CognitionDiagnostics::default(),
     };
 
     let id = world.creatures.insert(creature);
@@ -289,9 +293,10 @@ fn always_reproduce_and_eat_controller() -> ComputationGraph {
     ComputationGraph {
         palette: ControllerPalette::Hybrid,
         nodes: vec![
-            NodeKind::Constant(1.0),   // 0
+            NodeKind::Constant(0.6),   // 0
             NodeKind::OutputEat,       // 1
-            NodeKind::OutputReproduce, // 2
+            NodeKind::Constant(1.0),   // 2
+            NodeKind::OutputReproduce, // 3
         ],
         edges: vec![
             Edge {
@@ -300,8 +305,8 @@ fn always_reproduce_and_eat_controller() -> ComputationGraph {
                 weight: 1.0,
             },
             Edge {
-                from: 0,
-                to: 2,
+                from: 2,
+                to: 3,
                 weight: 1.0,
             },
         ],
@@ -418,6 +423,96 @@ fn inventory_controller(
     }
 }
 
+const ACTION_NO_OP_INDEX: usize = 5;
+
+fn cognition_arbitration_controller(
+    eat_confidence: f32,
+    reproduce_confidence: f32,
+    no_op_confidence: f32,
+    halt_confidence: f32,
+) -> ComputationGraph {
+    ComputationGraph {
+        palette: ControllerPalette::Hybrid,
+        nodes: vec![
+            NodeKind::Constant(eat_confidence),       // 0
+            NodeKind::OutputEat,                      // 1
+            NodeKind::Constant(reproduce_confidence), // 2
+            NodeKind::OutputReproduce,                // 3
+            NodeKind::Constant(no_op_confidence),     // 4
+            NodeKind::OutputNoOp,                     // 5
+            NodeKind::Constant(halt_confidence),      // 6
+            NodeKind::OutputHalt,                     // 7
+        ],
+        edges: vec![
+            Edge {
+                from: 0,
+                to: 1,
+                weight: 1.0,
+            },
+            Edge {
+                from: 2,
+                to: 3,
+                weight: 1.0,
+            },
+            Edge {
+                from: 4,
+                to: 5,
+                weight: 1.0,
+            },
+            Edge {
+                from: 6,
+                to: 7,
+                weight: 1.0,
+            },
+        ],
+    }
+}
+
+fn cognition_memory_probe_controller() -> ComputationGraph {
+    ComputationGraph {
+        palette: ControllerPalette::Hybrid,
+        nodes: vec![
+            NodeKind::Constant(-1.0),                                      // 0
+            NodeKind::OutputMemoryAddressSelect,                           // 1
+            NodeKind::Constant(1.0),                                       // 2
+            NodeKind::OutputMemoryWriteEnable,                             // 3
+            NodeKind::Constant(1.0),                                       // 4
+            NodeKind::OutputMemoryWriteValue,                              // 5
+            NodeKind::Constant(1.0),                                       // 6
+            NodeKind::OutputNoOp,                                          // 7
+            NodeKind::InputPrevActionConfidence(ACTION_NO_OP_INDEX as u8), // 8
+            NodeKind::OutputHalt,                                          // 9
+        ],
+        edges: vec![
+            Edge {
+                from: 0,
+                to: 1,
+                weight: 1.0,
+            },
+            Edge {
+                from: 2,
+                to: 3,
+                weight: 1.0,
+            },
+            Edge {
+                from: 4,
+                to: 5,
+                weight: 1.0,
+            },
+            Edge {
+                from: 6,
+                to: 7,
+                weight: 1.0,
+            },
+            Edge {
+                from: 8,
+                to: 9,
+                weight: 1.0,
+            },
+        ],
+    }
+}
+
 fn slot_selector(slot_id: usize) -> f32 {
     assert!((1..=SLOT_COUNT_MAX).contains(&slot_id));
     let width = 2.0 / SLOT_COUNT_MAX as f32;
@@ -475,7 +570,7 @@ fn inventory_actions_use_explicit_slot_addressing_for_pickup_and_put() {
         food_spawn_rate: 0.0,
         food_growth_rate: 0.0,
         energy_per_tick_decay: 0.0,
-        energy_per_compute_node: 0.0,
+        energy_per_think_step: 0.0,
         min_reproduce_energy: 10.0,
         world_wrap: false,
         ..WorldConfig::default()
@@ -550,7 +645,7 @@ fn illegal_inventory_attempts_stack_penalties_and_record_reasons() {
         food_spawn_rate: 0.0,
         food_growth_rate: 0.0,
         energy_per_tick_decay: 0.0,
-        energy_per_compute_node: 0.0,
+        energy_per_think_step: 0.0,
         energy_per_move: 0.0,
         energy_per_reproduce: 0.0,
         energy_per_inventory_attempt: 0.05,
@@ -626,7 +721,7 @@ fn illegal_move_cost_includes_load_scaling_and_penalty() {
         food_spawn_rate: 0.0,
         food_growth_rate: 0.0,
         energy_per_tick_decay: 0.0,
-        energy_per_compute_node: 0.0,
+        energy_per_think_step: 0.0,
         energy_per_move: 0.1,
         illegal_action_energy_penalty: 0.05,
         min_reproduce_energy: 10.0,
@@ -684,7 +779,7 @@ fn reproduce_failure_charges_attempt_cost_plus_illegal_penalty() {
         food_spawn_rate: 0.0,
         food_growth_rate: 0.0,
         energy_per_tick_decay: 0.0,
-        energy_per_compute_node: 0.0,
+        energy_per_think_step: 0.0,
         energy_per_reproduce: 0.2,
         illegal_action_energy_penalty: 0.1,
         min_reproduce_energy: 0.0,
@@ -729,7 +824,7 @@ fn eat_failure_charges_only_illegal_penalty() {
         food_spawn_rate: 0.0,
         food_growth_rate: 0.0,
         energy_per_tick_decay: 0.0,
-        energy_per_compute_node: 0.0,
+        energy_per_think_step: 0.0,
         illegal_action_energy_penalty: 0.07,
         min_reproduce_energy: 10.0,
         world_wrap: false,
@@ -774,7 +869,7 @@ fn offspring_slot_capacity_mutates_within_bounds_and_slots_start_empty() {
         food_spawn_rate: 0.0,
         food_growth_rate: 0.0,
         energy_per_tick_decay: 0.0,
-        energy_per_compute_node: 0.0,
+        energy_per_think_step: 0.0,
         energy_per_reproduce: 0.0,
         min_reproduce_energy: 0.2,
         offspring_energy_fraction: 0.5,
@@ -819,7 +914,7 @@ fn offspring_slot_capacity_shrinks_from_max_boundary() {
         food_spawn_rate: 0.0,
         food_growth_rate: 0.0,
         energy_per_tick_decay: 0.0,
-        energy_per_compute_node: 0.0,
+        energy_per_think_step: 0.0,
         energy_per_reproduce: 0.0,
         min_reproduce_energy: 0.2,
         offspring_energy_fraction: 0.5,
@@ -862,7 +957,7 @@ fn death_drop_falls_back_in_self_n_e_s_w_order() {
         food_spawn_rate: 0.0,
         food_growth_rate: 0.0,
         energy_per_tick_decay: 0.2,
-        energy_per_compute_node: 0.0,
+        energy_per_think_step: 0.0,
         min_reproduce_energy: 10.0,
         world_wrap: false,
         ..WorldConfig::default()
@@ -1087,7 +1182,7 @@ fn memory_write_output_updates_targeted_creature_register_byte() {
 }
 
 #[test]
-fn compute_cost_is_charged_once_per_tick_with_two_stage_memory_evaluation() {
+fn think_step_cost_is_charged_once_when_controller_has_no_halt_output() {
     let cfg = WorldConfig {
         width: 6,
         height: 6,
@@ -1096,7 +1191,7 @@ fn compute_cost_is_charged_once_per_tick_with_two_stage_memory_evaluation() {
         energy_max: 1.0,
         energy_per_tick_decay: 0.0,
         energy_per_move: 0.0,
-        energy_per_compute_node: 0.1,
+        energy_per_think_step: 0.1,
         food_spawn_rate: 0.0,
         food_growth_rate: 0.0,
         min_reproduce_energy: 10.0,
@@ -1146,7 +1241,206 @@ fn compute_cost_is_charged_once_per_tick_with_two_stage_memory_evaluation() {
         .creatures
         .get(id)
         .expect("creature should still exist after one tick");
-    assert!((creature.energy - 0.8).abs() < 1e-6);
+    assert!((creature.energy - 0.9).abs() < 1e-6);
+}
+
+#[test]
+fn halt_plus_no_op_prevents_world_interaction() {
+    let cfg = WorldConfig {
+        width: 5,
+        height: 5,
+        initial_creatures: 1,
+        food_spawn_rate: 0.0,
+        food_growth_rate: 0.0,
+        energy_per_tick_decay: 0.0,
+        energy_per_move: 0.0,
+        energy_per_think_step: 0.0,
+        min_reproduce_energy: 10.0,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 6111, ControllerPalette::Hybrid);
+    let (id, x, y) = world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, c)| (id, c.x, c.y))
+        .expect("expected one creature");
+    if let Some(creature) = world.creatures.get_mut(id) {
+        creature.controller = cognition_arbitration_controller(0.9, 0.8, 1.0, 1.0);
+    }
+    let idx = world.idx(x, y);
+    world.cells[idx].food = 1.0;
+
+    world.tick();
+
+    assert_eq!(world.diagnostics().eats, 0);
+    assert_eq!(world.diagnostics().reproductions, 0);
+    assert!((world.cells[idx].food - 1.0).abs() < 1e-6);
+}
+
+#[test]
+fn think_loop_energy_exhaustion_can_kill_creature() {
+    let cfg = WorldConfig {
+        width: 4,
+        height: 4,
+        initial_creatures: 1,
+        food_spawn_rate: 0.0,
+        food_growth_rate: 0.0,
+        energy_initial: 0.001,
+        energy_max: 1.0,
+        energy_per_tick_decay: 0.0,
+        energy_per_move: 0.0,
+        energy_per_think_step: 0.005,
+        min_reproduce_energy: 10.0,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 6112, ControllerPalette::Hybrid);
+    let id = world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, _)| id)
+        .expect("expected one creature");
+    if let Some(creature) = world.creatures.get_mut(id) {
+        creature.controller = cognition_arbitration_controller(0.0, 0.0, 1.0, 0.0);
+    }
+
+    world.tick();
+
+    assert_eq!(world.creature_count(), 0);
+    assert_eq!(world.diagnostics().deaths, 1);
+}
+
+#[test]
+fn exactly_one_world_interaction_runs_per_tick_under_competing_actions() {
+    let cfg = WorldConfig {
+        width: 6,
+        height: 6,
+        initial_creatures: 1,
+        max_creatures: 12,
+        food_spawn_rate: 0.0,
+        food_growth_rate: 0.0,
+        energy_initial: 1.2,
+        energy_max: 1.2,
+        energy_per_tick_decay: 0.0,
+        energy_per_move: 0.0,
+        energy_per_think_step: 0.0,
+        energy_per_reproduce: 0.0,
+        min_reproduce_energy: 0.2,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 6113, ControllerPalette::Hybrid);
+    let (id, x, y) = world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, c)| (id, c.x, c.y))
+        .expect("expected one creature");
+    if let Some(creature) = world.creatures.get_mut(id) {
+        creature.controller = cognition_arbitration_controller(1.0, 0.9, 0.0, 0.0);
+        creature.energy = 1.2;
+    }
+    let idx = world.idx(x, y);
+    world.cells[idx].food = 1.0;
+
+    world.tick();
+
+    let interactions = world.diagnostics().eats + world.diagnostics().reproductions;
+    assert_eq!(interactions, 1);
+}
+
+#[test]
+fn introspection_energy_and_memory_inputs_refresh_each_think_step() {
+    let cfg = WorldConfig {
+        width: 5,
+        height: 5,
+        initial_creatures: 1,
+        food_spawn_rate: 0.0,
+        food_growth_rate: 0.0,
+        energy_initial: 1.0,
+        energy_max: 1.0,
+        energy_per_tick_decay: 0.0,
+        energy_per_move: 0.0,
+        energy_per_think_step: 0.25,
+        min_reproduce_energy: 10.0,
+        ..WorldConfig::default()
+    };
+    let mut world = World::new_with_palette(cfg, 6114, ControllerPalette::Hybrid);
+    let id = world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, _)| id)
+        .expect("expected one creature");
+    if let Some(creature) = world.creatures.get_mut(id) {
+        creature.controller = cognition_memory_probe_controller();
+        creature.memory_register = vec![0];
+    }
+
+    world.tick();
+
+    let creature = world
+        .creatures
+        .get(id)
+        .expect("creature should remain alive");
+    assert_eq!(creature.last_memory_head.read_value, u8::MAX);
+    assert!(creature.last_inputs.prev_action_confidence[ACTION_NO_OP_INDEX] > 0.5);
+    assert!(creature.last_inputs.max_action_confidence[ACTION_NO_OP_INDEX] > 0.5);
+    assert!(creature.last_inputs.energy_spent_tick > 0.0);
+    assert!(creature.last_inputs.energy_remaining < creature.last_inputs.energy_start_tick);
+}
+
+#[test]
+fn equal_final_confidences_use_seeded_tie_break_deterministically() {
+    fn selected_action(diag: WorldDiagnostics) -> Option<&'static str> {
+        match (diag.eats, diag.reproductions) {
+            (1, 0) => Some("eat"),
+            (0, 1) => Some("reproduce"),
+            _ => None,
+        }
+    }
+
+    let cfg = WorldConfig {
+        width: 6,
+        height: 6,
+        initial_creatures: 1,
+        max_creatures: 12,
+        food_spawn_rate: 0.0,
+        food_growth_rate: 0.0,
+        energy_initial: 1.2,
+        energy_max: 1.2,
+        energy_per_tick_decay: 0.0,
+        energy_per_move: 0.0,
+        energy_per_think_step: 0.0,
+        energy_per_reproduce: 0.0,
+        min_reproduce_energy: 0.2,
+        ..WorldConfig::default()
+    };
+    let mut seed_world = World::new_with_palette(cfg, 6115, ControllerPalette::Hybrid);
+    let (id, x, y) = seed_world
+        .creatures
+        .iter()
+        .next()
+        .map(|(id, c)| (id, c.x, c.y))
+        .expect("expected one creature");
+    if let Some(creature) = seed_world.creatures.get_mut(id) {
+        creature.controller = cognition_arbitration_controller(1.0, 1.0, 0.0, 0.0);
+        creature.energy = 1.2;
+    }
+    let idx = seed_world.idx(x, y);
+    seed_world.cells[idx].food = 1.0;
+
+    let snapshot = seed_world.snapshot();
+    let mut a = World::from_snapshot(snapshot.clone());
+    let mut b = World::from_snapshot(snapshot);
+
+    a.tick();
+    b.tick();
+
+    let a_choice = selected_action(a.diagnostics());
+    let b_choice = selected_action(b.diagnostics());
+    assert!(a_choice.is_some());
+    assert_eq!(a_choice, b_choice);
 }
 
 #[test]
@@ -1159,7 +1453,7 @@ fn offspring_inherits_parent_memory_bytes() {
         food_spawn_rate: 0.0,
         food_growth_rate: 0.0,
         energy_per_tick_decay: 0.0,
-        energy_per_compute_node: 0.0,
+        energy_per_think_step: 0.0,
         energy_per_reproduce: 0.0,
         min_reproduce_energy: 0.2,
         offspring_energy_fraction: 0.5,
@@ -1604,6 +1898,7 @@ fn perception_reports_nearest_creature_direction_distance_and_density() {
         last_inputs: SensorInputs::default(),
         last_outputs: petri_graph::ActionOutputs::default(),
         last_memory_head: MemoryHeadState::default(),
+        cognition: CognitionDiagnostics::default(),
     };
     let b_controller = idle_controller();
     let b = Creature {
@@ -1628,6 +1923,7 @@ fn perception_reports_nearest_creature_direction_distance_and_density() {
         last_inputs: SensorInputs::default(),
         last_outputs: petri_graph::ActionOutputs::default(),
         last_memory_head: MemoryHeadState::default(),
+        cognition: CognitionDiagnostics::default(),
     };
     let id_a = world.creatures.insert(a);
     let id_b = world.creatures.insert(b);
@@ -1826,6 +2122,7 @@ fn spawn_random_creature_finds_free_cell_beyond_random_attempt_window() {
                 last_inputs: SensorInputs::default(),
                 last_outputs: ActionOutputs::default(),
                 last_memory_head: MemoryHeadState::default(),
+                cognition: CognitionDiagnostics::default(),
             };
             creature_seed += 1;
             let id = world.creatures.insert(creature);
@@ -1934,6 +2231,9 @@ fn offspring_controller_is_mutated_from_parent() {
         max_creatures: 8,
         energy_initial: 1.5,
         min_reproduce_energy: 0.8,
+        weight_mutation_rate: 1.0,
+        logic_node_mutation_rate: 1.0,
+        structural_mutation_rate: 1.0,
         ..WorldConfig::default()
     };
     let mut world = World::new_with_palette(cfg, 52, ControllerPalette::Hybrid);
@@ -1943,7 +2243,7 @@ fn offspring_controller_is_mutated_from_parent() {
         (id, parent.x, parent.y)
     };
     if let Some(parent_mut) = world.creatures.get_mut(parent_id) {
-        parent_mut.controller = ComputationGraph::founder(ControllerPalette::Hybrid);
+        parent_mut.controller = always_reproduce_and_eat_controller();
     }
     let idx = world.idx(px, py);
     world.cells[idx].food = 1.0;
@@ -2168,7 +2468,7 @@ fn founder_seeded_hybrid_population_survives_short_horizon() {
         max_creatures: 1000,
         food_spawn_rate: 0.1,
         food_growth_rate: 0.2,
-        energy_per_compute_node: 0.002,
+        energy_per_think_step: 0.002,
         ..WorldConfig::default()
     };
     let mut world = World::new_with_palette(cfg, 77, ControllerPalette::Hybrid);
@@ -2375,6 +2675,38 @@ fn world_snapshot_round_trip_preserves_last_inputs_outputs_and_blocked_feedback(
     assert!(restored_creature.last_inputs.move_blocked_last_tick > 0.5);
     assert!(restored_creature.last_outputs.move_x > 0.9);
     assert!(restored_creature.last_memory_head.address_index < FOUNDER_MEMORY_REGISTER_BITS as u16);
+    assert_eq!(
+        restored_creature.cognition.selected_action,
+        SelectedAction::Move
+    );
+    assert!(restored_creature.cognition.think_steps >= 1);
+    assert!(restored_creature.cognition.selected_confidence > 0.5);
+}
+
+#[test]
+fn world_snapshot_import_rejects_missing_cognition_fields() {
+    let cfg = WorldConfig {
+        width: 6,
+        height: 6,
+        initial_creatures: 1,
+        ..WorldConfig::default()
+    };
+    let world = World::new_with_palette(cfg, 31337, ControllerPalette::Hybrid);
+    let snapshot = world.snapshot();
+    let mut json = serde_json::to_value(snapshot).expect("snapshot should serialize");
+
+    let creatures = json
+        .get_mut("creatures")
+        .and_then(Value::as_array_mut)
+        .expect("creatures should serialize as array");
+    let first_creature = creatures
+        .first_mut()
+        .and_then(Value::as_object_mut)
+        .expect("expected one creature in snapshot json");
+    first_creature.remove("cognition");
+
+    let legacy_snapshot = serde_json::from_value::<WorldSnapshot>(json);
+    assert!(legacy_snapshot.is_err());
 }
 
 #[test]
@@ -2419,6 +2751,9 @@ fn creature_detail_exposes_last_inputs_outputs_and_events() {
     assert!((0.0..=1.0).contains(&detail.last_inputs.barrier_distance));
     assert!((0.0..=1.0).contains(&detail.last_inputs.memory_address_norm));
     assert!(detail.last_memory_head.address_index < FOUNDER_MEMORY_REGISTER_BITS as u16);
+    assert_eq!(detail.cognition.selected_action, SelectedAction::Move);
+    assert!(detail.cognition.think_steps >= 1);
+    assert!(detail.cognition.selected_confidence > 0.5);
     assert!(detail
         .events
         .iter()

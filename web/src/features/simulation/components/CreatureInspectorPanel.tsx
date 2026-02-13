@@ -25,6 +25,10 @@ function formatColorHex([r, g, b]: [number, number, number]): string {
   return `#${[r, g, b].map((channel) => channel.toString(16).padStart(2, "0")).join("")}`;
 }
 
+function formatConfidenceVector(values: readonly number[]): string {
+  return values.map((value) => value.toFixed(3)).join(", ");
+}
+
 export function CreatureInspectorPanel({ creature, detail }: CreatureInspectorPanelProps) {
   const phenotypeColor: [number, number, number] =
     detail?.phenotype_color ?? creature?.phenotype_color ?? [255, 255, 255];
@@ -133,6 +137,26 @@ export function CreatureInspectorPanel({ creature, detail }: CreatureInspectorPa
                 <span>Memory address (norm)</span>
                 <strong>{formatEnergy(detail.last_inputs.memory_address_norm)}</strong>
               </div>
+              <div className="metric-row">
+                <span>Energy start tick</span>
+                <strong>{formatEnergy(detail.last_inputs.energy_start_tick)}</strong>
+              </div>
+              <div className="metric-row">
+                <span>Energy spent tick</span>
+                <strong>{formatEnergy(detail.last_inputs.energy_spent_tick)}</strong>
+              </div>
+              <div className="metric-row">
+                <span>Energy remaining</span>
+                <strong>{formatEnergy(detail.last_inputs.energy_remaining)}</strong>
+              </div>
+              <div className="metric-row">
+                <span>Prev action confidence</span>
+                <strong>{formatConfidenceVector(detail.last_inputs.prev_action_confidence)}</strong>
+              </div>
+              <div className="metric-row">
+                <span>Max action confidence</span>
+                <strong>{formatConfidenceVector(detail.last_inputs.max_action_confidence)}</strong>
+              </div>
 
               <h3>Touch Sensors</h3>
               {TOUCH_LABELS.map((label, index) => (
@@ -191,6 +215,14 @@ export function CreatureInspectorPanel({ creature, detail }: CreatureInspectorPa
                 <span>Inventory direction select</span>
                 <strong>{formatEnergy(detail.last_outputs.inventory_direction_select)}</strong>
               </div>
+              <div className="metric-row">
+                <span>No-op</span>
+                <strong>{formatEnergy(detail.last_outputs.no_op)}</strong>
+              </div>
+              <div className="metric-row">
+                <span>Halt</span>
+                <strong>{formatEnergy(detail.last_outputs.halt)}</strong>
+              </div>
 
               <h3>Memory Head</h3>
               <div className="metric-row">
@@ -208,6 +240,24 @@ export function CreatureInspectorPanel({ creature, detail }: CreatureInspectorPa
               <div className="metric-row">
                 <span>Write applied</span>
                 <strong>{detail.last_memory_head.write_applied ? "Yes" : "No"}</strong>
+              </div>
+
+              <h3>Cognition</h3>
+              <div className="metric-row">
+                <span>Think steps</span>
+                <strong>{detail.cognition.think_steps}</strong>
+              </div>
+              <div className="metric-row">
+                <span>Halted</span>
+                <strong>{detail.cognition.halted ? "Yes" : "No"}</strong>
+              </div>
+              <div className="metric-row">
+                <span>Selected action</span>
+                <strong>{detail.cognition.selected_action}</strong>
+              </div>
+              <div className="metric-row">
+                <span>Selected confidence</span>
+                <strong>{formatEnergy(detail.cognition.selected_confidence)}</strong>
               </div>
 
               <h3>Illegal Attempts</h3>

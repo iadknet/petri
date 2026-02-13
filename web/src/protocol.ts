@@ -63,6 +63,8 @@ export type IllegalActionAttempt = {
   tick: number;
 };
 
+export type ActionConfidenceVector = [number, number, number, number, number, number];
+
 export type CreatureStateSnapshot = {
   id: number;
   lineage_id: number;
@@ -73,7 +75,14 @@ export type CreatureStateSnapshot = {
   age: number;
   generation: number;
   controller: unknown;
+  phenotype_hue?: number;
+  phenotype_saturation?: number;
   memory_register?: number[];
+  last_memory_head?: MemoryHeadState;
+  last_move_blocked?: boolean;
+  last_inputs?: SensorInputs;
+  last_outputs?: ActionOutputs;
+  cognition: CognitionDiagnostics;
   slot_capacity?: number;
   slots?: (InventoryItem | null)[];
   illegal_attempts?: IllegalActionAttempt[];
@@ -111,6 +120,11 @@ export type SensorInputs = {
   move_blocked_last_tick: number;
   memory_read: number;
   memory_address_norm: number;
+  prev_action_confidence: ActionConfidenceVector;
+  max_action_confidence: ActionConfidenceVector;
+  energy_start_tick: number;
+  energy_spent_tick: number;
+  energy_remaining: number;
   touch_exists: number[];
   touch_food_value: number[];
   touch_has_barrier: number[];
@@ -133,6 +147,8 @@ export type ActionOutputs = {
   inventory_put: number;
   inventory_slot_select: number;
   inventory_direction_select: number;
+  halt: number;
+  no_op: number;
 };
 
 export type MemoryHeadState = {
@@ -140,6 +156,21 @@ export type MemoryHeadState = {
   read_value: number;
   write_value: number;
   write_applied: boolean;
+};
+
+export type SelectedAction =
+  | "move"
+  | "eat"
+  | "reproduce"
+  | "inventory_pickup"
+  | "inventory_put"
+  | "no_op";
+
+export type CognitionDiagnostics = {
+  think_steps: number;
+  halted: boolean;
+  selected_action: SelectedAction;
+  selected_confidence: number;
 };
 
 export type CreatureEvent = {
@@ -162,6 +193,7 @@ export type CreatureDetail = {
   last_inputs: SensorInputs;
   last_outputs: ActionOutputs;
   last_memory_head: MemoryHeadState;
+  cognition: CognitionDiagnostics;
   events: CreatureEvent[];
   slot_capacity: number;
   slots: (InventoryItem | null)[];
@@ -181,7 +213,7 @@ export type ConfigPatch = {
   energy_per_tick_decay?: number;
   energy_per_move?: number;
   energy_per_inventory_attempt?: number;
-  energy_per_compute_node?: number;
+  energy_per_think_step?: number;
   energy_per_reproduce?: number;
   illegal_action_energy_penalty?: number;
   energy_max?: number;
@@ -239,6 +271,7 @@ export type StartupDraft = {
   food_spread_threshold: number;
   food_spawn_floor_density: number;
   energy_per_tick_decay: number;
+  energy_per_think_step: number;
   energy_per_move: number;
   energy_per_inventory_attempt: number;
   illegal_action_energy_penalty: number;

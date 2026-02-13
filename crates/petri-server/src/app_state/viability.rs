@@ -87,6 +87,9 @@ pub(super) fn startup_probe_seed(draft: &StartupDraft) -> u64 {
         .wrapping_add(draft.energy_per_tick_decay.to_bits() as u64);
     seed = seed
         .wrapping_mul(1_099_511_628_211)
+        .wrapping_add(draft.energy_per_think_step.to_bits() as u64);
+    seed = seed
+        .wrapping_mul(1_099_511_628_211)
         .wrapping_add(draft.energy_per_move.to_bits() as u64);
     seed = seed
         .wrapping_mul(1_099_511_628_211)

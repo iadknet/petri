@@ -10,9 +10,10 @@
 ## Current Baseline (Implemented)
 
 - Workspace crates: `petri-core`, `petri-graph`, `petri-server`, `petri-cli`, and `web`.
-- Simulation currently executes graph evaluation during each tick and may execute multiple world interactions in one tick (`eat`, `move`, `reproduce`, inventory actions) when outputs exceed thresholds.
-- Creature memory is currently addressable byte memory with two-stage per-tick memory addressing/write semantics.
+- Simulation now runs a cognition-first tick lifecycle: energy-bounded think loop, final-thought arbitration, and at most one world interaction per tick.
+- Creature memory is addressable byte memory with per-think-step addressing/read/write semantics.
 - Stage 2 environment features up through phenotype color pipeline are present.
+- Cognition diagnostics and new controller I/O channels are surfaced through server/web inspector contracts.
 
 ## Rebaseline (2026-02-13)
 
@@ -23,8 +24,8 @@ Reason for rebaseline:
 - Current tick semantics do not enforce single-action arbitration and do not provide explicit internal deliberation loops with a halt primitive.
 
 This roadmap now distinguishes:
-- **Current behavior**: implemented in code today.
-- **Planned cognition-first behavior**: target model for the next major refactor.
+- **Implemented behavior**: merged and test-covered in code today.
+- **Next slices**: lineage visualization and graph-inspector expansion on top of current cognition semantics.
 
 ---
 
@@ -67,12 +68,10 @@ Delivered baseline capabilities include:
 
 ### Slice 5.5 (New Blocking Slice): Cognition-First Tick Refactor
 
-**Status:** Planned (not implemented).
+**Status:** Implemented.
 
-**Why this is blocking:**
+Delivered outcomes:
 - Slice 6 lineage-tree UX and Slice 7 graph-inspector metrics should be built on final action semantics, not on transitional multi-action tick behavior.
-
-**Planned behavior:**
 - Energy-bounded internal think loop per creature within a tick.
 - Explicit `halt` output to end think loop.
 - Explicit `no_op` output for intentional no world interaction.
@@ -82,11 +81,8 @@ Delivered baseline capabilities include:
 - Three energy-awareness inputs: `energy_start_tick`, `energy_spent_tick`, and `energy_remaining`.
 - Movement confidence derived from `sqrt(move_x^2 + move_y^2)`.
 - Random tie-break for equal final confidences using per-creature seeded RNG.
-
-**Planned config/economics direction:**
-- Introduce `energy_per_think_step` as cognition-cost knob.
-- Normalize planned energy-awareness inputs against `energy_max`, with spent/remaining refreshed each think step.
-- Keep throughput benchmark informational while redesign stabilizes.
+- `energy_per_think_step` is now the cognition-cost knob across runtime and startup contracts.
+- Throughput benchmark remains informational while post-refactor tuning stabilizes.
 
 ### Slice 6 (Downstream of Slice 5.5): Evolutionary Tree API + Canvas Visualization
 
@@ -102,7 +98,7 @@ Delivered baseline capabilities include:
 
 - Slices 1-5 are retained.
 - Slice 5.5 cognition-first semantics are implemented and verified.
-- Slice 6 and 7 are implemented on top of the cognition-first model.
+- Slice 6 and 7 remain to be implemented on top of the cognition-first model.
 
 ---
 
@@ -141,17 +137,17 @@ Large-scale analysis tooling and stress-test environments remain downstream and 
 
 ### Documentation Policy
 
-- Canonical docs must explicitly label **Current** vs **Planned** behavior.
+- Canonical docs must reflect implemented semantics and clearly identify upcoming slices without contradicting current behavior.
 - Plan files in `docs/plans/` are execution artifacts and may be removed when superseded by rebaselines.
 
-### Compatibility Policy (for upcoming Slice 5.5)
+### Compatibility Policy
 
-- The cognition-first refactor is expected to be a breaking semantic change.
-- Old snapshots/config expectations may not remain compatible.
+- The cognition-first refactor introduced an intentional semantic break.
+- Snapshot payloads that omit required cognition fields are not guaranteed to load.
 
 ---
 
 ## Immediate Next Step
 
-- Execute the documentation-only rebaseline plan.
-- Then execute the cognition-first tick refactor implementation plan.
+- Execute Slice 6 (lineage tree API + canvas visualization) on top of the cognition-first baseline.
+- Keep Slice 7 planning aligned to the single-action arbitration model.

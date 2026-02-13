@@ -31,7 +31,7 @@ pub struct WorldConfig {
     pub energy_per_move: f32,
     #[serde(default = "default_energy_per_inventory_attempt")]
     pub energy_per_inventory_attempt: f32,
-    pub energy_per_compute_node: f32,
+    pub energy_per_think_step: f32,
     pub energy_per_reproduce: f32,
     #[serde(default = "default_illegal_action_energy_penalty")]
     pub illegal_action_energy_penalty: f32,
@@ -65,7 +65,7 @@ impl Default for WorldConfig {
             energy_per_tick_decay: 0.01,
             energy_per_move: 0.02,
             energy_per_inventory_attempt: default_energy_per_inventory_attempt(),
-            energy_per_compute_node: 0.005,
+            energy_per_think_step: 0.005,
             energy_per_reproduce: 0.12,
             illegal_action_energy_penalty: default_illegal_action_energy_penalty(),
             energy_initial: 0.7,
@@ -96,5 +96,6 @@ mod tests {
         assert!((cfg.structural_mutation_rate - 0.02).abs() < f32::EPSILON);
         assert!((cfg.illegal_action_energy_penalty - 0.01).abs() < f32::EPSILON);
         assert!((cfg.energy_per_inventory_attempt - 0.005).abs() < f32::EPSILON);
+        assert!(cfg.energy_per_think_step > 0.0);
     }
 }

@@ -4,6 +4,8 @@ use petri_core::WorldConfig;
 
 use super::SimulationError;
 
+const MIN_ENERGY_PER_THINK_STEP: f32 = 0.0001;
+
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct StartupDraft {
     pub initial_creatures: usize,
@@ -18,6 +20,7 @@ pub struct StartupDraft {
     pub food_spread_threshold: f32,
     pub food_spawn_floor_density: f32,
     pub energy_per_tick_decay: f32,
+    pub energy_per_think_step: f32,
     pub energy_per_move: f32,
     pub energy_per_inventory_attempt: f32,
     pub illegal_action_energy_penalty: f32,
@@ -38,6 +41,7 @@ pub struct StartupDraftPatch {
     pub food_spread_threshold: Option<f32>,
     pub food_spawn_floor_density: Option<f32>,
     pub energy_per_tick_decay: Option<f32>,
+    pub energy_per_think_step: Option<f32>,
     pub energy_per_move: Option<f32>,
     pub energy_per_inventory_attempt: Option<f32>,
     pub illegal_action_energy_penalty: Option<f32>,
@@ -58,6 +62,7 @@ impl StartupDraft {
             food_spread_threshold: 0.75,
             food_spawn_floor_density: 0.03,
             energy_per_tick_decay: 0.01,
+            energy_per_think_step: 0.005,
             energy_per_move: 0.02,
             energy_per_inventory_attempt: 0.005,
             illegal_action_energy_penalty: 0.01,
@@ -115,6 +120,10 @@ impl StartupDraft {
         if let Some(v) = patch.energy_per_tick_decay {
             changed |= (self.energy_per_tick_decay - v).abs() > f32::EPSILON;
             self.energy_per_tick_decay = v;
+        }
+        if let Some(v) = patch.energy_per_think_step {
+            changed |= (self.energy_per_think_step - v).abs() > f32::EPSILON;
+            self.energy_per_think_step = v;
         }
         if let Some(v) = patch.energy_per_move {
             changed |= (self.energy_per_move - v).abs() > f32::EPSILON;
@@ -174,6 +183,12 @@ impl StartupDraft {
             0.0,
             0.50,
         )?;
+        validate_range(
+            "energy_per_think_step",
+            self.energy_per_think_step as f64,
+            MIN_ENERGY_PER_THINK_STEP as f64,
+            0.50,
+        )?;
         validate_range("energy_per_move", self.energy_per_move as f64, 0.0, 0.50)?;
         validate_range(
             "energy_per_inventory_attempt",
@@ -221,6 +236,7 @@ pub(super) fn build_world_config(base: &WorldConfig, draft: &StartupDraft) -> Wo
     cfg.food_spread_threshold = draft.food_spread_threshold;
     cfg.food_spawn_floor_density = draft.food_spawn_floor_density;
     cfg.energy_per_tick_decay = draft.energy_per_tick_decay;
+    cfg.energy_per_think_step = draft.energy_per_think_step;
     cfg.energy_per_move = draft.energy_per_move;
     cfg.energy_per_inventory_attempt = draft.energy_per_inventory_attempt;
     cfg.illegal_action_energy_penalty = draft.illegal_action_energy_penalty;
@@ -245,6 +261,7 @@ pub(super) fn startup_draft_from_config(
         food_spread_threshold: config.food_spread_threshold,
         food_spawn_floor_density: config.food_spawn_floor_density,
         energy_per_tick_decay: config.energy_per_tick_decay,
+        energy_per_think_step: config.energy_per_think_step,
         energy_per_move: config.energy_per_move,
         energy_per_inventory_attempt: config.energy_per_inventory_attempt,
         illegal_action_energy_penalty: config.illegal_action_energy_penalty,

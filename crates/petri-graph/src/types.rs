@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 
 pub const TOUCH_DIRECTION_COUNT: usize = 5;
 pub const SLOT_COUNT_MAX: usize = 12;
+pub const ACTION_CONFIDENCE_COUNT: usize = 6;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ControllerPalette {
@@ -26,6 +27,11 @@ pub struct SensorInputs {
     pub move_blocked_last_tick: f32,
     pub memory_read: f32,
     pub memory_address_norm: f32,
+    pub prev_action_confidence: [f32; ACTION_CONFIDENCE_COUNT],
+    pub max_action_confidence: [f32; ACTION_CONFIDENCE_COUNT],
+    pub energy_start_tick: f32,
+    pub energy_spent_tick: f32,
+    pub energy_remaining: f32,
     pub touch_exists: [f32; TOUCH_DIRECTION_COUNT],
     pub touch_food_value: [f32; TOUCH_DIRECTION_COUNT],
     pub touch_has_barrier: [f32; TOUCH_DIRECTION_COUNT],
@@ -52,6 +58,11 @@ impl Default for SensorInputs {
             move_blocked_last_tick: 0.0,
             memory_read: 0.0,
             memory_address_norm: 0.0,
+            prev_action_confidence: [0.0; ACTION_CONFIDENCE_COUNT],
+            max_action_confidence: [0.0; ACTION_CONFIDENCE_COUNT],
+            energy_start_tick: 0.0,
+            energy_spent_tick: 0.0,
+            energy_remaining: 0.0,
             touch_exists: [0.0; TOUCH_DIRECTION_COUNT],
             touch_food_value: [0.0; TOUCH_DIRECTION_COUNT],
             touch_has_barrier: [0.0; TOUCH_DIRECTION_COUNT],
@@ -77,6 +88,8 @@ pub struct ActionOutputs {
     pub inventory_put: f32,
     pub inventory_slot_select: f32,
     pub inventory_direction_select: f32,
+    pub halt: f32,
+    pub no_op: f32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -101,6 +114,11 @@ pub enum NodeKind {
     InputMoveBlockedLastTick,
     InputMemoryRead,
     InputMemoryAddressNorm,
+    InputPrevActionConfidence(u8),
+    InputMaxActionConfidence(u8),
+    InputEnergyStartTick,
+    InputEnergySpentTick,
+    InputEnergyRemaining,
     InputTouchExists(u8),
     InputTouchFoodValue(u8),
     InputTouchHasBarrier(u8),
@@ -126,6 +144,8 @@ pub enum NodeKind {
     OutputMoveY,
     OutputEat,
     OutputReproduce,
+    OutputNoOp,
+    OutputHalt,
     OutputMemoryAddressSelect,
     OutputMemoryWriteValue,
     OutputMemoryWriteEnable,

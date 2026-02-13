@@ -24,6 +24,8 @@ pub(super) fn neural_only() -> ComputationGraph {
             NodeKind::InputMemoryAddressNorm,    // 15
             NodeKind::OutputMemoryWriteEnable,   // 16
             NodeKind::OutputMemoryAddressSelect, // 17
+            NodeKind::OutputNoOp,                // 18
+            NodeKind::OutputHalt,                // 19
         ],
         edges: vec![
             Edge {
@@ -132,6 +134,8 @@ pub(super) fn logic_only() -> ComputationGraph {
             NodeKind::InputMemoryAddressNorm,    // 15
             NodeKind::OutputMemoryWriteEnable,   // 16
             NodeKind::OutputMemoryAddressSelect, // 17
+            NodeKind::OutputNoOp,                // 18
+            NodeKind::OutputHalt,                // 19
         ],
         edges: vec![
             Edge {
@@ -230,6 +234,8 @@ pub(super) fn hybrid() -> ComputationGraph {
             NodeKind::InputMemoryAddressNorm,    // 15
             NodeKind::OutputMemoryWriteEnable,   // 16
             NodeKind::OutputMemoryAddressSelect, // 17
+            NodeKind::OutputNoOp,                // 18
+            NodeKind::OutputHalt,                // 19
         ],
         edges: vec![
             Edge {
@@ -348,6 +354,8 @@ pub(super) fn founder_neural_only() -> ComputationGraph {
     nodes.push(NodeKind::OutputInventoryPut);
     nodes.push(NodeKind::OutputInventorySlotSelect);
     nodes.push(NodeKind::OutputInventoryDirectionSelect);
+    nodes.push(NodeKind::OutputNoOp);
+    nodes.push(NodeKind::OutputHalt);
 
     ComputationGraph {
         palette: ControllerPalette::NeuralOnly,
@@ -468,6 +476,8 @@ pub(super) fn founder_logic_only() -> ComputationGraph {
     nodes.push(NodeKind::OutputInventoryPut);
     nodes.push(NodeKind::OutputInventorySlotSelect);
     nodes.push(NodeKind::OutputInventoryDirectionSelect);
+    nodes.push(NodeKind::OutputNoOp);
+    nodes.push(NodeKind::OutputHalt);
 
     ComputationGraph {
         palette: ControllerPalette::LogicOnly,
@@ -604,6 +614,8 @@ pub(super) fn founder_hybrid() -> ComputationGraph {
     nodes.push(NodeKind::OutputInventoryPut);
     nodes.push(NodeKind::OutputInventorySlotSelect);
     nodes.push(NodeKind::OutputInventoryDirectionSelect);
+    nodes.push(NodeKind::OutputNoOp);
+    nodes.push(NodeKind::OutputHalt);
 
     ComputationGraph {
         palette: ControllerPalette::Hybrid,
