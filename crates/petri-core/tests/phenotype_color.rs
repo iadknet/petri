@@ -23,7 +23,7 @@ fn founder_creatures_have_identical_colors() {
     let colors: Vec<_> = frame.creatures.iter().map(|c| c.phenotype_color).collect();
     let all_same = colors.windows(2).all(|w| w[0] == w[1]);
     assert!(all_same, "founders should all start with identical colors");
-    // Verify the color is red (hue=0, saturation=0.7, value=0.80)
+    // Founder RGB is intentionally a stable red-ish baseline.
     assert_eq!(colors[0], [204, 61, 61], "founder color should be red");
 }
 

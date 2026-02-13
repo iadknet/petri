@@ -6,6 +6,16 @@ use slotmap::new_key_type;
 
 use crate::config::WorldConfig;
 
+const DEFAULT_PHENOTYPE_COLOR: [u8; 3] = [204, 61, 61];
+
+fn default_phenotype_color() -> [u8; 3] {
+    DEFAULT_PHENOTYPE_COLOR
+}
+
+fn default_phenotype_positive_increment() -> bool {
+    true
+}
+
 new_key_type! {
     pub struct CreatureId;
 }
@@ -153,10 +163,10 @@ pub struct CreatureStateSnapshot {
     pub age: u64,
     pub generation: u32,
     pub controller: ComputationGraph,
-    #[serde(default)]
-    pub phenotype_hue: f32,
-    #[serde(default)]
-    pub phenotype_saturation: f32,
+    #[serde(default = "default_phenotype_color")]
+    pub phenotype_color: [u8; 3],
+    #[serde(default = "default_phenotype_positive_increment")]
+    pub phenotype_positive_increment: bool,
     #[serde(default)]
     pub memory_register: Vec<u8>,
     #[serde(default)]

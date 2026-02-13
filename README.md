@@ -79,7 +79,7 @@ The web control rail now exposes:
 - Snapshot export/import panel (`GET/POST /simulation/snapshot`)
 - Idle placeholder before first start, plus pending-restart state when startup-only values change during a run
 
-Creatures now render with heritable phenotype colors (hue drifts on mutation, saturation drifts each generation), and the inspector surfaces the same phenotype color value for the selected creature.
+Creatures now render with heritable phenotype colors (single RGB channels can step on mutation, and a rare heritable polarity flip reverses the step direction), and the inspector surfaces the same phenotype color value for the selected creature.
 
 Default simulation world size is `400x400` and can be changed in Startup Draft before starting (or before restarting) a run.
 

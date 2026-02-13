@@ -53,8 +53,8 @@ type OffspringRequest = (
     u64,
     usize,
     Vec<u8>,
-    f32,
-    f32,
+    [u8; 3],
+    bool,
 );
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -123,8 +123,7 @@ struct Creature {
     parent_id: Option<u64>,
     controller: ComputationGraph,
     phenotype_color: [u8; 3],
-    phenotype_hue: f32,
-    phenotype_saturation: f32,
+    phenotype_positive_increment: bool,
     memory_register: Vec<u8>,
     last_memory_head: MemoryHeadState,
     rng: SmallRng,
