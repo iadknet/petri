@@ -2,6 +2,12 @@
 
 Frontend-specific instructions for coding agents working in `web/`.
 
+## Instruction Layering
+
+- Follow root policy in `../AGENTS.md`.
+- Follow instruction-layering contract in `../docs/standards/agent-instruction-layering.md`.
+- Keep this file focused on frontend-local boundaries and tests.
+
 ## Stack and Scope
 
 - Keep the frontend stack as React + Vite + TypeScript.
