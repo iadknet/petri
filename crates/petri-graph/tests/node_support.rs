@@ -492,3 +492,147 @@ fn touch_slot_inputs_and_inventory_outputs_are_supported_and_clamped() {
     assert_eq!(outputs.reproduce, 1.0);
     assert_eq!(outputs.memory_write_value, 0.0);
 }
+
+#[test]
+fn halt_and_no_op_outputs_are_supported_and_clamped() {
+    let graph = ComputationGraph {
+        palette: ControllerPalette::Hybrid,
+        nodes: vec![
+            NodeKind::Constant(2.0),   // 0
+            NodeKind::OutputHalt,      // 1
+            NodeKind::Constant(-0.25), // 2
+            NodeKind::OutputNoOp,      // 3
+        ],
+        edges: vec![
+            Edge {
+                from: 0,
+                to: 1,
+                weight: 1.0,
+            },
+            Edge {
+                from: 2,
+                to: 3,
+                weight: 1.0,
+            },
+        ],
+    };
+
+    let outputs = graph.evaluate(SensorInputs::default());
+    assert_eq!(outputs.halt, 1.0);
+    assert_eq!(outputs.no_op, 0.0);
+}
+
+#[test]
+fn introspection_and_energy_inputs_are_supported_for_multi_step_updates() {
+    let graph = ComputationGraph {
+        palette: ControllerPalette::Hybrid,
+        nodes: vec![
+            NodeKind::InputPrevActionConfidence(0),  // 0
+            NodeKind::OutputEat,                     // 1
+            NodeKind::InputMaxActionConfidence(5),   // 2
+            NodeKind::OutputReproduce,               // 3
+            NodeKind::InputEnergyStartTick,          // 4
+            NodeKind::OutputMemoryWriteValue,        // 5
+            NodeKind::InputEnergySpentTick,          // 6
+            NodeKind::OutputMemoryWriteEnable,       // 7
+            NodeKind::InputEnergyRemaining,          // 8
+            NodeKind::OutputNoOp,                    // 9
+            NodeKind::InputPrevActionConfidence(99), // 10
+            NodeKind::OutputHalt,                    // 11
+        ],
+        edges: vec![
+            Edge {
+                from: 0,
+                to: 1,
+                weight: 1.0,
+            },
+            Edge {
+                from: 2,
+                to: 3,
+                weight: 1.0,
+            },
+            Edge {
+                from: 4,
+                to: 5,
+                weight: 1.0,
+            },
+            Edge {
+                from: 6,
+                to: 7,
+                weight: 1.0,
+            },
+            Edge {
+                from: 8,
+                to: 9,
+                weight: 1.0,
+            },
+            Edge {
+                from: 10,
+                to: 11,
+                weight: 1.0,
+            },
+        ],
+    };
+
+    let step_one = graph.evaluate(SensorInputs {
+        prev_action_confidence: [1.5, 0.2, 0.3, 0.4, 0.5, 0.6],
+        max_action_confidence: [0.1, 0.2, 0.3, 0.4, 0.5, 1.7],
+        energy_start_tick: 1.8,
+        energy_spent_tick: -0.3,
+        energy_remaining: 0.9,
+        ..SensorInputs::default()
+    });
+    assert_eq!(step_one.eat, 1.0);
+    assert_eq!(step_one.reproduce, 1.0);
+    assert_eq!(step_one.memory_write_value, 1.0);
+    assert_eq!(step_one.memory_write_enable, 0.0);
+    assert_eq!(step_one.no_op, 0.9);
+    assert_eq!(step_one.halt, 0.0);
+
+    let step_two = graph.evaluate(SensorInputs {
+        prev_action_confidence: [0.25, 0.2, 0.3, 0.4, 0.5, 0.6],
+        max_action_confidence: [0.1, 0.2, 0.3, 0.4, 0.5, 0.35],
+        energy_start_tick: 0.8,
+        energy_spent_tick: 0.65,
+        energy_remaining: 1.4,
+        ..SensorInputs::default()
+    });
+    assert_eq!(step_two.eat, 0.25);
+    assert_eq!(step_two.reproduce, 0.35);
+    assert_eq!(step_two.memory_write_value, 0.8);
+    assert_eq!(step_two.memory_write_enable, 0.65);
+    assert_eq!(step_two.no_op, 1.0);
+    assert_eq!(step_two.halt, 0.0);
+}
+
+#[test]
+fn movement_confidence_derivation_is_compatible_with_clamped_axes() {
+    let graph = ComputationGraph {
+        palette: ControllerPalette::Hybrid,
+        nodes: vec![
+            NodeKind::Constant(3.0),  // 0
+            NodeKind::OutputMoveX,    // 1
+            NodeKind::Constant(-2.0), // 2
+            NodeKind::OutputMoveY,    // 3
+        ],
+        edges: vec![
+            Edge {
+                from: 0,
+                to: 1,
+                weight: 1.0,
+            },
+            Edge {
+                from: 2,
+                to: 3,
+                weight: 1.0,
+            },
+        ],
+    };
+
+    let outputs = graph.evaluate(SensorInputs::default());
+    let movement_confidence = (outputs.move_x.powi(2) + outputs.move_y.powi(2)).sqrt();
+
+    assert_eq!(outputs.move_x, 1.0);
+    assert_eq!(outputs.move_y, -1.0);
+    assert!((movement_confidence - 2.0_f32.sqrt()).abs() < 1e-6);
+}

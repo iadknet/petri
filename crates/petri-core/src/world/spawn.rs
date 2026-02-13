@@ -62,6 +62,7 @@ impl World {
                     last_move_blocked: false,
                     last_inputs: SensorInputs::default(),
                     last_outputs: ActionOutputs::default(),
+                    cognition: CognitionDiagnostics::default(),
                 };
                 let id = self.creatures.insert(creature);
                 self.creature_at[idx] = Some(id);

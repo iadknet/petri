@@ -143,6 +143,19 @@ export function StartupDraftPanel({ startupDraft, phase, onUpdate }: StartupDraf
             onChange={(event) => onUpdate("energy_per_tick_decay", Number(event.target.value))}
           />
 
+          <label className="slider-label" htmlFor="think-step-cost-slider">
+            Think-step cost: {startupDraft.energy_per_think_step.toFixed(4)}
+          </label>
+          <input
+            id="think-step-cost-slider"
+            type="range"
+            min={STARTUP_LIMITS.energy_per_think_step.min}
+            max={STARTUP_LIMITS.energy_per_think_step.max}
+            step={STARTUP_LIMITS.energy_per_think_step.step}
+            value={startupDraft.energy_per_think_step}
+            onChange={(event) => onUpdate("energy_per_think_step", Number(event.target.value))}
+          />
+
           <label className="slider-label" htmlFor="move-cost-slider">
             Move cost: {startupDraft.energy_per_move.toFixed(3)}
           </label>

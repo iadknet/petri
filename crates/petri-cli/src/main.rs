@@ -108,7 +108,7 @@ fn founder_survival_config() -> WorldConfig {
         max_creatures: 1000,
         food_spawn_rate: 0.1,
         food_growth_rate: 0.2,
-        energy_per_compute_node: 0.002,
+        energy_per_think_step: 0.002,
         ..WorldConfig::default()
     }
 }

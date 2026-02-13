@@ -62,6 +62,48 @@ fn memory_address_norm(index: usize, len: usize) -> f32 {
     }
 }
 
+const MOVE_ACTION_INDEX: usize = 0;
+const EAT_ACTION_INDEX: usize = 1;
+const REPRODUCE_ACTION_INDEX: usize = 2;
+const INVENTORY_PICKUP_ACTION_INDEX: usize = 3;
+const INVENTORY_PUT_ACTION_INDEX: usize = 4;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum FinalAction {
+    Move,
+    Eat,
+    Reproduce,
+    InventoryPickup,
+    InventoryPut,
+    NoOp,
+}
+
+fn move_confidence(outputs: &ActionOutputs) -> f32 {
+    (outputs.move_x.powi(2) + outputs.move_y.powi(2)).sqrt()
+}
+
+fn action_confidences(outputs: &ActionOutputs) -> [f32; ACTION_CONFIDENCE_COUNT] {
+    [
+        move_confidence(outputs),
+        outputs.eat,
+        outputs.reproduce,
+        outputs.inventory_pickup,
+        outputs.inventory_put,
+        outputs.no_op,
+    ]
+}
+
+fn action_from_index(index: usize) -> FinalAction {
+    match index {
+        MOVE_ACTION_INDEX => FinalAction::Move,
+        EAT_ACTION_INDEX => FinalAction::Eat,
+        REPRODUCE_ACTION_INDEX => FinalAction::Reproduce,
+        INVENTORY_PICKUP_ACTION_INDEX => FinalAction::InventoryPickup,
+        INVENTORY_PUT_ACTION_INDEX => FinalAction::InventoryPut,
+        _ => FinalAction::NoOp,
+    }
+}
+
 impl World {
     pub fn tick(&mut self) {
         if self.config.paused {
@@ -163,110 +205,210 @@ impl World {
                     creature.memory_register.push(0);
                 };
 
-                let compute_cost = self.config.energy_per_compute_node
-                    * creature.controller.compute_node_count() as f32;
-                creature.energy -= self.config.energy_per_tick_decay + compute_cost;
+                creature.energy -= self.config.energy_per_tick_decay;
 
-                let current_idx = (creature.y * width + creature.x) as usize;
-                let random_input = creature.rng.gen_range(-1.0_f32..=1.0_f32);
-                let shared_energy_input =
-                    (creature.energy / self.config.energy_max).clamp(0.0, 1.0);
-                let stage_a_inputs = SensorInputs {
-                    food_here: self.cells[current_idx].food,
-                    energy: shared_energy_input,
-                    random: random_input,
-                    food_direction: perception.food_direction,
-                    food_distance: perception.food_distance,
-                    creature_direction: perception.creature_direction,
-                    creature_distance: perception.creature_distance,
-                    local_density: perception.local_density,
-                    barrier_direction: perception.barrier_direction,
-                    barrier_distance: perception.barrier_distance,
-                    move_blocked_last_tick: if move_blocked_last_tick { 1.0 } else { 0.0 },
-                    memory_read: 0.0,
-                    memory_address_norm: 0.0,
-                    touch_exists,
-                    touch_food_value,
-                    touch_has_barrier,
-                    touch_occupied,
-                    slot_exists,
-                    slot_is_empty,
-                    slot_is_barrier,
-                    slot_food_value,
-                };
-                let address_outputs = creature.controller.evaluate(stage_a_inputs);
-                let memory_idx = Self::selector_to_bin(
-                    address_outputs.memory_address_select,
-                    creature.memory_register.len(),
-                );
-                let memory_read_value = creature.memory_register[memory_idx];
-                let memory_read = memory_byte_to_signal(memory_read_value);
-                let memory_address_signal =
-                    memory_address_norm(memory_idx, creature.memory_register.len());
-                let action_inputs = SensorInputs {
-                    memory_read,
-                    memory_address_norm: memory_address_signal,
-                    ..stage_a_inputs
-                };
-                creature.last_inputs = action_inputs;
+                let think_step_cost = self.config.energy_per_think_step.max(0.0);
+                let energy_max = self.config.energy_max.max(0.01);
+                let tick_start_energy = creature.energy.max(0.0);
+                let tick_start_energy_norm = (tick_start_energy / energy_max).clamp(0.0, 1.0);
+                let has_halt_output = creature
+                    .controller
+                    .nodes
+                    .iter()
+                    .any(|node| matches!(node, petri_graph::NodeKind::OutputHalt));
+                let mut prev_action_confidence = [0.0; ACTION_CONFIDENCE_COUNT];
+                let mut max_action_confidence = [0.0; ACTION_CONFIDENCE_COUNT];
+                let mut final_inputs = creature.last_inputs;
+                let mut final_outputs = creature.last_outputs;
+                let mut final_memory_head = creature.last_memory_head;
+                let mut think_steps: u16 = 0;
+                let mut halted = false;
 
-                let outputs = creature.controller.evaluate(action_inputs);
-                creature.last_outputs = outputs;
-                let write_value = signal_to_memory_byte(outputs.memory_write_value);
-                let write_applied = outputs.memory_write_enable > 0.5;
-                if write_applied {
-                    creature.memory_register[memory_idx] = write_value;
-                }
-                creature.last_memory_head = MemoryHeadState {
-                    address_index: memory_idx as u16,
-                    read_value: memory_read_value,
-                    write_value,
-                    write_applied,
-                };
+                loop {
+                    if creature.energy <= 0.0 {
+                        break;
+                    }
 
-                let selected_inventory_action =
-                    if outputs.inventory_pickup > 0.5 || outputs.inventory_put > 0.5 {
-                        if outputs.inventory_pickup >= outputs.inventory_put
-                            && outputs.inventory_pickup > 0.5
-                        {
-                            Some(IllegalActionKind::InventoryPickup)
-                        } else if outputs.inventory_put > 0.5 {
-                            Some(IllegalActionKind::InventoryPut)
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
+                    let current_idx = (creature.y * width + creature.x) as usize;
+                    let random_input = creature.rng.gen_range(-1.0_f32..=1.0_f32);
+                    let energy_remaining_norm = (creature.energy / energy_max).clamp(0.0, 1.0);
+                    let energy_spent_norm = ((tick_start_energy - creature.energy).max(0.0)
+                        / energy_max)
+                        .clamp(0.0, 1.0);
+                    let stage_a_inputs = SensorInputs {
+                        food_here: self.cells[current_idx].food,
+                        energy: energy_remaining_norm,
+                        random: random_input,
+                        food_direction: perception.food_direction,
+                        food_distance: perception.food_distance,
+                        creature_direction: perception.creature_direction,
+                        creature_distance: perception.creature_distance,
+                        local_density: perception.local_density,
+                        barrier_direction: perception.barrier_direction,
+                        barrier_distance: perception.barrier_distance,
+                        move_blocked_last_tick: if move_blocked_last_tick { 1.0 } else { 0.0 },
+                        memory_read: 0.0,
+                        memory_address_norm: 0.0,
+                        prev_action_confidence,
+                        max_action_confidence,
+                        energy_start_tick: tick_start_energy_norm,
+                        energy_spent_tick: energy_spent_norm,
+                        energy_remaining: energy_remaining_norm,
+                        touch_exists,
+                        touch_food_value,
+                        touch_has_barrier,
+                        touch_occupied,
+                        slot_exists,
+                        slot_is_empty,
+                        slot_is_barrier,
+                        slot_food_value,
                     };
-                let selected_slot_idx =
-                    Self::slot_index_from_selector(outputs.inventory_slot_select);
-                let selected_direction =
-                    Self::direction_from_selector(outputs.inventory_direction_select);
 
-                if selected_inventory_action == Some(IllegalActionKind::InventoryPickup) {
-                    creature.energy -= self.config.energy_per_inventory_attempt;
+                    let address_outputs = creature.controller.evaluate(stage_a_inputs);
+                    let memory_idx = Self::selector_to_bin(
+                        address_outputs.memory_address_select,
+                        creature.memory_register.len(),
+                    );
+                    let memory_read_value = creature.memory_register[memory_idx];
+                    let memory_read = memory_byte_to_signal(memory_read_value);
+                    let memory_address_signal =
+                        memory_address_norm(memory_idx, creature.memory_register.len());
+                    let action_inputs = SensorInputs {
+                        memory_read,
+                        memory_address_norm: memory_address_signal,
+                        ..stage_a_inputs
+                    };
+                    let outputs = creature.controller.evaluate(action_inputs);
 
-                    let failure = if selected_slot_idx >= creature.slot_capacity
-                        || selected_slot_idx >= creature.slots.len()
-                    {
-                        Some(IllegalActionReason::SlotMissing)
-                    } else if creature.slots[selected_slot_idx].is_some() {
-                        Some(IllegalActionReason::SlotFull)
+                    let write_value = signal_to_memory_byte(outputs.memory_write_value);
+                    let write_applied = outputs.memory_write_enable > 0.5;
+                    if write_applied {
+                        creature.memory_register[memory_idx] = write_value;
+                    }
+
+                    final_inputs = action_inputs;
+                    final_outputs = outputs;
+                    final_memory_head = MemoryHeadState {
+                        address_index: memory_idx as u16,
+                        read_value: memory_read_value,
+                        write_value,
+                        write_applied,
+                    };
+
+                    let step_confidences = action_confidences(&outputs);
+                    prev_action_confidence = step_confidences;
+                    for idx in 0..ACTION_CONFIDENCE_COUNT {
+                        max_action_confidence[idx] =
+                            max_action_confidence[idx].max(step_confidences[idx]);
+                    }
+                    think_steps = think_steps.saturating_add(1);
+
+                    if think_step_cost > 0.0 {
+                        creature.energy -= think_step_cost;
+                    }
+                    if outputs.halt > 0.5 {
+                        halted = true;
+                        break;
+                    }
+                    if !has_halt_output || think_step_cost <= 0.0 {
+                        break;
+                    }
+                }
+
+                creature.last_inputs = final_inputs;
+                creature.last_outputs = final_outputs;
+                creature.last_memory_head = final_memory_head;
+
+                let final_confidences = action_confidences(&final_outputs);
+                let max_confidence = final_confidences
+                    .iter()
+                    .copied()
+                    .fold(f32::NEG_INFINITY, f32::max);
+                let (selected_action, selected_confidence) = if max_confidence <= 0.0 {
+                    (FinalAction::NoOp, 0.0)
+                } else {
+                    let tied = final_confidences
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(index, confidence)| {
+                            if confidence.to_bits() == max_confidence.to_bits() {
+                                Some(index)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<Vec<_>>();
+                    let selected_idx = if tied.len() == 1 {
+                        tied[0]
                     } else {
-                        match direction_target(
-                            creature.x,
-                            creature.y,
-                            selected_direction,
-                            width,
-                            height,
-                            world_wrap,
-                        ) {
-                            None => Some(IllegalActionReason::TargetOutOfBounds),
-                            Some((target_x, target_y)) => {
-                                if selected_direction != TouchDirection::SelfCell {
-                                    let target_idx = (target_y * width + target_x) as usize;
-                                    if self.creature_at[target_idx].is_some() {
-                                        Some(IllegalActionReason::TargetOccupied)
+                        tied[creature.rng.gen_range(0..tied.len())]
+                    };
+                    (
+                        action_from_index(selected_idx),
+                        final_confidences[selected_idx],
+                    )
+                };
+
+                creature.cognition = CognitionDiagnostics {
+                    think_steps,
+                    halted,
+                    selected_action: match selected_action {
+                        FinalAction::Move => SelectedAction::Move,
+                        FinalAction::Eat => SelectedAction::Eat,
+                        FinalAction::Reproduce => SelectedAction::Reproduce,
+                        FinalAction::InventoryPickup => SelectedAction::InventoryPickup,
+                        FinalAction::InventoryPut => SelectedAction::InventoryPut,
+                        FinalAction::NoOp => SelectedAction::NoOp,
+                    },
+                    selected_confidence,
+                };
+
+                let selected_slot_idx =
+                    Self::slot_index_from_selector(final_outputs.inventory_slot_select);
+                let selected_direction =
+                    Self::direction_from_selector(final_outputs.inventory_direction_select);
+                let mut move_attempted = false;
+                let mut move_succeeded = false;
+
+                match selected_action {
+                    FinalAction::InventoryPickup => {
+                        creature.energy -= self.config.energy_per_inventory_attempt;
+
+                        let failure = if selected_slot_idx >= creature.slot_capacity
+                            || selected_slot_idx >= creature.slots.len()
+                        {
+                            Some(IllegalActionReason::SlotMissing)
+                        } else if creature.slots[selected_slot_idx].is_some() {
+                            Some(IllegalActionReason::SlotFull)
+                        } else {
+                            match direction_target(
+                                creature.x,
+                                creature.y,
+                                selected_direction,
+                                width,
+                                height,
+                                world_wrap,
+                            ) {
+                                None => Some(IllegalActionReason::TargetOutOfBounds),
+                                Some((target_x, target_y)) => {
+                                    if selected_direction != TouchDirection::SelfCell {
+                                        let target_idx = (target_y * width + target_x) as usize;
+                                        if self.creature_at[target_idx].is_some() {
+                                            Some(IllegalActionReason::TargetOccupied)
+                                        } else if self.cells[target_idx].barrier {
+                                            self.cells[target_idx].barrier = false;
+                                            creature.slots[selected_slot_idx] =
+                                                Some(InventoryItem::Barrier);
+                                            None
+                                        } else if self.cells[target_idx].food > 0.0 {
+                                            let food_value = self.cells[target_idx].food;
+                                            self.cells[target_idx].food = 0.0;
+                                            creature.slots[selected_slot_idx] =
+                                                Some(InventoryItem::Food(food_value));
+                                            None
+                                        } else {
+                                            Some(IllegalActionReason::NoPickupableMaterial)
+                                        }
                                     } else {
                                         let target_idx = (target_y * width + target_x) as usize;
                                         if self.cells[target_idx].barrier {
@@ -284,208 +426,194 @@ impl World {
                                             Some(IllegalActionReason::NoPickupableMaterial)
                                         }
                                     }
-                                } else {
-                                    let target_idx = (target_y * width + target_x) as usize;
-                                    if self.cells[target_idx].barrier {
-                                        self.cells[target_idx].barrier = false;
-                                        creature.slots[selected_slot_idx] =
-                                            Some(InventoryItem::Barrier);
-                                        None
-                                    } else if self.cells[target_idx].food > 0.0 {
-                                        let food_value = self.cells[target_idx].food;
-                                        self.cells[target_idx].food = 0.0;
-                                        creature.slots[selected_slot_idx] =
-                                            Some(InventoryItem::Food(food_value));
-                                        None
-                                    } else {
-                                        Some(IllegalActionReason::NoPickupableMaterial)
-                                    }
                                 }
                             }
+                        };
+
+                        if let Some(reason) = failure {
+                            apply_illegal_action_penalty(
+                                creature,
+                                &mut self.diagnostics,
+                                self.config.illegal_action_energy_penalty,
+                                IllegalActionKind::InventoryPickup,
+                                reason,
+                                self.tick,
+                            );
                         }
-                    };
-
-                    if let Some(reason) = failure {
-                        apply_illegal_action_penalty(
-                            creature,
-                            &mut self.diagnostics,
-                            self.config.illegal_action_energy_penalty,
-                            IllegalActionKind::InventoryPickup,
-                            reason,
-                            self.tick,
-                        );
                     }
-                }
-
-                if outputs.eat > 0.5 {
-                    let available_food = self.cells[current_idx].food;
-                    if available_food > 0.0 {
-                        let consumed = available_food;
-                        self.cells[current_idx].food =
-                            (self.cells[current_idx].food - consumed).max(0.0);
-                        creature.energy += consumed * self.config.food_energy_value;
-                        creature.energy = creature.energy.min(self.config.energy_max);
-                        self.diagnostics.eats += 1;
-                        push_event(creature, CreatureEventKind::AteFood, self.tick);
-                    } else {
-                        apply_illegal_action_penalty(
-                            creature,
-                            &mut self.diagnostics,
-                            self.config.illegal_action_energy_penalty,
-                            IllegalActionKind::Eat,
-                            IllegalActionReason::EatNoFood,
-                            self.tick,
-                        );
-                    }
-                }
-
-                let dx = axis_step(outputs.move_x);
-                let dy = axis_step(outputs.move_y);
-                let mut move_attempted = false;
-                let mut move_succeeded = false;
-                if dx != 0 || dy != 0 {
-                    move_attempted = true;
-                    creature.energy -= self.config.energy_per_move
-                        * (1.0
-                            + Self::filled_slot_count(creature) as f32
-                                * MOVE_LOAD_PENALTY_PER_FILLED_SLOT);
-
-                    let raw_x = creature.x as i32 + dx;
-                    let raw_y = creature.y as i32 + dy;
-                    if !world_wrap
-                        && (raw_x < 0
-                            || raw_y < 0
-                            || raw_x >= width as i32
-                            || raw_y >= height as i32)
-                    {
-                        apply_illegal_action_penalty(
-                            creature,
-                            &mut self.diagnostics,
-                            self.config.illegal_action_energy_penalty,
-                            IllegalActionKind::Move,
-                            IllegalActionReason::MoveOutOfBounds,
-                            self.tick,
-                        );
-                    } else {
-                        let nx = map_axis(raw_x, width, world_wrap);
-                        let ny = map_axis(raw_y, height, world_wrap);
-                        let next_idx = (ny * width + nx) as usize;
-
-                        if self.creature_at[next_idx].is_none() && !self.cells[next_idx].barrier {
-                            self.creature_at[current_idx] = None;
-                            self.creature_at[next_idx] = Some(id);
-                            creature.x = nx;
-                            creature.y = ny;
-                            self.diagnostics.moves += 1;
-                            push_event(creature, CreatureEventKind::Moved, self.tick);
-                            move_succeeded = true;
+                    FinalAction::Eat => {
+                        let current_idx = (creature.y * width + creature.x) as usize;
+                        let available_food = self.cells[current_idx].food;
+                        if available_food > 0.0 {
+                            let consumed = available_food;
+                            self.cells[current_idx].food =
+                                (self.cells[current_idx].food - consumed).max(0.0);
+                            creature.energy += consumed * self.config.food_energy_value;
+                            creature.energy = creature.energy.min(self.config.energy_max);
+                            self.diagnostics.eats += 1;
+                            push_event(creature, CreatureEventKind::AteFood, self.tick);
                         } else {
                             apply_illegal_action_penalty(
                                 creature,
                                 &mut self.diagnostics,
                                 self.config.illegal_action_energy_penalty,
-                                IllegalActionKind::Move,
-                                IllegalActionReason::MoveBlocked,
+                                IllegalActionKind::Eat,
+                                IllegalActionReason::EatNoFood,
                                 self.tick,
                             );
                         }
                     }
-                }
-                creature.last_move_blocked = move_attempted && !move_succeeded;
+                    FinalAction::Move => {
+                        let dx = axis_step(final_outputs.move_x);
+                        let dy = axis_step(final_outputs.move_y);
+                        if dx != 0 || dy != 0 {
+                            move_attempted = true;
+                            creature.energy -= self.config.energy_per_move
+                                * (1.0
+                                    + Self::filled_slot_count(creature) as f32
+                                        * MOVE_LOAD_PENALTY_PER_FILLED_SLOT);
 
-                if selected_inventory_action == Some(IllegalActionKind::InventoryPut) {
-                    creature.energy -= self.config.energy_per_inventory_attempt;
+                            let current_idx = (creature.y * width + creature.x) as usize;
+                            let raw_x = creature.x as i32 + dx;
+                            let raw_y = creature.y as i32 + dy;
+                            if !world_wrap
+                                && (raw_x < 0
+                                    || raw_y < 0
+                                    || raw_x >= width as i32
+                                    || raw_y >= height as i32)
+                            {
+                                apply_illegal_action_penalty(
+                                    creature,
+                                    &mut self.diagnostics,
+                                    self.config.illegal_action_energy_penalty,
+                                    IllegalActionKind::Move,
+                                    IllegalActionReason::MoveOutOfBounds,
+                                    self.tick,
+                                );
+                            } else {
+                                let nx = map_axis(raw_x, width, world_wrap);
+                                let ny = map_axis(raw_y, height, world_wrap);
+                                let next_idx = (ny * width + nx) as usize;
 
-                    let failure = if selected_slot_idx >= creature.slot_capacity
-                        || selected_slot_idx >= creature.slots.len()
-                    {
-                        Some(IllegalActionReason::SlotMissing)
-                    } else if creature.slots[selected_slot_idx].is_none() {
-                        Some(IllegalActionReason::SlotEmpty)
-                    } else {
-                        match direction_target(
-                            creature.x,
-                            creature.y,
-                            selected_direction,
-                            width,
-                            height,
-                            world_wrap,
-                        ) {
-                            None => Some(IllegalActionReason::TargetOutOfBounds),
-                            Some((target_x, target_y)) => {
-                                let target_idx = (target_y * width + target_x) as usize;
-                                let item = creature.slots[selected_slot_idx]
-                                    .clone()
-                                    .expect("slot presence checked above");
+                                if self.creature_at[next_idx].is_none()
+                                    && !self.cells[next_idx].barrier
+                                {
+                                    self.creature_at[current_idx] = None;
+                                    self.creature_at[next_idx] = Some(id);
+                                    creature.x = nx;
+                                    creature.y = ny;
+                                    self.diagnostics.moves += 1;
+                                    push_event(creature, CreatureEventKind::Moved, self.tick);
+                                    move_succeeded = true;
+                                } else {
+                                    apply_illegal_action_penalty(
+                                        creature,
+                                        &mut self.diagnostics,
+                                        self.config.illegal_action_energy_penalty,
+                                        IllegalActionKind::Move,
+                                        IllegalActionReason::MoveBlocked,
+                                        self.tick,
+                                    );
+                                }
+                            }
+                        }
+                    }
+                    FinalAction::InventoryPut => {
+                        creature.energy -= self.config.energy_per_inventory_attempt;
 
-                                match item {
-                                    InventoryItem::Food(food_value) => {
-                                        if self.cells[target_idx].barrier {
-                                            Some(IllegalActionReason::TargetHasBarrier)
-                                        } else if self.cells[target_idx].food + food_value
-                                            > self.config.food_max_density + f32::EPSILON
-                                        {
-                                            Some(IllegalActionReason::FoodOverflow)
-                                        } else {
-                                            self.cells[target_idx].food += food_value;
-                                            creature.slots[selected_slot_idx] = None;
-                                            None
+                        let failure = if selected_slot_idx >= creature.slot_capacity
+                            || selected_slot_idx >= creature.slots.len()
+                        {
+                            Some(IllegalActionReason::SlotMissing)
+                        } else if creature.slots[selected_slot_idx].is_none() {
+                            Some(IllegalActionReason::SlotEmpty)
+                        } else {
+                            match direction_target(
+                                creature.x,
+                                creature.y,
+                                selected_direction,
+                                width,
+                                height,
+                                world_wrap,
+                            ) {
+                                None => Some(IllegalActionReason::TargetOutOfBounds),
+                                Some((target_x, target_y)) => {
+                                    let target_idx = (target_y * width + target_x) as usize;
+                                    let item = creature.slots[selected_slot_idx]
+                                        .clone()
+                                        .expect("slot presence checked above");
+
+                                    match item {
+                                        InventoryItem::Food(food_value) => {
+                                            if self.cells[target_idx].barrier {
+                                                Some(IllegalActionReason::TargetHasBarrier)
+                                            } else if self.cells[target_idx].food + food_value
+                                                > self.config.food_max_density + f32::EPSILON
+                                            {
+                                                Some(IllegalActionReason::FoodOverflow)
+                                            } else {
+                                                self.cells[target_idx].food += food_value;
+                                                creature.slots[selected_slot_idx] = None;
+                                                None
+                                            }
                                         }
-                                    }
-                                    InventoryItem::Barrier => {
-                                        if self.creature_at[target_idx].is_some() {
-                                            Some(IllegalActionReason::TargetOccupied)
-                                        } else if self.cells[target_idx].barrier {
-                                            Some(IllegalActionReason::TargetHasBarrier)
-                                        } else {
-                                            self.cells[target_idx].food = 0.0;
-                                            self.cells[target_idx].barrier = true;
-                                            creature.slots[selected_slot_idx] = None;
-                                            None
+                                        InventoryItem::Barrier => {
+                                            if self.creature_at[target_idx].is_some() {
+                                                Some(IllegalActionReason::TargetOccupied)
+                                            } else if self.cells[target_idx].barrier {
+                                                Some(IllegalActionReason::TargetHasBarrier)
+                                            } else {
+                                                self.cells[target_idx].food = 0.0;
+                                                self.cells[target_idx].barrier = true;
+                                                creature.slots[selected_slot_idx] = None;
+                                                None
+                                            }
                                         }
                                     }
                                 }
                             }
+                        };
+
+                        if let Some(reason) = failure {
+                            apply_illegal_action_penalty(
+                                creature,
+                                &mut self.diagnostics,
+                                self.config.illegal_action_energy_penalty,
+                                IllegalActionKind::InventoryPut,
+                                reason,
+                                self.tick,
+                            );
                         }
-                    };
-
-                    if let Some(reason) = failure {
-                        apply_illegal_action_penalty(
-                            creature,
-                            &mut self.diagnostics,
-                            self.config.illegal_action_energy_penalty,
-                            IllegalActionKind::InventoryPut,
-                            reason,
-                            self.tick,
-                        );
                     }
+                    FinalAction::Reproduce => {
+                        creature.energy -= self.config.energy_per_reproduce;
+                        if !can_spawn_more {
+                            apply_illegal_action_penalty(
+                                creature,
+                                &mut self.diagnostics,
+                                self.config.illegal_action_energy_penalty,
+                                IllegalActionKind::Reproduce,
+                                IllegalActionReason::ReproduceMaxCreatures,
+                                self.tick,
+                            );
+                        } else if creature.energy < self.config.min_reproduce_energy {
+                            apply_illegal_action_penalty(
+                                creature,
+                                &mut self.diagnostics,
+                                self.config.illegal_action_energy_penalty,
+                                IllegalActionKind::Reproduce,
+                                IllegalActionReason::ReproduceLowEnergy,
+                                self.tick,
+                            );
+                        } else {
+                            reproduce_from = Some((creature.x, creature.y));
+                            reproduce_intent = true;
+                        }
+                    }
+                    FinalAction::NoOp => {}
                 }
 
-                if outputs.reproduce > 0.5 {
-                    creature.energy -= self.config.energy_per_reproduce;
-                    if !can_spawn_more {
-                        apply_illegal_action_penalty(
-                            creature,
-                            &mut self.diagnostics,
-                            self.config.illegal_action_energy_penalty,
-                            IllegalActionKind::Reproduce,
-                            IllegalActionReason::ReproduceMaxCreatures,
-                            self.tick,
-                        );
-                    } else if creature.energy < self.config.min_reproduce_energy {
-                        apply_illegal_action_penalty(
-                            creature,
-                            &mut self.diagnostics,
-                            self.config.illegal_action_energy_penalty,
-                            IllegalActionKind::Reproduce,
-                            IllegalActionReason::ReproduceLowEnergy,
-                            self.tick,
-                        );
-                    } else {
-                        reproduce_from = Some((creature.x, creature.y));
-                        reproduce_intent = true;
-                    }
-                }
+                creature.last_move_blocked = move_attempted && !move_succeeded;
 
                 if creature.energy <= 0.0 {
                     dead = true;
@@ -646,6 +774,7 @@ impl World {
                 last_inputs: SensorInputs::default(),
                 last_outputs: ActionOutputs::default(),
                 last_memory_head: MemoryHeadState::default(),
+                cognition: CognitionDiagnostics::default(),
             };
             let child_id = self.creatures.insert(child);
             self.creature_at[idx] = Some(child_id);

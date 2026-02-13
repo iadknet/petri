@@ -130,22 +130,22 @@ export function AdvancedConfigPanel({
             }}
           />
 
-          <label className="slider-label" htmlFor="runtime-energy-compute-cost-slider">
-            Compute node cost: {runtimeConfig.energy_per_compute_node.toFixed(3)}
+          <label className="slider-label" htmlFor="runtime-energy-think-step-cost-slider">
+            Think-step cost: {runtimeConfig.energy_per_think_step.toFixed(4)}
           </label>
           <input
-            id="runtime-energy-compute-cost-slider"
+            id="runtime-energy-think-step-cost-slider"
             type="range"
-            min={STARTUP_LIMITS.energy_per_compute_node.min}
-            max={STARTUP_LIMITS.energy_per_compute_node.max}
-            step={STARTUP_LIMITS.energy_per_compute_node.step}
-            value={runtimeConfig.energy_per_compute_node}
+            min={STARTUP_LIMITS.energy_per_think_step.min}
+            max={STARTUP_LIMITS.energy_per_think_step.max}
+            step={STARTUP_LIMITS.energy_per_think_step.step}
+            value={runtimeConfig.energy_per_think_step}
             disabled={runtimeDisabled}
             onChange={(event) => {
               const value = Number(event.target.value);
               onUpdateRuntimeField(
-                { energy_per_compute_node: value },
-                { ...runtimeConfig, energy_per_compute_node: value }
+                { energy_per_think_step: value },
+                { ...runtimeConfig, energy_per_think_step: value }
               );
             }}
           />

@@ -84,6 +84,11 @@ describe("protocol", () => {
         move_blocked_last_tick: 0,
         memory_read: 0,
         memory_address_norm: 0,
+        prev_action_confidence: [0, 0, 0, 0, 0, 0],
+        max_action_confidence: [0, 0, 0, 0, 0, 0],
+        energy_start_tick: 0.5,
+        energy_spent_tick: 0.1,
+        energy_remaining: 0.4,
         touch_exists: [1, 1, 1, 1, 1],
         touch_food_value: [0, 0, 0, 0, 0],
         touch_has_barrier: [0, 0, 0, 0, 0],
@@ -104,13 +109,21 @@ describe("protocol", () => {
         inventory_pickup: 0,
         inventory_put: 0,
         inventory_slot_select: -1,
-        inventory_direction_select: -1
+        inventory_direction_select: -1,
+        halt: 1,
+        no_op: 0
       },
       last_memory_head: {
         address_index: 0,
         read_value: 0,
         write_value: 0,
         write_applied: false
+      },
+      cognition: {
+        think_steps: 1,
+        halted: true,
+        selected_action: "eat",
+        selected_confidence: 0.6
       },
       events: [{ kind: "Moved", tick: 12 }],
       slot_capacity: 1,

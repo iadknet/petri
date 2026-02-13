@@ -58,6 +58,24 @@ async fn paused_world_paint_stroke_mutates_active_world() {
         .clone()
         .oneshot(
             Request::builder()
+                .method("PATCH")
+                .uri("/simulation/startup-draft")
+                .header("content-type", "application/json")
+                .body(Body::from(
+                    json!({
+                        "initial_food_density": 0.0
+                    })
+                    .to_string(),
+                ))
+                .expect("request should build"),
+        )
+        .await
+        .expect("startup patch should succeed");
+
+    let _ = app
+        .clone()
+        .oneshot(
+            Request::builder()
                 .method("POST")
                 .uri("/simulation/start")
                 .body(Body::empty())

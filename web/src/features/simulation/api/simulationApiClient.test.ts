@@ -36,7 +36,20 @@ describe("SimulationApiClient", () => {
             barrier_distance: 1,
             move_blocked_last_tick: 0,
             memory_read: 0,
-            memory_address_norm: 0
+            memory_address_norm: 0,
+            prev_action_confidence: [0, 0, 0, 0, 0, 0],
+            max_action_confidence: [0, 0, 0, 0, 0, 0],
+            energy_start_tick: 0.6,
+            energy_spent_tick: 0.1,
+            energy_remaining: 0.5,
+            touch_exists: [1, 1, 1, 1, 1],
+            touch_food_value: [0, 0, 0, 0, 0],
+            touch_has_barrier: [0, 0, 0, 0, 0],
+            touch_occupied: [1, 0, 0, 0, 0],
+            slot_exists: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            slot_is_empty: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            slot_is_barrier: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            slot_food_value: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
           },
           last_outputs: {
             move_x: 0.1,
@@ -45,7 +58,13 @@ describe("SimulationApiClient", () => {
             reproduce: 0.2,
             memory_write_value: 0,
             memory_write_enable: 0,
-            memory_address_select: 0
+            memory_address_select: 0,
+            inventory_pickup: 0,
+            inventory_put: 0,
+            inventory_slot_select: -1,
+            inventory_direction_select: -1,
+            halt: 1,
+            no_op: 0.2
           },
           last_memory_head: {
             address_index: 0,
@@ -53,6 +72,15 @@ describe("SimulationApiClient", () => {
             write_value: 0,
             write_applied: false
           },
+          cognition: {
+            think_steps: 1,
+            halted: true,
+            selected_action: "eat",
+            selected_confidence: 0.5
+          },
+          slot_capacity: 1,
+          slots: [null],
+          illegal_attempts: [],
           events: [{ kind: "Moved", tick: 10 }]
         }),
         { status: 200, headers: { "content-type": "application/json" } }

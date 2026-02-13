@@ -78,6 +78,7 @@ async fn default_startup_draft_uses_lower_food_settings() {
         status_json["startup_draft"]["food_spawn_floor_density"],
         0.03
     );
+    assert_eq!(status_json["startup_draft"]["energy_per_think_step"], 0.005);
     assert_eq!(status_json["startup_draft"]["sensor_radius"], 12);
     assert_eq!(status_json["startup_draft"]["width"], 400);
     assert_eq!(status_json["startup_draft"]["height"], 400);
@@ -182,6 +183,7 @@ async fn startup_draft_patch_updates_restart_required_stage1_knobs() {
         "energy_initial": 0.82,
         "food_spread_threshold": 0.62,
         "food_spawn_floor_density": 0.08,
+        "energy_per_think_step": 0.019,
         "sensor_radius": 18,
         "energy_per_inventory_attempt": 0.017,
         "illegal_action_energy_penalty": 0.09
@@ -205,6 +207,7 @@ async fn startup_draft_patch_updates_restart_required_stage1_knobs() {
     assert_eq!(patch_json["energy_initial"], 0.82);
     assert_eq!(patch_json["food_spread_threshold"], 0.62);
     assert_eq!(patch_json["food_spawn_floor_density"], 0.08);
+    assert_eq!(patch_json["energy_per_think_step"], 0.019);
     assert_eq!(patch_json["sensor_radius"], 18);
     assert_eq!(patch_json["energy_per_inventory_attempt"], 0.017);
     assert_eq!(patch_json["illegal_action_energy_penalty"], 0.09);
@@ -227,6 +230,7 @@ async fn startup_draft_patch_updates_restart_required_stage1_knobs() {
         status_json["startup_draft"]["food_spawn_floor_density"],
         0.08
     );
+    assert_eq!(status_json["startup_draft"]["energy_per_think_step"], 0.019);
     assert_eq!(status_json["startup_draft"]["sensor_radius"], 18);
     assert_eq!(
         status_json["startup_draft"]["energy_per_inventory_attempt"],
@@ -310,7 +314,7 @@ async fn patch_config_updates_runtime_values() {
         "energy_per_tick_decay": 0.015,
         "energy_per_move": 0.025,
         "energy_per_inventory_attempt": 0.014,
-        "energy_per_compute_node": 0.009,
+        "energy_per_think_step": 0.009,
         "energy_per_reproduce": 0.18,
         "illegal_action_energy_penalty": 0.07,
         "energy_max": 1.8,
@@ -361,7 +365,8 @@ async fn patch_config_updates_runtime_values() {
     assert_eq!(cfg_json["energy_per_tick_decay"], 0.015);
     assert_eq!(cfg_json["energy_per_move"], 0.025);
     assert_eq!(cfg_json["energy_per_inventory_attempt"], 0.014);
-    assert_eq!(cfg_json["energy_per_compute_node"], 0.009);
+    assert_eq!(cfg_json["energy_per_think_step"], 0.009);
+    assert!(cfg_json.get("energy_per_compute_node").is_none());
     assert_eq!(cfg_json["energy_per_reproduce"], 0.18);
     assert_eq!(cfg_json["illegal_action_energy_penalty"], 0.07);
     assert_eq!(cfg_json["energy_max"], 1.8);
@@ -410,6 +415,49 @@ async fn patch_config_clamps_sensor_radius_to_minimum_one() {
 
     let cfg_json = common::read_json(get_response).await;
     assert_eq!(cfg_json["sensor_radius"], 1);
+}
+
+#[tokio::test]
+async fn patch_config_clamps_energy_per_think_step_to_positive_minimum() {
+    let state = common::fast_state();
+    let app = build_router(state);
+
+    let patch_payload = json!({
+        "energy_per_think_step": -1.0
+    });
+
+    let patch_response = app
+        .clone()
+        .oneshot(
+            Request::builder()
+                .method("PATCH")
+                .uri("/config")
+                .header("content-type", "application/json")
+                .body(Body::from(patch_payload.to_string()))
+                .expect("request should build"),
+        )
+        .await
+        .expect("request should succeed");
+    assert_eq!(patch_response.status(), StatusCode::OK);
+
+    let get_response = app
+        .oneshot(
+            Request::builder()
+                .uri("/config")
+                .body(Body::empty())
+                .expect("request should build"),
+        )
+        .await
+        .expect("request should succeed");
+    assert_eq!(get_response.status(), StatusCode::OK);
+
+    let cfg_json = common::read_json(get_response).await;
+    assert!(
+        cfg_json["energy_per_think_step"]
+            .as_f64()
+            .expect("energy_per_think_step should be number")
+            > 0.0
+    );
 }
 
 #[tokio::test]

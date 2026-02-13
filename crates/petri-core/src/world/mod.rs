@@ -1,8 +1,8 @@
 use std::collections::{HashMap, VecDeque};
 
 use petri_graph::{
-    ActionOutputs, ComputationGraph, ControllerPalette, SensorInputs, SLOT_COUNT_MAX,
-    TOUCH_DIRECTION_COUNT,
+    ActionOutputs, ComputationGraph, ControllerPalette, SensorInputs, ACTION_CONFIDENCE_COUNT,
+    SLOT_COUNT_MAX, TOUCH_DIRECTION_COUNT,
 };
 use rand::rngs::SmallRng;
 use rand::{Rng, SeedableRng};
@@ -11,9 +11,10 @@ use slotmap::{Key, SlotMap};
 
 use crate::config::WorldConfig;
 use crate::types::{
-    CreatureDetail, CreatureEvent, CreatureEventKind, CreatureId, CreatureSnapshot,
-    CreatureStateSnapshot, IllegalActionAttempt, IllegalActionKind, IllegalActionReason,
-    InventoryItem, MemoryHeadState, WorldDiagnostics, WorldFrame, WorldSnapshot,
+    CognitionDiagnostics, CreatureDetail, CreatureEvent, CreatureEventKind, CreatureId,
+    CreatureSnapshot, CreatureStateSnapshot, IllegalActionAttempt, IllegalActionKind,
+    IllegalActionReason, InventoryItem, MemoryHeadState, SelectedAction, WorldDiagnostics,
+    WorldFrame, WorldSnapshot,
 };
 
 mod color;
@@ -134,6 +135,7 @@ struct Creature {
     last_move_blocked: bool,
     last_inputs: SensorInputs,
     last_outputs: ActionOutputs,
+    cognition: CognitionDiagnostics,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -395,6 +397,7 @@ impl World {
                 last_inputs: c.last_inputs,
                 last_outputs: c.last_outputs,
                 last_memory_head: c.last_memory_head,
+                cognition: c.cognition,
                 events: c.events.iter().copied().collect(),
                 slot_capacity: c.slot_capacity as u8,
                 slots: c.slots.clone(),

@@ -22,7 +22,7 @@ export type RuntimeConfig = {
   energy_per_tick_decay: number;
   energy_per_move: number;
   energy_per_inventory_attempt: number;
-  energy_per_compute_node: number;
+  energy_per_think_step: number;
   energy_per_reproduce: number;
   illegal_action_energy_penalty: number;
   energy_max: number;

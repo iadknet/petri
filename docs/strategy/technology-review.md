@@ -47,14 +47,14 @@ None of the above are true in the current repository state.
 - MessagePack decode path in client protocol layer
 - Canvas-based world rendering and inspector-centric workflows
 
-## Planned Cognition-First Refactor: Technology Impact
+## Cognition-First Refactor: Technology Impact
 
-### Expected Near-Term Impact
+### Implemented Impact
 
 - No mandatory new third-party dependencies are required for the refactor design itself.
 - Primary changes are semantic and structural in existing crates (`petri-core`, `petri-graph`, server/web contract types).
 
-### Planned Runtime Semantics
+### Implemented Runtime Semantics
 
 - Energy-bounded internal think loop per tick.
 - `halt` and `no_op` controller outputs.
@@ -64,7 +64,7 @@ None of the above are true in the current repository state.
 ## Metrics and Performance Posture During Refactor
 
 - Keep benchmark tooling (`stage1_benchmark`) active.
-- Treat throughput as informational while cognition semantics stabilize.
+- Treat throughput as informational while post-refactor stabilization and profiling continue.
 - Prefer correctness/observability gates first, then tighten performance thresholds afterward.
 
 ## Selection Criteria Going Forward
@@ -78,5 +78,5 @@ When adding/changing dependencies, require all of:
 ## Short-Term Recommendations
 
 1. Maintain dependency minimization during docs/rebaseline and semantics refactor phases.
-2. Delay new infrastructure dependencies until the cognition model is implemented and profiled.
+2. Delay new infrastructure dependencies until current cognition behavior is profiled and bottlenecks are clear.
 3. Keep architecture docs and roadmap synchronized to prevent future drift.

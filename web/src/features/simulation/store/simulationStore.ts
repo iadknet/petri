@@ -52,7 +52,7 @@ export const STARTUP_LIMITS = {
   energy_per_tick_decay: { min: 0.005, max: 0.2, step: 0.001 },
   energy_per_move: { min: 0.005, max: 0.25, step: 0.001 },
   energy_per_inventory_attempt: { min: 0.0, max: 0.2, step: 0.001 },
-  energy_per_compute_node: { min: 0.0, max: 0.25, step: 0.001 },
+  energy_per_think_step: { min: 0.0001, max: 0.25, step: 0.0001 },
   energy_per_reproduce: { min: 0.0, max: 2.0, step: 0.005 },
   illegal_action_energy_penalty: { min: 0.0, max: 0.5, step: 0.001 },
   energy_max: { min: 0.2, max: 10.0, step: 0.01 },

@@ -24,6 +24,11 @@ fn hidden_node_count(graph: &ComputationGraph) -> usize {
                     | NodeKind::InputMoveBlockedLastTick
                     | NodeKind::InputMemoryRead
                     | NodeKind::InputMemoryAddressNorm
+                    | NodeKind::InputPrevActionConfidence(_)
+                    | NodeKind::InputMaxActionConfidence(_)
+                    | NodeKind::InputEnergyStartTick
+                    | NodeKind::InputEnergySpentTick
+                    | NodeKind::InputEnergyRemaining
                     | NodeKind::InputTouchExists(_)
                     | NodeKind::InputTouchFoodValue(_)
                     | NodeKind::InputTouchHasBarrier(_)
@@ -36,6 +41,8 @@ fn hidden_node_count(graph: &ComputationGraph) -> usize {
                     | NodeKind::OutputMoveY
                     | NodeKind::OutputEat
                     | NodeKind::OutputReproduce
+                    | NodeKind::OutputNoOp
+                    | NodeKind::OutputHalt
                     | NodeKind::OutputMemoryAddressSelect
                     | NodeKind::OutputMemoryWriteValue
                     | NodeKind::OutputMemoryWriteEnable
@@ -206,4 +213,29 @@ fn mutate_with_config_runs_structural_and_logic_operators() {
 
     assert!(changed);
     assert!(graph.nodes.len() != before_nodes || graph.edges.len() != before_edges);
+}
+
+#[test]
+fn cognition_io_nodes_are_never_counted_as_hidden_nodes() {
+    let graph = ComputationGraph {
+        palette: ControllerPalette::Hybrid,
+        nodes: vec![
+            NodeKind::InputPrevActionConfidence(0),
+            NodeKind::InputMaxActionConfidence(0),
+            NodeKind::InputEnergyStartTick,
+            NodeKind::InputEnergySpentTick,
+            NodeKind::InputEnergyRemaining,
+            NodeKind::OutputHalt,
+            NodeKind::OutputNoOp,
+            NodeKind::Add,
+        ],
+        edges: vec![Edge {
+            from: 0,
+            to: 7,
+            weight: 1.0,
+        }],
+    };
+
+    assert_eq!(hidden_node_count(&graph), 1);
+    assert_eq!(graph.compute_node_count(), 1);
 }

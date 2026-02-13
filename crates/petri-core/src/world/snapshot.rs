@@ -34,6 +34,7 @@ impl World {
                 last_move_blocked: c.last_move_blocked,
                 last_inputs: c.last_inputs,
                 last_outputs: c.last_outputs,
+                cognition: c.cognition,
                 slot_capacity: c.slot_capacity as u8,
                 slots: c.slots.clone(),
                 illegal_attempts: c.illegal_attempts.iter().copied().collect(),
@@ -138,6 +139,7 @@ impl World {
                 last_move_blocked: creature.last_move_blocked,
                 last_inputs: creature.last_inputs,
                 last_outputs: creature.last_outputs,
+                cognition: creature.cognition,
             };
 
             let new_id = world.creatures.insert(new_creature);
