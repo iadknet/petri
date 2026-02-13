@@ -27,7 +27,8 @@ impl World {
                 generation: c.generation,
                 controller: c.controller.clone(),
                 phenotype_color: c.phenotype_color,
-                phenotype_positive_increment: c.phenotype_positive_increment,
+                phenotype_channel_weights: c.phenotype_channel_weights,
+                phenotype_channel_positive_increment: c.phenotype_channel_positive_increment,
                 memory_register: c.memory_register.clone(),
                 last_memory_head: c.last_memory_head,
                 last_move_blocked: c.last_move_blocked,
@@ -104,7 +105,9 @@ impl World {
             }
             let controller = creature.controller;
             let phenotype_color = creature.phenotype_color;
-            let phenotype_positive_increment = creature.phenotype_positive_increment;
+            let phenotype_channel_weights = creature.phenotype_channel_weights;
+            let phenotype_channel_positive_increment =
+                creature.phenotype_channel_positive_increment;
             let new_creature = Creature {
                 x,
                 y,
@@ -115,7 +118,8 @@ impl World {
                 parent_id: creature.parent_id,
                 controller,
                 phenotype_color,
-                phenotype_positive_increment,
+                phenotype_channel_weights,
+                phenotype_channel_positive_increment,
                 memory_register: normalize_memory_register(creature.memory_register),
                 last_memory_head: creature.last_memory_head,
                 rng: SmallRng::seed_from_u64(old_id ^ snapshot.tick.rotate_left(13)),

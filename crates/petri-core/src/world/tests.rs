@@ -269,7 +269,8 @@ fn insert_idle_creature(world: &mut World, x: u32, y: u32, seed: u64) -> Creatur
         parent_id: None,
         controller,
         phenotype_color,
-        phenotype_positive_increment: color::founder_positive_increment(),
+        phenotype_channel_weights: color::founder_channel_weights(),
+        phenotype_channel_positive_increment: color::founder_channel_positive_increment(),
         memory_register: founder_memory_register(),
         rng: SmallRng::seed_from_u64(seed),
         events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
@@ -1884,7 +1885,8 @@ fn perception_reports_nearest_creature_direction_distance_and_density() {
         lineage_id: 1,
         parent_id: None,
         phenotype_color: color::founder_rgb(),
-        phenotype_positive_increment: color::founder_positive_increment(),
+        phenotype_channel_weights: color::founder_channel_weights(),
+        phenotype_channel_positive_increment: color::founder_channel_positive_increment(),
         controller: a_controller,
         memory_register: founder_memory_register(),
         rng: SmallRng::seed_from_u64(1),
@@ -1908,7 +1910,8 @@ fn perception_reports_nearest_creature_direction_distance_and_density() {
         lineage_id: 2,
         parent_id: None,
         phenotype_color: color::founder_rgb(),
-        phenotype_positive_increment: color::founder_positive_increment(),
+        phenotype_channel_weights: color::founder_channel_weights(),
+        phenotype_channel_positive_increment: color::founder_channel_positive_increment(),
         controller: b_controller,
         memory_register: founder_memory_register(),
         rng: SmallRng::seed_from_u64(2),
@@ -2033,7 +2036,8 @@ fn movement_into_barrier_cell_is_blocked_and_sets_feedback() {
 
     if let Some(creature) = world.creatures.get_mut(id) {
         creature.controller = move_right_controller();
-        creature.phenotype_positive_increment = color::founder_positive_increment();
+        creature.phenotype_channel_weights = color::founder_channel_weights();
+        creature.phenotype_channel_positive_increment = color::founder_channel_positive_increment();
         creature.phenotype_color = color::founder_rgb();
         creature.x = 2;
         creature.y = 2;
@@ -2105,7 +2109,8 @@ fn spawn_random_creature_finds_free_cell_beyond_random_attempt_window() {
                 lineage_id: creature_seed,
                 parent_id: None,
                 phenotype_color: color::founder_rgb(),
-                phenotype_positive_increment: color::founder_positive_increment(),
+                phenotype_channel_weights: color::founder_channel_weights(),
+                phenotype_channel_positive_increment: color::founder_channel_positive_increment(),
                 controller,
                 memory_register: founder_memory_register(),
                 rng: SmallRng::seed_from_u64(creature_seed),
@@ -2724,7 +2729,8 @@ fn creature_detail_exposes_last_inputs_outputs_and_events() {
 
     if let Some(creature) = world.creatures.get_mut(id) {
         creature.controller = move_right_controller();
-        creature.phenotype_positive_increment = color::founder_positive_increment();
+        creature.phenotype_channel_weights = color::founder_channel_weights();
+        creature.phenotype_channel_positive_increment = color::founder_channel_positive_increment();
         creature.phenotype_color = color::founder_rgb();
         creature.x = 2;
         creature.y = 2;

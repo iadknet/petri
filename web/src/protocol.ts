@@ -76,7 +76,8 @@ export type CreatureStateSnapshot = {
   generation: number;
   controller: unknown;
   phenotype_color?: [number, number, number];
-  phenotype_positive_increment?: boolean;
+  phenotype_channel_weights?: [number, number, number];
+  phenotype_channel_positive_increment?: [boolean, boolean, boolean];
   memory_register?: number[];
   last_memory_head?: MemoryHeadState;
   last_move_blocked?: boolean;

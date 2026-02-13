@@ -646,13 +646,17 @@ impl World {
                                 );
                                 let was_mutated = child_controller
                                     .mutate_with_config(&mut creature.rng, offspring_mutation_cfg);
-                                let (child_phenotype_color, child_phenotype_positive_increment) =
-                                    color::inherit_rgb(
-                                        creature.phenotype_color,
-                                        creature.phenotype_positive_increment,
-                                        was_mutated,
-                                        &mut creature.rng,
-                                    );
+                                let (
+                                    child_phenotype_color,
+                                    child_phenotype_channel_weights,
+                                    child_phenotype_channel_positive_increment,
+                                ) = color::inherit_rgb(
+                                    creature.phenotype_color,
+                                    creature.phenotype_channel_weights,
+                                    creature.phenotype_channel_positive_increment,
+                                    was_mutated,
+                                    &mut creature.rng,
+                                );
 
                                 child_request = Some((
                                     cx,
@@ -666,7 +670,8 @@ impl World {
                                     child_slot_capacity,
                                     child_memory_register,
                                     child_phenotype_color,
-                                    child_phenotype_positive_increment,
+                                    child_phenotype_channel_weights,
+                                    child_phenotype_channel_positive_increment,
                                 ));
                                 self.diagnostics.reproductions += 1;
                                 push_event(creature, CreatureEventKind::Reproduced, self.tick);
@@ -738,7 +743,8 @@ impl World {
             slot_capacity,
             memory_register,
             child_phenotype_color,
-            child_phenotype_positive_increment,
+            child_phenotype_channel_weights,
+            child_phenotype_channel_positive_increment,
         ) in offspring
         {
             if self.creatures.len() >= self.config.max_creatures {
@@ -759,7 +765,8 @@ impl World {
                 parent_id: Some(parent_id),
                 controller,
                 phenotype_color: child_phenotype_color,
-                phenotype_positive_increment: child_phenotype_positive_increment,
+                phenotype_channel_weights: child_phenotype_channel_weights,
+                phenotype_channel_positive_increment: child_phenotype_channel_positive_increment,
                 memory_register,
                 rng: SmallRng::seed_from_u64(seed),
                 events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),

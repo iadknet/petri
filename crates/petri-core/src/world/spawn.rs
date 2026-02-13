@@ -33,7 +33,9 @@ impl World {
                 controller.mutate_with_config(&mut self.rng, initial_mutation_cfg);
                 // All founders start with the same color/polarity - diversity emerges through reproduction.
                 let phenotype_color = color::founder_rgb();
-                let phenotype_positive_increment = color::founder_positive_increment();
+                let phenotype_channel_weights = color::founder_channel_weights();
+                let phenotype_channel_positive_increment =
+                    color::founder_channel_positive_increment();
                 let lineage_id = lineage_id.unwrap_or_else(|| {
                     let next = self.next_lineage_id;
                     self.next_lineage_id += 1;
@@ -49,7 +51,8 @@ impl World {
                     parent_id,
                     controller,
                     phenotype_color,
-                    phenotype_positive_increment,
+                    phenotype_channel_weights,
+                    phenotype_channel_positive_increment,
                     memory_register: founder_memory_register(),
                     last_memory_head: MemoryHeadState::default(),
                     rng: SmallRng::seed_from_u64(seed),
