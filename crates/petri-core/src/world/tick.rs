@@ -646,15 +646,13 @@ impl World {
                                 );
                                 let was_mutated = child_controller
                                     .mutate_with_config(&mut creature.rng, offspring_mutation_cfg);
-                                let child_hue = color::inherit_hue(
-                                    creature.phenotype_hue,
-                                    was_mutated,
-                                    &mut creature.rng,
-                                );
-                                let child_saturation = color::inherit_saturation(
-                                    creature.phenotype_saturation,
-                                    &mut creature.rng,
-                                );
+                                let (child_phenotype_color, child_phenotype_positive_increment) =
+                                    color::inherit_rgb(
+                                        creature.phenotype_color,
+                                        creature.phenotype_positive_increment,
+                                        was_mutated,
+                                        &mut creature.rng,
+                                    );
 
                                 child_request = Some((
                                     cx,
@@ -667,8 +665,8 @@ impl World {
                                     id.data().as_ffi(),
                                     child_slot_capacity,
                                     child_memory_register,
-                                    child_hue,
-                                    child_saturation,
+                                    child_phenotype_color,
+                                    child_phenotype_positive_increment,
                                 ));
                                 self.diagnostics.reproductions += 1;
                                 push_event(creature, CreatureEventKind::Reproduced, self.tick);
@@ -739,8 +737,8 @@ impl World {
             parent_id,
             slot_capacity,
             memory_register,
-            child_hue,
-            child_saturation,
+            child_phenotype_color,
+            child_phenotype_positive_increment,
         ) in offspring
         {
             if self.creatures.len() >= self.config.max_creatures {
@@ -751,7 +749,6 @@ impl World {
                 continue;
             }
 
-            let phenotype_color = color::phenotype_rgb(child_hue, child_saturation);
             let child = Creature {
                 x,
                 y,
@@ -761,9 +758,8 @@ impl World {
                 lineage_id,
                 parent_id: Some(parent_id),
                 controller,
-                phenotype_color,
-                phenotype_hue: child_hue,
-                phenotype_saturation: child_saturation,
+                phenotype_color: child_phenotype_color,
+                phenotype_positive_increment: child_phenotype_positive_increment,
                 memory_register,
                 rng: SmallRng::seed_from_u64(seed),
                 events: VecDeque::with_capacity(EVENT_LOG_CAPACITY),
