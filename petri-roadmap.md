@@ -2,360 +2,156 @@
 
 ## Guiding Principles
 
-Each stage produces a working, inspectable simulation. No stage is a "setup-only" milestone — every stage should be something you can run and verify. Later stages build on earlier ones without requiring rewrites, because the core architecture (graph-based creatures, energy economics, tick loop) is designed to accommodate all planned features from the start.
+- Each stage must produce a runnable and inspectable simulation state.
+- Architecture is allowed to evolve when it is necessary to support higher-level goals.
+- Documentation must separate current implementation behavior from planned behavior.
+- Deterministic reproducibility and observability remain core constraints.
 
-## Rebaseline (2026-02-11)
+## Current Baseline (Implemented)
 
-- Stage 1 is complete and remains the baseline for all future stage planning.
-- Already-landed baseline primitives include creature-direction/distance/local-density sensing, move-blocked feedback, memory read/write baseline, and arithmetic helpers (`Negate`, `Abs`, `Min`, `Max`).
-- Stage 2 remains full scope and will be delivered as vertical slices.
+- Workspace crates: `petri-core`, `petri-graph`, `petri-server`, `petri-cli`, and `web`.
+- Simulation currently executes graph evaluation during each tick and may execute multiple world interactions in one tick (`eat`, `move`, `reproduce`, inventory actions) when outputs exceed thresholds.
+- Creature memory is currently addressable byte memory with two-stage per-tick memory addressing/write semantics.
+- Stage 2 environment features up through phenotype color pipeline are present.
+
+## Rebaseline (2026-02-13)
+
+A new blocking Stage 2 slice is introduced before Slice 6 and Slice 7.
+
+Reason for rebaseline:
+- The project goal is to encourage evolution of richer decision-making behavior.
+- Current tick semantics do not enforce single-action arbitration and do not provide explicit internal deliberation loops with a halt primitive.
+
+This roadmap now distinguishes:
+- **Current behavior**: implemented in code today.
+- **Planned cognition-first behavior**: target model for the next major refactor.
 
 ---
 
 ## Stage 1: Minimal Viable Life
 
-**Goal:** A working simulation where creatures can sense, act, reproduce, and die. Validates the entire pipeline from Rust simulation to web visualization.
+**Status:** Complete.
 
-### Internal Milestone: Walking Skeleton (Stage 1a)
-Before building the full graph engine, get visual feedback by building the minimum end-to-end pipeline: grid world, creatures with hardcoded random-walk behavior (no graph evaluation yet), food, energy, death, WebSocket streaming, and a basic Canvas renderer. This validates the architecture (Rust tick loop → axum WebSocket → React canvas) with the smallest possible scope. Once pixels are moving on screen, replace the hardcoded behavior with the graph evaluation engine.
-
-### Internal Milestone: Hybrid Stability Check (Stage 1b)
-After graph evaluation is running, add a small ablation harness that runs three controller palettes under identical world settings:
-- Neural-only palette
-- Logic/arithmetic-only palette
-- Hybrid palette (neural + logic + interface nodes)
-
-The purpose is not to prove superior behavior. It is to verify that all three modes run stably, produce valid actions, and expose useful diagnostics for tuning mutation and energy settings.
-
-### Simulation Features
-- 2D grid world with configurable dimensions (start with 200×200)
-- Food cells with energy value; food regrows at configurable rate; food randomly spawns
-- Creatures as single-cell entities with position and energy
-- Passive energy decay per tick
-- Movement in 8 directions (cardinal + diagonal), costing energy
-- Eating: creature on a food cell can consume it, gaining energy
-- Death when energy reaches zero
-- Asexual reproduction: creature splits energy with offspring, offspring gets mutated copy of parent's graph
-- Computation graph evaluation with energy cost per node
-- Per-creature RNG (seeded from parent at birth) to keep stochastic behavior local and avoid shared RNG contention under parallel execution
-- Per-creature event log (small ring buffer of recent events: "ate food", "reproduced", "starved") for debugging and inspection
-
-### Creature Computation (Stage 1 Subset)
-Input nodes available:
-- `SensorFoodDirection` — angle to nearest food within a limited sensing radius
-- `SensorFoodDistance` — distance to nearest food
-- `SensorFoodHere` — food value at current cell
-- `SensorEnergy` — own energy level (0.0–1.0 normalized)
-- `SensorRandom` — random float each tick
-
-Hidden node types available:
-- `NeuralSigmoid`, `NeuralTanh`, `NeuralRelu` — basic neural processing
-- `Threshold` — converts float inputs to logic-like 0.0/1.0 outputs
-- `Select` — routes one of two float inputs based on a control input
-- `Add`, `Multiply` — arithmetic
-- `GreaterThan` — comparison
-- `Constant` — fixed value output
-- Graph initialization and topology mutation bias: prefer `sensor -> neural/perception -> logic/decision -> outputs` as a default prior (not a hard constraint)
-
-Output nodes available:
-- `OutputMoveX`, `OutputMoveY` — movement direction
-- `OutputEat` — eat intent (threshold-based)
-- `OutputReproduce` — reproduction intent (threshold-based)
-
-### Mutation Operators (Stage 1 Subset)
-- Perturb edge weight/parameter (most common mutation, high rate)
-- Add a new hidden node (splicing an existing edge)
-- Add a new edge between existing nodes
-- Remove an edge
-- Remove a disconnected hidden node
-- Change a hidden node's type (within available types, low rate for logic/converter nodes)
-
-### Genome and Lineage
-- Each creature gets a unique lineage ID at creation; offspring inherit the parent's lineage but get their own creature ID
-- Track parent-child relationships from the start — the lineage tree data structure should be built in stage 1 even if the visualization comes later
-- Generation counter per creature
-
-### Backend Deliverables
-- `petri-core` crate: world grid (`Vec<Cell>`), creature storage (`HopSlotMap`), tick loop, action resolution. No dependency on server/runtime frameworks (`tokio`, `axum`) so logic is reusable in server and CLI.
-- `petri-graph` crate: graph structure (backed by `petgraph::Graph`), stage 1 node types, evaluation engine. Keep it as a pure computation crate with no server/runtime dependencies.
-- `petri-genome` crate: mutation operators, innovation numbering for future crossover, lineage tracking. Keep it as a pure computation crate with no server/runtime dependencies.
-- `petri-server` crate: `axum` + `tokio` WebSocket world stream (MessagePack frames via `rmp-serde`), REST config/command API (JSON). `rayon` for parallel creature evaluation.
-- `petri-cli` crate: headless runner with basic stats output (population count, avg energy, avg genome size per tick)
-
-### Frontend Deliverables
-- React + TypeScript + Vite project scaffold
-- World renderer using direct `ImageData` buffer writes to `<canvas>`: grid with food (green intensity), creatures (white or colored dots), empty space (black). WebSocket connection receiving MessagePack frames via `@msgpack/msgpack`.
-- Pan and zoom
-- Config panel: React-based sliders for all WorldConfig values, pause/resume, speed control. REST API calls via `PATCH /config`.
-- Basic creature click-to-inspect: show energy, age, generation, node count
-- Population and average energy time-series charts (live, rendered with uPlot)
-
-### Configuration Knobs Active
-- `food_spawn_rate`, `food_growth_rate`, `food_max_density`, `food_energy_value`
-- `energy_per_tick_decay`, `energy_per_move`, `energy_per_compute_node`
-- `energy_per_reproduce`, `energy_initial`, `energy_max`
-- `weight_mutation_rate`, `weight_mutation_magnitude`, `logic_node_mutation_rate`, `structural_mutation_rate`
-- `min_reproduce_energy`, `offspring_energy_fraction`
-- `world_wrap`, `max_creatures`
-
-### What You'll See
-Creatures moving around a food field, consuming energy, reproducing, and dying according to configured rules. Changing configuration values should produce predictable mechanical changes (for example, higher movement cost reduces mobility and population).
-
-### Definition of Done
-- Simulation runs at 30+ ticks/sec with 5,000 creatures on a 200×200 grid
-- Creatures execute graph-driven actions and lifecycle transitions as expected (move/eat/reproduce/die)
-- Neural-only, logic-only, and hybrid controller palettes complete fixed-length test runs and emit comparable diagnostics (population, lifetime, action counts)
-- All config knobs adjustable at runtime via frontend
-- Full simulation state serializable and loadable (save/load)
-
-### Stage 1 Status (2026-02-11)
-- [x] Core simulation loop and graph-driven lifecycle are implemented
-- [x] Stage 1 sensors/nodes and mutation operators are implemented
-- [x] Lineage tracking, world-wrap toggle, and full config surfaces are implemented
-- [x] Inspector, live metrics chart, and snapshot save/load are implemented
-- [x] 5k-creature throughput benchmark binary is available (`petri-cli --bin stage1_benchmark`)
-
-### Baseline Extensions Already Landed
-- `SensorCreatureDirection`, `SensorCreatureDistance`, `SensorLocalDensity`, `SensorMoveBlockedLastTick`
-- `InputMemoryRead` + `OutputMemoryWrite` baseline single-register read/write loop
-- `Negate`, `Abs`, `Min`, `Max`
+Delivered baseline capabilities include:
+- world grid simulation, food economy, movement, reproduction, death
+- graph-based creature controllers and mutation
+- save/load snapshot pipeline
+- runtime/server/web integration and inspector
+- benchmark harness and ablation tooling
 
 ---
 
-## Stage 2: Rich Environment
+## Stage 2: Rich Environment and Cognition Foundation
 
-**Goal:** Add environment editing and richer inspection tools while preserving stable simulation behavior, delivered as full-scope vertical slices.
+**Goal:** Preserve environment-editing and observability progress while establishing a cognition-first control model for future slices.
 
-### Planned Interfaces (Stage 2)
-- `POST /simulation/world/paint`
-- `GET /simulation/lineage/tree`
-- `GET /simulation/creature/{id}/graph`
-- Frame payload additions: barriers, phenotype color, expanded metrics
-- Config addition: `sensor_radius`
-
-### Vertical Slices
+### Slices 1-5 (Delivered)
 
 **Slice 1: Barrier substrate + frame/render**
-- Add barrier cells as impassable world state.
-- Extend frame payload and frontend renderer to display barriers.
+- Barrier cell world state and rendering.
 
 **Slice 2: Paint API + paint UI**
-- Add world painting API for food/barrier placement and erase behavior.
-- Add paint tools in frontend (food, barrier, eraser with brush support).
+- Food/barrier paint workflows and controls.
 
 **Slice 3: Barrier-aware food rules + configurable sensing radius**
-- Ensure food spawn/spread respects barriers and occupied cells.
-- Add `sensor_radius` configuration with frontend controls.
+- Barrier-aware growth/spawn behavior and sensor radius controls.
 
 **Slice 4: Barrier sensors + inspector exposure**
-- Add `SensorBarrierDirection` and `SensorBarrierDistance`.
-- Expose barrier sensing values in creature inspector payload/views.
-- 
-**Slice 4.1: Slot-addressed generic inventory + illegal-action penalty**
-- Generic inventory actions with explicit slot addressing (`slot 1..12`) and direction targeting (`self/N/E/S/W`).
-- Evolvable slot capacity (`default=1`, `min=1`, `max=12`, reproduction mutation step `±1`).
-- Touch sensors for `self/N/E/S/W` and per-slot sensors for `slot_1..slot_12`.
-- Value-carrying food items (pickup stores whole cell value in selected slot).
-- Global illegal-action penalty system for failed creature actions.
-- Inspector/API exposure of slot state, inventory signals, and illegal-attempt diagnostics.
-  
-**Slice 5: Phenotype color pipeline**
-- Add deterministic phenotype color derived from genome structure.
-- Render phenotype colors in world view and related inspection surfaces.
+- Barrier direction/distance sensing and inspector visibility.
 
-**Slice 6: Evolutionary tree API + canvas visualization**
+**Slice 4.1: Slot-addressed inventory + illegal-action penalties**
+- Addressed slot operations, touch/slot sensors, illegal-action accounting.
+
+**Slice 5: Phenotype color pipeline**
+- Heritable phenotype color propagation and display.
+
+### Slice 5.5 (New Blocking Slice): Cognition-First Tick Refactor
+
+**Status:** Planned (not implemented).
+
+**Why this is blocking:**
+- Slice 6 lineage-tree UX and Slice 7 graph-inspector metrics should be built on final action semantics, not on transitional multi-action tick behavior.
+
+**Planned behavior:**
+- Energy-bounded internal think loop per creature within a tick.
+- Explicit `halt` output to end think loop.
+- Explicit `no_op` output for intentional no world interaction.
+- One world interaction maximum per tick.
+- Final-thought action selection.
+- Direct introspection inputs for previous-step and running-max action confidences.
+- Three energy-awareness inputs: `energy_start_tick`, `energy_spent_tick`, and `energy_remaining`.
+- Movement confidence derived from `sqrt(move_x^2 + move_y^2)`.
+- Random tie-break for equal final confidences using per-creature seeded RNG.
+
+**Planned config/economics direction:**
+- Introduce `energy_per_think_step` as cognition-cost knob.
+- Normalize planned energy-awareness inputs against `energy_max`, with spent/remaining refreshed each think step.
+- Keep throughput benchmark informational while redesign stabilizes.
+
+### Slice 6 (Downstream of Slice 5.5): Evolutionary Tree API + Canvas Visualization
+
 - Add lineage tree query/filter API.
 - Add scalable tree visualization (`d3-hierarchy` layout + canvas render).
 
-**Slice 7: Graph inspector + expanded metrics**
+### Slice 7 (Downstream of Slice 5.5): Graph Inspector + Expanded Metrics
+
 - Add interactive computation-graph inspector view (ReactFlow-based).
 - Add expanded metrics: species diversity, food availability, average genome complexity.
 
-### What You'll See
-With barriers, you can create mazes, islands, and corridors. Painting food and barrier regions immediately affects movement and resource access. The tree and graph-inspector views remain navigable at target event counts, and expanded metrics make population dynamics easier to interpret.
+### Stage 2 Done Criteria (Updated)
 
-### Definition of Done
-- Barriers fully functional; creature movement correctly respects blocked cells
-- Painting tools work smoothly in the frontend
-- Barrier-aware food rules and `sensor_radius` controls are fully wired and tested
-- Evolutionary tree renders and is navigable for simulations with 10,000+ birth events
-- Creature graph inspector is interactive and shows current node/edge activation context
-- Expanded statistics (species diversity, food availability, average genome complexity) stream and render correctly
-- Phenotype colors are stable and derived consistently from genome data
+- Slices 1-5 are retained.
+- Slice 5.5 cognition-first semantics are implemented and verified.
+- Slice 6 and 7 are implemented on top of the cognition-first model.
 
 ---
 
 ## Stage 3: Predation
 
-**Goal:** Introduce creature-eats-creature dynamics with correct conflict resolution and tunable safety controls.
+**Status:** Planned.
 
-### New Simulation Features
-- Predation action: a creature adjacent to another creature can attempt to consume it
-- Predation resolution: based on relative energy levels (and optionally size). The attacker must have significantly more energy than the defender to succeed. If successful, the prey dies and the predator gains a fraction of its energy. If unsuccessful, both lose some energy from the struggle.
-- Defense: no explicit defense action — energy level acts as implicit armor. Creatures that are well-fed are harder to kill.
-- **Population safety mechanisms:** Predation often causes extinction spirals in early evolutionary sims (predators eat everyone, then starve). Two mitigations: (1) a configurable minimum population floor below which predation is disabled, and (2) optional "nursery" zones where predation is disabled and food is abundant, allowing populations to recover from crashes.
-
-### New Creature Computation
-Input nodes added:
-- `SensorCreatureEnergy` — energy level of nearest creature (relative to self)
-
-Output nodes added:
-- `OutputAttack` — predation intent
-
-Hidden nodes added:
-- `Gate` — conditional signal pass-through (useful for "if big enough to eat, approach; else flee")
-
-Baseline note:
-- `SensorCreatureDirection`, `SensorCreatureDistance`, `Negate`, `Abs`, `Min`, and `Max` are already part of the pre-Stage-3 baseline and are not introduced as new Stage 3 primitives.
-
-### New Configuration Knobs
-- `predation_enabled` — toggle predation globally
-- `predation_energy_transfer` — fraction of prey energy gained (e.g., 0.5)
-- `predation_size_advantage` — how much relative energy matters (threshold multiplier)
-- `energy_per_attack` — energy cost of attempting predation (even if unsuccessful)
-- `predation_min_population` — population floor below which predation is disabled (default 0 = no floor)
-
-### What You'll See
-Predation attempts occurring in-world with clear success/failure outcomes, energy transfer, and expected death handling. Population safety controls should prevent runaway collapse during aggressive tuning.
-
-### Definition of Done
-- Predation mechanics work correctly (energy transfer, death, conflict resolution)
-- Predation configuration knobs produce expected mechanical effects in tests and runtime
-- Creature inspector exposes inputs/outputs relevant to predation debugging (`SensorCreature*`, `OutputAttack`)
+Predation design and balancing proceed after Slice 5.5, so predation action economics align with one-action arbitration semantics.
 
 ---
 
 ## Stage 4: Social Layer
 
-**Goal:** Add communication, kin recognition, sharing, memory, and sexual reproduction mechanics with clear observability.
+**Status:** Planned.
 
-### New Simulation Features
-
-**Signaling:**
-- Creatures can emit a signal value (float) on one of N configurable channels
-- Signals propagate to cells within `signal_range` with distance falloff
-- Signals last one tick (or configurable decay) then dissipate
-- Signal emission costs energy
-
-**Kin Recognition:**
-- Each creature has a kin tag (short sequence of values, inherited with slight mutation)
-- Creatures can sense the kin similarity of the nearest creature (cosine similarity or hamming distance of tags)
-- This doesn't directly affect anything — it just provides information that the creature's graph can use to make decisions
-
-**Resource Sharing:**
-- New output: `OutputShareEnergy` — when activated and adjacent to another creature, transfer a portion of own energy to that creature
-- Energy transfer has a cost (some energy lost in transit to prevent perpetual motion)
-
-**Sexual Reproduction:**
-- New output: `OutputReproduceMode` — controls whether reproduction is asexual or sexual
-- Sexual reproduction requires adjacency with another creature that is also signaling reproductive intent
-- Offspring genome is crossover of both parents' graphs (aligned by node historical markers, similar to NEAT), then mutated
-- Offspring kin tag is blend of parents' tags
-
-**Memory (upgrade from baseline):**
-- Baseline (already landed): single-register read/write loop via `InputMemoryRead` and `OutputMemoryWrite`.
-- Stage 4 target: indexed multi-slot memory (`SensorMemory(N)`, `OutputMemoryWrite(N)`) with richer semantics and observability.
-- Enables creatures to maintain structured state across ticks without relying solely on recurrent graph connections.
-
-### New Creature Computation
-Input nodes added:
-- `SensorCreatureKinSimilarity` — how similar nearest creature's kin tag is
-- `SensorSignal(N)` — incoming signal value on channel N
-- `SensorPopulationDensity` — creature count in local area
-- `SensorMemory(N)` — indexed read from memory register slot `N` (beyond baseline single-register behavior)
-
-Output nodes added:
-- `OutputSignal(N)` — emit signal on channel N
-- `OutputShareEnergy` — energy transfer intent
-- `OutputReproduceMode` — asexual/sexual toggle
-- `OutputMemoryWrite(N)` — indexed write to memory register slot `N` (beyond baseline single-register behavior)
-
-Hidden nodes added:
-- `Accumulator` — running sum across ticks (useful for integrating signals over time)
-- `Delay` — output previous tick's input (explicit single-tick memory)
-
-### New Configuration Knobs
-- `signaling_enabled`, `signal_channels`, `signal_range`
-- `kin_tag_length`
-- `energy_sharing_enabled`, `energy_share_transfer_rate`, `energy_share_cost`
-- `crossover_rate` — probability of gene crossover during sexual reproduction
-- `memory_slots` — number of memory registers per creature
-
-### What You'll See
-Signals appearing in-world, kin similarity values available to creature logic, energy-sharing transfers between neighbors, memory reads/writes affecting outputs, and sexual reproduction producing crossover offspring structures.
-
-### Definition of Done
-- Signaling works: signals visible in the world view as colored overlays, creatures respond to signals
-- Kin tags are generated, inherited, and exposed via sensors/inspector
-- Energy sharing transfers energy with configured transfer rate and cost
-- Sexual reproduction produces offspring with combined parent traits
-- Memory registers are readable/writable through graph nodes and visible in inspector/debug views
+Communication, kin, sharing, and extended reproduction mechanics should be introduced only after cognition-first control semantics are stable.
 
 ---
 
 ## Stage 5: Group Mechanics and Analysis
 
-**Goal:** Add group-level analysis tooling and environmental stressors to evaluate social mechanics.
+**Status:** Planned.
 
-### This Stage Is Primarily About Tuning and Environment Design
-
-By stage 4, all the mechanical ingredients exist. Stage 5 focuses on stress-testing and measuring those mechanics at group scale.
-
-### Environmental Additions
-- **Hazard zones:** Regions that drain energy at an accelerated rate, used to stress-test sharing and adaptation mechanics.
-- **Periodic catastrophes:** Events that kill creatures below an energy threshold, used to test recovery and resilience.
-- **Rich/barren regions:** Uneven food distribution, used to test migration and information-sharing mechanisms.
-- **Scaling predation:** Tunable predator pressure (higher energy transfer, faster) to test social responses under threat.
-
-### Analysis and Visualization Additions
-- **Group detection:** Algorithm to identify clusters of kin-similar creatures. Display group boundaries in the world view.
-- **Group statistics:** Track group size, group average energy, inter-group vs intra-group interactions over time.
-- **Behavioral profiling:** Classify creatures by behavior pattern (forager, predator, sentinel, sharer) based on action frequency distribution. Show population breakdown by behavioral type.
-- **Signal analysis:** Visualize signal patterns — which signals correlate with which events? Are different groups using signals differently?
-
-### What You'll See
-Group overlays, metrics, and signal analysis views updating as simulations run under hazard/catastrophe configurations. The focus is on instrumentation quality and interpretability rather than guaranteeing specific emergent outcomes.
-
-### Definition of Done
-- Group detection runs on live data and renders boundaries correctly
-- Group statistics and interaction metrics update correctly over time
-- Signal analysis views correlate emitted signals with configured world events
-- Visualization clearly shows group dynamics (boundaries, signals, resource flow)
+Large-scale analysis tooling and stress-test environments remain downstream and should assume cognition-first action semantics.
 
 ---
 
-## Cross-Cutting Concerns (All Stages)
+## Cross-Cutting Concerns
 
-### Testing Strategy
-- **Unit tests:** Per-crate tests for graph evaluation, mutation correctness, energy accounting, action resolution.
-- **Integration tests:** Full tick-loop tests with known initial conditions asserting expected outcomes.
-- **Ablation tests:** Neural-only vs logic-only vs hybrid palette runs with fixed configs to validate controller stability and diagnostic outputs.
-- **Statistical tests:** Run headless simulations for N ticks and verify properties (population doesn't immediately go extinct, energy is conserved, lineage tree is consistent).
-- **Benchmark tests:** Measure tick rate at target creature count to catch performance regressions.
+### Testing
 
-### Save/Load
-- Available from stage 1. Full simulation state serialized via `postcard` (compact binary serde format), including RNG runtime state needed for correct continuation after load. (Not `bincode` — it has a RUSTSEC-2025 unmaintained advisory.)
-- Versioned format so saves from earlier stages remain loadable.
+- Unit tests: node/eval behavior, mutation behavior, energy accounting.
+- Integration tests: world tick lifecycle and action resolution.
+- Snapshot tests: deterministic save/load continuation.
+- Benchmarking: throughput tracked continuously; strict thresholds may be relaxed during cognition refactor.
 
-### Configuration Presets
-- Build up a library of configuration presets that produce interesting dynamics: "Abundant World", "Famine", "Predator Arena", "Island Archipelago", "Cooperative Pressure".
+### Documentation Policy
 
-### Documentation
-- Each stage should include updated API documentation for new endpoints and WebSocket message types.
-- A living "field guide" document that catalogs notable simulation states, parameter effects, and debugging notes observed during development.
+- Canonical docs must explicitly label **Current** vs **Planned** behavior.
+- Plan files in `docs/plans/` are execution artifacts and may be removed when superseded by rebaselines.
+
+### Compatibility Policy (for upcoming Slice 5.5)
+
+- The cognition-first refactor is expected to be a breaking semantic change.
+- Old snapshots/config expectations may not remain compatible.
 
 ---
 
-## Rough Timeline Guidance
+## Immediate Next Step
 
-These aren't hard deadlines — they're rough estimates of relative complexity to help with planning.
-
-| Stage | Relative Effort | Key Risk |
-|-------|----------------|----------|
-| Stage 1 | Large (40%) | This is the foundation — world sim, graph engine, API, frontend. Most of the infrastructure is built here. |
-| Stage 2 | Medium-Large (20%) | Full-scope vertical slices span simulation, API, and frontend; sequencing and payload boundaries are the main risk. |
-| Stage 3 | Medium (12%) | Predation conflict resolution needs careful design. Balancing predation parameters is iterative. |
-| Stage 4 | Medium-Large (18%) | Sexual reproduction crossover is algorithmically complex. Multiple new systems (signals, kin, indexed multi-slot memory, sharing). |
-| Stage 5 | Small-Medium (10%) | Mostly tuning, environmental additions, and analysis tooling. Risk is metric complexity and interpretation overhead. |
-
-Stage 1 is the critical path. Once it's working, the remaining stages are incremental additions to a proven foundation.
+- Execute the documentation-only rebaseline plan.
+- Then execute the cognition-first tick refactor implementation plan.

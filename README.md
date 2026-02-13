@@ -11,6 +11,19 @@ This repository now contains the first runnable vertical slice of the Petri simu
 
 - `docs/reference/creature-controller-reference.md`: creature/controller structure, node semantics, and mutation operator reference
 
+## Upcoming cognition refactor (planned, not implemented yet)
+
+The next major simulation refactor is documented and planned but **not implemented yet**.
+
+Planned target semantics:
+- creatures can perform energy-bounded internal thinking loops inside a tick
+- controller gains explicit `halt` and `no_op` outputs
+- at most one world interaction is executed per creature per tick
+- action arbitration uses final-thought outputs with explicit no-op support
+- computation-energy tuning shifts toward an `energy_per_think_step` model
+
+During this transition, docs separate current behavior from planned behavior. Runtime/API behavior in code remains unchanged until implementation lands.
+
 ## Prerequisites
 
 - `rustup` (recommended) with Rust `1.93.0`
