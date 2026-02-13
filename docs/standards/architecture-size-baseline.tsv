@@ -1,0 +1,3 @@
+path	current_lines	owner	note	review_by
+crates/petri-core/src/world/tick.rs	703	petri-core	legacy oversize; split by concern during cognition refactor	2026-03-15
+crates/petri-graph/src/eval/presets.rs	749	petri-graph	legacy oversize; split preset construction helpers	2026-03-15

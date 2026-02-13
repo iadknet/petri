@@ -49,11 +49,13 @@ See canonical policy: `docs/standards/agent-instruction-layering.md`.
 Before claiming completion, run and confirm all pass:
 
 1. `scripts/check-doc-harness.sh --mode warn` (through February 27, 2026)
-2. `scripts/check-doc-harness.sh --mode strict` (starting February 28, 2026)
-3. `cargo fmt --all --check`
-4. `cargo test --workspace`
-5. `cargo clippy --workspace --all-targets -- -D warnings`
-6. `cd web && npm run build`
+2. `scripts/check-architecture-harness.sh --mode warn` (through February 27, 2026)
+3. `scripts/check-doc-harness.sh --mode strict` (starting February 28, 2026)
+4. `scripts/check-architecture-harness.sh --mode strict` (starting February 28, 2026)
+5. `cargo fmt --all --check`
+6. `cargo test --workspace`
+7. `cargo clippy --workspace --all-targets -- -D warnings`
+8. `cd web && npm run build`
 
 ## Doc Touch Policy
 
@@ -66,7 +68,7 @@ Before claiming completion, run and confirm all pass:
 - Docs index: `docs/README.md`
 - Strategy docs: `docs/strategy/roadmap.md`, `docs/strategy/architecture.md`, `docs/strategy/technology-review.md`
 - Controller reference: `docs/reference/creature-controller-reference.md`
-- Operations and standards: `docs/operations/doc-hygiene.md`, `docs/standards/agent-instruction-layering.md`
+- Operations and standards: `docs/operations/doc-hygiene.md`, `docs/standards/agent-instruction-layering.md`, `docs/standards/architecture-lint-policy.md`
 
 ## Git Hygiene
 
