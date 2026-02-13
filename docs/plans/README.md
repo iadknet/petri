@@ -2,11 +2,14 @@
 
 Use `docs/plans/YYYY-MM-DD-<topic>.md` for non-trivial, multi-step work.
 
+Archived historical plans live under `docs/plans/archive/` and are excluded from plan-quality harness enforcement.
+
 ## Required metadata
 
-Each new non-trivial plan must include:
+Each active non-trivial plan must include:
 
 - `Goal`: one-sentence outcome statement
+- `Goal IDs`: one or more IDs from `docs/strategy/goals.md`
 - `Scope`: what is included and excluded
 - `Docs Impact`: canonical docs touched and stale docs retired/superseded
 - `Supersedes`: older plan IDs/files being replaced (or `none`)
@@ -16,10 +19,29 @@ Each new non-trivial plan must include:
 
 At minimum include:
 
-1. Context
-2. Task list with explicit file targets
-3. Verification commands
-4. Risks/rollback notes when applicable
+1. `## Goal Alignment`
+2. `## Boundary Impact`
+3. `## Existing Boundary Recheck`
+4. `## Open Questions`
+5. Task list with explicit file targets
+6. Verification commands
+7. Risks/rollback notes when applicable
+
+## Existing Boundary Recheck requirements
+
+Include at least two reviewed existing areas (crate/module/file), each with:
+
+- decision (`keep` or `change`)
+- rationale
+
+## Open Questions table format
+
+`## Open Questions` must use a Markdown table with columns:
+
+- `question`
+- `decision`
+- `owner`
+- `status` (use `resolved` or `unresolved`)
 
 ## Docs Impact section
 
@@ -29,4 +51,4 @@ Use a compact table or bullet list with:
 - compatibility stubs (if any)
 - retired or superseded docs/plans
 
-This keeps plan output aligned with the docs harness checks and avoids silent drift.
+This keeps plan output aligned with docs and plan harness checks and avoids silent drift.
