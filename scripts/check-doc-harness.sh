@@ -206,7 +206,9 @@ check_markdown_links() {
     done < <(grep -oE '\[[^][]+\]\(([^)]+)\)' "$md_file" | sed -E 's/^[^\(]*\(([^)]+)\)$/\1/' || true)
   done < <(find . -type f -name '*.md' \
     -not -path './.git/*' \
+    -not -path './.worktrees/*' \
     -not -path './target/*' \
+    -not -path './node_modules/*' \
     -not -path './web/node_modules/*' \
     -print0)
 }
