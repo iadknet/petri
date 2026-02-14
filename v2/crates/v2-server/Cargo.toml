@@ -1,0 +1,8 @@
+[package]
+name = "v2-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+v2-core = { path = "../v2-core" }

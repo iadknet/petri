@@ -1,0 +1,9 @@
+[package]
+name = "v2-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "v2_core"
+path = "src/lib.rs"

@@ -1,130 +1,124 @@
-# Creature Brain Mesh Stage 2: Backends and Energy Metering (MAJOR REFACTOR/REWRITE)
+# Petri V2 Stage 2: Mesh Kernel and Energy-Bounded Backends
 
-> **Stage Type:** This stage is part of a **MAJOR REFACTOR/REWRITE** program.
+> **Stage Type:** This stage is part of a **MAJOR GREENFIELD REWRITE** program.
 
-**Goal:** Implement backend execution contracts for `graph` and `vm` node types with unified energy accounting and energy-bounded execution safety.
-**Goal IDs:** GP-01, GP-03
-**Scope:** Backend execution modules and energy-cost policy in `petri-core` and `petri-graph`; excludes mutation/ecology rollout.
-**Docs Impact:** Add stage plan file; no canonical docs changed until integration cutover.
+**Goal:** Implement the new mesh cognition runtime in `v2-core` with FIFO routing semantics and energy-bounded graph/VM backend execution.
+**Goal IDs:** GP-01, GP-03, GP-04
+**Scope:** `v2-core` runtime schema, queue engine, backend contracts, and energy accounting; excludes reproduction/mutation/ecology and product surface API details.
+**Docs Impact:** Update stage plan for greenfield kernel implementation tasks only.
 **Supersedes:** none
 **Superseded-By:** none
 
 ## Goal Alignment
 
-- `GP-01`: enables heterogeneous node cognition (`graph` + `vm`) inside one creature mesh.
-- `GP-03`: energy accounting and backend contracts are test-first to prevent silent infinite-loop/runtime hazards.
+- `GP-01`: introduces the new cognition substrate targeted at richer behaviors.
+- `GP-03`: kernel and energy semantics are implemented with strict TDD.
+- `GP-04`: runtime diagnostics are designed into queue execution from first implementation.
 
 ## Boundary Impact
 
-- Dependency direction: preserved; `petri-graph` remains graph semantics owner, `petri-core` owns runtime policy/energy charging.
-- Public API / wire format: internal runtime fields expand for per-dispatch and per-backend energy metrics.
-- Test migration: prior `energy_per_think_step` tests replaced by dispatch-entry + backend compute cost semantics.
+- Implementation is fully contained in `v2/crates/v2-core`.
+- Legacy runtime fields and types are not modified.
+- Backends are internal to `v2-core`; server/web contract decisions are deferred to stage 4.
 
 ## Existing Boundary Recheck
 
 | area | decision | rationale |
 | --- | --- | --- |
-| `crates/petri-graph/src/eval/*` | change | Graph evaluation becomes a backend implementation behind new mesh execution trait. |
-| `crates/petri-core/src/world/tick.rs` | change | Tick loop must charge dispatch entry cost + backend cost + action cost. |
-| `crates/petri-core/src/config.rs` | change | New config knobs required for dispatch base cost and VM opcode cost table defaults. |
+| `v2/crates/v2-core/src/lib.rs` | change | Stage needs complete runtime module layout and core types. |
+| `crates/petri-core/src/world/*` | keep | Legacy runtime remains untouched per greenfield policy. |
+| `v2/docs/BOUNDARIES.md` | change | Must be updated with backend-specific anti-coupling guidance. |
 
 ## Open Questions
 
 | question | decision | owner | status |
 | --- | --- | --- | --- |
-| Should graph cost be dynamic op metering or static tariff in v1? | Static tariff in v1. | user+agent | resolved |
-| Should VM loops be bounded by hard dispatch cap? | No; bounded by per-op energy drain and energy exhaustion. | user+agent | resolved |
-| Should backend errors kill the creature or noop the dispatch? | Kill creature in v1 to avoid silent corrupted execution. | agent | resolved |
+| Should queue order be FIFO in v1? | Yes. | user+agent | resolved |
+| Should world action commit halt further dispatch immediately? | Yes. | user+agent | resolved |
+| Should VM loops be bounded by dispatch caps or energy only? | Energy only in v1. | user+agent | resolved |
 
-### Task 1: Add failing energy/backend contract tests
-
-Files:
-- Add: `crates/petri-core/tests/mesh_energy.rs`
-- Modify: `crates/petri-core/src/world/tests.rs`
-
-Steps:
-1. Add failing tests for dispatch entry energy charge application.
-2. Add failing tests for graph static tariff charging per dispatch.
-3. Add failing tests showing VM loop dies by energy exhaustion.
-4. Add failing tests for action-cost charging after world-action commit.
-
-### Task 2: Implement backend interface and graph adapter
+### Task 1: Add failing schema and queue semantics tests
 
 Files:
-- Add: `crates/petri-core/src/world/backends/mod.rs`
-- Add: `crates/petri-core/src/world/backends/graph_backend.rs`
-- Modify: `crates/petri-graph/src/lib.rs`
-- Modify: `crates/petri-core/src/world/mesh.rs`
+- Create: `v2/crates/v2-core/tests/mesh_schema.rs`
+- Create: `v2/crates/v2-core/tests/mesh_queue.rs`
 
 Steps:
-1. Define shared backend trait contract (inputs, emitted outputs, backend diagnostics).
-2. Adapt existing graph evaluator to backend trait execution.
-3. Precompute per-node graph tariff metadata from graph shape.
+1. Add failing tests for genome validity and target resolution.
+2. Add failing tests for FIFO dispatch behavior.
+3. Add failing tests for immediate world-action commit and implicit noop-on-drain.
 
-### Task 3: Implement VM backend with opcode metering
+### Task 2: Implement mesh schema and queue runtime
 
 Files:
-- Add: `crates/petri-core/src/world/backends/vm_backend.rs`
-- Add: `crates/petri-core/src/world/backends/vm_types.rs`
-- Modify: `crates/petri-core/src/world/mesh.rs`
+- Create: `v2/crates/v2-core/src/mesh/mod.rs`
+- Create: `v2/crates/v2-core/src/mesh/schema.rs`
+- Create: `v2/crates/v2-core/src/mesh/queue.rs`
 
 Steps:
-1. Define minimal opcode set for v1 world parity and internal routing support.
-2. Implement per-op energy charging and opcode execution loop.
-3. Stop VM execution on energy exhaustion and surface terminal reason.
+1. Define `CreatureGenome`, `NodeGenome`, output schemas, and packet types.
+2. Implement schema validation routines.
+3. Implement queue kernel and execution outcome semantics.
 
-### Task 4: Wire unified energy policy into tick runtime
+### Task 3: Add failing energy/backends tests
 
 Files:
-- Modify: `crates/petri-core/src/world/tick.rs`
-- Modify: `crates/petri-core/src/config.rs`
-- Modify: `crates/petri-core/src/types.rs`
+- Create: `v2/crates/v2-core/tests/mesh_energy.rs`
 
 Steps:
-1. Apply `dispatch_entry_cost` before backend execution.
-2. Apply backend compute cost returned by graph/VM backends.
-3. Apply world-action side effect cost after commit.
-4. Update diagnostics fields for dispatch/backend/action energy components.
+1. Add failing tests for dispatch-entry energy charging.
+2. Add failing tests for graph static tariff charging.
+3. Add failing tests for VM per-op metering and energy exhaustion termination.
+
+### Task 4: Implement backend contracts and energy accounting
+
+Files:
+- Create: `v2/crates/v2-core/src/backends/mod.rs`
+- Create: `v2/crates/v2-core/src/backends/graph.rs`
+- Create: `v2/crates/v2-core/src/backends/vm.rs`
+- Create: `v2/crates/v2-core/src/energy.rs`
+
+Steps:
+1. Implement backend interface and graph adapter.
+2. Implement VM executor with per-op charging.
+3. Integrate energy accounting into queue dispatch.
 
 ## Checkpoint Boundaries
 
 ### Entry Checkpoint (`S2-ENTRY`)
 
 Required before starting:
-1. Program checkpoint `CP-1` is marked `go`.
-2. Stage-1 kernel interface is frozen for this stage window.
-3. Stage-2 failing tests are added before backend implementation edits.
+1. Stage-1 `S1-EXIT` is `go`.
+2. `v2` boundary docs confirm no legacy imports.
 
 ### Midpoint Checkpoint (`S2-MID`)
 
 Required before task 4:
-1. Graph backend adapter compiles and passes graph-contract tests.
-2. VM backend opcode metering tests fail then pass via TDD.
+1. Queue/schema tests pass.
+2. Energy tests fail for expected reasons before backend implementation.
 
 Stop conditions:
-1. Backend trait contracts require repeated redesign.
-2. Energy policy cannot be represented without changing stage-1 kernel semantics.
+1. Queue contract churn across tasks.
+2. Backend interface requires coupling to `v2-server` or `v2-web`.
 
 ### Exit Checkpoint (`S2-EXIT`)
 
 Required to close stage:
-1. Dispatch entry, graph tariff, VM per-op, and action-cost tests pass.
-2. Stage verification commands pass for both `petri-core` and `petri-graph`.
-3. Stage-3 mutation/evolution assumptions are documented against the frozen backend interface.
+1. Queue and energy tests all green.
+2. Runtime diagnostics are emitted from kernel outcomes.
+3. Stage verification commands pass.
 
 Go / stop rule:
-1. `go` to stage 3 only if backend and energy contracts remain unchanged through a full pass.
-2. `stop` and issue a stage-2 amendment if contracts are still unstable.
+1. `go` to stage 3 only if kernel/backends are stable for one full test pass.
+2. `stop` and amend stage 2 if semantics still churn.
 
 ## Verification Commands
 
 1. `scripts/check-plan-harness.sh --mode strict`
-2. `cargo test -p petri-core mesh_energy -- --nocapture`
-3. `cargo test -p petri-core`
-4. `cargo test -p petri-graph`
+2. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 
-- Risk: VM backend policy churn could destabilize early runtime behavior.
-- Risk: graph tariff calibration might over-penalize large but useful graph nodes.
-- Rollback: revert stage-2 backend commits and keep stage-1 graph-only execution placeholder.
+- Risk: VM scope can expand prematurely.
+- Risk: energy defaults may make kernel behavior hard to tune.
+- Rollback: revert stage-2 commits and keep stage-1 skeleton untouched.
