@@ -34,6 +34,11 @@
 | Should graph nodes have custom mini-language in CP-1? | No, keep graph backend minimal with simple expression operators. | user+agent | resolved |
 | Should internal packet fields be untyped strings? | No, typed value schema is required. | user+agent | resolved |
 | What is per-creature VM memory size in v1? | Fixed at `1024` bytes (`1 KiB`) per creature. | user+agent | resolved |
+| How are `ReadInput` slots mapped and normalized? | Slot index maps to ordered `input_refs`; normalization uses the table in this spec. | user+agent | resolved |
+| How do output-write overrides behave across VM execution? | Per-dispatch override buffers; last-write-wins; explicit reset rules. | user+agent | resolved |
+| What happens for invalid VM indices? | Register/const/output index faults are hard runtime errors; input index is soft-default `0.0`. | user+agent | resolved |
+| What numeric determinism rules apply? | Canonical sanitize/clamp/rounding rules are mandatory. | user+agent | resolved |
+| Should v1 include logic/conversion opcodes? | Yes (`And`, `Or`, `Not`, `Clamp01`, `ToI32`, `ToU8`, `ToBool`). | user+agent | resolved |
 
 ## Genome Schema Contract
 
@@ -145,6 +150,43 @@ VM emit override rule:
 2. Override target is identified by `(output_index, field_index)` in the selected output definition.
 3. Override source value is `f32` and coerced to target field type at emit time.
 
+### `ReadInput` slot mapping and normalization contract
+
+1. For each dispatch, runtime builds `resolved_input_slots: Vec<f32>` by iterating `input_refs` in order.
+2. `ReadInput { dst, input_index }` reads `resolved_input_slots[input_index]`.
+3. `input_index >= resolved_input_slots.len()` returns `0.0` (soft default, not a fault).
+
+Normalization table for built-in input keys:
+
+| input key | mapped value |
+| --- | --- |
+| `food_here` | `food_density / 255.0` |
+| `nearest_food_distance` | `clamp(distance / sensor_radius, 0.0, 1.0)`, default `1.0` |
+| `nearest_food_direction` | `atan2(dy, dx) / PI` in `[-1.0, 1.0]`, default `0.0` |
+| `nearest_creature_distance` | `clamp(distance / sensor_radius, 0.0, 1.0)`, default `1.0` |
+| `nearest_creature_direction` | `atan2(dy, dx) / PI` in `[-1.0, 1.0]`, default `0.0` |
+| `occupied_here` | `1.0` if occupied else `0.0` |
+| `energy_current` | raw energy units (`f32`) |
+| `energy_spent_this_tick` | raw energy units (`f32`) |
+| `energy_remaining_this_tick` | raw energy units (`f32`) |
+| `age_ticks` | raw ticks as `f32` |
+| `memory_bytes_total` | constant `1024.0` |
+
+Packet value conversion:
+1. `Bool` -> `0.0` or `1.0`
+2. `I32` -> `f32`
+3. `F32` -> sanitized `f32` (see numeric determinism)
+4. `U8` -> `f32` in `[0.0, 255.0]`
+
+### Output override lifecycle contract
+
+1. VM execution starts with empty override buffers.
+2. `WriteInternalPayload` and `WriteWorldActionMeta` write into per-dispatch buffers keyed by `(output_index, field_index)`.
+3. Multiple writes to the same key are `last-write-wins`.
+4. `EmitInternal`/`EmitWorldAction` apply current overrides for that `output_index`.
+5. After emit, overrides for emitted `output_index` are cleared.
+6. On dispatch end (`Halt`, exhaustion, or program end), all override buffers are cleared.
+
 ## VM ISA Contract (v1)
 
 ### Registers and values
@@ -166,21 +208,28 @@ VM emit override rule:
 9. `Max { dst, a, b }`
 10. `Abs { dst, src }`
 11. `Neg { dst, src }`
-12. `CmpGt { dst, a, b }`
-13. `CmpLt { dst, a, b }`
-14. `CmpEq { dst, a, b, epsilon }`
-15. `JumpIfZero { cond, offset }`
-16. `Jump { offset }`
-17. `ReadInput { dst, input_index }`
-18. `WriteInternalPayload { output_index, payload_field_index, src }`
-19. `WriteWorldActionMeta { output_index, metadata_field_index, src }`
-20. `EmitInternal { output_index }`
-21. `EmitWorldAction { output_index }`
-22. `Halt`
-23. `LoadMem8 { dst, addr_reg }`
-24. `StoreMem8 { addr_reg, src }`
-25. `LoadMem8Imm { dst, addr }`
-26. `StoreMem8Imm { addr, src }`
+12. `Clamp01 { dst, src }`
+13. `CmpGt { dst, a, b }`
+14. `CmpLt { dst, a, b }`
+15. `CmpEq { dst, a, b, epsilon }`
+16. `And { dst, a, b }`
+17. `Or { dst, a, b }`
+18. `Not { dst, src }`
+19. `ToI32 { dst, src }`
+20. `ToU8 { dst, src }`
+21. `ToBool { dst, src }`
+22. `JumpIfZero { cond, offset }`
+23. `Jump { offset }`
+24. `ReadInput { dst, input_index }`
+25. `WriteInternalPayload { output_index, payload_field_index, src }`
+26. `WriteWorldActionMeta { output_index, metadata_field_index, src }`
+27. `EmitInternal { output_index }`
+28. `EmitWorldAction { output_index }`
+29. `Halt`
+30. `LoadMem8 { dst, addr_reg }`
+31. `StoreMem8 { addr_reg, src }`
+32. `LoadMem8Imm { dst, addr }`
+33. `StoreMem8Imm { addr, src }`
 
 ### VM execution rules
 
@@ -202,6 +251,26 @@ VM emit override rule:
 - `f32 -> bool`: `>= 0.5` is `true`, else `false`
 12. If remaining energy is below an opcode's effective cost, that opcode does not execute and VM exits as exhausted.
 
+### Invalid index and fault semantics
+
+1. Invalid register index in any register-addressing opcode is a hard VM runtime fault.
+2. Invalid `const_idx` in `LoadConst` is a hard VM runtime fault.
+3. Invalid `output_index` or field index for write/emit opcodes is a hard VM runtime fault.
+4. Invalid `input_index` is a soft default (`0.0`) and not a fault.
+5. Memory addresses are never invalid (wrapping semantics).
+6. Jump target outside program bounds halts VM (not a fault).
+
+### Numeric determinism contract
+
+1. VM math uses IEEE-754 single-precision (`f32`).
+2. Every arithmetic/conversion write goes through `sanitize_f32`:
+- `NaN -> 0.0`
+- `+/-Inf -> clamp to +/-1_000_000_000.0`
+- finite values clamped to `[-1_000_000_000.0, 1_000_000_000.0]`
+3. Float->integer rounding uses ties-away-from-zero (`round()` semantics).
+4. `CmpEq` epsilon is clamped to `[1e-6, 1.0]`.
+5. Truthiness for logical ops and `ToBool` is `value >= 0.5`.
+
 ### VM opcode baseline cost table (v1 defaults)
 
 Global scalar:
@@ -222,9 +291,16 @@ Per-opcode baseline (`vm_opcode_base_cost`):
 | `Max` | `0.12` |
 | `Abs` | `0.10` |
 | `Neg` | `0.10` |
+| `Clamp01` | `0.10` |
 | `CmpGt` | `0.12` |
 | `CmpLt` | `0.12` |
 | `CmpEq` | `0.12` |
+| `And` | `0.12` |
+| `Or` | `0.12` |
+| `Not` | `0.10` |
+| `ToI32` | `0.10` |
+| `ToU8` | `0.10` |
+| `ToBool` | `0.10` |
 | `JumpIfZero` | `0.14` |
 | `Jump` | `0.10` |
 | `ReadInput` | `0.12` |
@@ -270,6 +346,9 @@ Files:
 - Create: `v2/crates/v2-core/tests/vm_memory.rs`
 - Create: `v2/crates/v2-core/tests/vm_io.rs`
 - Create: `v2/crates/v2-core/tests/vm_opcode_costs.rs`
+- Create: `v2/crates/v2-core/tests/vm_input_mapping.rs`
+- Create: `v2/crates/v2-core/tests/vm_output_overrides.rs`
+- Create: `v2/crates/v2-core/tests/vm_numeric_determinism.rs`
 
 Steps:
 1. Add failing tests for arithmetic and compare ops.
@@ -278,6 +357,9 @@ Steps:
 4. Add failing tests for memory load/store and address wrapping behavior.
 5. Add failing tests for input read/output write opcode semantics.
 6. Add failing tests verifying baseline opcode cost table and multiplier scaling.
+7. Add failing tests for `ReadInput` slot ordering and normalization mapping.
+8. Add failing tests for override lifecycle and invalid output index faults.
+9. Add failing tests for numeric sanitize/clamp/rounding determinism.
 
 ### Task 3: Implement schema and VM ISA contracts
 
@@ -299,8 +381,11 @@ Steps:
 4. `cd v2 && cargo test -p v2-core --test vm_memory`
 5. `cd v2 && cargo test -p v2-core --test vm_io`
 6. `cd v2 && cargo test -p v2-core --test vm_opcode_costs`
-7. `cd v2 && cargo test -p v2-core --test mesh_runtime`
-8. `cd v2 && cargo test -p v2-core`
+7. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
+8. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
+9. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
+10. `cd v2 && cargo test -p v2-core --test mesh_runtime`
+11. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 
