@@ -4,5 +4,11 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 
+[lib]
+name = "v2_cli"
+path = "src/lib.rs"
+
 [dependencies]
+serde = { version = "1.0.228", features = ["derive"] }
+serde_json = "1.0.145"
 v2-core = { path = "../v2-core" }
