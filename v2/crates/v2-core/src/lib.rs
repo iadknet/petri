@@ -1,6 +1,7 @@
 pub mod backends;
 pub mod energy;
 pub mod mesh;
+pub mod runtime;
 
 pub const V2_RUNTIME_NAME: &str = "petri-v2";
 

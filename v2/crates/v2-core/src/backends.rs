@@ -1,5 +1,7 @@
 use crate::energy::meter_vm_ops;
-use crate::mesh::{EmittedOutput, OutputDefinition};
+use crate::mesh::{
+    EmittedOutput, GraphBackendDef, GraphOperator, OutputDefinition, emitted_output_from_definition,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct EnergyBudget {
@@ -55,9 +57,114 @@ pub fn execute_vm_backend(request: &BackendExecutionRequest) -> BackendExecution
     }
 }
 
-fn emitted_output_from_definition(definition: &OutputDefinition) -> EmittedOutput {
-    match definition {
-        OutputDefinition::InternalTarget(target) => EmittedOutput::InternalTarget(target.clone()),
-        OutputDefinition::WorldAction(action) => EmittedOutput::WorldAction(action.clone()),
+#[must_use]
+pub fn graph_operator_cost_multiplier(operator: GraphOperator) -> f32 {
+    match operator {
+        GraphOperator::Passthrough => 0.7,
+        GraphOperator::WeightedSum => 1.0,
+        GraphOperator::Threshold { .. } => 0.9,
+        GraphOperator::Clamp01 => 0.8,
+        GraphOperator::DecayIntegrator { .. } => 1.2,
+        GraphOperator::Momentum { .. } => 1.3,
+        GraphOperator::Oscillator { .. } => 1.4,
+        GraphOperator::SumPool => 1.0,
+        GraphOperator::MeanPool => 1.1,
+        GraphOperator::MaxPool => 1.2,
+        GraphOperator::AdaptiveGain { .. } => 1.3,
+    }
+}
+
+#[must_use]
+pub fn evaluate_graph_operator(
+    graph: &GraphBackendDef,
+    inputs: &[f32],
+    state_slots: &mut [f32],
+) -> f32 {
+    let first = inputs.first().copied().unwrap_or(0.0);
+    let second = inputs.get(1).copied().unwrap_or(0.0);
+    match graph.operator {
+        GraphOperator::Passthrough => first + graph.bias,
+        GraphOperator::WeightedSum => {
+            let weighted = inputs
+                .iter()
+                .enumerate()
+                .map(|(index, value)| {
+                    let coefficient = graph.coefficients.get(index).copied().unwrap_or(1.0);
+                    coefficient * value
+                })
+                .sum::<f32>();
+            weighted + graph.bias
+        }
+        GraphOperator::Threshold { threshold } => {
+            if first >= threshold {
+                1.0
+            } else {
+                0.0
+            }
+        }
+        GraphOperator::Clamp01 => (first + graph.bias).clamp(0.0, 1.0),
+        GraphOperator::DecayIntegrator { state_slot, alpha } => {
+            let slot = usize::from(state_slot);
+            if let Some(state) = state_slots.get_mut(slot) {
+                let alpha = alpha.clamp(0.0, 1.0);
+                *state = (1.0 - alpha) * *state + alpha * first;
+                *state
+            } else {
+                0.0
+            }
+        }
+        GraphOperator::Momentum { state_slot, beta } => {
+            let slot = usize::from(state_slot);
+            if let Some(state) = state_slots.get_mut(slot) {
+                let beta = beta.clamp(0.0, 1.0);
+                let delta = first - second;
+                *state = beta * *state + (1.0 - beta) * delta;
+                *state
+            } else {
+                0.0
+            }
+        }
+        GraphOperator::Oscillator {
+            phase_slot,
+            frequency,
+            amplitude,
+            bias,
+        } => {
+            let slot = usize::from(phase_slot);
+            if let Some(phase) = state_slots.get_mut(slot) {
+                let frequency = frequency.clamp(0.0, 8.0);
+                *phase = (*phase + frequency).fract();
+                bias + amplitude.clamp(0.0, 10.0) * (2.0 * std::f32::consts::PI * *phase).sin()
+            } else {
+                bias
+            }
+        }
+        GraphOperator::SumPool => inputs.iter().copied().sum::<f32>() + graph.bias,
+        GraphOperator::MeanPool => {
+            if inputs.is_empty() {
+                graph.bias
+            } else {
+                (inputs.iter().copied().sum::<f32>() / inputs.len() as f32) + graph.bias
+            }
+        }
+        GraphOperator::MaxPool => {
+            let base = inputs.iter().copied().reduce(f32::max).unwrap_or(0.0);
+            base + graph.bias
+        }
+        GraphOperator::AdaptiveGain {
+            gain_slot,
+            learning_rate,
+            min_gain,
+            max_gain,
+        } => {
+            let slot = usize::from(gain_slot);
+            if let Some(gain) = state_slots.get_mut(slot) {
+                let learning_rate = learning_rate.clamp(0.0, 0.1);
+                *gain = (*gain + learning_rate * second).clamp(min_gain, max_gain);
+                *gain * first
+            } else {
+                0.0
+            }
+        }
     }
 }
