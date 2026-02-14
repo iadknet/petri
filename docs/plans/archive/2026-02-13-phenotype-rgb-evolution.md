@@ -1,3 +1,5 @@
+> **Archive note (2026-02-14):** Moved from active plans after the greenfield `v2` reset. Retained for historical context only.
+
 # Phenotype RGB Evolution Implementation Plan
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
