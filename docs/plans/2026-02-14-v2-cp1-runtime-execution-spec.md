@@ -34,6 +34,7 @@
 | Should runtime dispatch use FIFO or priority scheduling? | FIFO only for CP-1. | user+agent | resolved |
 | Should world-action arbitration pick highest confidence? | No; first valid emitted action commits immediately. | user+agent | resolved |
 | What halts execution when no action is emitted? | Queue drain returns implicit no-op outcome. | user+agent | resolved |
+| Should runtime expose full local sensor picture (food + creature metadata)? | Yes, via `SensorFrame` consumed by graph/VM sensor queries. | user+agent | resolved |
 
 ## Specification Dependencies
 
@@ -65,6 +66,7 @@
 - `energy_before_tick: f32`
 - `memory_bytes: [u8; 1024]`
 - `graph_state_slots: Vec<f32>` (node-local persistent state, per graph node)
+- `sensor_frame: SensorFrame` (full in-range world snapshot with rich metadata)
 
 4. `RuntimeOutcome`
 - `CommittedAction { action: WorldActionDef, energy_spent: f32, energy_remaining: f32, dispatches: usize }`
@@ -88,15 +90,18 @@
 ### Execution algorithm (single creature, single tick)
 
 1. Validate genome before dispatch. Invalid schema returns `RuntimeError::Schema`.
-2. Seed FIFO queue with entry packet (`entry_node_id`).
-3. Loop while queue not empty:
+2. Build `sensor_frame` for the acting creature (full in-range snapshot).
+3. Seed FIFO queue with entry packet (`entry_node_id`).
+4. Loop while queue not empty:
 - charge dispatch entry cost first
 - if energy reaches zero after entry charge: return `EnergyExhausted`
 - dispatch next packet (FIFO)
 - execute backend by target node type
 - VM backend supports opcode-level `ReadInput` and output write instructions (`WriteInternalPayload`, `WriteWorldActionMeta`)
+- VM backend supports rich sensor query opcodes (`ReadSensorCell`, `ReadSensorCreature`, `ReadSensorSummary`)
 - allow VM backend to mutate creature `memory_bytes` through memory opcodes
 - allow graph backend to mutate graph-local state slots via bounded fixed-function operators
+- allow graph backend to consume rich `Sensor*` input references from `sensor_frame`
 - enforce schema/ISA fault policy: hard-fault invalid register/const/output indices; soft-default invalid input index
 - charge backend compute energy (`graph_base_tariff * graph_operator_multiplier` or VM opcode-table metering)
 - if backend reports exhaustion: return `EnergyExhausted`
@@ -106,7 +111,7 @@
   - if action metadata invalid: return `RuntimeError::InvalidActionMetadata`
   - if energy is zero after action charge: still return `CommittedAction` (action is committed)
   - halt immediately; do not process remaining queue entries
-4. If queue drains without action, return `ImplicitNoOp`.
+5. If queue drains without action, return `ImplicitNoOp`.
 
 ### Energy charging order (normative)
 
@@ -123,6 +128,7 @@ Notes:
 - Runtime must never panic due to user genome input; return `RuntimeError`.
 - Memory arena is fixed at `1024` bytes and persists across ticks for a living creature.
 - Graph local state slots persist across ticks for living creatures.
+- Sensor frame exposes full local radius metadata (food, occupancy, creature phenotype and stats).
 
 ### Determinism rules
 
@@ -147,6 +153,7 @@ Steps:
 6. Add test for opcode-cost multiplier affecting VM exhaustion timing.
 7. Add test coverage for VM fault mapping and soft-default `ReadInput` out-of-range behavior.
 8. Add test coverage for graph stateful operator persistence and operator-aware tariff charging.
+9. Add test coverage for full-radius sensor-frame queries and metadata normalization.
 
 ### Task 2: Implement runtime module
 
@@ -184,9 +191,12 @@ Steps:
 11. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
 12. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
 13. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
-14. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
-15. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
-16. `cd v2 && cargo test -p v2-core`
+14. `cd v2 && cargo test -p v2-core --test vm_sensor_queries`
+15. `cd v2 && cargo test -p v2-core --test sensor_frame_contract`
+16. `cd v2 && cargo test -p v2-core --test graph_sensor_inputs`
+17. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
+18. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
+19. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 

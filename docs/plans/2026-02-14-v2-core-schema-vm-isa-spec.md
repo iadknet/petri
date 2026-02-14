@@ -40,6 +40,7 @@
 | What numeric determinism rules apply? | Canonical sanitize/clamp/rounding rules are mandatory. | user+agent | resolved |
 | Should v1 include logic/conversion opcodes? | Yes (`And`, `Or`, `Not`, `Clamp01`, `ToI32`, `ToU8`, `ToBool`). | user+agent | resolved |
 | Should graph nodes include temporal and aggregation richness in CP-1? | Yes, via bounded fixed-function operators (integrator, momentum, oscillator, pooling, adaptive gain). | user+agent | resolved |
+| Should creatures have full in-range sensor visibility with rich metadata? | Yes, via `SensorFrame` plus queryable sensor input references/opcodes. | user+agent | resolved |
 
 ## Genome Schema Contract
 
@@ -102,6 +103,9 @@ Validation:
 1. `World(WorldInputKey)`
 2. `Introspection(IntrospectionInputKey)`
 3. `Packet(PacketFieldKey)`
+4. `SensorCell { dx: i16, dy: i16, field: SensorCellField }`
+5. `SensorCreature { dx: i16, dy: i16, field: SensorCreatureField }`
+6. `SensorSummary(SensorSummaryField)`
 
 `WorldInputKey` (v1):
 - `food_here`
@@ -120,6 +124,50 @@ Validation:
 
 `PacketFieldKey`:
 - stable string key from packet payload map
+
+`SensorCellField`:
+1. `FoodDensityNorm`
+2. `BarrierFlag`
+3. `OccupiedFlag`
+4. `IsSelfFlag`
+
+`SensorCreatureField`:
+1. `PresentFlag`
+2. `PhenotypeRNorm`
+3. `PhenotypeGNorm`
+4. `PhenotypeBNorm`
+5. `EnergyNorm`
+6. `AgeNorm`
+7. `GenerationNorm`
+
+`SensorSummaryField`:
+1. `VisibleCreatureCountNorm`
+2. `VisibleFoodMeanNorm`
+3. `VisibleFoodTotalNorm`
+4. `CrowdingNorm`
+
+### SensorFrame contract
+
+1. Runtime builds a `SensorFrame` centered on the acting creature.
+2. Coverage includes all cells in Chebyshev radius `sensor_radius`:
+- `max(|dx|, |dy|) <= sensor_radius`
+3. For each visible relative cell `(dx, dy)`, frame stores:
+- `food_density_u8`
+- `barrier_flag`
+- `occupied_flag`
+- optional creature metadata (if creature present)
+4. Creature metadata channels include:
+- phenotype RGB (`u8` each)
+- energy (`f32`)
+- age ticks (`u64`)
+- generation (`u32`)
+5. `SensorFrame` supports full local visibility, not nearest-only summaries.
+
+Coordinate rules:
+1. `dx > 0` points east, `dx < 0` west.
+2. `dy > 0` points south, `dy < 0` north.
+3. If `world_wrap=true`, sensor sampling wraps at map boundaries.
+4. If `world_wrap=false`, out-of-bounds samples return empty/zero values.
 
 ### Packet field values
 
@@ -159,6 +207,8 @@ VM emit override rule:
 1. For each dispatch, runtime builds `resolved_input_slots: Vec<f32>` by iterating `input_refs` in order.
 2. `ReadInput { dst, input_index }` reads `resolved_input_slots[input_index]`.
 3. `input_index >= resolved_input_slots.len()` returns `0.0` (soft default, not a fault).
+4. `SensorCell` and `SensorCreature` refs with `|dx|` or `|dy|` above `sensor_radius` return `0.0`.
+5. `SensorSummary` refs always resolve against the current `SensorFrame`.
 
 Normalization table for built-in input keys:
 
@@ -175,6 +225,31 @@ Normalization table for built-in input keys:
 | `energy_remaining_this_tick` | raw energy units (`f32`) |
 | `age_ticks` | raw ticks as `f32` |
 | `memory_bytes_total` | constant `1024.0` |
+
+Normalization table for sensor fields:
+
+| sensor field | mapped value |
+| --- | --- |
+| `FoodDensityNorm` | `food_density_u8 / 255.0` |
+| `BarrierFlag` | `1.0` if barrier else `0.0` |
+| `OccupiedFlag` | `1.0` if occupied else `0.0` |
+| `IsSelfFlag` | `1.0` at `(dx=0,dy=0)` for self else `0.0` |
+| `PresentFlag` | `1.0` if creature metadata exists else `0.0` |
+| `PhenotypeRNorm` | `phenotype_r_u8 / 255.0` |
+| `PhenotypeGNorm` | `phenotype_g_u8 / 255.0` |
+| `PhenotypeBNorm` | `phenotype_b_u8 / 255.0` |
+| `EnergyNorm` | `clamp(energy / sensor_energy_norm_scale, 0.0, 1.0)` |
+| `AgeNorm` | `clamp(age_ticks / sensor_age_norm_ticks, 0.0, 1.0)` |
+| `GenerationNorm` | `clamp(generation / sensor_generation_norm, 0.0, 1.0)` |
+| `VisibleCreatureCountNorm` | `visible_creatures / max_visible_cells` |
+| `VisibleFoodMeanNorm` | `mean(food_density_norm over visible cells)` |
+| `VisibleFoodTotalNorm` | `sum(food_density_norm over visible cells) / max_visible_cells` |
+| `CrowdingNorm` | `visible_creatures / max_visible_cells` |
+
+Sensor normalization defaults:
+1. `sensor_energy_norm_scale = 10.0`
+2. `sensor_age_norm_ticks = 10_000.0`
+3. `sensor_generation_norm = 256.0`
 
 Packet value conversion:
 1. `Bool` -> `0.0` or `1.0`
@@ -225,15 +300,18 @@ Packet value conversion:
 22. `JumpIfZero { cond, offset }`
 23. `Jump { offset }`
 24. `ReadInput { dst, input_index }`
-25. `WriteInternalPayload { output_index, payload_field_index, src }`
-26. `WriteWorldActionMeta { output_index, metadata_field_index, src }`
-27. `EmitInternal { output_index }`
-28. `EmitWorldAction { output_index }`
-29. `Halt`
-30. `LoadMem8 { dst, addr_reg }`
-31. `StoreMem8 { addr_reg, src }`
-32. `LoadMem8Imm { dst, addr }`
-33. `StoreMem8Imm { addr, src }`
+25. `ReadSensorCell { dst, dx, dy, field }`
+26. `ReadSensorCreature { dst, dx, dy, field }`
+27. `ReadSensorSummary { dst, field }`
+28. `WriteInternalPayload { output_index, payload_field_index, src }`
+29. `WriteWorldActionMeta { output_index, metadata_field_index, src }`
+30. `EmitInternal { output_index }`
+31. `EmitWorldAction { output_index }`
+32. `Halt`
+33. `LoadMem8 { dst, addr_reg }`
+34. `StoreMem8 { addr_reg, src }`
+35. `LoadMem8Imm { dst, addr }`
+36. `StoreMem8Imm { addr, src }`
 
 ### VM execution rules
 
@@ -248,12 +326,15 @@ Packet value conversion:
 7. `LoadMem8*` writes byte value as `f32` in `[0.0, 255.0]`.
 8. `StoreMem8*` clamps source register to `[0.0, 255.0]`, rounds to nearest integer, and writes `u8`.
 9. `ReadInput` reads from per-dispatch resolved input slots; out-of-range index yields `0.0`.
-10. `WriteInternalPayload` and `WriteWorldActionMeta` write pending overrides for emit.
-11. Emit-time coercion rules for write-output overrides:
+10. `ReadSensorCell` and `ReadSensorCreature` query `SensorFrame` by relative `(dx,dy)`.
+11. `ReadSensorSummary` queries summary channels from `SensorFrame`.
+12. Out-of-range sensor offsets or absent creature metadata resolve to `0.0` (not a fault).
+13. `WriteInternalPayload` and `WriteWorldActionMeta` write pending overrides for emit.
+14. Emit-time coercion rules for write-output overrides:
 - `f32 -> i32`: round to nearest integer
 - `f32 -> u8`: clamp `[0.0, 255.0]` and round
 - `f32 -> bool`: `>= 0.5` is `true`, else `false`
-12. If remaining energy is below an opcode's effective cost, that opcode does not execute and VM exits as exhausted.
+15. If remaining energy is below an opcode's effective cost, that opcode does not execute and VM exits as exhausted.
 
 ### Invalid index and fault semantics
 
@@ -261,8 +342,9 @@ Packet value conversion:
 2. Invalid `const_idx` in `LoadConst` is a hard VM runtime fault.
 3. Invalid `output_index` or field index for write/emit opcodes is a hard VM runtime fault.
 4. Invalid `input_index` is a soft default (`0.0`) and not a fault.
-5. Memory addresses are never invalid (wrapping semantics).
-6. Jump target outside program bounds halts VM (not a fault).
+5. Invalid sensor field discriminant is a hard VM runtime fault.
+6. Memory addresses are never invalid (wrapping semantics).
+7. Jump target outside program bounds halts VM (not a fault).
 
 ### Numeric determinism contract
 
@@ -308,6 +390,9 @@ Per-opcode baseline (`vm_opcode_base_cost`):
 | `JumpIfZero` | `0.14` |
 | `Jump` | `0.10` |
 | `ReadInput` | `0.12` |
+| `ReadSensorCell` | `0.16` |
+| `ReadSensorCreature` | `0.20` |
+| `ReadSensorSummary` | `0.14` |
 | `WriteInternalPayload` | `0.14` |
 | `WriteWorldActionMeta` | `0.14` |
 | `EmitInternal` | `0.20` |
@@ -376,6 +461,7 @@ Rules:
 2. Graph backend is deterministic and bounded-time per dispatch.
 3. Graph compute energy uses static operator-aware tariff from runtime config.
 4. Graph emits outputs from `output_definitions` after operator evaluation.
+5. Graph `inputs` may reference `SensorCell`, `SensorCreature`, and `SensorSummary` for full in-range observability.
 
 ## Task List
 
@@ -385,12 +471,16 @@ Files:
 - Create: `v2/crates/v2-core/tests/mesh_schema_contract.rs`
 - Create: `v2/crates/v2-core/tests/graph_operator_richness.rs`
 - Create: `v2/crates/v2-core/tests/graph_stateful_ops.rs`
+- Create: `v2/crates/v2-core/tests/sensor_frame_contract.rs`
+- Create: `v2/crates/v2-core/tests/graph_sensor_inputs.rs`
 
 Steps:
 1. Add failing tests for backend/node_type mismatch.
 2. Add failing tests for typed input/output field validation.
 3. Add failing tests for graph/vm backend bound checks.
 4. Add failing tests for graph operator parameter and state-slot bounds.
+5. Add failing tests for `SensorFrame` coverage and metadata normalization.
+6. Add failing tests for graph access to rich sensor references.
 
 ### Task 2: Add failing VM ISA tests
 
@@ -398,6 +488,7 @@ Files:
 - Create: `v2/crates/v2-core/tests/vm_isa.rs`
 - Create: `v2/crates/v2-core/tests/vm_memory.rs`
 - Create: `v2/crates/v2-core/tests/vm_io.rs`
+- Create: `v2/crates/v2-core/tests/vm_sensor_queries.rs`
 - Create: `v2/crates/v2-core/tests/vm_opcode_costs.rs`
 - Create: `v2/crates/v2-core/tests/vm_input_mapping.rs`
 - Create: `v2/crates/v2-core/tests/vm_output_overrides.rs`
@@ -409,10 +500,11 @@ Steps:
 3. Add failing tests for emit/halt semantics.
 4. Add failing tests for memory load/store and address wrapping behavior.
 5. Add failing tests for input read/output write opcode semantics.
-6. Add failing tests verifying baseline opcode cost table and multiplier scaling.
-7. Add failing tests for `ReadInput` slot ordering and normalization mapping.
-8. Add failing tests for override lifecycle and invalid output index faults.
-9. Add failing tests for numeric sanitize/clamp/rounding determinism.
+6. Add failing tests for `ReadSensor*` query opcode semantics.
+7. Add failing tests verifying baseline opcode cost table and multiplier scaling.
+8. Add failing tests for `ReadInput` slot ordering and normalization mapping.
+9. Add failing tests for override lifecycle and invalid output index faults.
+10. Add failing tests for numeric sanitize/clamp/rounding determinism.
 
 ### Task 3: Implement schema and VM ISA contracts
 
@@ -433,14 +525,17 @@ Steps:
 3. `cd v2 && cargo test -p v2-core --test vm_isa`
 4. `cd v2 && cargo test -p v2-core --test vm_memory`
 5. `cd v2 && cargo test -p v2-core --test vm_io`
-6. `cd v2 && cargo test -p v2-core --test vm_opcode_costs`
-7. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
-8. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
-9. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
-10. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
-11. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
-12. `cd v2 && cargo test -p v2-core --test mesh_runtime`
-13. `cd v2 && cargo test -p v2-core`
+6. `cd v2 && cargo test -p v2-core --test vm_sensor_queries`
+7. `cd v2 && cargo test -p v2-core --test vm_opcode_costs`
+8. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
+9. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
+10. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
+11. `cd v2 && cargo test -p v2-core --test sensor_frame_contract`
+12. `cd v2 && cargo test -p v2-core --test graph_sensor_inputs`
+13. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
+14. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
+15. `cd v2 && cargo test -p v2-core --test mesh_runtime`
+16. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 
