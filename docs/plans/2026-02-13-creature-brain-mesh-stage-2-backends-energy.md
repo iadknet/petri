@@ -36,6 +36,7 @@
 | Should Stage 2 be tracked as one monolithic block? | No; use slice checkpoints (`CP-1A`..`CP-1D`). | user+agent | resolved |
 | Should dispatch limits exist separate from energy in v1? | No; energy is the execution budget. | user+agent | resolved |
 | Should first valid world action halt queue execution immediately? | Yes. | user+agent | resolved |
+| Should VM opcode costs be uniform or per-opcode? | Per-opcode baseline costs with global multiplier. | user+agent | resolved |
 
 ## Specification Dependencies
 
@@ -69,7 +70,7 @@ Files:
 
 Exit evidence:
 1. Dispatch entry, graph tariff, and action costs meter correctly.
-2. VM per-op metering drains energy and terminates long loops.
+2. VM opcode-table metering drains energy and terminates long loops.
 
 ### `CP-1C`: Backend execution contracts (`complete`)
 
@@ -95,6 +96,7 @@ Steps:
 3. Ensure immediate death/exhaustion semantics are represented in runtime outcomes.
 4. Keep runtime deterministic for fixture-based tests.
 5. Align runtime outcomes with CP-1 spec contract types.
+6. Ensure VM input-read/output-write opcodes are wired end-to-end via runtime+backend contracts.
 
 Exit gate:
 1. Runtime integration tests pass with first-action halt and energy-exhaustion behavior verified.
@@ -138,7 +140,9 @@ Go / stop rule:
 6. `cd v2 && cargo test -p v2-core --test mesh_schema_contract`
 7. `cd v2 && cargo test -p v2-core --test vm_isa`
 8. `cd v2 && cargo test -p v2-core --test vm_memory`
-9. `cd v2 && cargo test -p v2-core`
+9. `cd v2 && cargo test -p v2-core --test vm_io`
+10. `cd v2 && cargo test -p v2-core --test vm_opcode_costs`
+11. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 
