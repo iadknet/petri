@@ -128,11 +128,11 @@ Go / stop rule:
 ## Verification Commands
 
 1. `scripts/check-plan-harness.sh --mode strict`
-2. `cd v2 && cargo test -p v2-core mutation_invariants`
-3. `cd v2 && cargo test -p v2-core mutation_repair`
-4. `cd v2 && cargo test -p v2-core reproduction_memory_inheritance`
-5. `cd v2 && cargo test -p v2-core ecology_pressures`
-6. `cd v2 && cargo test -p v2-core ecology_noncollapse`
+2. `cd v2 && cargo test -p v2-core --test mutation_invariants`
+3. `cd v2 && cargo test -p v2-core --test mutation_repair`
+4. `cd v2 && cargo test -p v2-core --test reproduction_memory_inheritance`
+5. `cd v2 && cargo test -p v2-core --test ecology_pressures`
+6. `cd v2 && cargo test -p v2-core --test ecology_noncollapse`
 7. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback

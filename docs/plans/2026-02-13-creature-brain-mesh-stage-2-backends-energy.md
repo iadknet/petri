@@ -149,17 +149,20 @@ Go / stop rule:
 7. `cd v2 && cargo test -p v2-core --test vm_isa`
 8. `cd v2 && cargo test -p v2-core --test vm_memory`
 9. `cd v2 && cargo test -p v2-core --test vm_io`
-10. `cd v2 && cargo test -p v2-core --test vm_opcode_costs`
-11. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
-12. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
-13. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
-14. `cd v2 && cargo test -p v2-core --test vm_sensor_queries`
-15. `cd v2 && cargo test -p v2-core --test sensor_frame_contract`
-16. `cd v2 && cargo test -p v2-core --test graph_sensor_inputs`
-17. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
-18. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
-19. `cd v2 && cargo test -p v2-core --test sensor_radius_global_config`
-20. `cd v2 && cargo test -p v2-core`
+10. `cd v2 && cargo test -p v2-core --test vm_sensor_queries`
+11. `cd v2 && cargo test -p v2-core --test vm_neighbor_queries`
+12. `cd v2 && cargo test -p v2-core --test vm_opcode_costs`
+13. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
+14. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
+15. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
+16. `cd v2 && cargo test -p v2-core --test sensor_frame_contract`
+17. `cd v2 && cargo test -p v2-core --test neighbor_input_contract`
+18. `cd v2 && cargo test -p v2-core --test graph_sensor_inputs`
+19. `cd v2 && cargo test -p v2-core --test graph_neighbor_inputs`
+20. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
+21. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
+22. `cd v2 && cargo test -p v2-core --test sensor_radius_global_config`
+23. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 
