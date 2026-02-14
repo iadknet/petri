@@ -15,6 +15,10 @@ interface RuntimeControlsProps {
 }
 
 export function RuntimeControls(props: RuntimeControlsProps) {
+  const disableStart = props.disabled || props.state === "running";
+  const disablePause = props.disabled || props.state !== "running";
+  const disableStep = props.disabled || props.state !== "paused";
+
   return (
     <div className="control-stack">
       <p className="status-row">
@@ -24,10 +28,10 @@ export function RuntimeControls(props: RuntimeControlsProps) {
         <strong>{props.tick}</strong>
       </p>
       <div className="runtime-action-row">
-        <button type="button" onClick={() => void props.onStart()} disabled={props.disabled}>
+        <button type="button" onClick={() => void props.onStart()} disabled={disableStart}>
           Start
         </button>
-        <button type="button" onClick={() => void props.onPause()} disabled={props.disabled}>
+        <button type="button" onClick={() => void props.onPause()} disabled={disablePause}>
           Pause
         </button>
         <button type="button" onClick={() => void props.onRefresh()} disabled={props.disabled}>
@@ -43,6 +47,7 @@ export function RuntimeControls(props: RuntimeControlsProps) {
           min={1}
           max={1000}
           value={props.stepCount}
+          disabled={props.disabled}
           onChange={(event) =>
             props.onStepCountChange(Math.max(1, Number(event.target.value) || 1))
           }
@@ -56,6 +61,7 @@ export function RuntimeControls(props: RuntimeControlsProps) {
           type="number"
           min={1}
           value={props.ticksPerSecond}
+          disabled={props.disabled}
           onChange={(event) =>
             props.onTicksPerSecondChange(Math.max(1, Number(event.target.value) || 1))
           }
@@ -66,7 +72,7 @@ export function RuntimeControls(props: RuntimeControlsProps) {
         className="primary"
         type="button"
         onClick={() => void props.onStep()}
-        disabled={props.disabled || props.state !== "paused"}
+        disabled={disableStep}
       >
         Step
       </button>
