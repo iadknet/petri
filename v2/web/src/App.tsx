@@ -4,6 +4,7 @@ import { CreatureInspector } from "./features/inspector/CreatureInspector";
 import { PaintToolbar } from "./features/paint/PaintToolbar";
 import { StartupPanel } from "./features/startup/StartupPanel";
 import { RuntimeControls } from "./features/runtime/RuntimeControls";
+import { ProtocolBanner } from "./features/protocol/ProtocolBanner";
 import { ViewportCanvas } from "./features/viewport/ViewportCanvas";
 import { useSimulationStore } from "./features/simulation/store/simulationStore";
 
@@ -27,11 +28,12 @@ export default function App() {
         </span>
       }
       protocolBanner={
-        <span>
-          {simulation.protocolVersion}
-          {simulation.protocolMismatch ? " (version mismatch)" : " (compatible)"}
-          {simulation.errorMessage ? ` | ${simulation.errorMessage}` : ""}
-        </span>
+        <ProtocolBanner
+          protocolVersion={simulation.protocolVersion}
+          protocolMismatch={simulation.protocolMismatch}
+          connectionState={simulation.connectionState}
+          errorMessage={simulation.errorMessage}
+        />
       }
       startupPanel={
         <StartupPanel

@@ -179,11 +179,11 @@
 - Modify: `v2/web/src/App.tsx`
 
 **Checklist:**
-- [ ] Add/adjust failing tests for `connecting/reconnecting/error/protocol_mismatch` states.
-- [ ] Run targeted frontend tests and confirm failure is expected.
-- [ ] Implement minimal banner-state wiring fix.
-- [ ] Re-run targeted tests and confirm pass.
-- [ ] Commit slice `P3-F3`.
+- [x] Add/adjust failing tests for `connecting/reconnecting/error/protocol_mismatch` states.
+- [x] Run targeted frontend tests (`cd v2/web && npm run test -- app-shell`) and confirm failure is expected.
+- [x] Implement minimal banner-state wiring fix.
+- [x] Re-run targeted tests and confirm pass.
+- [x] Commit slice `P3-F3`.
 
 ### Slice P3-F4: Runtime controls unhappy-path behavior
 
