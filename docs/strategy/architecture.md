@@ -1,101 +1,78 @@
-# Petri — Architecture Design Document
+# Petri — V2 Target Architecture
 
 ## Purpose
 
-This document defines the implemented repository architecture and current simulation semantics.
+This document defines the active target architecture for the greenfield rewrite under `v2/`.
+Legacy root crates and `web/` remain reference-only during this program.
 
 **Goal IDs:** `GP-01`, `GP-02`, `GP-03`, `GP-04`
 
 ## Goal Alignment
 
-- `GP-01`: Keep decision mechanics deterministic and testable, including seeded tie-break behavior.
-- `GP-02`: Keep crate boundaries and ownership explicit.
-- `GP-03`: Keep semantics regression-resistant through contract-aligned tests across crates.
-- `GP-04`: Surface per-creature diagnostics for cognition and action arbitration.
+- `GP-01`: center richer cognition/runtime behavior in a dedicated v2 runtime.
+- `GP-02`: keep ownership boundaries explicit across runtime, transport, CLI, and web.
+- `GP-03`: lock protocol contracts through checkpoint-scoped tests and fixtures.
+- `GP-04`: surface deterministic run/status/frame/health telemetry to product surfaces.
 
 ## Boundary Impact
 
-- Crate direction: `petri-graph -> petri-core -> petri-server/petri-cli`.
-- `petri-graph` owns controller representation, evaluation, and mutation mechanics.
-- `petri-core` owns simulation lifecycle and action/arbitration policy.
-- `petri-server` owns REST/WebSocket/runtime control contracts.
-- `web` owns typed protocol consumption and visualization.
+- Active dependency direction: `v2-core -> v2-server/v2-cli`.
+- `v2-web` consumes protocol contracts from `v2-server`.
+- No dependency from `v2/*` into legacy `petri-*` crates or root `web/`.
+- Reuse is copy-only per `v2/docs/COPY_POLICY.md`.
 
 ## Existing Boundary Recheck
 
 | area | decision | rationale |
 | --- | --- | --- |
-| `petri-core` tick/arbitration ownership | `keep` | Cognition-first loop and final-action selection remain simulation policy concerns. |
-| `petri-server` payload/config ownership | `keep` | Runtime/startup patch semantics and creature-detail wire contracts belong in transport boundary. |
-| `petri-graph` controller I/O ownership | `keep` | Halt/no-op and introspection channels belong in graph representation/evaluation, not in server/web layers. |
+| `v2/crates/v2-core` policy ownership | `keep` | Runtime semantics and deterministic policy remain core-owned. |
+| `v2/crates/v2-server` transport ownership | `keep` | HTTP/WebSocket contracts and lifecycle error mapping remain server-owned. |
+| legacy `crates/petri-*` + root `web/` | `keep` | Historical reference only; no active implementation coupling. |
 
 ## Open Questions
 
 | question | decision | owner | status |
 | --- | --- | --- | --- |
-| Should cognition diagnostics include full per-step traces in stable payloads? | Keep stable payloads summary-only for now; defer trace expansion to future tooling slices if required. | `petri-server` maintainers | `resolved` |
+| Should legacy runtime contracts stay backward compatible with `v2`? | No; `v2` can break independently (`v2alpha1` contract ownership). | user+agent | resolved |
+| Should snapshot endpoints be part of initial `v2` protocol? | No; out of scope for current checkpoint set. | user+agent | resolved |
 
 ## Repository Architecture
 
-```
+```text
 petri/
-├── crates/
-│   ├── petri-core/      # world state, cognition-first tick lifecycle
-│   ├── petri-graph/     # controller node types, evaluation, mutation helpers
-│   ├── petri-server/    # REST + WebSocket runtime wrapper around petri-core
-│   └── petri-cli/       # headless runner, ablation, benchmark tools
-├── web/                 # React + TypeScript client
-├── docs/
-└── README.md
+├── v2/
+│   ├── crates/
+│   │   ├── v2-core/     # runtime/simulation policy
+│   │   ├── v2-server/   # HTTP + WebSocket contracts for v2
+│   │   └── v2-cli/      # deterministic NDJSON run/ablation surfaces
+│   ├── web/             # v2 desktop client + protocol decoders
+│   └── docs/            # local v2 boundary/copy-policy docs
+├── crates/              # legacy runtime stack (reference-only for rewrite)
+├── web/                 # legacy client (reference-only for rewrite)
+└── docs/                # canonical strategy/plan/operations docs
 ```
 
-## Core Runtime Model
+## Runtime/Protocol Contract Surfaces
 
-### World and Creature
+- `v2-core`:
+  - mesh queue execution semantics
+  - energy/backends primitives
+  - deterministic runtime policy contracts
+- `v2-server`:
+  - `/v2/simulation/*` lifecycle/status/frame/paint contracts
+  - non-2xx CP-3 error envelope
+  - WebSocket event ordering and event/payload mapping
+- `v2-cli`:
+  - `run` and `ablation` command surfaces
+  - deterministic NDJSON event shapes and field ordering
+- `v2-web`:
+  - typed models and runtime-safe decoders for `v2alpha1`
+  - fixture-locked protocol parser tests
 
-- World grid stores food density and barrier occupancy.
-- Creature state includes position, energy, controller graph, memory register, inventory slots, lineage IDs, per-creature RNG, and inspector/debug caches.
-- Creature state also includes cognition diagnostics:
-  - `think_steps`
-  - `halted`
-  - `selected_action`
-  - `selected_confidence`
+## Compatibility Posture
 
-### Tick Lifecycle (Implemented)
-
-Per creature, per tick:
-1. Age increment and passive energy charge.
-2. Internal think loop:
-   - stage A evaluate for memory address
-   - memory read
-   - stage B evaluate for outputs
-   - optional memory write
-   - introspection input refresh
-   - `energy_per_think_step` charge
-3. Stop on `halt`, energy exhaustion, or one-step fallback for graphs without `OutputHalt`.
-4. Final-thought arbitration across six action candidates:
-   - `move`, `eat`, `reproduce`, `inventory_pickup`, `inventory_put`, `no_op`
-5. Execute at most one world interaction path.
-6. Apply normal legality checks/penalties and death/reproduction handling.
-
-Arbitration notes:
-- Movement confidence uses vector magnitude `sqrt(move_x^2 + move_y^2)`.
-- Exact confidence ties are broken with per-creature seeded RNG for deterministic replay under fixed seeds/snapshots.
-
-## Data Contracts and Observability
-
-Implemented contract surfaces:
-- Controller I/O includes cognition channels:
-  - inputs: previous-step and running-max action confidences, plus `energy_start_tick`, `energy_spent_tick`, `energy_remaining`
-  - outputs: `halt`, `no_op`
-- Inspector payload (`CreatureDetail`) includes cognition diagnostics and expanded I/O state.
-- Snapshot payload includes cognition diagnostics for each creature.
-
-Compatibility stance:
-- Snapshot import intentionally rejects legacy payloads missing required cognition diagnostics.
-
-## Performance and Verification Posture
-
-- Benchmark tooling (`stage1_benchmark`) remains active.
-- Throughput is tracked but treated as informational while cognition semantics stabilize.
-- Quality gates prioritize correctness, deterministic behavior, and contract consistency across Rust and web layers.
+- Root compatibility stubs are pointer-only:
+  - `petri-architecture.md`
+  - `petri-roadmap.md`
+  - `petri-technology-review.md`
+- Legacy implementation/docs are retained for traceability, not as active targets.

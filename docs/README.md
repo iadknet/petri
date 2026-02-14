@@ -9,6 +9,9 @@ Canonical project documentation lives under `docs/`.
 - [Technology Review](strategy/technology-review.md)
 - [High-Level Goals Catalog](strategy/goals.md)
 
+`v2` is the active target architecture path.
+Legacy root/runtime artifacts are maintained as historical reference while greenfield work proceeds under `v2/`.
+
 ## Reference
 
 - [Creature Controller Reference](reference/creature-controller-reference.md)
@@ -29,3 +32,4 @@ Canonical project documentation lives under `docs/`.
 ## Operations
 
 - [Doc Hygiene and Harness Checks](operations/doc-hygiene.md)
+- [V2 Documentation Closeout](operations/v2-doc-closeout.md)
