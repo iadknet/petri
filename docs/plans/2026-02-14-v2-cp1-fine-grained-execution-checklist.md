@@ -143,12 +143,12 @@
 - Modify: `v2/crates/v2-core/tests/sensor_radius_global_config.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing test for `sensor_radius=0` rejection.
-- [ ] Run: `cd v2 && cargo test -p v2-core --test sensor_radius_global_config` and confirm failure is expected.
-- [ ] Implement minimal runtime config guard.
-- [ ] Re-run: `cd v2 && cargo test -p v2-core --test sensor_radius_global_config`.
-- [ ] Re-run: `cd v2 && cargo test -p v2-core --test mesh_runtime`.
-- [ ] Commit slice `K7`.
+- [x] Add/adjust regression assertions for `sensor_radius=0` rejection to require `SensorRadiusZero` specifically.
+- [x] Run: `cd v2 && cargo test -p v2-core --test sensor_radius_global_config` and confirm guard behavior coverage.
+- [x] Verify `runtime.rs` enforces `sensor_radius >= 1` via `RuntimeConfig::validate()`.
+- [x] Re-run: `cd v2 && cargo test -p v2-core --test sensor_radius_global_config`.
+- [x] Re-run: `cd v2 && cargo test -p v2-core --test mesh_runtime`.
+- [x] Commit slice `K7`.
 
 ### Slice K8: VM fault mapping and graph state persistence cross-check
 
