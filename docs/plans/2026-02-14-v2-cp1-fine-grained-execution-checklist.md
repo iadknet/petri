@@ -99,11 +99,11 @@
 - Modify: `v2/crates/v2-core/tests/mesh_runtime.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing test where invalid world-action metadata precedes later valid action.
-- [ ] Run: `cd v2 && cargo test -p v2-core --test mesh_runtime` and confirm failure is expected.
-- [ ] Implement minimal emitted-order handling fix.
-- [ ] Re-run targeted test and confirm pass.
-- [ ] Commit slice `K4`.
+- [x] Add/adjust regression test where invalid world-action metadata precedes a later valid world action.
+- [x] Run: `cd v2 && cargo test -p v2-core --test mesh_runtime` and confirm the behavior gate covers emitted ordering precedence.
+- [x] Verify `runtime.rs` preserves emitted output order and returns `RuntimeError::InvalidActionMetadata` before any later valid world action can commit.
+- [x] Re-run targeted test and confirm pass.
+- [x] Commit slice `K4`.
 
 ### Slice K5: First valid world-action commit and immediate halt
 
