@@ -113,7 +113,7 @@ Response:
 - `snapshot_format: "v2alpha1"`
 - `tick: u64`
 - `world_state: object`
-- `creatures: object[]`
+- `creatures: [{ ..., memory_b64: string }]` (`memory_b64` encodes fixed `1024` bytes per creature)
 
 ### `POST /v2/simulation/snapshot`
 
