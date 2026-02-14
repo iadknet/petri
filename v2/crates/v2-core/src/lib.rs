@@ -1,7 +1,10 @@
 pub mod backends;
+pub mod ecology;
 pub mod energy;
+pub mod evolution;
 pub mod mesh;
 pub mod runtime;
+pub mod telemetry;
 
 pub const V2_RUNTIME_NAME: &str = "petri-v2";
 
