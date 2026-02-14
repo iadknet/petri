@@ -35,6 +35,12 @@ fn season_shift_transitions_are_smoothed() {
 fn crowding_pressure_is_monotonic_non_increasing() {
     let config = EcologyConfig::default();
 
+    assert!((crowding_multiplier(0, &config) - 1.0).abs() < 1e-6);
+    assert!(
+        (crowding_multiplier(1, &config) - (1.0 - config.crowding_penalty_per_neighbor)).abs()
+            < 1e-6
+    );
+
     let mut previous = crowding_multiplier(0, &config);
     for neighbors in 1..=64 {
         let current = crowding_multiplier(neighbors, &config);
@@ -49,10 +55,20 @@ fn crowding_pressure_is_monotonic_non_increasing() {
 fn scarcity_attenuates_and_recovers_when_consumption_drops() {
     let config = EcologyConfig::default();
 
-    let attenuated = update_scarcity_multiplier(1.0, 1.0, &config);
-    assert!(attenuated < 1.0);
+    let mut attenuated = 1.0;
+    for _ in 0..20 {
+        let next = update_scarcity_multiplier(attenuated, 1.0, &config);
+        assert!(next <= attenuated + 1e-6);
+        attenuated = next;
+    }
+    assert!(attenuated >= config.scarcity_multiplier_min);
 
-    let recovered = update_scarcity_multiplier(attenuated, 0.0, &config);
+    let mut recovered = attenuated;
+    for _ in 0..20 {
+        let next = update_scarcity_multiplier(recovered, 0.0, &config);
+        assert!(next + 1e-6 >= recovered);
+        recovered = next;
+    }
+    assert!(recovered <= config.scarcity_multiplier_max + 1e-6);
     assert!(recovered >= attenuated);
-    assert!(recovered <= config.scarcity_multiplier_max);
 }
