@@ -192,11 +192,11 @@
 - Modify: `v2/web/src/features/simulation/store/simulationStore.ts`
 
 **Checklist:**
-- [ ] Add/adjust failing tests for invalid lifecycle transitions and disabled busy states.
-- [ ] Run targeted frontend tests and confirm failure is expected.
-- [ ] Implement minimal controls-state/error-path fix.
-- [ ] Re-run targeted tests and confirm pass.
-- [ ] Commit slice `P3-F4`.
+- [x] Add/adjust failing tests for invalid lifecycle transitions and disabled busy states.
+- [x] Run targeted frontend tests (`cd v2/web && npm run test -- runtimeControls`) and confirm failure is expected.
+- [x] Implement minimal controls-state/error-path fix.
+- [x] Re-run targeted tests and confirm pass.
+- [x] Commit slice `P3-F4`.
 
 ### Slice P3-F5: Paint interaction guardrails
 

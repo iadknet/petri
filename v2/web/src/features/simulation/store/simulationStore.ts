@@ -221,12 +221,20 @@ export function useSimulationStore() {
   }
 
   async function pause(): Promise<void> {
+    if (currentState !== "running") {
+      setErrorMessage("pause requires running state");
+      return;
+    }
     await runAction(async () => {
       await clientRef.current.pause();
     });
   }
 
   async function step(): Promise<void> {
+    if (currentState !== "paused") {
+      setErrorMessage("step requires paused state");
+      return;
+    }
     await runAction(async () => {
       await clientRef.current.step(stepCount);
     });
