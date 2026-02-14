@@ -55,17 +55,18 @@ Files:
 - Create: `v2/crates/v2-cli/tests/ablation_output.rs`
 - Create: `v2/crates/v2-cli/tests/run_output.rs`
 - Create: `v2/web/src/protocol.test.ts`
+- Create: `v2/web/src/fixtures/protocol-v2alpha1/*.json`
 
 Steps:
 1. Add failing tests for server lifecycle endpoints and status payloads.
-2. Add failing tests for core frame/detail contract serialization.
-3. Add failing tests for CLI run/ablation output format.
-4. Add failing tests for web protocol parsing/render assumptions.
+2. Add failing tests for frame/health payload serialization, HTTP error envelope mapping, and lifecycle transition rules.
+3. Add failing tests for CLI NDJSON run/ablation schema, unknown-field rejection, and canonical field ordering.
+4. Add failing tests for web protocol parser behavior against fixture-locked payloads and event/payload mismatch rejection.
 
 ### Task 2: Implement `v2-server` API and runtime loop wiring
 
 Files:
-- Create: `v2/crates/v2-server/src/main.rs`
+- Modify: `v2/crates/v2-server/src/main.rs`
 - Create: `v2/crates/v2-server/src/api.rs`
 - Create: `v2/crates/v2-server/src/state.rs`
 - Create: `v2/crates/v2-server/src/ws.rs`
@@ -78,7 +79,7 @@ Steps:
 ### Task 3: Implement `v2-cli` run and ablation flows
 
 Files:
-- Create: `v2/crates/v2-cli/src/main.rs`
+- Modify: `v2/crates/v2-cli/src/main.rs`
 - Create: `v2/crates/v2-cli/src/ablation.rs`
 - Create: `v2/crates/v2-cli/src/output.rs`
 
@@ -91,7 +92,7 @@ Steps:
 
 Files:
 - Create: `v2/web/src/protocol.ts`
-- Create: `v2/web/src/App.tsx`
+- Modify: `v2/web/src/App.tsx`
 - Modify: `README.md`
 - Modify: `docs/strategy/architecture.md`
 - Modify: `docs/strategy/roadmap.md`
@@ -134,11 +135,7 @@ Go / stop rule:
 ## Verification Commands
 
 1. `scripts/check-plan-harness.sh --mode strict`
-2. `cd v2 && cargo fmt --all --check`
-3. `cd v2 && cargo clippy --workspace --all-targets -- -D warnings`
-4. `cd v2 && cargo test --workspace`
-5. `cd v2/web && npm run test`
-6. `cd v2/web && npm run build`
+2. Run the `CP-3` command gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md` (`## Command Gates by Checkpoint` -> `### CP-3 exit`).
 
 ## Risks and Rollback
 

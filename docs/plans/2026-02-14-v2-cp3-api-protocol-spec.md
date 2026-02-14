@@ -68,6 +68,8 @@ Rules:
 - `config_digest` must be deterministic for identical startup requests.
 - `v2alpha1` definition: lowercase hex `sha256(canonical_json(startup_request))`.
 - `canonical_json` uses lexicographically sorted object keys and no insignificant whitespace.
+- `population.initial_creatures` is a requested target; actual seeded population is best-effort and bounded by occupancy and `max_creatures`.
+- first `status`/`frame` payloads after startup may report population lower than requested `initial_creatures`.
 
 ### `POST /v2/simulation/start`
 
@@ -320,11 +322,7 @@ Steps:
 ## Verification Commands
 
 1. `scripts/check-plan-harness.sh --mode strict`
-2. `cd v2 && cargo test -p v2-server`
-3. `cd v2 && cargo test -p v2-cli`
-4. `cd v2/web && npm run test`
-5. `cd v2/web && npm run build`
-6. `cd v2 && cargo test --workspace`
+2. Run the `CP-3` command gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md` (`## Command Gates by Checkpoint` -> `### CP-3 exit`).
 
 ## Risks and Rollback
 
