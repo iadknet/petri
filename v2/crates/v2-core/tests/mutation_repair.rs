@@ -70,6 +70,38 @@ fn repair_passes_fix_invalid_mutation_outputs() {
     let repaired = repair_genome(&mut genome, &config, 3);
     assert!(repaired, "repair should succeed within bounded passes");
     assert!(validate_mutation_invariants(&genome, &config).is_ok());
+
+    assert!(genome
+        .nodes
+        .iter()
+        .any(|node| node.node_id == genome.entry_node_id));
+
+    let internal = genome
+        .nodes
+        .iter()
+        .flat_map(|node| node.output_definitions.iter())
+        .find_map(|output| match output {
+            OutputDefinition::InternalTarget(target) => Some(target),
+            OutputDefinition::WorldAction(_) => None,
+        })
+        .expect("repaired internal target should exist");
+    assert!(genome
+        .nodes
+        .iter()
+        .any(|node| node.node_id == internal.target_node_id));
+    assert_eq!(internal.payload_fields.len(), 1);
+
+    let vm = genome
+        .nodes
+        .iter()
+        .find_map(|node| match &node.backend_def {
+            BackendDef::Vm(vm) => Some(vm),
+            BackendDef::Graph(_) => None,
+        })
+        .expect("vm node should exist");
+    assert!((1..=32).contains(&vm.register_count));
+    assert!((1..=64).contains(&vm.max_input_slots));
+    assert!(vm.program.len() <= config.max_vm_program_len);
 }
 
 #[test]
@@ -82,6 +114,16 @@ fn repair_or_discard_drops_candidate_when_config_is_unsatisfiable() {
 
     let candidate = invalid_genome();
     let repaired = repair_or_discard(candidate, &impossible, 3);
+
+    assert!(repaired.is_none());
+}
+
+#[test]
+fn repair_or_discard_drops_candidate_when_repair_budget_is_zero() {
+    let config = MutationConfig::default();
+    let candidate = invalid_genome();
+
+    let repaired = repair_or_discard(candidate, &config, 0);
 
     assert!(repaired.is_none());
 }
