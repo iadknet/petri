@@ -121,9 +121,13 @@ async fn tick_loop(state: ServerState) {
 
 async fn startup_handler(
     State(state): State<ServerState>,
-    payload: Option<Json<StartupRequest>>,
+    payload: Result<Option<Json<StartupRequest>>, axum::extract::rejection::JsonRejection>,
 ) -> Result<Json<crate::api::StartupResponse>, SimulationError> {
-    let request = payload.map_or_else(StartupRequest::default, |json| json.0);
+    let request = match payload {
+        Ok(Some(json)) => json.0,
+        Ok(None) => StartupRequest::default(),
+        Err(rejection) => return Err(SimulationError::from(rejection)),
+    };
     let mut api = state.api.lock().await;
     let response = api.startup(request);
     publish_snapshot(&api, &state.ws_tx);
@@ -155,18 +159,23 @@ struct StepRequest {
 
 async fn step_handler(
     State(state): State<ServerState>,
-    payload: Option<Json<StepRequest>>,
+    payload: Result<Option<Json<StepRequest>>, axum::extract::rejection::JsonRejection>,
 ) -> Result<Json<crate::api::LifecycleResponse>, SimulationError> {
     let mut api = state.api.lock().await;
-    let response = api.step(payload.and_then(|json| json.steps))?;
+    let steps = match payload {
+        Ok(payload) => payload.and_then(|json| json.steps),
+        Err(rejection) => return Err(SimulationError::from(rejection)),
+    };
+    let response = api.step(steps)?;
     publish_snapshot(&api, &state.ws_tx);
     Ok(Json(response))
 }
 
 async fn paint_handler(
     State(state): State<ServerState>,
-    Json(request): Json<PaintRequest>,
+    payload: Result<Json<PaintRequest>, axum::extract::rejection::JsonRejection>,
 ) -> Result<Json<PaintResponse>, SimulationError> {
+    let request = payload.map_err(SimulationError::from)?.0;
     let mut api = state.api.lock().await;
     let response = api.paint(request)?;
     publish_snapshot(&api, &state.ws_tx);

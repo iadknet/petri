@@ -100,6 +100,23 @@ fn step_requires_paused_and_valid_range() {
 }
 
 #[test]
+fn step_invalid_range_reports_field_error_details() {
+    let mut api = SimulationApi::new();
+    api.startup(startup_request());
+    api.start().expect("start");
+    api.pause().expect("pause");
+
+    let err = api.step(Some(0)).expect_err("steps=0 should fail");
+    let SimulationError::Protocol(protocol_error) = err;
+    assert_eq!(
+        protocol_error.details.endpoint.as_deref(),
+        Some("/v2/simulation/step")
+    );
+    assert_eq!(protocol_error.details.field_errors.len(), 1);
+    assert_eq!(protocol_error.details.field_errors[0].field, "steps");
+}
+
+#[test]
 fn protocol_errors_report_expected_and_current_state() {
     let mut api = SimulationApi::new();
     api.startup(startup_request());
