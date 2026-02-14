@@ -40,10 +40,11 @@
 ## Checklist Operating Rules
 
 1. Keep one slice active at a time.
-2. Every slice begins with a failing deterministic test.
+2. Use failing deterministic tests when behavior is missing; if behavior already meets intent, harden regression coverage and capture pass evidence.
 3. Use fixed seeds in all mutation/ecology behavior tests.
 4. Run only v2 tests.
-5. Update checklist boxes in the same commit as code.
+5. If a checklist step conflicts with architecture boundaries or project goals, stop and ask for guidance.
+6. Update checklist boxes in the same commit as code.
 
 ## Task List
 

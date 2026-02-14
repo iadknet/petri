@@ -42,9 +42,10 @@
 ## Slice Execution Rules
 
 1. One micro-slice per commit.
-2. Start each slice with a failing test (`unit`, `integration`, or `e2e`).
+2. Add/adjust targeted tests each slice; start red-first when behavior is missing, otherwise run a regression-hardening verification slice.
 3. Do not merge visual/style changes with transport/state refactors in the same slice.
 4. Keep Playwright as gate-critical smoke only; move most coverage to unit/integration tests.
+5. If a task conflicts with architecture boundaries or overall project goals, stop and ask for guidance before implementation.
 
 ## Micro-Slice Task List
 

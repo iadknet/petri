@@ -62,3 +62,10 @@ This keeps plan output aligned with docs and plan harness checks and avoids sile
 - When strategy changes (for example, a greenfield reset), move stale plans to `docs/plans/archive/`.
 - Prefer replacing one large plan with stage/checkpoint plans so ownership and go/stop boundaries are explicit.
 - For multi-checkpoint programs, maintain one shared verification matrix plan and reference it from each stage.
+
+## Intent-First Execution Policy
+
+- Treat functional and architectural intent as the primary completion criterion for every task.
+- If a checklist instruction conflicts with the wider architecture, system constraints, or project goals, stop and ask for guidance before proceeding.
+- Prefer red-green when a behavior gap exists; if behavior is already correct, add/adjust regression coverage and record verification evidence instead of forcing artificial failures.
+- Update checklist wording/checkmarks to reflect the actual verification path taken so status remains accurate.
