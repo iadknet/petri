@@ -48,7 +48,7 @@
 
 1. `RuntimeConfig`
 - `dispatch_entry_cost: f32`
-- `graph_static_tariff: f32`
+- `graph_base_tariff: f32`
 - `vm_opcode_cost_multiplier: f32`
 - `action_costs: RuntimeActionCosts`
 
@@ -64,6 +64,7 @@
 - `config: RuntimeConfig`
 - `energy_before_tick: f32`
 - `memory_bytes: [u8; 1024]`
+- `graph_state_slots: Vec<f32>` (node-local persistent state, per graph node)
 
 4. `RuntimeOutcome`
 - `CommittedAction { action: WorldActionDef, energy_spent: f32, energy_remaining: f32, dispatches: usize }`
@@ -95,8 +96,9 @@
 - execute backend by target node type
 - VM backend supports opcode-level `ReadInput` and output write instructions (`WriteInternalPayload`, `WriteWorldActionMeta`)
 - allow VM backend to mutate creature `memory_bytes` through memory opcodes
+- allow graph backend to mutate graph-local state slots via bounded fixed-function operators
 - enforce schema/ISA fault policy: hard-fault invalid register/const/output indices; soft-default invalid input index
-- charge backend compute energy (`graph_static_tariff` or VM opcode-table metering)
+- charge backend compute energy (`graph_base_tariff * graph_operator_multiplier` or VM opcode-table metering)
 - if backend reports exhaustion: return `EnergyExhausted`
 - enqueue all emitted internal targets (same packet order as emitted list)
 - on first valid emitted world action:
@@ -112,6 +114,7 @@ For each dispatch:
 1. `dispatch_entry_cost`
 2. backend compute cost
 - VM compute cost uses opcode baseline table from schema/ISA spec multiplied by `vm_opcode_cost_multiplier`
+- Graph compute cost uses operator multiplier table from schema/ISA spec with `graph_base_tariff`
 3. action cost (only if action emitted and committed)
 
 Notes:
@@ -119,6 +122,7 @@ Notes:
 - No separate dispatch cap in CP-1.
 - Runtime must never panic due to user genome input; return `RuntimeError`.
 - Memory arena is fixed at `1024` bytes and persists across ticks for a living creature.
+- Graph local state slots persist across ticks for living creatures.
 
 ### Determinism rules
 
@@ -142,6 +146,7 @@ Steps:
 5. Add test for invalid action metadata path returning runtime error.
 6. Add test for opcode-cost multiplier affecting VM exhaustion timing.
 7. Add test coverage for VM fault mapping and soft-default `ReadInput` out-of-range behavior.
+8. Add test coverage for graph stateful operator persistence and operator-aware tariff charging.
 
 ### Task 2: Implement runtime module
 
@@ -179,7 +184,9 @@ Steps:
 11. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
 12. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
 13. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
-14. `cd v2 && cargo test -p v2-core`
+14. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
+15. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
+16. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 

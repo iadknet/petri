@@ -37,6 +37,7 @@
 | Should dispatch limits exist separate from energy in v1? | No; energy is the execution budget. | user+agent | resolved |
 | Should first valid world action halt queue execution immediately? | Yes. | user+agent | resolved |
 | Should VM opcode costs be uniform or per-opcode? | Per-opcode baseline costs with global multiplier. | user+agent | resolved |
+| Should graph richness come from a graph DSL? | No; richer fixed-function graph operators with bounded state are in scope. | user+agent | resolved |
 
 ## Specification Dependencies
 
@@ -82,6 +83,7 @@ Files:
 Exit evidence:
 1. Graph backend emits outputs and charges static tariff.
 2. VM backend is bounded by remaining energy and reports exhaustion.
+3. Graph backend supports stateful/aggregating operators with deterministic bounded behavior.
 
 ### `CP-1D`: Integrated runtime executor (`pending`)
 
@@ -98,6 +100,7 @@ Steps:
 5. Align runtime outcomes with CP-1 spec contract types.
 6. Ensure VM input-read/output-write opcodes are wired end-to-end via runtime+backend contracts.
 7. Ensure `ReadInput` slot mapping/normalization and VM numeric determinism rules are covered by tests.
+8. Ensure graph operator richness (integrator/momentum/oscillator/pooling/adaptive gain) is covered by tests.
 
 Exit gate:
 1. Runtime integration tests pass with first-action halt and energy-exhaustion behavior verified.
@@ -146,7 +149,9 @@ Go / stop rule:
 11. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
 12. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
 13. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
-14. `cd v2 && cargo test -p v2-core`
+14. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
+15. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
+16. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 

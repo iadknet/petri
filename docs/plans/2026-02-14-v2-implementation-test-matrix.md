@@ -39,7 +39,7 @@
 | checkpoint | required suites | pass criteria |
 | --- | --- | --- |
 | `CP-0` | workspace/build skeleton checks | `v2` Rust workspace checks and `v2/web` build succeeds |
-| `CP-1` | `mesh_kernel`, `mesh_energy`, `mesh_backends`, `mesh_runtime`, `mesh_schema_contract`, `vm_isa`, `vm_memory`, `vm_io`, `vm_opcode_costs`, `vm_input_mapping`, `vm_output_overrides`, `vm_numeric_determinism` | all tests pass; runtime semantics, schema/ISA contracts, VM memory/I/O opcodes, slot mapping/override lifecycle, numeric determinism, and opcode-cost behavior match CP-1 specs |
+| `CP-1` | `mesh_kernel`, `mesh_energy`, `mesh_backends`, `mesh_runtime`, `mesh_schema_contract`, `vm_isa`, `vm_memory`, `vm_io`, `vm_opcode_costs`, `vm_input_mapping`, `vm_output_overrides`, `vm_numeric_determinism`, `graph_operator_richness`, `graph_stateful_ops` | all tests pass; runtime semantics, schema/ISA contracts, VM memory/I/O opcodes, slot mapping/override lifecycle, numeric determinism, opcode-cost behavior, and graph fixed-function richness match CP-1 specs |
 | `CP-2` | `mutation_invariants`, `mutation_repair`, `ecology_pressures`, `ecology_noncollapse` | all tests pass on fixed seeds; no invariant violations |
 | `CP-3` | server lifecycle/payload/ws tests, cli ndjson tests, web protocol fixtures, end-to-end smoke | all tests pass; schema/version parity across all surfaces |
 
@@ -93,7 +93,9 @@
 11. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
 12. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
 13. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
-14. `cd v2 && cargo test -p v2-core`
+14. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
+15. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
+16. `cd v2 && cargo test -p v2-core`
 
 ### `CP-2` exit
 
