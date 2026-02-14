@@ -68,11 +68,11 @@
 - Modify: `v2/crates/v2-core/tests/mutation_invariants.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing tests for add/remove/retarget operator behavior.
-- [ ] Run: `cd v2 && cargo test -p v2-core --test mutation_invariants` and confirm failure is expected.
-- [ ] Implement minimal operator fixes.
-- [ ] Re-run targeted test and confirm pass.
-- [ ] Commit slice `E2`.
+- [x] Add/adjust regression tests for add/remove/retarget operator behavior.
+- [x] Run: `cd v2 && cargo test -p v2-core --test mutation_invariants` and confirm operator behavior coverage.
+- [x] Verify operator implementations preserve bounded structural semantics and valid retargeting.
+- [x] Re-run targeted test and confirm pass.
+- [x] Commit slice `E2`.
 
 ### Slice E3: Node/subgraph duplication behavior
 

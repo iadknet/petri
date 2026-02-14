@@ -111,6 +111,125 @@ fn mutation_defaults_match_cp2_spec() {
 }
 
 #[test]
+fn add_node_operator_adds_unique_node_and_preserves_invariants() {
+    let mut genome = baseline_genome();
+    let config = MutationConfig::default();
+    let existing_ids = genome.nodes.iter().map(|node| node.node_id).collect::<Vec<_>>();
+
+    let changed = apply_operator(&mut genome, &config, MutationOperatorKind::AddNode, 17);
+    assert!(changed);
+    assert_eq!(genome.nodes.len(), existing_ids.len() + 1);
+
+    let new_id = genome
+        .nodes
+        .iter()
+        .map(|node| node.node_id)
+        .find(|id| !existing_ids.contains(id))
+        .expect("new node id should exist");
+    assert!(!existing_ids.contains(&new_id));
+
+    validate_mutation_invariants(&genome, &config).expect("add node mutation should stay valid");
+}
+
+#[test]
+fn remove_node_operator_retargets_removed_internal_targets() {
+    let mut genome = CreatureGenome {
+        entry_node_id: 1,
+        nodes: vec![
+            NodeGenome {
+                node_id: 1,
+                node_type: NodeType::Graph,
+                backend_def: BackendDef::Graph(GraphBackendDef {
+                    operator: GraphOperator::Passthrough,
+                    inputs: Vec::new(),
+                    coefficients: Vec::new(),
+                    bias: 0.0,
+                    state_slot_count: 0,
+                }),
+                output_definitions: vec![OutputDefinition::InternalTarget(InternalTargetDef {
+                    target_node_id: 2,
+                    input_refs: Vec::new(),
+                    payload_fields: Vec::new(),
+                })],
+                local_state_init: Vec::new(),
+            },
+            NodeGenome {
+                node_id: 2,
+                node_type: NodeType::Graph,
+                backend_def: BackendDef::Graph(GraphBackendDef {
+                    operator: GraphOperator::Passthrough,
+                    inputs: Vec::new(),
+                    coefficients: Vec::new(),
+                    bias: 0.0,
+                    state_slot_count: 0,
+                }),
+                output_definitions: Vec::new(),
+                local_state_init: Vec::new(),
+            },
+        ],
+        evolution_params: None,
+    };
+    let config = MutationConfig::default();
+
+    let changed = apply_operator(&mut genome, &config, MutationOperatorKind::RemoveNode, 3);
+    assert!(changed);
+    assert_eq!(genome.nodes.len(), 1);
+    assert_eq!(genome.entry_node_id, 1);
+
+    let node = genome.nodes.first().expect("remaining node");
+    let OutputDefinition::InternalTarget(target) = node
+        .output_definitions
+        .first()
+        .expect("retargeted internal output")
+    else {
+        panic!("expected internal target output");
+    };
+    assert_eq!(target.target_node_id, 1);
+
+    validate_mutation_invariants(&genome, &config)
+        .expect("remove node mutation should stay valid");
+}
+
+#[test]
+fn retarget_node_operator_retargets_to_existing_node() {
+    let mut genome = baseline_genome();
+    let config = MutationConfig::default();
+    let before_entry = genome.entry_node_id;
+    let before_targets = genome
+        .nodes
+        .iter()
+        .flat_map(|node| node.output_definitions.iter())
+        .filter_map(|output| match output {
+            OutputDefinition::InternalTarget(target) => Some(target.target_node_id),
+            OutputDefinition::WorldAction(_) => None,
+        })
+        .collect::<Vec<_>>();
+
+    let changed = apply_operator(&mut genome, &config, MutationOperatorKind::RetargetNode, 29);
+    assert!(changed);
+
+    let node_ids = genome.nodes.iter().map(|node| node.node_id).collect::<Vec<_>>();
+    assert!(node_ids.contains(&genome.entry_node_id));
+    let after_targets = genome
+        .nodes
+        .iter()
+        .flat_map(|node| node.output_definitions.iter())
+        .filter_map(|output| match output {
+            OutputDefinition::InternalTarget(target) => Some(target.target_node_id),
+            OutputDefinition::WorldAction(_) => None,
+        })
+        .collect::<Vec<_>>();
+    assert!(after_targets.iter().all(|target| node_ids.contains(target)));
+    assert!(
+        genome.entry_node_id != before_entry || after_targets != before_targets,
+        "retarget node should change entry or at least one internal target"
+    );
+
+    validate_mutation_invariants(&genome, &config)
+        .expect("retarget node mutation should stay valid");
+}
+
+#[test]
 fn required_operators_preserve_structural_invariants() {
     let mut genome = baseline_genome();
     let config = MutationConfig::default();
