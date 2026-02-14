@@ -33,6 +33,7 @@ function samePoint(a: PaintPoint, b: PaintPoint): boolean {
 
 export function ViewportCanvas(props: ViewportCanvasProps) {
   const svgRef = useRef<SVGSVGElement | null>(null);
+  const dragRef = useRef<DragState | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
 
   const frame = props.frame;
@@ -86,11 +87,14 @@ export function ViewportCanvas(props: ViewportCanvasProps) {
     }
 
     event.currentTarget.setPointerCapture(event.pointerId);
-    setDrag({ pointerId: event.pointerId, points: [point] });
+    const nextDrag = { pointerId: event.pointerId, points: [point] };
+    dragRef.current = nextDrag;
+    setDrag(nextDrag);
   }
 
   function extendStroke(event: PointerEvent<SVGSVGElement>) {
-    if (!drag || drag.pointerId !== event.pointerId || !frame) {
+    const currentDrag = dragRef.current;
+    if (!currentDrag || currentDrag.pointerId !== event.pointerId || !frame) {
       return;
     }
 
@@ -99,29 +103,29 @@ export function ViewportCanvas(props: ViewportCanvasProps) {
       return;
     }
 
-    setDrag((previous) => {
-      if (!previous) {
-        return previous;
-      }
-      const lastPoint = previous.points[previous.points.length - 1];
-      if (samePoint(lastPoint, point)) {
-        return previous;
-      }
-      return {
-        ...previous,
-        points: [...previous.points, point],
-      };
-    });
-  }
-
-  async function finishStroke(event: PointerEvent<SVGSVGElement>) {
-    if (!drag || drag.pointerId !== event.pointerId) {
+    const lastPoint = currentDrag.points[currentDrag.points.length - 1];
+    if (samePoint(lastPoint, point)) {
       return;
     }
 
-    const points = dedupeStrokePoints(drag.points);
+    const nextDrag = {
+      ...currentDrag,
+      points: [...currentDrag.points, point],
+    };
+    dragRef.current = nextDrag;
+    setDrag(nextDrag);
+  }
+
+  async function finishStroke(event: PointerEvent<SVGSVGElement>) {
+    const currentDrag = dragRef.current;
+    if (!currentDrag || currentDrag.pointerId !== event.pointerId) {
+      return;
+    }
+
+    dragRef.current = null;
     setDrag(null);
 
+    const points = dedupeStrokePoints(currentDrag.points);
     if (points.length === 0) {
       return;
     }
@@ -148,7 +152,10 @@ export function ViewportCanvas(props: ViewportCanvasProps) {
         onPointerUp={(event) => {
           void finishStroke(event);
         }}
-        onPointerCancel={() => setDrag(null)}
+        onPointerCancel={() => {
+          dragRef.current = null;
+          setDrag(null);
+        }}
       >
         <rect x={0} y={0} width={frame.width} height={frame.height} fill="#171c19" />
 
