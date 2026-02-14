@@ -1,6 +1,6 @@
 # Petri V2 Core Schema and VM ISA Spec
 
-**Goal:** Lock the CP-1 core contracts for genome structure, typed node inputs/outputs, backend definitions, and VM instruction set so runtime implementation is unambiguous.
+**Goal:** Lock the CP-1 core contracts for genome structure, creature memory model, typed node inputs/outputs, backend definitions, and VM instruction set so runtime implementation is unambiguous.
 **Goal IDs:** GP-01, GP-03
 **Scope:** `v2/crates/v2-core` schema and VM/backend contracts; excludes mutation/ecology policy and transport protocols.
 **Docs Impact:** Adds schema+ISA contract plan consumed by Stage 2 and CP-1 runtime spec.
@@ -33,6 +33,7 @@
 | Should VM be stack-based or register-based in v1? | Register-based for easier deterministic metering. | user+agent | resolved |
 | Should graph nodes have custom mini-language in CP-1? | No, keep graph backend minimal with simple expression operators. | user+agent | resolved |
 | Should internal packet fields be untyped strings? | No, typed value schema is required. | user+agent | resolved |
+| What is per-creature VM memory size in v1? | Fixed at `1024` bytes (`1 KiB`) per creature. | user+agent | resolved |
 
 ## Genome Schema Contract
 
@@ -47,6 +48,14 @@ Validation:
 2. unique node IDs
 3. `entry_node_id` exists
 4. all output targets resolve
+
+### Creature runtime memory contract
+
+1. Every creature has a persistent `1 KiB` memory arena during its lifetime:
+- `memory: [u8; 1024]`
+2. Memory arena is runtime state, not encoded directly in genome fields.
+3. VM instructions may read/write this arena.
+4. Memory state persists across ticks for a living creature.
 
 ### `NodeGenome`
 
@@ -97,7 +106,7 @@ Validation:
 - `energy_spent_this_tick`
 - `energy_remaining_this_tick`
 - `age_ticks`
-- `memory_slot_count`
+- `memory_bytes_total` (always `1024` in v1)
 
 `PacketFieldKey`:
 - stable string key from packet payload map
@@ -159,6 +168,10 @@ Validation:
 17. `EmitInternal { output_index }`
 18. `EmitWorldAction { output_index }`
 19. `Halt`
+20. `LoadMem8 { dst, addr_reg }`
+21. `StoreMem8 { addr_reg, src }`
+22. `LoadMem8Imm { dst, addr }`
+23. `StoreMem8Imm { addr, src }`
 
 ### VM execution rules
 
@@ -167,6 +180,10 @@ Validation:
 3. Jump offsets are signed relative offsets.
 4. Each executed instruction consumes `vm_per_op_cost` energy.
 5. Execution halts on first emitted world action (runtime-level rule still applies).
+6. Memory address resolution uses wrapping semantics over `1024` bytes:
+- `resolved_addr = raw_addr.rem_euclid(1024)`
+7. `LoadMem8*` writes byte value as `f32` in `[0.0, 255.0]`.
+8. `StoreMem8*` clamps source register to `[0.0, 255.0]`, rounds to nearest integer, and writes `u8`.
 
 ## Graph Backend Contract (v1)
 
@@ -197,11 +214,13 @@ Steps:
 
 Files:
 - Create: `v2/crates/v2-core/tests/vm_isa.rs`
+- Create: `v2/crates/v2-core/tests/vm_memory.rs`
 
 Steps:
 1. Add failing tests for arithmetic and compare ops.
 2. Add failing tests for jumps and loop energy exhaustion behavior.
 3. Add failing tests for emit/halt semantics.
+4. Add failing tests for memory load/store and address wrapping behavior.
 
 ### Task 3: Implement schema and VM ISA contracts
 
@@ -220,8 +239,9 @@ Steps:
 1. `scripts/check-plan-harness.sh --mode strict`
 2. `cd v2 && cargo test -p v2-core --test mesh_schema_contract`
 3. `cd v2 && cargo test -p v2-core --test vm_isa`
-4. `cd v2 && cargo test -p v2-core --test mesh_runtime`
-5. `cd v2 && cargo test -p v2-core`
+4. `cd v2 && cargo test -p v2-core --test vm_memory`
+5. `cd v2 && cargo test -p v2-core --test mesh_runtime`
+6. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 

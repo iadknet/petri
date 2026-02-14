@@ -34,6 +34,7 @@
 | Should CP-2 include sexual recombination? | No, asexual only. | user+agent | resolved |
 | Should novelty archives be introduced in CP-2? | No, ecology pressure is the novelty driver. | user+agent | resolved |
 | Should invalid mutations be discarded or repaired? | Repair first; discard only if repair fails invariants. | user+agent | resolved |
+| Should creature runtime memory be heritable at birth? | No in v1; newborn memory is zero-initialized `1 KiB`. | user+agent | resolved |
 
 ## Evolution Contract
 
@@ -106,6 +107,7 @@
 6. `nodes.len()` within `[min_nodes, max_nodes]`.
 7. Node output counts are `<= max_outputs_per_node`.
 8. VM program lengths are within bounds.
+9. Offspring runtime memory arena initializes to zeroed `1024` bytes.
 
 Repair policy:
 1. Apply mutation sequence.

@@ -63,6 +63,7 @@
 3. `RuntimeContext`
 - `config: RuntimeConfig`
 - `energy_before_tick: f32`
+- `memory_bytes: [u8; 1024]`
 
 4. `RuntimeOutcome`
 - `CommittedAction { action: WorldActionDef, energy_spent: f32, energy_remaining: f32, dispatches: usize }`
@@ -85,6 +86,7 @@
 - if energy reaches zero after entry charge: return `EnergyExhausted`
 - dispatch next packet (FIFO)
 - execute backend by target node type
+- allow VM backend to mutate creature `memory_bytes` through memory opcodes
 - charge backend compute energy (`graph_static_tariff` or VM per-op metering)
 - if backend reports exhaustion: return `EnergyExhausted`
 - enqueue all emitted internal targets (same packet order as emitted list)
@@ -106,6 +108,7 @@ Notes:
 - Energy is clamped to `[0, +inf)` at each operation.
 - No separate dispatch cap in CP-1.
 - Runtime must never panic due to user genome input; return `RuntimeError`.
+- Memory arena is fixed at `1024` bytes and persists across ticks for a living creature.
 
 ### Determinism rules
 
@@ -158,7 +161,8 @@ Steps:
 5. `cd v2 && cargo test -p v2-core --test mesh_runtime`
 6. `cd v2 && cargo test -p v2-core --test mesh_schema_contract`
 7. `cd v2 && cargo test -p v2-core --test vm_isa`
-8. `cd v2 && cargo test -p v2-core`
+8. `cd v2 && cargo test -p v2-core --test vm_memory`
+9. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 

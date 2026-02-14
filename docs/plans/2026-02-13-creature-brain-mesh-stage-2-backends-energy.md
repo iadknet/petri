@@ -137,7 +137,8 @@ Go / stop rule:
 5. `cd v2 && cargo test -p v2-core --test mesh_runtime`
 6. `cd v2 && cargo test -p v2-core --test mesh_schema_contract`
 7. `cd v2 && cargo test -p v2-core --test vm_isa`
-8. `cd v2 && cargo test -p v2-core`
+8. `cd v2 && cargo test -p v2-core --test vm_memory`
+9. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 
