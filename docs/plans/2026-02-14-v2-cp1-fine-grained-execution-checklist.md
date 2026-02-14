@@ -113,12 +113,12 @@
 - Modify: `v2/crates/v2-core/tests/mesh_kernel.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing test for immediate halt after first valid committed action.
-- [ ] Run: `cd v2 && cargo test -p v2-core --test mesh_runtime` and confirm failure is expected.
-- [ ] Implement minimal halt-path fix.
-- [ ] Re-run: `cd v2 && cargo test -p v2-core --test mesh_runtime`.
-- [ ] Re-run: `cd v2 && cargo test -p v2-core --test mesh_kernel`.
-- [ ] Commit slice `K5`.
+- [x] Add/adjust regression test for immediate halt after first valid committed action (including queued internal dispatch that must not execute).
+- [x] Run: `cd v2 && cargo test -p v2-core --test mesh_runtime` and confirm behavior gate coverage.
+- [x] Verify `runtime.rs` halts on the first valid committed world action and does not continue queued dispatches.
+- [x] Re-run: `cd v2 && cargo test -p v2-core --test mesh_runtime`.
+- [x] Re-run: `cd v2 && cargo test -p v2-core --test mesh_kernel`.
+- [x] Commit slice `K5`.
 
 ### Slice K6: Implicit no-op and exhaustion outcomes
 

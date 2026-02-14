@@ -1,7 +1,7 @@
 use v2_core::mesh::{
     ActionMetadataField, BackendDef, CreatureGenome, GraphBackendDef, GraphOperator,
-    NodeGenome, NodeType, OutputDefinition, VmBackendDef, VmInstruction, WorldActionDef,
-    WorldActionKind,
+    InputReference, InternalTargetDef, NodeGenome, NodeType, OutputDefinition, VmBackendDef,
+    VmInstruction, WorldActionDef, WorldActionKind,
 };
 use v2_core::runtime::{
     RuntimeActionCosts, RuntimeConfig, RuntimeContext, RuntimeError, RuntimeOutcome, SensorFrame,
@@ -223,6 +223,53 @@ fn emitted_output_order_stops_on_first_invalid_world_action() {
     match outcome {
         RuntimeOutcome::RuntimeError { error, .. } => {
             assert!(matches!(error, RuntimeError::InvalidActionMetadata(_)));
+        }
+        other => panic!("unexpected outcome: {other:?}"),
+    }
+}
+
+#[test]
+fn first_valid_world_action_commits_and_halts_before_queued_dispatch() {
+    let genome = CreatureGenome {
+        entry_node_id: 1,
+        nodes: vec![
+            graph_node_with_outputs(
+                1,
+                vec![
+                    OutputDefinition::InternalTarget(InternalTargetDef {
+                        target_node_id: 2,
+                        input_refs: vec![InputReference::Packet("queued".to_string())],
+                        payload_fields: Vec::new(),
+                    }),
+                    OutputDefinition::WorldAction(WorldActionDef {
+                        action_kind: WorldActionKind::Move,
+                        action_metadata_fields: vec![ActionMetadataField::Direction(3)],
+                    }),
+                ],
+            ),
+            graph_node_with_outputs(
+                2,
+                vec![OutputDefinition::WorldAction(WorldActionDef {
+                    action_kind: WorldActionKind::Move,
+                    action_metadata_fields: vec![ActionMetadataField::Direction(1)],
+                })],
+            ),
+        ],
+        evolution_params: None,
+    };
+
+    let mut context = runtime_context(10.0);
+    let outcome = run_runtime_tick(&genome, &mut context);
+    match outcome {
+        RuntimeOutcome::CommittedAction {
+            action, dispatches, ..
+        } => {
+            assert_eq!(dispatches, 1);
+            assert_eq!(action.action_kind, WorldActionKind::Move);
+            assert_eq!(
+                action.action_metadata_fields,
+                vec![ActionMetadataField::Direction(3)]
+            );
         }
         other => panic!("unexpected outcome: {other:?}"),
     }
