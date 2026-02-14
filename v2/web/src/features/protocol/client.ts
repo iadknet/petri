@@ -126,20 +126,46 @@ export class ProtocolClient {
       },
     });
 
-    const json = (await response.json()) as unknown;
+    const raw = await response.text();
+    const parsed = parseJsonBody(raw);
     if (!response.ok) {
-      throw protocolErrorFromEnvelope(json);
+      if (!parsed.ok) {
+        throw new Error(`request failed with HTTP ${response.status}: non-json response`);
+      }
+      throw protocolErrorFromEnvelope(parsed.value, response.status);
     }
-    return json;
+
+    if (!parsed.ok) {
+      throw new Error(
+        `request failed with HTTP ${response.status}: invalid JSON response`
+      );
+    }
+    return parsed.value;
   }
 }
 
-function protocolErrorFromEnvelope(raw: unknown): Error {
+function protocolErrorFromEnvelope(raw: unknown, status: number): Error {
   let envelope: ErrorEnvelope;
   try {
     envelope = decodeErrorEnvelope(raw);
   } catch {
-    return new Error("request failed and response was not a valid protocol envelope");
+    return new Error(
+      `request failed with HTTP ${status}: invalid protocol error envelope`
+    );
   }
-  return new Error(`${envelope.error.code}: ${envelope.error.message}`);
+  return new Error(
+    `request failed with HTTP ${status}: ${envelope.error.code}: ${envelope.error.message}`
+  );
+}
+
+function parseJsonBody(raw: string): { ok: true; value: unknown } | { ok: false } {
+  if (raw.trim().length === 0) {
+    return { ok: false };
+  }
+
+  try {
+    return { ok: true, value: JSON.parse(raw) as unknown };
+  } catch {
+    return { ok: false };
+  }
 }
