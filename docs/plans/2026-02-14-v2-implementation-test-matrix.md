@@ -40,7 +40,7 @@
 | --- | --- | --- |
 | `CP-0` | workspace/build skeleton checks | `v2` Rust workspace checks and `v2/web` build succeeds |
 | `CP-1` | `mesh_kernel`, `mesh_energy`, `mesh_backends`, `mesh_runtime`, `mesh_schema_contract`, `vm_isa`, `vm_memory`, `vm_io`, `vm_opcode_costs`, `vm_input_mapping`, `vm_output_overrides`, `vm_numeric_determinism`, `graph_operator_richness`, `graph_stateful_ops` | all tests pass; runtime semantics, schema/ISA contracts, VM memory/I/O opcodes, slot mapping/override lifecycle, numeric determinism, opcode-cost behavior, and graph fixed-function richness match CP-1 specs |
-| `CP-2` | `mutation_invariants`, `mutation_repair`, `ecology_pressures`, `ecology_noncollapse` | all tests pass on fixed seeds; no invariant violations |
+| `CP-2` | `mutation_invariants`, `mutation_repair`, `reproduction_memory_inheritance`, `ecology_pressures`, `ecology_noncollapse` | all tests pass on fixed seeds; no invariant violations and offspring memory-copy semantics hold |
 | `CP-3` | server lifecycle/payload/ws tests, cli ndjson tests, web protocol fixtures, end-to-end smoke | all tests pass; schema/version parity across all surfaces |
 
 ## Required Test Categories
@@ -102,9 +102,10 @@
 1. `scripts/check-plan-harness.sh --mode strict`
 2. `cd v2 && cargo test -p v2-core --test mutation_invariants`
 3. `cd v2 && cargo test -p v2-core --test mutation_repair`
-4. `cd v2 && cargo test -p v2-core --test ecology_pressures`
-5. `cd v2 && cargo test -p v2-core --test ecology_noncollapse`
-6. `cd v2 && cargo test -p v2-core`
+4. `cd v2 && cargo test -p v2-core --test reproduction_memory_inheritance`
+5. `cd v2 && cargo test -p v2-core --test ecology_pressures`
+6. `cd v2 && cargo test -p v2-core --test ecology_noncollapse`
+7. `cd v2 && cargo test -p v2-core`
 
 ### `CP-3` exit
 

@@ -62,6 +62,7 @@ Validation:
 2. Memory arena is runtime state, not encoded directly in genome fields.
 3. VM instructions may read/write this arena.
 4. Memory state persists across ticks for a living creature.
+5. On reproduction in v1, offspring memory is copied byte-for-byte from parent memory at reproduction commit time.
 
 ### `NodeGenome`
 
