@@ -5,7 +5,7 @@
 **Goal:** Build a new `v2` simulation app from scratch, optimized for mesh-DNA cognition and emergent behavior, without refactoring or integrating legacy runtime code.
 **Goal IDs:** GP-01, GP-02, GP-03, GP-04
 **Scope:** Create and ship a fully isolated app under `v2/` (`core`, `server`, `cli`, `web`) with checkpoint-gated execution plans; excludes in-place edits to legacy runtime/server/web codepaths.
-**Docs Impact:** Update greenfield program/stage planning around explicit checkpoints and archive stale legacy-only active plans.
+**Docs Impact:** Update greenfield program/stage planning around explicit checkpoints; add implementation-spec docs for CP-1/CP-2/CP-3 and shared verification matrix.
 **Supersedes:** none
 **Superseded-By:** none
 
@@ -48,6 +48,12 @@ Execution plans by checkpoint owner:
 - `CP-1`: `docs/plans/2026-02-13-creature-brain-mesh-stage-2-backends-energy.md`
 - `CP-2`: `docs/plans/2026-02-13-creature-brain-mesh-stage-3-evolution-ecology.md`
 - `CP-3`: `docs/plans/2026-02-13-creature-brain-mesh-stage-4-cutover.md`
+
+Implementation-spec dependencies:
+- `CP-1`: `docs/plans/2026-02-14-v2-cp1-runtime-execution-spec.md`
+- `CP-2`: `docs/plans/2026-02-14-v2-cp2-evolution-ecology-spec.md`
+- `CP-3`: `docs/plans/2026-02-14-v2-cp3-api-protocol-spec.md`
+- All checkpoints: `docs/plans/2026-02-14-v2-implementation-test-matrix.md`
 
 ## Current Status Snapshot
 
