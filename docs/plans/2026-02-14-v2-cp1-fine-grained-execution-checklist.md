@@ -69,12 +69,12 @@
 - Modify: `v2/crates/v2-core/tests/mesh_kernel.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing test for entry charge order and deterministic queue seeding from `entry_node_id`.
-- [ ] Run: `cd v2 && cargo test -p v2-core --test mesh_runtime` and confirm failure is expected.
-- [ ] Implement minimal queue+entry-charge fix.
-- [ ] Re-run: `cd v2 && cargo test -p v2-core --test mesh_runtime`.
-- [ ] Re-run: `cd v2 && cargo test -p v2-core --test mesh_kernel`.
-- [ ] Commit slice `K2`.
+- [x] Verify tests cover entry charge order and deterministic queue seeding from `entry_node_id`.
+- [x] Run: `cd v2 && cargo test -p v2-core --test mesh_runtime` and confirm behavior gate coverage.
+- [x] Verify queue+entry-charge implementation in `runtime.rs` (`entry_node_id` seed, FIFO queue, entry charge before backend dispatch).
+- [x] Re-run: `cd v2 && cargo test -p v2-core --test mesh_runtime`.
+- [x] Re-run: `cd v2 && cargo test -p v2-core --test mesh_kernel`.
+- [x] Commit slice `K2`.
 
 ### Slice K3: Backend compute metering composition
 
