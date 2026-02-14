@@ -94,11 +94,11 @@
 - Modify: `v2/crates/v2-core/tests/mutation_repair.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing tests for repair success and unsatisfiable discard behavior.
-- [ ] Run: `cd v2 && cargo test -p v2-core --test mutation_repair` and confirm failure is expected.
-- [ ] Implement minimal repair/discard pipeline fix.
-- [ ] Re-run targeted test and confirm pass.
-- [ ] Commit slice `E4`.
+- [x] Add/adjust regression tests for repair success and unsatisfiable/budget-exhausted discard behavior.
+- [x] Run: `cd v2 && cargo test -p v2-core --test mutation_repair` and confirm repair/discard coverage.
+- [x] Verify repair pipeline normalizes invalid structures while preserving bounded repair/discard semantics.
+- [x] Re-run targeted test and confirm pass.
+- [x] Commit slice `E4`.
 
 ### Slice E5: Reproduction memory inheritance
 
