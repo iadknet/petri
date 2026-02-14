@@ -43,6 +43,9 @@
 | `CP-2 Evolution + Ecology` | `docs/plans/2026-02-13-creature-brain-mesh-stage-3-evolution-ecology.md` | complete | `CP-1` complete and semantics frozen | Mutation invariants and non-collapse ecology checks green |
 | `CP-3 Product Surface + Stabilization` | `docs/plans/2026-02-13-creature-brain-mesh-stage-4-cutover.md` | complete | `CP-2` complete | `v2-server/cli/web` integration gates and docs rebaseline green |
 
+Verification snapshot:
+1. `CP-1` gate re-verified green on 2026-02-14 using `scripts/check-plan-harness.sh --mode strict` plus the full `CP-1` command gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md`.
+
 ## Checkpoint Specs
 
 | checkpoint | implementation spec |
