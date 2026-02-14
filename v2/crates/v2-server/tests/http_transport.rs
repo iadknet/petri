@@ -1,6 +1,6 @@
 use axum::body::Body;
-use axum::http::{Request, StatusCode};
 use axum::body::to_bytes;
+use axum::http::{Request, StatusCode};
 use tower::ServiceExt;
 
 #[tokio::test]
