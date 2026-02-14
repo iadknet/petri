@@ -15,6 +15,21 @@ import {
 
 export type ConnectionState = "connecting" | "reconnecting" | "connected" | "error";
 
+const DEFAULT_API_BASE = "http://127.0.0.1:4100";
+
+type TransportEnv = {
+  VITE_API_BASE?: string;
+  VITE_WS_BASE?: string;
+};
+
+export function resolveTransportEndpoints(
+  env: TransportEnv = import.meta.env as unknown as TransportEnv
+): { apiBase: string; wsBase: string } {
+  const apiBase = (env.VITE_API_BASE ?? DEFAULT_API_BASE).replace(/\/+$/, "");
+  const wsBase = (env.VITE_WS_BASE ?? apiBase.replace(/^http/, "ws")).replace(/\/+$/, "");
+  return { apiBase, wsBase };
+}
+
 const DEFAULT_STARTUP_DRAFT: StartupRequest = {
   seed: 0,
   world: {
@@ -41,10 +56,11 @@ function asErrorMessage(error: unknown): string {
 }
 
 export function useSimulationStore() {
+  const transport = useMemo(() => resolveTransportEndpoints(), []);
   const clientRef = useRef(
     new ProtocolClient(
-      import.meta.env.VITE_API_BASE ?? "",
-      import.meta.env.VITE_WS_BASE ?? ""
+      transport.apiBase,
+      transport.wsBase
     )
   );
 
