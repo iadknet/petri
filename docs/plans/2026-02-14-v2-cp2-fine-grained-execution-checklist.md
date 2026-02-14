@@ -160,10 +160,10 @@
 - Modify: `docs/plans/2026-02-14-v2-checkpoint-boundaries.md`
 
 **Checklist:**
-- [ ] Run full CP-2 gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md`.
-- [ ] Confirm deterministic pass behavior on required suites.
-- [ ] Update checkpoint status only when full gate is green.
-- [ ] Commit slice `E9`.
+- [x] Run full CP-2 gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md`.
+- [x] Confirm deterministic pass behavior on required suites.
+- [x] Update checkpoint status only when full gate is green.
+- [x] Commit slice `E9`.
 
 ## Verification Commands
 
