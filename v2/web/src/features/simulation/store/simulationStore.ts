@@ -12,6 +12,11 @@ import {
   type StartupRequest,
   type StatusPayload,
 } from "../../protocol/models";
+import {
+  applyWsEventSnapshot,
+  asErrorMessage,
+  selectNextCreatureId,
+} from "./simulationEffects";
 
 export type ConnectionState = "connecting" | "reconnecting" | "connected" | "error";
 
@@ -47,13 +52,6 @@ const DEFAULT_STARTUP_DRAFT: StartupRequest = {
     max_tick_budget_ms: 16,
   },
 };
-
-function asErrorMessage(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
-}
 
 export function useSimulationStore() {
   const transport = useMemo(() => resolveTransportEndpoints(), []);
@@ -134,10 +132,12 @@ export function useSimulationStore() {
           }
 
           setConnectionState("connected");
-          if (event.event === "status") {
-            setStatus(event.payload);
-          } else if (event.event === "frame") {
-            setFrame(event.payload);
+          const next = applyWsEventSnapshot({ status: null, frame: null }, event);
+          if (next.status) {
+            setStatus(next.status);
+          }
+          if (next.frame) {
+            setFrame(next.frame);
           }
         },
         (error) => {
@@ -169,18 +169,9 @@ export function useSimulationStore() {
   }, [refreshSnapshot]);
 
   useEffect(() => {
-    if (!frame || frame.creatures.length === 0) {
-      if (selectedCreatureId !== null) {
-        setSelectedCreatureId(null);
-      }
-      return;
-    }
-
-    if (
-      selectedCreatureId === null ||
-      !frame.creatures.some((creature) => creature.id === selectedCreatureId)
-    ) {
-      setSelectedCreatureId(frame.creatures[0]?.id ?? null);
+    const nextSelectedCreatureId = selectNextCreatureId(frame, selectedCreatureId);
+    if (nextSelectedCreatureId !== selectedCreatureId) {
+      setSelectedCreatureId(nextSelectedCreatureId);
     }
   }, [frame, selectedCreatureId]);
 
