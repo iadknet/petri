@@ -35,7 +35,7 @@
 
 | question | decision | owner | status |
 | --- | --- | --- | --- |
-| Should `v2` support legacy snapshot import/export compatibility? | No in initial greenfield release. | user+agent | resolved |
+| Should snapshot import/export endpoints be required in initial `v2`? | No; snapshotting is out of scope for initial release. | user+agent | resolved |
 | Should `v2` and legacy share API schema files? | No; `v2` owns independent contracts. | user+agent | resolved |
 | Should docs present legacy or `v2` as active architecture target? | `v2` once stage 4 gates pass. | user+agent | resolved |
 
@@ -71,7 +71,7 @@ Files:
 - Create: `v2/crates/v2-server/src/ws.rs`
 
 Steps:
-1. Implement startup/start/pause/step/status/snapshot endpoints.
+1. Implement startup/start/pause/step/status endpoints.
 2. Wire runtime tick loop to `v2-core`.
 3. Ensure endpoint payloads match protocol tests.
 
