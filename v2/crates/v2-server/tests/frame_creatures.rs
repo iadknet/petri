@@ -56,7 +56,10 @@ fn frame_creatures_keep_ids_and_positions_across_no_tick_reads() {
         .map(|creature| (creature.id, creature.x, creature.y))
         .collect::<Vec<_>>();
 
-    assert_eq!(first, third, "lifecycle transitions without ticks must not reshuffle creatures");
+    assert_eq!(
+        first, third,
+        "lifecycle transitions without ticks must not reshuffle creatures"
+    );
 }
 
 #[test]

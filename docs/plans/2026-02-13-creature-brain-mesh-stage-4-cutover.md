@@ -8,6 +8,7 @@
 **Docs Impact:** Update canonical docs to describe `v2` target architecture, keep compatibility stubs minimal and pointer-only, and run an explicit stale-doc retirement pass; consume CP-3 API/protocol spec and shared test matrix.
 **Supersedes:** none
 **Superseded-By:** none
+**Status:** complete (`CP-3` exit gate passed on February 14, 2026).
 
 ## Goal Alignment
 

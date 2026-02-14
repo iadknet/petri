@@ -248,10 +248,10 @@
 - Modify: `docs/plans/2026-02-13-creature-brain-mesh-rewrite-program.md`
 
 **Checklist:**
-- [ ] Run full CP-3 gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md`.
-- [ ] Confirm server + cli + web contract gates are all green.
-- [ ] Update checkpoint/program status only after full gate pass.
-- [ ] Commit slice `P3-X1`.
+- [x] Run full CP-3 gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md`.
+- [x] Confirm server + cli + web contract gates are all green.
+- [x] Update checkpoint/program status only after full gate pass.
+- [x] Commit slice `P3-X1`.
 
 ## Verification Commands
 

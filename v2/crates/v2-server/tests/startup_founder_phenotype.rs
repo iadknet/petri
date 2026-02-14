@@ -1,7 +1,7 @@
+use v2_core::phenotype::FOUNDER_PHENOTYPE_RGB;
 use v2_server::api::{
     SimulationApi, StartupPopulation, StartupRequest, StartupRuntime, StartupWorld,
 };
-use v2_core::phenotype::FOUNDER_PHENOTYPE_RGB;
 
 fn startup_request() -> StartupRequest {
     StartupRequest {

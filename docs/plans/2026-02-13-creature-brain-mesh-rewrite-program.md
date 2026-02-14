@@ -80,9 +80,9 @@ Implementation-spec dependencies:
 | checkpoint | status | required next move |
 | --- | --- | --- |
 | `CP-0 Greenfield Bootstrap` | complete | none |
-| `CP-1 Runtime Kernel` | in progress | finish remaining CP-1 matrix suites and runtime-spec edge cases |
-| `CP-2 Evolution + Ecology` | pending | begin only after `CP-1` exit criteria are green |
-| `CP-3 Product Surface + Stabilization` | in progress | complete docs closeout + full-surface frontend/server integration hardening |
+| `CP-1 Runtime Kernel` | complete | none |
+| `CP-2 Evolution + Ecology` | complete | none |
+| `CP-3 Product Surface + Stabilization` | complete | program implementation checkpoints complete |
 
 ## Stage Breakdown
 
