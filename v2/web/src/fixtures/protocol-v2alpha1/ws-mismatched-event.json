@@ -1,0 +1,14 @@
+{
+  "protocol_version": "v2alpha1",
+  "event": "status",
+  "tick": 12,
+  "payload": {
+    "protocol_version": "v2alpha1",
+    "tick": 12,
+    "width": 32,
+    "height": 24,
+    "creatures": [],
+    "food": [],
+    "barriers": []
+  }
+}

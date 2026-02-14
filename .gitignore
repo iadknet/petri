@@ -6,3 +6,8 @@ web/dist/
 web/*.tsbuildinfo
 web/test-results/
 web/playwright-report/
+v2/web/node_modules/
+v2/web/dist/
+v2/web/*.tsbuildinfo
+v2/web/test-results/
+v2/web/playwright-report/

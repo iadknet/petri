@@ -1,0 +1,24 @@
+{
+  "protocol_version": "v2alpha1",
+  "event": "status",
+  "tick": 12,
+  "payload": {
+    "protocol_version": "v2alpha1",
+    "state": "paused",
+    "tick": 12,
+    "sensor_radius": 4,
+    "health_window_ticks": 128,
+    "population": 10,
+    "mean_energy": 21.5,
+    "births_last_window": 2,
+    "deaths_last_window": 1,
+    "last_action_counts": {
+      "move": 5,
+      "eat": 3,
+      "reproduce": 1,
+      "inventory_pickup": 0,
+      "inventory_put": 0,
+      "noop": 1
+    }
+  }
+}
