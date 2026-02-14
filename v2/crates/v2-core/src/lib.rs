@@ -3,6 +3,7 @@ pub mod ecology;
 pub mod energy;
 pub mod evolution;
 pub mod mesh;
+pub mod phenotype;
 pub mod runtime;
 pub mod telemetry;
 

@@ -46,8 +46,10 @@
   - `docs/plans/2026-02-14-v2-cp3-api-protocol-spec.md`
 - Frontend UX source of truth:
   - `docs/plans/2026-02-14-v2-frontend-wireframe-spec.md`
-- Frontend execution source of truth:
-  - `docs/plans/2026-02-14-v2-frontend-implementation-plan.md`
+- CP-3 backend execution source of truth:
+  - `docs/plans/2026-02-14-v2-cp3-backend-micro-implementation-plan.md`
+- CP-3 frontend execution source of truth:
+  - `docs/plans/2026-02-14-v2-cp3-frontend-micro-implementation-plan.md`
 - Gate consistency source of truth:
   - `docs/plans/2026-02-14-v2-implementation-test-matrix.md`
 

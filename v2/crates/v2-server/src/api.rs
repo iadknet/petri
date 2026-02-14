@@ -2,6 +2,7 @@ use sha2::{Digest, Sha256};
 
 use crate::PROTOCOL_VERSION;
 use crate::state::{SimulationPhase, SimulationState};
+use v2_core::phenotype::FOUNDER_PHENOTYPE_RGB;
 
 #[derive(Clone, Debug)]
 pub struct SimulationApi {
@@ -599,11 +600,7 @@ fn creature_snapshots(state: &SimulationState) -> Vec<CreatureSnapshot> {
             x: x as u16,
             y: y as u16,
             energy: state.mean_energy + (index % 7) as f32 * 0.1,
-            phenotype_rgb: [
-                (37 * (index + 1) % 255) as u8,
-                (71 * (index + 3) % 255) as u8,
-                (113 * (index + 5) % 255) as u8,
-            ],
+            phenotype_rgb: FOUNDER_PHENOTYPE_RGB,
         });
     }
 

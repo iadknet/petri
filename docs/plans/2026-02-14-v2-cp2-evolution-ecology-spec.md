@@ -38,6 +38,8 @@
 | Should creature runtime memory be heritable at birth? | Yes in v1; offspring memory is copied byte-for-byte from parent. | user+agent | resolved |
 | What explicitly counts as a CP-2 non-collapse pass? | Fixed-seed baseline run must keep final-window mean population at or above `10%` of initial and produce at least one birth event. | user+agent | resolved |
 | Should duplication/remap behavior be probabilistic but explicitly defaulted? | Yes; defaults are explicit in `MutationConfig` and must be test-covered. | user+agent | resolved |
+| Should startup-seeded founders share one phenotype baseline or vary per spawn? | Founders share one baseline phenotype; phenotype diversity emerges through reproduction mutation. | user+agent | resolved |
+| Should v1 phenotype mutation behavior be retained in `v2`? | Yes; carry forward weighted channel mutation and rare polarity flips as the baseline phenotype evolution contract. | user+agent | resolved |
 
 ## Evolution Contract
 
@@ -111,6 +113,23 @@
 2. At successful reproduction commit, offspring memory is copied byte-for-byte from parent memory.
 3. Inheritance snapshot is taken at reproduction commit time (post parent cognition for the tick).
 4. No memory randomization or reset is applied in v1 reproduction path.
+
+### Phenotype evolution contract (v1 carry-forward)
+
+1. Founder phenotype baseline:
+- `founder_rgb = [204, 61, 61]`
+- `founder_channel_weights = [1.0, 1.0, 1.0]`
+- `founder_channel_positive_increment = [true, true, true]`
+2. Startup-seeded founders all start with the same phenotype baseline (no per-founder phenotype randomization).
+3. Offspring phenotype inheritance:
+- if no phenotype mutation event triggers, offspring phenotype matches parent exactly.
+- if phenotype mutation triggers:
+  - select one RGB channel using weighted selection from `channel_weights`
+  - optionally flip selected channel polarity with chance `0.002`
+  - mutate selected channel by step size `2` in the direction of selected polarity
+  - re-randomize selected channel weight in `[0.05, 1.0]`
+4. Unselected channels keep their previous RGB value, weight, and polarity.
+5. Phenotype mutation must be deterministic for fixed seed/input sequence.
 
 ### Structural invariants (must hold after each birth)
 
@@ -206,6 +225,7 @@ Files:
 - Create: `v2/crates/v2-core/tests/mutation_invariants.rs`
 - Create: `v2/crates/v2-core/tests/mutation_repair.rs`
 - Create: `v2/crates/v2-core/tests/reproduction_memory_inheritance.rs`
+- Create: `v2/crates/v2-core/tests/phenotype_evolution.rs`
 
 Steps:
 1. Add failing tests for each required operator.
@@ -213,6 +233,7 @@ Steps:
 3. Add deterministic seed fixtures for reproducible failures.
 4. Add failing tests proving offspring memory equals parent memory at reproduction commit.
 5. Add failing tests for duplication/remap default probabilities and external-edge-preservation default.
+6. Add failing tests for founder phenotype uniformity and phenotype mutation semantics.
 
 ### Task 2: Implement mutation engine with defaults
 
@@ -221,11 +242,13 @@ Files:
 - Create: `v2/crates/v2-core/src/evolution/config.rs`
 - Create: `v2/crates/v2-core/src/evolution/operators.rs`
 - Create: `v2/crates/v2-core/src/evolution/validation.rs`
+- Create: `v2/crates/v2-core/src/evolution/phenotype.rs`
 
 Steps:
 1. Implement config/weights and operator sampling.
 2. Implement mutation operators and bounded repair loop.
 3. Integrate with asexual reproduction path.
+4. Implement phenotype inheritance/mutation helpers and wire them into reproduction.
 
 ### Task 3: Add failing ecology pressure tests
 
