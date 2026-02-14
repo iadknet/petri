@@ -51,6 +51,7 @@ Execution plans by checkpoint owner:
 
 Implementation-spec dependencies:
 - `CP-1`: `docs/plans/2026-02-14-v2-cp1-runtime-execution-spec.md`
+- `CP-1` schema/ISA: `docs/plans/2026-02-14-v2-core-schema-vm-isa-spec.md`
 - `CP-2`: `docs/plans/2026-02-14-v2-cp2-evolution-ecology-spec.md`
 - `CP-3`: `docs/plans/2026-02-14-v2-cp3-api-protocol-spec.md`
 - All checkpoints: `docs/plans/2026-02-14-v2-implementation-test-matrix.md`

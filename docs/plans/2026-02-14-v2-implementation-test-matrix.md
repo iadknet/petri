@@ -39,7 +39,7 @@
 | checkpoint | required suites | pass criteria |
 | --- | --- | --- |
 | `CP-0` | workspace/build skeleton checks | `v2` Rust workspace checks and `v2/web` build succeeds |
-| `CP-1` | `mesh_kernel`, `mesh_energy`, `mesh_backends`, `mesh_runtime` | all tests pass; runtime semantics match CP-1 spec |
+| `CP-1` | `mesh_kernel`, `mesh_energy`, `mesh_backends`, `mesh_runtime`, `mesh_schema_contract`, `vm_isa` | all tests pass; runtime semantics and schema/ISA contracts match CP-1 specs |
 | `CP-2` | `mutation_invariants`, `mutation_repair`, `ecology_pressures`, `ecology_noncollapse` | all tests pass on fixed seeds; no invariant violations |
 | `CP-3` | server lifecycle/payload/ws tests, cli ndjson tests, web protocol fixtures, end-to-end smoke | all tests pass; schema/version parity across all surfaces |
 
@@ -85,7 +85,9 @@
 3. `cd v2 && cargo test -p v2-core --test mesh_energy`
 4. `cd v2 && cargo test -p v2-core --test mesh_backends`
 5. `cd v2 && cargo test -p v2-core --test mesh_runtime`
-6. `cd v2 && cargo test -p v2-core`
+6. `cd v2 && cargo test -p v2-core --test mesh_schema_contract`
+7. `cd v2 && cargo test -p v2-core --test vm_isa`
+8. `cd v2 && cargo test -p v2-core`
 
 ### `CP-2` exit
 

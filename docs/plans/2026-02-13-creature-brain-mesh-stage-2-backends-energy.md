@@ -41,6 +41,8 @@
 
 - Runtime semantics source of truth:
   - `docs/plans/2026-02-14-v2-cp1-runtime-execution-spec.md`
+- Core schema + VM ISA source of truth:
+  - `docs/plans/2026-02-14-v2-core-schema-vm-isa-spec.md`
 - Gate consistency source of truth:
   - `docs/plans/2026-02-14-v2-implementation-test-matrix.md`
 
@@ -133,7 +135,9 @@ Go / stop rule:
 3. `cd v2 && cargo test -p v2-core --test mesh_energy`
 4. `cd v2 && cargo test -p v2-core --test mesh_backends`
 5. `cd v2 && cargo test -p v2-core --test mesh_runtime`
-6. `cd v2 && cargo test -p v2-core`
+6. `cd v2 && cargo test -p v2-core --test mesh_schema_contract`
+7. `cd v2 && cargo test -p v2-core --test vm_isa`
+8. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 
