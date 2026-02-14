@@ -31,7 +31,7 @@
 | question | decision | owner | status |
 | --- | --- | --- | --- |
 | Should VM be stack-based or register-based in v1? | Register-based for easier deterministic metering. | user+agent | resolved |
-| Should graph nodes have custom mini-language in CP-1? | No, keep graph backend minimal with simple expression operators. | user+agent | resolved |
+| Should graph nodes have custom mini-language in CP-1? | No; use richer fixed-function graph operators instead of a programmable graph DSL. | user+agent | resolved |
 | Should internal packet fields be untyped strings? | No, typed value schema is required. | user+agent | resolved |
 | What is per-creature VM memory size in v1? | Fixed at `1024` bytes (`1 KiB`) per creature. | user+agent | resolved |
 | How are `ReadInput` slots mapped and normalized? | Slot index maps to ordered `input_refs`; normalization uses the table in this spec. | user+agent | resolved |
@@ -39,6 +39,7 @@
 | What happens for invalid VM indices? | Register/const/output index faults are hard runtime errors; input index is soft-default `0.0`. | user+agent | resolved |
 | What numeric determinism rules apply? | Canonical sanitize/clamp/rounding rules are mandatory. | user+agent | resolved |
 | Should v1 include logic/conversion opcodes? | Yes (`And`, `Or`, `Not`, `Clamp01`, `ToI32`, `ToU8`, `ToBool`). | user+agent | resolved |
+| Should graph nodes include temporal and aggregation richness in CP-1? | Yes, via bounded fixed-function operators (integrator, momentum, oscillator, pooling, adaptive gain). | user+agent | resolved |
 
 ## Genome Schema Contract
 
@@ -84,6 +85,8 @@ Validation:
 - `inputs: Vec<InputReference>`
 - `coefficients: Vec<f32>` (length must equal `inputs` for weighted operators)
 - `bias: f32`
+- `state_slot_count: u8` (`0..=8`, graph-local persistent scalar state slots)
+- `operator_params: GraphOperatorParams`
 
 `VmBackendDef`:
 - `register_count: u8` (`1..=32`)
@@ -321,11 +324,57 @@ Per-opcode baseline (`vm_opcode_base_cost`):
 2. `WeightedSum`
 3. `Threshold { threshold: f32 }`
 4. `Clamp01`
+5. `DecayIntegrator { state_slot: u8, alpha: f32 }`
+6. `Momentum { state_slot: u8, beta: f32 }`
+7. `Oscillator { phase_slot: u8, frequency: f32, amplitude: f32, bias: f32 }`
+8. `SumPool`
+9. `MeanPool`
+10. `MaxPool`
+11. `AdaptiveGain { gain_slot: u8, learning_rate: f32, min_gain: f32, max_gain: f32 }`
+
+`GraphOperatorParams` normalization and bounds:
+1. `alpha` and `beta` are clamped to `[0.0, 1.0]`.
+2. `frequency` is clamped to `[0.0, 8.0]` cycles per tick.
+3. `amplitude` is clamped to `[0.0, 10.0]`.
+4. `learning_rate` is clamped to `[0.0, 0.1]`.
+5. `state_slot` references must be `< state_slot_count`.
+
+Graph local-state contract:
+1. Each graph node owns `state_slot_count` persistent `f32` slots.
+2. State persists across ticks for living creatures.
+3. State resets to zero on creature birth unless explicitly initialized via `local_state_init`.
+4. Graph state updates are deterministic and operator-local (no cross-node state writes).
+
+Operator semantics:
+1. `DecayIntegrator`: `s = (1 - alpha) * s + alpha * input0`; output `s`.
+2. `Momentum`: `delta = input0 - input1`; `s = beta * s + (1 - beta) * delta`; output `s`.
+3. `Oscillator`: `phase = fract(phase + frequency * dt)` with `dt=1`; output `bias + amplitude * sin(2*pi*phase)`.
+4. `SumPool`: output sum of all inputs.
+5. `MeanPool`: output arithmetic mean of inputs (or `0.0` for empty input list).
+6. `MaxPool`: output max of inputs (or `0.0` for empty input list).
+7. `AdaptiveGain`: `gain = clamp(gain + learning_rate * input1, min_gain, max_gain)`; output `gain * input0`.
+
+Graph cost model (still static, but operator-aware):
+1. Runtime uses static graph tariff multiplied by operator multiplier.
+2. `effective_graph_cost = graph_base_tariff * graph_operator_cost_multiplier(operator)`
+3. Default multipliers:
+- `Passthrough`: `0.7`
+- `WeightedSum`: `1.0`
+- `Threshold`: `0.9`
+- `Clamp01`: `0.8`
+- `DecayIntegrator`: `1.2`
+- `Momentum`: `1.3`
+- `Oscillator`: `1.4`
+- `SumPool`: `1.0`
+- `MeanPool`: `1.1`
+- `MaxPool`: `1.2`
+- `AdaptiveGain`: `1.3`
 
 Rules:
-1. Graph backend is single-pass deterministic evaluation.
-2. Graph compute energy uses static tariff from runtime config.
-3. Graph emits outputs from `output_definitions` after operator evaluation.
+1. Graph backend remains fixed-function (no graph mini-language/bytecode in CP-1).
+2. Graph backend is deterministic and bounded-time per dispatch.
+3. Graph compute energy uses static operator-aware tariff from runtime config.
+4. Graph emits outputs from `output_definitions` after operator evaluation.
 
 ## Task List
 
@@ -333,11 +382,14 @@ Rules:
 
 Files:
 - Create: `v2/crates/v2-core/tests/mesh_schema_contract.rs`
+- Create: `v2/crates/v2-core/tests/graph_operator_richness.rs`
+- Create: `v2/crates/v2-core/tests/graph_stateful_ops.rs`
 
 Steps:
 1. Add failing tests for backend/node_type mismatch.
 2. Add failing tests for typed input/output field validation.
 3. Add failing tests for graph/vm backend bound checks.
+4. Add failing tests for graph operator parameter and state-slot bounds.
 
 ### Task 2: Add failing VM ISA tests
 
@@ -384,8 +436,10 @@ Steps:
 7. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
 8. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
 9. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
-10. `cd v2 && cargo test -p v2-core --test mesh_runtime`
-11. `cd v2 && cargo test -p v2-core`
+10. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
+11. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
+12. `cd v2 && cargo test -p v2-core --test mesh_runtime`
+13. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 
