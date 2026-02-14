@@ -134,11 +134,11 @@
 - Modify: `v2/crates/v2-core/tests/ecology_pressures.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing tests for crowding monotonicity, scarcity attenuation/recovery, and regime smoothing.
-- [ ] Run: `cd v2 && cargo test -p v2-core --test ecology_pressures` and confirm failure is expected.
-- [ ] Implement minimal ecology pressure fix.
-- [ ] Re-run targeted test and confirm pass.
-- [ ] Commit slice `E7`.
+- [x] Add/adjust regression tests for crowding monotonicity, scarcity attenuation/recovery, and regime smoothing.
+- [x] Run: `cd v2 && cargo test -p v2-core --test ecology_pressures` and confirm ecology pressure coverage.
+- [x] Verify ecology formulas in `ecology/mod.rs` + `ecology/config.rs` align with CP-2 pressure semantics.
+- [x] Re-run targeted test and confirm pass.
+- [x] Commit slice `E7`.
 
 ### Slice E8: Non-collapse baseline viability
 
