@@ -5,7 +5,7 @@
 **Goal:** Deliver stable `v2-server`, `v2-cli`, and `v2-web` surfaces over the new `v2-core` runtime and promote `v2` docs as the active architecture target.
 **Goal IDs:** GP-01, GP-02, GP-03, GP-04
 **Scope:** `v2` API/protocol/UI/CLI integration, docs rebaseline toward `v2`; excludes changes to legacy runtime behavior.
-**Docs Impact:** Update canonical docs to describe `v2` target architecture and keep legacy root documented as historical baseline; consume CP-3 API/protocol spec and shared test matrix.
+**Docs Impact:** Update canonical docs to describe `v2` target architecture, keep compatibility stubs minimal and pointer-only, and run an explicit stale-doc retirement pass; consume CP-3 API/protocol spec and shared test matrix.
 **Supersedes:** none
 **Superseded-By:** none
 
@@ -38,11 +38,16 @@
 | Should snapshot import/export endpoints be required in initial `v2`? | No; snapshotting is out of scope for initial release. | user+agent | resolved |
 | Should `v2` and legacy share API schema files? | No; `v2` owns independent contracts. | user+agent | resolved |
 | Should docs present legacy or `v2` as active architecture target? | `v2` once stage 4 gates pass. | user+agent | resolved |
+| Should CP-3 include full frontend parity including paint workflows? | Yes; CP-3 includes startup/runtime/inspector surfaces and food/barrier paint workflows. | user+agent | resolved |
 
 ## Specification Dependencies
 
 - API/protocol contract source of truth:
   - `docs/plans/2026-02-14-v2-cp3-api-protocol-spec.md`
+- Frontend UX source of truth:
+  - `docs/plans/2026-02-14-v2-frontend-wireframe-spec.md`
+- Frontend execution source of truth:
+  - `docs/plans/2026-02-14-v2-frontend-implementation-plan.md`
 - Gate consistency source of truth:
   - `docs/plans/2026-02-14-v2-implementation-test-matrix.md`
 
@@ -94,13 +99,55 @@ Files:
 - Create: `v2/web/src/protocol.ts`
 - Modify: `v2/web/src/App.tsx`
 - Modify: `README.md`
+- Modify: `docs/README.md`
 - Modify: `docs/strategy/architecture.md`
 - Modify: `docs/strategy/roadmap.md`
+- Modify: `docs/strategy/technology-review.md`
+- Modify: `petri-architecture.md`
+- Modify: `petri-roadmap.md`
+- Modify: `petri-technology-review.md`
 
 Steps:
 1. Implement minimal client protocol layer and runtime status/frame UI.
 2. Wire web client to `v2-server` endpoints.
 3. Update canonical docs to mark `v2` as target architecture path.
+4. Repoint root compatibility stubs to canonical docs with minimal pointer content only.
+
+### Task 5: Documentation closeout and stale-doc retirement
+
+Files:
+- Modify: `docs/README.md`
+- Modify: `docs/plans/2026-02-13-creature-brain-mesh-rewrite-program.md`
+- Move: stale or superseded active plans from `docs/plans/` to `docs/plans/archive/`
+- Create: `docs/operations/v2-doc-closeout.md`
+
+Steps:
+1. Build a doc inventory with disposition per file: `keep`, `update`, `archive`, or `supersede`.
+2. Archive stale active plans that conflict with the finalized `v2` direction.
+3. In each archived/superseded plan, set `Superseded-By` to the replacing plan where applicable.
+4. Publish `docs/operations/v2-doc-closeout.md` with:
+   - canonical docs updated
+   - compatibility stubs validated
+   - retired/superseded docs list
+   - residual follow-up docs (if any)
+5. Verify no canonical doc still states legacy runtime as active target architecture.
+
+## CP-3 Documentation Closeout Plan (normative)
+
+1. Canonical docs set to update:
+   - `docs/README.md`
+   - `docs/strategy/architecture.md`
+   - `docs/strategy/roadmap.md`
+   - `docs/strategy/technology-review.md`
+2. Compatibility stubs to keep pointer-only:
+   - `petri-architecture.md`
+   - `petri-roadmap.md`
+   - `petri-technology-review.md`
+3. Plan lifecycle cleanup:
+   - active `docs/plans/` contains only current direction plans
+   - stale plans move to `docs/plans/archive/`
+4. Closeout artifact:
+   - `docs/operations/v2-doc-closeout.md` published before `S4-EXIT`
 
 ## Checkpoint Boundaries
 
@@ -109,13 +156,15 @@ Steps:
 Required before starting:
 1. Stage-3 `S3-EXIT` is `go`.
 2. `v2-core` runtime contracts are frozen for integration window.
+3. Frontend wireframe and implementation plans are approved.
 
 ### Midpoint Checkpoint (`S4-MID`)
 
 Required before task 4:
 1. Server and CLI integration tests pass.
 2. Web protocol tests pass against fixture payloads.
-3. Protocol version is stable across server/cli/web fixtures.
+3. Paint endpoint contract tests and paint interaction UI tests pass.
+4. Protocol version is stable across server/cli/web fixtures.
 
 Stop conditions:
 1. Repeated contract drift between server and web.
@@ -127,6 +176,8 @@ Required to close stage:
 1. `v2` integration tests are green.
 2. `v2` web build passes.
 3. Canonical docs are updated for `v2` target state.
+4. Documentation closeout artifact is published with stale-doc retirement list.
+5. Compatibility stubs are pointer-only and consistent with canonical docs.
 
 Go / stop rule:
 1. `go` (program complete) only when stage verification gates pass in one full run.
