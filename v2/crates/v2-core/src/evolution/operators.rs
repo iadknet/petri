@@ -232,8 +232,7 @@ fn retarget_node(genome: &mut CreatureGenome, rng: &mut Lcg64) -> bool {
         .collect::<Vec<_>>();
     let entry_retarget = rng.chance(0.5);
 
-    if entry_retarget
-        && let Some(new_entry) = choose_different_id(&ids, genome.entry_node_id, rng)
+    if entry_retarget && let Some(new_entry) = choose_different_id(&ids, genome.entry_node_id, rng)
     {
         genome.entry_node_id = new_entry;
         return true;
