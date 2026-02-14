@@ -36,6 +36,7 @@
 | Should invalid mutations be discarded or repaired? | Repair first; discard only if repair fails invariants. | user+agent | resolved |
 | Should creature runtime memory be heritable at birth? | Yes in v1; offspring memory is copied byte-for-byte from parent. | user+agent | resolved |
 | What explicitly counts as a CP-2 non-collapse pass? | Fixed-seed baseline run must keep final-window mean population at or above `10%` of initial and produce at least one birth event. | user+agent | resolved |
+| Should duplication/remap behavior be probabilistic but explicitly defaulted? | Yes; defaults are explicit in `MutationConfig` and must be test-covered. | user+agent | resolved |
 
 ## Evolution Contract
 
@@ -49,6 +50,9 @@
 - `max_outputs_per_node: 8`
 - `max_subgraph_duplication_nodes: 6`
 - `max_vm_program_len: 128`
+- `node_duplication_clone_outputs_probability: 1.0`
+- `node_duplication_target_remap_probability: 0.35`
+- `subgraph_external_edge_retarget_probability: 0.0`
 
 `MutationWeights` (must sum to `1.0`):
 - `add_node: 0.10`
@@ -91,12 +95,14 @@
 7. `node_duplication`
 - clone source node (with new node ID)
 - copy local state/backend def
-- optionally clone outputs with target remap probability
+- clone outputs with probability `node_duplication_clone_outputs_probability` (default `1.0`)
+- for each cloned internal-target output field, apply target remap to duplicated IDs with probability `node_duplication_target_remap_probability` (default `0.35`)
 
 8. `subgraph_duplication`
 - BFS from seed node with upper bound `max_subgraph_duplication_nodes`
 - clone internal edges among duplicated nodes
-- remap internal targets to cloned IDs, external edges preserved by default
+- remap internal targets to cloned IDs
+- external edges are retargeted with probability `subgraph_external_edge_retarget_probability` (default `0.0`, preserve external edges)
 
 ### Reproduction memory inheritance contract
 
@@ -185,10 +191,11 @@ Telemetry window contract:
 
 1. Test run is deterministic with fixed seed `42`.
 2. Run length is `2000` ticks with CP-2 default config.
-3. Pass criteria:
+3. `baseline_population` is the actual seeded population at `tick=0` after occupancy constraints (not requested `initial_creatures`).
+4. Pass criteria:
 - no crash/panic
 - at least one successful birth occurs during run
-- mean population across final `400` ticks is `>= ceil(initial_creatures * 0.10)`
+- mean population across final `400` ticks is `>= ceil(baseline_population * 0.10)`
 
 ## Task List
 
@@ -204,6 +211,7 @@ Steps:
 2. Add failing tests for invariants and repair policy behavior.
 3. Add deterministic seed fixtures for reproducible failures.
 4. Add failing tests proving offspring memory equals parent memory at reproduction commit.
+5. Add failing tests for duplication/remap default probabilities and external-edge-preservation default.
 
 ### Task 2: Implement mutation engine with defaults
 
@@ -226,7 +234,7 @@ Files:
 
 Steps:
 1. Add failing tests for gradients, seasons, and crowding monotonicity.
-2. Add baseline non-collapse smoke test with bounded runtime and explicit pass thresholds from this spec.
+2. Add baseline non-collapse smoke test with bounded runtime and explicit pass thresholds using `baseline_population` definition from this spec.
 
 ### Task 4: Implement ecology systems and minimal telemetry
 

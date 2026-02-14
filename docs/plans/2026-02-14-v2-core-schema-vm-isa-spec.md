@@ -45,6 +45,7 @@
 | What is the minimum valid global `sensor_radius`? | `sensor_radius >= 1` in v1; `0` is invalid runtime config. | user+agent | resolved |
 | How is world-action `Direction` metadata encoded? | Ordinal `0..=7` using `NeighborDirection` order (`N, NE, E, SE, S, SW, W, NW`). | user+agent | resolved |
 | How are duplicate output field keys treated? | Duplicate payload keys and duplicate metadata field kinds are schema-invalid. | user+agent | resolved |
+| How does `max_input_slots` constrain routed input references? | Every internal edge targeting a VM node must satisfy `input_refs.len() <= target_vm.max_input_slots`; violations are schema-invalid. | user+agent | resolved |
 
 ## Genome Schema Contract
 
@@ -99,6 +100,10 @@ Validation:
 - `program: Vec<VmInstruction>` (`1..=128` instructions)
 - `constants: Vec<f32>` (`0..=64`)
 - `max_input_slots: u8` (`1..=64`, used for bounds validation of `ReadInput`)
+
+Validation:
+1. For each `OutputDefinition::InternalTarget`, if `target_node_id` resolves to a VM node, then `input_refs.len() <= target_vm.max_input_slots` must hold.
+2. Violations of the above rule are rejected by `CreatureGenome::validate()`.
 
 ## Typed Input/Output Contract
 
@@ -292,10 +297,11 @@ VM emit override rule:
 1. For each dispatch, runtime builds `resolved_input_slots: Vec<f32>` by iterating `input_refs` in order.
 2. `ReadInput { dst, input_index }` reads `resolved_input_slots[input_index]`.
 3. `input_index >= resolved_input_slots.len()` returns `0.0` (soft default, not a fault).
-4. `SensorCell` and `SensorCreature` refs with `|dx|` or `|dy|` above `sensor_radius` return `0.0`.
-5. `SensorSummary` refs always resolve against the current `SensorFrame`.
-6. `NeighborCell` and `NeighborCreature` refs resolve through `NeighborDirection` to fixed `(dx,dy)` offsets.
-7. Neighbor refs are valid only when `sensor_radius >= 1`; otherwise they return `0.0`.
+4. Runtime assumes `resolved_input_slots.len() <= target_vm.max_input_slots` due schema validation; if violated by corrupt state, dispatch returns schema/runtime error (not truncation).
+5. `SensorCell` and `SensorCreature` refs with `|dx|` or `|dy|` above `sensor_radius` return `0.0`.
+6. `SensorSummary` refs always resolve against the current `SensorFrame`.
+7. `NeighborCell` and `NeighborCreature` refs resolve through `NeighborDirection` to fixed `(dx,dy)` offsets.
+8. Neighbor refs are valid only when `sensor_radius >= 1`; otherwise they return `0.0`.
 
 Normalization table for built-in input keys:
 
@@ -584,6 +590,7 @@ Steps:
 8. Add failing tests for graph access to neighbor references.
 9. Add failing tests for duplicate payload keys and duplicate metadata field-kind rejection.
 10. Add failing tests for direction metadata range and action-kind metadata requirements.
+11. Add failing tests for `max_input_slots` edge-validation (`input_refs.len()` on VM targets).
 
 ### Task 2: Add failing VM ISA tests
 
