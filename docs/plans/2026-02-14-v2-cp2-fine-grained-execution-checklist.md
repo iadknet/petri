@@ -107,11 +107,11 @@
 - Modify: `v2/crates/v2-core/tests/reproduction_memory_inheritance.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing tests for byte-for-byte memory copy semantics.
-- [ ] Run: `cd v2 && cargo test -p v2-core --test reproduction_memory_inheritance` and confirm failure is expected.
-- [ ] Implement minimal inheritance-path fix.
-- [ ] Re-run targeted test and confirm pass.
-- [ ] Commit slice `E5`.
+- [x] Add/adjust regression tests for byte-for-byte memory copy semantics.
+- [x] Run: `cd v2 && cargo test -p v2-core --test reproduction_memory_inheritance` and confirm inheritance-path coverage.
+- [x] Verify `evolution/mod.rs` copies parent memory byte-for-byte at reproduction commit time.
+- [x] Re-run targeted test and confirm pass.
+- [x] Commit slice `E5`.
 
 ### Slice E6: Phenotype evolution contract checks
 
