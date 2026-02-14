@@ -76,11 +76,11 @@
 - Modify: `v2/crates/v2-server/tests/frame_creatures.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing tests for stable creature IDs/positions across no-tick frames.
-- [ ] Run: `cd v2 && cargo test -p v2-server --test frame_creatures` and confirm failure is expected.
-- [ ] Implement minimal frame-mapping fix from runtime state.
-- [ ] Re-run targeted test and confirm pass.
-- [ ] Commit slice `P3-B2`.
+- [x] Add/adjust regression tests for stable creature IDs/positions across no-tick frames.
+- [x] Run: `cd v2 && cargo test -p v2-server --test frame_creatures` and confirm behavior gate is covered.
+- [x] Verify frame mapping already sources creatures from runtime state (no code-path fix required in this slice).
+- [x] Re-run targeted test and confirm pass.
+- [x] Commit slice `P3-B2`.
 
 ### Slice P3-B3: Tick dynamics and action-count truthfulness
 
