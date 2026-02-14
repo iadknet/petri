@@ -5,7 +5,7 @@
 **Goal:** Deliver stable `v2-server`, `v2-cli`, and `v2-web` surfaces over the new `v2-core` runtime and promote `v2` docs as the active architecture target.
 **Goal IDs:** GP-01, GP-02, GP-03, GP-04
 **Scope:** `v2` API/protocol/UI/CLI integration, docs rebaseline toward `v2`; excludes changes to legacy runtime behavior.
-**Docs Impact:** Update canonical docs to describe `v2` target architecture and keep legacy root documented as historical baseline.
+**Docs Impact:** Update canonical docs to describe `v2` target architecture and keep legacy root documented as historical baseline; consume CP-3 API/protocol spec and shared test matrix.
 **Supersedes:** none
 **Superseded-By:** none
 
@@ -39,12 +39,21 @@
 | Should `v2` and legacy share API schema files? | No; `v2` owns independent contracts. | user+agent | resolved |
 | Should docs present legacy or `v2` as active architecture target? | `v2` once stage 4 gates pass. | user+agent | resolved |
 
+## Specification Dependencies
+
+- API/protocol contract source of truth:
+  - `docs/plans/2026-02-14-v2-cp3-api-protocol-spec.md`
+- Gate consistency source of truth:
+  - `docs/plans/2026-02-14-v2-implementation-test-matrix.md`
+
 ### Task 1: Add failing `v2` integration and protocol tests
 
 Files:
 - Create: `v2/crates/v2-server/tests/lifecycle.rs`
 - Create: `v2/crates/v2-server/tests/payloads.rs`
+- Create: `v2/crates/v2-server/tests/ws_stream.rs`
 - Create: `v2/crates/v2-cli/tests/ablation.rs`
+- Create: `v2/crates/v2-cli/tests/run_output.rs`
 - Create: `v2/web/src/protocol.test.ts`
 
 Steps:
@@ -59,6 +68,7 @@ Files:
 - Create: `v2/crates/v2-server/src/main.rs`
 - Create: `v2/crates/v2-server/src/api.rs`
 - Create: `v2/crates/v2-server/src/state.rs`
+- Create: `v2/crates/v2-server/src/ws.rs`
 
 Steps:
 1. Implement startup/start/pause/step/status/snapshot endpoints.
@@ -70,6 +80,7 @@ Steps:
 Files:
 - Create: `v2/crates/v2-cli/src/main.rs`
 - Create: `v2/crates/v2-cli/src/ablation.rs`
+- Create: `v2/crates/v2-cli/src/output.rs`
 
 Steps:
 1. Implement run loop and periodic stats reporting.
@@ -103,6 +114,7 @@ Required before starting:
 Required before task 4:
 1. Server and CLI integration tests pass.
 2. Web protocol tests pass against fixture payloads.
+3. Protocol version is stable across server/cli/web fixtures.
 
 Stop conditions:
 1. Repeated contract drift between server and web.
@@ -125,7 +137,8 @@ Go / stop rule:
 2. `cd v2 && cargo fmt --all --check`
 3. `cd v2 && cargo clippy --workspace --all-targets -- -D warnings`
 4. `cd v2 && cargo test --workspace`
-5. `cd v2/web && npm run build`
+5. `cd v2/web && npm run test`
+6. `cd v2/web && npm run build`
 
 ## Risks and Rollback
 

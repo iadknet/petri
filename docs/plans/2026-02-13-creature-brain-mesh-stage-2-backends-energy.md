@@ -5,7 +5,7 @@
 **Goal:** Complete checkpoint `CP-1` by delivering an integrated `v2-core` runtime executor that combines FIFO routing, backend execution, and energy-bounded halt semantics.
 **Goal IDs:** GP-01, GP-03, GP-04
 **Scope:** `v2-core` runtime schema/queue/energy/backend integration and tests; excludes mutation/ecology and product-surface protocol/UI work.
-**Docs Impact:** Update stage-2 execution around checkpoint slices and align file targets with the current `v2-core` layout.
+**Docs Impact:** Update stage-2 execution around checkpoint slices and align file targets with the current `v2-core` layout; consume CP-1 runtime spec and shared test matrix.
 **Supersedes:** none
 **Superseded-By:** none
 
@@ -36,6 +36,13 @@
 | Should Stage 2 be tracked as one monolithic block? | No; use slice checkpoints (`CP-1A`..`CP-1D`). | user+agent | resolved |
 | Should dispatch limits exist separate from energy in v1? | No; energy is the execution budget. | user+agent | resolved |
 | Should first valid world action halt queue execution immediately? | Yes. | user+agent | resolved |
+
+## Specification Dependencies
+
+- Runtime semantics source of truth:
+  - `docs/plans/2026-02-14-v2-cp1-runtime-execution-spec.md`
+- Gate consistency source of truth:
+  - `docs/plans/2026-02-14-v2-implementation-test-matrix.md`
 
 ## Slice Checkpoints
 
@@ -85,6 +92,7 @@ Steps:
 2. Implement runtime executor that composes queue dispatch + backend execution + action commit halt.
 3. Ensure immediate death/exhaustion semantics are represented in runtime outcomes.
 4. Keep runtime deterministic for fixture-based tests.
+5. Align runtime outcomes with CP-1 spec contract types.
 
 Exit gate:
 1. Runtime integration tests pass with first-action halt and energy-exhaustion behavior verified.
@@ -124,7 +132,8 @@ Go / stop rule:
 2. `cd v2 && cargo test -p v2-core --test mesh_kernel`
 3. `cd v2 && cargo test -p v2-core --test mesh_energy`
 4. `cd v2 && cargo test -p v2-core --test mesh_backends`
-5. `cd v2 && cargo test -p v2-core`
+5. `cd v2 && cargo test -p v2-core --test mesh_runtime`
+6. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 

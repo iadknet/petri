@@ -43,6 +43,17 @@
 | `CP-2 Evolution + Ecology` | `docs/plans/2026-02-13-creature-brain-mesh-stage-3-evolution-ecology.md` | pending | `CP-1` complete and semantics frozen | Mutation invariants and non-collapse ecology checks green |
 | `CP-3 Product Surface + Stabilization` | `docs/plans/2026-02-13-creature-brain-mesh-stage-4-cutover.md` | pending | `CP-2` complete | `v2-server/cli/web` integration gates and docs rebaseline green |
 
+## Checkpoint Specs
+
+| checkpoint | implementation spec |
+| --- | --- |
+| `CP-1 Runtime Kernel` | `docs/plans/2026-02-14-v2-cp1-runtime-execution-spec.md` |
+| `CP-2 Evolution + Ecology` | `docs/plans/2026-02-14-v2-cp2-evolution-ecology-spec.md` |
+| `CP-3 Product Surface + Stabilization` | `docs/plans/2026-02-14-v2-cp3-api-protocol-spec.md` |
+
+Shared test gate spec:
+- `docs/plans/2026-02-14-v2-implementation-test-matrix.md`
+
 ## Task List
 
 ### Task 1: Program plan alignment
@@ -65,7 +76,20 @@ Steps:
 2. Mark already completed slices and define remaining slice entry/exit gates.
 3. Align file targets with current `v2-core` layout.
 
-### Task 3: Retire stale active plan
+### Task 3: Add per-checkpoint implementation specs
+
+Files:
+- Create: `docs/plans/2026-02-14-v2-cp1-runtime-execution-spec.md`
+- Create: `docs/plans/2026-02-14-v2-cp2-evolution-ecology-spec.md`
+- Create: `docs/plans/2026-02-14-v2-cp3-api-protocol-spec.md`
+- Create: `docs/plans/2026-02-14-v2-implementation-test-matrix.md`
+
+Steps:
+1. Define runtime, evolution/ecology, and API/protocol contracts at implementation detail level.
+2. Define a shared verification matrix used by all checkpoint plans.
+3. Update stage plans to reference these specs.
+
+### Task 4: Retire stale active plan
 
 Files:
 - Move: `docs/plans/2026-02-13-phenotype-rgb-evolution.md`

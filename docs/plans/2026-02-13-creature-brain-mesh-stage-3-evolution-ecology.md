@@ -5,7 +5,7 @@
 **Goal:** Implement strong asexual mutation and ecology pressure systems in `v2-core` to drive emergent novelty without explicit novelty rewards.
 **Goal IDs:** GP-01, GP-03, GP-04
 **Scope:** `v2-core` mutation operators, reproduction flow, and ecology dynamics; excludes final server/web protocol/UI rollout.
-**Docs Impact:** Update stage plan to reflect greenfield mutation/ecology build path.
+**Docs Impact:** Update stage plan to reflect greenfield mutation/ecology build path; consume CP-2 evolution/ecology spec and shared test matrix.
 **Supersedes:** none
 **Superseded-By:** none
 
@@ -37,10 +37,18 @@
 | Should sexual recombination be in scope? | No, asexual only. | user+agent | resolved |
 | Should node and subgraph duplication be mandatory operators? | Yes. | user+agent | resolved |
 
+## Specification Dependencies
+
+- Evolution/ecology semantics source of truth:
+  - `docs/plans/2026-02-14-v2-cp2-evolution-ecology-spec.md`
+- Gate consistency source of truth:
+  - `docs/plans/2026-02-14-v2-implementation-test-matrix.md`
+
 ### Task 1: Add failing mutation invariant tests
 
 Files:
 - Create: `v2/crates/v2-core/tests/mutation_invariants.rs`
+- Create: `v2/crates/v2-core/tests/mutation_repair.rs`
 
 Steps:
 1. Add failing tests for add/remove/retarget operators.
@@ -51,6 +59,7 @@ Steps:
 
 Files:
 - Create: `v2/crates/v2-core/src/evolution/mod.rs`
+- Create: `v2/crates/v2-core/src/evolution/config.rs`
 - Create: `v2/crates/v2-core/src/evolution/operators.rs`
 - Create: `v2/crates/v2-core/src/evolution/validation.rs`
 
@@ -63,6 +72,7 @@ Steps:
 
 Files:
 - Create: `v2/crates/v2-core/tests/ecology_pressures.rs`
+- Create: `v2/crates/v2-core/tests/ecology_noncollapse.rs`
 
 Steps:
 1. Add failing tests for heterogeneity/scarcity gradient effects.
@@ -73,7 +83,8 @@ Steps:
 
 Files:
 - Create: `v2/crates/v2-core/src/ecology/mod.rs`
-- Create: `v2/crates/v2-core/src/ecology/food.rs`
+- Create: `v2/crates/v2-core/src/ecology/config.rs`
+- Create: `v2/crates/v2-core/src/ecology/regimes.rs`
 - Create: `v2/crates/v2-core/src/telemetry.rs`
 
 Steps:
@@ -94,6 +105,7 @@ Required before starting:
 Required before task 4:
 1. Mutation invariant tests pass.
 2. Ecology tests fail first, then pass with implementation.
+3. Mutation defaults/weights are implemented as specified.
 
 Stop conditions:
 1. Mutation operators repeatedly produce invalid genomes.
@@ -114,8 +126,10 @@ Go / stop rule:
 
 1. `scripts/check-plan-harness.sh --mode strict`
 2. `cd v2 && cargo test -p v2-core mutation_invariants`
-3. `cd v2 && cargo test -p v2-core ecology_pressures`
-4. `cd v2 && cargo test -p v2-core`
+3. `cd v2 && cargo test -p v2-core mutation_repair`
+4. `cd v2 && cargo test -p v2-core ecology_pressures`
+5. `cd v2 && cargo test -p v2-core ecology_noncollapse`
+6. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 

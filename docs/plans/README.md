@@ -58,3 +58,4 @@ This keeps plan output aligned with docs and plan harness checks and avoids sile
 - Active plans in `docs/plans/` should reflect the current product direction.
 - When strategy changes (for example, a greenfield reset), move stale plans to `docs/plans/archive/`.
 - Prefer replacing one large plan with stage/checkpoint plans so ownership and go/stop boundaries are explicit.
+- For multi-checkpoint programs, maintain one shared verification matrix plan and reference it from each stage.
