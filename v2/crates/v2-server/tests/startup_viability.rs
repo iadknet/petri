@@ -67,3 +67,24 @@ fn startup_viability_is_deterministic_for_same_request() {
             .map(|creature| creature.phenotype_rgb)
     );
 }
+
+#[test]
+fn startup_non_viable_inputs_normalize_to_deterministic_viable_baseline() {
+    let mut api = SimulationApi::new();
+    api.startup(non_viable_request());
+
+    let frame = api.frame();
+    assert_eq!(frame.width, 1);
+    assert_eq!(frame.height, 1);
+    assert_eq!(frame.tick, 0);
+
+    assert_eq!(frame.creatures.len(), 1);
+    let founder = &frame.creatures[0];
+    assert_eq!(founder.id, 1);
+    assert_eq!(founder.x, 0);
+    assert_eq!(founder.y, 0);
+
+    assert_eq!(frame.food.len(), 1);
+    assert_eq!(frame.food[0].x, 0);
+    assert_eq!(frame.food[0].y, 0);
+}
