@@ -41,7 +41,7 @@
 | `CP-0 Greenfield Bootstrap` | `docs/plans/2026-02-13-creature-brain-mesh-stage-1-runtime-kernel.md` | complete | Program doc declares greenfield isolation and copy-only policy | `v2` skeleton compiles/builds and boundary docs exist |
 | `CP-1 Runtime Kernel` | `docs/plans/2026-02-13-creature-brain-mesh-stage-2-backends-energy.md` | in progress | `CP-0` complete | Queue + energy + backend integration tests green |
 | `CP-2 Evolution + Ecology` | `docs/plans/2026-02-13-creature-brain-mesh-stage-3-evolution-ecology.md` | pending | `CP-1` complete and semantics frozen | Mutation invariants and non-collapse ecology checks green |
-| `CP-3 Product Surface + Stabilization` | `docs/plans/2026-02-13-creature-brain-mesh-stage-4-cutover.md` | pending | `CP-2` complete | `v2-server/cli/web` integration gates and docs rebaseline green |
+| `CP-3 Product Surface + Stabilization` | `docs/plans/2026-02-13-creature-brain-mesh-stage-4-cutover.md` | in progress | `CP-2` complete | `v2-server/cli/web` integration gates and docs rebaseline green |
 
 ## Checkpoint Specs
 

@@ -1,82 +1,47 @@
-# Petri — Technology Stack Review (Rebaselined)
+# Petri — V2 Technology Review
 
 ## Scope
 
-This document reflects the **actual** repository state and near-term planned direction.
-It replaces older assumptions that are no longer valid.
+This review reflects the active `v2/` implementation stack and immediate checkpoint needs.
+Legacy stack details are historical reference and not the active target for this phase.
 
-## Current Workspace Dependencies
+## V2 Runtime Stack (Current)
 
-Source of truth: workspace `Cargo.toml` and crate `Cargo.toml` files.
+Rust workspace:
+- `v2-core`
+- `v2-server`
+- `v2-cli`
 
-### Rust Workspace Dependencies (Current)
+Core dependency posture:
+- `v2-core`: std-only runtime primitives at current checkpoint baseline.
+- `v2-server`: `serde`, `serde_json`, `sha2`, `hex`, `v2-core`.
+- `v2-cli`: `serde`, `serde_json`, `v2-core`.
 
-- `serde`
-- `rand` (with `small_rng`)
-- `slotmap`
-- `anyhow`
-- `axum`
-- `tokio`
-- `rmp-serde`
-- `tracing`, `tracing-subscriber`
-- `clap`
-- `futures-util`
-- `tower`, `tower-http`
-- `serde_json`
+## V2 Web Stack (Current)
 
-### Crate-Level Reality (Current)
+- React 18
+- TypeScript 5
+- Vite 6
+- Vitest 3 (unit/integration protocol tests)
+- Playwright (CP-3 gate smoke coverage)
 
-- `petri-graph`: `serde`, `rand`
-- `petri-core`: `rand`, `serde`, `slotmap`, `petri-graph`
-- `petri-server`: `axum`/`tokio` stack plus transport/logging utilities and `petri-core`
-- `petri-cli`: `clap`, `petri-core`
+## Contract and Tooling Posture
 
-## Removed/Rejected Historical Assumptions
+- Server and CLI serialize explicit `v2alpha1` payloads.
+- Web consumption is model/decoder-driven, fixture-backed.
+- Verification gates are checkpoint-owned via:
+  - `docs/plans/2026-02-14-v2-implementation-test-matrix.md`
 
-The following assumptions should no longer appear in active architecture decisions unless intentionally reintroduced:
+## Rejected Assumptions for This Phase
 
-- `petri-genome` crate exists in workspace.
-- `petgraph` is currently used as graph storage.
-- `rayon` is currently active for simulation parallelism.
+- No requirement to maintain legacy API backward compatibility.
+- No requirement for snapshot export/import in `v2alpha1`.
+- No requirement for full-run deterministic replay as a product contract.
 
-None of the above are true in the current repository state.
+## Dependency Selection Rules
 
-## Frontend Stack (Current)
-
-- React + TypeScript + Vite
-- MessagePack decode path in client protocol layer
-- Canvas-based world rendering and inspector-centric workflows
-
-## Cognition-First Refactor: Technology Impact
-
-### Implemented Impact
-
-- No mandatory new third-party dependencies are required for the refactor design itself.
-- Primary changes are semantic and structural in existing crates (`petri-core`, `petri-graph`, server/web contract types).
-
-### Implemented Runtime Semantics
-
-- Energy-bounded internal think loop per tick.
-- `halt` and `no_op` controller outputs.
-- Single world interaction max per tick.
-- Confidence introspection channels in controller inputs.
-
-## Metrics and Performance Posture During Refactor
-
-- Keep benchmark tooling (`stage1_benchmark`) active.
-- Treat throughput as informational while post-refactor stabilization and profiling continue.
-- Prefer correctness/observability gates first, then tighten performance thresholds afterward.
-
-## Selection Criteria Going Forward
-
-When adding/changing dependencies, require all of:
-- direct need not solvable cleanly in current stack
-- maintained crate/project with active releases
-- clear boundary ownership (core vs transport vs tooling)
-- testability and deterministic replay impact documented
-
-## Short-Term Recommendations
-
-1. Maintain dependency minimization during docs/rebaseline and semantics refactor phases.
-2. Delay new infrastructure dependencies until current cognition behavior is profiled and bottlenecks are clear.
-3. Keep architecture docs and roadmap synchronized to prevent future drift.
+When adding dependencies in this phase, require:
+1. clear checkpoint-scoped need;
+2. explicit boundary ownership (`v2-core` vs `v2-server` vs `v2-cli` vs `v2-web`);
+3. deterministic testability impact documented;
+4. minimal overlap with existing stack.
