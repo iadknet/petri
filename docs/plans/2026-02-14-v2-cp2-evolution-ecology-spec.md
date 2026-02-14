@@ -217,6 +217,21 @@ Telemetry window contract:
 - at least one successful birth occurs during run
 - mean population across final `400` ticks is `>= ceil(baseline_population * 0.10)`
 
+### Standard startup viability gate (`startup_viability_gate`)
+
+1. A reusable viability gate helper must probe a deterministic short-horizon run before startup acceptance/fallback decisions.
+2. Gate parameters:
+- `probe_ticks` (default `100`)
+- `min_final_window_ratio` (default `0.10`)
+- `require_births` (toggle; enabled for strict test gate scenarios)
+3. Gate output includes:
+- `viable`
+- `baseline_population`
+- `births_total`
+- `final_window_mean_population`
+- `threshold_population`
+4. Strict gate scenario (`require_births=true`) must flag birthless low-population probes as non-viable.
+
 ## Task List
 
 ### Task 1: Add failing mutation invariant and repair tests
@@ -226,6 +241,7 @@ Files:
 - Create: `v2/crates/v2-core/tests/mutation_repair.rs`
 - Create: `v2/crates/v2-core/tests/reproduction_memory_inheritance.rs`
 - Create: `v2/crates/v2-core/tests/phenotype_evolution.rs`
+- Create: `v2/crates/v2-core/tests/startup_viability_gate.rs`
 
 Steps:
 1. Add failing tests for each required operator.
@@ -266,6 +282,7 @@ Files:
 - Create: `v2/crates/v2-core/src/ecology/mod.rs`
 - Create: `v2/crates/v2-core/src/ecology/config.rs`
 - Create: `v2/crates/v2-core/src/ecology/regimes.rs`
+- Create: `v2/crates/v2-core/src/viability.rs`
 - Create: `v2/crates/v2-core/src/telemetry.rs`
 
 Steps:

@@ -6,6 +6,8 @@ pub mod mesh;
 pub mod phenotype;
 pub mod runtime;
 pub mod telemetry;
+pub mod viability;
+pub mod world_seed;
 
 pub const V2_RUNTIME_NAME: &str = "petri-v2";
 
