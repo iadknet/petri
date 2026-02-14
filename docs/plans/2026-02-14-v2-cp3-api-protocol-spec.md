@@ -33,9 +33,11 @@
 | question | decision | owner | status |
 | --- | --- | --- | --- |
 | Should `v2` payloads be backward compatible with legacy API? | No. | user+agent | resolved |
-| Should status and frame data be separate endpoints? | Yes, status via HTTP and frames via WebSocket stream + optional HTTP snapshot endpoint. | user+agent | resolved |
+| Should status and frame data be separate endpoints? | Yes, status via HTTP and frames via WebSocket stream. | user+agent | resolved |
 | Should CLI output be text-only? | No, use line-delimited JSON for stable parsing. | user+agent | resolved |
-| Should lifecycle endpoints be strict or idempotent on repeated calls? | Idempotent for `start`/`pause`; state-restricted for `step` and snapshot import. | user+agent | resolved |
+| Should lifecycle endpoints be strict or idempotent on repeated calls? | Idempotent for `start`/`pause`; state-restricted for `step`. | user+agent | resolved |
+| Should status window counters share CP-2 telemetry semantics? | Yes; status counters use trailing `health_window_ticks` from CP-2 ecology config. | user+agent | resolved |
+| Should snapshot import/export endpoints be required in initial `v2`? | No; snapshot endpoints are out of scope for `v2alpha1` unless re-planned. | user+agent | resolved |
 
 ## Protocol Versioning
 
@@ -97,11 +99,15 @@ Response:
 - `state: "idle" | "running" | "paused"`
 - `tick: u64`
 - `sensor_radius: u16`
+- `health_window_ticks: u16`
 - `population: u32`
 - `mean_energy: f32`
 - `births_last_window: u32`
 - `deaths_last_window: u32`
 - `last_action_counts: { move: u32, eat: u32, reproduce: u32, inventory_pickup: u32, inventory_put: u32, noop: u32 }`
+
+Rules:
+- `births_last_window` and `deaths_last_window` use CP-2 telemetry window semantics (`health_window_ticks`, trailing right-aligned window).
 
 ### `GET /v2/simulation/frame`
 
@@ -114,40 +120,21 @@ Response:
 - `food: [{ x: u16, y: u16, density: u8 }]`
 - `barriers: [{ x: u16, y: u16 }]`
 
-### `GET /v2/simulation/snapshot`
-
-Response:
-- `protocol_version`
-- `snapshot_format: "v2alpha1"`
-- `tick: u64`
-- `world_state: object`
-- `creatures: [{ ..., memory_b64: string }]` (`memory_b64` encodes fixed `1024` bytes per creature)
-
-### `POST /v2/simulation/snapshot`
-
-Request:
-- snapshot payload matching `GET` response
-
-Response:
-- `protocol_version`
-- `accepted: bool`
-- `state: "paused"`
-- `tick: u64`
-
-Rules:
-- endpoint requires `state="paused"`; other states return `409`
-- schema/validation failure returns `422` error envelope and does not modify world state
+Snapshot endpoints policy (`v2alpha1`):
+1. `GET /v2/simulation/snapshot` is out of scope.
+2. `POST /v2/simulation/snapshot` is out of scope.
+3. Snapshot contracts may be added in a follow-up checkpoint/plan if needed.
 
 ### HTTP error envelope (normative)
 
 All non-2xx responses must use:
 - `protocol_version: "v2alpha1"`
-- `error: { code: string, message: string, details?: object }`
+- `error: { code: string, message: string, details?: { endpoint?: string, field_errors?: [{ field: string, reason: string }], expected_state?: "idle" | "running" | "paused", current_state?: "idle" | "running" | "paused" } }`
 
 Required error codes:
 - `invalid_request` (`400`)
 - `invalid_state_transition` (`409`)
-- `snapshot_rejected` (`422`)
+- `validation_rejected` (`422`)
 - `internal_error` (`500`)
 
 ### Lifecycle transition contract
@@ -176,7 +163,7 @@ Event envelope:
 - `protocol_version: "v2alpha1"`
 - `event: "status" | "frame" | "health"`
 - `tick: u64`
-- `payload: object`
+- `payload: StatusPayload | FramePayload | HealthPayload`
 
 Event payloads:
 1. `status` payload uses `GET /simulation/status` schema.
@@ -186,6 +173,12 @@ Event payloads:
 - `genome_node_count_p50: u16`
 - `genome_node_count_p90: u16`
 - `mean_energy: f32`
+
+Payload mapping rule:
+1. `event="status"` must carry `StatusPayload`.
+2. `event="frame"` must carry `FramePayload`.
+3. `event="health"` must carry `HealthPayload`.
+4. Any event/payload mismatch is protocol-invalid and must fail fixture/parser tests.
 
 Ordering requirements:
 1. `tick` is monotonic non-decreasing per connection.
@@ -230,6 +223,7 @@ Steps:
 2. Add fixture-based parser tests in web client.
 3. Add CLI NDJSON schema tests.
 4. Add failing tests for HTTP error envelope/status-code mapping and lifecycle transition rules.
+5. Add failing tests for event/payload mismatch rejection and snapshot-endpoint absence in `v2alpha1`.
 
 ### Task 2: Implement server lifecycle and streaming endpoints
 

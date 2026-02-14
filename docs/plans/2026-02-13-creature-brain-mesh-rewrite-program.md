@@ -37,6 +37,18 @@
 | Should the rewrite continue as in-place refactor work? | No; all implementation stays greenfield under `v2/`. | user+agent | resolved |
 | Should we optimize for checkpoint boundaries over monolithic plans? | Yes; stage work is broken into checkpoint slices with go/stop rules. | user+agent | resolved |
 | Should stale legacy-oriented active plans remain in `docs/plans/`? | No; move stale plans into `docs/plans/archive/`. | user+agent | resolved |
+| Should `v2` support snapshot export/import capability in the initial rewrite phase? | No; snapshotting is out of scope unless explicitly added in a follow-up plan. | user+agent | resolved |
+| Is full-run deterministic replay a product requirement? | No; determinism is scoped to runtime ordering correctness and deterministic tests/fixtures. | user+agent | resolved |
+
+## Policy Clarifications
+
+1. Snapshot policy:
+- Snapshot export/import is out of scope for the initial `v2` rewrite phase.
+- Legacy snapshot compatibility is also out of scope unless explicitly re-planned.
+2. Determinism policy:
+- Runtime ordering semantics are deterministic where specified (for correctness and debuggability).
+- Deterministic fixtures/seeds are required for checkpoint tests.
+- Full-run deterministic replay is not a product requirement for this rewrite phase.
 
 ## Checkpoint Authority
 
