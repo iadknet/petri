@@ -224,7 +224,7 @@ impl SimulationState {
             self.tick = self.tick.saturating_add(1);
             self.grow_food_for_tick();
         }
-        self.last_action_counts = action_counts_for_tick(self.tick);
+        self.last_action_counts = ActionCounts::default();
         self.refresh_health_from_core();
     }
 
@@ -368,17 +368,6 @@ fn sanitize_startup_request(mut startup: StartupRequest) -> StartupRequest {
         .max(1)
         .min(startup.population.max_creatures);
     startup
-}
-
-fn action_counts_for_tick(tick: u64) -> ActionCounts {
-    ActionCounts {
-        r#move: ((tick + 1) % 9) as u32,
-        eat: ((tick + 2) % 7) as u32,
-        reproduce: ((tick + 3) % 5) as u32,
-        inventory_pickup: ((tick + 4) % 4) as u32,
-        inventory_put: ((tick + 5) % 4) as u32,
-        noop: ((tick + 6) % 6) as u32,
-    }
 }
 
 #[derive(Clone, Debug)]

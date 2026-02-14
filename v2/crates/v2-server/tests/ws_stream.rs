@@ -76,3 +76,21 @@ fn event_payload_mismatch_is_rejected() {
     corrupted.event = "frame".to_string();
     assert!(validate_event_payload_shape(&corrupted).is_err());
 }
+
+#[test]
+fn ws_events_reflect_running_tick_updates() {
+    let mut api = SimulationApi::new();
+    api.startup(startup_request());
+    api.start().expect("start");
+    assert!(api.tick_running());
+    assert!(api.tick_running());
+
+    let status = api.status();
+    let frame = api.frame();
+    let events = ws_events_for_tick(&status, &frame, None);
+
+    assert_eq!(status.tick, 2);
+    assert_eq!(frame.tick, status.tick);
+    assert_eq!(events.len(), 2);
+    assert!(events.iter().all(|event| event.tick == status.tick));
+}
