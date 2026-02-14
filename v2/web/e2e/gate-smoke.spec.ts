@@ -1,10 +1,18 @@
 import { expect, test } from "@playwright/test";
 
 test("desktop shell startup/runtime/paint flow", async ({ page }) => {
+  let pageOrigin = "";
+  const simulationRequestOrigins = new Set<string>();
+
   const consoleErrors: string[] = [];
   page.on("console", (message) => {
     if (message.type() === "error") {
       consoleErrors.push(message.text());
+    }
+  });
+  page.on("request", (request) => {
+    if (request.url().includes("/v2/simulation/")) {
+      simulationRequestOrigins.add(new URL(request.url()).origin);
     }
   });
   page.on("pageerror", (error) => {
@@ -12,6 +20,7 @@ test("desktop shell startup/runtime/paint flow", async ({ page }) => {
   });
 
   await page.goto("/");
+  pageOrigin = new URL(page.url()).origin;
 
   await expect(page.getByRole("heading", { name: "Petri V2 Control Surface" })).toBeVisible();
 
@@ -31,5 +40,8 @@ test("desktop shell startup/runtime/paint flow", async ({ page }) => {
   await page.locator("[data-testid='viewport-canvas']").click({ position: { x: 32, y: 32 } });
 
   await expect(page.getByText("Paint last touched cells:")).toBeVisible();
+  expect(simulationRequestOrigins.size).toBeGreaterThan(0);
+  expect([...simulationRequestOrigins]).toContain("http://127.0.0.1:4180");
+  expect(simulationRequestOrigins.has(pageOrigin)).toBe(false);
   expect(consoleErrors).toEqual([]);
 });

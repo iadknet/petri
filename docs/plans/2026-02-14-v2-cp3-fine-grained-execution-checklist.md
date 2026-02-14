@@ -220,11 +220,11 @@
 - Modify: `v2/crates/v2-server/tests/http_transport.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing e2e/CORS checks for explicit cross-origin server/browser communication.
-- [ ] Run: `cd v2/web && npm run test:e2e` and confirm failure is expected.
-- [ ] Implement minimal CORS/test harness fix.
-- [ ] Re-run e2e and confirm pass.
-- [ ] Commit slice `P3-F6`.
+- [x] Add/adjust regression e2e/CORS checks for explicit cross-origin server/browser communication.
+- [x] Run: `cd v2/web && npm run test:e2e` and confirm behavior gate coverage.
+- [x] Implement minimal CORS/test harness fix.
+- [x] Re-run e2e and confirm pass.
+- [x] Commit slice `P3-F6`.
 
 ### Slice P3-F7: Visual polish with functional regression protection
 
