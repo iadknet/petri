@@ -81,11 +81,11 @@
 - Modify: `v2/crates/v2-core/tests/mutation_invariants.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing tests for node duplication and bounded subgraph duplication behavior.
-- [ ] Run: `cd v2 && cargo test -p v2-core --test mutation_invariants` and confirm failure is expected.
-- [ ] Implement minimal duplication/remap fix.
-- [ ] Re-run targeted test and confirm pass.
-- [ ] Commit slice `E3`.
+- [x] Add/adjust regression tests for node duplication and bounded subgraph duplication behavior.
+- [x] Run: `cd v2 && cargo test -p v2-core --test mutation_invariants` and confirm duplication/remap behavior coverage.
+- [x] Verify duplication implementations honor output clone/remap semantics and subgraph node-budget bounds.
+- [x] Re-run targeted test and confirm pass.
+- [x] Commit slice `E3`.
 
 ### Slice E4: Repair/discard pipeline invariants
 

@@ -280,6 +280,59 @@ fn node_duplication_clones_outputs_by_default() {
 }
 
 #[test]
+fn node_duplication_can_remap_self_target_to_duplicate() {
+    let mut genome = CreatureGenome {
+        entry_node_id: 1,
+        nodes: vec![NodeGenome {
+            node_id: 1,
+            node_type: NodeType::Graph,
+            backend_def: BackendDef::Graph(GraphBackendDef {
+                operator: GraphOperator::Passthrough,
+                inputs: Vec::new(),
+                coefficients: Vec::new(),
+                bias: 0.0,
+                state_slot_count: 0,
+            }),
+            output_definitions: vec![OutputDefinition::InternalTarget(InternalTargetDef {
+                target_node_id: 1,
+                input_refs: Vec::new(),
+                payload_fields: Vec::new(),
+            })],
+            local_state_init: Vec::new(),
+        }],
+        evolution_params: None,
+    };
+    let mut config = MutationConfig::default();
+    config.node_duplication_clone_outputs_probability = 1.0;
+    config.node_duplication_target_remap_probability = 1.0;
+
+    let changed = apply_operator(
+        &mut genome,
+        &config,
+        MutationOperatorKind::NodeDuplication,
+        11,
+    );
+    assert!(changed);
+    assert_eq!(genome.nodes.len(), 2);
+
+    let duplicated = genome
+        .nodes
+        .iter()
+        .find(|node| node.node_id != 1)
+        .expect("duplicated node should exist");
+    let OutputDefinition::InternalTarget(target) = duplicated
+        .output_definitions
+        .first()
+        .expect("duplicated output")
+    else {
+        panic!("expected duplicated internal target");
+    };
+    assert_eq!(target.target_node_id, duplicated.node_id);
+
+    validate_mutation_invariants(&genome, &config).expect("duplicated genome remains valid");
+}
+
+#[test]
 fn subgraph_duplication_preserves_external_edges_by_default() {
     let mut genome = baseline_genome();
     let config = MutationConfig::default();
@@ -310,4 +363,50 @@ fn subgraph_duplication_preserves_external_edges_by_default() {
 
     assert_eq!(external_before, external_after);
     validate_mutation_invariants(&genome, &config).expect("subgraph duplication remains valid");
+}
+
+#[test]
+fn subgraph_duplication_respects_budget_and_remaps_internal_edges() {
+    let mut genome = baseline_genome();
+    let mut config = MutationConfig::default();
+    config.max_subgraph_duplication_nodes = 2;
+
+    let before_len = genome.nodes.len();
+    let changed = apply_operator(
+        &mut genome,
+        &config,
+        MutationOperatorKind::SubgraphDuplication,
+        7,
+    );
+    assert!(changed);
+    assert_eq!(genome.nodes.len(), before_len + 2);
+
+    let clone_entry = genome
+        .nodes
+        .iter()
+        .find(|node| node.node_id == 4)
+        .expect("entry clone should exist");
+    let clone_second = genome
+        .nodes
+        .iter()
+        .find(|node| node.node_id == 5)
+        .expect("second clone should exist");
+
+    let entry_has_remapped_target = clone_entry.output_definitions.iter().any(|output| {
+        matches!(
+            output,
+            OutputDefinition::InternalTarget(InternalTargetDef { target_node_id: 5, .. })
+        )
+    });
+    let second_has_remapped_target = clone_second.output_definitions.iter().any(|output| {
+        matches!(
+            output,
+            OutputDefinition::InternalTarget(InternalTargetDef { target_node_id: 4, .. })
+        )
+    });
+    assert!(entry_has_remapped_target);
+    assert!(second_has_remapped_target);
+
+    validate_mutation_invariants(&genome, &config)
+        .expect("bounded subgraph duplication remains valid");
 }
