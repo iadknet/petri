@@ -85,12 +85,12 @@
 - Modify: `v2/crates/v2-core/tests/mesh_backends.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing tests for runtime-owned ledger application and backend compute metadata usage.
-- [ ] Run: `cd v2 && cargo test -p v2-core --test mesh_energy` and confirm failure is expected.
-- [ ] Implement minimal runtime/backends contract change.
-- [ ] Re-run: `cd v2 && cargo test -p v2-core --test mesh_energy`.
-- [ ] Re-run: `cd v2 && cargo test -p v2-core --test mesh_backends`.
-- [ ] Commit slice `K3`.
+- [x] Verify tests cover runtime-owned ledger application and backend compute metadata usage.
+- [x] Run: `cd v2 && cargo test -p v2-core --test mesh_energy` and confirm behavior gate coverage.
+- [x] Verify runtime/backends contract implementation for energy ledger ownership and backend compute metering.
+- [x] Re-run: `cd v2 && cargo test -p v2-core --test mesh_energy`.
+- [x] Re-run: `cd v2 && cargo test -p v2-core --test mesh_backends`.
+- [x] Commit slice `K3`.
 
 ### Slice K4: Emitted output ordering and invalid metadata precedence
 
