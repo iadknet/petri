@@ -173,10 +173,10 @@
 - Modify: `docs/plans/2026-02-14-v2-checkpoint-boundaries.md`
 
 **Checklist:**
-- [ ] Run full CP-1 gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md`.
-- [ ] Record pass evidence in commit notes/body.
-- [ ] Update checkpoint status only if gate is fully green.
-- [ ] Commit slice `K9`.
+- [x] Run full CP-1 gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md`.
+- [x] Record pass evidence in commit notes/body.
+- [x] Update checkpoint status only if gate is fully green.
+- [x] Commit slice `K9`.
 
 ## Verification Commands
 

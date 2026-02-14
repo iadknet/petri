@@ -90,24 +90,19 @@ Exit evidence:
 2. VM backend is bounded by remaining energy and reports exhaustion.
 3. Graph backend supports stateful/aggregating operators with deterministic bounded behavior.
 
-### `CP-1D`: Integrated runtime executor (`pending`)
+### `CP-1D`: Integrated runtime executor (`complete`)
 
 Files:
 - Create: `v2/crates/v2-core/src/runtime.rs`
 - Modify: `v2/crates/v2-core/src/lib.rs`
 - Create: `v2/crates/v2-core/tests/mesh_runtime.rs`
 
-Steps:
-1. Write failing integration tests for full dispatch loop with energy charging order.
-2. Implement runtime executor that composes queue dispatch + backend execution + action commit halt, with runtime as sole energy-ledger writer.
-3. Ensure immediate death/exhaustion semantics are represented in runtime outcomes.
-4. Keep runtime deterministic for fixture-based tests.
-5. Align runtime outcomes with CP-1 spec contract types.
-6. Ensure VM input-read/output-write opcodes are wired end-to-end via runtime+backend contracts.
-7. Ensure `ReadInput` slot mapping/normalization and VM numeric determinism rules are covered by tests.
-8. Ensure graph operator richness (integrator/momentum/oscillator/pooling/adaptive gain) is covered by tests.
-9. Ensure full-radius sensor frame richness (food + creature metadata including phenotype) is covered by graph/VM query tests.
-10. Ensure `sensor_radius` is explicitly global and configurable with tests.
+Exit evidence:
+1. Runtime executor composes FIFO dispatch, backend execution, and energy charging with runtime-owned ledger accounting.
+2. Runtime outcomes and precedence rules are covered for commit/no-op/exhaustion/error paths, including emitted ordering and first-valid commit halt.
+3. VM hard faults map to `RuntimeError::VmFault`, soft `ReadInput` defaults are non-faulting, and graph state slots persist across runtime ticks.
+4. Global `sensor_radius >= 1` guard is enforced and fixture-locked.
+5. Full `CP-1` gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md` passed on 2026-02-14.
 
 Exit gate:
 1. Runtime integration tests pass with first-action halt and energy-exhaustion behavior verified.
@@ -125,13 +120,13 @@ Required:
 
 Required:
 1. `CP-1A`, `CP-1B`, and `CP-1C` complete.
-2. `CP-1D` tests exist and fail for expected reasons before implementation.
+2. `CP-1D` red-to-green execution history is captured in `docs/plans/2026-02-14-v2-cp1-fine-grained-execution-checklist.md`.
 
 Stop conditions:
 1. Runtime integration requires coupling to non-`v2-core` crates.
 2. Queue/energy semantics churn without test updates.
 
-### Exit Checkpoint (`S2-EXIT`): `pending`
+### Exit Checkpoint (`S2-EXIT`): `complete`
 
 Required:
 1. `CP-1D` complete.
