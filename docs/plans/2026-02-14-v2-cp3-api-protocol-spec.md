@@ -50,7 +50,7 @@ Base path: `/v2`
 
 Request:
 - `seed: u64`
-- `world: { width: u16, height: u16, wrap: bool }`
+- `world: { width: u16, height: u16, wrap: bool, sensor_radius: u16 }`
 - `population: { initial_creatures: u32, max_creatures: u32 }`
 - `runtime: { ticks_per_second: u16, max_tick_budget_ms: u16 }`
 
@@ -89,6 +89,7 @@ Response:
 - `protocol_version`
 - `state: "idle" | "running" | "paused"`
 - `tick: u64`
+- `sensor_radius: u16`
 - `population: u32`
 - `mean_energy: f32`
 - `births_last_window: u32`

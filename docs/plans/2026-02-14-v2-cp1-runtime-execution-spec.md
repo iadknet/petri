@@ -35,6 +35,7 @@
 | Should world-action arbitration pick highest confidence? | No; first valid emitted action commits immediately. | user+agent | resolved |
 | What halts execution when no action is emitted? | Queue drain returns implicit no-op outcome. | user+agent | resolved |
 | Should runtime expose full local sensor picture (food + creature metadata)? | Yes, via `SensorFrame` consumed by graph/VM sensor queries. | user+agent | resolved |
+| Is sensor radius globally configurable? | Yes, global `sensor_radius` in `RuntimeConfig` applies to all creatures. | user+agent | resolved |
 
 ## Specification Dependencies
 
@@ -51,6 +52,7 @@
 - `dispatch_entry_cost: f32`
 - `graph_base_tariff: f32`
 - `vm_opcode_cost_multiplier: f32`
+- `sensor_radius: u16` (global for world, applies to all creatures)
 - `action_costs: RuntimeActionCosts`
 
 2. `RuntimeActionCosts`

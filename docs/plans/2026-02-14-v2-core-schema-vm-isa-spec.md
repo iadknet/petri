@@ -151,17 +151,19 @@ Validation:
 1. Runtime builds a `SensorFrame` centered on the acting creature.
 2. Coverage includes all cells in Chebyshev radius `sensor_radius`:
 - `max(|dx|, |dy|) <= sensor_radius`
-3. For each visible relative cell `(dx, dy)`, frame stores:
+3. `sensor_radius` is a global runtime config value shared by all creatures.
+4. `sensor_radius` must be configured in `RuntimeConfig` and is not creature-specific in v1.
+5. For each visible relative cell `(dx, dy)`, frame stores:
 - `food_density_u8`
 - `barrier_flag`
 - `occupied_flag`
 - optional creature metadata (if creature present)
-4. Creature metadata channels include:
+6. Creature metadata channels include:
 - phenotype RGB (`u8` each)
 - energy (`f32`)
 - age ticks (`u64`)
 - generation (`u32`)
-5. `SensorFrame` supports full local visibility, not nearest-only summaries.
+7. `SensorFrame` supports full local visibility, not nearest-only summaries.
 
 Coordinate rules:
 1. `dx > 0` points east, `dx < 0` west.
