@@ -51,6 +51,8 @@
 | `CP-1 Runtime Kernel` (schema/ISA) | `docs/plans/2026-02-14-v2-core-schema-vm-isa-spec.md` |
 | `CP-2 Evolution + Ecology` | `docs/plans/2026-02-14-v2-cp2-evolution-ecology-spec.md` |
 | `CP-3 Product Surface + Stabilization` | `docs/plans/2026-02-14-v2-cp3-api-protocol-spec.md` |
+| `CP-3 Product Surface + Stabilization` (backend execution) | `docs/plans/2026-02-14-v2-cp3-backend-micro-implementation-plan.md` |
+| `CP-3 Product Surface + Stabilization` (frontend execution) | `docs/plans/2026-02-14-v2-cp3-frontend-micro-implementation-plan.md` |
 
 Shared test gate spec:
 - `docs/plans/2026-02-14-v2-implementation-test-matrix.md`

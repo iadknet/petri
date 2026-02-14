@@ -67,7 +67,8 @@ Implementation-spec dependencies:
 - `CP-2`: `docs/plans/2026-02-14-v2-cp2-evolution-ecology-spec.md`
 - `CP-3`: `docs/plans/2026-02-14-v2-cp3-api-protocol-spec.md`
 - `CP-3` frontend wireframes: `docs/plans/2026-02-14-v2-frontend-wireframe-spec.md`
-- `CP-3` frontend execution: `docs/plans/2026-02-14-v2-frontend-implementation-plan.md`
+- `CP-3` backend execution: `docs/plans/2026-02-14-v2-cp3-backend-micro-implementation-plan.md`
+- `CP-3` frontend execution: `docs/plans/2026-02-14-v2-cp3-frontend-micro-implementation-plan.md`
 - All checkpoints: `docs/plans/2026-02-14-v2-implementation-test-matrix.md`
 
 ## Current Status Snapshot

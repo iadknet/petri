@@ -41,6 +41,13 @@
 | Should `config_digest` be deterministic and algorithm-defined? | Yes; `v2alpha1` uses lowercase hex SHA-256 over canonical startup JSON. | user+agent | resolved |
 | Should CLI NDJSON event payload fields be explicitly fixed? | Yes; each event has required fields and canonical key ordering in this spec. | user+agent | resolved |
 
+## Execution Decomposition
+
+- CP-3 backend execution plan:
+  - `docs/plans/2026-02-14-v2-cp3-backend-micro-implementation-plan.md`
+- CP-3 frontend execution plan:
+  - `docs/plans/2026-02-14-v2-cp3-frontend-micro-implementation-plan.md`
+
 ## Protocol Versioning
 
 1. `protocol_version` is required in all top-level responses/events.
@@ -70,6 +77,7 @@ Rules:
 - `canonical_json` uses lexicographically sorted object keys and no insignificant whitespace.
 - `population.initial_creatures` is a requested target; actual seeded population is best-effort and bounded by occupancy and `max_creatures`.
 - first `status`/`frame` payloads after startup may report population lower than requested `initial_creatures`.
+- startup must enforce viability: if a request is below viable minimum bounds, server may normalize deterministically to a viable startup baseline; if viability still cannot be established, return a protocol-valid rejection (`422 validation_rejected`) instead of starting a dead-on-arrival run.
 
 ### `POST /v2/simulation/start`
 
@@ -150,6 +158,9 @@ Response:
 - `creatures: [{ id: u64, x: u16, y: u16, energy: f32, phenotype_rgb: [u8; 3] }]`
 - `food: [{ x: u16, y: u16, density: u8 }]`
 - `barriers: [{ x: u16, y: u16 }]`
+
+Rules:
+- Startup founders begin from one shared phenotype baseline; phenotype diversity is introduced by reproduction mutation, not startup randomization.
 
 Snapshot endpoints policy (`v2alpha1`):
 1. `GET /v2/simulation/snapshot` is out of scope.

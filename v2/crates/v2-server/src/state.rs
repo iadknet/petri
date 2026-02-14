@@ -165,6 +165,7 @@ impl SimulationState {
     }
 
     pub fn reset(&mut self, startup: StartupRequest, digest: String) {
+        let startup = sanitize_startup_request(startup);
         let world = WorldGrid::new(
             startup.world.width,
             startup.world.height,
@@ -219,6 +220,18 @@ impl SimulationState {
             SimulationPhase::Paused => "paused",
         }
     }
+}
+
+fn sanitize_startup_request(mut startup: StartupRequest) -> StartupRequest {
+    startup.world.width = startup.world.width.max(1);
+    startup.world.height = startup.world.height.max(1);
+    startup.population.max_creatures = startup.population.max_creatures.max(1);
+    startup.population.initial_creatures = startup
+        .population
+        .initial_creatures
+        .max(1)
+        .min(startup.population.max_creatures);
+    startup
 }
 
 fn action_counts_for_tick(tick: u64) -> ActionCounts {

@@ -5,7 +5,7 @@
 **Scope:** `v2/web` UI architecture and behavior plus `v2-server` paint/edit transport required by the UI; excludes snapshot import/export and legacy API compatibility.
 **Docs Impact:** Adds detailed frontend execution plan referenced by Stage 4; depends on frontend wireframe spec and CP-3 API contract.
 **Supersedes:** none
-**Superseded-By:** none
+**Superseded-By:** `docs/plans/2026-02-14-v2-cp3-frontend-micro-implementation-plan.md`
 
 ## Goal Alignment
 
