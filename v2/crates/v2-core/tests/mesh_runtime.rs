@@ -5,7 +5,7 @@ use v2_core::mesh::{
 };
 use v2_core::runtime::{
     RuntimeActionCosts, RuntimeConfig, RuntimeConfigError, RuntimeContext, RuntimeError,
-    RuntimeOutcome, SensorFrame, run_runtime_tick,
+    RuntimeOutcome, SensorFrame, VmFaultCode, run_runtime_tick,
 };
 
 fn runtime_config() -> RuntimeConfig {
@@ -315,6 +315,74 @@ fn first_valid_world_action_commits_and_halts_before_queued_dispatch() {
                 action.action_metadata_fields,
                 vec![ActionMetadataField::Direction(3)]
             );
+        }
+        other => panic!("unexpected outcome: {other:?}"),
+    }
+}
+
+#[test]
+fn hard_vm_fault_maps_to_runtime_vm_fault_error() {
+    let genome = CreatureGenome {
+        entry_node_id: 1,
+        nodes: vec![NodeGenome {
+            node_id: 1,
+            node_type: NodeType::Vm,
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                program: vec![VmInstruction::Move { dst: 3, src: 0 }],
+                constants: Vec::new(),
+                max_input_slots: 4,
+            }),
+            output_definitions: Vec::new(),
+            local_state_init: Vec::new(),
+        }],
+        evolution_params: None,
+    };
+
+    let mut context = runtime_context(10.0);
+    let outcome = run_runtime_tick(&genome, &mut context);
+    match outcome {
+        RuntimeOutcome::RuntimeError { error, dispatches } => {
+            assert_eq!(dispatches, 1);
+            assert!(matches!(
+                error,
+                RuntimeError::VmFault(VmFaultCode::InvalidRegisterIndex)
+            ));
+        }
+        other => panic!("unexpected outcome: {other:?}"),
+    }
+}
+
+#[test]
+fn read_input_out_of_range_defaults_to_zero_without_fault() {
+    let genome = CreatureGenome {
+        entry_node_id: 1,
+        nodes: vec![NodeGenome {
+            node_id: 1,
+            node_type: NodeType::Vm,
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                program: vec![
+                    VmInstruction::ReadInput {
+                        dst: 0,
+                        input_index: 99,
+                    },
+                    VmInstruction::Halt,
+                ],
+                constants: Vec::new(),
+                max_input_slots: 4,
+            }),
+            output_definitions: Vec::new(),
+            local_state_init: Vec::new(),
+        }],
+        evolution_params: None,
+    };
+
+    let mut context = runtime_context(10.0);
+    let outcome = run_runtime_tick(&genome, &mut context);
+    match outcome {
+        RuntimeOutcome::ImplicitNoOp { dispatches, .. } => {
+            assert_eq!(dispatches, 1);
         }
         other => panic!("unexpected outcome: {other:?}"),
     }

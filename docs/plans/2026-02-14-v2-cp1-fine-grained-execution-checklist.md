@@ -159,12 +159,12 @@
 - Modify: `v2/crates/v2-core/tests/graph_stateful_ops.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing tests for hard VM faults vs soft `ReadInput` default and graph state persistence.
-- [ ] Run: `cd v2 && cargo test -p v2-core --test mesh_runtime` and confirm failure is expected.
-- [ ] Implement minimal fault-mapping/state-persistence fix.
-- [ ] Re-run: `cd v2 && cargo test -p v2-core --test mesh_runtime`.
-- [ ] Re-run: `cd v2 && cargo test -p v2-core --test graph_stateful_ops`.
-- [ ] Commit slice `K8`.
+- [x] Add/adjust regression tests for hard VM faults vs soft `ReadInput` default and graph state persistence across runtime ticks.
+- [x] Run: `cd v2 && cargo test -p v2-core --test mesh_runtime` and confirm behavior gate coverage.
+- [x] Verify runtime/backend contract: hard VM faults map to `RuntimeError::VmFault`, soft `ReadInput` defaults to `0.0`, and graph state slots persist in `RuntimeContext`.
+- [x] Re-run: `cd v2 && cargo test -p v2-core --test mesh_runtime`.
+- [x] Re-run: `cd v2 && cargo test -p v2-core --test graph_stateful_ops`.
+- [x] Commit slice `K8`.
 
 ### Slice K9: CP-1 gate closeout
 
