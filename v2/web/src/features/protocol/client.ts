@@ -1,18 +1,63 @@
 import {
   decodeErrorEnvelope,
   decodeFramePayload,
+  decodeLifecycleResponse,
+  decodePaintResponse,
+  decodeStartupResponse,
   decodeStatusPayload,
   decodeWsEventEnvelope,
 } from "./decoders";
 import type {
   ErrorEnvelope,
   FramePayload,
+  LifecycleResponse,
+  PaintRequest,
+  PaintResponse,
+  StartupRequest,
+  StartupResponse,
   StatusPayload,
   WsEventEnvelope,
 } from "./models";
 
 export class ProtocolClient {
-  constructor(private readonly baseUrl: string) {}
+  constructor(
+    private readonly baseUrl = "",
+    private readonly wsBaseUrl = ""
+  ) {}
+
+  async startup(request: StartupRequest): Promise<StartupResponse> {
+    const json = await this.fetchJson("/v2/simulation/startup", {
+      method: "POST",
+      body: JSON.stringify(request),
+    });
+    return decodeStartupResponse(json);
+  }
+
+  async start(): Promise<LifecycleResponse> {
+    const json = await this.fetchJson("/v2/simulation/start", { method: "POST" });
+    return decodeLifecycleResponse(json);
+  }
+
+  async pause(): Promise<LifecycleResponse> {
+    const json = await this.fetchJson("/v2/simulation/pause", { method: "POST" });
+    return decodeLifecycleResponse(json);
+  }
+
+  async step(steps = 1): Promise<LifecycleResponse> {
+    const json = await this.fetchJson("/v2/simulation/step", {
+      method: "POST",
+      body: JSON.stringify({ steps }),
+    });
+    return decodeLifecycleResponse(json);
+  }
+
+  async paint(request: PaintRequest): Promise<PaintResponse> {
+    const json = await this.fetchJson("/v2/simulation/world/paint", {
+      method: "POST",
+      body: JSON.stringify(request),
+    });
+    return decodePaintResponse(json);
+  }
 
   async fetchStatus(): Promise<StatusPayload> {
     const json = await this.fetchJson("/v2/simulation/status");
@@ -28,8 +73,59 @@ export class ProtocolClient {
     return decodeWsEventEnvelope(JSON.parse(raw));
   }
 
-  private async fetchJson(path: string): Promise<unknown> {
-    const response = await fetch(`${this.baseUrl}${path}`);
+  connectWs(
+    onEvent: (event: WsEventEnvelope) => void,
+    onError: (error: Error) => void
+  ): () => void {
+    const ws = new WebSocket(this.wsUrl("/v2/ws"));
+    ws.onmessage = (message) => {
+      try {
+        onEvent(this.decodeWsMessage(String(message.data)));
+      } catch (error) {
+        onError(error instanceof Error ? error : new Error(String(error)));
+      }
+    };
+    ws.onerror = () => {
+      onError(new Error("websocket connection error"));
+    };
+
+    return () => {
+      ws.close();
+    };
+  }
+
+  private wsUrl(path: string): string {
+    if (this.wsBaseUrl) {
+      const wsBase = this.wsBaseUrl.endsWith("/")
+        ? this.wsBaseUrl.slice(0, -1)
+        : this.wsBaseUrl;
+      if (wsBase.startsWith("http://") || wsBase.startsWith("https://")) {
+        return `${wsBase.replace(/^http/, "ws")}${path}`;
+      }
+      return `${wsBase}${path}`;
+    }
+
+    if (this.baseUrl) {
+      return `${this.baseUrl.replace(/^http/, "ws")}${path}`;
+    }
+
+    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    return `${protocol}//${window.location.host}${path}`;
+  }
+
+  private async fetchJson(path: string, init: RequestInit = {}): Promise<unknown> {
+    const method = init.method?.toUpperCase() ?? "GET";
+    const defaultHeaders =
+      method === "GET" ? {} : ({ "content-type": "application/json" } as Record<string, string>);
+
+    const response = await fetch(`${this.baseUrl}${path}`, {
+      ...init,
+      headers: {
+        ...defaultHeaders,
+        ...(init.headers ?? {}),
+      },
+    });
+
     const json = (await response.json()) as unknown;
     if (!response.ok) {
       throw protocolErrorFromEnvelope(json);

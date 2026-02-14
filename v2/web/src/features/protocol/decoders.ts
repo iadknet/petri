@@ -8,6 +8,9 @@ import {
   type FramePayload,
   type HealthPayload,
   type LifecycleState,
+  type LifecycleResponse,
+  type PaintResponse,
+  type StartupResponse,
   type StatusPayload,
   type WsEventEnvelope,
 } from "./models";
@@ -206,4 +209,39 @@ export function decodeWsEventEnvelope(input: unknown): WsEventEnvelope {
   }
 
   throw new Error(`unknown ws event kind: ${event}`);
+}
+
+export function decodeLifecycleResponse(input: unknown): LifecycleResponse {
+  const object = asObject(input, "lifecycle");
+  return {
+    protocol_version: assertProtocolVersion(object.protocol_version, "lifecycle"),
+    state: asState(object.state, "lifecycle.state"),
+    tick: asNumber(object.tick, "lifecycle.tick"),
+  };
+}
+
+export function decodeStartupResponse(input: unknown): StartupResponse {
+  const object = asObject(input, "startup");
+  return {
+    protocol_version: assertProtocolVersion(object.protocol_version, "startup"),
+    state: asState(object.state, "startup.state"),
+    tick: asNumber(object.tick, "startup.tick"),
+    config_digest: asString(object.config_digest, "startup.config_digest"),
+  };
+}
+
+export function decodePaintResponse(input: unknown): PaintResponse {
+  const object = asObject(input, "paint");
+  const paintResult = asObject(object.paint_result, "paint.paint_result");
+  return {
+    protocol_version: assertProtocolVersion(object.protocol_version, "paint"),
+    state: asState(object.state, "paint.state"),
+    tick: asNumber(object.tick, "paint.tick"),
+    paint_result: {
+      touched_cells: asNumber(
+        paintResult.touched_cells,
+        "paint.paint_result.touched_cells"
+      ),
+    },
+  };
 }
