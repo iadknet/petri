@@ -1,13 +1,20 @@
 use v2_core::mesh::{
-    ActionMetadataField, CreatureGenome, EmittedOutput, ExecutionOutcome, InputReference,
-    InternalTargetDef, NodeGenome, NodeType, OutputDefinition, WorldActionDef, WorldActionKind,
-    run_mesh_queue,
+    ActionMetadataField, BackendDef, CreatureGenome, EmittedOutput, ExecutionOutcome,
+    GraphBackendDef, GraphOperator, InputReference, InternalTargetDef, NodeGenome, NodeType,
+    OutputDefinition, WorldActionDef, WorldActionKind, WorldInputKey, run_mesh_queue,
 };
 
 fn minimal_node(id: u32) -> NodeGenome {
     NodeGenome {
         node_id: id,
         node_type: NodeType::Graph,
+        backend_def: BackendDef::Graph(GraphBackendDef {
+            operator: GraphOperator::Passthrough,
+            inputs: Vec::new(),
+            coefficients: Vec::new(),
+            bias: 0.0,
+            state_slot_count: 0,
+        }),
         output_definitions: vec![],
         local_state_init: vec![],
     }
@@ -27,9 +34,16 @@ fn genome_validation_rejects_missing_entry_and_invalid_targets() {
         nodes: vec![NodeGenome {
             node_id: 1,
             node_type: NodeType::Graph,
+            backend_def: BackendDef::Graph(GraphBackendDef {
+                operator: GraphOperator::Passthrough,
+                inputs: Vec::new(),
+                coefficients: Vec::new(),
+                bias: 0.0,
+                state_slot_count: 0,
+            }),
             output_definitions: vec![OutputDefinition::InternalTarget(InternalTargetDef {
                 target_node_id: 42,
-                input_refs: vec![InputReference::World("food_here".to_string())],
+                input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
                 payload_fields: vec![],
             })],
             local_state_init: vec![],
@@ -43,6 +57,13 @@ fn genome_validation_rejects_missing_entry_and_invalid_targets() {
         nodes: vec![NodeGenome {
             node_id: 1,
             node_type: NodeType::Graph,
+            backend_def: BackendDef::Graph(GraphBackendDef {
+                operator: GraphOperator::Passthrough,
+                inputs: Vec::new(),
+                coefficients: Vec::new(),
+                bias: 0.0,
+                state_slot_count: 0,
+            }),
             output_definitions: vec![OutputDefinition::WorldAction(WorldActionDef {
                 action_kind: WorldActionKind::Eat,
                 action_metadata_fields: vec![ActionMetadataField::Direction(1)],

@@ -1,3 +1,5 @@
+use crate::mesh::VmInstruction;
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct MeteringResult {
     pub remaining_energy: f32,
@@ -71,5 +73,49 @@ pub fn meter_vm_ops(
         remaining_energy: if exhausted { 0.0 } else { remaining },
         charged_energy,
         exhausted,
+    }
+}
+
+#[must_use]
+pub fn vm_opcode_base_cost(opcode: &VmInstruction) -> f32 {
+    match opcode {
+        VmInstruction::Noop => 0.05,
+        VmInstruction::LoadConst { .. } => 0.08,
+        VmInstruction::Move { .. } => 0.08,
+        VmInstruction::Add { .. } => 0.12,
+        VmInstruction::Sub { .. } => 0.12,
+        VmInstruction::Mul { .. } => 0.12,
+        VmInstruction::Div { .. } => 0.16,
+        VmInstruction::Min { .. } => 0.12,
+        VmInstruction::Max { .. } => 0.12,
+        VmInstruction::Abs { .. } => 0.10,
+        VmInstruction::Neg { .. } => 0.10,
+        VmInstruction::Clamp01 { .. } => 0.10,
+        VmInstruction::CmpGt { .. } => 0.12,
+        VmInstruction::CmpLt { .. } => 0.12,
+        VmInstruction::CmpEq { .. } => 0.12,
+        VmInstruction::And { .. } => 0.12,
+        VmInstruction::Or { .. } => 0.12,
+        VmInstruction::Not { .. } => 0.10,
+        VmInstruction::ToI32 { .. } => 0.10,
+        VmInstruction::ToU8 { .. } => 0.10,
+        VmInstruction::ToBool { .. } => 0.10,
+        VmInstruction::JumpIfZero { .. } => 0.14,
+        VmInstruction::Jump { .. } => 0.10,
+        VmInstruction::ReadInput { .. } => 0.12,
+        VmInstruction::ReadSensorCell { .. } => 0.16,
+        VmInstruction::ReadSensorCreature { .. } => 0.20,
+        VmInstruction::ReadSensorSummary { .. } => 0.14,
+        VmInstruction::ReadNeighborCell { .. } => 0.14,
+        VmInstruction::ReadNeighborCreature { .. } => 0.18,
+        VmInstruction::WriteInternalPayload { .. } => 0.14,
+        VmInstruction::WriteWorldActionMeta { .. } => 0.14,
+        VmInstruction::EmitInternal { .. } => 0.20,
+        VmInstruction::EmitWorldAction { .. } => 0.24,
+        VmInstruction::Halt => 0.05,
+        VmInstruction::LoadMem8 { .. } => 0.16,
+        VmInstruction::StoreMem8 { .. } => 0.18,
+        VmInstruction::LoadMem8Imm { .. } => 0.14,
+        VmInstruction::StoreMem8Imm { .. } => 0.16,
     }
 }
