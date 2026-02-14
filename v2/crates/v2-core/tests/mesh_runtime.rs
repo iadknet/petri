@@ -1,7 +1,7 @@
 use v2_core::mesh::{
     ActionMetadataField, BackendDef, CreatureGenome, GraphBackendDef, GraphOperator,
-    InputReference, InternalTargetDef, NodeGenome, NodeType, OutputDefinition, VmBackendDef,
-    VmInstruction, WorldActionDef, WorldActionKind,
+    NodeGenome, NodeType, OutputDefinition, VmBackendDef, VmInstruction, WorldActionDef,
+    WorldActionKind,
 };
 use v2_core::runtime::{
     RuntimeActionCosts, RuntimeConfig, RuntimeContext, RuntimeError, RuntimeOutcome, SensorFrame,
@@ -182,43 +182,39 @@ fn sensor_radius_zero_runtime_config_is_rejected() {
 fn emitted_output_order_stops_on_first_invalid_world_action() {
     let genome = CreatureGenome {
         entry_node_id: 1,
-        nodes: vec![
-            NodeGenome {
-                node_id: 1,
-                node_type: NodeType::Vm,
-                backend_def: BackendDef::Vm(VmBackendDef {
-                    register_count: 2,
-                    program: vec![
-                        VmInstruction::LoadConst {
-                            dst: 0,
-                            const_idx: 0,
-                        },
-                        VmInstruction::WriteWorldActionMeta {
-                            output_index: 0,
-                            metadata_field_index: 0,
-                            src: 0,
-                        },
-                        VmInstruction::EmitWorldAction { output_index: 0 },
-                        VmInstruction::EmitInternal { output_index: 1 },
-                    ],
-                    constants: vec![999.0],
-                    max_input_slots: 4,
-                }),
-                output_definitions: vec![
-                    OutputDefinition::WorldAction(WorldActionDef {
-                        action_kind: WorldActionKind::Move,
-                        action_metadata_fields: vec![ActionMetadataField::Direction(1)],
-                    }),
-                    OutputDefinition::InternalTarget(InternalTargetDef {
-                        target_node_id: 2,
-                        input_refs: vec![InputReference::Packet("carry".to_string())],
-                        payload_fields: Vec::new(),
-                    }),
+        nodes: vec![NodeGenome {
+            node_id: 1,
+            node_type: NodeType::Vm,
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 2,
+                program: vec![
+                    VmInstruction::LoadConst {
+                        dst: 0,
+                        const_idx: 0,
+                    },
+                    VmInstruction::WriteWorldActionMeta {
+                        output_index: 0,
+                        metadata_field_index: 0,
+                        src: 0,
+                    },
+                    VmInstruction::EmitWorldAction { output_index: 0 },
+                    VmInstruction::EmitWorldAction { output_index: 1 },
                 ],
-                local_state_init: Vec::new(),
-            },
-            graph_node_with_outputs(2, Vec::new()),
-        ],
+                constants: vec![999.0],
+                max_input_slots: 4,
+            }),
+            output_definitions: vec![
+                OutputDefinition::WorldAction(WorldActionDef {
+                    action_kind: WorldActionKind::Move,
+                    action_metadata_fields: vec![ActionMetadataField::Direction(1)],
+                }),
+                OutputDefinition::WorldAction(WorldActionDef {
+                    action_kind: WorldActionKind::Move,
+                    action_metadata_fields: vec![ActionMetadataField::Direction(2)],
+                }),
+            ],
+            local_state_init: Vec::new(),
+        }],
         evolution_params: None,
     };
 
