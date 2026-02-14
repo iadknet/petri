@@ -1,6 +1,16 @@
 import { expect, test } from "@playwright/test";
 
 test("desktop shell startup/runtime/paint flow", async ({ page }) => {
+  const consoleErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      consoleErrors.push(message.text());
+    }
+  });
+  page.on("pageerror", (error) => {
+    consoleErrors.push(error.message);
+  });
+
   await page.goto("/");
 
   await expect(page.getByRole("heading", { name: "Petri V2 Control Surface" })).toBeVisible();
@@ -21,4 +31,5 @@ test("desktop shell startup/runtime/paint flow", async ({ page }) => {
   await page.locator("[data-testid='viewport-canvas']").click({ position: { x: 32, y: 32 } });
 
   await expect(page.getByText("Paint last touched cells:")).toBeVisible();
+  expect(consoleErrors).toEqual([]);
 });
