@@ -91,12 +91,12 @@
 - Modify: `v2/crates/v2-server/tests/ws_stream.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing tests for real tick-driven state changes and non-synthetic action counts.
-- [ ] Run: `cd v2 && cargo test -p v2-server --test tick_dynamics` and confirm failure is expected.
-- [ ] Implement minimal tick-loop integration fix.
-- [ ] Re-run: `cd v2 && cargo test -p v2-server --test tick_dynamics`.
-- [ ] Re-run: `cd v2 && cargo test -p v2-server --test ws_stream`.
-- [ ] Commit slice `P3-B3`.
+- [x] Add/adjust failing tests for real tick-driven state changes and non-synthetic action counts.
+- [x] Run: `cd v2 && cargo test -p v2-server --test tick_dynamics` and confirm failure is expected.
+- [x] Implement minimal tick-loop integration fix.
+- [x] Re-run: `cd v2 && cargo test -p v2-server --test tick_dynamics`.
+- [x] Re-run: `cd v2 && cargo test -p v2-server --test ws_stream`.
+- [x] Commit slice `P3-B3`.
 
 ### Slice P3-B4: Founder phenotype uniform startup baseline
 
