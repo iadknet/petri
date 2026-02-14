@@ -49,7 +49,7 @@
 1. `RuntimeConfig`
 - `dispatch_entry_cost: f32`
 - `graph_static_tariff: f32`
-- `vm_per_op_cost: f32`
+- `vm_opcode_cost_multiplier: f32`
 - `action_costs: RuntimeActionCosts`
 
 2. `RuntimeActionCosts`
@@ -86,8 +86,9 @@
 - if energy reaches zero after entry charge: return `EnergyExhausted`
 - dispatch next packet (FIFO)
 - execute backend by target node type
+- VM backend supports opcode-level `ReadInput` and output write instructions (`WriteInternalPayload`, `WriteWorldActionMeta`)
 - allow VM backend to mutate creature `memory_bytes` through memory opcodes
-- charge backend compute energy (`graph_static_tariff` or VM per-op metering)
+- charge backend compute energy (`graph_static_tariff` or VM opcode-table metering)
 - if backend reports exhaustion: return `EnergyExhausted`
 - enqueue all emitted internal targets (same packet order as emitted list)
 - on first valid emitted world action:
@@ -102,6 +103,7 @@
 For each dispatch:
 1. `dispatch_entry_cost`
 2. backend compute cost
+- VM compute cost uses opcode baseline table from schema/ISA spec multiplied by `vm_opcode_cost_multiplier`
 3. action cost (only if action emitted and committed)
 
 Notes:
@@ -130,6 +132,7 @@ Steps:
 3. Add test for queue drain to implicit no-op.
 4. Add test for energy exhaustion mid-dispatch.
 5. Add test for invalid action metadata path returning runtime error.
+6. Add test for opcode-cost multiplier affecting VM exhaustion timing.
 
 ### Task 2: Implement runtime module
 
@@ -162,7 +165,9 @@ Steps:
 6. `cd v2 && cargo test -p v2-core --test mesh_schema_contract`
 7. `cd v2 && cargo test -p v2-core --test vm_isa`
 8. `cd v2 && cargo test -p v2-core --test vm_memory`
-9. `cd v2 && cargo test -p v2-core`
+9. `cd v2 && cargo test -p v2-core --test vm_io`
+10. `cd v2 && cargo test -p v2-core --test vm_opcode_costs`
+11. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 

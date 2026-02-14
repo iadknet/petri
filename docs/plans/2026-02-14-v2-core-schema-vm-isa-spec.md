@@ -84,6 +84,7 @@ Validation:
 - `register_count: u8` (`1..=32`)
 - `program: Vec<VmInstruction>` (`1..=128` instructions)
 - `constants: Vec<f32>` (`0..=64`)
+- `max_input_slots: u8` (`1..=64`, used for bounds validation of `ReadInput`)
 
 ## Typed Input/Output Contract
 
@@ -139,6 +140,11 @@ Validation:
 2. `Amount(u8)`
 3. `Slot(u8)`
 
+VM emit override rule:
+1. VM may override output field values before emit via write-output opcodes.
+2. Override target is identified by `(output_index, field_index)` in the selected output definition.
+3. Override source value is `f32` and coerced to target field type at emit time.
+
 ## VM ISA Contract (v1)
 
 ### Registers and values
@@ -165,25 +171,72 @@ Validation:
 14. `CmpEq { dst, a, b, epsilon }`
 15. `JumpIfZero { cond, offset }`
 16. `Jump { offset }`
-17. `EmitInternal { output_index }`
-18. `EmitWorldAction { output_index }`
-19. `Halt`
-20. `LoadMem8 { dst, addr_reg }`
-21. `StoreMem8 { addr_reg, src }`
-22. `LoadMem8Imm { dst, addr }`
-23. `StoreMem8Imm { addr, src }`
+17. `ReadInput { dst, input_index }`
+18. `WriteInternalPayload { output_index, payload_field_index, src }`
+19. `WriteWorldActionMeta { output_index, metadata_field_index, src }`
+20. `EmitInternal { output_index }`
+21. `EmitWorldAction { output_index }`
+22. `Halt`
+23. `LoadMem8 { dst, addr_reg }`
+24. `StoreMem8 { addr_reg, src }`
+25. `LoadMem8Imm { dst, addr }`
+26. `StoreMem8Imm { addr, src }`
 
 ### VM execution rules
 
 1. PC starts at `0`.
 2. Out-of-range PC terminates program (`halted=true`).
 3. Jump offsets are signed relative offsets.
-4. Each executed instruction consumes `vm_per_op_cost` energy.
+4. Each executed instruction consumes opcode-specific energy:
+- `effective_cost(opcode) = vm_opcode_base_cost(opcode) * vm_opcode_cost_multiplier`
 5. Execution halts on first emitted world action (runtime-level rule still applies).
 6. Memory address resolution uses wrapping semantics over `1024` bytes:
 - `resolved_addr = raw_addr.rem_euclid(1024)`
 7. `LoadMem8*` writes byte value as `f32` in `[0.0, 255.0]`.
 8. `StoreMem8*` clamps source register to `[0.0, 255.0]`, rounds to nearest integer, and writes `u8`.
+9. `ReadInput` reads from per-dispatch resolved input slots; out-of-range index yields `0.0`.
+10. `WriteInternalPayload` and `WriteWorldActionMeta` write pending overrides for emit.
+11. Emit-time coercion rules for write-output overrides:
+- `f32 -> i32`: round to nearest integer
+- `f32 -> u8`: clamp `[0.0, 255.0]` and round
+- `f32 -> bool`: `>= 0.5` is `true`, else `false`
+12. If remaining energy is below an opcode's effective cost, that opcode does not execute and VM exits as exhausted.
+
+### VM opcode baseline cost table (v1 defaults)
+
+Global scalar:
+- `vm_opcode_cost_multiplier` default: `1.0`
+
+Per-opcode baseline (`vm_opcode_base_cost`):
+
+| opcode | base cost |
+| --- | --- |
+| `Noop` | `0.05` |
+| `LoadConst` | `0.08` |
+| `Move` | `0.08` |
+| `Add` | `0.12` |
+| `Sub` | `0.12` |
+| `Mul` | `0.12` |
+| `Div` | `0.16` |
+| `Min` | `0.12` |
+| `Max` | `0.12` |
+| `Abs` | `0.10` |
+| `Neg` | `0.10` |
+| `CmpGt` | `0.12` |
+| `CmpLt` | `0.12` |
+| `CmpEq` | `0.12` |
+| `JumpIfZero` | `0.14` |
+| `Jump` | `0.10` |
+| `ReadInput` | `0.12` |
+| `WriteInternalPayload` | `0.14` |
+| `WriteWorldActionMeta` | `0.14` |
+| `EmitInternal` | `0.20` |
+| `EmitWorldAction` | `0.24` |
+| `Halt` | `0.05` |
+| `LoadMem8` | `0.16` |
+| `StoreMem8` | `0.18` |
+| `LoadMem8Imm` | `0.14` |
+| `StoreMem8Imm` | `0.16` |
 
 ## Graph Backend Contract (v1)
 
@@ -215,12 +268,16 @@ Steps:
 Files:
 - Create: `v2/crates/v2-core/tests/vm_isa.rs`
 - Create: `v2/crates/v2-core/tests/vm_memory.rs`
+- Create: `v2/crates/v2-core/tests/vm_io.rs`
+- Create: `v2/crates/v2-core/tests/vm_opcode_costs.rs`
 
 Steps:
 1. Add failing tests for arithmetic and compare ops.
 2. Add failing tests for jumps and loop energy exhaustion behavior.
 3. Add failing tests for emit/halt semantics.
 4. Add failing tests for memory load/store and address wrapping behavior.
+5. Add failing tests for input read/output write opcode semantics.
+6. Add failing tests verifying baseline opcode cost table and multiplier scaling.
 
 ### Task 3: Implement schema and VM ISA contracts
 
@@ -240,8 +297,10 @@ Steps:
 2. `cd v2 && cargo test -p v2-core --test mesh_schema_contract`
 3. `cd v2 && cargo test -p v2-core --test vm_isa`
 4. `cd v2 && cargo test -p v2-core --test vm_memory`
-5. `cd v2 && cargo test -p v2-core --test mesh_runtime`
-6. `cd v2 && cargo test -p v2-core`
+5. `cd v2 && cargo test -p v2-core --test vm_io`
+6. `cd v2 && cargo test -p v2-core --test vm_opcode_costs`
+7. `cd v2 && cargo test -p v2-core --test mesh_runtime`
+8. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 

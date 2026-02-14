@@ -39,7 +39,7 @@
 | checkpoint | required suites | pass criteria |
 | --- | --- | --- |
 | `CP-0` | workspace/build skeleton checks | `v2` Rust workspace checks and `v2/web` build succeeds |
-| `CP-1` | `mesh_kernel`, `mesh_energy`, `mesh_backends`, `mesh_runtime`, `mesh_schema_contract`, `vm_isa`, `vm_memory` | all tests pass; runtime semantics, schema/ISA contracts, and memory opcode behavior match CP-1 specs |
+| `CP-1` | `mesh_kernel`, `mesh_energy`, `mesh_backends`, `mesh_runtime`, `mesh_schema_contract`, `vm_isa`, `vm_memory`, `vm_io`, `vm_opcode_costs` | all tests pass; runtime semantics, schema/ISA contracts, VM memory/I/O opcodes, and opcode-cost behavior match CP-1 specs |
 | `CP-2` | `mutation_invariants`, `mutation_repair`, `ecology_pressures`, `ecology_noncollapse` | all tests pass on fixed seeds; no invariant violations |
 | `CP-3` | server lifecycle/payload/ws tests, cli ndjson tests, web protocol fixtures, end-to-end smoke | all tests pass; schema/version parity across all surfaces |
 
@@ -88,7 +88,9 @@
 6. `cd v2 && cargo test -p v2-core --test mesh_schema_contract`
 7. `cd v2 && cargo test -p v2-core --test vm_isa`
 8. `cd v2 && cargo test -p v2-core --test vm_memory`
-9. `cd v2 && cargo test -p v2-core`
+9. `cd v2 && cargo test -p v2-core --test vm_io`
+10. `cd v2 && cargo test -p v2-core --test vm_opcode_costs`
+11. `cd v2 && cargo test -p v2-core`
 
 ### `CP-2` exit
 
