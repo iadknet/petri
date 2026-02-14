@@ -38,6 +38,7 @@
 | Is sensor radius globally configurable? | Yes, global `sensor_radius` in `RuntimeConfig` applies to all creatures. | user+agent | resolved |
 | Should immediate-neighbor inputs be first-class and complete like sensor queries? | Yes; expose 8-direction neighbor refs/opcodes with metadata parity to `SensorFrame`. | user+agent | resolved |
 | How should mixed invalid/valid emitted world actions be handled? | Emitted outputs are processed in order; invalid world-action metadata errors immediately and later actions are not considered. | user+agent | resolved |
+| Is CP-1 intended to guarantee full-run deterministic replay? | No; CP-1 guarantees deterministic runtime ordering semantics and deterministic test fixtures only. | user+agent | resolved |
 
 ## Specification Dependencies
 
@@ -148,6 +149,7 @@ Notes:
 2. Internal target enqueues preserve emitted output order.
 3. Runtime does not iterate maps for ordering-sensitive logic.
 4. Tests use deterministic fixtures and avoid RNG in CP-1 runtime tests.
+5. Full-run deterministic replay across entire simulations is not required by CP-1.
 
 ## Task List
 
