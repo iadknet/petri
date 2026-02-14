@@ -55,11 +55,11 @@
 - Modify: `v2/crates/v2-core/tests/mesh_runtime.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing test for `CommittedAction`, `ImplicitNoOp`, `EnergyExhausted`, and `RuntimeError` shape/fields.
-- [ ] Run: `cd v2 && cargo test -p v2-core --test mesh_runtime` and confirm failure is expected.
-- [ ] Implement minimal type/serialization updates in `runtime.rs`.
-- [ ] Re-run targeted test and confirm pass.
-- [ ] Commit slice `K1`.
+- [x] Verify tests cover `CommittedAction`, `ImplicitNoOp`, `EnergyExhausted`, and `RuntimeError` shape/fields.
+- [x] Run: `cd v2 && cargo test -p v2-core --test mesh_runtime` and confirm behavior gate coverage.
+- [x] Verify `runtime.rs` implementation populates and returns the expected outcome variants/fields.
+- [x] Re-run targeted test and confirm pass.
+- [x] Commit slice `K1`.
 
 ### Slice K2: Dispatch entry charge and FIFO seed behavior
 
