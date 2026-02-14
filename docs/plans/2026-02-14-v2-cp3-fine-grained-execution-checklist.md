@@ -150,11 +150,11 @@
 - Modify: `v2/web/src/features/protocol/protocol.test.ts`
 
 **Checklist:**
-- [ ] Add/adjust failing tests for invalid JSON/HTML and malformed error envelope paths.
-- [ ] Run: `cd v2/web && npm run test -- --runInBand protocol` and confirm failure is expected.
-- [ ] Implement minimal protocol client error-normalization fix.
-- [ ] Re-run targeted tests and confirm pass.
-- [ ] Commit slice `P3-F1`.
+- [x] Add/adjust failing tests for invalid JSON/HTML and malformed error envelope paths.
+- [x] Run: `cd v2/web && npm run test -- protocol` and confirm failure is expected.
+- [x] Implement minimal protocol client error-normalization fix.
+- [x] Re-run targeted tests and confirm pass.
+- [x] Commit slice `P3-F1`.
 
 ### Slice P3-F2: Store-first orchestration extraction
 
@@ -166,7 +166,7 @@
 
 **Checklist:**
 - [ ] Add/adjust failing tests for store-owned orchestration behavior.
-- [ ] Run: `cd v2/web && npm run test -- --runInBand simulationStore` and confirm failure is expected.
+- [ ] Run: `cd v2/web && npm run test -- simulationStore` and confirm failure is expected.
 - [ ] Implement minimal extraction from `App.tsx` into store/effects.
 - [ ] Re-run targeted tests and confirm pass.
 - [ ] Commit slice `P3-F2`.
