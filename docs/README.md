@@ -12,6 +12,7 @@ Canonical project documentation lives under `docs/`.
 ## Reference
 
 - [Creature Controller Reference](reference/creature-controller-reference.md)
+- [V2 Frontend State Matrix](reference/v2-frontend-state-matrix.md)
 
 ## Plans
 
