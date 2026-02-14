@@ -39,7 +39,7 @@
 | checkpoint | required suites | pass criteria |
 | --- | --- | --- |
 | `CP-0` | workspace/build skeleton checks | `v2` Rust workspace checks and `v2/web` build succeeds |
-| `CP-1` | `mesh_kernel`, `mesh_energy`, `mesh_backends`, `mesh_runtime`, `mesh_schema_contract`, `vm_isa`, `vm_memory`, `vm_io`, `vm_sensor_queries`, `vm_opcode_costs`, `vm_input_mapping`, `vm_output_overrides`, `vm_numeric_determinism`, `sensor_frame_contract`, `graph_sensor_inputs`, `graph_operator_richness`, `graph_stateful_ops` | all tests pass; runtime semantics, schema/ISA contracts, full-radius sensor richness, VM memory/I/O/sensor opcodes, slot mapping/override lifecycle, numeric determinism, opcode-cost behavior, and graph fixed-function richness match CP-1 specs |
+| `CP-1` | `mesh_kernel`, `mesh_energy`, `mesh_backends`, `mesh_runtime`, `mesh_schema_contract`, `vm_isa`, `vm_memory`, `vm_io`, `vm_sensor_queries`, `vm_opcode_costs`, `vm_input_mapping`, `vm_output_overrides`, `vm_numeric_determinism`, `sensor_frame_contract`, `graph_sensor_inputs`, `graph_operator_richness`, `graph_stateful_ops`, `sensor_radius_global_config` | all tests pass; runtime semantics, schema/ISA contracts, global configurable sensor radius, full-radius sensor richness, VM memory/I/O/sensor opcodes, slot mapping/override lifecycle, numeric determinism, opcode-cost behavior, and graph fixed-function richness match CP-1 specs |
 | `CP-2` | `mutation_invariants`, `mutation_repair`, `reproduction_memory_inheritance`, `ecology_pressures`, `ecology_noncollapse` | all tests pass on fixed seeds; no invariant violations and offspring memory-copy semantics hold |
 | `CP-3` | server lifecycle/payload/ws tests, cli ndjson tests, web protocol fixtures, end-to-end smoke | all tests pass; schema/version parity across all surfaces |
 
@@ -98,7 +98,8 @@
 16. `cd v2 && cargo test -p v2-core --test graph_sensor_inputs`
 17. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
 18. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
-19. `cd v2 && cargo test -p v2-core`
+19. `cd v2 && cargo test -p v2-core --test sensor_radius_global_config`
+20. `cd v2 && cargo test -p v2-core`
 
 ### `CP-2` exit
 
