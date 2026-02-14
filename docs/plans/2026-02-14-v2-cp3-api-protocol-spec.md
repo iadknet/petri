@@ -38,6 +38,8 @@
 | Should lifecycle endpoints be strict or idempotent on repeated calls? | Idempotent for `start`/`pause`; state-restricted for `step`. | user+agent | resolved |
 | Should status window counters share CP-2 telemetry semantics? | Yes; status counters use trailing `health_window_ticks` from CP-2 ecology config. | user+agent | resolved |
 | Should snapshot import/export endpoints be required in initial `v2`? | No; snapshot endpoints are out of scope for `v2alpha1` unless re-planned. | user+agent | resolved |
+| Should `config_digest` be deterministic and algorithm-defined? | Yes; `v2alpha1` uses lowercase hex SHA-256 over canonical startup JSON. | user+agent | resolved |
+| Should CLI NDJSON event payload fields be explicitly fixed? | Yes; each event has required fields and canonical key ordering in this spec. | user+agent | resolved |
 
 ## Protocol Versioning
 
@@ -61,6 +63,11 @@ Response:
 - `protocol_version: string`
 - `state: "idle"`
 - `config_digest: string`
+
+Rules:
+- `config_digest` must be deterministic for identical startup requests.
+- `v2alpha1` definition: lowercase hex `sha256(canonical_json(startup_request))`.
+- `canonical_json` uses lexicographically sorted object keys and no insignificant whitespace.
 
 ### `POST /v2/simulation/start`
 
@@ -194,6 +201,8 @@ Commands:
 Output format:
 - stdout emits NDJSON records only.
 - every line contains `protocol_version: "v2alpha1"` and `event_type`.
+- records must contain all required fields for their `event_type` and no unknown top-level fields in fixture-based tests.
+- field ordering in emitted JSON objects must follow the canonical ordering defined below (for deterministic fixtures).
 
 Required `run` events:
 1. `run_started`
@@ -204,6 +213,53 @@ Required `ablation` events:
 1. `ablation_started`
 2. per-preset `ablation_result`
 3. `ablation_completed`
+
+CLI event payload schemas (normative):
+
+1. `run_started`:
+- `protocol_version: "v2alpha1"`
+- `event_type: "run_started"`
+- `seed: u64`
+- `ticks_requested: u64`
+- `sample_every: u16`
+
+2. `tick_sample`:
+- `protocol_version: "v2alpha1"`
+- `event_type: "tick_sample"`
+- `tick: u64`
+- `population: u32`
+- `mean_energy: f32`
+- `births_last_window: u32`
+- `deaths_last_window: u32`
+- `last_action_counts: { move: u32, eat: u32, reproduce: u32, inventory_pickup: u32, inventory_put: u32, noop: u32 }`
+
+3. `run_completed`:
+- `protocol_version: "v2alpha1"`
+- `event_type: "run_completed"`
+- `ticks_executed: u64`
+- `final_population: u32`
+- `final_mean_energy: f32`
+
+4. `ablation_started`:
+- `protocol_version: "v2alpha1"`
+- `event_type: "ablation_started"`
+- `seed: u64`
+- `ticks_requested: u64`
+- `presets: Vec<String>`
+
+5. `ablation_result`:
+- `protocol_version: "v2alpha1"`
+- `event_type: "ablation_result"`
+- `preset: String`
+- `score: f32`
+- `final_population: u32`
+- `final_mean_energy: f32`
+
+6. `ablation_completed`:
+- `protocol_version: "v2alpha1"`
+- `event_type: "ablation_completed"`
+- `results_count: u16`
+- `best_preset: String`
 
 ## Task List
 
@@ -221,7 +277,7 @@ Files:
 Steps:
 1. Add failing tests for every endpoint/event contract above.
 2. Add fixture-based parser tests in web client.
-3. Add CLI NDJSON schema tests.
+3. Add CLI NDJSON schema tests for required fields, forbidden unknown top-level fields, and canonical field ordering.
 4. Add failing tests for HTTP error envelope/status-code mapping and lifecycle transition rules.
 5. Add failing tests for event/payload mismatch rejection and snapshot-endpoint absence in `v2alpha1`.
 
