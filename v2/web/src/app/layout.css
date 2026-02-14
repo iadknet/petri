@@ -14,6 +14,7 @@
   --accent-soft: rgba(46, 207, 128, 0.18);
   --warn: #ff7a7a;
   --shadow: 0 14px 34px rgba(0, 0, 0, 0.35);
+  --panel-sheen: linear-gradient(120deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0));
 }
 
 * {
@@ -34,6 +35,8 @@ body {
 .app-shell {
   min-height: 100vh;
   padding: clamp(0.8rem, 1.4vw, 1.4rem);
+  max-width: 1760px;
+  margin: 0 auto;
 }
 
 .app-header {
@@ -48,8 +51,18 @@ body {
   grid-column: 1 / -1;
   margin: 0;
   font-size: clamp(1.3rem, 2.2vw, 1.85rem);
-  letter-spacing: 0.045em;
+  font-family: "Space Grotesk", "IBM Plex Sans", "Segoe UI", sans-serif;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+}
+
+.app-subtitle {
+  grid-column: 1 / -1;
+  margin: -0.15rem 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+  letter-spacing: 0.02em;
 }
 
 .app-status,
@@ -75,6 +88,11 @@ body {
   flex-wrap: wrap;
 }
 
+.app-banner-value {
+  color: #d8e7f4;
+  font-weight: 600;
+}
+
 .app-grid {
   display: grid;
   grid-template-columns: minmax(260px, 320px) minmax(0, 1fr) minmax(250px, 320px);
@@ -88,6 +106,8 @@ body {
 }
 
 .panel {
+  position: relative;
+  overflow: hidden;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0)),
     var(--panel);
@@ -95,6 +115,15 @@ body {
   border-radius: 14px;
   padding: 0.85rem;
   box-shadow: var(--shadow);
+}
+
+.panel::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 2px;
+  background: var(--panel-sheen);
+  opacity: 0.8;
 }
 
 .panel h2 {

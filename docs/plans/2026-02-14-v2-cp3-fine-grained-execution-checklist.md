@@ -234,11 +234,11 @@
 - Modify: `v2/web/src/features/layout/app-shell.test.tsx`
 
 **Checklist:**
-- [ ] Add/adjust tests for critical labels/control visibility at standard desktop widths.
-- [ ] Implement style/layout polish without changing protocol/state behavior.
-- [ ] Run: `cd v2/web && npm run test`.
-- [ ] Run: `cd v2/web && npm run build`.
-- [ ] Commit slice `P3-F7`.
+- [x] Add/adjust tests for critical labels/control visibility at standard desktop widths.
+- [x] Implement style/layout polish without changing protocol/state behavior.
+- [x] Run: `cd v2/web && npm run test`.
+- [x] Run: `cd v2/web && npm run build`.
+- [x] Commit slice `P3-F7`.
 
 ### Slice P3-X1: CP-3 gate closeout
 

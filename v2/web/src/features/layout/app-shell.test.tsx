@@ -26,6 +26,39 @@ describe("AppShell", () => {
     expect(html).toContain("Run Health");
     expect(html).toContain("Protocol");
   });
+
+  it("keeps critical desktop control labels visible", () => {
+    const html = renderToStaticMarkup(
+      <AppShell
+        startupPanel={<button type="button">Apply Startup</button>}
+        runtimeControls={
+          <div>
+            <button type="button">Start</button>
+            <button type="button">Pause</button>
+            <button type="button">Step</button>
+          </div>
+        }
+        paintToolbar={
+          <div>
+            <button type="button">Food Tool</button>
+            <button type="button">Clear All</button>
+          </div>
+        }
+        viewport={<div data-testid="viewport-canvas">viewport</div>}
+        inspector={<div>Selected Creature</div>}
+        runHealth={<div>Population</div>}
+        protocolBanner={<div>v2alpha1 (compatible) | connected</div>}
+      />
+    );
+
+    expect(html).toContain("Apply Startup");
+    expect(html).toContain("Start");
+    expect(html).toContain("Pause");
+    expect(html).toContain("Step");
+    expect(html).toContain("Food Tool");
+    expect(html).toContain("Clear All");
+    expect(html).toContain("Protocol");
+  });
 });
 
 describe("ProtocolBanner", () => {
