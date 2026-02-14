@@ -41,6 +41,10 @@
 | Should v1 include logic/conversion opcodes? | Yes (`And`, `Or`, `Not`, `Clamp01`, `ToI32`, `ToU8`, `ToBool`). | user+agent | resolved |
 | Should graph nodes include temporal and aggregation richness in CP-1? | Yes, via bounded fixed-function operators (integrator, momentum, oscillator, pooling, adaptive gain). | user+agent | resolved |
 | Should creatures have full in-range sensor visibility with rich metadata? | Yes, via `SensorFrame` plus queryable sensor input references/opcodes. | user+agent | resolved |
+| Should neighbor inputs be complete and explicit (like sensor inputs)? | Yes, provide first-class 8-neighbor refs and opcodes backed by `SensorFrame`. | user+agent | resolved |
+| What is the minimum valid global `sensor_radius`? | `sensor_radius >= 1` in v1; `0` is invalid runtime config. | user+agent | resolved |
+| How is world-action `Direction` metadata encoded? | Ordinal `0..=7` using `NeighborDirection` order (`N, NE, E, SE, S, SW, W, NW`). | user+agent | resolved |
+| How are duplicate output field keys treated? | Duplicate payload keys and duplicate metadata field kinds are schema-invalid. | user+agent | resolved |
 
 ## Genome Schema Contract
 
@@ -106,6 +110,8 @@ Validation:
 4. `SensorCell { dx: i16, dy: i16, field: SensorCellField }`
 5. `SensorCreature { dx: i16, dy: i16, field: SensorCreatureField }`
 6. `SensorSummary(SensorSummaryField)`
+7. `NeighborCell { direction: NeighborDirection, field: NeighborCellField }`
+8. `NeighborCreature { direction: NeighborDirection, field: NeighborCreatureField }`
 
 `WorldInputKey` (v1):
 - `food_here`
@@ -146,6 +152,30 @@ Validation:
 3. `VisibleFoodTotalNorm`
 4. `CrowdingNorm`
 
+`NeighborDirection`:
+1. `North`
+2. `NorthEast`
+3. `East`
+4. `SouthEast`
+5. `South`
+6. `SouthWest`
+7. `West`
+8. `NorthWest`
+
+`NeighborCellField`:
+1. `FoodDensityNorm`
+2. `BarrierFlag`
+3. `OccupiedFlag`
+
+`NeighborCreatureField`:
+1. `PresentFlag`
+2. `PhenotypeRNorm`
+3. `PhenotypeGNorm`
+4. `PhenotypeBNorm`
+5. `EnergyNorm`
+6. `AgeNorm`
+7. `GenerationNorm`
+
 ### SensorFrame contract
 
 1. Runtime builds a `SensorFrame` centered on the acting creature.
@@ -153,23 +183,47 @@ Validation:
 - `max(|dx|, |dy|) <= sensor_radius`
 3. `sensor_radius` is a global runtime config value shared by all creatures.
 4. `sensor_radius` must be configured in `RuntimeConfig` and is not creature-specific in v1.
-5. For each visible relative cell `(dx, dy)`, frame stores:
+5. Valid `sensor_radius` range in v1 is `>= 1`; `0` is rejected during runtime config validation.
+6. For each visible relative cell `(dx, dy)`, frame stores:
 - `food_density_u8`
 - `barrier_flag`
 - `occupied_flag`
 - optional creature metadata (if creature present)
-6. Creature metadata channels include:
+7. Creature metadata channels include:
 - phenotype RGB (`u8` each)
 - energy (`f32`)
 - age ticks (`u64`)
 - generation (`u32`)
-7. `SensorFrame` supports full local visibility, not nearest-only summaries.
+8. `SensorFrame` supports full local visibility, not nearest-only summaries.
 
 Coordinate rules:
 1. `dx > 0` points east, `dx < 0` west.
 2. `dy > 0` points south, `dy < 0` north.
 3. If `world_wrap=true`, sensor sampling wraps at map boundaries.
 4. If `world_wrap=false`, out-of-bounds samples return empty/zero values.
+
+### Neighbor input completeness contract
+
+1. Neighbor inputs expose full Moore neighborhood at radius `1` (8 adjacent cells).
+2. Direction-to-offset mapping:
+- `North` -> `(0, -1)`
+- `NorthEast` -> `(1, -1)`
+- `East` -> `(1, 0)`
+- `SouthEast` -> `(1, 1)`
+- `South` -> `(0, 1)`
+- `SouthWest` -> `(-1, 1)`
+- `West` -> `(-1, 0)`
+- `NorthWest` -> `(-1, -1)`
+3. `NeighborCell` is an alias over `SensorCell` at mapped offset with matching field semantics.
+4. `NeighborCreature` is an alias over `SensorCreature` at mapped offset with matching field semantics.
+5. Neighbor metadata richness matches sensor richness for creature channels:
+- phenotype RGB
+- energy
+- age
+- generation
+6. If mapped neighbor cell is out of bounds and `world_wrap=false`, neighbor values resolve to `0.0`.
+7. If `world_wrap=true`, neighbor sampling wraps exactly as `SensorFrame` sampling.
+8. `occupied_here` and `SensorCell(dx=0,dy=0)` remain the self-cell channels; neighbor inputs exclude center cell by design.
 
 ### Packet field values
 
@@ -199,6 +253,35 @@ Coordinate rules:
 2. `Amount(u8)`
 3. `Slot(u8)`
 
+World action metadata requirements (v1):
+
+| action kind | required metadata fields | optional fields | invalid examples |
+| --- | --- | --- | --- |
+| `move` | `Direction` | none | missing `Direction`, duplicate `Direction` |
+| `eat` | `Direction`, `Amount` | none | missing either field, duplicate field kind |
+| `reproduce` | `Amount` | `Direction` | missing `Amount`, duplicate `Amount` |
+| `inventory_pickup` | `Direction`, `Amount` | none | missing either field, duplicate field kind |
+| `inventory_put` | `Direction`, `Amount`, `Slot` | none | missing required field, duplicate field kind |
+| `noop` | none | none | any metadata field present |
+
+Direction metadata encoding:
+1. `Direction(i32)` must be in `0..=7`.
+2. Mapping uses `NeighborDirection` ordinal order:
+- `0=North`
+- `1=NorthEast`
+- `2=East`
+- `3=SouthEast`
+- `4=South`
+- `5=SouthWest`
+- `6=West`
+- `7=NorthWest`
+3. Out-of-range direction values are `InvalidActionMetadata` at runtime.
+
+Output field uniqueness contract:
+1. `OutputDefinition::InternalTarget.payload_fields` keys must be unique per output definition.
+2. `OutputDefinition::WorldAction.action_metadata_fields` must contain at most one field of each metadata kind.
+3. Duplicate key/kind violations are rejected by schema validation.
+
 VM emit override rule:
 1. VM may override output field values before emit via write-output opcodes.
 2. Override target is identified by `(output_index, field_index)` in the selected output definition.
@@ -211,6 +294,8 @@ VM emit override rule:
 3. `input_index >= resolved_input_slots.len()` returns `0.0` (soft default, not a fault).
 4. `SensorCell` and `SensorCreature` refs with `|dx|` or `|dy|` above `sensor_radius` return `0.0`.
 5. `SensorSummary` refs always resolve against the current `SensorFrame`.
+6. `NeighborCell` and `NeighborCreature` refs resolve through `NeighborDirection` to fixed `(dx,dy)` offsets.
+7. Neighbor refs are valid only when `sensor_radius >= 1`; otherwise they return `0.0`.
 
 Normalization table for built-in input keys:
 
@@ -247,6 +332,10 @@ Normalization table for sensor fields:
 | `VisibleFoodMeanNorm` | `mean(food_density_norm over visible cells)` |
 | `VisibleFoodTotalNorm` | `sum(food_density_norm over visible cells) / max_visible_cells` |
 | `CrowdingNorm` | `visible_creatures / max_visible_cells` |
+
+Neighbor field normalization:
+1. `NeighborCellField` normalization equals corresponding `SensorCellField` normalization at mapped neighbor offset.
+2. `NeighborCreatureField` normalization equals corresponding `SensorCreatureField` normalization at mapped neighbor offset.
 
 Sensor normalization defaults:
 1. `sensor_energy_norm_scale = 10.0`
@@ -305,15 +394,17 @@ Packet value conversion:
 25. `ReadSensorCell { dst, dx, dy, field }`
 26. `ReadSensorCreature { dst, dx, dy, field }`
 27. `ReadSensorSummary { dst, field }`
-28. `WriteInternalPayload { output_index, payload_field_index, src }`
-29. `WriteWorldActionMeta { output_index, metadata_field_index, src }`
-30. `EmitInternal { output_index }`
-31. `EmitWorldAction { output_index }`
-32. `Halt`
-33. `LoadMem8 { dst, addr_reg }`
-34. `StoreMem8 { addr_reg, src }`
-35. `LoadMem8Imm { dst, addr }`
-36. `StoreMem8Imm { addr, src }`
+28. `ReadNeighborCell { dst, direction, field }`
+29. `ReadNeighborCreature { dst, direction, field }`
+30. `WriteInternalPayload { output_index, payload_field_index, src }`
+31. `WriteWorldActionMeta { output_index, metadata_field_index, src }`
+32. `EmitInternal { output_index }`
+33. `EmitWorldAction { output_index }`
+34. `Halt`
+35. `LoadMem8 { dst, addr_reg }`
+36. `StoreMem8 { addr_reg, src }`
+37. `LoadMem8Imm { dst, addr }`
+38. `StoreMem8Imm { addr, src }`
 
 ### VM execution rules
 
@@ -330,13 +421,14 @@ Packet value conversion:
 9. `ReadInput` reads from per-dispatch resolved input slots; out-of-range index yields `0.0`.
 10. `ReadSensorCell` and `ReadSensorCreature` query `SensorFrame` by relative `(dx,dy)`.
 11. `ReadSensorSummary` queries summary channels from `SensorFrame`.
-12. Out-of-range sensor offsets or absent creature metadata resolve to `0.0` (not a fault).
-13. `WriteInternalPayload` and `WriteWorldActionMeta` write pending overrides for emit.
-14. Emit-time coercion rules for write-output overrides:
+12. `ReadNeighborCell` and `ReadNeighborCreature` query the mapped Moore-neighbor offsets from `SensorFrame`.
+13. Out-of-range sensor offsets, missing neighbor visibility (`sensor_radius < 1`), or absent creature metadata resolve to `0.0` (not a fault).
+14. `WriteInternalPayload` and `WriteWorldActionMeta` write pending overrides for emit.
+15. Emit-time coercion rules for write-output overrides:
 - `f32 -> i32`: round to nearest integer
 - `f32 -> u8`: clamp `[0.0, 255.0]` and round
 - `f32 -> bool`: `>= 0.5` is `true`, else `false`
-15. If remaining energy is below an opcode's effective cost, that opcode does not execute and VM exits as exhausted.
+16. If remaining energy is below an opcode's effective cost, that opcode does not execute and VM exits as exhausted.
 
 ### Invalid index and fault semantics
 
@@ -344,9 +436,10 @@ Packet value conversion:
 2. Invalid `const_idx` in `LoadConst` is a hard VM runtime fault.
 3. Invalid `output_index` or field index for write/emit opcodes is a hard VM runtime fault.
 4. Invalid `input_index` is a soft default (`0.0`) and not a fault.
-5. Invalid sensor field discriminant is a hard VM runtime fault.
-6. Memory addresses are never invalid (wrapping semantics).
-7. Jump target outside program bounds halts VM (not a fault).
+5. Invalid sensor/neighbor field discriminant is a hard VM runtime fault.
+6. Invalid neighbor direction discriminant is a hard VM runtime fault.
+7. Memory addresses are never invalid (wrapping semantics).
+8. Jump target outside program bounds halts VM (not a fault).
 
 ### Numeric determinism contract
 
@@ -395,6 +488,8 @@ Per-opcode baseline (`vm_opcode_base_cost`):
 | `ReadSensorCell` | `0.16` |
 | `ReadSensorCreature` | `0.20` |
 | `ReadSensorSummary` | `0.14` |
+| `ReadNeighborCell` | `0.14` |
+| `ReadNeighborCreature` | `0.18` |
 | `WriteInternalPayload` | `0.14` |
 | `WriteWorldActionMeta` | `0.14` |
 | `EmitInternal` | `0.20` |
@@ -463,7 +558,7 @@ Rules:
 2. Graph backend is deterministic and bounded-time per dispatch.
 3. Graph compute energy uses static operator-aware tariff from runtime config.
 4. Graph emits outputs from `output_definitions` after operator evaluation.
-5. Graph `inputs` may reference `SensorCell`, `SensorCreature`, and `SensorSummary` for full in-range observability.
+5. Graph `inputs` may reference `SensorCell`, `SensorCreature`, `SensorSummary`, `NeighborCell`, and `NeighborCreature` for full and neighbor-local observability.
 
 ## Task List
 
@@ -475,6 +570,8 @@ Files:
 - Create: `v2/crates/v2-core/tests/graph_stateful_ops.rs`
 - Create: `v2/crates/v2-core/tests/sensor_frame_contract.rs`
 - Create: `v2/crates/v2-core/tests/graph_sensor_inputs.rs`
+- Create: `v2/crates/v2-core/tests/neighbor_input_contract.rs`
+- Create: `v2/crates/v2-core/tests/graph_neighbor_inputs.rs`
 
 Steps:
 1. Add failing tests for backend/node_type mismatch.
@@ -483,6 +580,10 @@ Steps:
 4. Add failing tests for graph operator parameter and state-slot bounds.
 5. Add failing tests for `SensorFrame` coverage and metadata normalization.
 6. Add failing tests for graph access to rich sensor references.
+7. Add failing tests for complete 8-neighbor direction mapping and normalization.
+8. Add failing tests for graph access to neighbor references.
+9. Add failing tests for duplicate payload keys and duplicate metadata field-kind rejection.
+10. Add failing tests for direction metadata range and action-kind metadata requirements.
 
 ### Task 2: Add failing VM ISA tests
 
@@ -491,6 +592,7 @@ Files:
 - Create: `v2/crates/v2-core/tests/vm_memory.rs`
 - Create: `v2/crates/v2-core/tests/vm_io.rs`
 - Create: `v2/crates/v2-core/tests/vm_sensor_queries.rs`
+- Create: `v2/crates/v2-core/tests/vm_neighbor_queries.rs`
 - Create: `v2/crates/v2-core/tests/vm_opcode_costs.rs`
 - Create: `v2/crates/v2-core/tests/vm_input_mapping.rs`
 - Create: `v2/crates/v2-core/tests/vm_output_overrides.rs`
@@ -503,10 +605,11 @@ Steps:
 4. Add failing tests for memory load/store and address wrapping behavior.
 5. Add failing tests for input read/output write opcode semantics.
 6. Add failing tests for `ReadSensor*` query opcode semantics.
-7. Add failing tests verifying baseline opcode cost table and multiplier scaling.
-8. Add failing tests for `ReadInput` slot ordering and normalization mapping.
-9. Add failing tests for override lifecycle and invalid output index faults.
-10. Add failing tests for numeric sanitize/clamp/rounding determinism.
+7. Add failing tests for `ReadNeighbor*` query opcode semantics.
+8. Add failing tests verifying baseline opcode cost table and multiplier scaling.
+9. Add failing tests for `ReadInput` slot ordering and normalization mapping.
+10. Add failing tests for override lifecycle and invalid output index faults.
+11. Add failing tests for numeric sanitize/clamp/rounding determinism.
 
 ### Task 3: Implement schema and VM ISA contracts
 
@@ -528,16 +631,19 @@ Steps:
 4. `cd v2 && cargo test -p v2-core --test vm_memory`
 5. `cd v2 && cargo test -p v2-core --test vm_io`
 6. `cd v2 && cargo test -p v2-core --test vm_sensor_queries`
-7. `cd v2 && cargo test -p v2-core --test vm_opcode_costs`
-8. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
-9. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
-10. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
-11. `cd v2 && cargo test -p v2-core --test sensor_frame_contract`
-12. `cd v2 && cargo test -p v2-core --test graph_sensor_inputs`
-13. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
-14. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
-15. `cd v2 && cargo test -p v2-core --test mesh_runtime`
-16. `cd v2 && cargo test -p v2-core`
+7. `cd v2 && cargo test -p v2-core --test vm_neighbor_queries`
+8. `cd v2 && cargo test -p v2-core --test vm_opcode_costs`
+9. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
+10. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
+11. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
+12. `cd v2 && cargo test -p v2-core --test sensor_frame_contract`
+13. `cd v2 && cargo test -p v2-core --test neighbor_input_contract`
+14. `cd v2 && cargo test -p v2-core --test graph_sensor_inputs`
+15. `cd v2 && cargo test -p v2-core --test graph_neighbor_inputs`
+16. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
+17. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
+18. `cd v2 && cargo test -p v2-core --test mesh_runtime`
+19. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 

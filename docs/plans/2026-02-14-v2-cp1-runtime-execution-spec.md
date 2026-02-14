@@ -36,6 +36,8 @@
 | What halts execution when no action is emitted? | Queue drain returns implicit no-op outcome. | user+agent | resolved |
 | Should runtime expose full local sensor picture (food + creature metadata)? | Yes, via `SensorFrame` consumed by graph/VM sensor queries. | user+agent | resolved |
 | Is sensor radius globally configurable? | Yes, global `sensor_radius` in `RuntimeConfig` applies to all creatures. | user+agent | resolved |
+| Should immediate-neighbor inputs be first-class and complete like sensor queries? | Yes; expose 8-direction neighbor refs/opcodes with metadata parity to `SensorFrame`. | user+agent | resolved |
+| How should mixed invalid/valid emitted world actions be handled? | Emitted outputs are processed in order; invalid world-action metadata errors immediately and later actions are not considered. | user+agent | resolved |
 
 ## Specification Dependencies
 
@@ -52,7 +54,7 @@
 - `dispatch_entry_cost: f32`
 - `graph_base_tariff: f32`
 - `vm_opcode_cost_multiplier: f32`
-- `sensor_radius: u16` (global for world, applies to all creatures)
+- `sensor_radius: u16` (global for world, applies to all creatures, minimum `1`)
 - `action_costs: RuntimeActionCosts`
 
 2. `RuntimeActionCosts`
@@ -88,6 +90,9 @@
 - `InvalidConstIndex`
 - `InvalidOutputIndex`
 - `InvalidOutputFieldIndex`
+- `InvalidSensorField`
+- `InvalidNeighborField`
+- `InvalidNeighborDirection`
 
 ### Execution algorithm (single creature, single tick)
 
@@ -99,20 +104,23 @@
 - if energy reaches zero after entry charge: return `EnergyExhausted`
 - dispatch next packet (FIFO)
 - execute backend by target node type
+- backend returns emitted outputs in deterministic list order
 - VM backend supports opcode-level `ReadInput` and output write instructions (`WriteInternalPayload`, `WriteWorldActionMeta`)
 - VM backend supports rich sensor query opcodes (`ReadSensorCell`, `ReadSensorCreature`, `ReadSensorSummary`)
+- VM backend supports complete 8-direction neighbor query opcodes (`ReadNeighborCell`, `ReadNeighborCreature`)
 - allow VM backend to mutate creature `memory_bytes` through memory opcodes
 - allow graph backend to mutate graph-local state slots via bounded fixed-function operators
-- allow graph backend to consume rich `Sensor*` input references from `sensor_frame`
-- enforce schema/ISA fault policy: hard-fault invalid register/const/output indices; soft-default invalid input index
+- allow graph backend to consume rich `Sensor*` and `Neighbor*` input references from `sensor_frame`
+- enforce schema/ISA fault policy: hard-fault invalid register/const/output indices, invalid sensor/neighbor field discriminants, and invalid neighbor directions; soft-default invalid input index
 - charge backend compute energy (`graph_base_tariff * graph_operator_multiplier` or VM opcode-table metering)
 - if backend reports exhaustion: return `EnergyExhausted`
-- enqueue all emitted internal targets (same packet order as emitted list)
-- on first valid emitted world action:
-  - charge action cost by action kind
-  - if action metadata invalid: return `RuntimeError::InvalidActionMetadata`
-  - if energy is zero after action charge: still return `CommittedAction` (action is committed)
-  - halt immediately; do not process remaining queue entries
+- process emitted outputs in emitted-list order:
+  - `InternalTarget`: validate target node exists, else return `RuntimeError::InvalidTarget`; enqueue when valid
+  - `WorldAction`: validate metadata; invalid metadata returns `RuntimeError::InvalidActionMetadata` immediately
+  - first valid `WorldAction` commits immediately
+    - charge action cost by action kind
+    - if action cost exceeds remaining energy, clamp to `0.0` and still return `CommittedAction`
+    - halt immediately; do not process remaining queue entries
 5. If queue drains without action, return `ImplicitNoOp`.
 
 ### Energy charging order (normative)
@@ -128,9 +136,11 @@ Notes:
 - Energy is clamped to `[0, +inf)` at each operation.
 - No separate dispatch cap in CP-1.
 - Runtime must never panic due to user genome input; return `RuntimeError`.
+- Runtime config validation rejects `sensor_radius=0` before tick execution.
 - Memory arena is fixed at `1024` bytes and persists across ticks for a living creature.
 - Graph local state slots persist across ticks for living creatures.
 - Sensor frame exposes full local radius metadata (food, occupancy, creature phenotype and stats).
+- Neighbor inputs provide first-class 8-direction aliases over `SensorFrame` with matching normalization and wrap behavior.
 
 ### Determinism rules
 
@@ -156,6 +166,9 @@ Steps:
 7. Add test coverage for VM fault mapping and soft-default `ReadInput` out-of-range behavior.
 8. Add test coverage for graph stateful operator persistence and operator-aware tariff charging.
 9. Add test coverage for full-radius sensor-frame queries and metadata normalization.
+10. Add test coverage for 8-direction neighbor query mapping, normalization, and graph neighbor-input access.
+11. Add test coverage for emitted-output ordering when invalid world-action metadata appears before later valid world actions.
+12. Add test coverage for `sensor_radius=0` runtime-config rejection.
 
 ### Task 2: Implement runtime module
 
@@ -189,16 +202,19 @@ Steps:
 7. `cd v2 && cargo test -p v2-core --test vm_isa`
 8. `cd v2 && cargo test -p v2-core --test vm_memory`
 9. `cd v2 && cargo test -p v2-core --test vm_io`
-10. `cd v2 && cargo test -p v2-core --test vm_opcode_costs`
-11. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
-12. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
-13. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
-14. `cd v2 && cargo test -p v2-core --test vm_sensor_queries`
-15. `cd v2 && cargo test -p v2-core --test sensor_frame_contract`
-16. `cd v2 && cargo test -p v2-core --test graph_sensor_inputs`
-17. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
-18. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
-19. `cd v2 && cargo test -p v2-core`
+10. `cd v2 && cargo test -p v2-core --test vm_sensor_queries`
+11. `cd v2 && cargo test -p v2-core --test vm_neighbor_queries`
+12. `cd v2 && cargo test -p v2-core --test vm_opcode_costs`
+13. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
+14. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
+15. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
+16. `cd v2 && cargo test -p v2-core --test sensor_frame_contract`
+17. `cd v2 && cargo test -p v2-core --test neighbor_input_contract`
+18. `cd v2 && cargo test -p v2-core --test graph_sensor_inputs`
+19. `cd v2 && cargo test -p v2-core --test graph_neighbor_inputs`
+20. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
+21. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
+22. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 

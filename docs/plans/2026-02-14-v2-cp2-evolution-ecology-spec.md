@@ -35,6 +35,7 @@
 | Should novelty archives be introduced in CP-2? | No, ecology pressure is the novelty driver. | user+agent | resolved |
 | Should invalid mutations be discarded or repaired? | Repair first; discard only if repair fails invariants. | user+agent | resolved |
 | Should creature runtime memory be heritable at birth? | Yes in v1; offspring memory is copied byte-for-byte from parent. | user+agent | resolved |
+| What explicitly counts as a CP-2 non-collapse pass? | Fixed-seed baseline run must keep final-window mean population at or above `10%` of initial and produce at least one birth event. | user+agent | resolved |
 
 ## Evolution Contract
 
@@ -135,6 +136,7 @@ Repair policy:
 - `season_length_ticks: 500`
 - `season_transition_ticks: 50`
 - `barrier_density: 0.06`
+- `health_window_ticks: 100`
 
 ### Required ecology mechanisms
 
@@ -154,6 +156,13 @@ Repair policy:
 - local creature density adds energy pressure / reduced gain
 - pressure is monotonic with neighbor count in `crowding_radius`
 
+### Crowding pressure formula (normative)
+
+1. Neighbor count uses Chebyshev distance (`max(|dx|, |dy|) <= crowding_radius`) and excludes self.
+2. `crowding_multiplier = clamp(1.0 - crowding_penalty_per_neighbor * neighbor_count, 0.0, 1.0)`.
+3. `crowding_multiplier` applies to food-energy gain and passive recovery terms only (not direct movement/action costs).
+4. Higher neighbor count must never increase effective gain (monotonic non-increasing).
+
 ### Telemetry proxies (minimal)
 
 `RunHealthSnapshot` fields:
@@ -166,6 +175,20 @@ Repair policy:
 - `genome_node_count_p90`
 
 No lineage explanation is required in v1.
+
+Telemetry window contract:
+1. `births_last_window` and `deaths_last_window` are computed over trailing `health_window_ticks`.
+2. Window is tick-based and right-aligned at current `tick`.
+3. When `tick < health_window_ticks`, window starts at `tick=0`.
+
+### Baseline non-collapse contract (`ecology_noncollapse`)
+
+1. Test run is deterministic with fixed seed `42`.
+2. Run length is `2000` ticks with CP-2 default config.
+3. Pass criteria:
+- no crash/panic
+- at least one successful birth occurs during run
+- mean population across final `400` ticks is `>= ceil(initial_creatures * 0.10)`
 
 ## Task List
 
@@ -203,7 +226,7 @@ Files:
 
 Steps:
 1. Add failing tests for gradients, seasons, and crowding monotonicity.
-2. Add baseline non-collapse smoke test with bounded runtime.
+2. Add baseline non-collapse smoke test with bounded runtime and explicit pass thresholds from this spec.
 
 ### Task 4: Implement ecology systems and minimal telemetry
 

@@ -33,15 +33,16 @@
 | Should each checkpoint require a full workspace test pass? | Yes at exit; partial suites allowed at midpoint. | user+agent | resolved |
 | Should nondeterministic tests be allowed in checkpoint gates? | No; checkpoint gates require deterministic fixtures/seeds. | user+agent | resolved |
 | Should performance checks block CP-1/CP-2? | No hard perf gate until CP-3; only reliability gates before then. | user+agent | resolved |
+| Should CP-1 require explicit neighbor-input parity tests in addition to sensor tests? | Yes; neighbor mapping/normalization and VM/graph neighbor access are mandatory CP-1 gates. | user+agent | resolved |
 
 ## Checkpoint Test Matrix
 
 | checkpoint | required suites | pass criteria |
 | --- | --- | --- |
 | `CP-0` | workspace/build skeleton checks | `v2` Rust workspace checks and `v2/web` build succeeds |
-| `CP-1` | `mesh_kernel`, `mesh_energy`, `mesh_backends`, `mesh_runtime`, `mesh_schema_contract`, `vm_isa`, `vm_memory`, `vm_io`, `vm_sensor_queries`, `vm_opcode_costs`, `vm_input_mapping`, `vm_output_overrides`, `vm_numeric_determinism`, `sensor_frame_contract`, `graph_sensor_inputs`, `graph_operator_richness`, `graph_stateful_ops`, `sensor_radius_global_config` | all tests pass; runtime semantics, schema/ISA contracts, global configurable sensor radius, full-radius sensor richness, VM memory/I/O/sensor opcodes, slot mapping/override lifecycle, numeric determinism, opcode-cost behavior, and graph fixed-function richness match CP-1 specs |
-| `CP-2` | `mutation_invariants`, `mutation_repair`, `reproduction_memory_inheritance`, `ecology_pressures`, `ecology_noncollapse` | all tests pass on fixed seeds; no invariant violations and offspring memory-copy semantics hold |
-| `CP-3` | server lifecycle/payload/ws tests, cli ndjson tests, web protocol fixtures, end-to-end smoke | all tests pass; schema/version parity across all surfaces |
+| `CP-1` | `mesh_kernel`, `mesh_energy`, `mesh_backends`, `mesh_runtime`, `mesh_schema_contract`, `vm_isa`, `vm_memory`, `vm_io`, `vm_sensor_queries`, `vm_neighbor_queries`, `vm_opcode_costs`, `vm_input_mapping`, `vm_output_overrides`, `vm_numeric_determinism`, `sensor_frame_contract`, `neighbor_input_contract`, `graph_sensor_inputs`, `graph_neighbor_inputs`, `graph_operator_richness`, `graph_stateful_ops`, `sensor_radius_global_config` | all tests pass; runtime semantics, schema/ISA contracts, global configurable sensor radius, full-radius sensor richness, complete neighbor-input parity, VM memory/I/O/sensor+neighbor opcodes, emitted-output ordering/error precedence, slot mapping/override lifecycle, numeric determinism, opcode-cost behavior, and graph fixed-function richness match CP-1 specs |
+| `CP-2` | `mutation_invariants`, `mutation_repair`, `reproduction_memory_inheritance`, `ecology_pressures`, `ecology_noncollapse` | all tests pass on fixed seeds; no invariant violations, offspring memory-copy semantics hold, and non-collapse threshold contract is met |
+| `CP-3` | server lifecycle/payload/ws tests, cli ndjson tests, web protocol fixtures, end-to-end smoke | all tests pass; schema/version parity across all surfaces, lifecycle transition contract is enforced, and non-2xx responses follow error-envelope schema |
 
 ## Required Test Categories
 
@@ -90,16 +91,19 @@
 8. `cd v2 && cargo test -p v2-core --test vm_memory`
 9. `cd v2 && cargo test -p v2-core --test vm_io`
 10. `cd v2 && cargo test -p v2-core --test vm_sensor_queries`
-11. `cd v2 && cargo test -p v2-core --test vm_opcode_costs`
-12. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
-13. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
-14. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
-15. `cd v2 && cargo test -p v2-core --test sensor_frame_contract`
-16. `cd v2 && cargo test -p v2-core --test graph_sensor_inputs`
-17. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
-18. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
-19. `cd v2 && cargo test -p v2-core --test sensor_radius_global_config`
-20. `cd v2 && cargo test -p v2-core`
+11. `cd v2 && cargo test -p v2-core --test vm_neighbor_queries`
+12. `cd v2 && cargo test -p v2-core --test vm_opcode_costs`
+13. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
+14. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
+15. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
+16. `cd v2 && cargo test -p v2-core --test sensor_frame_contract`
+17. `cd v2 && cargo test -p v2-core --test neighbor_input_contract`
+18. `cd v2 && cargo test -p v2-core --test graph_sensor_inputs`
+19. `cd v2 && cargo test -p v2-core --test graph_neighbor_inputs`
+20. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
+21. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
+22. `cd v2 && cargo test -p v2-core --test sensor_radius_global_config`
+23. `cd v2 && cargo test -p v2-core`
 
 ### `CP-2` exit
 

@@ -35,6 +35,7 @@
 | Should `v2` payloads be backward compatible with legacy API? | No. | user+agent | resolved |
 | Should status and frame data be separate endpoints? | Yes, status via HTTP and frames via WebSocket stream + optional HTTP snapshot endpoint. | user+agent | resolved |
 | Should CLI output be text-only? | No, use line-delimited JSON for stable parsing. | user+agent | resolved |
+| Should lifecycle endpoints be strict or idempotent on repeated calls? | Idempotent for `start`/`pause`; state-restricted for `step` and snapshot import. | user+agent | resolved |
 
 ## Protocol Versioning
 
@@ -77,6 +78,12 @@ Response:
 
 Request:
 - `steps: u16` (default `1`, max `1000`)
+
+Rules:
+- omitted `steps` defaults to `1`
+- valid range is `1..=1000`
+- invalid value returns `400` with error envelope
+- endpoint requires `state="paused"`; other states return `409`
 
 Response:
 - `protocol_version`
@@ -127,6 +134,42 @@ Response:
 - `state: "paused"`
 - `tick: u64`
 
+Rules:
+- endpoint requires `state="paused"`; other states return `409`
+- schema/validation failure returns `422` error envelope and does not modify world state
+
+### HTTP error envelope (normative)
+
+All non-2xx responses must use:
+- `protocol_version: "v2alpha1"`
+- `error: { code: string, message: string, details?: object }`
+
+Required error codes:
+- `invalid_request` (`400`)
+- `invalid_state_transition` (`409`)
+- `snapshot_rejected` (`422`)
+- `internal_error` (`500`)
+
+### Lifecycle transition contract
+
+1. `POST /simulation/startup`
+- valid from any state
+- resets simulation state to configured idle at `tick=0`
+
+2. `POST /simulation/start`
+- if `idle` (configured) or `paused`: transitions to `running`
+- if already `running`: returns `200` with unchanged `running` state (idempotent)
+
+3. `POST /simulation/pause`
+- if `running`: transitions to `paused`
+- if already `paused`: returns `200` with unchanged `paused` state (idempotent)
+- if `idle`: returns `409` `invalid_state_transition`
+
+4. `POST /simulation/step`
+- valid only when `paused`
+- advances exactly requested steps
+- remains `paused` after completion
+
 ## WebSocket Stream Contract (`/v2/ws`)
 
 Event envelope:
@@ -147,6 +190,7 @@ Event payloads:
 Ordering requirements:
 1. `tick` is monotonic non-decreasing per connection.
 2. For same tick, `status` event is emitted before `frame`.
+3. If `health` is emitted for same tick, order is `status -> frame -> health`.
 
 ## CLI Contract (`v2-cli`)
 
@@ -185,6 +229,7 @@ Steps:
 1. Add failing tests for every endpoint/event contract above.
 2. Add fixture-based parser tests in web client.
 3. Add CLI NDJSON schema tests.
+4. Add failing tests for HTTP error envelope/status-code mapping and lifecycle transition rules.
 
 ### Task 2: Implement server lifecycle and streaming endpoints
 
