@@ -35,6 +35,13 @@
 | Should world-action arbitration pick highest confidence? | No; first valid emitted action commits immediately. | user+agent | resolved |
 | What halts execution when no action is emitted? | Queue drain returns implicit no-op outcome. | user+agent | resolved |
 
+## Specification Dependencies
+
+- Schema/ISA contract source of truth:
+  - `docs/plans/2026-02-14-v2-core-schema-vm-isa-spec.md`
+- Shared gate matrix:
+  - `docs/plans/2026-02-14-v2-implementation-test-matrix.md`
+
 ## Runtime Contract
 
 ### Runtime types (to add in `v2/crates/v2-core/src/runtime.rs`)
@@ -149,7 +156,9 @@ Steps:
 3. `cd v2 && cargo test -p v2-core --test mesh_energy`
 4. `cd v2 && cargo test -p v2-core --test mesh_backends`
 5. `cd v2 && cargo test -p v2-core --test mesh_runtime`
-6. `cd v2 && cargo test -p v2-core`
+6. `cd v2 && cargo test -p v2-core --test mesh_schema_contract`
+7. `cd v2 && cargo test -p v2-core --test vm_isa`
+8. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 

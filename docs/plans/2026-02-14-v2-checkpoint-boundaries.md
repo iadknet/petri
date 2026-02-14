@@ -48,6 +48,7 @@
 | checkpoint | implementation spec |
 | --- | --- |
 | `CP-1 Runtime Kernel` | `docs/plans/2026-02-14-v2-cp1-runtime-execution-spec.md` |
+| `CP-1 Runtime Kernel` (schema/ISA) | `docs/plans/2026-02-14-v2-core-schema-vm-isa-spec.md` |
 | `CP-2 Evolution + Ecology` | `docs/plans/2026-02-14-v2-cp2-evolution-ecology-spec.md` |
 | `CP-3 Product Surface + Stabilization` | `docs/plans/2026-02-14-v2-cp3-api-protocol-spec.md` |
 
@@ -80,6 +81,7 @@ Steps:
 
 Files:
 - Create: `docs/plans/2026-02-14-v2-cp1-runtime-execution-spec.md`
+- Create: `docs/plans/2026-02-14-v2-core-schema-vm-isa-spec.md`
 - Create: `docs/plans/2026-02-14-v2-cp2-evolution-ecology-spec.md`
 - Create: `docs/plans/2026-02-14-v2-cp3-api-protocol-spec.md`
 - Create: `docs/plans/2026-02-14-v2-implementation-test-matrix.md`
