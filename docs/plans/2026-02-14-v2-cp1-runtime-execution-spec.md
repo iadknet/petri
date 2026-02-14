@@ -214,7 +214,8 @@ Steps:
 19. `cd v2 && cargo test -p v2-core --test graph_neighbor_inputs`
 20. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
 21. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
-22. `cd v2 && cargo test -p v2-core`
+22. `cd v2 && cargo test -p v2-core --test sensor_radius_global_config`
+23. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 

@@ -52,7 +52,7 @@ Files:
 - Create: `v2/crates/v2-server/tests/lifecycle.rs`
 - Create: `v2/crates/v2-server/tests/payloads.rs`
 - Create: `v2/crates/v2-server/tests/ws_stream.rs`
-- Create: `v2/crates/v2-cli/tests/ablation.rs`
+- Create: `v2/crates/v2-cli/tests/ablation_output.rs`
 - Create: `v2/crates/v2-cli/tests/run_output.rs`
 - Create: `v2/web/src/protocol.test.ts`
 
