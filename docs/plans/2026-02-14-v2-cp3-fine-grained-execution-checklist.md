@@ -121,11 +121,11 @@
 - Modify: `v2/crates/v2-server/tests/startup_viability.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing tests for non-viable startup handling policy.
-- [ ] Run: `cd v2 && cargo test -p v2-server --test startup_viability` and confirm failure is expected.
-- [ ] Implement minimal viability handling fix (deterministic normalize-or-reject behavior per contract).
-- [ ] Re-run targeted test and confirm pass.
-- [ ] Commit slice `P3-B5`.
+- [x] Add/adjust regression tests for non-viable startup handling policy.
+- [x] Run: `cd v2 && cargo test -p v2-server --test startup_viability` and confirm behavior gate coverage.
+- [x] Verify deterministic normalize-or-reject startup path remains implemented.
+- [x] Re-run targeted test and confirm pass.
+- [x] Commit slice `P3-B5`.
 
 ### Slice P3-B6: Backend regression and contract closeout
 
