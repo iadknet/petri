@@ -2,7 +2,7 @@ use crate::PROTOCOL_VERSION;
 use crate::api::{FrameResponse, HealthPayload, StatusResponse};
 
 #[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "kind", content = "value", rename_all = "snake_case")]
+#[serde(untagged)]
 pub enum WsPayload {
     Status(StatusResponse),
     Frame(FrameResponse),

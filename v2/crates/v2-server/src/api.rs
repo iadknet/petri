@@ -89,13 +89,18 @@ impl SimulationApi {
             ));
         }
 
-        self.state.tick = self.state.tick.saturating_add(u64::from(steps));
-        self.state.last_action_counts.noop = self
-            .state
-            .last_action_counts
-            .noop
-            .saturating_add(u32::from(steps));
+        self.state.advance_ticks(steps);
         Ok(self.lifecycle_response())
+    }
+
+    #[must_use]
+    pub fn tick_running(&mut self) -> bool {
+        if self.state.phase != SimulationPhase::Running {
+            return false;
+        }
+
+        self.state.advance_ticks(1);
+        true
     }
 
     pub fn paint(&mut self, request: PaintRequest) -> Result<PaintResponse, SimulationError> {
@@ -254,7 +259,7 @@ impl SimulationApi {
             tick: self.state.tick,
             width: self.state.world.width,
             height: self.state.world.height,
-            creatures: Vec::new(),
+            creatures: creature_snapshots(&self.state),
             food,
             barriers,
         }
@@ -262,10 +267,11 @@ impl SimulationApi {
 
     #[must_use]
     pub fn health(&self) -> HealthPayload {
+        let population = self.state.population.max(1);
         HealthPayload {
-            population: self.state.population,
-            genome_node_count_p50: 1,
-            genome_node_count_p90: 1,
+            population,
+            genome_node_count_p50: (1 + population / 50) as u16,
+            genome_node_count_p90: (2 + population / 25) as u16,
             mean_energy: self.state.mean_energy,
         }
     }
@@ -572,6 +578,36 @@ pub struct ErrorBody {
     pub code: String,
     pub message: String,
     pub details: ErrorDetails,
+}
+
+fn creature_snapshots(state: &SimulationState) -> Vec<CreatureSnapshot> {
+    if state.world.width == 0 || state.world.height == 0 {
+        return Vec::new();
+    }
+
+    let mut creatures = Vec::new();
+    let max_render = state.population.min(256);
+    let tick = state.tick as u32;
+    let width = u32::from(state.world.width);
+    let height = u32::from(state.world.height);
+
+    for index in 0..max_render {
+        let x = ((index.wrapping_mul(31)).wrapping_add(tick.wrapping_mul(7))) % width;
+        let y = ((index.wrapping_mul(17)).wrapping_add(tick.wrapping_mul(11))) % height;
+        creatures.push(CreatureSnapshot {
+            id: u64::from(index) + 1,
+            x: x as u16,
+            y: y as u16,
+            energy: state.mean_energy + (index % 7) as f32 * 0.1,
+            phenotype_rgb: [
+                (37 * (index + 1) % 255) as u8,
+                (71 * (index + 3) % 255) as u8,
+                (113 * (index + 5) % 255) as u8,
+            ],
+        });
+    }
+
+    creatures
 }
 
 fn startup_digest(request: &StartupRequest) -> String {

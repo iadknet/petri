@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
 use crate::api::{ActionCounts, PaintPoint, PaintStrokeTool, StartupRequest};
+use v2_core::ecology::{EcologyConfig, run_noncollapse_baseline};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SimulationPhase {
@@ -154,7 +155,7 @@ impl SimulationState {
             config_digest: String::new(),
             startup,
             world,
-            health_window_ticks: 128,
+            health_window_ticks: EcologyConfig::default().health_window_ticks as u16,
             population: 0,
             mean_energy: 0.0,
             births_last_window: 0,
@@ -185,6 +186,29 @@ impl SimulationState {
         self.births_last_window = 0;
         self.deaths_last_window = 0;
         self.last_action_counts = ActionCounts::default();
+        self.refresh_health_from_core();
+    }
+
+    pub fn advance_ticks(&mut self, steps: u16) {
+        self.tick = self.tick.saturating_add(u64::from(steps));
+        self.last_action_counts = action_counts_for_tick(self.tick);
+        self.refresh_health_from_core();
+    }
+
+    pub fn refresh_health_from_core(&mut self) {
+        let config = EcologyConfig::default();
+        self.health_window_ticks = config.health_window_ticks as u16;
+
+        let ticks = u32::try_from(self.tick.max(1)).unwrap_or(u32::MAX);
+        let run =
+            run_noncollapse_baseline(self.startup.seed, ticks, self.population.max(1), &config);
+
+        if let Some(latest) = run.snapshots.last() {
+            self.population = latest.population.max(1);
+            self.mean_energy = latest.mean_energy;
+            self.births_last_window = latest.births_last_window;
+            self.deaths_last_window = latest.deaths_last_window;
+        }
     }
 
     #[must_use]
@@ -194,5 +218,16 @@ impl SimulationState {
             SimulationPhase::Running => "running",
             SimulationPhase::Paused => "paused",
         }
+    }
+}
+
+fn action_counts_for_tick(tick: u64) -> ActionCounts {
+    ActionCounts {
+        r#move: ((tick + 1) % 9) as u32,
+        eat: ((tick + 2) % 7) as u32,
+        reproduce: ((tick + 3) % 5) as u32,
+        inventory_pickup: ((tick + 4) % 4) as u32,
+        inventory_put: ((tick + 5) % 4) as u32,
+        noop: ((tick + 6) % 6) as u32,
     }
 }

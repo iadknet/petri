@@ -104,3 +104,58 @@ export interface ErrorEnvelope {
     details?: ErrorDetails;
   };
 }
+
+export interface StartupRequest {
+  seed: number;
+  world: {
+    width: number;
+    height: number;
+    wrap: boolean;
+    sensor_radius: number;
+  };
+  population: {
+    initial_creatures: number;
+    max_creatures: number;
+  };
+  runtime: {
+    ticks_per_second: number;
+    max_tick_budget_ms: number;
+  };
+}
+
+export interface StartupResponse {
+  protocol_version: string;
+  state: LifecycleState;
+  tick: number;
+  config_digest: string;
+}
+
+export interface LifecycleResponse {
+  protocol_version: string;
+  state: LifecycleState;
+  tick: number;
+}
+
+export type PaintTool = "food" | "barrier" | "erase_food" | "erase_barrier";
+export type PaintAction = "stroke" | "clear_all";
+
+export interface PaintPoint {
+  x: number;
+  y: number;
+}
+
+export interface PaintRequest {
+  action: PaintAction;
+  tool?: PaintTool;
+  brush_half_extent?: number;
+  points?: PaintPoint[];
+}
+
+export interface PaintResponse {
+  protocol_version: string;
+  state: LifecycleState;
+  tick: number;
+  paint_result: {
+    touched_cells: number;
+  };
+}
