@@ -99,13 +99,13 @@ Steps:
 
 ## Checkpoint Boundaries
 
-### Entry Checkpoint (`S3-ENTRY`)
+### Entry Checkpoint (`S3-ENTRY`): `go`
 
 Required before starting:
 1. Stage-2 `S2-EXIT` is `go`.
 2. Kernel/backends API is frozen for this stage window.
 
-### Midpoint Checkpoint (`S3-MID`)
+### Midpoint Checkpoint (`S3-MID`): `go`
 
 Required before task 4:
 1. Mutation invariant tests pass.
@@ -117,7 +117,7 @@ Stop conditions:
 1. Mutation operators repeatedly produce invalid genomes.
 2. Baseline ecology causes immediate deterministic collapse.
 
-### Exit Checkpoint (`S3-EXIT`)
+### Exit Checkpoint (`S3-EXIT`): `complete`
 
 Required to close stage:
 1. Mutation invariants and ecology tests pass.
@@ -127,6 +127,9 @@ Required to close stage:
 Go / stop rule:
 1. `go` to stage 4 only if stage baseline is stable enough for product-surface wiring.
 2. `stop` and tune stage defaults if instability persists.
+
+Verification snapshot:
+1. `CP-2` gate re-verified green on 2026-02-14 using `scripts/check-plan-harness.sh --mode strict` and the full `CP-2` command gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md`.
 
 ## Verification Commands
 

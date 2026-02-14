@@ -45,6 +45,7 @@
 
 Verification snapshot:
 1. `CP-1` gate re-verified green on 2026-02-14 using `scripts/check-plan-harness.sh --mode strict` plus the full `CP-1` command gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md`.
+2. `CP-2` gate re-verified green on 2026-02-14 using `scripts/check-plan-harness.sh --mode strict` plus the full `CP-2` command gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md`.
 
 ## Checkpoint Specs
 
