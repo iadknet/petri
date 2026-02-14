@@ -100,7 +100,7 @@ describe("ViewportCanvas paint interactions", () => {
   }
 
   it("shows preview cells while dragging before commit", async () => {
-    const onStrokeCommit = vi.fn(async () => {});
+    const onStrokeCommit = vi.fn(async (_points: PaintPoint[]) => {});
     const { getByTestId, container } = render(
       <ViewportCanvas
         frame={makeFrame()}
@@ -114,7 +114,7 @@ describe("ViewportCanvas paint interactions", () => {
       />
     );
 
-    const canvas = getByTestId("viewport-canvas") as SVGSVGElement;
+    const canvas = getByTestId("viewport-canvas") as unknown as SVGSVGElement;
     setCanvasBounds(canvas);
 
     await act(async () => {
@@ -140,7 +140,7 @@ describe("ViewportCanvas paint interactions", () => {
   });
 
   it("commits exactly once on pointer-up", async () => {
-    const onStrokeCommit = vi.fn(async () => {});
+    const onStrokeCommit = vi.fn(async (_points: PaintPoint[]) => {});
     const { getByTestId } = render(
       <ViewportCanvas
         frame={makeFrame()}
@@ -154,7 +154,7 @@ describe("ViewportCanvas paint interactions", () => {
       />
     );
 
-    const canvas = getByTestId("viewport-canvas") as SVGSVGElement;
+    const canvas = getByTestId("viewport-canvas") as unknown as SVGSVGElement;
     setCanvasBounds(canvas);
 
     await act(async () => {
@@ -191,6 +191,7 @@ describe("ViewportCanvas paint interactions", () => {
     await waitFor(() => {
       expect(onStrokeCommit).toHaveBeenCalledTimes(1);
     });
-    expect(onStrokeCommit.mock.calls[0][0].length).toBeGreaterThan(0);
+    const committedPoints = onStrokeCommit.mock.calls[0]?.[0] ?? [];
+    expect(committedPoints.length).toBeGreaterThan(0);
   });
 });

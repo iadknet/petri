@@ -18,10 +18,13 @@ export function AppShell(props: AppShellProps) {
     <main className="app-shell">
       <header className="app-header">
         <h1>Petri V2 Control Surface</h1>
+        <p className="app-subtitle">
+          Deterministic runtime control and ecology observability
+        </p>
         <div className="app-status">{props.statusLine ?? null}</div>
         <div className="app-banner">
           <strong>Protocol</strong>
-          <span>{props.protocolBanner}</span>
+          <span className="app-banner-value">{props.protocolBanner}</span>
         </div>
       </header>
 
