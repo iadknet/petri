@@ -124,6 +124,12 @@
 5. `cd v2/web && npm run test`
 6. `cd v2/web && npm run build`
 
+## Matrix Ownership (DRY Rule)
+
+1. This file is the single source of truth for `CP-1`..`CP-3` command gates.
+2. Stage/spec plans should reference these checkpoint sections instead of duplicating full command lists.
+3. When a checkpoint gate changes, update this matrix first, then update stage/spec references only.
+
 ## Task List
 
 ### Task 1: Align stage plans with this matrix

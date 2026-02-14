@@ -18,6 +18,7 @@
 ## Boundary Impact
 
 - Work remains isolated to `v2/crates/v2-core`.
+- Internal module ownership must follow `docs/plans/2026-02-14-v2-core-schema-vm-isa-spec.md` (`v2-core` internal boundary contract).
 - No modifications to legacy runtime code.
 - `v2-server`, `v2-cli`, and `v2-web` stay out of scope for this stage.
 
@@ -83,7 +84,7 @@ Files:
 - Create: `v2/crates/v2-core/tests/mesh_backends.rs`
 
 Exit evidence:
-1. Graph backend emits outputs and charges static tariff.
+1. Graph backend emits outputs and reports compute metadata; runtime applies operator-aware tariff charging.
 2. VM backend is bounded by remaining energy and reports exhaustion.
 3. Graph backend supports stateful/aggregating operators with deterministic bounded behavior.
 
@@ -96,7 +97,7 @@ Files:
 
 Steps:
 1. Write failing integration tests for full dispatch loop with energy charging order.
-2. Implement runtime executor that composes queue dispatch + backend execution + action commit halt.
+2. Implement runtime executor that composes queue dispatch + backend execution + action commit halt, with runtime as sole energy-ledger writer.
 3. Ensure immediate death/exhaustion semantics are represented in runtime outcomes.
 4. Keep runtime deterministic for fixture-based tests.
 5. Align runtime outcomes with CP-1 spec contract types.
@@ -141,28 +142,7 @@ Go / stop rule:
 ## Verification Commands
 
 1. `scripts/check-plan-harness.sh --mode strict`
-2. `cd v2 && cargo test -p v2-core --test mesh_kernel`
-3. `cd v2 && cargo test -p v2-core --test mesh_energy`
-4. `cd v2 && cargo test -p v2-core --test mesh_backends`
-5. `cd v2 && cargo test -p v2-core --test mesh_runtime`
-6. `cd v2 && cargo test -p v2-core --test mesh_schema_contract`
-7. `cd v2 && cargo test -p v2-core --test vm_isa`
-8. `cd v2 && cargo test -p v2-core --test vm_memory`
-9. `cd v2 && cargo test -p v2-core --test vm_io`
-10. `cd v2 && cargo test -p v2-core --test vm_sensor_queries`
-11. `cd v2 && cargo test -p v2-core --test vm_neighbor_queries`
-12. `cd v2 && cargo test -p v2-core --test vm_opcode_costs`
-13. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
-14. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
-15. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
-16. `cd v2 && cargo test -p v2-core --test sensor_frame_contract`
-17. `cd v2 && cargo test -p v2-core --test neighbor_input_contract`
-18. `cd v2 && cargo test -p v2-core --test graph_sensor_inputs`
-19. `cd v2 && cargo test -p v2-core --test graph_neighbor_inputs`
-20. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
-21. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
-22. `cd v2 && cargo test -p v2-core --test sensor_radius_global_config`
-23. `cd v2 && cargo test -p v2-core`
+2. Run the `CP-1` command gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md` (`## Command Gates by Checkpoint` -> `### CP-1 exit`).
 
 ## Risks and Rollback
 

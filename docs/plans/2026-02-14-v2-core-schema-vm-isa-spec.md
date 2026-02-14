@@ -18,6 +18,17 @@
 - No transport/API coupling introduced.
 - Legacy schema remains untouched.
 
+## `v2-core` Internal Boundary Contract (normative)
+
+1. `mesh.rs` owns schema/data contracts and validation only; it must not own runtime metering or ecology policy.
+2. `backends.rs` owns deterministic node execution semantics and may return emitted outputs plus compute metadata, but it must not debit global runtime energy directly.
+3. `runtime.rs` owns queue orchestration, energy ledger application, world-action commit/halt policy, and runtime error mapping.
+4. `energy.rs` owns reusable charge/clamp helpers consumed by `runtime.rs`.
+5. `evolution/*` owns mutation and repair over mesh contracts; no dependency on `runtime.rs` or transport layers.
+6. `ecology/*` owns resource/crowding/season dynamics and config; no dependency on backend internals.
+7. `telemetry.rs` owns read-only run-health aggregation from runtime/ecology outputs.
+8. Shared cross-module types must live in neutral contract modules (`mesh.rs` or a dedicated core contract module), not behind higher-level orchestrators.
+
 ## Existing Boundary Recheck
 
 | area | decision | rationale |
@@ -651,24 +662,7 @@ Steps:
 ## Verification Commands
 
 1. `scripts/check-plan-harness.sh --mode strict`
-2. `cd v2 && cargo test -p v2-core --test mesh_schema_contract`
-3. `cd v2 && cargo test -p v2-core --test vm_isa`
-4. `cd v2 && cargo test -p v2-core --test vm_memory`
-5. `cd v2 && cargo test -p v2-core --test vm_io`
-6. `cd v2 && cargo test -p v2-core --test vm_sensor_queries`
-7. `cd v2 && cargo test -p v2-core --test vm_neighbor_queries`
-8. `cd v2 && cargo test -p v2-core --test vm_opcode_costs`
-9. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
-10. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
-11. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
-12. `cd v2 && cargo test -p v2-core --test sensor_frame_contract`
-13. `cd v2 && cargo test -p v2-core --test neighbor_input_contract`
-14. `cd v2 && cargo test -p v2-core --test graph_sensor_inputs`
-15. `cd v2 && cargo test -p v2-core --test graph_neighbor_inputs`
-16. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
-17. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
-18. `cd v2 && cargo test -p v2-core --test mesh_runtime`
-19. `cd v2 && cargo test -p v2-core`
+2. Run the `CP-1` command gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md` (`## Command Gates by Checkpoint` -> `### CP-1 exit`).
 
 ## Risks and Rollback
 

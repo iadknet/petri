@@ -16,6 +16,7 @@
 ## Boundary Impact
 
 - Implementation remains fully inside `v2/crates/v2-core`.
+- Internal module ownership must follow `docs/plans/2026-02-14-v2-core-schema-vm-isa-spec.md` (`v2-core` internal boundary contract).
 - No mutation/ecology code shared with legacy runtime.
 - Transport layers consume outputs later without influencing operator semantics.
 
@@ -252,12 +253,7 @@ Steps:
 ## Verification Commands
 
 1. `scripts/check-plan-harness.sh --mode strict`
-2. `cd v2 && cargo test -p v2-core --test mutation_invariants`
-3. `cd v2 && cargo test -p v2-core --test mutation_repair`
-4. `cd v2 && cargo test -p v2-core --test reproduction_memory_inheritance`
-5. `cd v2 && cargo test -p v2-core --test ecology_pressures`
-6. `cd v2 && cargo test -p v2-core --test ecology_noncollapse`
-7. `cd v2 && cargo test -p v2-core`
+2. Run the `CP-2` command gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md` (`## Command Gates by Checkpoint` -> `### CP-2 exit`).
 
 ## Risks and Rollback
 

@@ -27,6 +27,9 @@ At minimum include:
 6. Verification commands
 7. Risks/rollback notes when applicable
 
+Verification command DRY rule:
+- If a shared checkpoint matrix exists, use it as command source-of-truth and reference matrix sections from stage/spec plans instead of duplicating long command lists.
+
 ## Existing Boundary Recheck requirements
 
 Include at least two reviewed existing areas (crate/module/file), each with:

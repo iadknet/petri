@@ -18,6 +18,7 @@
 ## Boundary Impact
 
 - Stage remains inside `v2-core` runtime and config modules.
+- Internal module ownership must follow `docs/plans/2026-02-14-v2-core-schema-vm-isa-spec.md` (`v2-core` internal boundary contract).
 - No edits to legacy evolution/ecology modules.
 - `v2-server` consumes stage outputs later without driving stage internals.
 
@@ -91,7 +92,7 @@ Files:
 
 Steps:
 1. Implement ecology pressure knobs and dynamics.
-2. Implement non-intrusive telemetry proxies for run health.
+2. Implement non-intrusive, read-only telemetry proxies for run health.
 3. Add baseline non-collapse integration test scenarios.
 
 ## Checkpoint Boundaries
@@ -128,12 +129,7 @@ Go / stop rule:
 ## Verification Commands
 
 1. `scripts/check-plan-harness.sh --mode strict`
-2. `cd v2 && cargo test -p v2-core --test mutation_invariants`
-3. `cd v2 && cargo test -p v2-core --test mutation_repair`
-4. `cd v2 && cargo test -p v2-core --test reproduction_memory_inheritance`
-5. `cd v2 && cargo test -p v2-core --test ecology_pressures`
-6. `cd v2 && cargo test -p v2-core --test ecology_noncollapse`
-7. `cd v2 && cargo test -p v2-core`
+2. Run the `CP-2` command gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md` (`## Command Gates by Checkpoint` -> `### CP-2 exit`).
 
 ## Risks and Rollback
 

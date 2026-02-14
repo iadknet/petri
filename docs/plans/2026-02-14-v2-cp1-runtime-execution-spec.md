@@ -16,6 +16,7 @@
 ## Boundary Impact
 
 - `v2/crates/v2-core` gains a `runtime` module that composes existing `mesh`, `energy`, and `backends`.
+- Internal module ownership must follow `docs/plans/2026-02-14-v2-core-schema-vm-isa-spec.md` (`v2-core` internal boundary contract).
 - No `v2-core` dependency on `v2-server`, `v2-cli`, or `v2-web`.
 - Legacy crates remain untouched and unreferenced.
 
@@ -105,7 +106,7 @@
 - if energy reaches zero after entry charge: return `EnergyExhausted`
 - dispatch next packet (FIFO)
 - execute backend by target node type
-- backend returns emitted outputs in deterministic list order
+- backend returns emitted outputs plus compute/exhaustion metadata in deterministic list order; backend must not debit runtime energy directly
 - VM backend supports opcode-level `ReadInput` and output write instructions (`WriteInternalPayload`, `WriteWorldActionMeta`)
 - VM backend supports rich sensor query opcodes (`ReadSensorCell`, `ReadSensorCreature`, `ReadSensorSummary`)
 - VM backend supports complete 8-direction neighbor query opcodes (`ReadNeighborCell`, `ReadNeighborCreature`)
@@ -142,6 +143,7 @@ Notes:
 - Graph local state slots persist across ticks for living creatures.
 - Sensor frame exposes full local radius metadata (food, occupancy, creature phenotype and stats).
 - Neighbor inputs provide first-class 8-direction aliases over `SensorFrame` with matching normalization and wrap behavior.
+- Runtime is the sole writer of the per-creature energy ledger during dispatch.
 
 ### Determinism rules
 
@@ -189,35 +191,14 @@ Files:
 - Modify: `v2/crates/v2-core/src/backends.rs`
 
 Steps:
-1. Ensure backend execution returns enough compute/exhaustion metadata.
+1. Ensure backend execution returns emitted outputs and compute/exhaustion metadata without mutating runtime energy state.
 2. Keep graph/vm behaviors aligned with existing tests.
 3. Add focused unit tests if contract shape changes.
 
 ## Verification Commands
 
 1. `scripts/check-plan-harness.sh --mode strict`
-2. `cd v2 && cargo test -p v2-core --test mesh_kernel`
-3. `cd v2 && cargo test -p v2-core --test mesh_energy`
-4. `cd v2 && cargo test -p v2-core --test mesh_backends`
-5. `cd v2 && cargo test -p v2-core --test mesh_runtime`
-6. `cd v2 && cargo test -p v2-core --test mesh_schema_contract`
-7. `cd v2 && cargo test -p v2-core --test vm_isa`
-8. `cd v2 && cargo test -p v2-core --test vm_memory`
-9. `cd v2 && cargo test -p v2-core --test vm_io`
-10. `cd v2 && cargo test -p v2-core --test vm_sensor_queries`
-11. `cd v2 && cargo test -p v2-core --test vm_neighbor_queries`
-12. `cd v2 && cargo test -p v2-core --test vm_opcode_costs`
-13. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
-14. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
-15. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
-16. `cd v2 && cargo test -p v2-core --test sensor_frame_contract`
-17. `cd v2 && cargo test -p v2-core --test neighbor_input_contract`
-18. `cd v2 && cargo test -p v2-core --test graph_sensor_inputs`
-19. `cd v2 && cargo test -p v2-core --test graph_neighbor_inputs`
-20. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
-21. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
-22. `cd v2 && cargo test -p v2-core --test sensor_radius_global_config`
-23. `cd v2 && cargo test -p v2-core`
+2. Run the `CP-1` command gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md` (`## Command Gates by Checkpoint` -> `### CP-1 exit`).
 
 ## Risks and Rollback
 
