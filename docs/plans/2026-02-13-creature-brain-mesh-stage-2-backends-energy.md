@@ -97,6 +97,7 @@ Steps:
 4. Keep runtime deterministic for fixture-based tests.
 5. Align runtime outcomes with CP-1 spec contract types.
 6. Ensure VM input-read/output-write opcodes are wired end-to-end via runtime+backend contracts.
+7. Ensure `ReadInput` slot mapping/normalization and VM numeric determinism rules are covered by tests.
 
 Exit gate:
 1. Runtime integration tests pass with first-action halt and energy-exhaustion behavior verified.
@@ -142,7 +143,10 @@ Go / stop rule:
 8. `cd v2 && cargo test -p v2-core --test vm_memory`
 9. `cd v2 && cargo test -p v2-core --test vm_io`
 10. `cd v2 && cargo test -p v2-core --test vm_opcode_costs`
-11. `cd v2 && cargo test -p v2-core`
+11. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
+12. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
+13. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
+14. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 
