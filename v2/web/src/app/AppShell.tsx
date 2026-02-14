@@ -20,7 +20,8 @@ export function AppShell(props: AppShellProps) {
         <h1>Petri V2 Control Surface</h1>
         <div className="app-status">{props.statusLine ?? null}</div>
         <div className="app-banner">
-          <strong>Protocol</strong> {props.protocolBanner}
+          <strong>Protocol</strong>
+          <span>{props.protocolBanner}</span>
         </div>
       </header>
 
