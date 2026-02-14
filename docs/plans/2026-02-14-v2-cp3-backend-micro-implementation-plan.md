@@ -40,6 +40,7 @@
 | Should this plan include snapshot endpoints? | No. Snapshot endpoints remain out of scope for `v2alpha1`. | user+agent | resolved |
 | Should startup-seeded creatures begin with heterogeneous phenotypes? | No. Startup-seeded founders must share one phenotype baseline; diversity emerges through reproduction mutation. | user+agent | resolved |
 | What should happen if startup creates a population that immediately collapses? | Startup must enforce a viability guard (or reject startup) so the run begins with at least one viable creature. | user+agent | resolved |
+| Should v1 food tuning defaults be carried forward before wire-level tuning fields exist? | Yes. Carry forward `initial_food_density`, `food_growth_rate`, `food_spawn_rate`, `food_spread_threshold`, and `food_spawn_floor_density` as deterministic internal defaults, then expose via API in a follow-up slice. | user+agent | resolved |
 
 ## Slice Execution Rules
 
@@ -232,9 +233,10 @@ Steps:
 2. `cd v2 && cargo test -p v2-core --test world_seed`
 3. `cd v2 && cargo test -p v2-core --test world_state`
 4. `cd v2 && cargo test -p v2-core --test phenotype_evolution`
-5. `cd v2 && cargo test -p v2-core --test startup_viability`
-6. `cd v2 && cargo test -p v2-server`
-7. Run the `CP-3` command gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md` (`## Command Gates by Checkpoint` -> `### CP-3 exit`).
+5. `cd v2 && cargo test -p v2-core --test startup_viability_gate`
+6. `cd v2 && cargo test -p v2-server --test startup_world_init`
+7. `cd v2 && cargo test -p v2-server`
+8. Run the `CP-3` command gate from `docs/plans/2026-02-14-v2-implementation-test-matrix.md` (`## Command Gates by Checkpoint` -> `### CP-3 exit`).
 
 ## Risks and Rollback
 

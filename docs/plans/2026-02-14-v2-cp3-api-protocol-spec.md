@@ -78,6 +78,8 @@ Rules:
 - `population.initial_creatures` is a requested target; actual seeded population is best-effort and bounded by occupancy and `max_creatures`.
 - first `status`/`frame` payloads after startup may report population lower than requested `initial_creatures`.
 - startup must enforce viability: if a request is below viable minimum bounds, server may normalize deterministically to a viable startup baseline; if viability still cannot be established, return a protocol-valid rejection (`422 validation_rejected`) instead of starting a dead-on-arrival run.
+- startup seeding must be deterministic for identical startup request + seed and must seed both creatures and food into the initial world frame.
+- until explicit startup food-tuning fields are added to `v2alpha1`, server applies v1-carry-forward internal defaults: `initial_food_density=0.15`, `food_growth_rate=0.10`, `food_spawn_rate=0.05`, `food_spread_threshold=0.75`, `food_spawn_floor_density=0.03`.
 
 ### `POST /v2/simulation/start`
 
@@ -161,6 +163,7 @@ Response:
 
 Rules:
 - Startup founders begin from one shared phenotype baseline; phenotype diversity is introduced by reproduction mutation, not startup randomization.
+- For viable startup configurations, first frame after startup must include seeded creatures and seeded food (not an empty-world placeholder).
 
 Snapshot endpoints policy (`v2alpha1`):
 1. `GET /v2/simulation/snapshot` is out of scope.

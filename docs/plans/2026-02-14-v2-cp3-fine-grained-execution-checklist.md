@@ -37,6 +37,7 @@
 | Should frontend tests hide CORS via same-origin proxy shortcuts? | No; CP-3 keeps cross-origin browser flow so CORS regressions are visible. | user+agent | resolved |
 | Should startup founders share one phenotype baseline? | Yes; startup founders begin with one baseline phenotype. | user+agent | resolved |
 | Should CP-3 close with partial frontend/backend gates? | No; CP-3 closes only when full matrix gate is green. | user+agent | resolved |
+| Should startup world seeding carry forward v1 food tuning defaults before API fields exist? | Yes; use deterministic internal defaults now and defer wire-level tuning fields to a follow-up contract slice. | user+agent | resolved |
 
 ## Checklist Operating Rules
 
@@ -51,16 +52,21 @@
 ### Slice P3-B1: Startup world initialization realism
 
 **Files:**
+- Modify: `v2/crates/v2-core/src/lib.rs`
+- Create: `v2/crates/v2-core/src/world_seed.rs`
+- Create: `v2/crates/v2-core/src/viability.rs`
+- Create: `v2/crates/v2-core/tests/world_seed.rs`
+- Create: `v2/crates/v2-core/tests/startup_viability_gate.rs`
 - Modify: `v2/crates/v2-server/src/state.rs`
 - Modify: `v2/crates/v2-server/src/api.rs`
 - Modify: `v2/crates/v2-server/tests/startup_world_init.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing tests for deterministic seeded food presence and startup world realism.
-- [ ] Run: `cd v2 && cargo test -p v2-server --test startup_world_init` and confirm failure is expected.
-- [ ] Implement minimal startup/reset world-init fix.
-- [ ] Re-run targeted test and confirm pass.
-- [ ] Commit slice `P3-B1`.
+- [x] Add/adjust failing tests for deterministic seeded food presence and startup world realism.
+- [x] Run: `cd v2 && cargo test -p v2-server --test startup_world_init` and confirm failure is expected.
+- [x] Implement minimal startup/reset world-init fix.
+- [x] Re-run targeted test and confirm pass.
+- [x] Commit slice `P3-B1`.
 
 ### Slice P3-B2: Frame creature realism from state (no synthetic reshuffle)
 

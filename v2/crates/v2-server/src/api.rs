@@ -2,7 +2,6 @@ use sha2::{Digest, Sha256};
 
 use crate::PROTOCOL_VERSION;
 use crate::state::{SimulationPhase, SimulationState};
-use v2_core::phenotype::FOUNDER_PHENOTYPE_RGB;
 
 #[derive(Clone, Debug)]
 pub struct SimulationApi {
@@ -582,29 +581,18 @@ pub struct ErrorBody {
 }
 
 fn creature_snapshots(state: &SimulationState) -> Vec<CreatureSnapshot> {
-    if state.world.width == 0 || state.world.height == 0 {
-        return Vec::new();
-    }
-
-    let mut creatures = Vec::new();
-    let max_render = state.population.min(256);
-    let tick = state.tick as u32;
-    let width = u32::from(state.world.width);
-    let height = u32::from(state.world.height);
-
-    for index in 0..max_render {
-        let x = ((index.wrapping_mul(31)).wrapping_add(tick.wrapping_mul(7))) % width;
-        let y = ((index.wrapping_mul(17)).wrapping_add(tick.wrapping_mul(11))) % height;
-        creatures.push(CreatureSnapshot {
-            id: u64::from(index) + 1,
-            x: x as u16,
-            y: y as u16,
-            energy: state.mean_energy + (index % 7) as f32 * 0.1,
-            phenotype_rgb: FOUNDER_PHENOTYPE_RGB,
-        });
-    }
-
-    creatures
+    state
+        .world
+        .creatures
+        .iter()
+        .map(|creature| CreatureSnapshot {
+            id: creature.id,
+            x: creature.x,
+            y: creature.y,
+            energy: creature.energy,
+            phenotype_rgb: creature.phenotype_rgb,
+        })
+        .collect()
 }
 
 fn startup_digest(request: &StartupRequest) -> String {
