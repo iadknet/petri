@@ -1,3 +1,4 @@
+pub mod energy;
 pub mod mesh;
 
 pub const V2_RUNTIME_NAME: &str = "petri-v2";
