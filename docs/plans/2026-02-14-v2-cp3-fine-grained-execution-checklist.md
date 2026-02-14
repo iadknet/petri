@@ -206,11 +206,11 @@
 - Modify: `v2/web/src/features/viewport/ViewportCanvas.tsx`
 
 **Checklist:**
-- [ ] Add/adjust failing tests for preview-during-drag and single-commit-on-pointer-up behavior.
-- [ ] Run targeted frontend tests and confirm failure is expected.
-- [ ] Implement minimal paint interaction fix.
-- [ ] Re-run targeted tests and confirm pass.
-- [ ] Commit slice `P3-F5`.
+- [x] Add/adjust failing tests for preview-during-drag and single-commit-on-pointer-up behavior.
+- [x] Run targeted frontend tests (`cd v2/web && npm run test -- paint-interaction`) and confirm failure is expected.
+- [x] Implement minimal paint interaction fix.
+- [x] Re-run targeted tests and confirm pass.
+- [x] Commit slice `P3-F5`.
 
 ### Slice P3-F6: Cross-origin browser smoke and CORS gate
 
