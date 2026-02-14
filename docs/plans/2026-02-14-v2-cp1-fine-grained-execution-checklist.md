@@ -40,10 +40,11 @@
 ## Checklist Operating Rules
 
 1. Keep exactly one slice `in progress` at a time.
-2. Do not start implementation until the new/updated test fails for the expected reason.
+2. Use red-green when behavior is missing; if behavior already matches intent, add/adjust regression coverage and record pass evidence instead of forcing artificial failure.
 3. Keep each slice to one behavior seam and one commit.
 4. Run only v2 tests.
-5. Update checklist boxes in this file in the same commit as code changes.
+5. If a checklist step conflicts with architecture boundaries or project goals, stop and ask for guidance.
+6. Update checklist boxes in this file in the same commit as code changes.
 
 ## Task List
 

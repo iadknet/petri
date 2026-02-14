@@ -38,6 +38,13 @@
 | Should multiple slices be in progress simultaneously? | No; exactly one slice in progress at any time. | user+agent | resolved |
 | Should checklist plans duplicate full command matrices? | No; all plans reference the shared matrix DRY source. | user+agent | resolved |
 
+## Intent-First Execution Directive
+
+1. Functional and architectural intent are the primary success criteria for each slice.
+2. If any checklist item conflicts with architecture boundaries or project goals, stop and ask for guidance before continuing.
+3. Prefer red-green when behavior is missing; if behavior is already correct, execute a regression-hardening verification slice and capture evidence.
+4. Keep checklist wording synchronized with what was actually verified and implemented.
+
 ## Task List
 
 ### Task 1: Execute CP-1 checklist slices
@@ -85,9 +92,9 @@ Steps:
 ### Per-Slice Gate (apply to every slice)
 
 - [ ] Mark one slice as `in progress`.
-- [ ] Add/adjust failing test for exactly one behavior seam.
-- [ ] Run targeted test and confirm expected failure.
-- [ ] Implement minimal fix.
+- [ ] Add/adjust targeted test coverage for exactly one behavior seam (failing when a real gap exists).
+- [ ] Run targeted test and capture evidence of failure or already-correct behavior.
+- [ ] Implement needed fix, or explicitly verify existing implementation if already correct.
 - [ ] Re-run targeted test and confirm pass.
 - [ ] Run required local regression tests for touched seam.
 - [ ] Commit only that slice.

@@ -42,10 +42,11 @@
 ## Checklist Operating Rules
 
 1. Keep one active slice at a time.
-2. Start each slice with a failing targeted test.
+2. Start with a failing targeted test when behavior is missing; if behavior is already correct, add/adjust regression coverage and record verification evidence.
 3. Keep backend and frontend changes in separate commits unless a contract seam requires both.
 4. Run only v2 tests and v2 web checks.
-5. Update checklist checkboxes in the same commit as implementation.
+5. If a checklist step conflicts with architecture boundaries or project goals, stop and ask for guidance.
+6. Update checklist checkboxes in the same commit as implementation.
 
 ## Task List
 

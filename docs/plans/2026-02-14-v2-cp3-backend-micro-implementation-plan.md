@@ -45,9 +45,10 @@
 ## Slice Execution Rules
 
 1. One slice per commit.
-2. Every slice starts with a failing test in the same area.
+2. Every slice adds/adjusts targeted tests in the same area; prefer failing-first when behavior is missing, otherwise run a regression-hardening verification slice.
 3. A slice is complete only when targeted tests pass and no new synthetic fallback path is introduced.
 4. Keep file touch scope narrow: one behavior seam per slice.
+5. If a task conflicts with architecture boundaries or overall project goals, stop and ask for guidance before implementation.
 
 ## Micro-Slice Task List
 
