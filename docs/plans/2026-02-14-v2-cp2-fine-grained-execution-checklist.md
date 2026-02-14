@@ -120,11 +120,11 @@
 - Modify: `v2/crates/v2-core/tests/phenotype_evolution.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing tests for founder baseline, deterministic mutation, and channel-step behavior.
-- [ ] Run: `cd v2 && cargo test -p v2-core --test phenotype_evolution` and confirm failure is expected.
-- [ ] Implement minimal phenotype evolution fix.
-- [ ] Re-run targeted test and confirm pass.
-- [ ] Commit slice `E6`.
+- [x] Add/adjust regression tests for founder baseline, deterministic mutation, and channel-step behavior.
+- [x] Run: `cd v2 && cargo test -p v2-core --test phenotype_evolution` and confirm phenotype contract coverage.
+- [x] Verify `phenotype.rs` implements founder baseline and weighted single-channel mutation semantics.
+- [x] Re-run targeted test and confirm pass.
+- [x] Commit slice `E6`.
 
 ### Slice E7: Ecology pressure formulas
 
