@@ -128,12 +128,12 @@
 - Modify: `v2/crates/v2-core/tests/mesh_energy.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing tests for queue-drain no-op and exhaustion termination behavior.
-- [ ] Run: `cd v2 && cargo test -p v2-core --test mesh_runtime` and confirm failure is expected.
-- [ ] Implement minimal outcome-path fix.
-- [ ] Re-run: `cd v2 && cargo test -p v2-core --test mesh_runtime`.
-- [ ] Re-run: `cd v2 && cargo test -p v2-core --test mesh_energy`.
-- [ ] Commit slice `K6`.
+- [x] Add/adjust regression tests for queue-drain no-op and exhaustion termination behavior (including dispatch-entry exhaustion with zero dispatches).
+- [x] Run: `cd v2 && cargo test -p v2-core --test mesh_runtime` and confirm behavior gate coverage.
+- [x] Verify `runtime.rs` outcome paths for `ImplicitNoOp` and `EnergyExhausted` align with dispatch/energy semantics.
+- [x] Re-run: `cd v2 && cargo test -p v2-core --test mesh_runtime`.
+- [x] Re-run: `cd v2 && cargo test -p v2-core --test mesh_energy`.
+- [x] Commit slice `K6`.
 
 ### Slice K7: Runtime config validation (`sensor_radius >= 1`)
 
