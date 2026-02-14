@@ -57,9 +57,10 @@ Files:
 - Create: `v2/crates/v2-server/tests/lifecycle.rs`
 - Create: `v2/crates/v2-server/tests/payloads.rs`
 - Create: `v2/crates/v2-server/tests/ws_stream.rs`
+- Create: `v2/crates/v2-server/tests/world_paint.rs`
 - Create: `v2/crates/v2-cli/tests/ablation_output.rs`
 - Create: `v2/crates/v2-cli/tests/run_output.rs`
-- Create: `v2/web/src/protocol.test.ts`
+- Create: `v2/web/src/features/protocol/protocol.test.ts`
 - Create: `v2/web/src/fixtures/protocol-v2alpha1/*.json`
 
 Steps:
@@ -67,6 +68,7 @@ Steps:
 2. Add failing tests for frame/health payload serialization, HTTP error envelope mapping, and lifecycle transition rules.
 3. Add failing tests for CLI NDJSON run/ablation schema, unknown-field rejection, and canonical field ordering.
 4. Add failing tests for web protocol parser behavior against fixture-locked payloads and event/payload mismatch rejection.
+5. Add failing tests for paint endpoint contract coverage and phase-restriction behavior.
 
 ### Task 2: Implement `v2-server` API and runtime loop wiring
 
@@ -77,7 +79,7 @@ Files:
 - Create: `v2/crates/v2-server/src/ws.rs`
 
 Steps:
-1. Implement startup/start/pause/step/status endpoints.
+1. Implement startup/start/pause/step/status/paint endpoints.
 2. Wire runtime tick loop to `v2-core`.
 3. Ensure endpoint payloads match protocol tests.
 
@@ -96,7 +98,9 @@ Steps:
 ### Task 4: Implement `v2-web` protocol/client baseline and rebaseline docs
 
 Files:
-- Create: `v2/web/src/protocol.ts`
+- Create: `v2/web/src/features/protocol/client.ts`
+- Create: `v2/web/src/features/protocol/models.ts`
+- Create: `v2/web/src/features/protocol/decoders.ts`
 - Modify: `v2/web/src/App.tsx`
 - Modify: `README.md`
 - Modify: `docs/README.md`
@@ -108,7 +112,7 @@ Files:
 - Modify: `petri-technology-review.md`
 
 Steps:
-1. Implement minimal client protocol layer and runtime status/frame UI.
+1. Implement wireframe-compliant desktop frontend surfaces (startup/runtime/inspector/paint) using the frontend implementation plan.
 2. Wire web client to `v2-server` endpoints.
 3. Update canonical docs to mark `v2` as target architecture path.
 4. Repoint root compatibility stubs to canonical docs with minimal pointer content only.
