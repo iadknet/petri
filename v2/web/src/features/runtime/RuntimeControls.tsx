@@ -17,10 +17,13 @@ interface RuntimeControlsProps {
 export function RuntimeControls(props: RuntimeControlsProps) {
   return (
     <div className="control-stack">
-      <p>
-        state <strong>{props.state}</strong> | tick <strong>{props.tick}</strong>
+      <p className="status-row">
+        <span>State</span>
+        <strong>{props.state}</strong>
+        <span>Tick</span>
+        <strong>{props.tick}</strong>
       </p>
-      <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+      <div className="runtime-action-row">
         <button type="button" onClick={() => void props.onStart()} disabled={props.disabled}>
           Start
         </button>

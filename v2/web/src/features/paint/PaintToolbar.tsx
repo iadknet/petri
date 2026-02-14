@@ -33,8 +33,9 @@ const BRUSH_OPTIONS = [
 export function PaintToolbar(props: PaintToolbarProps) {
   return (
     <div className="paint-controls control-stack">
-      <p>
-        Editability: <strong>{props.editable ? "editable" : "running (locked)"}</strong>
+      <p className="status-row">
+        <span>Editability</span>
+        <strong>{props.editable ? "editable" : "running (locked)"}</strong>
       </p>
 
       <div className="paint-tool-grid">
@@ -69,7 +70,7 @@ export function PaintToolbar(props: PaintToolbarProps) {
         Clear All
       </button>
 
-      <p>Paint last touched cells: {props.paintLastTouchedCells ?? 0}</p>
+      <p className="paint-stats">Paint last touched cells: {props.paintLastTouchedCells ?? 0}</p>
       {!props.editable ? <p className="muted">Paint disabled while simulation is running.</p> : null}
       {props.errorMessage ? <p className="error-text">{props.errorMessage}</p> : null}
     </div>
