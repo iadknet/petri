@@ -101,6 +101,28 @@ Response:
 - `state: "paused"`
 - `tick: u64`
 
+### `POST /v2/simulation/world/paint`
+
+Request:
+- `action: "stroke" | "clear_all"`
+- `tool: "food" | "barrier" | "erase_food" | "erase_barrier"` (required when `action="stroke"`)
+- `brush_half_extent: 0 | 1 | 2` (`stroke` only)
+- `points: [{ x: u16, y: u16 }]` (`stroke` only, non-empty)
+
+Rules:
+- allowed only in editable states: `idle` and `paused`
+- if current state is `running`: return `409` with `invalid_state_transition`
+- `clear_all` ignores `tool`, `brush_half_extent`, and `points`
+- `stroke` requires valid `tool`, `brush_half_extent`, and `points`
+- malformed request shape returns `400 invalid_request`
+- semantic validation failures (out of range, empty stroke points) return `422 validation_rejected`
+
+Response:
+- `protocol_version`
+- `state: "idle" | "paused"`
+- `tick: u64`
+- `paint_result: { touched_cells: u32 }`
+
 ### `GET /v2/simulation/status`
 
 Response:
@@ -271,9 +293,10 @@ Files:
 - Create: `v2/crates/v2-server/tests/lifecycle.rs`
 - Create: `v2/crates/v2-server/tests/payloads.rs`
 - Create: `v2/crates/v2-server/tests/ws_stream.rs`
+- Create: `v2/crates/v2-server/tests/world_paint.rs`
 - Create: `v2/crates/v2-cli/tests/run_output.rs`
 - Create: `v2/crates/v2-cli/tests/ablation_output.rs`
-- Create: `v2/web/src/protocol.test.ts`
+- Create: `v2/web/src/features/protocol/protocol.test.ts`
 - Create: `v2/web/src/fixtures/protocol-v2alpha1/*.json`
 
 Steps:
@@ -282,6 +305,7 @@ Steps:
 3. Add CLI NDJSON schema tests for required fields, forbidden unknown top-level fields, and canonical field ordering.
 4. Add failing tests for HTTP error envelope/status-code mapping and lifecycle transition rules.
 5. Add failing tests for event/payload mismatch rejection and snapshot-endpoint absence in `v2alpha1`.
+6. Add failing tests for paint stroke/clear behavior and phase restrictions.
 
 ### Task 2: Implement server lifecycle and streaming endpoints
 
@@ -311,7 +335,9 @@ Steps:
 ### Task 4: Implement web protocol layer
 
 Files:
-- Create: `v2/web/src/protocol.ts`
+- Create: `v2/web/src/features/protocol/client.ts`
+- Create: `v2/web/src/features/protocol/models.ts`
+- Create: `v2/web/src/features/protocol/decoders.ts`
 - Modify: `v2/web/src/App.tsx`
 
 Steps:
