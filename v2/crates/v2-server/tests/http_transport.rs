@@ -1,5 +1,6 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
+use axum::body::to_bytes;
 use tower::ServiceExt;
 
 #[tokio::test]
@@ -69,4 +70,39 @@ async fn cors_preflight_allows_browser_clients() {
             .and_then(|value| value.to_str().ok()),
         Some("*")
     );
+    let allow_methods = response
+        .headers()
+        .get("access-control-allow-methods")
+        .and_then(|value| value.to_str().ok())
+        .unwrap_or_default();
+    assert!(
+        allow_methods.contains("POST"),
+        "preflight should allow POST, got: {allow_methods}"
+    );
+}
+
+#[tokio::test]
+async fn startup_invalid_json_returns_protocol_error_envelope() {
+    let app = v2_server::server::build_router_for_tests();
+
+    let response = app
+        .oneshot(
+            Request::builder()
+                .method("POST")
+                .uri("/v2/simulation/startup")
+                .header("content-type", "application/json")
+                .body(Body::from("{not-json"))
+                .expect("valid request"),
+        )
+        .await
+        .expect("router call succeeds");
+
+    assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+
+    let bytes = to_bytes(response.into_body(), usize::MAX)
+        .await
+        .expect("response body");
+    let payload: serde_json::Value = serde_json::from_slice(&bytes).expect("json envelope");
+    assert_eq!(payload["protocol_version"], "v2alpha1");
+    assert_eq!(payload["error"]["code"], "invalid_request");
 }

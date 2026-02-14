@@ -77,6 +77,29 @@ fn paint_validation_failure_uses_422_validation_rejected() {
 }
 
 #[test]
+fn paint_validation_error_envelope_includes_endpoint_and_field_reason() {
+    let mut api = SimulationApi::new();
+    api.startup(startup_request());
+    let err = api
+        .paint(PaintRequest {
+            action: PaintAction::Stroke,
+            tool: Some(PaintStrokeTool::Food),
+            brush_half_extent: Some(1),
+            points: Vec::new(),
+        })
+        .expect_err("empty stroke should be rejected");
+
+    let envelope = err.into_envelope();
+    assert_eq!(envelope.error.code, "validation_rejected");
+    assert_eq!(
+        envelope.error.details.endpoint.as_deref(),
+        Some("/v2/simulation/world/paint")
+    );
+    assert_eq!(envelope.error.details.field_errors.len(), 1);
+    assert_eq!(envelope.error.details.field_errors[0].field, "points");
+}
+
+#[test]
 fn error_envelope_can_include_field_errors() {
     let envelope = ErrorEnvelope::new(SimulationError::Protocol(Box::new(
         v2_server::api::ProtocolError {

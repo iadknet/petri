@@ -136,11 +136,11 @@
 - Modify: `v2/crates/v2-server/tests/http_transport.rs`
 
 **Checklist:**
-- [ ] Add/adjust regression tests for lifecycle, payload envelope, and CORS preflight contract.
-- [ ] Run: `cd v2 && cargo test -p v2-server`.
-- [ ] Resolve remaining backend contract regressions.
-- [ ] Re-run: `cd v2 && cargo test -p v2-server` and confirm full pass.
-- [ ] Commit slice `P3-B6`.
+- [x] Add/adjust regression tests for lifecycle, payload envelope, and CORS preflight contract.
+- [x] Run: `cd v2 && cargo test -p v2-server`.
+- [x] Resolve remaining backend contract regressions.
+- [x] Re-run: `cd v2 && cargo test -p v2-server` and confirm full pass.
+- [x] Commit slice `P3-B6`.
 
 ### Slice P3-F1: Protocol client defensive parsing
 
