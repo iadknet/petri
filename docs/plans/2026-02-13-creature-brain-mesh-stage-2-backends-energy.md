@@ -48,6 +48,8 @@
   - `docs/plans/2026-02-14-v2-cp1-runtime-execution-spec.md`
 - Core schema + VM ISA source of truth:
   - `docs/plans/2026-02-14-v2-core-schema-vm-isa-spec.md`
+- Fine-grained execution checklist:
+  - `docs/plans/2026-02-14-v2-cp1-fine-grained-execution-checklist.md`
 - Gate consistency source of truth:
   - `docs/plans/2026-02-14-v2-implementation-test-matrix.md`
 

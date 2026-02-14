@@ -43,6 +43,8 @@
 
 - Evolution/ecology semantics source of truth:
   - `docs/plans/2026-02-14-v2-cp2-evolution-ecology-spec.md`
+- Fine-grained execution checklist:
+  - `docs/plans/2026-02-14-v2-cp2-fine-grained-execution-checklist.md`
 - Gate consistency source of truth:
   - `docs/plans/2026-02-14-v2-implementation-test-matrix.md`
 
