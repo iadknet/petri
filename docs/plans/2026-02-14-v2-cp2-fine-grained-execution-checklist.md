@@ -147,11 +147,11 @@
 - Modify: `v2/crates/v2-core/tests/ecology_noncollapse.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing non-collapse baseline test with fixed seed and startup baseline.
-- [ ] Run: `cd v2 && cargo test -p v2-core --test ecology_noncollapse` and confirm failure is expected.
-- [ ] Implement minimal non-collapse calibration fix.
-- [ ] Re-run targeted test and confirm pass.
-- [ ] Commit slice `E8`.
+- [x] Add/adjust regression non-collapse baseline tests with fixed seed and startup baseline behavior.
+- [x] Run: `cd v2 && cargo test -p v2-core --test ecology_noncollapse` and confirm non-collapse coverage.
+- [x] Verify non-collapse implementation enforces baseline-derived threshold and deterministic fixed-seed behavior.
+- [x] Re-run targeted test and confirm pass.
+- [x] Commit slice `E8`.
 
 ### Slice E9: CP-2 gate closeout
 
