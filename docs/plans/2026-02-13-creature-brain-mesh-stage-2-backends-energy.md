@@ -38,6 +38,7 @@
 | Should first valid world action halt queue execution immediately? | Yes. | user+agent | resolved |
 | Should VM opcode costs be uniform or per-opcode? | Per-opcode baseline costs with global multiplier. | user+agent | resolved |
 | Should graph richness come from a graph DSL? | No; richer fixed-function graph operators with bounded state are in scope. | user+agent | resolved |
+| Should creatures have full in-range sensor visibility with rich metadata? | Yes, expose full sensor frame + rich query semantics in CP-1. | user+agent | resolved |
 
 ## Specification Dependencies
 
@@ -101,6 +102,7 @@ Steps:
 6. Ensure VM input-read/output-write opcodes are wired end-to-end via runtime+backend contracts.
 7. Ensure `ReadInput` slot mapping/normalization and VM numeric determinism rules are covered by tests.
 8. Ensure graph operator richness (integrator/momentum/oscillator/pooling/adaptive gain) is covered by tests.
+9. Ensure full-radius sensor frame richness (food + creature metadata including phenotype) is covered by graph/VM query tests.
 
 Exit gate:
 1. Runtime integration tests pass with first-action halt and energy-exhaustion behavior verified.
@@ -149,9 +151,12 @@ Go / stop rule:
 11. `cd v2 && cargo test -p v2-core --test vm_input_mapping`
 12. `cd v2 && cargo test -p v2-core --test vm_output_overrides`
 13. `cd v2 && cargo test -p v2-core --test vm_numeric_determinism`
-14. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
-15. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
-16. `cd v2 && cargo test -p v2-core`
+14. `cd v2 && cargo test -p v2-core --test vm_sensor_queries`
+15. `cd v2 && cargo test -p v2-core --test sensor_frame_contract`
+16. `cd v2 && cargo test -p v2-core --test graph_sensor_inputs`
+17. `cd v2 && cargo test -p v2-core --test graph_operator_richness`
+18. `cd v2 && cargo test -p v2-core --test graph_stateful_ops`
+19. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 
