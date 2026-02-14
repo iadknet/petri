@@ -36,6 +36,7 @@
 | Should novelty archives/scoring be included in v1? | No. | user+agent | resolved |
 | Should sexual recombination be in scope? | No, asexual only. | user+agent | resolved |
 | Should node and subgraph duplication be mandatory operators? | Yes. | user+agent | resolved |
+| Should offspring inherit parent runtime memory? | Yes, byte-for-byte copy at reproduction commit. | user+agent | resolved |
 
 ## Specification Dependencies
 
@@ -49,6 +50,7 @@
 Files:
 - Create: `v2/crates/v2-core/tests/mutation_invariants.rs`
 - Create: `v2/crates/v2-core/tests/mutation_repair.rs`
+- Create: `v2/crates/v2-core/tests/reproduction_memory_inheritance.rs`
 
 Steps:
 1. Add failing tests for add/remove/retarget operators.
@@ -106,6 +108,7 @@ Required before task 4:
 1. Mutation invariant tests pass.
 2. Ecology tests fail first, then pass with implementation.
 3. Mutation defaults/weights are implemented as specified.
+4. Reproduction memory inheritance behavior is implemented and tested.
 
 Stop conditions:
 1. Mutation operators repeatedly produce invalid genomes.
@@ -127,9 +130,10 @@ Go / stop rule:
 1. `scripts/check-plan-harness.sh --mode strict`
 2. `cd v2 && cargo test -p v2-core mutation_invariants`
 3. `cd v2 && cargo test -p v2-core mutation_repair`
-4. `cd v2 && cargo test -p v2-core ecology_pressures`
-5. `cd v2 && cargo test -p v2-core ecology_noncollapse`
-6. `cd v2 && cargo test -p v2-core`
+4. `cd v2 && cargo test -p v2-core reproduction_memory_inheritance`
+5. `cd v2 && cargo test -p v2-core ecology_pressures`
+6. `cd v2 && cargo test -p v2-core ecology_noncollapse`
+7. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 

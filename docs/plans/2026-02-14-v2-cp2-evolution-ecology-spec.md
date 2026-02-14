@@ -34,7 +34,7 @@
 | Should CP-2 include sexual recombination? | No, asexual only. | user+agent | resolved |
 | Should novelty archives be introduced in CP-2? | No, ecology pressure is the novelty driver. | user+agent | resolved |
 | Should invalid mutations be discarded or repaired? | Repair first; discard only if repair fails invariants. | user+agent | resolved |
-| Should creature runtime memory be heritable at birth? | No in v1; newborn memory is zero-initialized `1 KiB`. | user+agent | resolved |
+| Should creature runtime memory be heritable at birth? | Yes in v1; offspring memory is copied byte-for-byte from parent. | user+agent | resolved |
 
 ## Evolution Contract
 
@@ -97,6 +97,13 @@
 - clone internal edges among duplicated nodes
 - remap internal targets to cloned IDs, external edges preserved by default
 
+### Reproduction memory inheritance contract
+
+1. Offspring memory arena size is fixed `1024` bytes.
+2. At successful reproduction commit, offspring memory is copied byte-for-byte from parent memory.
+3. Inheritance snapshot is taken at reproduction commit time (post parent cognition for the tick).
+4. No memory randomization or reset is applied in v1 reproduction path.
+
 ### Structural invariants (must hold after each birth)
 
 1. `CreatureGenome::validate()` passes.
@@ -107,7 +114,7 @@
 6. `nodes.len()` within `[min_nodes, max_nodes]`.
 7. Node output counts are `<= max_outputs_per_node`.
 8. VM program lengths are within bounds.
-9. Offspring runtime memory arena initializes to zeroed `1024` bytes.
+9. Offspring runtime memory arena is copied byte-for-byte from parent at reproduction commit.
 
 Repair policy:
 1. Apply mutation sequence.
@@ -167,11 +174,13 @@ No lineage explanation is required in v1.
 Files:
 - Create: `v2/crates/v2-core/tests/mutation_invariants.rs`
 - Create: `v2/crates/v2-core/tests/mutation_repair.rs`
+- Create: `v2/crates/v2-core/tests/reproduction_memory_inheritance.rs`
 
 Steps:
 1. Add failing tests for each required operator.
 2. Add failing tests for invariants and repair policy behavior.
 3. Add deterministic seed fixtures for reproducible failures.
+4. Add failing tests proving offspring memory equals parent memory at reproduction commit.
 
 ### Task 2: Implement mutation engine with defaults
 
@@ -214,9 +223,10 @@ Steps:
 1. `scripts/check-plan-harness.sh --mode strict`
 2. `cd v2 && cargo test -p v2-core --test mutation_invariants`
 3. `cd v2 && cargo test -p v2-core --test mutation_repair`
-4. `cd v2 && cargo test -p v2-core --test ecology_pressures`
-5. `cd v2 && cargo test -p v2-core --test ecology_noncollapse`
-6. `cd v2 && cargo test -p v2-core`
+4. `cd v2 && cargo test -p v2-core --test reproduction_memory_inheritance`
+5. `cd v2 && cargo test -p v2-core --test ecology_pressures`
+6. `cd v2 && cargo test -p v2-core --test ecology_noncollapse`
+7. `cd v2 && cargo test -p v2-core`
 
 ## Risks and Rollback
 
