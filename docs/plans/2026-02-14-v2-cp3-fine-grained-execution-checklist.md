@@ -165,11 +165,11 @@
 - Create/Modify: `v2/web/src/features/simulation/store/simulationEffects.ts`
 
 **Checklist:**
-- [ ] Add/adjust failing tests for store-owned orchestration behavior.
-- [ ] Run: `cd v2/web && npm run test -- simulationStore` and confirm failure is expected.
-- [ ] Implement minimal extraction from `App.tsx` into store/effects.
-- [ ] Re-run targeted tests and confirm pass.
-- [ ] Commit slice `P3-F2`.
+- [x] Add/adjust failing tests for store-owned orchestration behavior.
+- [x] Run: `cd v2/web && npm run test -- simulationStore` and confirm failure is expected.
+- [x] Implement minimal extraction from `App.tsx` into store/effects.
+- [x] Re-run targeted tests and confirm pass.
+- [x] Commit slice `P3-F2`.
 
 ### Slice P3-F3: Connection/protocol status banner resilience
 
