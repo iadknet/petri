@@ -55,11 +55,11 @@
 - Modify: `v2/crates/v2-core/src/evolution/config.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing test for CP-2 mutation default values.
-- [ ] Run: `cd v2 && cargo test -p v2-core --test mutation_invariants` and confirm failure is expected.
-- [ ] Implement minimal default-config fix.
-- [ ] Re-run targeted test and confirm pass.
-- [ ] Commit slice `E1`.
+- [x] Add/adjust regression test coverage for full CP-2 mutation default values (including per-weight defaults).
+- [x] Run: `cd v2 && cargo test -p v2-core --test mutation_invariants` and confirm default-contract coverage.
+- [x] Verify `evolution/config.rs` default values and validation align with CP-2 spec.
+- [x] Re-run targeted test and confirm pass.
+- [x] Commit slice `E1`.
 
 ### Slice E2: Core mutation operators (add/remove/retarget)
 

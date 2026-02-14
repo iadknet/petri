@@ -96,6 +96,16 @@ fn mutation_defaults_match_cp2_spec() {
     assert!((config.node_duplication_target_remap_probability - 0.35).abs() < f32::EPSILON);
     assert!((config.subgraph_external_edge_retarget_probability - 0.0).abs() < f32::EPSILON);
 
+    assert!((config.weights.add_node - 0.10).abs() < f32::EPSILON);
+    assert!((config.weights.remove_node - 0.06).abs() < f32::EPSILON);
+    assert!((config.weights.retarget_node - 0.06).abs() < f32::EPSILON);
+    assert!((config.weights.add_output - 0.10).abs() < f32::EPSILON);
+    assert!((config.weights.remove_output - 0.08).abs() < f32::EPSILON);
+    assert!((config.weights.retarget_output - 0.12).abs() < f32::EPSILON);
+    assert!((config.weights.graph_local_mutation - 0.12).abs() < f32::EPSILON);
+    assert!((config.weights.vm_instruction_mutation - 0.20).abs() < f32::EPSILON);
+    assert!((config.weights.node_duplication - 0.10).abs() < f32::EPSILON);
+    assert!((config.weights.subgraph_duplication - 0.06).abs() < f32::EPSILON);
     assert!((config.weights.total() - 1.0).abs() < 1e-6);
     assert!(config.validate().is_ok());
 }
