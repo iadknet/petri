@@ -46,6 +46,8 @@
 | How is world-action `Direction` metadata encoded? | Ordinal `0..=7` using `NeighborDirection` order (`N, NE, E, SE, S, SW, W, NW`). | user+agent | resolved |
 | How are duplicate output field keys treated? | Duplicate payload keys and duplicate metadata field kinds are schema-invalid. | user+agent | resolved |
 | How does `max_input_slots` constrain routed input references? | Every internal edge targeting a VM node must satisfy `input_refs.len() <= target_vm.max_input_slots`; violations are schema-invalid. | user+agent | resolved |
+| What are `PacketFieldKey` naming constraints? | ASCII snake-case, max length `32`, regex `^[a-z][a-z0-9_]{0,31}$`. | user+agent | resolved |
+| What semantics do `Amount` and `Slot` carry by action? | `Amount` and `Slot` ranges/meaning are action-specific and explicitly defined in this spec. | user+agent | resolved |
 
 ## Genome Schema Contract
 
@@ -135,6 +137,10 @@ Validation:
 
 `PacketFieldKey`:
 - stable string key from packet payload map
+- regex: `^[a-z][a-z0-9_]{0,31}$`
+- ASCII only
+- max length `32`
+- case-sensitive (lowercase required by regex)
 
 `SensorCellField`:
 1. `FoodDensityNorm`
@@ -281,6 +287,18 @@ Direction metadata encoding:
 - `6=West`
 - `7=NorthWest`
 3. Out-of-range direction values are `InvalidActionMetadata` at runtime.
+
+Action metadata field semantics:
+1. `Amount(u8)`:
+- schema-level range is `0..=255` (type-level `u8`)
+- semantic meaning is action-specific and interpreted by world action handlers
+- for actions where `Amount` is not listed in the requirements table above, presence is invalid
+- world policy may reject operationally invalid values for the action (for example zero transfer/investment) as `InvalidActionMetadata`
+2. `Slot(u8)`:
+- schema-level range is `0..=255` (type-level `u8`)
+- `inventory_put`: target inventory slot index
+- runtime/world policy must reject indices outside creature inventory capacity as invalid action metadata
+- other actions: invalid
 
 Output field uniqueness contract:
 1. `OutputDefinition::InternalTarget.payload_fields` keys must be unique per output definition.
