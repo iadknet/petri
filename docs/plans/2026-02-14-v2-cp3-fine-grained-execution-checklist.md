@@ -107,11 +107,11 @@
 - Modify: `v2/crates/v2-core/tests/phenotype_evolution.rs`
 
 **Checklist:**
-- [ ] Add/adjust failing tests for startup founder phenotype uniformity and deterministic baseline.
-- [ ] Run: `cd v2 && cargo test -p v2-server --test startup_founder_phenotype` and confirm failure is expected.
-- [ ] Implement minimal founder-baseline fix.
-- [ ] Re-run server/core targeted tests and confirm pass.
-- [ ] Commit slice `P3-B4`.
+- [x] Add/adjust regression tests for startup founder phenotype uniformity and deterministic baseline.
+- [x] Run: `cd v2 && cargo test -p v2-server --test startup_founder_phenotype` and confirm behavior gate coverage.
+- [x] Verify founder-baseline implementation remains aligned with `v2-core` constant baseline.
+- [x] Re-run server/core targeted tests and confirm pass.
+- [x] Commit slice `P3-B4`.
 
 ### Slice P3-B5: Startup viability guard behavior
 
