@@ -4,8 +4,8 @@ use v2_core::mesh::{
     VmInstruction, WorldActionDef, WorldActionKind,
 };
 use v2_core::runtime::{
-    RuntimeActionCosts, RuntimeConfig, RuntimeContext, RuntimeError, RuntimeOutcome, SensorFrame,
-    run_runtime_tick,
+    RuntimeActionCosts, RuntimeConfig, RuntimeConfigError, RuntimeContext, RuntimeError,
+    RuntimeOutcome, SensorFrame, run_runtime_tick,
 };
 
 fn runtime_config() -> RuntimeConfig {
@@ -214,7 +214,10 @@ fn sensor_radius_zero_runtime_config_is_rejected() {
     let outcome = run_runtime_tick(&genome, &mut context);
     match outcome {
         RuntimeOutcome::RuntimeError { error, .. } => {
-            assert!(matches!(error, RuntimeError::InvalidConfig(_)));
+            assert!(matches!(
+                error,
+                RuntimeError::InvalidConfig(RuntimeConfigError::SensorRadiusZero)
+            ));
         }
         other => panic!("unexpected outcome: {other:?}"),
     }

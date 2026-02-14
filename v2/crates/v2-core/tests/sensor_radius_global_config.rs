@@ -1,4 +1,4 @@
-use v2_core::runtime::{RuntimeActionCosts, RuntimeConfig};
+use v2_core::runtime::{RuntimeActionCosts, RuntimeConfig, RuntimeConfigError};
 
 #[test]
 fn sensor_radius_must_be_global_and_non_zero() {
@@ -22,5 +22,5 @@ fn sensor_radius_must_be_global_and_non_zero() {
         sensor_radius: 0,
         ..valid
     };
-    assert!(invalid.validate().is_err());
+    assert_eq!(invalid.validate(), Err(RuntimeConfigError::SensorRadiusZero));
 }
