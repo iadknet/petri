@@ -52,3 +52,9 @@ Use a compact table or bullet list with:
 - retired or superseded docs/plans
 
 This keeps plan output aligned with docs and plan harness checks and avoids silent drift.
+
+## Plan Lifecycle
+
+- Active plans in `docs/plans/` should reflect the current product direction.
+- When strategy changes (for example, a greenfield reset), move stale plans to `docs/plans/archive/`.
+- Prefer replacing one large plan with stage/checkpoint plans so ownership and go/stop boundaries are explicit.
