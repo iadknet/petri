@@ -91,7 +91,18 @@ fn queue_drain_produces_implicit_noop() {
     };
     let mut context = runtime_context(2.0);
     let outcome = run_runtime_tick(&genome, &mut context);
-    assert!(matches!(outcome, RuntimeOutcome::ImplicitNoOp { .. }));
+    match outcome {
+        RuntimeOutcome::ImplicitNoOp {
+            energy_spent,
+            energy_remaining,
+            dispatches,
+        } => {
+            assert_eq!(dispatches, 1);
+            assert!(energy_spent > 0.0);
+            assert!(energy_remaining > 0.0 && energy_remaining < 2.0);
+        }
+        other => panic!("unexpected outcome: {other:?}"),
+    }
 }
 
 #[test]
@@ -113,9 +124,40 @@ fn vm_exhaustion_returns_energy_exhausted() {
         evolution_params: None,
     };
 
-    let mut context = runtime_context(0.05);
+    let mut context = runtime_context(0.55);
     let outcome = run_runtime_tick(&genome, &mut context);
-    assert!(matches!(outcome, RuntimeOutcome::EnergyExhausted { .. }));
+    match outcome {
+        RuntimeOutcome::EnergyExhausted {
+            energy_spent,
+            dispatches,
+        } => {
+            assert_eq!(dispatches, 1);
+            assert!(energy_spent > context.config.dispatch_entry_cost);
+        }
+        other => panic!("unexpected outcome: {other:?}"),
+    }
+}
+
+#[test]
+fn dispatch_entry_exhaustion_returns_zero_dispatches() {
+    let genome = CreatureGenome {
+        entry_node_id: 1,
+        nodes: vec![graph_node_with_outputs(1, Vec::new())],
+        evolution_params: None,
+    };
+
+    let mut context = runtime_context(0.1);
+    let outcome = run_runtime_tick(&genome, &mut context);
+    match outcome {
+        RuntimeOutcome::EnergyExhausted {
+            energy_spent,
+            dispatches,
+        } => {
+            assert_eq!(dispatches, 0);
+            assert!((energy_spent - 0.1).abs() < 1e-6);
+        }
+        other => panic!("unexpected outcome: {other:?}"),
+    }
 }
 
 #[test]

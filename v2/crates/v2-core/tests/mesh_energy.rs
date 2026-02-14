@@ -13,6 +13,14 @@ fn dispatch_entry_energy_charge_is_applied() {
 }
 
 #[test]
+fn dispatch_entry_charge_exhausts_when_energy_below_cost() {
+    let result = charge_dispatch_entry(0.02, 0.03);
+    approx_eq(result.remaining_energy, 0.0);
+    approx_eq(result.charged_energy, 0.02);
+    assert!(result.exhausted);
+}
+
+#[test]
 fn graph_static_tariff_is_charged_per_dispatch() {
     let result = charge_backend_graph(0.08, 0.05);
     approx_eq(result.remaining_energy, 0.03);
