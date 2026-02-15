@@ -44,13 +44,23 @@
 | `CP-0` | workspace/build skeleton checks | `v2` Rust workspace checks and `v2/web` build succeeds |
 | `CP-1` | `mesh_kernel`, `mesh_energy`, `mesh_backends`, `mesh_runtime`, `mesh_schema_contract`, `vm_isa`, `vm_memory`, `vm_io`, `vm_sensor_queries`, `vm_neighbor_queries`, `vm_opcode_costs`, `vm_input_mapping`, `vm_output_overrides`, `vm_numeric_determinism`, `sensor_frame_contract`, `neighbor_input_contract`, `graph_sensor_inputs`, `graph_neighbor_inputs`, `graph_operator_richness`, `graph_stateful_ops`, `sensor_radius_global_config` | all tests pass; runtime semantics, schema/ISA contracts, global configurable sensor radius, full-radius sensor richness, complete neighbor-input parity, VM memory/I/O/sensor+neighbor opcodes, emitted-output ordering/error precedence, `max_input_slots` edge validation, slot mapping/override lifecycle, numeric determinism, opcode-cost behavior, and graph fixed-function richness match CP-1 specs |
 | `CP-2` | `mutation_invariants`, `mutation_repair`, `reproduction_memory_inheritance`, `ecology_pressures`, `ecology_noncollapse`, `startup_viability_gate` | all tests pass on fixed seeds; no invariant violations, offspring memory-copy semantics hold, duplication/remap defaults are enforced, and non-collapse threshold contract is met using actual seeded baseline population |
-| `CP-3` | server lifecycle/payload/ws tests + `startup_world_init`, `startup_founder_phenotype`, `startup_viability`; cli ndjson tests; web protocol fixtures + unit/integration tests; Playwright gate smoke | all tests pass; schema/version parity across all surfaces, lifecycle transition contract is enforced, non-2xx responses follow error-envelope schema, ws event/payload schemas are fixture-locked, startup world initialization is deterministic and non-empty for viable starts, and gate-smoke UI flows pass against real server transport |
+| `CP-3` | server lifecycle/payload/ws tests + `startup_world_init`, `startup_founder_phenotype`, `startup_viability`, `tick_dynamics`; core runtime realism regression (`world_state`); cli ndjson tests; web protocol fixtures + unit/integration tests; Playwright gate smoke | all tests pass; schema/version parity across all surfaces, lifecycle transition contract is enforced, non-2xx responses follow error-envelope schema, ws event/payload schemas are fixture-locked, startup world initialization is deterministic and non-empty for viable starts, running ticks mutate creature/world behavior beyond tick counters, action/energy/population telemetry reflects applied behavior (not synthetic derivation), and gate-smoke UI flows pass against real server transport |
 
 ## Gate-Only Execution Policy
 
 1. This matrix defines required tests for checkpoint and merge gates only.
 2. Nightly/scheduled suites are out of scope for this plan.
 3. Unit and integration tests are the primary signal; Playwright is limited to gate-critical smoke flows.
+
+## Functional Intent Rule (Golden Rule, Generalized)
+
+1. This matrix must always include intent/integration coverage for each checkpoint feature area.
+2. Contract-shape verification is required but never sufficient on its own.
+3. Future checkpoints must include equivalent evidence for:
+- functional intent behavior (what the feature is meant to do)
+- integrated execution-path behavior (fully wired, not isolated stubs)
+- negative/depletion/error path behavior where applicable
+4. Runtime surfaces additionally require behavior-realism checks (state evolution and telemetry truthfulness).
 
 ## Required Test Categories
 
@@ -136,10 +146,12 @@
 1. `scripts/check-plan-harness.sh --mode strict`
 2. `cd v2 && cargo fmt --all --check`
 3. `cd v2 && cargo clippy --workspace --all-targets -- -D warnings`
-4. `cd v2 && cargo test --workspace`
-5. `cd v2/web && npm run test`
-6. `cd v2/web && npm run build`
-7. `cd v2/web && npm run test:e2e`
+4. `cd v2 && cargo test -p v2-core --test world_state`
+5. `cd v2 && cargo test -p v2-server --test tick_dynamics`
+6. `cd v2 && cargo test --workspace`
+7. `cd v2/web && npm run test`
+8. `cd v2/web && npm run build`
+9. `cd v2/web && npm run test:e2e`
 
 ## Matrix Ownership (DRY Rule)
 

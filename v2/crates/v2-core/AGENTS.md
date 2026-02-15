@@ -19,6 +19,7 @@ Local instructions for `v2/crates/v2-core`.
 ## Contract Guardrails
 
 - Runtime ordering, energy charging, and validation semantics are contract surface.
+- World tick semantics (action application, energy change, and depletion/removal paths where applicable) are contract surface.
 - Backward compatibility is not required; runtime/schema changes may require world restart.
 - Keep randomness seed-driven and deterministic in tests.
 
@@ -27,3 +28,4 @@ Local instructions for `v2/crates/v2-core`.
 - Prefer focused integration tests in `v2/crates/v2-core/tests/`.
 - Add regression tests for behavior/policy changes before implementation.
 - Align required suite names with CP-1/CP-2 matrix gates.
+- Ensure tests demonstrate intended behavior in integrated runtime flow, not only isolated contract conformance.

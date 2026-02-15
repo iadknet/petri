@@ -8,6 +8,7 @@ pub mod runtime;
 pub mod telemetry;
 pub mod viability;
 pub mod world_seed;
+pub mod world_state;
 
 pub const V2_RUNTIME_NAME: &str = "petri-v2";
 

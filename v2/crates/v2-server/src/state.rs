@@ -1,31 +1,19 @@
-use std::collections::HashSet;
+use std::collections::{HashSet, VecDeque};
 
 use crate::api::{ActionCounts, PaintPoint, PaintStrokeTool, StartupRequest};
-use v2_core::ecology::{EcologyConfig, run_noncollapse_baseline};
+use v2_core::ecology::EcologyConfig;
 use v2_core::phenotype::FOUNDER_PHENOTYPE_RGB;
-use v2_core::viability::{StartupViabilityGate, run_startup_viability_gate};
-use v2_core::world_seed::{WorldSeedConfig, seed_creature_cells, seed_food_cells};
+use v2_core::viability::{run_startup_viability_gate, StartupViabilityGate};
+use v2_core::world_seed::{seed_creature_cells, seed_food_cells, WorldSeedConfig};
+use v2_core::world_state::{
+    tick_world, WorldActionCounts, WorldCell, WorldCreature, WorldTickConfig,
+};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SimulationPhase {
     Idle,
     Running,
     Paused,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct WorldCell {
-    pub x: u16,
-    pub y: u16,
-}
-
-#[derive(Clone, Debug)]
-pub struct WorldCreature {
-    pub id: u64,
-    pub x: u16,
-    pub y: u16,
-    pub energy: f32,
-    pub phenotype_rgb: [u8; 3],
 }
 
 #[derive(Clone, Debug)]
@@ -153,6 +141,8 @@ pub struct SimulationState {
     pub deaths_last_window: u32,
     pub last_action_counts: ActionCounts,
     pub world_seed_config: WorldSeedConfig,
+    pub world_tick_config: WorldTickConfig,
+    recent_population_events: VecDeque<(u32, u32)>,
 }
 
 impl SimulationState {
@@ -177,6 +167,8 @@ impl SimulationState {
             deaths_last_window: 0,
             last_action_counts: ActionCounts::default(),
             world_seed_config: WorldSeedConfig::default(),
+            world_tick_config: WorldTickConfig::default(),
+            recent_population_events: VecDeque::new(),
         }
     }
 
@@ -202,6 +194,46 @@ impl SimulationState {
         self.config_digest = digest;
         self.startup = startup;
         self.world = world;
+        self.health_window_ticks = EcologyConfig::default().health_window_ticks as u16;
+        self.recent_population_events.clear();
+        self.births_last_window = 0;
+        self.deaths_last_window = 0;
+        self.last_action_counts = ActionCounts::default();
+        self.refresh_metrics_from_world();
+    }
+
+    pub fn advance_ticks(&mut self, steps: u16) {
+        let mut combined_action_counts = WorldActionCounts::default();
+        for _ in 0..steps {
+            self.tick = self.tick.saturating_add(1);
+            let outcome = tick_world(
+                self.world.width,
+                self.world.height,
+                self.world.wrap,
+                self.tick,
+                self.startup.seed,
+                self.world_seed_config,
+                self.world_tick_config,
+                &mut self.world.creatures,
+                &mut self.world.food,
+                &self.world.barriers,
+            );
+            combined_action_counts.accumulate(outcome.action_counts);
+            self.record_population_window(outcome.births, outcome.deaths);
+        }
+        self.last_action_counts = map_action_counts(combined_action_counts);
+        self.refresh_metrics_from_world();
+    }
+
+    fn record_population_window(&mut self, births: u32, deaths: u32) {
+        let max_window = usize::from(self.health_window_ticks.max(1));
+        self.recent_population_events.push_back((births, deaths));
+        while self.recent_population_events.len() > max_window {
+            self.recent_population_events.pop_front();
+        }
+    }
+
+    fn refresh_metrics_from_world(&mut self) {
         self.population = self.world.creatures.len() as u32;
         self.mean_energy = if self.population == 0 {
             0.0
@@ -213,92 +245,16 @@ impl SimulationState {
                 .sum::<f32>()
                 / self.population as f32
         };
-        self.births_last_window = 0;
-        self.deaths_last_window = 0;
-        self.last_action_counts = ActionCounts::default();
-        self.refresh_health_from_core();
-    }
-
-    pub fn advance_ticks(&mut self, steps: u16) {
-        for _ in 0..steps {
-            self.tick = self.tick.saturating_add(1);
-            self.grow_food_for_tick();
-        }
-        self.last_action_counts = ActionCounts::default();
-        self.refresh_health_from_core();
-    }
-
-    pub fn refresh_health_from_core(&mut self) {
-        let config = EcologyConfig::default();
-        self.health_window_ticks = config.health_window_ticks as u16;
-
-        let ticks = u32::try_from(self.tick.max(1)).unwrap_or(u32::MAX);
-        let run = run_noncollapse_baseline(
-            self.startup.seed,
-            ticks,
-            (self.world.creatures.len() as u32).max(1),
-            &config,
-        );
-
-        if let Some(latest) = run.snapshots.last() {
-            self.mean_energy = latest.mean_energy;
-            self.births_last_window = latest.births_last_window;
-            self.deaths_last_window = latest.deaths_last_window;
-        }
-
-        self.population = self.world.creatures.len() as u32;
-    }
-
-    fn grow_food_for_tick(&mut self) {
-        let width = usize::from(self.world.width);
-        let height = usize::from(self.world.height);
-        let total_cells = width.saturating_mul(height);
-        if total_cells == 0 {
-            return;
-        }
-
-        let config = self.world_seed_config;
-        if config.food_growth_rate <= 0.0 && config.food_spawn_rate <= 0.0 {
-            return;
-        }
-
-        let current_density = self.world.food.len() as f32 / total_cells as f32;
-        let mut attempts =
-            ((total_cells as f32 * config.food_spawn_rate.clamp(0.0, 1.0)).round() as usize).max(1);
-
-        if current_density < config.food_spawn_floor_density.clamp(0.0, 1.0) {
-            attempts = attempts.saturating_mul(2);
-        }
-        if current_density >= config.food_spread_threshold.clamp(0.0, 1.0) {
-            attempts = attempts.saturating_add(attempts / 2);
-        }
-
-        let growth_bonus = (config.food_growth_rate.clamp(0.0, 1.0) * 8.0).round() as usize;
-        attempts = attempts.saturating_add(growth_bonus);
-
-        let creature_cells = self
-            .world
-            .creatures
+        self.births_last_window = self
+            .recent_population_events
             .iter()
-            .map(|creature| WorldCell {
-                x: creature.x,
-                y: creature.y,
-            })
-            .collect::<HashSet<_>>();
-
-        let mut rng = Lcg64::new(self.startup.seed ^ self.tick ^ 0xA5A5_5A5A_1122_3344);
-        for _ in 0..attempts {
-            let index = rng.next_usize(total_cells);
-            let x = (index % width) as u16;
-            let y = (index / width) as u16;
-            let cell = WorldCell { x, y };
-
-            if self.world.barriers.contains(&cell) || creature_cells.contains(&cell) {
-                continue;
-            }
-
-            self.world.food.insert(cell);
-        }
+            .map(|(births, _)| *births)
+            .sum();
+        self.deaths_last_window = self
+            .recent_population_events
+            .iter()
+            .map(|(_, deaths)| *deaths)
+            .sum();
     }
 
     #[must_use]
@@ -370,30 +326,13 @@ fn sanitize_startup_request(mut startup: StartupRequest) -> StartupRequest {
     startup
 }
 
-#[derive(Clone, Debug)]
-struct Lcg64 {
-    state: u64,
-}
-
-impl Lcg64 {
-    fn new(seed: u64) -> Self {
-        Self {
-            state: seed.wrapping_add(0x9E37_79B9_7F4A_7C15),
-        }
-    }
-
-    fn next_u64(&mut self) -> u64 {
-        self.state = self
-            .state
-            .wrapping_mul(6_364_136_223_846_793_005)
-            .wrapping_add(1_442_695_040_888_963_407);
-        self.state
-    }
-
-    fn next_usize(&mut self, upper_exclusive: usize) -> usize {
-        if upper_exclusive <= 1 {
-            return 0;
-        }
-        (self.next_u64() % upper_exclusive as u64) as usize
+fn map_action_counts(counts: WorldActionCounts) -> ActionCounts {
+    ActionCounts {
+        r#move: counts.r#move,
+        eat: counts.eat,
+        reproduce: counts.reproduce,
+        inventory_pickup: counts.inventory_pickup,
+        inventory_put: counts.inventory_put,
+        noop: counts.noop,
     }
 }

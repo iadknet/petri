@@ -48,6 +48,8 @@ Modes:
 - Open questions table structure and strict-mode resolution rules.
 - Unresolved markers (`TBD`, `TODO`, `???`) in decision-critical fields.
 
+Structural harness success is necessary but not sufficient for completion claims; apply `docs/standards/intent-verification-policy.md` for intent/integration evidence requirements.
+
 ## Rollout (completion-gate only)
 
 No CI gate is added in this phase; this is enforced by agent completion workflow.

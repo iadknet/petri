@@ -6,6 +6,10 @@ Project-level instructions for coding agents working in this repository.
 
 Build the Petri simulation incrementally while preserving deterministic testability, clear crate boundaries, reproducible toolchains, and strict quality gates.
 
+## Golden Rule
+
+- Completion requires verified functional intent and integration behavior; contract/shape checks alone are never sufficient.
+
 ## Instruction Layering
 
 Use the split-responsibility model:
@@ -29,6 +33,7 @@ See canonical policy: `docs/standards/agent-instruction-layering.md`.
 - Crate dependency direction remains `petri-graph -> petri-core -> petri-server/petri-cli`.
 - Keep simulation policy in `petri-core`; keep transport policy in `petri-server`.
 - Do not add web concerns to Rust core crates.
+- Runtime behavior telemetry must be truthfully simulation-derived: per-tick creature state, action counts, and energy/population metrics must come from applied world tick behavior, not synthetic placeholders.
 - Frame food payload stays quantized byte density (`0..255`) unless explicitly changed.
 - `initial_creatures` remains best-effort (bounded by occupancy and max creatures).
 - `food_growth_rate` is honored directly (no hidden minimum floor).
@@ -40,9 +45,10 @@ See canonical policy: `docs/standards/agent-instruction-layering.md`.
 2. For multi-step changes, write or update a plan in `docs/plans/`.
 3. Use isolated branches/worktrees with `codex/` branch prefix.
 4. For behavior changes and bug fixes, use TDD (failing test first).
-5. Keep commits focused and atomic.
-6. For code review requests, run Gemini MCP (`gemini-analyze-code`) first; if unavailable, state that and run a local fallback review.
-7. For Rust structural refactors, include a short "Boundary Impact" note in the plan covering dependency direction, public API/wire-format changes, and test migration approach.
+5. For feature/checkpoint completion claims, require intent-level + integration-level regression evidence (not only contract tests).
+6. Keep commits focused and atomic.
+7. For code review requests, run Gemini MCP (`gemini-analyze-code`) first; if unavailable, state that and run a local fallback review.
+8. For Rust structural refactors, include a short "Boundary Impact" note in the plan covering dependency direction, public API/wire-format changes, and test migration approach.
 
 ## Completion Gate
 
@@ -72,7 +78,7 @@ Before claiming completion, run and confirm all pass:
 - Docs index: `docs/README.md`
 - Strategy docs: `docs/strategy/goals.md`, `docs/strategy/roadmap.md`, `docs/strategy/architecture.md`, `docs/strategy/technology-review.md`
 - Controller reference: `docs/reference/creature-controller-reference.md`
-- Operations and standards: `docs/operations/doc-hygiene.md`, `docs/standards/agent-instruction-layering.md`, `docs/standards/architecture-lint-policy.md`, `docs/standards/plan-quality-gate-policy.md`, `docs/standards/documentation-consistency-policy.md`
+- Operations and standards: `docs/operations/doc-hygiene.md`, `docs/standards/agent-instruction-layering.md`, `docs/standards/architecture-lint-policy.md`, `docs/standards/plan-quality-gate-policy.md`, `docs/standards/documentation-consistency-policy.md`, `docs/standards/intent-verification-policy.md`, `docs/standards/runtime-behavior-realism-policy.md`
 
 ## Git Hygiene
 
