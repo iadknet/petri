@@ -36,6 +36,11 @@ fn running_ticks_mutate_world_state_beyond_tick_counter() {
     let mut api = SimulationApi::new();
     api.startup(startup_request());
     let before = api.frame();
+    let before_creatures = before
+        .creatures
+        .iter()
+        .map(|creature| (creature.id, creature.x, creature.y, creature.energy))
+        .collect::<Vec<_>>();
 
     api.start().expect("start");
     for _ in 0..5 {
@@ -50,10 +55,24 @@ fn running_ticks_mutate_world_state_beyond_tick_counter() {
         after.food.len() > before.food.len(),
         "food growth should mutate frame state while ticking"
     );
+    let any_creature_changed = after.creatures.iter().any(|creature| {
+        before_creatures
+            .iter()
+            .find(|(id, _, _, _)| *id == creature.id)
+            .is_none_or(|(_, x, y, energy)| {
+                creature.x != *x
+                    || creature.y != *y
+                    || (creature.energy - *energy).abs() > f32::EPSILON
+            })
+    });
+    assert!(
+        any_creature_changed,
+        "running ticks should mutate creature positions and/or energy"
+    );
 }
 
 #[test]
-fn action_counts_are_not_synthetic_when_no_actions_are_applied() {
+fn action_counts_reflect_applied_creature_tick_actions() {
     let mut api = SimulationApi::new();
     api.startup(startup_request());
     api.start().expect("start");
@@ -64,7 +83,7 @@ fn action_counts_are_not_synthetic_when_no_actions_are_applied() {
 
     let status = api.status();
     assert!(
-        all_zero(&status.last_action_counts),
-        "without applied creature actions, action counts should remain zero"
+        !all_zero(&status.last_action_counts),
+        "running ticks should report non-zero action counts from creature behavior"
     );
 }

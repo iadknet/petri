@@ -20,6 +20,9 @@ Local instructions for all work under `v2/`.
 - For multi-step work, update the active plan in `docs/plans/`.
 - Keep checkpoint verification aligned with `docs/plans/2026-02-14-v2-implementation-test-matrix.md`.
 - Prefer small, checkpoint-scoped commits.
+- Golden rule for completion: checkpoint intent must be functionally implemented/integrated and test-proven, not contract-only.
+- Treat `docs/standards/runtime-behavior-realism-policy.md` as a standing requirement for any runtime-facing change.
+- Treat `docs/standards/intent-verification-policy.md` as a standing requirement for all feature areas.
 
 ## Test Execution Rule
 

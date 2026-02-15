@@ -28,6 +28,8 @@ Legacy root/runtime artifacts are maintained as historical reference while green
 - [Architecture Lint Policy](standards/architecture-lint-policy.md)
 - [Plan Quality Gate Policy](standards/plan-quality-gate-policy.md)
 - [Documentation Consistency Policy](standards/documentation-consistency-policy.md)
+- [Intent Verification Policy](standards/intent-verification-policy.md)
+- [Runtime Behavior Realism Policy](standards/runtime-behavior-realism-policy.md)
 
 ## Operations
 

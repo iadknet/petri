@@ -92,3 +92,10 @@ Exit codes:
 
 - warn mode: always `0`
 - strict mode: non-zero when violations are present
+
+## Intent Completeness Overlay
+
+Plan-harness conformance does not, by itself, prove implementation completeness.
+
+- Apply `docs/standards/intent-verification-policy.md` alongside this harness policy.
+- Completion claims require intent-level and integration-level verification evidence, not metadata/structure compliance alone.

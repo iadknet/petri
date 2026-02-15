@@ -62,12 +62,20 @@ petri/
   - `/v2/simulation/*` lifecycle/status/frame/paint contracts
   - non-2xx CP-3 error envelope
   - WebSocket event ordering and event/payload mapping
+  - runtime payload truthfulness: state/telemetry values map from applied core simulation behavior, not synthetic derivation
 - `v2-cli`:
   - `run` and `ablation` command surfaces
   - deterministic NDJSON event shapes and field ordering
 - `v2-web`:
   - typed models and runtime-safe decoders for `v2alpha1`
   - fixture-locked protocol parser tests
+
+## Runtime Truthfulness Invariant
+
+- Runtime behavior realism is a standing architecture requirement, not a checkpoint-specific exception.
+- Any surface that reports simulation state/telemetry must derive values from applied simulation transitions.
+- This invariant applies to present and future runtime surfaces; see `docs/standards/runtime-behavior-realism-policy.md`.
+- This is a specialization of the project-wide intent-verification golden rule; see `docs/standards/intent-verification-policy.md`.
 
 ## Compatibility Posture
 
