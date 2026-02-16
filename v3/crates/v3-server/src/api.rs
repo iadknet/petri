@@ -14,9 +14,7 @@ pub struct StatusResponse {
     pub creature_count: usize,
 }
 
-pub async fn get_status(
-    State(state): State<Arc<RwLock<ServerState>>>,
-) -> Json<StatusResponse> {
+pub async fn get_status(State(state): State<Arc<RwLock<ServerState>>>) -> Json<StatusResponse> {
     let state = state.read().await;
     Json(StatusResponse {
         tick: state.sim.tick_number,
@@ -25,17 +23,13 @@ pub async fn get_status(
     })
 }
 
-pub async fn start_simulation(
-    State(state): State<Arc<RwLock<ServerState>>>,
-) -> StatusCode {
+pub async fn start_simulation(State(state): State<Arc<RwLock<ServerState>>>) -> StatusCode {
     let mut state = state.write().await;
     state.running = true;
     StatusCode::OK
 }
 
-pub async fn pause_simulation(
-    State(state): State<Arc<RwLock<ServerState>>>,
-) -> StatusCode {
+pub async fn pause_simulation(State(state): State<Arc<RwLock<ServerState>>>) -> StatusCode {
     let mut state = state.write().await;
     state.running = false;
     StatusCode::OK

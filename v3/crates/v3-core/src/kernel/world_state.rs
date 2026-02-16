@@ -7,7 +7,6 @@ pub struct WorldState {
 
     // Flat arrays indexed by (y * width + x) for cache-friendly O(1) access.
     // A 400x400 world is only 160K entries — flat Vec beats HashMap here.
-
     /// Food density per cell (0-255 quantized).
     food: Vec<u8>,
 
