@@ -83,9 +83,6 @@ petri/
 │   │   │   └── tests/          # Integration tests
 │   │   ├── v3-server/          # HTTP + WebSocket transport
 │   │   └── v3-cli/             # Headless runner
-│   └── docs/
-│       ├── BOUNDARIES.md       # Module boundary rules
-│       └── WALKING_SKELETON.md # Incremental build phases
 ├── v2/                         # Reference: what NOT to do
 ├── crates/                     # v1 working reference
 ├── web/                        # v1 web client
@@ -500,8 +497,6 @@ pub fn tick(
     config: &SimulationConfig,
     rng: &mut impl Rng,
 ) -> TickStats {
-    let pre_population = state.creatures.len();
-
     // Phase 0: World mechanics
     state.world.grow_food(&config.world.food, rng);
     apply_energy_decay(&mut state.creatures, config.energy.lifecycle.energy_decay_per_tick);

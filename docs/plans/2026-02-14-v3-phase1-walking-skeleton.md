@@ -10,6 +10,28 @@
 
 ---
 
+## Implementation Guidance: Handling Plan Discrepancies
+
+During implementation you will encounter minor issues in this plan — wrong feature flags, missing imports, slight API mismatches, untested edge cases, etc. Use this decision framework:
+
+**Fix and continue** (use your best judgement) when:
+- A dependency version or feature flag needs adjusting to compile (e.g., enabling `small_rng` feature for rand)
+- A test is missing for an obvious behavioral path (e.g., dead creature cleanup) — add it
+- An unused variable or import would fail clippy — remove it
+- A code snippet has a minor Rust API error (wrong method name, missing trait import)
+- Expected test output doesn't match implementation (e.g., hardcoded count in curl example)
+
+**Stop and flag** (ask the user or note in a commit message) when:
+- A module boundary or dependency direction would need to change
+- A type's ownership model (who owns what, borrow patterns) doesn't work as designed
+- A task's core purpose or gate criteria seems wrong or untestable
+- The architecture doc and this plan contradict each other on a design decision (not just a detail)
+- Adding a dependency not listed in the tech stack
+
+**Principle:** This plan describes intent and structure. Minor details (exact feature flags, import paths, helper functions) are implementation decisions the coding agent owns. Architectural decisions (module boundaries, ownership, data flow) are not — those require checking the architecture doc and flagging if something doesn't fit.
+
+---
+
 ## Task 1: Create v3 Workspace Structure
 
 **Files:**
@@ -85,7 +107,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-rand = "0.8"
+rand = { version = "0.8", features = ["small_rng"] }
 serde = { version = "1.0", features = ["derive"] }
 slotmap = "1.0"
 ```
@@ -230,6 +252,30 @@ fn world_state_new_creates_empty_world() {
     assert_eq!(world.get_food_density(Position { x: 5, y: 5 }), 0);
     assert!(!world.is_occupied(Position { x: 5, y: 5 }));
     assert!(world.creature_at(Position { x: 5, y: 5 }).is_none());
+}
+
+#[test]
+fn place_and_remove_creature_updates_spatial_index() {
+    use v3_core::kernel::world_state::WorldState;
+    use v3_core::kernel::types::{Position, CreatureId};
+    use slotmap::SlotMap;
+
+    let mut world = WorldState::new(10, 10, true);
+    let pos = Position { x: 3, y: 4 };
+
+    // Create a CreatureId via a temporary SlotMap
+    let mut slots: SlotMap<CreatureId, ()> = SlotMap::with_key();
+    let id = slots.insert(());
+
+    // Place creature
+    world.place_creature(pos, id);
+    assert!(world.is_occupied(pos));
+    assert_eq!(world.creature_at(pos), Some(id));
+
+    // Remove creature
+    world.remove_creature(pos);
+    assert!(!world.is_occupied(pos));
+    assert_eq!(world.creature_at(pos), None);
 }
 ```
 
@@ -756,11 +802,39 @@ fn tick_advances_and_creatures_persist() {
         assert!(state.world.creature_at(creature.position).is_some());
     }
 }
+
+#[test]
+fn tick_removes_dead_creatures_and_frees_positions() {
+    use v3_core::SimulationState;
+    use v3_core::creature::state::CreatureState;
+    use v3_core::kernel::types::Position;
+    use v3_core::kernel::world_state::WorldState;
+    use rand::SeedableRng;
+    use rand::rngs::SmallRng;
+
+    let mut state = SimulationState::new(WorldState::new(10, 10, true));
+    let mut rng = SmallRng::seed_from_u64(42);
+
+    let pos_alive = Position { x: 1, y: 1 };
+    let pos_dead = Position { x: 2, y: 2 };
+
+    state.spawn_creature(CreatureState::new(pos_alive, 10, 0, [255, 0, 0]));
+    state.spawn_creature(CreatureState::new(pos_dead, 0, 0, [0, 255, 0]));  // energy 0 = dead
+    assert_eq!(state.creatures.len(), 2);
+
+    state.tick(&mut rng);
+
+    // Dead creature removed from SlotMap and spatial index
+    assert_eq!(state.creatures.len(), 1);
+    assert!(!state.world.is_occupied(pos_dead));
+    // Living creature still present
+    assert!(state.world.is_occupied(pos_alive));
+}
 ```
 
 **Step 2: Run test to verify it fails**
 
-Run: `cd v3 && cargo test tick_advances_and_creatures_persist`
+Run: `cd v3 && cargo test tick_integration_test`
 Expected: FAIL
 
 **Step 3: Implement SimulationState and tick orchestrator (Phase 0 only)**
@@ -1189,28 +1263,74 @@ async fn main() {
 }
 ```
 
-**Step 6: Test server builds and runs**
+**Step 6: Extract router builder for testability**
+
+Add a public function in `main.rs` (or a separate `router.rs`) that builds the Router without binding a port, so integration tests can use it:
+
+```rust
+pub fn build_router(state: Arc<RwLock<ServerState>>) -> Router {
+    Router::new()
+        .route("/v3/simulation/status", get(api::get_status))
+        .route("/v3/simulation/start", post(api::start_simulation))
+        .route("/v3/simulation/pause", post(api::pause_simulation))
+        .with_state(state)
+}
+```
+
+**Step 7: Add dev-dependencies for server testing**
+
+Add to `v3/crates/v3-server/Cargo.toml`:
+```toml
+[dev-dependencies]
+axum-test-helpers = "0.1"  # or use tower::ServiceExt directly
+tower = { version = "0.4", features = ["util"] }
+http-body-util = "0.1"
+hyper = "1.0"
+```
+
+**Step 8: Write automated server integration test**
+
+Create `v3/crates/v3-server/tests/api_test.rs`:
+```rust
+use axum::http::{Request, StatusCode};
+use tower::ServiceExt;  // for oneshot()
+use std::sync::Arc;
+use tokio::sync::RwLock;
+
+#[tokio::test]
+async fn status_endpoint_returns_valid_json() {
+    let state = Arc::new(RwLock::new(v3_server::state::ServerState::new()));
+    let app = v3_server::build_router(state);
+
+    let response = app
+        .oneshot(Request::get("/v3/simulation/status").body(axum::body::Body::empty()).unwrap())
+        .await
+        .unwrap();
+
+    assert_eq!(response.status(), StatusCode::OK);
+    // Parse body and verify structure
+    let body = axum::body::to_bytes(response.into_body(), usize::MAX).await.unwrap();
+    let json: serde_json::Value = serde_json::from_slice(&body).unwrap();
+    assert_eq!(json["tick"], 0);
+    assert_eq!(json["running"], false);
+    assert_eq!(json["creature_count"], 50);
+}
+```
+
+Note: This requires `v3-server` to be structured as a library+binary crate (add `lib.rs` alongside `main.rs`) so integration tests can import `build_router` and `ServerState`. This is a standard Axum testing pattern.
+
+**Step 9: Manual smoke test**
 
 Run: `cd v3 && cargo run -p v3-server`
 Expected: Server starts on port 4000
-
-Stop server with Ctrl+C
-
-**Step 7: Test endpoints**
 
 In another terminal:
 ```bash
 curl http://127.0.0.1:4000/v3/simulation/status
 # Expected: {"tick":0,"running":false,"creature_count":50}
-
-curl -X POST http://127.0.0.1:4000/v3/simulation/start
-# Wait a moment...
-
-curl http://127.0.0.1:4000/v3/simulation/status
-# Expected: {"tick":<nonzero>,"running":true,"creature_count":50}
 ```
 
-**Step 8: Commit**
+**Step 10: Commit**
 
 ```bash
 git add v3/Cargo.toml v3/crates/v3-server/
