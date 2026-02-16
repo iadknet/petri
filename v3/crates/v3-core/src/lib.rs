@@ -2,6 +2,7 @@ pub mod contracts;
 pub mod creature;
 pub mod kernel;
 pub mod runtime;
+pub mod seed;
 pub mod sensors;
 pub mod tick;
 
