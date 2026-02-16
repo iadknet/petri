@@ -138,6 +138,20 @@ fn position_equality_works() {
     assert_eq!(pos1, pos2);
     assert_ne!(pos1, pos3);
 }
+
+#[test]
+fn direction_delta_returns_correct_offsets() {
+    use v3_core::kernel::types::Direction;
+
+    assert_eq!(Direction::N.delta(),  ( 0, -1));
+    assert_eq!(Direction::NE.delta(), ( 1, -1));
+    assert_eq!(Direction::E.delta(),  ( 1,  0));
+    assert_eq!(Direction::SE.delta(), ( 1,  1));
+    assert_eq!(Direction::S.delta(),  ( 0,  1));
+    assert_eq!(Direction::SW.delta(), (-1,  1));
+    assert_eq!(Direction::W.delta(),  (-1,  0));
+    assert_eq!(Direction::NW.delta(), (-1, -1));
+}
 ```
 
 **Step 2: Run test to verify it fails**
@@ -547,7 +561,7 @@ Create `v3/crates/v3-core/src/contracts/outputs.rs`:
 #[derive(Clone, Debug, PartialEq)]
 pub enum WorldAction {
     NoOp,
-    // More actions added in later phases (Move, Eat, Reproduce, etc.)
+    // More actions added in later stages (Move, Eat, Reproduce, etc.)
 }
 
 /// Internal outputs (stub for Stage 1)
@@ -717,7 +731,8 @@ Create `v3/crates/v3-core/tests/tick_integration_test.rs`:
 #[test]
 fn tick_advances_and_creatures_persist() {
     use v3_core::SimulationState;
-    use v3_core::seed::seed_creatures;
+    use v3_core::creature::state::CreatureState;
+    use v3_core::kernel::types::Position;
     use v3_core::kernel::world_state::WorldState;
     use rand::SeedableRng;
     use rand::rngs::SmallRng;
@@ -725,7 +740,10 @@ fn tick_advances_and_creatures_persist() {
     let mut state = SimulationState::new(WorldState::new(10, 10, true));
     let mut rng = SmallRng::seed_from_u64(42);
 
-    seed_creatures(&mut state, 3, 10, &mut rng);
+    // Use spawn_creature directly (seed module is Task 7)
+    state.spawn_creature(CreatureState::new(Position { x: 1, y: 1 }, 10, 0, [255, 0, 0]));
+    state.spawn_creature(CreatureState::new(Position { x: 2, y: 2 }, 10, 0, [0, 255, 0]));
+    state.spawn_creature(CreatureState::new(Position { x: 3, y: 3 }, 10, 0, [0, 0, 255]));
     assert_eq!(state.creatures.len(), 3);
 
     state.tick(&mut rng);
@@ -1183,13 +1201,13 @@ Stop server with Ctrl+C
 In another terminal:
 ```bash
 curl http://127.0.0.1:4000/v3/simulation/status
-# Expected: {"tick":0,"running":false,"creature_count":2}
+# Expected: {"tick":0,"running":false,"creature_count":50}
 
 curl -X POST http://127.0.0.1:4000/v3/simulation/start
 # Wait a moment...
 
 curl http://127.0.0.1:4000/v3/simulation/status
-# Expected: {"tick":<nonzero>,"running":true,"creature_count":2}
+# Expected: {"tick":<nonzero>,"running":true,"creature_count":50}
 ```
 
 **Step 8: Commit**

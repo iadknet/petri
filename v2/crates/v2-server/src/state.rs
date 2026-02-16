@@ -1,6 +1,6 @@
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::api::{ActionCounts, PaintPoint, PaintStrokeTool, StartupRequest};
+use crate::api::{ActionCounts, PaintPoint, PaintStrokeTool, StartupRequest, StartupTuning};
 use v2_core::ecology::EcologyConfig;
 use v2_core::phenotype::FOUNDER_PHENOTYPE_RGB;
 use v2_core::viability::{run_startup_viability_gate, StartupViabilityGate};
@@ -21,7 +21,7 @@ pub struct WorldGrid {
     pub width: u16,
     pub height: u16,
     pub wrap: bool,
-    pub food: HashSet<WorldCell>,
+    pub food: HashMap<WorldCell, u8>,
     pub barriers: HashSet<WorldCell>,
     pub creatures: Vec<WorldCreature>,
 }
@@ -33,7 +33,7 @@ impl WorldGrid {
             width,
             height,
             wrap,
-            food: HashSet::new(),
+            food: HashMap::new(),
             barriers: HashSet::new(),
             creatures: Vec::new(),
         }
@@ -107,14 +107,14 @@ fn apply_tool(grid: &mut WorldGrid, tool: PaintStrokeTool, cell: WorldCell) -> b
             if grid.barriers.remove(&cell) {
                 changed = true;
             }
-            if grid.food.insert(cell) {
+            if grid.food.insert(cell, u8::MAX) != Some(u8::MAX) {
                 changed = true;
             }
             changed
         }
         PaintStrokeTool::Barrier => {
             let mut changed = false;
-            if grid.food.remove(&cell) {
+            if grid.food.remove(&cell).is_some() {
                 changed = true;
             }
             if grid.barriers.insert(cell) {
@@ -122,7 +122,7 @@ fn apply_tool(grid: &mut WorldGrid, tool: PaintStrokeTool, cell: WorldCell) -> b
             }
             changed
         }
-        PaintStrokeTool::EraseFood => grid.food.remove(&cell),
+        PaintStrokeTool::EraseFood => grid.food.remove(&cell).is_some(),
         PaintStrokeTool::EraseBarrier => grid.barriers.remove(&cell),
     }
 }
@@ -172,8 +172,11 @@ impl SimulationState {
         }
     }
 
-    pub fn reset(&mut self, startup: StartupRequest, digest: String) {
+    pub fn reset(&mut self, startup: StartupRequest, tuning: StartupTuning, digest: String) {
         let startup = sanitize_startup_request(startup);
+        let tuning = sanitize_startup_tuning(tuning);
+        let world_seed_config = world_seed_config_from_tuning(&tuning);
+        let world_tick_config = world_tick_config_from_tuning(&tuning);
         let mut world = WorldGrid::new(
             startup.world.width,
             startup.world.height,
@@ -186,14 +189,22 @@ impl SimulationState {
             .min(startup.population.max_creatures)
             .min(occupancy);
 
-        seed_world(&mut world, seeded, startup.seed, self.world_seed_config);
-        enforce_startup_viability(&mut world, startup.seed);
+        seed_world(
+            &mut world,
+            seeded,
+            startup.seed,
+            world_seed_config,
+            world_tick_config.initial_energy,
+        );
+        enforce_startup_viability(&mut world, startup.seed, world_tick_config.initial_energy);
 
         self.phase = SimulationPhase::Idle;
         self.tick = 0;
         self.config_digest = digest;
         self.startup = startup;
         self.world = world;
+        self.world_seed_config = world_seed_config;
+        self.world_tick_config = world_tick_config;
         self.health_window_ticks = EcologyConfig::default().health_window_ticks as u16;
         self.recent_population_events.clear();
         self.births_last_window = 0;
@@ -212,6 +223,7 @@ impl SimulationState {
                 self.world.wrap,
                 self.tick,
                 self.startup.seed,
+                self.startup.population.max_creatures,
                 self.world_seed_config,
                 self.world_tick_config,
                 &mut self.world.creatures,
@@ -267,9 +279,15 @@ impl SimulationState {
     }
 }
 
-fn seed_world(world: &mut WorldGrid, creature_count: u32, seed: u64, config: WorldSeedConfig) {
+fn seed_world(
+    world: &mut WorldGrid,
+    creature_count: u32,
+    seed: u64,
+    config: WorldSeedConfig,
+    initial_energy: f32,
+) {
     for (x, y) in seed_food_cells(world.width, world.height, config.initial_food_density, seed) {
-        world.food.insert(WorldCell { x, y });
+        world.food.insert(WorldCell { x, y }, u8::MAX);
     }
 
     world.creatures = seed_creature_cells(world.width, world.height, creature_count as usize, seed)
@@ -279,13 +297,13 @@ fn seed_world(world: &mut WorldGrid, creature_count: u32, seed: u64, config: Wor
             id: index as u64 + 1,
             x,
             y,
-            energy: 20.0,
+            energy: initial_energy,
             phenotype_rgb: FOUNDER_PHENOTYPE_RGB,
         })
         .collect();
 }
 
-fn enforce_startup_viability(world: &mut WorldGrid, seed: u64) {
+fn enforce_startup_viability(world: &mut WorldGrid, seed: u64, initial_energy: f32) {
     let ecology = EcologyConfig::default();
     let gate = StartupViabilityGate::default();
     let viability = run_startup_viability_gate(seed, world.creatures.len() as u32, &ecology, &gate);
@@ -296,7 +314,7 @@ fn enforce_startup_viability(world: &mut WorldGrid, seed: u64) {
             id: 1,
             x: 0,
             y: 0,
-            energy: 20.0,
+            energy: initial_energy,
             phenotype_rgb: FOUNDER_PHENOTYPE_RGB,
         });
     }
@@ -310,7 +328,7 @@ fn enforce_startup_viability(world: &mut WorldGrid, seed: u64) {
                 y: creature.y,
             })
             .unwrap_or(WorldCell { x: 0, y: 0 });
-        world.food.insert(fallback);
+        world.food.insert(fallback, u8::MAX);
     }
 }
 
@@ -324,6 +342,50 @@ fn sanitize_startup_request(mut startup: StartupRequest) -> StartupRequest {
         .max(1)
         .min(startup.population.max_creatures);
     startup
+}
+
+fn sanitize_startup_tuning(mut tuning: StartupTuning) -> StartupTuning {
+    tuning.food.initial_food_density = tuning.food.initial_food_density.clamp(0.0, 1.0);
+    tuning.food.food_growth_rate = tuning.food.food_growth_rate.clamp(0.0, 1.0);
+    tuning.food.food_spawn_rate = tuning.food.food_spawn_rate.clamp(0.0, 1.0);
+    tuning.food.food_spread_threshold = tuning.food.food_spread_threshold.clamp(0.0, 1.0);
+    tuning.food.food_spawn_floor_density = tuning.food.food_spawn_floor_density.clamp(0.0, 1.0);
+
+    tuning.tick.initial_energy = tuning.tick.initial_energy.max(0.0);
+    tuning.tick.energy_decay_per_tick = tuning.tick.energy_decay_per_tick.max(0.0);
+    tuning.tick.move_cost = tuning.tick.move_cost.max(0.0);
+    tuning.tick.food_energy_gain = tuning.tick.food_energy_gain.max(0.0);
+    tuning.tick.reproduce_cost = tuning.tick.reproduce_cost.max(0.0);
+    tuning.tick.min_reproduce_energy = tuning.tick.min_reproduce_energy.max(0.0);
+    tuning.tick.offspring_energy_fraction = tuning.tick.offspring_energy_fraction.clamp(0.0, 1.0);
+    tuning.tick.energy_max = tuning.tick.energy_max.max(0.01);
+    if tuning.tick.initial_energy > tuning.tick.energy_max {
+        tuning.tick.initial_energy = tuning.tick.energy_max;
+    }
+    tuning
+}
+
+fn world_seed_config_from_tuning(tuning: &StartupTuning) -> WorldSeedConfig {
+    WorldSeedConfig {
+        initial_food_density: tuning.food.initial_food_density,
+        food_growth_rate: tuning.food.food_growth_rate,
+        food_spawn_rate: tuning.food.food_spawn_rate,
+        food_spread_threshold: tuning.food.food_spread_threshold,
+        food_spawn_floor_density: tuning.food.food_spawn_floor_density,
+    }
+}
+
+fn world_tick_config_from_tuning(tuning: &StartupTuning) -> WorldTickConfig {
+    WorldTickConfig {
+        initial_energy: tuning.tick.initial_energy,
+        energy_decay_per_tick: tuning.tick.energy_decay_per_tick,
+        move_cost: tuning.tick.move_cost,
+        food_energy_gain: tuning.tick.food_energy_gain,
+        reproduce_cost: tuning.tick.reproduce_cost,
+        min_reproduce_energy: tuning.tick.min_reproduce_energy,
+        offspring_energy_fraction: tuning.tick.offspring_energy_fraction,
+        energy_max: tuning.tick.energy_max,
+    }
 }
 
 fn map_action_counts(counts: WorldActionCounts) -> ActionCounts {

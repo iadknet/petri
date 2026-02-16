@@ -51,6 +51,25 @@ const DEFAULT_STARTUP_DRAFT: StartupRequest = {
     ticks_per_second: 30,
     max_tick_budget_ms: 16,
   },
+  tuning: {
+    food: {
+      initial_food_density: 0.15,
+      food_growth_rate: 0.1,
+      food_spawn_rate: 0.05,
+      food_spread_threshold: 0.75,
+      food_spawn_floor_density: 0.03,
+    },
+    tick: {
+      initial_energy: 20,
+      energy_decay_per_tick: 0.08,
+      move_cost: 0.02,
+      food_energy_gain: 0.25,
+      reproduce_cost: 0.12,
+      min_reproduce_energy: 18,
+      offspring_energy_fraction: 0.45,
+      energy_max: 20,
+    },
+  },
 };
 
 export function useSimulationStore() {

@@ -15,13 +15,21 @@ impl SimulationApi {
             state: SimulationState::new_default(),
         };
         let startup = StartupRequest::default();
-        api.startup(startup);
+        api.startup_with_tuning(startup, StartupTuning::default());
         api
     }
 
     pub fn startup(&mut self, request: StartupRequest) -> StartupResponse {
-        let digest = startup_digest(&request);
-        self.state.reset(request, digest);
+        self.startup_with_tuning(request, StartupTuning::default())
+    }
+
+    pub fn startup_with_tuning(
+        &mut self,
+        request: StartupRequest,
+        tuning: StartupTuning,
+    ) -> StartupResponse {
+        let digest = startup_digest(&request, &tuning);
+        self.state.reset(request, tuning, digest);
         StartupResponse {
             protocol_version: PROTOCOL_VERSION.to_string(),
             state: self.state.phase_label().to_string(),
@@ -234,10 +242,10 @@ impl SimulationApi {
             .world
             .food
             .iter()
-            .map(|cell| FoodSnapshot {
+            .map(|(cell, density)| FoodSnapshot {
                 x: cell.x,
                 y: cell.y,
-                density: 255,
+                density: *density,
             })
             .collect::<Vec<_>>();
         food.sort_by_key(|cell| (cell.y, cell.x));
@@ -339,6 +347,71 @@ pub struct StartupPopulation {
 pub struct StartupRuntime {
     pub ticks_per_second: u16,
     pub max_tick_budget_ms: u16,
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct StartupTuning {
+    #[serde(default)]
+    pub food: StartupFoodTuning,
+    #[serde(default)]
+    pub tick: StartupTickTuning,
+}
+
+impl Default for StartupTuning {
+    fn default() -> Self {
+        Self {
+            food: StartupFoodTuning::default(),
+            tick: StartupTickTuning::default(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct StartupFoodTuning {
+    pub initial_food_density: f32,
+    pub food_growth_rate: f32,
+    pub food_spawn_rate: f32,
+    pub food_spread_threshold: f32,
+    pub food_spawn_floor_density: f32,
+}
+
+impl Default for StartupFoodTuning {
+    fn default() -> Self {
+        Self {
+            initial_food_density: 0.15,
+            food_growth_rate: 0.10,
+            food_spawn_rate: 0.05,
+            food_spread_threshold: 0.75,
+            food_spawn_floor_density: 0.03,
+        }
+    }
+}
+
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+pub struct StartupTickTuning {
+    pub initial_energy: f32,
+    pub energy_decay_per_tick: f32,
+    pub move_cost: f32,
+    pub food_energy_gain: f32,
+    pub reproduce_cost: f32,
+    pub min_reproduce_energy: f32,
+    pub offspring_energy_fraction: f32,
+    pub energy_max: f32,
+}
+
+impl Default for StartupTickTuning {
+    fn default() -> Self {
+        Self {
+            initial_energy: 20.0,
+            energy_decay_per_tick: 0.08,
+            move_cost: 0.02,
+            food_energy_gain: 0.25,
+            reproduce_cost: 0.12,
+            min_reproduce_energy: 18.0,
+            offspring_energy_fraction: 0.45,
+            energy_max: 20.0,
+        }
+    }
 }
 
 #[derive(Clone, Debug, serde::Serialize)]
@@ -595,20 +668,33 @@ fn creature_snapshots(state: &SimulationState) -> Vec<CreatureSnapshot> {
         .collect()
 }
 
-fn startup_digest(request: &StartupRequest) -> String {
-    let canonical = canonical_startup_json(request);
+fn startup_digest(request: &StartupRequest, tuning: &StartupTuning) -> String {
+    let canonical = canonical_startup_json(request, tuning);
     let digest = Sha256::digest(canonical.as_bytes());
     hex::encode(digest)
 }
 
-fn canonical_startup_json(request: &StartupRequest) -> String {
+fn canonical_startup_json(request: &StartupRequest, tuning: &StartupTuning) -> String {
     format!(
-        "{{\"population\":{{\"initial_creatures\":{},\"max_creatures\":{}}},\"runtime\":{{\"max_tick_budget_ms\":{},\"ticks_per_second\":{}}},\"seed\":{},\"world\":{{\"height\":{},\"sensor_radius\":{},\"width\":{},\"wrap\":{}}}}}",
+        "{{\"population\":{{\"initial_creatures\":{},\"max_creatures\":{}}},\"runtime\":{{\"max_tick_budget_ms\":{},\"ticks_per_second\":{}}},\"seed\":{},\"tuning\":{{\"food\":{{\"food_growth_rate\":{},\"food_spawn_floor_density\":{},\"food_spawn_rate\":{},\"food_spread_threshold\":{},\"initial_food_density\":{}}},\"tick\":{{\"energy_decay_per_tick\":{},\"energy_max\":{},\"food_energy_gain\":{},\"initial_energy\":{},\"min_reproduce_energy\":{},\"move_cost\":{},\"offspring_energy_fraction\":{},\"reproduce_cost\":{}}}}},\"world\":{{\"height\":{},\"sensor_radius\":{},\"width\":{},\"wrap\":{}}}}}",
         request.population.initial_creatures,
         request.population.max_creatures,
         request.runtime.max_tick_budget_ms,
         request.runtime.ticks_per_second,
         request.seed,
+        tuning.food.food_growth_rate,
+        tuning.food.food_spawn_floor_density,
+        tuning.food.food_spawn_rate,
+        tuning.food.food_spread_threshold,
+        tuning.food.initial_food_density,
+        tuning.tick.energy_decay_per_tick,
+        tuning.tick.energy_max,
+        tuning.tick.food_energy_gain,
+        tuning.tick.initial_energy,
+        tuning.tick.min_reproduce_energy,
+        tuning.tick.move_cost,
+        tuning.tick.offspring_energy_fraction,
+        tuning.tick.reproduce_cost,
         request.world.height,
         request.world.sensor_radius,
         request.world.width,

@@ -15,7 +15,7 @@ use tower_http::cors::{Any, CorsLayer};
 
 use crate::api::{
     ErrorDetails, HealthPayload, PaintRequest, PaintResponse, ProtocolErrorCode, SimulationApi,
-    SimulationError, StartupRequest,
+    SimulationError, StartupRequest, StartupTuning,
 };
 use crate::ws::{WsEventEnvelope, ws_events_for_tick};
 
@@ -121,17 +121,144 @@ async fn tick_loop(state: ServerState) {
 
 async fn startup_handler(
     State(state): State<ServerState>,
-    payload: Result<Option<Json<StartupRequest>>, axum::extract::rejection::JsonRejection>,
+    payload: Result<Option<Json<serde_json::Value>>, axum::extract::rejection::JsonRejection>,
 ) -> Result<Json<crate::api::StartupResponse>, SimulationError> {
-    let request = match payload {
-        Ok(Some(json)) => json.0,
-        Ok(None) => StartupRequest::default(),
+    let (request, tuning) = match payload {
+        Ok(Some(json)) => {
+            let value = json.0;
+            let request: StartupRequest = serde_json::from_value(value.clone()).map_err(|err| {
+                SimulationError::protocol(
+                    ProtocolErrorCode::InvalidRequest,
+                    format!("invalid request payload: {err}"),
+                    ErrorDetails {
+                        endpoint: Some("/v2/simulation/startup".to_string()),
+                        field_errors: Vec::new(),
+                        expected_state: None,
+                        current_state: None,
+                    },
+                )
+            })?;
+            let tuning = extract_startup_tuning(&value)?;
+            (request, tuning)
+        }
+        Ok(None) => (StartupRequest::default(), StartupTuning::default()),
         Err(rejection) => return Err(SimulationError::from(rejection)),
     };
     let mut api = state.api.lock().await;
-    let response = api.startup(request);
+    let response = api.startup_with_tuning(request, tuning);
     publish_snapshot(&api, &state.ws_tx);
     Ok(Json(response))
+}
+
+fn extract_startup_tuning(root: &serde_json::Value) -> Result<StartupTuning, SimulationError> {
+    let Some(value) = root.get("tuning") else {
+        return Ok(StartupTuning::default());
+    };
+
+    let tuning_obj = value.as_object().ok_or_else(|| {
+        SimulationError::protocol(
+            ProtocolErrorCode::InvalidRequest,
+            "invalid startup tuning payload: expected object at `tuning`",
+            ErrorDetails {
+                endpoint: Some("/v2/simulation/startup".to_string()),
+                field_errors: Vec::new(),
+                expected_state: None,
+                current_state: None,
+            },
+        )
+    })?;
+
+    let mut tuning = StartupTuning::default();
+    if let Some(food) = tuning_obj.get("food") {
+        let food_obj = food.as_object().ok_or_else(|| {
+            SimulationError::protocol(
+                ProtocolErrorCode::InvalidRequest,
+                "invalid startup tuning payload: expected object at `tuning.food`",
+                ErrorDetails {
+                    endpoint: Some("/v2/simulation/startup".to_string()),
+                    field_errors: Vec::new(),
+                    expected_state: None,
+                    current_state: None,
+                },
+            )
+        })?;
+        if let Some(value) = parse_optional_f32(food_obj, "initial_food_density")? {
+            tuning.food.initial_food_density = value;
+        }
+        if let Some(value) = parse_optional_f32(food_obj, "food_growth_rate")? {
+            tuning.food.food_growth_rate = value;
+        }
+        if let Some(value) = parse_optional_f32(food_obj, "food_spawn_rate")? {
+            tuning.food.food_spawn_rate = value;
+        }
+        if let Some(value) = parse_optional_f32(food_obj, "food_spread_threshold")? {
+            tuning.food.food_spread_threshold = value;
+        }
+        if let Some(value) = parse_optional_f32(food_obj, "food_spawn_floor_density")? {
+            tuning.food.food_spawn_floor_density = value;
+        }
+    }
+    if let Some(tick) = tuning_obj.get("tick") {
+        let tick_obj = tick.as_object().ok_or_else(|| {
+            SimulationError::protocol(
+                ProtocolErrorCode::InvalidRequest,
+                "invalid startup tuning payload: expected object at `tuning.tick`",
+                ErrorDetails {
+                    endpoint: Some("/v2/simulation/startup".to_string()),
+                    field_errors: Vec::new(),
+                    expected_state: None,
+                    current_state: None,
+                },
+            )
+        })?;
+        if let Some(value) = parse_optional_f32(tick_obj, "initial_energy")? {
+            tuning.tick.initial_energy = value;
+        }
+        if let Some(value) = parse_optional_f32(tick_obj, "energy_decay_per_tick")? {
+            tuning.tick.energy_decay_per_tick = value;
+        }
+        if let Some(value) = parse_optional_f32(tick_obj, "move_cost")? {
+            tuning.tick.move_cost = value;
+        }
+        if let Some(value) = parse_optional_f32(tick_obj, "food_energy_gain")? {
+            tuning.tick.food_energy_gain = value;
+        }
+        if let Some(value) = parse_optional_f32(tick_obj, "reproduce_cost")? {
+            tuning.tick.reproduce_cost = value;
+        }
+        if let Some(value) = parse_optional_f32(tick_obj, "min_reproduce_energy")? {
+            tuning.tick.min_reproduce_energy = value;
+        }
+        if let Some(value) = parse_optional_f32(tick_obj, "offspring_energy_fraction")? {
+            tuning.tick.offspring_energy_fraction = value;
+        }
+        if let Some(value) = parse_optional_f32(tick_obj, "energy_max")? {
+            tuning.tick.energy_max = value;
+        }
+    }
+    Ok(tuning)
+}
+
+fn parse_optional_f32(
+    object: &serde_json::Map<String, serde_json::Value>,
+    key: &str,
+) -> Result<Option<f32>, SimulationError> {
+    let Some(raw) = object.get(key) else {
+        return Ok(None);
+    };
+    let Some(value) = raw.as_f64() else {
+        return Err(SimulationError::protocol(
+            ProtocolErrorCode::InvalidRequest,
+            format!("invalid startup tuning payload: `{key}` must be numeric"),
+            ErrorDetails {
+                endpoint: Some("/v2/simulation/startup".to_string()),
+                field_errors: Vec::new(),
+                expected_state: None,
+                current_state: None,
+            },
+        ));
+    };
+    Ok(Some(value as f32))
 }
 
 async fn start_handler(

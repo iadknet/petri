@@ -141,6 +141,299 @@ export function StartupPanel(props: StartupPanelProps) {
             }
           />
         </label>
+
+        <label>
+          Initial Food Density
+          <input
+            aria-label="Initial Food Density"
+            type="number"
+            min={0}
+            max={1}
+            step={0.01}
+            value={draft.tuning.food.initial_food_density}
+            onChange={(event) =>
+              props.onChange({
+                ...draft,
+                tuning: {
+                  ...draft.tuning,
+                  food: {
+                    ...draft.tuning.food,
+                    initial_food_density: Number(event.target.value),
+                  },
+                },
+              })
+            }
+          />
+        </label>
+        <label>
+          Food Growth Rate
+          <input
+            aria-label="Food Growth Rate"
+            type="number"
+            min={0}
+            max={1}
+            step={0.01}
+            value={draft.tuning.food.food_growth_rate}
+            onChange={(event) =>
+              props.onChange({
+                ...draft,
+                tuning: {
+                  ...draft.tuning,
+                  food: {
+                    ...draft.tuning.food,
+                    food_growth_rate: Number(event.target.value),
+                  },
+                },
+              })
+            }
+          />
+        </label>
+        <label>
+          Food Spawn Rate
+          <input
+            aria-label="Food Spawn Rate"
+            type="number"
+            min={0}
+            max={1}
+            step={0.01}
+            value={draft.tuning.food.food_spawn_rate}
+            onChange={(event) =>
+              props.onChange({
+                ...draft,
+                tuning: {
+                  ...draft.tuning,
+                  food: {
+                    ...draft.tuning.food,
+                    food_spawn_rate: Number(event.target.value),
+                  },
+                },
+              })
+            }
+          />
+        </label>
+        <label>
+          Food Spread Threshold
+          <input
+            aria-label="Food Spread Threshold"
+            type="number"
+            min={0}
+            max={1}
+            step={0.01}
+            value={draft.tuning.food.food_spread_threshold}
+            onChange={(event) =>
+              props.onChange({
+                ...draft,
+                tuning: {
+                  ...draft.tuning,
+                  food: {
+                    ...draft.tuning.food,
+                    food_spread_threshold: Number(event.target.value),
+                  },
+                },
+              })
+            }
+          />
+        </label>
+        <label>
+          Food Spawn Floor Density
+          <input
+            aria-label="Food Spawn Floor Density"
+            type="number"
+            min={0}
+            max={1}
+            step={0.01}
+            value={draft.tuning.food.food_spawn_floor_density}
+            onChange={(event) =>
+              props.onChange({
+                ...draft,
+                tuning: {
+                  ...draft.tuning,
+                  food: {
+                    ...draft.tuning.food,
+                    food_spawn_floor_density: Number(event.target.value),
+                  },
+                },
+              })
+            }
+          />
+        </label>
+        <label>
+          Initial Energy
+          <input
+            aria-label="Initial Energy"
+            type="number"
+            min={0}
+            step={0.1}
+            value={draft.tuning.tick.initial_energy}
+            onChange={(event) =>
+              props.onChange({
+                ...draft,
+                tuning: {
+                  ...draft.tuning,
+                  tick: {
+                    ...draft.tuning.tick,
+                    initial_energy: Number(event.target.value),
+                  },
+                },
+              })
+            }
+          />
+        </label>
+        <label>
+          Tick Decay Energy
+          <input
+            aria-label="Tick Decay Energy"
+            type="number"
+            min={0}
+            step={0.01}
+            value={draft.tuning.tick.energy_decay_per_tick}
+            onChange={(event) =>
+              props.onChange({
+                ...draft,
+                tuning: {
+                  ...draft.tuning,
+                  tick: {
+                    ...draft.tuning.tick,
+                    energy_decay_per_tick: Number(event.target.value),
+                  },
+                },
+              })
+            }
+          />
+        </label>
+        <label>
+          Move Cost
+          <input
+            aria-label="Move Cost"
+            type="number"
+            min={0}
+            step={0.01}
+            value={draft.tuning.tick.move_cost}
+            onChange={(event) =>
+              props.onChange({
+                ...draft,
+                tuning: {
+                  ...draft.tuning,
+                  tick: {
+                    ...draft.tuning.tick,
+                    move_cost: Number(event.target.value),
+                  },
+                },
+              })
+            }
+          />
+        </label>
+        <label>
+          Food Energy Gain
+          <input
+            aria-label="Food Energy Gain"
+            type="number"
+            min={0}
+            step={0.01}
+            value={draft.tuning.tick.food_energy_gain}
+            onChange={(event) =>
+              props.onChange({
+                ...draft,
+                tuning: {
+                  ...draft.tuning,
+                  tick: {
+                    ...draft.tuning.tick,
+                    food_energy_gain: Number(event.target.value),
+                  },
+                },
+              })
+            }
+          />
+        </label>
+        <label>
+          Reproduce Cost
+          <input
+            aria-label="Reproduce Cost"
+            type="number"
+            min={0}
+            step={0.01}
+            value={draft.tuning.tick.reproduce_cost}
+            onChange={(event) =>
+              props.onChange({
+                ...draft,
+                tuning: {
+                  ...draft.tuning,
+                  tick: {
+                    ...draft.tuning.tick,
+                    reproduce_cost: Number(event.target.value),
+                  },
+                },
+              })
+            }
+          />
+        </label>
+        <label>
+          Min Reproduce Energy
+          <input
+            aria-label="Min Reproduce Energy"
+            type="number"
+            min={0}
+            step={0.1}
+            value={draft.tuning.tick.min_reproduce_energy}
+            onChange={(event) =>
+              props.onChange({
+                ...draft,
+                tuning: {
+                  ...draft.tuning,
+                  tick: {
+                    ...draft.tuning.tick,
+                    min_reproduce_energy: Number(event.target.value),
+                  },
+                },
+              })
+            }
+          />
+        </label>
+        <label>
+          Offspring Energy Fraction
+          <input
+            aria-label="Offspring Energy Fraction"
+            type="number"
+            min={0}
+            max={1}
+            step={0.01}
+            value={draft.tuning.tick.offspring_energy_fraction}
+            onChange={(event) =>
+              props.onChange({
+                ...draft,
+                tuning: {
+                  ...draft.tuning,
+                  tick: {
+                    ...draft.tuning.tick,
+                    offspring_energy_fraction: Number(event.target.value),
+                  },
+                },
+              })
+            }
+          />
+        </label>
+        <label>
+          Energy Max
+          <input
+            aria-label="Energy Max"
+            type="number"
+            min={0.1}
+            step={0.1}
+            value={draft.tuning.tick.energy_max}
+            onChange={(event) =>
+              props.onChange({
+                ...draft,
+                tuning: {
+                  ...draft.tuning,
+                  tick: {
+                    ...draft.tuning.tick,
+                    energy_max: Math.max(0.1, Number(event.target.value)),
+                  },
+                },
+              })
+            }
+          />
+        </label>
       </div>
 
       <label>

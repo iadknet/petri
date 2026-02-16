@@ -4,7 +4,7 @@
 
 **Goal IDs:** GP-01, GP-02, GP-03, GP-04
 
-**Scope:** Complete v3 architecture including module boundaries, data flow, testing strategy, and walking skeleton phases. Includes core simulation (v3-core), transport layer (v3-server), and web client (v3/web). Excludes specific VM instruction set details and graph operator implementations (deferred to implementation).
+**Scope:** Complete v3 backend architecture including module boundaries, data flow, testing strategy, and walking skeleton stages. Includes core simulation (v3-core) and transport layer (v3-server). Excludes specific VM instruction set details and graph operator implementations (deferred to implementation). Frontend (v3/web) is excluded — it will be designed in a separate frontend architecture plan.
 
 **Docs Impact:**
 - Creates v3 architecture design document
@@ -83,7 +83,6 @@ petri/
 │   │   │   └── tests/          # Integration tests
 │   │   ├── v3-server/          # HTTP + WebSocket transport
 │   │   └── v3-cli/             # Headless runner
-│   ├── web/                    # React + TypeScript client
 │   └── docs/
 │       ├── BOUNDARIES.md       # Module boundary rules
 │       └── WALKING_SKELETON.md # Incremental build phases
@@ -111,7 +110,6 @@ v3-core internal:
 v3 workspace:
   v3-server → v3-core (owns a SimulationState)
   v3-cli → v3-core (owns a SimulationState)
-  v3/web → v3-server (protocol only)
 ```
 
 **Key insight:** contracts/ is the "clipboard" modules share. Kernel owns primitives, capabilities transform and consume via contracts. `SimulationState` is the thin coordination shell that bundles mutable simulation state — callers (server, cli) own one and call `state.tick(config, rng)`.
@@ -780,7 +778,7 @@ Build v3 incrementally in 3 stages. Each stage delivers a qualitatively differen
 **Goal:** Creatures exist, tick advances, server responds to REST queries.
 
 **Scope:**
-- kernel/ - Position, Direction (with delta), CreatureId (slotmap), WorldState (grid storage, creature_at spatial index, resolve_neighbor)
+- kernel/ - Position, Direction (with delta), CreatureId (slotmap), WorldState (grid storage, creature_at spatial index)
 - creature/ - CreatureState, Energy type (u32) with safe operations
 - contracts/ - stub inputs/outputs (NoOp only)
 - runtime/ - stub executor (returns NoOp)
@@ -895,8 +893,7 @@ Each stage must pass:
 1. `cd v3 && cargo fmt --all --check`
 2. `cd v3 && cargo test --workspace`
 3. `cd v3 && cargo clippy --workspace --all-targets -- -D warnings`
-4. `cd v3/web && npm run build` (once frontend exists)
-5. Manual: Start server, verify stage goals via curl/REST
+4. Manual: Start server, verify stage goals via curl/REST
 
 ---
 
@@ -905,8 +902,8 @@ Each stage must pass:
 **Risk:** Module boundaries become porous during implementation
 **Mitigation:** Code reviews focus on boundary violations. Use `pub(crate)` aggressively. Gemini reviews.
 
-**Risk:** Walking skeleton phases grow too large
-**Mitigation:** Each phase has single, testable goal. If phase feels large, split it.
+**Risk:** Walking skeleton stages grow too large
+**Mitigation:** Each stage has single, testable goal. If stage feels large, split it.
 
 **Risk:** Performance issues with phase-based tick
 **Mitigation:** Profile early. If Phase 1 (collect actions) + Phase 2 (execute) is too slow, optimize or reconsider two-phase.
@@ -923,8 +920,7 @@ v3 is successful when:
 1. **Feature parity with v1** - food, barriers, movement, eating, reproduction work
 2. **Mesh architecture works** - creatures with VM+Graph nodes execute correctly
 3. **Clean boundaries** - no leaky abstractions, modules testable in isolation
-4. **Walking skeleton proven** - each phase delivered working vertical slice
+4. **Walking skeleton proven** - each stage delivered working vertical slice
 5. **Tests verify intent** - not just contracts, actual behavior validated
-6. **Web UI functional** - creatures render, controls work, simulation observable
 
 When these criteria are met, v3 can replace v1 as the primary implementation.
