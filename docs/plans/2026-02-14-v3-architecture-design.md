@@ -2,7 +2,7 @@
 
 **Goal:** Design a clean, maintainable architecture for v3 that achieves the v2 vision (complex mesh creatures with VM+Graph nodes) while avoiding v2's leaky abstraction failures.
 
-**Goal IDs:** GP-01, GP-02, GP-03
+**Goal IDs:** GP-01, GP-02, GP-03, GP-04
 
 **Scope:** Complete v3 architecture including module boundaries, data flow, testing strategy, and walking skeleton phases. Includes core simulation (v3-core), transport layer (v3-server), and web client (v3/web). Excludes specific VM instruction set details and graph operator implementations (deferred to implementation).
 
@@ -22,6 +22,7 @@
 - **GP-01**: Provides expressive substrate for richer emergent behavior through VM+Graph mesh architecture, rich sensors, energy-bound processing, and phenotype evolution
 - **GP-02**: Establishes explicit ownership boundaries across kernel, contracts, config, creature, runtime, sensors, and tick modules to prevent leaky abstractions
 - **GP-03**: Enforces testable contracts through dedicated contracts/ module and intent-verification testing strategy
+- **GP-04**: Tick returns TickStats (births, deaths, action counts) for runtime observability; transport layer surfaces these to product UIs
 
 ---
 
@@ -31,7 +32,7 @@
 - v1 (`crates/petri-*`, `web/`) remains working reference
 - v2 (`v2/`) remains as reference for architectural failures
 - Independent toolchain manifests in `v3/` (no coupling to v1 or v2)
-- Clear dependency direction enforced by module structure
+- Clear dependency direction enforced by convention and code review
 
 ---
 
@@ -53,7 +54,7 @@
 | Should v3 use randomized turn order or two-phase commit? | Randomized turn order (simpler, solves bias, can upgrade later). | user+agent | resolved |
 | Where do input/output contracts live? | Dedicated `contracts/` module (interface segregation, modules as peers). | user+agent | resolved |
 | Where does energy logic live? | Energy type in `creature/`, energy config in `config/`, operations distributed. | user+agent | resolved |
-| Should reproduction spawn immediately or defer? | Collect during action execution, add to creatures list in same phase (safe with randomized indices). | user+agent | resolved |
+| Should reproduction spawn immediately or defer? | Defer: collect offspring during action execution, append after all actions complete. Keeps SlotMap keys valid during Phase 2. | user+agent | resolved |
 | What happens if reproduce has no spawn location? | Reproduction fails, parent loses energy (consistent with other failed actions). | user+agent | resolved |
 | Should we use granular config submodules? | Yes, split by concern (world/food, energy/costs, runtime/vm, etc.). | user+agent | resolved |
 
@@ -77,7 +78,8 @@ petri/
 │   │   │   │   ├── creature/   # Genome, phenotype, mutation, state
 │   │   │   │   ├── runtime/    # VM + Graph execution
 │   │   │   │   ├── sensors/    # Input assembly
-│   │   │   │   └── tick/       # Tick orchestration
+│   │   │   │   ├── tick/       # Tick orchestration
+│   │   │   │   └── seed.rs     # Initial creature placement
 │   │   │   └── tests/          # Integration tests
 │   │   ├── v3-server/          # HTTP + WebSocket transport
 │   │   └── v3-cli/             # Headless runner
@@ -103,14 +105,18 @@ v3-core internal:
   runtime/     → kernel/ + config/ + contracts/ + creature/
   sensors/     → kernel/ + config/ + contracts/ + creature/
   tick/        → kernel/ + config/ + contracts/ + creature/ + runtime/ + sensors/
+  seed         → kernel/ + creature/ + config/ + SimulationState
+  SimulationState (lib.rs) → tick/ + kernel/ + creature/ + config/
 
 v3 workspace:
-  v3-server → v3-core
-  v3-cli → v3-core
+  v3-server → v3-core (owns a SimulationState)
+  v3-cli → v3-core (owns a SimulationState)
   v3/web → v3-server (protocol only)
 ```
 
-**Key insight:** contracts/ is the "clipboard" modules share. Kernel owns primitives, capabilities transform and consume via contracts.
+**Key insight:** contracts/ is the "clipboard" modules share. Kernel owns primitives, capabilities transform and consume via contracts. `SimulationState` is the thin coordination shell that bundles mutable simulation state — callers (server, cli) own one and call `state.tick(config, rng)`.
+
+**Error philosophy:** v3-core panics on invariant violations (`debug_assert` for internal invariants, `assert` for preconditions that indicate programming errors). Invalid input from within the crate is a programming error, not an expected runtime condition. The `Result` type is reserved for fallible operations at crate boundaries (e.g., config parsing, file I/O in server/cli). Within v3-core, functions either succeed or panic — there are no "soft failures" for impossible states.
 
 ---
 
@@ -121,22 +127,52 @@ v3 workspace:
 **Purpose:** World reality - food, barriers, positions, occupancy. No business logic.
 
 **Files:**
-- `kernel/types.rs` - Position, Direction, CreatureId, WorldCell
-- `kernel/world_state.rs` - Food grid, barriers, occupancy tracking
+- `kernel/types.rs` - Position, Direction (with `delta() -> (i32, i32)`), CreatureId (slotmap key type)
+- `kernel/world_state.rs` - Food grid, barriers, occupancy tracking, position resolution
 
 **Key methods:**
 ```rust
 // kernel/world_state.rs
-pub fn get_food_density(&self, pos: WorldCell) -> u8;
-pub fn consume_food(&mut self, pos: WorldCell) -> u8;
-pub fn is_barrier(&self, pos: WorldCell) -> bool;
-pub fn is_occupied(&self, pos: WorldCell) -> bool;
-pub fn mark_occupied(&mut self, pos: WorldCell);
-pub fn mark_unoccupied(&mut self, pos: WorldCell);
-pub fn grow_food(&mut self, tick: u64, seed: u64, config: &FoodConfig);
+pub fn get_food_density(&self, pos: Position) -> u8;
+pub fn set_food_density(&mut self, pos: Position, density: u8);
+pub fn consume_food(&mut self, pos: Position) -> u8;
+pub fn is_barrier(&self, pos: Position) -> bool;
+pub fn is_occupied(&self, pos: Position) -> bool;      // convenience: creature_at(pos).is_some()
+pub fn creature_at(&self, pos: Position) -> Option<CreatureId>;
+pub fn place_creature(&mut self, pos: Position, id: CreatureId);
+pub fn remove_creature(&mut self, pos: Position);
+pub fn grow_food(&mut self, config: &FoodConfig, rng: &mut impl Rng);
 ```
 
-**Principle:** Kernel has NO knowledge of creatures, actions, VM, or ticks. Pure world primitives.
+**Storage:** All per-cell data uses flat `Vec` arrays indexed by `y * width + x` for cache-friendly O(1) access. Avoid HashMap/HashSet for grid data — a 400x400 world is only 160K cells. The `creature_at` spatial index (`Vec<Option<CreatureId>>`) replaces boolean occupancy — it provides O(1) position→creature lookup and occupancy checking in a single array.
+
+**Position resolution:** Kernel owns world geometry. All position arithmetic (neighbor calculation, wrapping, bounds checking) lives here — not in sensors or tick.
+```rust
+// kernel/world_state.rs
+
+/// Resolve a neighbor position, respecting wrap/clamp. Returns None if
+/// the target is out-of-bounds in a non-wrapping world.
+pub fn resolve_neighbor(&self, pos: Position, dir: Direction) -> Option<Position> {
+    let (dx, dy) = dir.delta();
+    let nx = pos.x as i32 + dx;
+    let ny = pos.y as i32 + dy;
+
+    if self.wrap {
+        Some(Position {
+            x: ((nx % self.width as i32 + self.width as i32) % self.width as i32) as u16,
+            y: ((ny % self.height as i32 + self.height as i32) % self.height as i32) as u16,
+        })
+    } else if nx >= 0 && nx < self.width as i32 && ny >= 0 && ny < self.height as i32 {
+        Some(Position { x: nx as u16, y: ny as u16 })
+    } else {
+        None
+    }
+}
+```
+
+**Bounds safety:** `cell_index` is private and assumes valid positions. All public methods that accept `Position` must validate bounds (debug_assert or early return). `resolve_neighbor` is the canonical way to produce valid positions from user-supplied directions.
+
+**Principle:** Kernel has NO knowledge of creature behavior, actions, VM, or ticks. Pure world primitives. The kernel does store `CreatureId` in the spatial index (it's a primitive key type, not creature logic).
 
 ---
 
@@ -215,16 +251,17 @@ config/
 **Energy design:**
 ```rust
 // creature/state.rs
-pub struct Energy(f32);  // Newtype ensures non-negative
+pub struct Energy(u32);  // Integer energy avoids floating-point flakiness in tests
 
 impl Energy {
-    pub fn drain(&mut self, amount: f32) -> bool;  // Returns success
-    pub fn charge(&mut self, amount: f32, max: f32);
-    pub fn is_alive(&self) -> bool;
+    pub fn drain(&mut self, amount: u32) -> bool;  // Returns success (false if insufficient)
+    pub fn charge(&mut self, amount: u32, max: u32);
+    pub fn is_alive(&self) -> bool;  // self.0 > 0
+    pub fn value(&self) -> u32;
 }
 ```
 
-Energy is a creature property. Config defines energy policy (costs, gains). Runtime and tick modify energy through the Energy type's safe operations.
+Energy uses `u32` (not `f32`) to ensure deterministic equality comparisons and avoid floating-point edge cases in tests. All config values (costs, rewards, thresholds) are also integers. Energy is a creature property. Config defines energy policy (costs, gains). Runtime and tick modify energy through the Energy type's safe operations.
 
 **Offspring creation:**
 ```rust
@@ -238,6 +275,10 @@ pub fn create_offspring(
     // Mutate genome, derive phenotype, calculate energy, create state
 }
 ```
+
+**Per-creature memory:** CreatureState will gain a `memory: Vec<u8>` field in Stage 3 (VM brain). This is the persistent scratch space the VM reads/writes across ticks. Deferred from Stage 1 because the stub runtime doesn't use it.
+
+**CreatureId:** `CreatureId` is a `slotmap` key type. The SlotMap generates IDs automatically on insert — no manual ID allocator needed.
 
 **Principle:** Creature owns data about what creatures are. Reproduction logic lives here (how to make offspring), but tick decides when reproduction happens.
 
@@ -264,7 +305,7 @@ pub fn execute_creature(
     config: &SimulationConfig,
 ) -> CreatureOutputs {
     let max_steps = config.runtime.execution.max_think_steps_per_tick;
-    let step_cost = config.energy.costs.energy_per_think_step;
+    let step_cost: u32 = config.energy.costs.energy_per_think_step;
 
     let mut step_count = 0;
     while step_count < max_steps {
@@ -318,16 +359,121 @@ pub fn gather_environmental_inputs(
     world: &WorldState,
     config: &SimulationConfig,
 ) -> EnvironmentalInputs {
+    // Use kernel's resolve_neighbor for position arithmetic
+    let neighbor_n = world.resolve_neighbor(position, Direction::N);
+
     EnvironmentalInputs {
         food_density_self: world.get_food_density(position),
-        neighbor_n: world.is_occupied(calculate_neighbor(position, Direction::N, config)),
-        barrier_n: world.is_barrier(calculate_neighbor(position, Direction::N, config)),
+        neighbor_n: neighbor_n.map_or(false, |p| world.is_occupied(p)),
+        barrier_n: neighbor_n.map_or(true, |p| world.is_barrier(p)),  // OOB = barrier
         // ... assemble all fields
     }
 }
 ```
 
 **Principle:** Sensors translate reality (kernel) to perspective (contracts). Sensors are the "lens" through which creatures perceive.
+
+---
+
+### SimulationState (Coordination Shell)
+
+**Purpose:** Bundle all mutable simulation state into a single owner. Thin coordination struct — no business logic. Lives at crate root (`lib.rs`).
+
+```rust
+// lib.rs
+use slotmap::SlotMap;
+
+pub struct SimulationState {
+    pub creatures: SlotMap<CreatureId, CreatureState>,
+    pub world: WorldState,
+    pub tick_number: u64,
+}
+
+impl SimulationState {
+    pub fn new(world: WorldState) -> Self {
+        Self {
+            creatures: SlotMap::with_key(),
+            world,
+            tick_number: 0,
+        }
+    }
+
+    /// Insert a creature and register it in the spatial index.
+    pub fn spawn_creature(&mut self, creature: CreatureState) -> CreatureId {
+        let pos = creature.position;
+        let id = self.creatures.insert(creature);
+        self.world.place_creature(pos, id);
+        id
+    }
+
+    pub fn tick(&mut self, config: &SimulationConfig, rng: &mut impl Rng) -> TickStats {
+        tick::orchestrator::tick(self, config, rng)
+    }
+}
+```
+
+**Why a struct:** The tick function needs mutable access to creatures, world, and tick counter. Bundling them eliminates a multi-parameter function and makes it impossible for callers to forget state. Server and CLI each own a `SimulationState` and call `state.tick(config, rng)`.
+
+**Not a god object:** `SimulationState` has no business logic. Modules (kernel, creature, tick, runtime, sensors) own behavior. `SimulationState` is just "the mutable things the simulation needs."
+
+**Why pub fields (borrow splitting):** The tick orchestrator needs simultaneous mutable borrows of different fields — e.g. `&mut state.creatures` and `&mut state.world` in the same function. Rust's borrow checker allows this through direct field access (`state.creatures` and `state.world` are disjoint borrows) but NOT through accessor methods (which take `&mut self`, borrowing the whole struct). This is a structural requirement, not convenience.
+
+---
+
+### Seed (Initial Creature Placement)
+
+**Purpose:** Populate a SimulationState with initial creatures. Cross-cutting operation used by server, CLI, and tests. Single source of truth for "how to start a simulation."
+
+**File:** `seed.rs` (crate root)
+
+```rust
+// seed.rs
+
+/// Seed creatures into the simulation at random empty positions.
+/// Stage 1: takes explicit params. Stage 2+: takes &SimulationConfig.
+pub fn seed_creatures(
+    state: &mut SimulationState,
+    count: usize,
+    initial_energy: u32,
+    rng: &mut impl Rng,
+) {
+    for _ in 0..count {
+        if let Some(pos) = find_empty_position(&state.world, rng) {
+            let creature = CreatureState::new(
+                pos,
+                initial_energy,
+                0,  // generation 0
+                random_phenotype(rng),
+            );
+            state.spawn_creature(creature);
+        }
+    }
+}
+
+fn find_empty_position(world: &WorldState, rng: &mut impl Rng) -> Option<Position> {
+    // Random probe with bounded retries — O(1) expected for sparse worlds.
+    // Falls back to None if world is full (callers handle best-effort).
+    let max_attempts = 100;
+    for _ in 0..max_attempts {
+        let pos = Position {
+            x: rng.gen_range(0..world.width),
+            y: rng.gen_range(0..world.height),
+        };
+        if !world.is_occupied(pos) && !world.is_barrier(pos) {
+            return Some(pos);
+        }
+    }
+    None
+}
+
+fn random_phenotype(rng: &mut impl Rng) -> [u8; 3] {
+    [rng.gen(), rng.gen(), rng.gen()]
+}
+```
+
+**Why a separate module:** Seeding touches world (find empty positions), creature (create state), and SimulationState (register in spatial index). It doesn't belong inside any single module. Server, CLI, and viability tests all call the same function — only the parameters differ.
+
+**Growth path:** Stage 2 refactors to take `&SimulationConfig` (initial energy from config, food seeding). Stage 3 adds genome initialization for seed creatures.
 
 ---
 
@@ -342,21 +488,31 @@ pub fn gather_environmental_inputs(
 **Phase-based tick:**
 ```rust
 // tick/orchestrator.rs
-pub fn tick(
-    creatures: &mut Vec<CreatureState>,
-    world: &mut WorldState,
-    config: &SimulationConfig,
-    tick_number: u64,
-    rng: &mut impl Rng,
-) {
-    // Phase 0: World mechanics
-    world.grow_food(tick_number, config.world.food, rng);
-    apply_energy_decay(creatures, config.energy.lifecycle.energy_decay_per_tick);
 
-    // Phase 1: Cognition - all creatures think, actions collected
-    let mut action_queue = Vec::new();
-    for creature in creatures.iter_mut() {
-        let inputs = sensors::gather_inputs(creature, world, config);
+/// Per-tick observability counters (GP-04).
+pub struct TickStats {
+    pub births: u32,
+    pub deaths: u32,
+    pub actions_attempted: u32,
+    pub actions_succeeded: u32,
+}
+
+pub fn tick(
+    state: &mut SimulationState,
+    config: &SimulationConfig,
+    rng: &mut impl Rng,
+) -> TickStats {
+    let pre_population = state.creatures.len();
+
+    // Phase 0: World mechanics
+    state.world.grow_food(&config.world.food, rng);
+    apply_energy_decay(&mut state.creatures, config.energy.lifecycle.energy_decay_per_tick);
+
+    // Phase 1: Cognition — all creatures think, actions collected.
+    // Collect (CreatureId, WorldAction) pairs — SlotMap keys are stable handles.
+    let mut action_queue: Vec<(CreatureId, WorldAction)> = Vec::new();
+    for (id, creature) in state.creatures.iter_mut() {
+        let inputs = sensors::gather_inputs(creature, &state.world, config);
         let outputs = runtime::execute_creature(
             &creature.genome,
             inputs,
@@ -364,26 +520,63 @@ pub fn tick(
             &mut creature.energy,
             config,
         );
-        action_queue.push((creature.id, outputs.world_action));
+        action_queue.push((id, outputs.world_action));
     }
 
-    // Phase 2: Action execution - randomize and execute
+    // Phase 2: Action execution — randomize and execute.
+    // INVARIANT: SlotMap keys remain valid during this phase because
+    // (a) no creatures are removed (cleanup is Phase 3), and
+    // (b) offspring are deferred to a separate spawn queue.
     action_queue.shuffle(rng);
-    for (creature_id, action) in action_queue {
-        let Some(creature) = creatures.iter_mut().find(|c| c.id == creature_id) else {
+    let mut spawns: Vec<CreatureState> = Vec::new();
+    let mut actions_attempted: u32 = 0;
+    let mut actions_succeeded: u32 = 0;
+
+    for (id, action) in &action_queue {
+        let creature = &mut state.creatures[*id];
+        if !creature.energy.is_alive() {
             continue;  // Creature died during action phase
-        };
+        }
 
-        let result = actions::execute_action(&action, creature, world, config, rng);
+        actions_attempted += 1;
+        // Actions apply energy changes directly (drain/charge) on creature.
+        // ActionResult.status is informational for stats tracking.
+        let result = actions::execute_action(
+            action, creature, &mut state.world, config, rng,
+        );
 
-        // Spawn offspring immediately if reproduce succeeded
+        if matches!(result.status, ActionStatus::Success) {
+            actions_succeeded += 1;
+        }
         if let Some(offspring) = result.spawn {
-            creatures.push(offspring);
+            spawns.push(offspring);
         }
     }
 
-    // Phase 3: Cleanup - remove dead creatures
-    creatures.retain(|c| c.energy.is_alive());
+    let births = spawns.len() as u32;
+
+    // Append deferred offspring — SlotMap assigns IDs on insert
+    for offspring in spawns {
+        let pos = offspring.position;
+        let id = state.creatures.insert(offspring);
+        state.world.place_creature(pos, id);
+    }
+
+    // Phase 3: Cleanup — remove dead creatures and update spatial index
+    let dead_ids: Vec<CreatureId> = state.creatures.iter()
+        .filter(|(_, c)| !c.energy.is_alive())
+        .map(|(id, _)| id)
+        .collect();
+    for id in &dead_ids {
+        if let Some(creature) = state.creatures.remove(*id) {
+            state.world.remove_creature(creature.position);
+        }
+    }
+    let deaths = dead_ids.len() as u32;
+
+    state.tick_number += 1;
+
+    TickStats { births, deaths, actions_attempted, actions_succeeded }
 }
 ```
 
@@ -408,10 +601,11 @@ pub enum FailureReason {
     NoSpawnLocation,
 }
 
+/// Actions apply energy changes (drain/charge) directly on the creature
+/// during execution. ActionResult reports what happened for stats/logging
+/// purposes only — the tick orchestrator does NOT re-apply energy changes.
 pub struct ActionResult {
     pub status: ActionStatus,
-    pub energy_cost: f32,
-    pub energy_gain: f32,
     pub spawn: Option<CreatureState>,
 }
 
@@ -455,41 +649,51 @@ fn execute_reproduce(...) -> ActionResult {
 ## Data Flow (End-to-End Example)
 
 ```
-Server tick loop → v3_core::tick::orchestrator::tick()
+Server owns SimulationState, calls state.tick(config, rng)
+  → v3_core::tick::orchestrator::tick(&mut state, config, rng)
 
 Phase 0: World Mechanics
-  kernel::world_state.grow_food()
+  state.world.grow_food(config, rng)
   creature::Energy.drain() for all (decay)
 
-Phase 1: Cognition (collect actions)
-  For each creature:
+Phase 1: Cognition (collect keyed actions)
+  For each (id, creature) in state.creatures (SlotMap iteration):
     sensors::gather_inputs()
-      ├─ sensors::environmental() → kernel::world_state methods
+      ├─ sensors::environmental() → state.world methods
       └─ sensors::introspection() → creature.energy, creature.phenotype
 
     runtime::executor::execute_creature()
       └─ runtime::vm::execute_vm_node() OR runtime::graph::execute_graph_node()
 
-    Add (creature.id, outputs.world_action) to action_queue
+    Add (id, outputs.world_action) to action_queue
 
-Phase 2: Action Execution (randomized)
+Phase 2: Action Execution (randomized, deferred spawns)
   Shuffle action_queue
-  For each (creature_id, action):
+  [SlotMap keys stable — no removals, spawns deferred]
+  For each (id, action):
     tick::actions::execute_action()
-      ├─ Validate via kernel methods
-      ├─ Execute via kernel methods (world.consume_food(), world.mark_occupied())
+      ├─ Validate via state.world methods
+      ├─ Execute via state.world methods (consume_food, place_creature)
+      ├─ Apply energy directly on creature (drain/charge)
       ├─ Or create offspring via creature::create_offspring()
-      └─ Modify creature.energy
+      └─ Return ActionResult (status + optional offspring)
 
-    If reproduce succeeded: creatures.push(offspring)
+    Track stats (attempted/succeeded/births)
+    If reproduce succeeded: spawns.push(offspring)
+
+  Insert spawns into state.creatures (SlotMap assigns IDs)
+  Update world.place_creature() for each spawn
 
 Phase 3: Cleanup
-  creatures.retain(|c| c.energy.is_alive())
+  Collect dead CreatureIds, remove from SlotMap + world.remove_creature()
+  Count deaths
 
-Server serializes WorldFrame → WebSocket → Web client renders
+state.tick_number += 1
+Return TickStats { births, deaths, actions_attempted, actions_succeeded }
+→ Server stores/exposes stats for transport layer
 ```
 
-**Key observation:** Data flows through clean module boundaries. No module directly manipulates another module's internal state.
+**Key observation:** Data flows through clean module boundaries. No module directly manipulates another module's internal state. Actions own energy mutation; tick owns orchestration and stats. SimulationState is the coordination shell, not a behavior owner. SlotMap provides stable creature handles without manual ID allocation.
 
 ---
 
@@ -523,18 +727,18 @@ fn environmental_inputs_has_required_fields() {
 #[test]
 fn eat_action_removes_food_and_increases_energy() {
     // Setup
-    let mut world = WorldState::new(10, 10);
-    world.set_food(Position { x: 5, y: 5 }, 200);
+    let mut world = WorldState::new(10, 10, true);
+    world.set_food_density(Position { x: 5, y: 5 }, 200);
     let mut creature = CreatureState::new(...);
     creature.position = Position { x: 5, y: 5 };
-    creature.energy = Energy::new(10.0);
+    creature.energy = Energy::new(10);
 
     // Execute
     let result = execute_action(&WorldAction::Eat, &mut creature, &mut world, &config, &mut rng);
 
     // Verify INTENT: food gone, energy increased
     assert_eq!(world.get_food_density(Position { x: 5, y: 5 }), 0);
-    assert!(creature.energy.value() > 10.0);
+    assert!(creature.energy.value() > 10);
     assert!(matches!(result.status, ActionStatus::Success));
 }
 ```
@@ -542,15 +746,18 @@ fn eat_action_removes_food_and_increases_energy() {
 
 #### 3. Integration Tests (End-to-end)
 ```rust
-// v3-server/tests/tick_integration.rs
+// v3-core/tests/tick_integration.rs
 #[test]
-fn full_tick_produces_valid_world_frame() {
-    let mut state = ServerState::new();
-    state.tick();
+fn full_tick_produces_valid_stats() {
+    let mut state = SimulationState::new(WorldState::new(10, 10, true));
+    // ... seed::seed_creatures(&mut state, ...), add food, config ...
 
-    assert_eq!(state.tick, 1);
-    assert!(state.creatures.len() > 0);
-    // Verify world changed (food grew, creatures acted)
+    let stats = state.tick(&config, &mut rng);
+
+    assert_eq!(state.tick_number, 1);
+    assert!(!state.creatures.is_empty());
+    // Verify stats reflect actual behavior
+    assert_eq!(stats.deaths, 0);
 }
 ```
 **Purpose:** Validate full-stack integration.
@@ -567,110 +774,129 @@ fn full_tick_produces_valid_world_frame() {
 
 ## Walking Skeleton Strategy
 
-Build v3 incrementally with always-working vertical slices:
+Build v3 incrementally in 3 stages. Each stage delivers a qualitatively different simulation. The seed creature viability test (introduced in Stage 2) is the primary forcing function — it won't pass unless the whole ecology works together end-to-end.
 
-### Phase 1: Minimal Walking Skeleton
-**Goal:** Creatures exist and can be rendered
+### Stage 1: Foundation + Working Tick
+**Goal:** Creatures exist, tick advances, server responds to REST queries.
 
 **Scope:**
-- kernel/ - positions only (no food yet)
-- creature/ - minimal state (id, position, energy)
+- kernel/ - Position, Direction (with delta), CreatureId (slotmap), WorldState (grid storage, creature_at spatial index, resolve_neighbor)
+- creature/ - CreatureState, Energy type (u32) with safe operations
 - contracts/ - stub inputs/outputs (NoOp only)
 - runtime/ - stub executor (returns NoOp)
 - sensors/ - stub inputs (zeros)
-- tick/ - Phase 0 only (no cognition)
-- v3-server/ - start/status endpoints, WebSocket streaming
-- v3/web/ - canvas rendering colored dots
+- tick/ - Phase 0 only (age increment, dead creature cleanup, no cognition)
+- seed - seed_creatures() for initial placement (shared by server, CLI, tests)
+- v3-server/ - start/status/pause REST endpoints, tick loop
+- SimulationState at crate root (SlotMap creatures, WorldState, tick counter)
 
-**Verification:** Creatures render, tick advances
-
----
-
-### Phase 2: Add Food and Eat Action
-**Goal:** Creatures can eat and gain energy
-
-**Scope:**
-- kernel/ - food grid, grow_food(), consume_food()
-- contracts/ - add food_density_self, Eat action
-- sensors/ - sense food at position
-- tick/actions/ - execute_eat()
-- v3/web/ - render food grid
-
-**Verification:** Creatures eat, energy increases, food disappears
+**Gate:** Server starts, tick advances, creatures persist across ticks.
+**Note:** Frontend (WebSocket, web client) deferred to separate frontend architecture plan.
+**Plan:** `docs/plans/2026-02-14-v3-phase1-walking-skeleton.md`
 
 ---
 
-### Phase 3: Add Movement
-**Goal:** Creatures can move around
+### Stage 2: Viable Ecology
+**Goal:** Creatures survive by eating, die without food, move toward resources. The simulation is alive.
+
+**Introduces:** config/ module, food growth, energy decay, eat/move actions, heuristic brain
 
 **Scope:**
-- kernel/ - occupancy tracking
-- contracts/ - Move action
-- tick/actions/ - execute_move()
-- v3/web/ - animate movement
+- config/ - FoodConfig, EnergyConfig (lifecycle + costs), SimulationConfig top-level
+- kernel/ - food grid operations: set_food_density(), consume_food(), grow_food()
+- contracts/ - food_density_self input, Eat/Move action variants
+- sensors/ - sense food at current position and neighbors
+- tick/actions/ - execute_eat(), execute_move()
+- tick/orchestrator - full Phase 0-3 with cognition and action execution
+- runtime/ - simple heuristic brain (eat if food present, move toward food, else random)
+- config threading through tick function signature
 
-**Verification:** Creatures move, don't overlap
+**Gate:** Seed creature viability test passes (see Viability Test Design below).
+**Plan:** Separate plan document (created when Stage 1 completes).
 
 ---
 
-### Phase 4: Add Energy Decay and Death
-**Goal:** Creatures must eat or die
+### Stage 3: Evolving Ecology
+**Goal:** Population grows through reproduction, offspring vary through mutation. Creatures make decisions via VM brain.
+
+**Introduces:** reproduction action, genome mutation, VM brain
 
 **Scope:**
-- config/energy/ - decay_per_tick
-- tick/ - apply decay, remove dead
-- creature/ - Energy::is_alive()
-
-**Verification:** Creatures without food die
-
----
-
-### Phase 5: Add Simple VM Brain
-**Goal:** Creatures make decisions
-
-**Scope:**
-- creature/genome/ - minimal VM genome
-- runtime/vm/ - basic VM execution
-- runtime/executor/ - energy-bound think loop
-- tick/ - Phase 1 cognition, Phase 2 execution
-
-**Verification:** Different genomes produce different behaviors
-
----
-
-### Phase 6: Add Reproduction
-**Goal:** Population grows and evolves
-
-**Scope:**
-- contracts/ - Reproduce action
+- contracts/ - Reproduce action variant
 - creature/reproduction/ - create_offspring()
 - creature/mutation/ - mutate_genome()
+- creature/genome/ - minimal VM genome
+- runtime/vm/ - basic VM execution (replacing heuristic brain)
+- runtime/executor/ - energy-bound think loop
 - tick/actions/ - execute_reproduce()
 
-**Verification:** Population grows, offspring differ from parents
+**Gate:** Extended viability test — population sustains via reproduction, offspring differ from parents.
+**Plan:** Separate plan document (created when Stage 2 completes).
 
 ---
 
-### Phase 7+: Expand Complexity
+### Stage 4+: Expand Complexity
 - Graph nodes
 - Rich sensors (8-directional, neighbor detection)
 - Inventory system (pickup/put)
 - Phenotype evolution
 - Advanced mutation operators
 
-**Each phase maintains a working system.**
+**Each stage maintains a working system. Each new creature capability adds assertions to the viability test suite.**
+
+---
+
+## Viability Test Design
+
+The seed creature viability test is the primary integration gate from Stage 2 onward. It verifies that the ecology works end-to-end — not just that individual modules pass contract tests. This is the "intent verification" that AGENTS.md requires.
+
+### Speed Requirement
+
+**Target: < 2 seconds for the core viability test.** In v1, the viability test became a development bottleneck because it ran at production-scale configs. v3 avoids this by using a deliberately small, fast test config separate from the default server config:
+
+- Small world: 32x32 (1,024 cells) — not 400x400
+- Few creatures: 10-20 — not hundreds
+- Short run: ~100 ticks — enough to prove viability, not simulate evolution
+- Tuned config: high food density, moderate decay — fast convergence to viability signal
+
+The viability test proves "the ecology mechanics work," not "the default config is interesting at scale."
+
+### Two Levels
+
+1. **Core viability test** (`v3-core/tests/seed_viability.rs`): Pure SimulationState, no server overhead. This is the fast gate that runs on every change.
+2. **Server viability test** (`v3-server/tests/seed_viability.rs`): Exercises HTTP API and tick loop using Axum test utilities (no real port binding). Slightly slower but validates transport integration.
+
+### Assertions (grow with each stage)
+
+**Stage 2 (viable ecology):**
+- Population > 0 after N ticks (creatures didn't all starve)
+- At least some creatures have eaten (energy economy works)
+- Food has been consumed and regrown (food cycle works)
+- Creature positions have changed (movement works)
+- TickStats counters are non-zero and consistent (GP-04 observability)
+
+**Stage 3 adds:**
+- Population has grown via reproduction (births > 0)
+- Offspring positions differ from parents (spawning works)
+- Offspring genomes differ from parents (mutation works)
+
+**Stage 4+ adds:** assertions for each new capability.
+
+### Test Config
+
+The viability test uses a shared `viability_config()` function — not the default server config. This config is tuned for fast, reliable viability signal and lives in a test utility module.
 
 ---
 
 ## Verification Commands
 
-Each phase must pass:
+Each stage must pass:
 
 1. `cd v3 && cargo fmt --all --check`
 2. `cd v3 && cargo test --workspace`
 3. `cd v3 && cargo clippy --workspace --all-targets -- -D warnings`
-4. `cd v3/web && npm run build`
-5. Manual: Start server, open web UI, verify phase goals work
+4. `cd v3/web && npm run build` (once frontend exists)
+5. Manual: Start server, verify stage goals via curl/REST
 
 ---
 
@@ -684,9 +910,6 @@ Each phase must pass:
 
 **Risk:** Performance issues with phase-based tick
 **Mitigation:** Profile early. If Phase 1 (collect actions) + Phase 2 (execute) is too slow, optimize or reconsider two-phase.
-
-**Risk:** Randomized turn order breaks deterministic replay
-**Mitigation:** Seed the shuffle RNG with tick number + global seed. Runs remain reproducible.
 
 **Risk:** Contract/intent testing discipline slips
 **Mitigation:** CI requires both test types. Code review checklist includes intent verification.
