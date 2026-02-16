@@ -50,6 +50,28 @@ See canonical policy: `docs/standards/agent-instruction-layering.md`.
 7. For code review requests, run Gemini MCP (`gemini-analyze-code`) first; if unavailable, state that and run a local fallback review.
 8. For Rust structural refactors, include a short "Boundary Impact" note in the plan covering dependency direction, public API/wire-format changes, and test migration approach.
 
+## Skills Policy
+
+Agents must invoke the appropriate installed skills during architecture, planning, and implementation work. Skills are auto-discovered from `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
+
+### Rust crates (`crates/`)
+
+- **`rust-skills`**: Invoke when writing, reviewing, or refactoring any Rust code. Covers ownership, error handling, async patterns, API design, memory optimization, performance, and testing.
+- **`cargo` MCP server** (Codex): Use for running clippy, check, test, fmt, and managing dependencies.
+
+### Frontend (`web/`)
+
+- **`vercel-react-best-practices`**: Invoke when writing, reviewing, or refactoring React components. Covers performance patterns, data fetching, bundle optimization.
+- **`vercel-composition-patterns`**: Invoke when designing component APIs, refactoring prop-heavy components, or building reusable component hierarchies.
+- **`web-design-guidelines`**: Invoke when reviewing UI for accessibility, forms, animation, typography, and design quality.
+- **`frontend-design`**: Invoke when creating new UI components that need high visual design quality. Guides bold aesthetic choices in typography, color, motion, and spatial composition.
+
+### Architecture and planning
+
+- Before designing crate APIs, module boundaries, or trait hierarchies: invoke `rust-skills`.
+- Before designing component hierarchies or state management patterns: invoke `vercel-react-best-practices` and `vercel-composition-patterns`.
+- Before writing implementation plans that touch `web/`: review `web-design-guidelines` for accessibility and UX constraints.
+
 ## Completion Gate
 
 Before claiming completion, run and confirm all pass:

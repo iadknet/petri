@@ -121,6 +121,25 @@ export interface StartupRequest {
     ticks_per_second: number;
     max_tick_budget_ms: number;
   };
+  tuning: {
+    food: {
+      initial_food_density: number;
+      food_growth_rate: number;
+      food_spawn_rate: number;
+      food_spread_threshold: number;
+      food_spawn_floor_density: number;
+    };
+    tick: {
+      initial_energy: number;
+      energy_decay_per_tick: number;
+      move_cost: number;
+      food_energy_gain: number;
+      reproduce_cost: number;
+      min_reproduce_energy: number;
+      offspring_energy_fraction: number;
+      energy_max: number;
+    };
+  };
 }
 
 export interface StartupResponse {
