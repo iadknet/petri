@@ -10,6 +10,12 @@ pub struct ServerState {
     pub rng: SmallRng,
 }
 
+impl Default for ServerState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ServerState {
     pub fn new() -> Self {
         let world = WorldState::new(400, 400, true);
