@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "crates/v3-core",
+    "crates/v3-server",
 ]
 resolver = "2"
