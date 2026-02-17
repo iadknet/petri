@@ -1,3 +1,4 @@
+use crate::config::SimulationConfig;
 use crate::contracts::inputs::CreatureInputs;
 use crate::contracts::outputs::{CreatureOutputs, WorldAction};
 use crate::kernel::types::Direction;
@@ -5,10 +6,15 @@ use rand::seq::SliceRandom;
 use rand::Rng;
 
 /// Heuristic brain for Stage 2.
-/// Logic: (1) eat if food at current position, (2) move toward highest-food
-/// passable neighbor (random tiebreak), (3) move in random passable direction,
-/// (4) NoOp if completely trapped.
-pub fn execute_heuristic(inputs: &CreatureInputs, rng: &mut impl Rng) -> CreatureOutputs {
+/// Logic: (1) eat if food at current position, (2) reproduce when energy is
+/// high and a passable neighbor exists, (3) move toward highest-food passable
+/// neighbor (random tiebreak), (4) move in random passable direction,
+/// (5) NoOp if completely trapped.
+pub fn execute_heuristic(
+    inputs: &CreatureInputs,
+    config: &SimulationConfig,
+    rng: &mut impl Rng,
+) -> CreatureOutputs {
     let env = &inputs.environmental;
 
     // If there's food here, eat it
@@ -17,6 +23,25 @@ pub fn execute_heuristic(inputs: &CreatureInputs, rng: &mut impl Rng) -> Creatur
             world_action: WorldAction::Eat,
             ..CreatureOutputs::noop()
         };
+    }
+
+    // If energy is high enough, attempt reproduction into a random passable direction.
+    let passable_dirs: Vec<Direction> = Direction::ALL
+        .iter()
+        .enumerate()
+        .filter(|(i, _)| env.neighbors[*i].passable)
+        .map(|(_, &dir)| dir)
+        .collect();
+    if inputs.introspection.energy >= config.energy.lifecycle.min_reproduce_energy {
+        if let Some(&dir) = passable_dirs.choose(rng) {
+            return CreatureOutputs {
+                world_action: WorldAction::Reproduce {
+                    direction: dir,
+                    energy_amount: config.energy.lifecycle.default_offspring_energy,
+                },
+                ..CreatureOutputs::noop()
+            };
+        }
     }
 
     // Find passable neighbors with food, pick the one with highest food (random tiebreak)
@@ -44,13 +69,6 @@ pub fn execute_heuristic(inputs: &CreatureInputs, rng: &mut impl Rng) -> Creatur
     }
 
     // No food visible — move in a random passable direction
-    let passable_dirs: Vec<Direction> = Direction::ALL
-        .iter()
-        .enumerate()
-        .filter(|(i, _)| env.neighbors[*i].passable)
-        .map(|(_, &dir)| dir)
-        .collect();
-
     if let Some(&dir) = passable_dirs.choose(rng) {
         return CreatureOutputs {
             world_action: WorldAction::Move { direction: dir },

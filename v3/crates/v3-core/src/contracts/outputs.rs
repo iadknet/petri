@@ -5,7 +5,13 @@ use crate::kernel::types::Direction;
 pub enum WorldAction {
     NoOp,
     Eat,
-    Move { direction: Direction },
+    Move {
+        direction: Direction,
+    },
+    Reproduce {
+        direction: Direction,
+        energy_amount: u32,
+    },
 }
 
 /// Internal outputs (stub for Stage 1).

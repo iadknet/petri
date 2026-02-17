@@ -1,26 +1,30 @@
 #[test]
 fn heuristic_eats_when_food_present() {
     use rand::SeedableRng;
+    use v3_core::config::SimulationConfig;
     use v3_core::contracts::inputs::CreatureInputs;
     use v3_core::contracts::outputs::WorldAction;
     use v3_core::runtime::executor::execute_heuristic;
 
+    let config = SimulationConfig::default();
     let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
     let mut inputs = CreatureInputs::default();
     inputs.environmental.food_density_self = 50;
 
-    let outputs = execute_heuristic(&inputs, &mut rng);
+    let outputs = execute_heuristic(&inputs, &config, &mut rng);
     assert!(matches!(outputs.world_action, WorldAction::Eat));
 }
 
 #[test]
 fn heuristic_moves_toward_food() {
     use rand::SeedableRng;
+    use v3_core::config::SimulationConfig;
     use v3_core::contracts::inputs::{CreatureInputs, NeighborSense};
     use v3_core::contracts::outputs::WorldAction;
     use v3_core::kernel::types::Direction;
     use v3_core::runtime::executor::execute_heuristic;
 
+    let config = SimulationConfig::default();
     let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
     let mut inputs = CreatureInputs::default();
     // All neighbors passable
@@ -33,7 +37,7 @@ fn heuristic_moves_toward_food() {
         passable: true,
     };
 
-    let outputs = execute_heuristic(&inputs, &mut rng);
+    let outputs = execute_heuristic(&inputs, &config, &mut rng);
     assert!(matches!(
         outputs.world_action,
         WorldAction::Move {
@@ -45,10 +49,12 @@ fn heuristic_moves_toward_food() {
 #[test]
 fn heuristic_moves_randomly_when_no_food() {
     use rand::SeedableRng;
+    use v3_core::config::SimulationConfig;
     use v3_core::contracts::inputs::CreatureInputs;
     use v3_core::contracts::outputs::WorldAction;
     use v3_core::runtime::executor::execute_heuristic;
 
+    let config = SimulationConfig::default();
     let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
     let mut inputs = CreatureInputs::default();
     // Make some neighbors passable, but no food anywhere
@@ -56,7 +62,7 @@ fn heuristic_moves_randomly_when_no_food() {
         n.passable = true;
     }
 
-    let outputs = execute_heuristic(&inputs, &mut rng);
+    let outputs = execute_heuristic(&inputs, &config, &mut rng);
     assert!(matches!(
         outputs.world_action,
         WorldAction::Move { direction: _ }
@@ -66,16 +72,53 @@ fn heuristic_moves_randomly_when_no_food() {
 #[test]
 fn heuristic_returns_noop_when_trapped() {
     use rand::SeedableRng;
+    use v3_core::config::SimulationConfig;
     use v3_core::contracts::inputs::CreatureInputs;
     use v3_core::contracts::outputs::WorldAction;
     use v3_core::runtime::executor::execute_heuristic;
 
+    let config = SimulationConfig::default();
     let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
     // Default: all neighbors have passable=false, no food
     let inputs = CreatureInputs::default();
 
-    let outputs = execute_heuristic(&inputs, &mut rng);
+    let outputs = execute_heuristic(&inputs, &config, &mut rng);
     assert!(matches!(outputs.world_action, WorldAction::NoOp));
+}
+
+#[test]
+fn heuristic_reproduces_when_energy_is_high_and_neighbor_is_open() {
+    use rand::SeedableRng;
+    use v3_core::config::SimulationConfig;
+    use v3_core::contracts::inputs::CreatureInputs;
+    use v3_core::contracts::outputs::WorldAction;
+    use v3_core::kernel::types::Direction;
+    use v3_core::runtime::executor::execute_heuristic;
+
+    let config = SimulationConfig::default();
+    let mut rng = rand::rngs::SmallRng::seed_from_u64(123);
+    let mut inputs = CreatureInputs::default();
+    inputs.introspection.energy = config.energy.lifecycle.min_reproduce_energy + 5;
+    inputs.environmental.neighbors[2].passable = true; // East
+
+    let outputs = execute_heuristic(&inputs, &config, &mut rng);
+
+    assert!(matches!(
+        outputs.world_action,
+        WorldAction::Reproduce {
+            direction: Direction::E,
+            energy_amount: _
+        }
+    ));
+
+    if let WorldAction::Reproduce { energy_amount, .. } = outputs.world_action {
+        assert_eq!(
+            energy_amount,
+            config.energy.lifecycle.default_offspring_energy
+        );
+    } else {
+        unreachable!();
+    }
 }
 
 #[test]
