@@ -1,7 +1,9 @@
 pub mod energy;
+pub mod runtime;
 pub mod world;
 
 pub use energy::EnergyConfig;
+pub use runtime::RuntimeConfig;
 pub use world::WorldConfig;
 
 /// Top-level simulation configuration.
@@ -10,4 +12,5 @@ pub use world::WorldConfig;
 pub struct SimulationConfig {
     pub world: WorldConfig,
     pub energy: EnergyConfig,
+    pub runtime: RuntimeConfig,
 }

@@ -1,6 +1,7 @@
 use rand::SeedableRng;
 use v3_core::config::SimulationConfig;
 use v3_core::contracts::outputs::WorldAction;
+use v3_core::creature::genome::CreatureGenome;
 use v3_core::creature::state::CreatureState;
 use v3_core::kernel::types::{CreatureId, Direction, Position};
 use v3_core::kernel::world_state::WorldState;
@@ -16,7 +17,7 @@ fn setup() -> (
     let config = SimulationConfig::default();
     let mut world = WorldState::new(10, 10, false);
     let pos = Position { x: 5, y: 5 };
-    let creature = CreatureState::new(pos, 20, 0, [204, 61, 61]);
+    let creature = CreatureState::new(pos, 20, 0, [204, 61, 61], CreatureGenome::simple_founder());
 
     // Create a CreatureId via a temporary slot
     let mut slots = slotmap::SlotMap::<CreatureId, ()>::with_key();

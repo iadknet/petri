@@ -123,12 +123,19 @@ fn heuristic_reproduces_when_energy_is_high_and_neighbor_is_open() {
 
 #[test]
 fn gather_inputs_returns_creature_energy_and_food() {
+    use v3_core::creature::genome::CreatureGenome;
     use v3_core::creature::state::CreatureState;
     use v3_core::kernel::types::Position;
     use v3_core::kernel::world_state::WorldState;
     use v3_core::sensors::gather_inputs;
 
-    let creature = CreatureState::new(Position { x: 5, y: 5 }, 42, 0, [100, 100, 100]);
+    let creature = CreatureState::new(
+        Position { x: 5, y: 5 },
+        42,
+        0,
+        [100, 100, 100],
+        CreatureGenome::simple_founder(),
+    );
     let mut world = WorldState::new(10, 10, true);
     world.set_food_density(Position { x: 5, y: 5 }, 120);
 
@@ -141,12 +148,19 @@ fn gather_inputs_returns_creature_energy_and_food() {
 
 #[test]
 fn gather_inputs_reads_neighbor_food_density() {
+    use v3_core::creature::genome::CreatureGenome;
     use v3_core::creature::state::CreatureState;
     use v3_core::kernel::types::Position;
     use v3_core::kernel::world_state::WorldState;
     use v3_core::sensors::gather_inputs;
 
-    let creature = CreatureState::new(Position { x: 5, y: 5 }, 10, 0, [100, 100, 100]);
+    let creature = CreatureState::new(
+        Position { x: 5, y: 5 },
+        10,
+        0,
+        [100, 100, 100],
+        CreatureGenome::simple_founder(),
+    );
     let mut world = WorldState::new(10, 10, true);
     // Place food to the north (Direction::ALL[0] = N, offset (0,-1))
     world.set_food_density(Position { x: 5, y: 4 }, 50);
@@ -169,12 +183,19 @@ fn gather_inputs_reads_neighbor_food_density() {
 #[test]
 fn gather_inputs_detects_barriers_and_occupied() {
     use slotmap::SlotMap;
+    use v3_core::creature::genome::CreatureGenome;
     use v3_core::creature::state::CreatureState;
     use v3_core::kernel::types::{CreatureId, Position};
     use v3_core::kernel::world_state::WorldState;
     use v3_core::sensors::gather_inputs;
 
-    let creature = CreatureState::new(Position { x: 5, y: 5 }, 10, 0, [100, 100, 100]);
+    let creature = CreatureState::new(
+        Position { x: 5, y: 5 },
+        10,
+        0,
+        [100, 100, 100],
+        CreatureGenome::simple_founder(),
+    );
     let mut world = WorldState::new(10, 10, true);
 
     // Place barrier to the north

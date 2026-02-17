@@ -1,10 +1,15 @@
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use v3_core::config::SimulationConfig;
+use v3_core::creature::genome::CreatureGenome;
 use v3_core::creature::state::CreatureState;
 use v3_core::kernel::types::Position;
 use v3_core::kernel::world_state::WorldState;
 use v3_core::SimulationState;
+
+fn g() -> CreatureGenome {
+    CreatureGenome::simple_founder()
+}
 
 fn default_config() -> SimulationConfig {
     let mut config = SimulationConfig::default();
@@ -26,18 +31,21 @@ fn tick_advances_and_creatures_persist() {
         50,
         0,
         [255, 0, 0],
+        g(),
     ));
     state.spawn_creature(CreatureState::new(
         Position { x: 2, y: 2 },
         50,
         0,
         [0, 255, 0],
+        g(),
     ));
     state.spawn_creature(CreatureState::new(
         Position { x: 3, y: 3 },
         50,
         0,
         [0, 0, 255],
+        g(),
     ));
     assert_eq!(state.creatures.len(), 3);
 
@@ -59,8 +67,8 @@ fn tick_removes_dead_creatures_and_frees_positions() {
     let pos_alive = Position { x: 1, y: 1 };
     let pos_dead = Position { x: 2, y: 2 };
 
-    state.spawn_creature(CreatureState::new(pos_alive, 50, 0, [255, 0, 0]));
-    state.spawn_creature(CreatureState::new(pos_dead, 0, 0, [0, 255, 0])); // energy 0 = dead
+    state.spawn_creature(CreatureState::new(pos_alive, 50, 0, [255, 0, 0], g()));
+    state.spawn_creature(CreatureState::new(pos_dead, 0, 0, [0, 255, 0], g())); // energy 0 = dead
     assert_eq!(state.creatures.len(), 2);
 
     state.tick(&config, &mut rng);
@@ -81,18 +89,21 @@ fn tick_returns_stats_with_death_count() {
         50,
         0,
         [255, 0, 0],
+        g(),
     ));
     state.spawn_creature(CreatureState::new(
         Position { x: 2, y: 2 },
         0,
         0,
         [0, 255, 0],
+        g(),
     )); // dead
     state.spawn_creature(CreatureState::new(
         Position { x: 3, y: 3 },
         0,
         0,
         [0, 0, 255],
+        g(),
     )); // dead
 
     let stats = state.tick(&config, &mut rng);
@@ -112,6 +123,7 @@ fn multiple_ticks_accumulate_age() {
         100,
         0,
         [128, 128, 128],
+        g(),
     ));
 
     for _ in 0..10 {
@@ -131,7 +143,7 @@ fn creatures_eat_food_and_gain_energy() {
     let mut rng = SmallRng::seed_from_u64(42);
 
     let pos = Position { x: 5, y: 5 };
-    state.spawn_creature(CreatureState::new(pos, 20, 0, [204, 61, 61]));
+    state.spawn_creature(CreatureState::new(pos, 20, 0, [204, 61, 61], g()));
     state.world.set_food_density(pos, 50);
 
     // Run a few ticks — creature should eat and gain energy
@@ -162,6 +174,7 @@ fn creatures_die_without_food() {
         10,
         0,
         [204, 61, 61],
+        g(),
     ));
 
     // With decay=2 and no food, creature should die within 10 ticks
@@ -187,6 +200,7 @@ fn tick_stats_show_nonzero_actions() {
         50,
         0,
         [204, 61, 61],
+        g(),
     ));
 
     let stats = state.tick(&config, &mut rng);
@@ -211,6 +225,7 @@ fn tick_reproduction_adds_offspring_and_reports_births() {
         40,
         0,
         [204, 61, 61],
+        g(),
     ));
 
     let stats = state.tick(&config, &mut rng);

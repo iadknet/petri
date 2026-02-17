@@ -1,3 +1,4 @@
+use crate::creature::genome::CreatureGenome;
 use crate::kernel::types::Position;
 
 /// Energy value with safe operations (non-negative, integer).
@@ -38,7 +39,7 @@ impl Energy {
     }
 }
 
-/// Minimal creature state for Stage 1.
+/// Creature state: position, energy, phenotype, genome, and persistent memory.
 /// Note: no `id` field — the SlotMap key IS the creature's identity.
 #[derive(Clone, Debug)]
 pub struct CreatureState {
@@ -49,6 +50,7 @@ pub struct CreatureState {
     pub phenotype_r: u8,
     pub phenotype_g: u8,
     pub phenotype_b: u8,
+    pub genome: CreatureGenome,
     pub memory: [u8; 1024],
 }
 
@@ -58,6 +60,7 @@ impl CreatureState {
         initial_energy: u32,
         generation: u32,
         phenotype_rgb: [u8; 3],
+        genome: CreatureGenome,
     ) -> Self {
         Self {
             position,
@@ -67,6 +70,7 @@ impl CreatureState {
             phenotype_r: phenotype_rgb[0],
             phenotype_g: phenotype_rgb[1],
             phenotype_b: phenotype_rgb[2],
+            genome,
             memory: [0u8; 1024],
         }
     }
