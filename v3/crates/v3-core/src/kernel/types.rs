@@ -21,6 +21,18 @@ pub enum Direction {
 }
 
 impl Direction {
+    /// All 8 directions in clockwise order starting from North.
+    pub const ALL: [Direction; 8] = [
+        Direction::N,
+        Direction::NE,
+        Direction::E,
+        Direction::SE,
+        Direction::S,
+        Direction::SW,
+        Direction::W,
+        Direction::NW,
+    ];
+
     pub fn delta(self) -> (i32, i32) {
         match self {
             Direction::N => (0, -1),

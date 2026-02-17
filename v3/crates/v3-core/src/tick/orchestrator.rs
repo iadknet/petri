@@ -1,24 +1,70 @@
+use crate::config::SimulationConfig;
+use crate::contracts::outputs::WorldAction;
 use crate::kernel::types::CreatureId;
+use crate::tick::actions;
 use crate::SimulationState;
+use rand::seq::SliceRandom;
 use rand::Rng;
 
-/// Per-tick observability counters (GP-04). Stub for Stage 1.
+/// Per-tick observability counters (GP-04).
 pub struct TickStats {
     pub births: u32,
     pub deaths: u32,
+    pub actions_attempted: u32,
+    pub actions_succeeded: u32,
 }
 
-/// Stage 1 tick: Only world mechanics and age increment (no cognition yet).
-pub fn tick(state: &mut SimulationState, _rng: &mut impl Rng) -> TickStats {
-    // Phase 0: World mechanics (stub for now - no food growth yet)
+/// Full Phase 0-3 tick.
+pub fn tick(
+    state: &mut SimulationState,
+    config: &SimulationConfig,
+    rng: &mut impl Rng,
+) -> TickStats {
+    // Phase 0: World mechanics + energy decay
+    state.world.grow_food(&config.world.food, rng);
 
-    // Increment creature age
     for (_, creature) in state.creatures.iter_mut() {
         creature.age += 1;
+        creature
+            .energy
+            .drain_saturating(config.energy.lifecycle.energy_decay_per_tick);
     }
 
-    // Phase 1: Cognition (stub - not implemented in Stage 1)
-    // Phase 2: Action execution (stub - not implemented in Stage 1)
+    // Phase 1: Cognition — gather inputs, run heuristic brain, collect action queue.
+    // Uses iter() (not iter_mut()) since the heuristic brain is pure/read-only.
+    let action_queue: Vec<(CreatureId, WorldAction)> = state
+        .creatures
+        .iter()
+        .map(|(id, creature)| {
+            let inputs = crate::sensors::gather_inputs(creature, &state.world);
+            let outputs = crate::runtime::executor::execute_heuristic(&inputs, rng);
+            (id, outputs.world_action)
+        })
+        .collect();
+
+    // Phase 2: Shuffle queue and execute actions
+    let mut shuffled_queue = action_queue;
+    shuffled_queue.shuffle(rng);
+
+    let mut actions_attempted: u32 = 0;
+    let mut actions_succeeded: u32 = 0;
+
+    for (creature_id, action) in &shuffled_queue {
+        actions_attempted += 1;
+        if let Some(creature) = state.creatures.get_mut(*creature_id) {
+            let result = actions::execute_action(
+                action,
+                *creature_id,
+                creature,
+                &mut state.world,
+                config,
+                rng,
+            );
+            if result.succeeded() {
+                actions_succeeded += 1;
+            }
+        }
+    }
 
     // Phase 3: Cleanup — remove dead creatures and update spatial index
     let dead_ids: Vec<CreatureId> = state
@@ -36,5 +82,10 @@ pub fn tick(state: &mut SimulationState, _rng: &mut impl Rng) -> TickStats {
 
     state.tick_number += 1;
 
-    TickStats { births: 0, deaths }
+    TickStats {
+        births: 0,
+        deaths,
+        actions_attempted,
+        actions_succeeded,
+    }
 }

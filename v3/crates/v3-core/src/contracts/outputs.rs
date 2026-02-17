@@ -1,8 +1,11 @@
+use crate::kernel::types::Direction;
+
 /// World actions a creature can attempt.
 #[derive(Clone, Debug, PartialEq)]
 pub enum WorldAction {
     NoOp,
-    // More actions added in later stages (Move, Eat, Reproduce, etc.)
+    Eat,
+    Move { direction: Direction },
 }
 
 /// Internal outputs (stub for Stage 1).

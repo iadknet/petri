@@ -1,3 +1,4 @@
+pub mod config;
 pub mod contracts;
 pub mod creature;
 pub mod kernel;
@@ -40,7 +41,11 @@ impl SimulationState {
         id
     }
 
-    pub fn tick(&mut self, rng: &mut impl rand::Rng) -> tick::orchestrator::TickStats {
-        tick::orchestrator::tick(self, rng)
+    pub fn tick(
+        &mut self,
+        config: &config::SimulationConfig,
+        rng: &mut impl rand::Rng,
+    ) -> tick::orchestrator::TickStats {
+        tick::orchestrator::tick(self, config, rng)
     }
 }

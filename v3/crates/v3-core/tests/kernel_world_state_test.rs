@@ -93,6 +93,62 @@ fn resolve_neighbor_wraps_correctly() {
 }
 
 #[test]
+fn grow_food_probabilistically_capped_at_255() {
+    use rand::SeedableRng;
+    use v3_core::config::world::FoodConfig;
+    use v3_core::kernel::types::Position;
+    use v3_core::kernel::world_state::WorldState;
+
+    let mut world = WorldState::new(4, 4, false);
+    let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
+
+    // Set growth_rate to 1.0 so every cell grows
+    let config = FoodConfig {
+        growth_rate: 1.0,
+        initial_density: 0,
+        initial_coverage: 0.0,
+    };
+
+    // Grow once — every cell should gain +1
+    world.grow_food(&config, &mut rng);
+    assert_eq!(world.get_food_density(Position { x: 0, y: 0 }), 1);
+    assert_eq!(world.get_food_density(Position { x: 3, y: 3 }), 1);
+
+    // Set a cell near max and verify cap at 255
+    world.set_food_density(Position { x: 1, y: 1 }, 255);
+    world.grow_food(&config, &mut rng);
+    assert_eq!(world.get_food_density(Position { x: 1, y: 1 }), 255); // capped
+
+    // Barrier cells do not grow
+    world.set_barrier(Position { x: 2, y: 2 }, true);
+    let before = world.get_food_density(Position { x: 2, y: 2 });
+    world.grow_food(&config, &mut rng);
+    assert_eq!(world.get_food_density(Position { x: 2, y: 2 }), before);
+}
+
+#[test]
+fn seed_food_places_initial_food() {
+    use rand::SeedableRng;
+    use v3_core::config::world::FoodConfig;
+    use v3_core::kernel::types::Position;
+    use v3_core::kernel::world_state::WorldState;
+
+    let mut world = WorldState::new(10, 10, false);
+    let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
+
+    let config = FoodConfig {
+        growth_rate: 0.0,
+        initial_density: 80,
+        initial_coverage: 1.0, // all cells get food
+    };
+
+    world.seed_food(&config, &mut rng);
+    // With coverage 1.0, every cell should have density 80
+    assert_eq!(world.get_food_density(Position { x: 0, y: 0 }), 80);
+    assert_eq!(world.get_food_density(Position { x: 9, y: 9 }), 80);
+}
+
+#[test]
 fn resolve_neighbor_non_wrapping_returns_none_at_edges() {
     use v3_core::kernel::types::{Direction, Position};
     use v3_core::kernel::world_state::WorldState;

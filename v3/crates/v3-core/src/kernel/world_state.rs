@@ -1,4 +1,6 @@
 use super::types::{CreatureId, Direction, Position};
+use crate::config::world::FoodConfig;
+use rand::Rng;
 
 pub struct WorldState {
     pub width: u16,
@@ -64,6 +66,11 @@ impl WorldState {
         self.barriers[self.cell_index(pos)]
     }
 
+    pub fn set_barrier(&mut self, pos: Position, val: bool) {
+        let idx = self.cell_index(pos);
+        self.barriers[idx] = val;
+    }
+
     pub fn place_creature(&mut self, pos: Position, id: CreatureId) {
         let idx = self.cell_index(pos);
         debug_assert!(self.creature_at[idx].is_none(), "cell already occupied");
@@ -74,6 +81,29 @@ impl WorldState {
         let idx = self.cell_index(pos);
         debug_assert!(self.creature_at[idx].is_some(), "cell not occupied");
         self.creature_at[idx] = None;
+    }
+
+    /// Grow food probabilistically across all non-barrier cells.
+    /// Each eligible cell gains +1 food with probability `config.growth_rate`, capped at 255.
+    pub fn grow_food(&mut self, config: &FoodConfig, rng: &mut impl Rng) {
+        let len = self.food.len();
+        for i in 0..len {
+            if !self.barriers[i] && rng.gen::<f32>() < config.growth_rate {
+                self.food[i] = self.food[i].saturating_add(1);
+            }
+        }
+    }
+
+    /// Seed initial food on the world during initialization.
+    /// Places food with density `config.initial_density` on a fraction
+    /// (`config.initial_coverage`) of non-barrier cells.
+    pub fn seed_food(&mut self, config: &FoodConfig, rng: &mut impl Rng) {
+        let len = self.food.len();
+        for i in 0..len {
+            if !self.barriers[i] && rng.gen::<f32>() < config.initial_coverage {
+                self.food[i] = config.initial_density;
+            }
+        }
     }
 
     /// Resolve a neighbor position, respecting wrap/clamp. Returns None if
