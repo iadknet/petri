@@ -56,3 +56,15 @@ fn simulation_config_includes_reproduction_energy_defaults() {
     assert_eq!(config.energy.lifecycle.min_reproduce_energy, 24);
     assert_eq!(config.energy.lifecycle.default_offspring_energy, 12);
 }
+
+#[test]
+fn simulation_config_includes_mutation_defaults() {
+    use v3_core::config::SimulationConfig;
+
+    let config = SimulationConfig::default();
+
+    assert!((config.runtime.mutation.mutation_probability - 0.01).abs() < f64::EPSILON);
+    assert_eq!(config.runtime.mutation.per_birth_mutation_events_min, 1);
+    assert_eq!(config.runtime.mutation.per_birth_mutation_events_max, 4);
+    assert!((config.runtime.mutation.constant_jitter_magnitude - 0.1).abs() < f32::EPSILON);
+}
