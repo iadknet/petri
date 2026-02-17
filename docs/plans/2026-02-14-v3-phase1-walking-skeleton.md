@@ -4,9 +4,21 @@
 
 **Goal:** Build minimal backend vertical slice where creatures exist, tick advances, and server responds to REST queries. This is Stage 1 of the walking skeleton (see architecture design doc for the full 3-stage strategy). Frontend (WebSocket streaming, web client rendering) is deferred to a separate frontend architecture plan.
 
+**Goal IDs:** GP-02, GP-03
+
+**Scope:** v3 workspace setup, kernel primitives, creature state, stub contracts/runtime/sensors, Phase 0 tick, REST server. Excludes food, energy decay, cognition, mutation, and frontend.
+
+**Docs Impact:** None — foundation stage, no existing docs changed.
+
+**Supersedes:** none
+
+**Superseded-By:** none
+
 **Architecture:** Phase-based tick (Phase 0: world mechanics only, no cognition yet), kernel owns world primitives, creature owns state, contracts define interfaces, stub runtime/sensors return NoOp, server exposes REST lifecycle endpoints.
 
 **Tech Stack:** Rust 1.93.0, Axum (server), Tokio (async), serde_json (serialization), slotmap (creature storage)
+
+**Parent plan:** `docs/plans/2026-02-14-v3-architecture-design.md`
 
 ---
 
@@ -29,6 +41,39 @@ During implementation you will encounter minor issues in this plan — wrong fea
 - Adding a dependency not listed in the tech stack
 
 **Principle:** This plan describes intent and structure. Minor details (exact feature flags, import paths, helper functions) are implementation decisions the coding agent owns. Architectural decisions (module boundaries, ownership, data flow) are not — those require checking the architecture doc and flagging if something doesn't fit.
+
+---
+
+## Goal Alignment
+
+- **GP-02**: Establishes clean module boundaries (kernel, contracts, creature, runtime, sensors, tick) from day one
+- **GP-03**: Every module has contract tests; stub implementations are testable and verifiable
+
+---
+
+## Boundary Impact
+
+- Creates `v3/` workspace with `v3-core` and `v3-server` crates
+- No changes to v1 (`crates/petri-*`) or v2 (`v2/`)
+- Dependency direction: `v3-server` depends on `v3-core`, not the reverse
+
+---
+
+## Existing Boundary Recheck
+
+| area | decision | rationale |
+| --- | --- | --- |
+| v1 `crates/petri-*` | keep | Untouched; Stage 1 creates new v3 workspace alongside |
+| `docs/strategy/architecture.md` | keep | No changes needed for foundation stage |
+
+---
+
+## Open Questions
+
+| question | decision | owner | status |
+| --- | --- | --- | --- |
+| Should Stage 1 include food or energy? | No — deferred to Stage 2 for minimal foundation | user+agent | resolved |
+| Should Stage 1 include frontend? | No — deferred to separate frontend architecture plan | user+agent | resolved |
 
 ---
 

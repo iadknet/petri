@@ -10,7 +10,7 @@
 - `docs/reference/v3-vm-isa-spec.md` — VM instruction set, opcodes, execution rules, numeric determinism
 - `docs/reference/v3-graph-operator-spec.md` — Graph operators, cost model, local state contract
 - `docs/reference/v3-genome-sensor-spec.md` — Genome schema, typed I/O, sensor system, normalization
-- `docs/reference/v3-evolution-ecology-spec.md` — Mutation, reproduction, ecology, telemetry, viability
+- `docs/reference/v3-creature-lifecycle-spec.md` — Mutation, reproduction, phenotype evolution
 
 **Docs Impact:**
 - Creates v3 architecture design document
@@ -49,7 +49,7 @@
 | v1 `crates/petri-*` | keep | Working reference for proven patterns (world/food, world/tick modular structure) |
 | v2 `v2/` directory | keep | Reference for what NOT to do (leaky abstractions, poor integration) |
 | v3 `v3/` directory (new) | change | Clean slate required to avoid v2's architectural mistakes |
-| `docs/strategy/architecture.md` | keep for now | Will be updated when v3 becomes primary |
+| `docs/strategy/architecture.md` | keep | Will be updated when v3 becomes primary |
 
 ---
 
@@ -81,7 +81,7 @@ petri/
 │   │   │   │   ├── kernel/     # Core primitives (world state, types)
 │   │   │   │   ├── contracts/  # Interface contracts (inputs, outputs)
 │   │   │   │   ├── config/     # Simulation configuration (granular)
-│   │   │   │   ├── creature/   # Genome, phenotype, mutation, state
+│   │   │   │   ├── creature/   # Genome, phenotype, mutation, founders, state
 │   │   │   │   ├── runtime/    # VM + Graph execution
 │   │   │   │   ├── sensors/    # Input assembly
 │   │   │   │   ├── tick/       # Tick orchestration
@@ -107,7 +107,7 @@ v3-core internal:
   runtime/     → kernel/ + config/ + contracts/ + creature/
   sensors/     → kernel/ + config/ + contracts/ + creature/
   tick/        → kernel/ + config/ + contracts/ + creature/ + runtime/ + sensors/
-  seed         → kernel/ + creature/ + config/ + SimulationState
+  seed         → kernel/ + creature/ (founders, state) + config/ + SimulationState
   SimulationState (lib.rs) → tick/ + kernel/ + creature/ + config/
 
 v3 workspace:
@@ -201,9 +201,11 @@ pub struct EnvironmentalInputs {
 pub enum WorldAction {
     Move { direction: Direction },
     Eat,
-    Reproduce { direction: Direction },
-    PickupFood { direction: Direction },
-    PickupBarrier { direction: Direction },
+    Reproduce { direction: Direction, energy_amount: u32 },
+    PickupFood { direction: Direction, slot: u8 },
+    PickupBarrier { direction: Direction, slot: u8 },
+    PlaceFood { direction: Direction, slot: u8 },
+    PlaceBarrier { direction: Direction, slot: u8 },
     NoOp,
 }
 ```
@@ -243,9 +245,10 @@ config/
 **Purpose:** What creatures ARE (data, identity, heritable traits). Not what they DO (runtime).
 
 **Files:**
-- `creature/state.rs` - CreatureState, Energy type
+- `creature/state.rs` - CreatureState, Energy type, `new_founder()` constructor
 - `creature/genome.rs` - CreatureGenome, NodeGenome, validation
-- `creature/phenotype.rs` - Phenotype, color evolution
+- `creature/founders.rs` - Named founder genome registry (`test`, `simple`)
+- `creature/phenotype.rs` - Phenotype, color evolution, founder baseline
 - `creature/mutation.rs` - mutate_genome()
 - `creature/reproduction.rs` - create_offspring()
 
@@ -423,29 +426,27 @@ impl SimulationState {
 
 ### Seed (Initial Creature Placement)
 
-**Purpose:** Populate a SimulationState with initial creatures. Cross-cutting operation used by server, CLI, and tests. Single source of truth for "how to start a simulation."
+**Purpose:** Populate a SimulationState with identical seed creatures from a named founder genome. Cross-cutting placement logic used by server, CLI, and tests. Thin orchestrator — delegates genome knowledge to `creature/founders.rs` and creature construction to `CreatureState::new_founder()`.
 
 **File:** `seed.rs` (crate root)
 
 ```rust
 // seed.rs
 
-/// Seed creatures into the simulation at random empty positions.
-/// Stage 1: takes explicit params. Stage 2+: takes &SimulationConfig.
+/// Seed `count` identical creatures from the named founder genome
+/// at random empty positions. Best-effort: if the world is too full,
+/// fewer creatures are placed.
 pub fn seed_creatures(
     state: &mut SimulationState,
+    founder_name: &str,
     count: usize,
-    initial_energy: u32,
+    config: &SimulationConfig,
     rng: &mut impl Rng,
 ) {
+    let genome = founders::get(founder_name);
     for _ in 0..count {
         if let Some(pos) = find_empty_position(&state.world, rng) {
-            let creature = CreatureState::new(
-                pos,
-                initial_energy,
-                0,  // generation 0
-                random_phenotype(rng),
-            );
+            let creature = CreatureState::new_founder(pos, genome.clone(), config);
             state.spawn_creature(creature);
         }
     }
@@ -466,15 +467,14 @@ fn find_empty_position(world: &WorldState, rng: &mut impl Rng) -> Option<Positio
     }
     None
 }
-
-fn random_phenotype(rng: &mut impl Rng) -> [u8; 3] {
-    [rng.gen(), rng.gen(), rng.gen()]
-}
 ```
 
-**Why a separate module:** Seeding touches world (find empty positions), creature (create state), and SimulationState (register in spatial index). It doesn't belong inside any single module. Server, CLI, and viability tests all call the same function — only the parameters differ.
+**Separation of concerns:**
+- `creature/founders.rs` — owns genome definitions (the "what"). Knows about node types, VM instructions, graph operators. Updated when creature features are added.
+- `CreatureState::new_founder()` — owns creature construction from a genome. Applies fixed phenotype baseline `[204, 61, 61]`, zeroes memory, empties inventory. No `rng` parameter — seed creatures are deterministically identical except for position.
+- `seed.rs` — owns placement (the "where"). Finds empty positions, clones genomes, spawns into SimulationState. Does not know genome internals.
 
-**Growth path:** Stage 2 refactors to take `&SimulationConfig` (initial energy from config, food seeding). Stage 3 adds genome initialization for seed creatures.
+**Why a separate module:** Seeding touches world (find empty positions), creature (create state), and SimulationState (register in spatial index). It doesn't belong inside any single module. Server, CLI, and viability tests all call the same function — only the founder name and count differ.
 
 ---
 
@@ -618,9 +618,12 @@ pub fn execute_action(
     match action {
         WorldAction::Eat => execute_eat(creature, world, config),
         WorldAction::Move { direction } => execute_move(creature, world, *direction, config),
-        WorldAction::Reproduce { direction } => execute_reproduce(creature, world, *direction, config, rng),
+        WorldAction::Reproduce { direction, energy_amount } => execute_reproduce(creature, world, *direction, *energy_amount, config, rng),
+        WorldAction::PickupFood { direction, slot } => execute_pickup_food(creature, world, *direction, *slot, config),
+        WorldAction::PickupBarrier { direction, slot } => execute_pickup_barrier(creature, world, *direction, *slot, config),
+        WorldAction::PlaceFood { direction, slot } => execute_place_food(creature, world, *direction, *slot, config),
+        WorldAction::PlaceBarrier { direction, slot } => execute_place_barrier(creature, world, *direction, *slot, config),
         WorldAction::NoOp => ActionResult::success(),
-        // ...
     }
 }
 
@@ -640,6 +643,8 @@ fn execute_reproduce(...) -> ActionResult {
     // 6. Return: ActionResult with offspring
 }
 ```
+
+**Failed action policy:** All world actions cost energy regardless of success or failure. If an action fails validation (e.g., pickup into a full inventory slot, place from an empty slot, place into an occupied or out-of-bounds cell, move into a barrier), the energy cost is still deducted but the world state is unchanged. Failed actions do **not** fall back to NoOp. The creature's turn is consumed.
 
 **Principle:** Tick orchestrates but delegates. Kernel provides world modification methods, creature provides offspring creation, tick coordinates timing and fairness.
 
@@ -837,11 +842,71 @@ Build v3 incrementally in 3 stages. Each stage delivers a qualitatively differen
 ### Stage 4+: Expand Complexity
 - Graph nodes
 - Rich sensors (8-directional, neighbor detection)
-- Inventory system (pickup/put)
+- Inventory system (pickup/place with slot-addressed storage; see genome-sensor spec)
 - Phenotype evolution
 - Advanced mutation operators
 
 **Each stage maintains a working system. Each new creature capability adds assertions to the viability test suite.**
+
+---
+
+## Telemetry
+
+### RunHealthSnapshot
+
+| Field                     | Description                                 |
+|---------------------------|---------------------------------------------|
+| `tick`                    | Current simulation tick                     |
+| `population`              | Current live creature count                 |
+| `births_last_window`      | Births in trailing window                   |
+| `deaths_last_window`      | Deaths in trailing window                   |
+| `mean_energy`             | Mean energy across live creatures            |
+| `genome_node_count_p50`   | Median genome node count                    |
+| `genome_node_count_p90`   | 90th percentile genome node count           |
+
+The window is trailing `health_window_ticks` (default `100`), right-aligned at the current tick.
+
+---
+
+## Non-Collapse Contract
+
+The non-collapse contract is the minimum bar for a working simulation.
+
+- Founder genome: `test`.
+- Deterministic seed: `42`.
+- Duration: `2000` ticks.
+- Config: default.
+- `baseline_population` = actual seeded population at tick 0.
+
+### Pass Criteria
+
+1. No crash.
+2. At least one birth.
+3. Mean population in the final 400 ticks >= `ceil(baseline_population * 0.10)`.
+
+---
+
+## Viability Gate
+
+Reusable helper for validating simulation viability in tests.
+
+### Parameters
+
+| Parameter                  | Default | Description                            |
+|----------------------------|---------|----------------------------------------|
+| `probe_ticks`              | 100     | Number of ticks to probe               |
+| `min_final_window_ratio`   | 0.10    | Minimum ratio of baseline population   |
+| `require_births`           | toggle  | Whether births are required to pass    |
+
+### Output
+
+| Field                          | Description                                |
+|--------------------------------|--------------------------------------------|
+| `viable`                       | Boolean pass/fail                          |
+| `baseline_population`          | Population at tick 0                       |
+| `births_total`                 | Total births during probe                  |
+| `final_window_mean_population` | Mean population in final window            |
+| `threshold_population`         | Minimum population required to pass        |
 
 ---
 

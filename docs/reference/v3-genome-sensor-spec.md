@@ -18,7 +18,7 @@ implementation plan.
 | ----------------- | ------------------------- | ------------------------------------ |
 | entry_node_id     | NodeId                    | First node evaluated each tick       |
 | nodes             | Vec\<NodeGenome\>         | All decision/processing nodes        |
-| evolution_params  | Option\<EvolutionParams\> | Optional per-creature mutation knobs |
+| evolution_params  | Option\<EvolutionParams\> | Optional per-creature mutation knobs (future; fields and inheritance TBD) |
 
 ### Validation rules
 
@@ -51,8 +51,8 @@ enum BackendDef {
 
 | field           | type                | constraints    | description                          |
 | --------------- | ------------------- | -------------- | ------------------------------------ |
-| register_count  | u8                  | 1..=32         | Number of VM registers               |
-| program         | Vec\<VmInstruction\>| 1..=128        | Instruction sequence                 |
+| register_count  | u8                  | 1..=64         | Number of VM registers               |
+| program         | Vec\<VmInstruction\>| 0..=512        | Instruction sequence (empty = immediate halt) |
 | constants       | Vec\<f32\>          | 0..=64         | Constant pool                        |
 | max_input_slots | u8                  | 1..=64         | Maximum number of input slot indices |
 
@@ -105,6 +105,12 @@ enum InputReference {
 | energy_spent_this_tick     | Energy spent so far in the current tick      |
 | energy_remaining_this_tick | Energy budget remaining for the current tick |
 | age_ticks                  | Creature's age in ticks                      |
+| generation                 | Creature's generation (0 for seed creatures) |
+| phenotype_r                | Red component of creature's own phenotype    |
+| phenotype_g                | Green component of creature's own phenotype  |
+| phenotype_b                | Blue component of creature's own phenotype   |
+| inventory_slot_count       | Number of inventory slots (genome-determined) |
+| inventory_slots_used       | Number of occupied inventory slots            |
 | memory_bytes_total         | Total memory size (always 1024)              |
 
 ### PacketFieldKey
@@ -145,7 +151,6 @@ enum InputReference {
 | VisibleCreatureCountNorm  | Fraction of visible cells with creatures   |
 | VisibleFoodMeanNorm       | Mean food density across visible cells     |
 | VisibleFoodTotalNorm      | Total food density normalized by cell count|
-| CrowdingNorm              | Crowding metric over visible cells         |
 
 ### NeighborDirection
 
@@ -211,7 +216,7 @@ max(|dx|, |dy|) <= sensor_radius
 | field      | type   | description                |
 | ---------- | ------ | -------------------------- |
 | phenotype  | (u8, u8, u8) | RGB phenotype color  |
-| energy     | f32    | Creature's energy as f32   |
+| energy     | u32    | Creature's energy          |
 | age_ticks  | u64    | Creature's age in ticks    |
 | generation | u32    | Creature's generation      |
 
@@ -264,6 +269,12 @@ neighborhood** at radius 1 (the 8 immediately adjacent cells).
 | energy_spent_this_tick       | raw energy as f32                                                   |
 | energy_remaining_this_tick   | raw energy as f32                                                   |
 | age_ticks                    | raw ticks as f32                                                    |
+| generation                   | raw generation as f32                                               |
+| phenotype_r                  | r / 255.0                                                           |
+| phenotype_g                  | g / 255.0                                                           |
+| phenotype_b                  | b / 255.0                                                           |
+| inventory_slot_count         | raw count as f32                                                    |
+| inventory_slots_used         | raw count as f32                                                    |
 | memory_bytes_total           | 1024.0                                                              |
 
 ### Sensor fields
@@ -284,7 +295,6 @@ neighborhood** at radius 1 (the 8 immediately adjacent cells).
 | VisibleCreatureCountNorm  | visible_creatures / max_visible_cells      |
 | VisibleFoodMeanNorm       | mean(food_density_norm)                    |
 | VisibleFoodTotalNorm      | sum(food_density_norm) / max_visible_cells |
-| CrowdingNorm              | visible_creatures / max_visible_cells      |
 
 ### Normalization defaults
 
@@ -336,10 +346,22 @@ enum ActionMetadataField {
 | -------------- | -------------------------- | ----------------- |
 | Move           | Direction                  |                   |
 | Eat            | (none)                     |                   |
-| Reproduce      | Amount                     | Direction         |
-| PickupFood     | Direction                  |                   |
-| PickupBarrier  | Direction                  |                   |
+| Reproduce      | Direction, Amount          |                   |
+| PickupFood     | Direction, Slot            |                   |
+| PickupBarrier  | Direction, Slot            |                   |
+| PlaceFood      | Direction, Slot            |                   |
+| PlaceBarrier   | Direction, Slot            |                   |
 | NoOp           | (none)                     |                   |
+
+### Inventory action semantics
+
+- **PickupFood / PickupBarrier**: Remove the item from the target cell (by Direction)
+  and store it in the creature's inventory at the given Slot index.
+- **PlaceFood / PlaceBarrier**: Remove the item from the creature's inventory at the
+  given Slot index and place it in the target cell (by Direction).
+- **Failed actions** (full slot, empty slot, invalid target cell, occupied cell) still
+  cost energy. The action is consumed (no fallback to NoOp) and the world state is
+  unchanged.
 
 ### PacketValue types
 
@@ -379,3 +401,42 @@ zero-indexed slot.
 - `max_input_slots` is enforced at schema validation time.
 - The number of `input_refs` on any incoming edge must not exceed the target
   node's `max_input_slots`.
+
+---
+
+## 10. Founder Genomes
+
+Founder genomes are named starting genome templates used to seed creatures when
+initializing a new world. Defined in `creature/founders.rs` as a registry of
+named genomes. Additional founders can be added over time.
+
+### Registry
+
+| name       | purpose                                                      |
+| ---------- | ------------------------------------------------------------ |
+| `test`     | Exercises all genome features. Used by viability tests and   |
+|            | the non-collapse contract. Must be updated when new creature |
+|            | features are added.                                          |
+| `simple`   | Minimal viable creature: move toward food, eat, reproduce.   |
+|            | Default founder for normal world initialization.             |
+
+### Contract
+
+- Every founder genome must pass `CreatureGenome::validate()`.
+- The `test` founder must exercise: VM nodes, graph nodes, inter-node routing,
+  world action outputs, memory read/write, inventory actions, and sensor inputs.
+- The `simple` founder must sustain a viable population under default config
+  (pass the non-collapse contract in the architecture design doc).
+- Founder genomes are defined in code (`creature/founders.rs`), not in config
+  files. Their exact structure is an implementation detail, but the behavioral
+  contracts above must hold.
+
+### World Initialization
+
+`seed.rs` accepts a founder genome name (defaulting to `simple`) and passes it
+to `creature/founders::get()` to retrieve the genome template. All seed
+creatures in a given world receive a clone of the same genome.
+`CreatureState::new_founder()` constructs each creature with the fixed
+phenotype baseline (`[204, 61, 61]`), zeroed memory, and empty inventory. No
+RNG is used during creature construction — seed creatures are deterministically
+identical except for position.

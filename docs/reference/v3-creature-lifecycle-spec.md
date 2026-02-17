@@ -1,7 +1,11 @@
-# Petri V3 Evolution and Ecology Reference
+# Petri V3 Creature Lifecycle Reference
 
-Reference specification for v3 mutation, reproduction, ecology, and telemetry.
-Adapted from v2 design. This is a reference document, not an implementation plan.
+Reference specification for v3 mutation, reproduction, and phenotype evolution.
+This is a reference document, not an implementation plan.
+
+> **V3 architecture context**: Mutation lives in `creature/mutation.rs`,
+> reproduction in `creature/reproduction.rs`, phenotype in
+> `creature/phenotype.rs`, genome validation in `creature/genome.rs`.
 
 ---
 
@@ -11,16 +15,20 @@ Adapted from v2 design. This is a reference document, not an implementation plan
 
 | Parameter                                    | Default |
 |----------------------------------------------|---------|
-| `per_birth_mutation_events_min`              | 2       |
+| `mutation_probability`                       | 0.01    |
+| `per_birth_mutation_events_min`              | 0       |
 | `per_birth_mutation_events_max`              | 8       |
 | `max_nodes`                                  | 64      |
 | `min_nodes`                                  | 1       |
 | `max_outputs_per_node`                       | 8       |
 | `max_subgraph_duplication_nodes`             | 6       |
-| `max_vm_program_len`                         | 128     |
+| `max_vm_program_len`                         | 512     |
 | `node_duplication_clone_outputs_probability` | 1.0     |
 | `node_duplication_target_remap_probability`  | 0.35    |
 | `subgraph_external_edge_retarget_probability`| 0.0     |
+| `min_inventory_slots`                        | 1       |
+| `max_inventory_slots`                        | 12      |
+| `default_inventory_slots`                    | 1       |
 
 ### MutationWeights (must sum to 1.0)
 
@@ -32,17 +40,28 @@ Adapted from v2 design. This is a reference document, not an implementation plan
 | `add_output`              | 0.10   |
 | `remove_output`           | 0.08   |
 | `retarget_output`         | 0.12   |
-| `graph_local_mutation`    | 0.12   |
-| `vm_instruction_mutation` | 0.20   |
+| `graph_local_mutation`    | 0.11   |
+| `vm_instruction_mutation` | 0.19   |
 | `node_duplication`        | 0.10   |
-| `subgraph_duplication`    | 0.06   |
+| `subgraph_duplication`    | 0.04   |
+| `genome_param_mutation`   | 0.04   |
 
 ---
 
-## 2. Mutation Operators
+## 2. Mutation Pipeline
 
-All 10 operators are listed below. Each operator must preserve structural
-invariants (Section 3) or defer to the repair policy (Section 4).
+On reproduction, the offspring genome is copied from the parent. A random roll
+against `mutation_probability` (default 1%) determines whether any mutation
+occurs. If the roll fails, the offspring is an **exact genome copy** (no
+mutation operators run, phenotype is also unchanged). If the roll succeeds,
+`per_birth_mutation_events_min..=per_birth_mutation_events_max` mutation events
+are applied sequentially, each chosen by weighted selection from the 11
+operators below.
+
+### Mutation Operators
+
+All 11 operators must preserve structural invariants (Section 3) or defer to
+the repair policy (Section 4).
 
 1. **add_node** -- Creates a unique `node_id`, assigns a random type,
    initializes backend and state within configured bounds.
@@ -80,6 +99,15 @@ invariants (Section 3) or defer to the repair policy (Section 4).
     targets. External edges are retargeted with
     `subgraph_external_edge_retarget_probability`.
 
+11. **genome_param_mutation** -- Mutates a genome-level parameter (not tied to
+    any specific node). Selects one parameter uniformly at random and applies a
+    small perturbation. Current genome-level parameters:
+    - `inventory_slot_count`: increment or decrement by 1, clamped to
+      `[min_inventory_slots, max_inventory_slots]`.
+
+    This operator is the extension point for future genome-level evolvable
+    parameters.
+
 ---
 
 ## 3. Structural Invariants
@@ -95,7 +123,9 @@ post-repair):
 - `nodes.len()` is within `[min_nodes, max_nodes]`.
 - Output counts on every node are `<= max_outputs_per_node`.
 - VM program lengths are within `[0, max_vm_program_len]`.
+- Inventory slot count is within `[min_inventory_slots, max_inventory_slots]`.
 - Offspring memory is copied byte-for-byte from parent.
+- Offspring inventory is empty (items are not inherited).
 
 ---
 
@@ -142,118 +172,6 @@ use this fixed baseline rather than random colors.
   3. Mutate selected channel value by step `2`.
   4. Re-randomize the selected channel's weight in `[0.05, 1.0]`.
 - Must be **deterministic** for a fixed seed.
-
----
-
-## 7. Ecology Config Defaults
-
-### EcologyConfig
-
-| Parameter                      | Default |
-|--------------------------------|---------|
-| `resource_gradient_bands`      | 4       |
-| `base_food_spawn_rate`         | 0.010   |
-| `scarcity_multiplier_min`      | 0.25    |
-| `scarcity_multiplier_max`      | 1.75    |
-| `crowding_radius`              | 3       |
-| `crowding_penalty_per_neighbor`| 0.005   |
-| `season_length_ticks`          | 500     |
-| `season_transition_ticks`      | 50      |
-| `barrier_density`              | 0.06    |
-| `health_window_ticks`          | 100     |
-
----
-
-## 8. Ecology Mechanisms
-
-### Resource Heterogeneity
-
-The world is partitioned into bands (count = `resource_gradient_bands`) with
-gradient multipliers controlling per-band food spawn rates.
-
-### Scarcity Dynamics
-
-Local food attenuates with overconsumption and recovers when underused.
-Multipliers are clamped to `[scarcity_multiplier_min, scarcity_multiplier_max]`.
-
-### Regime Shifts (Seasons)
-
-Periodic band remapping occurs every `season_length_ticks`. During the
-`season_transition_ticks` window, smoothing is applied to avoid abrupt resource
-discontinuities.
-
-### Crowding Pressure
-
-- Distance metric: **Chebyshev distance** (L-infinity).
-- Radius: `crowding_radius`.
-- Excludes self.
-- Formula:
-
-  ```
-  crowding_multiplier = clamp(1.0 - crowding_penalty_per_neighbor * neighbor_count, 0.0, 1.0)
-  ```
-
-- Applies to **food-energy gain** and **passive recovery** only (not action
-  costs).
-- The crowding multiplier is **monotonic non-increasing** with respect to
-  neighbor count.
-
----
-
-## 9. Telemetry Proxies
-
-### RunHealthSnapshot
-
-| Field                     | Description                                 |
-|---------------------------|---------------------------------------------|
-| `tick`                    | Current simulation tick                     |
-| `population`              | Current live creature count                 |
-| `births_last_window`      | Births in trailing window                   |
-| `deaths_last_window`      | Deaths in trailing window                   |
-| `mean_energy`             | Mean energy across live creatures            |
-| `genome_node_count_p50`   | Median genome node count                    |
-| `genome_node_count_p90`   | 90th percentile genome node count           |
-
-The window is trailing `health_window_ticks`, right-aligned at the current tick.
-
----
-
-## 10. Non-Collapse Contract
-
-- Deterministic seed: `42`.
-- Duration: `2000` ticks.
-- Config: default.
-- `baseline_population` = actual seeded population at tick 0.
-
-### Pass Criteria
-
-1. No crash.
-2. At least one birth.
-3. Mean population in the final 400 ticks >= `ceil(baseline_population * 0.10)`.
-
----
-
-## 11. Viability Gate
-
-Reusable helper for validating simulation viability.
-
-### Parameters
-
-| Parameter                  | Default | Description                            |
-|----------------------------|---------|----------------------------------------|
-| `probe_ticks`              | 100     | Number of ticks to probe               |
-| `min_final_window_ratio`   | 0.10    | Minimum ratio of baseline population   |
-| `require_births`           | toggle  | Whether births are required to pass    |
-
-### Output
-
-| Field                          | Description                                |
-|--------------------------------|--------------------------------------------|
-| `viable`                       | Boolean pass/fail                          |
-| `baseline_population`          | Population at tick 0                       |
-| `births_total`                 | Total births during probe                  |
-| `final_window_mean_population` | Mean population in final window            |
-| `threshold_population`         | Minimum population required to pass        |
 
 ---
 
