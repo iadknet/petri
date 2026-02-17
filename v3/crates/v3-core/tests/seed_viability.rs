@@ -16,6 +16,8 @@ fn viability_config() -> SimulationConfig {
     config.energy.lifecycle.initial_energy = 30;
     config.energy.lifecycle.max_energy = 100;
     config.energy.lifecycle.energy_decay_per_tick = 1;
+    // This test remains the Stage 2 viability gate; disable reproduction here.
+    config.energy.lifecycle.min_reproduce_energy = u32::MAX;
     config.energy.costs.move_cost = 1;
     config.energy.costs.eat_cost = 0;
     config.energy.costs.eat_reward_per_food = 1;

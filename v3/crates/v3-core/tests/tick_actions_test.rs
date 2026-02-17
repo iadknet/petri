@@ -125,3 +125,100 @@ fn eat_with_no_food_fails() {
     // Eat cost still deducted
     assert_eq!(creature.energy.value(), initial_energy - 1);
 }
+
+#[test]
+fn reproduce_spawns_offspring_and_transfers_energy() {
+    let (config, mut world, mut creature, id, mut rng) = setup();
+    creature
+        .energy
+        .charge(20, config.energy.lifecycle.max_energy); // 40 total
+    creature.memory[0] = 77;
+    creature.memory[1023] = 5;
+
+    let initial_energy = creature.energy.value();
+    let result = execute_action(
+        &WorldAction::Reproduce {
+            direction: Direction::E,
+            energy_amount: 12,
+        },
+        id,
+        &mut creature,
+        &mut world,
+        &config,
+        &mut rng,
+    );
+
+    assert!(result.succeeded());
+    let child = result
+        .offspring
+        .expect("reproduction should return offspring");
+    assert_eq!(child.position, Position { x: 6, y: 5 });
+    assert_eq!(child.energy.value(), 12);
+    assert_eq!(child.generation, creature.generation + 1);
+    assert_eq!(child.memory, creature.memory);
+    assert_eq!(
+        creature.energy.value(),
+        initial_energy - config.energy.costs.reproduce_cost - 12
+    );
+}
+
+#[test]
+fn reproduce_into_barrier_fails_and_only_cost_is_charged() {
+    let (config, mut world, mut creature, id, mut rng) = setup();
+    creature
+        .energy
+        .charge(20, config.energy.lifecycle.max_energy); // 40 total
+    world.set_barrier(Position { x: 6, y: 5 }, true);
+
+    let initial_energy = creature.energy.value();
+    let result = execute_action(
+        &WorldAction::Reproduce {
+            direction: Direction::E,
+            energy_amount: 12,
+        },
+        id,
+        &mut creature,
+        &mut world,
+        &config,
+        &mut rng,
+    );
+
+    assert_eq!(
+        result.status,
+        ActionStatus::Failed(FailureReason::CellBlocked)
+    );
+    assert!(result.offspring.is_none());
+    assert_eq!(
+        creature.energy.value(),
+        initial_energy - config.energy.costs.reproduce_cost
+    );
+}
+
+#[test]
+fn reproduce_fails_when_parent_energy_is_below_minimum() {
+    let (config, mut world, mut creature, id, mut rng) = setup();
+    // Keep default energy at 20, below default min_reproduce_energy (24).
+    let initial_energy = creature.energy.value();
+    let result = execute_action(
+        &WorldAction::Reproduce {
+            direction: Direction::E,
+            energy_amount: 12,
+        },
+        id,
+        &mut creature,
+        &mut world,
+        &config,
+        &mut rng,
+    );
+
+    assert_eq!(
+        result.status,
+        ActionStatus::Failed(FailureReason::InsufficientEnergy)
+    );
+    assert!(result.offspring.is_none());
+    // Action cost is still charged even on failure.
+    assert_eq!(
+        creature.energy.value(),
+        initial_energy - config.energy.costs.reproduce_cost
+    );
+}

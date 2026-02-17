@@ -37,7 +37,7 @@ pub fn tick(
         .iter()
         .map(|(id, creature)| {
             let inputs = crate::sensors::gather_inputs(creature, &state.world);
-            let outputs = crate::runtime::executor::execute_heuristic(&inputs, rng);
+            let outputs = crate::runtime::executor::execute_heuristic(&inputs, config, rng);
             (id, outputs.world_action)
         })
         .collect();
@@ -48,6 +48,7 @@ pub fn tick(
 
     let mut actions_attempted: u32 = 0;
     let mut actions_succeeded: u32 = 0;
+    let mut spawns = Vec::new();
 
     for (creature_id, action) in &shuffled_queue {
         actions_attempted += 1;
@@ -63,7 +64,20 @@ pub fn tick(
             if result.succeeded() {
                 actions_succeeded += 1;
             }
+            if let Some(offspring) = result.offspring {
+                spawns.push(offspring);
+            }
         }
+    }
+
+    let mut births: u32 = 0;
+    for offspring in spawns {
+        if state.world.is_barrier(offspring.position) || state.world.is_occupied(offspring.position)
+        {
+            continue;
+        }
+        state.spawn_creature(offspring);
+        births += 1;
     }
 
     // Phase 3: Cleanup — remove dead creatures and update spatial index
@@ -83,7 +97,7 @@ pub fn tick(
     state.tick_number += 1;
 
     TickStats {
-        births: 0,
+        births,
         deaths,
         actions_attempted,
         actions_succeeded,

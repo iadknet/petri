@@ -7,7 +7,11 @@ use v3_core::kernel::world_state::WorldState;
 use v3_core::SimulationState;
 
 fn default_config() -> SimulationConfig {
-    SimulationConfig::default()
+    let mut config = SimulationConfig::default();
+    // Most integration tests in this file validate Stage 2 behavior.
+    // Disable reproduction by default and opt-in only in the dedicated test.
+    config.energy.lifecycle.min_reproduce_energy = u32::MAX;
+    config
 }
 
 #[test]
@@ -190,5 +194,31 @@ fn tick_stats_show_nonzero_actions() {
     assert!(
         stats.actions_attempted > 0,
         "should have attempted at least one action"
+    );
+}
+
+#[test]
+fn tick_reproduction_adds_offspring_and_reports_births() {
+    let mut config = default_config();
+    config.energy.lifecycle.min_reproduce_energy = 24;
+    config.world.food.growth_rate = 0.0;
+
+    let mut state = SimulationState::new(WorldState::new(10, 10, true));
+    let mut rng = SmallRng::seed_from_u64(99);
+
+    state.spawn_creature(CreatureState::new(
+        Position { x: 5, y: 5 },
+        40,
+        0,
+        [204, 61, 61],
+    ));
+
+    let stats = state.tick(&config, &mut rng);
+
+    assert_eq!(stats.births, 1, "tick should report one birth");
+    assert_eq!(state.creatures.len(), 2, "offspring should be inserted");
+    assert!(
+        state.creatures.iter().any(|(_, c)| c.generation == 1),
+        "one offspring should have generation=1"
     );
 }

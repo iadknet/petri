@@ -26,3 +26,33 @@ fn environmental_inputs_defaults_to_zero() {
     let env = EnvironmentalInputs::default();
     assert_eq!(env.food_density_self, 0);
 }
+
+#[test]
+fn world_action_reproduce_carries_direction_and_energy_amount() {
+    use v3_core::contracts::outputs::WorldAction;
+    use v3_core::kernel::types::Direction;
+
+    let action = WorldAction::Reproduce {
+        direction: Direction::NE,
+        energy_amount: 12,
+    };
+
+    assert!(matches!(
+        action,
+        WorldAction::Reproduce {
+            direction: Direction::NE,
+            energy_amount: 12
+        }
+    ));
+}
+
+#[test]
+fn simulation_config_includes_reproduction_energy_defaults() {
+    use v3_core::config::SimulationConfig;
+
+    let config = SimulationConfig::default();
+
+    assert_eq!(config.energy.costs.reproduce_cost, 2);
+    assert_eq!(config.energy.lifecycle.min_reproduce_energy, 24);
+    assert_eq!(config.energy.lifecycle.default_offspring_energy, 12);
+}

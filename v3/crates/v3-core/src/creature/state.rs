@@ -49,6 +49,7 @@ pub struct CreatureState {
     pub phenotype_r: u8,
     pub phenotype_g: u8,
     pub phenotype_b: u8,
+    pub memory: [u8; 1024],
 }
 
 impl CreatureState {
@@ -66,6 +67,7 @@ impl CreatureState {
             phenotype_r: phenotype_rgb[0],
             phenotype_g: phenotype_rgb[1],
             phenotype_b: phenotype_rgb[2],
+            memory: [0u8; 1024],
         }
     }
 }
