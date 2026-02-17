@@ -50,6 +50,29 @@ See canonical policy: `docs/standards/agent-instruction-layering.md`.
 7. For code review requests, run Gemini MCP (`gemini-analyze-code`) first; if unavailable, state that and run a local fallback review.
 8. For Rust structural refactors, include a short "Boundary Impact" note in the plan covering dependency direction, public API/wire-format changes, and test migration approach.
 
+## Plan Splitting Rule
+
+Large plans **must** be split into multiple files:
+
+- If a plan exceeds ~200 lines or covers more than one stage/checkpoint, split it.
+- Use a **main plan file** that defines scope, goals, and a high-level task outline.
+- Place detailed designs, specs, or per-stage breakdowns in **separate companion files** in the same directory.
+- The main plan must include explicit `**See also:**` references linking to each companion file.
+- Companion files must include a `**Parent plan:**` back-reference to the main plan.
+- Each file (main and companion) must independently satisfy the required metadata and structure rules (Goal IDs, Goal Alignment, Boundary Impact, etc.).
+
+## Architecture and Goal Alignment Review Cycle
+
+After writing or substantially revising any plan, agents **must** run a review cycle before the plan is considered ready for implementation:
+
+1. **Draft** the plan (main file + any companions).
+2. **Architecture review**: Re-read the active architecture doc (currently `docs/plans/2026-02-14-v3-architecture-design.md`), the relevant crate/module `AGENTS.md` files, and the Non-Negotiable Invariants in this file. Verify every proposed change is consistent with existing boundaries, dependency directions, and module responsibilities. Document any tensions found.
+3. **Goal alignment review**: Re-read `docs/strategy/goals.md` and verify that the plan's Goal Alignment section accurately maps work items to goal IDs. Confirm no goal is undermined or ignored by the proposed changes.
+4. **Revise** the plan to resolve any issues found in steps 2–3.
+5. **Repeat** steps 2–4 until a clean pass (no architecture conflicts, no goal misalignment). Record the number of review cycles performed at the bottom of the plan in a `**Review cycles:** N` metadata line.
+
+This cycle is mandatory — a plan that has not completed at least one clean architecture + goal alignment pass must not be used to drive implementation.
+
 ## Skills Policy
 
 Agents must invoke the appropriate installed skills during architecture, planning, and implementation work. Skills are auto-discovered from `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
@@ -100,6 +123,7 @@ Before claiming completion, run and confirm all pass:
 - Docs index: `docs/README.md`
 - Strategy docs: `docs/strategy/goals.md`, `docs/strategy/roadmap.md`, `docs/strategy/architecture.md`, `docs/strategy/technology-review.md`
 - Controller reference: `docs/reference/creature-controller-reference.md`
+- V3 reference specs: `docs/reference/v3-vm-isa-spec.md`, `docs/reference/v3-graph-operator-spec.md`, `docs/reference/v3-genome-sensor-spec.md`, `docs/reference/v3-evolution-ecology-spec.md`
 - Operations and standards: `docs/operations/doc-hygiene.md`, `docs/standards/agent-instruction-layering.md`, `docs/standards/architecture-lint-policy.md`, `docs/standards/plan-quality-gate-policy.md`, `docs/standards/documentation-consistency-policy.md`, `docs/standards/intent-verification-policy.md`, `docs/standards/runtime-behavior-realism-policy.md`
 
 ## Git Hygiene

@@ -6,6 +6,12 @@
 
 **Scope:** Complete v3 backend architecture including module boundaries, data flow, testing strategy, and walking skeleton stages. Includes core simulation (v3-core) and transport layer (v3-server). Excludes specific VM instruction set details and graph operator implementations (deferred to implementation). Frontend (v3/web) is excluded — it will be designed in a separate frontend architecture plan.
 
+**See also:**
+- `docs/reference/v3-vm-isa-spec.md` — VM instruction set, opcodes, execution rules, numeric determinism
+- `docs/reference/v3-graph-operator-spec.md` — Graph operators, cost model, local state contract
+- `docs/reference/v3-genome-sensor-spec.md` — Genome schema, typed I/O, sensor system, normalization
+- `docs/reference/v3-evolution-ecology-spec.md` — Mutation, reproduction, ecology, telemetry, viability
+
 **Docs Impact:**
 - Creates v3 architecture design document
 - Will supersede `docs/strategy/architecture.md` when v3 becomes primary implementation
