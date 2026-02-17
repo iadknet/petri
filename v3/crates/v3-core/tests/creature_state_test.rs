@@ -32,6 +32,24 @@ fn energy_is_alive_when_nonzero() {
 }
 
 #[test]
+fn energy_drain_saturating_always_deducts() {
+    use v3_core::creature::state::Energy;
+
+    let mut energy = Energy::new(5);
+    energy.drain_saturating(3);
+    assert_eq!(energy.value(), 2);
+
+    // Saturates to 0 when draining more than available
+    energy.drain_saturating(10);
+    assert_eq!(energy.value(), 0);
+    assert!(!energy.is_alive());
+
+    // Draining from 0 stays at 0
+    energy.drain_saturating(1);
+    assert_eq!(energy.value(), 0);
+}
+
+#[test]
 fn creature_state_new_initializes_correctly() {
     use v3_core::creature::state::CreatureState;
     use v3_core::kernel::types::Position;

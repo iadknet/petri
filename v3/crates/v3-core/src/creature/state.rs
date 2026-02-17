@@ -19,6 +19,12 @@ impl Energy {
         }
     }
 
+    /// Always deducts energy, clamping to 0. Used for action costs that
+    /// are paid regardless of whether the action succeeds.
+    pub fn drain_saturating(&mut self, amount: u32) {
+        self.0 = self.0.saturating_sub(amount);
+    }
+
     pub fn charge(&mut self, amount: u32, max: u32) {
         self.0 = (self.0 + amount).min(max);
     }
