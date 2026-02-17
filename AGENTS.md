@@ -123,7 +123,7 @@ Before claiming completion, run and confirm all pass:
 - Docs index: `docs/README.md`
 - Strategy docs: `docs/strategy/goals.md`, `docs/strategy/roadmap.md`, `docs/strategy/architecture.md`, `docs/strategy/technology-review.md`
 - Controller reference: `docs/reference/creature-controller-reference.md`
-- V3 reference specs: `docs/reference/v3-vm-isa-spec.md`, `docs/reference/v3-graph-operator-spec.md`, `docs/reference/v3-genome-sensor-spec.md`, `docs/reference/v3-evolution-ecology-spec.md`
+- V3 reference specs: `docs/reference/v3-vm-isa-spec.md`, `docs/reference/v3-graph-operator-spec.md`, `docs/reference/v3-genome-sensor-spec.md`, `docs/reference/v3-creature-lifecycle-spec.md`
 - Operations and standards: `docs/operations/doc-hygiene.md`, `docs/standards/agent-instruction-layering.md`, `docs/standards/architecture-lint-policy.md`, `docs/standards/plan-quality-gate-policy.md`, `docs/standards/documentation-consistency-policy.md`, `docs/standards/intent-verification-policy.md`, `docs/standards/runtime-behavior-realism-policy.md`
 
 ## Git Hygiene
