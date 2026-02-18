@@ -1,5 +1,5 @@
 use crate::config::SimulationConfig;
-use crate::creature::genome::CreatureGenome;
+use crate::creature::founders;
 use crate::creature::state::CreatureState;
 use crate::kernel::types::Position;
 use crate::kernel::world_state::WorldState;
@@ -22,7 +22,7 @@ pub fn seed_creatures(
     state.world.seed_food(&config.world.food, rng);
 
     let initial_energy = config.energy.lifecycle.initial_energy;
-    let founder_genome = CreatureGenome::simple_founder();
+    let founder_genome = founders::get("simple");
     for _ in 0..count {
         if let Some(pos) = find_empty_position(&state.world, rng) {
             let creature = CreatureState::new(

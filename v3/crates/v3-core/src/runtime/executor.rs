@@ -1,81 +1,41 @@
 use crate::config::SimulationConfig;
 use crate::contracts::inputs::CreatureInputs;
 use crate::contracts::outputs::{CreatureOutputs, WorldAction};
-use crate::kernel::types::Direction;
-use rand::seq::SliceRandom;
-use rand::Rng;
+use crate::creature::genome::CreatureGenome;
+use crate::creature::state::Energy;
+use crate::runtime::vm;
 
-/// Heuristic brain for Stage 2.
-/// Logic: (1) eat if food at current position, (2) reproduce when energy is
-/// high and a passable neighbor exists, (3) move toward highest-food passable
-/// neighbor (random tiebreak), (4) move in random passable direction,
-/// (5) NoOp if completely trapped.
-pub fn execute_heuristic(
+/// Execute a creature's VM brain for one tick.
+///
+/// Looks up the entry node in the genome, runs the VM execution engine,
+/// and returns `CreatureOutputs` with the emitted world action (or `NoOp`
+/// if the program halted without calling `EmitWorldAction`).
+///
+/// Energy is drained per-opcode during VM execution. The caller (tick
+/// orchestrator) must pass `&mut creature.energy` to enable this.
+pub fn execute_vm_creature(
+    genome: &CreatureGenome,
     inputs: &CreatureInputs,
+    memory: &mut [u8],
+    energy: &mut Energy,
     config: &SimulationConfig,
-    rng: &mut impl Rng,
 ) -> CreatureOutputs {
-    let env = &inputs.environmental;
-
-    // If there's food here, eat it
-    if env.food_density_self > 0 {
-        return CreatureOutputs {
-            world_action: WorldAction::Eat,
-            ..CreatureOutputs::noop()
-        };
-    }
-
-    // If energy is high enough, attempt reproduction into a random passable direction.
-    let passable_dirs: Vec<Direction> = Direction::ALL
+    let entry_node = genome
+        .nodes
         .iter()
-        .enumerate()
-        .filter(|(i, _)| env.neighbors[*i].passable)
-        .map(|(_, &dir)| dir)
-        .collect();
-    if inputs.introspection.energy >= config.energy.lifecycle.min_reproduce_energy {
-        if let Some(&dir) = passable_dirs.choose(rng) {
-            return CreatureOutputs {
-                world_action: WorldAction::Reproduce {
-                    direction: dir,
-                    energy_amount: config.energy.lifecycle.default_offspring_energy,
-                },
-                ..CreatureOutputs::noop()
-            };
-        }
+        .find(|n| n.node_id == genome.entry_node_id)
+        .unwrap_or_else(|| {
+            panic!(
+                "VM: entry_node_id {:?} not found in genome nodes",
+                genome.entry_node_id
+            )
+        });
+
+    let world_action = vm::execute_vm_node(entry_node, inputs, memory, energy, &config.runtime.vm)
+        .unwrap_or(WorldAction::NoOp);
+
+    CreatureOutputs {
+        world_action,
+        ..CreatureOutputs::noop()
     }
-
-    // Find passable neighbors with food, pick the one with highest food (random tiebreak)
-    let mut best_food: u8 = 0;
-    let mut best_dirs: Vec<Direction> = Vec::new();
-
-    for (i, &dir) in Direction::ALL.iter().enumerate() {
-        let n = &env.neighbors[i];
-        if n.passable && n.food_density > 0 {
-            if n.food_density > best_food {
-                best_food = n.food_density;
-                best_dirs.clear();
-                best_dirs.push(dir);
-            } else if n.food_density == best_food {
-                best_dirs.push(dir);
-            }
-        }
-    }
-
-    if let Some(&dir) = best_dirs.choose(rng) {
-        return CreatureOutputs {
-            world_action: WorldAction::Move { direction: dir },
-            ..CreatureOutputs::noop()
-        };
-    }
-
-    // No food visible — move in a random passable direction
-    if let Some(&dir) = passable_dirs.choose(rng) {
-        return CreatureOutputs {
-            world_action: WorldAction::Move { direction: dir },
-            ..CreatureOutputs::noop()
-        };
-    }
-
-    // Completely trapped
-    CreatureOutputs::noop()
 }

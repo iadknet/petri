@@ -30,17 +30,22 @@ pub fn tick(
             .drain_saturating(config.energy.lifecycle.energy_decay_per_tick);
     }
 
-    // Phase 1: Cognition — gather inputs, run heuristic brain, collect action queue.
-    // Uses iter() (not iter_mut()) since the heuristic brain is pure/read-only.
-    let action_queue: Vec<(CreatureId, WorldAction)> = state
-        .creatures
-        .iter()
-        .map(|(id, creature)| {
-            let inputs = crate::sensors::gather_inputs(creature, &state.world);
-            let outputs = crate::runtime::executor::execute_heuristic(&inputs, config, rng);
-            (id, outputs.world_action)
-        })
-        .collect();
+    // Phase 1: Cognition — gather inputs, run VM brain, collect action queue.
+    // Uses iter_mut() because the VM executor drains energy per-opcode.
+    // SimulationState has public fields so state.creatures and state.world
+    // can be borrowed disjointly inside the loop.
+    let mut action_queue: Vec<(CreatureId, WorldAction)> = Vec::new();
+    for (id, creature) in state.creatures.iter_mut() {
+        let inputs = crate::sensors::gather_inputs(creature, &state.world);
+        let outputs = crate::runtime::executor::execute_vm_creature(
+            &creature.genome,
+            &inputs,
+            &mut creature.memory,
+            &mut creature.energy,
+            config,
+        );
+        action_queue.push((id, outputs.world_action));
+    }
 
     // Phase 2: Shuffle queue and execute actions
     let mut shuffled_queue = action_queue;

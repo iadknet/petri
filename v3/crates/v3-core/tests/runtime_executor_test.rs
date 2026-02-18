@@ -1,129 +1,11 @@
-#[test]
-fn heuristic_eats_when_food_present() {
-    use rand::SeedableRng;
-    use v3_core::config::SimulationConfig;
-    use v3_core::contracts::inputs::CreatureInputs;
-    use v3_core::contracts::outputs::WorldAction;
-    use v3_core::runtime::executor::execute_heuristic;
-
-    let config = SimulationConfig::default();
-    let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
-    let mut inputs = CreatureInputs::default();
-    inputs.environmental.food_density_self = 50;
-
-    let outputs = execute_heuristic(&inputs, &config, &mut rng);
-    assert!(matches!(outputs.world_action, WorldAction::Eat));
-}
-
-#[test]
-fn heuristic_moves_toward_food() {
-    use rand::SeedableRng;
-    use v3_core::config::SimulationConfig;
-    use v3_core::contracts::inputs::{CreatureInputs, NeighborSense};
-    use v3_core::contracts::outputs::WorldAction;
-    use v3_core::kernel::types::Direction;
-    use v3_core::runtime::executor::execute_heuristic;
-
-    let config = SimulationConfig::default();
-    let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
-    let mut inputs = CreatureInputs::default();
-    // All neighbors passable
-    for n in inputs.environmental.neighbors.iter_mut() {
-        n.passable = true;
-    }
-    // East (index 2) has the most food
-    inputs.environmental.neighbors[2] = NeighborSense {
-        food_density: 100,
-        passable: true,
-    };
-
-    let outputs = execute_heuristic(&inputs, &config, &mut rng);
-    assert!(matches!(
-        outputs.world_action,
-        WorldAction::Move {
-            direction: Direction::E
-        }
-    ));
-}
-
-#[test]
-fn heuristic_moves_randomly_when_no_food() {
-    use rand::SeedableRng;
-    use v3_core::config::SimulationConfig;
-    use v3_core::contracts::inputs::CreatureInputs;
-    use v3_core::contracts::outputs::WorldAction;
-    use v3_core::runtime::executor::execute_heuristic;
-
-    let config = SimulationConfig::default();
-    let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
-    let mut inputs = CreatureInputs::default();
-    // Make some neighbors passable, but no food anywhere
-    for n in inputs.environmental.neighbors.iter_mut() {
-        n.passable = true;
-    }
-
-    let outputs = execute_heuristic(&inputs, &config, &mut rng);
-    assert!(matches!(
-        outputs.world_action,
-        WorldAction::Move { direction: _ }
-    ));
-}
-
-#[test]
-fn heuristic_returns_noop_when_trapped() {
-    use rand::SeedableRng;
-    use v3_core::config::SimulationConfig;
-    use v3_core::contracts::inputs::CreatureInputs;
-    use v3_core::contracts::outputs::WorldAction;
-    use v3_core::runtime::executor::execute_heuristic;
-
-    let config = SimulationConfig::default();
-    let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
-    // Default: all neighbors have passable=false, no food
-    let inputs = CreatureInputs::default();
-
-    let outputs = execute_heuristic(&inputs, &config, &mut rng);
-    assert!(matches!(outputs.world_action, WorldAction::NoOp));
-}
-
-#[test]
-fn heuristic_reproduces_when_energy_is_high_and_neighbor_is_open() {
-    use rand::SeedableRng;
-    use v3_core::config::SimulationConfig;
-    use v3_core::contracts::inputs::CreatureInputs;
-    use v3_core::contracts::outputs::WorldAction;
-    use v3_core::kernel::types::Direction;
-    use v3_core::runtime::executor::execute_heuristic;
-
-    let config = SimulationConfig::default();
-    let mut rng = rand::rngs::SmallRng::seed_from_u64(123);
-    let mut inputs = CreatureInputs::default();
-    inputs.introspection.energy = config.energy.lifecycle.min_reproduce_energy + 5;
-    inputs.environmental.neighbors[2].passable = true; // East
-
-    let outputs = execute_heuristic(&inputs, &config, &mut rng);
-
-    assert!(matches!(
-        outputs.world_action,
-        WorldAction::Reproduce {
-            direction: Direction::E,
-            energy_amount: _
-        }
-    ));
-
-    if let WorldAction::Reproduce { energy_amount, .. } = outputs.world_action {
-        assert_eq!(
-            energy_amount,
-            config.energy.lifecycle.default_offspring_energy
-        );
-    } else {
-        unreachable!();
-    }
-}
+// Heuristic executor tests removed in Stage 3C: the heuristic brain was
+// replaced by the VM executor. VM unit tests live in src/runtime/vm.rs.
+// Sensor tests (gather_inputs) remain here since they exercise the sensing
+// layer independently of the executor.
 
 #[test]
 fn gather_inputs_returns_creature_energy_and_food() {
-    use v3_core::creature::genome::CreatureGenome;
+    use v3_core::creature::founders;
     use v3_core::creature::state::CreatureState;
     use v3_core::kernel::types::Position;
     use v3_core::kernel::world_state::WorldState;
@@ -134,7 +16,7 @@ fn gather_inputs_returns_creature_energy_and_food() {
         42,
         0,
         [100, 100, 100],
-        CreatureGenome::simple_founder(),
+        founders::get("simple"),
     );
     let mut world = WorldState::new(10, 10, true);
     world.set_food_density(Position { x: 5, y: 5 }, 120);
@@ -148,7 +30,7 @@ fn gather_inputs_returns_creature_energy_and_food() {
 
 #[test]
 fn gather_inputs_reads_neighbor_food_density() {
-    use v3_core::creature::genome::CreatureGenome;
+    use v3_core::creature::founders;
     use v3_core::creature::state::CreatureState;
     use v3_core::kernel::types::Position;
     use v3_core::kernel::world_state::WorldState;
@@ -159,7 +41,7 @@ fn gather_inputs_reads_neighbor_food_density() {
         10,
         0,
         [100, 100, 100],
-        CreatureGenome::simple_founder(),
+        founders::get("simple"),
     );
     let mut world = WorldState::new(10, 10, true);
     // Place food to the north (Direction::ALL[0] = N, offset (0,-1))
@@ -171,19 +53,19 @@ fn gather_inputs_reads_neighbor_food_density() {
 
     // Index 0 = N
     assert_eq!(inputs.environmental.neighbors[0].food_density, 50);
-    assert!(inputs.environmental.neighbors[0].passable);
+    assert!(inputs.environmental.neighbors[0].passable());
     // Index 2 = E
     assert_eq!(inputs.environmental.neighbors[2].food_density, 75);
-    assert!(inputs.environmental.neighbors[2].passable);
+    assert!(inputs.environmental.neighbors[2].passable());
     // Index 4 = S (no food)
     assert_eq!(inputs.environmental.neighbors[4].food_density, 0);
-    assert!(inputs.environmental.neighbors[4].passable);
+    assert!(inputs.environmental.neighbors[4].passable());
 }
 
 #[test]
 fn gather_inputs_detects_barriers_and_occupied() {
     use slotmap::SlotMap;
-    use v3_core::creature::genome::CreatureGenome;
+    use v3_core::creature::founders;
     use v3_core::creature::state::CreatureState;
     use v3_core::kernel::types::{CreatureId, Position};
     use v3_core::kernel::world_state::WorldState;
@@ -194,7 +76,7 @@ fn gather_inputs_detects_barriers_and_occupied() {
         10,
         0,
         [100, 100, 100],
-        CreatureGenome::simple_founder(),
+        founders::get("simple"),
     );
     let mut world = WorldState::new(10, 10, true);
 
@@ -208,9 +90,9 @@ fn gather_inputs_detects_barriers_and_occupied() {
     let inputs = gather_inputs(&creature, &world);
 
     // North is barrier — not passable
-    assert!(!inputs.environmental.neighbors[0].passable);
+    assert!(!inputs.environmental.neighbors[0].passable());
     // East is occupied — not passable
-    assert!(!inputs.environmental.neighbors[2].passable);
+    assert!(!inputs.environmental.neighbors[2].passable());
     // South is clear — passable
-    assert!(inputs.environmental.neighbors[4].passable);
+    assert!(inputs.environmental.neighbors[4].passable());
 }

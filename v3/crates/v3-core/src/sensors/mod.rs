@@ -6,7 +6,7 @@ use crate::kernel::types::Direction;
 use crate::kernel::world_state::WorldState;
 
 /// Gather all inputs for a creature's decision-making.
-/// Stage 2: food_density_self + 8 neighbor senses.
+/// Stage 3C: food_density_self + 8 neighbor senses (occupied + barrier separately).
 pub fn gather_inputs(creature: &CreatureState, world: &WorldState) -> CreatureInputs {
     let pos = creature.position;
 
@@ -15,11 +15,13 @@ pub fn gather_inputs(creature: &CreatureState, world: &WorldState) -> CreatureIn
         neighbors[i] = match world.resolve_neighbor(pos, dir) {
             Some(npos) => NeighborSense {
                 food_density: world.get_food_density(npos),
-                passable: !world.is_barrier(npos) && !world.is_occupied(npos),
+                occupied: world.is_occupied(npos),
+                barrier: world.is_barrier(npos),
             },
             None => NeighborSense {
                 food_density: 0,
-                passable: false,
+                occupied: false,
+                barrier: true, // out-of-bounds treated as barrier
             },
         };
     }
@@ -32,6 +34,8 @@ pub fn gather_inputs(creature: &CreatureState, world: &WorldState) -> CreatureIn
         introspection: IntrospectionInputs {
             energy: creature.energy.value(),
             position: creature.position,
+            generation: creature.generation,
+            age_ticks: creature.age,
         },
     }
 }

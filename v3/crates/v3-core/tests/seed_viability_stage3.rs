@@ -1,7 +1,6 @@
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use v3_core::config::SimulationConfig;
-use v3_core::creature::genome::CreatureGenome;
 use v3_core::kernel::world_state::WorldState;
 use v3_core::seed::seed_creatures;
 use v3_core::SimulationState;
@@ -42,7 +41,7 @@ fn stage3_viability_reproduction_and_genome_divergence() {
     let initial_pop = state.creatures.len();
     assert_eq!(initial_pop, 15, "should seed all 15 creatures");
 
-    let founder_genome = CreatureGenome::simple_founder();
+    let founder_genome = v3_core::creature::founders::get("simple");
 
     // Verify all seed creatures have founder genome
     for (_, c) in state.creatures.iter() {
