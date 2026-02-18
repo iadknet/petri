@@ -51,11 +51,11 @@ fn energy_drain_saturating_always_deducts() {
 
 #[test]
 fn creature_state_new_initializes_correctly() {
-    use v3_core::creature::genome::CreatureGenome;
+    use v3_core::creature::founders;
     use v3_core::creature::state::CreatureState;
     use v3_core::kernel::types::Position;
 
-    let genome = CreatureGenome::simple_founder();
+    let genome = founders::get("simple");
     let creature = CreatureState::new(Position { x: 10, y: 20 }, 15, 0, [255, 128, 64], genome);
 
     assert_eq!(creature.position, Position { x: 10, y: 20 });
@@ -65,7 +65,7 @@ fn creature_state_new_initializes_correctly() {
     assert_eq!(creature.phenotype_r, 255);
     assert_eq!(creature.phenotype_g, 128);
     assert_eq!(creature.phenotype_b, 64);
-    assert_eq!(creature.genome, CreatureGenome::simple_founder());
+    assert_eq!(creature.genome, founders::get("simple"));
     assert_eq!(creature.memory.len(), 1024);
     assert!(creature.memory.iter().all(|&byte| byte == 0));
 }
@@ -74,7 +74,7 @@ fn creature_state_new_initializes_correctly() {
 fn create_offspring_inherits_memory_phenotype_and_generation() {
     use rand::SeedableRng;
     use v3_core::config::SimulationConfig;
-    use v3_core::creature::genome::CreatureGenome;
+    use v3_core::creature::founders;
     use v3_core::creature::reproduction::create_offspring;
     use v3_core::creature::state::CreatureState;
     use v3_core::kernel::types::Position;
@@ -84,7 +84,7 @@ fn create_offspring_inherits_memory_phenotype_and_generation() {
         40,
         7,
         [10, 20, 30],
-        CreatureGenome::simple_founder(),
+        founders::get("simple"),
     );
     parent.memory[0] = 11;
     parent.memory[512] = 99;
@@ -110,10 +110,21 @@ fn create_offspring_inherits_memory_phenotype_and_generation() {
 fn mutation_with_high_probability_changes_genome() {
     use rand::SeedableRng;
     use v3_core::config::runtime::mutation::MutationConfig;
-    use v3_core::creature::genome::CreatureGenome;
+    use v3_core::creature::founders;
+    use v3_core::creature::genome::BackendDef;
     use v3_core::creature::mutation::mutate_genome;
 
-    let original = CreatureGenome::simple_founder();
+    fn total_constants(genome: &v3_core::creature::genome::CreatureGenome) -> usize {
+        genome
+            .nodes
+            .iter()
+            .map(|n| match &n.backend_def {
+                BackendDef::Vm(def) => def.constants.len(),
+            })
+            .sum()
+    }
+
+    let original = founders::get("simple");
     let mut mutated = original.clone();
     let config = MutationConfig {
         mutation_probability: 1.0,
@@ -127,8 +138,8 @@ fn mutation_with_high_probability_changes_genome() {
 
     assert_ne!(mutated, original, "mutation should change the genome");
     assert_eq!(
-        mutated.constants.len(),
-        original.constants.len(),
+        total_constants(&mutated),
+        total_constants(&original),
         "mutation should not change number of constants"
     );
 }
@@ -137,10 +148,10 @@ fn mutation_with_high_probability_changes_genome() {
 fn mutation_with_zero_probability_preserves_genome() {
     use rand::SeedableRng;
     use v3_core::config::runtime::mutation::MutationConfig;
-    use v3_core::creature::genome::CreatureGenome;
+    use v3_core::creature::founders;
     use v3_core::creature::mutation::mutate_genome;
 
-    let original = CreatureGenome::simple_founder();
+    let original = founders::get("simple");
     let mut unchanged = original.clone();
     let config = MutationConfig {
         mutation_probability: 0.0,
@@ -159,7 +170,7 @@ fn mutation_with_zero_probability_preserves_genome() {
 fn offspring_genome_diverges_when_mutation_enabled() {
     use rand::SeedableRng;
     use v3_core::config::SimulationConfig;
-    use v3_core::creature::genome::CreatureGenome;
+    use v3_core::creature::founders;
     use v3_core::creature::reproduction::create_offspring;
     use v3_core::creature::state::CreatureState;
     use v3_core::kernel::types::Position;
@@ -169,7 +180,7 @@ fn offspring_genome_diverges_when_mutation_enabled() {
         40,
         0,
         [204, 61, 61],
-        CreatureGenome::simple_founder(),
+        founders::get("simple"),
     );
 
     let mut config = SimulationConfig::default();

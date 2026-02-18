@@ -1,14 +1,13 @@
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use v3_core::config::SimulationConfig;
-use v3_core::creature::genome::CreatureGenome;
 use v3_core::creature::state::CreatureState;
 use v3_core::kernel::types::Position;
 use v3_core::kernel::world_state::WorldState;
 use v3_core::SimulationState;
 
-fn g() -> CreatureGenome {
-    CreatureGenome::simple_founder()
+fn g() -> v3_core::creature::genome::CreatureGenome {
+    v3_core::creature::founders::get("simple")
 }
 
 fn default_config() -> SimulationConfig {
@@ -220,9 +219,12 @@ fn tick_reproduction_adds_offspring_and_reports_births() {
     let mut state = SimulationState::new(WorldState::new(10, 10, true));
     let mut rng = SmallRng::seed_from_u64(99);
 
+    // VM founder reproduces when energy > 50.0 (hardcoded gate in the founder
+    // program). Give 60 so that after 1-tick decay (−1) the check passes:
+    // 59 > 50 → Reproduce. The action layer then enforces min_reproduce_energy=24.
     state.spawn_creature(CreatureState::new(
         Position { x: 5, y: 5 },
-        40,
+        60,
         0,
         [204, 61, 61],
         g(),
