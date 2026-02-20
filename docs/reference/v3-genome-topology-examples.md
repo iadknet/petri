@@ -12,6 +12,8 @@ Status: Active
 - `ENTRY` means `CreatureGenome.entry_node_id`.
 - Edge labels are `targets[idx]` positions, not node IDs.
 - Every hop passes `output_slots: [f32; 12]` to the next node.
+- Within a node evaluation, output slots pass through by default; explicit slot
+  writes overwrite selected positions.
 - VM nodes may emit action or route; Graph nodes route only.
 
 ---

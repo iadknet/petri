@@ -89,5 +89,9 @@ misalignment across topology mutations.
 ## 6. Output Slot Contract
 
 - Every node yields `output_slots: [f32; 12]` in `NodeResult`.
-- Slots default to `0.0`.
+- On the first hop, incoming `upstream_slots` is `[0.0; 12]`.
+- On subsequent hops, incoming `upstream_slots` is the prior node's
+  `NodeResult.output_slots`.
+- Per node evaluation, `output_slots` is initialized from incoming
+  `upstream_slots`; unwritten slots pass through unchanged.
 - Slots are runtime dataflow values, not persisted in genome.

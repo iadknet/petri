@@ -72,7 +72,7 @@ The VM defines **33 opcodes**.
 
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
-| 24 | `WriteInternalPayload` | slot_idx, src | writes candidate output slot value (invalid slot write ignored) |
+| 24 | `WriteInternalPayload` | slot_idx, src | overwrites payload slot value (payload buffer starts from incoming `upstream_slots`; invalid slot write ignored) |
 | 25 | `WriteWorldActionMeta` | slot_idx, src | writes world-action metadata slot (`slot_idx` in `0..7`; invalid slot write ignored) |
 | 26 | `EmitWorldAction` | action_type | emit world action and halt |
 | 27 | `WriteRouteTarget` | src_reg | write candidate route target value (`f32`) |
@@ -235,9 +235,14 @@ VM node evaluation maintains:
 - world action metadata buffer (8 slots)
 - route target register
 
-All three buffers are zeroed at the start of each VM node evaluation.
+Initialization at the start of each VM node evaluation:
+- internal payload buffer is copied from incoming `upstream_slots`
+- world action metadata buffer is zeroed
+- route target register starts at `0.0`
 
 All writes are last-write-wins per slot/register.
+If `WriteInternalPayload` targets an invalid slot (`>= 12`), the write is
+ignored and existing payload slot values are preserved.
 
 World-action metadata buffer size is fixed:
 - `WORLD_ACTION_META_SLOTS = 8`
