@@ -58,7 +58,7 @@ This document does not define:
 `OffspringDraft` minimum fields:
 
 - `position` (target spawn position)
-- `initial_energy` (post-transfer child energy)
+- `initial_energy` (post-transfer child energy, scalar `f32`)
 - `generation` (`parent.generation + 1`)
 - `phenotype` (inherited/mutated according to mutation policy)
 - `genome` (parent genome copy after mutation application)
@@ -104,6 +104,8 @@ Reproduction action semantics:
 - Requested child transfer is clamped by configured offspring transfer cap.
 - If parent cannot satisfy required transfer constraints, reproduction fails and
   no child draft is queued.
+- Energy/lifecycle config values are continuous scalar units (`f32`) as defined
+  in `v3-runtime-config-spec.md`.
 
 This document defines semantics only; exact field names/constants live in core
 runtime config contract: `v3-runtime-config-spec.md`.

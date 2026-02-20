@@ -242,7 +242,13 @@ Defined numeric rules:
 | LoadMem8Imm | 0.14 |
 | StoreMem8Imm | 0.16 |
 
-v3 energy is `u32`; costs are scaled to integer units by global multiplier.
+v3 energy uses continuous scalar units (`f32`).
+Opcode spend is:
+
+```text
+opcode_energy_cost = opcode_base_cost * runtime.vm.opcode_cost_multiplier
+```
+
 Canonical owner for `runtime.vm.opcode_cost_multiplier`:
 `v3-runtime-config-spec.md`.
 
@@ -277,13 +283,14 @@ World-action metadata buffer size is fixed:
 | `0` | `NoOp` | none |
 | `1` | `Eat` | none |
 | `2` | `Move` | `meta[0]` = direction index |
-| `3` | `Reproduce` | `meta[0]` = direction index, `meta[1]` = energy amount |
+| `3` | `Reproduce` | `meta[0]` = direction index, `meta[1]` = offspring transfer energy (scalar `f32`) |
 | other | `NoOp` | none |
 
 Metadata decode rules:
 - direction index uses `meta[0].round().clamp(0.0, 7.0)` and maps to
   `Direction::ALL` (`0=N,1=NE,2=E,3=SE,4=S,5=SW,6=W,7=NW`)
-- reproduce energy amount uses `meta[1].max(0.0).round() as u32`
+- reproduce energy amount uses non-negative scalar
+  `clamp_non_negative_finite(meta[1])` (no integer rounding)
 - unspecified metadata slots are reserved and ignored by current runtime action
   decoding
 - `WriteWorldActionMeta` to `slot_idx >= 8` is ignored
