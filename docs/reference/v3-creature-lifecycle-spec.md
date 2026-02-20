@@ -65,6 +65,7 @@ Rationale:
 - `RemoveInternalGraphNode`
 - `AlterGraphEdgeWeight`
 - `SwapGraphOperator`
+- `MutateGraphOperatorParam`
 
 ### Genome-parameter operators
 

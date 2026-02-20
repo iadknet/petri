@@ -17,7 +17,7 @@ Status: Active
 
 ## 2. Instruction Set
 
-The VM defines **39 opcodes**.
+The VM defines **33 opcodes**.
 
 ### Arithmetic and Data Movement
 
@@ -62,36 +62,38 @@ The VM defines **39 opcodes**.
 | 21 | `JumpIfZero` | cond, offset | if `!truthy(cond)` then jump |
 | 22 | `Jump` | offset | unconditional jump |
 
-### Input and Sensor Reads
+### Input Reads
 
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
 | 23 | `ReadInput` | dst, input_idx | reads `NodeGenome.input_refs[input_idx]`; invalid index yields `0.0` |
-| 24 | `ReadSensorCell` | dst, sensor_idx, field_idx | reads sensor-cell data; invalid index/field yields `0.0` |
-| 25 | `ReadSensorCreature` | dst, sensor_idx, field_idx | reads sensor-creature data; invalid index/field yields `0.0` |
-| 26 | `ReadSensorSummary` | dst, summary_idx | reads sensor-summary data; invalid index yields `0.0` |
-| 27 | `ReadNeighborCell` | dst, neighbor_idx, field_idx | reads neighbor-cell data; invalid index/field yields `0.0` |
-| 28 | `ReadNeighborCreature` | dst, neighbor_idx, field_idx | reads neighbor-creature data; invalid index/field yields `0.0` |
 
 ### Output and Routing Writes
 
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
-| 29 | `WriteInternalPayload` | slot_idx, src | writes candidate output slot value (invalid slot write ignored) |
-| 30 | `WriteWorldActionMeta` | slot_idx, src | writes world-action metadata slot (invalid slot write ignored) |
-| 31 | `EmitInternal` | action_type | emit internal action payload |
-| 32 | `EmitWorldAction` | action_type | emit world action and halt |
-| 33 | `WriteRouteTarget` | src_reg | write candidate route target value (`f32`) |
+| 24 | `WriteInternalPayload` | slot_idx, src | writes candidate output slot value (invalid slot write ignored) |
+| 25 | `WriteWorldActionMeta` | slot_idx, src | writes world-action metadata slot (invalid slot write ignored) |
+| 26 | `EmitWorldAction` | action_type | emit world action and halt |
+| 27 | `WriteRouteTarget` | src_reg | write candidate route target value (`f32`) |
 
 ### Halt and Memory
 
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
-| 34 | `Halt` | none | stop VM execution |
-| 35 | `LoadMem8` | dst, addr_reg | read byte at wrapped address |
-| 36 | `StoreMem8` | addr_reg, src | write byte at wrapped address |
-| 37 | `LoadMem8Imm` | dst, imm_addr | read byte at wrapped immediate address |
-| 38 | `StoreMem8Imm` | imm_addr, src | write byte at wrapped immediate address |
+| 28 | `Halt` | none | stop VM execution |
+| 29 | `LoadMem8` | dst, addr_reg | read byte at wrapped address |
+| 30 | `StoreMem8` | addr_reg, src | write byte at wrapped address |
+| 31 | `LoadMem8Imm` | dst, imm_addr | read byte at wrapped immediate address |
+| 32 | `StoreMem8Imm` | imm_addr, src | write byte at wrapped immediate address |
+
+Removed from active V3 mesh ISA:
+- `ReadSensorCell`, `ReadSensorCreature`, `ReadSensorSummary`
+- `ReadNeighborCell`, `ReadNeighborCreature`
+- `EmitInternal`
+
+These were replaced by unified `ReadInput` + `InputReference` dataflow and
+`output_slots` routing semantics.
 
 ---
 
@@ -101,6 +103,14 @@ The VM defines **39 opcodes**.
 - Per-opcode energy metering applies; exhausted energy halts node execution.
 - `EmitWorldAction` halts VM immediately.
 - `Halt` halts VM without emitting a world action.
+- VM runtime enforces a configurable step cap `max_vm_steps` per node
+  evaluation (default `1024`, sourced from runtime config).
+
+### VM step-cap safety
+
+- `max_vm_steps` is configuration-controlled for tuning and experiments.
+- Value must be `>= 1`.
+- Invalid values (for example `0`) fall back to default (`1024`).
 
 ### Jump target safety
 
@@ -117,7 +127,6 @@ All genome-derived indexes are handled without panic:
 - **Register index**: normalized by modulo `register_count`.
 - **Constant index**: if `constants` empty -> `0.0`; else modulo `constants.len()`.
 - **Payload/meta slot index**: out-of-range writes are ignored.
-- **Sensor/neighbor index or field index**: invalid index/field reads yield `0.0`.
 
 If `register_count == 0`, VM halts immediately (no action emission).
 
@@ -147,9 +156,9 @@ VM execution loop must be crash-proof for evolved genomes.
 
 Soft defaults / graceful behavior:
 - invalid register/constant/index operands use normalization rules
-- invalid sensor/neighbor fields yield `0.0`
 - invalid payload/meta writes are ignored
 - invalid jump target halts VM
+- invalid `ReadInput` index yields `0.0`
 
 Implementation bugs outside mutation-space (for example corrupted in-memory
 instruction representation) are still defects, but evolved operands do not
@@ -201,14 +210,8 @@ Additional deterministic rules:
 | JumpIfZero | 0.14 |
 | Jump | 0.10 |
 | ReadInput | 0.12 |
-| ReadSensorCell | 0.16 |
-| ReadSensorCreature | 0.20 |
-| ReadSensorSummary | 0.14 |
-| ReadNeighborCell | 0.14 |
-| ReadNeighborCreature | 0.18 |
 | WriteInternalPayload | 0.14 |
 | WriteWorldActionMeta | 0.14 |
-| EmitInternal | 0.20 |
 | EmitWorldAction | 0.24 |
 | WriteRouteTarget | 0.10 |
 | Halt | 0.05 |
@@ -227,6 +230,8 @@ VM node evaluation maintains:
 - internal payload buffer (12 slots)
 - world action metadata buffer
 - route target register
+
+All three buffers are zeroed at the start of each VM node evaluation.
 
 All writes are last-write-wins per slot/register.
 

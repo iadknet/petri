@@ -62,11 +62,14 @@ pub enum GraphNodeKind {
     Sigmoid,
     Tanh,
     Relu,
+    Select,
     Clamp01,
+    WeightedSum,
 
     DecayIntegrator(f32),
     Momentum(f32),
     Oscillator(f32),
+    AdaptiveGain,
 
     CustomOutput(u8),
     RouterOutput,

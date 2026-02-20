@@ -1,50 +1,43 @@
-# Petri — V2 Program Roadmap
+# Petri - V3 Program Roadmap
 
 ## Guiding Principles
 
-- `v2/` is the active implementation target.
-- Legacy runtime and root web are reference-only during this program.
-- Checkpoint gates are the source of truth for stage completion.
+- V3 mesh architecture is the active implementation target.
+- Legacy v1/v2 stacks are reference-only during this program.
+- Checkpoint gates and reference specs are the source of truth for completion.
 - Deterministic, test-backed contracts take priority over feature breadth.
 
 ## Active Program Structure
 
-Checkpoint authority:
-- `docs/plans/2026-02-14-v2-checkpoint-boundaries.md`
+Primary architecture/design plan:
+- `docs/plans/2026-02-18-v3-mesh-refactor-design.md`
 
-Execution stages:
-- `CP-0`: `docs/plans/2026-02-13-creature-brain-mesh-stage-1-runtime-kernel.md`
-- `CP-1`: `docs/plans/2026-02-13-creature-brain-mesh-stage-2-backends-energy.md`
-- `CP-2`: `docs/plans/2026-02-13-creature-brain-mesh-stage-3-evolution-ecology.md`
-- `CP-3`: `docs/plans/2026-02-13-creature-brain-mesh-stage-4-cutover.md`
+Canonical reference specs:
+- `docs/reference/v3-mesh-execution-spec.md`
+- `docs/reference/v3-genome-spec.md`
+- `docs/reference/v3-sensor-spec.md`
+- `docs/reference/v3-graph-backend-spec.md`
+- `docs/reference/v3-vm-isa-spec.md`
+- `docs/reference/v3-creature-lifecycle-spec.md`
 
-Implementation specs:
-- `docs/plans/2026-02-14-v2-cp1-runtime-execution-spec.md`
-- `docs/plans/2026-02-14-v2-core-schema-vm-isa-spec.md`
-- `docs/plans/2026-02-14-v2-cp2-evolution-ecology-spec.md`
-- `docs/plans/2026-02-14-v2-cp3-api-protocol-spec.md`
-- `docs/plans/2026-02-14-v2-frontend-wireframe-spec.md`
-- `docs/plans/2026-02-14-v2-frontend-implementation-plan.md`
-- `docs/plans/2026-02-14-v2-implementation-test-matrix.md`
+## Current Program Status
 
-## Checkpoint Status Snapshot
-
-| checkpoint | status | summary |
+| stage | status | summary |
 | --- | --- | --- |
-| `CP-0` | complete | `v2` workspace and boundary guardrails established. |
-| `CP-1` | in progress | runtime kernel/backends semantics remain under active completion. |
-| `CP-2` | pending | mutation/ecology checkpoint follows CP-1 exit. |
-| `CP-3` | in progress | protocol/test baseline landed across server/cli/web; closeout continues. |
+| Architecture reconciliation | complete | Mesh execution model and soft-default philosophy stabilized in docs. |
+| Reference specification sync | complete | VM, graph, genome, sensor, and lifecycle specs aligned. |
+| Legacy doc archival | complete | Superseded V3 plans and legacy refs archived/pointerized. |
+| Implementation planning | next | Convert canonical docs into executable milestone plans and task slices. |
 
-## CP-3 Scope Focus
+## Current Focus
 
-- Stabilize `v2alpha1` contracts for HTTP, WebSocket, CLI NDJSON, and web decoders.
-- Keep paint/lifecycle semantics fixture- and test-locked.
-- Complete docs closeout and stale-plan retirement before final exit.
+- Preserve strict abstraction boundaries while implementing mesh runtime.
+- Enforce crash-proof evaluation under junk-DNA mutation behavior.
+- Keep determinism guarantees explicit and test-backed.
 
-## Done Criteria for Program Close
+## Done Criteria for Current Documentation Phase
 
-- All checkpoint gates pass under matrix-defined commands.
-- Canonical docs reflect `v2` as the target architecture.
-- Compatibility stubs remain pointer-only and consistent.
-- Closeout artifact exists at `docs/operations/v2-doc-closeout.md`.
+- No active-doc conflicts on target architecture direction.
+- Canonical references are internally consistent.
+- Superseded references point to canonical replacements.
+- Active plan and strategy docs agree on V3 as target.
