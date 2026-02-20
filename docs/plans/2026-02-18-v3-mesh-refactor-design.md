@@ -55,8 +55,8 @@
 | `runtime/` | change | Single-node executor → mesh chain evaluator; add graph backend |
 | `creature/genome.rs` | change | NodeGenome gains targets, GraphBackendDef, unified InputReference |
 | `sensors/` | change (minor) | Split static/dynamic introspection; gather static snapshot once |
-| `v3-graph-operator-spec.md` | change | Single-operator model → mini computation graph |
-| `v3-genome-sensor-spec.md` | change | Split into genome spec + sensor spec |
+| `v3-graph-backend-spec.md` | keep | Active canonical graph backend spec for mini computation graph semantics |
+| `v3-genome-spec.md` + `v3-sensor-spec.md` | keep | Active canonical split of genome structure vs sensor model contracts |
 
 ---
 

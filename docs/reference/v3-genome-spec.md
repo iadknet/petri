@@ -63,9 +63,13 @@ Topology examples are documented in `v3-genome-topology-examples.md`.
 
 Genome validation enforces parseability, not full logical viability.
 
+This section is the authoritative parseability invariant set for V3 genome
+validation and mutation `ParseabilityGate`.
+
 Required invariants:
 - `nodes` is non-empty.
 - `node_id` values are unique.
+- backend payloads remain decodable.
 
 Deliberately not required at validation time:
 - `entry_node_id` must resolve.
