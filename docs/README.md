@@ -14,13 +14,16 @@ v1 (`crates/petri-*`) and v2 (`v2/`) are retained as historical reference.
 
 ## Reference
 
-- [Creature Controller Reference](reference/creature-controller-reference.md)
 - [V3 Mesh Execution Spec](reference/v3-mesh-execution-spec.md)
 - [V3 Genome Spec](reference/v3-genome-spec.md)
 - [V3 Sensor Spec](reference/v3-sensor-spec.md)
 - [V3 Graph Backend Spec](reference/v3-graph-backend-spec.md)
 - [V3 VM ISA Spec](reference/v3-vm-isa-spec.md)
 - [V3 Creature Lifecycle Spec](reference/v3-creature-lifecycle-spec.md)
+
+## Reference (Legacy)
+
+- [Creature Controller Reference](reference/archive/creature-controller-reference.md)
 
 ## Plans
 
