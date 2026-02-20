@@ -59,8 +59,8 @@ The VM defines **33 opcodes**.
 
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
-| 21 | `JumpIfZero` | cond, offset | if `!truthy(cond)` then jump |
-| 22 | `Jump` | offset | unconditional jump |
+| 21 | `JumpIfZero` | cond, offset | if `!truthy(cond)` then jump (signed target wrapping applies) |
+| 22 | `Jump` | offset | unconditional jump (signed target wrapping applies) |
 
 ### Input Reads
 
@@ -115,10 +115,12 @@ These were replaced by unified `ReadInput` + `InputReference` dataflow and
 ### Jump target safety
 
 Jump targets are mutation-safe:
-- compute next PC using signed offset semantics
-- if computed PC is outside `0..program_len`, VM halts immediately
+- compute provisional target PC using signed offset semantics
+- if `program_len == 0`, VM halts immediately
+- otherwise set `pc = provisional_pc.rem_euclid(program_len as i64) as usize`
 
-This replaces hard-fault behavior for negative/out-of-range PCs.
+This replaces hard-fault behavior and avoids mutation-induced dead halts from
+negative/out-of-range jump targets.
 
 ### Operand normalization rules
 
@@ -158,7 +160,7 @@ VM execution loop must be crash-proof for evolved genomes.
 Soft defaults / graceful behavior:
 - invalid register/constant/index operands use normalization rules
 - invalid payload/meta writes are ignored
-- invalid jump target halts VM
+- out-of-range jump targets wrap into valid program range (when program non-empty)
 - invalid `ReadInput` index yields `0.0`
 
 Implementation bugs outside mutation-space (for example corrupted in-memory
@@ -180,6 +182,7 @@ Additional deterministic rules:
 - float->int conversions use ties-away-from-zero
 - `CmpEq` epsilon clamped to `[1e-6, 1.0]`
 - division by zero returns `0.0`
+- jump targets use deterministic signed `rem_euclid` wrapping by `program_len`
 
 ---
 

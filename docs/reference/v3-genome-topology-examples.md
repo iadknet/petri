@@ -97,7 +97,7 @@ Topology:
 
 Tick trace (example route):
 1. Node 0 computes `route_target_idx = 1.8`.
-2. Runtime maps to `target_idx = floor(1.8) = 1`.
+2. Runtime maps to `target_idx = floor(1.8) = 1`, then wraps: `1 % 3 = 1`.
 3. Node 2 executes and emits `Reproduce`.
 
 ---

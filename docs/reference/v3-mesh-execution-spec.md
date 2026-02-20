@@ -56,13 +56,20 @@ loop:
   if node.targets is empty:
     return WorldAction::NoOp
 
-  target_idx = route_target_idx.floor()
-  if route_target_idx is NaN or infinite:
-    target_idx = 0
-  target_idx = max(target_idx, 0)
+  route_idx_i64 =
+    if route_target_idx is NaN:
+      -1
+    else if route_target_idx is +infinite:
+      i64::MAX
+    else if route_target_idx is -infinite:
+      i64::MIN
+    else:
+      floor(route_target_idx).clamp(i64::MIN as f32, i64::MAX as f32) as i64
 
-  target_id = node.targets.get(target_idx)
-  if target_id is None:
+  target_idx = route_idx_i64.rem_euclid(node.targets.len() as i64) as usize
+
+  target_id = node.targets[target_idx]
+  if target_id is missing from genome node set:
     return WorldAction::NoOp
 
   upstream_slots = output_slots
@@ -102,6 +109,7 @@ Runtime must never panic on malformed evolved topologies.
 | Condition | Runtime behavior |
 |---|---|
 | `entry_node_id` missing from node set | Return `WorldAction::NoOp` |
+| Routed index (negative, out-of-range, or non-finite) | Map to signed route index and wrap with `rem_euclid(targets.len())` |
 | Routed target id missing | Return `WorldAction::NoOp` |
 | Routing requested but `targets` is empty | Return `WorldAction::NoOp` |
 | `ReadInput` index out of range | Yield `0.0` |
@@ -128,7 +136,7 @@ mutating `energy` during execution.
 ## 6. Determinism Requirements
 
 To preserve reproducibility:
-- Routing conversion uses explicit floor/clamp/NaN fallback rules.
+- Routing conversion uses explicit signed-index mapping (`NaN -> -1`, `+inf -> i64::MAX`, `-inf -> i64::MIN`) and `rem_euclid` wrapping.
 - Float sanitation rules from VM/graph specs apply before routing decisions.
 - Node iteration order is deterministic (`nodes` order and internal graph order).
 - Soft-default fallbacks are deterministic constants (`0.0`, `NoOp`).
