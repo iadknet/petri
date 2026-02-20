@@ -33,5 +33,7 @@ Local instructions for `crates/petri-core`.
 ## Related Canonical Docs
 
 - Root policy: `AGENTS.md`
-- Reference behavior: `docs/reference/creature-controller-reference.md`
-- Architecture context: `docs/strategy/architecture.md`
+- Docs index: `docs/README.md`
+- Active strategy docs: `docs/strategy/`
+- Active reference specs: `docs/reference/`
+- Archived reference specs: `docs/reference/archive/`

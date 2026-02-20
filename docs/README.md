@@ -21,6 +21,9 @@ v1 (`crates/petri-*`) and v2 (`v2/`) are retained as historical reference.
 - [V3 Graph Backend Spec](reference/v3-graph-backend-spec.md)
 - [V3 VM ISA Spec](reference/v3-vm-isa-spec.md)
 - [V3 Creature Lifecycle Spec](reference/v3-creature-lifecycle-spec.md)
+- [V3 Mutation Spec](reference/v3-mutation-spec.md)
+- [V3 Reproduction Spec](reference/v3-reproduction-spec.md)
+- [V3 Evolution Observability Spec](reference/v3-evolution-observability-spec.md)
 
 ## Reference (Legacy)
 

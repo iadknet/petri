@@ -29,8 +29,8 @@ Core dependency posture:
 
 - Server and CLI serialize explicit `v2alpha1` payloads.
 - Web consumption is model/decoder-driven, fixture-backed.
-- Verification gates are checkpoint-owned via:
-  - `docs/plans/2026-02-14-v2-implementation-test-matrix.md`
+- Verification gates are checkpoint-owned via active docs in `docs/plans/`
+  (historical snapshots live in `docs/plans/archive/`).
 
 ## Rejected Assumptions for This Phase
 
