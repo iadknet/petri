@@ -76,10 +76,11 @@ pub enum GraphNodeKind {
 }
 ```
 
-`InputRef(u8)` reads through `NodeGenome.input_refs`.
+`InputRef(u8)` reads through `NodeGenome.input_refs` (ignores internal weighted
+inputs).
 
-`InputUpstreamSlot(u8)` reads from routing parent output slots. Invalid slot
-reads yield `0.0`.
+`InputUpstreamSlot(u8)` reads from routing parent output slots (ignores
+internal weighted inputs). Invalid slot reads yield `0.0`.
 
 ---
 
