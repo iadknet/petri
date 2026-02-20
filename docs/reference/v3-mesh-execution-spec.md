@@ -44,7 +44,7 @@ loop:
   if hops >= max_mesh_hops:
     return WorldAction::NoOp
 
-  evaluate current node -> NodeResult {
+  evaluate current node with upstream_slots -> NodeResult {
     output_slots: [f32; 12],
     route_target_idx: f32,
     world_action: Option<WorldAction>,
@@ -80,6 +80,9 @@ loop:
 Notes:
 - Entry upstream slots are zeroed only on the first hop.
 - If routing later returns to the entry node, routed upstream slots are used.
+- For every node evaluation, `output_slots` starts as a copy of incoming
+  `upstream_slots`; backend slot writes overwrite addressed slots only.
+- Slots not written during a node evaluation pass through unchanged.
 - No visited set is used; self-loops are legal.
 
 ---
@@ -119,6 +122,7 @@ Runtime must never panic on malformed evolved topologies.
 | Routing requested but `targets` is empty | Return `WorldAction::NoOp` |
 | `ReadInput` index out of range | Yield `0.0` |
 | `UpstreamOutput` slot out of range | Yield `0.0` |
+| Node backend does not write an output slot | Preserve incoming `upstream_slots[slot]` |
 | Graph edge source out of bounds | Input contributes `0.0` |
 | Graph convergence not reached before `max_graph_relax_iters` | Use last computed pass outputs and continue |
 | Graph state for `NodeId` missing | Allocate zero-initialized state and continue |

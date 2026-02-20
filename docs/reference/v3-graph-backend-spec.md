@@ -159,8 +159,9 @@ Rules:
 ## 5. Outputs and Routing
 
 During graph evaluation:
+- Graph `output_slots` buffer is initialized from incoming `upstream_slots`.
 - `CustomOutput(slot)` writes into `output_slots[slot]` when `slot < 12`.
-- Invalid custom output slot writes are ignored.
+- Invalid custom output slot writes are ignored (slot value is unchanged).
 - `RouterOutput` writes candidate route value to `route_target_idx`.
 - If multiple `RouterOutput` nodes execute, last-write-wins.
 
