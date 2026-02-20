@@ -100,6 +100,11 @@ Safety rules:
 - invalid values (for example `0`) fall back to default (`128`)
 - the cap cannot be disabled
 
+Graph internal recurrence rule:
+- Within one graph node evaluation, runtime iterates internal relaxation passes
+  until convergence or `max_graph_relax_iters`, whichever comes first.
+- `max_graph_relax_iters` must be `>= 1` and cannot be disabled.
+
 ---
 
 ## 4. Soft Default Contract (Junk DNA Safe)
@@ -114,7 +119,8 @@ Runtime must never panic on malformed evolved topologies.
 | Routing requested but `targets` is empty | Return `WorldAction::NoOp` |
 | `ReadInput` index out of range | Yield `0.0` |
 | `UpstreamOutput` slot out of range | Yield `0.0` |
-| Graph edge source invalid (`>= current_idx` or OOB) | Input contributes `0.0` |
+| Graph edge source out of bounds | Input contributes `0.0` |
+| Graph convergence not reached before `max_graph_relax_iters` | Use last computed pass outputs and continue |
 | Graph state for `NodeId` missing | Allocate zero-initialized state and continue |
 
 This policy intentionally allows junk DNA. Invalid offspring are culled by
@@ -125,7 +131,7 @@ selection pressure rather than strict genome repair.
 ## 5. Energy Metering
 
 - VM nodes: energy deducted per opcode from VM cost table.
-- Graph nodes: energy deducted per internal node evaluation.
+- Graph nodes: energy deducted per internal-node-per-pass evaluation.
 - If energy is exhausted mid-node, evaluation halts and returns `NoOp`.
 
 Dynamic introspection values (for example `EnergyCurrent`) are read live from
@@ -139,4 +145,6 @@ To preserve reproducibility:
 - Routing conversion uses explicit signed-index mapping (`NaN -> -1`, `+inf -> i64::MAX`, `-inf -> i64::MIN`) and `rem_euclid` wrapping.
 - Float sanitation rules from VM/graph specs apply before routing decisions.
 - Node iteration order is deterministic (`nodes` order and internal graph order).
+- Graph convergence loop order and stop criteria are deterministic
+  (`max_graph_relax_iters`, epsilon threshold, stable-pass rule).
 - Soft-default fallbacks are deterministic constants (`0.0`, `NoOp`).

@@ -29,19 +29,61 @@ cache-friendly evaluation.
 
 ---
 
-## 2. Evaluation Order and Input Semantics
+## 2. Evaluation Order, Recurrence, and Convergence
 
-Internal nodes are evaluated in array order (`0..N-1`).
+Graph evaluation uses bounded relaxation passes to support internal recurrence
+(including backward and self edges) without unbounded runtime.
 
-For an internal node at `current_idx`:
-- Each input reads source output from `source_idx`.
-- Contribution is `source_value * weight`.
-- Invalid `source_idx` (`>= current_idx` or out of bounds) contributes `0.0`.
-- The node's weighted aggregate is:
-  `weighted_input_sum = sum(contribution_i)`.
+Per node evaluation:
 
-This prevents crashes from mutations and forbids backward edge dependency during
-single-pass evaluation.
+```text
+node_count = internal_nodes.len()
+prev_outputs = [0.0; node_count]
+curr_outputs = [0.0; node_count]
+
+max_graph_relax_iters =
+  validated(config.max_graph_relax_iters, default=4, min=1)
+graph_convergence_epsilon =
+  validated(config.graph_convergence_epsilon, default=1e-3, min=0.0)
+graph_convergence_stable_passes =
+  validated(config.graph_convergence_stable_passes, default=1, min=1)
+
+stable_passes = 0
+passes_executed = 0
+
+for pass in 0..max_graph_relax_iters:
+  for current_idx in 0..node_count-1:
+    weighted_input_sum = 0.0
+    for input in internal_nodes[current_idx].inputs:
+      source_idx = input.source_idx as usize
+      source_value =
+        if source_idx >= node_count:
+          0.0
+        else if source_idx < current_idx:
+          curr_outputs[source_idx]   // already updated this pass
+        else:
+          prev_outputs[source_idx]   // self/backward/not-yet-updated
+
+      weighted_input_sum += source_value * input.weight
+
+    curr_outputs[current_idx] =
+      evaluate_kind(internal_nodes[current_idx].kind, weighted_input_sum)
+
+  passes_executed += 1
+  delta = max_abs(curr_outputs[i] - prev_outputs[i]) over i in 0..node_count-1
+  prev_outputs = curr_outputs
+
+  if delta <= graph_convergence_epsilon:
+    stable_passes += 1
+  else:
+    stable_passes = 0
+
+  if stable_passes >= graph_convergence_stable_passes:
+    break
+```
+
+This is "iterate until convergence or budget exhaustion." It is intentionally
+bounded by `max_graph_relax_iters` to prevent infinite internal loops.
 
 ---
 
@@ -128,8 +170,15 @@ Graph backend never emits `WorldAction` directly.
 
 ## 6. Energy Cost
 
-Graph node cost is charged per internal node evaluation (`graph_node_base_cost`
-or equivalent config-driven scalar).
+Graph node cost is charged per internal-node-per-pass evaluation
+(`graph_node_base_cost` or equivalent config-driven scalar).
+
+Equivalent requested energy:
+
+```text
+graph_energy_requested =
+  graph_node_base_cost * internal_nodes.len() * passes_executed
+```
 
 If energy is exhausted during graph evaluation, node evaluation halts and mesh
 execution returns `WorldAction::NoOp`.
@@ -140,6 +189,11 @@ execution returns `WorldAction::NoOp`.
 
 Determinism requirements:
 - Stable internal node order.
+- Stable bounded pass order (`0..max_graph_relax_iters-1`).
+- Stable edge source resolution rule (`curr_outputs` for `source_idx <
+  current_idx`, otherwise `prev_outputs`).
+- Stable convergence predicate (`delta <= graph_convergence_epsilon` for
+  `graph_convergence_stable_passes` consecutive passes).
 - Deterministic numeric sanitation rules.
 - Deterministic last-write-wins behavior.
 
@@ -147,3 +201,4 @@ Soft defaults:
 - Invalid edges read as `0.0`.
 - Missing input refs read as `0.0`.
 - Missing state lazily initialized to zeros.
+- Non-converged graphs at iteration cap use the last computed pass output.
