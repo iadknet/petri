@@ -149,10 +149,9 @@ If no target can be selected, event is skipped with `NoApplicableTarget`.
 
 After each event, run `ParseabilityGate`.
 
-Minimum required parseability invariants:
-- `nodes` is non-empty.
-- `node_id` values are unique.
-- backend payloads remain decodable.
+Required parseability invariants are defined authoritatively in
+`v3-genome-spec.md` (Section 4) and must be applied verbatim by
+`ParseabilityGate`.
 
 Not required for parseability:
 - `entry_node_id` resolves.

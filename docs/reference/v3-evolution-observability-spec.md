@@ -18,6 +18,13 @@ This document defines the minimal required observability contract for:
 - mutation processing outcomes,
 - reproduction/spawn outcomes.
 
+Minimal required scope includes:
+- required counters,
+- required reason enums.
+
+Event records are optional extensions for debugging/tuning and are specified as
+"required fields if enabled."
+
 This document is intentionally non-prescriptive about:
 - storage format,
 - transport/API shape,
@@ -77,10 +84,12 @@ Optional diagnostic detail:
 
 ---
 
-## 4. Minimal Event Record Schemas
+## 4. Optional Event Record Schemas (If Enabled)
 
-Implementations should provide event records where feasible for debugging and
-tuning. Minimum fields:
+Event records are not required by the minimal contract.
+
+If an implementation emits event records, it should provide the following
+minimum fields per event type:
 
 ### `MutationEvent`
 
