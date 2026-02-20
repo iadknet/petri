@@ -11,6 +11,7 @@ Related references:
 - `v3-graph-backend-spec.md`
 - `v3-mutation-spec.md`
 - `v3-reproduction-spec.md`
+- `v3-runtime-config-spec.md`
 
 ---
 
@@ -92,6 +93,8 @@ Notes:
   `upstream_slots`; backend slot writes overwrite addressed slots only.
 - Slots not written during a node evaluation pass through unchanged.
 - No visited set is used; self-loops are legal.
+- Canonical owner for `runtime.max_mesh_hops` defaults/validation:
+  `v3-runtime-config-spec.md`.
 
 ---
 
@@ -115,6 +118,8 @@ Graph internal recurrence rule:
 - Within one graph node evaluation, runtime iterates internal relaxation passes
   until convergence or `max_graph_relax_iters`, whichever comes first.
 - `max_graph_relax_iters` must be `>= 1` and cannot be disabled.
+- Canonical owner for graph convergence config defaults/validation:
+  `v3-runtime-config-spec.md`.
 
 ---
 
