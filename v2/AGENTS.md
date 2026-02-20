@@ -18,7 +18,7 @@ Local instructions for all work under `v2/`.
 ## Planning and Gates
 
 - For multi-step work, update the active plan in `docs/plans/`.
-- Keep checkpoint verification aligned with `docs/plans/2026-02-14-v2-implementation-test-matrix.md`.
+- Keep checkpoint verification aligned with active gate docs in `docs/plans/` (use `docs/plans/archive/` only for historical comparison).
 - Prefer small, checkpoint-scoped commits.
 - Golden rule for completion: checkpoint intent must be functionally implemented/integrated and test-proven, not contract-only.
 - Treat `docs/standards/runtime-behavior-realism-policy.md` as a standing requirement for any runtime-facing change.

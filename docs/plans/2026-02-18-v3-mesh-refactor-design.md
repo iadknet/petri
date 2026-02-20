@@ -15,7 +15,10 @@
 | `docs/reference/v3-vm-isa-spec.md` | Update in-place (add routing opcodes) |
 | `docs/reference/v3-graph-operator-spec.md` | Rewrite → `v3-graph-backend-spec.md` |
 | `docs/reference/v3-genome-sensor-spec.md` | Split → `v3-genome-spec.md` + `v3-sensor-spec.md` |
-| `docs/reference/v3-creature-lifecycle-spec.md` | Update in-place (add graph mutation operators) |
+| `docs/reference/v3-creature-lifecycle-spec.md` | Refactor to lifecycle overview/index |
+| `docs/reference/v3-mutation-spec.md` | New |
+| `docs/reference/v3-reproduction-spec.md` | New |
+| `docs/reference/v3-evolution-observability-spec.md` | New |
 | `docs/reference/v3-mesh-execution-spec.md` | New |
 | `docs/README.md` | Update reference links |
 
@@ -95,7 +98,10 @@ This document is the primary architecture/design plan for the mesh refactor. It 
 | `v3-graph-operator-spec.md` | Rewrite | → `v3-graph-backend-spec.md`: mini computation graph, co-located edges, internal node kinds, stateful operators, evaluation rules |
 | `v3-genome-sensor-spec.md` | Split | → `v3-genome-spec.md`: NodeGenome, BackendDef, GraphBackendDef, CreatureGenome, validation rules |
 | | | → `v3-sensor-spec.md`: Three-category sensor model, InputReference enum, sensor resolution |
-| `v3-creature-lifecycle-spec.md` | Update in-place | Add graph mutation operators, junk-DNA mutation policy, graph state init for offspring |
+| `v3-creature-lifecycle-spec.md` | Refactor | Lifecycle phase/invariant overview; links to detailed split mutation/reproduction specs |
+| (new) | Create | `v3-mutation-spec.md`: mutation engine boundaries, domain mutators, rollback+skip policy, parseability gate |
+| (new) | Create | `v3-reproduction-spec.md`: offspring draft contract, inheritance semantics, spawn queue, first-wins arbitration |
+| (new) | Create | `v3-evolution-observability-spec.md`: minimal counters, event schemas, skip/rejection reason contracts |
 | (new) | Create | `v3-mesh-execution-spec.md`: Chain evaluation, routing, output slots, energy metering, dynamic terminality |
 
 ### Archived docs

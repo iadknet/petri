@@ -4,6 +4,14 @@ Reference specification for evaluating a V3 creature mesh during cognition.
 
 Status: Active
 
+Related references:
+- `v3-genome-spec.md`
+- `v3-sensor-spec.md`
+- `v3-vm-isa-spec.md`
+- `v3-graph-backend-spec.md`
+- `v3-mutation-spec.md`
+- `v3-reproduction-spec.md`
+
 ---
 
 ## 1. Execution Entry and Runtime Boundary
@@ -143,12 +151,16 @@ mutating `energy` during execution.
 
 ---
 
-## 6. Determinism Requirements
+## 6. Test-Mode Reproducibility Notes
 
-To preserve reproducibility:
-- Routing conversion uses explicit signed-index mapping (`NaN -> -1`, `+inf -> i64::MAX`, `-inf -> i64::MIN`) and `rem_euclid` wrapping.
-- Float sanitation rules from VM/graph specs apply before routing decisions.
-- Node iteration order is deterministic (`nodes` order and internal graph order).
-- Graph convergence loop order and stop criteria are deterministic
+Production behavior is not required to be deterministic across runs. Runtime is
+required to preserve the safety and soft-default contracts in this spec.
+
+For deterministic tests, use a fixed mode that pins:
+- Routing conversion (`NaN -> -1`, `+inf -> i64::MAX`, `-inf -> i64::MIN`) and
+  `rem_euclid` wrapping.
+- Float sanitation rules from VM/graph specs before routing decisions.
+- Node iteration order (`nodes` order and internal graph order).
+- Graph convergence loop order and stop criteria
   (`max_graph_relax_iters`, epsilon threshold, stable-pass rule).
-- Soft-default fallbacks are deterministic constants (`0.0`, `NoOp`).
+- Soft-default fallback constants (`0.0`, `NoOp`).

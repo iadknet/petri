@@ -4,6 +4,13 @@ Reference specification for the v3 VM instruction set used by mesh VM nodes.
 
 Status: Active
 
+Related references:
+- `v3-genome-spec.md`
+- `v3-sensor-spec.md`
+- `v3-mesh-execution-spec.md`
+- `v3-mutation-spec.md`
+- `v3-reproduction-spec.md`
+
 ---
 
 ## 1. Registers and Values
@@ -105,6 +112,8 @@ These were replaced by unified `ReadInput` + `InputReference` dataflow and
 - `Halt` halts VM without emitting a world action.
 - VM runtime enforces a configurable step cap `max_vm_steps` per node
   evaluation (default `1024`, sourced from runtime config).
+- Production behavior is not required to be deterministic across runs. For
+  deterministic tests, pin RNG seed and execution order in the harness.
 
 ### VM step-cap safety
 
@@ -171,18 +180,18 @@ Memory addressing is never invalid; all addresses wrap with `rem_euclid(1024)`.
 
 ---
 
-## 5. Numeric Determinism
+## 5. Numeric Safety and Repeatability
 
 All register writes pass through `sanitize_f32`:
 - `NaN -> 0.0`
 - `+/-inf -> +/-1_000_000_000.0`
 - finite values clamped to `[-1e9, 1e9]`
 
-Additional deterministic rules:
+Defined numeric rules:
 - float->int conversions use ties-away-from-zero
 - `CmpEq` epsilon clamped to `[1e-6, 1.0]`
 - division by zero returns `0.0`
-- jump targets use deterministic signed `rem_euclid` wrapping by `program_len`
+- jump targets use signed `rem_euclid` wrapping by `program_len`
 
 ---
 
@@ -246,7 +255,7 @@ ignored and existing payload slot values are preserved.
 
 World-action metadata buffer size is fixed:
 - `WORLD_ACTION_META_SLOTS = 8`
-- non-configurable (to keep VM behavior stable across runs/configs)
+- non-configurable (to keep VM behavior consistent across configs)
 
 ### Action encoding and metadata mapping
 

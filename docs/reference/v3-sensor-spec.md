@@ -5,6 +5,14 @@ execution.
 
 Status: Active
 
+Related references:
+- `v3-genome-spec.md`
+- `v3-mesh-execution-spec.md`
+- `v3-vm-isa-spec.md`
+- `v3-graph-backend-spec.md`
+- `v3-mutation-spec.md`
+- `v3-reproduction-spec.md`
+
 ---
 
 ## 1. Unified InputReference
@@ -78,7 +86,7 @@ If `slot >= 12`, value is `0.0`.
 2. Call runtime mesh executor.
 3. Runtime resolves dynamic introspection and upstream slots per node evaluation.
 
-This split keeps borrow boundaries explicit and deterministic.
+This split keeps borrow boundaries explicit and easy to validate in tests.
 
 ---
 

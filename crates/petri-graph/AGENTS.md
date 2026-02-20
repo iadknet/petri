@@ -27,5 +27,7 @@ Local instructions for `crates/petri-graph`.
 ## Related Canonical Docs
 
 - Root policy: `AGENTS.md`
-- Controller reference: `docs/reference/creature-controller-reference.md`
-- Architecture context: `docs/strategy/architecture.md`
+- Docs index: `docs/README.md`
+- Active strategy docs: `docs/strategy/`
+- Active reference specs: `docs/reference/`
+- Archived reference specs: `docs/reference/archive/`

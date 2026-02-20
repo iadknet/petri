@@ -4,6 +4,13 @@ Reference specification for `BackendDef::Graph` execution.
 
 Status: Active
 
+Related references:
+- `v3-genome-spec.md`
+- `v3-sensor-spec.md`
+- `v3-mesh-execution-spec.md`
+- `v3-mutation-spec.md`
+- `v3-reproduction-spec.md`
+
 ---
 
 ## 1. Graph Backend Data Model
@@ -144,7 +151,7 @@ Graph state is keyed by mesh `NodeId`:
 HashMap<NodeId, Vec<f32>>
 ```
 
-Stateful operators use deterministic slot mapping by internal node index.
+Stateful operators use fixed slot mapping by internal node index.
 Example: internal node `i` uses state slot `i` in the owning mesh node state
 vector.
 
@@ -186,17 +193,19 @@ execution returns `WorldAction::NoOp`.
 
 ---
 
-## 7. Determinism and Soft Defaults
+## 7. Consistency and Soft Defaults
 
-Determinism requirements:
-- Stable internal node order.
-- Stable bounded pass order (`0..max_graph_relax_iters-1`).
-- Stable edge source resolution rule (`curr_outputs` for `source_idx <
+Production behavior is not required to be deterministic across runs.
+
+For deterministic tests, pin:
+- Internal node order.
+- Bounded pass order (`0..max_graph_relax_iters-1`).
+- Edge source resolution rule (`curr_outputs` for `source_idx <
   current_idx`, otherwise `prev_outputs`).
-- Stable convergence predicate (`delta <= graph_convergence_epsilon` for
+- Convergence predicate (`delta <= graph_convergence_epsilon` for
   `graph_convergence_stable_passes` consecutive passes).
-- Deterministic numeric sanitation rules.
-- Deterministic last-write-wins behavior.
+- Numeric sanitation rules.
+- Last-write-wins behavior.
 
 Soft defaults:
 - Invalid edges read as `0.0`.

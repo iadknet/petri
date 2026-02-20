@@ -26,4 +26,7 @@ Local instructions for `crates/petri-cli`.
 ## Related Canonical Docs
 
 - Root policy: `AGENTS.md`
-- Strategy docs: `docs/strategy/roadmap.md`, `docs/strategy/technology-review.md`
+- Docs index: `docs/README.md`
+- Active strategy docs: `docs/strategy/`
+- Active reference specs: `docs/reference/`
+- Archived reference specs: `docs/reference/archive/`

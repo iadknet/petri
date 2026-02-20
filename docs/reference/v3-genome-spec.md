@@ -4,6 +4,13 @@ Reference specification for the V3 creature mesh genome structure.
 
 Status: Active
 
+Related references:
+- `v3-mutation-spec.md`
+- `v3-reproduction-spec.md`
+- `v3-mesh-execution-spec.md`
+- `v3-vm-isa-spec.md`
+- `v3-graph-backend-spec.md`
+
 ---
 
 ## 1. Top-Level Genome
