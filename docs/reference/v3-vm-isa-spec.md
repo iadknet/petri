@@ -10,7 +10,8 @@ Status: Active
 
 - Register values are IEEE-754 `f32`.
 - Boolean truthiness is `value >= 0.5`.
-- Register and constant index violations are hard faults (panic).
+- VM operand handling is mutation-safe: genome-derived operand values must not
+  crash VM execution.
 
 ---
 
@@ -23,7 +24,7 @@ The VM defines **39 opcodes**.
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
 | 0 | `Noop` | none | No operation. |
-| 1 | `LoadConst` | dst, const_idx | `dst = constants[const_idx]` |
+| 1 | `LoadConst` | dst, const_idx | `dst = constants[const_idx]` (constant index normalization applies). |
 | 2 | `Move` | dst, src | `dst = src` |
 | 3 | `Add` | dst, a, b | `dst = a + b` |
 | 4 | `Sub` | dst, a, b | `dst = a - b` |
@@ -66,18 +67,18 @@ The VM defines **39 opcodes**.
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
 | 23 | `ReadInput` | dst, input_idx | reads `NodeGenome.input_refs[input_idx]`; invalid index yields `0.0` |
-| 24 | `ReadSensorCell` | dst, sensor_idx, field_idx | reads sensor-cell data |
-| 25 | `ReadSensorCreature` | dst, sensor_idx, field_idx | reads sensor-creature data |
-| 26 | `ReadSensorSummary` | dst, summary_idx | reads sensor-summary data |
-| 27 | `ReadNeighborCell` | dst, neighbor_idx, field_idx | reads neighbor-cell data |
-| 28 | `ReadNeighborCreature` | dst, neighbor_idx, field_idx | reads neighbor-creature data |
+| 24 | `ReadSensorCell` | dst, sensor_idx, field_idx | reads sensor-cell data; invalid index/field yields `0.0` |
+| 25 | `ReadSensorCreature` | dst, sensor_idx, field_idx | reads sensor-creature data; invalid index/field yields `0.0` |
+| 26 | `ReadSensorSummary` | dst, summary_idx | reads sensor-summary data; invalid index yields `0.0` |
+| 27 | `ReadNeighborCell` | dst, neighbor_idx, field_idx | reads neighbor-cell data; invalid index/field yields `0.0` |
+| 28 | `ReadNeighborCreature` | dst, neighbor_idx, field_idx | reads neighbor-creature data; invalid index/field yields `0.0` |
 
 ### Output and Routing Writes
 
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
-| 29 | `WriteInternalPayload` | slot_idx, src | write internal payload slot |
-| 30 | `WriteWorldActionMeta` | slot_idx, src | write world-action metadata slot |
+| 29 | `WriteInternalPayload` | slot_idx, src | writes candidate output slot value (invalid slot write ignored) |
+| 30 | `WriteWorldActionMeta` | slot_idx, src | writes world-action metadata slot (invalid slot write ignored) |
 | 31 | `EmitInternal` | action_type | emit internal action payload |
 | 32 | `EmitWorldAction` | action_type | emit world action and halt |
 | 33 | `WriteRouteTarget` | src_reg | write candidate route target value (`f32`) |
@@ -97,10 +98,28 @@ The VM defines **39 opcodes**.
 ## 3. VM Execution Rules
 
 - PC starts at `0`; normal step increments by `+1`.
-- Jumps apply signed offsets; negative PC is a hard fault.
 - Per-opcode energy metering applies; exhausted energy halts node execution.
 - `EmitWorldAction` halts VM immediately.
 - `Halt` halts VM without emitting a world action.
+
+### Jump target safety
+
+Jump targets are mutation-safe:
+- compute next PC using signed offset semantics
+- if computed PC is outside `0..program_len`, VM halts immediately
+
+This replaces hard-fault behavior for negative/out-of-range PCs.
+
+### Operand normalization rules
+
+All genome-derived indexes are handled without panic:
+
+- **Register index**: normalized by modulo `register_count`.
+- **Constant index**: if `constants` empty -> `0.0`; else modulo `constants.len()`.
+- **Payload/meta slot index**: out-of-range writes are ignored.
+- **Sensor/neighbor index or field index**: invalid index/field reads yield `0.0`.
+
+If `register_count == 0`, VM halts immediately (no action emission).
 
 ### `ReadInput` and Upstream Slot Resolution
 
@@ -124,15 +143,17 @@ Invalid `input_idx` is a soft default and yields `0.0`.
 
 ## 4. Fault Semantics
 
-Hard faults (panic):
-- invalid register index
-- invalid constant index
-- invalid payload/meta slot index
-- invalid neighbor/sensor field index
+VM execution loop must be crash-proof for evolved genomes.
 
-Soft defaults:
-- invalid `ReadInput` index -> `0.0`
-- `InputReference::UpstreamOutput` slot out of range -> `0.0`
+Soft defaults / graceful behavior:
+- invalid register/constant/index operands use normalization rules
+- invalid sensor/neighbor fields yield `0.0`
+- invalid payload/meta writes are ignored
+- invalid jump target halts VM
+
+Implementation bugs outside mutation-space (for example corrupted in-memory
+instruction representation) are still defects, but evolved operands do not
+panic the VM.
 
 Memory addressing is never invalid; all addresses wrap with `rem_euclid(1024)`.
 
@@ -203,7 +224,7 @@ v3 energy is `u32`; costs are scaled to integer units by global multiplier.
 ## 7. Output Lifecycle
 
 VM node evaluation maintains:
-- internal payload buffer
+- internal payload buffer (12 slots)
 - world action metadata buffer
 - route target register
 
@@ -211,8 +232,11 @@ All writes are last-write-wins per slot/register.
 
 At node end:
 - if world action emitted: action returned; routing ignored
-- else route target is returned in `NodeResult.route_target_idx`
-- payload/meta buffers are discarded after dispatch
+- otherwise internal payload buffer is emitted as `NodeResult.output_slots`
+- route target is returned in `NodeResult.route_target_idx`
+- payload/meta buffers are discarded after node dispatch
+
+This makes `WriteInternalPayload` the VM path for producing routed output slots.
 
 ---
 
