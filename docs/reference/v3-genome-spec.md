@@ -48,6 +48,7 @@ pub enum BackendDef {
 
 `VmBackendDef` is defined in `v3-vm-isa-spec.md`.
 `GraphBackendDef` is defined in `v3-graph-backend-spec.md`.
+Topology examples are documented in `v3-genome-topology-examples.md`.
 
 ---
 
