@@ -37,6 +37,8 @@ For an internal node at `current_idx`:
 - Each input reads source output from `source_idx`.
 - Contribution is `source_value * weight`.
 - Invalid `source_idx` (`>= current_idx` or out of bounds) contributes `0.0`.
+- The node's weighted aggregate is:
+  `weighted_input_sum = sum(contribution_i)`.
 
 This prevents crashes from mutations and forbids backward edge dependency during
 single-pass evaluation.
@@ -76,11 +78,19 @@ pub enum GraphNodeKind {
 }
 ```
 
-`InputRef(u8)` reads through `NodeGenome.input_refs` (ignores internal weighted
-inputs).
+`InputRef(u8)` reads through `NodeGenome.input_refs` and combines it with the
+node's internal weighted aggregate:
 
-`InputUpstreamSlot(u8)` reads from routing parent output slots (ignores
-internal weighted inputs). Invalid slot reads yield `0.0`.
+`output = input_ref_value + weighted_input_sum`
+
+Missing input refs read as `0.0`.
+
+`InputUpstreamSlot(u8)` reads from routing parent output slots and combines that
+base value with internal weighted aggregate:
+
+`output = upstream_slot_value + weighted_input_sum`
+
+Invalid slot reads yield `0.0`.
 
 ---
 
