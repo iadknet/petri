@@ -121,9 +121,9 @@ reason breakdowns remain mandatory.
 
 ---
 
-## 6. Test-Mode Reproducibility (Optional)
+## 6. Policy References
 
-Production behavior is not required to be deterministic across runs.
-
-For deterministic tests and replay analysis, harnesses may pin RNG seed and
-processing order so that counter/event sequences are reproducible.
+- Project-level determinism scope is canonical in `AGENTS.md`
+  (`Determinism Scope (Canonical)`).
+- V3 harness reproducibility controls are canonical in
+  `v3-mesh-execution-spec.md` (`Test-Mode Reproducibility Notes`).

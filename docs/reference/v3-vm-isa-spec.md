@@ -112,8 +112,9 @@ These were replaced by unified `ReadInput` + `InputReference` dataflow and
 - `Halt` halts VM without emitting a world action.
 - VM runtime enforces a configurable step cap `max_vm_steps` per node
   evaluation (default `1024`, sourced from runtime config).
-- Production behavior is not required to be deterministic across runs. For
-  deterministic tests, pin RNG seed and execution order in the harness.
+- Determinism scope is canonical in `AGENTS.md` and V3 harness reproducibility
+  controls are specified in `v3-mesh-execution-spec.md`
+  (`Test-Mode Reproducibility Notes`).
 
 ### VM step-cap safety
 
@@ -165,6 +166,10 @@ Invalid `input_idx` is a soft default and yields `0.0`.
 ## 4. Fault Semantics
 
 VM execution loop must be crash-proof for evolved genomes.
+
+Cross-runtime fallback outcomes (for example chain-level `WorldAction::NoOp`
+resolution) are canonical in `v3-mesh-execution-spec.md` (Section 4,
+authoritative soft-default matrix).
 
 Soft defaults / graceful behavior:
 - invalid register/constant/index operands use normalization rules

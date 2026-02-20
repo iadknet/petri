@@ -20,7 +20,7 @@ Local instructions for `v2/crates/v2-server`.
 
 - Non-2xx responses must follow the CP-3 error envelope.
 - Lifecycle transitions must stay consistent with CP-3 rules.
-- Event ordering for same tick must remain deterministic.
+- Event ordering for same tick must remain stable where tests/fixtures and protocol assertions require reproducibility.
 - Backward compatibility is not required; schema changes may assume restart.
 - Runtime-facing payload fields (`status`, `frame`, `health`, and equivalent future surfaces) must remain behavior-truthful per `docs/standards/runtime-behavior-realism-policy.md`.
 

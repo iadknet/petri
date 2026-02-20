@@ -14,7 +14,7 @@ Local instructions for `crates/petri-cli`.
 
 ## Benchmark and Ablation Expectations
 
-- Keep deterministic presets clearly named and documented.
+- Keep reproducible benchmark presets clearly named and documented.
 - Treat benchmark thresholds as project policy, not ad hoc local overrides.
 - If behavior changes affect benchmark interpretation, document expectations in plans.
 

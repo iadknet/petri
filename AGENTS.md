@@ -4,7 +4,7 @@ Project-level instructions for coding agents working in this repository.
 
 ## Mission
 
-Build the Petri simulation incrementally while preserving deterministic testability, clear crate boundaries, reproducible toolchains, and strict quality gates.
+Build the Petri simulation incrementally while preserving high-confidence testability, clear crate boundaries, reproducible toolchains, and strict quality gates.
 
 ## Golden Rule
 
@@ -38,6 +38,11 @@ See canonical policy: `docs/standards/agent-instruction-layering.md`.
 - `initial_creatures` remains best-effort (bounded by occupancy and max creatures).
 - `food_growth_rate` is honored directly (no hidden minimum floor).
 - Localhost defaults (`127.0.0.1`) are intentional unless explicitly changed.
+
+## Determinism Scope (Canonical)
+
+- Production runtime determinism is not a product requirement.
+- Deterministic behavior is required in tests/harnesses when assertions depend on reproducibility.
 
 ## Required Workflow
 

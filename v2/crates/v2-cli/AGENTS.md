@@ -7,7 +7,7 @@ Local instructions for `v2/crates/v2-cli`.
 `v2-cli` owns headless workflows over `v2-core`:
 - run loop execution commands
 - ablation workflows
-- deterministic NDJSON reporting
+- reproducible NDJSON reporting for tests/fixtures
 
 ## Boundary Rules
 
@@ -17,7 +17,7 @@ Local instructions for `v2/crates/v2-cli`.
 
 ## Contract Guardrails
 
-- NDJSON events must keep deterministic required fields and ordering per checkpoint.
+- NDJSON events must keep required fields and stable ordering per checkpoint fixtures/tests.
 - Prefer explicit event payloads over ad-hoc logging.
 - Unknown-field and shape regressions should fail tests.
 - Backward compatibility is not required; schema changes may assume restart.

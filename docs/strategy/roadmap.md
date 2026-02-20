@@ -5,7 +5,7 @@
 - V3 mesh architecture is the active implementation target.
 - Legacy v1/v2 stacks are reference-only during this program.
 - Checkpoint gates and reference specs are the source of truth for completion.
-- Deterministic, test-backed contracts take priority over feature breadth.
+- Test-reproducible, high-confidence contracts take priority over feature breadth.
 
 ## Active Program Structure
 
@@ -33,7 +33,9 @@ Canonical reference specs:
 
 - Preserve strict abstraction boundaries while implementing mesh runtime.
 - Enforce crash-proof evaluation under junk-DNA mutation behavior.
-- Keep determinism guarantees explicit and test-backed.
+- Keep test reproducibility guarantees explicit and harness-backed.
+
+Determinism scope is canonical in `AGENTS.md` (`Determinism Scope (Canonical)`).
 
 ## Done Criteria for Current Documentation Phase
 
