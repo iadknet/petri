@@ -193,21 +193,16 @@ execution returns `WorldAction::NoOp`.
 
 ---
 
-## 7. Consistency and Soft Defaults
+## 7. Backend-Local Soft Defaults
 
-Production behavior is not required to be deterministic across runs.
+Determinism scope is canonical in `AGENTS.md`; V3 harness reproducibility
+controls are specified in `v3-mesh-execution-spec.md`
+(`Test-Mode Reproducibility Notes`).
 
-For deterministic tests, pin:
-- Internal node order.
-- Bounded pass order (`0..max_graph_relax_iters-1`).
-- Edge source resolution rule (`curr_outputs` for `source_idx <
-  current_idx`, otherwise `prev_outputs`).
-- Convergence predicate (`delta <= graph_convergence_epsilon` for
-  `graph_convergence_stable_passes` consecutive passes).
-- Numeric sanitation rules.
-- Last-write-wins behavior.
+Cross-runtime fallback outcomes are canonical in
+`v3-mesh-execution-spec.md` (Section 4, authoritative soft-default matrix).
 
-Soft defaults:
+Backend-local soft defaults:
 - Invalid edges read as `0.0`.
 - Missing input refs read as `0.0`.
 - Missing state lazily initialized to zeros.

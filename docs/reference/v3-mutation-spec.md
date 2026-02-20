@@ -158,7 +158,9 @@ Not required for parseability:
 - all route targets resolve.
 - all graph internal edges are runtime-valid.
 
-These non-required conditions are handled by runtime soft defaults.
+These non-required conditions are handled by runtime soft defaults; canonical
+chain-level fallback behavior is in
+`v3-mesh-execution-spec.md` (Section 4, authoritative soft-default matrix).
 
 ---
 
@@ -193,12 +195,9 @@ At minimum:
 
 ---
 
-## 8. Test-Mode Reproducibility (Optional)
+## 8. Policy References
 
-Production behavior is not required to be deterministic across runs.
-
-For deterministic tests, harnesses may pin:
-- RNG seed.
-- event-domain/operator traversal order.
-- mutation budget settings.
-- tie-breaking conventions inside domain mutators.
+- Project-level determinism scope is canonical in `AGENTS.md`
+  (`Determinism Scope (Canonical)`).
+- V3 harness reproducibility controls are canonical in
+  `v3-mesh-execution-spec.md` (`Test-Mode Reproducibility Notes`).

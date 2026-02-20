@@ -158,12 +158,9 @@ At minimum:
 
 ---
 
-## 8. Test-Mode Reproducibility (Optional)
+## 8. Policy References
 
-Production behavior is not required to be deterministic across runs.
-
-For deterministic tests, harnesses may pin:
-- Action queue ordering.
-- Spawn candidate processing order.
-- RNG seed for mutation and reproduction direction/energy generation when those
-  are randomized.
+- Project-level determinism scope is canonical in `AGENTS.md`
+  (`Determinism Scope (Canonical)`).
+- V3 harness reproducibility controls are canonical in
+  `v3-mesh-execution-spec.md` (`Test-Mode Reproducibility Notes`).

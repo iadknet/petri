@@ -118,9 +118,12 @@ Graph internal recurrence rule:
 
 ---
 
-## 4. Soft Default Contract (Junk DNA Safe)
+## 4. Authoritative Soft-Default Matrix (Junk DNA Safe)
 
 Runtime must never panic on malformed evolved topologies.
+
+This section is the authoritative soft-default matrix for V3 chain-level runtime
+behavior.
 
 | Condition | Runtime behavior |
 |---|---|
@@ -151,10 +154,12 @@ mutating `energy` during execution.
 
 ---
 
-## 6. Test-Mode Reproducibility Notes
+## Test-Mode Reproducibility Notes
 
-Production behavior is not required to be deterministic across runs. Runtime is
-required to preserve the safety and soft-default contracts in this spec.
+Project-level determinism scope is canonical in `AGENTS.md` (`Determinism Scope
+(Canonical)`): production runtime determinism is not a product requirement.
+
+This section defines V3-local harness controls for deterministic tests.
 
 For deterministic tests, use a fixed mode that pins:
 - Routing conversion (`NaN -> -1`, `+inf -> i64::MAX`, `-inf -> i64::MIN`) and

@@ -12,7 +12,7 @@ Shared instructions for `v2/crates/*`.
 
 - Keep public interfaces explicit and minimal.
 - When wire-facing contracts change, update tests and CP docs in the same slice.
-- Prefer deterministic, fixture-friendly behavior over implicit defaults.
+- Prefer reproducible, fixture-friendly behavior in tests over implicit defaults.
 - No backward-compatibility layer is required in this phase; breaking changes may assume restart.
 
 ## Testing

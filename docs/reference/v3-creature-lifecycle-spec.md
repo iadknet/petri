@@ -54,17 +54,13 @@ specified in `v3-mutation-spec.md`.
 
 Mutation processing enforces structural parseability, not behavioral viability.
 
-Minimum structural invariants:
-- `nodes` remains non-empty.
-- `node_id` values remain unique.
-- backend payloads remain decodable.
+Canonical parseability invariants are specified in
+`v3-genome-spec.md` (Section 4) and applied by mutation
+`ParseabilityGate` in `v3-mutation-spec.md`.
 
-Not required for structural parseability:
-- `entry_node_id` resolves.
-- all route targets resolve.
-- all graph edges are runtime-valid.
-
-Runtime execution owns handling for those degraded but parseable cases.
+Canonical runtime fallback behavior for degraded-but-parseable genomes is
+specified in `v3-mesh-execution-spec.md` (Section 4, authoritative soft-default
+matrix).
 
 ---
 
@@ -103,9 +99,9 @@ rejections are specified in `v3-evolution-observability-spec.md`.
 
 ---
 
-## 6. Test-Mode Reproducibility (Optional)
+## 6. Policy References
 
-Production behavior is not required to be deterministic across runs.
-
-For deterministic tests, harnesses may pin RNG seed and processing order while
-maintaining the same lifecycle safety and soft-default contracts.
+- Project-level determinism scope is canonical in `AGENTS.md`
+  (`Determinism Scope (Canonical)`).
+- V3 harness reproducibility controls are canonical in
+  `v3-mesh-execution-spec.md` (`Test-Mode Reproducibility Notes`).

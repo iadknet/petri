@@ -8,7 +8,7 @@ Local instructions for `v2/crates/v2-core`.
 - mesh schema and execution semantics
 - VM/graph backend behavior
 - evolution/ecology policy
-- deterministic runtime telemetry needed by higher layers
+- runtime telemetry semantics needed by higher layers
 
 ## Boundary Rules
 
@@ -21,7 +21,8 @@ Local instructions for `v2/crates/v2-core`.
 - Runtime ordering, energy charging, and validation semantics are contract surface.
 - World tick semantics (action application, energy change, and depletion/removal paths where applicable) are contract surface.
 - Backward compatibility is not required; runtime/schema changes may require world restart.
-- Keep randomness seed-driven and deterministic in tests.
+- Determinism scope is canonical in root `AGENTS.md`; deterministic behavior is required in tests/harnesses when assertions depend on reproducibility.
+- Keep randomness seed-driven in tests that require reproducibility.
 
 ## Test Expectations
 

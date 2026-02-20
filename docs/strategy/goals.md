@@ -23,6 +23,7 @@ Use these goal IDs in `Goal IDs` metadata for active plans and architecture docs
 ### GP-03 Keep Iteration High-Confidence
 
 - Why this matters: Fast, reliable tests and safe refactoring are required for sustained progress.
+- Determinism scope reference: `AGENTS.md` (`Determinism Scope (Canonical)`).
 - Non-goals:
   - Treating determinism as a product goal by itself.
   - Accepting changes that reduce test confidence.

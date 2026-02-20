@@ -14,7 +14,7 @@ Local instructions for `crates/petri-graph`.
 
 ## Mutation and Eval Guardrails
 
-- Preserve deterministic evaluation behavior under fixed seeds.
+- Preserve deterministic evaluation behavior in fixed-seed test modes.
 - Keep mutation operators bounded and covered by tests.
 - When adding node semantics, update palette/evaluation tests and corresponding docs.
 

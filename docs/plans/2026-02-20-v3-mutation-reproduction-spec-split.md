@@ -49,8 +49,8 @@
 | area | decision | rationale |
 | --- | --- | --- |
 | `docs/reference/v3-creature-lifecycle-spec.md` | change | Lifecycle should describe phase-level semantics and link to dedicated mutation/reproduction contracts to avoid one-file policy sprawl. |
-| `docs/reference/v3-mesh-execution-spec.md` | keep + link updates | Runtime soft-default/termination policy remains authoritative there; add links to mutation/reproduction contracts rather than duplicating them. |
-| `docs/reference/v3-vm-isa-spec.md` + `docs/reference/v3-graph-backend-spec.md` | keep + link updates | Backend execution semantics stay in backend specs; mutation ownership is referenced, not duplicated. |
+| `docs/reference/v3-mesh-execution-spec.md` | keep | Runtime soft-default/termination policy remains authoritative there; links to mutation/reproduction contracts are updated rather than duplicated. |
+| `docs/reference/v3-vm-isa-spec.md` + `docs/reference/v3-graph-backend-spec.md` | keep | Backend execution semantics stay in backend specs; mutation ownership is referenced via updated links, not duplicated. |
 | `docs/plans/2026-02-18-v3-mesh-refactor-design.md` | change | Architecture doc must list the new split reference docs to prevent canonical-doc drift. |
 
 ## Open Questions

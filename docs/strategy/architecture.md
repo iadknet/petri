@@ -6,16 +6,18 @@ This document defines the active target architecture for the V3 mesh runtime.
 Legacy root crates, v1/v2 docs, and root `web/` are retained as historical
 reference only.
 
-Goal IDs: `GP-01`, `GP-02`, `GP-03`, `GP-04`
+**Goal IDs:** `GP-01`, `GP-02`, `GP-03`, `GP-04`
 
 ## Goal Alignment
 
 - `GP-01`: richer creature cognition via multi-node mesh execution.
 - `GP-02`: explicit module boundaries across kernel, sensors, creature, runtime,
   tick, and contracts.
-- `GP-03`: deterministic, test-backed iteration with crash-proof soft defaults.
+- `GP-03`: test-reproducible, high-confidence iteration with crash-proof soft defaults.
 - `GP-04`: observable behavior and runtime introspection suitable for evolution
   debugging.
+
+Determinism scope is canonical in `AGENTS.md` (`Determinism Scope (Canonical)`).
 
 ## Boundary Impact
 
@@ -35,9 +37,16 @@ No dependency from active V3 docs into legacy implementation contracts.
 | --- | --- | --- |
 | `v3/crates/v3-core/src/kernel` | keep | world reality independent of cognition backend details |
 | `v3/crates/v3-core/src/sensors` | keep | snapshot assembly separated from runtime mutation logic |
-| `v3/crates/v3-core/src/runtime` | keep/refine | owns chain evaluation, routing, VM/graph execution |
+| `v3/crates/v3-core/src/runtime` | keep | owns chain evaluation, routing, VM/graph execution |
 | `v3/crates/v3-core/src/tick` | keep | phase orchestration and action application stay outside runtime internals |
-| legacy `crates/petri-*`, `v2/`, root `web/` | keep (reference-only) | traceability without active coupling |
+| legacy `crates/petri-*`, `v2/`, root `web/` | keep | traceability without active coupling |
+
+## Open Questions
+
+| question | decision | owner | status |
+| --- | --- | --- | --- |
+| Are there unresolved architecture-direction questions for the active V3 target? | No unresolved direction questions at this time. | user+agent | resolved |
+| Where is determinism policy canonical? | Root `AGENTS.md` (`Determinism Scope (Canonical)`). | user+agent | resolved |
 
 ## Repository Architecture (Active Slice)
 

@@ -76,8 +76,9 @@ Deliberately not required at validation time:
 - Every `targets` id must resolve.
 - Graph nodes must have non-empty targets.
 
-These are handled by mesh runtime soft defaults (`NoOp`) to preserve evolutionary
-freedom.
+These are handled by mesh runtime soft defaults to preserve evolutionary
+freedom; the authoritative chain-level fallback matrix is in
+`v3-mesh-execution-spec.md` (Section 4).
 
 ---
 
