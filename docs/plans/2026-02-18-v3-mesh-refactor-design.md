@@ -130,8 +130,12 @@ execute_creature_mesh(genome, static_inputs, energy, memory, graph_state, config
     │
     ├── If no targets and no action → return NoOp
     │
-    ├── target_idx = if NaN then 0 else max(0, floor(route_target))
-    ├── Select target: targets.get(target_idx) (None = NoOp)
+    ├── route_idx = map(route_target):
+    │      NaN -> -1, +inf -> i64::MAX, -inf -> i64::MIN,
+    │      finite -> floor(value) clamped to i64 range
+    ├── target_idx = route_idx.rem_euclid(targets.len() as i64) as usize
+    ├── Select target id: targets[target_idx]
+    ├── If selected target id missing from genome -> NoOp
     ├── upstream_slots = node_result.output_slots
     ├── current_node = target (may be same node — self-targeting valid)
     └── hops += 1
@@ -155,7 +159,8 @@ execute_creature_mesh(genome, static_inputs, energy, memory, graph_state, config
 ### Soft default runtime contract
 
 - Missing `entry_node_id` → `WorldAction::NoOp`
-- Missing or out-of-range route target → `WorldAction::NoOp`
+- Missing routed target id (dangling NodeId) → `WorldAction::NoOp`
+- Routed index (negative, out-of-range, non-finite) wraps with signed `rem_euclid`
 - Empty `targets` when routing is required → `WorldAction::NoOp`
 - Invalid input ref / upstream slot read → `0.0`
 - Missing graph state for a node id → allocate zero-initialized state for that node
