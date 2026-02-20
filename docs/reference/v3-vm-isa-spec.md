@@ -73,7 +73,7 @@ The VM defines **33 opcodes**.
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
 | 24 | `WriteInternalPayload` | slot_idx, src | writes candidate output slot value (invalid slot write ignored) |
-| 25 | `WriteWorldActionMeta` | slot_idx, src | writes world-action metadata slot (invalid slot write ignored) |
+| 25 | `WriteWorldActionMeta` | slot_idx, src | writes world-action metadata slot (`slot_idx` in `0..7`; invalid slot write ignored) |
 | 26 | `EmitWorldAction` | action_type | emit world action and halt |
 | 27 | `WriteRouteTarget` | src_reg | write candidate route target value (`f32`) |
 
@@ -126,7 +126,8 @@ All genome-derived indexes are handled without panic:
 
 - **Register index**: normalized by modulo `register_count`.
 - **Constant index**: if `constants` empty -> `0.0`; else modulo `constants.len()`.
-- **Payload/meta slot index**: out-of-range writes are ignored.
+- **Payload slot index**: valid when `< 12`; otherwise write ignored.
+- **World-action metadata slot index**: valid when `< 8`; otherwise write ignored.
 
 If `register_count == 0`, VM halts immediately (no action emission).
 
@@ -228,12 +229,16 @@ v3 energy is `u32`; costs are scaled to integer units by global multiplier.
 
 VM node evaluation maintains:
 - internal payload buffer (12 slots)
-- world action metadata buffer
+- world action metadata buffer (8 slots)
 - route target register
 
 All three buffers are zeroed at the start of each VM node evaluation.
 
 All writes are last-write-wins per slot/register.
+
+World-action metadata buffer size is fixed:
+- `WORLD_ACTION_META_SLOTS = 8`
+- non-configurable (to keep VM behavior stable across runs/configs)
 
 ### Action encoding and metadata mapping
 
@@ -253,6 +258,7 @@ Metadata decode rules:
 - reproduce energy amount uses `meta[1].max(0.0).round() as u32`
 - unspecified metadata slots are reserved and ignored by current runtime action
   decoding
+- `WriteWorldActionMeta` to `slot_idx >= 8` is ignored
 
 At node end:
 - if world action emitted: action returned; routing ignored
