@@ -64,14 +64,15 @@
 | Should v3 use a separate crate for graph backend? | No — keep in v3-core as `runtime/graph.rs` | user+agent | resolved |
 | How should GraphBackendDef store edges? | Co-located inputs per node (not separate edge array) | user+agent | resolved |
 | Should output slot count be fixed or evolvable? | Fixed constant (12) | user+agent | resolved |
-| Where does graph local state live? | `Vec<f32>` on CreatureState | user+agent | resolved |
+| Where does graph local state live? | `HashMap<NodeId, Vec<f32>>` on CreatureState keyed by mesh node id | user+agent | resolved |
 | How is graph energy cost calculated? | Flat per-internal-node cost | user+agent | resolved |
-| How should entry node upstream slots be handled? | Always zeroed `[0.0; 12]` | user+agent | resolved |
+| How should entry node upstream slots be handled? | Zeroed `[0.0; 12]` only at chain start; later re-entry uses routed upstream slots | user+agent | resolved |
 | Are NeighborCell/NeighborCreature world inputs? | Yes — unified under `WorldInputKey` | user+agent | resolved |
 | Should GraphNodeKind have explicit sensor input variants? | No — use `InputRef(idx)` into shared `input_refs` | user+agent | resolved |
 | Is terminality static or dynamic? | Dynamic — VM nodes decide at runtime whether to emit or route | user+agent | resolved |
 | Should the simple founder be VM-only? | No — simple founder should be a mesh with multiple node types | user+agent | resolved |
 | How should sensors handle values that change during mesh evaluation? | Three categories: World (snapshot), Static Introspection (snapshot), Dynamic Introspection (live from creature state) | user+agent | resolved |
+| Should mesh execution rely only on energy for termination? | No — energy remains primary, but runtime enforces hardcoded `MAX_MESH_HOPS` failsafe | user+agent | resolved |
 
 ---
 
@@ -94,7 +95,7 @@ A slim (~300–400 line) `2026-02-18-v3-architecture-design.md` replacing the 99
 | `v3-graph-operator-spec.md` | Rewrite | → `v3-graph-backend-spec.md`: mini computation graph, co-located edges, internal node kinds, stateful operators, evaluation rules |
 | `v3-genome-sensor-spec.md` | Split | → `v3-genome-spec.md`: NodeGenome, BackendDef, GraphBackendDef, CreatureGenome, validation rules |
 | | | → `v3-sensor-spec.md`: Three-category sensor model, InputReference enum, sensor resolution |
-| `v3-creature-lifecycle-spec.md` | Update in-place | Add graph mutation operators, graph validity rules, graph state init for offspring |
+| `v3-creature-lifecycle-spec.md` | Update in-place | Add graph mutation operators, junk-DNA mutation policy, graph state init for offspring |
 | (new) | Create | `v3-mesh-execution-spec.md`: Chain evaluation, routing, output slots, energy metering, dynamic terminality |
 
 ### Archived docs
@@ -110,12 +111,15 @@ Move to `docs/plans/archive/`:
 ### Chain evaluation
 
 ```
-execute_creature_mesh(genome, static_inputs, creature_state, config)
+execute_creature_mesh(genome, static_inputs, energy, memory, graph_state, config)
 │
-├── current_node = genome.entry_node
+├── current_node = genome.entry_node_id
 ├── upstream_slots = [0.0; 12]
+├── hops = 0
 │
 └── LOOP:
+    │
+    ├── If hops >= MAX_MESH_HOPS → return NoOp
     │
     ├── Evaluate current_node (VM or Graph)
     │   ├── Costs energy (per-opcode for VM, per-internal-node for Graph)
@@ -126,25 +130,35 @@ execute_creature_mesh(genome, static_inputs, creature_state, config)
     │
     ├── If no targets and no action → return NoOp
     │
-    ├── Select target: targets[clamp(route_target_idx, 0, len-1)]
+    ├── target_idx = if NaN then 0 else max(0, floor(route_target))
+    ├── Select target: targets[target_idx] (missing target = NoOp)
     ├── upstream_slots = node_result.output_slots
-    └── current_node = target (may be same node — self-targeting valid)
+    ├── current_node = target (may be same node — self-targeting valid)
+    └── hops += 1
 ```
 
 ### Key rules
 
 - **No visited set** — nodes can be evaluated multiple times; loops and self-targeting are valid
-- **No max chain depth** — energy exhaustion is the sole termination guard
+- **Hard failsafe hop cap** — `MAX_MESH_HOPS` is a runtime constant independent of config/energy (prevents deadlock if costs are zero)
 - **Dynamic terminality** — VM nodes decide at runtime whether to emit a WorldAction (terminal) or route to a target (non-terminal); the same node can do either on different ticks
-- **Graph nodes cannot be terminal** — they must always have targets (enforced by genome validation)
+- **Junk DNA allowed** — broken routing and dangling IDs are tolerated; runtime degrades to `NoOp` rather than panicking
 - **Output slots** — 12 f32 values (fixed constant), default 0.0, passed from each node to the next
-- **Entry node** — receives zeroed upstream slots `[0.0; 12]`
+- **Entry node upstream semantics** — zeroed `[0.0; 12]` only on first hop; later routes into entry receive routed slots like any other node
 
 ### Energy metering
 
 - **VM nodes**: per-opcode cost (existing model, unchanged)
 - **Graph nodes**: flat per-internal-node cost (configurable)
 - Energy drains during evaluation — downstream nodes see current (reduced) energy via Dynamic Introspection
+
+### Soft default runtime contract
+
+- Missing `entry_node_id` → `WorldAction::NoOp`
+- Missing or out-of-range route target → `WorldAction::NoOp`
+- Empty `targets` when routing is required → `WorldAction::NoOp`
+- Invalid input ref / upstream slot read → `0.0`
+- Missing graph state for a node id → allocate zero-initialized state for that node
 
 ---
 
@@ -157,7 +171,7 @@ pub struct NodeGenome {
     pub node_id: NodeId,
     pub input_refs: Vec<InputReference>,  // unified sensor mapping for both backends
     pub backend_def: BackendDef,
-    pub targets: Vec<NodeId>,             // routing targets (empty = can only emit or NoOp)
+    pub targets: Vec<NodeId>,             // routing targets (may contain dangling ids; runtime handles safely)
 }
 ```
 
@@ -185,12 +199,12 @@ pub struct GraphInternalNode {
 }
 
 pub struct GraphInput {
-    pub source_idx: u16,   // index of source node (must be < this node's index)
+    pub source_idx: u16,   // intended source node index; invalid indexes soft-default to 0.0 at runtime
     pub weight: f32,
 }
 ```
 
-Each internal node carries its own input edges. During evaluation, iterate nodes in array order — inputs are co-located, no edge lookup needed. Topological constraint: `source_idx < current_idx`.
+Each internal node carries its own input edges. During evaluation, iterate nodes in array order — inputs are co-located, no edge lookup needed. If mutation produces invalid `source_idx` (`>= current_idx` or out of bounds), that input contributes `0.0` (junk-DNA safe fallback).
 
 ### GraphNodeKind
 
@@ -283,7 +297,7 @@ pub enum DynamicIntrospectionKey {
 - `contracts/outputs.rs` — minimal changes
 - `config/` — add `GraphConfig`, `MeshConfig`, graph mutation rates
 - `sensors/` — produces static snapshot (World + StaticIntrospection)
-- `creature/state.rs` — add `graph_state: Vec<f32>` for stateful operators
+- `creature/state.rs` — add `graph_state: HashMap<NodeId, Vec<f32>>` for stateful graph operators
 - `tick/orchestrator.rs` — change runtime call to mesh executor
 
 ### Significant refactors (in-place)
@@ -323,9 +337,9 @@ Three-layer testing: contract tests, intent verification tests, integration test
 ### New test areas
 
 1. **Graph evaluation** — internal node computation, weighted inputs, stateful operators, output slot collection
-2. **Mesh chain evaluation** — routing, output slot passing, energy exhaustion termination, self-targeting loops
+2. **Mesh chain evaluation** — routing, output slot passing, energy + hop-cap termination, self-targeting loops
 3. **Dynamic terminality** — VM node conditionally emitting vs. routing
-4. **Genome validation** — graph nodes must have targets, input_refs bounds, co-located input constraints
+4. **Genome validation + soft defaults** — parseability checks plus runtime behavior for dangling targets/missing entry/invalid graph edges
 5. **Graph mutation** — internal node add/remove, weight jitter, operator swap
 
 ### Non-collapse contract
@@ -354,7 +368,7 @@ Three-layer testing: contract tests, intent verification tests, integration test
 
 3. Runtime: Mesh executor (rewrite)
    ├── runtime/mesh.rs — chain evaluation loop
-   ├── Energy-only termination
+   ├── Energy-based termination + hardcoded MAX_MESH_HOPS failsafe
    ├── Output slot passing, dynamic terminality
    └── Integration tests
 
@@ -366,7 +380,7 @@ Three-layer testing: contract tests, intent verification tests, integration test
 5. Config + sensors
    ├── GraphConfig, MeshConfig
    ├── Static/dynamic sensor split
-   └── CreatureState.graph_state
+   └── CreatureState.graph_state keyed by NodeId
 
 6. Founder + mutation
    ├── New simple founder (multi-node mesh)
@@ -385,7 +399,7 @@ Three-layer testing: contract tests, intent verification tests, integration test
 |------|------------|
 | Genome schema cascade breaks many files | Compiler-driven: change structs, fix all errors. Types enforce correctness. |
 | Graph evaluator performance (runs every tick for every creature) | Co-located inputs avoid edge lookups. Profile after implementation. |
-| Energy-only termination allows runaway loops | Natural selection penalizes energy waste. Monitor mean energy consumption per tick. |
+| Routing loops deadlock when costs are zero/misconfigured | Enforce hardcoded `MAX_MESH_HOPS` failsafe plus energy metering. |
 | Losing details from archived docs | Archive, don't delete. New spec files reference archived docs. |
 | Stateful graph operators (DecayIntegrator etc.) introduce hidden state bugs | Unit test each stateful operator in isolation. Test state persistence across ticks. |
 

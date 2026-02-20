@@ -1,231 +1,161 @@
 # Petri V3 VM Instruction Set Reference
 
-> Reference specification for the v3 VM instruction set. Adapted from v2 design.
-> This is a reference document, not an implementation plan.
+Reference specification for the v3 VM instruction set used by mesh VM nodes.
+
+Status: Active
 
 ---
 
 ## 1. Registers and Values
 
-The VM uses **f32 register values**. Every register holds a single IEEE-754 32-bit float.
-
-**Boolean semantics.** There is no dedicated boolean type. Truthiness is defined
-by the threshold `value >= 0.5` (true) and `value < 0.5` (false). Instructions
-that produce boolean-like results write `1.0` (true) or `0.0` (false).
-
-**Invalid register handling.** Any instruction that references a register index
-outside the valid register file **panics immediately**. In v3's
-panic-for-invariants philosophy, an out-of-bounds register access is a program
-invariant violation, not a recoverable error. There are no `Result` types for
-internal VM faults.
+- Register values are IEEE-754 `f32`.
+- Boolean truthiness is `value >= 0.5`.
+- Register and constant index violations are hard faults (panic).
 
 ---
 
 ## 2. Instruction Set
 
-The VM defines **38 opcodes**, listed below with brief semantics.
+The VM defines **39 opcodes**.
 
 ### Arithmetic and Data Movement
 
 | # | Opcode | Operands | Semantics |
-|---|--------|----------|-----------|
-| 0 | **Noop** | (none) | No operation. |
-| 1 | **LoadConst** | dst, const_idx | Load constant at `const_idx` into register `dst`. |
-| 2 | **Move** | dst, src | Copy register `src` into register `dst`. |
-| 3 | **Add** | dst, a, b | `dst = a + b` |
-| 4 | **Sub** | dst, a, b | `dst = a - b` |
-| 5 | **Mul** | dst, a, b | `dst = a * b` |
-| 6 | **Div** | dst, a, b | `dst = a / b` (division by zero writes `0.0`) |
-| 7 | **Min** | dst, a, b | `dst = min(a, b)` |
-| 8 | **Max** | dst, a, b | `dst = max(a, b)` |
-| 9 | **Abs** | dst, src | `dst = abs(src)` |
-| 10 | **Neg** | dst, src | `dst = -src` |
-| 11 | **Clamp01** | dst, src | `dst = clamp(src, 0.0, 1.0)` |
+|---|---|---|---|
+| 0 | `Noop` | none | No operation. |
+| 1 | `LoadConst` | dst, const_idx | `dst = constants[const_idx]` |
+| 2 | `Move` | dst, src | `dst = src` |
+| 3 | `Add` | dst, a, b | `dst = a + b` |
+| 4 | `Sub` | dst, a, b | `dst = a - b` |
+| 5 | `Mul` | dst, a, b | `dst = a * b` |
+| 6 | `Div` | dst, a, b | `dst = if b == 0 { 0.0 } else { a / b }` |
+| 7 | `Min` | dst, a, b | `dst = min(a, b)` |
+| 8 | `Max` | dst, a, b | `dst = max(a, b)` |
+| 9 | `Abs` | dst, src | `dst = abs(src)` |
+| 10 | `Neg` | dst, src | `dst = -src` |
+| 11 | `Clamp01` | dst, src | `dst = clamp(src, 0.0, 1.0)` |
 
 ### Comparison and Logic
 
 | # | Opcode | Operands | Semantics |
-|---|--------|----------|-----------|
-| 12 | **CmpGt** | dst, a, b | `dst = if a > b { 1.0 } else { 0.0 }` |
-| 13 | **CmpLt** | dst, a, b | `dst = if a < b { 1.0 } else { 0.0 }` |
-| 14 | **CmpEq** | dst, a, b, eps | `dst = if abs(a - b) <= eps { 1.0 } else { 0.0 }` (epsilon clamped; see section 5) |
-| 15 | **And** | dst, a, b | `dst = if truthy(a) && truthy(b) { 1.0 } else { 0.0 }` |
-| 16 | **Or** | dst, a, b | `dst = if truthy(a) \|\| truthy(b) { 1.0 } else { 0.0 }` |
-| 17 | **Not** | dst, src | `dst = if truthy(src) { 0.0 } else { 1.0 }` |
+|---|---|---|---|
+| 12 | `CmpGt` | dst, a, b | `dst = if a > b { 1.0 } else { 0.0 }` |
+| 13 | `CmpLt` | dst, a, b | `dst = if a < b { 1.0 } else { 0.0 }` |
+| 14 | `CmpEq` | dst, a, b, eps | `dst = if abs(a-b) <= clamp_eps(eps) { 1.0 } else { 0.0 }` |
+| 15 | `And` | dst, a, b | boolean `and` using truthiness |
+| 16 | `Or` | dst, a, b | boolean `or` using truthiness |
+| 17 | `Not` | dst, src | boolean `not` using truthiness |
 
 ### Type Conversion
 
 | # | Opcode | Operands | Semantics |
-|---|--------|----------|-----------|
-| 18 | **ToI32** | dst, src | Round `src` to nearest i32 (ties-away-from-zero), store as f32. |
-| 19 | **ToU8** | dst, src | Clamp `src` to [0.0, 255.0], round to nearest integer, store as f32. |
-| 20 | **ToBool** | dst, src | `dst = if truthy(src) { 1.0 } else { 0.0 }` |
+|---|---|---|---|
+| 18 | `ToI32` | dst, src | round ties-away-from-zero, store as f32 |
+| 19 | `ToU8` | dst, src | clamp `[0,255]`, round ties-away-from-zero, store as f32 |
+| 20 | `ToBool` | dst, src | `dst = if truthy(src) {1.0} else {0.0}` |
 
 ### Control Flow
 
 | # | Opcode | Operands | Semantics |
-|---|--------|----------|-----------|
-| 21 | **JumpIfZero** | cond, offset | If `!truthy(cond)`, set `PC += offset`. |
-| 22 | **Jump** | offset | Unconditional `PC += offset`. |
+|---|---|---|---|
+| 21 | `JumpIfZero` | cond, offset | if `!truthy(cond)` then jump |
+| 22 | `Jump` | offset | unconditional jump |
 
-### Input / Sensor / Neighbor Reads
-
-| # | Opcode | Operands | Semantics |
-|---|--------|----------|-----------|
-| 23 | **ReadInput** | dst, input_idx | Read input slot `input_idx` into `dst`. Invalid index yields `0.0` (soft default). |
-| 24 | **ReadSensorCell** | dst, sensor_idx, field_idx | Read a cell-sensor field into `dst`. |
-| 25 | **ReadSensorCreature** | dst, sensor_idx, field_idx | Read a creature-sensor field into `dst`. |
-| 26 | **ReadSensorSummary** | dst, summary_idx | Read a summary-sensor field into `dst`. |
-| 27 | **ReadNeighborCell** | dst, neighbor_idx, field_idx | Read a neighbor cell field into `dst`. |
-| 28 | **ReadNeighborCreature** | dst, neighbor_idx, field_idx | Read a neighbor creature field into `dst`. |
-
-### Output / Action Writes
+### Input and Sensor Reads
 
 | # | Opcode | Operands | Semantics |
-|---|--------|----------|-----------|
-| 29 | **WriteInternalPayload** | slot_idx, src | Write register `src` to internal payload buffer at `slot_idx`. |
-| 30 | **WriteWorldActionMeta** | slot_idx, src | Write register `src` to world-action meta buffer at `slot_idx`. |
-| 31 | **EmitInternal** | action_type | Emit the current internal payload buffer as an internal action of the given type. |
-| 32 | **EmitWorldAction** | action_type | Emit the current world-action meta buffer as a world action of the given type. **Halts execution** (first world action terminates the program). |
+|---|---|---|---|
+| 23 | `ReadInput` | dst, input_idx | reads `NodeGenome.input_refs[input_idx]`; invalid index yields `0.0` |
+| 24 | `ReadSensorCell` | dst, sensor_idx, field_idx | reads sensor-cell data |
+| 25 | `ReadSensorCreature` | dst, sensor_idx, field_idx | reads sensor-creature data |
+| 26 | `ReadSensorSummary` | dst, summary_idx | reads sensor-summary data |
+| 27 | `ReadNeighborCell` | dst, neighbor_idx, field_idx | reads neighbor-cell data |
+| 28 | `ReadNeighborCreature` | dst, neighbor_idx, field_idx | reads neighbor-creature data |
 
-### Halt
-
-| # | Opcode | Operands | Semantics |
-|---|--------|----------|-----------|
-| 33 | **Halt** | (none) | Immediately stop execution. |
-
-### Memory Access
+### Output and Routing Writes
 
 | # | Opcode | Operands | Semantics |
-|---|--------|----------|-----------|
-| 34 | **LoadMem8** | dst, addr_reg | Load byte from memory at address in `addr_reg` into `dst` as f32 `[0.0, 255.0]`. |
-| 35 | **StoreMem8** | addr_reg, src | Store register `src` (clamped to `[0.0, 255.0]`, rounded to nearest integer) as a u8 at the memory address in `addr_reg`. |
-| 36 | **LoadMem8Imm** | dst, imm_addr | Load byte from memory at immediate address `imm_addr` into `dst` as f32 `[0.0, 255.0]`. |
-| 37 | **StoreMem8Imm** | imm_addr, src | Store register `src` (clamped to `[0.0, 255.0]`, rounded to nearest integer) as a u8 at immediate address `imm_addr`. |
+|---|---|---|---|
+| 29 | `WriteInternalPayload` | slot_idx, src | write internal payload slot |
+| 30 | `WriteWorldActionMeta` | slot_idx, src | write world-action metadata slot |
+| 31 | `EmitInternal` | action_type | emit internal action payload |
+| 32 | `EmitWorldAction` | action_type | emit world action and halt |
+| 33 | `WriteRouteTarget` | src_reg | write candidate route target value (`f32`) |
+
+### Halt and Memory
+
+| # | Opcode | Operands | Semantics |
+|---|---|---|---|
+| 34 | `Halt` | none | stop VM execution |
+| 35 | `LoadMem8` | dst, addr_reg | read byte at wrapped address |
+| 36 | `StoreMem8` | addr_reg, src | write byte at wrapped address |
+| 37 | `LoadMem8Imm` | dst, imm_addr | read byte at wrapped immediate address |
+| 38 | `StoreMem8Imm` | imm_addr, src | write byte at wrapped immediate address |
 
 ---
 
 ## 3. VM Execution Rules
 
-**Program counter.** The PC starts at `0`. After each instruction executes, PC
-advances by 1 (unless modified by a jump). If PC reaches or exceeds the
-instruction count, execution halts normally.
+- PC starts at `0`; normal step increments by `+1`.
+- Jumps apply signed offsets; negative PC is a hard fault.
+- Per-opcode energy metering applies; exhausted energy halts node execution.
+- `EmitWorldAction` halts VM immediately.
+- `Halt` halts VM without emitting a world action.
 
-**Jump semantics.** `Jump` and `JumpIfZero` apply a signed offset to PC. The
-offset is added to PC *after* the default +1 increment. Jumping past the end of
-the program halts execution. Jumping to a negative PC panics (invariant
-violation).
+### `ReadInput` and Upstream Slot Resolution
 
-**Energy metering.** Each opcode deducts a base cost from the creature's
-remaining energy budget for that tick. If the creature's energy is exhausted,
-execution halts. In v3, energy is stored as `u32`; the f32 base costs from the
-opcode cost table (section 6) will be scaled to integer energy units via a
-global multiplier. Per-opcode metering is the canonical model for VM nodes;
-graph nodes use a per-node complexity cost instead (see graph operator spec).
+`ReadInput(dst, input_idx)` resolves through `NodeGenome.input_refs`.
 
-**Halt on first world action.** When `EmitWorldAction` executes, the action is
-recorded and execution halts immediately. A creature may emit at most one world
-action per tick.
+If the referenced variant is `InputReference::UpstreamOutput { slot }`:
+- value is `upstream_slots[slot]` when `slot < 12`
+- otherwise `0.0`
 
-**Memory wrapping.** All memory addresses are resolved modulo 1024:
-`resolved_addr = raw_addr.rem_euclid(1024)`. Memory addresses are therefore
-never invalid; any integer address maps to a valid byte.
+Invalid `input_idx` is a soft default and yields `0.0`.
 
-**ReadInput semantics.** `ReadInput` with an invalid `input_idx` (out of range
-for the input vector) returns `0.0` as a soft default. This is the one case
-where an out-of-bounds index does *not* panic.
+### Routing Write Semantics
 
-**Sensor and neighbor query semantics.** `ReadSensorCell`, `ReadSensorCreature`,
-`ReadSensorSummary`, `ReadNeighborCell`, and `ReadNeighborCreature` read from
-the pre-assembled `CreatureInputs` / `SensorFrame` built by the `sensors/`
-module at the start of Phase 1 (cognition). The VM does not access `WorldState`
-directly. Invalid sensor/neighbor indices are hard faults (panic). Sensor data
-is provided as f32 values; the VM does not interpret their meaning.
+`WriteRouteTarget(src_reg)` sets VM node's `route_target_idx` output.
+- Multiple writes in one VM run use last-write-wins.
+- If never written, default `route_target_idx` is `0.0`.
+- Mesh executor applies routing conversion rules from
+  `v3-mesh-execution-spec.md`.
 
 ---
 
-## 4. Invalid Index and Fault Semantics
+## 4. Fault Semantics
 
-v3 uses a **panic-for-invariants** error philosophy. Internal errors are
-programming bugs, not recoverable conditions. There are no `Result` return types
-for VM-internal faults.
+Hard faults (panic):
+- invalid register index
+- invalid constant index
+- invalid payload/meta slot index
+- invalid neighbor/sensor field index
 
-### Hard faults (panic)
+Soft defaults:
+- invalid `ReadInput` index -> `0.0`
+- `InputReference::UpstreamOutput` slot out of range -> `0.0`
 
-The following index violations cause an immediate panic:
-
-- **Invalid register index** -- register file access out of bounds.
-- **Invalid const index** -- constant pool access out of bounds.
-- **Invalid output slot index** -- payload/meta buffer access out of bounds.
-- **Invalid sensor index** -- sensor query with out-of-range sensor ID.
-- **Invalid neighbor index** -- neighbor query with out-of-range neighbor ID.
-- **Invalid field index** -- sensor/neighbor field access out of bounds.
-
-### Soft default (0.0)
-
-- **Invalid input_index in ReadInput** -- returns `0.0`. This accommodates
-  programs that were compiled against a different input vector length.
-
-### Never invalid
-
-- **Memory addresses** -- always resolved via `rem_euclid(1024)`, so every
-  integer address maps to a valid byte. No fault is possible.
+Memory addressing is never invalid; all addresses wrap with `rem_euclid(1024)`.
 
 ---
 
-## 5. Numeric Determinism Contract
+## 5. Numeric Determinism
 
-All VM arithmetic operates on **IEEE-754 f32** values. Determinism is enforced
-by sanitizing every f32 result before it is written to a register.
+All register writes pass through `sanitize_f32`:
+- `NaN -> 0.0`
+- `+/-inf -> +/-1_000_000_000.0`
+- finite values clamped to `[-1e9, 1e9]`
 
-### sanitize_f32 rules
-
-Every value written to a register passes through `sanitize_f32`:
-
-| Condition | Result |
-|-----------|--------|
-| NaN | `0.0` |
-| +Inf | `+1_000_000_000.0` |
-| -Inf | `-1_000_000_000.0` |
-| Finite, magnitude > 1e9 | Clamped to `[-1_000_000_000.0, +1_000_000_000.0]` |
-| Finite, magnitude <= 1e9 | Unchanged |
-
-### Float-to-integer rounding
-
-Instructions that convert float to integer (`ToI32`, `ToU8`, `StoreMem8`,
-`StoreMem8Imm`) use **ties-away-from-zero** rounding (Rust `f32::round()`
-semantics).
-
-### CmpEq epsilon
-
-The `CmpEq` instruction takes an epsilon operand. Before comparison, epsilon is
-clamped to the range `[1e-6, 1.0]`. The comparison succeeds if
-`abs(a - b) <= clamped_epsilon`.
-
-### Truthiness threshold
-
-A value is truthy if `value >= 0.5`, falsy otherwise. Used by `And`, `Or`,
-`Not`, `ToBool`, and `JumpIfZero`.
-
-### Division by zero
-
-`Div` with a zero divisor writes `0.0` to the destination register (not NaN or
-Inf). This is applied before `sanitize_f32`.
+Additional deterministic rules:
+- float->int conversions use ties-away-from-zero
+- `CmpEq` epsilon clamped to `[1e-6, 1.0]`
+- division by zero returns `0.0`
 
 ---
 
-## 6. VM Opcode Cost Table
-
-Each opcode has a base energy cost. A global multiplier scales all costs
-uniformly.
-
-> **v3 note:** v3 uses `u32` energy. These f32 base costs will be scaled to
-> integer energy units by multiplying by an integer scaling factor (e.g., 100 or
-> 1000) so that all per-opcode costs become whole numbers. The relative ratios
-> between opcodes are preserved exactly.
+## 6. Opcode Cost Table
 
 | Opcode | Base Cost (f32) |
-|--------|----------------|
+|---|---|
 | Noop | 0.05 |
 | LoadConst | 0.08 |
 | Move | 0.08 |
@@ -259,64 +189,36 @@ uniformly.
 | WriteWorldActionMeta | 0.14 |
 | EmitInternal | 0.20 |
 | EmitWorldAction | 0.24 |
+| WriteRouteTarget | 0.10 |
 | Halt | 0.05 |
 | LoadMem8 | 0.16 |
 | StoreMem8 | 0.18 |
 | LoadMem8Imm | 0.14 |
 | StoreMem8Imm | 0.16 |
 
-**Global multiplier.** All base costs above are multiplied by a single
-configurable global multiplier before being deducted from the creature's energy
-budget. This allows tuning overall VM execution cost without changing the
-relative opcode weights.
+v3 energy is `u32`; costs are scaled to integer units by global multiplier.
 
 ---
 
-## 7. Output Override Lifecycle
+## 7. Output Lifecycle
 
-The VM maintains two output buffers:
+VM node evaluation maintains:
+- internal payload buffer
+- world action metadata buffer
+- route target register
 
-- **Internal payload buffer** -- written by `WriteInternalPayload`.
-- **World action meta buffer** -- written by `WriteWorldActionMeta`.
+All writes are last-write-wins per slot/register.
 
-### Last-write-wins
-
-Multiple writes to the same buffer slot within a single program execution
-overwrite silently. Only the final value in each slot matters at emit time.
-
-### Clear on emit
-
-When `EmitInternal` executes, the internal payload buffer is consumed and
-cleared. Subsequent `WriteInternalPayload` instructions write to a fresh buffer.
-
-When `EmitWorldAction` executes, the world action meta buffer is consumed,
-cleared, and execution halts.
-
-### Clear on dispatch end
-
-At the end of the creature's dispatch (after the VM halts for any reason), both
-buffers are discarded. Un-emitted buffer contents do not persist across ticks.
+At node end:
+- if world action emitted: action returned; routing ignored
+- else route target is returned in `NodeResult.route_target_idx`
+- payload/meta buffers are discarded after dispatch
 
 ---
 
 ## 8. Creature Memory Contract
 
-Each creature has **1 KiB (1024 bytes)** of persistent memory.
-
-**Persistence across ticks.** Memory contents survive between ticks. A
-creature's memory is available at the start of every tick with the same contents
-it had at the end of the previous tick.
-
-**Byte-for-byte copy on reproduction.** When a creature reproduces, the child
-receives an exact byte-for-byte copy of the parent's memory at the time of
-reproduction. Parent and child memory are independent after the copy; subsequent
-writes by either do not affect the other.
-
-**Addressing.** All memory addresses are resolved via
-`resolved_addr = raw_addr.rem_euclid(1024)`. There are no out-of-bounds memory
-faults.
-
-**Encoding.** Memory stores raw bytes (`u8`). `LoadMem8` / `LoadMem8Imm` read a
-single byte and return it as an f32 in `[0.0, 255.0]`. `StoreMem8` /
-`StoreMem8Imm` clamp the source register to `[0.0, 255.0]`, round to the
-nearest integer (ties-away-from-zero), and write the resulting `u8`.
+- Memory size: 1024 bytes per creature.
+- Persists across ticks for same creature.
+- Copied byte-for-byte on reproduction.
+- Addressing wraps with `rem_euclid(1024)`.
