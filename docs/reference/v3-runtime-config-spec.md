@@ -49,10 +49,14 @@ This document does not define:
 | `runtime.graph_convergence_epsilon` | `f32` | `1e-3` | Must be `>= 0.0`; invalid values fall back to `1e-3`. | `v3-graph-backend-spec.md` |
 | `runtime.graph_convergence_stable_passes` | `u32` | `1` | Must be `>= 1`; invalid values fall back to `1`. | `v3-graph-backend-spec.md` |
 | `runtime.graph_node_base_cost` | `f32` | `1.0` | Must be `>= 0.0`; invalid values fall back to `1.0`. | `v3-graph-backend-spec.md` |
-| `runtime.vm.opcode_cost_multiplier` | `u32` | `1` | Integer scalar; `0` is allowed and means zero opcode energy spend. | `v3-vm-isa-spec.md` |
+| `runtime.vm.opcode_cost_multiplier` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. `0.0` is allowed and means zero opcode energy spend. | `v3-vm-isa-spec.md` |
 
 If implementation structs use different nesting, a one-to-one semantic mapping
 to these keys must exist.
+
+Type posture:
+- Use `f32` for tunable scalar magnitudes.
+- Use integers (`u32`) only for clearly discrete counts/limits.
 
 ---
 
@@ -84,22 +88,31 @@ section only owns config contract shape/defaults.
 
 | Key | Type | Default | Constraint / normalization |
 | --- | --- | --- | --- |
-| `energy.lifecycle.initial_energy` | `u32` | `20` | Starting energy for seeded/spawned creatures. |
-| `energy.lifecycle.max_energy` | `u32` | `100` | Must be `>= 1`; invalid values fall back to `100`. |
-| `energy.lifecycle.energy_decay_per_tick` | `u32` | `.2` | Passive per-tick energy loss. |
-| `energy.lifecycle.min_reproduce_energy` | `u32` | `24` | Parent minimum required after paying reproduce action cost. |
-| `energy.lifecycle.default_offspring_energy` | `u32` | `20` | Transfer cap applied to requested child energy. |
-| `energy.costs.move_cost` | `u32` | `.2` | Action energy cost. |
-| `energy.costs.eat_cost` | `u32` | `0` | Action energy cost. |
-| `energy.costs.noop_cost` | `u32` | `0` | Action energy cost. |
-| `energy.costs.reproduce_cost` | `u32` | `2` | Action energy cost. |
-| `energy.costs.eat_reward_per_food` | `u32` | `1` | Energy gain scalar for consumed food. |
+| `energy.lifecycle.initial_energy` | `f32` | `20.0` | Must be finite and `>= 0.0`; invalid values fall back to `20.0`. |
+| `energy.lifecycle.max_energy` | `f32` | `100.0` | Must be finite and `>= 1.0`; invalid values fall back to `100.0`. |
+| `energy.lifecycle.energy_decay_per_tick` | `f32` | `0.2` | Must be finite and `>= 0.0`; invalid values fall back to `0.2`. |
+| `energy.lifecycle.min_reproduce_energy` | `f32` | `24.0` | Must be finite and `>= 0.0`; invalid values fall back to `24.0`. |
+| `energy.lifecycle.default_offspring_energy` | `f32` | `20.0` | Must be finite and `>= 0.0`; invalid values fall back to `20.0`. |
+| `energy.costs.move_cost` | `f32` | `0.2` | Must be finite and `>= 0.0`; invalid values fall back to `0.2`. |
+| `energy.costs.eat_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; invalid values fall back to `0.0`. |
+| `energy.costs.noop_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; invalid values fall back to `0.0`. |
+| `energy.costs.reproduce_cost` | `f32` | `2.0` | Must be finite and `>= 0.0`; invalid values fall back to `2.0`. |
+| `energy.costs.eat_reward_per_food` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. |
+
+Energy posture:
+- Energy lifecycle and action-cost config values are continuous scalar units
+  (`f32`), not integer-only buckets.
+- This allows fractional tuning while preserving deterministic harness behavior
+  through fixed test-mode controls.
 
 Reproduction transfer sequencing:
 1. Pay `energy.costs.reproduce_cost`.
 2. Enforce `energy.lifecycle.min_reproduce_energy` gate.
-3. Compute `transfer = min(requested_energy, energy.lifecycle.default_offspring_energy)`.
-4. Reject reproduction when `transfer == 0` or parent cannot cover transfer.
+3. Compute
+   `requested_energy_sanitized = clamp_non_negative_finite(requested_energy)`,
+   then
+   `transfer = min(requested_energy_sanitized, energy.lifecycle.default_offspring_energy)`.
+4. Reject reproduction when `transfer <= 0.0` or parent cannot cover transfer.
 
 Behavioral ownership remains in `v3-reproduction-spec.md`; this section owns
 field names/defaults and transfer-gate config semantics.
