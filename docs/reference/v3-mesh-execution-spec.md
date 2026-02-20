@@ -38,9 +38,10 @@ Each tick evaluates a routing chain from `entry_node_id`.
 current_node_id = genome.entry_node_id
 upstream_slots = [0.0; 12]
 hops = 0
+max_mesh_hops = validated(config.max_mesh_hops, default=128, min=1)
 
 loop:
-  if hops >= MAX_MESH_HOPS:
+  if hops >= max_mesh_hops:
     return WorldAction::NoOp
 
   evaluate current node -> NodeResult {
@@ -60,8 +61,8 @@ loop:
     target_idx = 0
   target_idx = max(target_idx, 0)
 
-  target_id = node.targets[target_idx]
-  if target_id missing/out of range:
+  target_id = node.targets.get(target_idx)
+  if target_id is None:
     return WorldAction::NoOp
 
   upstream_slots = output_slots
@@ -82,11 +83,15 @@ A single chain evaluation terminates on the first matching condition:
 
 1. VM emits `WorldAction`.
 2. Energy reaches zero during node evaluation.
-3. `MAX_MESH_HOPS` failsafe triggers.
+3. `max_mesh_hops` failsafe triggers.
 4. Runtime hits a broken routing state handled by soft default (`NoOp`).
 
-`MAX_MESH_HOPS` is a hardcoded runtime failsafe and must not be disabled by
-configuration.
+`max_mesh_hops` is configuration-controlled.
+
+Safety rules:
+- value must be `>= 1`
+- invalid values (for example `0`) fall back to default (`128`)
+- the cap cannot be disabled
 
 ---
 

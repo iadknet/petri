@@ -11,7 +11,7 @@
 | Doc | Action |
 |-----|--------|
 | `docs/plans/2026-02-14-v3-architecture-design.md` | Archive to `docs/plans/archive/` |
-| `docs/plans/2026-02-18-v3-architecture-design.md` | New slim primary architecture doc |
+| `docs/plans/2026-02-18-v3-mesh-refactor-design.md` | New slim primary architecture doc |
 | `docs/reference/v3-vm-isa-spec.md` | Update in-place (add routing opcodes) |
 | `docs/reference/v3-graph-operator-spec.md` | Rewrite → `v3-graph-backend-spec.md` |
 | `docs/reference/v3-genome-sensor-spec.md` | Split → `v3-genome-spec.md` + `v3-sensor-spec.md` |
@@ -72,7 +72,7 @@
 | Is terminality static or dynamic? | Dynamic — VM nodes decide at runtime whether to emit or route | user+agent | resolved |
 | Should the simple founder be VM-only? | No — simple founder should be a mesh with multiple node types | user+agent | resolved |
 | How should sensors handle values that change during mesh evaluation? | Three categories: World (snapshot), Static Introspection (snapshot), Dynamic Introspection (live from creature state) | user+agent | resolved |
-| Should mesh execution rely only on energy for termination? | No — energy remains primary, but runtime enforces hardcoded `MAX_MESH_HOPS` failsafe | user+agent | resolved |
+| Should mesh execution rely only on energy for termination? | No — energy remains primary, with configurable `max_mesh_hops` failsafe (validated, non-zero) | user+agent | resolved |
 
 ---
 
@@ -80,7 +80,7 @@
 
 ### New primary architecture doc
 
-A slim (~300–400 line) `2026-02-18-v3-architecture-design.md` replacing the 993-line original. Focused on:
+This document is the primary architecture/design plan for the mesh refactor. It is focused on:
 - Module boundaries and dependency flow
 - Mesh execution model (with diagram)
 - Data flow diagrams
@@ -119,7 +119,7 @@ execute_creature_mesh(genome, static_inputs, energy, memory, graph_state, config
 │
 └── LOOP:
     │
-    ├── If hops >= MAX_MESH_HOPS → return NoOp
+    ├── If hops >= max_mesh_hops → return NoOp
     │
     ├── Evaluate current_node (VM or Graph)
     │   ├── Costs energy (per-opcode for VM, per-internal-node for Graph)
@@ -131,7 +131,7 @@ execute_creature_mesh(genome, static_inputs, energy, memory, graph_state, config
     ├── If no targets and no action → return NoOp
     │
     ├── target_idx = if NaN then 0 else max(0, floor(route_target))
-    ├── Select target: targets[target_idx] (missing target = NoOp)
+    ├── Select target: targets.get(target_idx) (None = NoOp)
     ├── upstream_slots = node_result.output_slots
     ├── current_node = target (may be same node — self-targeting valid)
     └── hops += 1
@@ -140,7 +140,7 @@ execute_creature_mesh(genome, static_inputs, energy, memory, graph_state, config
 ### Key rules
 
 - **No visited set** — nodes can be evaluated multiple times; loops and self-targeting are valid
-- **Hard failsafe hop cap** — `MAX_MESH_HOPS` is a runtime constant independent of config/energy (prevents deadlock if costs are zero)
+- **Failsafe hop cap** — `max_mesh_hops` is configurable but validated (`>= 1`) and cannot be disabled (prevents deadlock if costs are zero)
 - **Dynamic terminality** — VM nodes decide at runtime whether to emit a WorldAction (terminal) or route to a target (non-terminal); the same node can do either on different ticks
 - **Junk DNA allowed** — broken routing and dangling IDs are tolerated; runtime degrades to `NoOp` rather than panicking
 - **Output slots** — 12 f32 values (fixed constant), default 0.0, passed from each node to the next
@@ -368,13 +368,14 @@ Three-layer testing: contract tests, intent verification tests, integration test
 
 3. Runtime: Mesh executor (rewrite)
    ├── runtime/mesh.rs — chain evaluation loop
-   ├── Energy-based termination + hardcoded MAX_MESH_HOPS failsafe
+   ├── Energy-based termination + configurable `max_mesh_hops` failsafe
    ├── Output slot passing, dynamic terminality
    └── Integration tests
 
 4. Runtime: VM additions
    ├── WriteRouteTarget opcode
    ├── ReadInput with UpstreamOutput reference support
+   ├── Configurable `max_vm_steps` per VM node evaluation
    └── Update VM tests
 
 5. Config + sensors
@@ -399,7 +400,7 @@ Three-layer testing: contract tests, intent verification tests, integration test
 |------|------------|
 | Genome schema cascade breaks many files | Compiler-driven: change structs, fix all errors. Types enforce correctness. |
 | Graph evaluator performance (runs every tick for every creature) | Co-located inputs avoid edge lookups. Profile after implementation. |
-| Routing loops deadlock when costs are zero/misconfigured | Enforce hardcoded `MAX_MESH_HOPS` failsafe plus energy metering. |
+| Routing/VM loops deadlock when costs are zero/misconfigured | Enforce validated configurable `max_mesh_hops` and `max_vm_steps` failsafes plus energy metering. |
 | Losing details from archived docs | Archive, don't delete. New spec files reference archived docs. |
 | Stateful graph operators (DecayIntegrator etc.) introduce hidden state bugs | Unit test each stateful operator in isolation. Test state persistence across ticks. |
 

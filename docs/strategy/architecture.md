@@ -1,86 +1,76 @@
-# Petri — V2 Target Architecture
+# Petri - V3 Target Architecture
 
 ## Purpose
 
-This document defines the active target architecture for the greenfield rewrite under `v2/`.
-Legacy root crates and `web/` remain reference-only during this program.
+This document defines the active target architecture for the V3 mesh runtime.
+Legacy root crates, v1/v2 docs, and root `web/` are retained as historical
+reference only.
 
-**Goal IDs:** `GP-01`, `GP-02`, `GP-03`, `GP-04`
+Goal IDs: `GP-01`, `GP-02`, `GP-03`, `GP-04`
 
 ## Goal Alignment
 
-- `GP-01`: center richer cognition/runtime behavior in a dedicated v2 runtime.
-- `GP-02`: keep ownership boundaries explicit across runtime, transport, CLI, and web.
-- `GP-03`: lock protocol contracts through checkpoint-scoped tests and fixtures.
-- `GP-04`: surface deterministic run/status/frame/health telemetry to product surfaces.
+- `GP-01`: richer creature cognition via multi-node mesh execution.
+- `GP-02`: explicit module boundaries across kernel, sensors, creature, runtime,
+  tick, and contracts.
+- `GP-03`: deterministic, test-backed iteration with crash-proof soft defaults.
+- `GP-04`: observable behavior and runtime introspection suitable for evolution
+  debugging.
 
 ## Boundary Impact
 
-- Active dependency direction: `v2-core -> v2-server/v2-cli`.
-- `v2-web` consumes protocol contracts from `v2-server`.
-- No dependency from `v2/*` into legacy `petri-*` crates or root `web/`.
-- Reuse is copy-only per `v2/docs/COPY_POLICY.md`.
+Active dependency direction in V3 core:
+- `kernel` -> world reality only
+- `sensors` -> world/static snapshots
+- `creature` -> genome/state/mutation/reproduction
+- `runtime` -> mesh/VM/graph execution
+- `tick` -> orchestration and action application
+- `contracts` -> shared boundary types (`WorldAction` and related)
+
+No dependency from active V3 docs into legacy implementation contracts.
 
 ## Existing Boundary Recheck
 
 | area | decision | rationale |
 | --- | --- | --- |
-| `v2/crates/v2-core` policy ownership | `keep` | Runtime semantics and deterministic policy remain core-owned. |
-| `v2/crates/v2-server` transport ownership | `keep` | HTTP/WebSocket contracts and lifecycle error mapping remain server-owned. |
-| legacy `crates/petri-*` + root `web/` | `keep` | Historical reference only; no active implementation coupling. |
+| `v3/crates/v3-core/src/kernel` | keep | world reality independent of cognition backend details |
+| `v3/crates/v3-core/src/sensors` | keep | snapshot assembly separated from runtime mutation logic |
+| `v3/crates/v3-core/src/runtime` | keep/refine | owns chain evaluation, routing, VM/graph execution |
+| `v3/crates/v3-core/src/tick` | keep | phase orchestration and action application stay outside runtime internals |
+| legacy `crates/petri-*`, `v2/`, root `web/` | keep (reference-only) | traceability without active coupling |
 
-## Open Questions
-
-| question | decision | owner | status |
-| --- | --- | --- | --- |
-| Should legacy runtime contracts stay backward compatible with `v2`? | No; `v2` can break independently (`v2alpha1` contract ownership). | user+agent | resolved |
-| Should snapshot endpoints be part of initial `v2` protocol? | No; out of scope for current checkpoint set. | user+agent | resolved |
-
-## Repository Architecture
+## Repository Architecture (Active Slice)
 
 ```text
 petri/
-├── v2/
-│   ├── crates/
-│   │   ├── v2-core/     # runtime/simulation policy
-│   │   ├── v2-server/   # HTTP + WebSocket contracts for v2
-│   │   └── v2-cli/      # deterministic NDJSON run/ablation surfaces
-│   ├── web/             # v2 desktop client + protocol decoders
-│   └── docs/            # local v2 boundary/copy-policy docs
-├── crates/              # legacy runtime stack (reference-only for rewrite)
-├── web/                 # legacy client (reference-only for rewrite)
-└── docs/                # canonical strategy/plan/operations docs
+|- v3/
+|  |- crates/
+|  |  \- v3-core/
+|  |     |- kernel/
+|  |     |- sensors/
+|  |     |- creature/
+|  |     |- runtime/
+|  |     |- tick/
+|  |     \- contracts/
+|  \- crates/v3-server/    # service surfaces over v3-core
+|- docs/                   # canonical strategy/plans/reference docs
+|- crates/                 # legacy runtime stacks (reference-only)
+|- v2/                     # legacy rewrite program (reference-only)
+\- web/                    # legacy root web client (reference-only)
 ```
-
-## Runtime/Protocol Contract Surfaces
-
-- `v2-core`:
-  - mesh queue execution semantics
-  - energy/backends primitives
-  - deterministic runtime policy contracts
-- `v2-server`:
-  - `/v2/simulation/*` lifecycle/status/frame/paint contracts
-  - non-2xx CP-3 error envelope
-  - WebSocket event ordering and event/payload mapping
-  - runtime payload truthfulness: state/telemetry values map from applied core simulation behavior, not synthetic derivation
-- `v2-cli`:
-  - `run` and `ablation` command surfaces
-  - deterministic NDJSON event shapes and field ordering
-- `v2-web`:
-  - typed models and runtime-safe decoders for `v2alpha1`
-  - fixture-locked protocol parser tests
 
 ## Runtime Truthfulness Invariant
 
-- Runtime behavior realism is a standing architecture requirement, not a checkpoint-specific exception.
-- Any surface that reports simulation state/telemetry must derive values from applied simulation transitions.
-- This invariant applies to present and future runtime surfaces; see `docs/standards/runtime-behavior-realism-policy.md`.
-- This is a specialization of the project-wide intent-verification golden rule; see `docs/standards/intent-verification-policy.md`.
+- Reported runtime values must derive from applied simulation behavior.
+- No synthetic values in state/telemetry surfaces where behavior-backed values
+  are expected.
+- Applies to current and future runtime-facing APIs and inspectors.
 
 ## Compatibility Posture
 
-- Root compatibility stubs are pointer-only:
+- Root compatibility stubs remain pointer-only:
   - `petri-architecture.md`
   - `petri-roadmap.md`
   - `petri-technology-review.md`
-- Legacy implementation/docs are retained for traceability, not as active targets.
+- Legacy implementation/docs are retained for traceability, not as active
+  targets.

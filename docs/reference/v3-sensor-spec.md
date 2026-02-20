@@ -38,7 +38,7 @@ pub enum WorldInputKey {
 }
 ```
 
-`u8` direction index is expected in `0..8`; out-of-range behaves as zero.
+`u8` direction index is expected in `0..7`; out-of-range behaves as zero.
 
 ### Static Introspection
 
