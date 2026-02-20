@@ -10,6 +10,7 @@ Related references:
 - `v3-mesh-execution-spec.md`
 - `v3-mutation-spec.md`
 - `v3-reproduction-spec.md`
+- `v3-runtime-config-spec.md`
 
 ---
 
@@ -91,6 +92,8 @@ for pass in 0..max_graph_relax_iters:
 
 This is "iterate until convergence or budget exhaustion." It is intentionally
 bounded by `max_graph_relax_iters` to prevent infinite internal loops.
+Canonical owner for graph convergence budget/config defaults:
+`v3-runtime-config-spec.md`.
 
 ---
 
@@ -180,6 +183,8 @@ Graph backend never emits `WorldAction` directly.
 
 Graph node cost is charged per internal-node-per-pass evaluation
 (`graph_node_base_cost` or equivalent config-driven scalar).
+Canonical owner for graph runtime cost config:
+`v3-runtime-config-spec.md`.
 
 Equivalent requested energy:
 

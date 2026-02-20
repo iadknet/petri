@@ -10,6 +10,7 @@ Related references:
 - `v3-mesh-execution-spec.md`
 - `v3-mutation-spec.md`
 - `v3-reproduction-spec.md`
+- `v3-runtime-config-spec.md`
 
 ---
 
@@ -111,7 +112,8 @@ These were replaced by unified `ReadInput` + `InputReference` dataflow and
 - `EmitWorldAction` halts VM immediately.
 - `Halt` halts VM without emitting a world action.
 - VM runtime enforces a configurable step cap `max_vm_steps` per node
-  evaluation (default `1024`, sourced from runtime config).
+  evaluation (default `1024`; canonical owner:
+  `v3-runtime-config-spec.md`).
 - Determinism scope is canonical in `AGENTS.md` and V3 harness reproducibility
   controls are specified in `v3-mesh-execution-spec.md`
   (`Test-Mode Reproducibility Notes`).
@@ -121,6 +123,8 @@ These were replaced by unified `ReadInput` + `InputReference` dataflow and
 - `max_vm_steps` is configuration-controlled for tuning and experiments.
 - Value must be `>= 1`.
 - Invalid values (for example `0`) fall back to default (`1024`).
+- Canonical owner for VM runtime config defaults/validation:
+  `v3-runtime-config-spec.md`.
 
 ### Jump target safety
 
@@ -239,6 +243,8 @@ Defined numeric rules:
 | StoreMem8Imm | 0.16 |
 
 v3 energy is `u32`; costs are scaled to integer units by global multiplier.
+Canonical owner for `runtime.vm.opcode_cost_multiplier`:
+`v3-runtime-config-spec.md`.
 
 ---
 

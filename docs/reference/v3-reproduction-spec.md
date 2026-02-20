@@ -11,6 +11,7 @@ Related references:
 - `v3-genome-spec.md`
 - `v3-evolution-observability-spec.md`
 - `v3-mesh-execution-spec.md`
+- `v3-runtime-config-spec.md`
 
 ---
 
@@ -105,7 +106,7 @@ Reproduction action semantics:
   no child draft is queued.
 
 This document defines semantics only; exact field names/constants live in core
-config/runtime docs.
+runtime config contract: `v3-runtime-config-spec.md`.
 
 ---
 
@@ -152,6 +153,7 @@ Reproduction processing must emit required minimal data defined in
 
 At minimum:
 - Reproduction attempt count.
+- Spawn candidates queued count.
 - Spawned count.
 - Rejected count by `SpawnCommitResult` reason.
 - Optional per-candidate event records for debugging.

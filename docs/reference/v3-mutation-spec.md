@@ -12,6 +12,7 @@ Related references:
 - `v3-graph-backend-spec.md`
 - `v3-reproduction-spec.md`
 - `v3-evolution-observability-spec.md`
+- `v3-runtime-config-spec.md`
 
 ---
 
@@ -23,11 +24,14 @@ This document defines:
 - Structural validity checks after mutation events.
 - Invalid-event handling policy.
 - Required mutation telemetry semantics.
+- Randomized mutation selection semantics (trigger, event count, domain/operator
+  sampling).
 
 This document does not define:
 - Runtime mesh execution semantics.
 - Reproduction action cost rules.
 - Storage or transport format for telemetry.
+- Canonical mutation config field defaults (see `v3-runtime-config-spec.md`).
 
 ---
 
@@ -129,6 +133,14 @@ for each selected event:
        continue
   7) commit event
 ```
+
+Selection randomization rules:
+- Mutation trigger uses global `mutation_probability`.
+- Event count is sampled from configured inclusive min/max bounds.
+- For each event, domain/operator are sampled from configured weights.
+- Operator modifiers are randomized per event (subject to operator-specific
+  constraints and global modifier scaling).
+- Canonical owner for mutation config keys/defaults: `v3-runtime-config-spec.md`.
 
 ---
 

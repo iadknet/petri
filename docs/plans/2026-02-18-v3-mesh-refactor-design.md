@@ -14,6 +14,7 @@
 | `docs/plans/2026-02-18-v3-mesh-runtime-execution-companion.md` | Create |
 | `docs/plans/2026-02-18-v3-mesh-schema-module-companion.md` | Create |
 | `docs/reference/v3-mesh-execution-spec.md` | Canonical execution/soft-default reference |
+| `docs/reference/v3-runtime-config-spec.md` | Canonical runtime config defaults/validation reference |
 | `docs/reference/v3-genome-spec.md` | Canonical genome parseability reference |
 | `docs/reference/v3-vm-isa-spec.md` | VM backend-local behavior reference |
 | `docs/reference/v3-graph-backend-spec.md` | Graph backend-local behavior reference |
@@ -73,6 +74,7 @@
 
 Primary reference specs:
 - `docs/reference/v3-mesh-execution-spec.md`
+- `docs/reference/v3-runtime-config-spec.md`
 - `docs/reference/v3-genome-spec.md`
 - `docs/reference/v3-sensor-spec.md`
 - `docs/reference/v3-vm-isa-spec.md`
