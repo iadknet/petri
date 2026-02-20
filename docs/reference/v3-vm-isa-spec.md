@@ -235,6 +235,25 @@ All three buffers are zeroed at the start of each VM node evaluation.
 
 All writes are last-write-wins per slot/register.
 
+### Action encoding and metadata mapping
+
+`EmitWorldAction(action_type)` decodes using the canonical mapping below:
+
+| `action_type` | Decoded `WorldAction` | Metadata usage |
+|---|---|---|
+| `0` | `NoOp` | none |
+| `1` | `Eat` | none |
+| `2` | `Move` | `meta[0]` = direction index |
+| `3` | `Reproduce` | `meta[0]` = direction index, `meta[1]` = energy amount |
+| other | `NoOp` | none |
+
+Metadata decode rules:
+- direction index uses `meta[0].round().clamp(0.0, 7.0)` and maps to
+  `Direction::ALL` (`0=N,1=NE,2=E,3=SE,4=S,5=SW,6=W,7=NW`)
+- reproduce energy amount uses `meta[1].max(0.0).round() as u32`
+- unspecified metadata slots are reserved and ignored by current runtime action
+  decoding
+
 At node end:
 - if world action emitted: action returned; routing ignored
 - otherwise internal payload buffer is emitted as `NodeResult.output_slots`
