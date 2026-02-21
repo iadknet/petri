@@ -59,7 +59,7 @@
 | --- | --- | --- | --- |
 | Should this slice include code changes? | No. Docs/contracts only. | user+agent | resolved |
 | Should lifecycle stay monolithic? | No. Split into mutation + reproduction specs and keep lifecycle as overview/index. | user+agent | resolved |
-| How should contested spawn cells be resolved? | First processed valid spawn candidate wins; later contenders fail the same invalid-target gate (single rejection outcome). | user+agent | resolved |
+| How should contested spawn cells be resolved? | First processed reproduce action against current world state wins; later contenders fail the same invalid-target gate (single rejection outcome). | user+agent | resolved |
 | What should happen when a mutation event yields non-parseable genome? | Rollback event and skip it; record skip reason telemetry. | user+agent | resolved |
 | Should determinism be runtime requirement? | No. Runtime determinism is not required; reproducibility guidance is test-mode only. | user+agent | resolved |
 | Where should telemetry contract live? | Dedicated `v3-evolution-observability-spec.md` with minimal required schema. | user+agent | resolved |
@@ -76,7 +76,8 @@
 
 **Checklist:**
 - [x] Create mutation spec with explicit engine vs domain mutator boundaries.
-- [x] Create reproduction spec with draft/queue/commit semantics and first-wins arbitration.
+- [x] Create reproduction spec with immediate action-time resolution and
+  first-processed-wins arbitration.
 - [x] Create observability spec with minimal required counters/events/reasons.
 - [x] Use ASCII diagrams in mutation and reproduction specs.
 
@@ -136,10 +137,14 @@
   - Mitigation: update docs-impact/reference-spec tables in architecture plan in same slice.
 - Rollback: revert newly added split specs and restore lifecycle detail sections, then rerun warn-mode harness checks.
 
-## Review cycles: 3
+## Review cycles: 4
 
 Cycle 1 (architecture + goals): validated that splitting mutation/reproduction contracts improves GP-02 boundary clarity and GP-04 observability without changing runtime ownership or crate dependency direction.
 
 Cycle 2 (verification): completed warn-mode doc/architecture harness checks plus grep-based assertions for new doc discoverability and absence of `Determinism Requirements` headings in active v3 reference docs.
 
-Cycle 3 (spawn-arbitration simplification): replaced multi-reason spawn rejection contract with a single invalid-target gate and clarified that authoritative target validation is owned by spawn commit.
+Cycle 3 (spawn-arbitration simplification): replaced multi-reason spawn rejection contract with a single invalid-target gate and clarified immediate action-time validation against current world state.
+
+Cycle 4 (tick orchestration alignment): removed deferred queue/commit terminology
+from active contracts, aligned reproduction to immediate action resolution, and
+linked arbitration ownership to `v3-tick-orchestration-spec.md`.

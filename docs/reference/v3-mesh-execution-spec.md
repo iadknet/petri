@@ -1,12 +1,14 @@
 # V3 Mesh Execution Spec
 
-Reference specification for evaluating a V3 creature mesh during cognition.
+Reference specification for evaluating a V3 creature mesh during cognition
+runtime.
 
 Status: Active
 
 Related references:
 - `v3-genome-spec.md`
 - `v3-sensor-spec.md`
+- `v3-tick-orchestration-spec.md`
 - `v3-vm-isa-spec.md`
 - `v3-graph-backend-spec.md`
 - `v3-mutation-spec.md`
@@ -20,6 +22,10 @@ Related references:
 Mesh execution is initiated by `tick/orchestrator.rs` during cognition.
 Runtime receives split borrows so it can mutate execution state while reading
 live dynamic introspection values.
+
+This spec owns cognition/runtime chain behavior only. Top-level tick queue
+construction, randomization, per-turn action arbitration, and newborn
+eligibility are owned by `v3-tick-orchestration-spec.md`.
 
 ```rust
 pub fn execute_creature_mesh(
@@ -36,6 +42,7 @@ Boundary intent:
 - `sensors/` owns static snapshot assembly.
 - `runtime/` owns node evaluation, routing, and soft-default behavior.
 - `contracts/` boundary remains `WorldAction` only.
+- `tick/orchestrator` owns turn ordering and immediate action application.
 
 ---
 
@@ -174,3 +181,7 @@ For deterministic tests, use a fixed mode that pins:
 - Graph convergence loop order and stop criteria
   (`max_graph_relax_iters`, epsilon threshold, stable-pass rule).
 - Soft-default fallback constants (`0.0`, `NoOp`).
+
+Tick-order/action-arbitration reproducibility controls are specified separately
+in `v3-tick-orchestration-spec.md` (`Test-Mode Reproducibility Notes (Tick
+Arbitration)`).

@@ -8,6 +8,7 @@ Status: Active
 Related references:
 - `v3-genome-spec.md`
 - `v3-mesh-execution-spec.md`
+- `v3-tick-orchestration-spec.md`
 - `v3-vm-isa-spec.md`
 - `v3-graph-backend-spec.md`
 - `v3-mutation-spec.md`
@@ -34,7 +35,8 @@ All node backends consume the same `input_refs` vector.
 
 ### World
 
-Resolved once per acting creature per tick from world snapshot:
+Resolved once at the start of each acting-creature turn from current world
+state:
 
 ```rust
 pub enum WorldInputKey {
@@ -50,7 +52,8 @@ pub enum WorldInputKey {
 
 ### Static Introspection
 
-Resolved once per tick from creature snapshot:
+Resolved once at the start of each acting-creature turn from current creature
+state:
 
 ```rust
 pub enum StaticIntrospectionKey {
@@ -81,12 +84,16 @@ If `slot >= 12`, value is `0.0`.
 
 ## 3. Resolution Timing
 
-`tick/orchestrator` flow:
-1. Build static world/static-introspection snapshot once.
+Per acting-creature turn, `tick/orchestrator` flow:
+1. Read world/static-introspection values from current world/creature state at
+   turn start.
 2. Call runtime mesh executor.
 3. Runtime resolves dynamic introspection and upstream slots per node evaluation.
 
 This split keeps borrow boundaries explicit and easy to validate in tests.
+
+Canonical turn timing and action-application order are specified in
+`v3-tick-orchestration-spec.md`.
 
 ---
 
