@@ -77,7 +77,7 @@ Type posture:
 
 | Key | Type | Default | Constraint / normalization |
 | --- | --- | --- | --- |
-| `runtime.mutation.mutation_probability` | `f64` | `0.01` | Clamp to `[0.0, 1.0]`. |
+| `runtime.mutation.mutation_probability` | `f64` | `0.01` | Clamp to `[0.0, 1.0]`. Uses `f64` (not `f32`) to preserve precision for very small probability values used in low-mutation-rate experiments. |
 | `runtime.mutation.per_birth_mutation_events_min` | `u32` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
 | `runtime.mutation.per_birth_mutation_events_max` | `u32` | `4` | Must be `>= per_birth_mutation_events_min`; lower values normalize to min. |
 | `runtime.mutation.domain_selection_weights` | `map<MutationDomain,f32>` | Equal weights across enabled genome domains (Topology, Vm, Graph) | Weights must be non-negative; all-zero set falls back to equal enabled-domain weights. Phenotype is not a mutation domain; see `v3-phenotype-spec.md`. |
@@ -147,7 +147,28 @@ field names/defaults and transfer-gate config semantics.
 
 ---
 
-## 5. Cross-Spec Ownership Rules
+## 5. Population Config Fields (Canonical)
+
+| Key | Type | Default | Constraint / normalization |
+| --- | --- | --- | --- |
+| `population.initial_creatures` | `u32` | `50` | Must be `>= 1`; invalid values fall back to `50`. |
+| `population.max_creatures` | `u32` | `1000` | Must be `>= population.initial_creatures`; invalid values fall back to `1000`. |
+
+Population config governs startup seeding targets and runtime population caps.
+
+- `initial_creatures` is the target founder count at startup. Actual placement
+  may be lower if spatial constraints prevent full placement (see
+  `v3-startup-seeding-spec.md` Section 6).
+- `max_creatures` is the hard cap enforced during reproduction. When population
+  reaches this limit, reproduce actions are rejected.
+
+Transport posture: same as other config fields — server startup/config-patch
+transport MUST reject submitted values that violate canonical constraints
+(`422 validation_rejected`).
+
+---
+
+## 6. Cross-Spec Ownership Rules
 
 - This file is the canonical source for runtime config key names/defaults.
 - Other V3 reference specs may describe how fields are used, but should link to
@@ -159,7 +180,7 @@ field names/defaults and transfer-gate config semantics.
 
 ---
 
-## 6. Policy References
+## 7. Policy References
 
 - Project-level determinism scope is canonical in `AGENTS.md`
   (`Determinism Scope (Canonical)`).

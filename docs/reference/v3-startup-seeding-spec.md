@@ -60,7 +60,8 @@ startup(seed, overrides?)
 ```
 
 Conceptual override domains:
-- `population` (initial counts and limits),
+- `population` (initial counts and limits; canonical defaults in
+  `v3-runtime-config-spec.md` Section 5),
 - `world` (`width`, `height`, `edge_mode`, food parameters),
 - `energy` (lifecycle and action-cost controls),
 - `runtime` (mesh/vm/graph/mutation controls).
@@ -112,6 +113,162 @@ Rules:
 Founder genome structure, parseability, and runtime interpretation remain owned
 by `v3-genome-spec.md`, `v3-mutation-spec.md`, and
 `v3-mesh-execution-spec.md`.
+
+### 5.1 Canonical v3alpha1 Founder Genome
+
+The founder genome is a 2-node mesh with both backend types.
+
+**Structural layout:**
+
+```text
+CreatureGenome {
+  entry_node_id: 0,
+  nodes: [Node0, Node1],
+}
+```
+
+**Node 0 — Graph backend (sensor aggregator)**
+
+```text
+NodeGenome {
+  node_id: 0,
+  input_refs: [
+    0: World(FoodHere),
+    1: DynamicIntrospection(EnergyCurrent),
+    2: World(NeighborCellFood(0)),     // N
+    3: World(NeighborCellFood(2)),     // E
+    4: World(NeighborCellFood(4)),     // S
+    5: World(NeighborCellFood(6)),     // W
+    6: World(NeighborCellOccupied(0)), // N
+    7: World(NeighborCellOccupied(2)), // E
+    8: World(NeighborCellOccupied(4)), // S
+    9: World(NeighborCellOccupied(6)), // W
+  ],
+  backend_def: Graph(GraphBackendDef {
+    internal_nodes: [
+      // idx 0: food_here signal
+      { kind: InputRef(0), inputs: [] },
+      // idx 1: energy_current signal
+      { kind: InputRef(1), inputs: [] },
+      // idx 2: reproduce gate (energy >= 24.0)
+      { kind: Threshold(24.0), inputs: [{ source_idx: 1, weight: 1.0 }] },
+      // idx 3-6: neighbor food N/E/S/W
+      { kind: InputRef(2), inputs: [] },
+      { kind: InputRef(3), inputs: [] },
+      { kind: InputRef(4), inputs: [] },
+      { kind: InputRef(5), inputs: [] },
+      // idx 7-10: neighbor occupied N/E/S/W
+      { kind: InputRef(6), inputs: [] },
+      { kind: InputRef(7), inputs: [] },
+      { kind: InputRef(8), inputs: [] },
+      { kind: InputRef(9), inputs: [] },
+      // idx 11-16: output writers
+      { kind: CustomOutput(0), inputs: [{ source_idx: 0, weight: 1.0 }] },
+        // slot 0 = food_here
+      { kind: CustomOutput(1), inputs: [{ source_idx: 2, weight: 1.0 }] },
+        // slot 1 = can_reproduce (0 or 1)
+      { kind: CustomOutput(2), inputs: [{ source_idx: 3, weight: 1.0 }] },
+        // slot 2 = food_N
+      { kind: CustomOutput(3), inputs: [{ source_idx: 4, weight: 1.0 }] },
+        // slot 3 = food_E
+      { kind: CustomOutput(4), inputs: [{ source_idx: 5, weight: 1.0 }] },
+        // slot 4 = food_S
+      { kind: CustomOutput(5), inputs: [{ source_idx: 6, weight: 1.0 }] },
+        // slot 5 = food_W
+      // idx 17: route to node 1
+      { kind: RouterOutput, inputs: [] },
+    ],
+  }),
+  targets: [1],
+}
+```
+
+**Node 1 — VM backend (decision + action emitter)**
+
+```text
+NodeGenome {
+  node_id: 1,
+  input_refs: [
+    0: UpstreamOutput { slot: 0 },  // food_here
+    1: UpstreamOutput { slot: 1 },  // can_reproduce
+    2: UpstreamOutput { slot: 2 },  // food_N
+    3: UpstreamOutput { slot: 3 },  // food_E
+    4: UpstreamOutput { slot: 4 },  // food_S
+    5: UpstreamOutput { slot: 5 },  // food_W
+  ],
+  backend_def: Vm(VmBackendDef {
+    registers: 8,
+    constants: [0.5, 1.0, 2.0, 3.0, 20.0],
+    program: [
+      // Read inputs into registers
+      ReadInput(r0, 0),       // r0 = food_here
+      ReadInput(r1, 1),       // r1 = can_reproduce
+      ReadInput(r2, 2),       // r2 = food_N
+      ReadInput(r3, 3),       // r3 = food_E
+      ReadInput(r4, 4),       // r4 = food_S
+      ReadInput(r5, 5),       // r5 = food_W
+
+      // Priority 1: Eat if food here
+      CmpGt(r6, r0, r7),     // r6 = (food_here > 0)? r7 starts at 0
+      JumpIfZero(r6, +2),     // skip eat if no food
+      EmitWorldAction(1),     // Eat
+      Noop,                   // (jumped past)
+
+      // Priority 2: Reproduce if energy sufficient
+      CmpGt(r6, r1, r7),     // r6 = can_reproduce?
+      JumpIfZero(r6, +7),     // skip reproduce block
+
+      // Find least-occupied cardinal direction for reproduce
+      // Use food dirs as proxy (food = likely unoccupied)
+      Max(r6, r2, r3),       // r6 = max(food_N, food_E)
+      Max(r7, r4, r5),       // r7 = max(food_S, food_W)
+      // Pick best cardinal: N=0, E=2, S=4, W=6
+      CmpGt(r6, r2, r3),     // r6 = food_N > food_E?
+      // Default direction North (0.0 in meta[0])
+      WriteWorldActionMeta(0, r7),  // direction placeholder
+      LoadConst(r6, 4),       // const[4] = 20.0 offspring energy
+      WriteWorldActionMeta(1, r6),  // offspring energy
+      EmitWorldAction(3),     // Reproduce
+
+      // Priority 3: Move toward highest food direction
+      // Find max food cardinal
+      Max(r6, r2, r3),       // max(food_N, food_E)
+      Max(r7, r4, r5),       // max(food_S, food_W)
+      // Simple direction select: compare N vs S, E vs W
+      CmpGt(r6, r2, r4),     // r6 = food_N > food_S?
+      CmpGt(r7, r3, r5),     // r7 = food_E > food_W?
+      // Build direction: 0=N, 2=E, 4=S, 6=W
+      LoadConst(r0, 0),       // const[0] = 0.5, but we need 0
+      Sub(r0, r0, r0),        // r0 = 0 (N)
+      JumpIfZero(r6, +2),     // if food_S >= food_N, skip
+      Jump(+2),               // food_N wins, keep r0=0
+      LoadConst(r0, 3),       // const[3] = 3.0 ~ S direction idx
+      // Check E/W axis
+      WriteWorldActionMeta(0, r0),  // set direction
+      EmitWorldAction(2),     // Move
+
+      // Priority 4: Fallback NoOp
+      EmitWorldAction(0),     // NoOp
+    ],
+  }),
+  targets: [],
+}
+```
+
+**Behavioral intent:**
+- Founders eat when standing on food (highest priority).
+- Founders reproduce when energy is sufficient (above 24.0 threshold).
+- Founders move toward the cardinal direction with highest visible food.
+- Founders emit NoOp as a last resort.
+
+This gives natural selection immediate material to work with: creatures that
+find food and reproduce efficiently will out-compete those that do not.
+
+**Determinism note:** The founder genome structure above is canonical for
+v3alpha1 seeding. The exact bytewise encoding is an implementation detail, but
+the structural layout (node count, node IDs, input_refs, graph internal
+topology, VM instruction sequence, and constants) must be identical across
+implementations for deterministic seeding with the same seed.
 
 ---
 

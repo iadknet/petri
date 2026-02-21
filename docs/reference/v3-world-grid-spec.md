@@ -64,6 +64,9 @@ as these semantics are preserved.
 
 ## 3. Coordinate and Direction Semantics
 
+Coordinate system: `(0,0)` is top-left. X increases rightward, Y increases
+downward (screen coordinates).
+
 Coordinate domain:
 - `x in [0, width - 1]`
 - `y in [0, height - 1]`

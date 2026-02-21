@@ -38,7 +38,21 @@ Startup/reset seeding behavior and founder baseline policy are specified in
 
 ---
 
-## 2. Death and Removal
+## 2. CreatureId Contract
+
+`CreatureId` is a `u64` monotonically incrementing identifier.
+
+Rules:
+- Each creature receives a unique `CreatureId` at spawn time (including
+  startup-seeded founders).
+- IDs are never reused within a simulation run.
+- Allocation is monotonically incrementing from `0`.
+- `CreatureId` is used for occupancy indexing, turn-queue stable sort, and
+  observability event attribution.
+
+---
+
+## 3. Death and Removal
 
 A creature dies when its energy reaches zero or below.
 
@@ -51,7 +65,7 @@ Canonical Phase 0 sub-step ordering (including death removal) is specified in
 
 ---
 
-## 3. Mutation Policy Summary
+## 4. Mutation Policy Summary
 
 V3 uses a junk-DNA-friendly mutation policy.
 
@@ -72,7 +86,7 @@ specified in `v3-mutation-spec.md`.
 
 ---
 
-## 4. Structural Validity Summary
+## 5. Structural Validity Summary
 
 Mutation processing enforces structural parseability, not behavioral viability.
 
@@ -85,7 +99,7 @@ matrix).
 
 ---
 
-## 5. Reproduction Inheritance Summary
+## 6. Reproduction Inheritance Summary
 
 ### Memory
 
@@ -115,7 +129,7 @@ in `v3-reproduction-spec.md`.
 
 ---
 
-## 6. Observability Summary
+## 7. Observability Summary
 
 Minimal required counters/events/reason enums for mutation skips and
 reproduction action outcomes are specified in
@@ -126,7 +140,7 @@ in `v3-cli-contract-spec.md`.
 
 ---
 
-## 7. Policy References
+## 8. Policy References
 
 - Project-level determinism scope is canonical in `AGENTS.md`
   (`Determinism Scope (Canonical)`).

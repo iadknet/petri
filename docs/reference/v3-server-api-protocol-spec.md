@@ -168,10 +168,17 @@ Response:
   "protocol_version": "v3alpha1",
   "state": "idle",
   "tick": 0,
-  "config_digest": "sha256-hex",
+  "config_digest": "sha256:<hex>",
   "seeded_creatures": 50
 }
 ```
+
+`config_digest` computation:
+- Serialize the effective config (after applying defaults and accepted
+  overrides) as canonical JSON with keys sorted alphabetically at every nesting
+  level, no whitespace.
+- Compute SHA-256 of the resulting UTF-8 byte string.
+- Format as `"sha256:<lowercase-hex>"`.
 
 ### 4.2 `POST /v3/simulation/start`
 
@@ -378,6 +385,8 @@ Rules:
 - Unknown fields rejected.
 - PATCH supports the full canonical keyspace from `GET /config`, including all
   runtime mutation keys owned by `v3-runtime-config-spec.md`.
+- PATCH uses deep merge: only specified keys are updated; unspecified keys
+  retain their existing values at every nesting level.
 - Invalid values rejected with `422 validation_rejected`; transport does not
   apply fallback/clamp normalization to invalid submitted values.
 - World topology fields (`world.width`, `world.height`, `world.edge_mode`) are
@@ -445,6 +454,12 @@ Envelope/payload consistency rules:
 - `status` and `frame` payloads must not duplicate envelope-owned keys
   (`protocol_version`, `tick`).
 - Any duplicated envelope-owned keys inside payload are protocol-invalid.
+
+Emission frequency:
+- Events are emitted once per completed tick while the simulation is `running`.
+- Implementations may throttle emission (for example emit every Nth tick) for
+  performance, but must document the throttle policy. The default v3alpha1
+  behavior is per-tick emission.
 
 Ordering rules:
 1. `tick` is monotonic non-decreasing per connection.
