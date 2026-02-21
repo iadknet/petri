@@ -102,7 +102,6 @@ Canonical owner for graph convergence budget/config defaults:
 ```rust
 pub enum GraphNodeKind {
     InputRef(u8),
-    InputUpstreamSlot(u8),
 
     Constant(f32),
     Add,
@@ -137,12 +136,9 @@ node's internal weighted aggregate:
 
 Missing input refs read as `0.0`.
 
-`InputUpstreamSlot(u8)` reads from routing parent output slots and combines that
-base value with internal weighted aggregate:
-
-`output = upstream_slot_value + weighted_input_sum`
-
-Invalid slot reads yield `0.0`.
+When `InputRef(u8)` resolves to `InputReference::UpstreamOutput { slot }`, the
+base value is routing-parent `upstream_slots[slot]` (invalid slot -> `0.0`),
+then combined with internal weighted aggregate using the same rule.
 
 ---
 
