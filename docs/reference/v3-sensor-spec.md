@@ -116,7 +116,6 @@ Soft defaults are deliberate to support junk-DNA evolution without crashes.
 
 - VM: `ReadInput(dst, idx)` reads `input_refs[idx]`.
 - Graph: `InputRef(idx)` reads `input_refs[idx]`.
-- Graph direct upstream reads: `InputUpstreamSlot(slot)`.
 
-No backend reads world state directly. All access is through `InputReference` or
-`InputUpstreamSlot` runtime dataflow.
+No backend reads world state directly. All access is through `InputReference`
+runtime dataflow.
