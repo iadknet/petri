@@ -13,6 +13,7 @@ Related references:
 - `v3-genome-spec.md`
 - `v3-server-api-protocol-spec.md`
 - `v3-cli-contract-spec.md`
+- `v3-phenotype-spec.md`
 
 ---
 
@@ -103,6 +104,8 @@ Rules:
 - Startup-seeded founders begin at `generation = 0`.
 - Startup does not introduce per-founder profile selection via API.
 - Startup phenotype baseline is deterministic and uniform for seeded founders.
+  Canonical founder phenotype baseline values (RGB, channel weights, polarity)
+  are defined in `v3-phenotype-spec.md` Section 3.
 - Diversity is introduced after startup via mutation/reproduction policy, not via
   startup profile randomization.
 

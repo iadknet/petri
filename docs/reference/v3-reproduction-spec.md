@@ -14,6 +14,7 @@ Related references:
 - `v3-mesh-execution-spec.md`
 - `v3-runtime-config-spec.md`
 - `v3-world-grid-spec.md`
+- `v3-phenotype-spec.md`
 
 ---
 
@@ -72,7 +73,7 @@ This document does not define:
 - `position` (target spawn position)
 - `initial_energy` (post-transfer child energy, scalar `f32`)
 - `generation` (`parent.generation + 1`)
-- `phenotype` (inherited/mutated according to mutation policy)
+- `phenotype` (inherited or mutated per `v3-phenotype-spec.md` trigger rules)
 - `genome` (parent genome copy after mutation application)
 - `memory` (byte-for-byte copy from parent)
 - `graph_state` (empty map at spawn)
@@ -102,6 +103,15 @@ Constraints:
 - Child graph runtime state is not inherited.
 - Child starts with empty graph-state map.
 - Graph state is lazily allocated at runtime by `NodeId` as nodes execute.
+
+### Phenotype
+
+- If genome mutation was applied (`MutationSummary.applied_events > 0`),
+  phenotype mutates per `v3-phenotype-spec.md` Section 5 algorithm.
+- If no genome mutation occurred (`applied_events == 0`), offspring inherits
+  parent phenotype exactly (RGB, channel weights, and channel polarity).
+- Phenotype mutation is NOT a mutation engine domain; it is a separate pathway
+  evaluated in this reproduction flow after `MutationEngine` returns.
 
 ### Inventory
 
@@ -137,7 +147,8 @@ runtime config contract: `v3-runtime-config-spec.md`.
   -> [validate parent energy + transfer constraints]
        -> failed  : [reject RejectedEnergyConstraints; return]
   -> [build OffspringDraft]
-  -> [mutate child genome via MutationEngine]
+  -> [mutate child genome via MutationEngine -> MutationSummary]
+  -> [if MutationSummary.applied_events > 0: mutate phenotype per v3-phenotype-spec.md]
   -> [spawn immediately; occupy cell now]
 ```
 
