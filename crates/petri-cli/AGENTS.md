@@ -4,7 +4,12 @@ Local instructions for `crates/petri-cli`.
 
 ## Scope
 
-`petri-cli` owns headless simulation workflows: run command, ablation command, and benchmark entrypoints.
+`petri-cli` is a legacy maintenance surface.
+For net-new architecture/contracts, treat V3 docs under `docs/strategy/` and
+`docs/reference/` as canonical.
+
+When touching this crate, keep headless simulation workflows here (run command,
+ablation command, benchmark entrypoints).
 
 ## Boundary Rules
 
@@ -26,7 +31,7 @@ Local instructions for `crates/petri-cli`.
 ## Related Canonical Docs
 
 - Root policy: `AGENTS.md`
-- Docs index: `docs/README.md`
+- Docs entrypoint: `docs/`
 - Active strategy docs: `docs/strategy/`
 - Active reference specs: `docs/reference/`
 - Archived reference specs: `docs/reference/archive/`

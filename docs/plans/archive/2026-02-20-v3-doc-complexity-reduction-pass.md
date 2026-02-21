@@ -133,7 +133,7 @@
 ### Task 5: Verification and completion metadata
 
 **Files:**
-- Modify: `docs/plans/2026-02-20-v3-doc-complexity-reduction-pass.md`
+- Modify: `docs/plans/archive/2026-02-20-v3-doc-complexity-reduction-pass.md`
 
 **Checklist:**
 - [x] Run doc harness in warn mode.

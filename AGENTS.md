@@ -17,27 +17,33 @@ Use the split-responsibility model:
 - Skills own **HOW** execution is performed.
 - Repository docs and `AGENTS.md` own **WHAT** project constraints must hold.
 
-See canonical policy: `docs/standards/agent-instruction-layering.md`.
+See canonical policy set: `docs/standards/`.
 
 ## Repository Map
 
-- `crates/petri-core`: simulation world state and tick logic (`crates/petri-core/AGENTS.md`)
-- `crates/petri-graph`: controller graph types/evaluation/mutation (`crates/petri-graph/AGENTS.md`)
-- `crates/petri-server`: REST + WebSocket transport around core (`crates/petri-server/AGENTS.md`)
-- `crates/petri-cli`: headless runner/ablation/benchmark entrypoints (`crates/petri-cli/AGENTS.md`)
-- `web/`: React + TypeScript client (`web/AGENTS.md`)
-- `docs/`: canonical strategy/reference/standards/operations docs (`docs/README.md`)
+- `v3/`: active implementation target
+- `docs/`: canonical strategy/reference/standards/operations docs
+- `crates/`: legacy runtime crates (maintenance/reference only; see local `AGENTS.md` files)
+- `v2/`: legacy rewrite workspace (maintenance/reference only)
+- `web/`: legacy root frontend (maintenance/reference only; see `web/AGENTS.md`)
+
+Local instruction files:
+- `crates/petri-core/AGENTS.md`
+- `crates/petri-graph/AGENTS.md`
+- `crates/petri-server/AGENTS.md`
+- `crates/petri-cli/AGENTS.md`
+- `web/AGENTS.md`
 
 ## Non-Negotiable Invariants
 
-- Crate dependency direction remains `petri-graph -> petri-core -> petri-server/petri-cli`.
-- Keep simulation policy in `petri-core`; keep transport policy in `petri-server`.
-- Do not add web concerns to Rust core crates.
-- Runtime behavior telemetry must be truthfully simulation-derived: per-tick creature state, action counts, and energy/population metrics must come from applied world tick behavior, not synthetic placeholders.
-- Frame food payload stays quantized byte density (`0..255`) unless explicitly changed.
-- `initial_creatures` remains best-effort (bounded by occupancy and max creatures).
-- `food_growth_rate` is honored directly (no hidden minimum floor).
-- Localhost defaults (`127.0.0.1`) are intentional unless explicitly changed.
+- Active architecture direction and contracts are defined under `docs/strategy/` and
+  `docs/reference/` for V3.
+- Legacy surfaces (`crates/`, `v2/`, root `web/`) are maintenance/reference-only
+  unless explicitly promoted by a new approved plan.
+- Runtime-facing telemetry/state values must be derived from applied simulation
+  behavior (no synthetic placeholder metrics).
+- Legacy crate boundary direction remains
+  `petri-graph -> petri-core -> petri-server/petri-cli` when touching legacy code.
 
 ## Determinism Scope (Canonical)
 
@@ -72,7 +78,7 @@ After writing or substantially revising any plan, agents **must** run a review c
 
 1. **Draft** the plan (main file + any companions).
 2. **Architecture review**: Re-read active architecture and planning docs in `docs/strategy/` and `docs/plans/` (exclude `docs/plans/archive/` unless doing historical comparison), the relevant crate/module `AGENTS.md` files, and the Non-Negotiable Invariants in this file. Verify every proposed change is consistent with existing boundaries, dependency directions, and module responsibilities. Document any tensions found.
-3. **Goal alignment review**: Re-read `docs/strategy/goals.md` and verify that the plan's Goal Alignment section accurately maps work items to goal IDs. Confirm no goal is undermined or ignored by the proposed changes.
+3. **Goal alignment review**: Re-read active strategy docs in `docs/strategy/` (including the goals catalog) and verify that the plan's Goal Alignment section accurately maps work items to goal IDs. Confirm no goal is undermined or ignored by the proposed changes.
 4. **Revise** the plan to resolve any issues found in steps 2–3.
 5. **Repeat** steps 2–4 until a clean pass (no architecture conflicts, no goal misalignment). Record the number of review cycles performed at the bottom of the plan in a `**Review cycles:** N` metadata line.
 
@@ -116,8 +122,8 @@ Before claiming completion, run and confirm all pass:
 
 ## Doc Touch Policy
 
-- For any non-trivial plan, follow metadata and section requirements in `docs/plans/README.md`.
-- Use `Goal IDs` from `docs/strategy/goals.md` and include explicit `Goal Alignment`, `Existing Boundary Recheck`, and `Open Questions` sections.
+- For any non-trivial plan, follow metadata and section requirements in `docs/plans/` (template rules are maintained there).
+- Use `Goal IDs` from the active goals catalog in `docs/strategy/` and include explicit `Goal Alignment`, `Existing Boundary Recheck`, and `Open Questions` sections.
 - Include a `Docs Impact` section listing canonical docs touched and stale docs retired/superseded.
 - Prefer references to canonical docs over repeating the same narrative in multiple files.
 - Avoid conflicting invariant statements across docs; update all affected canonical docs together when invariants change.
@@ -125,7 +131,7 @@ Before claiming completion, run and confirm all pass:
 
 ## Canonical Docs
 
-- Docs index: `docs/README.md`
+- Docs entrypoint: `docs/`
 - Active strategy docs: `docs/strategy/`
 - Active reference specs: `docs/reference/`
 - Archived reference specs: `docs/reference/archive/`

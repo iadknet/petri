@@ -111,7 +111,7 @@
 ### Task 4: Verification and final status
 
 **Files:**
-- Modify: `docs/plans/2026-02-20-v3-mutation-reproduction-spec-split.md`
+- Modify: `docs/plans/archive/2026-02-20-v3-mutation-reproduction-spec-split.md`
 
 **Checklist:**
 - [x] Run doc harness warn mode.

@@ -4,48 +4,35 @@ Canonical project documentation lives under `docs/`.
 
 ## Strategy
 
-- [Roadmap](strategy/roadmap.md)
-- [Architecture](strategy/architecture.md)
-- [Technology Review](strategy/technology-review.md)
-- [High-Level Goals Catalog](strategy/goals.md)
+- [Active Strategy Directory](strategy/)
+- [Active Goals Catalog](strategy/goals.md)
+
+## Strategy (Historical)
+
+- [Strategy Archives](strategy/archive/)
 
 `v3` is the active target architecture path.
 v1 (`crates/petri-*`) and v2 (`v2/`) are retained as historical reference.
 
 ## Reference
 
-- [V3 Mesh Execution Spec](reference/v3-mesh-execution-spec.md)
-- [V3 Tick Orchestration Spec](reference/v3-tick-orchestration-spec.md)
-- [V3 Runtime Config Spec](reference/v3-runtime-config-spec.md)
-- [V3 Genome Spec](reference/v3-genome-spec.md)
-- [V3 Genome Topology Examples](reference/v3-genome-topology-examples.md)
-- [V3 Sensor Spec](reference/v3-sensor-spec.md)
-- [V3 Graph Backend Spec](reference/v3-graph-backend-spec.md)
-- [V3 VM ISA Spec](reference/v3-vm-isa-spec.md)
-- [V3 Creature Lifecycle Spec](reference/v3-creature-lifecycle-spec.md)
-- [V3 Mutation Spec](reference/v3-mutation-spec.md)
-- [V3 Reproduction Spec](reference/v3-reproduction-spec.md)
-- [V3 Evolution Observability Spec](reference/v3-evolution-observability-spec.md)
+- [Active V3 Reference Specs](reference/)
 
 ## Reference (Legacy)
 
-- [Creature Controller Reference](reference/archive/creature-controller-reference.md)
+- [Reference Archives](reference/archive/)
 
 ## Plans
 
-- [Plans Directory](plans/)
+- [Active Plans Directory](plans/)
+- [Archived Plans Directory](plans/archive/)
 - [Plans Metadata and Template Rules](plans/README.md)
 
 ## Standards
 
-- [Agent Instruction Layering](standards/agent-instruction-layering.md)
-- [Architecture Lint Policy](standards/architecture-lint-policy.md)
-- [Plan Quality Gate Policy](standards/plan-quality-gate-policy.md)
-- [Documentation Consistency Policy](standards/documentation-consistency-policy.md)
-- [Intent Verification Policy](standards/intent-verification-policy.md)
-- [Runtime Behavior Realism Policy](standards/runtime-behavior-realism-policy.md)
+- [Standards Directory](standards/)
 
 ## Operations
 
-- [Doc Hygiene and Harness Checks](operations/doc-hygiene.md)
-- [V2 Documentation Closeout](operations/v2-doc-closeout.md)
+- [Active Operations Directory](operations/)
+- [Operations Archives](operations/archive/)

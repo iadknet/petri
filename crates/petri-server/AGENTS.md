@@ -4,7 +4,13 @@ Local instructions for `crates/petri-server`.
 
 ## Scope
 
-`petri-server` owns transport and lifecycle orchestration around `petri-core`: REST endpoints, WebSocket frame streaming, startup/runtime config patching, and simulation lifecycle management.
+`petri-server` is a legacy maintenance surface.
+For net-new architecture/contracts, treat V3 docs under `docs/strategy/` and
+`docs/reference/` as canonical.
+
+When touching this crate, keep transport and lifecycle orchestration around
+`petri-core` here: REST endpoints, WebSocket frame streaming, startup/runtime
+config patching, and simulation lifecycle management.
 
 ## Boundary Rules
 
@@ -27,7 +33,7 @@ Local instructions for `crates/petri-server`.
 ## Related Canonical Docs
 
 - Root policy: `AGENTS.md`
-- Docs index: `docs/README.md`
+- Docs entrypoint: `docs/`
 - Active strategy docs: `docs/strategy/`
 - Active reference specs: `docs/reference/`
 - Archived reference specs: `docs/reference/archive/`

@@ -4,7 +4,12 @@ Local instructions for `crates/petri-graph`.
 
 ## Scope
 
-`petri-graph` owns controller representation, graph evaluation, presets, and mutation behavior.
+`petri-graph` is a legacy maintenance surface.
+For net-new architecture/contracts, treat V3 docs under `docs/strategy/` and
+`docs/reference/` as canonical.
+
+When touching this crate, keep controller representation, graph evaluation,
+presets, and mutation behavior localized here.
 
 ## Purity Rules
 
@@ -27,7 +32,7 @@ Local instructions for `crates/petri-graph`.
 ## Related Canonical Docs
 
 - Root policy: `AGENTS.md`
-- Docs index: `docs/README.md`
+- Docs entrypoint: `docs/`
 - Active strategy docs: `docs/strategy/`
 - Active reference specs: `docs/reference/`
 - Archived reference specs: `docs/reference/archive/`

@@ -5,11 +5,14 @@ Frontend-specific instructions for coding agents working in `web/`.
 ## Instruction Layering
 
 - Follow root policy in `../AGENTS.md`.
-- Follow instruction-layering contract in `../docs/standards/agent-instruction-layering.md`.
+- Follow active standards in `../docs/standards/`.
 - Keep this file focused on frontend-local boundaries and tests.
 
 ## Stack and Scope
 
+- This `web/` app is a legacy maintenance surface.
+- For net-new architecture/contracts, treat V3 docs under `../docs/strategy/`
+  and `../docs/reference/` as canonical.
 - Keep the frontend stack as React + Vite + TypeScript.
 - Do not introduce framework migrations (Next.js/Svelte/etc.) in this phase.
 - Preserve current Stage 1e behavior and API contracts.

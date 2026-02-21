@@ -9,21 +9,11 @@
 
 ## Active Program Structure
 
-Primary architecture/design plan:
-- `docs/plans/2026-02-18-v3-mesh-refactor-design.md`
+Primary architecture/design planning:
+- `docs/plans/` (active plan set)
 
-Canonical reference specs:
-- `docs/reference/v3-mesh-execution-spec.md`
-- `docs/reference/v3-tick-orchestration-spec.md`
-- `docs/reference/v3-runtime-config-spec.md`
-- `docs/reference/v3-genome-spec.md`
-- `docs/reference/v3-sensor-spec.md`
-- `docs/reference/v3-graph-backend-spec.md`
-- `docs/reference/v3-vm-isa-spec.md`
-- `docs/reference/v3-creature-lifecycle-spec.md`
-- `docs/reference/v3-mutation-spec.md`
-- `docs/reference/v3-reproduction-spec.md`
-- `docs/reference/v3-evolution-observability-spec.md`
+Canonical runtime/contracts specs:
+- `docs/reference/` (active V3 specs)
 
 ## Current Program Status
 
