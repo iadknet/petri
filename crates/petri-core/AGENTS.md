@@ -4,7 +4,13 @@ Local instructions for `crates/petri-core`.
 
 ## Scope
 
-`petri-core` owns simulation policy: world state, tick semantics, energy accounting, spawning, perception, paint effects, and snapshot behavior.
+`petri-core` is a legacy maintenance surface.
+For net-new architecture/contracts, treat V3 docs under `docs/strategy/` and
+`docs/reference/` as canonical.
+
+When touching this crate, keep simulation policy concerns localized here (world
+state, tick semantics, energy accounting, spawning, perception, paint effects,
+snapshot behavior).
 
 ## Boundary Rules
 
@@ -33,7 +39,7 @@ Local instructions for `crates/petri-core`.
 ## Related Canonical Docs
 
 - Root policy: `AGENTS.md`
-- Docs index: `docs/README.md`
+- Docs entrypoint: `docs/`
 - Active strategy docs: `docs/strategy/`
 - Active reference specs: `docs/reference/`
 - Archived reference specs: `docs/reference/archive/`
