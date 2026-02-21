@@ -124,7 +124,7 @@ Implications:
   later reproduce actions targeting now-invalid cells fail the same invalid-target
   gate.
 
-No deferred global arbitration pass is required.
+No additional global arbitration pass runs after the per-turn loop.
 
 ---
 
@@ -147,8 +147,8 @@ For deterministic tests that depend on action-order outcomes, pin:
 - Queue source filter (alive after Phase 0 updates only).
 - Pre-shuffle ordering rule (stable sorted `CreatureId`).
 - Shuffle algorithm and RNG seed/stream for tick queue.
-- Per-turn sequencing (`think -> emit action -> apply action`) with no deferred
-  commit phases.
+- Per-turn sequencing (`think -> emit action -> apply action`) with no separate
+  post-loop commit phase.
 - Newborn eligibility rule (next tick only).
 
 Runtime cognition reproducibility controls are canonical in
