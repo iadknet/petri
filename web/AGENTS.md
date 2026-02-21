@@ -15,7 +15,8 @@ Frontend-specific instructions for coding agents working in `web/`.
   and `../docs/reference/` as canonical.
 - Keep the frontend stack as React + Vite + TypeScript.
 - Do not introduce framework migrations (Next.js/Svelte/etc.) in this phase.
-- Preserve current Stage 1e behavior and API contracts.
+- Preserve the existing legacy `web/` behavior and API contracts unless an
+  approved plan explicitly changes them.
 
 ## Architecture Boundaries
 

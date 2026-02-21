@@ -139,8 +139,7 @@ reason breakdowns remain mandatory.
 
 ## 6. Counter Rename Note
 
-This immediate-action model replaces deferred-queue counter naming from earlier
-drafts.
+This immediate-action model replaces earlier counter names.
 
 Renamed counters:
 - `reproduction_attempts_total` -> `reproduction_actions_attempted_total`
