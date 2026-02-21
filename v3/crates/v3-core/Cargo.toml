@@ -1,9 +1,0 @@
-[package]
-name = "v3-core"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
-rand = { version = "0.8", features = ["small_rng"] }
-serde = { version = "1.0", features = ["derive"] }
-slotmap = "1.0"
