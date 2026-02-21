@@ -14,6 +14,7 @@ Primary architecture/design plan:
 
 Canonical reference specs:
 - `docs/reference/v3-mesh-execution-spec.md`
+- `docs/reference/v3-tick-orchestration-spec.md`
 - `docs/reference/v3-runtime-config-spec.md`
 - `docs/reference/v3-genome-spec.md`
 - `docs/reference/v3-sensor-spec.md`
@@ -29,7 +30,7 @@ Canonical reference specs:
 | stage | status | summary |
 | --- | --- | --- |
 | Architecture reconciliation | complete | Mesh execution model and soft-default philosophy stabilized in docs. |
-| Reference specification sync | complete | Execution/runtime-config, VM, graph, genome, sensor, lifecycle, mutation, reproduction, and observability specs aligned. |
+| Reference specification sync | complete | Execution/tick-orchestration/runtime-config, VM, graph, genome, sensor, lifecycle, mutation, reproduction, and observability specs aligned. |
 | Legacy doc archival | complete | Superseded V3 plans and legacy refs archived/pointerized. |
 | Implementation planning | next | Convert canonical docs into executable milestone plans and task slices. |
 

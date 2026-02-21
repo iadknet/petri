@@ -106,6 +106,8 @@ Energy posture:
   through fixed test-mode controls.
 
 Reproduction transfer sequencing:
+This sequencing is evaluated only after spawn target validity succeeds, as
+defined in `v3-reproduction-spec.md`.
 1. Pay `energy.costs.reproduce_cost`.
 2. Enforce `energy.lifecycle.min_reproduce_energy` gate.
 3. Compute
@@ -113,6 +115,11 @@ Reproduction transfer sequencing:
    then
    `transfer = min(requested_energy_sanitized, energy.lifecycle.default_offspring_energy)`.
 4. Reject reproduction when `transfer <= 0.0` or parent cannot cover transfer.
+
+Outcome mapping:
+- Energy/transfer validation failures in this sequencing map to
+  `ReproductionActionResult::RejectedEnergyConstraints` in
+  `v3-reproduction-spec.md`.
 
 Behavioral ownership remains in `v3-reproduction-spec.md`; this section owns
 field names/defaults and transfer-gate config semantics.
@@ -133,5 +140,8 @@ field names/defaults and transfer-gate config semantics.
 
 - Project-level determinism scope is canonical in `AGENTS.md`
   (`Determinism Scope (Canonical)`).
-- V3 harness reproducibility controls are canonical in
+- V3 runtime cognition reproducibility controls are canonical in
   `v3-mesh-execution-spec.md` (`Test-Mode Reproducibility Notes`).
+- V3 tick ordering/arbitration reproducibility controls are canonical in
+  `v3-tick-orchestration-spec.md` (`Test-Mode Reproducibility Notes (Tick
+  Arbitration)`).

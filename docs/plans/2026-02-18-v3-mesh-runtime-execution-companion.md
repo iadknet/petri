@@ -13,6 +13,7 @@
 | `docs/plans/2026-02-18-v3-mesh-runtime-execution-companion.md` | Create |
 | `docs/plans/2026-02-18-v3-mesh-refactor-design.md` | Link as companion |
 | `docs/reference/v3-mesh-execution-spec.md` | Keep as canonical runtime contract |
+| `docs/reference/v3-tick-orchestration-spec.md` | Keep as canonical tick queue/arbitration contract |
 | `docs/reference/v3-vm-isa-spec.md` | Keep VM backend-local execution details |
 | `docs/reference/v3-graph-backend-spec.md` | Keep Graph backend-local execution details |
 
@@ -37,6 +38,8 @@
 
 - Runtime execution remains in `v3/crates/v3-core/src/runtime/`.
 - Tick/orchestrator invokes runtime but does not own runtime internal fallback policy.
+- Tick/orchestrator owns queue ordering/randomization and immediate action
+  arbitration (see `v3-tick-orchestration-spec.md`).
 - VM/Graph backends supply node-local behavior; mesh runtime owns chain-level routing and termination.
 
 ---
@@ -46,7 +49,7 @@
 | area | decision | rationale |
 | --- | --- | --- |
 | `runtime/` | keep | canonical owner of chain evaluation, routing conversion, and soft defaults; this companion refines runtime detail |
-| `tick/orchestrator.rs` | keep | orchestration invokes runtime; no execution-policy duplication |
+| `tick/orchestrator.rs` | keep | orchestrator owns queue order/arbitration while runtime owns cognition internals; no policy overlap |
 | `runtime/vm.rs` | keep | VM defines opcode semantics; chain-level outcomes stay in mesh execution contract and are linked, not duplicated |
 | `runtime/graph.rs` | keep | Graph defines pass/eval behavior; chain-level outcomes stay in mesh execution contract and are linked, not duplicated |
 

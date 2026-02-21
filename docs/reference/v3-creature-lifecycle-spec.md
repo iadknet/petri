@@ -1,11 +1,12 @@
 # Petri V3 Creature Lifecycle Reference
 
-Overview reference for lifecycle phases and high-level invariants in V3 mesh
-architecture.
+Overview/index reference for lifecycle phases and high-level invariants in V3
+mesh architecture.
 
 Status: Active
 
 Authoritative detailed contracts:
+- `v3-tick-orchestration-spec.md`
 - `v3-mutation-spec.md`
 - `v3-reproduction-spec.md`
 - `v3-evolution-observability-spec.md`
@@ -17,15 +18,17 @@ Authoritative detailed contracts:
 ## 1. Lifecycle Phases
 
 At a high level per tick:
-1. Existing creatures act.
-2. Reproduction requests are generated.
-3. Offspring drafts are created and queued.
-4. Spawn queue is committed after action processing.
+1. Phase 0 world updates run (food growth, aging, energy decay).
+2. Turn queue is built from creatures alive after Phase 0, then stable-sorted
+   by `CreatureId` and shuffled with tick RNG.
+3. Each queued creature executes one turn in order:
+   - gather turn-start inputs from current world state,
+   - execute cognition runtime to emit one `WorldAction`,
+   - apply action immediately and mutate world state.
+4. Tick ends; any newborn spawned mid-tick becomes eligible on next tick only.
 
-This preserves stable keys while actions are executing.
-
-Detailed reproduction flow, drafting, and spawn arbitration semantics are
-specified in `v3-reproduction-spec.md`.
+Canonical phase order, queue contract, and arbitration semantics are specified in
+`v3-tick-orchestration-spec.md`.
 
 ---
 
@@ -54,9 +57,8 @@ specified in `v3-mutation-spec.md`.
 
 Mutation processing enforces structural parseability, not behavioral viability.
 
-Canonical parseability invariants are specified in
-`v3-genome-spec.md` (Section 4) and applied by mutation
-`ParseabilityGate` in `v3-mutation-spec.md`.
+Canonical parseability invariants are specified in `v3-genome-spec.md` (Section
+4) and applied by mutation `ParseabilityGate` in `v3-mutation-spec.md`.
 
 Canonical runtime fallback behavior for degraded-but-parseable genomes is
 specified in `v3-mesh-execution-spec.md` (Section 4, authoritative soft-default
@@ -87,15 +89,16 @@ matrix).
 - On no mutation event, offspring phenotype matches parent.
 - On mutation event, phenotype changes follow mutation policy.
 
-Detailed inheritance and spawn semantics are specified in
-`v3-reproduction-spec.md`.
+Detailed inheritance and immediate reproduce-action spawn semantics are specified
+in `v3-reproduction-spec.md`.
 
 ---
 
 ## 5. Observability Summary
 
-Minimal required counters/events/reason enums for mutation skips and spawn
-rejections are specified in `v3-evolution-observability-spec.md`.
+Minimal required counters/events/reason enums for mutation skips and
+reproduction action outcomes are specified in
+`v3-evolution-observability-spec.md`.
 
 ---
 
@@ -103,5 +106,8 @@ rejections are specified in `v3-evolution-observability-spec.md`.
 
 - Project-level determinism scope is canonical in `AGENTS.md`
   (`Determinism Scope (Canonical)`).
-- V3 harness reproducibility controls are canonical in
+- V3 runtime cognition reproducibility controls are canonical in
   `v3-mesh-execution-spec.md` (`Test-Mode Reproducibility Notes`).
+- V3 tick queue/arbitration reproducibility controls are canonical in
+  `v3-tick-orchestration-spec.md` (`Test-Mode Reproducibility Notes (Tick
+  Arbitration)`).

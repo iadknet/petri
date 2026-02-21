@@ -15,6 +15,7 @@ v1 (`crates/petri-*`) and v2 (`v2/`) are retained as historical reference.
 ## Reference
 
 - [V3 Mesh Execution Spec](reference/v3-mesh-execution-spec.md)
+- [V3 Tick Orchestration Spec](reference/v3-tick-orchestration-spec.md)
 - [V3 Runtime Config Spec](reference/v3-runtime-config-spec.md)
 - [V3 Genome Spec](reference/v3-genome-spec.md)
 - [V3 Genome Topology Examples](reference/v3-genome-topology-examples.md)

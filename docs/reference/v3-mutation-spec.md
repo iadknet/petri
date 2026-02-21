@@ -8,6 +8,7 @@ Status: Active
 Related references:
 - `v3-genome-spec.md`
 - `v3-mesh-execution-spec.md`
+- `v3-tick-orchestration-spec.md`
 - `v3-vm-isa-spec.md`
 - `v3-graph-backend-spec.md`
 - `v3-reproduction-spec.md`
@@ -211,5 +212,8 @@ At minimum:
 
 - Project-level determinism scope is canonical in `AGENTS.md`
   (`Determinism Scope (Canonical)`).
-- V3 harness reproducibility controls are canonical in
+- V3 runtime cognition reproducibility controls are canonical in
   `v3-mesh-execution-spec.md` (`Test-Mode Reproducibility Notes`).
+- V3 tick ordering/arbitration reproducibility controls are canonical in
+  `v3-tick-orchestration-spec.md` (`Test-Mode Reproducibility Notes (Tick
+  Arbitration)`).

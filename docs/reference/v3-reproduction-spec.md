@@ -1,12 +1,13 @@
 # V3 Reproduction Spec
 
 Reference specification for reproduction flow, offspring drafting, and spawn
-commit arbitration in V3.
+resolution in V3.
 
 Status: Active
 
 Related references:
 - `v3-creature-lifecycle-spec.md`
+- `v3-tick-orchestration-spec.md`
 - `v3-mutation-spec.md`
 - `v3-genome-spec.md`
 - `v3-evolution-observability-spec.md`
@@ -18,15 +19,17 @@ Related references:
 ## 1. Purpose and Scope
 
 This document defines:
-- Reproduction action flow from action execution through spawn commit.
+- Reproduction action flow at action-application time.
 - Offspring draft contract.
 - Inheritance rules.
-- Spawn arbitration and rejection semantics.
+- Spawn validity and rejection semantics.
 - Required reproduction telemetry semantics.
 
 This document does not define:
 - VM/graph cognition internals.
 - Mutation operator internals (covered in `v3-mutation-spec.md`).
+- Top-level turn queue ordering/arbitration (covered in
+  `v3-tick-orchestration-spec.md`).
 - Telemetry storage/transport implementation details.
 
 ---
@@ -34,21 +37,22 @@ This document does not define:
 ## 2. Reproduction Ownership
 
 ```text
-[tick/actions]
+[tick turn order]
+  owns action ordering and first-processed-wins behavior
+         |
+         v
+[reproduce action apply]
+  checks is_valid_spawn_target(position, current_world_state)
+  if invalid:
+    reject RejectedInvalidTarget
+    return
   validates reproduce action + energy transfer
-  builds OffspringDraft (no world mutation)
-  calls MutationEngine on child genome
-  emits SpawnCandidate
-         |
-         v
-[spawn queue]
-  deferred commit after action processing
-         |
-         v
-[spawn commit]
-  owns authoritative target-cell validity check
-  first valid candidate claims target cell
-  invalid targets rejected with one failure result
+  if energy validation fails:
+    reject RejectedEnergyConstraints
+    return
+  build OffspringDraft
+  call MutationEngine on child genome
+  spawn child immediately, mutate occupancy now
 ```
 
 ---
@@ -68,7 +72,7 @@ This document does not define:
 Constraints:
 - Draft creation must not mutate world occupancy state.
 - Draft creation must not allocate creature identity key; identity is assigned on
-  spawn commit.
+  successful immediate spawn.
 
 ---
 
@@ -82,7 +86,8 @@ Constraints:
 ### Genome
 
 - Child genome starts as parent genome copy.
-- Mutation is applied through `MutationEngine` before enqueue.
+- Mutation is applied through `MutationEngine` only after spawn target validity
+  and energy/transfer validation both succeed.
 
 ### Graph state
 
@@ -100,10 +105,11 @@ Constraints:
 ## 5. Energy Transfer Contract
 
 Reproduction action semantics:
-- Parent pays reproduction action cost according to energy config.
+- After target validity succeeds, parent pays reproduction action cost according
+  to energy config.
 - Requested child transfer is clamped by configured offspring transfer cap.
 - If parent cannot satisfy required transfer constraints, reproduction fails and
-  no child draft is queued.
+  no child is spawned.
 - Energy/lifecycle config values are continuous scalar units (`f32`) as defined
   in `v3-runtime-config-spec.md`.
 
@@ -112,39 +118,50 @@ runtime config contract: `v3-runtime-config-spec.md`.
 
 ---
 
-## 6. Spawn Queue and Commit Arbitration
+## 6. Immediate Reproduce Action Resolution
 
-### Queue semantics
+### Action-time flow
 
-- Spawn candidates are queued during action execution.
-- World mutation for child occupancy is deferred until spawn commit phase.
+```text
+[reproduce action emitted]
+  -> [check target against current world state]
+       -> invalid : [reject RejectedInvalidTarget; return]
+  -> [validate parent energy + transfer constraints]
+       -> failed  : [reject RejectedEnergyConstraints; return]
+  -> [build OffspringDraft]
+  -> [mutate child genome via MutationEngine]
+  -> [spawn immediately; occupy cell now]
+```
 
-### Commit semantics
+### Validity gate semantics
 
-Commit uses a single validity gate in queue order:
+`is_valid_spawn_target(position, world_state_now)` is evaluated at the moment
+the reproduce action is applied.
 
-1. Evaluate `is_valid_spawn_target(position, world_state_now)` at commit time.
-2. If valid, spawn candidate and occupy the cell.
-3. If invalid, reject `RejectedInvalidTarget`.
+It returns false when target cell is out of bounds, barrier-blocked, already
+occupied, or otherwise not spawnable at that moment.
 
-`is_valid_spawn_target` returns false when target cell is out of bounds,
-barrier-blocked, already occupied, or otherwise not spawnable.
+Same-tick contention is handled by normal action ordering: if an earlier
+processed action has already changed occupancy, later reproduce actions observe
+that updated state and fail the same invalid-target gate.
 
-No pre-pass or cascading rejection-order policy is required. Same-tick
-contention is handled naturally by commit order: once one candidate claims a
-cell, later candidates for that cell fail the same invalid-target gate.
+If target validation fails:
+- No `OffspringDraft` is created.
+- No mutation event is attempted for that failed reproduce action.
 
 ### Ownership boundary
 
-- Spawn target validity is owned by spawn commit.
-- Action execution/draft creation may run advisory prechecks for UX/perf, but
-  those prechecks are not authoritative.
-- Authoritative acceptance/rejection telemetry must be emitted at spawn commit.
+- Action ordering/arbitration is owned by `v3-tick-orchestration-spec.md`.
+- Reproduction owns child drafting/mutation and spawn-target validity checks
+  during reproduce action application.
+- Advisory prechecks may exist for UX/perf, but authoritative
+  acceptance/rejection is emitted at action-application time.
 
-### `SpawnCommitResult` minimum enum
+### `ReproductionActionResult` minimum enum
 
 - `Spawned`
 - `RejectedInvalidTarget`
+- `RejectedEnergyConstraints`
 
 ---
 
@@ -154,11 +171,12 @@ Reproduction processing must emit required minimal data defined in
 `v3-evolution-observability-spec.md`.
 
 At minimum:
-- Reproduction attempt count.
-- Spawn candidates queued count.
+- Reproduction action attempt count (increment once per emitted reproduce action,
+  regardless of later target/energy/mutation/spawn outcome).
 - Spawned count.
-- Rejected count by `SpawnCommitResult` reason.
-- Optional per-candidate event records for debugging.
+- Rejected count by `ReproductionActionResult` reason.
+- Accounting invariant: `attempted = spawned + rejected`.
+- Optional per-action event records for debugging.
 
 ---
 
@@ -166,5 +184,8 @@ At minimum:
 
 - Project-level determinism scope is canonical in `AGENTS.md`
   (`Determinism Scope (Canonical)`).
-- V3 harness reproducibility controls are canonical in
+- V3 runtime cognition reproducibility controls are canonical in
   `v3-mesh-execution-spec.md` (`Test-Mode Reproducibility Notes`).
+- V3 tick ordering/arbitration reproducibility controls are canonical in
+  `v3-tick-orchestration-spec.md` (`Test-Mode Reproducibility Notes (Tick
+  Arbitration)`).
