@@ -51,6 +51,21 @@ pub enum WorldInputKey {
 
 `u8` direction index is expected in `0..7`; out-of-range behaves as zero.
 
+Resolved f32 values per key:
+- `FoodHere`: `food_density[self_cell] as f32 / 255.0` → `[0.0, 1.0]`
+- `NeighborCellFood(dir)`: `food_density[neighbor] as f32 / 255.0` → `[0.0, 1.0]`
+- `NeighborCellBarrier(dir)`: `1.0` if barrier, else `0.0`
+- `NeighborCellOccupied(dir)`: `1.0` if occupied by any creature, else `0.0`
+- `NeighborCreaturePresent(dir)`: same as `NeighborCellOccupied` in v3alpha1
+
+Normalization rationale: food is stored as `u8` for memory efficiency. Raw
+values (0–255) would saturate Graph activation functions (e.g., `Sigmoid`,
+`Tanh`) at any non-trivial density, making them insensitive to food gradients.
+Normalized values preserve relative food signal across the full [0.0, 1.0]
+range. This normalization applies only to sensor output; Eat action reward
+mechanics use the raw consumed food amount as defined in
+`v3-runtime-config-spec.md` (`eat_reward_per_food`).
+
 World neighbor semantics (coordinate system, direction mapping, and edge-mode
 resolution) are canonical in `v3-world-grid-spec.md`.
 
@@ -66,6 +81,9 @@ pub enum StaticIntrospectionKey {
 }
 ```
 
+Resolved f32 values: raw integer cast to f32. Values are unbounded and
+increase monotonically over the creature's lifetime.
+
 ### Dynamic Introspection
 
 Resolved live during mesh evaluation:
@@ -76,6 +94,10 @@ pub enum DynamicIntrospectionKey {
     EnergyConsumedThisTick,
 }
 ```
+
+Resolved f32 values: raw energy units (same scale as `energy.*` config fields
+in `v3-runtime-config-spec.md`). `EnergyCurrent` is in `[0.0, max_energy]`;
+`EnergyConsumedThisTick` accumulates action/cognition costs since turn start.
 
 These values may change between node hops during the same tick.
 
