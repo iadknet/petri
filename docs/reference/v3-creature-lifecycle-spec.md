@@ -9,6 +9,7 @@ Authoritative detailed contracts:
 - `v3-tick-orchestration-spec.md`
 - `v3-mutation-spec.md`
 - `v3-reproduction-spec.md`
+- `v3-phenotype-spec.md`
 - `v3-evolution-observability-spec.md`
 - `v3-genome-spec.md`
 - `v3-mesh-execution-spec.md`
@@ -21,7 +22,7 @@ Authoritative detailed contracts:
 ## 1. Lifecycle Phases
 
 At a high level per tick:
-1. Phase 0 world updates run (food growth, aging, energy decay).
+1. Phase 0 world updates run (food growth, aging, energy decay, death removal).
 2. Turn queue is built from creatures alive after Phase 0, then stable-sorted
    by `CreatureId` and shuffled with tick RNG.
 3. Each queued creature executes one turn in order:
@@ -37,7 +38,20 @@ Startup/reset seeding behavior and founder baseline policy are specified in
 
 ---
 
-## 2. Mutation Policy Summary
+## 2. Death and Removal
+
+A creature dies when its energy reaches zero or below.
+
+Death removal is processed during Phase 0 of each tick, after energy decay is
+applied. Creatures that reach zero or negative energy during cognition or action
+application within a tick are not removed until the following tick's Phase 0.
+
+Canonical Phase 0 sub-step ordering (including death removal) is specified in
+`v3-tick-orchestration-spec.md` Section 3.
+
+---
+
+## 3. Mutation Policy Summary
 
 V3 uses a junk-DNA-friendly mutation policy.
 
@@ -58,7 +72,7 @@ specified in `v3-mutation-spec.md`.
 
 ---
 
-## 3. Structural Validity Summary
+## 4. Structural Validity Summary
 
 Mutation processing enforces structural parseability, not behavioral viability.
 
@@ -71,7 +85,7 @@ matrix).
 
 ---
 
-## 4. Reproduction Inheritance Summary
+## 5. Reproduction Inheritance Summary
 
 ### Memory
 
@@ -93,13 +107,15 @@ matrix).
 
 - On no mutation event, offspring phenotype matches parent.
 - On mutation event, phenotype changes follow mutation policy.
+- Phenotype state model, mutation algorithm, and trigger rules are canonical in
+  `v3-phenotype-spec.md`.
 
 Detailed inheritance and immediate reproduce-action spawn semantics are specified
 in `v3-reproduction-spec.md`.
 
 ---
 
-## 5. Observability Summary
+## 6. Observability Summary
 
 Minimal required counters/events/reason enums for mutation skips and
 reproduction action outcomes are specified in
@@ -110,7 +126,7 @@ in `v3-cli-contract-spec.md`.
 
 ---
 
-## 6. Policy References
+## 7. Policy References
 
 - Project-level determinism scope is canonical in `AGENTS.md`
   (`Determinism Scope (Canonical)`).

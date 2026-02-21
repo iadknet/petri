@@ -88,16 +88,18 @@ runtime backends or reproduction internals.
   -> [tick ends; newborns eligible next tick]
 ```
 
-Phase 0 includes:
-- Food growth.
-- Creature aging.
-- Energy decay.
+Phase 0 sub-steps (canonical order):
+1. Food growth (per-cell, world-level).
+2. Creature aging (`age_ticks += 1` for each living creature).
+3. Energy decay (`energy -= energy_decay_per_tick` for each living creature).
+4. Death removal: remove all creatures with `energy <= 0.0`.
 
-Canonical world-update semantics (for example food growth behavior) are owned by
-`v3-world-grid-spec.md`.
+Canonical food growth behavior is owned by `v3-world-grid-spec.md`.
+Canonical `energy_decay_per_tick` default is owned by
+`v3-runtime-config-spec.md`.
 
-Only creatures alive after Phase 0 world updates are eligible for the current
-tick queue.
+Only creatures surviving Phase 0 (including death removal) are eligible for the
+current tick queue.
 
 ---
 
@@ -127,7 +129,50 @@ This is the canonical first-processed-wins model.
 
 ---
 
-## 6. Conflict Resolution Contract
+## 6. Action Application Semantics
+
+Each world action is applied at the acting creature's turn per Section 5.
+
+### NoOp
+
+- No world effects.
+- Deduct `energy.costs.noop_cost` from creature energy.
+
+### Eat
+
+- Consume food from creature's current cell using `consume_food` semantics
+  from `v3-world-grid-spec.md`.
+- Gain energy: `energy += consumed_amount * energy.costs.eat_reward_per_food`.
+- Cap energy at `energy.lifecycle.max_energy`.
+- Deduct `energy.costs.eat_cost` from creature energy.
+
+### Move
+
+- Resolve target neighbor using validity primitives from
+  `v3-world-grid-spec.md`.
+- If valid: update creature position and world occupancy.
+- If invalid: no position change.
+- Deduct `energy.costs.move_cost` from creature energy regardless of move
+  success.
+
+### Reproduce
+
+- Full flow per `v3-reproduction-spec.md` and `v3-runtime-config-spec.md`
+  Section 4.
+- `energy.costs.reproduce_cost` is deducted within reproduction transfer
+  sequencing (not as a separate post-action step).
+
+### Energy after action
+
+Energy may become zero or negative after action application. The creature is
+not removed until the next tick's Phase 0 death removal step (Section 3).
+
+Config key defaults for all action costs are canonical in
+`v3-runtime-config-spec.md`.
+
+---
+
+## 7. Conflict Resolution Contract
 
 All conflict-prone actions resolve against current world state at the moment the
 action is applied.
@@ -146,7 +191,7 @@ No additional global arbitration pass runs after the per-turn loop.
 
 ---
 
-## 7. Newborn Eligibility
+## 8. Newborn Eligibility
 
 Creatures spawned during tick `T`:
 - are inserted into world state immediately on successful reproduction action,
@@ -155,7 +200,7 @@ Creatures spawned during tick `T`:
 
 ---
 
-## 8. Test-Mode Reproducibility Notes (Tick Arbitration)
+## 9. Test-Mode Reproducibility Notes (Tick Arbitration)
 
 Project-level determinism scope is canonical in `AGENTS.md`
 (`Determinism Scope (Canonical)`): production runtime determinism is not a
@@ -174,7 +219,7 @@ Runtime cognition reproducibility controls are canonical in
 
 ---
 
-## 9. Cross-Reference Map
+## 10. Cross-Reference Map
 
 - Cognition runtime internals: `v3-mesh-execution-spec.md`
 - Reproduce action internals: `v3-reproduction-spec.md`
