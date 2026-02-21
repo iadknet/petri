@@ -12,6 +12,10 @@ Related references:
 - `v3-evolution-observability-spec.md`
 - `v3-runtime-config-spec.md`
 - `v3-sensor-spec.md`
+- `v3-world-grid-spec.md`
+- `v3-startup-seeding-spec.md`
+- `v3-server-api-protocol-spec.md`
+- `v3-cli-contract-spec.md`
 
 ---
 
@@ -29,8 +33,16 @@ This document does not define:
 - Cognition runtime internals (owned by `v3-mesh-execution-spec.md`).
 - Reproduction child drafting/mutation internals (owned by
   `v3-reproduction-spec.md` and `v3-mutation-spec.md`).
-- Telemetry storage/transport implementation details (owned by
-  `v3-evolution-observability-spec.md` semantics only).
+- World/grid data model, edge-mode semantics, and target-validity primitives
+  (owned by `v3-world-grid-spec.md`).
+- Startup seeding/founder baseline policy (owned by
+  `v3-startup-seeding-spec.md`).
+- External transport lifecycle controls (`startup`, `start`, `pause`, `step`)
+  (owned by `v3-server-api-protocol-spec.md`).
+- Observability semantic requirements (counters/reasons) are owned by
+  `v3-evolution-observability-spec.md`.
+- Transport/API mapping for observability surfaces is owned by
+  `v3-server-api-protocol-spec.md` and `v3-cli-contract-spec.md`.
 
 ---
 
@@ -81,6 +93,9 @@ Phase 0 includes:
 - Creature aging.
 - Energy decay.
 
+Canonical world-update semantics (for example food growth behavior) are owned by
+`v3-world-grid-spec.md`.
+
 Only creatures alive after Phase 0 world updates are eligible for the current
 tick queue.
 
@@ -116,6 +131,9 @@ This is the canonical first-processed-wins model.
 
 All conflict-prone actions resolve against current world state at the moment the
 action is applied.
+
+Canonical move/spawn target-validity primitives (edge handling, occupancy, and
+barrier checks) are owned by `v3-world-grid-spec.md`.
 
 Implications:
 - `Move`: first processed successful move claims destination occupancy.
@@ -163,3 +181,6 @@ Runtime cognition reproducibility controls are canonical in
 - Mutation event pipeline: `v3-mutation-spec.md`
 - Required counters/reasons: `v3-evolution-observability-spec.md`
 - Tick/runtime config defaults: `v3-runtime-config-spec.md`
+- World/grid semantics and validity primitives: `v3-world-grid-spec.md`
+- Startup seeding and founder baseline policy: `v3-startup-seeding-spec.md`
+- External lifecycle transport contract: `v3-server-api-protocol-spec.md`

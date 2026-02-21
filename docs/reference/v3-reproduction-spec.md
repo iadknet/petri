@@ -13,6 +13,7 @@ Related references:
 - `v3-evolution-observability-spec.md`
 - `v3-mesh-execution-spec.md`
 - `v3-runtime-config-spec.md`
+- `v3-world-grid-spec.md`
 
 ---
 
@@ -30,6 +31,8 @@ This document does not define:
 - Mutation operator internals (covered in `v3-mutation-spec.md`).
 - Top-level turn queue ordering/arbitration (covered in
   `v3-tick-orchestration-spec.md`).
+- World/grid coordinate, edge-mode, or occupancy primitive semantics
+  (covered in `v3-world-grid-spec.md`).
 - Telemetry storage/transport implementation details.
 
 ---
@@ -42,7 +45,12 @@ This document does not define:
          |
          v
 [reproduce action apply]
-  checks is_valid_spawn_target(position, current_world_state)
+  target_opt = resolve_neighbor(parent_position, direction, world.edge_mode)
+  if target_opt is None:
+    reject RejectedInvalidTarget
+    return
+  target_position = target_opt.unwrap()
+  checks is_valid_spawn_cell(target_position, current_world_state)
   if invalid:
     reject RejectedInvalidTarget
     return
@@ -135,11 +143,19 @@ runtime config contract: `v3-runtime-config-spec.md`.
 
 ### Validity gate semantics
 
-`is_valid_spawn_target(position, world_state_now)` is evaluated at the moment
-the reproduce action is applied.
+Spawn validity is evaluated at the moment the reproduce action is applied.
 
-It returns false when target cell is out of bounds, barrier-blocked, already
-occupied, or otherwise not spawnable at that moment.
+Canonical gate sequence:
+1. Resolve target with
+   `resolve_neighbor(parent_position, direction, world.edge_mode)`.
+2. If target is unresolved, reject as `RejectedInvalidTarget`.
+3. If resolved target cell is barrier-blocked, already occupied, or otherwise
+   not spawnable at that moment, reject as `RejectedInvalidTarget`.
+
+Out-of-bounds rejection applies only when `world.edge_mode = bounded`; when
+`world.edge_mode = wrap`, neighbor resolution wraps into an in-bounds cell.
+Canonical edge handling and occupancy/barrier validity semantics are owned by
+`v3-world-grid-spec.md`.
 
 Same-tick contention is handled by normal action ordering: if an earlier
 processed action has already changed occupancy, later reproduce actions observe
@@ -154,6 +170,9 @@ If target validation fails:
 - Action ordering/arbitration is owned by `v3-tick-orchestration-spec.md`.
 - Reproduction owns child drafting/mutation and spawn-target validity checks
   during reproduce action application.
+- World/grid low-level validity primitives are owned by
+  `v3-world-grid-spec.md`; reproduction consumes those primitives via
+  `resolve_neighbor(...)` + cell-level spawn validity checks.
 - Advisory prechecks may exist for UX/perf, but authoritative
   acceptance/rejection is emitted at action-application time.
 
