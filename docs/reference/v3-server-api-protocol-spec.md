@@ -12,6 +12,7 @@ Related references:
 - `v3-tick-orchestration-spec.md`
 - `v3-evolution-observability-spec.md`
 - `v3-cli-contract-spec.md`
+- `v3-phenotype-spec.md`
 
 ---
 
@@ -121,8 +122,7 @@ Request (conceptual v3alpha1 shape):
       "domain_selection_weights": {
         "Topology": 1.0,
         "Vm": 1.0,
-        "Graph": 1.0,
-        "Phenotype": 1.0
+        "Graph": 1.0
       },
       "operator_selection_weights": {
         "Topology": { "AddNode": 1.0, "RemoveNode": 1.0 },
@@ -135,7 +135,13 @@ Request (conceptual v3alpha1 shape):
           "RemoveInternalGraphNode": 1.0
         }
       },
-      "operator_modifier_scale": 1.0
+      "operator_modifier_scale": 1.0,
+      "phenotype": {
+        "channel_step": 2,
+        "polarity_flip_chance": 0.002,
+        "channel_weight_min": 0.05,
+        "channel_weight_max": 1.0
+      }
     }
   }
 }
@@ -337,8 +343,7 @@ Response:
         "domain_selection_weights": {
           "Topology": 1.0,
           "Vm": 1.0,
-          "Graph": 1.0,
-          "Phenotype": 1.0
+          "Graph": 1.0
         },
         "operator_selection_weights": {
           "Topology": { "AddNode": 1.0, "RemoveNode": 1.0 },
@@ -351,7 +356,13 @@ Response:
             "RemoveInternalGraphNode": 1.0
           }
         },
-        "operator_modifier_scale": 1.0
+        "operator_modifier_scale": 1.0,
+        "phenotype": {
+          "channel_step": 2,
+          "polarity_flip_chance": 0.002,
+          "channel_weight_min": 0.05,
+          "channel_weight_max": 1.0
+        }
       }
     }
   }
@@ -491,6 +502,7 @@ Snapshot import/export contracts require a follow-up spec.
   `v3-startup-seeding-spec.md`
 - World defaults and spatial validity behavior: `v3-world-grid-spec.md`
 - Runtime/energy/mutation key defaults: `v3-runtime-config-spec.md`
+- Phenotype state model and mutation algorithm: `v3-phenotype-spec.md`
 - Tick action ordering/arbitration: `v3-tick-orchestration-spec.md`
 - Required observability semantics: `v3-evolution-observability-spec.md`
 - Local runner NDJSON output contract: `v3-cli-contract-spec.md`

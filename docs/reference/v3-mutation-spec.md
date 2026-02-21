@@ -14,6 +14,7 @@ Related references:
 - `v3-reproduction-spec.md`
 - `v3-evolution-observability-spec.md`
 - `v3-runtime-config-spec.md`
+- `v3-phenotype-spec.md`
 
 ---
 
@@ -57,9 +58,6 @@ This document does not define:
       +--> [GraphMutator]
       |      graph internal node/edge/operator/param mutations
       |
-      +--> [PhenotypeMutator] (optional when enabled)
-      |      phenotype trait/color mutations
-      |
       +--> [ParseabilityGate]
              enforces structural validity only
              (no behavioral viability guarantees)
@@ -96,9 +94,8 @@ Core rule:
 - `SwapGraphOperator`
 - `MutateGraphOperatorParam`
 
-### Phenotype domain (optional)
-
-- Domain-specific phenotype mutation operations, when enabled for the stage.
+Phenotype mutation is not a mutation engine domain. It is a separate pathway
+triggered by genome mutation; see `v3-phenotype-spec.md`.
 
 Implementations may add operators, but they must preserve structural
 parseability or be rolled back/skipped under policy below.

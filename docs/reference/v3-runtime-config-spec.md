@@ -14,6 +14,7 @@ Related references:
 - `v3-world-grid-spec.md`
 - `v3-startup-seeding-spec.md`
 - `v3-server-api-protocol-spec.md`
+- `v3-phenotype-spec.md`
 
 ---
 
@@ -79,9 +80,17 @@ Type posture:
 | `runtime.mutation.mutation_probability` | `f64` | `0.01` | Clamp to `[0.0, 1.0]`. |
 | `runtime.mutation.per_birth_mutation_events_min` | `u32` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
 | `runtime.mutation.per_birth_mutation_events_max` | `u32` | `4` | Must be `>= per_birth_mutation_events_min`; lower values normalize to min. |
-| `runtime.mutation.domain_selection_weights` | `map<MutationDomain,f32>` | Equal weights across enabled domains | Weights must be non-negative; all-zero set falls back to equal enabled-domain weights. |
+| `runtime.mutation.domain_selection_weights` | `map<MutationDomain,f32>` | Equal weights across enabled genome domains (Topology, Vm, Graph) | Weights must be non-negative; all-zero set falls back to equal enabled-domain weights. Phenotype is not a mutation domain; see `v3-phenotype-spec.md`. |
 | `runtime.mutation.operator_selection_weights` | `map<MutationDomain,map<Operator,f32>>` | Equal weights across enabled operators in each domain | Weights must be non-negative; missing/all-zero domain map falls back to equal enabled-operator weights for that domain. |
 | `runtime.mutation.operator_modifier_scale` | `f32` | `1.0` | Must be `>= 0.0`; negative values clamp to `0.0`. |
+| `runtime.mutation.phenotype.channel_step` | `u8` | `2` | Must be `>= 1`; invalid values fall back to `2`. |
+| `runtime.mutation.phenotype.polarity_flip_chance` | `f32` | `0.002` | Clamp to `[0.0, 1.0]`. |
+| `runtime.mutation.phenotype.channel_weight_min` | `f32` | `0.05` | Must be `>= 0.0`; invalid values fall back to `0.05`. |
+| `runtime.mutation.phenotype.channel_weight_max` | `f32` | `1.0` | Must be `> channel_weight_min`; invalid values fall back to `1.0`. |
+
+Phenotype mutation is not a mutation engine domain; it is a separate pathway
+triggered by genome mutation. Phenotype algorithm and trigger semantics are
+canonical in `v3-phenotype-spec.md`.
 
 Mutation randomization semantics:
 1. Roll mutation trigger from `mutation_probability`.
