@@ -60,7 +60,8 @@ This document does not define:
     reject RejectedEnergyConstraints
     return
   build OffspringDraft
-  call MutationEngine on child genome
+  call MutationEngine unconditionally on child genome
+    (MutationEngine internally handles mutation_probability gate)
   spawn child immediately, mutate occupancy now
 ```
 
@@ -138,19 +139,32 @@ runtime config contract: `v3-runtime-config-spec.md`.
 
 ## 6. Immediate Reproduce Action Resolution
 
-### Action-time flow
+### Action-time flow (unified sequence)
 
 ```text
 [reproduce action emitted]
-  -> [check target against current world state]
-       -> invalid : [reject RejectedInvalidTarget; return]
-  -> [validate parent energy + transfer constraints]
-       -> failed  : [reject RejectedEnergyConstraints; return]
-  -> [build OffspringDraft]
-  -> [mutate child genome via MutationEngine -> MutationSummary]
-  -> [if MutationSummary.applied_events > 0: mutate phenotype per v3-phenotype-spec.md]
-  -> [spawn immediately; occupy cell now]
+  1. resolve target with resolve_neighbor(parent_position, direction, edge_mode)
+     -> unresolved : [reject RejectedInvalidTarget; return]
+  2. check is_valid_spawn_cell(target, current_world_state)
+     -> invalid    : [reject RejectedInvalidTarget; return]
+  3. pay energy.costs.reproduce_cost from parent
+  4. enforce energy.lifecycle.min_reproduce_energy gate on parent
+     -> below threshold : [reject RejectedEnergyConstraints; return]
+  5. compute transfer = min(clamp_non_negative_finite(requested_energy),
+                           energy.lifecycle.default_offspring_energy)
+     -> reject if transfer <= 0.0 or parent cannot cover transfer
+     -> [reject RejectedEnergyConstraints; return]
+  6. deduct transfer from parent; build OffspringDraft with initial_energy = transfer
+  7. call MutationEngine unconditionally on child genome -> MutationSummary
+     (MutationEngine internally handles the mutation_probability gate;
+      see v3-mutation-spec.md Section 4.1)
+  8. if MutationSummary.applied_events > 0: mutate phenotype per v3-phenotype-spec.md
+  9. spawn child immediately; occupy cell now
 ```
+
+Energy config field names/defaults are canonical in `v3-runtime-config-spec.md`
+Section 4. This unified sequence supersedes cross-referencing between files for
+the reproduction energy flow.
 
 ### Validity gate semantics
 

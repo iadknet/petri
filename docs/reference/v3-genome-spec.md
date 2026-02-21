@@ -10,6 +10,7 @@ Related references:
 - `v3-mesh-execution-spec.md`
 - `v3-vm-isa-spec.md`
 - `v3-graph-backend-spec.md`
+- `v3-sensor-spec.md`
 
 ---
 

@@ -160,6 +160,8 @@ selection pressure rather than strict genome repair.
 - VM nodes: energy deducted per opcode from VM cost table.
 - Graph nodes: energy deducted per internal-node-per-pass evaluation.
 - If energy is exhausted mid-node, evaluation halts and returns `NoOp`.
+  No partial state mutations (graph_state writes, memory writes) from the
+  interrupted node persist. The mesh returns `WorldAction::NoOp` immediately.
 
 Dynamic introspection values (for example `EnergyCurrent`) are read live from
 mutating `energy` during execution.

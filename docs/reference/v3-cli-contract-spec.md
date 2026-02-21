@@ -57,8 +57,17 @@ Rules:
 - `--sample-every` defaults to `1` when omitted.
 - `--sample-every` must be `>= 1`.
 - `--seed` is required for deterministic replay and fixture reproducibility.
-- `--config` is optional structured overrides; unknown/invalid fields are
-  rejected.
+- `--config` is optional; the config file must be JSON with the same schema as
+  the server startup request body (Section 4.1 of
+  `v3-server-api-protocol-spec.md`), excluding the `seed` field (seed is
+  provided via `--seed`). Malformed or missing config files are fatal errors.
+- Unknown/invalid fields in the config file are rejected.
+
+Exit codes:
+- `0`: successful completion (run finished normally).
+- `1`: validation error (invalid arguments, malformed config, constraint
+  violations).
+- `2`: runtime error (unexpected failure during simulation execution).
 
 ---
 
@@ -122,8 +131,9 @@ minimal contract.
 
 Event semantics:
 - `run_started` appears exactly once at run start.
-- `tick_sample` appears every `sample_every` ticks and may include final tick if
-  aligned.
+- `tick_sample` is emitted at ticks `sample_every`, `2 * sample_every`, ...,
+  plus the final tick if it is not already aligned to a sample boundary.
+  Tick numbering starts at `1` (the first completed tick).
 - `run_completed` appears exactly once at run end.
 
 ---

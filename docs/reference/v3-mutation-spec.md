@@ -110,11 +110,20 @@ parseability or be rolled back/skipped under policy below.
 apply_mutations(genome, mutation_config, rng_ctx) -> MutationSummary
 ```
 
+Call semantics:
+- `MutationEngine` is called unconditionally for every offspring. Internally,
+  it rolls `mutation_probability` to decide whether any mutation events are
+  attempted. If the probability gate fails, it returns a zero-event summary
+  immediately. Callers never skip the `MutationEngine` call.
+
 `MutationSummary` minimum fields:
 - `attempted_events: u32`
 - `applied_events: u32`
 - `skipped_events: u32`
 - `skip_reasons: map<MutationSkipReason, u32>`
+
+Accounting invariant:
+- `attempted_events = applied_events + skipped_events`.
 
 ### 4.2 Event processing sequence
 
@@ -132,9 +141,11 @@ for each selected event:
   7) commit event
 ```
 
-Selection randomization rules:
-- Mutation trigger uses global `mutation_probability`.
-- Event count is sampled from configured inclusive min/max bounds.
+Selection randomization rules (internal to `MutationEngine`):
+- Mutation trigger rolls global `mutation_probability` internally. If the roll
+  fails, `MutationEngine` returns `MutationSummary { attempted_events: 0,
+  applied_events: 0, skipped_events: 0, ... }` immediately.
+- If triggered, event count is sampled from configured inclusive min/max bounds.
 - For each event, domain/operator are sampled from configured weights.
 - Operator modifiers are randomized per event (subject to operator-specific
   constraints and global modifier scaling).

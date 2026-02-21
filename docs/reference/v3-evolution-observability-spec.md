@@ -116,7 +116,7 @@ minimum fields per event type:
 
 - `tick`
 - `event_index`
-- `domain` (`Topology`, `Vm`, `Graph`, `Phenotype`, or implementation-defined equivalent)
+- `domain` (`Topology`, `Vm`, `Graph`, or implementation-defined equivalent)
 - `operator`
 - `outcome` (`Applied` or `Skipped`)
 - `skip_reason` (when skipped)
