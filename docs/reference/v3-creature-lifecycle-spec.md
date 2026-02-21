@@ -12,6 +12,9 @@ Authoritative detailed contracts:
 - `v3-evolution-observability-spec.md`
 - `v3-genome-spec.md`
 - `v3-mesh-execution-spec.md`
+- `v3-startup-seeding-spec.md`
+- `v3-server-api-protocol-spec.md`
+- `v3-cli-contract-spec.md`
 
 ---
 
@@ -29,6 +32,8 @@ At a high level per tick:
 
 Canonical phase order, queue contract, and arbitration semantics are specified in
 `v3-tick-orchestration-spec.md`.
+Startup/reset seeding behavior and founder baseline policy are specified in
+`v3-startup-seeding-spec.md`.
 
 ---
 
@@ -99,6 +104,9 @@ in `v3-reproduction-spec.md`.
 Minimal required counters/events/reason enums for mutation skips and
 reproduction action outcomes are specified in
 `v3-evolution-observability-spec.md`.
+Canonical server/ws transport mapping for observability data is specified in
+`v3-server-api-protocol-spec.md`; canonical CLI run-output mapping is specified
+in `v3-cli-contract-spec.md`.
 
 ---
 

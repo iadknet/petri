@@ -11,6 +11,9 @@ Related references:
 - `v3-graph-backend-spec.md`
 - `v3-mutation-spec.md`
 - `v3-reproduction-spec.md`
+- `v3-world-grid-spec.md`
+- `v3-startup-seeding-spec.md`
+- `v3-server-api-protocol-spec.md`
 
 ---
 
@@ -35,7 +38,16 @@ Planning note:
 This document does not define:
 - API/transport schema for config payloads,
 - UI exposure choices,
+- world/grid configuration defaults (owned by `v3-world-grid-spec.md`),
 - runtime action/telemetry behavior contracts (see related references).
+
+Transport posture note:
+- This file owns config semantics/defaults/normalization.
+- v3alpha1 server startup/config-patch transport MUST reject submitted values
+  that violate canonical constraints (`422 validation_rejected`); transport does
+  not apply fallback/clamp normalization to invalid wire values.
+- Unspecified fields still inherit canonical defaults from this file and
+  `v3-world-grid-spec.md`.
 
 ---
 
@@ -133,6 +145,8 @@ field names/defaults and transfer-gate config semantics.
   this file rather than duplicating default/normalization tables.
 - Runtime implementations may choose equivalent internal struct layouts, but
   semantic behavior must match this contract.
+- Startup/config transport payload schemas are canonical in
+  `v3-server-api-protocol-spec.md`.
 
 ---
 

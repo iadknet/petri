@@ -9,6 +9,8 @@ Related references:
 - `v3-mutation-spec.md`
 - `v3-reproduction-spec.md`
 - `v3-creature-lifecycle-spec.md`
+- `v3-server-api-protocol-spec.md`
+- `v3-cli-contract-spec.md`
 
 ---
 
@@ -30,6 +32,10 @@ This document is intentionally non-prescriptive about:
 - transport/API shape,
 - logging backend,
 - retention policy.
+
+Canonical v3alpha1 transport mappings for these observability semantics are
+specified in `v3-server-api-protocol-spec.md` and
+`v3-cli-contract-spec.md`.
 
 ---
 
@@ -131,6 +137,8 @@ The minimal contract supports:
 - test assertions for mutation/reproduction behavior,
 - debugging unexpected ecology behavior,
 - tuning mutation and reproduction policies over time.
+- consistent server/ws and CLI reporting with one-to-one semantic mapping from
+  applied runtime behavior.
 
 If an implementation cannot emit full event records, required counters and
 reason breakdowns remain mandatory.

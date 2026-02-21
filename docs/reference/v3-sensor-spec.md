@@ -13,6 +13,7 @@ Related references:
 - `v3-graph-backend-spec.md`
 - `v3-mutation-spec.md`
 - `v3-reproduction-spec.md`
+- `v3-world-grid-spec.md`
 
 ---
 
@@ -50,6 +51,9 @@ pub enum WorldInputKey {
 
 `u8` direction index is expected in `0..7`; out-of-range behaves as zero.
 
+World neighbor semantics (coordinate system, direction mapping, and edge-mode
+resolution) are canonical in `v3-world-grid-spec.md`.
+
 ### Static Introspection
 
 Resolved once at the start of each acting-creature turn from current creature
@@ -86,7 +90,7 @@ If `slot >= 12`, value is `0.0`.
 
 Per acting-creature turn, `tick/orchestrator` flow:
 1. Read world/static-introspection values from current world/creature state at
-   turn start.
+   turn start (using world/grid semantics from `v3-world-grid-spec.md`).
 2. Call runtime mesh executor.
 3. Runtime resolves dynamic introspection and upstream slots per node evaluation.
 

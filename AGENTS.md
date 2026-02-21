@@ -58,7 +58,7 @@ Local instruction files:
 4. For behavior changes and bug fixes, use TDD (failing test first).
 5. For feature/checkpoint completion claims, require intent-level + integration-level regression evidence (not only contract tests).
 6. Keep commits focused and atomic.
-7. For code review requests, run Gemini MCP (`gemini-analyze-code`) first; if unavailable, state that and run a local fallback review.
+7. For code review requests, run at least one substantive review pass using available review tooling (MCP reviewer, local static analysis, or manual diff review) and document which path was used.
 8. For Rust structural refactors, include a short "Boundary Impact" note in the plan covering dependency direction, public API/wire-format changes, and test migration approach.
 
 ## Plan Splitting Rule
