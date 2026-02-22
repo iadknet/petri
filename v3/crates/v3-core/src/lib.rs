@@ -2,4 +2,5 @@
 //! This file is export-only. No impl items belong here.
 pub mod config;
 pub mod contracts;
+pub mod creature;
 pub mod kernel;
