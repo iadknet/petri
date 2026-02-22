@@ -38,6 +38,21 @@ impl Direction {
             Direction::NW => (-1, -1),
         }
     }
+
+    /// Canonical direction index (0=N, 1=NE, 2=E, 3=SE, 4=S, 5=SW, 6=W, 7=NW).
+    /// Matches the position in `Direction::ALL`.
+    pub fn to_index(self) -> usize {
+        match self {
+            Direction::N => 0,
+            Direction::NE => 1,
+            Direction::E => 2,
+            Direction::SE => 3,
+            Direction::S => 4,
+            Direction::SW => 5,
+            Direction::W => 6,
+            Direction::NW => 7,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -82,5 +97,12 @@ mod tests {
         let json = serde_json::to_string(&d).unwrap();
         let d2: Direction = serde_json::from_str(&json).unwrap();
         assert_eq!(d, d2);
+    }
+
+    #[test]
+    fn to_index_matches_all_order() {
+        for (i, dir) in Direction::ALL.iter().enumerate() {
+            assert_eq!(dir.to_index(), i);
+        }
     }
 }
