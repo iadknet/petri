@@ -1628,17 +1628,25 @@ git commit -m "feat(v3-core): wire all stage-1 modules; contracts, config, kerne
 
 Before claiming Stage 1 complete:
 
-- [ ] `AGENTS.md` exists at repo root and includes rust-skills imperative for v3
-- [ ] `v3/crates/v3-core/src/contracts/` has: `direction.rs`, `position.rs`, `ids.rs`, `actions.rs`, `inputs.rs`, `mod.rs`
-- [ ] `v3/crates/v3-core/src/config/` has: `simulation.rs`, `mod.rs`
-- [ ] `v3/crates/v3-core/src/kernel/` has: `grid.rs`, `world.rs`, `mod.rs`
-- [ ] `cd v3 && cargo test --workspace` → all green
-- [ ] `cd v3 && cargo clippy --workspace --all-targets -- -D warnings` → 0 warnings
-- [ ] `cd v3 && cargo fmt --all --check` → no diffs
-- [ ] `scripts/check-plan-harness.sh --mode strict` → violations=0
-- [ ] `scripts/check-architecture-harness.sh --mode warn` → no new violations
-- [ ] All `SimulationConfig::default()` fields match spec exactly (covered by `default_config_matches_spec` test)
-- [ ] `WorldState` food seeding is deterministic (covered by `seed_food_deterministic_with_same_seed` test)
+- [x] `AGENTS.md` exists at repo root and includes rust-skills imperative for v3
+- [x] `v3/crates/v3-core/src/contracts/` has: `direction.rs`, `position.rs`, `ids.rs`, `actions.rs`, `inputs.rs`, `mod.rs`
+- [x] `v3/crates/v3-core/src/config/` has: `simulation.rs`, `mod.rs`
+- [x] `v3/crates/v3-core/src/kernel/` has: `grid.rs`, `world.rs`, `mod.rs`
+- [x] `cd v3 && cargo test --workspace` → all green
+- [x] `cd v3 && cargo clippy --workspace --all-targets -- -D warnings` → 0 warnings
+- [x] `cd v3 && cargo fmt --all --check` → no diffs
+- [x] `scripts/check-plan-harness.sh --mode strict` → violations=0
+- [x] `scripts/check-architecture-harness.sh --mode warn` → no new violations
+- [x] All `SimulationConfig::default()` fields match spec exactly (covered by `default_config_matches_spec` test)
+- [x] `WorldState` food seeding is deterministic (covered by `seed_food_deterministic_with_same_seed` test)
+
+## Reconciliation Snapshot (2026-02-22)
+
+- verified: 11
+- partial: 0
+- missing: 0
+- conflict: 0
+- evidence matrix: `docs/plans/reconciliation/2026-02-22-v3-stage-1-evidence-matrix.md`
 
 ---
 
