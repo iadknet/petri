@@ -2,6 +2,8 @@ use crate::contracts::WorldAction;
 
 /// Result returned by a single node evaluation.
 /// The mesh executor uses this to decide routing and final WorldAction.
+#[must_use]
+#[derive(Debug, Clone, PartialEq)]
 pub struct NodeResult {
     /// Output slots for downstream nodes. Initialized from incoming upstream_slots;
     /// only slots written by the node are overwritten.
@@ -53,6 +55,7 @@ impl NodeResult {
 /// - -Inf → -1_000_000_000.0
 /// - Finite values clamped to [-1e9, 1e9]
 #[inline]
+#[must_use]
 pub fn sanitize_f32(v: f32) -> f32 {
     const CLAMP: f32 = 1_000_000_000.0;
     if v.is_nan() {
