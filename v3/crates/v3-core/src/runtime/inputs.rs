@@ -1,4 +1,4 @@
-use crate::contracts::{DynamicIntrospectionKey, InputReference, StaticIntrospectionKey};
+use crate::contracts::{DynamicIntrospectionKey, InputReference};
 use crate::sensors::static_inputs::StaticInputs;
 
 /// Resolve an `InputReference` to its current f32 value.
@@ -7,6 +7,8 @@ use crate::sensors::static_inputs::StaticInputs;
 /// - Dynamic introspection is resolved live from the `energy` and `energy_consumed` args.
 /// - UpstreamSlot: reads `upstream_slots[idx]`; idx >= 12 yields 0.0.
 /// - Missing or out-of-range index: 0.0 (soft default).
+#[inline]
+#[must_use]
 pub fn resolve_input(
     reference: &InputReference,
     static_inputs: &StaticInputs,
@@ -16,10 +18,7 @@ pub fn resolve_input(
 ) -> f32 {
     match reference {
         InputReference::World(key) => static_inputs.resolve_world(key),
-        InputReference::StaticIntrospection(key) => match key {
-            StaticIntrospectionKey::Generation => static_inputs.generation,
-            StaticIntrospectionKey::AgeTicks => static_inputs.age_ticks,
-        },
+        InputReference::StaticIntrospection(key) => static_inputs.resolve_static(key),
         InputReference::DynamicIntrospection(key) => match key {
             DynamicIntrospectionKey::EnergyCurrent => energy,
             DynamicIntrospectionKey::EnergyConsumedThisTick => energy_consumed,
