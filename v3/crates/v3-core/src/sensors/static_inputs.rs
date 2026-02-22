@@ -8,6 +8,7 @@ use crate::kernel::WorldState;
 /// resolved live during mesh evaluation.
 ///
 /// All food values are normalized to [0.0, 1.0] by dividing raw u8 by 255.
+#[derive(Debug, Clone, PartialEq)]
 pub struct StaticInputs {
     /// Food density at the creature's current cell, normalized to [0.0, 1.0].
     pub food_here: f32,
@@ -47,6 +48,13 @@ impl StaticInputs {
 }
 
 /// Assemble all static sensor values for one creature at turn start.
+///
+/// Edge-mode behaviour for neighbor cells:
+/// - `WorldEdgeMode::Wrap`: neighbor coordinates are wrapped toroidally, so every
+///   direction always resolves to a valid cell and is sampled normally.
+/// - `WorldEdgeMode::Bounded`: a neighbor that falls outside the grid bounds resolves
+///   to `None`. All sensor slots for such out-of-bounds neighbors are set to 0.0
+///   (no food, no barrier signal, not occupied).
 pub fn assemble_static_inputs(world: &WorldState, creature: &CreatureState) -> StaticInputs {
     let pos = creature.position;
     let food_here = world.food_at(pos) as f32 / 255.0;
