@@ -55,7 +55,7 @@ pub fn execute_creature_mesh(
             return WorldAction::NoOp;
         }
 
-        // SAFETY: verified present before the loop, and after every routing step.
+        // Invariant: verified present before the loop, and after every routing step.
         let node = genome
             .find_node(current_node_id)
             .expect("node must exist: checked before loop and after routing");
@@ -86,6 +86,7 @@ pub fn execute_creature_mesh(
             ),
         };
 
+        // Check exhaustion before world_action: NodeResult::exhausted() never carries a valid action.
         if result.energy_exhausted {
             return WorldAction::NoOp;
         }
@@ -464,68 +465,22 @@ mod tests {
         );
     }
 
-    // ── Test 8: nan_route_uses_minus_one ─────────────────────────────────────
+    // ── Test 8: negative_route_wraps_with_rem_euclid ─────────────────────────
 
-    /// VM sets route=NaN → index=-1; (-1).rem_euclid(2)=1 → targets[1].
+    /// VM sets route=-1.0 → floor(-1.0)=-1 → (-1).rem_euclid(2)=1 → targets[1].
     /// targets[1] emits Eat, targets[0] emits NoOp.
+    /// This verifies negative-index wrapping via rem_euclid in the mesh router.
     #[test]
-    fn nan_route_uses_minus_one() {
+    fn negative_route_wraps_with_rem_euclid() {
         let id0 = NodeId::new(0);
         let id_noop = NodeId::new(1); // targets[0]
         let id_eat = NodeId::new(2); // targets[1]
 
-        // Entry node: writes NaN to route_target (NaN cannot be a constant, so we
-        // instead use WriteRouteTarget with a register that starts at 0.0, then
-        // we'll use an Inf-based trick to produce NaN: 0.0/0.0 or use div-by-zero).
-        // The VM's Div opcode yields 0.0 for division-by-zero (not NaN), so we
-        // need a different approach.  Per the spec a VM register initializes to 0.0;
-        // a sub(0,0)=0, and we can write that as a route target.  To produce an
-        // actual NaN we rely on the fact that 0.0*inf=NaN can be expressed via
-        // arithmetic on large constants.
-        //
-        // Simplest approach: use LoadConst with infinity in the constant pool; then
-        // multiply by zero register to get NaN.  However, sanitize_f32 will sanitize
-        // register writes.  Looking at vm.rs: Mul → sanitize_f32(a*b).  sanitize_f32
-        // of NaN returns 0.0.  So we cannot produce NaN in a register.
-        //
-        // Instead, WriteRouteTarget writes the raw register value *without*
-        // sanitization (it writes `regs[nr(*src, reg_count)]` directly).
-        // So we need a NaN in the register.  The only unsanitized path is a Halt
-        // that returns the route_target before any sanitization.  But registers ARE
-        // sanitized on write.
-        //
-        // Actually, looking at vm.rs more carefully: WriteRouteTarget writes
-        // `route_target = regs[nr(*src, reg_count)]` — the register value.
-        // Registers are always sanitized on write via sanitize_f32. So you cannot
-        // get NaN into a register through arithmetic.
-        //
-        // The only way to get NaN in route_target is to use a Graph node (which
-        // can compute NaN via stateful ops or raw math that escapes sanitize_f32).
-        // However, graph nodes pass through sanitize_f32 on all output writes too.
-        //
-        // Conclusion: Given the spec constraints, the NaN-route path is reachable
-        // only when the backend returns NaN *before* its own sanitization. This can
-        // happen with Graph RouterOutput if the internal computation yields NaN
-        // (e.g., Oscillator with INFINITY state, but sanitize_f32 turns that to 0.0
-        // too). The spec says to handle NaN as -1; this test verifies that code path
-        // in the mesh executor by injecting a custom node result via an indirect
-        // approach.
-        //
-        // The simplest correct test: use a Graph node that produces NaN in
-        // route_target_idx. The Graph RouterOutput = sanitize_f32(wsum). If wsum
-        // is NaN (e.g. from Oscillator with NaN state bypassing the check), it
-        // becomes 0.0 after sanitize_f32.  We cannot produce NaN through existing
-        // backends.
-        //
-        // Therefore, we test the NaN-route path by using a VM node that stores 0.0
-        // (which maps to -1 only if NaN) — but we can verify the rem_euclid(-1, n)
-        // = n-1 property via a different approach: we explicitly set route to -1.0,
-        // which floors to -1 and rem_euclid(2) = 1 → targets[1].
-        //
-        // We'll test both the NaN case indirectly (covered by the algorithm spec)
-        // and the concrete floor(-1.0)=rem_euclid(2)=1 case here.
-
-        // Entry node: sets route=-1.0 → floor=-1 → rem_euclid(2)=1 → targets[1]=id_eat
+        // Entry node: sets route=-1.0 → floor(-1.0)=-1 → rem_euclid(2)=1 → targets[1]=id_eat
+        // Note: the NaN→-1 code path in the mesh router is unreachable via current backends
+        // because sanitize_f32 prevents NaN from appearing in any register or output slot.
+        // This test verifies the rem_euclid wrapping behaviour with a directly injected
+        // negative index (-1.0).
         let entry = vm_halt_with_route(id0, -1.0, vec![id_noop, id_eat]);
         let node_noop = vm_emit_node(id_noop, 0, vec![]); // NoOp
         let node_eat = vm_emit_node(id_eat, 1, vec![]); // Eat
@@ -551,7 +506,7 @@ mod tests {
         assert_eq!(
             action,
             WorldAction::Eat,
-            "route=-1.0 (NaN-equivalent path) should select targets[1]"
+            "route=-1.0 should wrap via rem_euclid and select targets[1]"
         );
     }
 
