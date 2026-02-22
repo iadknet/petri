@@ -1646,7 +1646,7 @@ Before claiming Stage 1 complete:
 - partial: 0
 - missing: 0
 - conflict: 0
-- evidence matrix: `docs/plans/reconciliation/2026-02-22-v3-stage-1-evidence-matrix.md`
+- evidence matrix: `docs/plans/archive/reconciliation/2026-02-22-v3-stage-1-evidence-matrix.md`
 
 ---
 
