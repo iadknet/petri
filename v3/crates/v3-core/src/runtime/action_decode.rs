@@ -20,6 +20,7 @@ pub fn decode_world_action(action_type: u8, meta: &[f32; 8]) -> WorldAction {
 
 /// Decode a direction from a raw f32 meta value.
 /// Rounds to nearest integer, clamps to [0, 7], indexes into Direction::ALL.
+#[inline]
 fn decode_direction(raw: f32) -> Direction {
     // NaN rounds to itself and would cause issues; sanitize first
     let clamped = if raw.is_nan() {
@@ -31,6 +32,7 @@ fn decode_direction(raw: f32) -> Direction {
 }
 
 /// Clamp to non-negative finite: NaN/Inf/negative → 0.0.
+#[inline]
 fn clamp_non_negative_finite(v: f32) -> f32 {
     if v.is_finite() && v >= 0.0 {
         v
