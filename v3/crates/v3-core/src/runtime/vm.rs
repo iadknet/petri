@@ -1435,7 +1435,8 @@ mod tests {
                 targets: vec![],
             }],
         };
-        let creature = CreatureState::new(id, genome, pos, 30.0, 0, [0, 0, 0]);
+        let creature =
+            CreatureState::new(id, genome, pos, 30.0, 0, [0, 0, 0], [1.0f32; 3], [true; 3]);
 
         let si = assemble_static_inputs(&world, &creature);
         // food_here should be > 0.0 (200/255 ≈ 0.78)
@@ -1508,7 +1509,8 @@ mod tests {
                 targets: vec![],
             }],
         };
-        let creature = CreatureState::new(id, genome, pos, 30.0, 0, [0, 0, 0]);
+        let creature =
+            CreatureState::new(id, genome, pos, 30.0, 0, [0, 0, 0], [1.0f32; 3], [true; 3]);
         let si = assemble_static_inputs(&world, &creature);
         assert_eq!(si.food_here, 0.0);
 

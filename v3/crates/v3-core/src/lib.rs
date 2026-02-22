@@ -4,5 +4,7 @@ pub mod config;
 pub mod contracts;
 pub mod creature;
 pub mod kernel;
+pub mod mutation;
 pub mod runtime;
 pub mod sensors;
+pub mod simulation;
