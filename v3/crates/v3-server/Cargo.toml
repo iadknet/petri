@@ -1,0 +1,9 @@
+[package]
+name = "v3-server"
+edition.workspace = true
+version.workspace = true
+license.workspace = true
+authors.workspace = true
+
+[dependencies]
+v3-core = { path = "../v3-core" }
