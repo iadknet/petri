@@ -1381,4 +1381,160 @@ mod tests {
         let (r, _) = run_vm(program, 2, vec![2e9_f32], &[], zeroed_upstream(), 100.0);
         assert!((r.output_slots[0] - 1_000_000_000.0).abs() < 1.0);
     }
+
+    // ── Integration: full input resolution pipeline ────────────────────────
+
+    #[test]
+    fn vm_eats_when_food_here() {
+        use crate::config::{SimulationConfig, WorldEdgeMode};
+        use crate::contracts::{CreatureId, NodeId, Position, WorldInputKey};
+        use crate::creature::genome::{
+            BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
+        };
+        use crate::creature::state::CreatureState;
+        use crate::kernel::WorldState;
+        use crate::sensors::static_inputs::assemble_static_inputs;
+        use rand::rngs::SmallRng;
+        use rand::SeedableRng;
+        use slotmap::SlotMap;
+
+        // Build a world with food everywhere
+        let mut world = WorldState::new(5, 5, WorldEdgeMode::Wrap);
+        let mut cfg = SimulationConfig::default();
+        cfg.world.food.initial_coverage = 1.0;
+        cfg.world.food.initial_density = 200;
+        let mut rng = SmallRng::seed_from_u64(42);
+        world.seed_food(&mut rng, &cfg);
+
+        let pos = Position::new(1, 1);
+        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
+        let id = sm.insert(());
+
+        // Single-node VM: read food_here into r0, compare > 0, jump-if-zero past Eat, else Eat
+        let input_refs = vec![InputReference::World(WorldInputKey::FoodHere)];
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: input_refs.clone(),
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 2,
+                    constants: vec![],
+                    program: vec![
+                        VmInstruction::ReadInput {
+                            dst: 0,
+                            input_idx: 0,
+                        }, // r0 = food_here
+                        // r1 is 0.0; compare r0 > r1
+                        VmInstruction::CmpGt { dst: 0, a: 0, b: 1 }, // r0 = (food > 0)?
+                        VmInstruction::JumpIfZero { cond: 0, offset: 1 }, // skip Eat if no food
+                        VmInstruction::EmitWorldAction { action_type: 1 }, // Eat
+                        VmInstruction::EmitWorldAction { action_type: 0 }, // NoOp fallback
+                    ],
+                }),
+                targets: vec![],
+            }],
+        };
+        let creature = CreatureState::new(id, genome, pos, 30.0, 0, [0, 0, 0]);
+
+        let si = assemble_static_inputs(&world, &creature);
+        // food_here should be > 0.0 (200/255 ≈ 0.78)
+        assert!(si.food_here > 0.0);
+
+        let def = if let BackendDef::Vm(ref v) = creature.genome.nodes[0].backend_def {
+            v
+        } else {
+            panic!("expected VM backend");
+        };
+
+        let upstream = [0.0f32; 12];
+        let mut energy = creature.energy;
+        let mut mem = [0u8; 1024];
+        let result = execute_vm_node(
+            def,
+            &creature.genome.nodes[0].input_refs,
+            &upstream,
+            &mut energy,
+            0.0,
+            &mut mem,
+            &si,
+            &config(),
+        );
+        assert_eq!(
+            result.world_action,
+            Some(crate::contracts::WorldAction::Eat),
+            "Expected Eat when food is present"
+        );
+    }
+
+    #[test]
+    fn vm_noop_when_no_food() {
+        use crate::config::WorldEdgeMode;
+        use crate::contracts::{CreatureId, NodeId, Position, WorldInputKey};
+        use crate::creature::genome::{
+            BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
+        };
+        use crate::creature::state::CreatureState;
+        use crate::kernel::WorldState;
+        use crate::sensors::static_inputs::assemble_static_inputs;
+        use slotmap::SlotMap;
+
+        // World with no food
+        let world = WorldState::new(5, 5, WorldEdgeMode::Wrap);
+        let pos = Position::new(2, 2);
+        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
+        let id = sm.insert(());
+
+        let input_refs = vec![InputReference::World(WorldInputKey::FoodHere)];
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: input_refs.clone(),
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 2,
+                    constants: vec![],
+                    program: vec![
+                        VmInstruction::ReadInput {
+                            dst: 0,
+                            input_idx: 0,
+                        }, // r0 = food_here = 0
+                        VmInstruction::CmpGt { dst: 0, a: 0, b: 1 }, // r0 = (0 > 0) = 0
+                        VmInstruction::JumpIfZero { cond: 0, offset: 1 }, // fires → skip Eat
+                        VmInstruction::EmitWorldAction { action_type: 1 }, // Eat (skipped)
+                        VmInstruction::EmitWorldAction { action_type: 0 }, // NoOp fallback
+                    ],
+                }),
+                targets: vec![],
+            }],
+        };
+        let creature = CreatureState::new(id, genome, pos, 30.0, 0, [0, 0, 0]);
+        let si = assemble_static_inputs(&world, &creature);
+        assert_eq!(si.food_here, 0.0);
+
+        let def = if let BackendDef::Vm(ref v) = creature.genome.nodes[0].backend_def {
+            v
+        } else {
+            panic!()
+        };
+
+        let upstream = [0.0f32; 12];
+        let mut energy = 30.0;
+        let mut mem = [0u8; 1024];
+        let result = execute_vm_node(
+            def,
+            &creature.genome.nodes[0].input_refs,
+            &upstream,
+            &mut energy,
+            0.0,
+            &mut mem,
+            &si,
+            &config(),
+        );
+        assert_eq!(
+            result.world_action,
+            Some(crate::contracts::WorldAction::NoOp),
+            "Expected NoOp when no food"
+        );
+    }
 }
