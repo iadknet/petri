@@ -4,7 +4,7 @@ use crate::config::RuntimeConfig;
 use crate::contracts::{InputReference, NodeId};
 use crate::creature::genome::{GraphBackendDef, GraphInternalNode, GraphNodeKind};
 use crate::runtime::inputs::resolve_input;
-use crate::runtime::types::NodeResult;
+use crate::runtime::types::{sanitize_f32, NodeResult};
 use crate::sensors::static_inputs::StaticInputs;
 
 /// Immutable context for resolving `InputRef` nodes during graph evaluation.
@@ -229,8 +229,13 @@ pub fn execute_graph_node(
                 .get(&node_id)
                 .expect("state vec must exist after entry() call above")[current_idx];
 
-            curr_outputs[current_idx] =
-                evaluate_kind(&node.kind, &w_inputs, wsum, &ctx, &mut node_state);
+            curr_outputs[current_idx] = sanitize_f32(evaluate_kind(
+                &node.kind,
+                &w_inputs,
+                wsum,
+                &ctx,
+                &mut node_state,
+            ));
 
             // Persist any state mutation from stateful operators.
             graph_state
@@ -723,6 +728,514 @@ mod tests {
 
         // 2 nodes * 1.0 cost = 2.0 consumed in exactly 1 pass.
         assert!((energy - 48.0).abs() < 1e-5, "energy={energy}");
+    }
+
+    // ─── Test: decay_integrator_formula_correct ───────────────────────────────
+    //
+    // DecayIntegrator(alpha=0.5): state = (1-alpha)*state + alpha*wsum
+    //
+    // Two-node graph: Constant(1.0) → DecayIntegrator(0.5) → CustomOutput(0)
+    // Call 1: state=0.0 → (1-0.5)*0.0 + 0.5*1.0 = 0.5
+    // Call 2: state=0.5 → (1-0.5)*0.5 + 0.5*1.0 = 0.75
+    #[test]
+    fn decay_integrator_formula_correct() {
+        let def = GraphBackendDef {
+            internal_nodes: vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::Constant(1.0),
+                    inputs: vec![],
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::DecayIntegrator(0.5),
+                    inputs: vec![GraphInput {
+                        source_idx: 0,
+                        weight: 1.0,
+                    }],
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::CustomOutput(0),
+                    inputs: vec![GraphInput {
+                        source_idx: 1,
+                        weight: 1.0,
+                    }],
+                },
+            ],
+        };
+        let upstream = [0.0f32; 12];
+        let mut energy = 1000.0f32;
+        let mut graph_state: HashMap<NodeId, Vec<f32>> = HashMap::new();
+        let si = make_static_inputs();
+        let mut config = default_config();
+        config.max_graph_relax_iters = 1;
+        config.graph_convergence_stable_passes = 1;
+
+        let nid = node_id(20);
+
+        let r1 = execute_graph_node(
+            &def,
+            &[],
+            &upstream,
+            &mut energy,
+            0.0,
+            nid,
+            &mut graph_state,
+            &si,
+            &config,
+        );
+        assert!(
+            (r1.output_slots[0] - 0.5).abs() < 1e-5,
+            "first call expected 0.5, got {}",
+            r1.output_slots[0]
+        );
+
+        let r2 = execute_graph_node(
+            &def,
+            &[],
+            &upstream,
+            &mut energy,
+            0.0,
+            nid,
+            &mut graph_state,
+            &si,
+            &config,
+        );
+        assert!(
+            (r2.output_slots[0] - 0.75).abs() < 1e-5,
+            "second call expected 0.75, got {}",
+            r2.output_slots[0]
+        );
+    }
+
+    // ─── Test: momentum_formula_correct ──────────────────────────────────────
+    //
+    // Momentum(beta=0.8): state = beta*state + (1-beta)*wsum
+    //
+    // Call 1: state=0.0 → 0.8*0.0 + 0.2*1.0 = 0.2
+    #[test]
+    fn momentum_formula_correct() {
+        let def = GraphBackendDef {
+            internal_nodes: vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::Constant(1.0),
+                    inputs: vec![],
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::Momentum(0.8),
+                    inputs: vec![GraphInput {
+                        source_idx: 0,
+                        weight: 1.0,
+                    }],
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::CustomOutput(0),
+                    inputs: vec![GraphInput {
+                        source_idx: 1,
+                        weight: 1.0,
+                    }],
+                },
+            ],
+        };
+        let upstream = [0.0f32; 12];
+        let mut energy = 1000.0f32;
+        let mut graph_state: HashMap<NodeId, Vec<f32>> = HashMap::new();
+        let si = make_static_inputs();
+        let mut config = default_config();
+        config.max_graph_relax_iters = 1;
+        config.graph_convergence_stable_passes = 1;
+
+        let nid = node_id(21);
+
+        let r1 = execute_graph_node(
+            &def,
+            &[],
+            &upstream,
+            &mut energy,
+            0.0,
+            nid,
+            &mut graph_state,
+            &si,
+            &config,
+        );
+        assert!(
+            (r1.output_slots[0] - 0.2).abs() < 1e-5,
+            "momentum first call expected 0.2, got {}",
+            r1.output_slots[0]
+        );
+    }
+
+    // ─── Test: oscillator_nan_safe ────────────────────────────────────────────
+    //
+    // With initial state = f32::INFINITY, (*state + f_c).fract() = INFINITY.fract() = NaN.
+    // sanitize_f32 must turn this into 0.0 before it propagates.
+    #[test]
+    fn oscillator_nan_safe() {
+        let def = GraphBackendDef {
+            internal_nodes: vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::Oscillator(0.0),
+                    inputs: vec![],
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::CustomOutput(0),
+                    inputs: vec![GraphInput {
+                        source_idx: 0,
+                        weight: 1.0,
+                    }],
+                },
+            ],
+        };
+        let upstream = [0.0f32; 12];
+        let mut energy = 1000.0f32;
+        let mut graph_state: HashMap<NodeId, Vec<f32>> = HashMap::new();
+        let si = make_static_inputs();
+        let mut config = default_config();
+        config.max_graph_relax_iters = 1;
+        config.graph_convergence_stable_passes = 1;
+
+        let nid = node_id(22);
+        // Pre-set state slot 0 to INFINITY to simulate the corrupted state case.
+        graph_state.insert(nid, vec![f32::INFINITY, 0.0]);
+
+        let r = execute_graph_node(
+            &def,
+            &[],
+            &upstream,
+            &mut energy,
+            0.0,
+            nid,
+            &mut graph_state,
+            &si,
+            &config,
+        );
+
+        assert!(
+            !r.output_slots[0].is_nan(),
+            "output must not be NaN, got {}",
+            r.output_slots[0]
+        );
+        assert!(!r.energy_exhausted);
+    }
+
+    // ─── Test: threshold_formula_correct ─────────────────────────────────────
+    //
+    // Threshold(t=0.5): output = 1.0 if wsum > t, else 0.0  (strictly greater than)
+    #[test]
+    fn threshold_formula_correct() {
+        let make_threshold_graph = |input_weight: f32| -> GraphBackendDef {
+            GraphBackendDef {
+                internal_nodes: vec![
+                    GraphInternalNode {
+                        kind: GraphNodeKind::Constant(1.0),
+                        inputs: vec![],
+                    },
+                    GraphInternalNode {
+                        kind: GraphNodeKind::Threshold(0.5),
+                        inputs: vec![GraphInput {
+                            source_idx: 0,
+                            weight: input_weight,
+                        }],
+                    },
+                    GraphInternalNode {
+                        kind: GraphNodeKind::CustomOutput(0),
+                        inputs: vec![GraphInput {
+                            source_idx: 1,
+                            weight: 1.0,
+                        }],
+                    },
+                ],
+            }
+        };
+
+        let upstream = [0.0f32; 12];
+        let si = make_static_inputs();
+        let mut config = default_config();
+        config.max_graph_relax_iters = 1;
+        config.graph_convergence_stable_passes = 1;
+
+        // wsum = 0.6 > 0.5 → 1.0
+        let mut energy = 1000.0f32;
+        let r = execute_graph_node(
+            &make_threshold_graph(0.6),
+            &[],
+            &upstream,
+            &mut energy,
+            0.0,
+            node_id(23),
+            &mut HashMap::new(),
+            &si,
+            &config,
+        );
+        assert_eq!(r.output_slots[0], 1.0, "wsum=0.6 should fire");
+
+        // wsum = 0.5 = 0.5 (not strictly greater) → 0.0
+        let mut energy = 1000.0f32;
+        let r = execute_graph_node(
+            &make_threshold_graph(0.5),
+            &[],
+            &upstream,
+            &mut energy,
+            0.0,
+            node_id(24),
+            &mut HashMap::new(),
+            &si,
+            &config,
+        );
+        assert_eq!(
+            r.output_slots[0], 0.0,
+            "wsum=0.5 should NOT fire (strictly >)"
+        );
+
+        // wsum = 0.4 < 0.5 → 0.0
+        let mut energy = 1000.0f32;
+        let r = execute_graph_node(
+            &make_threshold_graph(0.4),
+            &[],
+            &upstream,
+            &mut energy,
+            0.0,
+            node_id(25),
+            &mut HashMap::new(),
+            &si,
+            &config,
+        );
+        assert_eq!(r.output_slots[0], 0.0, "wsum=0.4 should NOT fire");
+    }
+
+    // ─── Test: multiply_empty_inputs_is_one ──────────────────────────────────
+    //
+    // Multiply with no inputs: product of empty iterator = 1.0 (identity element).
+    #[test]
+    fn multiply_empty_inputs_is_one() {
+        let def = GraphBackendDef {
+            internal_nodes: vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::Multiply,
+                    inputs: vec![],
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::CustomOutput(0),
+                    inputs: vec![GraphInput {
+                        source_idx: 0,
+                        weight: 1.0,
+                    }],
+                },
+            ],
+        };
+        let upstream = [0.0f32; 12];
+        let mut energy = 1000.0f32;
+        let mut graph_state = HashMap::new();
+        let si = make_static_inputs();
+        let mut config = default_config();
+        config.max_graph_relax_iters = 1;
+        config.graph_convergence_stable_passes = 1;
+
+        let r = execute_graph_node(
+            &def,
+            &[],
+            &upstream,
+            &mut energy,
+            0.0,
+            node_id(26),
+            &mut graph_state,
+            &si,
+            &config,
+        );
+
+        assert_eq!(
+            r.output_slots[0], 1.0,
+            "Multiply with no inputs should produce 1.0, got {}",
+            r.output_slots[0]
+        );
+    }
+
+    // ─── Test: greater_than_formula ───────────────────────────────────────────
+    //
+    // GreaterThan: output = 1.0 if w_inputs[0] > w_inputs[1], else 0.0
+    #[test]
+    fn greater_than_formula() {
+        let make_gt_graph = |wa: f32, wb: f32| -> GraphBackendDef {
+            GraphBackendDef {
+                internal_nodes: vec![
+                    // node 0: Constant(1.0)
+                    GraphInternalNode {
+                        kind: GraphNodeKind::Constant(1.0),
+                        inputs: vec![],
+                    },
+                    // node 1: GreaterThan — two edges from node 0, weights wa and wb
+                    GraphInternalNode {
+                        kind: GraphNodeKind::GreaterThan,
+                        inputs: vec![
+                            GraphInput {
+                                source_idx: 0,
+                                weight: wa,
+                            },
+                            GraphInput {
+                                source_idx: 0,
+                                weight: wb,
+                            },
+                        ],
+                    },
+                    GraphInternalNode {
+                        kind: GraphNodeKind::CustomOutput(0),
+                        inputs: vec![GraphInput {
+                            source_idx: 1,
+                            weight: 1.0,
+                        }],
+                    },
+                ],
+            }
+        };
+
+        let upstream = [0.0f32; 12];
+        let si = make_static_inputs();
+        let mut config = default_config();
+        config.max_graph_relax_iters = 1;
+        config.graph_convergence_stable_passes = 1;
+
+        // a=2.0 > b=1.0 → 1.0
+        let mut energy = 1000.0f32;
+        let r = execute_graph_node(
+            &make_gt_graph(2.0, 1.0),
+            &[],
+            &upstream,
+            &mut energy,
+            0.0,
+            node_id(27),
+            &mut HashMap::new(),
+            &si,
+            &config,
+        );
+        assert_eq!(r.output_slots[0], 1.0, "2.0 > 1.0 should produce 1.0");
+
+        // a=1.0 == b=1.0 → 0.0
+        let mut energy = 1000.0f32;
+        let r = execute_graph_node(
+            &make_gt_graph(1.0, 1.0),
+            &[],
+            &upstream,
+            &mut energy,
+            0.0,
+            node_id(28),
+            &mut HashMap::new(),
+            &si,
+            &config,
+        );
+        assert_eq!(r.output_slots[0], 0.0, "1.0 == 1.0 should produce 0.0");
+
+        // a=0.5 < b=1.0 → 0.0
+        let mut energy = 1000.0f32;
+        let r = execute_graph_node(
+            &make_gt_graph(0.5, 1.0),
+            &[],
+            &upstream,
+            &mut energy,
+            0.0,
+            node_id(29),
+            &mut HashMap::new(),
+            &si,
+            &config,
+        );
+        assert_eq!(r.output_slots[0], 0.0, "0.5 < 1.0 should produce 0.0");
+    }
+
+    // ─── Test: select_formula ─────────────────────────────────────────────────
+    //
+    // Select: if w_inputs[0] >= 0.5 return w_inputs[1], else return w_inputs[2].
+    //
+    // Graph: three Constant feeders → Select → CustomOutput(0)
+    //   node 0: Constant(cond_weight)   — varied per sub-test
+    //   node 1: Constant(10.0)          — "true" branch value
+    //   node 2: Constant(20.0)          — "false" branch value
+    //   node 3: Select with edges: [0*1.0, 1*1.0, 2*1.0]
+    //   node 4: CustomOutput(0) ← node 3
+    #[test]
+    fn select_formula() {
+        let make_select_graph = |cond: f32| -> GraphBackendDef {
+            GraphBackendDef {
+                internal_nodes: vec![
+                    GraphInternalNode {
+                        kind: GraphNodeKind::Constant(cond),
+                        inputs: vec![],
+                    },
+                    GraphInternalNode {
+                        kind: GraphNodeKind::Constant(10.0),
+                        inputs: vec![],
+                    },
+                    GraphInternalNode {
+                        kind: GraphNodeKind::Constant(20.0),
+                        inputs: vec![],
+                    },
+                    GraphInternalNode {
+                        kind: GraphNodeKind::Select,
+                        inputs: vec![
+                            GraphInput {
+                                source_idx: 0,
+                                weight: 1.0,
+                            },
+                            GraphInput {
+                                source_idx: 1,
+                                weight: 1.0,
+                            },
+                            GraphInput {
+                                source_idx: 2,
+                                weight: 1.0,
+                            },
+                        ],
+                    },
+                    GraphInternalNode {
+                        kind: GraphNodeKind::CustomOutput(0),
+                        inputs: vec![GraphInput {
+                            source_idx: 3,
+                            weight: 1.0,
+                        }],
+                    },
+                ],
+            }
+        };
+
+        let upstream = [0.0f32; 12];
+        let si = make_static_inputs();
+        let mut config = default_config();
+        config.max_graph_relax_iters = 1;
+        config.graph_convergence_stable_passes = 1;
+
+        // cond=1.0 >= 0.5 → picks w_inputs[1] = 10.0
+        let mut energy = 1000.0f32;
+        let r = execute_graph_node(
+            &make_select_graph(1.0),
+            &[],
+            &upstream,
+            &mut energy,
+            0.0,
+            node_id(30),
+            &mut HashMap::new(),
+            &si,
+            &config,
+        );
+        assert_eq!(
+            r.output_slots[0], 10.0,
+            "cond=1.0 should select true branch (10.0), got {}",
+            r.output_slots[0]
+        );
+
+        // cond=0.0 < 0.5 → picks w_inputs[2] = 20.0
+        let mut energy = 1000.0f32;
+        let r = execute_graph_node(
+            &make_select_graph(0.0),
+            &[],
+            &upstream,
+            &mut energy,
+            0.0,
+            node_id(31),
+            &mut HashMap::new(),
+            &si,
+            &config,
+        );
+        assert_eq!(
+            r.output_slots[0], 20.0,
+            "cond=0.0 should select false branch (20.0), got {}",
+            r.output_slots[0]
+        );
     }
 
     // ─── Additional: RouterOutput last-write-wins ─────────────────────────────
