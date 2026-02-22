@@ -928,6 +928,30 @@ cd v3 && cargo clippy --workspace --all-targets -- -D warnings
 
 ---
 
+## Completion Checklist (evidence-gated, 2026-02-22)
+
+- [x] `runtime/graph.rs` implements `execute_graph_node` with bounded relaxation loop, convergence checks, and energy metering.
+- [x] Graph backend supports all 22 `GraphNodeKind` operators (formula/operator tests + enum constructibility coverage).
+- [x] Stateful graph behavior persists across ticks and rolls back atomically on exhaustion.
+- [x] `runtime/mesh.rs` implements `execute_creature_mesh` chain execution with soft-default `NoOp` fallbacks.
+- [x] Route index normalization uses `rem_euclid` and handles negative/edge route values robustly.
+- [x] Graph -> VM chain routing and upstream slot passthrough are covered by integration tests.
+- [x] `runtime/mod.rs` exports graph/mesh modules and `execute_creature_mesh`.
+- [x] `cd v3 && cargo test --workspace` passes (all tests green).
+- [x] `cd v3 && cargo clippy --workspace --all-targets -- -D warnings` passes (zero warnings).
+- [x] `cd v3 && cargo fmt --all -- --check` passes (no diffs).
+- [x] `scripts/check-plan-harness.sh --mode strict`, `scripts/check-doc-harness.sh --mode warn`, and `scripts/check-architecture-harness.sh --mode warn` pass.
+
+## Reconciliation Snapshot (2026-02-22)
+
+- verified: 11
+- partial: 0
+- missing: 0
+- conflict: 0
+- evidence matrix: `docs/plans/reconciliation/2026-02-22-v3-stage-3b-evidence-matrix.md`
+
+---
+
 ## Risks and Rollback
 
 - Risk: stateful operator formulas might diverge from mutation spec expectations. Mitigation: formulas are specified explicitly above and testable in isolation.

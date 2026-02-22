@@ -2415,15 +2415,23 @@ git commit -m "feat(v3-core): Stage 3a Task 6 — VM integration tests (assemble
 
 ## Quality Checklist (Run Before Declaring Done)
 
-- [ ] `cargo fmt --all -- --check` passes
-- [ ] `cargo clippy --workspace --all-targets -- -D warnings` passes (zero warnings)
-- [ ] `cargo test --workspace` passes (all tests green)
-- [ ] `runtime/types.rs`: `sanitize_f32` + `NodeResult` with 9 tests
-- [ ] `sensors/static_inputs.rs`: `StaticInputs` + `assemble_static_inputs` + `resolve_static_ref`
-- [ ] `runtime/inputs.rs`: `resolve_input` for all 4 InputReference variants
-- [ ] `runtime/action_decode.rs`: `decode_world_action` for all 4 action types + edge cases
-- [ ] `runtime/vm.rs`: `execute_vm_node` covering all 33 opcodes, energy metering, step cap, operand normalization, memory contract
-- [ ] Integration test: single-VM-node eat-when-food-present confirmed working
+- [x] `cargo fmt --all -- --check` passes
+- [x] `cargo clippy --workspace --all-targets -- -D warnings` passes (zero warnings)
+- [x] `cargo test --workspace` passes (all tests green)
+- [x] `runtime/types.rs`: `sanitize_f32` + `NodeResult` with 9 tests
+- [x] `sensors/static_inputs.rs`: `StaticInputs` + `assemble_static_inputs` + `resolve_static_ref`
+- [x] `runtime/inputs.rs`: `resolve_input` for all 4 InputReference variants
+- [x] `runtime/action_decode.rs`: `decode_world_action` for all 4 action types + edge cases
+- [x] `runtime/vm.rs`: `execute_vm_node` covering all 33 opcodes, energy metering, step cap, operand normalization, memory contract
+- [x] Integration test: single-VM-node eat-when-food-present confirmed working
+
+## Reconciliation Snapshot (2026-02-22)
+
+- verified: 9
+- partial: 0
+- missing: 0
+- conflict: 0
+- evidence matrix: `docs/plans/reconciliation/2026-02-22-v3-stage-3a-evidence-matrix.md`
 
 ---
 
