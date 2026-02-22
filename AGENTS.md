@@ -91,7 +91,6 @@ Agents must invoke the appropriate installed skills during architecture, plannin
 ### Rust crates (`crates/` and `v3/`)
 
 - **`rust-skills`**: ALWAYS invoke when writing, reviewing, or refactoring ANY Rust code (both `crates/` and `v3/`). Covers ownership, error handling, async patterns, API design, memory optimization, performance, and testing.
-- **`cargo` MCP server** (Codex): Use for running clippy, check, test, fmt, and managing dependencies.
 
 ### Frontend (`web/`)
 
