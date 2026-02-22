@@ -2431,7 +2431,7 @@ git commit -m "feat(v3-core): Stage 3a Task 6 — VM integration tests (assemble
 - partial: 0
 - missing: 0
 - conflict: 0
-- evidence matrix: `docs/plans/reconciliation/2026-02-22-v3-stage-3a-evidence-matrix.md`
+- evidence matrix: `docs/plans/archive/reconciliation/2026-02-22-v3-stage-3a-evidence-matrix.md`
 
 ---
 
