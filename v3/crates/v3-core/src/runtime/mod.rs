@@ -1,4 +1,5 @@
 pub mod action_decode;
+pub mod graph;
 pub mod inputs;
 pub mod types;
 pub mod vm;
