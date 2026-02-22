@@ -60,7 +60,7 @@ stable_passes = 0
 passes_executed = 0
 
 for pass in 0..max_graph_relax_iters:
-  for current_idx in 0..node_count-1:
+  for current_idx in 0..node_count:
     weighted_input_sum = 0.0
     for input in internal_nodes[current_idx].inputs:
       source_idx = input.source_idx as usize
@@ -78,7 +78,7 @@ for pass in 0..max_graph_relax_iters:
       evaluate_kind(internal_nodes[current_idx].kind, weighted_input_sum)
 
   passes_executed += 1
-  delta = max_abs(curr_outputs[i] - prev_outputs[i]) over i in 0..node_count-1
+  delta = max_abs(curr_outputs[i] - prev_outputs[i]) over i in 0..node_count
   prev_outputs = curr_outputs
 
   if delta <= graph_convergence_epsilon:
