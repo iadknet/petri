@@ -18,10 +18,15 @@ pub struct CreatureState {
     pub graph_state: HashMap<NodeId, Vec<f32>>,
     /// RGB phenotype color. Channel values in [0, 255].
     pub phenotype_rgb: [u8; 3],
+    /// Per-channel weights for phenotype mutation (internal, not API-exposed).
+    pub phenotype_channel_weights: [f32; 3],
+    /// Per-channel polarity flags for phenotype mutation (internal, not API-exposed).
+    pub phenotype_channel_polarity: [bool; 3],
 }
 
 impl CreatureState {
     /// Create a new creature with zeroed memory and empty graph state.
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: CreatureId,
         genome: CreatureGenome,
@@ -29,6 +34,8 @@ impl CreatureState {
         energy: f32,
         generation: u64,
         phenotype_rgb: [u8; 3],
+        phenotype_channel_weights: [f32; 3],
+        phenotype_channel_polarity: [bool; 3],
     ) -> Self {
         Self {
             id,
@@ -40,6 +47,8 @@ impl CreatureState {
             memory: [0u8; 1024],
             graph_state: HashMap::new(),
             phenotype_rgb,
+            phenotype_channel_weights,
+            phenotype_channel_polarity,
         }
     }
 }
@@ -80,6 +89,8 @@ mod tests {
             20.0,
             0,
             [128, 64, 32],
+            [1.0f32; 3],
+            [true; 3],
         );
         assert_eq!(state.age, 0);
         assert_eq!(state.memory, [0u8; 1024]);
@@ -87,6 +98,8 @@ mod tests {
         assert_eq!(state.generation, 0);
         assert!((state.energy - 20.0).abs() < f32::EPSILON);
         assert_eq!(state.phenotype_rgb, [128, 64, 32]);
+        assert_eq!(state.phenotype_channel_weights, [1.0f32; 3]);
+        assert_eq!(state.phenotype_channel_polarity, [true; 3]);
     }
 
     #[test]
@@ -100,6 +113,8 @@ mod tests {
             50.0,
             2,
             [0, 0, 0],
+            [1.0f32; 3],
+            [true; 3],
         );
         assert_eq!(state.position, Position::new(3, 7));
         assert_eq!(state.generation, 2);
