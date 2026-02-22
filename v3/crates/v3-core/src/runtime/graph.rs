@@ -186,14 +186,6 @@ pub fn execute_graph_node(
     let mut curr_outputs = vec![0.0f32; node_count];
     let mut stable_passes: u32 = 0;
 
-    let ctx = EvalCtx {
-        input_refs,
-        upstream_slots,
-        energy: *energy,
-        energy_consumed,
-        static_inputs,
-    };
-
     for _pass in 0..max_passes {
         // Charge energy BEFORE evaluating this pass.
         let pass_cost = config.graph_node_base_cost * node_count as f32;
@@ -210,6 +202,15 @@ pub fn execute_graph_node(
             }
             return NodeResult::exhausted();
         }
+
+        // Rebuild the eval context with the live energy value after the pass charge.
+        let ctx = EvalCtx {
+            input_refs,
+            upstream_slots,
+            energy: *energy,
+            energy_consumed,
+            static_inputs,
+        };
 
         for current_idx in 0..node_count {
             let node = &def.internal_nodes[current_idx];
