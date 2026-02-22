@@ -1,0 +1,362 @@
+use crate::contracts::{InputReference, NodeId};
+
+/// A single VM instruction. 33 opcodes per v3-vm-isa-spec.md.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum VmInstruction {
+    // ── Arithmetic and Data Movement ─────────────────────────────────────────
+    /// No operation.
+    Noop,
+    /// `dst = constants[const_idx]`
+    LoadConst { dst: u8, const_idx: u8 },
+    /// `dst = src`
+    Move { dst: u8, src: u8 },
+    /// `dst = a + b`
+    Add { dst: u8, a: u8, b: u8 },
+    /// `dst = a - b`
+    Sub { dst: u8, a: u8, b: u8 },
+    /// `dst = a * b`
+    Mul { dst: u8, a: u8, b: u8 },
+    /// `dst = if b == 0 { 0.0 } else { a / b }`
+    Div { dst: u8, a: u8, b: u8 },
+    /// `dst = min(a, b)`
+    Min { dst: u8, a: u8, b: u8 },
+    /// `dst = max(a, b)`
+    Max { dst: u8, a: u8, b: u8 },
+    /// `dst = abs(src)`
+    Abs { dst: u8, src: u8 },
+    /// `dst = -src`
+    Neg { dst: u8, src: u8 },
+    /// `dst = clamp(src, 0.0, 1.0)`
+    Clamp01 { dst: u8, src: u8 },
+
+    // ── Comparison and Logic ─────────────────────────────────────────────────
+    /// `dst = if a > b { 1.0 } else { 0.0 }`
+    CmpGt { dst: u8, a: u8, b: u8 },
+    /// `dst = if a < b { 1.0 } else { 0.0 }`
+    CmpLt { dst: u8, a: u8, b: u8 },
+    /// `dst = if abs(a-b) <= clamp_eps(eps) { 1.0 } else { 0.0 }`
+    CmpEq { dst: u8, a: u8, b: u8, eps: u8 },
+    /// Boolean `and` using `>= 0.5` truthiness.
+    And { dst: u8, a: u8, b: u8 },
+    /// Boolean `or` using `>= 0.5` truthiness.
+    Or { dst: u8, a: u8, b: u8 },
+    /// Boolean `not` using `>= 0.5` truthiness.
+    Not { dst: u8, src: u8 },
+
+    // ── Type Conversion ───────────────────────────────────────────────────────
+    /// Round ties-away-from-zero, store as f32.
+    ToI32 { dst: u8, src: u8 },
+    /// Clamp `[0, 255]`, round ties-away-from-zero, store as f32.
+    ToU8 { dst: u8, src: u8 },
+    /// `dst = if truthy(src) { 1.0 } else { 0.0 }`
+    ToBool { dst: u8, src: u8 },
+
+    // ── Control Flow ─────────────────────────────────────────────────────────
+    /// If `!truthy(cond)` jump by signed offset (wraps via rem_euclid over program_len).
+    JumpIfZero { cond: u8, offset: i32 },
+    /// Unconditional jump by signed offset.
+    Jump { offset: i32 },
+
+    // ── Input Reads ───────────────────────────────────────────────────────────
+    /// `dst = resolve(input_refs[input_idx])`; invalid index yields `0.0`.
+    ReadInput { dst: u8, input_idx: u8 },
+
+    // ── Output and Routing Writes ─────────────────────────────────────────────
+    /// Overwrite internal payload slot; invalid slot write ignored.
+    WriteInternalPayload { slot_idx: u8, src: u8 },
+    /// Write world-action metadata slot (0..7); invalid slot write ignored.
+    WriteWorldActionMeta { slot_idx: u8, src: u8 },
+    /// Emit world action by discriminant and halt.
+    EmitWorldAction { action_type: u8 },
+    /// Write candidate route target value.
+    WriteRouteTarget { src: u8 },
+
+    // ── Halt and Memory ───────────────────────────────────────────────────────
+    /// Stop VM execution without emitting a world action.
+    Halt,
+    /// `dst = memory[addr_reg % 1024]`
+    LoadMem8 { dst: u8, addr_reg: u8 },
+    /// `memory[addr_reg % 1024] = truncate(src)`
+    StoreMem8 { addr_reg: u8, src: u8 },
+    /// `dst = memory[imm_addr % 1024]`
+    LoadMem8Imm { dst: u8, imm_addr: u16 },
+    /// `memory[imm_addr % 1024] = truncate(src)`
+    StoreMem8Imm { imm_addr: u16, src: u8 },
+}
+
+/// VM backend definition for a mesh node.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct VmBackendDef {
+    /// Number of general-purpose f32 registers. If 0, VM halts immediately.
+    pub register_count: u8,
+    /// Constant pool; indexed by `LoadConst.const_idx` with rem_euclid wrapping.
+    pub constants: Vec<f32>,
+    /// Instruction sequence. PC starts at 0.
+    pub program: Vec<VmInstruction>,
+}
+
+// ── Graph backend types ───────────────────────────────────────────────────────
+
+/// A weighted edge in a graph internal node's input list.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct GraphInput {
+    /// Source internal node index. Out-of-range -> 0.0 (soft default).
+    pub source_idx: u16,
+    pub weight: f32,
+}
+
+/// The kind of operation performed by a graph internal node.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum GraphNodeKind {
+    /// Read from `NodeGenome.input_refs[u8]` + weighted_input_sum.
+    InputRef(u8),
+    /// Constant output value (ignores inputs).
+    Constant(f32),
+    /// Sum all weighted inputs.
+    Add,
+    /// Multiply all weighted inputs.
+    Multiply,
+    Negate,
+    Abs,
+    Min,
+    Max,
+    /// Threshold gate: 1.0 if input > threshold, else 0.0.
+    Threshold(f32),
+    GreaterThan,
+    Sigmoid,
+    Tanh,
+    Relu,
+    /// Ternary select using first input as condition.
+    Select,
+    Clamp01,
+    WeightedSum,
+    // ── Stateful operators (persist across ticks via graph_state) ─────────────
+    DecayIntegrator(f32),
+    Momentum(f32),
+    Oscillator(f32),
+    AdaptiveGain,
+    // ── Output writers ────────────────────────────────────────────────────────
+    /// Write computed value to `output_slots[u8]`.
+    CustomOutput(u8),
+    /// Write computed value to `route_target_idx`.
+    RouterOutput,
+}
+
+/// A single internal node in the graph backend.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct GraphInternalNode {
+    pub kind: GraphNodeKind,
+    pub inputs: Vec<GraphInput>,
+}
+
+/// Graph backend definition for a mesh node.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct GraphBackendDef {
+    pub internal_nodes: Vec<GraphInternalNode>,
+}
+
+// ── Top-level genome types ────────────────────────────────────────────────────
+
+/// Backend definition: either VM or Graph.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub enum BackendDef {
+    Vm(VmBackendDef),
+    Graph(GraphBackendDef),
+}
+
+/// A single node in the creature genome.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct NodeGenome {
+    pub node_id: NodeId,
+    /// Shared input slot references for both VM and Graph backends.
+    pub input_refs: Vec<InputReference>,
+    pub backend_def: BackendDef,
+    /// Candidate routing targets. May contain dangling IDs (junk DNA).
+    pub targets: Vec<NodeId>,
+}
+
+/// The complete genome of a creature.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct CreatureGenome {
+    /// Node to begin mesh execution from each tick.
+    pub entry_node_id: NodeId,
+    pub nodes: Vec<NodeGenome>,
+}
+
+impl CreatureGenome {
+    /// Look up a node by its ID. O(n) — genomes are small.
+    pub fn find_node(&self, id: NodeId) -> Option<&NodeGenome> {
+        self.nodes.iter().find(|n| n.node_id == id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn vm_instruction_all_33_variants_constructible() {
+        let instructions: Vec<VmInstruction> = vec![
+            VmInstruction::Noop,
+            VmInstruction::LoadConst {
+                dst: 0,
+                const_idx: 0,
+            },
+            VmInstruction::Move { dst: 0, src: 1 },
+            VmInstruction::Add { dst: 0, a: 1, b: 2 },
+            VmInstruction::Sub { dst: 0, a: 1, b: 2 },
+            VmInstruction::Mul { dst: 0, a: 1, b: 2 },
+            VmInstruction::Div { dst: 0, a: 1, b: 2 },
+            VmInstruction::Min { dst: 0, a: 1, b: 2 },
+            VmInstruction::Max { dst: 0, a: 1, b: 2 },
+            VmInstruction::Abs { dst: 0, src: 1 },
+            VmInstruction::Neg { dst: 0, src: 1 },
+            VmInstruction::Clamp01 { dst: 0, src: 1 },
+            VmInstruction::CmpGt { dst: 0, a: 1, b: 2 },
+            VmInstruction::CmpLt { dst: 0, a: 1, b: 2 },
+            VmInstruction::CmpEq {
+                dst: 0,
+                a: 1,
+                b: 2,
+                eps: 3,
+            },
+            VmInstruction::And { dst: 0, a: 1, b: 2 },
+            VmInstruction::Or { dst: 0, a: 1, b: 2 },
+            VmInstruction::Not { dst: 0, src: 1 },
+            VmInstruction::ToI32 { dst: 0, src: 1 },
+            VmInstruction::ToU8 { dst: 0, src: 1 },
+            VmInstruction::ToBool { dst: 0, src: 1 },
+            VmInstruction::JumpIfZero { cond: 0, offset: 2 },
+            VmInstruction::Jump { offset: -1 },
+            VmInstruction::ReadInput {
+                dst: 0,
+                input_idx: 0,
+            },
+            VmInstruction::WriteInternalPayload {
+                slot_idx: 0,
+                src: 1,
+            },
+            VmInstruction::WriteWorldActionMeta {
+                slot_idx: 0,
+                src: 1,
+            },
+            VmInstruction::EmitWorldAction { action_type: 1 },
+            VmInstruction::WriteRouteTarget { src: 0 },
+            VmInstruction::Halt,
+            VmInstruction::LoadMem8 {
+                dst: 0,
+                addr_reg: 1,
+            },
+            VmInstruction::StoreMem8 {
+                addr_reg: 0,
+                src: 1,
+            },
+            VmInstruction::LoadMem8Imm {
+                dst: 0,
+                imm_addr: 100,
+            },
+            VmInstruction::StoreMem8Imm {
+                imm_addr: 200,
+                src: 1,
+            },
+        ];
+        assert_eq!(instructions.len(), 33, "must have exactly 33 opcodes");
+    }
+
+    #[test]
+    fn vm_instruction_serde_roundtrip() {
+        let instr = VmInstruction::CmpEq {
+            dst: 0,
+            a: 1,
+            b: 2,
+            eps: 3,
+        };
+        let json = serde_json::to_string(&instr).unwrap();
+        let instr2: VmInstruction = serde_json::from_str(&json).unwrap();
+        assert_eq!(instr, instr2);
+    }
+
+    #[test]
+    fn graph_node_kinds_all_22_constructible() {
+        let kinds: Vec<GraphNodeKind> = vec![
+            GraphNodeKind::InputRef(0),
+            GraphNodeKind::Constant(1.0),
+            GraphNodeKind::Add,
+            GraphNodeKind::Multiply,
+            GraphNodeKind::Negate,
+            GraphNodeKind::Abs,
+            GraphNodeKind::Min,
+            GraphNodeKind::Max,
+            GraphNodeKind::Threshold(0.5),
+            GraphNodeKind::GreaterThan,
+            GraphNodeKind::Sigmoid,
+            GraphNodeKind::Tanh,
+            GraphNodeKind::Relu,
+            GraphNodeKind::Select,
+            GraphNodeKind::Clamp01,
+            GraphNodeKind::WeightedSum,
+            GraphNodeKind::DecayIntegrator(0.9),
+            GraphNodeKind::Momentum(0.1),
+            GraphNodeKind::Oscillator(1.0),
+            GraphNodeKind::AdaptiveGain,
+            GraphNodeKind::CustomOutput(0),
+            GraphNodeKind::RouterOutput,
+        ];
+        assert_eq!(kinds.len(), 22);
+    }
+
+    #[test]
+    fn creature_genome_find_node() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                NodeGenome {
+                    node_id: NodeId::new(0),
+                    input_refs: vec![],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 1,
+                        constants: vec![],
+                        program: vec![VmInstruction::Halt],
+                    }),
+                    targets: vec![],
+                },
+                NodeGenome {
+                    node_id: NodeId::new(1),
+                    input_refs: vec![],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 1,
+                        constants: vec![],
+                        program: vec![VmInstruction::EmitWorldAction { action_type: 0 }],
+                    }),
+                    targets: vec![],
+                },
+            ],
+        };
+        assert!(genome.find_node(NodeId::new(0)).is_some());
+        assert!(genome.find_node(NodeId::new(1)).is_some());
+        assert!(genome.find_node(NodeId::new(99)).is_none());
+    }
+
+    #[test]
+    fn creature_genome_serde_roundtrip() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 2,
+                    constants: vec![1.0, 2.0],
+                    program: vec![
+                        VmInstruction::Add { dst: 0, a: 1, b: 1 },
+                        VmInstruction::Halt,
+                    ],
+                }),
+                targets: vec![],
+            }],
+        };
+        let json = serde_json::to_string(&genome).unwrap();
+        let genome2: CreatureGenome = serde_json::from_str(&json).unwrap();
+        assert_eq!(genome, genome2);
+    }
+}
