@@ -62,7 +62,7 @@ impl Default for EnergyLifecycleConfig {
             max_energy: 100.0,
             energy_decay_per_tick: 0.2,
             min_reproduce_energy: 24.0,
-            default_offspring_energy: 20.0,
+            default_offspring_energy: 8.0,
         }
     }
 }
@@ -83,7 +83,7 @@ impl Default for EnergyCostsConfig {
             move_cost: 0.2,
             eat_cost: 0.0,
             noop_cost: 0.0,
-            reproduce_cost: 2.0,
+            reproduce_cost: 1.0,
             eat_reward_per_food: 1.0,
         }
     }
@@ -105,7 +105,7 @@ pub struct VmRuntimeConfig {
 impl Default for VmRuntimeConfig {
     fn default() -> Self {
         Self {
-            opcode_cost_multiplier: 1.0,
+            opcode_cost_multiplier: 0.5,
         }
     }
 }
@@ -130,7 +130,7 @@ impl Default for RuntimeConfig {
             max_graph_relax_iters: 4,
             graph_convergence_epsilon: 1e-3,
             graph_convergence_stable_passes: 1,
-            graph_node_base_cost: 1.0,
+            graph_node_base_cost: 0.05,
             vm: VmRuntimeConfig::default(),
         }
     }
@@ -201,14 +201,13 @@ impl SimulationConfig {
         el.max_energy = normalize_f32_finite_min(el.max_energy, 1.0, 100.0);
         el.energy_decay_per_tick = normalize_f32_finite_nonneg(el.energy_decay_per_tick, 0.2);
         el.min_reproduce_energy = normalize_f32_finite_nonneg(el.min_reproduce_energy, 24.0);
-        el.default_offspring_energy =
-            normalize_f32_finite_nonneg(el.default_offspring_energy, 20.0);
+        el.default_offspring_energy = normalize_f32_finite_nonneg(el.default_offspring_energy, 8.0);
 
         let ec = &mut self.energy.costs;
         ec.move_cost = normalize_f32_finite_nonneg(ec.move_cost, 0.2);
         ec.eat_cost = normalize_f32_finite_nonneg(ec.eat_cost, 0.0);
         ec.noop_cost = normalize_f32_finite_nonneg(ec.noop_cost, 0.0);
-        ec.reproduce_cost = normalize_f32_finite_nonneg(ec.reproduce_cost, 2.0);
+        ec.reproduce_cost = normalize_f32_finite_nonneg(ec.reproduce_cost, 1.0);
         ec.eat_reward_per_food = normalize_f32_finite_nonneg(ec.eat_reward_per_food, 1.0);
 
         let rt = &mut self.runtime;
@@ -225,9 +224,9 @@ impl SimulationConfig {
         if rt.graph_convergence_stable_passes < 1 {
             rt.graph_convergence_stable_passes = 1;
         }
-        rt.graph_node_base_cost = normalize_f32_nonneg(rt.graph_node_base_cost, 1.0);
+        rt.graph_node_base_cost = normalize_f32_nonneg(rt.graph_node_base_cost, 0.05);
         rt.vm.opcode_cost_multiplier =
-            normalize_f32_finite_nonneg(rt.vm.opcode_cost_multiplier, 1.0);
+            normalize_f32_finite_nonneg(rt.vm.opcode_cost_multiplier, 0.25);
 
         let m = &mut self.mutation;
         m.mutation_probability = m.mutation_probability.clamp(0.0, 1.0);
@@ -299,12 +298,12 @@ mod tests {
         assert!((cfg.energy.lifecycle.max_energy - 100.0).abs() < 1e-6);
         assert!((cfg.energy.lifecycle.energy_decay_per_tick - 0.2).abs() < 1e-6);
         assert!((cfg.energy.lifecycle.min_reproduce_energy - 24.0).abs() < 1e-6);
-        assert!((cfg.energy.lifecycle.default_offspring_energy - 20.0).abs() < 1e-6);
+        assert!((cfg.energy.lifecycle.default_offspring_energy - 8.0).abs() < 1e-6);
         // Energy costs
         assert!((cfg.energy.costs.move_cost - 0.2).abs() < 1e-6);
         assert!((cfg.energy.costs.eat_cost - 0.0).abs() < 1e-6);
         assert!((cfg.energy.costs.noop_cost - 0.0).abs() < 1e-6);
-        assert!((cfg.energy.costs.reproduce_cost - 2.0).abs() < 1e-6);
+        assert!((cfg.energy.costs.reproduce_cost - 1.0).abs() < 1e-6);
         assert!((cfg.energy.costs.eat_reward_per_food - 1.0).abs() < 1e-6);
         // Runtime
         assert_eq!(cfg.runtime.max_mesh_hops, 128);
@@ -312,8 +311,8 @@ mod tests {
         assert_eq!(cfg.runtime.max_graph_relax_iters, 4);
         assert!((cfg.runtime.graph_convergence_epsilon - 1e-3).abs() < 1e-6);
         assert_eq!(cfg.runtime.graph_convergence_stable_passes, 1);
-        assert!((cfg.runtime.graph_node_base_cost - 1.0).abs() < 1e-6);
-        assert!((cfg.runtime.vm.opcode_cost_multiplier - 1.0).abs() < 1e-6);
+        assert!((cfg.runtime.graph_node_base_cost - 0.05).abs() < 1e-6);
+        assert!((cfg.runtime.vm.opcode_cost_multiplier - 0.5).abs() < 1e-6);
         // Mutation
         assert!((cfg.mutation.mutation_probability - 0.01).abs() < 1e-9);
         assert_eq!(cfg.mutation.per_birth_mutation_events_min, 1);
@@ -353,6 +352,14 @@ mod tests {
         cfg.runtime.max_mesh_hops = 0;
         cfg.normalize();
         assert_eq!(cfg.runtime.max_mesh_hops, 128);
+    }
+
+    #[test]
+    fn normalize_nan_vm_opcode_cost_multiplier_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.runtime.vm.opcode_cost_multiplier = f32::NAN;
+        cfg.normalize();
+        assert!((cfg.runtime.vm.opcode_cost_multiplier - 0.5).abs() < 1e-6);
     }
 
     #[test]
