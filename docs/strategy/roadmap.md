@@ -3,17 +3,20 @@
 ## Guiding Principles
 
 - V3 mesh architecture is the active implementation target.
-- Legacy v1/v2 stacks are reference-only during this program.
 - Checkpoint gates and reference specs are the source of truth for completion.
 - Test-reproducible, high-confidence contracts take priority over feature breadth.
 
 ## Active Program Structure
 
 Primary architecture/design planning:
-- `docs/plans/` (active plan set)
+- `docs/strategy/` (active strategy/design direction)
+- `docs/plans/` (active plan set for new work)
 
 Canonical runtime/contracts specs:
 - `docs/reference/` (active V3 specs)
+
+Archived implementation planning history:
+- `docs/plans/archive/`
 
 ## Current Program Status
 
@@ -21,8 +24,8 @@ Canonical runtime/contracts specs:
 | --- | --- | --- |
 | Architecture reconciliation | complete | Mesh execution model and soft-default philosophy stabilized in docs. |
 | Reference specification sync | complete | Execution/tick-orchestration/runtime-config, VM, graph, genome, sensor, lifecycle, mutation, reproduction, and observability specs aligned. |
-| Legacy doc archival | complete | Superseded V3 plans and legacy refs archived/pointerized. |
-| Implementation planning | next | Convert canonical docs into executable milestone plans and task slices. |
+| Documentation archival | complete | Non-active docs moved to archive locations; archived-marked docs removed. |
+| Runtime implementation | next | Continue execution against active strategy and reference specs. |
 
 ## Current Focus
 
@@ -37,4 +40,4 @@ Determinism scope is canonical in `AGENTS.md` (`Determinism Scope (Canonical)`).
 - No active-doc conflicts on target architecture direction.
 - Canonical references are internally consistent.
 - Superseded references point to canonical replacements.
-- Active plan and strategy docs agree on V3 as target.
+- Active strategy, reference, and plan docs agree on V3 as target.

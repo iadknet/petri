@@ -2,25 +2,13 @@
 
 Canonical project documentation lives under `docs/`.
 
-## Strategy
+## Active Spec/Design Docs
 
-- [Active Strategy Directory](strategy/)
-- [Active Goals Catalog](strategy/goals.md)
-
-## Strategy (Historical)
-
-- [Strategy Archives](strategy/archive/)
-
-`v3` is the active target architecture path.
-v1 (`crates/petri-*`) and v2 (`v2/`) are retained as historical reference.
-
-## Reference
-
-- [Active V3 Reference Specs](reference/)
-
-## Reference (Legacy)
-
-- [Reference Archives](reference/archive/)
+- [Strategy Directory](strategy/)
+- [Architecture](strategy/architecture.md)
+- [Goals Catalog](strategy/goals.md)
+- [Roadmap](strategy/roadmap.md)
+- [V3 Reference Specs](reference/)
 
 ## Plans
 
@@ -28,11 +16,9 @@ v1 (`crates/petri-*`) and v2 (`v2/`) are retained as historical reference.
 - [Archived Plans Directory](plans/archive/)
 - [Plans Metadata and Template Rules](plans/README.md)
 
-## Standards
+## Archived Docs
 
-- [Standards Directory](standards/)
-
-## Operations
-
-- [Active Operations Directory](operations/)
+- [Standards Archives](standards/archive/)
 - [Operations Archives](operations/archive/)
+- [Strategy Archives](strategy/archive/)
+- [Reference Archives](reference/archive/)
