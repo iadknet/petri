@@ -24,7 +24,6 @@ See canonical policy set: `docs/standards/`.
 - `v3/`: active implementation target
 - `docs/`: canonical strategy/reference/standards/operations docs
 - `crates/`: legacy runtime crates (maintenance/reference only; see local `AGENTS.md` files)
-- `v2/`: legacy rewrite workspace (maintenance/reference only)
 - `web/`: legacy root frontend (maintenance/reference only; see `web/AGENTS.md`)
 
 Local instruction files:
@@ -38,7 +37,7 @@ Local instruction files:
 
 - Active architecture direction and contracts are defined under `docs/strategy/` and
   `docs/reference/` for V3.
-- Legacy surfaces (`crates/`, `v2/`, root `web/`) are maintenance/reference-only
+- Legacy surfaces (`crates/`, root `web/`) are maintenance/reference-only
   unless explicitly promoted by a new approved plan.
 - Runtime-facing telemetry/state values must be derived from applied simulation
   behavior (no synthetic placeholder metrics).
