@@ -10,9 +10,9 @@
 
 | Doc | Action |
 |-----|--------|
-| `docs/plans/2026-02-18-v3-mesh-refactor-design.md` | Refactor to concise index |
-| `docs/plans/2026-02-18-v3-mesh-runtime-execution-companion.md` | Create |
-| `docs/plans/2026-02-18-v3-mesh-schema-module-companion.md` | Create |
+| `docs/plans/archive/2026-02-18-v3-mesh-refactor-design.md` | Refactor to concise index |
+| `docs/plans/archive/2026-02-18-v3-mesh-runtime-execution-companion.md` | Create |
+| `docs/plans/archive/2026-02-18-v3-mesh-schema-module-companion.md` | Create |
 | `docs/reference/v3-mesh-execution-spec.md` | Canonical execution/soft-default reference |
 | `docs/reference/v3-tick-orchestration-spec.md` | Canonical tick flow/arbitration reference |
 | `docs/reference/v3-runtime-config-spec.md` | Canonical runtime config defaults/validation reference |
@@ -25,8 +25,8 @@
 **Superseded-By:** none
 
 **See also:**
-- `docs/plans/2026-02-18-v3-mesh-runtime-execution-companion.md`
-- `docs/plans/2026-02-18-v3-mesh-schema-module-companion.md`
+- `docs/plans/archive/2026-02-18-v3-mesh-runtime-execution-companion.md`
+- `docs/plans/archive/2026-02-18-v3-mesh-schema-module-companion.md`
 
 ---
 
@@ -87,8 +87,8 @@ Primary reference specs:
 - `docs/reference/v3-evolution-observability-spec.md`
 
 Companion plans:
-- Runtime/execution detail: `docs/plans/2026-02-18-v3-mesh-runtime-execution-companion.md`
-- Schema/module detail: `docs/plans/2026-02-18-v3-mesh-schema-module-companion.md`
+- Runtime/execution detail: `docs/plans/archive/2026-02-18-v3-mesh-runtime-execution-companion.md`
+- Schema/module detail: `docs/plans/archive/2026-02-18-v3-mesh-schema-module-companion.md`
 
 ---
 
@@ -107,9 +107,9 @@ Companion plans:
 ### Task 1: Maintain architecture index and companion links
 
 **Files:**
-- Modify: `docs/plans/2026-02-18-v3-mesh-refactor-design.md`
-- Modify: `docs/plans/2026-02-18-v3-mesh-runtime-execution-companion.md`
-- Modify: `docs/plans/2026-02-18-v3-mesh-schema-module-companion.md`
+- Modify: `docs/plans/archive/2026-02-18-v3-mesh-refactor-design.md`
+- Modify: `docs/plans/archive/2026-02-18-v3-mesh-runtime-execution-companion.md`
+- Modify: `docs/plans/archive/2026-02-18-v3-mesh-schema-module-companion.md`
 
 - [ ] Keep this file concise and navigational.
 - [ ] Keep `See also` links current.

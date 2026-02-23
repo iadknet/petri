@@ -19,7 +19,7 @@ strategy rewrites.
 | `docs/reference/v3-runtime-config-spec.md` | Targeted ownership links for startup/config patch transport |
 | `docs/reference/v3-evolution-observability-spec.md` | Targeted ownership links for server/CLI observability surfaces |
 | `docs/reference/v3-tick-orchestration-spec.md` | Targeted ownership links for external lifecycle controls |
-| `docs/plans/2026-02-21-v3-remaining-docs-completion.md` | Create docs-only execution + readiness gate plan |
+| `docs/plans/archive/2026-02-21-v3-remaining-docs-completion.md` | Create docs-only execution + readiness gate plan |
 
 **Supersedes:** none
 
@@ -117,7 +117,7 @@ strategy rewrites.
 ### Task 5: Readiness gate and recursive review
 
 **Files:**
-- Modify: `docs/plans/2026-02-21-v3-remaining-docs-completion.md`
+- Modify: `docs/plans/archive/2026-02-21-v3-remaining-docs-completion.md`
 
 - [x] Run self-review passes for cross-spec contradictions until stable.
 - [x] Record readiness checklist and verification outcomes.

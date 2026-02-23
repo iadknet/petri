@@ -8,13 +8,13 @@
 
 **Scope:** New `mutation/` and `simulation/` modules in `v3/crates/v3-core/src/`; extend `creature/state.rs`; new integration tests in `tests/viability.rs`. Status updates to master plan.
 
-**Docs Impact:** `docs/plans/2026-02-21-v3-stage-4-tick-seeding-viability.md` (this plan created); `docs/plans/2026-02-21-v3-implementation-master-plan.md` Stage 4 row updated on completion.
+**Docs Impact:** `docs/plans/archive/2026-02-21-v3-stage-4-tick-seeding-viability.md` (this plan created); `docs/plans/archive/2026-02-21-v3-implementation-master-plan.md` Stage 4 row updated on completion.
 
 **Supersedes:** none
 
 **Superseded-By:** none
 
-**Parent plan:** `docs/plans/2026-02-21-v3-implementation-master-plan.md`
+**Parent plan:** `docs/plans/archive/2026-02-21-v3-implementation-master-plan.md`
 
 ---
 

@@ -10,8 +10,8 @@
 
 | Doc | Action |
 | --- | --- |
-| `docs/plans/2026-02-18-v3-mesh-schema-module-companion.md` | Create |
-| `docs/plans/2026-02-18-v3-mesh-refactor-design.md` | Link as companion |
+| `docs/plans/archive/2026-02-18-v3-mesh-schema-module-companion.md` | Create |
+| `docs/plans/archive/2026-02-18-v3-mesh-refactor-design.md` | Link as companion |
 | `docs/reference/v3-genome-spec.md` | Keep canonical schema/parseability contract |
 | `docs/reference/v3-sensor-spec.md` | Keep canonical input category contract |
 | `docs/reference/v3-mutation-spec.md` | Keep mutation ownership + parseability gate contract |
@@ -20,7 +20,7 @@
 
 **Superseded-By:** none
 
-**Parent plan:** `docs/plans/2026-02-18-v3-mesh-refactor-design.md`
+**Parent plan:** `docs/plans/archive/2026-02-18-v3-mesh-refactor-design.md`
 
 ---
 
@@ -116,7 +116,7 @@ Canonical test behavior contracts are owned by active V3 reference specs.
 ### Task 1: Keep schema companion aligned with canonical schema/mutation/sensor specs
 
 **Files:**
-- Modify: `docs/plans/2026-02-18-v3-mesh-schema-module-companion.md`
+- Modify: `docs/plans/archive/2026-02-18-v3-mesh-schema-module-companion.md`
 - Modify: `docs/reference/v3-genome-spec.md`
 - Modify: `docs/reference/v3-sensor-spec.md`
 - Modify: `docs/reference/v3-mutation-spec.md`
@@ -128,7 +128,7 @@ Canonical test behavior contracts are owned by active V3 reference specs.
 ### Task 2: Keep parent/index links healthy
 
 **Files:**
-- Modify: `docs/plans/2026-02-18-v3-mesh-refactor-design.md`
+- Modify: `docs/plans/archive/2026-02-18-v3-mesh-refactor-design.md`
 - Modify: this companion file
 
 - [ ] Keep `Parent plan` reference valid.

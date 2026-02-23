@@ -10,13 +10,13 @@ the Stage 7 evidence matrix.
 expose mutation skip by reason in server health payload; add targeted tests; run quality gates.
 
 **Docs Impact:**
-- `docs/plans/2026-02-23-v3-stage-7-observability-hardening.md` — created at Task 0
+- `docs/plans/archive/2026-02-23-v3-stage-7-observability-hardening.md` — created at Task 0
 - archived reconciliation evidence file removed
-- `docs/plans/2026-02-21-v3-implementation-master-plan.md` — Stage 7 row `[x]` at Task 4
+- `docs/plans/archive/2026-02-21-v3-implementation-master-plan.md` — Stage 7 row `[x]` at Task 4
 
 **Supersedes:** none
 **Superseded-By:** none
-**Parent plan:** `docs/plans/2026-02-21-v3-implementation-master-plan.md`
+**Parent plan:** `docs/plans/archive/2026-02-21-v3-implementation-master-plan.md`
 
 ---
 
@@ -94,7 +94,7 @@ These are separate mutation-engine features outside Stage 7 scope.
 - [x] **Task 0: Write subplan document to `docs/plans/`**
 
   Write this plan's full content to
-  `docs/plans/2026-02-23-v3-stage-7-observability-hardening.md` before any code changes.
+  `docs/plans/archive/2026-02-23-v3-stage-7-observability-hardening.md` before any code changes.
   All tasks marked `[ ]`.
 
   **Acceptance:** file exists at correct path; `scripts/check-plan-harness.sh --mode strict` passes
