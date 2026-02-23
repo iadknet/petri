@@ -14,7 +14,7 @@ update `simulation/actions.rs`; new integration tests.
 
 **Docs Impact:** `docs/plans/2026-02-21-v3-stage-5-mutation-phenotype-evolution.md` (this plan
 created); `docs/plans/2026-02-21-v3-implementation-master-plan.md` Stage 5 row updated on
-completion; `docs/plans/archive/reconciliation/2026-02-22-v3-stage-5-evidence-matrix.md` created.
+completion; archived evidence file removed.
 
 **Supersedes:** none
 

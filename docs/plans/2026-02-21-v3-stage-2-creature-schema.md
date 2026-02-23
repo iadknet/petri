@@ -753,7 +753,7 @@ git add v3/ && git commit -m "feat(v3-core): wire creature module into lib.rs; S
 - partial: 0
 - missing: 0
 - conflict: 0
-- evidence matrix: `docs/plans/archive/reconciliation/2026-02-22-v3-stage-2-evidence-matrix.md`
+- evidence matrix: archived file removed
 
 ---
 

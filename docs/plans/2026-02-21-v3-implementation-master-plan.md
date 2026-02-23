@@ -8,9 +8,9 @@
 
 **Scope:** Master-plan status management and stage tracking for V3 implementation in `.worktrees/v3-implementation`.
 
-**Docs Impact:** Restores active master plan at the original path with explicit status checkmarks, maintenance protocol, and links to stage evidence artifacts.
+**Docs Impact:** Restores active master plan at the original path with explicit status checkmarks and maintenance protocol.
 
-**Supersedes:** `docs/plans/archive/2026-02-21-v3-implementation-master-plan.recovered.md`, `docs/plans/archive/2026-02-22-v3-implementation-reconciliation-master-plan.md`
+**Supersedes:** none
 
 **Superseded-By:** none
 
@@ -25,7 +25,7 @@
 
 - Canonical master plan path is restored to `docs/plans/2026-02-21-v3-implementation-master-plan.md`.
 - Stage subplans remain the detailed task-level source for checklist completion.
-- Evidence matrices in `docs/plans/archive/reconciliation/` remain supporting artifacts for verification traceability.
+- Archived reconciliation evidence files were removed from the archive docs directories.
 
 ## Existing Boundary Recheck
 
@@ -48,16 +48,16 @@
 
 ## Stage Overview (Canonical Status)
 
-| Status | Stage | Name | Active Subplan | Evidence Matrix |
+| Status | Stage | Name | Active Subplan | Evidence |
 | --- | --- | --- | --- | --- |
-| `[x]` | 1 | Scaffolding + Contracts + Kernel | `docs/plans/2026-02-21-v3-stage-1-scaffolding-contracts-kernel.md` | `docs/plans/archive/reconciliation/2026-02-22-v3-stage-1-evidence-matrix.md` |
-| `[x]` | 2 | Creature Schema | `docs/plans/2026-02-21-v3-stage-2-creature-schema.md` | `docs/plans/archive/reconciliation/2026-02-22-v3-stage-2-evidence-matrix.md` |
-| `[x]` | 3a | Sensors + VM Backend | `docs/plans/2026-02-21-v3-stage-3a-sensors-vm.md` | `docs/plans/archive/reconciliation/2026-02-22-v3-stage-3a-evidence-matrix.md` |
-| `[x]` | 3b | Graph Backend + Mesh Chain | `docs/plans/2026-02-21-v3-stage-3b-graph-mesh.md` | `docs/plans/archive/reconciliation/2026-02-22-v3-stage-3b-evidence-matrix.md` |
-| `[x]` | 4 | Tick + Seeding + Viability E2E | `docs/plans/2026-02-21-v3-stage-4-tick-seeding-viability.md` | `docs/plans/archive/reconciliation/2026-02-22-v3-stage-4-evidence-matrix.md` |
-| `[x]` | 5 | Mutation + Phenotype + Evolution | `docs/plans/2026-02-21-v3-stage-5-mutation-phenotype-evolution.md` | `docs/plans/archive/reconciliation/2026-02-22-v3-stage-5-evidence-matrix.md` |
-| `[x]` | 6 | CLI + Server | `docs/plans/2026-02-21-v3-stage-6-cli-server.md` | `docs/plans/archive/reconciliation/2026-02-22-v3-stage-6-evidence-matrix.md` |
-| `[x]` | 7 | Observability + Hardening | `docs/plans/2026-02-23-v3-stage-7-observability-hardening.md` | `docs/plans/archive/reconciliation/2026-02-23-v3-stage-7-evidence-matrix.md` |
+| `[x]` | 1 | Scaffolding + Contracts + Kernel | `docs/plans/2026-02-21-v3-stage-1-scaffolding-contracts-kernel.md` | Archived evidence file removed |
+| `[x]` | 2 | Creature Schema | `docs/plans/2026-02-21-v3-stage-2-creature-schema.md` | Archived evidence file removed |
+| `[x]` | 3a | Sensors + VM Backend | `docs/plans/2026-02-21-v3-stage-3a-sensors-vm.md` | Archived evidence file removed |
+| `[x]` | 3b | Graph Backend + Mesh Chain | `docs/plans/2026-02-21-v3-stage-3b-graph-mesh.md` | Archived evidence file removed |
+| `[x]` | 4 | Tick + Seeding + Viability E2E | `docs/plans/2026-02-21-v3-stage-4-tick-seeding-viability.md` | Archived evidence file removed |
+| `[x]` | 5 | Mutation + Phenotype + Evolution | `docs/plans/2026-02-21-v3-stage-5-mutation-phenotype-evolution.md` | Archived evidence file removed |
+| `[x]` | 6 | CLI + Server | `docs/plans/2026-02-21-v3-stage-6-cli-server.md` | Archived evidence file removed |
+| `[x]` | 7 | Observability + Hardening | `docs/plans/2026-02-23-v3-stage-7-observability-hardening.md` | Archived evidence file removed |
 
 ---
 
@@ -82,15 +82,4 @@
   - `2026-02-21T23:59:36.899Z`
   - `2026-02-22T00:09:36.754Z`
   - `2026-02-22T00:09:50.999Z`
-- Full divergence narrative:
-  - `docs/plans/archive/reconciliation/2026-02-22-v3-divergence-timeline.md`
-
-## Supporting Artifacts
-
-- `docs/plans/archive/reconciliation/2026-02-22-v3-stage-1-evidence-matrix.md`
-- `docs/plans/archive/reconciliation/2026-02-22-v3-stage-2-evidence-matrix.md`
-- `docs/plans/archive/reconciliation/2026-02-22-v3-stage-3a-evidence-matrix.md`
-- `docs/plans/archive/reconciliation/2026-02-22-v3-stage-3b-evidence-matrix.md`
-- `docs/plans/archive/reconciliation/2026-02-22-v3-stage-4-evidence-matrix.md`
-- `docs/plans/archive/reconciliation/2026-02-22-v3-gap-backlog.md`
-- `docs/plans/archive/reconciliation/2026-02-22-v3-divergence-timeline.md`
+- Full divergence narrative was previously stored in archived reconciliation docs; those files were removed.

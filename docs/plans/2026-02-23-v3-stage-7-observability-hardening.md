@@ -11,7 +11,7 @@ expose mutation skip by reason in server health payload; add targeted tests; run
 
 **Docs Impact:**
 - `docs/plans/2026-02-23-v3-stage-7-observability-hardening.md` — created at Task 0
-- `docs/plans/archive/reconciliation/2026-02-23-v3-stage-7-evidence-matrix.md` — created at Task 4
+- archived reconciliation evidence file removed
 - `docs/plans/2026-02-21-v3-implementation-master-plan.md` — Stage 7 row `[x]` at Task 4
 
 **Supersedes:** none
