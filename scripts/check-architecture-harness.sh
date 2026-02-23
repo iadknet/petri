@@ -31,7 +31,6 @@ fi
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
-BASELINE_FILE="docs/standards/architecture-size-baseline.tsv"
 violations=0
 warnings=0
 
@@ -56,26 +55,27 @@ is_allowed_workspace_dep() {
   local to_crate="$2"
 
   case "$from_crate:$to_crate" in
-    petri-core:petri-graph) return 0 ;;
-    petri-server:petri-core) return 0 ;;
-    petri-cli:petri-core) return 0 ;;
+    v3-server:v3-core) return 0 ;;
+    v3-cli:v3-core) return 0 ;;
   esac
 
   case "$from_crate" in
-    petri-core|petri-graph|petri-server|petri-cli) return 1 ;;
+    v3-core|v3-server|v3-cli) return 1 ;;
     *) return 0 ;;
   esac
 }
 
 check_workspace_dependency_direction() {
   local manifest
-  for manifest in crates/*/Cargo.toml; do
+  for manifest in v3/crates/*/Cargo.toml; do
+    [[ -f "$manifest" ]] || continue
+
     local from_crate
     from_crate="$(basename "$(dirname "$manifest")")"
 
     while IFS= read -r dep_name; do
       [[ -z "$dep_name" ]] && continue
-      [[ "$dep_name" != petri-* ]] && continue
+      [[ "$dep_name" != v3-* ]] && continue
 
       if ! is_allowed_workspace_dep "$from_crate" "$dep_name"; then
         report_violation "disallowed workspace dependency: ${from_crate} -> ${dep_name} (${manifest})"
@@ -89,17 +89,14 @@ check_workspace_dependency_direction() {
 }
 
 check_forbidden_runtime_deps_manifest() {
-  local crate
-  for crate in petri-core petri-graph; do
-    local manifest="crates/${crate}/Cargo.toml"
-    [[ -f "$manifest" ]] || continue
+  local manifest="v3/crates/v3-core/Cargo.toml"
+  [[ -f "$manifest" ]] || return
 
-    local dep
-    for dep in axum tokio tower-http hyper; do
-      if grep -Eq "^[[:space:]]*${dep}([[:space:]]*=|[[:space:]]*\.)" "$manifest"; then
-        report_violation "forbidden runtime dependency '${dep}' found in ${manifest}"
-      fi
-    done
+  local dep
+  for dep in axum tokio tower-http hyper; do
+    if grep -Eq "^[[:space:]]*${dep}([[:space:]]*=|[[:space:]]*\.)" "$manifest"; then
+      report_violation "forbidden runtime dependency '${dep}' found in ${manifest}"
+    fi
   done
 }
 
@@ -108,13 +105,13 @@ check_forbidden_runtime_imports_source() {
     [[ -z "$hit" ]] && continue
     report_violation "forbidden runtime import in pure crate source: ${hit}"
   done < <(
-    rg -n --glob '*.rs' '\b(axum|tokio|hyper|tower_http)::' crates/petri-core/src crates/petri-graph/src 2>/dev/null || true
+    rg -n --glob '*.rs' '\b(axum|tokio|hyper|tower_http)::' v3/crates/v3-core/src 2>/dev/null || true
   )
 }
 
 check_lib_rs_export_focus() {
   local lib_file
-  for lib_file in crates/*/src/lib.rs; do
+  for lib_file in v3/crates/*/src/lib.rs; do
     [[ -f "$lib_file" ]] || continue
 
     while IFS= read -r hit; do
@@ -129,38 +126,7 @@ check_lib_rs_export_focus() {
   done
 }
 
-baseline_line_for_path() {
-  local target_path="$1"
-  awk -F '\t' -v target="$target_path" '
-    $0 ~ /^[[:space:]]*#/ { next }
-    $1 == "path" { next }
-    NF >= 2 && $1 == target { print $2; exit }
-  ' "$BASELINE_FILE"
-}
-
-check_baseline_entries_reference_existing_files() {
-  if [[ ! -f "$BASELINE_FILE" ]]; then
-    report_violation "missing baseline file: ${BASELINE_FILE}"
-    return
-  fi
-
-  while IFS=$'\t' read -r path _rest; do
-    [[ -z "$path" ]] && continue
-    [[ "$path" == "path" ]] && continue
-    [[ "$path" =~ ^# ]] && continue
-
-    if [[ ! -f "$path" ]]; then
-      report_warning "baseline entry references missing file: ${path}"
-    fi
-  done < "$BASELINE_FILE"
-}
-
 check_production_file_sizes() {
-  if [[ ! -f "$BASELINE_FILE" ]]; then
-    report_violation "missing baseline file: ${BASELINE_FILE}"
-    return
-  fi
-
   local source_file
   while IFS= read -r source_file; do
     local base_name
@@ -173,33 +139,18 @@ check_production_file_sizes() {
     local line_count
     line_count="$(wc -l < "$source_file" | tr -d ' ')"
 
-    local baseline_count
-    baseline_count="$(baseline_line_for_path "$source_file")"
-
-    if [[ -n "$baseline_count" ]]; then
-      if (( line_count > baseline_count )); then
-        report_warning "baseline allowlisted file grew: ${source_file} (${baseline_count} -> ${line_count} lines)"
-      fi
-
-      if (( line_count > 400 )); then
-        report_warning "baseline allowlisted oversize production file: ${source_file} (${line_count} lines > 400)"
-      fi
-      continue
-    fi
-
     if (( line_count > 600 )); then
-      report_violation "production file exceeds 600 lines and is not baselined: ${source_file} (${line_count} lines)"
+      report_violation "production file exceeds 600 lines: ${source_file} (${line_count} lines)"
     elif (( line_count > 400 )); then
       report_warning "production file exceeds 400 lines: ${source_file} (${line_count} lines)"
     fi
-  done < <(find crates -type f -path '*/src/*' -name '*.rs' | sort)
+  done < <(find v3/crates -type f -path '*/src/*' -name '*.rs' | sort)
 }
 
 check_workspace_dependency_direction
 check_forbidden_runtime_deps_manifest
 check_forbidden_runtime_imports_source
 check_lib_rs_export_focus
-check_baseline_entries_reference_existing_files
 check_production_file_sizes
 
 echo ""

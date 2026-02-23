@@ -31,7 +31,7 @@
 
 ## Boundary Impact
 
-- New crate `v3/crates/v3-core` created. No changes to legacy `crates/petri-*`.
+- New crate `v3/crates/v3-core` created. No changes outside the active V3 workspace.
 - New crate `v3/crates/v3-server` created as empty shell.
 - `AGENTS.md` restored at repo root.
 - Architecture harness (`scripts/check-architecture-harness.sh`) only scans `crates/*/`, not `v3/crates/*/`. No violations introduced.
@@ -40,8 +40,8 @@
 
 | area | decision | rationale |
 |------|----------|-----------|
-| `crates/petri-core/src/` | keep | Legacy crate; not touched in this stage |
-| `crates/petri-graph/src/` | keep | Legacy crate; not touched in this stage |
+| `v3/crates/v3-core/src/` | keep | New module layout and contracts remain bounded to active V3 scope |
+| `v3/crates/v3-server/src/` | keep | Transport surface remains isolated from core simulation policy |
 | `v3/Cargo.toml` workspace manifest | keep | Already exists; only members we add are v3-core/v3-server which already declared |
 | `docs/strategy/architecture.md` | keep | Already correctly describes target V3 layout |
 

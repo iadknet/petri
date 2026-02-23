@@ -17,32 +17,19 @@ Use the split-responsibility model:
 - Skills own **HOW** execution is performed.
 - Repository docs and `AGENTS.md` own **WHAT** project constraints must hold.
 
-See canonical policy set: `docs/standards/`.
+See canonical policy set: `docs/strategy/` and `docs/reference/`.
 
 ## Repository Map
 
 - `v3/`: active implementation target
-- `docs/`: canonical strategy/reference/standards/operations docs
-- `crates/`: legacy runtime crates (maintenance/reference only; see local `AGENTS.md` files)
-- `web/`: legacy root frontend (maintenance/reference only; see `web/AGENTS.md`)
-
-Local instruction files:
-- `crates/petri-core/AGENTS.md`
-- `crates/petri-graph/AGENTS.md`
-- `crates/petri-server/AGENTS.md`
-- `crates/petri-cli/AGENTS.md`
-- `web/AGENTS.md`
+- `docs/`: canonical strategy/reference/plans docs
 
 ## Non-Negotiable Invariants
 
 - Active architecture direction and contracts are defined under `docs/strategy/` and
   `docs/reference/` for V3.
-- Legacy surfaces (`crates/`, root `web/`) are maintenance/reference-only
-  unless explicitly promoted by a new approved plan.
 - Runtime-facing telemetry/state values must be derived from applied simulation
   behavior (no synthetic placeholder metrics).
-- Legacy crate boundary direction remains
-  `petri-graph -> petri-core -> petri-server/petri-cli` when touching legacy code.
 
 ## Determinism Scope (Canonical)
 
@@ -87,11 +74,11 @@ This cycle is mandatory — a plan that has not completed at least one clean arc
 
 Agents must invoke the appropriate installed skills during architecture, planning, and implementation work. Skills are auto-discovered from `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
 
-### Rust crates (`crates/` and `v3/`)
+### Rust crates (`v3/`)
 
-- **`rust-skills`**: ALWAYS invoke when writing, reviewing, or refactoring ANY Rust code (both `crates/` and `v3/`). Covers ownership, error handling, async patterns, API design, memory optimization, performance, and testing.
+- **`rust-skills`**: ALWAYS invoke when writing, reviewing, or refactoring Rust code in `v3/`. Covers ownership, error handling, async patterns, API design, memory optimization, performance, and testing.
 
-### Frontend (`web/`)
+### Frontend
 
 - **`vercel-react-best-practices`**: Invoke when writing, reviewing, or refactoring React components. Covers performance patterns, data fetching, bundle optimization.
 - **`vercel-composition-patterns`**: Invoke when designing component APIs, refactoring prop-heavy components, or building reusable component hierarchies.
@@ -102,7 +89,7 @@ Agents must invoke the appropriate installed skills during architecture, plannin
 
 - Before designing crate APIs, module boundaries, or trait hierarchies: invoke `rust-skills`.
 - Before designing component hierarchies or state management patterns: invoke `vercel-react-best-practices` and `vercel-composition-patterns`.
-- Before writing implementation plans that touch `web/`: review `web-design-guidelines` for accessibility and UX constraints.
+- Before writing implementation plans that touch frontend surfaces: review `web-design-guidelines` for accessibility and UX constraints.
 
 ## Completion Gate
 
@@ -113,10 +100,9 @@ Before claiming completion, run and confirm all pass:
 3. `scripts/check-doc-harness.sh --mode strict` (starting February 28, 2026)
 4. `scripts/check-architecture-harness.sh --mode strict` (starting February 28, 2026)
 5. `scripts/check-plan-harness.sh --mode strict` (effective immediately)
-6. `cargo fmt --all --check`
-7. `cargo test --workspace`
-8. `cargo clippy --workspace --all-targets -- -D warnings`
-9. `cd web && npm run build`
+6. `cd v3 && cargo fmt --all -- --check`
+7. `cd v3 && cargo test --workspace`
+8. `cd v3 && cargo clippy --workspace --all-targets -- -D warnings`
 
 ## Doc Touch Policy
 
@@ -135,8 +121,6 @@ Before claiming completion, run and confirm all pass:
 - Archived reference specs: `docs/reference/archive/`
 - Active plans: `docs/plans/`
 - Archived plans: `docs/plans/archive/`
-- Operations docs: `docs/operations/`
-- Standards/policy docs: `docs/standards/`
 
 ## Git Hygiene
 

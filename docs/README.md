@@ -18,7 +18,5 @@ Canonical project documentation lives under `docs/`.
 
 ## Archived Docs
 
-- [Standards Archives](standards/archive/)
-- [Operations Archives](operations/archive/)
 - [Strategy Archives](strategy/archive/)
 - [Reference Archives](reference/archive/)
