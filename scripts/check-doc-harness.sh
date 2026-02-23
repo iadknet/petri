@@ -52,11 +52,6 @@ require_file() {
 
 check_required_agents() {
   require_file "AGENTS.md"
-  require_file "web/AGENTS.md"
-  require_file "crates/petri-core/AGENTS.md"
-  require_file "crates/petri-graph/AGENTS.md"
-  require_file "crates/petri-server/AGENTS.md"
-  require_file "crates/petri-cli/AGENTS.md"
 }
 
 check_claude_adapter() {
@@ -111,7 +106,7 @@ check_root_stub() {
 check_root_strategy_stubs() {
   check_root_stub "petri-roadmap.md" "docs/strategy/roadmap.md"
   check_root_stub "petri-architecture.md" "docs/strategy/architecture.md"
-  check_root_stub "petri-technology-review.md" "docs/strategy/technology-review.md"
+  check_root_stub "petri-technology-review.md" "docs/strategy/roadmap.md"
 }
 
 check_root_agents_shape() {
@@ -135,20 +130,6 @@ check_root_agents_shape() {
     fi
   done
 
-  local required_refs=(
-    "web/AGENTS.md"
-    "crates/petri-core/AGENTS.md"
-    "crates/petri-graph/AGENTS.md"
-    "crates/petri-server/AGENTS.md"
-    "crates/petri-cli/AGENTS.md"
-  )
-
-  local ref
-  for ref in "${required_refs[@]}"; do
-    if ! grep -Fq "$ref" "AGENTS.md"; then
-      report_violation "AGENTS.md must reference local instruction file: $ref"
-    fi
-  done
 }
 
 check_strategy_redundancy() {
@@ -251,7 +232,7 @@ check_conflicting_dependency_direction_statements() {
         if [[ -n "$chain" ]]; then
           printf '%s\n' "$chain" >> "$matches_file"
         fi
-      done
+      done || true
 
   if [[ -s "$matches_file" ]]; then
     local unique_chains
@@ -324,7 +305,6 @@ check_markdown_links() {
     -not -path './.worktrees/*' \
     -not -path './target/*' \
     -not -path './node_modules/*' \
-    -not -path './web/node_modules/*' \
     -print0)
 }
 

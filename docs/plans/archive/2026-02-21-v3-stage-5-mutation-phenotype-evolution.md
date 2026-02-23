@@ -139,7 +139,7 @@ producing genuine evolutionary variation in offspring.
   - cargo fmt --all -- --check: clean
   - scripts/check-plan-harness.sh --mode strict: violations=0, warnings=0
   - scripts/check-doc-harness.sh --mode warn: violations=2 (pre-existing CLAUDE.md warnings, not Stage 5)
-  - scripts/check-architecture-harness.sh --mode warn: violations=0 (5 pre-existing petri-core warnings)
+  - scripts/check-architecture-harness.sh --mode warn: violations=0 (pre-existing warnings unchanged)
   - Subplan written; evidence matrix created; master plan Stage 5 updated
 
 ---

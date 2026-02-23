@@ -28,7 +28,7 @@ strategy rewrites.
 ## Goal Alignment
 
 - `GP-01`: enables clean implementation of startup and lifecycle controls
-  without relying on legacy behaviors.
+  without relying on deprecated behaviors.
 - `GP-02`: clarifies ownership boundaries across startup, transport, and runtime
   contracts.
 - `GP-03`: makes implementation planning high-confidence by removing contract

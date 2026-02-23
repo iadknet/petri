@@ -14,8 +14,6 @@ This repository contains the active V3 simulation architecture/refactor target.
 - `docs/reference/`: active contracts/specs
 - `docs/plans/`: active plans (new work lands here)
 - `docs/plans/archive/`: archived completed plans
-- `docs/standards/archive/`: archived standards/policy docs
-- `docs/operations/archive/`: archived operations docs
 - `docs/*/archive/`: historical docs
 
 Compatibility note: `petri-roadmap.md`, `petri-architecture.md`, and `petri-technology-review.md` are root compatibility stubs.
@@ -23,6 +21,5 @@ Compatibility note: `petri-roadmap.md`, `petri-architecture.md`, and `petri-tech
 ## Verification
 
 ```bash
-cargo test --workspace
-cd web && npm run build
+cd v3 && cargo test --workspace
 ```
