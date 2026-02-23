@@ -12,15 +12,15 @@ evolutionary variation in offspring.
 **Scope:** `mutation/` module in `v3/crates/v3-core/src/`; extend `config/simulation.rs`;
 update `simulation/actions.rs`; new integration tests.
 
-**Docs Impact:** `docs/plans/2026-02-21-v3-stage-5-mutation-phenotype-evolution.md` (this plan
-created); `docs/plans/2026-02-21-v3-implementation-master-plan.md` Stage 5 row updated on
+**Docs Impact:** `docs/plans/archive/2026-02-21-v3-stage-5-mutation-phenotype-evolution.md` (this plan
+created); `docs/plans/archive/2026-02-21-v3-implementation-master-plan.md` Stage 5 row updated on
 completion; archived evidence file removed.
 
 **Supersedes:** none
 
 **Superseded-By:** none
 
-**Parent plan:** `docs/plans/2026-02-21-v3-implementation-master-plan.md`
+**Parent plan:** `docs/plans/archive/2026-02-21-v3-implementation-master-plan.md`
 
 ---
 

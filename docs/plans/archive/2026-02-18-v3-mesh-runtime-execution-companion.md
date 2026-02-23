@@ -10,8 +10,8 @@
 
 | Doc | Action |
 | --- | --- |
-| `docs/plans/2026-02-18-v3-mesh-runtime-execution-companion.md` | Create |
-| `docs/plans/2026-02-18-v3-mesh-refactor-design.md` | Link as companion |
+| `docs/plans/archive/2026-02-18-v3-mesh-runtime-execution-companion.md` | Create |
+| `docs/plans/archive/2026-02-18-v3-mesh-refactor-design.md` | Link as companion |
 | `docs/reference/v3-mesh-execution-spec.md` | Keep as canonical runtime contract |
 | `docs/reference/v3-tick-orchestration-spec.md` | Keep as canonical tick queue/arbitration contract |
 | `docs/reference/v3-vm-isa-spec.md` | Keep VM backend-local execution details |
@@ -21,7 +21,7 @@
 
 **Superseded-By:** none
 
-**Parent plan:** `docs/plans/2026-02-18-v3-mesh-refactor-design.md`
+**Parent plan:** `docs/plans/archive/2026-02-18-v3-mesh-refactor-design.md`
 
 ---
 
@@ -138,7 +138,7 @@ Contract source-of-truth remains active V3 reference specs, not this companion.
 ### Task 1: Keep runtime companion aligned with canonical runtime specs
 
 **Files:**
-- Modify: `docs/plans/2026-02-18-v3-mesh-runtime-execution-companion.md`
+- Modify: `docs/plans/archive/2026-02-18-v3-mesh-runtime-execution-companion.md`
 - Modify: `docs/reference/v3-mesh-execution-spec.md`
 - Modify: `docs/reference/v3-vm-isa-spec.md`
 - Modify: `docs/reference/v3-graph-backend-spec.md`
@@ -150,7 +150,7 @@ Contract source-of-truth remains active V3 reference specs, not this companion.
 ### Task 2: Keep parent/index links healthy
 
 **Files:**
-- Modify: `docs/plans/2026-02-18-v3-mesh-refactor-design.md`
+- Modify: `docs/plans/archive/2026-02-18-v3-mesh-refactor-design.md`
 - Modify: this companion file
 
 - [ ] Keep `Parent plan` reference valid.

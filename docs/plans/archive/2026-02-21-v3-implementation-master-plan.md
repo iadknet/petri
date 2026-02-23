@@ -23,7 +23,7 @@
 
 ## Boundary Impact
 
-- Canonical master plan path is restored to `docs/plans/2026-02-21-v3-implementation-master-plan.md`.
+- Canonical master plan path is restored to `docs/plans/archive/2026-02-21-v3-implementation-master-plan.md`.
 - Stage subplans remain the detailed task-level source for checklist completion.
 - Archived reconciliation evidence files were removed from the archive docs directories.
 
@@ -31,7 +31,7 @@
 
 | area | decision | rationale |
 | --- | --- | --- |
-| `docs/plans/2026-02-21-v3-implementation-master-plan.md` | change | Reinstated as canonical master status file with active checkmark tracking. |
+| `docs/plans/archive/2026-02-21-v3-implementation-master-plan.md` | change | Reinstated as canonical master status file with active checkmark tracking. |
 | `docs/plans/2026-02-21-v3-stage-*.md` | keep | Subplans remain task-level execution and checklist detail. |
 | `docs/plans/archive/reconciliation/*.md` | keep | Retained as evidence trail and divergence/gap analysis inputs. |
 | `docs/plans/archive/*.md` | keep | Historical artifacts remain immutable references, not active status sources. |
@@ -40,7 +40,7 @@
 
 | question | decision | owner | status |
 | --- | --- | --- | --- |
-| Which file is canonical for stage status? | This file (`docs/plans/2026-02-21-v3-implementation-master-plan.md`) is canonical. | user+agent | resolved |
+| Which file is canonical for stage status? | This file (`docs/plans/archive/2026-02-21-v3-implementation-master-plan.md`) is canonical. | user+agent | resolved |
 | How are stage statuses marked complete? | Only with evidence-gated verification from subplans + tests/harness gates. | user+agent | resolved |
 | How are historical/recovered plans handled? | Keep under `docs/plans/archive/` unchanged for provenance only. | user+agent | resolved |
 
@@ -50,14 +50,14 @@
 
 | Status | Stage | Name | Active Subplan | Evidence |
 | --- | --- | --- | --- | --- |
-| `[x]` | 1 | Scaffolding + Contracts + Kernel | `docs/plans/2026-02-21-v3-stage-1-scaffolding-contracts-kernel.md` | Archived evidence file removed |
-| `[x]` | 2 | Creature Schema | `docs/plans/2026-02-21-v3-stage-2-creature-schema.md` | Archived evidence file removed |
-| `[x]` | 3a | Sensors + VM Backend | `docs/plans/2026-02-21-v3-stage-3a-sensors-vm.md` | Archived evidence file removed |
-| `[x]` | 3b | Graph Backend + Mesh Chain | `docs/plans/2026-02-21-v3-stage-3b-graph-mesh.md` | Archived evidence file removed |
-| `[x]` | 4 | Tick + Seeding + Viability E2E | `docs/plans/2026-02-21-v3-stage-4-tick-seeding-viability.md` | Archived evidence file removed |
-| `[x]` | 5 | Mutation + Phenotype + Evolution | `docs/plans/2026-02-21-v3-stage-5-mutation-phenotype-evolution.md` | Archived evidence file removed |
-| `[x]` | 6 | CLI + Server | `docs/plans/2026-02-21-v3-stage-6-cli-server.md` | Archived evidence file removed |
-| `[x]` | 7 | Observability + Hardening | `docs/plans/2026-02-23-v3-stage-7-observability-hardening.md` | Archived evidence file removed |
+| `[x]` | 1 | Scaffolding + Contracts + Kernel | `docs/plans/archive/2026-02-21-v3-stage-1-scaffolding-contracts-kernel.md` | Archived evidence file removed |
+| `[x]` | 2 | Creature Schema | `docs/plans/archive/2026-02-21-v3-stage-2-creature-schema.md` | Archived evidence file removed |
+| `[x]` | 3a | Sensors + VM Backend | `docs/plans/archive/2026-02-21-v3-stage-3a-sensors-vm.md` | Archived evidence file removed |
+| `[x]` | 3b | Graph Backend + Mesh Chain | `docs/plans/archive/2026-02-21-v3-stage-3b-graph-mesh.md` | Archived evidence file removed |
+| `[x]` | 4 | Tick + Seeding + Viability E2E | `docs/plans/archive/2026-02-21-v3-stage-4-tick-seeding-viability.md` | Archived evidence file removed |
+| `[x]` | 5 | Mutation + Phenotype + Evolution | `docs/plans/archive/2026-02-21-v3-stage-5-mutation-phenotype-evolution.md` | Archived evidence file removed |
+| `[x]` | 6 | CLI + Server | `docs/plans/archive/2026-02-21-v3-stage-6-cli-server.md` | Archived evidence file removed |
+| `[x]` | 7 | Observability + Hardening | `docs/plans/archive/2026-02-23-v3-stage-7-observability-hardening.md` | Archived evidence file removed |
 
 ---
 

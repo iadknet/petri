@@ -16,7 +16,7 @@ harnesses; excludes code changes and broad strategy/roadmap rewrites.
 | `docs/reference/v3-sensor-spec.md` | Add targeted world-input ownership link |
 | `docs/reference/v3-reproduction-spec.md` | Add targeted spawn-validity and edge-mode ownership links |
 | `docs/reference/v3-runtime-config-spec.md` | Clarify world config ownership is outside runtime-config scope |
-| `docs/plans/2026-02-21-v3-world-docs-integration.md` | Create docs-only execution and readiness gate plan |
+| `docs/plans/archive/2026-02-21-v3-world-docs-integration.md` | Create docs-only execution and readiness gate plan |
 
 **Supersedes:** none
 
@@ -88,7 +88,7 @@ harnesses; excludes code changes and broad strategy/roadmap rewrites.
 ### Task 3: Readiness gate and scope enforcement
 
 **Files:**
-- Create: `docs/plans/2026-02-21-v3-world-docs-integration.md`
+- Create: `docs/plans/archive/2026-02-21-v3-world-docs-integration.md`
 
 - [x] Record docs-only scope and no-code-change rule.
 - [x] Include implementation readiness checklist below.

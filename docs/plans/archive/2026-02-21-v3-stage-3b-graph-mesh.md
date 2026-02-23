@@ -8,7 +8,7 @@
 
 **Tech Stack:** Rust, `std::collections::HashMap`, existing v3-core types: `CreatureGenome`, `NodeGenome`, `BackendDef`, `GraphBackendDef`, `GraphNodeKind`, `GraphInternalNode`, `GraphInput`, `NodeId`, `InputReference`, `RuntimeConfig`, `StaticInputs`, `NodeResult`, `WorldAction`, `resolve_input`, `execute_vm_node`.
 
-**Parent plan:** `docs/plans/2026-02-21-v3-stage-3a-sensors-vm.md`
+**Parent plan:** `docs/plans/archive/2026-02-21-v3-stage-3a-sensors-vm.md`
 
 ---
 
@@ -16,7 +16,7 @@
 
 **Scope:** `runtime/graph.rs` (`execute_graph_node`, 22 operators, relaxation loop, stateful ops) and `runtime/mesh.rs` (`execute_creature_mesh`, chain algorithm, soft-default matrix) in `v3/crates/v3-core`. Excludes tick orchestration, mutation, reproduction, server, and CLI.
 
-**Docs Impact:** `docs/plans/2026-02-21-v3-stage-3b-graph-mesh.md` (this plan created); `docs/reference/v3-graph-backend-spec.md` loop-range typo fixed; no other canonical docs changed.
+**Docs Impact:** `docs/plans/archive/2026-02-21-v3-stage-3b-graph-mesh.md` (this plan created); `docs/reference/v3-graph-backend-spec.md` loop-range typo fixed; no other canonical docs changed.
 
 **Supersedes:** none
 

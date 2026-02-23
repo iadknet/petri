@@ -10,13 +10,13 @@ observability to `v3/crates/v3-core`. Excludes snapshot import/export (out of sc
 Section 7) and Stage 7 hardening.
 
 **Docs Impact:**
-- `docs/plans/2026-02-21-v3-stage-6-cli-server.md` — created on completion
+- `docs/plans/archive/2026-02-21-v3-stage-6-cli-server.md` — created on completion
 - archived reconciliation evidence file removed
-- `docs/plans/2026-02-21-v3-implementation-master-plan.md` — Stage 6 row `[x]` on completion
+- `docs/plans/archive/2026-02-21-v3-implementation-master-plan.md` — Stage 6 row `[x]` on completion
 
 **Supersedes:** none
 **Superseded-By:** none
-**Parent plan:** `docs/plans/2026-02-21-v3-implementation-master-plan.md`
+**Parent plan:** `docs/plans/archive/2026-02-21-v3-implementation-master-plan.md`
 
 ---
 
@@ -129,7 +129,7 @@ v3/crates/v3-server/
       server.rs                                        <- NEW: tokio main, bind and serve
   tests/
     server.rs                                          <- NEW: integration tests (tower::ServiceExt::oneshot)
-docs/plans/2026-02-21-v3-stage-6-cli-server.md         <- NEW (written at Task 8)
+docs/plans/archive/2026-02-21-v3-stage-6-cli-server.md         <- NEW (written at Task 8)
 archived reconciliation evidence file removed
 ```
 
@@ -139,7 +139,7 @@ archived reconciliation evidence file removed
 
 - [x] **Task 0: Write subplan document to `docs/plans/`**
 
-  Write this plan's content to `docs/plans/2026-02-21-v3-stage-6-cli-server.md` before any code
+  Write this plan's content to `docs/plans/archive/2026-02-21-v3-stage-6-cli-server.md` before any code
   changes. The file should contain the full plan with all tasks marked `[ ]` (pending).
   This ensures the plan is in the repo and visible before implementation begins.
 
