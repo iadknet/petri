@@ -1,0 +1,177 @@
+import { useCallback, useState } from "react";
+import { api } from "../api/rest.ts";
+import { usePanelLayout } from "../stores/layout.tsx";
+import { useSimulationStore } from "../stores/simulation.ts";
+import type { SimState } from "../types/api.ts";
+import { StartupDialog } from "./StartupDialog.tsx";
+
+function ConnectionDot({ status }: { status: string }) {
+	const color =
+		status === "connected"
+			? "bg-emerald-500"
+			: status === "connecting"
+				? "bg-amber-500"
+				: "bg-red-500";
+
+	return (
+		<span className="flex items-center gap-1.5 text-xs text-slate-400">
+			<span className={`inline-block w-2 h-2 rounded-full ${color}`} />
+			{status}
+		</span>
+	);
+}
+
+function SimButton({
+	label,
+	disabled,
+	active,
+	onClick,
+	pulse,
+}: {
+	label: string;
+	disabled: boolean;
+	active?: boolean;
+	onClick: () => void;
+	pulse?: boolean;
+}) {
+	return (
+		<button
+			type="button"
+			disabled={disabled}
+			onClick={onClick}
+			className={`
+				px-3 py-1 text-sm font-medium rounded transition-colors
+				${
+					disabled
+						? "bg-slate-800 text-slate-500 opacity-50 cursor-not-allowed"
+						: active
+							? "bg-emerald-600 text-white hover:bg-emerald-500"
+							: "bg-slate-700 text-slate-200 hover:bg-slate-600"
+				}
+			`}
+		>
+			{pulse ? (
+				<span className="flex items-center gap-1.5">
+					<span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+					{label}
+				</span>
+			) : (
+				label
+			)}
+		</button>
+	);
+}
+
+function buttonEnabled(state: SimState) {
+	return {
+		startup: true,
+		start: state === "idle" || state === "paused",
+		pause: state === "running",
+		step: state === "paused",
+	};
+}
+
+export function ControlBar() {
+	const simState = useSimulationStore((s) => s.simState);
+	const tick = useSimulationStore((s) => s.tick);
+	const population = useSimulationStore((s) => s.status?.population ?? 0);
+	const connectionStatus = useSimulationStore((s) => s.connectionStatus);
+	const { toggleConfig, toggleStats } = usePanelLayout();
+	const [showStartup, setShowStartup] = useState(false);
+
+	const enabled = buttonEnabled(simState);
+
+	const handleStart = useCallback(async () => {
+		try {
+			const res = await api.start();
+			useSimulationStore.getState().setSimState(res.state);
+		} catch (e) {
+			console.error("Start failed:", e);
+		}
+	}, []);
+
+	const handlePause = useCallback(async () => {
+		try {
+			const res = await api.pause();
+			useSimulationStore.getState().setSimState(res.state);
+		} catch (e) {
+			console.error("Pause failed:", e);
+		}
+	}, []);
+
+	const handleStep = useCallback(async () => {
+		try {
+			const res = await api.step({ steps: 1 });
+			useSimulationStore.getState().setSimState(res.state);
+			useSimulationStore.getState().setTick(res.tick);
+		} catch (e) {
+			console.error("Step failed:", e);
+		}
+	}, []);
+
+	return (
+		<>
+			<header className="flex items-center gap-3 px-4 h-12 bg-petri-panel border-b border-petri-border">
+				{/* Brand */}
+				<span className="font-semibold text-slate-200 tracking-tight text-sm mr-2">PETRI</span>
+
+				{/* Divider */}
+				<div className="w-px h-6 bg-petri-border" />
+
+				{/* Lifecycle buttons */}
+				<div className="flex items-center gap-1.5">
+					<SimButton
+						label="Startup"
+						disabled={!enabled.startup}
+						onClick={() => setShowStartup(true)}
+					/>
+					<SimButton
+						label="Start"
+						disabled={!enabled.start}
+						active={simState === "running"}
+						pulse={simState === "running"}
+						onClick={handleStart}
+					/>
+					<SimButton label="Pause" disabled={!enabled.pause} onClick={handlePause} />
+					<SimButton label="Step" disabled={!enabled.step} onClick={handleStep} />
+				</div>
+
+				{/* Divider */}
+				<div className="w-px h-6 bg-petri-border" />
+
+				{/* Tick counter */}
+				<span className="font-mono text-sm text-slate-300 tabular-nums">
+					Tick: {tick.toLocaleString()}
+				</span>
+
+				{/* Population */}
+				<span className="font-mono text-xs text-slate-400 tabular-nums">
+					Pop: {population.toLocaleString()}
+				</span>
+
+				{/* Spacer */}
+				<div className="flex-1" />
+
+				{/* Connection indicator */}
+				<ConnectionDot status={connectionStatus} />
+
+				{/* Panel toggles */}
+				<button
+					type="button"
+					onClick={toggleConfig}
+					className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-800 rounded"
+				>
+					Config
+				</button>
+				<button
+					type="button"
+					onClick={toggleStats}
+					className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-800 rounded"
+				>
+					Stats
+				</button>
+			</header>
+			{showStartup && <StartupDialog onClose={() => setShowStartup(false)} />}
+		</>
+	);
+}
