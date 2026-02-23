@@ -8,7 +8,8 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 BACKEND_PORT="${BACKEND_PORT:-3000}"
 FRONTEND_PORT="${FRONTEND_PORT:-5173}"
-FRONTEND_API_URL="${FRONTEND_API_URL:-http://localhost:${BACKEND_PORT}}"
+FRONTEND_API_URL="${FRONTEND_API_URL:-}"
+FRONTEND_PROXY_TARGET="${FRONTEND_PROXY_TARGET:-http://localhost:${BACKEND_PORT}}"
 
 if [[ ! -x "${ROOT_DIR}/frontend/node_modules/.bin/vite" ]]; then
   echo "Frontend dependencies are missing."
@@ -40,7 +41,7 @@ backend_pid=$!
 echo "Starting frontend on http://localhost:${FRONTEND_PORT} ..."
 (
   cd "${ROOT_DIR}/frontend"
-  VITE_API_URL="${FRONTEND_API_URL}" npm run dev -- --port "${FRONTEND_PORT}"
+  VITE_PROXY_TARGET="${FRONTEND_PROXY_TARGET}" VITE_API_URL="${FRONTEND_API_URL}" npm run dev -- --port "${FRONTEND_PORT}"
 ) &
 frontend_pid=$!
 

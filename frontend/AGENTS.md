@@ -56,15 +56,18 @@ Minimum verification for frontend changes:
 
 Use `agent-browser` for frontend e2e or flow validation work.
 
+Canonical local e2e entrypoints:
+
+1. `cd /Users/istefanek/claude-evolution-game/frontend && npm run test:e2e`
+2. `cd /Users/istefanek/claude-evolution-game/frontend && npm run test:e2e -- --scenario E2E-03`
+3. `cd /Users/istefanek/claude-evolution-game/frontend && npm run test:e2e -- --headed`
+
 Recommended loop:
 
-1. Start the app stack on dedicated e2e ports (do not use default dev ports):
-   `BACKEND_PORT=3100 FRONTEND_PORT=4173 FRONTEND_API_URL=http://localhost:3100 /Users/istefanek/claude-evolution-game/scripts/dev.sh`
-2. `agent-browser open http://localhost:4173`
-3. `agent-browser snapshot -i`
-4. Interact using refs (`click`, `fill`, `select`, `press`).
-5. Re-run `snapshot -i` after navigation or DOM-changing actions.
-6. Verify expected UI/state transitions from simulation actions (startup/start/pause/step/config updates).
+1. Prefer the scripted suite above (it self-manages stack lifecycle on isolated ports).
+2. For ad-hoc debugging, run targeted `agent-browser` commands against the e2e runner ports.
+3. Re-run `snapshot -i` after navigation or DOM-changing actions.
+4. Verify expected UI/state transitions from simulation actions (startup/start/pause/step/config updates).
 
 When authoring new e2e coverage, prefer reproducible scripted flows and keep scenarios focused on user-visible behavior regressions.
 

@@ -12,6 +12,7 @@ export interface ConfigState {
 	isDirty: boolean;
 
 	setServerConfig: (config: SimulationConfig, simState: SimState) => void;
+	commitServerConfig: (config: SimulationConfig, simState: SimState) => void;
 	updateDraft: (path: string, value: number | string) => void;
 	resetDraft: () => void;
 	reset: () => void;
@@ -51,6 +52,14 @@ export const useConfigStore = create<ConfigState>()((set) => ({
 			localDraft: s.isDirty ? s.localDraft : structuredClone(config),
 			isDirty: s.isDirty ? !deepEqual(s.localDraft, config) : false,
 		})),
+
+	commitServerConfig: (config, simState) =>
+		set({
+			serverConfig: config,
+			simState,
+			localDraft: structuredClone(config),
+			isDirty: false,
+		}),
 
 	updateDraft: (path, value) =>
 		set((s) => {

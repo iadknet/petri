@@ -108,4 +108,27 @@ describe("ConfigStore", () => {
 		const draft = useConfigStore.getState().localDraft!;
 		expect(draft.runtime.mutation.phenotype.channel_step).toBe(5);
 	});
+
+	it("commitServerConfig syncs draft to server and clears dirty", () => {
+		useConfigStore.getState().setServerConfig(MOCK_CONFIG, "idle");
+		useConfigStore.getState().updateDraft("energy.costs.move_cost", 0.3);
+		expect(useConfigStore.getState().isDirty).toBe(true);
+
+		const committedConfig: SimulationConfig = {
+			...MOCK_CONFIG,
+			energy: {
+				...MOCK_CONFIG.energy,
+				costs: {
+					...MOCK_CONFIG.energy.costs,
+					move_cost: 0.30000001192092896,
+				},
+			},
+		};
+		useConfigStore.getState().commitServerConfig(committedConfig, "paused");
+
+		const state = useConfigStore.getState();
+		expect(state.isDirty).toBe(false);
+		expect(state.serverConfig).toEqual(committedConfig);
+		expect(state.localDraft).toEqual(committedConfig);
+	});
 });

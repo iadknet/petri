@@ -14,7 +14,10 @@ function ConnectionDot({ status }: { status: string }) {
 				: "bg-red-500";
 
 	return (
-		<span className="flex items-center gap-1.5 text-xs text-slate-400">
+		<span
+			data-testid="connection-status"
+			className="flex items-center gap-1.5 text-xs text-slate-400"
+		>
 			<span className={`inline-block w-2 h-2 rounded-full ${color}`} />
 			{status}
 		</span>
@@ -27,16 +30,19 @@ function SimButton({
 	active,
 	onClick,
 	pulse,
+	testId,
 }: {
 	label: string;
 	disabled: boolean;
 	active?: boolean;
 	onClick: () => void;
 	pulse?: boolean;
+	testId?: string;
 }) {
 	return (
 		<button
 			type="button"
+			data-testid={testId}
 			disabled={disabled}
 			onClick={onClick}
 			className={`
@@ -85,6 +91,7 @@ export function ControlBar() {
 		try {
 			const res = await api.start();
 			useSimulationStore.getState().setSimState(res.state);
+			useSimulationStore.getState().setTick(res.tick);
 		} catch (e) {
 			console.error("Start failed:", e);
 		}
@@ -94,6 +101,7 @@ export function ControlBar() {
 		try {
 			const res = await api.pause();
 			useSimulationStore.getState().setSimState(res.state);
+			useSimulationStore.getState().setTick(res.tick);
 		} catch (e) {
 			console.error("Pause failed:", e);
 		}
@@ -122,25 +130,37 @@ export function ControlBar() {
 				<div className="flex items-center gap-1.5">
 					<SimButton
 						label="Startup"
+						testId="control-startup"
 						disabled={!enabled.startup}
 						onClick={() => setShowStartup(true)}
 					/>
 					<SimButton
 						label="Start"
+						testId="control-start"
 						disabled={!enabled.start}
 						active={simState === "running"}
 						pulse={simState === "running"}
 						onClick={handleStart}
 					/>
-					<SimButton label="Pause" disabled={!enabled.pause} onClick={handlePause} />
-					<SimButton label="Step" disabled={!enabled.step} onClick={handleStep} />
+					<SimButton
+						label="Pause"
+						testId="control-pause"
+						disabled={!enabled.pause}
+						onClick={handlePause}
+					/>
+					<SimButton
+						label="Step"
+						testId="control-step"
+						disabled={!enabled.step}
+						onClick={handleStep}
+					/>
 				</div>
 
 				{/* Divider */}
 				<div className="w-px h-6 bg-petri-border" />
 
 				{/* Tick counter */}
-				<span className="font-mono text-sm text-slate-300 tabular-nums">
+				<span data-testid="tick-value" className="font-mono text-sm text-slate-300 tabular-nums">
 					Tick: {tick.toLocaleString()}
 				</span>
 
@@ -158,6 +178,7 @@ export function ControlBar() {
 				{/* Panel toggles */}
 				<button
 					type="button"
+					data-testid="toggle-config"
 					onClick={toggleConfig}
 					className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-800 rounded"
 				>
@@ -165,6 +186,7 @@ export function ControlBar() {
 				</button>
 				<button
 					type="button"
+					data-testid="toggle-stats"
 					onClick={toggleStats}
 					className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-800 rounded"
 				>
