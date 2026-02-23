@@ -6,6 +6,9 @@ unsetopt BG_NICE
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 ROOT_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+BACKEND_PORT="${BACKEND_PORT:-3000}"
+FRONTEND_PORT="${FRONTEND_PORT:-5173}"
+FRONTEND_API_URL="${FRONTEND_API_URL:-http://localhost:${BACKEND_PORT}}"
 
 if [[ ! -x "${ROOT_DIR}/frontend/node_modules/.bin/vite" ]]; then
   echo "Frontend dependencies are missing."
@@ -27,17 +30,17 @@ cleanup() {
 
 trap cleanup EXIT INT TERM
 
-echo "Starting backend on http://localhost:3000 ..."
+echo "Starting backend on http://localhost:${BACKEND_PORT} ..."
 (
   cd "${ROOT_DIR}/v3"
-  cargo run -p v3-server
+  V3_SERVER_BIND_ADDR="0.0.0.0:${BACKEND_PORT}" cargo run -p v3-server
 ) &
 backend_pid=$!
 
-echo "Starting frontend on http://localhost:5173 ..."
+echo "Starting frontend on http://localhost:${FRONTEND_PORT} ..."
 (
   cd "${ROOT_DIR}/frontend"
-  npm run dev
+  VITE_API_URL="${FRONTEND_API_URL}" npm run dev -- --port "${FRONTEND_PORT}"
 ) &
 frontend_pid=$!
 
