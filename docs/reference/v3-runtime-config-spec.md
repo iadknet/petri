@@ -61,8 +61,8 @@ Transport posture note:
 | `runtime.max_graph_relax_iters` | `u32` | `4` | Must be `>= 1`; invalid values fall back to `4`. | `v3-graph-backend-spec.md` |
 | `runtime.graph_convergence_epsilon` | `f32` | `1e-3` | Must be `>= 0.0`; invalid values fall back to `1e-3`. | `v3-graph-backend-spec.md` |
 | `runtime.graph_convergence_stable_passes` | `u32` | `1` | Must be `>= 1`; invalid values fall back to `1`. | `v3-graph-backend-spec.md` |
-| `runtime.graph_node_base_cost` | `f32` | `1.0` | Must be `>= 0.0`; invalid values fall back to `1.0`. | `v3-graph-backend-spec.md` |
-| `runtime.vm.opcode_cost_multiplier` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. `0.0` is allowed and means zero opcode energy spend. | `v3-vm-isa-spec.md` |
+| `runtime.graph_node_base_cost` | `f32` | `0.05` | Must be `>= 0.0`; invalid values fall back to `0.05`. | `v3-graph-backend-spec.md` |
+| `runtime.vm.opcode_cost_multiplier` | `f32` | `0.5` | Must be finite and `>= 0.0`; invalid values fall back to `0.5`. `0.0` is allowed and means zero opcode energy spend. | `v3-vm-isa-spec.md` |
 
 If implementation structs use different nesting, a one-to-one semantic mapping
 to these keys must exist.
@@ -113,11 +113,11 @@ section only owns config contract shape/defaults.
 | `energy.lifecycle.max_energy` | `f32` | `100.0` | Must be finite and `>= 1.0`; invalid values fall back to `100.0`. |
 | `energy.lifecycle.energy_decay_per_tick` | `f32` | `0.2` | Must be finite and `>= 0.0`; invalid values fall back to `0.2`. |
 | `energy.lifecycle.min_reproduce_energy` | `f32` | `24.0` | Must be finite and `>= 0.0`; invalid values fall back to `24.0`. |
-| `energy.lifecycle.default_offspring_energy` | `f32` | `20.0` | Must be finite and `>= 0.0`; invalid values fall back to `20.0`. |
+| `energy.lifecycle.default_offspring_energy` | `f32` | `8.0` | Must be finite and `>= 0.0`; invalid values fall back to `8.0`. |
 | `energy.costs.move_cost` | `f32` | `0.2` | Must be finite and `>= 0.0`; invalid values fall back to `0.2`. |
 | `energy.costs.eat_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; invalid values fall back to `0.0`. |
 | `energy.costs.noop_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; invalid values fall back to `0.0`. |
-| `energy.costs.reproduce_cost` | `f32` | `2.0` | Must be finite and `>= 0.0`; invalid values fall back to `2.0`. |
+| `energy.costs.reproduce_cost` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. |
 | `energy.costs.eat_reward_per_food` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. |
 
 Energy posture:
