@@ -140,7 +140,7 @@ v3/crates/v3-core/tests/viability.rs  ← NEW: E2E integration tests
   - [x] `scripts/check-doc-harness.sh --mode warn` no errors
   - [x] `scripts/check-architecture-harness.sh --mode warn` no errors
   - [x] Master plan Stage 4 row updated to `[x]`
-  - [x] Evidence matrix created at `docs/plans/archive/reconciliation/2026-02-22-v3-stage-4-evidence-matrix.md`
+  - [x] Evidence matrix archived file removed
 
 ---
 

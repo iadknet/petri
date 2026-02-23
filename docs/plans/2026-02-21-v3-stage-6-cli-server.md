@@ -11,7 +11,7 @@ Section 7) and Stage 7 hardening.
 
 **Docs Impact:**
 - `docs/plans/2026-02-21-v3-stage-6-cli-server.md` — created on completion
-- `docs/plans/archive/reconciliation/2026-02-22-v3-stage-6-evidence-matrix.md` — created on completion
+- archived reconciliation evidence file removed
 - `docs/plans/2026-02-21-v3-implementation-master-plan.md` — Stage 6 row `[x]` on completion
 
 **Supersedes:** none
@@ -130,7 +130,7 @@ v3/crates/v3-server/
   tests/
     server.rs                                          <- NEW: integration tests (tower::ServiceExt::oneshot)
 docs/plans/2026-02-21-v3-stage-6-cli-server.md         <- NEW (written at Task 8)
-docs/plans/archive/reconciliation/2026-02-22-v3-stage-6-evidence-matrix.md  <- NEW at Task 8
+archived reconciliation evidence file removed
 ```
 
 ---
