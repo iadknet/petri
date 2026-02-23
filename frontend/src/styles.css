@@ -1,0 +1,15 @@
+@import "tailwindcss";
+@import "@fontsource-variable/jetbrains-mono";
+@import "@fontsource/geist-sans/400.css";
+@import "@fontsource/geist-sans/500.css";
+@import "@fontsource/geist-sans/600.css";
+
+@theme {
+	--font-sans: "Geist Sans", ui-sans-serif, system-ui, sans-serif;
+	--font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+
+	--color-petri-bg: #020617;
+	--color-petri-panel: #0f172a;
+	--color-petri-border: #1e293b;
+	--color-petri-border-subtle: #334155;
+}
