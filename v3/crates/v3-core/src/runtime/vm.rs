@@ -64,6 +64,12 @@ pub fn execute_vm_node(
             return NodeResult::halted(payload, route_target);
         }
 
+        // Soft default: if control flow lands outside the program, halt cleanly.
+        if pc >= program_len {
+            *memory = mem_copy;
+            return NodeResult::halted(payload, route_target);
+        }
+
         let instr = &def.program[pc];
         let opcode_cost = opcode_base_cost(instr) * cost_mult;
 
@@ -445,6 +451,23 @@ mod tests {
         );
         assert!(r.world_action.is_none());
         assert!(!r.energy_exhausted);
+    }
+
+    #[test]
+    fn program_counter_past_program_len_soft_halts() {
+        // Program has one instruction and no explicit halt/jump.
+        // After first step pc becomes 1 (out of range for len=1) and must soft-halt.
+        let (r, energy_after) = run_vm(
+            vec![VmInstruction::Noop],
+            1,
+            vec![],
+            &[],
+            zeroed_upstream(),
+            100.0,
+        );
+        assert!(r.world_action.is_none());
+        assert!(!r.energy_exhausted);
+        assert!(energy_after < 100.0);
     }
 
     // ── EmitWorldAction ───────────────────────────────────────────────────────
