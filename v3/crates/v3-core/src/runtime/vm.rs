@@ -1259,9 +1259,12 @@ mod tests {
             ],
         };
         let si = empty_static_inputs();
-        // Give 0.20 energy: LoadConst(0.08) → 0.12 left; StoreMem8Imm(0.16) → -0.04 → exhausted
+        // Give 0.20 energy with opcode_cost_multiplier=1.0:
+        // LoadConst(0.08) → 0.12 left; StoreMem8Imm(0.16) → -0.04 → exhausted
         let mut e = 0.20;
         let mut mem = [0u8; 1024];
+        let mut cfg = config();
+        cfg.vm.opcode_cost_multiplier = 1.0;
         let r = execute_vm_node(
             &def,
             &[],
@@ -1270,7 +1273,7 @@ mod tests {
             0.0,
             &mut mem,
             &si,
-            &config(),
+            &cfg,
         );
         assert!(r.energy_exhausted);
         // mem[10] should still be 0 (not written)

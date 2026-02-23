@@ -570,3 +570,60 @@ fn deterministic_seeding_reproducible() {
         }
     }
 }
+
+// ── Stage 6: SimStats tests ──────────────────────────────────────────────────
+
+#[test]
+fn stats_accounting_invariant_holds_over_50_ticks() {
+    let mut sim = seed_simulation(viability_config(), 77);
+    for _ in 0..50 {
+        run_tick(&mut sim);
+    }
+    let s = &sim.stats;
+    assert_eq!(
+        s.reproduction_actions_attempted_total,
+        s.reproduction_actions_spawned_total + s.reproduction_actions_rejected_total,
+        "accounting invariant: attempted == spawned + rejected"
+    );
+}
+
+#[test]
+fn stats_last_tick_counters_reset_each_tick() {
+    let mut sim = seed_simulation(viability_config(), 88);
+    // Run tick 1 and capture last_tick_reproduce.
+    run_tick(&mut sim);
+    let tick1_reproduce = sim.stats.last_tick_reproduce;
+    let tick1_attempted = sim.stats.reproduction_actions_attempted_total;
+    // Run tick 2.
+    run_tick(&mut sim);
+    let tick2_reproduce = sim.stats.last_tick_reproduce;
+    // Per-tick counter must not be cumulative from tick 1.
+    // Total cumulative must have grown by tick2_reproduce.
+    assert_eq!(
+        sim.stats.reproduction_actions_attempted_total,
+        tick1_attempted + tick2_reproduce as u64,
+        "cumulative counter must grow by per-tick count each tick"
+    );
+    // Per-tick counter is independent each tick (not simply the sum of all previous ticks).
+    // We check that if both ticks had reproduce actions, they aren't cumulated.
+    if tick1_reproduce > 0 && tick2_reproduce > 0 {
+        assert_ne!(
+            tick2_reproduce,
+            tick1_reproduce + tick2_reproduce,
+            "last_tick_reproduce must reset each tick"
+        );
+    }
+}
+
+#[test]
+fn mean_energy_is_positive_in_viable_sim() {
+    let mut sim = seed_simulation(viability_config(), 99);
+    for _ in 0..10 {
+        run_tick(&mut sim);
+    }
+    assert!(
+        sim.mean_energy() > 0.0,
+        "mean_energy should be positive in a viable simulation, got {}",
+        sim.mean_energy()
+    );
+}

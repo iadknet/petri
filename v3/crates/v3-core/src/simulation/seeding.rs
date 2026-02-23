@@ -77,6 +77,7 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
         creatures,
         tick: 0,
         config,
+        stats: crate::simulation::stats::SimStats::default(),
         rng,
     }
 }

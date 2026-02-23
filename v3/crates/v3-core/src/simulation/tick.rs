@@ -51,6 +51,12 @@ pub fn run_tick(sim: &mut Simulation) {
     use crate::sensors::static_inputs::assemble_static_inputs;
     use crate::simulation::actions::{apply_eat, apply_move, apply_noop, apply_reproduce};
 
+    // Reset per-tick counters at the start of each tick.
+    sim.stats.last_tick_move = 0;
+    sim.stats.last_tick_eat = 0;
+    sim.stats.last_tick_noop = 0;
+    sim.stats.last_tick_reproduce = 0;
+
     run_phase_0(sim);
 
     // Build turn queue: stable sort for reproducibility, then shuffle.
@@ -92,22 +98,26 @@ pub fn run_tick(sim: &mut Simulation) {
             WorldAction::NoOp => {
                 if let Some(creature) = sim.creatures.get_mut(id) {
                     apply_noop(creature, &config);
+                    sim.stats.last_tick_noop += 1;
                 }
             }
             WorldAction::Eat => {
                 if let Some(creature) = sim.creatures.get_mut(id) {
                     apply_eat(creature, &mut sim.world, &config);
+                    sim.stats.last_tick_eat += 1;
                 }
             }
             WorldAction::Move(dir) => {
                 if let Some(creature) = sim.creatures.get_mut(id) {
                     apply_move(id, creature, &mut sim.world, dir, &config);
+                    sim.stats.last_tick_move += 1;
                 }
             }
             WorldAction::Reproduce {
                 direction,
                 energy_transfer,
             } => {
+                // last_tick_reproduce is incremented inside apply_reproduce, regardless of outcome.
                 apply_reproduce(id, sim, direction, energy_transfer, &mut reproduce_rng);
             }
         }
@@ -164,6 +174,7 @@ mod tests {
             creatures,
             tick: 0,
             config: cfg,
+            stats: crate::simulation::stats::SimStats::default(),
             rng: rand::rngs::SmallRng::seed_from_u64(42),
         };
         (sim, id)

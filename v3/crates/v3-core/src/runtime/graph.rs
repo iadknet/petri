@@ -370,7 +370,8 @@ mod tests {
         let mut energy = 0.5f32;
         let mut graph_state = HashMap::new();
         let si = make_static_inputs();
-        let config = default_config();
+        let mut config = default_config();
+        config.graph_node_base_cost = 1.0;
 
         let result = execute_graph_node(
             &def,
@@ -634,7 +635,8 @@ mod tests {
         graph_state.insert(nid, vec![42.0f32]);
 
         let si = make_static_inputs();
-        let config = default_config();
+        let mut config = default_config();
+        config.graph_node_base_cost = 1.0; // 1 node × 1.0 > energy (0.5) → exhausted
 
         let result = execute_graph_node(
             &def,

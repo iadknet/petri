@@ -1,6 +1,7 @@
 /// Edge mode for the world grid.
 /// Canonical owner: v3-world-grid-spec.md Section 4.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub enum WorldEdgeMode {
     #[default]
     Wrap,
@@ -9,6 +10,7 @@ pub enum WorldEdgeMode {
 
 /// Food substrate config. Canonical owner: v3-world-grid-spec.md Section 4.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct WorldFoodConfig {
     pub growth_rate: f32,
     pub initial_density: u8,
@@ -27,6 +29,7 @@ impl Default for WorldFoodConfig {
 
 /// World/grid config. Canonical owner: v3-world-grid-spec.md Section 4.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct WorldConfig {
     pub width: u16,
     pub height: u16,
@@ -47,6 +50,7 @@ impl Default for WorldConfig {
 
 /// Energy lifecycle config. Canonical owner: v3-runtime-config-spec.md Section 4.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EnergyLifecycleConfig {
     pub initial_energy: f32,
     pub max_energy: f32,
@@ -69,6 +73,7 @@ impl Default for EnergyLifecycleConfig {
 
 /// Energy action costs config. Canonical owner: v3-runtime-config-spec.md Section 4.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EnergyCostsConfig {
     pub move_cost: f32,
     pub eat_cost: f32,
@@ -91,6 +96,7 @@ impl Default for EnergyCostsConfig {
 
 /// Combined energy config.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct EnergyConfig {
     pub lifecycle: EnergyLifecycleConfig,
     pub costs: EnergyCostsConfig,
@@ -98,6 +104,7 @@ pub struct EnergyConfig {
 
 /// VM runtime config. Canonical owner: v3-runtime-config-spec.md Section 2.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct VmRuntimeConfig {
     pub opcode_cost_multiplier: f32,
 }
@@ -112,6 +119,7 @@ impl Default for VmRuntimeConfig {
 
 /// Mesh/VM/graph execution limits. Canonical owner: v3-runtime-config-spec.md Section 2.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct RuntimeConfig {
     pub max_mesh_hops: u32,
     pub max_vm_steps: u32,
@@ -138,6 +146,7 @@ impl Default for RuntimeConfig {
 
 /// Phenotype mutation tuning config. Canonical owner: v3-phenotype-spec.md Section 6.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PhenotypeConfig {
     /// RGB channel step magnitude (wrapping u8). Default: 2. Falls back to 2 if 0.
     pub channel_step: u8,
@@ -162,6 +171,7 @@ impl Default for PhenotypeConfig {
 
 /// Mutation tuning config. Canonical owner: v3-runtime-config-spec.md Section 3.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct MutationConfig {
     pub mutation_probability: f64,
     pub per_birth_mutation_events_min: u32,
@@ -182,6 +192,7 @@ impl Default for MutationConfig {
 
 /// Population caps. Canonical owner: v3-runtime-config-spec.md Section 5.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct PopulationConfig {
     pub initial_creatures: u32,
     pub max_creatures: u32,
@@ -201,6 +212,7 @@ impl Default for PopulationConfig {
 /// Call `normalize()` after deserialization or programmatic construction to
 /// apply fallback rules for out-of-range values.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SimulationConfig {
     pub world: WorldConfig,
     pub energy: EnergyConfig,
@@ -252,7 +264,7 @@ impl SimulationConfig {
         }
         rt.graph_node_base_cost = normalize_f32_nonneg(rt.graph_node_base_cost, 0.05);
         rt.vm.opcode_cost_multiplier =
-            normalize_f32_finite_nonneg(rt.vm.opcode_cost_multiplier, 0.25);
+            normalize_f32_finite_nonneg(rt.vm.opcode_cost_multiplier, 0.5);
 
         let m = &mut self.mutation;
         m.mutation_probability = m.mutation_probability.clamp(0.0, 1.0);
@@ -459,5 +471,11 @@ mod tests {
         assert!(
             (cfg.mutation.mutation_probability - cfg2.mutation.mutation_probability).abs() < 1e-12
         );
+    }
+
+    #[test]
+    fn deny_unknown_fields_rejects_extra_key() {
+        let result = serde_json::from_str::<SimulationConfig>(r#"{"unknown_key": 1}"#);
+        assert!(result.is_err(), "unknown key must be rejected");
     }
 }

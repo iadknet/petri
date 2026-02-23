@@ -65,21 +65,42 @@ pub fn apply_reproduce(
     energy_transfer_request: f32,
     rng: &mut impl Rng,
 ) -> ReproductionActionResult {
+    // Stats: always count attempt and per-tick reproduce regardless of outcome.
+    sim.stats.reproduction_actions_attempted_total += 1;
+    sim.stats.last_tick_reproduce += 1;
+
     let parent_pos = sim.creatures[parent_id].position;
 
     // Step 1: Resolve target cell.
     let target = match sim.world.resolve_neighbor(parent_pos, dir) {
         Some(p) => p,
-        None => return ReproductionActionResult::RejectedInvalidTarget,
+        None => {
+            sim.stats.reproduction_actions_rejected_total += 1;
+            *sim.stats
+                .reproduction_actions_rejected_by_reason
+                .entry("RejectedInvalidTarget".to_string())
+                .or_insert(0) += 1;
+            return ReproductionActionResult::RejectedInvalidTarget;
+        }
     };
 
     // Step 2: Validate target cell (no barrier, not occupied).
     if !sim.world.is_valid_target_cell(target) {
+        sim.stats.reproduction_actions_rejected_total += 1;
+        *sim.stats
+            .reproduction_actions_rejected_by_reason
+            .entry("RejectedInvalidTarget".to_string())
+            .or_insert(0) += 1;
         return ReproductionActionResult::RejectedInvalidTarget;
     }
 
     // Step 3: Check population cap.
     if sim.creatures.len() >= sim.config.population.max_creatures as usize {
+        sim.stats.reproduction_actions_rejected_total += 1;
+        *sim.stats
+            .reproduction_actions_rejected_by_reason
+            .entry("RejectedPopulationCap".to_string())
+            .or_insert(0) += 1;
         return ReproductionActionResult::RejectedPopulationCap;
     }
 
@@ -88,6 +109,11 @@ pub fn apply_reproduce(
 
     // Step 5: Check parent has sufficient energy after cost deduction.
     if sim.creatures[parent_id].energy < sim.config.energy.lifecycle.min_reproduce_energy {
+        sim.stats.reproduction_actions_rejected_total += 1;
+        *sim.stats
+            .reproduction_actions_rejected_by_reason
+            .entry("RejectedEnergyConstraints".to_string())
+            .or_insert(0) += 1;
         return ReproductionActionResult::RejectedEnergyConstraints;
     }
 
@@ -100,6 +126,11 @@ pub fn apply_reproduce(
     };
 
     if transfer <= 0.0 || sim.creatures[parent_id].energy < transfer {
+        sim.stats.reproduction_actions_rejected_total += 1;
+        *sim.stats
+            .reproduction_actions_rejected_by_reason
+            .entry("RejectedEnergyConstraints".to_string())
+            .or_insert(0) += 1;
         return ReproductionActionResult::RejectedEnergyConstraints;
     }
 
@@ -117,6 +148,11 @@ pub fn apply_reproduce(
     // Step 9: Apply genome mutations.
     let mut child_genome = child_genome;
     let summary = MutationEngine::apply_mutations(&mut child_genome, &sim.config.mutation, rng);
+
+    // Update mutation stats.
+    sim.stats.mutation_events_attempted_total += summary.attempted_events as u64;
+    sim.stats.mutation_events_applied_total += summary.applied_events as u64;
+    sim.stats.mutation_events_skipped_total += summary.skipped_events as u64;
 
     // Step 10: Phenotype mutation — triggered only when at least one genome event was applied.
     let (child_rgb, child_weights, child_polarity) = if summary.applied_events > 0 {
@@ -148,6 +184,7 @@ pub fn apply_reproduce(
     });
     sim.world.place_creature(target, child_id);
 
+    sim.stats.reproduction_actions_spawned_total += 1;
     ReproductionActionResult::Spawned
 }
 
@@ -194,6 +231,7 @@ mod tests {
             creatures,
             tick: 0,
             config: cfg,
+            stats: crate::simulation::stats::SimStats::default(),
             rng: rand::rngs::SmallRng::seed_from_u64(42),
         };
         (sim, id)
@@ -326,6 +364,7 @@ mod tests {
             creatures,
             tick: 0,
             config: cfg,
+            stats: crate::simulation::stats::SimStats::default(),
             rng: rand::rngs::SmallRng::seed_from_u64(0),
         };
         {
@@ -389,6 +428,7 @@ mod tests {
             creatures,
             tick: 0,
             config: cfg,
+            stats: crate::simulation::stats::SimStats::default(),
             rng: rand::rngs::SmallRng::seed_from_u64(0),
         };
         let mut rng = rand::rngs::SmallRng::seed_from_u64(2);
