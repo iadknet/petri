@@ -18,6 +18,14 @@ This repository contains the active V3 simulation architecture/refactor target.
 
 Compatibility note: `petri-roadmap.md`, `petri-architecture.md`, and `petri-technology-review.md` are root compatibility stubs.
 
+## Development
+
+Start backend + frontend together from repo root:
+
+```bash
+./scripts/dev.sh
+```
+
 ## Verification
 
 ```bash
