@@ -306,3 +306,44 @@ async fn config_digest_present_in_startup_response() {
         "config_digest must start with 'sha256:', got: {digest}"
     );
 }
+
+// ── 14. health_payload_contains_mutation_skip_by_reason ──────────────────────
+
+#[tokio::test]
+async fn health_payload_contains_mutation_skip_by_reason() {
+    use v3_core::config::SimulationConfig;
+    use v3_core::simulation::{run_tick, seed_simulation};
+    use v3_server::handlers::lifecycle::build_ws_event;
+    use v3_server::state::{SimHandle, SimulationStatus};
+
+    let mut cfg = SimulationConfig::default();
+    cfg.world.width = 16;
+    cfg.world.height = 16;
+    cfg.population.initial_creatures = 5;
+    cfg.mutation.mutation_probability = 1.0;
+    cfg.mutation.per_birth_mutation_events_min = 3;
+    cfg.mutation.per_birth_mutation_events_max = 3;
+    cfg.world.food.initial_coverage = 0.8;
+    cfg.world.food.initial_density = 120;
+    cfg.world.food.growth_rate = 0.5;
+    cfg.energy.lifecycle.initial_energy = 150.0;
+    cfg.energy.lifecycle.default_offspring_energy = 4.0;
+    cfg.energy.costs.reproduce_cost = 1.0;
+
+    let mut sim = seed_simulation(cfg, 42);
+    for _ in 0..20 {
+        run_tick(&mut sim);
+    }
+    let handle = SimHandle {
+        sim,
+        status: SimulationStatus::Paused,
+    };
+    let event = build_ws_event(&handle);
+    assert!(
+        event
+            .health_payload
+            .get("mutation_events_skipped_total_by_reason")
+            .is_some(),
+        "health_payload must include mutation_events_skipped_total_by_reason"
+    );
+}

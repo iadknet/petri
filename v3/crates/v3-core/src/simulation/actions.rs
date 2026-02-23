@@ -153,6 +153,12 @@ pub fn apply_reproduce(
     sim.stats.mutation_events_attempted_total += summary.attempted_events as u64;
     sim.stats.mutation_events_applied_total += summary.applied_events as u64;
     sim.stats.mutation_events_skipped_total += summary.skipped_events as u64;
+    for (reason, count) in &summary.skip_reasons {
+        *sim.stats
+            .mutation_events_skipped_by_reason
+            .entry(format!("{reason:?}"))
+            .or_insert(0) += *count as u64;
+    }
 
     // Step 10: Phenotype mutation — triggered only when at least one genome event was applied.
     let (child_rgb, child_weights, child_polarity) = if summary.applied_events > 0 {

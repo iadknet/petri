@@ -11,6 +11,8 @@ pub struct SimStats {
     pub mutation_events_attempted_total: u64,
     pub mutation_events_applied_total: u64,
     pub mutation_events_skipped_total: u64,
+    /// Per-reason mutation skip breakdown (cumulative).
+    pub mutation_events_skipped_by_reason: std::collections::HashMap<String, u64>,
     /// Per-reason rejection breakdown (cumulative).
     pub reproduction_actions_rejected_by_reason: std::collections::HashMap<String, u64>,
 

@@ -28,7 +28,7 @@ pub struct RunStartedEvent {
     pub event_type: &'static str,
     pub seed: u64,
     pub ticks_requested: u64,
-    pub initial_population: usize,
+    pub sample_every: u16,
 }
 
 #[derive(Debug, Serialize)]
@@ -52,6 +52,7 @@ pub struct RunCompletedEvent {
     pub event_type: &'static str,
     pub ticks_executed: u64,
     pub final_population: usize,
+    pub final_mean_energy: f32,
 }
 
 // ── run_simulation ────────────────────────────────────────────────────────────
@@ -77,7 +78,7 @@ pub fn run_simulation<W: std::io::Write>(
         event_type: "run_started",
         seed,
         ticks_requested: ticks,
-        initial_population: sim.creatures.len(),
+        sample_every,
     };
     emit(out, &started)?;
 
@@ -108,6 +109,7 @@ pub fn run_simulation<W: std::io::Write>(
         event_type: "run_completed",
         ticks_executed: ticks,
         final_population: sim.creatures.len(),
+        final_mean_energy: sim.mean_energy(),
     };
     emit(out, &completed)?;
 

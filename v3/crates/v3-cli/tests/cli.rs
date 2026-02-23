@@ -35,6 +35,11 @@ fn run_started_is_first_event() {
         "run_started",
         "first event must be run_started"
     );
+    assert_eq!(
+        events[0]["sample_every"].as_u64().unwrap(),
+        1,
+        "run_started must have sample_every == 1"
+    );
 }
 
 #[test]
@@ -124,4 +129,20 @@ fn sample_every_1_emits_one_sample_per_tick() {
         "sample_every=1 should emit exactly 5 tick_samples, got {samples:?}"
     );
     assert_eq!(samples, vec![1, 2, 3, 4, 5]);
+}
+
+#[test]
+fn run_completed_has_final_mean_energy() {
+    let events = run_and_collect(10, 10);
+    let last = events.last().unwrap();
+    assert_eq!(last["event_type"].as_str().unwrap(), "run_completed");
+    let fme = last["final_mean_energy"].as_f64();
+    assert!(
+        fme.is_some(),
+        "run_completed must contain final_mean_energy"
+    );
+    assert!(
+        fme.unwrap() >= 0.0,
+        "final_mean_energy must be non-negative"
+    );
 }
