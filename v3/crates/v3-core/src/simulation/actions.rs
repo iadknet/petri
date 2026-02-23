@@ -4,6 +4,7 @@ use crate::config::SimulationConfig;
 use crate::contracts::{CreatureId, Direction};
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
+use crate::mutation::phenotype::mutate_phenotype;
 use crate::mutation::MutationEngine;
 use crate::simulation::simulation::Simulation;
 
@@ -113,11 +114,22 @@ pub fn apply_reproduce(
     let child_weights = sim.creatures[parent_id].phenotype_channel_weights;
     let child_polarity = sim.creatures[parent_id].phenotype_channel_polarity;
 
-    // Step 9: Apply mutations (Stage 4 stub — always returns zero summary).
+    // Step 9: Apply genome mutations.
     let mut child_genome = child_genome;
-    let _summary = MutationEngine::apply_mutations(&mut child_genome, &sim.config.mutation, rng);
+    let summary = MutationEngine::apply_mutations(&mut child_genome, &sim.config.mutation, rng);
 
-    // Step 10: Phenotype mutation skipped (stub applies 0 events in Stage 4).
+    // Step 10: Phenotype mutation — triggered only when at least one genome event was applied.
+    let (child_rgb, child_weights, child_polarity) = if summary.applied_events > 0 {
+        mutate_phenotype(
+            child_rgb,
+            child_weights,
+            child_polarity,
+            &sim.config.mutation.phenotype,
+            rng,
+        )
+    } else {
+        (child_rgb, child_weights, child_polarity)
+    };
 
     // Step 11–12: Spawn child in slotmap + world.
     let child_id = sim.creatures.insert_with_key(|id| {

@@ -55,7 +55,7 @@
 | `[x]` | 3a | Sensors + VM Backend | `docs/plans/2026-02-21-v3-stage-3a-sensors-vm.md` | `docs/plans/archive/reconciliation/2026-02-22-v3-stage-3a-evidence-matrix.md` |
 | `[x]` | 3b | Graph Backend + Mesh Chain | `docs/plans/2026-02-21-v3-stage-3b-graph-mesh.md` | `docs/plans/archive/reconciliation/2026-02-22-v3-stage-3b-evidence-matrix.md` |
 | `[x]` | 4 | Tick + Seeding + Viability E2E | `docs/plans/2026-02-21-v3-stage-4-tick-seeding-viability.md` | `docs/plans/archive/reconciliation/2026-02-22-v3-stage-4-evidence-matrix.md` |
-| `[ ]` | 5 | Mutation + Phenotype + Evolution | not yet audited in this pass | N/A |
+| `[x]` | 5 | Mutation + Phenotype + Evolution | `docs/plans/2026-02-21-v3-stage-5-mutation-phenotype-evolution.md` | `docs/plans/archive/reconciliation/2026-02-22-v3-stage-5-evidence-matrix.md` |
 | `[ ]` | 6 | CLI + Server | not yet audited in this pass | N/A |
 | `[ ]` | 7 | Observability + Hardening | not yet audited in this pass | N/A |
 
