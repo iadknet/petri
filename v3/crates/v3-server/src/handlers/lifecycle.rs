@@ -164,7 +164,7 @@ pub(crate) async fn run_loop(app: AppState) {
     }
 }
 
-pub(crate) fn build_ws_event(handle: &SimHandle) -> WsEvent {
+pub fn build_ws_event(handle: &SimHandle) -> WsEvent {
     let sim = &handle.sim;
     let stats = &sim.stats;
 
@@ -229,6 +229,7 @@ pub(crate) fn build_ws_event(handle: &SimHandle) -> WsEvent {
         "reproduction_actions_spawned_total": stats.reproduction_actions_spawned_total,
         "reproduction_actions_rejected_total": stats.reproduction_actions_rejected_total,
         "reproduction_actions_rejected_total_by_reason": stats.reproduction_actions_rejected_by_reason,
+        "mutation_events_skipped_total_by_reason": stats.mutation_events_skipped_by_reason,
     });
 
     WsEvent {

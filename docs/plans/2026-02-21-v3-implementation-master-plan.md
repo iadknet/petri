@@ -57,7 +57,7 @@
 | `[x]` | 4 | Tick + Seeding + Viability E2E | `docs/plans/2026-02-21-v3-stage-4-tick-seeding-viability.md` | `docs/plans/archive/reconciliation/2026-02-22-v3-stage-4-evidence-matrix.md` |
 | `[x]` | 5 | Mutation + Phenotype + Evolution | `docs/plans/2026-02-21-v3-stage-5-mutation-phenotype-evolution.md` | `docs/plans/archive/reconciliation/2026-02-22-v3-stage-5-evidence-matrix.md` |
 | `[x]` | 6 | CLI + Server | `docs/plans/2026-02-21-v3-stage-6-cli-server.md` | `docs/plans/archive/reconciliation/2026-02-22-v3-stage-6-evidence-matrix.md` |
-| `[ ]` | 7 | Observability + Hardening | not yet audited in this pass | N/A |
+| `[x]` | 7 | Observability + Hardening | `docs/plans/2026-02-23-v3-stage-7-observability-hardening.md` | `docs/plans/archive/reconciliation/2026-02-23-v3-stage-7-evidence-matrix.md` |
 
 ---
 

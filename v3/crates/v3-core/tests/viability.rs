@@ -627,3 +627,46 @@ fn mean_energy_is_positive_in_viable_sim() {
         sim.mean_energy()
     );
 }
+
+// ── Stage 7: Mutation skip reason tracking ────────────────────────────────────
+
+#[test]
+fn mutation_skip_reason_tracking_accumulates_correctly() {
+    let mut cfg = SimulationConfig::default();
+    cfg.world.width = 32;
+    cfg.world.height = 32;
+    cfg.population.initial_creatures = 10;
+    cfg.mutation.mutation_probability = 1.0;
+    cfg.mutation.per_birth_mutation_events_min = 3;
+    cfg.mutation.per_birth_mutation_events_max = 3;
+    cfg.world.food.initial_coverage = 0.8;
+    cfg.world.food.initial_density = 120;
+    cfg.world.food.growth_rate = 0.5;
+    cfg.energy.lifecycle.initial_energy = 150.0;
+    cfg.energy.lifecycle.default_offspring_energy = 4.0;
+    cfg.energy.costs.reproduce_cost = 1.0;
+    let mut sim = seed_simulation(cfg, 42);
+    for _ in 0..50 {
+        run_tick(&mut sim);
+    }
+    let stats = &sim.stats;
+    // If any skips occurred, all keys must be valid reason names.
+    let valid_keys = [
+        "ParseabilityViolation",
+        "NoApplicableTarget",
+        "BudgetExhausted",
+    ];
+    for key in stats.mutation_events_skipped_by_reason.keys() {
+        assert!(
+            valid_keys.contains(&key.as_str()),
+            "unexpected skip reason key: {key}"
+        );
+    }
+    // Sum of per-reason counts must equal total skipped.
+    let reason_total: u64 = stats.mutation_events_skipped_by_reason.values().sum();
+    assert_eq!(
+        reason_total, stats.mutation_events_skipped_total,
+        "sum of skip reasons ({reason_total}) must equal skipped_total ({})",
+        stats.mutation_events_skipped_total
+    );
+}
