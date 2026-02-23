@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/v3-core",
+    "crates/v3-cli",
     "crates/v3-server",
 ]
 resolver = "2"
@@ -16,3 +17,8 @@ serde = { version = "1.0", features = ["derive"] }
 rand = { version = "0.8", features = ["small_rng"] }
 slotmap = "1.0"
 serde_json = "1.0"
+clap = { version = "4", features = ["derive"] }
+axum = { version = "0.7", features = ["ws"] }
+tokio = { version = "1", features = ["full"] }
+sha2 = "0.10"
+tower = "0.4"

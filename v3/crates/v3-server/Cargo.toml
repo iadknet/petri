@@ -5,5 +5,23 @@ version.workspace = true
 license.workspace = true
 authors.workspace = true
 
+[[bin]]
+name = "v3-server"
+path = "src/bin/server.rs"
+
 [dependencies]
 v3-core = { path = "../v3-core" }
+axum = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+tower = { workspace = true }
+slotmap = { workspace = true }
+hex = "0.4"
+
+[dev-dependencies]
+tokio = { workspace = true }
+tower = "0.5"
+http-body-util = "0.1"
+axum = { workspace = true }
