@@ -21,30 +21,37 @@ export class WsClient {
 	}
 
 	connect(): void {
-		if (this.disposed) return;
+		this.disposed = false;
+		if (this.ws) return;
 
 		const sim = useSimulationStore.getState();
 		sim.setConnectionStatus("connecting");
 
-		this.ws = new WebSocket(this.url);
+		const socket = new WebSocket(this.url);
+		this.ws = socket;
 
-		this.ws.onopen = () => {
+		socket.onopen = () => {
+			if (this.ws !== socket) return;
 			this.reconnectAttempt = 0;
 			useSimulationStore.getState().setConnectionStatus("connected");
 			this.resync();
 		};
 
-		this.ws.onmessage = (event) => {
+		socket.onmessage = (event) => {
+			if (this.ws !== socket) return;
 			this.handleMessage(event.data as string);
 		};
 
-		this.ws.onclose = () => {
+		socket.onclose = () => {
+			if (this.ws !== socket) return;
+			this.ws = null;
 			useSimulationStore.getState().setConnectionStatus("disconnected");
 			this.scheduleReconnect();
 		};
 
-		this.ws.onerror = () => {
-			this.ws?.close();
+		socket.onerror = () => {
+			if (this.ws !== socket) return;
+			socket.close();
 		};
 	}
 
@@ -54,7 +61,13 @@ export class WsClient {
 			clearTimeout(this.reconnectTimer);
 			this.reconnectTimer = null;
 		}
-		this.ws?.close();
+		if (this.ws) {
+			this.ws.onopen = null;
+			this.ws.onmessage = null;
+			this.ws.onclose = null;
+			this.ws.onerror = null;
+			this.ws.close();
+		}
 		this.ws = null;
 	}
 
