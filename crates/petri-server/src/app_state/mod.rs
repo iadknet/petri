@@ -35,8 +35,16 @@ impl AppState {
     }
 
     pub fn new_with_options(seed: u64, config: WorldConfig, options: AppStateOptions) -> Self {
+        Self::new_with_startup_draft(seed, config, options, StartupDraft::viable_default())
+    }
+
+    fn new_with_startup_draft(
+        seed: u64,
+        config: WorldConfig,
+        options: AppStateOptions,
+        startup_draft: StartupDraft,
+    ) -> Self {
         let (frames_tx, _) = broadcast::channel(256);
-        let startup_draft = StartupDraft::viable_default();
         let startup_viability =
             evaluate_startup_viability(&config, &startup_draft, options.viability_probe_enabled);
         let state = SimulationState {
@@ -60,7 +68,14 @@ impl AppState {
 
     pub fn new_for_tests() -> Self {
         let config = WorldConfig::default();
-        Self::new(1, config)
+        let mut startup_draft = StartupDraft::viable_default();
+        startup_draft.width = 64;
+        startup_draft.height = 64;
+        startup_draft.initial_creatures = 96;
+        startup_draft.max_creatures = 10_000;
+        startup_draft.sensor_radius = 8;
+
+        Self::new_with_startup_draft(1, config, AppStateOptions::default(), startup_draft)
     }
 
     #[cfg(test)]
