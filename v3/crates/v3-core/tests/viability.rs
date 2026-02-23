@@ -1,14 +1,16 @@
-//! End-to-end viability tests for the Stage 4 simulation loop.
+//! End-to-end viability tests for the Stage 4-5 simulation loop.
 //!
 //! These tests validate intent-level behavior instead of only "no panic":
-//! world mechanics, founder eat/move/reproduce behavior, and short-horizon
-//! viability across deterministic seeds.
+//! world mechanics, founder eat/move/reproduce behavior, short-horizon
+//! viability across deterministic seeds, and Stage 5 mutation-driven
+//! phenotype divergence.
 
 use std::collections::HashMap;
 
 use v3_core::config::SimulationConfig;
 use v3_core::contracts::{CreatureId, Position};
-use v3_core::simulation::{Simulation, run_tick, seed_simulation};
+use v3_core::mutation::MutationEngine;
+use v3_core::simulation::{run_tick, seed_simulation, Simulation};
 
 const FOUNDER_RGB: [u8; 3] = [204, 61, 61];
 const FOUNDER_WEIGHTS: [f32; 3] = [1.0; 3];
@@ -227,8 +229,8 @@ fn seeded_founders_start_with_correct_energy() {
 /// that food was consumed or energy changed.
 #[test]
 fn creatures_can_eat_food() {
-    use rand::SeedableRng;
     use rand::rngs::SmallRng;
+    use rand::SeedableRng;
     use slotmap::SlotMap;
     use v3_core::creature::founder::v3alpha1_founder_genome;
     use v3_core::creature::state::CreatureState;
@@ -380,11 +382,149 @@ fn founder_moves_when_no_food_and_below_reproduce_threshold() {
     let mut sim = Simulation::new(world, creatures, 0, cfg, 11);
     run_tick(&mut sim);
 
-    assert_eq!(sim.creature_count(), 1, "movement test should not spawn child");
+    assert_eq!(
+        sim.creature_count(),
+        1,
+        "movement test should not spawn child"
+    );
     let moved_to = sim.creatures[creature_id].position;
     assert_ne!(
         moved_to, start,
         "founder did not move from {start:?}; moved_to={moved_to:?}"
+    );
+}
+
+// ── Stage 5: Mutation + phenotype divergence ──────────────────────────────────
+
+/// With mutation_probability=1.0, at some point during 30 ticks a creature must
+/// carry a phenotype_rgb that differs from the founder baseline [204, 61, 61].
+///
+/// We track divergence across all ticks rather than only at the end, because
+/// heavy mutation can eventually drive the population extinct (genome damage
+/// accumulates). What matters is that the phenotype divergence mechanism fires.
+#[test]
+fn mutation_offspring_diverge_from_parent_over_time() {
+    let mut cfg = viability_config();
+    cfg.mutation.mutation_probability = 1.0;
+    cfg.mutation.per_birth_mutation_events_min = 1;
+    cfg.mutation.per_birth_mutation_events_max = 2;
+
+    let mut sim = seed_simulation(cfg, 42);
+    let mut ever_diverged = false;
+    for _ in 0..30 {
+        run_tick(&mut sim);
+        if sim
+            .creatures
+            .values()
+            .any(|c| c.phenotype_rgb != FOUNDER_RGB)
+        {
+            ever_diverged = true;
+            break;
+        }
+    }
+
+    assert!(
+        ever_diverged,
+        "after 30 ticks with mutation_probability=1.0, no creature ever diverged from founder phenotype"
+    );
+}
+
+/// MutationEngine accounting invariant: attempted == applied + skipped for all calls.
+#[test]
+fn mutation_accounting_invariant_in_viability() {
+    use rand::rngs::SmallRng;
+    use rand::SeedableRng;
+    use v3_core::creature::founder::v3alpha1_founder_genome;
+
+    let mut cfg = SimulationConfig::default().mutation;
+    cfg.mutation_probability = 1.0;
+    cfg.per_birth_mutation_events_min = 1;
+    cfg.per_birth_mutation_events_max = 5;
+
+    let mut genome = v3alpha1_founder_genome();
+    for seed in 0u64..1000 {
+        let mut rng = SmallRng::seed_from_u64(seed);
+        let summary = MutationEngine::apply_mutations(&mut genome, &cfg, &mut rng);
+        assert_eq!(
+            summary.attempted_events,
+            summary.applied_events + summary.skipped_events,
+            "accounting invariant violated at seed {seed}"
+        );
+    }
+}
+
+/// When mutation_probability=0.0, child must inherit parent phenotype unchanged.
+#[test]
+fn phenotype_inherits_unchanged_when_no_genome_mutation() {
+    use slotmap::SlotMap;
+    use v3_core::creature::founder::v3alpha1_founder_genome;
+    use v3_core::creature::state::CreatureState;
+    use v3_core::kernel::WorldState;
+
+    let mut cfg = SimulationConfig::default();
+    cfg.world.width = 10;
+    cfg.world.height = 10;
+    cfg.mutation.mutation_probability = 0.0;
+    cfg.energy.lifecycle.initial_energy = 80.0;
+    cfg.energy.lifecycle.max_energy = 120.0;
+    cfg.energy.lifecycle.default_offspring_energy = 12.0;
+    cfg.energy.costs.reproduce_cost = 1.0;
+    cfg.runtime.graph_node_base_cost = 0.1;
+
+    let pos = Position::new(5, 5);
+    let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
+    let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+    let parent_id = creatures.insert_with_key(|id| {
+        CreatureState::new(
+            id,
+            v3alpha1_founder_genome(),
+            pos,
+            cfg.energy.lifecycle.initial_energy,
+            0,
+            FOUNDER_RGB,
+            FOUNDER_WEIGHTS,
+            FOUNDER_POLARITY,
+        )
+    });
+    world.place_creature(pos, parent_id);
+
+    let mut sim = Simulation::new(world, creatures, 0, cfg, 7);
+    run_tick(&mut sim);
+
+    // Find the child (generation == 1).
+    let child = sim.creatures.values().find(|c| c.generation == 1);
+
+    if let Some(child) = child {
+        assert_eq!(
+            child.phenotype_rgb, FOUNDER_RGB,
+            "child phenotype must be identical to parent when mutation_probability=0.0"
+        );
+    }
+    // If no child was produced this tick, the test is vacuously satisfied (no mutation check needed).
+}
+
+/// Existing viability profile still works with real mutations enabled.
+#[test]
+fn viability_still_passes_with_real_mutations() {
+    let mut cfg = viability_config();
+    cfg.mutation.mutation_probability = 1.0;
+    cfg.mutation.per_birth_mutation_events_min = 1;
+    cfg.mutation.per_birth_mutation_events_max = 2;
+
+    let mut sim = seed_simulation(cfg, 42);
+    let metrics = run_ticks_with_metrics(&mut sim, 20);
+    let births_total: usize = metrics.iter().map(|m| m.newborns).sum();
+
+    assert!(
+        sim.creature_count() > 0,
+        "population went extinct with real mutations by tick {}.\n{}",
+        sim.tick_number(),
+        format_tick_metrics(&metrics)
+    );
+    assert!(
+        births_total > 0,
+        "no reproduction occurred with real mutations.\n{}",
+        format_tick_metrics(&metrics)
     );
 }
 

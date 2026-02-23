@@ -136,12 +136,37 @@ impl Default for RuntimeConfig {
     }
 }
 
+/// Phenotype mutation tuning config. Canonical owner: v3-phenotype-spec.md Section 6.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct PhenotypeConfig {
+    /// RGB channel step magnitude (wrapping u8). Default: 2. Falls back to 2 if 0.
+    pub channel_step: u8,
+    /// Probability of flipping the selected channel's polarity. Default: 0.002. Clamped [0.0, 1.0].
+    pub polarity_flip_chance: f32,
+    /// Minimum weight when re-randomizing the selected channel. Default: 0.05. Falls back to 0.05 if < 0.
+    pub channel_weight_min: f32,
+    /// Maximum weight when re-randomizing the selected channel. Default: 1.0. Falls back to 1.0 if <= channel_weight_min.
+    pub channel_weight_max: f32,
+}
+
+impl Default for PhenotypeConfig {
+    fn default() -> Self {
+        Self {
+            channel_step: 2,
+            polarity_flip_chance: 0.002,
+            channel_weight_min: 0.05,
+            channel_weight_max: 1.0,
+        }
+    }
+}
+
 /// Mutation tuning config. Canonical owner: v3-runtime-config-spec.md Section 3.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct MutationConfig {
     pub mutation_probability: f64,
     pub per_birth_mutation_events_min: u32,
     pub per_birth_mutation_events_max: u32,
+    pub phenotype: PhenotypeConfig,
 }
 
 impl Default for MutationConfig {
@@ -150,6 +175,7 @@ impl Default for MutationConfig {
             mutation_probability: 0.01,
             per_birth_mutation_events_min: 1,
             per_birth_mutation_events_max: 4,
+            phenotype: PhenotypeConfig::default(),
         }
     }
 }
@@ -236,6 +262,17 @@ impl SimulationConfig {
         if m.per_birth_mutation_events_max < m.per_birth_mutation_events_min {
             m.per_birth_mutation_events_max = m.per_birth_mutation_events_min;
         }
+        let ph = &mut m.phenotype;
+        if ph.channel_step == 0 {
+            ph.channel_step = 2;
+        }
+        ph.polarity_flip_chance = ph.polarity_flip_chance.clamp(0.0, 1.0);
+        if ph.channel_weight_min < 0.0 || !ph.channel_weight_min.is_finite() {
+            ph.channel_weight_min = 0.05;
+        }
+        if !ph.channel_weight_max.is_finite() || ph.channel_weight_max <= ph.channel_weight_min {
+            ph.channel_weight_max = 1.0;
+        }
 
         let p = &mut self.population;
         if p.initial_creatures < 1 {
@@ -317,6 +354,11 @@ mod tests {
         assert!((cfg.mutation.mutation_probability - 0.01).abs() < 1e-9);
         assert_eq!(cfg.mutation.per_birth_mutation_events_min, 1);
         assert_eq!(cfg.mutation.per_birth_mutation_events_max, 4);
+        // Phenotype
+        assert_eq!(cfg.mutation.phenotype.channel_step, 2);
+        assert!((cfg.mutation.phenotype.polarity_flip_chance - 0.002).abs() < 1e-6);
+        assert!((cfg.mutation.phenotype.channel_weight_min - 0.05).abs() < 1e-6);
+        assert!((cfg.mutation.phenotype.channel_weight_max - 1.0).abs() < 1e-6);
         // Population
         assert_eq!(cfg.population.initial_creatures, 50);
         assert_eq!(cfg.population.max_creatures, 1000);
@@ -372,6 +414,39 @@ mod tests {
             cfg.mutation.per_birth_mutation_events_max
                 >= cfg.mutation.per_birth_mutation_events_min
         );
+    }
+
+    #[test]
+    fn normalize_phenotype_zero_channel_step_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.mutation.phenotype.channel_step = 0;
+        cfg.normalize();
+        assert_eq!(cfg.mutation.phenotype.channel_step, 2);
+    }
+
+    #[test]
+    fn normalize_phenotype_polarity_flip_chance_clamped() {
+        let mut cfg = SimulationConfig::default();
+        cfg.mutation.phenotype.polarity_flip_chance = 1.5;
+        cfg.normalize();
+        assert!((cfg.mutation.phenotype.polarity_flip_chance - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_phenotype_negative_channel_weight_min_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.mutation.phenotype.channel_weight_min = -0.1;
+        cfg.normalize();
+        assert!((cfg.mutation.phenotype.channel_weight_min - 0.05).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_phenotype_weight_max_lte_min_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.mutation.phenotype.channel_weight_min = 0.5;
+        cfg.mutation.phenotype.channel_weight_max = 0.4;
+        cfg.normalize();
+        assert!((cfg.mutation.phenotype.channel_weight_max - 1.0).abs() < 1e-6);
     }
 
     #[test]
