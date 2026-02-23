@@ -169,6 +169,7 @@ pub fn build_ws_event(handle: &SimHandle) -> WsEvent {
     let stats = &sim.stats;
 
     let status_payload = serde_json::json!({
+        "state": handle.status,
         "population": sim.creatures.len(),
         "mean_energy": sim.mean_energy(),
         "last_tick_actions": {

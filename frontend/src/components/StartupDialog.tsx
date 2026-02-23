@@ -35,7 +35,10 @@ export function StartupDialog({ onClose }: { onClose: () => void }) {
 	}, [seed, population, onClose]);
 
 	return (
-		<div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+		<div
+			data-testid="startup-modal"
+			className="fixed inset-0 z-50 flex items-center justify-center bg-black/60"
+		>
 			<div className="bg-petri-panel border border-petri-border rounded-lg shadow-2xl w-96 p-6">
 				<h2 className="text-lg font-semibold text-slate-100 mb-4">New Simulation</h2>
 
@@ -43,6 +46,7 @@ export function StartupDialog({ onClose }: { onClose: () => void }) {
 					<label className="flex flex-col gap-1">
 						<span className="text-xs text-slate-400">Seed</span>
 						<input
+							data-testid="startup-seed"
 							type="number"
 							value={seed}
 							onChange={(e) => setSeed(Number(e.target.value))}
@@ -53,6 +57,7 @@ export function StartupDialog({ onClose }: { onClose: () => void }) {
 					<label className="flex flex-col gap-1">
 						<span className="text-xs text-slate-400">Initial Population</span>
 						<input
+							data-testid="startup-population"
 							type="number"
 							value={population}
 							min={1}
@@ -62,11 +67,16 @@ export function StartupDialog({ onClose }: { onClose: () => void }) {
 						/>
 					</label>
 
-					{error && <p className="text-xs text-red-400">{error}</p>}
+					{error && (
+						<p data-testid="startup-error" className="text-xs text-red-400">
+							{error}
+						</p>
+					)}
 
 					<div className="flex gap-2 mt-2">
 						<button
 							type="button"
+							data-testid="startup-initialize"
 							disabled={submitting}
 							onClick={handleStartup}
 							className="flex-1 px-4 py-2 text-sm font-medium bg-emerald-600 text-white rounded hover:bg-emerald-500 disabled:opacity-50"
@@ -75,6 +85,7 @@ export function StartupDialog({ onClose }: { onClose: () => void }) {
 						</button>
 						<button
 							type="button"
+							data-testid="startup-cancel"
 							onClick={onClose}
 							className="px-4 py-2 text-sm text-slate-400 bg-slate-800 rounded hover:bg-slate-700"
 						>

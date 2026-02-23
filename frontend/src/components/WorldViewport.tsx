@@ -110,6 +110,7 @@ export function WorldViewport() {
 		<div ref={containerRef} className="relative w-full h-full overflow-hidden bg-petri-bg">
 			<canvas
 				ref={canvasRef}
+				data-testid="world-canvas"
 				className="absolute inset-0 cursor-crosshair"
 				onWheel={handleWheel}
 				onMouseDown={handleMouseDown}

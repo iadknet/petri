@@ -47,6 +47,31 @@ describe("SimulationStore", () => {
 		expect(useSimulationStore.getState().status!.population).toBe(50);
 	});
 
+	it("does not regress paused state on same-tick running status update", () => {
+		useSimulationStore.getState().setStatus(10, {
+			state: "paused",
+			population: 50,
+			mean_energy: 37.4,
+			last_tick_actions: { move: 10, eat: 5, reproduce: 2, noop: 1 },
+			reproduction_actions_attempted_total: 100,
+			reproduction_actions_spawned_total: 20,
+			reproduction_actions_rejected_total: 80,
+		});
+
+		useSimulationStore.getState().setStatus(10, {
+			state: "running",
+			population: 51,
+			mean_energy: 37.8,
+			last_tick_actions: { move: 11, eat: 4, reproduce: 3, noop: 1 },
+			reproduction_actions_attempted_total: 101,
+			reproduction_actions_spawned_total: 21,
+			reproduction_actions_rejected_total: 80,
+		});
+
+		expect(useSimulationStore.getState().simState).toBe("paused");
+		expect(useSimulationStore.getState().status!.population).toBe(51);
+	});
+
 	it("resets to initial state", () => {
 		useSimulationStore.getState().setSimState("running");
 		useSimulationStore.getState().setTick(100);

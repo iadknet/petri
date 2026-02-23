@@ -241,9 +241,10 @@ export function StatsPanel() {
 	const [tab, setTab] = useState<Tab>("overview");
 
 	const tabButton = useCallback(
-		(t: Tab, label: string) => (
+		(t: Tab, label: string, testId: string) => (
 			<button
 				type="button"
+				data-testid={testId}
 				onClick={() => setTab(t)}
 				className={`px-3 py-1 text-xs font-medium rounded-t ${
 					tab === t ? "bg-petri-panel text-slate-200" : "text-slate-500 hover:text-slate-300"
@@ -257,14 +258,15 @@ export function StatsPanel() {
 
 	return (
 		<div
+			data-testid="stats-panel"
 			className="bg-petri-panel border-t border-petri-border flex flex-col"
 			style={{ height: "200px" }}
 		>
 			{/* Tab bar */}
 			<div className="flex gap-1 px-3 pt-1 bg-slate-950">
-				{tabButton("overview", "Overview")}
-				{tabButton("actions", "Actions")}
-				{tabButton("evolution", "Evolution")}
+				{tabButton("overview", "Overview", "stats-tab-overview")}
+				{tabButton("actions", "Actions", "stats-tab-actions")}
+				{tabButton("evolution", "Evolution", "stats-tab-evolution")}
 			</div>
 
 			{/* Tab content */}

@@ -347,3 +347,26 @@ async fn health_payload_contains_mutation_skip_by_reason() {
         "health_payload must include mutation_events_skipped_total_by_reason"
     );
 }
+
+// ── 15. status_payload_includes_state ───────────────────────────────────────
+
+#[tokio::test]
+async fn status_payload_includes_state() {
+    use v3_core::config::SimulationConfig;
+    use v3_core::simulation::seed_simulation;
+    use v3_server::handlers::lifecycle::build_ws_event;
+    use v3_server::state::{SimHandle, SimulationStatus};
+
+    let sim = seed_simulation(SimulationConfig::default(), 7);
+    let handle = SimHandle {
+        sim,
+        status: SimulationStatus::Paused,
+    };
+
+    let event = build_ws_event(&handle);
+    assert_eq!(
+        event.status_payload.get("state").and_then(|v| v.as_str()),
+        Some("paused"),
+        "status_payload must include current simulation state"
+    );
+}

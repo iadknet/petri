@@ -31,3 +31,9 @@ Start backend + frontend together from repo root:
 ```bash
 cd v3 && cargo test --workspace
 ```
+
+## Frontend E2E (Local Only)
+
+```bash
+cd frontend && npm run test:e2e
+```

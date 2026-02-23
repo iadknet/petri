@@ -43,7 +43,19 @@ export const useSimulationStore = create<SimulationState>()((set) => ({
 	setTick: (tick) => set({ tick }),
 
 	setFrame: (tick, frame) => set({ tick, frame }),
-	setStatus: (tick, status) => set({ tick, simState: status.state, status }),
+	setStatus: (tick, status) =>
+		set((prev) => {
+			if (tick < prev.tick) {
+				return prev;
+			}
+
+			let simState = status.state;
+			if (tick === prev.tick && prev.simState === "paused" && status.state === "running") {
+				simState = prev.simState;
+			}
+
+			return { tick, simState, status };
+		}),
 	setHealth: (tick, health) => set({ tick, health }),
 
 	reset: () => set(initialState),
