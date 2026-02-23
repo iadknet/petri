@@ -1,3 +1,21 @@
 .DS_Store
 .worktrees/
 target/
+
+# Node/frontend dependencies and build artifacts
+node_modules/
+dist/
+.vite/
+coverage/
+*.tsbuildinfo
+
+# Frontend tool logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Local environment files
+.env
+.env.*
+!.env.example
