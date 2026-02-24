@@ -64,7 +64,15 @@ export interface HealthPayload {
 	reproduction_actions_rejected_total_by_reason: Record<string, number>;
 }
 
-// WebSocket envelope
+// WebSocket binary frame (msgpack)
+export interface WsFrame {
+	tick: number;
+	status: StatusPayload;
+	frame: Frame;
+	health: HealthPayload;
+}
+
+// Legacy WebSocket envelope (no longer used by WS, kept for reference)
 export type WsEventType = "status" | "frame" | "health";
 
 export interface WsEnvelope<T = unknown> {

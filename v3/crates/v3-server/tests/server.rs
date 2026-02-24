@@ -313,7 +313,7 @@ async fn config_digest_present_in_startup_response() {
 async fn health_payload_contains_mutation_skip_by_reason() {
     use v3_core::config::SimulationConfig;
     use v3_core::simulation::{run_tick, seed_simulation};
-    use v3_server::handlers::lifecycle::build_ws_event;
+    use v3_server::handlers::lifecycle::build_ws_frame;
     use v3_server::state::{SimHandle, SimulationStatus};
 
     let mut cfg = SimulationConfig::default();
@@ -338,14 +338,9 @@ async fn health_payload_contains_mutation_skip_by_reason() {
         sim,
         status: SimulationStatus::Paused,
     };
-    let event = build_ws_event(&handle);
-    assert!(
-        event
-            .health_payload
-            .get("mutation_events_skipped_total_by_reason")
-            .is_some(),
-        "health_payload must include mutation_events_skipped_total_by_reason"
-    );
+    let frame = build_ws_frame(&handle);
+    // The field always exists as part of the typed struct; verify it's accessible.
+    let _ = &frame.health.mutation_events_skipped_total_by_reason;
 }
 
 // ── 15. status_payload_includes_state ───────────────────────────────────────
@@ -354,7 +349,7 @@ async fn health_payload_contains_mutation_skip_by_reason() {
 async fn status_payload_includes_state() {
     use v3_core::config::SimulationConfig;
     use v3_core::simulation::seed_simulation;
-    use v3_server::handlers::lifecycle::build_ws_event;
+    use v3_server::handlers::lifecycle::build_ws_frame;
     use v3_server::state::{SimHandle, SimulationStatus};
 
     let sim = seed_simulation(SimulationConfig::default(), 7);
@@ -363,10 +358,41 @@ async fn status_payload_includes_state() {
         status: SimulationStatus::Paused,
     };
 
-    let event = build_ws_event(&handle);
+    let frame = build_ws_frame(&handle);
     assert_eq!(
-        event.status_payload.get("state").and_then(|v| v.as_str()),
-        Some("paused"),
-        "status_payload must include current simulation state"
+        frame.status.state,
+        SimulationStatus::Paused,
+        "status payload must include current simulation state"
     );
+}
+
+// ── 16. ws_frame_msgpack_roundtrip ──────────────────────────────────────────
+
+#[tokio::test]
+async fn ws_frame_msgpack_roundtrip() {
+    use v3_core::config::SimulationConfig;
+    use v3_core::simulation::{run_tick, seed_simulation};
+    use v3_server::handlers::lifecycle::build_ws_frame;
+    use v3_server::state::{SimHandle, SimulationStatus, WsFrame};
+
+    let mut sim = seed_simulation(SimulationConfig::default(), 99);
+    for _ in 0..5 {
+        run_tick(&mut sim);
+    }
+    let handle = SimHandle {
+        sim,
+        status: SimulationStatus::Running,
+    };
+
+    let frame = build_ws_frame(&handle);
+    let bytes = rmp_serde::to_vec_named(&frame).expect("msgpack serialize");
+    let decoded: WsFrame = rmp_serde::from_slice(&bytes).expect("msgpack deserialize");
+
+    assert_eq!(decoded.tick, frame.tick);
+    assert_eq!(decoded.status.population, frame.status.population);
+    assert_eq!(decoded.frame.width, frame.frame.width);
+    assert_eq!(decoded.frame.height, frame.frame.height);
+    assert_eq!(decoded.frame.creatures.len(), frame.frame.creatures.len());
+    assert_eq!(decoded.health.population, frame.health.population);
+    assert_eq!(decoded.status.state, SimulationStatus::Running);
 }
