@@ -260,7 +260,7 @@ export function StatsPanel() {
 		<div
 			data-testid="stats-panel"
 			className="bg-petri-panel border-t border-petri-border flex flex-col"
-			style={{ height: "200px" }}
+			style={{ height: "280px" }}
 		>
 			{/* Tab bar */}
 			<div className="flex gap-1 px-3 pt-1 bg-slate-950">
