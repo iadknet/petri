@@ -34,23 +34,16 @@ const MOCK_CONFIG: SimulationConfig = {
 		graph_convergence_stable_passes: 1,
 		graph_node_base_cost: 1.0,
 		vm: { opcode_cost_multiplier: 1.0 },
-		mutation: {
-			mutation_probability: 0.01,
-			per_birth_mutation_events_min: 1,
-			per_birth_mutation_events_max: 4,
-			domain_selection_weights: { Topology: 1, Vm: 1, Graph: 1 },
-			operator_selection_weights: {
-				Topology: { AddNode: 1, RemoveNode: 1 },
-				Vm: { VmInstructionMutation: 1, VmConstantMutation: 1 },
-				Graph: { AddInternalGraphNode: 1, RemoveInternalGraphNode: 1 },
-			},
-			operator_modifier_scale: 1.0,
-			phenotype: {
-				channel_step: 2,
-				polarity_flip_chance: 0.002,
-				channel_weight_min: 0.05,
-				channel_weight_max: 1.0,
-			},
+	},
+	mutation: {
+		mutation_probability: 0.01,
+		per_birth_mutation_events_min: 1,
+		per_birth_mutation_events_max: 4,
+		phenotype: {
+			channel_step: 2,
+			polarity_flip_chance: 0.002,
+			channel_weight_min: 0.05,
+			channel_weight_max: 1.0,
 		},
 	},
 };
