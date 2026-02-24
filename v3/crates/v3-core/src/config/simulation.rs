@@ -26,7 +26,7 @@ impl Default for WorldFoodConfig {
         Self {
             growth_rate: 0.25,
             initial_density: 1.0,
-            initial_coverage: 1.0,
+            initial_coverage: 0.15,
             spread_threshold_ratio: 0.75,
             recovery_spawn_rate: 0.02,
             recovery_floor_ratio: 0.03,
@@ -241,7 +241,7 @@ impl SimulationConfig {
         }
         w.food.max_density = normalize_f32_finite_positive(w.food.max_density, 1.0);
         w.food.growth_rate = normalize_f32_clamp(w.food.growth_rate, 0.0, 1.0, 0.25);
-        w.food.initial_coverage = normalize_f32_clamp(w.food.initial_coverage, 0.0, 1.0, 1.0);
+        w.food.initial_coverage = normalize_f32_clamp(w.food.initial_coverage, 0.0, 1.0, 0.15);
         w.food.spread_threshold_ratio =
             normalize_f32_clamp(w.food.spread_threshold_ratio, 0.0, 1.0, 0.75);
         w.food.recovery_spawn_rate =
@@ -370,7 +370,7 @@ mod tests {
         assert!(matches!(cfg.world.edge_mode, WorldEdgeMode::Wrap));
         assert!((cfg.world.food.growth_rate - 0.25).abs() < 1e-6);
         assert!((cfg.world.food.initial_density - 1.0).abs() < 1e-6);
-        assert!((cfg.world.food.initial_coverage - 1.0).abs() < 1e-6);
+        assert!((cfg.world.food.initial_coverage - 0.15).abs() < 1e-6);
         assert!((cfg.world.food.spread_threshold_ratio - 0.75).abs() < 1e-6);
         assert!((cfg.world.food.recovery_spawn_rate - 0.02).abs() < 1e-6);
         assert!((cfg.world.food.recovery_floor_ratio - 0.03).abs() < 1e-6);

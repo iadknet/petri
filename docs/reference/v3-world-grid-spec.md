@@ -99,7 +99,7 @@ This file is the canonical owner for world/grid config keys/defaults.
 | `world.edge_mode` | `enum{wrap,bounded}` | `wrap` | Unknown/invalid values fall back to `wrap`. |
 | `world.food.growth_rate` | `f32` | `0.25` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.25`. |
 | `world.food.initial_density` | `f32` | `1.0` | Clamp to `[0.0, max_density]`; invalid falls back to `max_density`. |
-| `world.food.initial_coverage` | `f32` | `1.0` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `1.0`. |
+| `world.food.initial_coverage` | `f32` | `0.15` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.15`. |
 | `world.food.spread_threshold_ratio` | `f32` | `0.75` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.75`. |
 | `world.food.recovery_spawn_rate` | `f32` | `0.02` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.02`. |
 | `world.food.recovery_floor_ratio` | `f32` | `0.03` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.03`. |
