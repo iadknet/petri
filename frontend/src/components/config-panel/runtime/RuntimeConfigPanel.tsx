@@ -6,12 +6,10 @@ import { FOOD_PARAMETERS_FIELDS, FoodParametersSection } from "./FoodParametersS
 import { MUTATION_FIELDS, MutationSection } from "./MutationSection.tsx";
 import { POPULATION_FIELDS, PopulationSection } from "./PopulationSection.tsx";
 import { RUNTIME_FIELDS, RuntimeSection } from "./RuntimeSection.tsx";
-import { WORLD_TOPOLOGY_FIELDS, WorldTopologySection } from "./WorldTopologySection.tsx";
 
 export const RUNTIME_PATCH_FIELDS: FieldDef[] = [
 	...FOOD_PARAMETERS_FIELDS,
 	...POPULATION_FIELDS,
-	...WORLD_TOPOLOGY_FIELDS,
 	...ENERGY_LIFECYCLE_FIELDS,
 	...ENERGY_COSTS_FIELDS,
 	...RUNTIME_FIELDS,
@@ -51,12 +49,6 @@ export function RuntimeConfigPanel({
 						updateDraft={updateDraft}
 					/>
 					<PopulationSection
-						localDraft={localDraft}
-						serverConfig={serverConfig}
-						simState={simState}
-						updateDraft={updateDraft}
-					/>
-					<WorldTopologySection
 						localDraft={localDraft}
 						serverConfig={serverConfig}
 						simState={simState}

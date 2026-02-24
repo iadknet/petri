@@ -5,13 +5,6 @@ import type { FieldDef, RuntimePanelProps } from "../shared/types.ts";
 
 export const POPULATION_FIELDS: FieldDef[] = [
 	{
-		path: "population.initial_creatures",
-		label: "Initial Creatures",
-		min: 1,
-		max: 10000,
-		step: 1,
-	},
-	{
 		path: "population.max_creatures",
 		label: "Max Creatures",
 		min: 1,

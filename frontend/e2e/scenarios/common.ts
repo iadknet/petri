@@ -21,7 +21,6 @@ export const selectors = {
 	configApply: '[data-testid="config-apply"]',
 	configReset: '[data-testid="config-reset"]',
 	configMoveCostField: '[data-testid="config-field-energy-costs-move-cost"]',
-	configWorldWidthField: '[data-testid="config-field-world-width"]',
 };
 
 export async function openDashboardAndWaitConnection(ctx: RuntimeContext): Promise<void> {
