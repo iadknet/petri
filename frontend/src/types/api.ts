@@ -137,9 +137,6 @@ export interface MutationConfig {
 	mutation_probability: number;
 	per_birth_mutation_events_min: number;
 	per_birth_mutation_events_max: number;
-	domain_selection_weights: Record<string, number>;
-	operator_selection_weights: Record<string, Record<string, number>>;
-	operator_modifier_scale: number;
 	phenotype: PhenotypeConfig;
 }
 
@@ -151,7 +148,6 @@ export interface RuntimeConfig {
 	graph_convergence_stable_passes: number;
 	graph_node_base_cost: number;
 	vm: VmConfig;
-	mutation: MutationConfig;
 }
 
 export interface SimulationConfig {
@@ -159,6 +155,7 @@ export interface SimulationConfig {
 	world: WorldConfig;
 	energy: EnergyConfig;
 	runtime: RuntimeConfig;
+	mutation: MutationConfig;
 }
 
 // HTTP response types
@@ -199,11 +196,11 @@ export interface StartupRequest {
 	population?: Partial<PopulationConfig>;
 	world?: Partial<WorldConfig> & { food?: Partial<FoodConfig> };
 	energy?: { lifecycle?: Partial<LifecycleEnergyConfig>; costs?: Partial<CostsConfig> };
-	runtime?: Partial<Omit<RuntimeConfig, "vm" | "mutation">> & {
+	runtime?: Partial<Omit<RuntimeConfig, "vm">> & {
 		vm?: Partial<VmConfig>;
-		mutation?: Partial<Omit<MutationConfig, "phenotype">> & {
-			phenotype?: Partial<PhenotypeConfig>;
-		};
+	};
+	mutation?: Partial<Omit<MutationConfig, "phenotype">> & {
+		phenotype?: Partial<PhenotypeConfig>;
 	};
 }
 

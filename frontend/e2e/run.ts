@@ -12,6 +12,7 @@ import { scenarioStartupLifecycleStep } from "./scenarios/e2e-02-startup-lifecyc
 import { scenarioConfigApplyResetLocks } from "./scenarios/e2e-03-config-apply-reset-locks.ts";
 import { scenarioStatsAndPanels } from "./scenarios/e2e-04-stats-and-panels.ts";
 import { scenarioViewportSmoke } from "./scenarios/e2e-05-viewport-smoke.ts";
+import { scenarioMutationConfig } from "./scenarios/e2e-06-mutation-config.ts";
 import type { ScenarioDefinition } from "./types.ts";
 
 const scenarios: ScenarioDefinition[] = [
@@ -20,6 +21,7 @@ const scenarios: ScenarioDefinition[] = [
 	scenarioConfigApplyResetLocks,
 	scenarioStatsAndPanels,
 	scenarioViewportSmoke,
+	scenarioMutationConfig,
 ];
 
 async function main(): Promise<void> {
