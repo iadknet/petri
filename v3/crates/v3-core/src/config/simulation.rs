@@ -72,8 +72,8 @@ impl Default for EnergyLifecycleConfig {
         Self {
             initial_energy: 20.0,
             max_energy: 100.0,
-            energy_decay_per_tick: 0.2,
-            min_reproduce_energy: 24.0,
+            energy_decay_per_tick: 0.01,
+            min_reproduce_energy: 1.0,
             default_offspring_energy: 8.0,
         }
     }
@@ -93,10 +93,10 @@ pub struct EnergyCostsConfig {
 impl Default for EnergyCostsConfig {
     fn default() -> Self {
         Self {
-            move_cost: 0.2,
+            move_cost: 0.02,
             eat_cost: 0.0,
             noop_cost: 0.0,
-            reproduce_cost: 1.0,
+            reproduce_cost: 0.12,
             eat_reward_per_food: 12.0,
         }
     }
@@ -258,15 +258,15 @@ impl SimulationConfig {
         let el = &mut self.energy.lifecycle;
         el.initial_energy = normalize_f32_finite_nonneg(el.initial_energy, 20.0);
         el.max_energy = normalize_f32_finite_min(el.max_energy, 1.0, 100.0);
-        el.energy_decay_per_tick = normalize_f32_finite_nonneg(el.energy_decay_per_tick, 0.2);
-        el.min_reproduce_energy = normalize_f32_finite_nonneg(el.min_reproduce_energy, 24.0);
+        el.energy_decay_per_tick = normalize_f32_finite_nonneg(el.energy_decay_per_tick, 0.01);
+        el.min_reproduce_energy = normalize_f32_finite_nonneg(el.min_reproduce_energy, 1.0);
         el.default_offspring_energy = normalize_f32_finite_nonneg(el.default_offspring_energy, 8.0);
 
         let ec = &mut self.energy.costs;
-        ec.move_cost = normalize_f32_finite_nonneg(ec.move_cost, 0.2);
+        ec.move_cost = normalize_f32_finite_nonneg(ec.move_cost, 0.02);
         ec.eat_cost = normalize_f32_finite_nonneg(ec.eat_cost, 0.0);
         ec.noop_cost = normalize_f32_finite_nonneg(ec.noop_cost, 0.0);
-        ec.reproduce_cost = normalize_f32_finite_nonneg(ec.reproduce_cost, 1.0);
+        ec.reproduce_cost = normalize_f32_finite_nonneg(ec.reproduce_cost, 0.12);
         ec.eat_reward_per_food = normalize_f32_finite_nonneg(ec.eat_reward_per_food, 12.0);
 
         let rt = &mut self.runtime;
@@ -378,14 +378,14 @@ mod tests {
         // Energy lifecycle
         assert!((cfg.energy.lifecycle.initial_energy - 20.0).abs() < 1e-6);
         assert!((cfg.energy.lifecycle.max_energy - 100.0).abs() < 1e-6);
-        assert!((cfg.energy.lifecycle.energy_decay_per_tick - 0.2).abs() < 1e-6);
-        assert!((cfg.energy.lifecycle.min_reproduce_energy - 24.0).abs() < 1e-6);
+        assert!((cfg.energy.lifecycle.energy_decay_per_tick - 0.01).abs() < 1e-6);
+        assert!((cfg.energy.lifecycle.min_reproduce_energy - 1.0).abs() < 1e-6);
         assert!((cfg.energy.lifecycle.default_offspring_energy - 8.0).abs() < 1e-6);
         // Energy costs
-        assert!((cfg.energy.costs.move_cost - 0.2).abs() < 1e-6);
+        assert!((cfg.energy.costs.move_cost - 0.02).abs() < 1e-6);
         assert!((cfg.energy.costs.eat_cost - 0.0).abs() < 1e-6);
         assert!((cfg.energy.costs.noop_cost - 0.0).abs() < 1e-6);
-        assert!((cfg.energy.costs.reproduce_cost - 1.0).abs() < 1e-6);
+        assert!((cfg.energy.costs.reproduce_cost - 0.12).abs() < 1e-6);
         assert!((cfg.energy.costs.eat_reward_per_food - 12.0).abs() < 1e-6);
         // Runtime
         assert_eq!(cfg.runtime.max_mesh_hops, 128);

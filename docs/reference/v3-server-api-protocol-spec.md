@@ -101,15 +101,15 @@ Request (conceptual v3alpha1 shape):
     "lifecycle": {
       "initial_energy": 20.0,
       "max_energy": 100.0,
-      "energy_decay_per_tick": 0.2,
-      "min_reproduce_energy": 24.0,
+      "energy_decay_per_tick": 0.01,
+      "min_reproduce_energy": 1.0,
       "default_offspring_energy": 8.0
     },
     "costs": {
-      "move_cost": 0.2,
+      "move_cost": 0.02,
       "eat_cost": 0.0,
       "noop_cost": 0.0,
-      "reproduce_cost": 1.0,
+      "reproduce_cost": 0.12,
       "eat_reward_per_food": 12.0
     }
   },
@@ -333,15 +333,15 @@ Response:
       "lifecycle": {
         "initial_energy": 20.0,
         "max_energy": 100.0,
-        "energy_decay_per_tick": 0.2,
-        "min_reproduce_energy": 24.0,
+        "energy_decay_per_tick": 0.01,
+        "min_reproduce_energy": 1.0,
         "default_offspring_energy": 8.0
       },
       "costs": {
-        "move_cost": 0.2,
+        "move_cost": 0.02,
         "eat_cost": 0.0,
         "noop_cost": 0.0,
-        "reproduce_cost": 1.0,
+        "reproduce_cost": 0.12,
         "eat_reward_per_food": 12.0
       }
     },
