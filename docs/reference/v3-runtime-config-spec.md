@@ -111,13 +111,13 @@ section only owns config contract shape/defaults.
 | --- | --- | --- | --- |
 | `energy.lifecycle.initial_energy` | `f32` | `20.0` | Must be finite and `>= 0.0`; invalid values fall back to `20.0`. |
 | `energy.lifecycle.max_energy` | `f32` | `100.0` | Must be finite and `>= 1.0`; invalid values fall back to `100.0`. |
-| `energy.lifecycle.energy_decay_per_tick` | `f32` | `0.2` | Must be finite and `>= 0.0`; invalid values fall back to `0.2`. |
-| `energy.lifecycle.min_reproduce_energy` | `f32` | `24.0` | Must be finite and `>= 0.0`; invalid values fall back to `24.0`. |
+| `energy.lifecycle.energy_decay_per_tick` | `f32` | `0.01` | Must be finite and `>= 0.0`; invalid values fall back to `0.01`. |
+| `energy.lifecycle.min_reproduce_energy` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. |
 | `energy.lifecycle.default_offspring_energy` | `f32` | `8.0` | Must be finite and `>= 0.0`; invalid values fall back to `8.0`. |
-| `energy.costs.move_cost` | `f32` | `0.2` | Must be finite and `>= 0.0`; invalid values fall back to `0.2`. |
+| `energy.costs.move_cost` | `f32` | `0.02` | Must be finite and `>= 0.0`; invalid values fall back to `0.02`. |
 | `energy.costs.eat_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; invalid values fall back to `0.0`. |
 | `energy.costs.noop_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; invalid values fall back to `0.0`. |
-| `energy.costs.reproduce_cost` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. |
+| `energy.costs.reproduce_cost` | `f32` | `0.12` | Must be finite and `>= 0.0`; invalid values fall back to `0.12`. |
 | `energy.costs.eat_reward_per_food` | `f32` | `12.0` | Must be finite and `>= 0.0`; invalid values fall back to `12.0`. |
 
 Energy posture:
