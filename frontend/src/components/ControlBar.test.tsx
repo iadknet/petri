@@ -1,22 +1,85 @@
 import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/rest.ts";
+import { useConfigStore } from "../stores/config.ts";
 import { PanelLayoutProvider } from "../stores/layout.tsx";
 import { useSimulationStore } from "../stores/simulation.ts";
+import { useStartupConfigStore } from "../stores/startupConfig.ts";
+import { useStatsHistoryStore } from "../stores/stats.ts";
+import type { SimulationConfig } from "../types/api.ts";
 import { ControlBar } from "./ControlBar.tsx";
 
 vi.mock("../api/rest.ts", () => ({
 	api: {
+		startup: vi.fn(),
 		start: vi.fn(),
 		pause: vi.fn(),
 		step: vi.fn(),
+		getConfig: vi.fn(),
 	},
 }));
+
+const MOCK_CONFIG: SimulationConfig = {
+	population: { initial_creatures: 64, max_creatures: 1000 },
+	world: {
+		width: 512,
+		height: 384,
+		edge_mode: "wrap",
+		food: { growth_rate: 0.2, initial_density: 100, initial_coverage: 0.4 },
+	},
+	energy: {
+		lifecycle: {
+			initial_energy: 20,
+			max_energy: 100,
+			energy_decay_per_tick: 0.2,
+			min_reproduce_energy: 24,
+			default_offspring_energy: 20,
+		},
+		costs: {
+			move_cost: 0.2,
+			eat_cost: 0,
+			noop_cost: 0,
+			reproduce_cost: 2,
+			eat_reward_per_food: 1,
+		},
+	},
+	runtime: {
+		max_mesh_hops: 128,
+		max_vm_steps: 1024,
+		max_graph_relax_iters: 4,
+		graph_convergence_epsilon: 0.001,
+		graph_convergence_stable_passes: 1,
+		graph_node_base_cost: 1.0,
+		vm: { opcode_cost_multiplier: 1.0 },
+		mutation: {
+			mutation_probability: 0.01,
+			per_birth_mutation_events_min: 1,
+			per_birth_mutation_events_max: 4,
+			domain_selection_weights: { Topology: 1, Vm: 1, Graph: 1 },
+			operator_selection_weights: {
+				Topology: { AddNode: 1, RemoveNode: 1 },
+				Vm: { VmInstructionMutation: 1, VmConstantMutation: 1 },
+				Graph: { AddInternalGraphNode: 1, RemoveInternalGraphNode: 1 },
+			},
+			operator_modifier_scale: 1.0,
+			phenotype: {
+				channel_step: 2,
+				polarity_flip_chance: 0.002,
+				channel_weight_min: 0.05,
+				channel_weight_max: 1.0,
+			},
+		},
+	},
+};
 
 describe("ControlBar", () => {
 	beforeEach(() => {
 		useSimulationStore.getState().reset();
+		useConfigStore.getState().reset();
+		useStartupConfigStore.getState().reset();
+		useStatsHistoryStore.getState().reset();
 		vi.clearAllMocks();
+		vi.restoreAllMocks();
 	});
 
 	it("updates tick from pause response", async () => {
@@ -39,6 +102,73 @@ describe("ControlBar", () => {
 		await waitFor(() => {
 			expect(useSimulationStore.getState().simState).toBe("paused");
 			expect(useSimulationStore.getState().tick).toBe(42);
+		});
+	});
+
+	it("restart from idle calls startup with preset values and reloads config", async () => {
+		useStartupConfigStore.getState().setPreset({
+			seed: 424242,
+			population: { initial_creatures: 64 },
+			world: {
+				width: 512,
+				height: 384,
+				food: { growth_rate: 0.2, initial_density: 100, initial_coverage: 0.4 },
+			},
+		});
+		useStatsHistoryStore.getState().pushStats(3, 10, 25);
+
+		vi.mocked(api.startup).mockResolvedValue({
+			protocol_version: "v3alpha1",
+			state: "idle",
+			tick: 0,
+			config_digest: "sha256:deadbeef",
+			seeded_creatures: 64,
+		});
+		vi.mocked(api.getConfig).mockResolvedValue({
+			protocol_version: "v3alpha1",
+			state: "idle",
+			config: MOCK_CONFIG,
+		});
+
+		render(
+			<PanelLayoutProvider>
+				<ControlBar />
+			</PanelLayoutProvider>,
+		);
+
+		fireEvent.click(screen.getByTestId("control-restart"));
+
+		await waitFor(() => {
+			expect(api.startup).toHaveBeenCalledWith({
+				seed: 424242,
+				population: { initial_creatures: 64 },
+				world: {
+					width: 512,
+					height: 384,
+					food: { growth_rate: 0.2, initial_density: 100, initial_coverage: 0.4 },
+				},
+			});
+			expect(useSimulationStore.getState().simState).toBe("idle");
+			expect(useSimulationStore.getState().tick).toBe(0);
+			expect(useStatsHistoryStore.getState().statsHistory).toHaveLength(0);
+			expect(useConfigStore.getState().serverConfig).toEqual(MOCK_CONFIG);
+		});
+	});
+
+	it("restart asks for confirmation when running and cancel skips API call", async () => {
+		useSimulationStore.getState().setSimState("running");
+		vi.spyOn(window, "confirm").mockReturnValue(false);
+
+		render(
+			<PanelLayoutProvider>
+				<ControlBar />
+			</PanelLayoutProvider>,
+		);
+
+		fireEvent.click(screen.getByTestId("control-restart"));
+		await waitFor(() => {
+			expect(window.confirm).toHaveBeenCalledTimes(1);
+			expect(api.startup).not.toHaveBeenCalled();
 		});
 	});
 });

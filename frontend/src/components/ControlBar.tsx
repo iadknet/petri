@@ -1,9 +1,11 @@
 import { useCallback, useState } from "react";
 import { api } from "../api/rest.ts";
+import { useConfigStore } from "../stores/config.ts";
 import { usePanelLayout } from "../stores/layout.tsx";
 import { useSimulationStore } from "../stores/simulation.ts";
+import { useStartupConfigStore } from "../stores/startupConfig.ts";
+import { useStatsHistoryStore } from "../stores/stats.ts";
 import type { SimState } from "../types/api.ts";
-import { StartupDialog } from "./StartupDialog.tsx";
 
 function ConnectionDot({ status }: { status: string }) {
 	const color =
@@ -70,8 +72,8 @@ function SimButton({
 
 function buttonEnabled(state: SimState) {
 	return {
-		startup: true,
 		start: state === "idle" || state === "paused",
+		restart: true,
 		pause: state === "running",
 		step: state === "paused",
 	};
@@ -83,7 +85,7 @@ export function ControlBar() {
 	const population = useSimulationStore((s) => s.status?.population ?? 0);
 	const connectionStatus = useSimulationStore((s) => s.connectionStatus);
 	const { toggleConfig, toggleStats } = usePanelLayout();
-	const [showStartup, setShowStartup] = useState(false);
+	const [restarting, setRestarting] = useState(false);
 
 	const enabled = buttonEnabled(simState);
 
@@ -117,83 +119,118 @@ export function ControlBar() {
 		}
 	}, []);
 
+	const handleRestart = useCallback(async () => {
+		if (
+			(simState === "running" || simState === "paused") &&
+			!window.confirm("Restart the simulation with the current startup settings?")
+		) {
+			return;
+		}
+
+		setRestarting(true);
+		try {
+			const startup = useStartupConfigStore.getState().preset;
+			const res = await api.startup({
+				seed: startup.seed,
+				population: { initial_creatures: startup.population.initial_creatures },
+				world: {
+					width: startup.world.width,
+					height: startup.world.height,
+					food: {
+						growth_rate: startup.world.food.growth_rate,
+						initial_density: startup.world.food.initial_density,
+						initial_coverage: startup.world.food.initial_coverage,
+					},
+				},
+			});
+
+			useSimulationStore.getState().setSimState(res.state);
+			useSimulationStore.getState().setTick(res.tick);
+			useStatsHistoryStore.getState().reset();
+
+			const configRes = await api.getConfig();
+			useConfigStore.getState().commitServerConfig(configRes.config, configRes.state);
+		} catch (e) {
+			console.error("Restart failed:", e);
+		} finally {
+			setRestarting(false);
+		}
+	}, [simState]);
+
 	return (
-		<>
-			<header className="flex items-center gap-3 px-4 h-12 bg-petri-panel border-b border-petri-border">
-				{/* Brand */}
-				<span className="font-semibold text-slate-200 tracking-tight text-sm mr-2">PETRI</span>
+		<header className="flex items-center gap-3 px-4 h-12 bg-petri-panel border-b border-petri-border">
+			{/* Brand */}
+			<span className="font-semibold text-slate-200 tracking-tight text-sm mr-2">PETRI</span>
 
-				{/* Divider */}
-				<div className="w-px h-6 bg-petri-border" />
+			{/* Divider */}
+			<div className="w-px h-6 bg-petri-border" />
 
-				{/* Lifecycle buttons */}
-				<div className="flex items-center gap-1.5">
-					<SimButton
-						label="Startup"
-						testId="control-startup"
-						disabled={!enabled.startup}
-						onClick={() => setShowStartup(true)}
-					/>
-					<SimButton
-						label="Start"
-						testId="control-start"
-						disabled={!enabled.start}
-						active={simState === "running"}
-						pulse={simState === "running"}
-						onClick={handleStart}
-					/>
-					<SimButton
-						label="Pause"
-						testId="control-pause"
-						disabled={!enabled.pause}
-						onClick={handlePause}
-					/>
-					<SimButton
-						label="Step"
-						testId="control-step"
-						disabled={!enabled.step}
-						onClick={handleStep}
-					/>
-				</div>
+			{/* Lifecycle buttons */}
+			<div className="flex items-center gap-1.5">
+				<SimButton
+					label="Start"
+					testId="control-start"
+					disabled={!enabled.start}
+					active={simState === "running"}
+					pulse={simState === "running"}
+					onClick={handleStart}
+				/>
+				<SimButton
+					label={restarting ? "Restarting..." : "Restart"}
+					testId="control-restart"
+					disabled={!enabled.restart || restarting}
+					onClick={handleRestart}
+				/>
+				<SimButton
+					label="Pause"
+					testId="control-pause"
+					disabled={!enabled.pause}
+					onClick={handlePause}
+				/>
+				<SimButton
+					label="Step"
+					testId="control-step"
+					disabled={!enabled.step}
+					onClick={handleStep}
+				/>
+			</div>
 
-				{/* Divider */}
-				<div className="w-px h-6 bg-petri-border" />
+			{/* Divider */}
+			<div className="w-px h-6 bg-petri-border" />
 
-				{/* Tick counter */}
-				<span data-testid="tick-value" className="font-mono text-sm text-slate-300 tabular-nums">
-					Tick: {tick.toLocaleString()}
-				</span>
+			{/* Tick counter */}
+			<span data-testid="tick-value" className="font-mono text-sm text-slate-300 tabular-nums">
+				Tick: {tick.toLocaleString()}
+			</span>
 
-				{/* Population */}
-				<span className="font-mono text-xs text-slate-400 tabular-nums">
-					Pop: {population.toLocaleString()}
-				</span>
+			{/* Population */}
+			<span className="font-mono text-xs text-slate-400 tabular-nums">
+				Pop: {population.toLocaleString()}
+			</span>
 
-				{/* Spacer */}
-				<div className="flex-1" />
+			{/* Spacer */}
+			<div className="flex-1" />
 
-				{/* Connection indicator */}
-				<ConnectionDot status={connectionStatus} />
+			{/* Connection indicator */}
+			<ConnectionDot status={connectionStatus} />
 
-				{/* Panel toggles */}
-				<button
-					type="button"
-					data-testid="toggle-config"
-					onClick={toggleConfig}
-					className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-800 rounded"
-				>
-					Config
-				</button>
-				<button
-					type="button"
-					data-testid="toggle-stats"
-					onClick={toggleStats}
-					className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-800 rounded"
-				>
-					Stats
-				</button>
-			</header>
-			{showStartup && <StartupDialog onClose={() => setShowStartup(false)} />}
-		</>
+			{/* Panel toggles */}
+			<button
+				type="button"
+				data-testid="toggle-config"
+				onClick={toggleConfig}
+				className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-800 rounded"
+			>
+				Config
+			</button>
+			<button
+				type="button"
+				data-testid="toggle-stats"
+				onClick={toggleStats}
+				className="px-2 py-1 text-xs text-slate-400 hover:text-slate-200 bg-slate-800 rounded"
+			>
+				Stats
+			</button>
+		</header>
 	);
 }

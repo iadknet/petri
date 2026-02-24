@@ -2,18 +2,16 @@ import { assert, parseTickValue, waitForCondition } from "../lib/assertions.ts";
 import type { RuntimeContext } from "../types.ts";
 
 export const selectors = {
-	controlStartup: '[data-testid="control-startup"]',
 	controlStart: '[data-testid="control-start"]',
+	controlRestart: '[data-testid="control-restart"]',
 	controlPause: '[data-testid="control-pause"]',
 	controlStep: '[data-testid="control-step"]',
 	toggleConfig: '[data-testid="toggle-config"]',
 	toggleStats: '[data-testid="toggle-stats"]',
 	connectionStatus: '[data-testid="connection-status"]',
 	tickValue: '[data-testid="tick-value"]',
-	startupModal: '[data-testid="startup-modal"]',
-	startupSeed: '[data-testid="startup-seed"]',
-	startupPopulation: '[data-testid="startup-population"]',
-	startupInitialize: '[data-testid="startup-initialize"]',
+	startupSeed: '[data-testid="startup-field-seed"]',
+	startupPopulation: '[data-testid="startup-field-population-initial-creatures"]',
 	configPanel: '[data-testid="config-panel"]',
 	statsPanel: '[data-testid="stats-panel"]',
 	statsTabOverview: '[data-testid="stats-tab-overview"]',
@@ -43,14 +41,9 @@ export async function initializePausedSimulation(
 ): Promise<void> {
 	await openDashboardAndWaitConnection(ctx);
 
-	await ctx.browser.click(selectors.controlStartup);
-	await waitForCondition(async () => {
-		return (await ctx.browser.isVisible(selectors.startupModal)).visible;
-	}, "startup dialog visible", 10_000);
-
 	await ctx.browser.fill(selectors.startupSeed, String(seed));
 	await ctx.browser.fill(selectors.startupPopulation, String(population));
-	await ctx.browser.click(selectors.startupInitialize);
+	await ctx.browser.click(selectors.controlRestart);
 
 	await waitForCondition(async () => {
 		return (await ctx.browser.isEnabled(selectors.controlStart)).enabled;
