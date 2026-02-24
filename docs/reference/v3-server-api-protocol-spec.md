@@ -90,7 +90,7 @@ Request (conceptual v3alpha1 shape):
     "food": {
       "growth_rate": 0.25,
       "initial_density": 1.0,
-      "initial_coverage": 1.0,
+      "initial_coverage": 0.15,
       "spread_threshold_ratio": 0.75,
       "recovery_spawn_rate": 0.02,
       "recovery_floor_ratio": 0.03,
@@ -322,7 +322,7 @@ Response:
       "food": {
         "growth_rate": 0.25,
         "initial_density": 1.0,
-        "initial_coverage": 1.0,
+        "initial_coverage": 0.15,
         "spread_threshold_ratio": 0.75,
         "recovery_spawn_rate": 0.02,
         "recovery_floor_ratio": 0.03,
