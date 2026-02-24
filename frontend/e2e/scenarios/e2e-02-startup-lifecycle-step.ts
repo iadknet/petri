@@ -8,20 +8,19 @@ import {
 
 export const scenarioStartupLifecycleStep: ScenarioDefinition = {
 	id: "E2E-02",
-	description: "Runs startup, start/pause lifecycle, and validates deterministic step increment",
+	description: "Runs restart, start/pause lifecycle, and validates deterministic step increment",
 	run: async (ctx) => {
 		await openDashboardAndWaitConnection(ctx);
 
-		await ctx.browser.click(selectors.controlStartup);
 		await ctx.browser.fill(selectors.startupSeed, "424242");
 		await ctx.browser.fill(selectors.startupPopulation, "64");
-		await ctx.browser.click(selectors.startupInitialize);
+		await ctx.browser.click(selectors.controlRestart);
 
 		await waitForCondition(async () => {
 			return (await ctx.browser.isEnabled(selectors.controlStart)).enabled;
-		}, "start enabled after startup", ctx.startupTimeoutMs);
+		}, "start enabled after restart", ctx.startupTimeoutMs);
 
-		assert((await readTick(ctx)) === 0, "tick should be zero after startup");
+		assert((await readTick(ctx)) === 0, "tick should be zero after restart");
 
 		await ctx.browser.click(selectors.controlStart);
 		await waitForCondition(async () => {

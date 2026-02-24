@@ -7,6 +7,7 @@ import { StatsPanel } from "./components/StatsPanel.tsx";
 import { WorldViewport } from "./components/WorldViewport.tsx";
 import { useConfigStore } from "./stores/config.ts";
 import { PanelLayoutProvider, usePanelLayout } from "./stores/layout.tsx";
+import { useStartupConfigStore } from "./stores/startupConfig.ts";
 
 function Dashboard() {
 	const { configOpen, statsOpen } = usePanelLayout();
@@ -23,6 +24,7 @@ function Dashboard() {
 			.getConfig()
 			.then((res) => {
 				useConfigStore.getState().setServerConfig(res.config, res.state);
+				useStartupConfigStore.getState().hydrateFromServerConfig(res.config);
 			})
 			.catch(() => {
 				// Server may not be running yet -- config loads on first successful connection
