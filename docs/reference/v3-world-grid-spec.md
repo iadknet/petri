@@ -44,14 +44,15 @@ pub struct WorldState {
     pub width: u16,
     pub height: u16,
     pub edge_mode: WorldEdgeMode,
-    food_density: Grid<u8>,
+    food_density: Grid<f32>,
     barriers: Grid<bool>,
     creature_at: Grid<Option<CreatureId>>,
 }
 ```
 
 State semantics:
-- `food_density` is per-cell scalar in `[0, 255]`.
+- `food_density` is per-cell scalar in `[0.0, max_density]`.
+- v3alpha1 canonical operating scale is normalized `f32` in `[0.0, 1.0]`.
 - `barriers` marks non-passable cells.
 - `creature_at` is single-occupancy: at most one creature per cell.
 - Food/barrier/occupancy values are independent stored state, but movement and
@@ -96,9 +97,13 @@ This file is the canonical owner for world/grid config keys/defaults.
 | `world.width` | `u16` | `400` | Must be `>= 1`; invalid values fall back to `400`. |
 | `world.height` | `u16` | `400` | Must be `>= 1`; invalid values fall back to `400`. |
 | `world.edge_mode` | `enum{wrap,bounded}` | `wrap` | Unknown/invalid values fall back to `wrap`. |
-| `world.food.growth_rate` | `f32` | `0.02` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.02`. |
-| `world.food.initial_density` | `u8` | `80` | Clamp to `[0, 255]`; invalid falls back to `80`. |
-| `world.food.initial_coverage` | `f32` | `0.3` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.3`. |
+| `world.food.growth_rate` | `f32` | `0.25` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.25`. |
+| `world.food.initial_density` | `f32` | `1.0` | Clamp to `[0.0, max_density]`; invalid falls back to `max_density`. |
+| `world.food.initial_coverage` | `f32` | `1.0` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `1.0`. |
+| `world.food.spread_threshold_ratio` | `f32` | `0.75` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.75`. |
+| `world.food.recovery_spawn_rate` | `f32` | `0.02` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.02`. |
+| `world.food.recovery_floor_ratio` | `f32` | `0.03` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.03`. |
+| `world.food.max_density` | `f32` | `1.0` | Must be finite and `> 0.0`; invalid falls back to `1.0`. |
 
 World edge-mode behavior:
 - `wrap`: neighbor coordinates wrap with modulo arithmetic in both axes.
@@ -119,32 +124,48 @@ Runtime/mutation/energy config defaults remain canonical in
 
 ## 5. Food Substrate Semantics
 
-Per-cell food is quantized as `u8` in `[0, 255]`.
+Per-cell food is represented as `f32` in `[0.0, max_density]`, with v3alpha1
+canonical scale `[0.0, 1.0]`.
 
 ### Growth
 
-At Phase 0 (tick start), each non-barrier cell independently rolls a Bernoulli
-trial with `world.food.growth_rate`.
+At Phase 0 (tick start), growth uses a source snapshot of pre-growth food
+densities.
 
-If successful:
-- `food_density[cell] = saturating_add(food_density[cell], 1)`.
+For each non-barrier cell:
+- `source = clamp(snapshot[cell], 0.0, max_density)`.
+- `delta = source * world.food.growth_rate`.
+- Apply local growth: `food_density[cell] = clamp(food_density[cell] + delta, 0.0, max_density)`.
+- If `source >= max_density * world.food.spread_threshold_ratio` and
+  `delta > 0.0`, pick one random valid cardinal neighbor (non-barrier) and add
+  the same `delta` (clamped to `max_density`).
 
-Barrier cells do not grow food in baseline behavior.
+After local growth/spread pass:
+- Compute `average_density_ratio = sum(snapshot_food) / (total_cells * max_density)`.
+- If `average_density_ratio < world.food.recovery_floor_ratio`, run
+  `round(total_cells * world.food.recovery_spawn_rate)` recovery attempts.
+- Each attempt picks one random non-barrier cell and adds
+  `max_density * world.food.growth_rate` (clamped).
+
+Barrier cells are excluded from growth/spread/recovery targets.
+Creature occupancy does not block food growth/spread/recovery in v3alpha1.
 
 ### Consumption
 
 `consume_food(cell)` semantics:
 - returns the cell's current food amount;
-- sets the cell food amount to `0`.
+- sets the cell food amount to `0.0`.
 
 ### Seeding
 
 World initialization food seeding:
-- each non-barrier cell independently rolls with
-  `world.food.initial_coverage`;
-- on success, set cell food to `world.food.initial_density`.
+- clear prior food;
+- enumerate non-barrier candidate cells;
+- sample exactly
+  `round(world.food.initial_coverage * candidate_count)` unique cells;
+- set sampled cells to
+  `clamp(world.food.initial_density, 0.0, world.food.max_density)`.
 
-No diffusion/spread mechanic is defined in this baseline.
 Startup flow and founder-baseline policy consuming these world seeding semantics
 are canonical in `v3-startup-seeding-spec.md`.
 

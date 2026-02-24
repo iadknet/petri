@@ -64,7 +64,7 @@ pub struct CreatureSnapshot {
 pub struct FoodCell {
     pub x: u16,
     pub y: u16,
-    pub density: u8,
+    pub density: f32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

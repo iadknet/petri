@@ -140,6 +140,10 @@ export function ControlBar() {
 						growth_rate: startup.world.food.growth_rate,
 						initial_density: startup.world.food.initial_density,
 						initial_coverage: startup.world.food.initial_coverage,
+						spread_threshold_ratio: startup.world.food.spread_threshold_ratio,
+						recovery_spawn_rate: startup.world.food.recovery_spawn_rate,
+						recovery_floor_ratio: startup.world.food.recovery_floor_ratio,
+						max_density: startup.world.food.max_density,
 					},
 				},
 			});

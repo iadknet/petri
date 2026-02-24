@@ -24,7 +24,7 @@ pub enum InputReference {
     World(WorldInputKey),
     StaticIntrospection(StaticIntrospectionKey),
     DynamicIntrospection(DynamicIntrospectionKey),
-    UpstreamOutput { slot: u8 },
+    UpstreamSlot(usize),
 }
 ```
 
@@ -42,28 +42,21 @@ state:
 ```rust
 pub enum WorldInputKey {
     FoodHere,
-    NeighborCellFood(u8),
-    NeighborCellBarrier(u8),
-    NeighborCellOccupied(u8),
-    NeighborCreaturePresent(u8),
+    NeighborCellFood(Direction),
+    NeighborCellBarrier(Direction),
+    NeighborCellOccupied(Direction),
 }
 ```
 
-`u8` direction index is expected in `0..7`; out-of-range behaves as zero.
-
 Resolved f32 values per key:
-- `FoodHere`: `food_density[self_cell] as f32 / 255.0` → `[0.0, 1.0]`
-- `NeighborCellFood(dir)`: `food_density[neighbor] as f32 / 255.0` → `[0.0, 1.0]`
+- `FoodHere`: `clamp(food_density[self_cell], 0.0, 1.0)` → `[0.0, 1.0]`
+- `NeighborCellFood(dir)`: `clamp(food_density[neighbor], 0.0, 1.0)` → `[0.0, 1.0]`
 - `NeighborCellBarrier(dir)`: `1.0` if barrier, else `0.0`
 - `NeighborCellOccupied(dir)`: `1.0` if occupied by any creature, else `0.0`
-- `NeighborCreaturePresent(dir)`: same as `NeighborCellOccupied` in v3alpha1
 
-Normalization rationale: food is stored as `u8` for memory efficiency. Raw
-values (0–255) would saturate Graph activation functions (e.g., `Sigmoid`,
-`Tanh`) at any non-trivial density, making them insensitive to food gradients.
-Normalized values preserve relative food signal across the full [0.0, 1.0]
-range. This normalization applies only to sensor output; Eat action reward
-mechanics use the raw consumed food amount as defined in
+Sensor rationale: food substrate is represented as continuous `f32` and sensor
+contracts stay bounded to `[0.0, 1.0]` for stable cognition inputs. Eat action
+reward mechanics still use the raw consumed food amount as defined in
 `v3-runtime-config-spec.md` (`eat_reward_per_food`).
 
 World neighbor semantics (coordinate system, direction mapping, and edge-mode
@@ -103,7 +96,7 @@ These values may change between node hops during the same tick.
 
 ### Upstream Output
 
-`UpstreamOutput { slot }` reads routing-parent output slots.
+`UpstreamSlot(slot)` reads routing-parent output slots.
 If `slot >= 12`, value is `0.0`.
 
 ---
@@ -126,7 +119,6 @@ Canonical turn timing and action-application order are specified in
 ## 4. Soft Defaults
 
 - Missing `input_refs` index: `0.0`.
-- Invalid world direction index: `0.0`.
 - Invalid upstream slot: `0.0`.
 - Unknown/unsupported key variant at runtime boundary: `0.0`.
 

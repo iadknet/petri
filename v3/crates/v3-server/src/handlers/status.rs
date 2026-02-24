@@ -57,7 +57,7 @@ pub async fn get_frame(State(app): State<AppState>) -> impl IntoResponse {
         for x in 0..sim.world.width {
             let pos = v3_core::contracts::Position::new(x, y);
             let density = sim.world.food_at(pos);
-            if density > 0 {
+            if density > 0.0 {
                 food_cells.push(serde_json::json!({"x": x, "y": y, "density": density}));
             }
             if sim.world.is_barrier(pos) {

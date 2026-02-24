@@ -1428,7 +1428,7 @@ mod tests {
         let mut world = WorldState::new(5, 5, WorldEdgeMode::Wrap);
         let mut cfg = SimulationConfig::default();
         cfg.world.food.initial_coverage = 1.0;
-        cfg.world.food.initial_density = 200;
+        cfg.world.food.initial_density = 1.0;
         let mut rng = SmallRng::seed_from_u64(42);
         world.seed_food(&mut rng, &cfg);
 
@@ -1465,7 +1465,7 @@ mod tests {
             CreatureState::new(id, genome, pos, 30.0, 0, [0, 0, 0], [1.0f32; 3], [true; 3]);
 
         let si = assemble_static_inputs(&world, &creature);
-        // food_here should be > 0.0 (200/255 ≈ 0.78)
+        // food_here should be > 0.0
         assert!(si.food_here > 0.0);
 
         let def = if let BackendDef::Vm(ref v) = creature.genome.nodes[0].backend_def {

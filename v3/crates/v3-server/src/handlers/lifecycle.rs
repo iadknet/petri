@@ -213,7 +213,7 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
         for x in 0..sim.world.width {
             let pos = v3_core::contracts::Position::new(x, y);
             let density = sim.world.food_at(pos);
-            if density > 0 {
+            if density > 0.0 {
                 food.push(FoodCell { x, y, density });
             }
             if sim.world.is_barrier(pos) {

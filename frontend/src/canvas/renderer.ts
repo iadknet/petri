@@ -162,7 +162,8 @@ export class WorldRenderer {
 		// Food: green intensity mapped from density
 		for (const food of frame.food) {
 			const idx = (food.y * width + food.x) * 4;
-			const intensity = Math.min(255, Math.round((food.density / 255) * 180) + 30);
+			const density = Math.max(0, Math.min(1, food.density));
+			const intensity = Math.min(255, Math.round(density * 180) + 30);
 			data[idx] = 0;
 			data[idx + 1] = intensity;
 			data[idx + 2] = 0;
@@ -208,7 +209,8 @@ export class WorldRenderer {
 
 		// Food
 		for (const food of frame.food) {
-			const intensity = Math.min(255, Math.round((food.density / 255) * 180) + 30);
+			const density = Math.max(0, Math.min(1, food.density));
+			const intensity = Math.min(255, Math.round(density * 180) + 30);
 			ctx.fillStyle = `rgb(0,${intensity},0)`;
 			ctx.fillRect(cx + food.x * zoom, cy + food.y * zoom, zoom, zoom);
 		}

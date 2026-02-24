@@ -90,6 +90,10 @@ Seeding flow contract:
 1. Build effective startup config from defaults plus accepted overrides.
 2. Seed world food using world food initialization semantics from
    `v3-world-grid-spec.md`.
+   - v3alpha1 seeds exact coverage over non-barrier cells:
+     `round(initial_coverage * eligible_cells)` unique cells.
+   - Seeded density uses normalized `f32` food values in canonical `[0.0, 1.0]`
+     scale (clamped by `world.food.max_density`).
 3. Seed founders using the canonical founder baseline from Section 5.
 4. Commit simulation state at tick `0` in `idle` state.
 
