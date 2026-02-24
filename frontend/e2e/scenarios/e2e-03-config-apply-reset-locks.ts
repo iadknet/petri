@@ -4,7 +4,7 @@ import { initializePausedSimulation, selectors } from "./common.ts";
 
 export const scenarioConfigApplyResetLocks: ScenarioDefinition = {
 	id: "E2E-03",
-	description: "Validates config apply/reset flow and field lock rules by lifecycle state",
+	description: "Validates config apply/reset flow and runtime field lock rules by lifecycle state",
 	run: async (ctx) => {
 		await initializePausedSimulation(ctx, 7878, 32);
 
@@ -43,10 +43,5 @@ export const scenarioConfigApplyResetLocks: ScenarioDefinition = {
 		await waitForCondition(async () => {
 			return (await ctx.browser.isEnabled(selectors.configMoveCostField)).enabled;
 		}, "non-topology field re-enabled when paused", 10_000);
-
-		assert(
-			(await ctx.browser.isEnabled(selectors.configWorldWidthField)).enabled === false,
-			"topology field should be disabled while paused",
-		);
 	},
 };

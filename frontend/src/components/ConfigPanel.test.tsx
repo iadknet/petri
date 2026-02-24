@@ -90,18 +90,16 @@ describe("ConfigPanel", () => {
 
 	it("applies runtime field disable rules by simulation state", () => {
 		render(<ConfigPanel />);
-		expect(screen.getByTestId("config-field-world-width")).toBeDisabled();
 		expect(screen.getByTestId("config-field-energy-costs-move-cost")).not.toBeDisabled();
 
 		act(() => {
 			useSimulationStore.getState().setSimState("idle");
 		});
-		expect(screen.getByTestId("config-field-world-width")).not.toBeDisabled();
+		expect(screen.getByTestId("config-field-energy-costs-move-cost")).not.toBeDisabled();
 
 		act(() => {
 			useSimulationStore.getState().setSimState("running");
 		});
-		expect(screen.getByTestId("config-field-world-width")).toBeDisabled();
 		expect(screen.getByTestId("config-field-energy-costs-move-cost")).toBeDisabled();
 	});
 

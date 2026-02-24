@@ -22,6 +22,7 @@ export function StartupConfigPanel({
 				updateSeed={(value) => updateStartupPreset("seed", value)}
 				randomizeSeed={randomizeSeed}
 			/>
+			<PopulationSection startupPreset={startupPreset} updateStartupPreset={updateStartupPreset} />
 			<WorldTopologySection
 				startupPreset={startupPreset}
 				updateStartupPreset={updateStartupPreset}
@@ -30,7 +31,6 @@ export function StartupConfigPanel({
 				startupPreset={startupPreset}
 				updateStartupPreset={updateStartupPreset}
 			/>
-			<PopulationSection startupPreset={startupPreset} updateStartupPreset={updateStartupPreset} />
 		</Section>
 	);
 }
