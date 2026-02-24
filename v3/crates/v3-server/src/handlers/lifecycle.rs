@@ -1,3 +1,5 @@
+use std::time::{Duration, Instant};
+
 use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::Json;
@@ -6,8 +8,13 @@ use v3_core::config::SimulationConfig;
 use v3_core::simulation::{run_tick, seed_simulation};
 
 use crate::error::{AppError, FieldError};
-use crate::state::{AppState, SimHandle, SimulationStatus, WsEvent};
+use crate::state::{
+    AppState, BarrierCell, CreatureSnapshot, FoodCell, FramePayload, HealthPayload,
+    LastTickActions, SimHandle, SimulationStatus, StatusPayload, WsFrame,
+};
 use crate::types::{config_digest, deep_merge, StepRequest, PROTOCOL_VERSION};
+
+const FRAME_INTERVAL: Duration = Duration::from_millis(100);
 
 pub async fn startup(
     State(app): State<AppState>,
@@ -151,92 +158,97 @@ pub async fn step(
 }
 
 pub(crate) async fn run_loop(app: AppState) {
+    let mut last_frame = Instant::now() - FRAME_INTERVAL;
     loop {
         let mut handle = app.sim.lock().await;
         if handle.status != SimulationStatus::Running {
             break;
         }
         run_tick(&mut handle.sim);
-        let event = build_ws_event(&handle);
-        let _ = app.ws_tx.send(event);
+        if last_frame.elapsed() >= FRAME_INTERVAL {
+            let frame = build_ws_frame(&handle);
+            let bytes = rmp_serde::to_vec_named(&frame).unwrap_or_default();
+            let _ = app.ws_tx.send(bytes);
+            last_frame = Instant::now();
+        }
         drop(handle);
         tokio::task::yield_now().await;
     }
 }
 
-pub fn build_ws_event(handle: &SimHandle) -> WsEvent {
+pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
     let sim = &handle.sim;
     let stats = &sim.stats;
 
-    let status_payload = serde_json::json!({
-        "state": handle.status,
-        "population": sim.creatures.len(),
-        "mean_energy": sim.mean_energy(),
-        "last_tick_actions": {
-            "move": stats.last_tick_move,
-            "eat": stats.last_tick_eat,
-            "reproduce": stats.last_tick_reproduce,
-            "noop": stats.last_tick_noop,
+    let status = StatusPayload {
+        state: handle.status,
+        population: sim.creatures.len(),
+        mean_energy: sim.mean_energy(),
+        last_tick_actions: LastTickActions {
+            move_count: stats.last_tick_move,
+            eat: stats.last_tick_eat,
+            reproduce: stats.last_tick_reproduce,
+            noop: stats.last_tick_noop,
         },
-        "reproduction_actions_attempted_total": stats.reproduction_actions_attempted_total,
-        "reproduction_actions_spawned_total": stats.reproduction_actions_spawned_total,
-        "reproduction_actions_rejected_total": stats.reproduction_actions_rejected_total,
-    });
+        reproduction_actions_attempted_total: stats.reproduction_actions_attempted_total,
+        reproduction_actions_spawned_total: stats.reproduction_actions_spawned_total,
+        reproduction_actions_rejected_total: stats.reproduction_actions_rejected_total,
+    };
 
-    // Build frame payload: scan world grid for creatures and food.
-    let mut creatures = Vec::new();
+    let mut creatures = Vec::with_capacity(sim.creatures.len());
     for (id, creature) in &sim.creatures {
-        let numeric_id = id.data().as_ffi();
-        creatures.push(serde_json::json!({
-            "id": numeric_id,
-            "x": creature.position.x,
-            "y": creature.position.y,
-            "energy": creature.energy,
-            "generation": creature.generation,
-            "phenotype_rgb": creature.phenotype_rgb,
-        }));
+        creatures.push(CreatureSnapshot {
+            id: id.data().as_ffi(),
+            x: creature.position.x,
+            y: creature.position.y,
+            energy: creature.energy,
+            generation: creature.generation,
+            phenotype_rgb: creature.phenotype_rgb,
+        });
     }
 
-    let mut food_cells = Vec::new();
-    let mut barrier_cells = Vec::new();
+    let mut food = Vec::new();
+    let mut barriers = Vec::new();
     for y in 0..sim.world.height {
         for x in 0..sim.world.width {
             let pos = v3_core::contracts::Position::new(x, y);
             let density = sim.world.food_at(pos);
             if density > 0 {
-                food_cells.push(serde_json::json!({"x": x, "y": y, "density": density}));
+                food.push(FoodCell { x, y, density });
             }
             if sim.world.is_barrier(pos) {
-                barrier_cells.push(serde_json::json!({"x": x, "y": y}));
+                barriers.push(BarrierCell { x, y });
             }
         }
     }
 
-    let frame_payload = serde_json::json!({
-        "width": sim.world.width,
-        "height": sim.world.height,
-        "creatures": creatures,
-        "food": food_cells,
-        "barriers": barrier_cells,
-    });
+    let frame = FramePayload {
+        width: sim.world.width,
+        height: sim.world.height,
+        creatures,
+        food,
+        barriers,
+    };
 
-    let health_payload = serde_json::json!({
-        "population": sim.creatures.len(),
-        "mean_energy": sim.mean_energy(),
-        "mutation_events_attempted_total": stats.mutation_events_attempted_total,
-        "mutation_events_applied_total": stats.mutation_events_applied_total,
-        "mutation_events_skipped_total": stats.mutation_events_skipped_total,
-        "reproduction_actions_attempted_total": stats.reproduction_actions_attempted_total,
-        "reproduction_actions_spawned_total": stats.reproduction_actions_spawned_total,
-        "reproduction_actions_rejected_total": stats.reproduction_actions_rejected_total,
-        "reproduction_actions_rejected_total_by_reason": stats.reproduction_actions_rejected_by_reason,
-        "mutation_events_skipped_total_by_reason": stats.mutation_events_skipped_by_reason,
-    });
+    let health = HealthPayload {
+        population: sim.creatures.len(),
+        mean_energy: sim.mean_energy(),
+        mutation_events_attempted_total: stats.mutation_events_attempted_total,
+        mutation_events_applied_total: stats.mutation_events_applied_total,
+        mutation_events_skipped_total: stats.mutation_events_skipped_total,
+        reproduction_actions_attempted_total: stats.reproduction_actions_attempted_total,
+        reproduction_actions_spawned_total: stats.reproduction_actions_spawned_total,
+        reproduction_actions_rejected_total: stats.reproduction_actions_rejected_total,
+        reproduction_actions_rejected_total_by_reason: stats
+            .reproduction_actions_rejected_by_reason
+            .clone(),
+        mutation_events_skipped_total_by_reason: stats.mutation_events_skipped_by_reason.clone(),
+    };
 
-    WsEvent {
+    WsFrame {
         tick: sim.tick,
-        status_payload,
-        frame_payload,
-        health_payload,
+        status,
+        frame,
+        health,
     }
 }

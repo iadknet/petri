@@ -5,8 +5,9 @@ class MockWebSocket {
 	static instances: MockWebSocket[] = [];
 
 	url: string;
+	binaryType = "blob";
 	onopen: ((event: Event) => void) | null = null;
-	onmessage: ((event: MessageEvent<string>) => void) | null = null;
+	onmessage: ((event: MessageEvent<ArrayBuffer>) => void) | null = null;
 	onclose: ((event: CloseEvent) => void) | null = null;
 	onerror: ((event: Event) => void) | null = null;
 

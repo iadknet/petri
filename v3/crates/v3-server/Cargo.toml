@@ -19,9 +19,11 @@ sha2 = { workspace = true }
 tower = { workspace = true }
 slotmap = { workspace = true }
 hex = "0.4"
+rmp-serde = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
 tower = "0.5"
 http-body-util = "0.1"
 axum = { workspace = true }
+rmp-serde = { workspace = true }

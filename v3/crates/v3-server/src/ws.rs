@@ -3,7 +3,6 @@ use axum::extract::{State, WebSocketUpgrade};
 use tokio::sync::broadcast;
 
 use crate::state::AppState;
-use crate::types::PROTOCOL_VERSION;
 
 pub async fn ws_handler(
     ws: WebSocketUpgrade,
@@ -16,23 +15,9 @@ async fn handle_socket(mut socket: WebSocket, app: AppState) {
     let mut rx = app.ws_tx.subscribe();
     loop {
         match rx.recv().await {
-            Ok(event) => {
-                let payloads = [
-                    ("status", event.status_payload),
-                    ("frame", event.frame_payload),
-                    ("health", event.health_payload),
-                ];
-                for (evt_name, payload) in payloads {
-                    let msg = serde_json::to_string(&serde_json::json!({
-                        "protocol_version": PROTOCOL_VERSION,
-                        "event": evt_name,
-                        "tick": event.tick,
-                        "payload": payload,
-                    }))
-                    .unwrap_or_default();
-                    if socket.send(Message::Text(msg)).await.is_err() {
-                        return;
-                    }
+            Ok(bytes) => {
+                if socket.send(Message::Binary(bytes)).await.is_err() {
+                    return;
                 }
             }
             Err(broadcast::error::RecvError::Closed) => break,

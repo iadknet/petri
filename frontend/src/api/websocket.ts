@@ -1,7 +1,7 @@
+import { decode } from "@msgpack/msgpack";
 import { useSimulationStore } from "../stores/simulation.ts";
 import { useStatsHistoryStore } from "../stores/stats.ts";
-import { PROTOCOL_VERSION } from "../types/api.ts";
-import type { Frame, HealthPayload, StatusPayload, WsEnvelope } from "../types/api.ts";
+import type { WsFrame } from "../types/api.ts";
 import { api } from "./rest.ts";
 
 const BACKOFF_BASE = 1000;
@@ -28,6 +28,7 @@ export class WsClient {
 		sim.setConnectionStatus("connecting");
 
 		const socket = new WebSocket(this.url);
+		socket.binaryType = "arraybuffer";
 		this.ws = socket;
 
 		socket.onopen = () => {
@@ -39,7 +40,7 @@ export class WsClient {
 
 		socket.onmessage = (event) => {
 			if (this.ws !== socket) return;
-			this.handleMessage(event.data as string);
+			this.handleMessage(event.data as ArrayBuffer);
 		};
 
 		socket.onclose = () => {
@@ -71,54 +72,35 @@ export class WsClient {
 		this.ws = null;
 	}
 
-	private handleMessage(data: string): void {
-		let envelope: WsEnvelope;
+	private handleMessage(data: ArrayBuffer): void {
+		let frame: WsFrame;
 		try {
-			envelope = JSON.parse(data) as WsEnvelope;
+			frame = decode(new Uint8Array(data)) as WsFrame;
 		} catch {
-			return;
-		}
-
-		if (envelope.protocol_version !== PROTOCOL_VERSION) {
-			console.warn(
-				`Protocol mismatch: expected ${PROTOCOL_VERSION}, got ${envelope.protocol_version}`,
-			);
 			return;
 		}
 
 		const sim = useSimulationStore.getState();
 		const stats = useStatsHistoryStore.getState();
 
-		switch (envelope.event) {
-			case "status": {
-				const payload = envelope.payload as StatusPayload;
-				sim.setStatus(envelope.tick, payload);
-				stats.pushStats(envelope.tick, payload.population, payload.mean_energy);
-				stats.pushActions(envelope.tick, payload.last_tick_actions);
-				break;
-			}
-			case "frame": {
-				const payload = envelope.payload as Frame;
-				sim.setFrame(envelope.tick, payload);
-				break;
-			}
-			case "health": {
-				const payload = envelope.payload as HealthPayload;
-				sim.setHealth(envelope.tick, payload);
-				stats.setReproStats(
-					payload.reproduction_actions_attempted_total,
-					payload.reproduction_actions_spawned_total,
-					payload.reproduction_actions_rejected_total,
-					payload.reproduction_actions_rejected_total_by_reason,
-				);
-				stats.setMutationStats(
-					payload.mutation_events_attempted_total,
-					payload.mutation_events_applied_total,
-					payload.mutation_events_skipped_total,
-				);
-				break;
-			}
-		}
+		sim.setStatus(frame.tick, frame.status);
+		stats.pushStats(frame.tick, frame.status.population, frame.status.mean_energy);
+		stats.pushActions(frame.tick, frame.status.last_tick_actions);
+
+		sim.setFrame(frame.tick, frame.frame);
+
+		sim.setHealth(frame.tick, frame.health);
+		stats.setReproStats(
+			frame.health.reproduction_actions_attempted_total,
+			frame.health.reproduction_actions_spawned_total,
+			frame.health.reproduction_actions_rejected_total,
+			frame.health.reproduction_actions_rejected_total_by_reason,
+		);
+		stats.setMutationStats(
+			frame.health.mutation_events_attempted_total,
+			frame.health.mutation_events_applied_total,
+			frame.health.mutation_events_skipped_total,
+		);
 	}
 
 	private async resync(): Promise<void> {
