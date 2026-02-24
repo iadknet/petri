@@ -118,7 +118,7 @@ section only owns config contract shape/defaults.
 | `energy.costs.eat_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; invalid values fall back to `0.0`. |
 | `energy.costs.noop_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; invalid values fall back to `0.0`. |
 | `energy.costs.reproduce_cost` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. |
-| `energy.costs.eat_reward_per_food` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. |
+| `energy.costs.eat_reward_per_food` | `f32` | `12.0` | Must be finite and `>= 0.0`; invalid values fall back to `12.0`. |
 
 Energy posture:
 - Energy lifecycle and action-cost config values are continuous scalar units

@@ -119,7 +119,7 @@ mod tests {
     #[test]
     fn world_has_food_after_seeding() {
         let sim = seed_simulation(small_config(), 42);
-        assert!(sim.world.total_food() > 0);
+        assert!(sim.world.total_food() > 0.0);
     }
 
     #[test]

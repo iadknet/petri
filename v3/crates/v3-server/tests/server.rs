@@ -324,7 +324,7 @@ async fn health_payload_contains_mutation_skip_by_reason() {
     cfg.mutation.per_birth_mutation_events_min = 3;
     cfg.mutation.per_birth_mutation_events_max = 3;
     cfg.world.food.initial_coverage = 0.8;
-    cfg.world.food.initial_density = 120;
+    cfg.world.food.initial_density = 1.0;
     cfg.world.food.growth_rate = 0.5;
     cfg.energy.lifecycle.initial_energy = 150.0;
     cfg.energy.lifecycle.default_offspring_energy = 4.0;

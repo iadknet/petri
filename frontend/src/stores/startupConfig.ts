@@ -13,6 +13,10 @@ export interface StartupPreset {
 			growth_rate: number;
 			initial_density: number;
 			initial_coverage: number;
+			spread_threshold_ratio: number;
+			recovery_spawn_rate: number;
+			recovery_floor_ratio: number;
+			max_density: number;
 		};
 	};
 }
@@ -43,9 +47,13 @@ function buildDefaultPreset(): StartupPreset {
 			width: 400,
 			height: 400,
 			food: {
-				growth_rate: 0.02,
-				initial_density: 80,
-				initial_coverage: 0.3,
+				growth_rate: 0.25,
+				initial_density: 1.0,
+				initial_coverage: 1.0,
+				spread_threshold_ratio: 0.75,
+				recovery_spawn_rate: 0.02,
+				recovery_floor_ratio: 0.03,
+				max_density: 1.0,
 			},
 		},
 	};
@@ -79,6 +87,10 @@ function fromServerConfig(config: SimulationConfig): StartupPreset {
 				growth_rate: config.world.food.growth_rate,
 				initial_density: config.world.food.initial_density,
 				initial_coverage: config.world.food.initial_coverage,
+				spread_threshold_ratio: config.world.food.spread_threshold_ratio,
+				recovery_spawn_rate: config.world.food.recovery_spawn_rate,
+				recovery_floor_ratio: config.world.food.recovery_floor_ratio,
+				max_density: config.world.food.max_density,
 			},
 		},
 	};

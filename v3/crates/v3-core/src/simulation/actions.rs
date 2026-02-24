@@ -27,7 +27,7 @@ pub fn apply_noop(creature: &mut CreatureState, config: &SimulationConfig) {
 /// Apply an Eat action: consume all food on the creature's cell, reward energy, cap at max.
 pub fn apply_eat(creature: &mut CreatureState, world: &mut WorldState, config: &SimulationConfig) {
     let food = world.consume_food(creature.position);
-    creature.energy += food as f32 * config.energy.costs.eat_reward_per_food;
+    creature.energy += food * config.energy.costs.eat_reward_per_food;
     creature.energy = creature.energy.min(config.energy.lifecycle.max_energy);
     creature.energy -= config.energy.costs.eat_cost;
 }
@@ -254,7 +254,7 @@ mod tests {
             .seed_food(&mut rand::rngs::SmallRng::seed_from_u64(0), &{
                 let mut cfg = small_config();
                 cfg.world.food.initial_coverage = 1.0;
-                cfg.world.food.initial_density = 100;
+                cfg.world.food.initial_density = 0.5;
                 cfg
             });
         let energy_before = sim.creatures[id].energy;
@@ -264,18 +264,22 @@ mod tests {
             sim.creatures[id].energy > energy_before,
             "eat should increase energy"
         );
-        assert_eq!(sim.world.food_at(pos), 0, "food should be consumed");
+        assert!(
+            (sim.world.food_at(pos) - 0.0).abs() < 1e-6,
+            "food should be consumed"
+        );
     }
 
     #[test]
     fn apply_eat_caps_energy_at_max() {
         let pos = Position::new(3, 3);
         let (mut sim, id) = make_sim_one_creature(pos, 95.0);
+        sim.config.energy.costs.eat_reward_per_food = 20.0;
         // Place max food to ensure energy would exceed max without cap.
         {
             let mut cfg = small_config();
             cfg.world.food.initial_coverage = 1.0;
-            cfg.world.food.initial_density = 255;
+            cfg.world.food.initial_density = 1.0;
             sim.world
                 .seed_food(&mut rand::rngs::SmallRng::seed_from_u64(0), &cfg);
         }

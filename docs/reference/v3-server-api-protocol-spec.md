@@ -41,6 +41,10 @@ Version contract:
   event envelopes.
 - Canonical value: `"v3alpha1"`.
 - Breaking payload changes require protocol-version bump.
+- Documented v3alpha1 exception: food-density payloads and food config shape
+  are migrated in-place to normalized `f32` semantics (`density: f32`,
+  world food recovery/spread/max fields) without a version bump, to keep core,
+  server, and frontend aligned in one compatibility window.
 
 ---
 
@@ -84,9 +88,13 @@ Request (conceptual v3alpha1 shape):
     "height": 400,
     "edge_mode": "wrap",
     "food": {
-      "growth_rate": 0.02,
-      "initial_density": 80,
-      "initial_coverage": 0.3
+      "growth_rate": 0.25,
+      "initial_density": 1.0,
+      "initial_coverage": 1.0,
+      "spread_threshold_ratio": 0.75,
+      "recovery_spawn_rate": 0.02,
+      "recovery_floor_ratio": 0.03,
+      "max_density": 1.0
     }
   },
   "energy": {
@@ -95,14 +103,14 @@ Request (conceptual v3alpha1 shape):
       "max_energy": 100.0,
       "energy_decay_per_tick": 0.2,
       "min_reproduce_energy": 24.0,
-      "default_offspring_energy": 20.0
+      "default_offspring_energy": 8.0
     },
     "costs": {
       "move_cost": 0.2,
       "eat_cost": 0.0,
       "noop_cost": 0.0,
-      "reproduce_cost": 2.0,
-      "eat_reward_per_food": 1.0
+      "reproduce_cost": 1.0,
+      "eat_reward_per_food": 12.0
     }
   },
   "runtime": {
@@ -111,9 +119,9 @@ Request (conceptual v3alpha1 shape):
     "max_graph_relax_iters": 4,
     "graph_convergence_epsilon": 0.001,
     "graph_convergence_stable_passes": 1,
-    "graph_node_base_cost": 1.0,
+    "graph_node_base_cost": 0.05,
     "vm": {
-      "opcode_cost_multiplier": 1.0
+      "opcode_cost_multiplier": 0.5
     },
     "mutation": {
       "mutation_probability": 0.01,
@@ -281,7 +289,7 @@ Response (full sparse frame):
     }
   ],
   "food": [
-    { "x": 5, "y": 9, "density": 17 }
+    { "x": 5, "y": 9, "density": 0.42 }
   ],
   "barriers": [
     { "x": 12, "y": 8 }
@@ -312,9 +320,13 @@ Response:
       "height": 400,
       "edge_mode": "wrap",
       "food": {
-        "growth_rate": 0.02,
-        "initial_density": 80,
-        "initial_coverage": 0.3
+        "growth_rate": 0.25,
+        "initial_density": 1.0,
+        "initial_coverage": 1.0,
+        "spread_threshold_ratio": 0.75,
+        "recovery_spawn_rate": 0.02,
+        "recovery_floor_ratio": 0.03,
+        "max_density": 1.0
       }
     },
     "energy": {
@@ -323,14 +335,14 @@ Response:
         "max_energy": 100.0,
         "energy_decay_per_tick": 0.2,
         "min_reproduce_energy": 24.0,
-        "default_offspring_energy": 20.0
+        "default_offspring_energy": 8.0
       },
       "costs": {
         "move_cost": 0.2,
         "eat_cost": 0.0,
         "noop_cost": 0.0,
-        "reproduce_cost": 2.0,
-        "eat_reward_per_food": 1.0
+        "reproduce_cost": 1.0,
+        "eat_reward_per_food": 12.0
       }
     },
     "runtime": {
@@ -339,9 +351,9 @@ Response:
       "max_graph_relax_iters": 4,
       "graph_convergence_epsilon": 0.001,
       "graph_convergence_stable_passes": 1,
-      "graph_node_base_cost": 1.0,
+      "graph_node_base_cost": 0.05,
       "vm": {
-        "opcode_cost_multiplier": 1.0
+        "opcode_cost_multiplier": 0.5
       },
       "mutation": {
         "mutation_probability": 0.01,

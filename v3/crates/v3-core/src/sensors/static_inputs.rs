@@ -7,7 +7,7 @@ use crate::kernel::WorldState;
 /// Assembled once at turn start; dynamic introspection (energy, consumed) is
 /// resolved live during mesh evaluation.
 ///
-/// All food values are normalized to [0.0, 1.0] by dividing raw u8 by 255.
+/// All food values are normalized to [0.0, 1.0] by clamping raw food density.
 #[derive(Debug, Clone, PartialEq)]
 pub struct StaticInputs {
     /// Food density at the creature's current cell, normalized to [0.0, 1.0].
@@ -57,7 +57,7 @@ impl StaticInputs {
 ///   (no food, no barrier signal, not occupied).
 pub fn assemble_static_inputs(world: &WorldState, creature: &CreatureState) -> StaticInputs {
     let pos = creature.position;
-    let food_here = world.food_at(pos) as f32 / 255.0;
+    let food_here = world.food_at(pos).clamp(0.0, 1.0);
 
     let mut neighbor_food = [0.0f32; 8];
     let mut neighbor_barrier = [0.0f32; 8];
@@ -67,7 +67,7 @@ pub fn assemble_static_inputs(world: &WorldState, creature: &CreatureState) -> S
         let idx = dir.to_index();
         match world.resolve_neighbor(pos, dir) {
             Some(npos) => {
-                neighbor_food[idx] = world.food_at(npos) as f32 / 255.0;
+                neighbor_food[idx] = world.food_at(npos).clamp(0.0, 1.0);
                 neighbor_barrier[idx] = if world.is_barrier(npos) { 1.0 } else { 0.0 };
                 neighbor_occupied[idx] = if world.creature_at(npos).is_some() {
                     1.0
@@ -175,7 +175,7 @@ mod tests {
         use rand::SeedableRng;
         let mut cfg = SimulationConfig::default();
         cfg.world.food.initial_coverage = 1.0;
-        cfg.world.food.initial_density = 255;
+        cfg.world.food.initial_density = 1.0;
         let mut rng = SmallRng::seed_from_u64(42);
         world.seed_food(&mut rng, &cfg);
         let id = get_id();
@@ -191,7 +191,7 @@ mod tests {
         use rand::SeedableRng;
         let mut cfg = SimulationConfig::default();
         cfg.world.food.initial_coverage = 1.0;
-        cfg.world.food.initial_density = 255;
+        cfg.world.food.initial_density = 1.0;
         let mut rng = SmallRng::seed_from_u64(0);
         world.seed_food(&mut rng, &cfg);
         let id = get_id();

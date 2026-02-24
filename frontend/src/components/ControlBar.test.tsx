@@ -25,7 +25,15 @@ const MOCK_CONFIG: SimulationConfig = {
 		width: 512,
 		height: 384,
 		edge_mode: "wrap",
-		food: { growth_rate: 0.2, initial_density: 100, initial_coverage: 0.4 },
+		food: {
+			growth_rate: 0.2,
+			initial_density: 1.0,
+			initial_coverage: 0.4,
+			spread_threshold_ratio: 0.8,
+			recovery_spawn_rate: 0.05,
+			recovery_floor_ratio: 0.04,
+			max_density: 1.0,
+		},
 	},
 	energy: {
 		lifecycle: {
@@ -33,14 +41,14 @@ const MOCK_CONFIG: SimulationConfig = {
 			max_energy: 100,
 			energy_decay_per_tick: 0.2,
 			min_reproduce_energy: 24,
-			default_offspring_energy: 20,
+			default_offspring_energy: 8,
 		},
 		costs: {
 			move_cost: 0.2,
 			eat_cost: 0,
 			noop_cost: 0,
-			reproduce_cost: 2,
-			eat_reward_per_food: 1,
+			reproduce_cost: 1,
+			eat_reward_per_food: 12,
 		},
 	},
 	runtime: {
@@ -49,8 +57,8 @@ const MOCK_CONFIG: SimulationConfig = {
 		max_graph_relax_iters: 4,
 		graph_convergence_epsilon: 0.001,
 		graph_convergence_stable_passes: 1,
-		graph_node_base_cost: 1.0,
-		vm: { opcode_cost_multiplier: 1.0 },
+		graph_node_base_cost: 0.05,
+		vm: { opcode_cost_multiplier: 0.5 },
 	},
 	mutation: {
 		mutation_probability: 0.01,
@@ -105,7 +113,15 @@ describe("ControlBar", () => {
 			world: {
 				width: 512,
 				height: 384,
-				food: { growth_rate: 0.2, initial_density: 100, initial_coverage: 0.4 },
+				food: {
+					growth_rate: 0.2,
+					initial_density: 1.0,
+					initial_coverage: 0.4,
+					spread_threshold_ratio: 0.8,
+					recovery_spawn_rate: 0.05,
+					recovery_floor_ratio: 0.04,
+					max_density: 1.0,
+				},
 			},
 		});
 		useStatsHistoryStore.getState().pushStats(3, 10, 25);
@@ -138,7 +154,15 @@ describe("ControlBar", () => {
 				world: {
 					width: 512,
 					height: 384,
-					food: { growth_rate: 0.2, initial_density: 100, initial_coverage: 0.4 },
+					food: {
+						growth_rate: 0.2,
+						initial_density: 1.0,
+						initial_coverage: 0.4,
+						spread_threshold_ratio: 0.8,
+						recovery_spawn_rate: 0.05,
+						recovery_floor_ratio: 0.04,
+						max_density: 1.0,
+					},
 				},
 			});
 			expect(useSimulationStore.getState().simState).toBe("idle");

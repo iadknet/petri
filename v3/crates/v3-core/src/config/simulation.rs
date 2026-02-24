@@ -13,16 +13,24 @@ pub enum WorldEdgeMode {
 #[serde(deny_unknown_fields)]
 pub struct WorldFoodConfig {
     pub growth_rate: f32,
-    pub initial_density: u8,
+    pub initial_density: f32,
     pub initial_coverage: f32,
+    pub spread_threshold_ratio: f32,
+    pub recovery_spawn_rate: f32,
+    pub recovery_floor_ratio: f32,
+    pub max_density: f32,
 }
 
 impl Default for WorldFoodConfig {
     fn default() -> Self {
         Self {
-            growth_rate: 0.02,
-            initial_density: 80,
-            initial_coverage: 0.3,
+            growth_rate: 0.25,
+            initial_density: 1.0,
+            initial_coverage: 1.0,
+            spread_threshold_ratio: 0.75,
+            recovery_spawn_rate: 0.02,
+            recovery_floor_ratio: 0.03,
+            max_density: 1.0,
         }
     }
 }
@@ -89,7 +97,7 @@ impl Default for EnergyCostsConfig {
             eat_cost: 0.0,
             noop_cost: 0.0,
             reproduce_cost: 1.0,
-            eat_reward_per_food: 1.0,
+            eat_reward_per_food: 12.0,
         }
     }
 }
@@ -231,8 +239,21 @@ impl SimulationConfig {
         if w.height == 0 {
             w.height = 400;
         }
-        w.food.growth_rate = normalize_f32_clamp(w.food.growth_rate, 0.0, 1.0, 0.02);
-        w.food.initial_coverage = normalize_f32_clamp(w.food.initial_coverage, 0.0, 1.0, 0.3);
+        w.food.max_density = normalize_f32_finite_positive(w.food.max_density, 1.0);
+        w.food.growth_rate = normalize_f32_clamp(w.food.growth_rate, 0.0, 1.0, 0.25);
+        w.food.initial_coverage = normalize_f32_clamp(w.food.initial_coverage, 0.0, 1.0, 1.0);
+        w.food.spread_threshold_ratio =
+            normalize_f32_clamp(w.food.spread_threshold_ratio, 0.0, 1.0, 0.75);
+        w.food.recovery_spawn_rate =
+            normalize_f32_clamp(w.food.recovery_spawn_rate, 0.0, 1.0, 0.02);
+        w.food.recovery_floor_ratio =
+            normalize_f32_clamp(w.food.recovery_floor_ratio, 0.0, 1.0, 0.03);
+        w.food.initial_density = normalize_f32_clamp(
+            w.food.initial_density,
+            0.0,
+            w.food.max_density,
+            w.food.max_density,
+        );
 
         let el = &mut self.energy.lifecycle;
         el.initial_energy = normalize_f32_finite_nonneg(el.initial_energy, 20.0);
@@ -246,7 +267,7 @@ impl SimulationConfig {
         ec.eat_cost = normalize_f32_finite_nonneg(ec.eat_cost, 0.0);
         ec.noop_cost = normalize_f32_finite_nonneg(ec.noop_cost, 0.0);
         ec.reproduce_cost = normalize_f32_finite_nonneg(ec.reproduce_cost, 1.0);
-        ec.eat_reward_per_food = normalize_f32_finite_nonneg(ec.eat_reward_per_food, 1.0);
+        ec.eat_reward_per_food = normalize_f32_finite_nonneg(ec.eat_reward_per_food, 12.0);
 
         let rt = &mut self.runtime;
         if rt.max_mesh_hops < 1 {
@@ -328,6 +349,14 @@ fn normalize_f32_nonneg(v: f32, fallback: f32) -> f32 {
     }
 }
 
+fn normalize_f32_finite_positive(v: f32, fallback: f32) -> f32 {
+    if v.is_finite() && v > 0.0 {
+        v
+    } else {
+        fallback
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -339,9 +368,13 @@ mod tests {
         assert_eq!(cfg.world.width, 400);
         assert_eq!(cfg.world.height, 400);
         assert!(matches!(cfg.world.edge_mode, WorldEdgeMode::Wrap));
-        assert!((cfg.world.food.growth_rate - 0.02).abs() < 1e-6);
-        assert_eq!(cfg.world.food.initial_density, 80);
-        assert!((cfg.world.food.initial_coverage - 0.3).abs() < 1e-6);
+        assert!((cfg.world.food.growth_rate - 0.25).abs() < 1e-6);
+        assert!((cfg.world.food.initial_density - 1.0).abs() < 1e-6);
+        assert!((cfg.world.food.initial_coverage - 1.0).abs() < 1e-6);
+        assert!((cfg.world.food.spread_threshold_ratio - 0.75).abs() < 1e-6);
+        assert!((cfg.world.food.recovery_spawn_rate - 0.02).abs() < 1e-6);
+        assert!((cfg.world.food.recovery_floor_ratio - 0.03).abs() < 1e-6);
+        assert!((cfg.world.food.max_density - 1.0).abs() < 1e-6);
         // Energy lifecycle
         assert!((cfg.energy.lifecycle.initial_energy - 20.0).abs() < 1e-6);
         assert!((cfg.energy.lifecycle.max_energy - 100.0).abs() < 1e-6);
@@ -353,7 +386,7 @@ mod tests {
         assert!((cfg.energy.costs.eat_cost - 0.0).abs() < 1e-6);
         assert!((cfg.energy.costs.noop_cost - 0.0).abs() < 1e-6);
         assert!((cfg.energy.costs.reproduce_cost - 1.0).abs() < 1e-6);
-        assert!((cfg.energy.costs.eat_reward_per_food - 1.0).abs() < 1e-6);
+        assert!((cfg.energy.costs.eat_reward_per_food - 12.0).abs() < 1e-6);
         // Runtime
         assert_eq!(cfg.runtime.max_mesh_hops, 128);
         assert_eq!(cfg.runtime.max_vm_steps, 1024);
@@ -381,7 +414,7 @@ mod tests {
         let mut cfg = SimulationConfig::default();
         cfg.world.food.growth_rate = f32::NAN;
         cfg.normalize();
-        assert!((cfg.world.food.growth_rate - 0.02).abs() < 1e-6);
+        assert!((cfg.world.food.growth_rate - 0.25).abs() < 1e-6);
     }
 
     #[test]
@@ -390,6 +423,23 @@ mod tests {
         cfg.world.food.growth_rate = 1.5;
         cfg.normalize();
         assert!((cfg.world.food.growth_rate - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_food_max_density_non_positive_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.world.food.max_density = 0.0;
+        cfg.normalize();
+        assert!((cfg.world.food.max_density - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_initial_density_clamps_to_max_density() {
+        let mut cfg = SimulationConfig::default();
+        cfg.world.food.max_density = 0.8;
+        cfg.world.food.initial_density = 1.5;
+        cfg.normalize();
+        assert!((cfg.world.food.initial_density - 0.8).abs() < 1e-6);
     }
 
     #[test]
