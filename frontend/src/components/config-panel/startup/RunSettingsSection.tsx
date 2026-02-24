@@ -1,0 +1,53 @@
+import { CollapsibleGroup } from "../shared/CollapsibleGroup.tsx";
+
+interface RunSettingsSectionProps {
+	seed: number;
+	updateSeed: (value: number) => void;
+	randomizeSeed: () => void;
+}
+
+interface SeedRowProps {
+	value: number;
+	onChange: (value: number) => void;
+	onRandomize: () => void;
+}
+
+function SeedRow({ value, onChange, onRandomize }: SeedRowProps) {
+	const inputId = "startup-seed-input";
+
+	return (
+		<div className="flex flex-col gap-1.5 py-1.5 pl-2 border-l-2 border-transparent">
+			<div className="flex items-center justify-between gap-2">
+				<label htmlFor={inputId} className="text-xs text-slate-300">
+					Seed
+				</label>
+			</div>
+			<div className="flex items-center gap-2">
+				<input
+					id={inputId}
+					data-testid="startup-field-seed"
+					type="number"
+					value={value}
+					onChange={(e) => onChange(Number(e.target.value))}
+					className="flex-1 px-2 py-1 text-xs font-mono bg-slate-800 border border-slate-700 rounded text-slate-200"
+				/>
+				<button
+					type="button"
+					data-testid="startup-seed-randomize"
+					onClick={onRandomize}
+					className="px-2 py-1 text-[11px] text-slate-200 bg-slate-700 hover:bg-slate-600 rounded"
+				>
+					Randomize
+				</button>
+			</div>
+		</div>
+	);
+}
+
+export function RunSettingsSection({ seed, updateSeed, randomizeSeed }: RunSettingsSectionProps) {
+	return (
+		<CollapsibleGroup title="Run Settings">
+			<SeedRow value={seed} onChange={updateSeed} onRandomize={randomizeSeed} />
+		</CollapsibleGroup>
+	);
+}

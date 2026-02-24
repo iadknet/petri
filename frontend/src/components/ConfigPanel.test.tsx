@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { useConfigStore } from "../stores/config.ts";
 import { useSimulationStore } from "../stores/simulation.ts";
@@ -86,5 +86,31 @@ describe("ConfigPanel", () => {
 
 		expect(useStartupConfigStore.getState().preset.world.food.growth_rate).toBe(0.25);
 		expect(useConfigStore.getState().localDraft?.world.food.growth_rate).toBe(0.02);
+	});
+
+	it("applies runtime field disable rules by simulation state", () => {
+		render(<ConfigPanel />);
+		expect(screen.getByTestId("config-field-world-width")).toBeDisabled();
+		expect(screen.getByTestId("config-field-energy-costs-move-cost")).not.toBeDisabled();
+
+		act(() => {
+			useSimulationStore.getState().setSimState("idle");
+		});
+		expect(screen.getByTestId("config-field-world-width")).not.toBeDisabled();
+
+		act(() => {
+			useSimulationStore.getState().setSimState("running");
+		});
+		expect(screen.getByTestId("config-field-world-width")).toBeDisabled();
+		expect(screen.getByTestId("config-field-energy-costs-move-cost")).toBeDisabled();
+	});
+
+	it("shows runtime unavailable message when runtime config is missing", () => {
+		useConfigStore.getState().reset();
+		render(<ConfigPanel />);
+
+		expect(
+			screen.getByText("Runtime config unavailable. Restart to initialize the simulation."),
+		).toBeInTheDocument();
 	});
 });
