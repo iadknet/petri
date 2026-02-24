@@ -212,15 +212,9 @@ NodeGenome {
       ReadInput(r4, 4),       // r4 = food_S
       ReadInput(r5, 5),       // r5 = food_W
 
-      // Priority 1: Eat if food here
-      CmpGt(r6, r0, r7),     // r6 = (food_here > 0)? r7 starts at 0
-      JumpIfZero(r6, +2),     // skip eat if no food
-      EmitWorldAction(1),     // Eat
-      Noop,                   // (jumped past)
-
-      // Priority 2: Reproduce if energy sufficient
+      // Priority 1: Reproduce if energy sufficient
       CmpGt(r6, r1, r7),     // r6 = can_reproduce?
-      JumpIfZero(r6, +7),     // skip reproduce block
+      JumpIfZero(r6, +8),     // skip reproduce block + reset
 
       // Find least-occupied cardinal direction for reproduce
       // Use food dirs as proxy (food = likely unoccupied)
@@ -233,6 +227,13 @@ NodeGenome {
       LoadConst(r6, 4),       // const[4] = 20.0 offspring energy
       WriteWorldActionMeta(1, r6),  // offspring energy
       EmitWorldAction(3),     // Reproduce
+      Sub(r7, r7, r7),        // r7 = 0.0 (clean up for Eat check)
+
+      // Priority 2: Eat if food here
+      CmpGt(r6, r0, r7),     // r6 = (food_here > 0)? r7 starts at 0
+      JumpIfZero(r6, +2),     // skip eat if no food
+      EmitWorldAction(1),     // Eat
+      Noop,                   // (jumped past)
 
       // Priority 3: Move toward highest food direction
       // Find max food cardinal
@@ -260,8 +261,8 @@ NodeGenome {
 ```
 
 **Behavioral intent:**
-- Founders eat when standing on food (highest priority).
-- Founders reproduce when energy is sufficient (above 24.0 threshold).
+- Founders reproduce when energy is sufficient (above 24.0 threshold) (highest priority).
+- Founders eat when standing on food (second priority).
 - Founders move toward the cardinal direction with highest visible food.
 - Founders emit NoOp as a last resort.
 
