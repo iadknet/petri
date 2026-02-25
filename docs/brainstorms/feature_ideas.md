@@ -5,9 +5,6 @@
 
 ## Small Modifications
 
-### Add ticks/second stat to header bar
-  - Capture number of ticks processed per second and report that in top bar
-
 ### Report mean/min/max "computation" cost
   - Add a new "Computation" tab to the bar at the bottom
   - Report overall mean/min/max energy spent on computation per creature

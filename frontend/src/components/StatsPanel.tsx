@@ -247,7 +247,13 @@ function ComputationTab() {
 	const vmMean = latest?.vmMean ?? 0;
 	const graphMean = latest?.graphMean ?? 0;
 
-	const fmt = (v: number) => v.toFixed(5);
+	const fmt = (v: number) => {
+		if (v === 0) return "0";
+		const abs = Math.abs(v);
+		if (abs >= 0.01) return v.toFixed(4);
+		if (abs >= 0.0001) return v.toFixed(6);
+		return v.toExponential(2);
+	};
 
 	return (
 		<div className="flex flex-col gap-3 p-3">
