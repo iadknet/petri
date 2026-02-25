@@ -18,11 +18,7 @@
     - Number of nodes?
     - Total genome size?
     - Any other ideas?
-  
-### Adjust default energy usage config values
-  - Default vm opcode and graph node costs should be greatly reduced.
-  - Default initial creatures should be increased.
-  
+
 ### Change phenotype drift
   - instead of weighted random channel have a set channel that increments/decrements depending on polarity
   - Random chance the channel target changes

@@ -24,12 +24,12 @@ pub struct WorldFoodConfig {
 impl Default for WorldFoodConfig {
     fn default() -> Self {
         Self {
-            growth_rate: 0.25,
+            growth_rate: 0.096,
             initial_density: 1.0,
             initial_coverage: 0.15,
-            spread_threshold_ratio: 0.75,
-            recovery_spawn_rate: 0.02,
-            recovery_floor_ratio: 0.03,
+            spread_threshold_ratio: 0.8,
+            recovery_spawn_rate: 0.01,
+            recovery_floor_ratio: 0.01,
             max_density: 1.0,
         }
     }
@@ -71,8 +71,8 @@ impl Default for EnergyLifecycleConfig {
     fn default() -> Self {
         Self {
             initial_energy: 20.0,
-            max_energy: 100.0,
-            energy_decay_per_tick: 0.01,
+            max_energy: 200.0,
+            energy_decay_per_tick: 0.5,
             min_reproduce_energy: 1.0,
             default_offspring_energy: 8.0,
         }
@@ -93,10 +93,10 @@ pub struct EnergyCostsConfig {
 impl Default for EnergyCostsConfig {
     fn default() -> Self {
         Self {
-            move_cost: 0.02,
+            move_cost: 1.0,
             eat_cost: 0.0,
-            noop_cost: 0.0,
-            reproduce_cost: 0.12,
+            noop_cost: 0.05,
+            reproduce_cost: 0.1,
             eat_reward_per_food: 12.0,
         }
     }
@@ -120,7 +120,7 @@ pub struct VmRuntimeConfig {
 impl Default for VmRuntimeConfig {
     fn default() -> Self {
         Self {
-            opcode_cost_multiplier: 0.5,
+            opcode_cost_multiplier: 1e-6,
         }
     }
 }
@@ -141,12 +141,12 @@ pub struct RuntimeConfig {
 impl Default for RuntimeConfig {
     fn default() -> Self {
         Self {
-            max_mesh_hops: 128,
-            max_vm_steps: 1024,
-            max_graph_relax_iters: 4,
+            max_mesh_hops: 1024,
+            max_vm_steps: 10000,
+            max_graph_relax_iters: 15,
             graph_convergence_epsilon: 1e-3,
-            graph_convergence_stable_passes: 1,
-            graph_node_base_cost: 0.05,
+            graph_convergence_stable_passes: 2,
+            graph_node_base_cost: 1e-5,
             vm: VmRuntimeConfig::default(),
         }
     }
@@ -169,7 +169,7 @@ pub struct PhenotypeConfig {
 impl Default for PhenotypeConfig {
     fn default() -> Self {
         Self {
-            channel_step: 2,
+            channel_step: 1,
             polarity_flip_chance: 0.002,
             channel_weight_min: 0.05,
             channel_weight_max: 1.0,
@@ -190,9 +190,9 @@ pub struct MutationConfig {
 impl Default for MutationConfig {
     fn default() -> Self {
         Self {
-            mutation_probability: 0.01,
+            mutation_probability: 0.303,
             per_birth_mutation_events_min: 1,
-            per_birth_mutation_events_max: 4,
+            per_birth_mutation_events_max: 10,
             phenotype: PhenotypeConfig::default(),
         }
     }
@@ -209,8 +209,8 @@ pub struct PopulationConfig {
 impl Default for PopulationConfig {
     fn default() -> Self {
         Self {
-            initial_creatures: 50,
-            max_creatures: 1000,
+            initial_creatures: 2000,
+            max_creatures: 100000,
         }
     }
 }
@@ -240,14 +240,14 @@ impl SimulationConfig {
             w.height = 400;
         }
         w.food.max_density = normalize_f32_finite_positive(w.food.max_density, 1.0);
-        w.food.growth_rate = normalize_f32_clamp(w.food.growth_rate, 0.0, 1.0, 0.25);
+        w.food.growth_rate = normalize_f32_clamp(w.food.growth_rate, 0.0, 1.0, 0.096);
         w.food.initial_coverage = normalize_f32_clamp(w.food.initial_coverage, 0.0, 1.0, 0.15);
         w.food.spread_threshold_ratio =
-            normalize_f32_clamp(w.food.spread_threshold_ratio, 0.0, 1.0, 0.75);
+            normalize_f32_clamp(w.food.spread_threshold_ratio, 0.0, 1.0, 0.8);
         w.food.recovery_spawn_rate =
-            normalize_f32_clamp(w.food.recovery_spawn_rate, 0.0, 1.0, 0.02);
+            normalize_f32_clamp(w.food.recovery_spawn_rate, 0.0, 1.0, 0.01);
         w.food.recovery_floor_ratio =
-            normalize_f32_clamp(w.food.recovery_floor_ratio, 0.0, 1.0, 0.03);
+            normalize_f32_clamp(w.food.recovery_floor_ratio, 0.0, 1.0, 0.01);
         w.food.initial_density = normalize_f32_clamp(
             w.food.initial_density,
             0.0,
@@ -257,35 +257,35 @@ impl SimulationConfig {
 
         let el = &mut self.energy.lifecycle;
         el.initial_energy = normalize_f32_finite_nonneg(el.initial_energy, 20.0);
-        el.max_energy = normalize_f32_finite_min(el.max_energy, 1.0, 100.0);
-        el.energy_decay_per_tick = normalize_f32_finite_nonneg(el.energy_decay_per_tick, 0.01);
+        el.max_energy = normalize_f32_finite_min(el.max_energy, 1.0, 200.0);
+        el.energy_decay_per_tick = normalize_f32_finite_nonneg(el.energy_decay_per_tick, 0.5);
         el.min_reproduce_energy = normalize_f32_finite_nonneg(el.min_reproduce_energy, 1.0);
         el.default_offspring_energy = normalize_f32_finite_nonneg(el.default_offspring_energy, 8.0);
 
         let ec = &mut self.energy.costs;
-        ec.move_cost = normalize_f32_finite_nonneg(ec.move_cost, 0.02);
+        ec.move_cost = normalize_f32_finite_nonneg(ec.move_cost, 1.0);
         ec.eat_cost = normalize_f32_finite_nonneg(ec.eat_cost, 0.0);
-        ec.noop_cost = normalize_f32_finite_nonneg(ec.noop_cost, 0.0);
-        ec.reproduce_cost = normalize_f32_finite_nonneg(ec.reproduce_cost, 0.12);
+        ec.noop_cost = normalize_f32_finite_nonneg(ec.noop_cost, 0.05);
+        ec.reproduce_cost = normalize_f32_finite_nonneg(ec.reproduce_cost, 0.1);
         ec.eat_reward_per_food = normalize_f32_finite_nonneg(ec.eat_reward_per_food, 12.0);
 
         let rt = &mut self.runtime;
         if rt.max_mesh_hops < 1 {
-            rt.max_mesh_hops = 128;
+            rt.max_mesh_hops = 1024;
         }
         if rt.max_vm_steps < 1 {
-            rt.max_vm_steps = 1024;
+            rt.max_vm_steps = 10000;
         }
         if rt.max_graph_relax_iters < 1 {
-            rt.max_graph_relax_iters = 4;
+            rt.max_graph_relax_iters = 15;
         }
         rt.graph_convergence_epsilon = normalize_f32_nonneg(rt.graph_convergence_epsilon, 1e-3);
         if rt.graph_convergence_stable_passes < 1 {
-            rt.graph_convergence_stable_passes = 1;
+            rt.graph_convergence_stable_passes = 2;
         }
-        rt.graph_node_base_cost = normalize_f32_nonneg(rt.graph_node_base_cost, 0.05);
+        rt.graph_node_base_cost = normalize_f32_nonneg(rt.graph_node_base_cost, 1e-5);
         rt.vm.opcode_cost_multiplier =
-            normalize_f32_finite_nonneg(rt.vm.opcode_cost_multiplier, 0.5);
+            normalize_f32_finite_nonneg(rt.vm.opcode_cost_multiplier, 1e-6);
 
         let m = &mut self.mutation;
         m.mutation_probability = m.mutation_probability.clamp(0.0, 1.0);
@@ -297,7 +297,7 @@ impl SimulationConfig {
         }
         let ph = &mut m.phenotype;
         if ph.channel_step == 0 {
-            ph.channel_step = 2;
+            ph.channel_step = 1;
         }
         ph.polarity_flip_chance = ph.polarity_flip_chance.clamp(0.0, 1.0);
         if ph.channel_weight_min < 0.0 || !ph.channel_weight_min.is_finite() {
@@ -309,10 +309,10 @@ impl SimulationConfig {
 
         let p = &mut self.population;
         if p.initial_creatures < 1 {
-            p.initial_creatures = 50;
+            p.initial_creatures = 2000;
         }
         if p.max_creatures < p.initial_creatures {
-            p.max_creatures = 1000;
+            p.max_creatures = 100000;
         }
     }
 }
@@ -368,45 +368,45 @@ mod tests {
         assert_eq!(cfg.world.width, 400);
         assert_eq!(cfg.world.height, 400);
         assert!(matches!(cfg.world.edge_mode, WorldEdgeMode::Wrap));
-        assert!((cfg.world.food.growth_rate - 0.25).abs() < 1e-6);
+        assert!((cfg.world.food.growth_rate - 0.096).abs() < 1e-6);
         assert!((cfg.world.food.initial_density - 1.0).abs() < 1e-6);
         assert!((cfg.world.food.initial_coverage - 0.15).abs() < 1e-6);
-        assert!((cfg.world.food.spread_threshold_ratio - 0.75).abs() < 1e-6);
-        assert!((cfg.world.food.recovery_spawn_rate - 0.02).abs() < 1e-6);
-        assert!((cfg.world.food.recovery_floor_ratio - 0.03).abs() < 1e-6);
+        assert!((cfg.world.food.spread_threshold_ratio - 0.8).abs() < 1e-6);
+        assert!((cfg.world.food.recovery_spawn_rate - 0.01).abs() < 1e-6);
+        assert!((cfg.world.food.recovery_floor_ratio - 0.01).abs() < 1e-6);
         assert!((cfg.world.food.max_density - 1.0).abs() < 1e-6);
         // Energy lifecycle
         assert!((cfg.energy.lifecycle.initial_energy - 20.0).abs() < 1e-6);
-        assert!((cfg.energy.lifecycle.max_energy - 100.0).abs() < 1e-6);
-        assert!((cfg.energy.lifecycle.energy_decay_per_tick - 0.01).abs() < 1e-6);
+        assert!((cfg.energy.lifecycle.max_energy - 200.0).abs() < 1e-6);
+        assert!((cfg.energy.lifecycle.energy_decay_per_tick - 0.5).abs() < 1e-6);
         assert!((cfg.energy.lifecycle.min_reproduce_energy - 1.0).abs() < 1e-6);
         assert!((cfg.energy.lifecycle.default_offspring_energy - 8.0).abs() < 1e-6);
         // Energy costs
-        assert!((cfg.energy.costs.move_cost - 0.02).abs() < 1e-6);
+        assert!((cfg.energy.costs.move_cost - 1.0).abs() < 1e-6);
         assert!((cfg.energy.costs.eat_cost - 0.0).abs() < 1e-6);
-        assert!((cfg.energy.costs.noop_cost - 0.0).abs() < 1e-6);
-        assert!((cfg.energy.costs.reproduce_cost - 0.12).abs() < 1e-6);
+        assert!((cfg.energy.costs.noop_cost - 0.05).abs() < 1e-6);
+        assert!((cfg.energy.costs.reproduce_cost - 0.1).abs() < 1e-6);
         assert!((cfg.energy.costs.eat_reward_per_food - 12.0).abs() < 1e-6);
         // Runtime
-        assert_eq!(cfg.runtime.max_mesh_hops, 128);
-        assert_eq!(cfg.runtime.max_vm_steps, 1024);
-        assert_eq!(cfg.runtime.max_graph_relax_iters, 4);
+        assert_eq!(cfg.runtime.max_mesh_hops, 1024);
+        assert_eq!(cfg.runtime.max_vm_steps, 10000);
+        assert_eq!(cfg.runtime.max_graph_relax_iters, 15);
         assert!((cfg.runtime.graph_convergence_epsilon - 1e-3).abs() < 1e-6);
-        assert_eq!(cfg.runtime.graph_convergence_stable_passes, 1);
-        assert!((cfg.runtime.graph_node_base_cost - 0.05).abs() < 1e-6);
-        assert!((cfg.runtime.vm.opcode_cost_multiplier - 0.5).abs() < 1e-6);
+        assert_eq!(cfg.runtime.graph_convergence_stable_passes, 2);
+        assert!((cfg.runtime.graph_node_base_cost - 1e-5).abs() < 1e-9);
+        assert!((cfg.runtime.vm.opcode_cost_multiplier - 1e-6).abs() < 1e-12);
         // Mutation
-        assert!((cfg.mutation.mutation_probability - 0.01).abs() < 1e-9);
+        assert!((cfg.mutation.mutation_probability - 0.303).abs() < 1e-9);
         assert_eq!(cfg.mutation.per_birth_mutation_events_min, 1);
-        assert_eq!(cfg.mutation.per_birth_mutation_events_max, 4);
+        assert_eq!(cfg.mutation.per_birth_mutation_events_max, 10);
         // Phenotype
-        assert_eq!(cfg.mutation.phenotype.channel_step, 2);
+        assert_eq!(cfg.mutation.phenotype.channel_step, 1);
         assert!((cfg.mutation.phenotype.polarity_flip_chance - 0.002).abs() < 1e-6);
         assert!((cfg.mutation.phenotype.channel_weight_min - 0.05).abs() < 1e-6);
         assert!((cfg.mutation.phenotype.channel_weight_max - 1.0).abs() < 1e-6);
         // Population
-        assert_eq!(cfg.population.initial_creatures, 50);
-        assert_eq!(cfg.population.max_creatures, 1000);
+        assert_eq!(cfg.population.initial_creatures, 2000);
+        assert_eq!(cfg.population.max_creatures, 100000);
     }
 
     #[test]
@@ -414,7 +414,7 @@ mod tests {
         let mut cfg = SimulationConfig::default();
         cfg.world.food.growth_rate = f32::NAN;
         cfg.normalize();
-        assert!((cfg.world.food.growth_rate - 0.25).abs() < 1e-6);
+        assert!((cfg.world.food.growth_rate - 0.096).abs() < 1e-6);
     }
 
     #[test]
@@ -447,7 +447,7 @@ mod tests {
         let mut cfg = SimulationConfig::default();
         cfg.energy.lifecycle.max_energy = -1.0;
         cfg.normalize();
-        assert!((cfg.energy.lifecycle.max_energy - 100.0).abs() < 1e-6);
+        assert!((cfg.energy.lifecycle.max_energy - 200.0).abs() < 1e-6);
     }
 
     #[test]
@@ -455,7 +455,7 @@ mod tests {
         let mut cfg = SimulationConfig::default();
         cfg.runtime.max_mesh_hops = 0;
         cfg.normalize();
-        assert_eq!(cfg.runtime.max_mesh_hops, 128);
+        assert_eq!(cfg.runtime.max_mesh_hops, 1024);
     }
 
     #[test]
@@ -463,7 +463,7 @@ mod tests {
         let mut cfg = SimulationConfig::default();
         cfg.runtime.vm.opcode_cost_multiplier = f32::NAN;
         cfg.normalize();
-        assert!((cfg.runtime.vm.opcode_cost_multiplier - 0.5).abs() < 1e-6);
+        assert!((cfg.runtime.vm.opcode_cost_multiplier - 1e-6).abs() < 1e-12);
     }
 
     #[test]
@@ -483,7 +483,7 @@ mod tests {
         let mut cfg = SimulationConfig::default();
         cfg.mutation.phenotype.channel_step = 0;
         cfg.normalize();
-        assert_eq!(cfg.mutation.phenotype.channel_step, 2);
+        assert_eq!(cfg.mutation.phenotype.channel_step, 1);
     }
 
     #[test]
