@@ -5,11 +5,6 @@
 
 ## Small Modifications
 
-### Report mean/min/max "computation" cost
-  - Add a new "Computation" tab to the bar at the bottom
-  - Report overall mean/min/max energy spent on computation per creature
-  - Break down into more specific vm/graph cost
-  
 ### Add "complexity" score metadata attribute to creatures
   - Need to figure out how to compute compute creature "complexity"
     - Number of nodes?
