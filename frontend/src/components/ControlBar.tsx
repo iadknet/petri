@@ -7,6 +7,12 @@ import { useStartupConfigStore } from "../stores/startupConfig.ts";
 import { useStatsHistoryStore } from "../stores/stats.ts";
 import type { SimState } from "../types/api.ts";
 
+function formatTps(tps: number): string {
+	if (tps === 0) return "0";
+	if (tps < 10) return tps.toFixed(1);
+	return Math.round(tps).toLocaleString();
+}
+
 function ConnectionDot({ status }: { status: string }) {
 	const color =
 		status === "connected"
@@ -83,6 +89,7 @@ export function ControlBar() {
 	const simState = useSimulationStore((s) => s.simState);
 	const tick = useSimulationStore((s) => s.tick);
 	const population = useSimulationStore((s) => s.status?.population ?? 0);
+	const ticksPerSecond = useSimulationStore((s) => s.ticksPerSecond);
 	const connectionStatus = useSimulationStore((s) => s.connectionStatus);
 	const { toggleConfig, toggleStats } = usePanelLayout();
 	const [restarting, setRestarting] = useState(false);
@@ -210,6 +217,11 @@ export function ControlBar() {
 			{/* Population */}
 			<span className="font-mono text-xs text-slate-400 tabular-nums">
 				Pop: {population.toLocaleString()}
+			</span>
+
+			{/* TPS */}
+			<span data-testid="tps-value" className="font-mono text-xs text-slate-300 tabular-nums">
+				TPS: {formatTps(ticksPerSecond)}
 			</span>
 
 			{/* Spacer */}
