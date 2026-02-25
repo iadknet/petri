@@ -49,6 +49,11 @@ export interface StatusPayload {
 	reproduction_actions_attempted_total: number;
 	reproduction_actions_spawned_total: number;
 	reproduction_actions_rejected_total: number;
+	last_tick_compute_total_mean: number;
+	last_tick_compute_total_min: number;
+	last_tick_compute_total_max: number;
+	last_tick_compute_vm_mean: number;
+	last_tick_compute_graph_mean: number;
 }
 
 // Health

@@ -49,6 +49,18 @@ impl NodeResult {
     }
 }
 
+/// Energy cost attributed to VM and graph node execution during one mesh evaluation.
+///
+/// Returned alongside the [`WorldAction`] by [`execute_creature_mesh`].
+/// Does not include lifecycle decay, move, eat, noop, or reproduce costs.
+#[derive(Debug, Clone, Default)]
+pub struct ComputeCostReport {
+    /// Total energy deducted from executing VM nodes this tick.
+    pub vm_cost: f32,
+    /// Total energy deducted from executing Graph nodes this tick.
+    pub graph_cost: f32,
+}
+
 /// Sanitize an f32 value per v3-vm-isa-spec.md Section 5:
 /// - NaN → 0.0
 /// - +Inf → +1_000_000_000.0

@@ -48,6 +48,11 @@ pub struct StatusPayload {
     pub reproduction_actions_attempted_total: u64,
     pub reproduction_actions_spawned_total: u64,
     pub reproduction_actions_rejected_total: u64,
+    pub last_tick_compute_total_mean: f32,
+    pub last_tick_compute_total_min: f32,
+    pub last_tick_compute_total_max: f32,
+    pub last_tick_compute_vm_mean: f32,
+    pub last_tick_compute_graph_mean: f32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

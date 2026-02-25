@@ -21,4 +21,16 @@ pub struct SimStats {
     pub last_tick_eat: u32,
     pub last_tick_noop: u32,
     pub last_tick_reproduce: u32,
+
+    // ── Per-tick compute cost (reset at start of each tick) ──────────────────
+    /// Mean total (vm + graph) compute energy cost across all creatures that ran the mesh.
+    pub last_tick_compute_total_mean: f32,
+    /// Minimum total compute cost across creatures that ran the mesh.
+    pub last_tick_compute_total_min: f32,
+    /// Maximum total compute cost across creatures that ran the mesh.
+    pub last_tick_compute_total_max: f32,
+    /// Mean VM-node compute cost across creatures that executed at least one VM node.
+    pub last_tick_compute_vm_mean: f32,
+    /// Mean graph-node compute cost across creatures that executed at least one graph node.
+    pub last_tick_compute_graph_mean: f32,
 }

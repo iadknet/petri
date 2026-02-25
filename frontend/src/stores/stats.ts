@@ -14,6 +14,15 @@ export interface ActionPoint {
 	actions: LastTickActions;
 }
 
+export interface ComputePoint {
+	tick: number;
+	totalMean: number;
+	totalMin: number;
+	totalMax: number;
+	vmMean: number;
+	graphMean: number;
+}
+
 /** Fixed-size ring buffer that overwrites oldest entries */
 function pushRing<T>(buf: T[], item: T, maxSize: number): T[] {
 	if (buf.length >= maxSize) {
@@ -27,6 +36,7 @@ function pushRing<T>(buf: T[], item: T, maxSize: number): T[] {
 export interface StatsHistoryState {
 	statsHistory: StatsPoint[];
 	actionsHistory: ActionPoint[];
+	computeHistory: ComputePoint[];
 
 	// Cumulative reproduction stats (from health events)
 	reproAttempted: number;
@@ -42,6 +52,14 @@ export interface StatsHistoryState {
 	// Actions
 	pushStats: (tick: number, population: number, meanEnergy: number) => void;
 	pushActions: (tick: number, actions: LastTickActions) => void;
+	pushCompute: (
+		tick: number,
+		totalMean: number,
+		totalMin: number,
+		totalMax: number,
+		vmMean: number,
+		graphMean: number,
+	) => void;
 	setReproStats: (
 		attempted: number,
 		spawned: number,
@@ -55,6 +73,7 @@ export interface StatsHistoryState {
 export const useStatsHistoryStore = create<StatsHistoryState>()((set) => ({
 	statsHistory: [],
 	actionsHistory: [],
+	computeHistory: [],
 	reproAttempted: 0,
 	reproSpawned: 0,
 	reproRejected: 0,
@@ -71,6 +90,15 @@ export const useStatsHistoryStore = create<StatsHistoryState>()((set) => ({
 	pushActions: (tick, actions) =>
 		set((s) => ({
 			actionsHistory: pushRing(s.actionsHistory, { tick, actions }, RING_SIZE),
+		})),
+
+	pushCompute: (tick, totalMean, totalMin, totalMax, vmMean, graphMean) =>
+		set((s) => ({
+			computeHistory: pushRing(
+				s.computeHistory,
+				{ tick, totalMean, totalMin, totalMax, vmMean, graphMean },
+				RING_SIZE,
+			),
 		})),
 
 	setReproStats: (attempted, spawned, rejected, byReason) =>
@@ -92,6 +120,7 @@ export const useStatsHistoryStore = create<StatsHistoryState>()((set) => ({
 		set({
 			statsHistory: [],
 			actionsHistory: [],
+			computeHistory: [],
 			reproAttempted: 0,
 			reproSpawned: 0,
 			reproRejected: 0,

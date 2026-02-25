@@ -193,6 +193,11 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
         reproduction_actions_attempted_total: stats.reproduction_actions_attempted_total,
         reproduction_actions_spawned_total: stats.reproduction_actions_spawned_total,
         reproduction_actions_rejected_total: stats.reproduction_actions_rejected_total,
+        last_tick_compute_total_mean: stats.last_tick_compute_total_mean,
+        last_tick_compute_total_min: stats.last_tick_compute_total_min,
+        last_tick_compute_total_max: stats.last_tick_compute_total_max,
+        last_tick_compute_vm_mean: stats.last_tick_compute_vm_mean,
+        last_tick_compute_graph_mean: stats.last_tick_compute_graph_mean,
     };
 
     let mut creatures = Vec::with_capacity(sim.creatures.len());

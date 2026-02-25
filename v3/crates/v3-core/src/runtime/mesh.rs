@@ -11,10 +11,12 @@ use crate::config::RuntimeConfig;
 use crate::contracts::{NodeId, WorldAction};
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::runtime::graph::execute_graph_node;
+use crate::runtime::types::ComputeCostReport;
 use crate::runtime::vm::execute_vm_node;
 use crate::sensors::static_inputs::StaticInputs;
 
-/// Execute the creature's mesh chain for one tick, returning the chosen [`WorldAction`].
+/// Execute the creature's mesh chain for one tick, returning the chosen [`WorldAction`]
+/// and a [`ComputeCostReport`] of energy spent on VM and graph node execution.
 ///
 /// The function walks the genome's node chain starting at `entry_node_id`,
 /// dispatching each node to its VM or Graph backend, routing to subsequent
@@ -38,12 +40,13 @@ pub fn execute_creature_mesh(
     memory: &mut [u8; 1024],
     graph_state: &mut Vec<Vec<f32>>,
     config: &RuntimeConfig,
-) -> WorldAction {
+) -> (WorldAction, ComputeCostReport) {
     let mut current_node_id = genome.entry_node_id;
     let mut upstream_slots = [0.0f32; 12];
     let mut hops: usize = 0;
     let max_hops = config.max_mesh_hops.max(1) as usize;
     let start_energy = *energy;
+    let mut report = ComputeCostReport::default();
 
     // Build a NodeId → index map for O(1) lookups instead of O(n) find_node per hop.
     let node_index: HashMap<NodeId, usize> = genome
@@ -55,18 +58,21 @@ pub fn execute_creature_mesh(
 
     // Soft default: entry_node_id missing from node set → return NoOp immediately.
     if !node_index.contains_key(&current_node_id) {
-        return WorldAction::NoOp;
+        return (WorldAction::NoOp, report);
     }
 
     loop {
         if hops >= max_hops {
-            return WorldAction::NoOp;
+            return (WorldAction::NoOp, report);
         }
 
         // Invariant: verified present before the loop, and after every routing step.
         let node = &genome.nodes[node_index[&current_node_id]];
 
         let energy_consumed = (start_energy - *energy).max(0.0);
+
+        // Snapshot energy before node dispatch to attribute cost to the correct backend.
+        let node_energy_before = *energy;
 
         let current_idx = node_index[&current_node_id];
         let result = match &node.backend_def {
@@ -93,18 +99,25 @@ pub fn execute_creature_mesh(
             ),
         };
 
+        // Attribute energy delta to the correct backend.
+        let node_cost = (node_energy_before - *energy).max(0.0);
+        match &node.backend_def {
+            BackendDef::Vm(_) => report.vm_cost += node_cost,
+            BackendDef::Graph(_) => report.graph_cost += node_cost,
+        }
+
         // Check exhaustion before world_action: NodeResult::exhausted() never carries a valid action.
         if result.energy_exhausted {
-            return WorldAction::NoOp;
+            return (WorldAction::NoOp, report);
         }
 
         if let Some(action) = result.world_action {
-            return action;
+            return (action, report);
         }
 
         // Routing: if no targets, the chain terminates with NoOp.
         if node.targets.is_empty() {
-            return WorldAction::NoOp;
+            return (WorldAction::NoOp, report);
         }
 
         // Convert route_target_idx (f32) to i64 with special-case handling for
@@ -128,7 +141,7 @@ pub fn execute_creature_mesh(
 
         // Soft default: routed target id missing from node set → return NoOp.
         if !node_index.contains_key(&target_id) {
-            return WorldAction::NoOp;
+            return (WorldAction::NoOp, report);
         }
 
         upstream_slots = result.output_slots;
@@ -217,7 +230,7 @@ mod tests {
         let mut graph_state = vec![];
         let config = default_config();
 
-        let action = execute_creature_mesh(
+        let (action, _report) = execute_creature_mesh(
             &genome,
             &si,
             &mut energy,
@@ -259,7 +272,7 @@ mod tests {
             ..RuntimeConfig::default()
         };
 
-        let action = execute_creature_mesh(
+        let (action, _report) = execute_creature_mesh(
             &genome,
             &si,
             &mut energy,
@@ -295,7 +308,7 @@ mod tests {
         let mut graph_state = vec![];
         let config = default_config();
 
-        let action = execute_creature_mesh(
+        let (action, _report) = execute_creature_mesh(
             &genome,
             &si,
             &mut energy,
@@ -332,7 +345,7 @@ mod tests {
         let mut graph_state = vec![];
         let config = default_config();
 
-        let action = execute_creature_mesh(
+        let (action, _report) = execute_creature_mesh(
             &genome,
             &si,
             &mut energy,
@@ -359,7 +372,7 @@ mod tests {
         let mut graph_state = vec![];
         let config = default_config();
 
-        let action = execute_creature_mesh(
+        let (action, _report) = execute_creature_mesh(
             &genome,
             &si,
             &mut energy,
@@ -414,7 +427,7 @@ mod tests {
         let mut graph_state = vec![];
         let config = default_config();
 
-        let action = execute_creature_mesh(
+        let (action, _report) = execute_creature_mesh(
             &genome,
             &si,
             &mut energy,
@@ -456,7 +469,7 @@ mod tests {
         let mut graph_state = vec![];
         let config = default_config();
 
-        let action = execute_creature_mesh(
+        let (action, _report) = execute_creature_mesh(
             &genome,
             &si,
             &mut energy,
@@ -501,7 +514,7 @@ mod tests {
         let mut graph_state = vec![];
         let config = default_config();
 
-        let action = execute_creature_mesh(
+        let (action, _report) = execute_creature_mesh(
             &genome,
             &si,
             &mut energy,
@@ -586,7 +599,7 @@ mod tests {
         let mut graph_state = vec![];
         let config = default_config();
 
-        let action = execute_creature_mesh(
+        let (action, _report) = execute_creature_mesh(
             &genome,
             &si,
             &mut energy,
