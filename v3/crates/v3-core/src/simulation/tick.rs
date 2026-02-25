@@ -56,6 +56,11 @@ pub fn run_tick(sim: &mut Simulation) {
     sim.stats.last_tick_eat = 0;
     sim.stats.last_tick_noop = 0;
     sim.stats.last_tick_reproduce = 0;
+    sim.stats.last_tick_compute_total_mean = 0.0;
+    sim.stats.last_tick_compute_total_min = 0.0;
+    sim.stats.last_tick_compute_total_max = 0.0;
+    sim.stats.last_tick_compute_vm_mean = 0.0;
+    sim.stats.last_tick_compute_graph_mean = 0.0;
 
     run_phase_0(sim);
 
@@ -73,6 +78,16 @@ pub fn run_tick(sim: &mut Simulation) {
     let energy_config = sim.config.energy.clone();
     let runtime_config = sim.config.runtime.clone();
 
+    // Compute cost accumulators for this tick.
+    let mut compute_total_sum = 0.0f32;
+    let mut compute_total_min = f32::MAX;
+    let mut compute_total_max = 0.0f32;
+    let mut compute_vm_sum = 0.0f32;
+    let mut compute_vm_count = 0u32;
+    let mut compute_graph_sum = 0.0f32;
+    let mut compute_graph_count = 0u32;
+    let mut compute_creature_count = 0u32;
+
     for id in queue {
         // Skip creatures removed mid-tick (killed by a previous action this tick).
         if !sim.creatures.contains_key(id) {
@@ -83,7 +98,7 @@ pub fn run_tick(sim: &mut Simulation) {
 
         // Execute the creature's mesh chain.  The borrow of `sim.creatures` ends
         // when this block closes.
-        let action = {
+        let (action, compute_cost) = {
             let creature = sim.creatures.get_mut(id).unwrap();
             execute_creature_mesh(
                 &creature.genome,
@@ -94,6 +109,25 @@ pub fn run_tick(sim: &mut Simulation) {
                 &runtime_config,
             )
         };
+
+        // Accumulate compute cost for this creature.
+        let total_cost = compute_cost.vm_cost + compute_cost.graph_cost;
+        compute_total_sum += total_cost;
+        if total_cost < compute_total_min {
+            compute_total_min = total_cost;
+        }
+        if total_cost > compute_total_max {
+            compute_total_max = total_cost;
+        }
+        if compute_cost.vm_cost > 0.0 {
+            compute_vm_sum += compute_cost.vm_cost;
+            compute_vm_count += 1;
+        }
+        if compute_cost.graph_cost > 0.0 {
+            compute_graph_sum += compute_cost.graph_cost;
+            compute_graph_count += 1;
+        }
+        compute_creature_count += 1;
 
         // Apply the chosen action.  Each branch re-borrows only what it needs.
         // NoOp/Eat/Move use the pre-copied energy_config to avoid re-borrowing sim.config.
@@ -138,6 +172,23 @@ pub fn run_tick(sim: &mut Simulation) {
                 apply_reproduce(id, sim, direction, energy_transfer, &mut reproduce_rng);
             }
         }
+    }
+
+    // Write per-tick compute stats after the creature queue is fully processed.
+    if compute_creature_count > 0 {
+        sim.stats.last_tick_compute_total_mean = compute_total_sum / compute_creature_count as f32;
+        sim.stats.last_tick_compute_total_min = compute_total_min;
+        sim.stats.last_tick_compute_total_max = compute_total_max;
+        sim.stats.last_tick_compute_vm_mean = if compute_vm_count > 0 {
+            compute_vm_sum / compute_vm_count as f32
+        } else {
+            0.0
+        };
+        sim.stats.last_tick_compute_graph_mean = if compute_graph_count > 0 {
+            compute_graph_sum / compute_graph_count as f32
+        } else {
+            0.0
+        };
     }
 
     sim.tick += 1;

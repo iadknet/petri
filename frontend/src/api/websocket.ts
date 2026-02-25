@@ -86,6 +86,14 @@ export class WsClient {
 		sim.setStatus(frame.tick, frame.status);
 		stats.pushStats(frame.tick, frame.status.population, frame.status.mean_energy);
 		stats.pushActions(frame.tick, frame.status.last_tick_actions);
+		stats.pushCompute(
+			frame.tick,
+			frame.status.last_tick_compute_total_mean,
+			frame.status.last_tick_compute_total_min,
+			frame.status.last_tick_compute_total_max,
+			frame.status.last_tick_compute_vm_mean,
+			frame.status.last_tick_compute_graph_mean,
+		);
 
 		sim.setFrame(frame.tick, frame.frame);
 
@@ -115,6 +123,11 @@ export class WsClient {
 				reproduction_actions_attempted_total: status.reproduction_actions_attempted_total,
 				reproduction_actions_spawned_total: status.reproduction_actions_spawned_total,
 				reproduction_actions_rejected_total: status.reproduction_actions_rejected_total,
+				last_tick_compute_total_mean: status.last_tick_compute_total_mean,
+				last_tick_compute_total_min: status.last_tick_compute_total_min,
+				last_tick_compute_total_max: status.last_tick_compute_total_max,
+				last_tick_compute_vm_mean: status.last_tick_compute_vm_mean,
+				last_tick_compute_graph_mean: status.last_tick_compute_graph_mean,
 			});
 			sim.setFrame(frame.tick, {
 				width: frame.width,

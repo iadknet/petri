@@ -31,6 +31,11 @@ pub async fn get_status(State(app): State<AppState>) -> impl IntoResponse {
         "mutation_events_attempted_total": stats.mutation_events_attempted_total,
         "mutation_events_applied_total": stats.mutation_events_applied_total,
         "mutation_events_skipped_total": stats.mutation_events_skipped_total,
+        "last_tick_compute_total_mean": stats.last_tick_compute_total_mean,
+        "last_tick_compute_total_min": stats.last_tick_compute_total_min,
+        "last_tick_compute_total_max": stats.last_tick_compute_total_max,
+        "last_tick_compute_vm_mean": stats.last_tick_compute_vm_mean,
+        "last_tick_compute_graph_mean": stats.last_tick_compute_graph_mean,
     }))
 }
 

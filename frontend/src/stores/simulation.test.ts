@@ -41,6 +41,11 @@ describe("SimulationStore", () => {
 			reproduction_actions_attempted_total: 100,
 			reproduction_actions_spawned_total: 20,
 			reproduction_actions_rejected_total: 80,
+			last_tick_compute_total_mean: 0,
+			last_tick_compute_total_min: 0,
+			last_tick_compute_total_max: 0,
+			last_tick_compute_vm_mean: 0,
+			last_tick_compute_graph_mean: 0,
 		});
 		expect(useSimulationStore.getState().simState).toBe("paused");
 		expect(useSimulationStore.getState().tick).toBe(10);
@@ -56,6 +61,11 @@ describe("SimulationStore", () => {
 			reproduction_actions_attempted_total: 100,
 			reproduction_actions_spawned_total: 20,
 			reproduction_actions_rejected_total: 80,
+			last_tick_compute_total_mean: 0,
+			last_tick_compute_total_min: 0,
+			last_tick_compute_total_max: 0,
+			last_tick_compute_vm_mean: 0,
+			last_tick_compute_graph_mean: 0,
 		});
 
 		useSimulationStore.getState().setStatus(10, {
@@ -66,6 +76,11 @@ describe("SimulationStore", () => {
 			reproduction_actions_attempted_total: 101,
 			reproduction_actions_spawned_total: 21,
 			reproduction_actions_rejected_total: 80,
+			last_tick_compute_total_mean: 0,
+			last_tick_compute_total_min: 0,
+			last_tick_compute_total_max: 0,
+			last_tick_compute_vm_mean: 0,
+			last_tick_compute_graph_mean: 0,
 		});
 
 		expect(useSimulationStore.getState().simState).toBe("paused");
