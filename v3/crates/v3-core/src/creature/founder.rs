@@ -402,13 +402,11 @@ fn node1_vm_decision() -> NodeGenome {
                 }, // offspring energy
                 VmInstruction::EmitWorldAction { action_type: 3 }, // Reproduce
                 VmInstruction::Sub { dst: 7, a: 7, b: 7 }, // r7 = 0.0 (clean up for Eat check)
-
                 // Priority 2: Eat if food here
                 VmInstruction::CmpGt { dst: 6, a: 0, b: 7 }, // r6 = food_here > 0? (r7=0.0)
                 VmInstruction::JumpIfZero { cond: 6, offset: 2 }, // skip eat if no food
                 VmInstruction::EmitWorldAction { action_type: 1 }, // Eat
                 VmInstruction::Noop,                         // (jumped past)
-
                 // Priority 3: Move toward highest food direction
                 VmInstruction::Max { dst: 6, a: 2, b: 3 }, // max(food_N, food_E)
                 VmInstruction::Max { dst: 7, a: 4, b: 5 }, // max(food_S, food_W)

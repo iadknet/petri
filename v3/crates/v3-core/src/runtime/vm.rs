@@ -46,27 +46,41 @@ pub fn execute_vm_node(
     let max_steps = config.max_vm_steps.max(1) as usize;
     let cost_mult = config.vm.opcode_cost_multiplier;
 
-    let mut regs = vec![0.0f32; reg_count];
+    // Stack-allocated registers covering the full u8 range (256 * 4 = 1KB).
+    const MAX_REGS: usize = 256;
+    let mut regs = [0.0f32; MAX_REGS];
     let mut payload: [f32; 12] = *upstream_slots;
     let mut meta: [f32; 8] = [0.0; 8];
     let mut route_target: f32 = 0.0;
     let mut pc: usize = 0;
     let mut steps: usize = 0;
 
-    // Work on a memory copy; committed only on normal exit.
-    let mut mem_copy = *memory;
+    // Only copy memory when the program contains memory instructions.
+    // This avoids a 1 KiB copy for the majority of genomes.
+    let uses_mem = def.has_memory_ops();
+    let mut mem_copy: [u8; 1024] = if uses_mem { *memory } else { [0u8; 1024] };
 
     use crate::creature::genome::VmInstruction;
 
+    /// Commit the working memory copy back to the creature's persistent memory,
+    /// but only when the program actually uses memory operations.
+    macro_rules! commit_memory {
+        () => {
+            if uses_mem {
+                *memory = mem_copy;
+            }
+        };
+    }
+
     loop {
         if steps >= max_steps {
-            *memory = mem_copy;
+            commit_memory!();
             return NodeResult::halted(payload, route_target);
         }
 
         // Soft default: if control flow lands outside the program, halt cleanly.
         if pc >= program_len {
-            *memory = mem_copy;
+            commit_memory!();
             return NodeResult::halted(payload, route_target);
         }
 
@@ -251,7 +265,7 @@ pub fn execute_vm_node(
 
             VmInstruction::EmitWorldAction { action_type } => {
                 let action = decode_world_action(*action_type, &meta);
-                *memory = mem_copy;
+                commit_memory!();
                 return NodeResult::action(payload, route_target, action);
             }
 
@@ -260,7 +274,7 @@ pub fn execute_vm_node(
             }
 
             VmInstruction::Halt => {
-                *memory = mem_copy;
+                commit_memory!();
                 return NodeResult::halted(payload, route_target);
             }
 

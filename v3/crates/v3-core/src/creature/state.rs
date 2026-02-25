@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-
-use crate::contracts::{CreatureId, NodeId, Position};
+use crate::contracts::{CreatureId, Position};
 use crate::creature::genome::CreatureGenome;
 
 /// Full runtime state of a creature in the simulation.
@@ -14,8 +12,8 @@ pub struct CreatureState {
     /// 1024-byte persistent memory, copied on reproduction.
     pub memory: [u8; 1024],
     /// Per-node stateful operator state for the Graph backend.
-    /// Keyed by NodeId; lazily initialized on first access.
-    pub graph_state: HashMap<NodeId, Vec<f32>>,
+    /// Indexed by node position within `genome.nodes`; lazily resized on first access.
+    pub graph_state: Vec<Vec<f32>>,
     /// RGB phenotype color. Channel values in [0, 255].
     pub phenotype_rgb: [u8; 3],
     /// Per-channel weights for phenotype mutation (internal, not API-exposed).
@@ -45,7 +43,7 @@ impl CreatureState {
             age: 0,
             generation,
             memory: [0u8; 1024],
-            graph_state: HashMap::new(),
+            graph_state: Vec::new(),
             phenotype_rgb,
             phenotype_channel_weights,
             phenotype_channel_polarity,

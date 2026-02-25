@@ -36,7 +36,7 @@ pub fn execute_creature_mesh(
     static_inputs: &StaticInputs,
     energy: &mut f32,
     memory: &mut [u8; 1024],
-    graph_state: &mut HashMap<NodeId, Vec<f32>>,
+    graph_state: &mut Vec<Vec<f32>>,
     config: &RuntimeConfig,
 ) -> WorldAction {
     let mut current_node_id = genome.entry_node_id;
@@ -45,8 +45,16 @@ pub fn execute_creature_mesh(
     let max_hops = config.max_mesh_hops.max(1) as usize;
     let start_energy = *energy;
 
+    // Build a NodeId → index map for O(1) lookups instead of O(n) find_node per hop.
+    let node_index: HashMap<NodeId, usize> = genome
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.node_id, i))
+        .collect();
+
     // Soft default: entry_node_id missing from node set → return NoOp immediately.
-    if genome.find_node(current_node_id).is_none() {
+    if !node_index.contains_key(&current_node_id) {
         return WorldAction::NoOp;
     }
 
@@ -56,12 +64,11 @@ pub fn execute_creature_mesh(
         }
 
         // Invariant: verified present before the loop, and after every routing step.
-        let node = genome
-            .find_node(current_node_id)
-            .expect("node must exist: checked before loop and after routing");
+        let node = &genome.nodes[node_index[&current_node_id]];
 
         let energy_consumed = (start_energy - *energy).max(0.0);
 
+        let current_idx = node_index[&current_node_id];
         let result = match &node.backend_def {
             BackendDef::Vm(def) => execute_vm_node(
                 def,
@@ -79,7 +86,7 @@ pub fn execute_creature_mesh(
                 &upstream_slots,
                 energy,
                 energy_consumed,
-                node.node_id,
+                current_idx,
                 graph_state,
                 static_inputs,
                 config,
@@ -120,7 +127,7 @@ pub fn execute_creature_mesh(
         let target_id = node.targets[target_pos];
 
         // Soft default: routed target id missing from node set → return NoOp.
-        if genome.find_node(target_id).is_none() {
+        if !node_index.contains_key(&target_id) {
             return WorldAction::NoOp;
         }
 
@@ -140,7 +147,6 @@ mod tests {
         NodeGenome, VmBackendDef, VmInstruction,
     };
     use crate::sensors::static_inputs::StaticInputs;
-    use std::collections::HashMap;
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -208,7 +214,7 @@ mod tests {
         let si = empty_static_inputs();
         let mut energy = 100.0f32;
         let mut memory = [0u8; 1024];
-        let mut graph_state = HashMap::new();
+        let mut graph_state = vec![];
         let config = default_config();
 
         let action = execute_creature_mesh(
@@ -247,7 +253,7 @@ mod tests {
         let si = empty_static_inputs();
         let mut energy = 1000.0f32;
         let mut memory = [0u8; 1024];
-        let mut graph_state = HashMap::new();
+        let mut graph_state = vec![];
         let config = RuntimeConfig {
             max_mesh_hops: 3,
             ..RuntimeConfig::default()
@@ -286,7 +292,7 @@ mod tests {
         let si = empty_static_inputs();
         let mut energy = 100.0f32;
         let mut memory = [0u8; 1024];
-        let mut graph_state = HashMap::new();
+        let mut graph_state = vec![];
         let config = default_config();
 
         let action = execute_creature_mesh(
@@ -323,7 +329,7 @@ mod tests {
         let si = empty_static_inputs();
         let mut energy = 0.01f32; // way below the Noop cost of 0.05
         let mut memory = [0u8; 1024];
-        let mut graph_state = HashMap::new();
+        let mut graph_state = vec![];
         let config = default_config();
 
         let action = execute_creature_mesh(
@@ -350,7 +356,7 @@ mod tests {
         let si = empty_static_inputs();
         let mut energy = 100.0f32;
         let mut memory = [0u8; 1024];
-        let mut graph_state = HashMap::new();
+        let mut graph_state = vec![];
         let config = default_config();
 
         let action = execute_creature_mesh(
@@ -405,7 +411,7 @@ mod tests {
         let si = empty_static_inputs();
         let mut energy = 100.0f32;
         let mut memory = [0u8; 1024];
-        let mut graph_state = HashMap::new();
+        let mut graph_state = vec![];
         let config = default_config();
 
         let action = execute_creature_mesh(
@@ -447,7 +453,7 @@ mod tests {
         let si = empty_static_inputs();
         let mut energy = 1000.0f32;
         let mut memory = [0u8; 1024];
-        let mut graph_state = HashMap::new();
+        let mut graph_state = vec![];
         let config = default_config();
 
         let action = execute_creature_mesh(
@@ -492,7 +498,7 @@ mod tests {
         let si = empty_static_inputs();
         let mut energy = 1000.0f32;
         let mut memory = [0u8; 1024];
-        let mut graph_state = HashMap::new();
+        let mut graph_state = vec![];
         let config = default_config();
 
         let action = execute_creature_mesh(
@@ -577,7 +583,7 @@ mod tests {
         let si = empty_static_inputs();
         let mut energy = 1000.0f32;
         let mut memory = [0u8; 1024];
-        let mut graph_state = HashMap::new();
+        let mut graph_state = vec![];
         let config = default_config();
 
         let action = execute_creature_mesh(
