@@ -41,18 +41,18 @@ function buildDefaultPreset(): StartupPreset {
 	return {
 		seed: randomSeed(),
 		population: {
-			initial_creatures: 50,
+			initial_creatures: 2000,
 		},
 		world: {
 			width: 400,
 			height: 400,
 			food: {
-				growth_rate: 0.25,
+				growth_rate: 0.096,
 				initial_density: 1.0,
 				initial_coverage: 0.15,
-				spread_threshold_ratio: 0.75,
-				recovery_spawn_rate: 0.02,
-				recovery_floor_ratio: 0.03,
+				spread_threshold_ratio: 0.8,
+				recovery_spawn_rate: 0.01,
+				recovery_floor_ratio: 0.01,
 				max_density: 1.0,
 			},
 		},
