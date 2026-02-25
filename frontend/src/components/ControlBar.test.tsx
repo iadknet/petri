@@ -172,6 +172,40 @@ describe("ControlBar", () => {
 		});
 	});
 
+	it("displays TPS value when ticksPerSecond is non-zero", () => {
+		useSimulationStore.setState({ ticksPerSecond: 0.3 });
+
+		render(
+			<PanelLayoutProvider>
+				<ControlBar />
+			</PanelLayoutProvider>,
+		);
+
+		expect(screen.getByTestId("tps-value")).toHaveTextContent("TPS: 0.3");
+	});
+
+	it("displays TPS with locale formatting for large values", () => {
+		useSimulationStore.setState({ ticksPerSecond: 1234 });
+
+		render(
+			<PanelLayoutProvider>
+				<ControlBar />
+			</PanelLayoutProvider>,
+		);
+
+		expect(screen.getByTestId("tps-value")).toHaveTextContent("TPS: 1,234");
+	});
+
+	it("displays TPS as 0 when simulation is idle", () => {
+		render(
+			<PanelLayoutProvider>
+				<ControlBar />
+			</PanelLayoutProvider>,
+		);
+
+		expect(screen.getByTestId("tps-value")).toHaveTextContent("TPS: 0");
+	});
+
 	it("restart asks for confirmation when running and cancel skips API call", async () => {
 		useSimulationStore.getState().setSimState("running");
 		vi.spyOn(window, "confirm").mockReturnValue(false);

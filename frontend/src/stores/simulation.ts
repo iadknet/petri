@@ -10,6 +10,8 @@ export interface SimulationState {
 	// Simulation state
 	simState: SimState;
 	tick: number;
+	ticksPerSecond: number;
+	_tpsSample: { tick: number; timestamp: number } | null;
 
 	// Latest data from WebSocket events
 	frame: Frame | null;
@@ -30,6 +32,8 @@ const initialState = {
 	connectionStatus: "disconnected" as ConnectionStatus,
 	simState: "idle" as SimState,
 	tick: 0,
+	ticksPerSecond: 0,
+	_tpsSample: null as { tick: number; timestamp: number } | null,
 	frame: null,
 	status: null,
 	health: null,
@@ -54,7 +58,27 @@ export const useSimulationStore = create<SimulationState>()((set) => ({
 				simState = prev.simState;
 			}
 
-			return { tick, simState, status };
+			// TPS derivation: only compute when simulation is actively running
+			let ticksPerSecond = prev.ticksPerSecond;
+			let _tpsSample = prev._tpsSample;
+
+			if (simState === "running") {
+				const now = Date.now();
+				if (_tpsSample && tick > _tpsSample.tick) {
+					const elapsed = (now - _tpsSample.timestamp) / 1000;
+					const rawTps = (tick - _tpsSample.tick) / elapsed;
+					ticksPerSecond = prev.ticksPerSecond === 0 ? rawTps : 0.2 * rawTps + 0.8 * prev.ticksPerSecond;
+					_tpsSample = { tick, timestamp: now };
+				} else if (!_tpsSample) {
+					_tpsSample = { tick, timestamp: Date.now() };
+				}
+			} else {
+				// Reset TPS when not running (paused or idle)
+				ticksPerSecond = 0;
+				_tpsSample = null;
+			}
+
+			return { tick, simState, status, ticksPerSecond, _tpsSample };
 		}),
 	setHealth: (tick, health) => set({ tick, health }),
 
