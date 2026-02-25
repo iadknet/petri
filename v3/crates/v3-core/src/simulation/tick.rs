@@ -49,7 +49,7 @@ pub fn run_tick(sim: &mut Simulation) {
     use crate::contracts::WorldAction;
     use crate::runtime::mesh::execute_creature_mesh;
     use crate::sensors::static_inputs::assemble_static_inputs;
-    use crate::simulation::actions::{apply_eat, apply_move, apply_noop, apply_reproduce};
+    use crate::simulation::actions::apply_reproduce;
 
     // Reset per-tick counters at the start of each tick.
     sim.stats.last_tick_move = 0;
@@ -67,9 +67,11 @@ pub fn run_tick(sim: &mut Simulation) {
     // Derive a separate RNG for reproduction to avoid double-borrowing sim.rng.
     let mut reproduce_rng = rand::rngs::SmallRng::seed_from_u64(sim.rng.next_u64());
 
-    // Clone config once per tick so action-dispatch can access it alongside
-    // a mutable creature borrow (different SlotMap entry).
-    let config = sim.config.clone();
+    // Copy only the small config subsets needed by the per-creature loop,
+    // avoiding a full SimulationConfig clone (which contains Vecs/Strings).
+    // EnergyConfig is 9 f32 fields; RuntimeConfig is ~7 scalars + VmRuntimeConfig (1 f32).
+    let energy_config = sim.config.energy.clone();
+    let runtime_config = sim.config.runtime.clone();
 
     for id in queue {
         // Skip creatures removed mid-tick (killed by a previous action this tick).
@@ -89,27 +91,42 @@ pub fn run_tick(sim: &mut Simulation) {
                 &mut creature.energy,
                 &mut creature.memory,
                 &mut creature.graph_state,
-                &config.runtime,
+                &runtime_config,
             )
         };
 
         // Apply the chosen action.  Each branch re-borrows only what it needs.
+        // NoOp/Eat/Move use the pre-copied energy_config to avoid re-borrowing sim.config.
         match action {
             WorldAction::NoOp => {
                 if let Some(creature) = sim.creatures.get_mut(id) {
-                    apply_noop(creature, &config);
+                    creature.energy -= energy_config.costs.noop_cost;
                     sim.stats.last_tick_noop += 1;
                 }
             }
             WorldAction::Eat => {
                 if let Some(creature) = sim.creatures.get_mut(id) {
-                    apply_eat(creature, &mut sim.world, &config);
+                    let food = sim.world.consume_food(creature.position);
+                    creature.energy += food * energy_config.costs.eat_reward_per_food;
+                    creature.energy = creature.energy.min(energy_config.lifecycle.max_energy);
+                    creature.energy -= energy_config.costs.eat_cost;
                     sim.stats.last_tick_eat += 1;
                 }
             }
             WorldAction::Move(dir) => {
                 if let Some(creature) = sim.creatures.get_mut(id) {
-                    apply_move(id, creature, &mut sim.world, dir, &config);
+                    let target = sim
+                        .world
+                        .resolve_neighbor(creature.position, dir)
+                        .filter(|&p| sim.world.is_valid_target_cell(p));
+
+                    if let Some(target_pos) = target {
+                        sim.world.remove_creature(creature.position);
+                        sim.world.place_creature(target_pos, id);
+                        creature.position = target_pos;
+                    }
+
+                    creature.energy -= energy_config.costs.move_cost;
                     sim.stats.last_tick_move += 1;
                 }
             }

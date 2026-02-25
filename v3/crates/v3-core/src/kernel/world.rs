@@ -17,6 +17,8 @@ pub struct WorldState {
     food_density: Grid<f32>,
     barriers: Grid<bool>,
     creature_at: Grid<Option<CreatureId>>,
+    /// Reusable scratch buffer for `grow_food` to avoid per-tick allocation.
+    food_snapshot: Vec<f32>,
 }
 
 impl WorldState {
@@ -29,6 +31,7 @@ impl WorldState {
             food_density: Grid::new(width, height, 0.0),
             barriers: Grid::new(width, height, false),
             creature_at: Grid::new(width, height, None),
+            food_snapshot: Vec::new(),
         }
     }
 
@@ -101,18 +104,20 @@ impl WorldState {
             max_density * config.world.food.spread_threshold_ratio.clamp(0.0, 1.0);
         let recovery_floor = config.world.food.recovery_floor_ratio.clamp(0.0, 1.0);
         let recovery_spawn_rate = config.world.food.recovery_spawn_rate.clamp(0.0, 1.0);
-        let source_food = (0..total_cells)
-            .map(|idx| {
-                let x = (idx % self.width as usize) as u16;
-                let y = (idx / self.width as usize) as u16;
-                (*self.food_density.get(x, y)).clamp(0.0, max_density)
-            })
-            .collect::<Vec<_>>();
-        let total_food: f32 = source_food.iter().sum();
+        // Snapshot food densities into a reusable buffer (avoids per-tick allocation).
+        self.food_snapshot.clear();
+        self.food_snapshot.extend(
+            self.food_density
+                .as_slice()
+                .iter()
+                .map(|v| v.clamp(0.0, max_density)),
+        );
+        let total_food: f32 = self.food_snapshot.iter().sum();
         let average_density_ratio =
             (total_food / (total_cells as f32 * max_density)).clamp(0.0, 1.0);
 
-        for (idx, source) in source_food.iter().copied().enumerate() {
+        for idx in 0..total_cells {
+            let source = self.food_snapshot[idx];
             let x = (idx % self.width as usize) as u16;
             let y = (idx / self.width as usize) as u16;
             let pos = Position::new(x, y);

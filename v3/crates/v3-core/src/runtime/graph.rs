@@ -1,7 +1,5 @@
-use std::collections::HashMap;
-
 use crate::config::RuntimeConfig;
-use crate::contracts::{InputReference, NodeId};
+use crate::contracts::InputReference;
 use crate::creature::genome::{GraphBackendDef, GraphInternalNode, GraphNodeKind};
 use crate::runtime::inputs::resolve_input;
 use crate::runtime::types::{sanitize_f32, NodeResult};
@@ -106,11 +104,14 @@ fn evaluate_kind(
     }
 }
 
-/// Collect the weighted input values for a single internal node.
+/// Collect the weighted input values for a single internal node into `buf`.
 ///
 /// Implements Gauss-Seidel update order: sources already updated in this pass
 /// (`source_idx < current_idx`) use `curr_outputs`; sources not yet updated
 /// (or self-loops) use `prev_outputs`.
+///
+/// `buf` is cleared and filled with one entry per input edge. The caller
+/// should allocate `buf` once and reuse it across nodes/passes.
 #[inline]
 fn collect_weighted_inputs(
     node: &GraphInternalNode,
@@ -118,21 +119,20 @@ fn collect_weighted_inputs(
     node_count: usize,
     prev_outputs: &[f32],
     curr_outputs: &[f32],
-) -> Vec<f32> {
-    node.inputs
-        .iter()
-        .map(|input| {
-            let src = input.source_idx as usize;
-            let source_value = if src >= node_count {
-                0.0
-            } else if src < current_idx {
-                curr_outputs[src]
-            } else {
-                prev_outputs[src]
-            };
-            source_value * input.weight
-        })
-        .collect()
+    buf: &mut Vec<f32>,
+) {
+    buf.clear();
+    buf.extend(node.inputs.iter().map(|input| {
+        let src = input.source_idx as usize;
+        let source_value = if src >= node_count {
+            0.0
+        } else if src < current_idx {
+            curr_outputs[src]
+        } else {
+            prev_outputs[src]
+        };
+        source_value * input.weight
+    }));
 }
 
 /// Execute a graph-backend mesh node.
@@ -157,8 +157,8 @@ pub fn execute_graph_node(
     upstream_slots: &[f32; 12],
     energy: &mut f32,
     energy_consumed: f32,
-    node_id: NodeId,
-    graph_state: &mut HashMap<NodeId, Vec<f32>>,
+    node_idx: usize,
+    graph_state: &mut Vec<Vec<f32>>,
     static_inputs: &StaticInputs,
     config: &RuntimeConfig,
 ) -> NodeResult {
@@ -169,11 +169,16 @@ pub fn execute_graph_node(
         return NodeResult::halted(*upstream_slots, 0.0);
     }
 
-    // Snapshot state for atomic rollback on energy exhaustion.
-    let state_backup: Option<Vec<f32>> = graph_state.get(&node_id).cloned();
+    // Ensure graph_state has enough slots for this node index.
+    if graph_state.len() <= node_idx {
+        graph_state.resize(node_idx + 1, Vec::new());
+    }
 
-    // Ensure the state Vec exists and is long enough.
-    let state_vec = graph_state.entry(node_id).or_default();
+    // Snapshot state for atomic rollback on energy exhaustion.
+    let state_backup: Vec<f32> = graph_state[node_idx].clone();
+
+    // Ensure the state Vec for this node is long enough.
+    let state_vec = &mut graph_state[node_idx];
     if state_vec.len() < node_count {
         state_vec.resize(node_count, 0.0);
     }
@@ -185,6 +190,7 @@ pub fn execute_graph_node(
     let mut prev_outputs = vec![0.0f32; node_count];
     let mut curr_outputs = vec![0.0f32; node_count];
     let mut stable_passes: u32 = 0;
+    let mut w_inputs_buf: Vec<f32> = Vec::new();
 
     for _pass in 0..max_passes {
         // Charge energy BEFORE evaluating this pass.
@@ -192,14 +198,7 @@ pub fn execute_graph_node(
         *energy -= pass_cost;
         if *energy <= 0.0 {
             // Restore state snapshot.
-            match state_backup {
-                Some(backup) => {
-                    graph_state.insert(node_id, backup);
-                }
-                None => {
-                    graph_state.remove(&node_id);
-                }
-            }
+            graph_state[node_idx] = state_backup;
             return NodeResult::exhausted();
         }
 
@@ -214,33 +213,29 @@ pub fn execute_graph_node(
 
         for current_idx in 0..node_count {
             let node = &def.internal_nodes[current_idx];
-            let w_inputs = collect_weighted_inputs(
+            collect_weighted_inputs(
                 node,
                 current_idx,
                 node_count,
                 &prev_outputs,
                 &curr_outputs,
+                &mut w_inputs_buf,
             );
-            let wsum: f32 = w_inputs.iter().sum();
+            let wsum: f32 = w_inputs_buf.iter().sum();
 
             // Load node-local state; write back after evaluate_kind updates it.
-            // The Vec was extended to `node_count` before the loop.
-            let mut node_state = graph_state
-                .get(&node_id)
-                .expect("state vec must exist after entry() call above")[current_idx];
+            let mut node_state = graph_state[node_idx][current_idx];
 
             curr_outputs[current_idx] = sanitize_f32(evaluate_kind(
                 &node.kind,
-                &w_inputs,
+                &w_inputs_buf,
                 wsum,
                 &ctx,
                 &mut node_state,
             ));
 
             // Persist any state mutation from stateful operators.
-            graph_state
-                .get_mut(&node_id)
-                .expect("state vec must still exist")[current_idx] = node_state;
+            graph_state[node_idx][current_idx] = node_state;
         }
 
         // Convergence check: max absolute change across all outputs.
@@ -292,10 +287,8 @@ pub fn execute_graph_node(
 mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
-    use crate::contracts::NodeId;
     use crate::creature::genome::{GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind};
     use crate::sensors::static_inputs::StaticInputs;
-    use std::collections::HashMap;
 
     fn default_config() -> RuntimeConfig {
         RuntimeConfig::default()
@@ -310,10 +303,6 @@ mod tests {
             generation: 0.0,
             age_ticks: 0.0,
         }
-    }
-
-    fn node_id(n: u32) -> NodeId {
-        NodeId::new(n)
     }
 
     /// Single-node graph with the given kind and no inputs.
@@ -334,7 +323,7 @@ mod tests {
         };
         let upstream = [1.0, 2.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
         let mut energy = 50.0f32;
-        let mut graph_state = HashMap::new();
+        let mut graph_state: Vec<Vec<f32>> = vec![];
         let si = make_static_inputs();
         let config = default_config();
 
@@ -344,7 +333,7 @@ mod tests {
             &upstream,
             &mut energy,
             0.0,
-            node_id(0),
+            0,
             &mut graph_state,
             &si,
             &config,
@@ -368,7 +357,7 @@ mod tests {
         let def = single_node_graph(GraphNodeKind::Constant(99.0));
         let upstream = [0.0f32; 12];
         let mut energy = 0.5f32;
-        let mut graph_state = HashMap::new();
+        let mut graph_state: Vec<Vec<f32>> = vec![];
         let si = make_static_inputs();
         let mut config = default_config();
         config.graph_node_base_cost = 1.0;
@@ -379,7 +368,7 @@ mod tests {
             &upstream,
             &mut energy,
             0.0,
-            node_id(1),
+            0,
             &mut graph_state,
             &si,
             &config,
@@ -395,7 +384,7 @@ mod tests {
         let def = single_node_graph(GraphNodeKind::Constant(42.0));
         let upstream = [7.0f32; 12];
         let mut energy = 100.0f32;
-        let mut graph_state = HashMap::new();
+        let mut graph_state: Vec<Vec<f32>> = vec![];
         let si = make_static_inputs();
         let config = default_config();
 
@@ -405,7 +394,7 @@ mod tests {
             &upstream,
             &mut energy,
             0.0,
-            node_id(2),
+            0,
             &mut graph_state,
             &si,
             &config,
@@ -446,7 +435,7 @@ mod tests {
         };
         let upstream = [0.0f32; 12];
         let mut energy = 100.0f32;
-        let mut graph_state = HashMap::new();
+        let mut graph_state: Vec<Vec<f32>> = vec![];
         let si = make_static_inputs();
         let config = default_config();
 
@@ -456,7 +445,7 @@ mod tests {
             &upstream,
             &mut energy,
             0.0,
-            node_id(3),
+            0,
             &mut graph_state,
             &si,
             &config,
@@ -490,7 +479,7 @@ mod tests {
         };
         let upstream = [0.0f32; 12];
         let mut energy = 100.0f32;
-        let mut graph_state = HashMap::new();
+        let mut graph_state: Vec<Vec<f32>> = vec![];
         let si = make_static_inputs();
         let config = default_config();
 
@@ -500,7 +489,7 @@ mod tests {
             &upstream,
             &mut energy,
             0.0,
-            node_id(4),
+            0,
             &mut graph_state,
             &si,
             &config,
@@ -520,7 +509,7 @@ mod tests {
         let def = single_node_graph(GraphNodeKind::Add);
         let upstream = [1.0f32; 12];
         let mut energy = 100.0f32;
-        let mut graph_state = HashMap::new();
+        let mut graph_state: Vec<Vec<f32>> = vec![];
         let si = make_static_inputs();
         let config = default_config();
 
@@ -530,7 +519,7 @@ mod tests {
             &upstream,
             &mut energy,
             0.0,
-            node_id(5),
+            0,
             &mut graph_state,
             &si,
             &config,
@@ -572,14 +561,14 @@ mod tests {
         };
         let upstream = [0.0f32; 12];
         let mut energy = 1000.0f32;
-        let mut graph_state: HashMap<NodeId, Vec<f32>> = HashMap::new();
+        let mut graph_state: Vec<Vec<f32>> = vec![];
         let si = make_static_inputs();
         // One pass, converges immediately.
         let mut config = default_config();
         config.max_graph_relax_iters = 1;
         config.graph_convergence_stable_passes = 1;
 
-        let nid = node_id(6);
+        let nid: usize = 0;
 
         let result1 = execute_graph_node(
             &def,
@@ -627,12 +616,12 @@ mod tests {
                 inputs: vec![],
             }],
         };
-        let nid = node_id(7);
+        let nid: usize = 0;
         let upstream = [0.0f32; 12];
-        let mut energy = 0.5f32; // Will exhaust on first pass charge.
-        let mut graph_state: HashMap<NodeId, Vec<f32>> = HashMap::new();
+        // Will exhaust on first pass charge.
+        let mut energy = 0.5f32;
         // Pre-populate state with a known sentinel.
-        graph_state.insert(nid, vec![42.0f32]);
+        let mut graph_state: Vec<Vec<f32>> = vec![vec![42.0f32]];
 
         let si = make_static_inputs();
         let mut config = default_config();
@@ -652,11 +641,10 @@ mod tests {
 
         assert!(result.energy_exhausted);
         // State must be restored to the pre-call value.
-        let state_after = graph_state.get(&nid).expect("state key must be present");
         assert!(
-            (state_after[0] - 42.0).abs() < 1e-6,
+            (graph_state[nid][0] - 42.0).abs() < 1e-6,
             "state was mutated: {}",
-            state_after[0]
+            graph_state[nid][0]
         );
     }
 
@@ -668,7 +656,7 @@ mod tests {
         ];
         let def = single_node_graph(GraphNodeKind::Sigmoid);
         let mut energy = 100.0f32;
-        let mut graph_state = HashMap::new();
+        let mut graph_state: Vec<Vec<f32>> = vec![];
         let si = make_static_inputs();
         let config = default_config();
 
@@ -678,7 +666,7 @@ mod tests {
             &upstream,
             &mut energy,
             0.0,
-            node_id(8),
+            0,
             &mut graph_state,
             &si,
             &config,
@@ -713,7 +701,7 @@ mod tests {
 
         let upstream = [0.0f32; 12];
         let mut energy = 50.0f32;
-        let mut graph_state = HashMap::new();
+        let mut graph_state: Vec<Vec<f32>> = vec![];
         let si = make_static_inputs();
 
         let _ = execute_graph_node(
@@ -722,7 +710,7 @@ mod tests {
             &upstream,
             &mut energy,
             0.0,
-            node_id(9),
+            0,
             &mut graph_state,
             &si,
             &config,
@@ -765,13 +753,13 @@ mod tests {
         };
         let upstream = [0.0f32; 12];
         let mut energy = 1000.0f32;
-        let mut graph_state: HashMap<NodeId, Vec<f32>> = HashMap::new();
+        let mut graph_state: Vec<Vec<f32>> = vec![];
         let si = make_static_inputs();
         let mut config = default_config();
         config.max_graph_relax_iters = 1;
         config.graph_convergence_stable_passes = 1;
 
-        let nid = node_id(20);
+        let nid: usize = 0;
 
         let r1 = execute_graph_node(
             &def,
@@ -839,13 +827,13 @@ mod tests {
         };
         let upstream = [0.0f32; 12];
         let mut energy = 1000.0f32;
-        let mut graph_state: HashMap<NodeId, Vec<f32>> = HashMap::new();
+        let mut graph_state: Vec<Vec<f32>> = vec![];
         let si = make_static_inputs();
         let mut config = default_config();
         config.max_graph_relax_iters = 1;
         config.graph_convergence_stable_passes = 1;
 
-        let nid = node_id(21);
+        let nid: usize = 0;
 
         let r1 = execute_graph_node(
             &def,
@@ -888,15 +876,14 @@ mod tests {
         };
         let upstream = [0.0f32; 12];
         let mut energy = 1000.0f32;
-        let mut graph_state: HashMap<NodeId, Vec<f32>> = HashMap::new();
         let si = make_static_inputs();
         let mut config = default_config();
         config.max_graph_relax_iters = 1;
         config.graph_convergence_stable_passes = 1;
 
-        let nid = node_id(22);
+        let nid: usize = 0;
         // Pre-set state slot 0 to INFINITY to simulate the corrupted state case.
-        graph_state.insert(nid, vec![f32::INFINITY, 0.0]);
+        let mut graph_state: Vec<Vec<f32>> = vec![vec![f32::INFINITY, 0.0]];
 
         let r = execute_graph_node(
             &def,
@@ -962,8 +949,8 @@ mod tests {
             &upstream,
             &mut energy,
             0.0,
-            node_id(23),
-            &mut HashMap::new(),
+            0,
+            &mut vec![],
             &si,
             &config,
         );
@@ -977,8 +964,8 @@ mod tests {
             &upstream,
             &mut energy,
             0.0,
-            node_id(24),
-            &mut HashMap::new(),
+            0,
+            &mut vec![],
             &si,
             &config,
         );
@@ -995,8 +982,8 @@ mod tests {
             &upstream,
             &mut energy,
             0.0,
-            node_id(25),
-            &mut HashMap::new(),
+            0,
+            &mut vec![],
             &si,
             &config,
         );
@@ -1025,7 +1012,7 @@ mod tests {
         };
         let upstream = [0.0f32; 12];
         let mut energy = 1000.0f32;
-        let mut graph_state = HashMap::new();
+        let mut graph_state: Vec<Vec<f32>> = vec![];
         let si = make_static_inputs();
         let mut config = default_config();
         config.max_graph_relax_iters = 1;
@@ -1037,7 +1024,7 @@ mod tests {
             &upstream,
             &mut energy,
             0.0,
-            node_id(26),
+            0,
             &mut graph_state,
             &si,
             &config,
@@ -1102,8 +1089,8 @@ mod tests {
             &upstream,
             &mut energy,
             0.0,
-            node_id(27),
-            &mut HashMap::new(),
+            0,
+            &mut vec![],
             &si,
             &config,
         );
@@ -1117,8 +1104,8 @@ mod tests {
             &upstream,
             &mut energy,
             0.0,
-            node_id(28),
-            &mut HashMap::new(),
+            0,
+            &mut vec![],
             &si,
             &config,
         );
@@ -1132,8 +1119,8 @@ mod tests {
             &upstream,
             &mut energy,
             0.0,
-            node_id(29),
-            &mut HashMap::new(),
+            0,
+            &mut vec![],
             &si,
             &config,
         );
@@ -1209,8 +1196,8 @@ mod tests {
             &upstream,
             &mut energy,
             0.0,
-            node_id(30),
-            &mut HashMap::new(),
+            0,
+            &mut vec![],
             &si,
             &config,
         );
@@ -1228,8 +1215,8 @@ mod tests {
             &upstream,
             &mut energy,
             0.0,
-            node_id(31),
-            &mut HashMap::new(),
+            0,
+            &mut vec![],
             &si,
             &config,
         );
@@ -1271,7 +1258,7 @@ mod tests {
         };
         let upstream = [0.0f32; 12];
         let mut energy = 100.0f32;
-        let mut graph_state = HashMap::new();
+        let mut graph_state: Vec<Vec<f32>> = vec![];
         let si = make_static_inputs();
         let config = default_config();
 
@@ -1281,7 +1268,7 @@ mod tests {
             &upstream,
             &mut energy,
             0.0,
-            node_id(10),
+            0,
             &mut graph_state,
             &si,
             &config,

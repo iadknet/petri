@@ -95,6 +95,21 @@ pub struct VmBackendDef {
     pub program: Vec<VmInstruction>,
 }
 
+impl VmBackendDef {
+    /// Returns `true` if any instruction in the program reads or writes memory.
+    pub fn has_memory_ops(&self) -> bool {
+        self.program.iter().any(|instr| {
+            matches!(
+                instr,
+                VmInstruction::LoadMem8 { .. }
+                    | VmInstruction::StoreMem8 { .. }
+                    | VmInstruction::LoadMem8Imm { .. }
+                    | VmInstruction::StoreMem8Imm { .. }
+            )
+        })
+    }
+}
+
 // ── Graph backend types ───────────────────────────────────────────────────────
 
 /// A weighted edge in a graph internal node's input list.
