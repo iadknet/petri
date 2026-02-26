@@ -5,12 +5,6 @@
 
 ## Small Modifications
 
-### Add "complexity" score metadata attribute to creatures
-  - Need to figure out how to compute compute creature "complexity"
-    - Number of nodes?
-    - Total genome size?
-    - Any other ideas?
-
 ### Change phenotype drift
   - instead of weighted random channel have a set channel that increments/decrements depending on polarity
   - Random chance the channel target changes
