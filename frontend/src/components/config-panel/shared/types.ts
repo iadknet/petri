@@ -10,6 +10,7 @@ export interface FieldDef {
 	testId?: string;
 	topologyField?: boolean;
 	defaultValue?: number;
+	tooltip?: string;
 }
 
 export type StartupUpdater = (path: string, value: number) => void;

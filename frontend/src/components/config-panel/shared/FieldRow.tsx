@@ -1,3 +1,4 @@
+import { Tooltip } from "./Tooltip.tsx";
 import type { FieldDef } from "./types.ts";
 
 interface FieldRowProps {
@@ -36,6 +37,11 @@ export function FieldRow({
 						</span>
 					)}
 					{field.label}
+					{field.tooltip && (
+						<Tooltip text={field.tooltip}>
+							<span className="text-slate-500 cursor-help text-[10px]">&#x24D8;</span>
+						</Tooltip>
+					)}
 				</label>
 				{showReset && (
 					<button
