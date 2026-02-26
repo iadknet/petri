@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef } from "react";
 import { WorldRenderer } from "../canvas/renderer.ts";
+import { usePaintInteraction } from "../hooks/usePaintInteraction.ts";
+import { usePaintStore } from "../stores/paint.ts";
 import { useSimulationStore } from "../stores/simulation.ts";
+import { PaintToolbar } from "./PaintToolbar.tsx";
 import { ZoomControls } from "./ZoomControls.tsx";
 
 export function WorldViewport() {
@@ -8,6 +11,11 @@ export function WorldViewport() {
 	const containerRef = useRef<HTMLDivElement>(null);
 	const rendererRef = useRef<WorldRenderer | null>(null);
 	const dragRef = useRef<{ startX: number; startY: number } | null>(null);
+
+	const paintMode = usePaintStore((s) => s.paintMode);
+	const simState = useSimulationStore((s) => s.simState);
+
+	const paint = usePaintInteraction(rendererRef, canvasRef);
 
 	const initRenderer = useCallback(() => {
 		const canvas = canvasRef.current;
@@ -60,6 +68,15 @@ export function WorldViewport() {
 		});
 	}, []);
 
+	// Exit paint mode when simulation starts running
+	useEffect(() => {
+		return useSimulationStore.subscribe((state, prev) => {
+			if (state.simState === "running" && prev.simState !== "running") {
+				usePaintStore.getState().setPaintMode(false);
+			}
+		});
+	}, []);
+
 	// Keyboard shortcut: Home to reset view
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
@@ -78,34 +95,84 @@ export function WorldViewport() {
 	}, []);
 
 	// Pan: mouse down
-	const handleMouseDown = useCallback((e: React.MouseEvent) => {
-		if (e.button === 0) {
-			dragRef.current = { startX: e.clientX, startY: e.clientY };
-		}
-	}, []);
+	const handleMouseDown = useCallback(
+		(e: React.MouseEvent) => {
+			if (paintMode && e.button === 0) {
+				paint.handleMouseDown(e);
+				return;
+			}
+			if (e.button === 0) {
+				dragRef.current = { startX: e.clientX, startY: e.clientY };
+			}
+		},
+		[paintMode, paint],
+	);
 
 	// Pan: mouse move
-	const handleMouseMove = useCallback((e: React.MouseEvent) => {
-		if (dragRef.current) {
-			const dx = e.clientX - dragRef.current.startX;
-			const dy = e.clientY - dragRef.current.startY;
-			dragRef.current = { startX: e.clientX, startY: e.clientY };
-			rendererRef.current?.pan(dx, dy);
-		}
-	}, []);
+	const handleMouseMove = useCallback(
+		(e: React.MouseEvent) => {
+			if (paintMode) {
+				paint.handleMouseMove(e);
+				// Still allow pan with right-click drag
+				if (dragRef.current) {
+					const dx = e.clientX - dragRef.current.startX;
+					const dy = e.clientY - dragRef.current.startY;
+					dragRef.current = { startX: e.clientX, startY: e.clientY };
+					rendererRef.current?.pan(dx, dy);
+				}
+				return;
+			}
+			if (dragRef.current) {
+				const dx = e.clientX - dragRef.current.startX;
+				const dy = e.clientY - dragRef.current.startY;
+				dragRef.current = { startX: e.clientX, startY: e.clientY };
+				rendererRef.current?.pan(dx, dy);
+			}
+		},
+		[paintMode, paint],
+	);
 
 	// Pan: mouse up
 	const handleMouseUp = useCallback(() => {
 		dragRef.current = null;
-	}, []);
+		if (paintMode) {
+			paint.handleMouseUp();
+		}
+	}, [paintMode, paint]);
 
-	// Double-click: center + zoom to 4x
-	const handleDoubleClick = useCallback((e: React.MouseEvent) => {
-		const renderer = rendererRef.current;
-		if (!renderer) return;
-		const world = renderer.canvasToWorld(e.clientX, e.clientY);
-		renderer.centerOn(world.x, world.y, 4);
-	}, []);
+	// Right-click drag for pan in paint mode
+	const handleContextMenu = useCallback(
+		(e: React.MouseEvent) => {
+			if (paintMode) {
+				e.preventDefault();
+				dragRef.current = { startX: e.clientX, startY: e.clientY };
+			}
+		},
+		[paintMode],
+	);
+
+	// Double-click: center + zoom to 4x (disabled in paint mode)
+	const handleDoubleClick = useCallback(
+		(e: React.MouseEvent) => {
+			if (paintMode) return;
+			const renderer = rendererRef.current;
+			if (!renderer) return;
+			const world = renderer.canvasToWorld(e.clientX, e.clientY);
+			renderer.centerOn(world.x, world.y, 4);
+		},
+		[paintMode],
+	);
+
+	const handleMouseLeave = useCallback(() => {
+		dragRef.current = null;
+		if (paintMode) {
+			paint.handleMouseUp();
+			// Hide brush overlay
+			if (paint.brushOverlayRef.current) {
+				paint.brushOverlayRef.current.style.display = "none";
+			}
+		}
+	}, [paintMode, paint]);
 
 	const handleZoomIn = useCallback(() => {
 		rendererRef.current?.zoomCenter(-1);
@@ -119,24 +186,54 @@ export function WorldViewport() {
 		rendererRef.current?.resetView();
 	}, []);
 
+	const canTogglePaint = simState === "idle" || simState === "paused";
+	const togglePaintMode = usePaintStore((s) => s.togglePaintMode);
+
 	return (
 		<div ref={containerRef} className="relative w-full h-full overflow-hidden bg-petri-bg">
 			<canvas
 				ref={canvasRef}
 				data-testid="world-canvas"
-				className="absolute inset-0 cursor-crosshair"
+				className={`absolute inset-0 ${paintMode ? "cursor-cell" : "cursor-crosshair"}`}
 				onWheel={handleWheel}
 				onMouseDown={handleMouseDown}
 				onMouseMove={handleMouseMove}
 				onMouseUp={handleMouseUp}
-				onMouseLeave={handleMouseUp}
+				onMouseLeave={handleMouseLeave}
 				onDoubleClick={handleDoubleClick}
+				onContextMenu={handleContextMenu}
 			/>
+			{/* Brush overlay — positioned via direct DOM manipulation in the hook */}
+			{paintMode && (
+				<div
+					ref={paint.brushOverlayRef}
+					className="fixed pointer-events-none border border-white/40 bg-white/10"
+					style={{ display: "none" }}
+				/>
+			)}
+			{paintMode && <PaintToolbar />}
 			<ZoomControls
 				onZoomIn={handleZoomIn}
 				onZoomOut={handleZoomOut}
 				onFitToWorld={handleFitToWorld}
 			/>
+			{/* Paint mode toggle */}
+			{canTogglePaint && (
+				<button
+					type="button"
+					onClick={togglePaintMode}
+					title={paintMode ? "Exit paint mode" : "Enter paint mode"}
+					aria-pressed={paintMode}
+					aria-label={paintMode ? "Exit paint mode" : "Enter paint mode"}
+					className={`absolute bottom-3 right-3 z-10 px-3 py-1.5 text-xs rounded transition-colors ${
+						paintMode
+							? "bg-emerald-600 text-white hover:bg-emerald-500"
+							: "bg-slate-800/60 backdrop-blur-sm text-slate-300 hover:bg-slate-700/80"
+					}`}
+				>
+					{paintMode ? "Painting" : "Paint"}
+				</button>
+			)}
 		</div>
 	);
 }

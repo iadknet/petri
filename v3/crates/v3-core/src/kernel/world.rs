@@ -184,6 +184,11 @@ impl WorldState {
         *self.food_density.get(pos.x, pos.y)
     }
 
+    /// Set food density at a position directly.
+    pub fn set_food(&mut self, pos: Position, value: f32) {
+        self.food_density.set(pos.x, pos.y, value);
+    }
+
     // ── Barriers ─────────────────────────────────────────────────────────────
 
     pub fn is_barrier(&self, pos: Position) -> bool {

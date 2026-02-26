@@ -3,6 +3,8 @@ import type {
 	ConfigResponse,
 	FrameResponse,
 	LifecycleResponse,
+	PaintRequest,
+	PaintResponse,
 	SimulationConfig,
 	StartupRequest,
 	StartupResponse,
@@ -70,6 +72,13 @@ class ApiClient {
 		return this.request("/v3/simulation/config", {
 			method: "PATCH",
 			body: JSON.stringify(patch),
+		});
+	}
+
+	async paint(req: PaintRequest): Promise<PaintResponse> {
+		return this.request("/v3/simulation/paint", {
+			method: "POST",
+			body: JSON.stringify(req),
 		});
 	}
 }

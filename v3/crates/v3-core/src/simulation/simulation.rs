@@ -4,6 +4,7 @@ use slotmap::SlotMap;
 use crate::config::SimulationConfig;
 use crate::contracts::CreatureId;
 use crate::creature::state::CreatureState;
+use crate::kernel::paint::{PaintPoint, PaintStats, PaintTool};
 use crate::kernel::WorldState;
 use crate::simulation::stats::SimStats;
 
@@ -53,6 +54,23 @@ impl Simulation {
     /// Current tick number (incremented by `run_tick`).
     pub fn tick_number(&self) -> u64 {
         self.tick
+    }
+
+    /// Apply a paint stroke, mutating world grids and evicting any creatures under barriers.
+    pub fn apply_paint(
+        &mut self,
+        tool: PaintTool,
+        brush_half_extent: u8,
+        points: &[PaintPoint],
+    ) -> PaintStats {
+        let max_density = self.config.world.food.max_density;
+        let (stats, evicted) =
+            self.world
+                .apply_paint_stroke(tool, brush_half_extent, points, max_density);
+        for id in evicted {
+            self.creatures.remove(id);
+        }
+        stats
     }
 
     /// Mean energy across all living creatures. Returns `0.0` for an empty population.
