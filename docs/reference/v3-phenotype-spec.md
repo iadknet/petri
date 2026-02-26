@@ -144,8 +144,8 @@ by `v3-runtime-config-spec.md`.
 | Key | Type | Default | Constraint |
 | --- | --- | --- | --- |
 | `runtime.mutation.phenotype.channel_step` | `u8` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
-| `runtime.mutation.phenotype.channel_change_chance` | `f32` | `0.01` | Clamp to `[0.0, 1.0]`. |
-| `runtime.mutation.phenotype.polarity_flip_chance` | `f32` | `0.002` | Clamp to `[0.0, 1.0]`. |
+| `runtime.mutation.phenotype.channel_change_chance` | `f32` | `0.001` | Clamp to `[0.0, 1.0]`. |
+| `runtime.mutation.phenotype.polarity_flip_chance` | `f32` | `0.0002` | Clamp to `[0.0, 1.0]`. |
 
 ---
 

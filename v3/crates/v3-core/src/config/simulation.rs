@@ -158,9 +158,9 @@ impl Default for RuntimeConfig {
 pub struct PhenotypeConfig {
     /// RGB channel step magnitude (wrapping u8). Default: 1. Falls back to 1 if 0.
     pub channel_step: u8,
-    /// Probability of switching active channel per reproduction. Default: 0.01. Clamped [0.0, 1.0].
+    /// Probability of switching active channel per reproduction. Default: 0.001. Clamped [0.0, 1.0].
     pub channel_change_chance: f32,
-    /// Probability of flipping the selected channel's polarity. Default: 0.002. Clamped [0.0, 1.0].
+    /// Probability of flipping the selected channel's polarity. Default: 0.0002. Clamped [0.0, 1.0].
     pub polarity_flip_chance: f32,
 }
 
@@ -168,8 +168,8 @@ impl Default for PhenotypeConfig {
     fn default() -> Self {
         Self {
             channel_step: 1,
-            channel_change_chance: 0.01,
-            polarity_flip_chance: 0.002,
+            channel_change_chance: 0.001,
+            polarity_flip_chance: 0.0002,
         }
     }
 }
@@ -393,8 +393,8 @@ mod tests {
         assert_eq!(cfg.mutation.per_birth_mutation_events_max, 10);
         // Phenotype
         assert_eq!(cfg.mutation.phenotype.channel_step, 1);
-        assert!((cfg.mutation.phenotype.channel_change_chance - 0.01).abs() < 1e-6);
-        assert!((cfg.mutation.phenotype.polarity_flip_chance - 0.002).abs() < 1e-6);
+        assert!((cfg.mutation.phenotype.channel_change_chance - 0.001).abs() < 1e-6);
+        assert!((cfg.mutation.phenotype.polarity_flip_chance - 0.0002).abs() < 1e-6);
         // Population
         assert_eq!(cfg.population.initial_creatures, 2000);
         assert_eq!(cfg.population.max_creatures, 100000);

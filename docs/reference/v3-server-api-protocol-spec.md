@@ -146,8 +146,8 @@ Request (conceptual v3alpha1 shape):
       "operator_modifier_scale": 1.0,
       "phenotype": {
         "channel_step": 1,
-        "channel_change_chance": 0.01,
-        "polarity_flip_chance": 0.002
+        "channel_change_chance": 0.001,
+        "polarity_flip_chance": 0.0002
       }
     }
   }
