@@ -158,8 +158,13 @@ export class WorldRenderer {
 	}
 
 	private renderPixelMode(frame: Frame): void {
-		const { ctx } = this;
+		const { ctx, canvas } = this;
 		const { width, height } = frame;
+
+		// Clear canvas so stale pixels don't bleed through at sub-pixel camera offsets
+		ctx.fillStyle = "#020617";
+		ctx.fillRect(0, 0, canvas.width, canvas.height);
+
 		const img = this.ensureImageData(width, height);
 		const data = img.data;
 
