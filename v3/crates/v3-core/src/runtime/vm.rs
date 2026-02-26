@@ -471,17 +471,31 @@ mod tests {
     fn program_counter_past_program_len_soft_halts() {
         // Program has one instruction and no explicit halt/jump.
         // After first step pc becomes 1 (out of range for len=1) and must soft-halt.
-        let (r, energy_after) = run_vm(
-            vec![VmInstruction::Noop],
-            1,
-            vec![],
+        // Uses opcode_cost_multiplier=1.0 so the deduction is observable in f32.
+        let def = VmBackendDef {
+            register_count: 1,
+            constants: vec![],
+            program: vec![VmInstruction::Noop],
+        };
+        let si = empty_static_inputs();
+        let mut e = 100.0;
+        let mut mem = [0u8; 1024];
+        let mut cfg = config();
+        cfg.vm.opcode_cost_multiplier = 1.0;
+        let r = execute_vm_node(
+            &def,
             &[],
-            zeroed_upstream(),
-            100.0,
+            &zeroed_upstream(),
+            &mut e,
+            0.0,
+            &mut mem,
+            &si,
+            &cfg,
         );
         assert!(r.world_action.is_none());
         assert!(!r.energy_exhausted);
-        assert!(energy_after < 100.0);
+        // Noop base cost = 0.05, multiplier = 1.0 → energy = 99.95
+        assert!(e < 100.0);
     }
 
     // ── EmitWorldAction ───────────────────────────────────────────────────────
@@ -1261,20 +1275,55 @@ mod tests {
 
     #[test]
     fn energy_is_deducted_per_opcode() {
-        let program = vec![
-            VmInstruction::Noop, // 0.05
-            VmInstruction::Halt, // 0.05
-        ];
-        let (_, energy_after) = run_vm(program, 1, vec![], &[], zeroed_upstream(), 100.0);
-        assert!(energy_after < 100.0);
-        assert!(energy_after > 99.0);
+        // Uses opcode_cost_multiplier=1.0 so the deduction is observable in f32.
+        // Noop(0.05) + Halt(0.05) = 0.10 total cost → energy = 99.90
+        let def = VmBackendDef {
+            register_count: 1,
+            constants: vec![],
+            program: vec![VmInstruction::Noop, VmInstruction::Halt],
+        };
+        let si = empty_static_inputs();
+        let mut e = 100.0;
+        let mut mem = [0u8; 1024];
+        let mut cfg = config();
+        cfg.vm.opcode_cost_multiplier = 1.0;
+        let _ = execute_vm_node(
+            &def,
+            &[],
+            &zeroed_upstream(),
+            &mut e,
+            0.0,
+            &mut mem,
+            &si,
+            &cfg,
+        );
+        assert!(e < 100.0);
+        assert!(e > 99.0);
     }
 
     #[test]
     fn energy_exhaustion_returns_exhausted() {
-        // Very low energy; Noop costs 0.05
-        let program = vec![VmInstruction::Noop, VmInstruction::Halt];
-        let (r, _) = run_vm(program, 1, vec![], &[], zeroed_upstream(), 0.01);
+        // Very low energy with opcode_cost_multiplier=1.0; Noop base cost = 0.05
+        let def = VmBackendDef {
+            register_count: 1,
+            constants: vec![],
+            program: vec![VmInstruction::Noop, VmInstruction::Halt],
+        };
+        let si = empty_static_inputs();
+        let mut e = 0.01;
+        let mut mem = [0u8; 1024];
+        let mut cfg = config();
+        cfg.vm.opcode_cost_multiplier = 1.0;
+        let r = execute_vm_node(
+            &def,
+            &[],
+            &zeroed_upstream(),
+            &mut e,
+            0.0,
+            &mut mem,
+            &si,
+            &cfg,
+        );
         assert!(r.energy_exhausted);
     }
 
