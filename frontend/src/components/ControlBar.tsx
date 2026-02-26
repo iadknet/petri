@@ -1,11 +1,13 @@
 import { useCallback, useState } from "react";
-import { api } from "../api/rest.ts";
+import { api, type DeepPartial } from "../api/rest.ts";
 import { useConfigStore } from "../stores/config.ts";
 import { usePanelLayout } from "../stores/layout.tsx";
 import { useSimulationStore } from "../stores/simulation.ts";
 import { buildStartupRequest, useStartupConfigStore } from "../stores/startupConfig.ts";
 import { useStatsHistoryStore } from "../stores/stats.ts";
-import type { SimState } from "../types/api.ts";
+import type { SimState, SimulationConfig } from "../types/api.ts";
+import { RUNTIME_PATCH_FIELDS } from "./config-panel/runtime/RuntimeConfigPanel.tsx";
+import { buildPatch, getByPath, mergePatch } from "./config-panel/shared/pathUtils.ts";
 
 function formatTps(tps: number): string {
 	if (tps === 0) return "0";
@@ -136,12 +138,24 @@ export function ControlBar() {
 
 		setRestarting(true);
 		try {
+			// Capture current runtime config before startup resets it
+			const prevConfig = useConfigStore.getState().serverConfig;
+
 			const startup = useStartupConfigStore.getState().preset;
 			const res = await api.startup(buildStartupRequest(startup));
 
 			useSimulationStore.getState().setSimState(res.state);
 			useSimulationStore.getState().setTick(res.tick);
 			useStatsHistoryStore.getState().reset();
+
+			// Re-apply current runtime config values so they survive restart
+			if (prevConfig) {
+				const patch: Record<string, unknown> = {};
+				for (const field of RUNTIME_PATCH_FIELDS) {
+					mergePatch(patch, buildPatch(field.path, getByPath(prevConfig, field.path) as number));
+				}
+				await api.patchConfig(patch as DeepPartial<SimulationConfig>);
+			}
 
 			const configRes = await api.getConfig();
 			useConfigStore.getState().commitServerConfig(configRes.config, configRes.state);
