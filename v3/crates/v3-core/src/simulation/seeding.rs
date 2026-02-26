@@ -10,10 +10,10 @@ use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
 use crate::simulation::simulation::Simulation;
 
-/// Founder phenotype baseline per v3-phenotype-spec.md.
-const FOUNDER_RGB: [u8; 3] = [204, 61, 61];
-const FOUNDER_ACTIVE_CHANNEL: usize = 0; // all founders start on red channel
-const FOUNDER_POLARITY: [bool; 3] = [true, true, true];
+/// Founder phenotype baseline — 6 HSL-mapped channels that produce RGB [204, 61, 61].
+const FOUNDER_CHANNELS: [u8; 6] = [0, 0, 92, 92, 138, 138];
+const FOUNDER_ACTIVE_CHANNEL: usize = 0;
+const FOUNDER_POLARITY: [bool; 6] = [true; 6];
 
 /// Seed a new simulation from a `SimulationConfig` and a deterministic seed.
 ///
@@ -64,7 +64,7 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
                 pos,
                 energy,
                 0,
-                FOUNDER_RGB,
+                FOUNDER_CHANNELS,
                 FOUNDER_ACTIVE_CHANNEL,
                 FOUNDER_POLARITY,
             )
@@ -136,7 +136,10 @@ mod tests {
         let sim = seed_simulation(small_config(), 42);
         // All founders should have the canonical baseline phenotype.
         for (_, creature) in &sim.creatures {
-            assert_eq!(creature.phenotype_rgb, FOUNDER_RGB, "rgb mismatch");
+            assert_eq!(
+                creature.phenotype_channels, FOUNDER_CHANNELS,
+                "channels mismatch"
+            );
             assert_eq!(
                 creature.phenotype_active_channel, FOUNDER_ACTIVE_CHANNEL,
                 "active channel mismatch"

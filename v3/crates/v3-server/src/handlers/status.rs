@@ -3,6 +3,7 @@ use axum::response::IntoResponse;
 use axum::Json;
 use slotmap::Key;
 use v3_core::config::SimulationConfig;
+use v3_core::mutation::phenotype::channels_to_rgb;
 
 use crate::error::{AppError, FieldError};
 use crate::state::{AppState, SimulationStatus};
@@ -52,7 +53,7 @@ pub async fn get_frame(State(app): State<AppState>) -> impl IntoResponse {
             "y": creature.position.y,
             "energy": creature.energy,
             "generation": creature.generation,
-            "phenotype_rgb": creature.phenotype_rgb,
+            "phenotype_rgb": channels_to_rgb(creature.phenotype_channels),
         }));
     }
 

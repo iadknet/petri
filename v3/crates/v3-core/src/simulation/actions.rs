@@ -141,7 +141,7 @@ pub fn apply_reproduce(
     let child_genome = sim.creatures[parent_id].genome.clone();
     let child_memory = sim.creatures[parent_id].memory;
     let child_generation = sim.creatures[parent_id].generation + 1;
-    let child_rgb = sim.creatures[parent_id].phenotype_rgb;
+    let child_channels = sim.creatures[parent_id].phenotype_channels;
     let child_active_channel = sim.creatures[parent_id].phenotype_active_channel;
     let child_polarity = sim.creatures[parent_id].phenotype_channel_polarity;
 
@@ -161,16 +161,16 @@ pub fn apply_reproduce(
     }
 
     // Step 10: Phenotype mutation — triggered only when at least one genome event was applied.
-    let (child_rgb, child_active_channel, child_polarity) = if summary.applied_events > 0 {
+    let (child_channels, child_active_channel, child_polarity) = if summary.applied_events > 0 {
         mutate_phenotype(
-            child_rgb,
+            child_channels,
             child_active_channel,
             child_polarity,
             &sim.config.mutation.phenotype,
             rng,
         )
     } else {
-        (child_rgb, child_active_channel, child_polarity)
+        (child_channels, child_active_channel, child_polarity)
     };
 
     // Step 11–12: Spawn child in slotmap + world.
@@ -181,7 +181,7 @@ pub fn apply_reproduce(
             target,
             transfer,
             child_generation,
-            child_rgb,
+            child_channels,
             child_active_channel,
             child_polarity,
         );
@@ -226,9 +226,9 @@ mod tests {
                 pos,
                 energy,
                 0,
-                [204, 61, 61],
+                [0, 0, 92, 92, 138, 138],
                 0,
-                [true; 3],
+                [true; 6],
             )
         });
         world.place_creature(pos, id);
@@ -350,9 +350,9 @@ mod tests {
                 pos1,
                 50.0,
                 0,
-                [204, 61, 61],
+                [0, 0, 92, 92, 138, 138],
                 0,
-                [true; 3],
+                [true; 6],
             )
         });
         let id2 = creatures.insert_with_key(|id| {
@@ -362,9 +362,9 @@ mod tests {
                 pos2,
                 50.0,
                 0,
-                [204, 61, 61],
+                [0, 0, 92, 92, 138, 138],
                 0,
-                [true; 3],
+                [true; 6],
             )
         });
         world.place_creature(pos1, id1);
@@ -414,9 +414,9 @@ mod tests {
                 pos,
                 80.0,
                 0,
-                [204, 61, 61],
+                [0, 0, 92, 92, 138, 138],
                 0,
-                [true; 3],
+                [true; 6],
             )
         });
         let blocker = creatures.insert_with_key(|id| {
@@ -426,9 +426,9 @@ mod tests {
                 north,
                 80.0,
                 0,
-                [204, 61, 61],
+                [0, 0, 92, 92, 138, 138],
                 0,
-                [true; 3],
+                [true; 6],
             )
         });
         world.place_creature(pos, parent);

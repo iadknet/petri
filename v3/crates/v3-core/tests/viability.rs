@@ -28,9 +28,9 @@ use v3_core::contracts::{CreatureId, Position};
 use v3_core::mutation::MutationEngine;
 use v3_core::simulation::{run_tick, seed_simulation, Simulation};
 
-const FOUNDER_RGB: [u8; 3] = [204, 61, 61];
+const FOUNDER_CHANNELS: [u8; 6] = [0, 0, 92, 92, 138, 138];
 const FOUNDER_ACTIVE_CHANNEL: usize = 0;
-const FOUNDER_POLARITY: [bool; 3] = [true; 3];
+const FOUNDER_POLARITY: [bool; 6] = [true; 6];
 
 /// Return a compact config suitable for fast, behavior-focused viability tests.
 ///
@@ -279,7 +279,7 @@ fn creatures_can_eat_food() {
             pos,
             start_energy,
             0,
-            FOUNDER_RGB,
+            FOUNDER_CHANNELS,
             FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
         )
@@ -334,7 +334,7 @@ fn founder_reproduces_when_energy_allows_and_target_is_open() {
             pos,
             cfg.energy.lifecycle.initial_energy,
             0,
-            FOUNDER_RGB,
+            FOUNDER_CHANNELS,
             FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
         )
@@ -384,7 +384,7 @@ fn founder_moves_when_no_food_and_below_reproduce_threshold() {
             start,
             cfg.energy.lifecycle.initial_energy,
             0,
-            FOUNDER_RGB,
+            FOUNDER_CHANNELS,
             FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
         )
@@ -428,7 +428,7 @@ fn mutation_offspring_diverge_from_parent_over_time() {
         if sim
             .creatures
             .values()
-            .any(|c| c.phenotype_rgb != FOUNDER_RGB)
+            .any(|c| c.phenotype_channels != FOUNDER_CHANNELS)
         {
             ever_diverged = true;
             break;
@@ -493,7 +493,7 @@ fn phenotype_inherits_unchanged_when_no_genome_mutation() {
             pos,
             cfg.energy.lifecycle.initial_energy,
             0,
-            FOUNDER_RGB,
+            FOUNDER_CHANNELS,
             FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
         )
@@ -508,7 +508,7 @@ fn phenotype_inherits_unchanged_when_no_genome_mutation() {
 
     if let Some(child) = child {
         assert_eq!(
-            child.phenotype_rgb, FOUNDER_RGB,
+            child.phenotype_channels, FOUNDER_CHANNELS,
             "child phenotype must be identical to parent when mutation_probability=0.0"
         );
     }

@@ -232,9 +232,9 @@ mod tests {
                 pos,
                 energy,
                 0,
-                [204, 61, 61],
+                [0, 0, 92, 92, 138, 138],
                 0,
-                [true; 3],
+                [true; 6],
             )
         });
         world.place_creature(pos, id);
