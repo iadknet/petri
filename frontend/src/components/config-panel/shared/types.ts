@@ -9,6 +9,7 @@ export interface FieldDef {
 	step: number;
 	testId?: string;
 	topologyField?: boolean;
+	defaultValue?: number;
 }
 
 export type StartupUpdater = (path: string, value: number) => void;

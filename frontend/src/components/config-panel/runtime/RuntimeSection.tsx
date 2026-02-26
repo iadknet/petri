@@ -7,6 +7,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		min: 1,
 		max: 1024,
 		step: 1,
+		defaultValue: 1024,
 	},
 	{
 		path: "runtime.max_vm_steps",
@@ -14,6 +15,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		min: 1,
 		max: 10000,
 		step: 1,
+		defaultValue: 10000,
 	},
 	{
 		path: "runtime.max_graph_relax_iters",
@@ -21,6 +23,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		min: 1,
 		max: 100,
 		step: 1,
+		defaultValue: 15,
 	},
 	{
 		path: "runtime.graph_convergence_epsilon",
@@ -28,6 +31,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		min: 0.0001,
 		max: 1,
 		step: 0.0001,
+		defaultValue: 0.001,
 	},
 	{
 		path: "runtime.graph_convergence_stable_passes",
@@ -35,6 +39,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		min: 1,
 		max: 10,
 		step: 1,
+		defaultValue: 2,
 	},
 	{
 		path: "runtime.graph_node_base_cost",
@@ -42,6 +47,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		min: 0,
 		max: 100,
 		step: 0.1,
+		defaultValue: 0.00001,
 	},
 	{
 		path: "runtime.vm.opcode_cost_multiplier",
@@ -49,5 +55,6 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		min: 0,
 		max: 10,
 		step: 0.1,
+		defaultValue: 0.000001,
 	},
 ];

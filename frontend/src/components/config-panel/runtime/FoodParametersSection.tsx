@@ -7,6 +7,7 @@ export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 		min: 0,
 		max: 1,
 		step: 0.001,
+		defaultValue: 0.096,
 	},
 	{
 		path: "world.food.spread_threshold_ratio",
@@ -14,6 +15,7 @@ export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 		min: 0,
 		max: 1,
 		step: 0.01,
+		defaultValue: 0.8,
 	},
 	{
 		path: "world.food.recovery_spawn_rate",
@@ -21,6 +23,7 @@ export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 		min: 0,
 		max: 1,
 		step: 0.01,
+		defaultValue: 0.01,
 	},
 	{
 		path: "world.food.recovery_floor_ratio",
@@ -28,6 +31,7 @@ export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 		min: 0,
 		max: 1,
 		step: 0.01,
+		defaultValue: 0.01,
 	},
 	{
 		path: "world.food.max_density",
@@ -35,5 +39,6 @@ export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 		min: 0.1,
 		max: 1,
 		step: 0.01,
+		defaultValue: 1.0,
 	},
 ];

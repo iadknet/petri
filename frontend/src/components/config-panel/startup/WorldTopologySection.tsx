@@ -11,6 +11,7 @@ const FIELDS: FieldDef[] = [
 		max: 2000,
 		step: 10,
 		testId: "startup-field-world-width",
+		defaultValue: 400,
 	},
 	{
 		path: "world.height",
@@ -19,6 +20,7 @@ const FIELDS: FieldDef[] = [
 		max: 2000,
 		step: 10,
 		testId: "startup-field-world-height",
+		defaultValue: 400,
 	},
 ];
 

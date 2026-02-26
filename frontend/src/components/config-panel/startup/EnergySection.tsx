@@ -11,6 +11,7 @@ const FIELDS: FieldDef[] = [
 		max: 500,
 		step: 0.5,
 		testId: "startup-field-energy-initial-energy",
+		defaultValue: 20.0,
 	},
 ];
 

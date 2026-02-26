@@ -7,5 +7,6 @@ export const POPULATION_FIELDS: FieldDef[] = [
 		min: 1,
 		max: 100000,
 		step: 100,
+		defaultValue: 100000,
 	},
 ];

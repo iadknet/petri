@@ -22,6 +22,7 @@ export function FieldRow({
 	const isDirty = serverValue !== undefined ? value !== serverValue : false;
 	const inputId = `${id}-input`;
 	const sliderAccentClass = id.startsWith("runtime-") ? "accent-sky-500" : "accent-emerald-500";
+	const showReset = field.defaultValue !== undefined && value !== field.defaultValue;
 
 	return (
 		<div
@@ -36,6 +37,18 @@ export function FieldRow({
 					)}
 					{field.label}
 				</label>
+				{showReset && (
+					<button
+						type="button"
+						data-testid={`reset-${field.path.replaceAll(".", "-")}`}
+						onClick={() => onChange(field.path, field.defaultValue!)}
+						disabled={disabled}
+						className="text-[10px] text-slate-500 hover:text-slate-300 disabled:opacity-40"
+						title={`Reset to default (${field.defaultValue})`}
+					>
+						&#x21ba;
+					</button>
+				)}
 			</div>
 			<div className="flex items-center gap-2">
 				<input
