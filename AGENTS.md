@@ -30,11 +30,49 @@ See canonical policy set: `docs/strategy/` and `docs/reference/`.
   `docs/reference/` for V3.
 - Runtime-facing telemetry/state values must be derived from applied simulation
   behavior (no synthetic placeholder metrics).
+- Viability tests (`v3/crates/v3-core/tests/viability.rs`) must pass before any
+  branch merge. See **Viability Test Policy** below.
 
 ## Determinism Scope (Canonical)
 
 - Production runtime determinism is not a product requirement.
 - Deterministic behavior is required in tests/harnesses when assertions depend on reproducibility.
+
+## Viability Test Policy
+
+The viability tests in `v3/crates/v3-core/tests/viability.rs` are a **merge gate**.
+They verify that the simulation's production economics (energy, food, costs, runtime
+limits) support a self-sustaining founder population. Any change to production
+defaults, founder genome behavior, or tick-loop mechanics that breaks viability is
+a real regression — not a test maintenance issue.
+
+### Rules
+
+1. **Viability tests must pass before merge.** No exceptions. If a config change,
+   founder behavior change, or runtime mechanics change causes viability failures,
+   the change must be revised — not the tests.
+
+2. **Viability configs use production defaults.** The shared `viability_config()`
+   function and individual test configs must use `SimulationConfig::default()` for
+   all economic parameters (energy, costs, runtime limits, mutation rates). The only
+   permitted overrides are:
+   - **World size** — smaller for test speed (e.g. 32×32).
+   - **Population count** — fewer creatures for test speed.
+   - **Food coverage/density** — increased to compensate for the smaller world.
+   - **Scenario-specific setup** — tests for specific behaviors (e.g. "creature
+     eats when on food") may override parameters needed to set up that scenario
+     (e.g. disabling food growth, placing creatures manually), but economic
+     parameters (costs, decay, rewards, runtime limits) must remain at production
+     defaults.
+
+3. **Do not "fix" viability tests by weakening assertions or inflating energy.**
+   If the population goes extinct in a viability test, the correct response is to
+   fix the config or behavior change that caused extinction — not to give creatures
+   more starting energy, reduce decay, or shorten the test horizon.
+
+4. **When changing production defaults**, run `cargo test -p v3-core --test viability`
+   as the first validation step, before any other testing. If viability breaks,
+   reconsider the default change.
 
 ## Required Workflow
 
