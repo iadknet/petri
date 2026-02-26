@@ -11,6 +11,7 @@ const FIELDS: FieldDef[] = [
 		max: 10000,
 		step: 1,
 		testId: "startup-field-population-initial-creatures",
+		defaultValue: 2000,
 	},
 ];
 

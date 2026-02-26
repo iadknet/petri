@@ -11,6 +11,7 @@ const FIELDS: FieldDef[] = [
 		max: 1,
 		step: 0.01,
 		testId: "startup-field-food-initial-density",
+		defaultValue: 1.0,
 	},
 	{
 		path: "world.food.initial_coverage",
@@ -19,6 +20,7 @@ const FIELDS: FieldDef[] = [
 		max: 1,
 		step: 0.01,
 		testId: "startup-field-food-initial-coverage",
+		defaultValue: 0.15,
 	},
 ];
 

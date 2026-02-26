@@ -8,6 +8,7 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		max: 1,
 		step: 0.001,
 		testId: "config-field-mutation-mutation-probability",
+		defaultValue: 0.303,
 	},
 	{
 		path: "mutation.per_birth_mutation_events_min",
@@ -16,6 +17,7 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		max: 20,
 		step: 1,
 		testId: "config-field-mutation-events-min",
+		defaultValue: 1,
 	},
 	{
 		path: "mutation.per_birth_mutation_events_max",
@@ -24,6 +26,7 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		max: 20,
 		step: 1,
 		testId: "config-field-mutation-events-max",
+		defaultValue: 10,
 	},
 	{
 		path: "mutation.phenotype.channel_step",
@@ -32,6 +35,7 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		max: 50,
 		step: 1,
 		testId: "config-field-mutation-channel-step",
+		defaultValue: 1,
 	},
 	{
 		path: "mutation.phenotype.polarity_flip_chance",
@@ -40,6 +44,7 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		max: 1,
 		step: 0.001,
 		testId: "config-field-mutation-polarity-flip",
+		defaultValue: 0.0002,
 	},
 	{
 		path: "mutation.phenotype.channel_change_chance",
@@ -48,5 +53,6 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		max: 1,
 		step: 0.001,
 		testId: "config-field-mutation-channel-change",
+		defaultValue: 0.001,
 	},
 ];

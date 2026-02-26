@@ -8,6 +8,7 @@ export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 		max: 10,
 		step: 0.01,
 		testId: "config-field-energy-costs-move-cost",
+		defaultValue: 1.0,
 	},
 	{
 		path: "energy.costs.eat_cost",
@@ -15,6 +16,7 @@ export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 		min: 0,
 		max: 10,
 		step: 0.01,
+		defaultValue: 0.0,
 	},
 	{
 		path: "energy.costs.noop_cost",
@@ -22,6 +24,7 @@ export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 		min: 0,
 		max: 10,
 		step: 0.01,
+		defaultValue: 0.05,
 	},
 	{
 		path: "energy.costs.reproduce_cost",
@@ -29,6 +32,7 @@ export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 		min: 0,
 		max: 50,
 		step: 0.1,
+		defaultValue: 0.1,
 	},
 	{
 		path: "energy.costs.eat_reward_per_food",
@@ -36,5 +40,6 @@ export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 		min: 0,
 		max: 50,
 		step: 0.1,
+		defaultValue: 12.0,
 	},
 ];
