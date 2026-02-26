@@ -1,9 +1,25 @@
-//! End-to-end viability tests for the Stage 4-5 simulation loop.
+//! End-to-end viability tests — a **merge gate** for the simulation.
 //!
-//! These tests validate intent-level behavior instead of only "no panic":
-//! world mechanics, founder eat/move/reproduce behavior, short-horizon
-//! viability across deterministic seeds, and Stage 5 mutation-driven
-//! phenotype divergence.
+//! These tests validate that production economics (energy, costs, runtime limits)
+//! support a self-sustaining founder population. They cover: world mechanics,
+//! founder eat/move/reproduce behavior, short-horizon viability across
+//! deterministic seeds, and mutation-driven phenotype divergence.
+//!
+//! # Viability test rules (see also AGENTS.md § Viability Test Policy)
+//!
+//! 1. **Production defaults required.** All configs must use `SimulationConfig::default()`
+//!    for economic parameters. Permitted overrides: world size, population count, and
+//!    food coverage/density (for test speed on a smaller world).
+//!
+//! 2. **Scenario-specific tests** may override non-economic parameters to set up a
+//!    specific situation (e.g. no food growth, manual creature placement), but costs,
+//!    decay, rewards, and runtime limits must stay at production defaults.
+//!
+//! 3. **Never weaken assertions to pass.** If viability breaks, fix the config or
+//!    behavior change that caused it — not the tests.
+//!
+//! 4. **Run viability tests first** when changing production defaults:
+//!    `cargo test -p v3-core --test viability`
 
 use std::collections::HashMap;
 
@@ -18,25 +34,19 @@ const FOUNDER_POLARITY: [bool; 3] = [true; 3];
 
 /// Return a compact config suitable for fast, behavior-focused viability tests.
 ///
-/// This intentionally avoids the previous "energy=500 safety net" profile:
-/// we keep startup energy finite and tune runtime execution cost + offspring
-/// transfer so founders must still interact with world food to remain viable.
+/// Uses production defaults for all economic parameters so these tests serve
+/// as a gate against config changes that break viability. Only world size,
+/// population count, and food coverage are overridden for test speed.
 fn viability_config() -> SimulationConfig {
     let mut cfg = SimulationConfig::default();
+    // Smaller world for test speed
     cfg.world.width = 32;
     cfg.world.height = 32;
+    // Fewer creatures for test speed
     cfg.population.initial_creatures = 10;
-
+    // Full food coverage to compensate for small world
     cfg.world.food.initial_coverage = 1.0;
     cfg.world.food.initial_density = 1.0;
-    cfg.world.food.growth_rate = 0.25;
-
-    cfg.runtime.graph_node_base_cost = 0.1;
-
-    cfg.energy.lifecycle.initial_energy = 110.0;
-    cfg.energy.lifecycle.max_energy = 160.0;
-    cfg.energy.lifecycle.default_offspring_energy = 4.0;
-    cfg.energy.costs.reproduce_cost = 1.0;
     cfg
 }
 
@@ -258,13 +268,16 @@ fn creatures_can_eat_food() {
     }
     let food_before = world.food_at(pos);
 
+    // Use production initial_energy (below founder reproduce threshold of 24.0)
+    // so the creature eats rather than reproduces.
+    let start_energy = cfg.energy.lifecycle.initial_energy;
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let creature_id = creatures.insert_with_key(|id| {
         CreatureState::new(
             id,
             v3alpha1_founder_genome(),
             pos,
-            80.0,
+            start_energy,
             0,
             FOUNDER_RGB,
             FOUNDER_WEIGHTS,
@@ -359,9 +372,7 @@ fn founder_moves_when_no_food_and_below_reproduce_threshold() {
     cfg.population.initial_creatures = 0;
     cfg.world.food.initial_coverage = 0.0;
     cfg.world.food.growth_rate = 0.0;
-    cfg.runtime.graph_node_base_cost = 0.1;
-    cfg.energy.lifecycle.initial_energy = 23.0;
-    cfg.energy.lifecycle.max_energy = 40.0;
+    // Production initial_energy (20.0) is below the founder reproduce threshold (24.0)
 
     let start = Position::new(5, 5);
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
