@@ -1,4 +1,4 @@
-import { CollapsibleGroup } from "../shared/CollapsibleGroup.tsx";
+import { FieldGroup } from "../shared/FieldGroup.tsx";
 import { FieldRow } from "../shared/FieldRow.tsx";
 import { getByPath } from "../shared/pathUtils.ts";
 import type { FieldDef, RuntimePanelProps } from "../shared/types.ts";
@@ -48,7 +48,7 @@ export function EnergyLifecycleSection({
 	updateDraft,
 }: RuntimePanelProps) {
 	return (
-		<CollapsibleGroup title="Energy > Lifecycle">
+		<FieldGroup title="Energy > Lifecycle">
 			{ENERGY_LIFECYCLE_FIELDS.map((field) => (
 				<FieldRow
 					key={`runtime-${field.path}`}
@@ -61,6 +61,6 @@ export function EnergyLifecycleSection({
 					testId={field.testId}
 				/>
 			))}
-		</CollapsibleGroup>
+		</FieldGroup>
 	);
 }

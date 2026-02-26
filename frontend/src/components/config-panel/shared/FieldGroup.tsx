@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
 
-interface CollapsibleGroupProps {
+interface FieldGroupProps {
 	title: string;
 	children: ReactNode;
 }
 
-export function CollapsibleGroup({ title, children }: CollapsibleGroupProps) {
+export function FieldGroup({ title, children }: FieldGroupProps) {
 	return (
 		<div className="border-b border-petri-border">
 			<div className="w-full px-3 py-2 text-xs font-medium text-slate-300 bg-slate-900/20">

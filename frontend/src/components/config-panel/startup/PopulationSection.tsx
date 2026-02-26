@@ -1,4 +1,4 @@
-import { CollapsibleGroup } from "../shared/CollapsibleGroup.tsx";
+import { FieldGroup } from "../shared/FieldGroup.tsx";
 import { FieldRow } from "../shared/FieldRow.tsx";
 import { getByPath } from "../shared/pathUtils.ts";
 import type { FieldDef, StartupSectionProps } from "../shared/types.ts";
@@ -16,7 +16,7 @@ const FIELDS: FieldDef[] = [
 
 export function PopulationSection({ startupPreset, updateStartupPreset }: StartupSectionProps) {
 	return (
-		<CollapsibleGroup title="Population">
+		<FieldGroup title="Population">
 			{FIELDS.map((field) => (
 				<FieldRow
 					key={`startup-${field.path}`}
@@ -28,6 +28,6 @@ export function PopulationSection({ startupPreset, updateStartupPreset }: Startu
 					testId={field.testId}
 				/>
 			))}
-		</CollapsibleGroup>
+		</FieldGroup>
 	);
 }
