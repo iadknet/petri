@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import { WorldRenderer } from "../canvas/renderer.ts";
 import { useSimulationStore } from "../stores/simulation.ts";
+import { ZoomControls } from "./ZoomControls.tsx";
 
 export function WorldViewport() {
 	const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -106,6 +107,18 @@ export function WorldViewport() {
 		renderer.centerOn(world.x, world.y, 4);
 	}, []);
 
+	const handleZoomIn = useCallback(() => {
+		rendererRef.current?.zoomCenter(-1);
+	}, []);
+
+	const handleZoomOut = useCallback(() => {
+		rendererRef.current?.zoomCenter(1);
+	}, []);
+
+	const handleFitToWorld = useCallback(() => {
+		rendererRef.current?.resetView();
+	}, []);
+
 	return (
 		<div ref={containerRef} className="relative w-full h-full overflow-hidden bg-petri-bg">
 			<canvas
@@ -118,6 +131,11 @@ export function WorldViewport() {
 				onMouseUp={handleMouseUp}
 				onMouseLeave={handleMouseUp}
 				onDoubleClick={handleDoubleClick}
+			/>
+			<ZoomControls
+				onZoomIn={handleZoomIn}
+				onZoomOut={handleZoomOut}
+				onFitToWorld={handleFitToWorld}
 			/>
 		</div>
 	);
