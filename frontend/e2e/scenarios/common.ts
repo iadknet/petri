@@ -22,6 +22,15 @@ export const selectors = {
 	configReset: '[data-testid="config-reset"]',
 	configMoveCostField: '[data-testid="config-field-energy-costs-move-cost"]',
 	configMutationProbabilityField: '[data-testid="config-field-mutation-mutation-probability"]',
+	paintToggle: '[data-testid="paint-toggle"]',
+	paintToolbar: '[data-testid="paint-toolbar"]',
+	paintToolBarrier: '[data-testid="paint-tool-barrier"]',
+	paintToolFood: '[data-testid="paint-tool-food"]',
+	paintToolEraseBarrier: '[data-testid="paint-tool-erase_barrier"]',
+	paintToolEraseFood: '[data-testid="paint-tool-erase_food"]',
+	paintBrush0: '[data-testid="paint-brush-0"]',
+	paintBrush1: '[data-testid="paint-brush-1"]',
+	paintBrush2: '[data-testid="paint-brush-2"]',
 };
 
 export async function openDashboardAndWaitConnection(ctx: RuntimeContext): Promise<void> {

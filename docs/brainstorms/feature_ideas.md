@@ -6,6 +6,10 @@
   - add metadata to move action for number of spaces.
   - Extra energy penalty for each additional space
 
+### Add a failed action penalty configuration
+  - Is there any existing penalty for failed actions other than the action cost?
+  - Add a configuration for an extra energy penalty on failed actions
+
 ## Major New Features
 
 ### Creature inspector
@@ -27,12 +31,6 @@
   - Show all inputs that are used for that node on the left, show outputs on the right
   - As the node "executes" highlight that particular part of the node, highlight all values changed
 
-### Drawing of barriers and food
-  - this was pretty well implemented in v1 we can use v1 as a reference
-  - make sure barrier mechanics are in place for the world
-  - Add the a ability to draw barriers
-  - add the ability to draw food
-
 ### Storage slots
   - add the ability for creatures to pick up and place food and barriers
   - This was implemented in v1, we can refrence v1 implementation
@@ -42,7 +40,12 @@
     - snapshot world state for tick
     - loop through cognition, collect actions for later processing
     - randomize order of action execution
-  - implement rayon
+  - implement rayon so "cognition" can happen in parallel
+
+### Creatures can spend energy to "cut in line" during action execution
+  - When selecting an action, a creature can dedicate "extra energy" to an action
+  - When determining action order, the actions with the most extra energy are evaluated first
+  - The order of ties should be randomized
 
 ### Predation
   - Creature can "steal" energy from neighbors
