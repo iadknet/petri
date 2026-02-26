@@ -1,4 +1,4 @@
-import { CollapsibleGroup } from "../shared/CollapsibleGroup.tsx";
+import { FieldGroup } from "../shared/FieldGroup.tsx";
 import { FieldRow } from "../shared/FieldRow.tsx";
 import { getByPath } from "../shared/pathUtils.ts";
 import type { FieldDef, RuntimePanelProps } from "../shared/types.ts";
@@ -61,7 +61,7 @@ export function MutationSection({
 	updateDraft,
 }: RuntimePanelProps) {
 	return (
-		<CollapsibleGroup title="Mutation">
+		<FieldGroup title="Mutation">
 			{MUTATION_FIELDS.map((field) => (
 				<FieldRow
 					key={`runtime-${field.path}`}
@@ -74,6 +74,6 @@ export function MutationSection({
 					testId={field.testId}
 				/>
 			))}
-		</CollapsibleGroup>
+		</FieldGroup>
 	);
 }

@@ -1,4 +1,4 @@
-import { CollapsibleGroup } from "../shared/CollapsibleGroup.tsx";
+import { FieldGroup } from "../shared/FieldGroup.tsx";
 
 interface RunSettingsSectionProps {
 	seed: number;
@@ -46,8 +46,8 @@ function SeedRow({ value, onChange, onRandomize }: SeedRowProps) {
 
 export function RunSettingsSection({ seed, updateSeed, randomizeSeed }: RunSettingsSectionProps) {
 	return (
-		<CollapsibleGroup title="Run Settings">
+		<FieldGroup title="Run Settings">
 			<SeedRow value={seed} onChange={updateSeed} onRandomize={randomizeSeed} />
-		</CollapsibleGroup>
+		</FieldGroup>
 	);
 }
