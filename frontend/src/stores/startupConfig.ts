@@ -130,3 +130,24 @@ export const useStartupConfigStore = create<StartupConfigState>()((set) => ({
 			hydrated: false,
 		}),
 }));
+
+/** Build the startup API request from the current preset */
+export function buildStartupRequest(preset: StartupPreset): {
+	seed: number;
+	population: { initial_creatures: number };
+	world: {
+		width: number;
+		height: number;
+		food: StartupPreset["world"]["food"];
+	};
+} {
+	return {
+		seed: preset.seed,
+		population: { initial_creatures: preset.population.initial_creatures },
+		world: {
+			width: preset.world.width,
+			height: preset.world.height,
+			food: { ...preset.world.food },
+		},
+	};
+}

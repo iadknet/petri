@@ -3,7 +3,7 @@ import { api } from "../api/rest.ts";
 import { useConfigStore } from "../stores/config.ts";
 import { usePanelLayout } from "../stores/layout.tsx";
 import { useSimulationStore } from "../stores/simulation.ts";
-import { useStartupConfigStore } from "../stores/startupConfig.ts";
+import { buildStartupRequest, useStartupConfigStore } from "../stores/startupConfig.ts";
 import { useStatsHistoryStore } from "../stores/stats.ts";
 import type { SimState } from "../types/api.ts";
 
@@ -137,23 +137,7 @@ export function ControlBar() {
 		setRestarting(true);
 		try {
 			const startup = useStartupConfigStore.getState().preset;
-			const res = await api.startup({
-				seed: startup.seed,
-				population: { initial_creatures: startup.population.initial_creatures },
-				world: {
-					width: startup.world.width,
-					height: startup.world.height,
-					food: {
-						growth_rate: startup.world.food.growth_rate,
-						initial_density: startup.world.food.initial_density,
-						initial_coverage: startup.world.food.initial_coverage,
-						spread_threshold_ratio: startup.world.food.spread_threshold_ratio,
-						recovery_spawn_rate: startup.world.food.recovery_spawn_rate,
-						recovery_floor_ratio: startup.world.food.recovery_floor_ratio,
-						max_density: startup.world.food.max_density,
-					},
-				},
-			});
+			const res = await api.startup(buildStartupRequest(startup));
 
 			useSimulationStore.getState().setSimState(res.state);
 			useSimulationStore.getState().setTick(res.tick);
