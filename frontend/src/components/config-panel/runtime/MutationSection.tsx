@@ -9,6 +9,7 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		step: 0.001,
 		testId: "config-field-mutation-mutation-probability",
 		defaultValue: 0.303,
+		tooltip: "Probability that a newborn genome undergoes mutation",
 	},
 	{
 		path: "mutation.per_birth_mutation_events_min",
@@ -18,6 +19,7 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		step: 1,
 		testId: "config-field-mutation-events-min",
 		defaultValue: 1,
+		tooltip: "Minimum number of mutation events per birth when mutation triggers",
 	},
 	{
 		path: "mutation.per_birth_mutation_events_max",
@@ -27,6 +29,7 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		step: 1,
 		testId: "config-field-mutation-events-max",
 		defaultValue: 10,
+		tooltip: "Maximum number of mutation events per birth when mutation triggers",
 	},
 	{
 		path: "mutation.phenotype.channel_step",
@@ -36,6 +39,7 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		step: 1,
 		testId: "config-field-mutation-channel-step",
 		defaultValue: 1,
+		tooltip: "RGB step size applied per tick to the active color channel",
 	},
 	{
 		path: "mutation.phenotype.polarity_flip_chance",
@@ -45,6 +49,7 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		step: 0.001,
 		testId: "config-field-mutation-polarity-flip",
 		defaultValue: 0.0002,
+		tooltip: "Probability of reversing the drift direction of the active color channel",
 	},
 	{
 		path: "mutation.phenotype.channel_change_chance",
@@ -54,5 +59,6 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		step: 0.001,
 		testId: "config-field-mutation-channel-change",
 		defaultValue: 0.001,
+		tooltip: "Probability of switching to a different active color channel (R/G/B)",
 	},
 ];

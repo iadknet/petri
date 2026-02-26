@@ -12,6 +12,7 @@ const FIELDS: FieldDef[] = [
 		step: 1,
 		testId: "startup-field-population-initial-creatures",
 		defaultValue: 2000,
+		tooltip: "Number of creatures spawned at world initialization",
 	},
 ];
 

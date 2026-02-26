@@ -12,6 +12,7 @@ const FIELDS: FieldDef[] = [
 		step: 0.5,
 		testId: "startup-field-energy-initial-energy",
 		defaultValue: 20.0,
+		tooltip: "Starting energy given to each founder creature at world initialization",
 	},
 ];
 

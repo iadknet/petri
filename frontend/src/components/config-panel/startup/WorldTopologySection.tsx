@@ -12,6 +12,7 @@ const FIELDS: FieldDef[] = [
 		step: 10,
 		testId: "startup-field-world-width",
 		defaultValue: 400,
+		tooltip: "World grid width in cells",
 	},
 	{
 		path: "world.height",
@@ -21,6 +22,7 @@ const FIELDS: FieldDef[] = [
 		step: 10,
 		testId: "startup-field-world-height",
 		defaultValue: 400,
+		tooltip: "World grid height in cells",
 	},
 ];
 

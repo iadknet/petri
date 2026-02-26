@@ -8,6 +8,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		max: 1024,
 		step: 1,
 		defaultValue: 1024,
+		tooltip: "Maximum signal propagation hops through the genome mesh per tick",
 	},
 	{
 		path: "runtime.max_vm_steps",
@@ -16,6 +17,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		max: 10000,
 		step: 1,
 		defaultValue: 10000,
+		tooltip: "Maximum VM instructions executed per creature per tick",
 	},
 	{
 		path: "runtime.max_graph_relax_iters",
@@ -24,6 +26,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		max: 100,
 		step: 1,
 		defaultValue: 15,
+		tooltip: "Maximum iterations for graph relaxation convergence",
 	},
 	{
 		path: "runtime.graph_convergence_epsilon",
@@ -32,6 +35,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		max: 1,
 		step: 0.0001,
 		defaultValue: 0.001,
+		tooltip: "Threshold below which graph relaxation is considered converged",
 	},
 	{
 		path: "runtime.graph_convergence_stable_passes",
@@ -40,6 +44,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		max: 10,
 		step: 1,
 		defaultValue: 2,
+		tooltip: "Consecutive stable passes required before declaring convergence",
 	},
 	{
 		path: "runtime.graph_node_base_cost",
@@ -48,6 +53,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		max: 100,
 		step: 0.1,
 		defaultValue: 0.00001,
+		tooltip: "Base compute cost per graph node during evaluation",
 	},
 	{
 		path: "runtime.vm.opcode_cost_multiplier",
@@ -56,5 +62,6 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		max: 10,
 		step: 0.1,
 		defaultValue: 0.000001,
+		tooltip: "Multiplier applied to each VM opcode's compute cost",
 	},
 ];

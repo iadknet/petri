@@ -9,6 +9,7 @@ export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 		step: 0.01,
 		testId: "config-field-energy-costs-move-cost",
 		defaultValue: 1.0,
+		tooltip: "Energy subtracted each time a creature moves to an adjacent cell",
 	},
 	{
 		path: "energy.costs.eat_cost",
@@ -17,6 +18,7 @@ export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 		max: 10,
 		step: 0.01,
 		defaultValue: 0.0,
+		tooltip: "Energy subtracted when a creature eats food from its cell",
 	},
 	{
 		path: "energy.costs.noop_cost",
@@ -25,6 +27,7 @@ export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 		max: 10,
 		step: 0.01,
 		defaultValue: 0.05,
+		tooltip: "Energy subtracted when a creature takes no action",
 	},
 	{
 		path: "energy.costs.reproduce_cost",
@@ -33,6 +36,7 @@ export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 		max: 50,
 		step: 0.1,
 		defaultValue: 0.1,
+		tooltip: "Energy subtracted from parent when reproduction occurs",
 	},
 	{
 		path: "energy.costs.eat_reward_per_food",
@@ -41,5 +45,6 @@ export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 		max: 50,
 		step: 0.1,
 		defaultValue: 12.0,
+		tooltip: "Energy gained per unit of food density consumed",
 	},
 ];

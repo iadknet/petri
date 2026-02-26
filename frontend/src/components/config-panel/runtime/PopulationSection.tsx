@@ -8,5 +8,6 @@ export const POPULATION_FIELDS: FieldDef[] = [
 		max: 100000,
 		step: 100,
 		defaultValue: 100000,
+		tooltip: "Hard cap on total population \u2014 reproduction blocked above this",
 	},
 ];

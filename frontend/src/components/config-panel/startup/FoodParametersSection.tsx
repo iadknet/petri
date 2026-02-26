@@ -12,6 +12,7 @@ const FIELDS: FieldDef[] = [
 		step: 0.01,
 		testId: "startup-field-food-initial-density",
 		defaultValue: 1.0,
+		tooltip: "Starting food density (0-1) for cells selected during world generation",
 	},
 	{
 		path: "world.food.initial_coverage",
@@ -21,6 +22,7 @@ const FIELDS: FieldDef[] = [
 		step: 0.01,
 		testId: "startup-field-food-initial-coverage",
 		defaultValue: 0.15,
+		tooltip: "Fraction of world cells that start with food during generation",
 	},
 ];
 
