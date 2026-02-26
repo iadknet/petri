@@ -16,8 +16,8 @@ pub struct CreatureState {
     pub graph_state: Vec<Vec<f32>>,
     /// RGB phenotype color. Channel values in [0, 255].
     pub phenotype_rgb: [u8; 3],
-    /// Per-channel weights for phenotype mutation (internal, not API-exposed).
-    pub phenotype_channel_weights: [f32; 3],
+    /// Active channel for phenotype mutation (0=R, 1=G, 2=B; internal, not API-exposed).
+    pub phenotype_active_channel: usize,
     /// Per-channel polarity flags for phenotype mutation (internal, not API-exposed).
     pub phenotype_channel_polarity: [bool; 3],
 }
@@ -32,7 +32,7 @@ impl CreatureState {
         energy: f32,
         generation: u64,
         phenotype_rgb: [u8; 3],
-        phenotype_channel_weights: [f32; 3],
+        phenotype_active_channel: usize,
         phenotype_channel_polarity: [bool; 3],
     ) -> Self {
         Self {
@@ -45,7 +45,7 @@ impl CreatureState {
             memory: [0u8; 1024],
             graph_state: Vec::new(),
             phenotype_rgb,
-            phenotype_channel_weights,
+            phenotype_active_channel,
             phenotype_channel_polarity,
         }
     }
@@ -87,7 +87,7 @@ mod tests {
             20.0,
             0,
             [128, 64, 32],
-            [1.0f32; 3],
+            0,
             [true; 3],
         );
         assert_eq!(state.age, 0);
@@ -96,7 +96,7 @@ mod tests {
         assert_eq!(state.generation, 0);
         assert!((state.energy - 20.0).abs() < f32::EPSILON);
         assert_eq!(state.phenotype_rgb, [128, 64, 32]);
-        assert_eq!(state.phenotype_channel_weights, [1.0f32; 3]);
+        assert_eq!(state.phenotype_active_channel, 0);
         assert_eq!(state.phenotype_channel_polarity, [true; 3]);
     }
 
@@ -111,7 +111,7 @@ mod tests {
             50.0,
             2,
             [0, 0, 0],
-            [1.0f32; 3],
+            0,
             [true; 3],
         );
         assert_eq!(state.position, Position::new(3, 7));

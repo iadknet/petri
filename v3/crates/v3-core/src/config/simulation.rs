@@ -156,23 +156,20 @@ impl Default for RuntimeConfig {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PhenotypeConfig {
-    /// RGB channel step magnitude (wrapping u8). Default: 2. Falls back to 2 if 0.
+    /// RGB channel step magnitude (wrapping u8). Default: 1. Falls back to 1 if 0.
     pub channel_step: u8,
+    /// Probability of switching active channel per reproduction. Default: 0.01. Clamped [0.0, 1.0].
+    pub channel_change_chance: f32,
     /// Probability of flipping the selected channel's polarity. Default: 0.002. Clamped [0.0, 1.0].
     pub polarity_flip_chance: f32,
-    /// Minimum weight when re-randomizing the selected channel. Default: 0.05. Falls back to 0.05 if < 0.
-    pub channel_weight_min: f32,
-    /// Maximum weight when re-randomizing the selected channel. Default: 1.0. Falls back to 1.0 if <= channel_weight_min.
-    pub channel_weight_max: f32,
 }
 
 impl Default for PhenotypeConfig {
     fn default() -> Self {
         Self {
             channel_step: 1,
+            channel_change_chance: 0.01,
             polarity_flip_chance: 0.002,
-            channel_weight_min: 0.05,
-            channel_weight_max: 1.0,
         }
     }
 }
@@ -299,13 +296,8 @@ impl SimulationConfig {
         if ph.channel_step == 0 {
             ph.channel_step = 1;
         }
+        ph.channel_change_chance = ph.channel_change_chance.clamp(0.0, 1.0);
         ph.polarity_flip_chance = ph.polarity_flip_chance.clamp(0.0, 1.0);
-        if ph.channel_weight_min < 0.0 || !ph.channel_weight_min.is_finite() {
-            ph.channel_weight_min = 0.05;
-        }
-        if !ph.channel_weight_max.is_finite() || ph.channel_weight_max <= ph.channel_weight_min {
-            ph.channel_weight_max = 1.0;
-        }
 
         let p = &mut self.population;
         if p.initial_creatures < 1 {
@@ -401,9 +393,8 @@ mod tests {
         assert_eq!(cfg.mutation.per_birth_mutation_events_max, 10);
         // Phenotype
         assert_eq!(cfg.mutation.phenotype.channel_step, 1);
+        assert!((cfg.mutation.phenotype.channel_change_chance - 0.01).abs() < 1e-6);
         assert!((cfg.mutation.phenotype.polarity_flip_chance - 0.002).abs() < 1e-6);
-        assert!((cfg.mutation.phenotype.channel_weight_min - 0.05).abs() < 1e-6);
-        assert!((cfg.mutation.phenotype.channel_weight_max - 1.0).abs() < 1e-6);
         // Population
         assert_eq!(cfg.population.initial_creatures, 2000);
         assert_eq!(cfg.population.max_creatures, 100000);
@@ -495,20 +486,19 @@ mod tests {
     }
 
     #[test]
-    fn normalize_phenotype_negative_channel_weight_min_falls_back() {
+    fn normalize_phenotype_channel_change_chance_clamped() {
         let mut cfg = SimulationConfig::default();
-        cfg.mutation.phenotype.channel_weight_min = -0.1;
+        cfg.mutation.phenotype.channel_change_chance = 1.5;
         cfg.normalize();
-        assert!((cfg.mutation.phenotype.channel_weight_min - 0.05).abs() < 1e-6);
+        assert!((cfg.mutation.phenotype.channel_change_chance - 1.0).abs() < 1e-6);
     }
 
     #[test]
-    fn normalize_phenotype_weight_max_lte_min_falls_back() {
+    fn normalize_phenotype_channel_change_chance_negative_clamped() {
         let mut cfg = SimulationConfig::default();
-        cfg.mutation.phenotype.channel_weight_min = 0.5;
-        cfg.mutation.phenotype.channel_weight_max = 0.4;
+        cfg.mutation.phenotype.channel_change_chance = -0.5;
         cfg.normalize();
-        assert!((cfg.mutation.phenotype.channel_weight_max - 1.0).abs() < 1e-6);
+        assert!((cfg.mutation.phenotype.channel_change_chance - 0.0).abs() < 1e-6);
     }
 
     #[test]
