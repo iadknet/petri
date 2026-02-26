@@ -140,9 +140,8 @@ export interface VmConfig {
 
 export interface PhenotypeConfig {
 	channel_step: number;
+	channel_change_chance: number;
 	polarity_flip_chance: number;
-	channel_weight_min: number;
-	channel_weight_max: number;
 }
 
 export interface MutationConfig {

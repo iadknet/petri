@@ -5,6 +5,10 @@ use crate::config::PhenotypeConfig;
 /// Apply phenotype mutation to active channel, following v3-phenotype-spec.md Section 5.
 ///
 /// Returns updated `(rgb, active_channel, channel_polarity)`.
+///
+/// # Panics
+///
+/// Debug-asserts that `active_channel < 3`.
 pub fn mutate_phenotype(
     rgb: [u8; 3],
     active_channel: usize,
@@ -12,6 +16,8 @@ pub fn mutate_phenotype(
     config: &PhenotypeConfig,
     rng: &mut impl Rng,
 ) -> ([u8; 3], usize, [bool; 3]) {
+    debug_assert!(active_channel < 3, "active_channel must be 0, 1, or 2");
+
     // Step 1: Channel switch — with prob `channel_change_chance`, pick a different channel.
     let mut child_active_channel = active_channel;
     if rng.gen::<f32>() < config.channel_change_chance {
@@ -50,11 +56,6 @@ mod tests {
     use crate::config::PhenotypeConfig;
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
-
-    #[allow(dead_code)]
-    fn default_config() -> PhenotypeConfig {
-        PhenotypeConfig::default()
-    }
 
     #[test]
     fn phenotype_active_channel_unchanged_when_no_switch() {
@@ -96,7 +97,7 @@ mod tests {
         let cfg = PhenotypeConfig {
             channel_step: 5,
             channel_change_chance: 0.0, // don't switch
-            polarity_flip_chance: 0.0, // don't flip
+            polarity_flip_chance: 0.0,  // don't flip
         };
         let rgb = [100u8, 100, 100];
         let active_channel = 1; // green

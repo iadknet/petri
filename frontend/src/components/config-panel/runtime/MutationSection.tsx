@@ -45,20 +45,12 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		testId: "config-field-mutation-polarity-flip",
 	},
 	{
-		path: "mutation.phenotype.channel_weight_min",
-		label: "Weight Min",
+		path: "mutation.phenotype.channel_change_chance",
+		label: "Channel Switch",
 		min: 0,
 		max: 1,
-		step: 0.01,
-		testId: "config-field-mutation-weight-min",
-	},
-	{
-		path: "mutation.phenotype.channel_weight_max",
-		label: "Weight Max",
-		min: 0,
-		max: 10,
-		step: 0.01,
-		testId: "config-field-mutation-weight-max",
+		step: 0.001,
+		testId: "config-field-mutation-channel-change",
 	},
 ];
 

@@ -43,12 +43,12 @@ Per-creature phenotype state:
 | Field | Type | Visibility | Description |
 | --- | --- | --- | --- |
 | `phenotype_rgb` | `[u8; 3]` | API/frame payloads | Visible color (R, G, B channels). |
-| `phenotype_channel_weights` | `[f32; 3]` | Internal only | Mutation selection probability per channel. |
+| `phenotype_active_channel` | `usize` | Internal only | Currently active channel index (0=R, 1=G, 2=B). |
 | `phenotype_channel_polarity` | `[bool; 3]` | Internal only | Direction of walk per channel (`true` = increment, `false` = decrement). |
 
 Visibility rules:
 - `phenotype_rgb` is exposed in frame payloads and creature state.
-- `phenotype_channel_weights` and `phenotype_channel_polarity` are internal
+- `phenotype_active_channel` and `phenotype_channel_polarity` are internal
   simulation state; they are NOT exposed in API responses, frame payloads, or
   WebSocket events.
 
@@ -61,7 +61,7 @@ All startup-seeded founders use a single canonical phenotype baseline:
 | Field | Value |
 | --- | --- |
 | `phenotype_rgb` | `[204, 61, 61]` |
-| `phenotype_channel_weights` | `[1.0, 1.0, 1.0]` |
+| `phenotype_active_channel` | `0` (red) |
 | `phenotype_channel_polarity` | `[true, true, true]` |
 
 v3alpha1 policy:
@@ -85,7 +85,7 @@ Trigger semantics:
   was applied), phenotype also mutates using the algorithm in Section 5.
 - If `MutationSummary.applied_events == 0` (no genome mutation occurred),
   offspring inherits the parent's exact `phenotype_rgb`,
-  `phenotype_channel_weights`, and `phenotype_channel_polarity` unchanged.
+  `phenotype_active_channel`, and `phenotype_channel_polarity` unchanged.
 
 Ownership boundary:
 - This trigger is evaluated in the reproduction flow after `MutationEngine`
@@ -101,44 +101,37 @@ When the trigger condition is met (`applied_events > 0`), phenotype mutates as
 follows:
 
 ```text
-mutate_phenotype(parent_rgb, parent_weights, parent_polarity, config, rng):
-  1. channel = select_weighted_channel(parent_weights, rng)
+mutate_phenotype(parent_rgb, parent_active_channel, parent_polarity, config, rng):
+  1. if rng.random() < config.channel_change_chance:
+       child_active_channel = pick uniformly from the other 2 channels
+     else:
+       child_active_channel = parent_active_channel
   2. if rng.random() < config.polarity_flip_chance:
-       child_polarity[channel] = !parent_polarity[channel]
+       child_polarity[child_active_channel] = !parent_polarity[child_active_channel]
      else:
        child_polarity = copy(parent_polarity)
-  3. child_weights[channel] = rng.uniform(config.channel_weight_min, config.channel_weight_max)
-     (other channels keep parent weights)
-  4. step = max(config.channel_step, 1)
-     if child_polarity[channel] is true:
-       child_rgb[channel] = parent_rgb[channel] wrapping_add step
+  3. step = max(config.channel_step, 1)
+     if child_polarity[child_active_channel] is true:
+       child_rgb[child_active_channel] = parent_rgb[child_active_channel] wrapping_add step
      else:
-       child_rgb[channel] = parent_rgb[channel] wrapping_sub step
+       child_rgb[child_active_channel] = parent_rgb[child_active_channel] wrapping_sub step
      (other channels keep parent RGB)
-  5. return (child_rgb, child_weights, child_polarity)
+  4. return (child_rgb, child_active_channel, child_polarity)
 ```
 
 Step details:
 
-1. **Channel selection**: Select one RGB channel index (0=R, 1=G, 2=B) using
-   weighted random sampling from `parent_weights`.
+1. **Channel switch**: With probability `channel_change_chance`, switch the
+   active channel to one of the other two channels chosen uniformly at random.
+   Otherwise, the active channel is inherited unchanged. This creates
+   persistent directional drift within a single channel, with rare switches.
 2. **Polarity flip**: With probability `polarity_flip_chance`, flip the
-   selected channel's polarity. All other channels retain parent polarity.
-3. **Weight re-randomize**: Re-randomize the selected channel's weight
-   uniformly in `[channel_weight_min, channel_weight_max]`. All other channels
-   retain parent weights.
-4. **RGB step**: Apply `+channel_step` or `-channel_step` to the selected
+   active channel's polarity. All other channels retain parent polarity.
+3. **RGB step**: Apply `+channel_step` or `-channel_step` to the active
    channel's RGB value using the (possibly flipped) polarity as sign direction.
    Arithmetic uses **wrapping u8** semantics (overflow wraps around 0/255).
    All other channels retain parent RGB.
-5. **Return**: Output the child phenotype state.
-
-### Weight sanitization
-
-Before weighted channel selection:
-- Non-finite or negative weight values are treated as `0.0`.
-- If all three sanitized weights are zero (or effectively zero within
-  `f32::EPSILON`), fall back to uniform random channel selection.
+4. **Return**: Output the child phenotype state.
 
 ---
 
@@ -150,10 +143,9 @@ by `v3-runtime-config-spec.md`.
 
 | Key | Type | Default | Constraint |
 | --- | --- | --- | --- |
-| `runtime.mutation.phenotype.channel_step` | `u8` | `2` | Must be `>= 1`; invalid values fall back to `2`. |
+| `runtime.mutation.phenotype.channel_step` | `u8` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
+| `runtime.mutation.phenotype.channel_change_chance` | `f32` | `0.01` | Clamp to `[0.0, 1.0]`. |
 | `runtime.mutation.phenotype.polarity_flip_chance` | `f32` | `0.002` | Clamp to `[0.0, 1.0]`. |
-| `runtime.mutation.phenotype.channel_weight_min` | `f32` | `0.05` | Must be `>= 0.0`; invalid values fall back to `0.05`. |
-| `runtime.mutation.phenotype.channel_weight_max` | `f32` | `1.0` | Must be `> channel_weight_min`; invalid values fall back to `1.0`. |
 
 ---
 
