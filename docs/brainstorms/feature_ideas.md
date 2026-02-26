@@ -1,28 +1,10 @@
 # Feature ideas
 
-## Bug fixes
-  - Fix "blurring" when dragging full world in canvas, does not blur when more zoomed in. 
-
 ## Small Modifications
 
-### Change phenotype drift
-  - instead of weighted random channel have a set channel that increments/decrements depending on polarity
-  - Random chance the channel target changes
-  - Make this random channel change probability configurable
-  - This makes it so creature's appearance drifts apart more subtly.
-  
 ### Allow creatures to move more than one space
   - add metadata to move action for number of spaces.
   - Extra energy penalty for each additional space
-
-## UI Cleanup
-  - Add "reset" button for each confuration option, that resets to default. This conditionally appears if value has changed from default.
-  - Change "restart" behavior to use current runtime values.
-  - Limit "startup" config options to only those values that apply to word initialization and cannot be changed at runtime.
-    - Remove any runtime config options that cannot actually be adjusted at runtime.
-    - In the end, there should be no overlap between "startup" and "runtime" config options.
-  - Add an informative tooltip
-  - provide zoom in / zoom out buttons (translucent buttons in upper-right of canvas)
 
 ## Major New Features
 
@@ -46,7 +28,10 @@
   - As the node "executes" highlight that particular part of the node, highlight all values changed
 
 ### Drawing of barriers and food
+  - this was pretty well implemented in v1 we can use v1 as a reference
+  - make sure barrier mechanics are in place for the world
   - Add the a ability to draw barriers
+  - add the ability to draw food
 
 ### Storage slots
   - add the ability for creatures to pick up and place food and barriers
