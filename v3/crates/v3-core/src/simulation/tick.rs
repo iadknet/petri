@@ -34,22 +34,26 @@ pub fn run_phase_0(sim: &mut Simulation) {
 
 /// Run one full simulation tick per v3-tick-orchestration-spec.md.
 ///
-/// 1. Phase 0 world updates
+/// Two-phase model:
+/// 1. Phase 0: world updates (food growth, aging, decay, death removal)
 /// 2. Build turn queue: sort all creature IDs then shuffle
-/// 3. For each creature in queue (skip if removed mid-tick):
-///    a. Assemble static sensor snapshot
-///    b. Execute creature mesh → WorldAction
-///    c. Apply action
-/// 4. Increment sim.tick
+/// 3. Phase 1 — Batch cognition: all creatures see the frozen post-Phase-0 world snapshot
+/// 4. Phase 2 — Sequential action execution: apply decisions in queue order
+/// 5. Increment sim.tick
 pub fn run_tick(sim: &mut Simulation) {
     use rand::seq::SliceRandom;
     use rand::RngCore;
     use rand::SeedableRng;
 
-    use crate::contracts::WorldAction;
+    use std::collections::HashMap;
+
+    use rayon::prelude::*;
+
+    use crate::contracts::{CreatureId, WorldAction};
     use crate::runtime::mesh::execute_creature_mesh;
+    use crate::runtime::types::ComputeCostReport;
     use crate::sensors::static_inputs::assemble_static_inputs;
-    use crate::simulation::actions::apply_reproduce;
+    use crate::simulation::actions::{apply_eat, apply_move, apply_noop, apply_reproduce};
 
     // Reset per-tick counters at the start of each tick.
     sim.stats.last_tick_move = 0;
@@ -72,13 +76,48 @@ pub fn run_tick(sim: &mut Simulation) {
     // Derive a separate RNG for reproduction to avoid double-borrowing sim.rng.
     let mut reproduce_rng = rand::rngs::SmallRng::seed_from_u64(sim.rng.next_u64());
 
-    // Copy only the small config subsets needed by the per-creature loop,
-    // avoiding a full SimulationConfig clone (which contains Vecs/Strings).
-    // EnergyConfig is 9 f32 fields; RuntimeConfig is ~7 scalars + VmRuntimeConfig (1 f32).
-    let energy_config = sim.config.energy.clone();
+    // Clone RuntimeConfig for cognition phase (small struct, ~7 scalars).
     let runtime_config = sim.config.runtime.clone();
 
-    // Compute cost accumulators for this tick.
+    // ── Phase 1: Batch cognition (parallel) ──────────────────────────────────
+    // All creatures see the frozen post-Phase-0 world snapshot. Cognition only
+    // mutates each creature's private state (energy, memory, graph_state).
+
+    // 1a: Assemble sensor inputs sequentially (needs &sim.world + &sim.creatures).
+    let inputs: Vec<_> = queue
+        .iter()
+        .filter(|&&id| sim.creatures.contains_key(id))
+        .map(|&id| (id, assemble_static_inputs(&sim.world, &sim.creatures[id])))
+        .collect();
+
+    // 1b: Parallel cognition — each creature's mesh executes independently.
+    // Extract disjoint &mut CreatureState refs via HashMap::remove, then run
+    // par_iter_mut so each thread gets its own exclusive creature reference.
+    let decisions: Vec<(CreatureId, WorldAction, ComputeCostReport)> = {
+        let mut creature_refs: HashMap<_, _> = sim.creatures.iter_mut().collect();
+
+        let mut work: Vec<_> = inputs
+            .into_iter()
+            .filter_map(|(id, si)| creature_refs.remove(&id).map(|c| (id, si, c)))
+            .collect();
+
+        work.par_iter_mut()
+            .map(|(id, si, creature)| {
+                let (action, cost) = execute_creature_mesh(
+                    &creature.genome,
+                    si,
+                    &mut creature.energy,
+                    &mut creature.memory,
+                    &mut creature.graph_state,
+                    &runtime_config,
+                );
+                (*id, action, cost)
+            })
+            .collect()
+    };
+
+    // ── Phase 2: Sequential action execution ────────────────────────────────
+    // Apply decisions in queue order. Compute cost stats are accumulated here.
     let mut compute_total_sum = 0.0f32;
     let mut compute_total_min = f32::MAX;
     let mut compute_total_max = 0.0f32;
@@ -88,28 +127,7 @@ pub fn run_tick(sim: &mut Simulation) {
     let mut compute_graph_count = 0u32;
     let mut compute_creature_count = 0u32;
 
-    for id in queue {
-        // Skip creatures removed mid-tick (killed by a previous action this tick).
-        if !sim.creatures.contains_key(id) {
-            continue;
-        }
-
-        let static_inputs = assemble_static_inputs(&sim.world, &sim.creatures[id]);
-
-        // Execute the creature's mesh chain.  The borrow of `sim.creatures` ends
-        // when this block closes.
-        let (action, compute_cost) = {
-            let creature = sim.creatures.get_mut(id).unwrap();
-            execute_creature_mesh(
-                &creature.genome,
-                &static_inputs,
-                &mut creature.energy,
-                &mut creature.memory,
-                &mut creature.graph_state,
-                &runtime_config,
-            )
-        };
-
+    for (id, action, compute_cost) in decisions {
         // Accumulate compute cost for this creature.
         let total_cost = compute_cost.vm_cost + compute_cost.graph_cost;
         compute_total_sum += total_cost;
@@ -129,38 +147,23 @@ pub fn run_tick(sim: &mut Simulation) {
         }
         compute_creature_count += 1;
 
-        // Apply the chosen action.  Each branch re-borrows only what it needs.
-        // NoOp/Eat/Move use the pre-copied energy_config to avoid re-borrowing sim.config.
+        // Apply the chosen action using the factored apply_* functions.
         match action {
             WorldAction::NoOp => {
                 if let Some(creature) = sim.creatures.get_mut(id) {
-                    creature.energy -= energy_config.costs.noop_cost;
+                    apply_noop(creature, &sim.config);
                     sim.stats.last_tick_noop += 1;
                 }
             }
             WorldAction::Eat => {
                 if let Some(creature) = sim.creatures.get_mut(id) {
-                    let food = sim.world.consume_food(creature.position);
-                    creature.energy += food * energy_config.costs.eat_reward_per_food;
-                    creature.energy = creature.energy.min(energy_config.lifecycle.max_energy);
-                    creature.energy -= energy_config.costs.eat_cost;
+                    apply_eat(creature, &mut sim.world, &sim.config);
                     sim.stats.last_tick_eat += 1;
                 }
             }
             WorldAction::Move(dir) => {
                 if let Some(creature) = sim.creatures.get_mut(id) {
-                    let target = sim
-                        .world
-                        .resolve_neighbor(creature.position, dir)
-                        .filter(|&p| sim.world.is_valid_target_cell(p));
-
-                    if let Some(target_pos) = target {
-                        sim.world.remove_creature(creature.position);
-                        sim.world.place_creature(target_pos, id);
-                        creature.position = target_pos;
-                    }
-
-                    creature.energy -= energy_config.costs.move_cost;
+                    apply_move(id, creature, &mut sim.world, dir, &sim.config);
                     sim.stats.last_tick_move += 1;
                 }
             }
@@ -168,7 +171,6 @@ pub fn run_tick(sim: &mut Simulation) {
                 direction,
                 energy_transfer,
             } => {
-                // last_tick_reproduce is incremented inside apply_reproduce, regardless of outcome.
                 apply_reproduce(id, sim, direction, energy_transfer, &mut reproduce_rng);
             }
         }

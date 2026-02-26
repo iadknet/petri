@@ -81,10 +81,14 @@ runtime backends or reproduction internals.
   -> [Build turn queue from living CreatureIds after Phase 0]
   -> [Stable sort IDs]
   -> [Shuffle with tick RNG]
-  -> loop each id:
-       [gather inputs from current world]
-       [execute cognition runtime -> WorldAction]
-       [apply action immediately to current world]
+  -> [Phase 1: Batch cognition — all creatures see frozen post-Phase-0 world snapshot]
+       For each creature in queue (parallel-safe):
+         [gather inputs from frozen world snapshot]
+         [execute cognition runtime -> WorldAction]
+       Collect all (CreatureId, WorldAction, ComputeCostReport)
+  -> [Phase 2: Sequential action execution]
+       For each decision in queue order:
+         [apply action to current world state]
   -> [tick ends; newborns eligible next tick]
 ```
 
@@ -117,13 +121,23 @@ by earlier action outcomes), its turn is skipped and processing continues.
 
 ---
 
-## 5. Immediate Action-Application Contract
+## 5. Two-Phase Action Contract
 
-Per queued creature turn:
-1. Resolve turn-start inputs from current world state.
-2. Execute cognition runtime to produce one `WorldAction`.
-3. Apply that action immediately to current world state.
-4. Persist resulting world mutations before next creature turn.
+### Phase 1: Batch Cognition
+
+All creatures resolve sensor inputs from the frozen post-Phase-0 world snapshot
+(before any creature actions this tick). Cognition executes for each creature and
+produces a `WorldAction`. Cognition only mutates each creature's private state
+(energy, memory, graph_state) — it does not modify world state.
+
+Phase 1 is parallel-safe: each creature's cognition is independent with no
+shared mutable state. The implementation uses Rayon `par_iter_mut` for
+multi-core execution.
+
+### Phase 2: Sequential Action Execution
+
+Decisions are applied in queue order. Each action is applied immediately to
+current world state, and resulting mutations persist before the next action.
 
 This is the canonical first-processed-wins model.
 
@@ -175,19 +189,25 @@ Config key defaults for all action costs are canonical in
 ## 7. Conflict Resolution Contract
 
 All conflict-prone actions resolve against current world state at the moment the
-action is applied.
+action is applied (during Phase 2).
+
+Because cognition sees the frozen post-Phase-0 world snapshot (Phase 1), multiple
+creatures may independently decide to target the same cell or food during
+cognition. Conflicts are resolved during Phase 2 action execution via
+first-processed-wins in queue order.
 
 Canonical move/spawn target-validity primitives (edge handling, occupancy, and
 barrier checks) are owned by `v3-world-grid-spec.md`.
 
 Implications:
 - `Move`: first processed successful move claims destination occupancy.
-- `Eat`: first processed successful eat consumes target food/resource.
+- `Eat`: first processed successful eat consumes target food/resource. Later
+  creatures that decided to eat the same cell during cognition will find no food.
 - `Reproduce`: first processed valid spawn into a target cell succeeds;
-  later reproduce actions targeting now-invalid cells fail the same invalid-target
+  later reproduce actions targeting now-occupied cells fail the invalid-target
   gate.
 
-No additional global arbitration pass runs after the per-turn loop.
+No additional global arbitration pass runs after Phase 2.
 
 ---
 
@@ -210,9 +230,15 @@ For deterministic tests that depend on action-order outcomes, pin:
 - Queue source filter (alive after Phase 0 updates only).
 - Pre-shuffle ordering rule (stable sorted `CreatureId`).
 - Shuffle algorithm and RNG seed/stream for tick queue.
-- Per-turn sequencing (`think -> emit action -> apply action`) with no separate
-  post-loop commit phase.
+- Two-phase sequencing: batch cognition (Phase 1) then sequential action
+  execution (Phase 2) in queue order.
 - Newborn eligibility rule (next tick only).
+
+Parallel cognition (Phase 1) is deterministic: `execute_creature_mesh` is a
+pure function of its inputs (no RNG, no shared mutable state). Results are
+collected in original queue order via Rayon's `IndexedParallelIterator::collect`,
+which preserves input ordering. Action execution (Phase 2) is sequential and
+deterministic given the same decision order.
 
 Runtime cognition reproducibility controls are canonical in
 `v3-mesh-execution-spec.md` (`Test-Mode Reproducibility Notes`).

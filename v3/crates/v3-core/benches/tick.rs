@@ -64,10 +64,29 @@ fn bench_mesh_execution_only(c: &mut Criterion) {
     });
 }
 
+fn bench_full_tick_large_population(c: &mut Criterion) {
+    let mut cfg = SimulationConfig::default();
+    cfg.world.width = 400;
+    cfg.world.height = 400;
+    cfg.population.initial_creatures = 2000;
+
+    c.bench_function("full_tick_2000_creatures_50_ticks", |b| {
+        b.iter_with_setup(
+            || seed_simulation(cfg.clone(), 42),
+            |mut sim| {
+                for _ in 0..50 {
+                    run_tick(black_box(&mut sim));
+                }
+            },
+        );
+    });
+}
+
 criterion_group!(
     benches,
     bench_phase_0_only,
     bench_full_tick,
-    bench_mesh_execution_only
+    bench_mesh_execution_only,
+    bench_full_tick_large_population
 );
 criterion_main!(benches);
