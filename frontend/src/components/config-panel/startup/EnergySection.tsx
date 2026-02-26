@@ -5,26 +5,18 @@ import type { FieldDef, StartupSectionProps } from "../shared/types.ts";
 
 const FIELDS: FieldDef[] = [
 	{
-		path: "world.food.initial_density",
-		label: "Food Initial Density",
+		path: "energy.initial_energy",
+		label: "Initial Energy",
 		min: 0,
-		max: 1,
-		step: 0.01,
-		testId: "startup-field-food-initial-density",
-	},
-	{
-		path: "world.food.initial_coverage",
-		label: "Food Coverage",
-		min: 0,
-		max: 1,
-		step: 0.01,
-		testId: "startup-field-food-initial-coverage",
+		max: 500,
+		step: 0.5,
+		testId: "startup-field-energy-initial-energy",
 	},
 ];
 
-export function FoodParametersSection({ startupPreset, updateStartupPreset }: StartupSectionProps) {
+export function EnergySection({ startupPreset, updateStartupPreset }: StartupSectionProps) {
 	return (
-		<FieldGroup title="Food Parameters">
+		<FieldGroup title="Energy">
 			{FIELDS.map((field) => (
 				<FieldRow
 					key={`startup-${field.path}`}

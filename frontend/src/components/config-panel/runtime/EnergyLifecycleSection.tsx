@@ -2,13 +2,6 @@ import type { FieldDef } from "../shared/types.ts";
 
 export const ENERGY_LIFECYCLE_FIELDS: FieldDef[] = [
 	{
-		path: "energy.lifecycle.initial_energy",
-		label: "Initial Energy",
-		min: 0,
-		max: 500,
-		step: 0.5,
-	},
-	{
 		path: "energy.lifecycle.max_energy",
 		label: "Max Energy",
 		min: 1,

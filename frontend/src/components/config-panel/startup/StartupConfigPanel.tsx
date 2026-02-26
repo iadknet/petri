@@ -1,5 +1,6 @@
 import { Section } from "../shared/Section.tsx";
 import type { StartupPanelProps } from "../shared/types.ts";
+import { EnergySection } from "./EnergySection.tsx";
 import { FoodParametersSection } from "./FoodParametersSection.tsx";
 import { PopulationSection } from "./PopulationSection.tsx";
 import { RunSettingsSection } from "./RunSettingsSection.tsx";
@@ -13,7 +14,7 @@ export function StartupConfigPanel({
 	return (
 		<Section
 			title="Startup Config"
-			description="These settings apply on Restart. Shared fields can diverge from live runtime values."
+			description="These settings apply on Restart."
 			collapsible
 			sectionClassName="bg-emerald-950/10 border-l-2 border-l-emerald-500"
 		>
@@ -27,6 +28,7 @@ export function StartupConfigPanel({
 				startupPreset={startupPreset}
 				updateStartupPreset={updateStartupPreset}
 			/>
+			<EnergySection startupPreset={startupPreset} updateStartupPreset={updateStartupPreset} />
 			<FoodParametersSection
 				startupPreset={startupPreset}
 				updateStartupPreset={updateStartupPreset}
