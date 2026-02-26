@@ -11,14 +11,12 @@ export interface StartupPreset {
 		width: number;
 		height: number;
 		food: {
-			growth_rate: number;
 			initial_density: number;
 			initial_coverage: number;
-			spread_threshold_ratio: number;
-			recovery_spawn_rate: number;
-			recovery_floor_ratio: number;
-			max_density: number;
 		};
+	};
+	energy: {
+		initial_energy: number;
 	};
 }
 
@@ -41,44 +39,32 @@ function randomSeed(): number {
 function buildDefaultPreset(): StartupPreset {
 	return {
 		seed: randomSeed(),
-		population: {
-			initial_creatures: 2000,
-		},
+		population: { initial_creatures: 2000 },
 		world: {
 			width: 400,
 			height: 400,
 			food: {
-				growth_rate: 0.096,
 				initial_density: 1.0,
 				initial_coverage: 0.15,
-				spread_threshold_ratio: 0.8,
-				recovery_spawn_rate: 0.01,
-				recovery_floor_ratio: 0.01,
-				max_density: 1.0,
 			},
 		},
+		energy: { initial_energy: 20.0 },
 	};
 }
 
 function fromServerConfig(config: SimulationConfig): StartupPreset {
 	return {
 		seed: randomSeed(),
-		population: {
-			initial_creatures: config.population.initial_creatures,
-		},
+		population: { initial_creatures: config.population.initial_creatures },
 		world: {
 			width: config.world.width,
 			height: config.world.height,
 			food: {
-				growth_rate: config.world.food.growth_rate,
 				initial_density: config.world.food.initial_density,
 				initial_coverage: config.world.food.initial_coverage,
-				spread_threshold_ratio: config.world.food.spread_threshold_ratio,
-				recovery_spawn_rate: config.world.food.recovery_spawn_rate,
-				recovery_floor_ratio: config.world.food.recovery_floor_ratio,
-				max_density: config.world.food.max_density,
 			},
 		},
+		energy: { initial_energy: config.energy.lifecycle.initial_energy },
 	};
 }
 
@@ -132,15 +118,7 @@ export const useStartupConfigStore = create<StartupConfigState>()((set) => ({
 }));
 
 /** Build the startup API request from the current preset */
-export function buildStartupRequest(preset: StartupPreset): {
-	seed: number;
-	population: { initial_creatures: number };
-	world: {
-		width: number;
-		height: number;
-		food: StartupPreset["world"]["food"];
-	};
-} {
+export function buildStartupRequest(preset: StartupPreset) {
 	return {
 		seed: preset.seed,
 		population: { initial_creatures: preset.population.initial_creatures },
@@ -148,6 +126,9 @@ export function buildStartupRequest(preset: StartupPreset): {
 			width: preset.world.width,
 			height: preset.world.height,
 			food: { ...preset.world.food },
+		},
+		energy: {
+			lifecycle: { initial_energy: preset.energy.initial_energy },
 		},
 	};
 }

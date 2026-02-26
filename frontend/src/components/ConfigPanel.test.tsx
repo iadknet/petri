@@ -76,20 +76,19 @@ describe("ConfigPanel", () => {
 		expect(screen.getByText("Runtime (Live) Config")).toBeInTheDocument();
 		expect(screen.getByTestId("startup-seed-randomize")).toBeInTheDocument();
 		expect(screen.getAllByText("Food Parameters").length).toBeGreaterThan(0);
-		expect(screen.getByTestId("startup-field-food-spread-threshold-ratio")).toBeInTheDocument();
-		expect(screen.getByTestId("startup-field-food-recovery-spawn-rate")).toBeInTheDocument();
-		expect(screen.getByTestId("startup-field-food-recovery-floor-ratio")).toBeInTheDocument();
-		expect(screen.getByTestId("startup-field-food-max-density")).toBeInTheDocument();
+		expect(screen.getByTestId("startup-field-food-initial-density")).toBeInTheDocument();
+		expect(screen.getByTestId("startup-field-food-initial-coverage")).toBeInTheDocument();
+		expect(screen.getByTestId("startup-field-energy-initial-energy")).toBeInTheDocument();
 	});
 
-	it("startup edits do not modify runtime local draft for shared food fields", () => {
+	it("startup edits do not modify runtime local draft for startup-only fields", () => {
 		render(<ConfigPanel />);
-		fireEvent.change(screen.getByTestId("startup-field-food-growth-rate"), {
-			target: { value: "0.25" },
+		fireEvent.change(screen.getByTestId("startup-field-food-initial-density"), {
+			target: { value: "0.75" },
 		});
 
-		expect(useStartupConfigStore.getState().preset.world.food.growth_rate).toBe(0.25);
-		expect(useConfigStore.getState().localDraft?.world.food.growth_rate).toBe(0.25);
+		expect(useStartupConfigStore.getState().preset.world.food.initial_density).toBe(0.75);
+		expect(useConfigStore.getState().localDraft?.world.food.initial_density).toBe(1.0);
 	});
 
 	it("applies runtime field disable rules by simulation state", () => {

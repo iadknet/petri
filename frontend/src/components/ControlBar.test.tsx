@@ -113,15 +113,11 @@ describe("ControlBar", () => {
 				width: 512,
 				height: 384,
 				food: {
-					growth_rate: 0.2,
 					initial_density: 1.0,
 					initial_coverage: 0.4,
-					spread_threshold_ratio: 0.8,
-					recovery_spawn_rate: 0.05,
-					recovery_floor_ratio: 0.04,
-					max_density: 1.0,
 				},
 			},
+			energy: { initial_energy: 20 },
 		});
 		useStatsHistoryStore.getState().pushStats(3, 10, 25);
 
@@ -154,14 +150,12 @@ describe("ControlBar", () => {
 					width: 512,
 					height: 384,
 					food: {
-						growth_rate: 0.2,
 						initial_density: 1.0,
 						initial_coverage: 0.4,
-						spread_threshold_ratio: 0.8,
-						recovery_spawn_rate: 0.05,
-						recovery_floor_ratio: 0.04,
-						max_density: 1.0,
 					},
+				},
+				energy: {
+					lifecycle: { initial_energy: 20 },
 				},
 			});
 			expect(useSimulationStore.getState().simState).toBe("idle");

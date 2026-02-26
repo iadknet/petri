@@ -67,7 +67,7 @@ describe("StartupConfigStore", () => {
 		expect(state.preset.population.initial_creatures).toBe(50);
 		expect(state.preset.world.width).toBe(400);
 		expect(state.preset.world.food.initial_density).toBe(1.0);
-		expect(state.preset.world.food.spread_threshold_ratio).toBe(0.75);
+		expect(state.preset.energy.initial_energy).toBe(20);
 	});
 
 	it("does not overwrite user edits after touch", () => {
