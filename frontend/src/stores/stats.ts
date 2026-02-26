@@ -23,6 +23,13 @@ export interface ComputePoint {
 	graphMean: number;
 }
 
+export interface ComplexityPoint {
+	tick: number;
+	mean: number;
+	min: number;
+	max: number;
+}
+
 /** Fixed-size ring buffer that overwrites oldest entries */
 function pushRing<T>(buf: T[], item: T, maxSize: number): T[] {
 	if (buf.length >= maxSize) {
@@ -37,6 +44,7 @@ export interface StatsHistoryState {
 	statsHistory: StatsPoint[];
 	actionsHistory: ActionPoint[];
 	computeHistory: ComputePoint[];
+	complexityHistory: ComplexityPoint[];
 
 	// Cumulative reproduction stats (from health events)
 	reproAttempted: number;
@@ -60,6 +68,7 @@ export interface StatsHistoryState {
 		vmMean: number,
 		graphMean: number,
 	) => void;
+	pushComplexity: (tick: number, mean: number, min: number, max: number) => void;
 	setReproStats: (
 		attempted: number,
 		spawned: number,
@@ -74,6 +83,7 @@ export const useStatsHistoryStore = create<StatsHistoryState>()((set) => ({
 	statsHistory: [],
 	actionsHistory: [],
 	computeHistory: [],
+	complexityHistory: [],
 	reproAttempted: 0,
 	reproSpawned: 0,
 	reproRejected: 0,
@@ -101,6 +111,11 @@ export const useStatsHistoryStore = create<StatsHistoryState>()((set) => ({
 			),
 		})),
 
+	pushComplexity: (tick, mean, min, max) =>
+		set((s) => ({
+			complexityHistory: pushRing(s.complexityHistory, { tick, mean, min, max }, RING_SIZE),
+		})),
+
 	setReproStats: (attempted, spawned, rejected, byReason) =>
 		set({
 			reproAttempted: attempted,
@@ -121,6 +136,7 @@ export const useStatsHistoryStore = create<StatsHistoryState>()((set) => ({
 			statsHistory: [],
 			actionsHistory: [],
 			computeHistory: [],
+			complexityHistory: [],
 			reproAttempted: 0,
 			reproSpawned: 0,
 			reproRejected: 0,

@@ -67,6 +67,9 @@ export interface HealthPayload {
 	reproduction_actions_spawned_total: number;
 	reproduction_actions_rejected_total: number;
 	reproduction_actions_rejected_total_by_reason: Record<string, number>;
+	genome_complexity_mean: number;
+	genome_complexity_min: number;
+	genome_complexity_max: number;
 }
 
 // WebSocket binary frame (msgpack)

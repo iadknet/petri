@@ -109,6 +109,12 @@ export class WsClient {
 			frame.health.mutation_events_applied_total,
 			frame.health.mutation_events_skipped_total,
 		);
+		stats.pushComplexity(
+			frame.tick,
+			frame.health.genome_complexity_mean,
+			frame.health.genome_complexity_min,
+			frame.health.genome_complexity_max,
+		);
 	}
 
 	private async resync(): Promise<void> {
