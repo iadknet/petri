@@ -670,7 +670,111 @@ async fn paint_response_includes_frame() {
     );
 }
 
-// ── 26. paint_erase_barrier_clears_barrier ──────────────────────────────────
+// ── 26. get_creature_returns_full_detail ──────────────────────────────────────
+
+#[tokio::test]
+async fn get_creature_returns_full_detail() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":42}"#))
+        .await
+        .unwrap();
+
+    // Get frame to find a creature ID
+    let (_, frame_body) = do_request(a.clone(), get_req("/v3/simulation/frame")).await;
+    let creatures = frame_body["creatures"].as_array().expect("creatures array");
+    assert!(!creatures.is_empty(), "need at least one creature");
+    let creature_id = creatures[0]["id"].as_u64().unwrap();
+
+    let uri = format!("/v3/simulation/creature/{creature_id}");
+    let (status, body) = do_request(a, get_req(&uri)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert!(
+        body["protocol_version"].is_string(),
+        "missing protocol_version"
+    );
+    assert_eq!(body["id"].as_u64(), Some(creature_id));
+    assert!(body["position"]["x"].is_number(), "missing position.x");
+    assert!(body["position"]["y"].is_number(), "missing position.y");
+    assert!(body["energy"].is_number(), "missing energy");
+    assert!(body["max_energy"].is_number(), "missing max_energy");
+    assert!(body["age"].is_number(), "missing age");
+    assert!(body["generation"].is_number(), "missing generation");
+    assert!(body["complexity"].is_number(), "missing complexity");
+
+    // Phenotype
+    let pheno = &body["phenotype"];
+    assert!(pheno["channels"].is_array(), "missing phenotype.channels");
+    assert_eq!(
+        pheno["channels"].as_array().unwrap().len(),
+        6,
+        "phenotype.channels must have 6 elements"
+    );
+    assert!(
+        pheno["active_channel"].is_number(),
+        "missing phenotype.active_channel"
+    );
+    assert!(pheno["polarity"].is_array(), "missing phenotype.polarity");
+    assert!(pheno["rgb"].is_array(), "missing phenotype.rgb");
+    assert_eq!(
+        pheno["rgb"].as_array().unwrap().len(),
+        3,
+        "phenotype.rgb must have 3 elements"
+    );
+
+    // Genome
+    assert!(body["genome"].is_object(), "missing genome");
+    assert!(
+        body["genome"]["entry_node_id"].is_number(),
+        "missing genome.entry_node_id"
+    );
+    assert!(body["genome"]["nodes"].is_array(), "missing genome.nodes");
+
+    // Memory
+    assert!(body["memory"].is_array(), "missing memory");
+    assert_eq!(
+        body["memory"].as_array().unwrap().len(),
+        1024,
+        "memory must have 1024 bytes"
+    );
+}
+
+// ── 27. get_creature_invalid_id_returns_404 ──────────────────────────────────
+
+#[tokio::test]
+async fn get_creature_invalid_id_returns_404() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":42}"#))
+        .await
+        .unwrap();
+
+    // Use an ID that doesn't correspond to any creature
+    let (status, body) = do_request(a, get_req("/v3/simulation/creature/999999999")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "body: {body}");
+    assert_eq!(body["error"].as_str(), Some("not_found"), "body: {body}");
+}
+
+// ── 28. get_creature_on_idle_state_works ─────────────────────────────────────
+
+#[tokio::test]
+async fn get_creature_on_idle_state_works() {
+    // Fresh default state has creatures from default seed
+    let a = app();
+
+    // Get frame to find a creature (default state seeds creatures)
+    let (_, frame_body) = do_request(a.clone(), get_req("/v3/simulation/frame")).await;
+    let creatures = frame_body["creatures"].as_array().expect("creatures array");
+    assert!(!creatures.is_empty(), "default state should have creatures");
+    let creature_id = creatures[0]["id"].as_u64().unwrap();
+
+    let uri = format!("/v3/simulation/creature/{creature_id}");
+    let (status, body) = do_request(a, get_req(&uri)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert_eq!(body["id"].as_u64(), Some(creature_id));
+}
+
+// ── 29. paint_erase_barrier_clears_barrier ──────────────────────────────────
 
 #[tokio::test]
 async fn paint_erase_barrier_clears_barrier() {

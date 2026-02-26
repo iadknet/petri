@@ -36,6 +36,7 @@ export class WorldRenderer {
 	camera: Camera = { x: 0, y: 0, zoom: 1 };
 	private previewCells: Set<string> | null = null;
 	private previewTool: PaintTool | null = null;
+	private selectedCreatureId: number | null = null;
 
 	constructor(canvas: HTMLCanvasElement, getFrame: () => { frame: Frame | null; tick: number }) {
 		this.canvas = canvas;
@@ -94,6 +95,11 @@ export class WorldRenderer {
 	setPreview(cells: Set<string> | null, tool: PaintTool | null): void {
 		this.previewCells = cells;
 		this.previewTool = tool;
+	}
+
+	setSelectedCreature(id: number | null): void {
+		this.selectedCreatureId = id;
+		this.invalidate();
 	}
 
 	zoomAt(clientX: number, clientY: number, delta: number): void {
@@ -243,8 +249,8 @@ export class WorldRenderer {
 			const [pr, pg, pb] = this.previewColor(this.previewTool);
 			for (const key of this.previewCells) {
 				const sep = key.indexOf(",");
-				const px = parseInt(key.substring(0, sep), 10);
-				const py = parseInt(key.substring(sep + 1), 10);
+				const px = Number.parseInt(key.substring(0, sep), 10);
+				const py = Number.parseInt(key.substring(sep + 1), 10);
 				if (px < 0 || py < 0 || px >= width || py >= height) continue;
 				const idx = (py * width + px) * 4;
 				// Alpha blend at 40%
@@ -252,6 +258,19 @@ export class WorldRenderer {
 				data[idx] = Math.round(data[idx]! * (1 - alpha) + pr * alpha);
 				data[idx + 1] = Math.round(data[idx + 1]! * (1 - alpha) + pg * alpha);
 				data[idx + 2] = Math.round(data[idx + 2]! * (1 - alpha) + pb * alpha);
+			}
+		}
+
+		// Selection marker for selected creature
+		if (this.selectedCreatureId !== null) {
+			const sel = frame.creatures.find((c) => c.id === this.selectedCreatureId);
+			if (sel) {
+				const idx = (sel.y * width + sel.x) * 4;
+				// Emerald marker: override pixel to bright emerald
+				data[idx] = 52;
+				data[idx + 1] = 211;
+				data[idx + 2] = 153;
+				data[idx + 3] = 255;
 			}
 		}
 
@@ -309,9 +328,19 @@ export class WorldRenderer {
 			ctx.fillStyle = `rgba(${pr},${pg},${pb},0.4)`;
 			for (const key of this.previewCells) {
 				const sep = key.indexOf(",");
-				const px = parseInt(key.substring(0, sep), 10);
-				const py = parseInt(key.substring(sep + 1), 10);
+				const px = Number.parseInt(key.substring(0, sep), 10);
+				const py = Number.parseInt(key.substring(sep + 1), 10);
 				ctx.fillRect(cx + px * zoom, cy + py * zoom, zoom, zoom);
+			}
+		}
+
+		// Selection highlight for selected creature
+		if (this.selectedCreatureId !== null) {
+			const sel = frame.creatures.find((c) => c.id === this.selectedCreatureId);
+			if (sel) {
+				ctx.strokeStyle = "#34d399";
+				ctx.lineWidth = 2;
+				ctx.strokeRect(cx + sel.x * zoom + 1, cy + sel.y * zoom + 1, zoom - 2, zoom - 2);
 			}
 		}
 	}

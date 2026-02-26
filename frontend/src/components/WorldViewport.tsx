@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef } from "react";
 import { WorldRenderer } from "../canvas/renderer.ts";
+import { useCreatureSelection } from "../hooks/useCreatureSelection.ts";
 import { usePaintInteraction } from "../hooks/usePaintInteraction.ts";
+import { useCreatureInspectorStore } from "../stores/creatureInspector.ts";
 import { usePaintStore } from "../stores/paint.ts";
 import { useSimulationStore } from "../stores/simulation.ts";
 import { PaintToolbar } from "./PaintToolbar.tsx";
@@ -22,6 +24,9 @@ export function WorldViewport() {
 		brushOverlayRef,
 		clearPreview,
 	} = usePaintInteraction(rendererRef);
+
+	const { handleMouseDown: selectionMouseDown, handleMouseUp: selectionMouseUp } =
+		useCreatureSelection(rendererRef);
 
 	const initRenderer = useCallback(() => {
 		const canvas = canvasRef.current;
@@ -83,11 +88,21 @@ export function WorldViewport() {
 		});
 	}, []);
 
-	// Keyboard shortcut: Home to reset view
+	// Sync selected creature to renderer for highlight
+	useEffect(() => {
+		return useCreatureInspectorStore.subscribe((state) => {
+			rendererRef.current?.setSelectedCreature(state.selectedCreatureId);
+		});
+	}, []);
+
+	// Keyboard shortcut: Home to reset view, Escape to clear selection
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if (e.key === "Home" && rendererRef.current) {
 				rendererRef.current.resetView();
+			}
+			if (e.key === "Escape") {
+				useCreatureInspectorStore.getState().clearSelection();
 			}
 		};
 		window.addEventListener("keydown", handleKeyDown);
@@ -108,10 +123,11 @@ export function WorldViewport() {
 				return;
 			}
 			if (e.button === 0) {
+				selectionMouseDown(e);
 				dragRef.current = { startX: e.clientX, startY: e.clientY };
 			}
 		},
-		[paintMode, paintMouseDown],
+		[paintMode, paintMouseDown, selectionMouseDown],
 	);
 
 	// Pan: mouse move
@@ -139,12 +155,17 @@ export function WorldViewport() {
 	);
 
 	// Pan: mouse up
-	const handleMouseUp = useCallback(() => {
-		dragRef.current = null;
-		if (paintMode) {
-			paintMouseUp();
-		}
-	}, [paintMode, paintMouseUp]);
+	const handleMouseUp = useCallback(
+		(e: React.MouseEvent) => {
+			dragRef.current = null;
+			if (paintMode) {
+				paintMouseUp();
+			} else {
+				selectionMouseUp(e);
+			}
+		},
+		[paintMode, paintMouseUp, selectionMouseUp],
+	);
 
 	// Right-click drag for pan in paint mode
 	const handleContextMenu = useCallback(

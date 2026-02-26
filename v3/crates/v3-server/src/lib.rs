@@ -22,6 +22,10 @@ pub fn router(state: state::AppState) -> axum::Router {
             patch(handlers::status::patch_config),
         )
         .route("/v3/simulation/paint", post(handlers::paint::paint))
+        .route(
+            "/v3/simulation/creature/:id",
+            get(handlers::creature::get_creature),
+        )
         .route("/v3/ws", get(ws::ws_handler))
         .with_state(state)
 }
