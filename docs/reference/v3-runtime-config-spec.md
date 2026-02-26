@@ -84,8 +84,8 @@ Type posture:
 | `runtime.mutation.operator_selection_weights` | `map<MutationDomain,map<Operator,f32>>` | Equal weights across enabled operators in each domain | Weights must be non-negative; missing/all-zero domain map falls back to equal enabled-operator weights for that domain. |
 | `runtime.mutation.operator_modifier_scale` | `f32` | `1.0` | Must be `>= 0.0`; negative values clamp to `0.0`. |
 | `runtime.mutation.phenotype.channel_step` | `u8` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
-| `runtime.mutation.phenotype.channel_change_chance` | `f32` | `0.01` | Clamp to `[0.0, 1.0]`. |
-| `runtime.mutation.phenotype.polarity_flip_chance` | `f32` | `0.002` | Clamp to `[0.0, 1.0]`. |
+| `runtime.mutation.phenotype.channel_change_chance` | `f32` | `0.001` | Clamp to `[0.0, 1.0]`. |
+| `runtime.mutation.phenotype.polarity_flip_chance` | `f32` | `0.0002` | Clamp to `[0.0, 1.0]`. |
 
 Phenotype mutation is not a mutation engine domain; it is a separate pathway
 triggered by genome mutation. Phenotype algorithm and trigger semantics are

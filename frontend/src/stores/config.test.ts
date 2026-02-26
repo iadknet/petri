@@ -49,8 +49,8 @@ const MOCK_CONFIG: SimulationConfig = {
 		per_birth_mutation_events_max: 4,
 		phenotype: {
 			channel_step: 1,
-			channel_change_chance: 0.01,
-			polarity_flip_chance: 0.002,
+			channel_change_chance: 0.001,
+			polarity_flip_chance: 0.0002,
 		},
 	},
 };
