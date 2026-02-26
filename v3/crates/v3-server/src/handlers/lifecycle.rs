@@ -201,7 +201,14 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
     };
 
     let mut creatures = Vec::with_capacity(sim.creatures.len());
+    let mut complexity_sum: u64 = 0;
+    let mut complexity_min: u32 = u32::MAX;
+    let mut complexity_max: u32 = 0;
     for (id, creature) in &sim.creatures {
+        let c = creature.genome.complexity();
+        complexity_sum += c as u64;
+        complexity_min = complexity_min.min(c);
+        complexity_max = complexity_max.max(c);
         creatures.push(CreatureSnapshot {
             id: id.data().as_ffi(),
             x: creature.position.x,
@@ -210,6 +217,15 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             generation: creature.generation,
             phenotype_rgb: creature.phenotype_rgb,
         });
+    }
+    let creature_count = creatures.len();
+    let complexity_mean = if creature_count > 0 {
+        complexity_sum as f32 / creature_count as f32
+    } else {
+        0.0
+    };
+    if creature_count == 0 {
+        complexity_min = 0;
     }
 
     let mut food = Vec::new();
@@ -248,6 +264,9 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             .reproduction_actions_rejected_by_reason
             .clone(),
         mutation_events_skipped_total_by_reason: stats.mutation_events_skipped_by_reason.clone(),
+        genome_complexity_mean: complexity_mean,
+        genome_complexity_min: complexity_min,
+        genome_complexity_max: complexity_max,
     };
 
     WsFrame {

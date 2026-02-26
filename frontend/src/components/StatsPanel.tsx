@@ -202,6 +202,12 @@ function EvolutionTab() {
 	const mutationAttempted = useStatsHistoryStore((s) => s.mutationAttempted);
 	const mutationApplied = useStatsHistoryStore((s) => s.mutationApplied);
 	const mutationSkipped = useStatsHistoryStore((s) => s.mutationSkipped);
+	const complexityHistory = useStatsHistoryStore((s) => s.complexityHistory);
+
+	const latestComplexity = complexityHistory[complexityHistory.length - 1];
+	const complexityMean = latestComplexity?.mean ?? 0;
+	const complexityMin = latestComplexity?.min ?? 0;
+	const complexityMax = latestComplexity?.max ?? 0;
 
 	return (
 		<div className="flex flex-col gap-3 p-3">
@@ -231,6 +237,22 @@ function EvolutionTab() {
 					<Gauge label="Attempted" value={mutationAttempted} />
 					<Gauge label="Applied" value={mutationApplied} />
 					<Gauge label="Skipped" value={mutationSkipped} />
+				</div>
+			</div>
+
+			<div className="flex flex-col gap-1">
+				<span className="text-xs font-medium text-slate-300">Genome Complexity</span>
+				<div className="flex gap-4">
+					<Gauge label="Mean" value={complexityMean} format={(v) => v.toFixed(1)} />
+					<Gauge label="Min" value={complexityMin} />
+					<Gauge label="Max" value={complexityMax} />
+				</div>
+				<div>
+					<span className="text-[11px] text-slate-400">Mean Complexity Trend</span>
+					<MiniChart
+						data={complexityHistory.map((c) => ({ tick: c.tick, value: c.mean }))}
+						color="#f59e0b"
+					/>
 				</div>
 			</div>
 		</div>

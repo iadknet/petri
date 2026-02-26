@@ -99,6 +99,9 @@ pub struct HealthPayload {
     pub reproduction_actions_rejected_total: u64,
     pub reproduction_actions_rejected_total_by_reason: HashMap<String, u64>,
     pub mutation_events_skipped_total_by_reason: HashMap<String, u64>,
+    pub genome_complexity_mean: f32,
+    pub genome_complexity_min: u32,
+    pub genome_complexity_max: u32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

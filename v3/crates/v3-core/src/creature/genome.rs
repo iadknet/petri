@@ -203,11 +203,42 @@ impl CreatureGenome {
     pub fn find_node(&self, id: NodeId) -> Option<&NodeGenome> {
         self.nodes.iter().find(|n| n.node_id == id)
     }
+
+    /// Structural complexity score: sum of all discrete genome components.
+    ///
+    /// Counts every node, input ref, target, instruction, constant, and
+    /// graph internal node (plus its inputs). Equal weights, includes junk DNA,
+    /// no reachability analysis.
+    pub fn complexity(&self) -> u32 {
+        let mut score: u32 = 0;
+        for node in &self.nodes {
+            // Count the node itself
+            score += 1;
+            // Count input refs and targets
+            score += node.input_refs.len() as u32;
+            score += node.targets.len() as u32;
+            // Count backend components
+            match &node.backend_def {
+                BackendDef::Vm(vm) => {
+                    score += vm.program.len() as u32;
+                    score += vm.constants.len() as u32;
+                }
+                BackendDef::Graph(graph) => {
+                    score += graph.internal_nodes.len() as u32;
+                    for inode in &graph.internal_nodes {
+                        score += inode.inputs.len() as u32;
+                    }
+                }
+            }
+        }
+        score
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::contracts::{DynamicIntrospectionKey, StaticIntrospectionKey, WorldInputKey};
 
     #[test]
     fn vm_instruction_all_33_variants_constructible() {
@@ -350,6 +381,116 @@ mod tests {
         assert!(genome.find_node(NodeId::new(0)).is_some());
         assert!(genome.find_node(NodeId::new(1)).is_some());
         assert!(genome.find_node(NodeId::new(99)).is_none());
+    }
+
+    #[test]
+    fn complexity_empty_genome() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![],
+        };
+        assert_eq!(genome.complexity(), 0);
+    }
+
+    #[test]
+    fn complexity_single_vm_node() {
+        // 1 node + 2 input_refs + 1 target + 3 program + 2 constants = 9
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![
+                    InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
+                    InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
+                ],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 4,
+                    constants: vec![1.0, 2.0],
+                    program: vec![
+                        VmInstruction::LoadConst {
+                            dst: 0,
+                            const_idx: 0,
+                        },
+                        VmInstruction::Add { dst: 0, a: 0, b: 1 },
+                        VmInstruction::Halt,
+                    ],
+                }),
+                targets: vec![NodeId::new(1)],
+            }],
+        };
+        assert_eq!(genome.complexity(), 9);
+    }
+
+    #[test]
+    fn complexity_single_graph_node() {
+        // 1 node + 1 input_ref + 0 targets + 2 internal_nodes + (1 + 2) inputs = 7
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
+                backend_def: BackendDef::Graph(GraphBackendDef {
+                    internal_nodes: vec![
+                        GraphInternalNode {
+                            kind: GraphNodeKind::InputRef(0),
+                            inputs: vec![GraphInput {
+                                source_idx: 0,
+                                weight: 1.0,
+                            }],
+                        },
+                        GraphInternalNode {
+                            kind: GraphNodeKind::Sigmoid,
+                            inputs: vec![
+                                GraphInput {
+                                    source_idx: 0,
+                                    weight: 0.5,
+                                },
+                                GraphInput {
+                                    source_idx: 1,
+                                    weight: -0.3,
+                                },
+                            ],
+                        },
+                    ],
+                }),
+                targets: vec![],
+            }],
+        };
+        assert_eq!(genome.complexity(), 7);
+    }
+
+    #[test]
+    fn complexity_multi_node_mixed() {
+        // Node 0 (VM): 1 + 0 inputs + 1 target + 1 program + 0 constants = 3
+        // Node 1 (Graph): 1 + 1 input + 0 targets + 1 internal + 0 graph_inputs = 3
+        // Total = 6
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                NodeGenome {
+                    node_id: NodeId::new(0),
+                    input_refs: vec![],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 1,
+                        constants: vec![],
+                        program: vec![VmInstruction::Halt],
+                    }),
+                    targets: vec![NodeId::new(1)],
+                },
+                NodeGenome {
+                    node_id: NodeId::new(1),
+                    input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
+                    backend_def: BackendDef::Graph(GraphBackendDef {
+                        internal_nodes: vec![GraphInternalNode {
+                            kind: GraphNodeKind::Constant(1.0),
+                            inputs: vec![],
+                        }],
+                    }),
+                    targets: vec![],
+                },
+            ],
+        };
+        assert_eq!(genome.complexity(), 6);
     }
 
     #[test]
