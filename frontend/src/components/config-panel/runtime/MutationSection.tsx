@@ -1,7 +1,4 @@
-import { FieldGroup } from "../shared/FieldGroup.tsx";
-import { FieldRow } from "../shared/FieldRow.tsx";
-import { getByPath } from "../shared/pathUtils.ts";
-import type { FieldDef, RuntimePanelProps } from "../shared/types.ts";
+import type { FieldDef } from "../shared/types.ts";
 
 export const MUTATION_FIELDS: FieldDef[] = [
 	{
@@ -53,27 +50,3 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		testId: "config-field-mutation-channel-change",
 	},
 ];
-
-export function MutationSection({
-	localDraft,
-	serverConfig,
-	simState,
-	updateDraft,
-}: RuntimePanelProps) {
-	return (
-		<FieldGroup title="Mutation">
-			{MUTATION_FIELDS.map((field) => (
-				<FieldRow
-					key={`runtime-${field.path}`}
-					field={field}
-					id={`runtime-${field.path.replaceAll(".", "-")}`}
-					value={getByPath(localDraft, field.path) as number}
-					serverValue={getByPath(serverConfig, field.path) as number}
-					disabled={simState === "running"}
-					onChange={updateDraft}
-					testId={field.testId}
-				/>
-			))}
-		</FieldGroup>
-	);
-}

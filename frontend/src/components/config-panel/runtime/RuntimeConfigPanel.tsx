@@ -1,11 +1,12 @@
 import { Section } from "../shared/Section.tsx";
 import type { FieldDef, RuntimePanelProps } from "../shared/types.ts";
-import { ENERGY_COSTS_FIELDS, EnergyCostsSection } from "./EnergyCostsSection.tsx";
-import { ENERGY_LIFECYCLE_FIELDS, EnergyLifecycleSection } from "./EnergyLifecycleSection.tsx";
-import { FOOD_PARAMETERS_FIELDS, FoodParametersSection } from "./FoodParametersSection.tsx";
-import { MUTATION_FIELDS, MutationSection } from "./MutationSection.tsx";
-import { POPULATION_FIELDS, PopulationSection } from "./PopulationSection.tsx";
-import { RUNTIME_FIELDS, RuntimeSection } from "./RuntimeSection.tsx";
+import { ENERGY_COSTS_FIELDS } from "./EnergyCostsSection.tsx";
+import { ENERGY_LIFECYCLE_FIELDS } from "./EnergyLifecycleSection.tsx";
+import { FOOD_PARAMETERS_FIELDS } from "./FoodParametersSection.tsx";
+import { MUTATION_FIELDS } from "./MutationSection.tsx";
+import { POPULATION_FIELDS } from "./PopulationSection.tsx";
+import { RUNTIME_FIELDS } from "./RuntimeSection.tsx";
+import { RuntimeFieldGroup } from "./RuntimeFieldGroup.tsx";
 
 export const RUNTIME_PATCH_FIELDS: FieldDef[] = [
 	...FOOD_PARAMETERS_FIELDS,
@@ -42,42 +43,12 @@ export function RuntimeConfigPanel({
 				</div>
 			) : (
 				<>
-					<FoodParametersSection
-						localDraft={localDraft}
-						serverConfig={serverConfig}
-						simState={simState}
-						updateDraft={updateDraft}
-					/>
-					<PopulationSection
-						localDraft={localDraft}
-						serverConfig={serverConfig}
-						simState={simState}
-						updateDraft={updateDraft}
-					/>
-					<EnergyLifecycleSection
-						localDraft={localDraft}
-						serverConfig={serverConfig}
-						simState={simState}
-						updateDraft={updateDraft}
-					/>
-					<EnergyCostsSection
-						localDraft={localDraft}
-						serverConfig={serverConfig}
-						simState={simState}
-						updateDraft={updateDraft}
-					/>
-					<RuntimeSection
-						localDraft={localDraft}
-						serverConfig={serverConfig}
-						simState={simState}
-						updateDraft={updateDraft}
-					/>
-					<MutationSection
-						localDraft={localDraft}
-						serverConfig={serverConfig}
-						simState={simState}
-						updateDraft={updateDraft}
-					/>
+					<RuntimeFieldGroup title="Food Parameters" fields={FOOD_PARAMETERS_FIELDS} localDraft={localDraft} serverConfig={serverConfig} simState={simState} updateDraft={updateDraft} />
+					<RuntimeFieldGroup title="Population" fields={POPULATION_FIELDS} localDraft={localDraft} serverConfig={serverConfig} simState={simState} updateDraft={updateDraft} />
+					<RuntimeFieldGroup title="Energy > Lifecycle" fields={ENERGY_LIFECYCLE_FIELDS} localDraft={localDraft} serverConfig={serverConfig} simState={simState} updateDraft={updateDraft} />
+					<RuntimeFieldGroup title="Energy > Costs" fields={ENERGY_COSTS_FIELDS} localDraft={localDraft} serverConfig={serverConfig} simState={simState} updateDraft={updateDraft} />
+					<RuntimeFieldGroup title="Runtime" fields={RUNTIME_FIELDS} localDraft={localDraft} serverConfig={serverConfig} simState={simState} updateDraft={updateDraft} />
+					<RuntimeFieldGroup title="Mutation" fields={MUTATION_FIELDS} localDraft={localDraft} serverConfig={serverConfig} simState={simState} updateDraft={updateDraft} />
 				</>
 			)}
 		</Section>

@@ -1,7 +1,4 @@
-import { FieldGroup } from "../shared/FieldGroup.tsx";
-import { FieldRow } from "../shared/FieldRow.tsx";
-import { getByPath } from "../shared/pathUtils.ts";
-import type { FieldDef, RuntimePanelProps } from "../shared/types.ts";
+import type { FieldDef } from "../shared/types.ts";
 
 export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 	{
@@ -40,27 +37,3 @@ export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 		step: 0.01,
 	},
 ];
-
-export function FoodParametersSection({
-	localDraft,
-	serverConfig,
-	simState,
-	updateDraft,
-}: RuntimePanelProps) {
-	return (
-		<FieldGroup title="Food Parameters">
-			{FOOD_PARAMETERS_FIELDS.map((field) => (
-				<FieldRow
-					key={`runtime-${field.path}`}
-					field={field}
-					id={`runtime-${field.path.replaceAll(".", "-")}`}
-					value={getByPath(localDraft, field.path) as number}
-					serverValue={getByPath(serverConfig, field.path) as number}
-					disabled={simState === "running"}
-					onChange={updateDraft}
-					testId={field.testId}
-				/>
-			))}
-		</FieldGroup>
-	);
-}
