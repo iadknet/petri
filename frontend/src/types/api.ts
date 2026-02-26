@@ -205,7 +205,7 @@ export interface ConfigResponse {
 export interface StartupRequest {
 	seed: number;
 	population?: Partial<PopulationConfig>;
-	world?: Partial<WorldConfig> & { food?: Partial<FoodConfig> };
+	world?: Partial<Omit<WorldConfig, "food">> & { food?: Partial<FoodConfig> };
 	energy?: { lifecycle?: Partial<LifecycleEnergyConfig>; costs?: Partial<CostsConfig> };
 	runtime?: Partial<Omit<RuntimeConfig, "vm">> & {
 		vm?: Partial<VmConfig>;
