@@ -21,13 +21,14 @@ export function PaintToolbar() {
 	const setBrushHalfExtent = usePaintStore((s) => s.setBrushHalfExtent);
 
 	return (
-		<div className="absolute top-3 left-3 flex flex-col gap-2 z-10 bg-slate-800/60 backdrop-blur-sm rounded-lg p-2">
+		<div data-testid="paint-toolbar" className="absolute top-3 left-3 flex flex-col gap-2 z-10 bg-slate-800/60 backdrop-blur-sm rounded-lg p-2">
 			<div className="text-[10px] uppercase tracking-wider text-slate-400 px-1">Tool</div>
 			<div className="flex flex-col gap-0.5">
 				{TOOLS.map((t) => (
 					<button
 						key={t.id}
 						type="button"
+						data-testid={`paint-tool-${t.id}`}
 						onClick={() => setTool(t.id)}
 						title={t.title}
 						aria-pressed={tool === t.id}
@@ -48,6 +49,7 @@ export function PaintToolbar() {
 					<button
 						key={b.extent}
 						type="button"
+						data-testid={`paint-brush-${b.extent}`}
 						onClick={() => setBrushHalfExtent(b.extent)}
 						aria-pressed={brushHalfExtent === b.extent}
 						aria-label={`Brush size ${b.label}`}

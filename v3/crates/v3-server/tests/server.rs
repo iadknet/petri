@@ -396,3 +396,313 @@ async fn ws_frame_msgpack_roundtrip() {
     assert_eq!(decoded.health.population, frame.health.population);
     assert_eq!(decoded.status.state, SimulationStatus::Running);
 }
+
+// ── 17. paint_on_idle_succeeds ──────────────────────────────────────────────
+
+#[tokio::test]
+async fn paint_on_idle_succeeds() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let (status, body) = do_request(
+        a,
+        post_json(
+            "/v3/simulation/paint",
+            r#"{"tool":"barrier","brush_half_extent":0,"points":[{"x":5,"y":5}]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert!(
+        body["protocol_version"].is_string(),
+        "missing protocol_version"
+    );
+    assert!(
+        body["stats"]["barrier_set_cells"].as_u64().unwrap_or(0) > 0,
+        "expected barrier_set_cells > 0: {body}"
+    );
+    assert!(body["frame"].is_object(), "missing frame object");
+}
+
+// ── 18. paint_on_paused_succeeds ────────────────────────────────────────────
+
+#[tokio::test]
+async fn paint_on_paused_succeeds() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+    a.clone()
+        .oneshot(post_req("/v3/simulation/start"))
+        .await
+        .unwrap();
+    a.clone()
+        .oneshot(post_req("/v3/simulation/pause"))
+        .await
+        .unwrap();
+
+    let (status, body) = do_request(
+        a,
+        post_json(
+            "/v3/simulation/paint",
+            r#"{"tool":"food","brush_half_extent":0,"points":[{"x":3,"y":3}]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert!(
+        body["stats"]["food_set_cells"].as_u64().unwrap_or(0) > 0,
+        "expected food_set_cells > 0: {body}"
+    );
+}
+
+// ── 19. paint_on_running_returns_409 ────────────────────────────────────────
+
+#[tokio::test]
+async fn paint_on_running_returns_409() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+    a.clone()
+        .oneshot(post_req("/v3/simulation/start"))
+        .await
+        .unwrap();
+
+    let (status, body) = do_request(
+        a,
+        post_json(
+            "/v3/simulation/paint",
+            r#"{"tool":"barrier","brush_half_extent":0,"points":[{"x":5,"y":5}]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::CONFLICT, "body: {body}");
+    assert_eq!(
+        body["error"].as_str(),
+        Some("invalid_state_transition"),
+        "body: {body}"
+    );
+}
+
+// ── 20. paint_empty_points_returns_422 ──────────────────────────────────────
+
+#[tokio::test]
+async fn paint_empty_points_returns_422() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let (status, body) = do_request(
+        a,
+        post_json(
+            "/v3/simulation/paint",
+            r#"{"tool":"barrier","brush_half_extent":0,"points":[]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
+    assert_eq!(
+        body["error"].as_str(),
+        Some("validation_rejected"),
+        "body: {body}"
+    );
+}
+
+// ── 21. paint_invalid_brush_returns_422 ─────────────────────────────────────
+
+#[tokio::test]
+async fn paint_invalid_brush_returns_422() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let (status, body) = do_request(
+        a,
+        post_json(
+            "/v3/simulation/paint",
+            r#"{"tool":"barrier","brush_half_extent":5,"points":[{"x":5,"y":5}]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
+    assert_eq!(
+        body["error"].as_str(),
+        Some("validation_rejected"),
+        "body: {body}"
+    );
+}
+
+// ── 22. paint_too_many_points_returns_422 ───────────────────────────────────
+
+#[tokio::test]
+async fn paint_too_many_points_returns_422() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    // Build 10001 points
+    let points: Vec<String> = (0..10_001)
+        .map(|i| format!(r#"{{"x":{},"y":{}}}"#, i % 100, i / 100))
+        .collect();
+    let body_str = format!(
+        r#"{{"tool":"barrier","brush_half_extent":0,"points":[{}]}}"#,
+        points.join(",")
+    );
+
+    let (status, body) = do_request(a, post_json("/v3/simulation/paint", &body_str)).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
+    assert_eq!(
+        body["error"].as_str(),
+        Some("validation_rejected"),
+        "body: {body}"
+    );
+}
+
+// ── 23. paint_oob_points_are_filtered ───────────────────────────────────────
+
+#[tokio::test]
+async fn paint_oob_points_are_filtered() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let (status, body) = do_request(
+        a,
+        post_json(
+            "/v3/simulation/paint",
+            r#"{"tool":"barrier","brush_half_extent":0,"points":[{"x":9999,"y":9999}]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert_eq!(
+        body["stats"]["affected_cells"].as_u64().unwrap_or(999),
+        0,
+        "expected affected_cells == 0 for out-of-bounds: {body}"
+    );
+}
+
+// ── 24. paint_barrier_evicts_creature ───────────────────────────────────────
+
+#[tokio::test]
+async fn paint_barrier_evicts_creature() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":42}"#))
+        .await
+        .unwrap();
+
+    // Get frame to find a creature position
+    let (_, frame_body) = do_request(a.clone(), get_req("/v3/simulation/frame")).await;
+    let creatures = frame_body["creatures"].as_array().expect("creatures array");
+    assert!(!creatures.is_empty(), "need at least one creature");
+    let cx = creatures[0]["x"].as_u64().unwrap();
+    let cy = creatures[0]["y"].as_u64().unwrap();
+
+    // Paint barrier at creature position with brush extent 1 (3x3) for reliability
+    let paint_body = format!(
+        r#"{{"tool":"barrier","brush_half_extent":1,"points":[{{"x":{},"y":{}}}]}}"#,
+        cx, cy
+    );
+    let (status, body) =
+        do_request(a.clone(), post_json("/v3/simulation/paint", &paint_body)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert!(
+        body["stats"]["creatures_removed"].as_u64().unwrap_or(0) > 0,
+        "expected creatures_removed > 0: {body}"
+    );
+
+    // Verify population decreased
+    let (_, status_body) = do_request(a, get_req("/v3/simulation/status")).await;
+    let pop = status_body["population"].as_u64().unwrap();
+    let initial_pop = creatures.len() as u64;
+    assert!(
+        pop < initial_pop,
+        "population {pop} should be less than initial {initial_pop}"
+    );
+}
+
+// ── 25. paint_response_includes_frame ───────────────────────────────────────
+
+#[tokio::test]
+async fn paint_response_includes_frame() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let (status, body) = do_request(
+        a,
+        post_json(
+            "/v3/simulation/paint",
+            r#"{"tool":"food","brush_half_extent":0,"points":[{"x":1,"y":1}]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    let frame = &body["frame"];
+    assert!(
+        frame["frame"]["creatures"].is_array(),
+        "missing frame.frame.creatures"
+    );
+    assert!(
+        frame["frame"]["food"].is_array(),
+        "missing frame.frame.food"
+    );
+    assert!(
+        frame["frame"]["barriers"].is_array(),
+        "missing frame.frame.barriers"
+    );
+}
+
+// ── 26. paint_erase_barrier_clears_barrier ──────────────────────────────────
+
+#[tokio::test]
+async fn paint_erase_barrier_clears_barrier() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    // First paint a barrier at (5,5)
+    let (s1, _) = do_request(
+        a.clone(),
+        post_json(
+            "/v3/simulation/paint",
+            r#"{"tool":"barrier","brush_half_extent":0,"points":[{"x":5,"y":5}]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(s1, StatusCode::OK);
+
+    // Now erase barrier at (5,5)
+    let (status, body) = do_request(
+        a,
+        post_json(
+            "/v3/simulation/paint",
+            r#"{"tool":"erase_barrier","brush_half_extent":0,"points":[{"x":5,"y":5}]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert!(
+        body["stats"]["barrier_cleared_cells"].as_u64().unwrap_or(0) > 0,
+        "expected barrier_cleared_cells > 0: {body}"
+    );
+}

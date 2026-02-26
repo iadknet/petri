@@ -13,6 +13,7 @@ import { scenarioConfigApplyResetLocks } from "./scenarios/e2e-03-config-apply-r
 import { scenarioStatsAndPanels } from "./scenarios/e2e-04-stats-and-panels.ts";
 import { scenarioViewportSmoke } from "./scenarios/e2e-05-viewport-smoke.ts";
 import { scenarioMutationConfig } from "./scenarios/e2e-06-mutation-config.ts";
+import { scenarioPaintDrawing } from "./scenarios/e2e-07-paint-drawing.ts";
 import type { ScenarioDefinition } from "./types.ts";
 
 const scenarios: ScenarioDefinition[] = [
@@ -22,6 +23,7 @@ const scenarios: ScenarioDefinition[] = [
 	scenarioStatsAndPanels,
 	scenarioViewportSmoke,
 	scenarioMutationConfig,
+	scenarioPaintDrawing,
 ];
 
 async function main(): Promise<void> {
