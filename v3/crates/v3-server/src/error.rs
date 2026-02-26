@@ -20,6 +20,7 @@ pub enum AppError {
         field_errors: Vec<FieldError>,
         endpoint: &'static str,
     },
+    NotFound(String),
     Internal(String),
 }
 
@@ -49,6 +50,12 @@ impl IntoResponse for AppError {
                 "validation_rejected",
                 format!("validation failed for {endpoint}"),
                 serde_json::json!({ "field_errors": field_errors }),
+            ),
+            AppError::NotFound(msg) => (
+                StatusCode::NOT_FOUND,
+                "not_found",
+                msg,
+                serde_json::Value::Null,
             ),
             AppError::Internal(msg) => (
                 StatusCode::INTERNAL_SERVER_ERROR,

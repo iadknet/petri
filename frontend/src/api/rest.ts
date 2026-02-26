@@ -1,6 +1,7 @@
 import type {
 	ApiError,
 	ConfigResponse,
+	CreatureDetail,
 	FrameResponse,
 	LifecycleResponse,
 	PaintRequest,
@@ -73,6 +74,10 @@ class ApiClient {
 			method: "PATCH",
 			body: JSON.stringify(patch),
 		});
+	}
+
+	async getCreature(id: number, signal?: AbortSignal): Promise<CreatureDetail> {
+		return this.request(`/v3/simulation/creature/${id}`, { signal });
 	}
 
 	async paint(req: PaintRequest): Promise<PaintResponse> {

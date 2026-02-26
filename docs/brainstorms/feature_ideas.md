@@ -15,9 +15,9 @@
 ### Creature inspector
   - click on creature to open new modal or window with creature inspector
   - a fun whimsical illustration representation of node graph
-  - Pan with additional creature metadata
+  - Panels with additional creature metadata
   - Live updating up creature stats
-  - have the ability to see creature memory somehow
+  - have the ability to visualize and inspect creature memory somehow
   
 ### Creature inspector execution sampler
   - In creature inspector have an "execution sampler" button.
@@ -35,13 +35,6 @@
   - add the ability for creatures to pick up and place food and barriers
   - This was implemented in v1, we can refrence v1 implementation
   
-### Rayon parallelism
-  - refactor tick processor to allow for paralell execution
-    - snapshot world state for tick
-    - loop through cognition, collect actions for later processing
-    - randomize order of action execution
-  - implement rayon so "cognition" can happen in parallel
-
 ### Creatures can spend energy to "cut in line" during action execution
   - When selecting an action, a creature can dedicate "extra energy" to an action
   - When determining action order, the actions with the most extra energy are evaluated first
