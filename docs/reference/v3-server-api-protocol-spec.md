@@ -145,10 +145,9 @@ Request (conceptual v3alpha1 shape):
       },
       "operator_modifier_scale": 1.0,
       "phenotype": {
-        "channel_step": 2,
-        "polarity_flip_chance": 0.002,
-        "channel_weight_min": 0.05,
-        "channel_weight_max": 1.0
+        "channel_step": 1,
+        "channel_change_chance": 0.01,
+        "polarity_flip_chance": 0.002
       }
     }
   }
@@ -377,10 +376,9 @@ Response:
         },
         "operator_modifier_scale": 1.0,
         "phenotype": {
-          "channel_step": 2,
-          "polarity_flip_chance": 0.002,
-          "channel_weight_min": 0.05,
-          "channel_weight_max": 1.0
+          "channel_step": 1,
+          "channel_change_chance": 0.01,
+          "polarity_flip_chance": 0.002
         }
       }
     }
