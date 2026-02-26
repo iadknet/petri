@@ -21,6 +21,7 @@ pub fn router(state: state::AppState) -> axum::Router {
             "/v3/simulation/config",
             patch(handlers::status::patch_config),
         )
+        .route("/v3/simulation/paint", post(handlers::paint::paint))
         .route("/v3/ws", get(ws::ws_handler))
         .with_state(state)
 }
