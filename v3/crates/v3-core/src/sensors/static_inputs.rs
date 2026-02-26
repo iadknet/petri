@@ -142,16 +142,7 @@ mod tests {
                 targets: vec![],
             }],
         };
-        CreatureState::new(
-            id,
-            genome,
-            pos,
-            20.0,
-            0,
-            [128, 64, 32],
-            [1.0f32; 3],
-            [true; 3],
-        )
+        CreatureState::new(id, genome, pos, 20.0, 0, [128, 64, 32], 0, [true; 3])
     }
 
     fn get_id() -> CreatureId {
@@ -254,7 +245,7 @@ mod tests {
             20.0,
             5,
             [0, 0, 0],
-            [1.0f32; 3],
+            0,
             [true; 3],
         );
         creature.age = 42;

@@ -142,7 +142,7 @@ pub fn apply_reproduce(
     let child_memory = sim.creatures[parent_id].memory;
     let child_generation = sim.creatures[parent_id].generation + 1;
     let child_rgb = sim.creatures[parent_id].phenotype_rgb;
-    let child_weights = sim.creatures[parent_id].phenotype_channel_weights;
+    let child_active_channel = sim.creatures[parent_id].phenotype_active_channel;
     let child_polarity = sim.creatures[parent_id].phenotype_channel_polarity;
 
     // Step 9: Apply genome mutations.
@@ -161,16 +161,16 @@ pub fn apply_reproduce(
     }
 
     // Step 10: Phenotype mutation — triggered only when at least one genome event was applied.
-    let (child_rgb, child_weights, child_polarity) = if summary.applied_events > 0 {
+    let (child_rgb, child_active_channel, child_polarity) = if summary.applied_events > 0 {
         mutate_phenotype(
             child_rgb,
-            child_weights,
+            child_active_channel,
             child_polarity,
             &sim.config.mutation.phenotype,
             rng,
         )
     } else {
-        (child_rgb, child_weights, child_polarity)
+        (child_rgb, child_active_channel, child_polarity)
     };
 
     // Step 11–12: Spawn child in slotmap + world.
@@ -182,7 +182,7 @@ pub fn apply_reproduce(
             transfer,
             child_generation,
             child_rgb,
-            child_weights,
+            child_active_channel,
             child_polarity,
         );
         child.memory = child_memory;
@@ -227,7 +227,7 @@ mod tests {
                 energy,
                 0,
                 [204, 61, 61],
-                [1.0f32; 3],
+                0,
                 [true; 3],
             )
         });
@@ -351,7 +351,7 @@ mod tests {
                 50.0,
                 0,
                 [204, 61, 61],
-                [1.0f32; 3],
+                0,
                 [true; 3],
             )
         });
@@ -363,7 +363,7 @@ mod tests {
                 50.0,
                 0,
                 [204, 61, 61],
-                [1.0f32; 3],
+                0,
                 [true; 3],
             )
         });
@@ -415,7 +415,7 @@ mod tests {
                 80.0,
                 0,
                 [204, 61, 61],
-                [1.0f32; 3],
+                0,
                 [true; 3],
             )
         });
@@ -427,7 +427,7 @@ mod tests {
                 80.0,
                 0,
                 [204, 61, 61],
-                [1.0f32; 3],
+                0,
                 [true; 3],
             )
         });

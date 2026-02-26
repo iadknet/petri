@@ -12,7 +12,7 @@ use crate::simulation::simulation::Simulation;
 
 /// Founder phenotype baseline per v3-phenotype-spec.md.
 const FOUNDER_RGB: [u8; 3] = [204, 61, 61];
-const FOUNDER_WEIGHTS: [f32; 3] = [1.0, 1.0, 1.0];
+const FOUNDER_ACTIVE_CHANNEL: usize = 0; // all founders start on red channel
 const FOUNDER_POLARITY: [bool; 3] = [true, true, true];
 
 /// Seed a new simulation from a `SimulationConfig` and a deterministic seed.
@@ -65,7 +65,7 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
                 energy,
                 0,
                 FOUNDER_RGB,
-                FOUNDER_WEIGHTS,
+                FOUNDER_ACTIVE_CHANNEL,
                 FOUNDER_POLARITY,
             )
         });
@@ -138,8 +138,8 @@ mod tests {
         for (_, creature) in &sim.creatures {
             assert_eq!(creature.phenotype_rgb, FOUNDER_RGB, "rgb mismatch");
             assert_eq!(
-                creature.phenotype_channel_weights, FOUNDER_WEIGHTS,
-                "weights mismatch"
+                creature.phenotype_active_channel, FOUNDER_ACTIVE_CHANNEL,
+                "active channel mismatch"
             );
             assert_eq!(
                 creature.phenotype_channel_polarity, FOUNDER_POLARITY,

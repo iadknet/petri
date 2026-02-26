@@ -29,7 +29,7 @@ use v3_core::mutation::MutationEngine;
 use v3_core::simulation::{run_tick, seed_simulation, Simulation};
 
 const FOUNDER_RGB: [u8; 3] = [204, 61, 61];
-const FOUNDER_WEIGHTS: [f32; 3] = [1.0; 3];
+const FOUNDER_ACTIVE_CHANNEL: usize = 0;
 const FOUNDER_POLARITY: [bool; 3] = [true; 3];
 
 /// Return a compact config suitable for fast, behavior-focused viability tests.
@@ -280,7 +280,7 @@ fn creatures_can_eat_food() {
             start_energy,
             0,
             FOUNDER_RGB,
-            FOUNDER_WEIGHTS,
+            FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
         )
     });
@@ -335,7 +335,7 @@ fn founder_reproduces_when_energy_allows_and_target_is_open() {
             cfg.energy.lifecycle.initial_energy,
             0,
             FOUNDER_RGB,
-            FOUNDER_WEIGHTS,
+            FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
         )
     });
@@ -385,7 +385,7 @@ fn founder_moves_when_no_food_and_below_reproduce_threshold() {
             cfg.energy.lifecycle.initial_energy,
             0,
             FOUNDER_RGB,
-            FOUNDER_WEIGHTS,
+            FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
         )
     });
@@ -494,7 +494,7 @@ fn phenotype_inherits_unchanged_when_no_genome_mutation() {
             cfg.energy.lifecycle.initial_energy,
             0,
             FOUNDER_RGB,
-            FOUNDER_WEIGHTS,
+            FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
         )
     });
