@@ -5,6 +5,7 @@ use axum::response::IntoResponse;
 use axum::Json;
 use slotmap::Key;
 use v3_core::config::SimulationConfig;
+use v3_core::mutation::phenotype::channels_to_rgb;
 use v3_core::simulation::{run_tick, seed_simulation};
 
 use crate::error::{AppError, FieldError};
@@ -215,7 +216,7 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             y: creature.position.y,
             energy: creature.energy,
             generation: creature.generation,
-            phenotype_rgb: creature.phenotype_rgb,
+            phenotype_rgb: channels_to_rgb(creature.phenotype_channels),
         });
     }
     let creature_count = creatures.len();

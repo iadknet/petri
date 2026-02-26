@@ -142,7 +142,16 @@ mod tests {
                 targets: vec![],
             }],
         };
-        CreatureState::new(id, genome, pos, 20.0, 0, [128, 64, 32], 0, [true; 3])
+        CreatureState::new(
+            id,
+            genome,
+            pos,
+            20.0,
+            0,
+            [128, 64, 32, 10, 20, 30],
+            0,
+            [true; 6],
+        )
     }
 
     fn get_id() -> CreatureId {
@@ -244,9 +253,9 @@ mod tests {
             Position::new(1, 1),
             20.0,
             5,
-            [0, 0, 0],
+            [0; 6],
             0,
-            [true; 3],
+            [true; 6],
         );
         creature.age = 42;
         let si = assemble_static_inputs(&world, &creature);

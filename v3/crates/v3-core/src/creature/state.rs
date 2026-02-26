@@ -14,12 +14,12 @@ pub struct CreatureState {
     /// Per-node stateful operator state for the Graph backend.
     /// Indexed by node position within `genome.nodes`; lazily resized on first access.
     pub graph_state: Vec<Vec<f32>>,
-    /// RGB phenotype color. Channel values in [0, 255].
-    pub phenotype_rgb: [u8; 3],
-    /// Active channel for phenotype mutation (0=R, 1=G, 2=B; internal, not API-exposed).
+    /// 6-channel internal phenotype (HSL-mapped). Converted to RGB for wire format.
+    pub phenotype_channels: [u8; 6],
+    /// Active channel for phenotype mutation (0..6; internal, not API-exposed).
     pub phenotype_active_channel: usize,
     /// Per-channel polarity flags for phenotype mutation (internal, not API-exposed).
-    pub phenotype_channel_polarity: [bool; 3],
+    pub phenotype_channel_polarity: [bool; 6],
 }
 
 impl CreatureState {
@@ -31,9 +31,9 @@ impl CreatureState {
         position: Position,
         energy: f32,
         generation: u64,
-        phenotype_rgb: [u8; 3],
+        phenotype_channels: [u8; 6],
         phenotype_active_channel: usize,
-        phenotype_channel_polarity: [bool; 3],
+        phenotype_channel_polarity: [bool; 6],
     ) -> Self {
         Self {
             id,
@@ -44,7 +44,7 @@ impl CreatureState {
             generation,
             memory: [0u8; 1024],
             graph_state: Vec::new(),
-            phenotype_rgb,
+            phenotype_channels,
             phenotype_active_channel,
             phenotype_channel_polarity,
         }
@@ -86,18 +86,18 @@ mod tests {
             Position::new(5, 5),
             20.0,
             0,
-            [128, 64, 32],
+            [128, 64, 32, 10, 20, 30],
             0,
-            [true; 3],
+            [true; 6],
         );
         assert_eq!(state.age, 0);
         assert_eq!(state.memory, [0u8; 1024]);
         assert!(state.graph_state.is_empty());
         assert_eq!(state.generation, 0);
         assert!((state.energy - 20.0).abs() < f32::EPSILON);
-        assert_eq!(state.phenotype_rgb, [128, 64, 32]);
+        assert_eq!(state.phenotype_channels, [128, 64, 32, 10, 20, 30]);
         assert_eq!(state.phenotype_active_channel, 0);
-        assert_eq!(state.phenotype_channel_polarity, [true; 3]);
+        assert_eq!(state.phenotype_channel_polarity, [true; 6]);
     }
 
     #[test]
@@ -110,9 +110,9 @@ mod tests {
             Position::new(3, 7),
             50.0,
             2,
-            [0, 0, 0],
+            [0; 6],
             0,
-            [true; 3],
+            [true; 6],
         );
         assert_eq!(state.position, Position::new(3, 7));
         assert_eq!(state.generation, 2);
