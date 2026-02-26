@@ -3,7 +3,15 @@ import type { WorldRenderer } from "../canvas/renderer.ts";
 import { api } from "../api/rest.ts";
 import { usePaintStore } from "../stores/paint.ts";
 import { useSimulationStore } from "../stores/simulation.ts";
-import type { PaintPoint } from "../types/api.ts";
+import type { PaintPoint, PaintTool } from "../types/api.ts";
+
+/** Border color for the brush overlay, keyed by active tool. */
+const BORDER_COLORS: Record<PaintTool, string> = {
+	barrier: "rgba(139, 69, 19, 0.8)",
+	food: "rgba(0, 180, 0, 0.8)",
+	erase_barrier: "rgba(239, 68, 68, 0.6)",
+	erase_food: "rgba(239, 68, 68, 0.6)",
+};
 
 /**
  * Bresenham line interpolation between two grid points.
@@ -35,21 +43,45 @@ function bresenhamLine(x0: number, y0: number, x1: number, y1: number): PaintPoi
 	return points;
 }
 
+/** Expand a center point by brush half-extent, clamped to world bounds. */
+function expandBrush(
+	cx: number,
+	cy: number,
+	halfExt: number,
+	w: number,
+	h: number,
+	out: Set<string>,
+): void {
+	for (let dx = -halfExt; dx <= halfExt; dx++) {
+		for (let dy = -halfExt; dy <= halfExt; dy++) {
+			const nx = cx + dx;
+			const ny = cy + dy;
+			if (nx >= 0 && ny >= 0 && nx < w && ny < h) {
+				out.add(`${nx},${ny}`);
+			}
+		}
+	}
+}
+
 export interface PaintInteractionHandlers {
 	handleMouseDown: (e: React.MouseEvent) => void;
 	handleMouseMove: (e: React.MouseEvent) => void;
 	handleMouseUp: () => void;
 	brushOverlayRef: RefObject<HTMLDivElement | null>;
+	clearPreview: () => void;
 }
 
 export function usePaintInteraction(
 	rendererRef: RefObject<WorldRenderer | null>,
-	canvasRef: RefObject<HTMLCanvasElement | null>,
 ): PaintInteractionHandlers {
 	const isPaintingRef = useRef(false);
 	const strokePointsRef = useRef<PaintPoint[]>([]);
 	const lastPointRef = useRef<{ x: number; y: number } | null>(null);
 	const brushOverlayRef = useRef<HTMLDivElement>(null);
+	const previewCellsRef = useRef(new Set<string>());
+	/** Tool + brush captured at drag start so mid-drag changes don't cause mismatches. */
+	const dragToolRef = useRef<PaintTool>("barrier");
+	const dragBrushRef = useRef<0 | 1 | 2>(0);
 
 	const updateOverlay = useCallback(
 		(clientX: number, clientY: number) => {
@@ -59,25 +91,26 @@ export function usePaintInteraction(
 
 			const world = renderer.canvasToWorld(clientX, clientY);
 			const { camera } = renderer;
-			const canvas = canvasRef.current;
-			if (!canvas) return;
-			const rect = canvas.getBoundingClientRect();
 
 			const store = usePaintStore.getState();
 			const halfExt = store.brushHalfExtent;
 			const size = 2 * halfExt + 1;
 
-			// Position the overlay in screen-space over the brush area
-			const screenX = camera.x + (world.x - halfExt) * camera.zoom + rect.left;
-			const screenY = camera.y + (world.y - halfExt) * camera.zoom + rect.top;
-			const screenSize = size * camera.zoom;
+			overlay.style.borderColor = BORDER_COLORS[store.tool];
 
-			overlay.style.transform = `translate(${screenX}px, ${screenY}px)`;
+			// Convert brush top-left from canvas-pixel space to viewport CSS space
+			const canvasX = camera.x + (world.x - halfExt) * camera.zoom;
+			const canvasY = camera.y + (world.y - halfExt) * camera.zoom;
+			const vp = renderer.canvasToViewport(canvasX, canvasY);
+			const vpEnd = renderer.canvasToViewport(canvasX + size * camera.zoom, canvasY);
+			const screenSize = vpEnd.x - vp.x;
+
+			overlay.style.transform = `translate(${vp.x}px, ${vp.y}px)`;
 			overlay.style.width = `${screenSize}px`;
 			overlay.style.height = `${screenSize}px`;
 			overlay.style.display = "block";
 		},
-		[rendererRef, canvasRef],
+		[rendererRef],
 	);
 
 	const flushStroke = useCallback(async () => {
@@ -96,11 +129,11 @@ export function usePaintInteraction(
 		}
 		strokePointsRef.current = [];
 
-		const store = usePaintStore.getState();
+		// Use tool + brush captured at drag start for consistency with preview
 		try {
 			const resp = await api.paint({
-				tool: store.tool,
-				brush_half_extent: store.brushHalfExtent,
+				tool: dragToolRef.current,
+				brush_half_extent: dragBrushRef.current,
 				points: unique,
 			});
 
@@ -112,8 +145,8 @@ export function usePaintInteraction(
 
 			// Force re-render since tick may not change
 			rendererRef.current?.invalidate();
-		} catch {
-			// Silently ignore paint errors (e.g. simulation started running)
+		} catch (err) {
+			console.error("[Paint] API error:", err);
 		}
 	}, [rendererRef]);
 
@@ -130,6 +163,11 @@ export function usePaintInteraction(
 		[worldBounds],
 	);
 
+	const clearPreview = useCallback(() => {
+		previewCellsRef.current.clear();
+		rendererRef.current?.setPreview(null, null);
+	}, [rendererRef]);
+
 	const handleMouseDown = useCallback(
 		(e: React.MouseEvent) => {
 			// Only intercept left-click for painting
@@ -144,45 +182,72 @@ export function usePaintInteraction(
 			isPaintingRef.current = true;
 			strokePointsRef.current = [{ x: world.x, y: world.y }];
 			lastPointRef.current = world;
+
+			// Capture tool + brush at drag start for consistent preview/commit
+			const store = usePaintStore.getState();
+			dragToolRef.current = store.tool;
+			dragBrushRef.current = store.brushHalfExtent;
+
+			// Start preview
+			const bounds = worldBounds();
+			if (bounds) {
+				previewCellsRef.current.clear();
+				expandBrush(world.x, world.y, dragBrushRef.current, bounds.w, bounds.h, previewCellsRef.current);
+				renderer.setPreview(previewCellsRef.current, dragToolRef.current);
+			}
 		},
-		[rendererRef, isInBounds],
+		[rendererRef, isInBounds, worldBounds],
 	);
 
 	const handleMouseMove = useCallback(
 		(e: React.MouseEvent) => {
 			updateOverlay(e.clientX, e.clientY);
 
-			if (!isPaintingRef.current) return;
-
 			const renderer = rendererRef.current;
 			if (!renderer) return;
 
 			const world = renderer.canvasToWorld(e.clientX, e.clientY);
-			const last = lastPointRef.current;
+			const store = usePaintStore.getState();
+			const bounds = worldBounds();
 
+			if (!isPaintingRef.current) {
+				// Hover preview: show single brush footprint under cursor
+				if (bounds) {
+					previewCellsRef.current.clear();
+					expandBrush(world.x, world.y, store.brushHalfExtent, bounds.w, bounds.h, previewCellsRef.current);
+					renderer.setPreview(previewCellsRef.current, store.tool);
+				}
+				return;
+			}
+
+			// Drag: accumulate stroke + expand preview using captured brush
+			const last = lastPointRef.current;
 			if (last && (world.x !== last.x || world.y !== last.y)) {
-				// Interpolate from last point to current
 				const interpolated = bresenhamLine(last.x, last.y, world.x, world.y);
-				// Skip the first point (it's the last point from previous move)
 				for (let i = 1; i < interpolated.length; i++) {
 					const pt = interpolated[i];
 					if (pt && isInBounds(pt.x, pt.y)) strokePointsRef.current.push(pt);
+					if (pt && bounds) {
+						expandBrush(pt.x, pt.y, dragBrushRef.current, bounds.w, bounds.h, previewCellsRef.current);
+					}
 				}
-				// Only update lastPoint when in bounds to avoid edge artifacts on re-entry
 				if (isInBounds(world.x, world.y)) {
 					lastPointRef.current = world;
 				}
 			}
 		},
-		[rendererRef, updateOverlay, isInBounds],
+		[rendererRef, updateOverlay, isInBounds, worldBounds],
 	);
 
 	const handleMouseUp = useCallback(() => {
 		if (!isPaintingRef.current) return;
 		isPaintingRef.current = false;
 		lastPointRef.current = null;
+		// Clear preview — flush will update the real frame
+		previewCellsRef.current.clear();
+		rendererRef.current?.setPreview(null, null);
 		flushStroke();
-	}, [flushStroke]);
+	}, [flushStroke, rendererRef]);
 
-	return { handleMouseDown, handleMouseMove, handleMouseUp, brushOverlayRef };
+	return { handleMouseDown, handleMouseMove, handleMouseUp, brushOverlayRef, clearPreview };
 }

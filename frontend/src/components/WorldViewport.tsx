@@ -15,7 +15,13 @@ export function WorldViewport() {
 	const paintMode = usePaintStore((s) => s.paintMode);
 	const simState = useSimulationStore((s) => s.simState);
 
-	const paint = usePaintInteraction(rendererRef, canvasRef);
+	const {
+		handleMouseDown: paintMouseDown,
+		handleMouseMove: paintMouseMove,
+		handleMouseUp: paintMouseUp,
+		brushOverlayRef,
+		clearPreview,
+	} = usePaintInteraction(rendererRef);
 
 	const initRenderer = useCallback(() => {
 		const canvas = canvasRef.current;
@@ -98,21 +104,21 @@ export function WorldViewport() {
 	const handleMouseDown = useCallback(
 		(e: React.MouseEvent) => {
 			if (paintMode && e.button === 0) {
-				paint.handleMouseDown(e);
+				paintMouseDown(e);
 				return;
 			}
 			if (e.button === 0) {
 				dragRef.current = { startX: e.clientX, startY: e.clientY };
 			}
 		},
-		[paintMode, paint],
+		[paintMode, paintMouseDown],
 	);
 
 	// Pan: mouse move
 	const handleMouseMove = useCallback(
 		(e: React.MouseEvent) => {
 			if (paintMode) {
-				paint.handleMouseMove(e);
+				paintMouseMove(e);
 				// Still allow pan with right-click drag
 				if (dragRef.current) {
 					const dx = e.clientX - dragRef.current.startX;
@@ -129,16 +135,16 @@ export function WorldViewport() {
 				rendererRef.current?.pan(dx, dy);
 			}
 		},
-		[paintMode, paint],
+		[paintMode, paintMouseMove],
 	);
 
 	// Pan: mouse up
 	const handleMouseUp = useCallback(() => {
 		dragRef.current = null;
 		if (paintMode) {
-			paint.handleMouseUp();
+			paintMouseUp();
 		}
-	}, [paintMode, paint]);
+	}, [paintMode, paintMouseUp]);
 
 	// Right-click drag for pan in paint mode
 	const handleContextMenu = useCallback(
@@ -163,16 +169,26 @@ export function WorldViewport() {
 		[paintMode],
 	);
 
+	const handleMouseEnter = useCallback(
+		(e: React.MouseEvent) => {
+			if (paintMode) {
+				paintMouseMove(e);
+			}
+		},
+		[paintMode, paintMouseMove],
+	);
+
 	const handleMouseLeave = useCallback(() => {
 		dragRef.current = null;
 		if (paintMode) {
-			paint.handleMouseUp();
+			paintMouseUp();
+			clearPreview();
 			// Hide brush overlay
-			if (paint.brushOverlayRef.current) {
-				paint.brushOverlayRef.current.style.display = "none";
+			if (brushOverlayRef.current) {
+				brushOverlayRef.current.style.display = "none";
 			}
 		}
-	}, [paintMode, paint]);
+	}, [paintMode, paintMouseUp, clearPreview, brushOverlayRef]);
 
 	const handleZoomIn = useCallback(() => {
 		rendererRef.current?.zoomCenter(-1);
@@ -194,11 +210,12 @@ export function WorldViewport() {
 			<canvas
 				ref={canvasRef}
 				data-testid="world-canvas"
-				className={`absolute inset-0 ${paintMode ? "cursor-cell" : "cursor-crosshair"}`}
+				className={`absolute inset-0 ${paintMode ? "cursor-none" : "cursor-crosshair"}`}
 				onWheel={handleWheel}
 				onMouseDown={handleMouseDown}
 				onMouseMove={handleMouseMove}
 				onMouseUp={handleMouseUp}
+				onMouseEnter={handleMouseEnter}
 				onMouseLeave={handleMouseLeave}
 				onDoubleClick={handleDoubleClick}
 				onContextMenu={handleContextMenu}
@@ -206,8 +223,8 @@ export function WorldViewport() {
 			{/* Brush overlay — positioned via direct DOM manipulation in the hook */}
 			{paintMode && (
 				<div
-					ref={paint.brushOverlayRef}
-					className="fixed pointer-events-none border border-white/40 bg-white/10"
+					ref={brushOverlayRef}
+					className="fixed top-0 left-0 pointer-events-none border-2 bg-white/5"
 					style={{ display: "none" }}
 				/>
 			)}
@@ -221,6 +238,7 @@ export function WorldViewport() {
 			{canTogglePaint && (
 				<button
 					type="button"
+					data-testid="paint-toggle"
 					onClick={togglePaintMode}
 					title={paintMode ? "Exit paint mode" : "Enter paint mode"}
 					aria-pressed={paintMode}

@@ -1,14 +1,14 @@
-import type { Creature, Frame } from "../types/api.ts";
+import type { Creature, Frame, PaintTool } from "../types/api.ts";
 
 /** Background color: slate-950 (#020617) */
 const BG_R = 2;
 const BG_G = 6;
 const BG_B = 23;
 
-/** Barrier color: slate-700 */
-const BARRIER_R = 51;
-const BARRIER_G = 65;
-const BARRIER_B = 85;
+/** Barrier color: dark rust (#8B4513) */
+const BARRIER_R = 139;
+const BARRIER_G = 69;
+const BARRIER_B = 19;
 
 /** Zoom threshold for switching from pixel to rect mode */
 const RECT_MODE_THRESHOLD = 4;
@@ -27,11 +27,15 @@ export class WorldRenderer {
 	private imageData: ImageData | null = null;
 	private imageDataWidth = 0;
 	private imageDataHeight = 0;
+	private offscreen: OffscreenCanvas | null = null;
+	private offscreenCtx: OffscreenCanvasRenderingContext2D | null = null;
 	private lastRenderedTick = -1;
 	private rafId = 0;
 	private getFrame: () => { frame: Frame | null; tick: number };
 
 	camera: Camera = { x: 0, y: 0, zoom: 1 };
+	private previewCells: Set<string> | null = null;
+	private previewTool: PaintTool | null = null;
 
 	constructor(canvas: HTMLCanvasElement, getFrame: () => { frame: Frame | null; tick: number }) {
 		this.canvas = canvas;
@@ -73,15 +77,31 @@ export class WorldRenderer {
 		return this.imageData;
 	}
 
+	private ensureOffscreen(w: number, h: number): OffscreenCanvasRenderingContext2D {
+		if (!this.offscreen || this.offscreen.width !== w || this.offscreen.height !== h) {
+			this.offscreen = new OffscreenCanvas(w, h);
+			this.offscreenCtx = this.offscreen.getContext("2d")!;
+		}
+		return this.offscreenCtx!;
+	}
+
 	/** Force re-render on next frame (e.g. after camera change) */
 	invalidate(): void {
 		this.lastRenderedTick = -1;
 	}
 
+	/** Update paint preview overlay. Pass null to clear. */
+	setPreview(cells: Set<string> | null, tool: PaintTool | null): void {
+		this.previewCells = cells;
+		this.previewTool = tool;
+	}
+
 	zoomAt(clientX: number, clientY: number, delta: number): void {
 		const rect = this.canvas.getBoundingClientRect();
-		const mx = clientX - rect.left;
-		const my = clientY - rect.top;
+		const scaleX = this.canvas.width / rect.width;
+		const scaleY = this.canvas.height / rect.height;
+		const mx = (clientX - rect.left) * scaleX;
+		const my = (clientY - rect.top) * scaleY;
 
 		const factor = delta > 0 ? 0.9 : 1.1;
 		const newZoom = Math.max(0.5, Math.min(20, this.camera.zoom * factor));
@@ -131,18 +151,30 @@ export class WorldRenderer {
 	/** Convert canvas pixel to world cell coordinates */
 	canvasToWorld(clientX: number, clientY: number): { x: number; y: number } {
 		const rect = this.canvas.getBoundingClientRect();
-		const mx = clientX - rect.left;
-		const my = clientY - rect.top;
+		const scaleX = this.canvas.width / rect.width;
+		const scaleY = this.canvas.height / rect.height;
+		const mx = (clientX - rect.left) * scaleX;
+		const my = (clientY - rect.top) * scaleY;
 		return {
 			x: Math.floor((mx - this.camera.x) / this.camera.zoom),
 			y: Math.floor((my - this.camera.y) / this.camera.zoom),
 		};
 	}
 
+	/** Convert canvas-local pixel position to viewport CSS coordinates */
+	canvasToViewport(canvasX: number, canvasY: number): { x: number; y: number } {
+		const rect = this.canvas.getBoundingClientRect();
+		return {
+			x: rect.left + canvasX * (rect.width / this.canvas.width),
+			y: rect.top + canvasY * (rect.height / this.canvas.height),
+		};
+	}
+
 	private render(): void {
 		const { frame, tick } = this.getFrame();
 		if (!frame) return;
-		if (tick === this.lastRenderedTick) return;
+		const hasPreview = this.previewCells !== null && this.previewCells.size > 0;
+		if (tick === this.lastRenderedTick && !hasPreview) return;
 		this.lastRenderedTick = tick;
 
 		const { ctx, canvas } = this;
@@ -206,14 +238,30 @@ export class WorldRenderer {
 			data[idx + 3] = 255;
 		}
 
+		// Paint preview overlay (40% alpha blend)
+		if (this.previewCells && this.previewTool) {
+			const [pr, pg, pb] = this.previewColor(this.previewTool);
+			for (const key of this.previewCells) {
+				const sep = key.indexOf(",");
+				const px = parseInt(key.substring(0, sep), 10);
+				const py = parseInt(key.substring(sep + 1), 10);
+				if (px < 0 || py < 0 || px >= width || py >= height) continue;
+				const idx = (py * width + px) * 4;
+				// Alpha blend at 40%
+				const alpha = 0.4;
+				data[idx] = Math.round(data[idx]! * (1 - alpha) + pr * alpha);
+				data[idx + 1] = Math.round(data[idx + 1]! * (1 - alpha) + pg * alpha);
+				data[idx + 2] = Math.round(data[idx + 2]! * (1 - alpha) + pb * alpha);
+			}
+		}
+
 		// Draw at world resolution then scale up
-		const offscreen = new OffscreenCanvas(width, height);
-		const offCtx = offscreen.getContext("2d")!;
+		const offCtx = this.ensureOffscreen(width, height);
 		offCtx.putImageData(img, 0, 0);
 
 		ctx.imageSmoothingEnabled = false;
 		ctx.drawImage(
-			offscreen,
+			this.offscreen!,
 			this.camera.x,
 			this.camera.y,
 			width * this.camera.zoom,
@@ -254,6 +302,18 @@ export class WorldRenderer {
 		if (detailed) {
 			this.drawGrid(frame.width, frame.height);
 		}
+
+		// Paint preview overlay
+		if (this.previewCells && this.previewTool) {
+			const [pr, pg, pb] = this.previewColor(this.previewTool);
+			ctx.fillStyle = `rgba(${pr},${pg},${pb},0.4)`;
+			for (const key of this.previewCells) {
+				const sep = key.indexOf(",");
+				const px = parseInt(key.substring(0, sep), 10);
+				const py = parseInt(key.substring(sep + 1), 10);
+				ctx.fillRect(cx + px * zoom, cy + py * zoom, zoom, zoom);
+			}
+		}
 	}
 
 	private drawCreatureDetail(c: Creature, px: number, py: number, cellSize: number): void {
@@ -288,5 +348,17 @@ export class WorldRenderer {
 			ctx.lineTo(cx + worldWidth * zoom, py);
 		}
 		ctx.stroke();
+	}
+
+	private previewColor(tool: PaintTool): [number, number, number] {
+		switch (tool) {
+			case "barrier":
+				return [220, 120, 50]; // Bright orange preview (committed result stays dark rust)
+			case "food":
+				return [0, 180, 0];
+			case "erase_barrier":
+			case "erase_food":
+				return [BG_R, BG_G, BG_B];
+		}
 	}
 }
