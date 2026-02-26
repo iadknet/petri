@@ -93,6 +93,19 @@ export class WorldRenderer {
 		this.invalidate();
 	}
 
+	/** Zoom toward/from the canvas center */
+	zoomCenter(delta: number): void {
+		const cx = this.canvas.width / 2;
+		const cy = this.canvas.height / 2;
+		const factor = delta > 0 ? 0.9 : 1.1;
+		const newZoom = Math.max(0.5, Math.min(20, this.camera.zoom * factor));
+		const ratio = newZoom / this.camera.zoom;
+		this.camera.x = cx - (cx - this.camera.x) * ratio;
+		this.camera.y = cy - (cy - this.camera.y) * ratio;
+		this.camera.zoom = newZoom;
+		this.invalidate();
+	}
+
 	pan(dx: number, dy: number): void {
 		this.camera.x += dx;
 		this.camera.y += dy;
