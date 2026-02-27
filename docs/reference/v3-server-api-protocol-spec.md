@@ -92,6 +92,7 @@ Request (conceptual v3alpha1 shape):
       "initial_density": 1.0,
       "initial_coverage": 0.15,
       "spread_threshold_ratio": 0.8,
+      "spread_density_ratio": 0.25,
       "recovery_spawn_rate": 0.01,
       "recovery_floor_ratio": 0.01,
       "max_density": 1.0
@@ -337,6 +338,7 @@ Response:
         "initial_density": 1.0,
         "initial_coverage": 0.15,
         "spread_threshold_ratio": 0.8,
+        "spread_density_ratio": 0.25,
         "recovery_spawn_rate": 0.01,
         "recovery_floor_ratio": 0.01,
         "max_density": 1.0

@@ -16,6 +16,7 @@ pub struct WorldFoodConfig {
     pub initial_density: f32,
     pub initial_coverage: f32,
     pub spread_threshold_ratio: f32,
+    pub spread_density_ratio: f32,
     pub recovery_spawn_rate: f32,
     pub recovery_floor_ratio: f32,
     pub max_density: f32,
@@ -28,6 +29,7 @@ impl Default for WorldFoodConfig {
             initial_density: 1.0,
             initial_coverage: 0.15,
             spread_threshold_ratio: 0.8,
+            spread_density_ratio: 0.25,
             recovery_spawn_rate: 0.01,
             recovery_floor_ratio: 0.01,
             max_density: 1.0,
@@ -241,6 +243,8 @@ impl SimulationConfig {
         w.food.initial_coverage = normalize_f32_clamp(w.food.initial_coverage, 0.0, 1.0, 0.15);
         w.food.spread_threshold_ratio =
             normalize_f32_clamp(w.food.spread_threshold_ratio, 0.0, 1.0, 0.8);
+        w.food.spread_density_ratio =
+            normalize_f32_clamp(w.food.spread_density_ratio, 0.0, 1.0, 0.25);
         w.food.recovery_spawn_rate =
             normalize_f32_clamp(w.food.recovery_spawn_rate, 0.0, 1.0, 0.01);
         w.food.recovery_floor_ratio =
@@ -364,6 +368,7 @@ mod tests {
         assert!((cfg.world.food.initial_density - 1.0).abs() < 1e-6);
         assert!((cfg.world.food.initial_coverage - 0.15).abs() < 1e-6);
         assert!((cfg.world.food.spread_threshold_ratio - 0.8).abs() < 1e-6);
+        assert!((cfg.world.food.spread_density_ratio - 0.25).abs() < 1e-6);
         assert!((cfg.world.food.recovery_spawn_rate - 0.01).abs() < 1e-6);
         assert!((cfg.world.food.recovery_floor_ratio - 0.01).abs() < 1e-6);
         assert!((cfg.world.food.max_density - 1.0).abs() < 1e-6);
@@ -431,6 +436,30 @@ mod tests {
         cfg.world.food.initial_density = 1.5;
         cfg.normalize();
         assert!((cfg.world.food.initial_density - 0.8).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_clamps_spread_density_ratio_above_one() {
+        let mut cfg = SimulationConfig::default();
+        cfg.world.food.spread_density_ratio = 1.5;
+        cfg.normalize();
+        assert!((cfg.world.food.spread_density_ratio - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_nan_spread_density_ratio_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.world.food.spread_density_ratio = f32::NAN;
+        cfg.normalize();
+        assert!((cfg.world.food.spread_density_ratio - 0.25).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_negative_spread_density_ratio_clamps_to_zero() {
+        let mut cfg = SimulationConfig::default();
+        cfg.world.food.spread_density_ratio = -0.5;
+        cfg.normalize();
+        assert!((cfg.world.food.spread_density_ratio - 0.0).abs() < 1e-6);
     }
 
     #[test]
