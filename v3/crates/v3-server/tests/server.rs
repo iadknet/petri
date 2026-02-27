@@ -235,6 +235,30 @@ async fn get_status_has_all_required_fields() {
     assert!(body["tick"].is_number(), "missing tick");
     assert!(body["population"].is_number(), "missing population");
     assert!(body["mean_energy"].is_number(), "missing mean_energy");
+    assert!(
+        body["mutation_events_attempted_total_by_domain"].is_object(),
+        "missing mutation_events_attempted_total_by_domain"
+    );
+    assert!(
+        body["mutation_events_applied_total_by_domain"].is_object(),
+        "missing mutation_events_applied_total_by_domain"
+    );
+    assert!(
+        body["mutation_events_attempted_total_by_operator"].is_object(),
+        "missing mutation_events_attempted_total_by_operator"
+    );
+    assert!(
+        body["mutation_events_applied_total_by_operator"].is_object(),
+        "missing mutation_events_applied_total_by_operator"
+    );
+    assert!(
+        body["mutation_events_applied_total_semantic_noop"].is_number(),
+        "missing mutation_events_applied_total_semantic_noop"
+    );
+    assert!(
+        body["mutation_events_applied_total_semantic_change"].is_number(),
+        "missing mutation_events_applied_total_semantic_change"
+    );
 }
 
 // ── 10. get_frame_returns_creature_food_barrier_arrays ──────────────────────
@@ -341,6 +365,48 @@ async fn health_payload_contains_mutation_skip_by_reason() {
     let frame = build_ws_frame(&handle);
     // The field always exists as part of the typed struct; verify it's accessible.
     let _ = &frame.health.mutation_events_skipped_total_by_reason;
+    let attempted_by_domain: u64 = frame
+        .health
+        .mutation_events_attempted_total_by_domain
+        .values()
+        .sum();
+    let applied_by_domain: u64 = frame
+        .health
+        .mutation_events_applied_total_by_domain
+        .values()
+        .sum();
+    let attempted_by_operator: u64 = frame
+        .health
+        .mutation_events_attempted_total_by_operator
+        .values()
+        .sum();
+    let applied_by_operator: u64 = frame
+        .health
+        .mutation_events_applied_total_by_operator
+        .values()
+        .sum();
+    assert_eq!(
+        attempted_by_domain, frame.health.mutation_events_attempted_total,
+        "attempted_by_domain must reconcile to mutation_events_attempted_total"
+    );
+    assert_eq!(
+        applied_by_domain, frame.health.mutation_events_applied_total,
+        "applied_by_domain must reconcile to mutation_events_applied_total"
+    );
+    assert_eq!(
+        attempted_by_operator, frame.health.mutation_events_attempted_total,
+        "attempted_by_operator must reconcile to mutation_events_attempted_total"
+    );
+    assert_eq!(
+        applied_by_operator, frame.health.mutation_events_applied_total,
+        "applied_by_operator must reconcile to mutation_events_applied_total"
+    );
+    assert_eq!(
+        frame.health.mutation_events_applied_total_semantic_noop
+            + frame.health.mutation_events_applied_total_semantic_change,
+        frame.health.mutation_events_applied_total,
+        "semantic categories must reconcile to mutation_events_applied_total"
+    );
 }
 
 // ── 15. status_payload_includes_state ───────────────────────────────────────
@@ -394,6 +460,14 @@ async fn ws_frame_msgpack_roundtrip() {
     assert_eq!(decoded.frame.height, frame.frame.height);
     assert_eq!(decoded.frame.creatures.len(), frame.frame.creatures.len());
     assert_eq!(decoded.health.population, frame.health.population);
+    assert_eq!(
+        decoded.health.mutation_events_attempted_total_by_domain,
+        frame.health.mutation_events_attempted_total_by_domain
+    );
+    assert_eq!(
+        decoded.health.mutation_events_applied_total_by_operator,
+        frame.health.mutation_events_applied_total_by_operator
+    );
     assert_eq!(decoded.status.state, SimulationStatus::Running);
 }
 

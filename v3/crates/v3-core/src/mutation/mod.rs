@@ -1,9 +1,25 @@
 pub mod engine;
-pub mod graph_mutator;
-pub mod input_ref_mutator;
+pub mod graph;
+pub mod input_ref;
 pub mod phenotype;
 pub mod topology;
 pub mod types;
-pub mod vm_mutator;
+pub mod vm;
+
+// Transitional compatibility modules for existing import paths.
+pub mod graph_mutator {
+    pub use super::graph::{GraphMutator, GraphOperator};
+}
+
+pub mod input_ref_mutator {
+    pub use super::input_ref::{InputRefMutator, InputRefOperator};
+}
+
+pub mod vm_mutator {
+    pub use super::vm::{VmMutator, VmOperator};
+}
+
 pub use engine::MutationEngine;
-pub use types::{MutationSkipReason, MutationSummary};
+pub use types::{
+    MutationDomain, MutationOperator, MutationSemanticCategory, MutationSkipReason, MutationSummary,
+};

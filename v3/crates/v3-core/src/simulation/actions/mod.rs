@@ -1,21 +1,11 @@
-use rand::Rng;
+mod reproduction;
+
+pub use reproduction::{apply_reproduce, ReproductionActionResult};
 
 use crate::config::SimulationConfig;
 use crate::contracts::{CreatureId, Direction};
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
-use crate::mutation::phenotype::mutate_phenotype;
-use crate::mutation::MutationEngine;
-use crate::simulation::simulation::Simulation;
-
-/// Result of an attempted reproduction action.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum ReproductionActionResult {
-    Spawned,
-    RejectedInvalidTarget,
-    RejectedEnergyConstraints,
-    RejectedPopulationCap,
-}
 
 // ─── Action application functions ─────────────────────────────────────────────
 
@@ -55,145 +45,6 @@ pub fn apply_move(
     creature.energy -= config.energy.costs.move_cost;
 }
 
-/// Apply a Reproduce action per v3-reproduction-spec.md Section 6 unified sequence.
-///
-/// Returns the outcome indicating whether offspring was spawned or why it was rejected.
-pub fn apply_reproduce(
-    parent_id: CreatureId,
-    sim: &mut Simulation,
-    dir: Direction,
-    energy_transfer_request: f32,
-    rng: &mut impl Rng,
-) -> ReproductionActionResult {
-    // Stats: always count attempt and per-tick reproduce regardless of outcome.
-    sim.stats.reproduction_actions_attempted_total += 1;
-    sim.stats.last_tick_reproduce += 1;
-
-    let parent_pos = sim.creatures[parent_id].position;
-
-    // Step 1: Resolve target cell.
-    let target = match sim.world.resolve_neighbor(parent_pos, dir) {
-        Some(p) => p,
-        None => {
-            sim.stats.reproduction_actions_rejected_total += 1;
-            *sim.stats
-                .reproduction_actions_rejected_by_reason
-                .entry("RejectedInvalidTarget".to_string())
-                .or_insert(0) += 1;
-            return ReproductionActionResult::RejectedInvalidTarget;
-        }
-    };
-
-    // Step 2: Validate target cell (no barrier, not occupied).
-    if !sim.world.is_valid_target_cell(target) {
-        sim.stats.reproduction_actions_rejected_total += 1;
-        *sim.stats
-            .reproduction_actions_rejected_by_reason
-            .entry("RejectedInvalidTarget".to_string())
-            .or_insert(0) += 1;
-        return ReproductionActionResult::RejectedInvalidTarget;
-    }
-
-    // Step 3: Check population cap.
-    if sim.creatures.len() >= sim.config.population.max_creatures as usize {
-        sim.stats.reproduction_actions_rejected_total += 1;
-        *sim.stats
-            .reproduction_actions_rejected_by_reason
-            .entry("RejectedPopulationCap".to_string())
-            .or_insert(0) += 1;
-        return ReproductionActionResult::RejectedPopulationCap;
-    }
-
-    // Step 4: Deduct reproduce_cost from parent.
-    sim.creatures[parent_id].energy -= sim.config.energy.costs.reproduce_cost;
-
-    // Step 5: Check parent has sufficient energy after cost deduction.
-    if sim.creatures[parent_id].energy < sim.config.energy.lifecycle.min_reproduce_energy {
-        sim.stats.reproduction_actions_rejected_total += 1;
-        *sim.stats
-            .reproduction_actions_rejected_by_reason
-            .entry("RejectedEnergyConstraints".to_string())
-            .or_insert(0) += 1;
-        return ReproductionActionResult::RejectedEnergyConstraints;
-    }
-
-    // Step 6: Compute energy transfer (clamped to [0, default_offspring_energy]).
-    let max_transfer = sim.config.energy.lifecycle.default_offspring_energy;
-    let transfer = if energy_transfer_request.is_finite() && energy_transfer_request > 0.0 {
-        energy_transfer_request.min(max_transfer)
-    } else {
-        0.0
-    };
-
-    if transfer <= 0.0 || sim.creatures[parent_id].energy < transfer {
-        sim.stats.reproduction_actions_rejected_total += 1;
-        *sim.stats
-            .reproduction_actions_rejected_by_reason
-            .entry("RejectedEnergyConstraints".to_string())
-            .or_insert(0) += 1;
-        return ReproductionActionResult::RejectedEnergyConstraints;
-    }
-
-    // Step 7: Deduct transfer from parent.
-    sim.creatures[parent_id].energy -= transfer;
-
-    // Step 8: Build offspring draft (clone parent genome + state).
-    let child_genome = sim.creatures[parent_id].genome.clone();
-    let child_memory = sim.creatures[parent_id].memory;
-    let child_generation = sim.creatures[parent_id].generation + 1;
-    let child_channels = sim.creatures[parent_id].phenotype_channels;
-    let child_active_channel = sim.creatures[parent_id].phenotype_active_channel;
-    let child_polarity = sim.creatures[parent_id].phenotype_channel_polarity;
-
-    // Step 9: Apply genome mutations.
-    let mut child_genome = child_genome;
-    let summary = MutationEngine::apply_mutations(&mut child_genome, &sim.config.mutation, rng);
-
-    // Update mutation stats.
-    sim.stats.mutation_events_attempted_total += summary.attempted_events as u64;
-    sim.stats.mutation_events_applied_total += summary.applied_events as u64;
-    sim.stats.mutation_events_skipped_total += summary.skipped_events as u64;
-    for (reason, count) in &summary.skip_reasons {
-        *sim.stats
-            .mutation_events_skipped_by_reason
-            .entry(format!("{reason:?}"))
-            .or_insert(0) += *count as u64;
-    }
-
-    // Step 10: Phenotype mutation — triggered only when at least one genome event was applied.
-    let (child_channels, child_active_channel, child_polarity) = if summary.applied_events > 0 {
-        mutate_phenotype(
-            child_channels,
-            child_active_channel,
-            child_polarity,
-            &sim.config.mutation.phenotype,
-            rng,
-        )
-    } else {
-        (child_channels, child_active_channel, child_polarity)
-    };
-
-    // Step 11–12: Spawn child in slotmap + world.
-    let child_id = sim.creatures.insert_with_key(|id| {
-        let mut child = CreatureState::new(
-            id,
-            child_genome,
-            target,
-            transfer,
-            child_generation,
-            child_channels,
-            child_active_channel,
-            child_polarity,
-        );
-        child.memory = child_memory;
-        child
-    });
-    sim.world.place_creature(target, child_id);
-
-    sim.stats.reproduction_actions_spawned_total += 1;
-    ReproductionActionResult::Spawned
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -202,6 +53,7 @@ mod tests {
     use crate::creature::founder::v3alpha1_founder_genome;
     use crate::kernel::WorldState;
     use crate::simulation::seeding::seed_simulation;
+    use crate::simulation::simulation::Simulation;
     use rand::SeedableRng;
     use slotmap::SlotMap;
 
@@ -525,6 +377,162 @@ mod tests {
             .expect("child not found");
         assert_eq!(child.memory[42], 0xAB);
         assert_eq!(child.memory[100], 0xCD);
+    }
+
+    #[test]
+    fn semantic_noop_applied_event_still_triggers_phenotype_mutation() {
+        let pos = Position::new(5, 5);
+        let mut observed = false;
+
+        for seed in 0u64..10_000 {
+            let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
+            sim.config.mutation.mutation_probability = 1.0;
+            sim.config.mutation.per_birth_mutation_events_min = 1;
+            sim.config.mutation.per_birth_mutation_events_max = 1;
+            sim.config.mutation.phenotype.channel_change_chance = 0.0;
+            sim.config.mutation.phenotype.polarity_flip_chance = 0.0;
+            sim.config.mutation.phenotype.channel_step = 1;
+
+            let parent_channels = sim.creatures[parent_id].phenotype_channels;
+            let parent_generation = sim.creatures[parent_id].generation;
+            let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
+            let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
+
+            if result == ReproductionActionResult::Spawned
+                && sim.stats.mutation_events_applied_total_semantic_noop > 0
+            {
+                let child = sim
+                    .creatures
+                    .values()
+                    .find(|c| c.generation == parent_generation + 1)
+                    .expect("child must exist when reproduction spawned");
+                assert_ne!(
+                    child.phenotype_channels, parent_channels,
+                    "semantic-noop applied event must still trigger phenotype mutation"
+                );
+                observed = true;
+                break;
+            }
+        }
+
+        assert!(
+            observed,
+            "expected at least one spawned child with semantic-noop applied mutation"
+        );
+    }
+
+    #[test]
+    fn skipped_only_mutation_event_does_not_trigger_phenotype_mutation() {
+        use crate::contracts::NodeId;
+        use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
+
+        let pos = Position::new(5, 5);
+        let mut observed = false;
+
+        for seed in 0u64..10_000 {
+            let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
+            sim.config.mutation.mutation_probability = 1.0;
+            sim.config.mutation.per_birth_mutation_events_min = 1;
+            sim.config.mutation.per_birth_mutation_events_max = 1;
+            sim.config.mutation.phenotype.channel_change_chance = 0.0;
+            sim.config.mutation.phenotype.polarity_flip_chance = 0.0;
+            sim.config.mutation.phenotype.channel_step = 1;
+
+            // Bias toward skipped mutations: no Graph nodes, no input refs, no route targets.
+            sim.creatures[parent_id].genome.nodes = vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![VmInstruction::Halt],
+                }),
+                targets: vec![],
+            }];
+
+            let parent_channels = sim.creatures[parent_id].phenotype_channels;
+            let parent_generation = sim.creatures[parent_id].generation;
+            let mut rng = rand::rngs::SmallRng::seed_from_u64(seed);
+            let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
+            if result == ReproductionActionResult::Spawned
+                && sim.stats.mutation_events_applied_total == 0
+                && sim.stats.mutation_events_skipped_total > 0
+            {
+                let child = sim
+                    .creatures
+                    .values()
+                    .find(|c| c.generation == parent_generation + 1)
+                    .expect("child must exist when reproduction spawned");
+                assert_eq!(
+                    child.phenotype_channels, parent_channels,
+                    "skipped-only mutation event must not trigger phenotype mutation"
+                );
+                observed = true;
+                break;
+            }
+        }
+
+        assert!(
+            observed,
+            "expected at least one spawned child with skipped-only mutation event"
+        );
+    }
+
+    #[test]
+    fn reproduce_updates_domain_and_operator_mutation_stats() {
+        let pos = Position::new(5, 5);
+        let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
+        sim.config.mutation.mutation_probability = 1.0;
+        sim.config.mutation.per_birth_mutation_events_min = 3;
+        sim.config.mutation.per_birth_mutation_events_max = 3;
+
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
+        let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
+        assert_eq!(result, ReproductionActionResult::Spawned);
+
+        let attempted_by_domain: u64 = sim
+            .stats
+            .mutation_events_attempted_total_by_domain
+            .values()
+            .sum();
+        let applied_by_domain: u64 = sim
+            .stats
+            .mutation_events_applied_total_by_domain
+            .values()
+            .sum();
+        let attempted_by_operator: u64 = sim
+            .stats
+            .mutation_events_attempted_total_by_operator
+            .values()
+            .sum();
+        let applied_by_operator: u64 = sim
+            .stats
+            .mutation_events_applied_total_by_operator
+            .values()
+            .sum();
+
+        assert_eq!(
+            attempted_by_domain,
+            sim.stats.mutation_events_attempted_total
+        );
+        assert_eq!(applied_by_domain, sim.stats.mutation_events_applied_total);
+        assert_eq!(
+            attempted_by_operator,
+            sim.stats.mutation_events_attempted_total
+        );
+        assert_eq!(applied_by_operator, sim.stats.mutation_events_applied_total);
+        assert!(
+            !sim.stats
+                .mutation_events_attempted_total_by_domain
+                .is_empty(),
+            "expected at least one attempted domain counter entry"
+        );
+        assert!(
+            !sim.stats
+                .mutation_events_attempted_total_by_operator
+                .is_empty(),
+            "expected at least one attempted operator counter entry"
+        );
     }
 
     #[test]

@@ -662,17 +662,15 @@ fn mutation_skip_reason_tracking_accumulates_correctly() {
         run_tick(&mut sim);
     }
     let stats = &sim.stats;
-    // If any skips occurred, all keys must be valid reason names.
-    let valid_keys = [
-        "ParseabilityViolation",
-        "NoApplicableTarget",
-        "BudgetExhausted",
-    ];
-    for key in stats.mutation_events_skipped_by_reason.keys() {
-        assert!(
-            valid_keys.contains(&key.as_str()),
-            "unexpected skip reason key: {key}"
+    // If any skips occurred, all keys must be valid skip reasons.
+    for reason in stats.mutation_events_skipped_by_reason.keys() {
+        let is_valid = matches!(
+            reason,
+            v3_core::mutation::MutationSkipReason::ParseabilityViolation
+                | v3_core::mutation::MutationSkipReason::NoApplicableTarget
+                | v3_core::mutation::MutationSkipReason::BudgetExhausted
         );
+        assert!(is_valid, "unexpected skip reason key: {:?}", reason);
     }
     // Sum of per-reason counts must equal total skipped.
     let reason_total: u64 = stats.mutation_events_skipped_by_reason.values().sum();

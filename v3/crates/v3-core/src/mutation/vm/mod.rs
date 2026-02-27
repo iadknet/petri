@@ -9,15 +9,17 @@ pub enum VmOperator {
     VmConstantMutation,
     VmInstructionMutation,
     VmRegisterCountMutation,
+    VmInstructionRawFieldMutation,
 }
 
 impl VmOperator {
     /// Pick a random VM operator uniformly.
     pub fn random(rng: &mut impl Rng) -> Self {
-        match rng.gen_range(0u8..3) {
+        match rng.gen_range(0u8..4) {
             0 => Self::VmConstantMutation,
             1 => Self::VmInstructionMutation,
-            _ => Self::VmRegisterCountMutation,
+            2 => Self::VmRegisterCountMutation,
+            _ => Self::VmInstructionRawFieldMutation,
         }
     }
 }
@@ -53,6 +55,9 @@ impl VmMutator {
             VmOperator::VmInstructionMutation => apply_instruction_mutation(genome, node_idx, rng),
             VmOperator::VmRegisterCountMutation => {
                 apply_register_count_mutation(genome, node_idx, rng)
+            }
+            VmOperator::VmInstructionRawFieldMutation => {
+                apply_instruction_raw_field_mutation(genome, node_idx, rng)
             }
         }
     }
@@ -225,7 +230,7 @@ fn random_vm_instruction(
             src: rng.gen_range(0..rc),
         },
         26 => VmInstruction::EmitWorldAction {
-            action_type: rng.gen_range(0u8..4),
+            action_type: rng.gen(),
         },
         27 => VmInstruction::WriteRouteTarget {
             src: rng.gen_range(0..rc),
@@ -241,12 +246,95 @@ fn random_vm_instruction(
         },
         31 => VmInstruction::LoadMem8Imm {
             dst: rng.gen_range(0..rc),
-            imm_addr: rng.gen_range(0u16..1024),
+            imm_addr: rng.gen(),
         },
         _ => VmInstruction::StoreMem8Imm {
-            imm_addr: rng.gen_range(0u16..1024),
+            imm_addr: rng.gen(),
             src: rng.gen_range(0..rc),
         },
+    }
+}
+
+fn mutate_instruction_raw_fields(instr: &mut VmInstruction, rng: &mut impl Rng) {
+    match instr {
+        VmInstruction::Noop | VmInstruction::Halt => {
+            *instr = VmInstruction::EmitWorldAction {
+                action_type: rng.gen(),
+            };
+        }
+        VmInstruction::LoadConst { dst, const_idx } => {
+            *dst = rng.gen();
+            *const_idx = rng.gen();
+        }
+        VmInstruction::Move { dst, src }
+        | VmInstruction::Abs { dst, src }
+        | VmInstruction::Neg { dst, src }
+        | VmInstruction::Clamp01 { dst, src }
+        | VmInstruction::Not { dst, src }
+        | VmInstruction::ToI32 { dst, src }
+        | VmInstruction::ToU8 { dst, src }
+        | VmInstruction::ToBool { dst, src } => {
+            *dst = rng.gen();
+            *src = rng.gen();
+        }
+        VmInstruction::Add { dst, a, b }
+        | VmInstruction::Sub { dst, a, b }
+        | VmInstruction::Mul { dst, a, b }
+        | VmInstruction::Div { dst, a, b }
+        | VmInstruction::Min { dst, a, b }
+        | VmInstruction::Max { dst, a, b }
+        | VmInstruction::CmpGt { dst, a, b }
+        | VmInstruction::CmpLt { dst, a, b }
+        | VmInstruction::And { dst, a, b }
+        | VmInstruction::Or { dst, a, b } => {
+            *dst = rng.gen();
+            *a = rng.gen();
+            *b = rng.gen();
+        }
+        VmInstruction::CmpEq { dst, a, b, eps } => {
+            *dst = rng.gen();
+            *a = rng.gen();
+            *b = rng.gen();
+            *eps = rng.gen();
+        }
+        VmInstruction::JumpIfZero { cond, offset } => {
+            *cond = rng.gen();
+            *offset = rng.gen();
+        }
+        VmInstruction::Jump { offset } => {
+            *offset = rng.gen();
+        }
+        VmInstruction::ReadInput { dst, input_idx } => {
+            *dst = rng.gen();
+            *input_idx = rng.gen();
+        }
+        VmInstruction::WriteInternalPayload { slot_idx, src }
+        | VmInstruction::WriteWorldActionMeta { slot_idx, src } => {
+            *slot_idx = rng.gen();
+            *src = rng.gen();
+        }
+        VmInstruction::EmitWorldAction { action_type } => {
+            *action_type = rng.gen();
+        }
+        VmInstruction::WriteRouteTarget { src } => {
+            *src = rng.gen();
+        }
+        VmInstruction::LoadMem8 { dst, addr_reg } => {
+            *dst = rng.gen();
+            *addr_reg = rng.gen();
+        }
+        VmInstruction::StoreMem8 { addr_reg, src } => {
+            *addr_reg = rng.gen();
+            *src = rng.gen();
+        }
+        VmInstruction::LoadMem8Imm { dst, imm_addr } => {
+            *dst = rng.gen();
+            *imm_addr = rng.gen();
+        }
+        VmInstruction::StoreMem8Imm { imm_addr, src } => {
+            *imm_addr = rng.gen();
+            *src = rng.gen();
+        }
     }
 }
 
@@ -308,6 +396,25 @@ fn apply_instruction_mutation(
                 }
             }
         }
+    }
+    Ok(())
+}
+
+fn apply_instruction_raw_field_mutation(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    let node = &mut genome.nodes[node_idx];
+    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+        if vm.program.is_empty() {
+            vm.program.push(VmInstruction::EmitWorldAction {
+                action_type: rng.gen(),
+            });
+            return Ok(());
+        }
+        let idx = rng.gen_range(0..vm.program.len());
+        mutate_instruction_raw_fields(&mut vm.program[idx], rng);
     }
     Ok(())
 }
@@ -421,6 +528,7 @@ mod tests {
             VmOperator::VmConstantMutation,
             VmOperator::VmInstructionMutation,
             VmOperator::VmRegisterCountMutation,
+            VmOperator::VmInstructionRawFieldMutation,
         ];
         for (i, &op) in operators.iter().enumerate() {
             let mut genome = v3alpha1_founder_genome();
@@ -501,6 +609,105 @@ mod tests {
             33,
             "all 33 VmInstruction variants must be reachable; got {}",
             discriminants.len()
+        );
+    }
+
+    #[test]
+    fn random_vm_instruction_widens_emit_world_action_range() {
+        let mut saw_above_3 = false;
+        for seed in 0u64..1024 {
+            let mut r = rng(seed);
+            if let VmInstruction::EmitWorldAction { action_type } =
+                random_vm_instruction(&mut r, 4, 4, 4)
+            {
+                if action_type > 3 {
+                    saw_above_3 = true;
+                    break;
+                }
+            }
+        }
+        assert!(
+            saw_above_3,
+            "random instruction generation should reach action_type values above 3"
+        );
+    }
+
+    #[test]
+    fn random_vm_instruction_widens_imm_addr_range() {
+        let mut saw_above_1023 = false;
+        for seed in 0u64..1024 {
+            let mut r = rng(seed);
+            match random_vm_instruction(&mut r, 4, 4, 4) {
+                VmInstruction::LoadMem8Imm { imm_addr, .. }
+                | VmInstruction::StoreMem8Imm { imm_addr, .. } => {
+                    if imm_addr > 1023 {
+                        saw_above_1023 = true;
+                        break;
+                    }
+                }
+                _ => {}
+            }
+        }
+        assert!(
+            saw_above_1023,
+            "random instruction generation should reach imm_addr values above 1023"
+        );
+    }
+
+    #[test]
+    fn raw_field_mutation_can_produce_out_of_range_action_type() {
+        let mut genome = v3alpha1_founder_genome();
+        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+            vm.program = vec![VmInstruction::EmitWorldAction { action_type: 0 }];
+        }
+
+        let mut saw_out_of_range = false;
+        for seed in 0u64..512 {
+            let mut g = genome.clone();
+            let mut r = rng(seed);
+            VmMutator::apply(&mut g, VmOperator::VmInstructionRawFieldMutation, &mut r).unwrap();
+            if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+                if let VmInstruction::EmitWorldAction { action_type } = vm.program[0] {
+                    if action_type > 3 {
+                        saw_out_of_range = true;
+                        break;
+                    }
+                }
+            }
+        }
+        assert!(
+            saw_out_of_range,
+            "raw field mutation should produce action_type values outside 0..=3"
+        );
+    }
+
+    #[test]
+    fn raw_field_mutation_can_produce_out_of_range_imm_addr() {
+        let mut genome = v3alpha1_founder_genome();
+        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+            vm.program = vec![VmInstruction::LoadMem8Imm {
+                dst: 0,
+                imm_addr: 0,
+            }];
+        }
+
+        let mut saw_out_of_range = false;
+        for seed in 0u64..512 {
+            let mut g = genome.clone();
+            let mut r = rng(seed);
+            VmMutator::apply(&mut g, VmOperator::VmInstructionRawFieldMutation, &mut r).unwrap();
+            if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+                if let VmInstruction::LoadMem8Imm { imm_addr, .. } = vm.program[0] {
+                    if imm_addr > 1023 {
+                        saw_out_of_range = true;
+                        break;
+                    }
+                }
+            }
+        }
+        assert!(
+            saw_out_of_range,
+            "raw field mutation should produce imm_addr values outside 0..=1023"
         );
     }
 
