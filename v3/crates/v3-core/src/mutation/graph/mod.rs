@@ -386,13 +386,14 @@ fn apply_copy_subgraph(
         let mut cluster = vec![seed];
         let mut in_cluster = vec![false; g.internal_nodes.len()];
         in_cluster[seed] = true;
+        let mut neighbors = Vec::new();
         for _ in 0..10 {
             if cluster.len() >= target_size {
                 break;
             }
             let current = cluster[rng.gen_range(0..cluster.len())];
             // Collect neighbors: inputs of current and nodes that reference current.
-            let mut neighbors = Vec::new();
+            neighbors.clear();
             for edge in &g.internal_nodes[current].inputs {
                 let src = edge.source_idx as usize;
                 if src < g.internal_nodes.len() && !in_cluster[src] {
