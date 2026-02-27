@@ -7,7 +7,7 @@ use crate::creature::genome::CreatureGenome;
 use crate::mutation::types::MutationSkipReason;
 
 /// Input reference mutation operator variants.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum InputRefOperator {
     Add,
     Remove,
@@ -16,14 +16,32 @@ pub enum InputRefOperator {
 }
 
 impl InputRefOperator {
-    /// Pick a random input ref operator uniformly.
-    pub fn random(rng: &mut impl Rng) -> Self {
-        match rng.gen_range(0u8..4) {
-            0 => Self::Add,
-            1 => Self::Remove,
-            2 => Self::Swap,
-            _ => Self::RawFieldMutation,
+    pub const ALL: [Self; 4] = [Self::Add, Self::Remove, Self::Swap, Self::RawFieldMutation];
+
+    /// Per-operator weight reflecting impact tier.
+    /// 4 = refinement, 2 = moderate, 1 = structural.
+    #[must_use]
+    pub const fn weight(self) -> u8 {
+        match self {
+            Self::Add => 2,
+            Self::Remove => 2,
+            Self::Swap => 4,
+            Self::RawFieldMutation => 4,
         }
+    }
+
+    /// Pick a random input ref operator weighted by impact tier.
+    pub fn random(rng: &mut impl Rng) -> Self {
+        let total: u16 = Self::ALL.iter().map(|op| op.weight() as u16).sum();
+        let mut r = rng.gen_range(0..total);
+        for &op in &Self::ALL {
+            let w = op.weight() as u16;
+            if r < w {
+                return op;
+            }
+            r -= w;
+        }
+        unreachable!()
     }
 }
 
@@ -42,48 +60,54 @@ impl InputRefMutator {
         }
 
         match op {
-            InputRefOperator::Add => {
-                let node_idx = rng.gen_range(0..genome.nodes.len());
-                genome.nodes[node_idx]
-                    .input_refs
-                    .push(random_input_reference(rng));
-                Ok(())
-            }
-            InputRefOperator::Remove => {
-                let eligible: Vec<usize> = genome
-                    .nodes
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, n)| !n.input_refs.is_empty())
-                    .map(|(i, _)| i)
-                    .collect();
-                if eligible.is_empty() {
-                    return Err(MutationSkipReason::NoApplicableTarget);
-                }
-                let node_idx = eligible[rng.gen_range(0..eligible.len())];
-                let ref_idx = rng.gen_range(0..genome.nodes[node_idx].input_refs.len());
-                genome.nodes[node_idx].input_refs.remove(ref_idx);
-                Ok(())
-            }
-            InputRefOperator::Swap => {
-                let eligible: Vec<usize> = genome
-                    .nodes
-                    .iter()
-                    .enumerate()
-                    .filter(|(_, n)| !n.input_refs.is_empty())
-                    .map(|(i, _)| i)
-                    .collect();
-                if eligible.is_empty() {
-                    return Err(MutationSkipReason::NoApplicableTarget);
-                }
-                let node_idx = eligible[rng.gen_range(0..eligible.len())];
-                let ref_idx = rng.gen_range(0..genome.nodes[node_idx].input_refs.len());
-                genome.nodes[node_idx].input_refs[ref_idx] = random_input_reference(rng);
-                Ok(())
-            }
+            InputRefOperator::Add => apply_add(genome, rng),
+            InputRefOperator::Remove => apply_remove(genome, rng),
+            InputRefOperator::Swap => apply_swap(genome, rng),
             InputRefOperator::RawFieldMutation => apply_raw_field_mutation(genome, rng),
         }
     }
+}
+
+fn apply_add(genome: &mut CreatureGenome, rng: &mut impl Rng) -> Result<(), MutationSkipReason> {
+    let node_idx = rng.gen_range(0..genome.nodes.len());
+    genome.nodes[node_idx]
+        .input_refs
+        .push(random_input_reference(rng));
+    Ok(())
+}
+
+fn apply_remove(genome: &mut CreatureGenome, rng: &mut impl Rng) -> Result<(), MutationSkipReason> {
+    let eligible: Vec<usize> = genome
+        .nodes
+        .iter()
+        .enumerate()
+        .filter(|(_, n)| !n.input_refs.is_empty())
+        .map(|(i, _)| i)
+        .collect();
+    if eligible.is_empty() {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
+    let node_idx = eligible[rng.gen_range(0..eligible.len())];
+    let ref_idx = rng.gen_range(0..genome.nodes[node_idx].input_refs.len());
+    genome.nodes[node_idx].input_refs.remove(ref_idx);
+    Ok(())
+}
+
+fn apply_swap(genome: &mut CreatureGenome, rng: &mut impl Rng) -> Result<(), MutationSkipReason> {
+    let eligible: Vec<usize> = genome
+        .nodes
+        .iter()
+        .enumerate()
+        .filter(|(_, n)| !n.input_refs.is_empty())
+        .map(|(i, _)| i)
+        .collect();
+    if eligible.is_empty() {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
+    let node_idx = eligible[rng.gen_range(0..eligible.len())];
+    let ref_idx = rng.gen_range(0..genome.nodes[node_idx].input_refs.len());
+    genome.nodes[node_idx].input_refs[ref_idx] = random_input_reference(rng);
+    Ok(())
 }
 
 /// Generate a random input reference from the full set of 37 possible values.
@@ -327,6 +351,32 @@ mod tests {
                 "parseability failed after {:?}",
                 op
             );
+        }
+    }
+
+    #[test]
+    fn input_ref_weighted_random_favors_refinement() {
+        let mut counts = std::collections::HashMap::new();
+        let mut r = rng(42);
+        for _ in 0..10_000 {
+            let op = InputRefOperator::random(&mut r);
+            *counts.entry(op).or_insert(0u32) += 1;
+        }
+        let swap = counts.get(&InputRefOperator::Swap).copied().unwrap_or(0);
+        let add = counts.get(&InputRefOperator::Add).copied().unwrap_or(0);
+        assert!(
+            swap > add + (add / 2),
+            "Swap (weight 4) must appear >1.5x Add (weight 2); got {} vs {}",
+            swap,
+            add,
+        );
+    }
+
+    #[test]
+    fn input_ref_operator_weights_are_positive() {
+        let all = InputRefOperator::ALL;
+        for &op in &all {
+            assert!(op.weight() > 0, "weight must be positive for {:?}", op);
         }
     }
 }

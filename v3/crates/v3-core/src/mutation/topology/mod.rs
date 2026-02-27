@@ -10,7 +10,7 @@ use crate::creature::genome::{
 use crate::mutation::types::MutationSkipReason;
 
 /// Topology mutation operator variants.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum TopologyOperator {
     AddNode,
     RemoveNode,
@@ -28,23 +28,55 @@ pub enum TopologyOperator {
 }
 
 impl TopologyOperator {
-    /// Pick a random topology operator uniformly.
-    pub fn random(rng: &mut impl Rng) -> Self {
-        match rng.gen_range(0u8..13) {
-            0 => Self::AddNode,
-            1 => Self::RemoveNode,
-            2 => Self::RetargetNodeTarget,
-            3 => Self::AddRouteTarget,
-            4 => Self::RemoveRouteTarget,
-            5 => Self::ChangeEntryNode,
-            6 => Self::SwapNodeBackend,
-            7 => Self::RewriteNodeId,
-            8 => Self::CopyNode,
-            9 => Self::CopyMeshBackwardSlice,
-            10 => Self::CopyMeshForwardSlice,
-            11 => Self::SpliceNode,
-            _ => Self::SwapRouteTargets,
+    pub const ALL: [Self; 13] = [
+        Self::AddNode,
+        Self::RemoveNode,
+        Self::RetargetNodeTarget,
+        Self::AddRouteTarget,
+        Self::RemoveRouteTarget,
+        Self::ChangeEntryNode,
+        Self::SwapNodeBackend,
+        Self::RewriteNodeId,
+        Self::CopyNode,
+        Self::CopyMeshBackwardSlice,
+        Self::CopyMeshForwardSlice,
+        Self::SpliceNode,
+        Self::SwapRouteTargets,
+    ];
+
+    /// Per-operator weight reflecting impact tier.
+    /// 4 = refinement, 2 = moderate, 1 = structural.
+    #[must_use]
+    pub const fn weight(self) -> u8 {
+        match self {
+            Self::AddNode => 1,
+            Self::RemoveNode => 1,
+            Self::RetargetNodeTarget => 2,
+            Self::AddRouteTarget => 2,
+            Self::RemoveRouteTarget => 2,
+            Self::ChangeEntryNode => 2,
+            Self::SwapNodeBackend => 1,
+            Self::RewriteNodeId => 4,
+            Self::CopyNode => 1,
+            Self::CopyMeshBackwardSlice => 1,
+            Self::CopyMeshForwardSlice => 1,
+            Self::SpliceNode => 1,
+            Self::SwapRouteTargets => 4,
         }
+    }
+
+    /// Pick a random topology operator weighted by impact tier.
+    pub fn random(rng: &mut impl Rng) -> Self {
+        let total: u16 = Self::ALL.iter().map(|op| op.weight() as u16).sum();
+        let mut r = rng.gen_range(0..total);
+        for &op in &Self::ALL {
+            let w = op.weight() as u16;
+            if r < w {
+                return op;
+            }
+            r -= w;
+        }
+        unreachable!()
     }
 }
 
@@ -1312,6 +1344,35 @@ mod tests {
                 }
                 Err(other) => panic!("unexpected skip reason {:?} for {:?}", other, op),
             }
+        }
+    }
+
+    #[test]
+    fn topology_weighted_random_favors_refinement() {
+        let mut counts = std::collections::HashMap::new();
+        let mut r = rng(42);
+        for _ in 0..10_000 {
+            let op = TopologyOperator::random(&mut r);
+            *counts.entry(op).or_insert(0u32) += 1;
+        }
+        let rewrite = counts
+            .get(&TopologyOperator::RewriteNodeId)
+            .copied()
+            .unwrap_or(0);
+        let add_node = counts.get(&TopologyOperator::AddNode).copied().unwrap_or(0);
+        assert!(
+            rewrite > add_node * 2,
+            "RewriteNodeId (weight 4) must appear >2x AddNode (weight 1); got {} vs {}",
+            rewrite,
+            add_node,
+        );
+    }
+
+    #[test]
+    fn topology_operator_weights_are_positive() {
+        let all = TopologyOperator::ALL;
+        for &op in &all {
+            assert!(op.weight() > 0, "weight must be positive for {:?}", op);
         }
     }
 }

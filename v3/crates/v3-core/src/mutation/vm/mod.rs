@@ -5,7 +5,7 @@ use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
 use crate::mutation::types::MutationSkipReason;
 
 /// VM mutation operator variants.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum VmOperator {
     VmConstantMutation,
     VmInstructionMutation,
@@ -19,19 +19,47 @@ pub enum VmOperator {
 }
 
 impl VmOperator {
-    /// Pick a random VM operator uniformly.
-    pub fn random(rng: &mut impl Rng) -> Self {
-        match rng.gen_range(0u8..9) {
-            0 => Self::VmConstantMutation,
-            1 => Self::VmInstructionMutation,
-            2 => Self::VmRegisterCountMutation,
-            3 => Self::VmInstructionRawFieldMutation,
-            4 => Self::VmCopyInstructionBlock,
-            5 => Self::VmCopyInstructionBlockRemapped,
-            6 => Self::VmCopyConstantBlock,
-            7 => Self::VmCopyGeneBackwardSlice,
-            _ => Self::VmCopyGeneForwardSlice,
+    pub const ALL: [Self; 9] = [
+        Self::VmConstantMutation,
+        Self::VmInstructionMutation,
+        Self::VmRegisterCountMutation,
+        Self::VmInstructionRawFieldMutation,
+        Self::VmCopyInstructionBlock,
+        Self::VmCopyInstructionBlockRemapped,
+        Self::VmCopyConstantBlock,
+        Self::VmCopyGeneBackwardSlice,
+        Self::VmCopyGeneForwardSlice,
+    ];
+
+    /// Per-operator weight reflecting impact tier.
+    /// 4 = refinement, 2 = moderate, 1 = structural.
+    #[must_use]
+    pub const fn weight(self) -> u8 {
+        match self {
+            Self::VmConstantMutation => 4,
+            Self::VmInstructionMutation => 2,
+            Self::VmRegisterCountMutation => 2,
+            Self::VmInstructionRawFieldMutation => 4,
+            Self::VmCopyInstructionBlock => 1,
+            Self::VmCopyInstructionBlockRemapped => 1,
+            Self::VmCopyConstantBlock => 1,
+            Self::VmCopyGeneBackwardSlice => 1,
+            Self::VmCopyGeneForwardSlice => 1,
         }
+    }
+
+    /// Pick a random VM operator weighted by impact tier.
+    pub fn random(rng: &mut impl Rng) -> Self {
+        let total: u16 = Self::ALL.iter().map(|op| op.weight() as u16).sum();
+        let mut r = rng.gen_range(0..total);
+        for &op in &Self::ALL {
+            let w = op.weight() as u16;
+            if r < w {
+                return op;
+            }
+            r -= w;
+        }
+        unreachable!()
     }
 }
 
@@ -1453,5 +1481,36 @@ mod tests {
             "forward slice must capture multi-instruction chain; max growth was {}",
             max_growth
         );
+    }
+
+    #[test]
+    fn vm_weighted_random_favors_refinement() {
+        let mut counts = std::collections::HashMap::new();
+        let mut r = rng(42);
+        for _ in 0..10_000 {
+            let op = VmOperator::random(&mut r);
+            *counts.entry(op).or_insert(0u32) += 1;
+        }
+        let constant = counts
+            .get(&VmOperator::VmConstantMutation)
+            .copied()
+            .unwrap_or(0);
+        let copy_block = counts
+            .get(&VmOperator::VmCopyInstructionBlock)
+            .copied()
+            .unwrap_or(0);
+        assert!(
+            constant > copy_block * 2,
+            "VmConstantMutation (weight 4) must appear >2x VmCopyInstructionBlock (weight 1); got {} vs {}",
+            constant, copy_block,
+        );
+    }
+
+    #[test]
+    fn vm_operator_weights_are_positive() {
+        let all = VmOperator::ALL;
+        for &op in &all {
+            assert!(op.weight() > 0, "weight must be positive for {:?}", op);
+        }
     }
 }
