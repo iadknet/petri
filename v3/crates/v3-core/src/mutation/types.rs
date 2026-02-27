@@ -58,6 +58,7 @@ pub enum MutationOperator {
     TopologyChangeEntryNode,
     TopologySwapNodeBackend,
     TopologyRewriteNodeId,
+    TopologyCopyNode,
     // VM
     VmConstantMutation,
     VmInstructionMutation,
@@ -92,6 +93,7 @@ impl MutationOperator {
             Self::TopologyChangeEntryNode => "Topology.ChangeEntryNode",
             Self::TopologySwapNodeBackend => "Topology.SwapNodeBackend",
             Self::TopologyRewriteNodeId => "Topology.RewriteNodeId",
+            Self::TopologyCopyNode => "Topology.CopyNode",
             Self::VmConstantMutation => "Vm.VmConstantMutation",
             Self::VmInstructionMutation => "Vm.VmInstructionMutation",
             Self::VmRegisterCountMutation => "Vm.VmRegisterCountMutation",
@@ -122,7 +124,8 @@ impl MutationOperator {
             | Self::TopologyRemoveRouteTarget
             | Self::TopologyChangeEntryNode
             | Self::TopologySwapNodeBackend
-            | Self::TopologyRewriteNodeId => MutationDomain::Topology,
+            | Self::TopologyRewriteNodeId
+            | Self::TopologyCopyNode => MutationDomain::Topology,
             Self::VmConstantMutation
             | Self::VmInstructionMutation
             | Self::VmRegisterCountMutation
@@ -152,7 +155,7 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 25] {
+    pub const fn all() -> [Self; 26] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
@@ -162,6 +165,7 @@ impl MutationOperator {
             Self::TopologyChangeEntryNode,
             Self::TopologySwapNodeBackend,
             Self::TopologyRewriteNodeId,
+            Self::TopologyCopyNode,
             Self::VmConstantMutation,
             Self::VmInstructionMutation,
             Self::VmRegisterCountMutation,
@@ -297,7 +301,8 @@ mod tests {
                 | MutationOperator::TopologyRemoveRouteTarget
                 | MutationOperator::TopologyChangeEntryNode
                 | MutationOperator::TopologySwapNodeBackend
-                | MutationOperator::TopologyRewriteNodeId => {
+                | MutationOperator::TopologyRewriteNodeId
+                | MutationOperator::TopologyCopyNode => {
                     assert_eq!(operator.domain(), MutationDomain::Topology)
                 }
                 MutationOperator::VmConstantMutation
