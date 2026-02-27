@@ -251,7 +251,7 @@ export const NodeGraph = memo(function NodeGraph({ genome, activeNodeId }: NodeG
 										fill="none"
 										stroke="#38bdf8"
 										strokeWidth={2}
-										style={{ opacity: 0.7, transition: "opacity 0.3s" }}
+										className="animate-glow-pulse"
 									/>
 								)}
 

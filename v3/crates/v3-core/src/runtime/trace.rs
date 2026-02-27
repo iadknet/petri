@@ -162,6 +162,7 @@ pub struct GraphNodeEvalTrace {
 ///
 /// Uses `&'static str` to avoid heap allocation per node evaluation
 /// in traced passes (`anti-format-hot-path`).
+#[inline]
 pub fn kind_label(kind: &GraphNodeKind) -> &'static str {
     match kind {
         GraphNodeKind::InputRef(_) => "InputRef",
@@ -192,6 +193,10 @@ pub fn kind_label(kind: &GraphNodeKind) -> &'static str {
 // ─── Sample error ────────────────────────────────────────────────────────────
 
 /// Errors that can occur during execution sampling.
+///
+/// Manual `Display` + `Error` impls used instead of `thiserror` because
+/// `thiserror` is not a direct dependency of v3-core, and adding a crate
+/// dependency for 2 variants is not warranted.
 #[derive(Debug, Clone, Serialize)]
 pub enum SampleError {
     CreatureNotFound,
@@ -237,6 +242,7 @@ impl ActiveTrace {
     }
 
     /// Whether recording is complete (all requested ticks captured).
+    #[must_use]
     pub fn is_complete(&self) -> bool {
         self.ticks_remaining == 0
     }

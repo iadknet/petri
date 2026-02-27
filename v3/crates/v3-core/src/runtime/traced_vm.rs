@@ -113,20 +113,39 @@ pub fn execute_vm_node_traced(
         };
     }
 
-    loop {
-        if steps_count >= max_steps || pc >= program_len {
-            commit_memory!();
-            let trace = VmTrace {
+    // Macro to build VmTrace at exit points, avoiding repeated struct construction.
+    // Only one exit point executes per call, so the single clone is the actual cost.
+    macro_rules! build_trace {
+        ($steps:expr, $mem_writes:expr) => {
+            VmTrace {
                 register_count: def.register_count,
                 constants: def.constants.clone(),
-                steps: trace_steps,
+                steps: $steps,
                 final_registers: regs[..reg_count].to_vec(),
                 final_payload: payload,
                 final_meta: meta,
                 final_route_target: route_target,
-                memory_writes: mem_writes,
-            };
-            return (NodeResult::halted(payload, route_target), trace);
+                memory_writes: $mem_writes,
+            }
+        };
+    }
+
+    loop {
+        // Match vm.rs loop structure: check max_steps and program bounds separately.
+        if steps_count >= max_steps {
+            commit_memory!();
+            return (
+                NodeResult::halted(payload, route_target),
+                build_trace!(trace_steps, mem_writes),
+            );
+        }
+
+        if pc >= program_len {
+            commit_memory!();
+            return (
+                NodeResult::halted(payload, route_target),
+                build_trace!(trace_steps, mem_writes),
+            );
         }
 
         let instr = &def.program[pc];
@@ -146,17 +165,10 @@ pub fn execute_vm_node_traced(
                 energy_after: *energy,
                 register_changes: Vec::new(),
             });
-            let trace = VmTrace {
-                register_count: def.register_count,
-                constants: def.constants.clone(),
-                steps: trace_steps,
-                final_registers: regs[..reg_count].to_vec(),
-                final_payload: payload,
-                final_meta: meta,
-                final_route_target: route_target,
-                memory_writes: mem_writes,
-            };
-            return (NodeResult::exhausted(), trace);
+            return (
+                NodeResult::exhausted(),
+                build_trace!(trace_steps, mem_writes),
+            );
         }
 
         steps_count += 1;
@@ -335,17 +347,10 @@ pub fn execute_vm_node_traced(
                     energy_after: *energy,
                     register_changes: Vec::new(),
                 });
-                let trace = VmTrace {
-                    register_count: def.register_count,
-                    constants: def.constants.clone(),
-                    steps: trace_steps,
-                    final_registers: regs[..reg_count].to_vec(),
-                    final_payload: payload,
-                    final_meta: meta,
-                    final_route_target: route_target,
-                    memory_writes: mem_writes,
-                };
-                return (NodeResult::action(payload, route_target, action), trace);
+                return (
+                    NodeResult::action(payload, route_target, action),
+                    build_trace!(trace_steps, mem_writes),
+                );
             }
 
             VmInstruction::WriteRouteTarget { src } => {
@@ -361,17 +366,10 @@ pub fn execute_vm_node_traced(
                     energy_after: *energy,
                     register_changes: Vec::new(),
                 });
-                let trace = VmTrace {
-                    register_count: def.register_count,
-                    constants: def.constants.clone(),
-                    steps: trace_steps,
-                    final_registers: regs[..reg_count].to_vec(),
-                    final_payload: payload,
-                    final_meta: meta,
-                    final_route_target: route_target,
-                    memory_writes: mem_writes,
-                };
-                return (NodeResult::halted(payload, route_target), trace);
+                return (
+                    NodeResult::halted(payload, route_target),
+                    build_trace!(trace_steps, mem_writes),
+                );
             }
 
             VmInstruction::LoadMem8 { dst, addr_reg } => {

@@ -1,6 +1,6 @@
 import { memo } from "react";
 import type { GraphTrace, InputReference } from "../../types/api.ts";
-import { formatInputRef, inputRefColor } from "./inputRefUtils.ts";
+import { InputsPanel } from "./InputsPanel.tsx";
 
 interface GraphExecutionViewProps {
 	trace: GraphTrace;
@@ -22,19 +22,7 @@ export const GraphExecutionView = memo(function GraphExecutionView({
 	return (
 		<div className="px-3 py-2 space-y-2">
 			{/* Inputs panel */}
-			<div>
-				<div className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-1">
-					Inputs
-				</div>
-				<div className="grid grid-cols-2 gap-x-4 gap-y-0.5 text-[10px] font-mono">
-					{inputRefs.map((ref, i) => (
-						<div key={i} className="flex justify-between">
-							<span style={{ color: inputRefColor(ref) }}>{formatInputRef(ref)}</span>
-							<span className="text-slate-400">{(upstreamSlots[i] ?? 0).toFixed(2)}</span>
-						</div>
-					))}
-				</div>
-			</div>
+			<InputsPanel inputRefs={inputRefs} upstreamSlots={upstreamSlots} />
 
 			{/* Pass selector */}
 			<div>
