@@ -756,7 +756,8 @@ fn apply_copy_gene_forward_slice(
             return Err(MutationSkipReason::NoApplicableTarget);
         }
         let seed_idx = writers[rng.gen_range(0..writers.len())];
-        let seed_dst = register_write(&vm.program[seed_idx]).unwrap();
+        let seed_dst = register_write(&vm.program[seed_idx])
+            .expect("seed_idx drawn from writers filtered on register_write().is_some()");
         // Forward trace using u32 bitset.
         let mut produced: u32 = reg_bit(seed_dst);
         let mut gene_indices = vec![seed_idx];
