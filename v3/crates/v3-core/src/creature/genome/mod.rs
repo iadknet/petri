@@ -114,6 +114,32 @@ impl VmBackendDef {
 
 // ── Graph backend types ───────────────────────────────────────────────────────
 
+/// Hebbian learning rule variant controlling how edge weights adapt at runtime.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum HebbianRule {
+    /// dw = eta * pre * post
+    Classic,
+    /// dw = eta * post * (pre - w * post)  (normalizing)
+    Oja,
+    /// dw = -eta * pre * post
+    AntiHebb,
+    /// dw = eta * (pre - 0.5) * (post - 0.5)
+    Covariance,
+}
+
+/// Per-node Hebbian learning configuration stored in the genome.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct HebbianConfig {
+    pub rule: HebbianRule,
+    /// Learning rate, clamped to [0.0, 1.0] at runtime.
+    pub learning_rate: f32,
+    /// Symmetric weight clamp magnitude, clamped to [0.01, 10.0] at runtime.
+    pub weight_clamp: f32,
+    /// If true, offspring inherit learned weights (Lamarckian); otherwise
+    /// offspring start from genome birth weights (Darwinian).
+    pub lamarckian: bool,
+}
+
 /// A weighted edge in a graph internal node's input list.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct GraphInput {
@@ -164,6 +190,9 @@ pub enum GraphNodeKind {
 pub struct GraphInternalNode {
     pub kind: GraphNodeKind,
     pub inputs: Vec<GraphInput>,
+    /// Per-node Hebbian learning config. `None` = immutable weights (default).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hebbian: Option<HebbianConfig>,
 }
 
 /// Graph backend definition for a mesh node.
@@ -457,6 +486,7 @@ mod tests {
                                 source_idx: 0,
                                 weight: 1.0,
                             }],
+                            hebbian: None,
                         },
                         GraphInternalNode {
                             kind: GraphNodeKind::Sigmoid,
@@ -470,6 +500,7 @@ mod tests {
                                     weight: -0.3,
                                 },
                             ],
+                            hebbian: None,
                         },
                     ],
                 }),
@@ -504,6 +535,7 @@ mod tests {
                         internal_nodes: vec![GraphInternalNode {
                             kind: GraphNodeKind::Constant(1.0),
                             inputs: vec![],
+                            hebbian: None,
                         }],
                     }),
                     targets: vec![],
@@ -521,6 +553,7 @@ mod tests {
             internal_nodes: vec![GraphInternalNode {
                 kind: GraphNodeKind::CustomOutput(2),
                 inputs: vec![],
+                hebbian: None,
             }],
         });
         backend.remap_output_slots(3);
@@ -539,6 +572,7 @@ mod tests {
             internal_nodes: vec![GraphInternalNode {
                 kind: GraphNodeKind::CustomOutput(10),
                 inputs: vec![],
+                hebbian: None,
             }],
         });
         backend.remap_output_slots(5);
@@ -557,6 +591,7 @@ mod tests {
             internal_nodes: vec![GraphInternalNode {
                 kind: GraphNodeKind::CustomOutput(200),
                 inputs: vec![],
+                hebbian: None,
             }],
         });
         backend.remap_output_slots(5);

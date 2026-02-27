@@ -1,6 +1,7 @@
 use crate::config::RuntimeConfig;
 use crate::contracts::InputReference;
 use crate::creature::genome::{GraphBackendDef, GraphInternalNode, GraphNodeKind};
+use crate::creature::state::GraphRuntimeState;
 use crate::runtime::inputs::resolve_input;
 use crate::runtime::types::{sanitize_f32, NodeResult};
 use crate::sensors::static_inputs::StaticInputs;
@@ -158,7 +159,7 @@ pub fn execute_graph_node(
     energy: &mut f32,
     energy_consumed: f32,
     node_idx: usize,
-    graph_state: &mut Vec<Vec<f32>>,
+    graph_runtime: &mut GraphRuntimeState,
     static_inputs: &StaticInputs,
     config: &RuntimeConfig,
 ) -> NodeResult {
@@ -169,16 +170,16 @@ pub fn execute_graph_node(
         return NodeResult::halted(*upstream_slots, 0.0);
     }
 
-    // Ensure graph_state has enough slots for this node index.
-    if graph_state.len() <= node_idx {
-        graph_state.resize(node_idx + 1, Vec::new());
+    // Ensure node_state has enough slots for this node index.
+    if graph_runtime.node_state.len() <= node_idx {
+        graph_runtime.node_state.resize(node_idx + 1, Vec::new());
     }
 
     // Snapshot state for atomic rollback on energy exhaustion.
-    let state_backup: Vec<f32> = graph_state[node_idx].clone();
+    let state_backup: Vec<f32> = graph_runtime.node_state[node_idx].clone();
 
     // Ensure the state Vec for this node is long enough.
-    let state_vec = &mut graph_state[node_idx];
+    let state_vec = &mut graph_runtime.node_state[node_idx];
     if state_vec.len() < node_count {
         state_vec.resize(node_count, 0.0);
     }
@@ -198,7 +199,7 @@ pub fn execute_graph_node(
         *energy -= pass_cost;
         if *energy <= 0.0 {
             // Restore state snapshot.
-            graph_state[node_idx] = state_backup;
+            graph_runtime.node_state[node_idx] = state_backup;
             return NodeResult::exhausted();
         }
 
@@ -224,7 +225,7 @@ pub fn execute_graph_node(
             let wsum: f32 = w_inputs_buf.iter().sum();
 
             // Load node-local state; write back after evaluate_kind updates it.
-            let mut node_state = graph_state[node_idx][current_idx];
+            let mut node_state = graph_runtime.node_state[node_idx][current_idx];
 
             curr_outputs[current_idx] = sanitize_f32(evaluate_kind(
                 &node.kind,
@@ -235,7 +236,7 @@ pub fn execute_graph_node(
             ));
 
             // Persist any state mutation from stateful operators.
-            graph_state[node_idx][current_idx] = node_state;
+            graph_runtime.node_state[node_idx][current_idx] = node_state;
         }
 
         // Convergence check: max absolute change across all outputs.
@@ -288,6 +289,7 @@ mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
     use crate::creature::genome::{GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind};
+    use crate::creature::state::GraphRuntimeState;
     use crate::sensors::static_inputs::StaticInputs;
 
     fn default_config() -> RuntimeConfig {
@@ -311,6 +313,7 @@ mod tests {
             internal_nodes: vec![GraphInternalNode {
                 kind,
                 inputs: vec![],
+                hebbian: None,
             }],
         }
     }
@@ -323,7 +326,7 @@ mod tests {
         };
         let upstream = [1.0, 2.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
         let mut energy = 50.0f32;
-        let mut graph_state: Vec<Vec<f32>> = vec![];
+        let mut gr = GraphRuntimeState::new();
         let si = make_static_inputs();
         let config = default_config();
 
@@ -334,7 +337,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );
@@ -357,7 +360,7 @@ mod tests {
         let def = single_node_graph(GraphNodeKind::Constant(99.0));
         let upstream = [0.0f32; 12];
         let mut energy = 0.5f32;
-        let mut graph_state: Vec<Vec<f32>> = vec![];
+        let mut gr = GraphRuntimeState::new();
         let si = make_static_inputs();
         let mut config = default_config();
         config.graph_node_base_cost = 1.0;
@@ -369,7 +372,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );
@@ -384,7 +387,7 @@ mod tests {
         let def = single_node_graph(GraphNodeKind::Constant(42.0));
         let upstream = [7.0f32; 12];
         let mut energy = 100.0f32;
-        let mut graph_state: Vec<Vec<f32>> = vec![];
+        let mut gr = GraphRuntimeState::new();
         let si = make_static_inputs();
         let config = default_config();
 
@@ -395,7 +398,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );
@@ -423,6 +426,7 @@ mod tests {
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(2.0),
                     inputs: vec![],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(0),
@@ -430,12 +434,13 @@ mod tests {
                         source_idx: 0,
                         weight: 3.0,
                     }],
+                    hebbian: None,
                 },
             ],
         };
         let upstream = [0.0f32; 12];
         let mut energy = 100.0f32;
-        let mut graph_state: Vec<Vec<f32>> = vec![];
+        let mut gr = GraphRuntimeState::new();
         let si = make_static_inputs();
         let config = default_config();
 
@@ -446,7 +451,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );
@@ -467,6 +472,7 @@ mod tests {
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(3.5),
                     inputs: vec![],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::RouterOutput,
@@ -474,12 +480,13 @@ mod tests {
                         source_idx: 0,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
             ],
         };
         let upstream = [0.0f32; 12];
         let mut energy = 100.0f32;
-        let mut graph_state: Vec<Vec<f32>> = vec![];
+        let mut gr = GraphRuntimeState::new();
         let si = make_static_inputs();
         let config = default_config();
 
@@ -490,7 +497,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );
@@ -509,7 +516,7 @@ mod tests {
         let def = single_node_graph(GraphNodeKind::Add);
         let upstream = [1.0f32; 12];
         let mut energy = 100.0f32;
-        let mut graph_state: Vec<Vec<f32>> = vec![];
+        let mut gr = GraphRuntimeState::new();
         let si = make_static_inputs();
         let config = default_config();
 
@@ -520,7 +527,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );
@@ -542,6 +549,7 @@ mod tests {
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(1.0),
                     inputs: vec![],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::DecayIntegrator(0.5),
@@ -549,6 +557,7 @@ mod tests {
                         source_idx: 0,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(0),
@@ -556,12 +565,13 @@ mod tests {
                         source_idx: 1,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
             ],
         };
         let upstream = [0.0f32; 12];
         let mut energy = 1000.0f32;
-        let mut graph_state: Vec<Vec<f32>> = vec![];
+        let mut gr = GraphRuntimeState::new();
         let si = make_static_inputs();
         // One pass, converges immediately.
         let mut config = default_config();
@@ -577,7 +587,7 @@ mod tests {
             &mut energy,
             0.0,
             nid,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );
@@ -595,7 +605,7 @@ mod tests {
             &mut energy,
             0.0,
             nid,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );
@@ -614,6 +624,7 @@ mod tests {
             internal_nodes: vec![GraphInternalNode {
                 kind: GraphNodeKind::DecayIntegrator(0.9),
                 inputs: vec![],
+                hebbian: None,
             }],
         };
         let nid: usize = 0;
@@ -621,7 +632,10 @@ mod tests {
         // Will exhaust on first pass charge.
         let mut energy = 0.5f32;
         // Pre-populate state with a known sentinel.
-        let mut graph_state: Vec<Vec<f32>> = vec![vec![42.0f32]];
+        let mut gr = GraphRuntimeState {
+            node_state: vec![vec![42.0f32]],
+            hebbian_weights: Vec::new(),
+        };
 
         let si = make_static_inputs();
         let mut config = default_config();
@@ -634,7 +648,7 @@ mod tests {
             &mut energy,
             0.0,
             nid,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );
@@ -642,9 +656,9 @@ mod tests {
         assert!(result.energy_exhausted);
         // State must be restored to the pre-call value.
         assert!(
-            (graph_state[nid][0] - 42.0).abs() < 1e-6,
+            (gr.node_state[nid][0] - 42.0).abs() < 1e-6,
             "state was mutated: {}",
-            graph_state[nid][0]
+            gr.node_state[nid][0]
         );
     }
 
@@ -656,7 +670,7 @@ mod tests {
         ];
         let def = single_node_graph(GraphNodeKind::Sigmoid);
         let mut energy = 100.0f32;
-        let mut graph_state: Vec<Vec<f32>> = vec![];
+        let mut gr = GraphRuntimeState::new();
         let si = make_static_inputs();
         let config = default_config();
 
@@ -667,7 +681,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );
@@ -688,10 +702,12 @@ mod tests {
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(1.0),
                     inputs: vec![],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(2.0),
                     inputs: vec![],
+                    hebbian: None,
                 },
             ],
         };
@@ -701,7 +717,7 @@ mod tests {
 
         let upstream = [0.0f32; 12];
         let mut energy = 50.0f32;
-        let mut graph_state: Vec<Vec<f32>> = vec![];
+        let mut gr = GraphRuntimeState::new();
         let si = make_static_inputs();
 
         let _ = execute_graph_node(
@@ -711,7 +727,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );
@@ -734,6 +750,7 @@ mod tests {
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(1.0),
                     inputs: vec![],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::DecayIntegrator(0.5),
@@ -741,6 +758,7 @@ mod tests {
                         source_idx: 0,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(0),
@@ -748,12 +766,13 @@ mod tests {
                         source_idx: 1,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
             ],
         };
         let upstream = [0.0f32; 12];
         let mut energy = 1000.0f32;
-        let mut graph_state: Vec<Vec<f32>> = vec![];
+        let mut gr = GraphRuntimeState::new();
         let si = make_static_inputs();
         let mut config = default_config();
         config.max_graph_relax_iters = 1;
@@ -768,7 +787,7 @@ mod tests {
             &mut energy,
             0.0,
             nid,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );
@@ -785,7 +804,7 @@ mod tests {
             &mut energy,
             0.0,
             nid,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );
@@ -808,6 +827,7 @@ mod tests {
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(1.0),
                     inputs: vec![],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::Momentum(0.8),
@@ -815,6 +835,7 @@ mod tests {
                         source_idx: 0,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(0),
@@ -822,12 +843,13 @@ mod tests {
                         source_idx: 1,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
             ],
         };
         let upstream = [0.0f32; 12];
         let mut energy = 1000.0f32;
-        let mut graph_state: Vec<Vec<f32>> = vec![];
+        let mut gr = GraphRuntimeState::new();
         let si = make_static_inputs();
         let mut config = default_config();
         config.max_graph_relax_iters = 1;
@@ -842,7 +864,7 @@ mod tests {
             &mut energy,
             0.0,
             nid,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );
@@ -864,6 +886,7 @@ mod tests {
                 GraphInternalNode {
                     kind: GraphNodeKind::Oscillator(0.0),
                     inputs: vec![],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(0),
@@ -871,6 +894,7 @@ mod tests {
                         source_idx: 0,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
             ],
         };
@@ -883,7 +907,10 @@ mod tests {
 
         let nid: usize = 0;
         // Pre-set state slot 0 to INFINITY to simulate the corrupted state case.
-        let mut graph_state: Vec<Vec<f32>> = vec![vec![f32::INFINITY, 0.0]];
+        let mut gr = GraphRuntimeState {
+            node_state: vec![vec![f32::INFINITY, 0.0]],
+            hebbian_weights: Vec::new(),
+        };
 
         let r = execute_graph_node(
             &def,
@@ -892,7 +919,7 @@ mod tests {
             &mut energy,
             0.0,
             nid,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );
@@ -916,6 +943,7 @@ mod tests {
                     GraphInternalNode {
                         kind: GraphNodeKind::Constant(1.0),
                         inputs: vec![],
+                        hebbian: None,
                     },
                     GraphInternalNode {
                         kind: GraphNodeKind::Threshold(0.5),
@@ -923,6 +951,7 @@ mod tests {
                             source_idx: 0,
                             weight: input_weight,
                         }],
+                        hebbian: None,
                     },
                     GraphInternalNode {
                         kind: GraphNodeKind::CustomOutput(0),
@@ -930,6 +959,7 @@ mod tests {
                             source_idx: 1,
                             weight: 1.0,
                         }],
+                        hebbian: None,
                     },
                 ],
             }
@@ -950,7 +980,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut vec![],
+            &mut GraphRuntimeState::new(),
             &si,
             &config,
         );
@@ -965,7 +995,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut vec![],
+            &mut GraphRuntimeState::new(),
             &si,
             &config,
         );
@@ -983,7 +1013,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut vec![],
+            &mut GraphRuntimeState::new(),
             &si,
             &config,
         );
@@ -1000,6 +1030,7 @@ mod tests {
                 GraphInternalNode {
                     kind: GraphNodeKind::Multiply,
                     inputs: vec![],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(0),
@@ -1007,12 +1038,13 @@ mod tests {
                         source_idx: 0,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
             ],
         };
         let upstream = [0.0f32; 12];
         let mut energy = 1000.0f32;
-        let mut graph_state: Vec<Vec<f32>> = vec![];
+        let mut gr = GraphRuntimeState::new();
         let si = make_static_inputs();
         let mut config = default_config();
         config.max_graph_relax_iters = 1;
@@ -1025,7 +1057,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );
@@ -1049,6 +1081,7 @@ mod tests {
                     GraphInternalNode {
                         kind: GraphNodeKind::Constant(1.0),
                         inputs: vec![],
+                        hebbian: None,
                     },
                     // node 1: GreaterThan — two edges from node 0, weights wa and wb
                     GraphInternalNode {
@@ -1063,6 +1096,7 @@ mod tests {
                                 weight: wb,
                             },
                         ],
+                        hebbian: None,
                     },
                     GraphInternalNode {
                         kind: GraphNodeKind::CustomOutput(0),
@@ -1070,6 +1104,7 @@ mod tests {
                             source_idx: 1,
                             weight: 1.0,
                         }],
+                        hebbian: None,
                     },
                 ],
             }
@@ -1090,7 +1125,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut vec![],
+            &mut GraphRuntimeState::new(),
             &si,
             &config,
         );
@@ -1105,7 +1140,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut vec![],
+            &mut GraphRuntimeState::new(),
             &si,
             &config,
         );
@@ -1120,7 +1155,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut vec![],
+            &mut GraphRuntimeState::new(),
             &si,
             &config,
         );
@@ -1145,14 +1180,17 @@ mod tests {
                     GraphInternalNode {
                         kind: GraphNodeKind::Constant(cond),
                         inputs: vec![],
+                        hebbian: None,
                     },
                     GraphInternalNode {
                         kind: GraphNodeKind::Constant(10.0),
                         inputs: vec![],
+                        hebbian: None,
                     },
                     GraphInternalNode {
                         kind: GraphNodeKind::Constant(20.0),
                         inputs: vec![],
+                        hebbian: None,
                     },
                     GraphInternalNode {
                         kind: GraphNodeKind::Select,
@@ -1170,6 +1208,7 @@ mod tests {
                                 weight: 1.0,
                             },
                         ],
+                        hebbian: None,
                     },
                     GraphInternalNode {
                         kind: GraphNodeKind::CustomOutput(0),
@@ -1177,6 +1216,7 @@ mod tests {
                             source_idx: 3,
                             weight: 1.0,
                         }],
+                        hebbian: None,
                     },
                 ],
             }
@@ -1197,7 +1237,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut vec![],
+            &mut GraphRuntimeState::new(),
             &si,
             &config,
         );
@@ -1216,7 +1256,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut vec![],
+            &mut GraphRuntimeState::new(),
             &si,
             &config,
         );
@@ -1239,6 +1279,7 @@ mod tests {
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(7.0),
                     inputs: vec![],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::RouterOutput,
@@ -1246,6 +1287,7 @@ mod tests {
                         source_idx: 0,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::RouterOutput,
@@ -1253,12 +1295,13 @@ mod tests {
                         source_idx: 0,
                         weight: 2.0,
                     }],
+                    hebbian: None,
                 },
             ],
         };
         let upstream = [0.0f32; 12];
         let mut energy = 100.0f32;
-        let mut graph_state: Vec<Vec<f32>> = vec![];
+        let mut gr = GraphRuntimeState::new();
         let si = make_static_inputs();
         let config = default_config();
 
@@ -1269,7 +1312,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );
@@ -1289,6 +1332,7 @@ mod tests {
                 GraphInternalNode {
                     kind: GraphNodeKind::InputRef(255),
                     inputs: vec![],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(0),
@@ -1296,12 +1340,13 @@ mod tests {
                         source_idx: 0,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
             ],
         };
         let upstream = [0.0f32; 12];
         let mut energy = 100.0f32;
-        let mut graph_state: Vec<Vec<f32>> = vec![];
+        let mut gr = GraphRuntimeState::new();
         let si = make_static_inputs();
         let config = default_config();
 
@@ -1312,7 +1357,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );
@@ -1331,6 +1376,7 @@ mod tests {
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(7.0),
                     inputs: vec![],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(255),
@@ -1338,12 +1384,13 @@ mod tests {
                         source_idx: 0,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
             ],
         };
         let upstream = [3.0f32; 12];
         let mut energy = 100.0f32;
-        let mut graph_state: Vec<Vec<f32>> = vec![];
+        let mut gr = GraphRuntimeState::new();
         let si = make_static_inputs();
         let config = default_config();
 
@@ -1354,7 +1401,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );
@@ -1376,6 +1423,7 @@ mod tests {
                         source_idx: u16::MAX,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(0),
@@ -1383,12 +1431,13 @@ mod tests {
                         source_idx: 0,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
             ],
         };
         let upstream = [0.0f32; 12];
         let mut energy = 100.0f32;
-        let mut graph_state: Vec<Vec<f32>> = vec![];
+        let mut gr = GraphRuntimeState::new();
         let si = make_static_inputs();
         let config = default_config();
 
@@ -1399,7 +1448,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut graph_state,
+            &mut gr,
             &si,
             &config,
         );

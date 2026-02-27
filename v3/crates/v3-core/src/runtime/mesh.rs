@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use crate::config::RuntimeConfig;
 use crate::contracts::{NodeId, WorldAction};
 use crate::creature::genome::{BackendDef, CreatureGenome};
+use crate::creature::state::GraphRuntimeState;
 use crate::runtime::graph::execute_graph_node;
 use crate::runtime::types::ComputeCostReport;
 use crate::runtime::vm::execute_vm_node;
@@ -30,7 +31,7 @@ use crate::sensors::static_inputs::StaticInputs;
 /// - `static_inputs`: pre-assembled sensor snapshot for this tick
 /// - `energy`: creature's mutable energy; decremented by node evaluation costs
 /// - `memory`: creature's 1024-byte persistent memory
-/// - `graph_state`: per-node persistent state for Graph backends
+/// - `graph_runtime`: per-node persistent runtime state for Graph backends
 /// - `config`: runtime limits (max_mesh_hops, max_vm_steps, etc.)
 #[allow(clippy::too_many_arguments)]
 pub fn execute_creature_mesh(
@@ -38,7 +39,7 @@ pub fn execute_creature_mesh(
     static_inputs: &StaticInputs,
     energy: &mut f32,
     memory: &mut [u8; 1024],
-    graph_state: &mut Vec<Vec<f32>>,
+    graph_runtime: &mut GraphRuntimeState,
     config: &RuntimeConfig,
 ) -> (WorldAction, ComputeCostReport) {
     let mut current_node_id = genome.entry_node_id;
@@ -93,7 +94,7 @@ pub fn execute_creature_mesh(
                 energy,
                 energy_consumed,
                 current_idx,
-                graph_state,
+                graph_runtime,
                 static_inputs,
                 config,
             ),
@@ -159,6 +160,7 @@ mod tests {
         BackendDef, CreatureGenome, GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind,
         NodeGenome, VmBackendDef, VmInstruction,
     };
+    use crate::creature::state::GraphRuntimeState;
     use crate::sensors::static_inputs::StaticInputs;
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -227,17 +229,11 @@ mod tests {
         let si = empty_static_inputs();
         let mut energy = 100.0f32;
         let mut memory = [0u8; 1024];
-        let mut graph_state = vec![];
+        let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (action, _report) = execute_creature_mesh(
-            &genome,
-            &si,
-            &mut energy,
-            &mut memory,
-            &mut graph_state,
-            &config,
-        );
+        let (action, _report) =
+            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(action, WorldAction::NoOp);
     }
 
@@ -266,20 +262,14 @@ mod tests {
         let si = empty_static_inputs();
         let mut energy = 1000.0f32;
         let mut memory = [0u8; 1024];
-        let mut graph_state = vec![];
+        let mut gr = GraphRuntimeState::new();
         let config = RuntimeConfig {
             max_mesh_hops: 3,
             ..RuntimeConfig::default()
         };
 
-        let (action, _report) = execute_creature_mesh(
-            &genome,
-            &si,
-            &mut energy,
-            &mut memory,
-            &mut graph_state,
-            &config,
-        );
+        let (action, _report) =
+            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(action, WorldAction::NoOp);
     }
 
@@ -305,17 +295,11 @@ mod tests {
         let si = empty_static_inputs();
         let mut energy = 100.0f32;
         let mut memory = [0u8; 1024];
-        let mut graph_state = vec![];
+        let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (action, _report) = execute_creature_mesh(
-            &genome,
-            &si,
-            &mut energy,
-            &mut memory,
-            &mut graph_state,
-            &config,
-        );
+        let (action, _report) =
+            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(action, WorldAction::NoOp);
     }
 
@@ -342,17 +326,11 @@ mod tests {
         let si = empty_static_inputs();
         let mut energy = 0.01f32; // way below the Noop cost of 0.05
         let mut memory = [0u8; 1024];
-        let mut graph_state = vec![];
+        let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (action, _report) = execute_creature_mesh(
-            &genome,
-            &si,
-            &mut energy,
-            &mut memory,
-            &mut graph_state,
-            &config,
-        );
+        let (action, _report) =
+            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(action, WorldAction::NoOp);
     }
 
@@ -369,17 +347,11 @@ mod tests {
         let si = empty_static_inputs();
         let mut energy = 100.0f32;
         let mut memory = [0u8; 1024];
-        let mut graph_state = vec![];
+        let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (action, _report) = execute_creature_mesh(
-            &genome,
-            &si,
-            &mut energy,
-            &mut memory,
-            &mut graph_state,
-            &config,
-        );
+        let (action, _report) =
+            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(action, WorldAction::Eat);
     }
 
@@ -401,6 +373,7 @@ mod tests {
                     GraphInternalNode {
                         kind: GraphNodeKind::Constant(0.0),
                         inputs: vec![],
+                        hebbian: None,
                     },
                     GraphInternalNode {
                         kind: GraphNodeKind::RouterOutput,
@@ -408,6 +381,7 @@ mod tests {
                             source_idx: 0,
                             weight: 1.0,
                         }],
+                        hebbian: None,
                     },
                 ],
             }),
@@ -424,17 +398,11 @@ mod tests {
         let si = empty_static_inputs();
         let mut energy = 100.0f32;
         let mut memory = [0u8; 1024];
-        let mut graph_state = vec![];
+        let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (action, _report) = execute_creature_mesh(
-            &genome,
-            &si,
-            &mut energy,
-            &mut memory,
-            &mut graph_state,
-            &config,
-        );
+        let (action, _report) =
+            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(action, WorldAction::Eat);
     }
 
@@ -466,17 +434,11 @@ mod tests {
         let si = empty_static_inputs();
         let mut energy = 1000.0f32;
         let mut memory = [0u8; 1024];
-        let mut graph_state = vec![];
+        let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (action, _report) = execute_creature_mesh(
-            &genome,
-            &si,
-            &mut energy,
-            &mut memory,
-            &mut graph_state,
-            &config,
-        );
+        let (action, _report) =
+            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(
             action,
             WorldAction::Eat,
@@ -511,17 +473,11 @@ mod tests {
         let si = empty_static_inputs();
         let mut energy = 1000.0f32;
         let mut memory = [0u8; 1024];
-        let mut graph_state = vec![];
+        let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (action, _report) = execute_creature_mesh(
-            &genome,
-            &si,
-            &mut energy,
-            &mut memory,
-            &mut graph_state,
-            &config,
-        );
+        let (action, _report) =
+            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(
             action,
             WorldAction::Eat,
@@ -549,6 +505,7 @@ mod tests {
                     GraphInternalNode {
                         kind: GraphNodeKind::Constant(9.0),
                         inputs: vec![],
+                        hebbian: None,
                     },
                     GraphInternalNode {
                         kind: GraphNodeKind::CustomOutput(5),
@@ -556,11 +513,13 @@ mod tests {
                             source_idx: 0,
                             weight: 1.0,
                         }],
+                        hebbian: None,
                     },
                     // RouterOutput: 0.0 → targets[0]
                     GraphInternalNode {
                         kind: GraphNodeKind::RouterOutput,
                         inputs: vec![],
+                        hebbian: None,
                     },
                 ],
             }),
@@ -596,17 +555,11 @@ mod tests {
         let si = empty_static_inputs();
         let mut energy = 1000.0f32;
         let mut memory = [0u8; 1024];
-        let mut graph_state = vec![];
+        let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (action, _report) = execute_creature_mesh(
-            &genome,
-            &si,
-            &mut energy,
-            &mut memory,
-            &mut graph_state,
-            &config,
-        );
+        let (action, _report) =
+            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(
             action,
             WorldAction::Eat,

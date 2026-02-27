@@ -825,6 +825,7 @@ mod tests {
             GraphInternalNode {
                 kind: GraphNodeKind::InputRef(0),
                 inputs: vec![],
+                hebbian: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::Add,
@@ -832,6 +833,7 @@ mod tests {
                     source_idx: 0,
                     weight: 1.0,
                 }],
+                hebbian: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::CustomOutput(0),
@@ -839,6 +841,7 @@ mod tests {
                     source_idx: 1,
                     weight: 1.0,
                 }],
+                hebbian: None,
             },
         ]
     }
@@ -874,10 +877,12 @@ mod tests {
             GraphInternalNode {
                 kind: GraphNodeKind::InputRef(0),
                 inputs: vec![],
+                hebbian: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::InputRef(1),
                 inputs: vec![],
+                hebbian: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::CustomOutput(0),
@@ -885,6 +890,7 @@ mod tests {
                     source_idx: 0,
                     weight: 1.0,
                 }],
+                hebbian: None,
             },
         ];
         let gene = graph_backward_slice(&nodes, 2, 32).unwrap();
@@ -921,10 +927,12 @@ mod tests {
             GraphInternalNode {
                 kind: GraphNodeKind::InputRef(0),
                 inputs: vec![],
+                hebbian: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::InputRef(1),
                 inputs: vec![],
+                hebbian: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::Add,
@@ -932,6 +940,7 @@ mod tests {
                     source_idx: 0,
                     weight: 1.0,
                 }],
+                hebbian: None,
             },
         ];
         let gene = graph_forward_slice(&nodes, 0, 32).unwrap();
@@ -956,6 +965,7 @@ mod tests {
         let nodes = vec![GraphInternalNode {
             kind: GraphNodeKind::Add,
             inputs: vec![],
+            hebbian: None,
         }];
         let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
         assert_eq!(graph_backward_slice_random(&nodes, &mut rng, 32), None);

@@ -230,7 +230,11 @@ fn add_internal_node(
         } else {
             vec![]
         };
-        g.internal_nodes.push(GraphInternalNode { kind, inputs });
+        g.internal_nodes.push(GraphInternalNode {
+            kind,
+            inputs,
+            hebbian: None,
+        });
     }
     Ok(())
 }
@@ -776,6 +780,7 @@ mod tests {
             g.internal_nodes.push(GraphInternalNode {
                 kind: GraphNodeKind::Constant(0.5),
                 inputs: vec![],
+                hebbian: None,
             });
         }
         let original = 0.5f32;
@@ -970,6 +975,7 @@ mod tests {
             let mut genome = graph_only_genome(vec![GraphInternalNode {
                 kind: GraphNodeKind::InputRef(0),
                 inputs: vec![],
+                hebbian: None,
             }]);
             let mut r = rng(seed);
             GraphMutator::apply(&mut genome, GraphOperator::GraphRawFieldMutation, &mut r).unwrap();
@@ -995,6 +1001,7 @@ mod tests {
             let mut genome = graph_only_genome(vec![GraphInternalNode {
                 kind: GraphNodeKind::CustomOutput(0),
                 inputs: vec![],
+                hebbian: None,
             }]);
             let mut r = rng(seed);
             GraphMutator::apply(&mut genome, GraphOperator::GraphRawFieldMutation, &mut r).unwrap();
@@ -1021,6 +1028,7 @@ mod tests {
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(1.0),
                     inputs: vec![],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::Add,
@@ -1028,6 +1036,7 @@ mod tests {
                         source_idx: 0,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
             ]);
             let mut r = rng(seed);
@@ -1101,6 +1110,7 @@ mod tests {
             let mut genome = graph_only_genome(vec![GraphInternalNode {
                 kind: GraphNodeKind::Sigmoid,
                 inputs: vec![],
+                hebbian: None,
             }]);
             let mut r = rng(seed);
             GraphMutator::apply(&mut genome, GraphOperator::CopyInternalNode, &mut r).unwrap();
@@ -1122,6 +1132,7 @@ mod tests {
                 source_idx: 0,
                 weight: 1.0,
             }],
+            hebbian: None,
         };
         let mut saw_with_edges = false;
         let mut saw_without_edges = false;
@@ -1150,6 +1161,7 @@ mod tests {
         let source_node = GraphInternalNode {
             kind: GraphNodeKind::Relu,
             inputs: vec![],
+            hebbian: None,
         };
         let mut saw_backlink = false;
         let mut saw_no_backlink = false;
@@ -1196,6 +1208,7 @@ mod tests {
         let mut genome = graph_only_genome(vec![GraphInternalNode {
             kind: GraphNodeKind::Add,
             inputs: vec![],
+            hebbian: None,
         }]);
         let mut r = rng(0);
         let result = GraphMutator::apply(&mut genome, GraphOperator::CopySubgraph, &mut r);
@@ -1209,6 +1222,7 @@ mod tests {
             GraphInternalNode {
                 kind: GraphNodeKind::Constant(1.0),
                 inputs: vec![],
+                hebbian: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::Add,
@@ -1216,6 +1230,7 @@ mod tests {
                     source_idx: 0,
                     weight: 1.0,
                 }],
+                hebbian: None,
             },
         ];
         let mut found_remapped = false;
@@ -1254,6 +1269,7 @@ mod tests {
             GraphInternalNode {
                 kind: GraphNodeKind::Constant(1.0),
                 inputs: vec![],
+                hebbian: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::Relu,
@@ -1261,6 +1277,7 @@ mod tests {
                     source_idx: 0,
                     weight: 0.5,
                 }],
+                hebbian: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::Add,
@@ -1268,6 +1285,7 @@ mod tests {
                     source_idx: 1,
                     weight: 1.0,
                 }],
+                hebbian: None,
             },
         ];
         let mut found_external_preserved = false;
@@ -1302,6 +1320,7 @@ mod tests {
             GraphInternalNode {
                 kind: GraphNodeKind::Sigmoid,
                 inputs: vec![],
+                hebbian: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::Tanh,
@@ -1309,6 +1328,7 @@ mod tests {
                     source_idx: 0,
                     weight: 1.0,
                 }],
+                hebbian: None,
             },
         ];
         let mut r = rng(0);
@@ -1339,6 +1359,7 @@ mod tests {
             GraphInternalNode {
                 kind: GraphNodeKind::Constant(1.0),
                 inputs: vec![],
+                hebbian: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::Add,
@@ -1352,10 +1373,12 @@ mod tests {
                         weight: 2.0,
                     },
                 ],
+                hebbian: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::Relu,
                 inputs: vec![],
+                hebbian: None,
             },
         ];
         let mut found_copied = false;
@@ -1385,6 +1408,7 @@ mod tests {
                 source_idx: 0,
                 weight: 1.0,
             }],
+            hebbian: None,
         }]);
         let mut r = rng(0);
         let result = GraphMutator::apply(&mut genome, GraphOperator::CopyEdgeBundle, &mut r);
@@ -1397,10 +1421,12 @@ mod tests {
             GraphInternalNode {
                 kind: GraphNodeKind::Constant(1.0),
                 inputs: vec![],
+                hebbian: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::Relu,
                 inputs: vec![],
+                hebbian: None,
             },
         ];
         let mut all_skip = true;
@@ -1515,6 +1541,7 @@ mod tests {
                 source_idx: 0,
                 weight: 10.0,
             }],
+            hebbian: None,
         }]);
         for seed in 0u64..50 {
             let mut g = genome.clone();
@@ -1540,6 +1567,7 @@ mod tests {
                 source_idx: 0,
                 weight: 0.0,
             }],
+            hebbian: None,
         }]);
         for seed in 0u64..50 {
             let mut g = genome.clone();
@@ -1579,6 +1607,7 @@ mod tests {
         let genome = graph_only_genome(vec![GraphInternalNode {
             kind: GraphNodeKind::CustomOutput(5),
             inputs: vec![],
+            hebbian: None,
         }]);
         let mut changed = false;
         for seed in 0u64..50 {
@@ -1604,6 +1633,7 @@ mod tests {
         let genome = graph_only_genome(vec![GraphInternalNode {
             kind: GraphNodeKind::InputRef(3),
             inputs: vec![],
+            hebbian: None,
         }]);
         let mut changed = false;
         for seed in 0u64..50 {
@@ -1630,6 +1660,7 @@ mod tests {
         let genome = graph_only_genome(vec![GraphInternalNode {
             kind: GraphNodeKind::CustomOutput(0),
             inputs: vec![],
+            hebbian: None,
         }]);
         let mut saw_255 = false;
         for seed in 0u64..200 {
@@ -1656,6 +1687,7 @@ mod tests {
         let genome = graph_only_genome(vec![GraphInternalNode {
             kind: GraphNodeKind::InputRef(255),
             inputs: vec![],
+            hebbian: None,
         }]);
         let mut saw_0 = false;
         for seed in 0u64..200 {
@@ -1685,10 +1717,12 @@ mod tests {
                     source_idx: 0,
                     weight: 3.0,
                 }],
+                hebbian: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::Relu,
                 inputs: vec![],
+                hebbian: None,
             },
         ];
         for seed in 0u64..100 {

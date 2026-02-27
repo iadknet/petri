@@ -101,7 +101,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
 
     // ── Phase 1: Batch cognition (parallel, with optional trace extraction) ──
     // All creatures see the frozen post-Phase-0 world snapshot. Cognition only
-    // mutates each creature's private state (energy, memory, graph_state).
+    // mutates each creature's private state (energy, memory, graph_runtime).
 
     // 1a: Assemble sensor inputs sequentially (needs &sim.world + &sim.creatures).
     let inputs: Vec<_> = queue
@@ -132,7 +132,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                     si,
                     &mut creature.energy,
                     &mut creature.memory,
-                    &mut creature.graph_state,
+                    &mut creature.graph_runtime,
                     &runtime_config,
                 );
                 (*id, action, cost)
@@ -151,7 +151,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                     si,
                     &mut creature.energy,
                     &mut creature.memory,
-                    &mut creature.graph_state,
+                    &mut creature.graph_runtime,
                     &runtime_config,
                 );
 

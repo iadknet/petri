@@ -55,7 +55,7 @@ fn bench_mesh_execution_only(c: &mut Criterion) {
                         &si,
                         &mut creature.energy,
                         &mut creature.memory,
-                        &mut creature.graph_state,
+                        &mut creature.graph_runtime,
                         &config,
                     ));
                 }
