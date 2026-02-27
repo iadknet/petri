@@ -66,6 +66,13 @@ impl TopologyOperator {
     }
 
     const TOTAL_WEIGHT: u16 = {
+        // Compile-time guard: if a variant is added to the enum but not to ALL,
+        // weight() will still compile (exhaustive match), but ALL will be incomplete.
+        // This assertion catches that at compile time.
+        assert!(
+            Self::ALL.len() == 13,
+            "ALL must cover every TopologyOperator variant"
+        );
         let mut sum = 0u16;
         let mut i = 0;
         while i < Self::ALL.len() {
