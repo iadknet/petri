@@ -442,11 +442,10 @@ pub fn mesh_backward_slice(
             if included[i] || count >= max_size {
                 continue;
             }
-            let targets_included = node.targets.iter().any(|target_id| {
-                node_id_to_idx
-                    .get(target_id)
-                    .is_some_and(|&j| included[j])
-            });
+            let targets_included = node
+                .targets
+                .iter()
+                .any(|target_id| node_id_to_idx.get(target_id).is_some_and(|&j| included[j]));
             if targets_included {
                 included[i] = true;
                 count += 1;
@@ -1081,10 +1080,7 @@ mod tests {
     fn mesh_backward_slice_anchor_only_when_nothing_targets_it() {
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![
-                simple_vm_node(0, vec![1]),
-                simple_vm_node(1, vec![]),
-            ],
+            nodes: vec![simple_vm_node(0, vec![1]), simple_vm_node(1, vec![])],
         };
         let gene = mesh_backward_slice(&genome, 0, 8).unwrap();
         assert_eq!(gene.indices, vec![0]);
@@ -1126,10 +1122,7 @@ mod tests {
     fn mesh_backward_slice_handles_cycle() {
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![
-                simple_vm_node(0, vec![1]),
-                simple_vm_node(1, vec![0]),
-            ],
+            nodes: vec![simple_vm_node(0, vec![1]), simple_vm_node(1, vec![0])],
         };
         let gene = mesh_backward_slice(&genome, 0, 8).unwrap();
         assert_eq!(gene.indices, vec![0, 1]);
@@ -1169,10 +1162,7 @@ mod tests {
     fn mesh_forward_slice_seed_only_when_no_targets() {
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![
-                simple_vm_node(0, vec![1]),
-                simple_vm_node(1, vec![]),
-            ],
+            nodes: vec![simple_vm_node(0, vec![1]), simple_vm_node(1, vec![])],
         };
         let gene = mesh_forward_slice(&genome, 1, 8).unwrap();
         assert_eq!(gene.indices, vec![1]);
@@ -1229,10 +1219,7 @@ mod tests {
     fn mesh_forward_slice_handles_cycle() {
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
-            nodes: vec![
-                simple_vm_node(0, vec![1]),
-                simple_vm_node(1, vec![0]),
-            ],
+            nodes: vec![simple_vm_node(0, vec![1]), simple_vm_node(1, vec![0])],
         };
         let gene = mesh_forward_slice(&genome, 0, 8).unwrap();
         assert_eq!(gene.indices, vec![0, 1]);

@@ -181,6 +181,24 @@ pub enum BackendDef {
     Graph(GraphBackendDef),
 }
 
+impl BackendDef {
+    /// Offset CustomOutput slot indices in Graph backends. No-op for VM.
+    /// Only remaps in-range slots (0..12). Out-of-range slots are junk
+    /// (runtime ignores writes to slot >= 12) and left untouched to
+    /// avoid u8 overflow.
+    pub fn remap_output_slots(&mut self, offset: u8) {
+        if let BackendDef::Graph(ref mut g) = self {
+            for node in &mut g.internal_nodes {
+                if let GraphNodeKind::CustomOutput(ref mut slot) = node.kind {
+                    if *slot < 12 {
+                        *slot = (*slot + offset) % 12;
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// A single node in the creature genome.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct NodeGenome {
@@ -493,6 +511,74 @@ mod tests {
             ],
         };
         assert_eq!(genome.complexity(), 6);
+    }
+
+    // ── Gap 5: remap_output_slots tests ──
+
+    #[test]
+    fn remap_output_slots_offsets_graph_custom_outputs() {
+        let mut backend = BackendDef::Graph(GraphBackendDef {
+            internal_nodes: vec![GraphInternalNode {
+                kind: GraphNodeKind::CustomOutput(2),
+                inputs: vec![],
+            }],
+        });
+        backend.remap_output_slots(3);
+        if let BackendDef::Graph(ref g) = backend {
+            assert_eq!(
+                g.internal_nodes[0].kind,
+                GraphNodeKind::CustomOutput(5),
+                "2 + 3 = 5"
+            );
+        }
+    }
+
+    #[test]
+    fn remap_output_slots_wraps_within_12() {
+        let mut backend = BackendDef::Graph(GraphBackendDef {
+            internal_nodes: vec![GraphInternalNode {
+                kind: GraphNodeKind::CustomOutput(10),
+                inputs: vec![],
+            }],
+        });
+        backend.remap_output_slots(5);
+        if let BackendDef::Graph(ref g) = backend {
+            assert_eq!(
+                g.internal_nodes[0].kind,
+                GraphNodeKind::CustomOutput(3),
+                "10 + 5 = 15, 15 % 12 = 3"
+            );
+        }
+    }
+
+    #[test]
+    fn remap_output_slots_skips_out_of_range_slots() {
+        let mut backend = BackendDef::Graph(GraphBackendDef {
+            internal_nodes: vec![GraphInternalNode {
+                kind: GraphNodeKind::CustomOutput(200),
+                inputs: vec![],
+            }],
+        });
+        backend.remap_output_slots(5);
+        if let BackendDef::Graph(ref g) = backend {
+            assert_eq!(
+                g.internal_nodes[0].kind,
+                GraphNodeKind::CustomOutput(200),
+                "out-of-range slots must be left untouched"
+            );
+        }
+    }
+
+    #[test]
+    fn remap_output_slots_noop_for_vm() {
+        let mut backend = BackendDef::Vm(VmBackendDef {
+            register_count: 1,
+            constants: vec![],
+            program: vec![VmInstruction::Halt],
+        });
+        let before = backend.clone();
+        backend.remap_output_slots(5);
+        assert_eq!(backend, before, "VM backend must be unchanged");
     }
 
     #[test]

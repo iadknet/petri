@@ -23,12 +23,14 @@ pub enum TopologyOperator {
     CopyNode,
     CopyMeshBackwardSlice,
     CopyMeshForwardSlice,
+    SpliceNode,
+    SwapRouteTargets,
 }
 
 impl TopologyOperator {
     /// Pick a random topology operator uniformly.
     pub fn random(rng: &mut impl Rng) -> Self {
-        match rng.gen_range(0u8..11) {
+        match rng.gen_range(0u8..13) {
             0 => Self::AddNode,
             1 => Self::RemoveNode,
             2 => Self::RetargetNodeTarget,
@@ -39,7 +41,9 @@ impl TopologyOperator {
             7 => Self::RewriteNodeId,
             8 => Self::CopyNode,
             9 => Self::CopyMeshBackwardSlice,
-            _ => Self::CopyMeshForwardSlice,
+            10 => Self::CopyMeshForwardSlice,
+            11 => Self::SpliceNode,
+            _ => Self::SwapRouteTargets,
         }
     }
 }
@@ -68,6 +72,8 @@ impl TopologyMutator {
             TopologyOperator::CopyNode => apply_copy_node(genome, rng),
             TopologyOperator::CopyMeshBackwardSlice => apply_copy_mesh_backward_slice(genome, rng),
             TopologyOperator::CopyMeshForwardSlice => apply_copy_mesh_forward_slice(genome, rng),
+            TopologyOperator::SpliceNode => apply_splice_node(genome, rng),
+            TopologyOperator::SwapRouteTargets => apply_swap_route_targets(genome, rng),
         }
     }
 }
@@ -322,6 +328,14 @@ fn clone_and_remap_slice(genome: &mut CreatureGenome, gene_indices: &[usize], rn
     let pre_existing_count = genome.nodes.len();
     genome.nodes.extend(cloned);
 
+    // 50% chance: remap CustomOutput slots in cloned nodes to avoid clobbering
+    if rng.gen_bool(0.5) {
+        let offset = rng.gen_range(1u8..12); // 1-11, never 0 (no-op)
+        for idx in pre_existing_count..genome.nodes.len() {
+            genome.nodes[idx].backend_def.remap_output_slots(offset);
+        }
+    }
+
     // 50% chance: add backlink from random pre-existing node to a random cloned node
     if rng.gen_bool(0.5) {
         let new_ids: Vec<NodeId> = id_map.values().copied().collect();
@@ -354,6 +368,63 @@ fn apply_copy_mesh_forward_slice(
     let gene = mesh_forward_slice_random(genome, rng, MESH_SLICE_MAX_SIZE)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     clone_and_remap_slice(genome, &gene.indices, rng);
+    Ok(())
+}
+
+fn apply_splice_node(
+    genome: &mut CreatureGenome,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    let eligible: Vec<usize> = genome
+        .nodes
+        .iter()
+        .enumerate()
+        .filter(|(_, n)| !n.targets.is_empty())
+        .map(|(i, _)| i)
+        .collect();
+    if eligible.is_empty() {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
+    let a_idx = eligible[rng.gen_range(0..eligible.len())];
+    let target_slot = rng.gen_range(0..genome.nodes[a_idx].targets.len());
+    let b_id = genome.nodes[a_idx].targets[target_slot];
+    let c_id = next_node_id(genome);
+    genome.nodes.push(NodeGenome {
+        node_id: c_id,
+        input_refs: vec![],
+        backend_def: BackendDef::Vm(VmBackendDef {
+            register_count: 1,
+            constants: vec![],
+            program: vec![VmInstruction::Halt],
+        }),
+        targets: vec![b_id],
+    });
+    genome.nodes[a_idx].targets[target_slot] = c_id;
+    Ok(())
+}
+
+fn apply_swap_route_targets(
+    genome: &mut CreatureGenome,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    let eligible: Vec<usize> = genome
+        .nodes
+        .iter()
+        .enumerate()
+        .filter(|(_, n)| n.targets.len() >= 2)
+        .map(|(i, _)| i)
+        .collect();
+    if eligible.is_empty() {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
+    let node_idx = eligible[rng.gen_range(0..eligible.len())];
+    let len = genome.nodes[node_idx].targets.len();
+    let a = rng.gen_range(0..len);
+    let mut b = rng.gen_range(0..len - 1);
+    if b >= a {
+        b += 1;
+    }
+    genome.nodes[node_idx].targets.swap(a, b);
     Ok(())
 }
 
@@ -467,6 +538,8 @@ mod tests {
             TopologyOperator::CopyNode,
             TopologyOperator::CopyMeshBackwardSlice,
             TopologyOperator::CopyMeshForwardSlice,
+            TopologyOperator::SpliceNode,
+            TopologyOperator::SwapRouteTargets,
         ];
         for (i, &op) in operators.iter().enumerate() {
             let mut genome = v3alpha1_founder_genome();
@@ -896,6 +969,325 @@ mod tests {
             .unwrap();
         assert_eq!(genome.nodes.len(), 2);
         assert_ne!(genome.nodes[0].node_id, genome.nodes[1].node_id);
+    }
+
+    // ── Gap 6: SwapRouteTargets tests ──
+
+    #[test]
+    fn swap_route_targets_changes_target_order() {
+        // Create a genome with a node that has multiple targets.
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![VmInstruction::Halt],
+                }),
+                targets: vec![NodeId::new(1), NodeId::new(2), NodeId::new(3)],
+            }],
+        };
+        let original_targets = genome.nodes[0].targets.clone();
+        let mut changed = false;
+        for seed in 0u64..50 {
+            let mut g = genome.clone();
+            let mut r = rng(seed);
+            TopologyMutator::apply(&mut g, TopologyOperator::SwapRouteTargets, &mut r).unwrap();
+            if g.nodes[0].targets != original_targets {
+                changed = true;
+                break;
+            }
+        }
+        assert!(changed, "swap must change target order");
+    }
+
+    #[test]
+    fn swap_route_targets_preserves_target_set() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![VmInstruction::Halt],
+                }),
+                targets: vec![NodeId::new(1), NodeId::new(2), NodeId::new(3)],
+            }],
+        };
+        let mut original_sorted = genome.nodes[0].targets.clone();
+        original_sorted.sort();
+        for seed in 0u64..50 {
+            let mut g = genome.clone();
+            let mut r = rng(seed);
+            TopologyMutator::apply(&mut g, TopologyOperator::SwapRouteTargets, &mut r).unwrap();
+            let mut after_sorted = g.nodes[0].targets.clone();
+            after_sorted.sort();
+            assert_eq!(
+                original_sorted, after_sorted,
+                "swap must preserve the same set of targets"
+            );
+        }
+    }
+
+    #[test]
+    fn swap_route_targets_requires_at_least_two_targets() {
+        let mut genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![VmInstruction::Halt],
+                }),
+                targets: vec![NodeId::new(1)],
+            }],
+        };
+        let mut r = rng(0);
+        let result =
+            TopologyMutator::apply(&mut genome, TopologyOperator::SwapRouteTargets, &mut r);
+        assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+    }
+
+    // ── Gap 3: SpliceNode tests ──
+
+    #[test]
+    fn splice_node_increases_node_count_by_one() {
+        let mut genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                NodeGenome {
+                    node_id: NodeId::new(0),
+                    input_refs: vec![],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 1,
+                        constants: vec![],
+                        program: vec![VmInstruction::Halt],
+                    }),
+                    targets: vec![NodeId::new(1)],
+                },
+                NodeGenome {
+                    node_id: NodeId::new(1),
+                    input_refs: vec![],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 1,
+                        constants: vec![],
+                        program: vec![VmInstruction::Halt],
+                    }),
+                    targets: vec![],
+                },
+            ],
+        };
+        let before = genome.nodes.len();
+        let mut r = rng(0);
+        TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &mut r).unwrap();
+        assert_eq!(genome.nodes.len(), before + 1);
+    }
+
+    #[test]
+    fn splice_node_creates_a_to_c_to_b_chain() {
+        let mut genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                NodeGenome {
+                    node_id: NodeId::new(0),
+                    input_refs: vec![],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 1,
+                        constants: vec![],
+                        program: vec![VmInstruction::Halt],
+                    }),
+                    targets: vec![NodeId::new(1)],
+                },
+                NodeGenome {
+                    node_id: NodeId::new(1),
+                    input_refs: vec![],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 1,
+                        constants: vec![],
+                        program: vec![VmInstruction::Halt],
+                    }),
+                    targets: vec![],
+                },
+            ],
+        };
+        let b_id = NodeId::new(1);
+        let mut r = rng(0);
+        TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &mut r).unwrap();
+        let c = genome.nodes.last().unwrap();
+        let c_id = c.node_id;
+        // C's target is B
+        assert_eq!(c.targets, vec![b_id], "C must target B");
+        // A's target is now C (not B)
+        assert!(
+            genome.nodes[0].targets.contains(&c_id),
+            "A must now target C"
+        );
+        assert!(
+            !genome.nodes[0].targets.contains(&b_id),
+            "A must no longer directly target B"
+        );
+    }
+
+    #[test]
+    fn splice_node_new_node_is_blank_vm() {
+        let mut genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![VmInstruction::Halt],
+                }),
+                targets: vec![NodeId::new(1)],
+            }],
+        };
+        let mut r = rng(0);
+        TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &mut r).unwrap();
+        let c = genome.nodes.last().unwrap();
+        assert!(
+            c.input_refs.is_empty(),
+            "spliced node must have no input_refs"
+        );
+        if let BackendDef::Vm(ref vm) = c.backend_def {
+            assert_eq!(vm.register_count, 1);
+            assert!(vm.constants.is_empty());
+            assert_eq!(vm.program, vec![VmInstruction::Halt]);
+        } else {
+            panic!("spliced node must be VM backend");
+        }
+    }
+
+    #[test]
+    fn splice_node_no_targets_returns_skip() {
+        let mut genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![VmInstruction::Halt],
+                }),
+                targets: vec![],
+            }],
+        };
+        let mut r = rng(0);
+        let result = TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &mut r);
+        assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+    }
+
+    #[test]
+    fn splice_node_passes_parseability_gate() {
+        let mut genome = v3alpha1_founder_genome();
+        let mut r = rng(42);
+        let result = TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &mut r);
+        match result {
+            Ok(()) | Err(MutationSkipReason::NoApplicableTarget) => {
+                assert!(
+                    ParseabilityGate::validate(&genome).is_ok(),
+                    "parseability failed after SpliceNode"
+                );
+            }
+            Err(other) => panic!("unexpected skip reason {:?}", other),
+        }
+    }
+
+    #[test]
+    fn splice_node_new_node_gets_fresh_node_id() {
+        let mut genome = v3alpha1_founder_genome();
+        let original_ids: Vec<NodeId> = genome.nodes.iter().map(|n| n.node_id).collect();
+        let mut r = rng(0);
+        TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &mut r).unwrap();
+        let c = genome.nodes.last().unwrap();
+        assert!(
+            !original_ids.contains(&c.node_id),
+            "spliced node must have a fresh NodeId"
+        );
+    }
+
+    // ── Gap 5: Output slot remapping in clones tests ──
+
+    #[test]
+    fn clone_remap_slice_sometimes_offsets_custom_outputs() {
+        use crate::creature::genome::{GraphBackendDef, GraphInternalNode, GraphNodeKind};
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Graph(GraphBackendDef {
+                    internal_nodes: vec![GraphInternalNode {
+                        kind: GraphNodeKind::CustomOutput(2),
+                        inputs: vec![],
+                    }],
+                }),
+                targets: vec![],
+            }],
+        };
+        let mut saw_different = false;
+        for seed in 0u64..200 {
+            let mut g = genome.clone();
+            let mut r = rng(seed);
+            clone_and_remap_slice(&mut g, &[0], &mut r);
+            if let BackendDef::Graph(ref gd) = g.nodes.last().unwrap().backend_def {
+                if let GraphNodeKind::CustomOutput(slot) = gd.internal_nodes[0].kind {
+                    if slot != 2 {
+                        saw_different = true;
+                        break;
+                    }
+                }
+            }
+        }
+        assert!(
+            saw_different,
+            "cloned nodes must sometimes have different CustomOutput slot"
+        );
+    }
+
+    #[test]
+    fn clone_remap_slice_sometimes_preserves_custom_outputs() {
+        use crate::creature::genome::{GraphBackendDef, GraphInternalNode, GraphNodeKind};
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Graph(GraphBackendDef {
+                    internal_nodes: vec![GraphInternalNode {
+                        kind: GraphNodeKind::CustomOutput(2),
+                        inputs: vec![],
+                    }],
+                }),
+                targets: vec![],
+            }],
+        };
+        let mut saw_same = false;
+        for seed in 0u64..200 {
+            let mut g = genome.clone();
+            let mut r = rng(seed);
+            clone_and_remap_slice(&mut g, &[0], &mut r);
+            if let BackendDef::Graph(ref gd) = g.nodes.last().unwrap().backend_def {
+                if let GraphNodeKind::CustomOutput(slot) = gd.internal_nodes[0].kind {
+                    if slot == 2 {
+                        saw_same = true;
+                        break;
+                    }
+                }
+            }
+        }
+        assert!(
+            saw_same,
+            "cloned nodes must sometimes keep original CustomOutput slot"
+        );
     }
 
     #[test]
