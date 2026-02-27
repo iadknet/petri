@@ -30,10 +30,19 @@ impl InputRefOperator {
         }
     }
 
+    const TOTAL_WEIGHT: u16 = {
+        let mut sum = 0u16;
+        let mut i = 0;
+        while i < Self::ALL.len() {
+            sum += Self::ALL[i].weight() as u16;
+            i += 1;
+        }
+        sum
+    };
+
     /// Pick a random input ref operator weighted by impact tier.
     pub fn random(rng: &mut impl Rng) -> Self {
-        let total: u16 = Self::ALL.iter().map(|op| op.weight() as u16).sum();
-        let mut r = rng.gen_range(0..total);
+        let mut r = rng.gen_range(0..Self::TOTAL_WEIGHT);
         for &op in &Self::ALL {
             let w = op.weight() as u16;
             if r < w {
@@ -375,6 +384,11 @@ mod tests {
     #[test]
     fn input_ref_operator_weights_are_positive() {
         let all = InputRefOperator::ALL;
+        assert_eq!(
+            all.len(),
+            4,
+            "ALL must cover every InputRefOperator variant"
+        );
         for &op in &all {
             assert!(op.weight() > 0, "weight must be positive for {:?}", op);
         }
