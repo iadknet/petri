@@ -1,5 +1,6 @@
 pub mod action_decode;
 pub mod graph;
+pub mod hebbian;
 pub mod inputs;
 pub mod mesh;
 pub mod trace;

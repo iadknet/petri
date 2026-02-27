@@ -11,6 +11,7 @@ use crate::contracts::InputReference;
 use crate::creature::genome::GraphBackendDef;
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::graph::{collect_weighted_inputs, evaluate_kind, EvalCtx};
+use crate::runtime::hebbian;
 use crate::runtime::trace::{kind_label, GraphNodeEvalTrace, GraphPassTrace, GraphTrace};
 use crate::runtime::types::{sanitize_f32, NodeResult};
 use crate::sensors::static_inputs::StaticInputs;
@@ -61,6 +62,12 @@ pub fn execute_graph_node_traced(
         state_vec.resize(node_count, 0.0);
     }
 
+    // Check if any node uses Hebbian learning and prepare weights if so.
+    let use_hebbian = hebbian::has_any_hebbian(def);
+    if use_hebbian {
+        hebbian::ensure_hebbian_weights(def, node_idx, &mut graph_runtime.hebbian_weights);
+    }
+
     let max_passes = config.max_graph_relax_iters;
     let epsilon = config.graph_convergence_epsilon;
     let req_stable = config.graph_convergence_stable_passes;
@@ -99,14 +106,29 @@ pub fn execute_graph_node_traced(
 
         for current_idx in 0..node_count {
             let node = &def.internal_nodes[current_idx];
-            collect_weighted_inputs(
-                node,
-                current_idx,
-                node_count,
-                &prev_outputs,
-                &curr_outputs,
-                &mut w_inputs_buf,
-            );
+
+            // Use learned weights for Hebbian nodes, genome weights otherwise.
+            if use_hebbian && node.hebbian.is_some() {
+                let learned = &graph_runtime.hebbian_weights[node_idx][current_idx];
+                hebbian::collect_weighted_inputs_hebbian(
+                    node,
+                    current_idx,
+                    node_count,
+                    &prev_outputs,
+                    &curr_outputs,
+                    learned,
+                    &mut w_inputs_buf,
+                );
+            } else {
+                collect_weighted_inputs(
+                    node,
+                    current_idx,
+                    node_count,
+                    &prev_outputs,
+                    &curr_outputs,
+                    &mut w_inputs_buf,
+                );
+            }
             let wsum: f32 = w_inputs_buf.iter().sum();
 
             let mut node_state = graph_runtime.node_state[node_idx][current_idx];
@@ -158,6 +180,18 @@ pub fn execute_graph_node_traced(
         if stable_passes >= req_stable {
             break;
         }
+    }
+
+    // Apply Hebbian weight updates after convergence.
+    if use_hebbian {
+        let hebb_cost = hebbian::apply_hebbian_updates(
+            def,
+            node_idx,
+            &mut graph_runtime.hebbian_weights,
+            &curr_outputs,
+            config.hebbian_update_cost,
+        );
+        *energy -= hebb_cost;
     }
 
     // Build NodeResult
