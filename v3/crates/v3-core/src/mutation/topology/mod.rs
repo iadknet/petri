@@ -2,7 +2,7 @@ use rand::Rng;
 
 use crate::contracts::NodeId;
 use crate::creature::genome::{
-    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
+    BackendDef, CreatureGenome, GraphBackendDef, NodeGenome, VmBackendDef, VmInstruction,
 };
 use crate::mutation::types::MutationSkipReason;
 
@@ -15,18 +15,22 @@ pub enum TopologyOperator {
     AddRouteTarget,
     RemoveRouteTarget,
     ChangeEntryNode,
+    SwapNodeBackend,
+    RewriteNodeId,
 }
 
 impl TopologyOperator {
     /// Pick a random topology operator uniformly.
     pub fn random(rng: &mut impl Rng) -> Self {
-        match rng.gen_range(0u8..6) {
+        match rng.gen_range(0u8..8) {
             0 => Self::AddNode,
             1 => Self::RemoveNode,
             2 => Self::RetargetNodeTarget,
             3 => Self::AddRouteTarget,
             4 => Self::RemoveRouteTarget,
-            _ => Self::ChangeEntryNode,
+            5 => Self::ChangeEntryNode,
+            6 => Self::SwapNodeBackend,
+            _ => Self::RewriteNodeId,
         }
     }
 }
@@ -50,6 +54,8 @@ impl TopologyMutator {
             TopologyOperator::AddRouteTarget => apply_add_route_target(genome, rng),
             TopologyOperator::RemoveRouteTarget => apply_remove_route_target(genome, rng),
             TopologyOperator::ChangeEntryNode => apply_change_entry_node(genome, rng),
+            TopologyOperator::SwapNodeBackend => apply_swap_node_backend(genome, rng),
+            TopologyOperator::RewriteNodeId => apply_rewrite_node_id(genome, rng),
         }
     }
 }
@@ -175,6 +181,56 @@ fn apply_change_entry_node(
     Ok(())
 }
 
+fn apply_swap_node_backend(
+    genome: &mut CreatureGenome,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    if genome.nodes.is_empty() {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
+    let idx = rng.gen_range(0..genome.nodes.len());
+    let node = &mut genome.nodes[idx];
+    node.backend_def = match &node.backend_def {
+        BackendDef::Vm(_) => BackendDef::Graph(GraphBackendDef {
+            internal_nodes: vec![],
+        }),
+        BackendDef::Graph(_) => BackendDef::Vm(VmBackendDef {
+            register_count: 1,
+            constants: vec![],
+            program: vec![VmInstruction::Halt],
+        }),
+    };
+    Ok(())
+}
+
+fn apply_rewrite_node_id(
+    genome: &mut CreatureGenome,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    if genome.nodes.is_empty() {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
+
+    let idx = rng.gen_range(0..genome.nodes.len());
+    let old_id = genome.nodes[idx].node_id;
+    let new_id = next_node_id(genome);
+    genome.nodes[idx].node_id = new_id;
+
+    if genome.entry_node_id == old_id {
+        genome.entry_node_id = new_id;
+    }
+
+    for node in &mut genome.nodes {
+        for target in &mut node.targets {
+            if *target == old_id {
+                *target = new_id;
+            }
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -280,6 +336,8 @@ mod tests {
             TopologyOperator::AddRouteTarget,
             TopologyOperator::RemoveRouteTarget,
             TopologyOperator::ChangeEntryNode,
+            TopologyOperator::SwapNodeBackend,
+            TopologyOperator::RewriteNodeId,
         ];
         for (i, &op) in operators.iter().enumerate() {
             let mut genome = v3alpha1_founder_genome();
@@ -298,5 +356,41 @@ mod tests {
                 Err(other) => panic!("unexpected skip reason {:?} for {:?}", other, op),
             }
         }
+    }
+
+    #[test]
+    fn swap_node_backend_toggles_backend_on_single_node_genome() {
+        let mut genome = v3alpha1_founder_genome();
+        genome.nodes.truncate(1);
+        genome.entry_node_id = genome.nodes[0].node_id;
+
+        let mut r1 = rng(7);
+        TopologyMutator::apply(&mut genome, TopologyOperator::SwapNodeBackend, &mut r1).unwrap();
+        assert!(matches!(genome.nodes[0].backend_def, BackendDef::Vm(_)));
+
+        let mut r2 = rng(8);
+        TopologyMutator::apply(&mut genome, TopologyOperator::SwapNodeBackend, &mut r2).unwrap();
+        assert!(matches!(genome.nodes[0].backend_def, BackendDef::Graph(_)));
+    }
+
+    #[test]
+    fn rewrite_node_id_rewrites_entry_and_target_references() {
+        let mut genome = v3alpha1_founder_genome();
+        genome.nodes.truncate(1);
+        genome.nodes[0].targets = vec![genome.nodes[0].node_id];
+        genome.entry_node_id = genome.nodes[0].node_id;
+        let old_id = genome.nodes[0].node_id;
+
+        let mut r = rng(11);
+        TopologyMutator::apply(&mut genome, TopologyOperator::RewriteNodeId, &mut r).unwrap();
+        let new_id = genome.nodes[0].node_id;
+
+        assert_ne!(new_id, old_id, "node id should be rewritten");
+        assert_eq!(genome.entry_node_id, new_id, "entry id should be rewritten");
+        assert_eq!(
+            genome.nodes[0].targets,
+            vec![new_id],
+            "all target references should be rewritten"
+        );
     }
 }

@@ -3,11 +3,13 @@ use rand::Rng;
 use crate::config::MutationConfig;
 use crate::creature::genome::CreatureGenome;
 use crate::creature::parseability::ParseabilityGate;
-use crate::mutation::graph_mutator::{GraphMutator, GraphOperator};
-use crate::mutation::input_ref_mutator::{InputRefMutator, InputRefOperator};
+use crate::mutation::graph::{GraphMutator, GraphOperator};
+use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
 use crate::mutation::topology::{TopologyMutator, TopologyOperator};
-use crate::mutation::types::{MutationSkipReason, MutationSummary};
-use crate::mutation::vm_mutator::{VmMutator, VmOperator};
+use crate::mutation::types::{
+    MutationDomain, MutationOperator, MutationSkipReason, MutationSummary,
+};
+use crate::mutation::vm::{VmMutator, VmOperator};
 
 /// Orchestrates genome mutation events for offspring.
 pub struct MutationEngine;
@@ -32,23 +34,46 @@ impl MutationEngine {
 
         let mut summary = MutationSummary::zero();
         for _ in 0..event_count {
-            summary.attempted_events += 1;
-
             // Pick domain uniformly: 0=Topology, 1=VM, 2=Graph, 3=InputRef.
-            let domain = rng.gen_range(0u8..4);
-            let result = match domain {
-                0 => apply_topology_event(genome, rng),
-                1 => apply_vm_event(genome, rng),
-                2 => apply_graph_event(genome, rng),
-                _ => apply_input_ref_event(genome, rng),
+            let (domain, operator, result) = match rng.gen_range(0u8..4) {
+                0 => {
+                    let op = TopologyOperator::random(rng);
+                    (
+                        MutationDomain::Topology,
+                        topology_operator_key(op),
+                        apply_topology_event(genome, op, rng),
+                    )
+                }
+                1 => {
+                    let op = VmOperator::random(rng);
+                    (
+                        MutationDomain::Vm,
+                        vm_operator_key(op),
+                        apply_vm_event(genome, op, rng),
+                    )
+                }
+                2 => {
+                    let op = GraphOperator::random(rng);
+                    (
+                        MutationDomain::Graph,
+                        graph_operator_key(op),
+                        apply_graph_event(genome, op, rng),
+                    )
+                }
+                _ => {
+                    let op = InputRefOperator::random(rng);
+                    (
+                        MutationDomain::InputRef,
+                        input_ref_operator_key(op),
+                        apply_input_ref_event(genome, op, rng),
+                    )
+                }
             };
+            summary.record_attempt(domain, operator);
 
             match result {
-                Ok(()) => summary.applied_events += 1,
-                Err(reason) => {
-                    summary.skipped_events += 1;
-                    *summary.skip_reasons.entry(reason).or_insert(0) += 1;
-                }
+                Ok(()) => summary.record_applied(domain, operator, operator.semantic_category()),
+                Err(reason) => summary.record_skipped(reason),
             }
         }
 
@@ -59,9 +84,9 @@ impl MutationEngine {
 /// Apply one topology mutation event with parseability gate.
 fn apply_topology_event(
     genome: &mut CreatureGenome,
+    op: TopologyOperator,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let op = TopologyOperator::random(rng);
     let snapshot = genome.clone();
     match TopologyMutator::apply(genome, op, rng) {
         Ok(()) => {
@@ -82,9 +107,9 @@ fn apply_topology_event(
 /// Apply one VM mutation event with parseability gate.
 fn apply_vm_event(
     genome: &mut CreatureGenome,
+    op: VmOperator,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let op = VmOperator::random(rng);
     let snapshot = genome.clone();
     match VmMutator::apply(genome, op, rng) {
         Ok(()) => {
@@ -105,9 +130,9 @@ fn apply_vm_event(
 /// Apply one graph mutation event with parseability gate.
 fn apply_graph_event(
     genome: &mut CreatureGenome,
+    op: GraphOperator,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let op = GraphOperator::random(rng);
     let snapshot = genome.clone();
     match GraphMutator::apply(genome, op, rng) {
         Ok(()) => {
@@ -128,9 +153,9 @@ fn apply_graph_event(
 /// Apply one input ref mutation event with parseability gate.
 fn apply_input_ref_event(
     genome: &mut CreatureGenome,
+    op: InputRefOperator,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let op = InputRefOperator::random(rng);
     let snapshot = genome.clone();
     match InputRefMutator::apply(genome, op, rng) {
         Ok(()) => {
@@ -148,11 +173,59 @@ fn apply_input_ref_event(
     }
 }
 
+fn topology_operator_key(op: TopologyOperator) -> MutationOperator {
+    match op {
+        TopologyOperator::AddNode => MutationOperator::TopologyAddNode,
+        TopologyOperator::RemoveNode => MutationOperator::TopologyRemoveNode,
+        TopologyOperator::RetargetNodeTarget => MutationOperator::TopologyRetargetNodeTarget,
+        TopologyOperator::AddRouteTarget => MutationOperator::TopologyAddRouteTarget,
+        TopologyOperator::RemoveRouteTarget => MutationOperator::TopologyRemoveRouteTarget,
+        TopologyOperator::ChangeEntryNode => MutationOperator::TopologyChangeEntryNode,
+        TopologyOperator::SwapNodeBackend => MutationOperator::TopologySwapNodeBackend,
+        TopologyOperator::RewriteNodeId => MutationOperator::TopologyRewriteNodeId,
+    }
+}
+
+fn vm_operator_key(op: VmOperator) -> MutationOperator {
+    match op {
+        VmOperator::VmConstantMutation => MutationOperator::VmConstantMutation,
+        VmOperator::VmInstructionMutation => MutationOperator::VmInstructionMutation,
+        VmOperator::VmRegisterCountMutation => MutationOperator::VmRegisterCountMutation,
+        VmOperator::VmInstructionRawFieldMutation => {
+            MutationOperator::VmInstructionRawFieldMutation
+        }
+    }
+}
+
+fn graph_operator_key(op: GraphOperator) -> MutationOperator {
+    match op {
+        GraphOperator::AlterGraphEdgeWeight => MutationOperator::GraphAlterGraphEdgeWeight,
+        GraphOperator::SwapGraphOperator => MutationOperator::GraphSwapGraphOperator,
+        GraphOperator::MutateGraphOperatorParam => MutationOperator::GraphMutateGraphOperatorParam,
+        GraphOperator::AddInternalGraphNode => MutationOperator::GraphAddInternalGraphNode,
+        GraphOperator::RemoveInternalGraphNode => MutationOperator::GraphRemoveInternalGraphNode,
+        GraphOperator::AddGraphEdge => MutationOperator::GraphAddGraphEdge,
+        GraphOperator::RetargetGraphEdge => MutationOperator::GraphRetargetGraphEdge,
+        GraphOperator::RemoveGraphEdge => MutationOperator::GraphRemoveGraphEdge,
+        GraphOperator::GraphRawFieldMutation => MutationOperator::GraphRawFieldMutation,
+    }
+}
+
+fn input_ref_operator_key(op: InputRefOperator) -> MutationOperator {
+    match op {
+        InputRefOperator::Add => MutationOperator::InputRefAdd,
+        InputRefOperator::Remove => MutationOperator::InputRefRemove,
+        InputRefOperator::Swap => MutationOperator::InputRefSwap,
+        InputRefOperator::RawFieldMutation => MutationOperator::InputRefRawFieldMutation,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::config::SimulationConfig;
     use crate::creature::founder::v3alpha1_founder_genome;
+    use crate::mutation::{MutationDomain, MutationOperator};
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
 
@@ -313,5 +386,98 @@ mod tests {
                 copy
             );
         }
+    }
+
+    #[test]
+    fn engine_domain_and_operator_counters_reconcile_to_global_totals() {
+        let mut config = SimulationConfig::default().mutation;
+        config.mutation_probability = 1.0;
+        config.per_birth_mutation_events_min = 5;
+        config.per_birth_mutation_events_max = 5;
+
+        let mut genome = v3alpha1_founder_genome();
+        let mut rng = rng(123);
+        let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut rng);
+
+        let attempted_by_domain: u32 = summary.attempted_by_domain.values().sum();
+        let applied_by_domain: u32 = summary.applied_by_domain.values().sum();
+        let attempted_by_operator: u32 = summary.attempted_by_operator.values().sum();
+        let applied_by_operator: u32 = summary.applied_by_operator.values().sum();
+
+        assert_eq!(attempted_by_domain, summary.attempted_events);
+        assert_eq!(applied_by_domain, summary.applied_events);
+        assert_eq!(attempted_by_operator, summary.attempted_events);
+        assert_eq!(applied_by_operator, summary.applied_events);
+
+        assert_eq!(
+            summary.applied_semantic_noop_events + summary.applied_semantic_change_events,
+            summary.applied_events
+        );
+    }
+
+    #[test]
+    fn engine_attempted_counters_cover_all_domains_and_operators_over_long_run() {
+        let mut config = SimulationConfig::default().mutation;
+        config.mutation_probability = 1.0;
+        config.per_birth_mutation_events_min = 1;
+        config.per_birth_mutation_events_max = 1;
+
+        let mut domain_hits = std::collections::HashMap::<MutationDomain, u64>::new();
+        let mut operator_hits = std::collections::HashMap::<MutationOperator, u64>::new();
+
+        for seed in 0u64..20_000 {
+            let mut genome = v3alpha1_founder_genome();
+            let mut r = rng(seed);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            for (domain, count) in summary.attempted_by_domain {
+                *domain_hits.entry(domain).or_insert(0) += count as u64;
+            }
+            for (operator, count) in summary.attempted_by_operator {
+                *operator_hits.entry(operator).or_insert(0) += count as u64;
+            }
+        }
+
+        for domain in MutationDomain::all() {
+            assert!(
+                domain_hits.get(&domain).copied().unwrap_or(0) > 0,
+                "expected attempted events for domain {:?}",
+                domain
+            );
+        }
+
+        for operator in MutationOperator::all() {
+            assert!(
+                operator_hits.get(&operator).copied().unwrap_or(0) > 0,
+                "expected attempted events for operator {:?}",
+                operator
+            );
+        }
+    }
+
+    #[test]
+    fn engine_applied_semantic_categories_record_noop_and_change_events() {
+        let mut config = SimulationConfig::default().mutation;
+        config.mutation_probability = 1.0;
+        config.per_birth_mutation_events_min = 1;
+        config.per_birth_mutation_events_max = 1;
+
+        let mut noop_total: u64 = 0;
+        let mut change_total: u64 = 0;
+        let mut genome = v3alpha1_founder_genome();
+        for seed in 0u64..10_000 {
+            let mut r = rng(seed);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            noop_total += summary.applied_semantic_noop_events as u64;
+            change_total += summary.applied_semantic_change_events as u64;
+        }
+
+        assert!(
+            noop_total > 0,
+            "expected at least one applied semantic-noop mutation across long run"
+        );
+        assert!(
+            change_total > 0,
+            "expected at least one applied semantic-change mutation across long run"
+        );
     }
 }
