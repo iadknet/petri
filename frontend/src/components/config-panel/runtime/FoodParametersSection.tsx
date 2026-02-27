@@ -20,6 +20,16 @@ export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 		tooltip: "Minimum neighbor density ratio to trigger food spread to empty cells",
 	},
 	{
+		path: "world.food.spread_density_ratio",
+		label: "Spread Density Ratio",
+		min: 0,
+		max: 1,
+		step: 0.01,
+		defaultValue: 0.25,
+		tooltip:
+			"Fraction of growth delta deposited to neighbor during spread",
+	},
+	{
 		path: "world.food.recovery_spawn_rate",
 		label: "Recovery Spawn Rate",
 		min: 0,

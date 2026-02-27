@@ -30,6 +30,7 @@ const MOCK_CONFIG: SimulationConfig = {
 			initial_density: 1.0,
 			initial_coverage: 0.4,
 			spread_threshold_ratio: 0.8,
+			spread_density_ratio: 0.25,
 			recovery_spawn_rate: 0.05,
 			recovery_floor_ratio: 0.04,
 			max_density: 1.0,
