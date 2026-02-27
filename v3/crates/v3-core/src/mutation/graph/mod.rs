@@ -80,13 +80,9 @@ impl GraphMutator {
             GraphOperator::GraphRawFieldMutation => {
                 apply_graph_raw_field_mutation(genome, node_idx, rng)
             }
-            GraphOperator::CopyInternalNode => {
-                apply_copy_internal_node(genome, node_idx, rng)
-            }
+            GraphOperator::CopyInternalNode => apply_copy_internal_node(genome, node_idx, rng),
             GraphOperator::CopySubgraph => apply_copy_subgraph(genome, node_idx, rng),
-            GraphOperator::CopyEdgeBundle => {
-                apply_copy_edge_bundle(genome, node_idx, rng)
-            }
+            GraphOperator::CopyEdgeBundle => apply_copy_edge_bundle(genome, node_idx, rng),
         }
     }
 }
@@ -1159,8 +1155,7 @@ mod tests {
         for seed in 0u64..100 {
             let mut genome = graph_only_genome(nodes.clone());
             let mut r = rng(seed);
-            let result =
-                GraphMutator::apply(&mut genome, GraphOperator::CopySubgraph, &mut r);
+            let result = GraphMutator::apply(&mut genome, GraphOperator::CopySubgraph, &mut r);
             if result.is_ok() {
                 if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
                     // New nodes start at index 2. Check if any cloned node has an edge
@@ -1304,8 +1299,7 @@ mod tests {
                 if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
                     // The target node (initially empty Relu at idx 2) should now have edges.
                     // Or node 1's edges were copied onto node 0 or 2.
-                    let total_edges: usize =
-                        g.internal_nodes.iter().map(|n| n.inputs.len()).sum();
+                    let total_edges: usize = g.internal_nodes.iter().map(|n| n.inputs.len()).sum();
                     if total_edges > 2 {
                         found_copied = true;
                         break;
@@ -1352,7 +1346,10 @@ mod tests {
                 break;
             }
         }
-        assert!(all_skip, "with no edges on any node, all attempts must return NoApplicableTarget");
+        assert!(
+            all_skip,
+            "with no edges on any node, all attempts must return NoApplicableTarget"
+        );
     }
 
     #[test]
