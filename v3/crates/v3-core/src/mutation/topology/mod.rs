@@ -290,8 +290,9 @@ const MESH_SLICE_MAX_SIZE: usize = 8;
 
 /// Clone a set of nodes identified by `gene_indices`, remapping internal
 /// target references to fresh NodeIds. Appends cloned nodes to the genome.
-/// With 50% probability, adds a backlink from a random pre-existing node
-/// to a random cloned node.
+/// With 50% probability, offsets CustomOutput slots in cloned Graph backends
+/// to avoid clobbering the originals. With 50% probability, adds a backlink
+/// from a random pre-existing node to a random cloned node.
 fn clone_and_remap_slice(genome: &mut CreatureGenome, gene_indices: &[usize], rng: &mut impl Rng) {
     // Build old_id -> new_id mapping
     let mut id_map = HashMap::with_capacity(gene_indices.len());
