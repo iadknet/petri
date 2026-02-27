@@ -1,5 +1,9 @@
 //! Traced mesh execution — identical routing logic to [`super::mesh::execute_creature_mesh`]
 //! but records per-hop trace data for the Execution Sampler.
+//!
+//! **Maintenance note:** This module duplicates the mesh routing loop from `mesh.rs`
+//! with trace recording. When updating mesh routing logic, apply the same changes
+//! here and verify with equivalence tests.
 
 use std::collections::HashMap;
 

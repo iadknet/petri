@@ -1,5 +1,9 @@
 //! Traced VM execution — identical logic to [`super::vm::execute_vm_node`] but
 //! records per-instruction trace data for the Execution Sampler.
+//!
+//! **Maintenance note:** This module intentionally duplicates the instruction loop
+//! from `vm.rs` with interleaved trace recording. When updating `vm.rs` execution
+//! semantics, apply the same changes here and verify with equivalence tests.
 
 use crate::config::RuntimeConfig;
 use crate::contracts::InputReference;

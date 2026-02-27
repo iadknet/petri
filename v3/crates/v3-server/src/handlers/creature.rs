@@ -130,12 +130,17 @@ pub async fn get_sample(
         })));
     }
 
-    let active = handle.active_trace.as_ref().unwrap();
+    // Safety: `matches` guard above guarantees active_trace is Some with matching creature_id.
+    let Some(active) = handle.active_trace.as_ref() else {
+        unreachable!("active_trace confirmed Some by matches guard");
+    };
 
     if active.is_complete() {
         // Take the completed trace and convert to sample.
         let ffi_id = active.creature_id.data().as_ffi();
-        let trace = handle.active_trace.take().unwrap();
+        let Some(trace) = handle.active_trace.take() else {
+            unreachable!("active_trace confirmed Some by matches guard");
+        };
         let sample = trace.into_sample(ffi_id);
 
         Ok(Json(serde_json::json!({

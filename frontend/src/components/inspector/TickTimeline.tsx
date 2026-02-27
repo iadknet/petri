@@ -1,17 +1,11 @@
 import { memo } from "react";
-import type { TickTrace, WorldAction } from "../../types/api.ts";
+import type { TickTrace } from "../../types/api.ts";
+import { formatAction } from "./inputRefUtils.ts";
 
 interface TickTimelineProps {
 	ticks: TickTrace[];
 	activeTickIndex: number;
 	onTickSelect: (index: number) => void;
-}
-
-function formatAction(action: WorldAction): string {
-	if (typeof action === "string") return action;
-	if ("Move" in action) return `Move(${action.Move})`;
-	if ("Reproduce" in action) return "Reproduce";
-	return "?";
 }
 
 export const TickTimeline = memo(function TickTimeline({

@@ -1,5 +1,10 @@
 //! Traced graph execution — identical logic to [`super::graph::execute_graph_node`]
 //! but records per-pass trace data for the Execution Sampler.
+//!
+//! **Maintenance note:** This module reuses `evaluate_kind` and `collect_weighted_inputs`
+//! from `graph.rs`. Only the outer relaxation loop is duplicated with trace recording.
+//! When updating graph execution semantics, apply the same changes here and verify
+//! with equivalence tests.
 
 use crate::config::RuntimeConfig;
 use crate::contracts::InputReference;

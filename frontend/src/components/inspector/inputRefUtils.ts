@@ -1,4 +1,11 @@
-import type { InputReference } from "../../types/api.ts";
+import type { InputReference, WorldAction } from "../../types/api.ts";
+
+export function formatAction(action: WorldAction): string {
+	if (typeof action === "string") return action;
+	if ("Move" in action) return `Move(${action.Move})`;
+	if ("Reproduce" in action) return "Reproduce";
+	return "?";
+}
 
 export function formatInputRef(ref: InputReference): string {
 	if ("World" in ref) {

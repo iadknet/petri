@@ -1,23 +1,17 @@
 import { memo } from "react";
 import type { SamplerPosition } from "../../stores/executionSampler.ts";
-import type { ExecutionSample, WorldAction } from "../../types/api.ts";
+import type { ExecutionSample } from "../../types/api.ts";
 import { GraphExecutionView } from "./GraphExecutionView.tsx";
 import { MeshHopTimeline } from "./MeshHopTimeline.tsx";
 import { TickTimeline } from "./TickTimeline.tsx";
 import { VmExecutionView } from "./VmExecutionView.tsx";
+import { formatAction } from "./inputRefUtils.ts";
 
 interface SamplerPlaybackPanelProps {
 	sample: ExecutionSample;
 	position: SamplerPosition;
 	onTickSelect: (index: number) => void;
 	onHopSelect: (index: number) => void;
-}
-
-function formatAction(action: WorldAction): string {
-	if (typeof action === "string") return action;
-	if ("Move" in action) return `Move(${action.Move})`;
-	if ("Reproduce" in action) return "Reproduce";
-	return "?";
 }
 
 export const SamplerPlaybackPanel = memo(function SamplerPlaybackPanel({

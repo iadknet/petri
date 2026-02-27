@@ -112,7 +112,8 @@ export const useExecutionSamplerStore = create<ExecutionSamplerState>()((set, ge
 			}
 		}
 
-		// At end — stay at last position.
+		// At end — auto-pause playback.
+		set({ playbackState: "loaded" });
 	},
 
 	stepBackward: () => {
@@ -171,8 +172,10 @@ export const useExecutionSamplerStore = create<ExecutionSamplerState>()((set, ge
 	setError: (msg) => set({ error: msg, playbackState: "idle", sample: null }),
 }));
 
-// Helper to count detail steps for a backend trace.
-function getDetailCount(trace: ExecutionSample["ticks"][0]["hops"][0]["backend_trace"]): number {
+/** Count detail steps for a backend trace (VM steps or Graph passes). */
+export function getDetailCount(
+	trace: ExecutionSample["ticks"][0]["hops"][0]["backend_trace"],
+): number {
 	if ("Vm" in trace) return trace.Vm.steps.length;
 	if ("Graph" in trace) return trace.Graph.passes.length;
 	return 0;
