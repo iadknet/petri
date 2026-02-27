@@ -1,10 +1,10 @@
 import { memo } from "react";
-import type { MeshHopTrace } from "../../types/api.ts";
+import type { MeshHopTrace, TerminationReason } from "../../types/api.ts";
 
 interface MeshHopTimelineProps {
 	hops: MeshHopTrace[];
 	activeHopIndex: number;
-	terminationReason: string;
+	terminationReason: TerminationReason;
 	finalAction: string;
 	onHopSelect: (index: number) => void;
 }

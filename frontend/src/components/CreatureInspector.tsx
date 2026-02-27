@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from "react";
 import { useCreatureDetail } from "../hooks/useCreatureDetail.ts";
 import { useExecutionSampler } from "../hooks/useExecutionSampler.ts";
 import { useCreatureInspectorStore } from "../stores/creatureInspector.ts";
-import { useExecutionSamplerStore } from "../stores/executionSampler.ts";
+import { getDetailCount, useExecutionSamplerStore } from "../stores/executionSampler.ts";
 import { InspectorHeader } from "./inspector/InspectorHeader.tsx";
 import { MemoryHexView } from "./inspector/MemoryHexView.tsx";
 import { NodeGraph } from "./inspector/NodeGraph.tsx";
@@ -10,14 +10,6 @@ import { PhenotypeDetail } from "./inspector/PhenotypeDetail.tsx";
 import { SamplerControls } from "./inspector/SamplerControls.tsx";
 import { SamplerPlaybackPanel } from "./inspector/SamplerPlaybackPanel.tsx";
 import { StatsSection } from "./inspector/StatsSection.tsx";
-
-function getDetailCount(
-	trace: { Vm: { steps: unknown[] } } | { Graph: { passes: unknown[] } },
-): number {
-	if ("Vm" in trace) return trace.Vm.steps.length;
-	if ("Graph" in trace) return trace.Graph.passes.length;
-	return 0;
-}
 
 function CreatureInspector() {
 	useCreatureDetail();
@@ -79,8 +71,11 @@ function CreatureInspector() {
 	);
 
 	const handleHopSelect = useCallback(
-		(index: number) => jumpToPosition({ ...position, hopIndex: index, detailIndex: 0 }),
-		[jumpToPosition, position],
+		(index: number) => {
+			const currentPos = useExecutionSamplerStore.getState().position;
+			jumpToPosition({ ...currentPos, hopIndex: index, detailIndex: 0 });
+		},
+		[jumpToPosition],
 	);
 
 	return (
