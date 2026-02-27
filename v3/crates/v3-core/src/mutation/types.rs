@@ -64,6 +64,11 @@ pub enum MutationOperator {
     VmInstructionMutation,
     VmRegisterCountMutation,
     VmInstructionRawFieldMutation,
+    VmCopyInstructionBlock,
+    VmCopyInstructionBlockRemapped,
+    VmCopyConstantBlock,
+    VmCopyGeneBackwardSlice,
+    VmCopyGeneForwardSlice,
     // Graph
     GraphAlterGraphEdgeWeight,
     GraphSwapGraphOperator,
@@ -74,6 +79,9 @@ pub enum MutationOperator {
     GraphRetargetGraphEdge,
     GraphRemoveGraphEdge,
     GraphRawFieldMutation,
+    GraphCopyInternalNode,
+    GraphCopySubgraph,
+    GraphCopyEdgeBundle,
     // InputRef
     InputRefAdd,
     InputRefRemove,
@@ -98,6 +106,11 @@ impl MutationOperator {
             Self::VmInstructionMutation => "Vm.VmInstructionMutation",
             Self::VmRegisterCountMutation => "Vm.VmRegisterCountMutation",
             Self::VmInstructionRawFieldMutation => "Vm.VmInstructionRawFieldMutation",
+            Self::VmCopyInstructionBlock => "Vm.CopyInstructionBlock",
+            Self::VmCopyInstructionBlockRemapped => "Vm.CopyInstructionBlockRemapped",
+            Self::VmCopyConstantBlock => "Vm.CopyConstantBlock",
+            Self::VmCopyGeneBackwardSlice => "Vm.CopyGeneBackwardSlice",
+            Self::VmCopyGeneForwardSlice => "Vm.CopyGeneForwardSlice",
             Self::GraphAlterGraphEdgeWeight => "Graph.AlterGraphEdgeWeight",
             Self::GraphSwapGraphOperator => "Graph.SwapGraphOperator",
             Self::GraphMutateGraphOperatorParam => "Graph.MutateGraphOperatorParam",
@@ -107,6 +120,9 @@ impl MutationOperator {
             Self::GraphRetargetGraphEdge => "Graph.RetargetGraphEdge",
             Self::GraphRemoveGraphEdge => "Graph.RemoveGraphEdge",
             Self::GraphRawFieldMutation => "Graph.GraphRawFieldMutation",
+            Self::GraphCopyInternalNode => "Graph.CopyInternalNode",
+            Self::GraphCopySubgraph => "Graph.CopySubgraph",
+            Self::GraphCopyEdgeBundle => "Graph.CopyEdgeBundle",
             Self::InputRefAdd => "InputRef.Add",
             Self::InputRefRemove => "InputRef.Remove",
             Self::InputRefSwap => "InputRef.Swap",
@@ -129,7 +145,12 @@ impl MutationOperator {
             Self::VmConstantMutation
             | Self::VmInstructionMutation
             | Self::VmRegisterCountMutation
-            | Self::VmInstructionRawFieldMutation => MutationDomain::Vm,
+            | Self::VmInstructionRawFieldMutation
+            | Self::VmCopyInstructionBlock
+            | Self::VmCopyInstructionBlockRemapped
+            | Self::VmCopyConstantBlock
+            | Self::VmCopyGeneBackwardSlice
+            | Self::VmCopyGeneForwardSlice => MutationDomain::Vm,
             Self::GraphAlterGraphEdgeWeight
             | Self::GraphSwapGraphOperator
             | Self::GraphMutateGraphOperatorParam
@@ -138,7 +159,10 @@ impl MutationOperator {
             | Self::GraphAddGraphEdge
             | Self::GraphRetargetGraphEdge
             | Self::GraphRemoveGraphEdge
-            | Self::GraphRawFieldMutation => MutationDomain::Graph,
+            | Self::GraphRawFieldMutation
+            | Self::GraphCopyInternalNode
+            | Self::GraphCopySubgraph
+            | Self::GraphCopyEdgeBundle => MutationDomain::Graph,
             Self::InputRefAdd
             | Self::InputRefRemove
             | Self::InputRefSwap
@@ -155,7 +179,7 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 26] {
+    pub const fn all() -> [Self; 34] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
@@ -170,6 +194,11 @@ impl MutationOperator {
             Self::VmInstructionMutation,
             Self::VmRegisterCountMutation,
             Self::VmInstructionRawFieldMutation,
+            Self::VmCopyInstructionBlock,
+            Self::VmCopyInstructionBlockRemapped,
+            Self::VmCopyConstantBlock,
+            Self::VmCopyGeneBackwardSlice,
+            Self::VmCopyGeneForwardSlice,
             Self::GraphAlterGraphEdgeWeight,
             Self::GraphSwapGraphOperator,
             Self::GraphMutateGraphOperatorParam,
@@ -179,6 +208,9 @@ impl MutationOperator {
             Self::GraphRetargetGraphEdge,
             Self::GraphRemoveGraphEdge,
             Self::GraphRawFieldMutation,
+            Self::GraphCopyInternalNode,
+            Self::GraphCopySubgraph,
+            Self::GraphCopyEdgeBundle,
             Self::InputRefAdd,
             Self::InputRefRemove,
             Self::InputRefSwap,
@@ -308,7 +340,12 @@ mod tests {
                 MutationOperator::VmConstantMutation
                 | MutationOperator::VmInstructionMutation
                 | MutationOperator::VmRegisterCountMutation
-                | MutationOperator::VmInstructionRawFieldMutation => {
+                | MutationOperator::VmInstructionRawFieldMutation
+                | MutationOperator::VmCopyInstructionBlock
+                | MutationOperator::VmCopyInstructionBlockRemapped
+                | MutationOperator::VmCopyConstantBlock
+                | MutationOperator::VmCopyGeneBackwardSlice
+                | MutationOperator::VmCopyGeneForwardSlice => {
                     assert_eq!(operator.domain(), MutationDomain::Vm)
                 }
                 MutationOperator::GraphAlterGraphEdgeWeight
@@ -319,7 +356,10 @@ mod tests {
                 | MutationOperator::GraphAddGraphEdge
                 | MutationOperator::GraphRetargetGraphEdge
                 | MutationOperator::GraphRemoveGraphEdge
-                | MutationOperator::GraphRawFieldMutation => {
+                | MutationOperator::GraphRawFieldMutation
+                | MutationOperator::GraphCopyInternalNode
+                | MutationOperator::GraphCopySubgraph
+                | MutationOperator::GraphCopyEdgeBundle => {
                     assert_eq!(operator.domain(), MutationDomain::Graph)
                 }
                 MutationOperator::InputRefAdd

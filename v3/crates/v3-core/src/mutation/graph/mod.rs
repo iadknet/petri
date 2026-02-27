@@ -17,12 +17,15 @@ pub enum GraphOperator {
     RetargetGraphEdge,
     RemoveGraphEdge,
     GraphRawFieldMutation,
+    CopyInternalNode,
+    CopySubgraph,
+    CopyEdgeBundle,
 }
 
 impl GraphOperator {
     /// Pick a random graph operator uniformly.
     pub fn random(rng: &mut impl Rng) -> Self {
-        match rng.gen_range(0u8..9) {
+        match rng.gen_range(0u8..12) {
             0 => Self::AlterGraphEdgeWeight,
             1 => Self::SwapGraphOperator,
             2 => Self::MutateGraphOperatorParam,
@@ -31,7 +34,10 @@ impl GraphOperator {
             5 => Self::AddGraphEdge,
             6 => Self::RetargetGraphEdge,
             7 => Self::RemoveGraphEdge,
-            _ => Self::GraphRawFieldMutation,
+            8 => Self::GraphRawFieldMutation,
+            9 => Self::CopyInternalNode,
+            10 => Self::CopySubgraph,
+            _ => Self::CopyEdgeBundle,
         }
     }
 }
@@ -73,6 +79,13 @@ impl GraphMutator {
             GraphOperator::RemoveGraphEdge => remove_graph_edge(genome, node_idx, rng),
             GraphOperator::GraphRawFieldMutation => {
                 apply_graph_raw_field_mutation(genome, node_idx, rng)
+            }
+            GraphOperator::CopyInternalNode => {
+                apply_copy_internal_node(genome, node_idx, rng)
+            }
+            GraphOperator::CopySubgraph => apply_copy_subgraph(genome, node_idx, rng),
+            GraphOperator::CopyEdgeBundle => {
+                apply_copy_edge_bundle(genome, node_idx, rng)
             }
         }
     }
@@ -330,6 +343,30 @@ fn is_parameterized(kind: &GraphNodeKind) -> bool {
             | GraphNodeKind::Momentum(_)
             | GraphNodeKind::Oscillator(_)
     )
+}
+
+fn apply_copy_internal_node(
+    _genome: &mut CreatureGenome,
+    _node_idx: usize,
+    _rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    Err(MutationSkipReason::NoApplicableTarget)
+}
+
+fn apply_copy_subgraph(
+    _genome: &mut CreatureGenome,
+    _node_idx: usize,
+    _rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    Err(MutationSkipReason::NoApplicableTarget)
+}
+
+fn apply_copy_edge_bundle(
+    _genome: &mut CreatureGenome,
+    _node_idx: usize,
+    _rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    Err(MutationSkipReason::NoApplicableTarget)
 }
 
 #[cfg(test)]
@@ -854,6 +891,9 @@ mod tests {
             GraphOperator::RetargetGraphEdge,
             GraphOperator::RemoveGraphEdge,
             GraphOperator::GraphRawFieldMutation,
+            GraphOperator::CopyInternalNode,
+            GraphOperator::CopySubgraph,
+            GraphOperator::CopyEdgeBundle,
         ];
         for (i, &op) in operators.iter().enumerate() {
             let mut genome = v3alpha1_founder_genome();
