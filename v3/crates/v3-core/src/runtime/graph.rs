@@ -1281,4 +1281,133 @@ mod tests {
             result.route_target_idx
         );
     }
+
+    #[test]
+    fn input_ref_255_soft_defaults_to_zero() {
+        let def = GraphBackendDef {
+            internal_nodes: vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::InputRef(255),
+                    inputs: vec![],
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::CustomOutput(0),
+                    inputs: vec![GraphInput {
+                        source_idx: 0,
+                        weight: 1.0,
+                    }],
+                },
+            ],
+        };
+        let upstream = [0.0f32; 12];
+        let mut energy = 100.0f32;
+        let mut graph_state: Vec<Vec<f32>> = vec![];
+        let si = make_static_inputs();
+        let config = default_config();
+
+        let result = execute_graph_node(
+            &def,
+            &[],
+            &upstream,
+            &mut energy,
+            0.0,
+            0,
+            &mut graph_state,
+            &si,
+            &config,
+        );
+
+        assert!(!result.energy_exhausted);
+        assert_eq!(
+            result.output_slots[0], 0.0,
+            "out-of-range InputRef must soft-default to zero"
+        );
+    }
+
+    #[test]
+    fn custom_output_255_does_not_write_output_slots() {
+        let def = GraphBackendDef {
+            internal_nodes: vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::Constant(7.0),
+                    inputs: vec![],
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::CustomOutput(255),
+                    inputs: vec![GraphInput {
+                        source_idx: 0,
+                        weight: 1.0,
+                    }],
+                },
+            ],
+        };
+        let upstream = [3.0f32; 12];
+        let mut energy = 100.0f32;
+        let mut graph_state: Vec<Vec<f32>> = vec![];
+        let si = make_static_inputs();
+        let config = default_config();
+
+        let result = execute_graph_node(
+            &def,
+            &[],
+            &upstream,
+            &mut energy,
+            0.0,
+            0,
+            &mut graph_state,
+            &si,
+            &config,
+        );
+
+        assert!(!result.energy_exhausted);
+        assert_eq!(
+            result.output_slots, upstream,
+            "out-of-range CustomOutput index must leave output slots unchanged"
+        );
+    }
+
+    #[test]
+    fn edge_source_65535_soft_defaults_to_zero() {
+        let def = GraphBackendDef {
+            internal_nodes: vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::Add,
+                    inputs: vec![GraphInput {
+                        source_idx: u16::MAX,
+                        weight: 1.0,
+                    }],
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::CustomOutput(0),
+                    inputs: vec![GraphInput {
+                        source_idx: 0,
+                        weight: 1.0,
+                    }],
+                },
+            ],
+        };
+        let upstream = [0.0f32; 12];
+        let mut energy = 100.0f32;
+        let mut graph_state: Vec<Vec<f32>> = vec![];
+        let si = make_static_inputs();
+        let config = default_config();
+
+        let result = execute_graph_node(
+            &def,
+            &[],
+            &upstream,
+            &mut energy,
+            0.0,
+            0,
+            &mut graph_state,
+            &si,
+            &config,
+        );
+
+        assert!(!result.energy_exhausted);
+        assert_eq!(
+            result.output_slots[0], 0.0,
+            "out-of-range edge sources must soft-default to zero"
+        );
+    }
 }

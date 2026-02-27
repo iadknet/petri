@@ -12,15 +12,17 @@ pub enum InputRefOperator {
     Add,
     Remove,
     Swap,
+    RawFieldMutation,
 }
 
 impl InputRefOperator {
     /// Pick a random input ref operator uniformly.
     pub fn random(rng: &mut impl Rng) -> Self {
-        match rng.gen_range(0u8..3) {
+        match rng.gen_range(0u8..4) {
             0 => Self::Add,
             1 => Self::Remove,
-            _ => Self::Swap,
+            2 => Self::Swap,
+            _ => Self::RawFieldMutation,
         }
     }
 }
@@ -79,6 +81,7 @@ impl InputRefMutator {
                 genome.nodes[node_idx].input_refs[ref_idx] = random_input_reference(rng);
                 Ok(())
             }
+            InputRefOperator::RawFieldMutation => apply_raw_field_mutation(genome, rng),
         }
     }
 }
@@ -87,7 +90,7 @@ impl InputRefMutator {
 ///
 /// Distribution: FoodHere (1) + NeighborCellFood (8) + NeighborCellBarrier (8) +
 /// NeighborCellOccupied (8) + StaticIntrospection (2) + DynamicIntrospection (2) +
-/// UpstreamSlot(0..8) (8) = 37 total.
+/// UpstreamSlot(usize) raw values (8 weighted slots) = 37 total.
 fn random_input_reference(rng: &mut impl Rng) -> InputReference {
     let idx = rng.gen_range(0u8..37);
     match idx {
@@ -105,8 +108,39 @@ fn random_input_reference(rng: &mut impl Rng) -> InputReference {
         26 => InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
         27 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
         28 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),
-        _ => InputReference::UpstreamSlot((idx - 29) as usize),
+        _ => InputReference::UpstreamSlot(rng.gen::<u8>() as usize),
     }
+}
+
+fn apply_raw_field_mutation(
+    genome: &mut CreatureGenome,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    let mut eligible_count: usize = 0;
+    for node in &genome.nodes {
+        eligible_count += node
+            .input_refs
+            .iter()
+            .filter(|r| matches!(r, InputReference::UpstreamSlot(_)))
+            .count();
+    }
+    if eligible_count == 0 {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
+
+    let mut pick = rng.gen_range(0..eligible_count);
+    for node in &mut genome.nodes {
+        for input_ref in &mut node.input_refs {
+            if matches!(input_ref, InputReference::UpstreamSlot(_)) {
+                if pick == 0 {
+                    *input_ref = InputReference::UpstreamSlot(rng.gen::<u16>() as usize);
+                    return Ok(());
+                }
+                pick -= 1;
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Map an index 0..8 to a Direction (canonical order).
@@ -117,13 +151,33 @@ fn direction_from_idx(idx: u8) -> Direction {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::contracts::NodeId;
     use crate::creature::founder::v3alpha1_founder_genome;
+    use crate::creature::genome::{
+        BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
+    };
     use crate::creature::parseability::ParseabilityGate;
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
 
     fn rng(seed: u64) -> SmallRng {
         SmallRng::seed_from_u64(seed)
+    }
+
+    fn single_node_genome_with_input_ref(input_ref: InputReference) -> CreatureGenome {
+        CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![input_ref],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![VmInstruction::Halt],
+                }),
+                targets: vec![],
+            }],
+        }
     }
 
     #[test]
@@ -218,11 +272,51 @@ mod tests {
     }
 
     #[test]
+    fn random_input_reference_reaches_out_of_range_upstream_slot() {
+        let mut saw_out_of_range_upstream_slot = false;
+        for seed in 0u64..20_000 {
+            let mut r = rng(seed);
+            if let InputReference::UpstreamSlot(slot) = random_input_reference(&mut r) {
+                if slot > 11 {
+                    saw_out_of_range_upstream_slot = true;
+                    break;
+                }
+            }
+        }
+        assert!(
+            saw_out_of_range_upstream_slot,
+            "input ref mutation surface must include out-of-range upstream slots"
+        );
+    }
+
+    #[test]
+    fn raw_field_mutation_can_set_out_of_range_upstream_slot() {
+        let mut found_out_of_range = false;
+        for seed in 0u64..512 {
+            let mut genome = single_node_genome_with_input_ref(InputReference::UpstreamSlot(0));
+            let mut r = rng(seed);
+            InputRefMutator::apply(&mut genome, InputRefOperator::RawFieldMutation, &mut r)
+                .unwrap();
+            if let InputReference::UpstreamSlot(slot) = genome.nodes[0].input_refs[0] {
+                if slot > 11 {
+                    found_out_of_range = true;
+                    break;
+                }
+            }
+        }
+        assert!(
+            found_out_of_range,
+            "raw input-ref mutation must reach out-of-range upstream slots"
+        );
+    }
+
+    #[test]
     fn input_ref_after_mutation_passes_parseability_gate() {
         let operators = [
             InputRefOperator::Add,
             InputRefOperator::Remove,
             InputRefOperator::Swap,
+            InputRefOperator::RawFieldMutation,
         ];
         for (i, &op) in operators.iter().enumerate() {
             let mut genome = v3alpha1_founder_genome();

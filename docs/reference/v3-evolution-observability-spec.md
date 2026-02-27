@@ -49,6 +49,12 @@ Implementations must expose, at minimum:
 - `mutation_events_applied_total`
 - `mutation_events_skipped_total`
 - `mutation_events_skipped_total_by_reason`
+- `mutation_events_attempted_total_by_domain`
+- `mutation_events_applied_total_by_domain`
+- `mutation_events_attempted_total_by_operator`
+- `mutation_events_applied_total_by_operator`
+- `mutation_events_applied_total_semantic_noop`
+- `mutation_events_applied_total_semantic_change`
 
 ### Reproduction counters
 
@@ -66,6 +72,27 @@ Implementations must expose, at minimum:
 
 Counter scope (tick-level, run-level, or both) may vary by implementation, but
 the semantic meaning of each counter must remain consistent.
+
+Core accounting representation guidance:
+- Core runtime accounting should use typed keys (domain/operator/reason enums)
+  on hot paths.
+- String-key maps are a transport concern and should be produced at API/CLI
+  boundaries only.
+
+Mutation accounting invariants:
+- `mutation_events_attempted_total =
+  mutation_events_applied_total + mutation_events_skipped_total`
+- `sum(mutation_events_attempted_total_by_domain) =
+  mutation_events_attempted_total`
+- `sum(mutation_events_applied_total_by_domain) =
+  mutation_events_applied_total`
+- `sum(mutation_events_attempted_total_by_operator) =
+  mutation_events_attempted_total`
+- `sum(mutation_events_applied_total_by_operator) =
+  mutation_events_applied_total`
+- `mutation_events_applied_total_semantic_noop +
+  mutation_events_applied_total_semantic_change =
+  mutation_events_applied_total`
 
 ---
 
@@ -116,10 +143,12 @@ minimum fields per event type:
 
 - `tick`
 - `event_index`
-- `domain` (`Topology`, `Vm`, `Graph`, or implementation-defined equivalent)
+- `domain` (`Topology`, `Vm`, `Graph`, `InputRef`, or
+  implementation-defined equivalent)
 - `operator`
 - `outcome` (`Applied` or `Skipped`)
 - `skip_reason` (when skipped)
+- `semantic_category` (`SemanticNoop` or `SemanticChange`, when applied)
 
 ### `ReproductionActionEvent`
 

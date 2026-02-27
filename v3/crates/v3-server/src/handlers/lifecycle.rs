@@ -261,13 +261,43 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
         mutation_events_attempted_total: stats.mutation_events_attempted_total,
         mutation_events_applied_total: stats.mutation_events_applied_total,
         mutation_events_skipped_total: stats.mutation_events_skipped_total,
+        mutation_events_attempted_total_by_domain: stats
+            .mutation_events_attempted_total_by_domain
+            .iter()
+            .map(|(domain, count)| (domain.as_key().to_string(), *count))
+            .collect(),
+        mutation_events_applied_total_by_domain: stats
+            .mutation_events_applied_total_by_domain
+            .iter()
+            .map(|(domain, count)| (domain.as_key().to_string(), *count))
+            .collect(),
+        mutation_events_attempted_total_by_operator: stats
+            .mutation_events_attempted_total_by_operator
+            .iter()
+            .map(|(operator, count)| (operator.as_key().to_string(), *count))
+            .collect(),
+        mutation_events_applied_total_by_operator: stats
+            .mutation_events_applied_total_by_operator
+            .iter()
+            .map(|(operator, count)| (operator.as_key().to_string(), *count))
+            .collect(),
+        mutation_events_applied_total_semantic_noop: stats
+            .mutation_events_applied_total_semantic_noop,
+        mutation_events_applied_total_semantic_change: stats
+            .mutation_events_applied_total_semantic_change,
         reproduction_actions_attempted_total: stats.reproduction_actions_attempted_total,
         reproduction_actions_spawned_total: stats.reproduction_actions_spawned_total,
         reproduction_actions_rejected_total: stats.reproduction_actions_rejected_total,
         reproduction_actions_rejected_total_by_reason: stats
             .reproduction_actions_rejected_by_reason
-            .clone(),
-        mutation_events_skipped_total_by_reason: stats.mutation_events_skipped_by_reason.clone(),
+            .iter()
+            .map(|(reason, count)| (reason.as_key().to_string(), *count))
+            .collect(),
+        mutation_events_skipped_total_by_reason: stats
+            .mutation_events_skipped_by_reason
+            .iter()
+            .map(|(reason, count)| (reason.as_key().to_string(), *count))
+            .collect(),
         genome_complexity_mean: complexity_mean,
         genome_complexity_min: complexity_min,
         genome_complexity_max: complexity_max,

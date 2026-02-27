@@ -527,6 +527,19 @@ mod tests {
     }
 
     #[test]
+    fn emit_unknown_action_type_255_defaults_to_noop() {
+        let (r, _) = run_vm(
+            vec![VmInstruction::EmitWorldAction { action_type: 255 }],
+            1,
+            vec![],
+            &[],
+            zeroed_upstream(),
+            100.0,
+        );
+        assert_eq!(r.world_action, Some(crate::contracts::WorldAction::NoOp));
+    }
+
+    #[test]
     fn emit_move_with_meta() {
         // Set meta[0] = 2.0 (East), then emit Move
         let program = vec![
@@ -929,6 +942,31 @@ mod tests {
         ];
         let (r, _) = run_vm(program, 2, vec![300.0], &[], zeroed_upstream(), 100.0);
         assert!((r.output_slots[0] - 255.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn mem8_imm_addr_65535_wraps_and_executes_without_panic() {
+        let program = vec![
+            VmInstruction::LoadConst {
+                dst: 0,
+                const_idx: 0,
+            },
+            VmInstruction::StoreMem8Imm {
+                imm_addr: 65535,
+                src: 0,
+            },
+            VmInstruction::LoadMem8Imm {
+                dst: 1,
+                imm_addr: 65535,
+            },
+            VmInstruction::WriteInternalPayload {
+                slot_idx: 0,
+                src: 1,
+            },
+            VmInstruction::Halt,
+        ];
+        let (r, _) = run_vm(program, 2, vec![42.0], &[], zeroed_upstream(), 100.0);
+        assert!((r.output_slots[0] - 42.0).abs() < 1e-6);
     }
 
     #[test]
