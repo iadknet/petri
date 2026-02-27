@@ -183,6 +183,7 @@ fn topology_operator_key(op: TopologyOperator) -> MutationOperator {
         TopologyOperator::ChangeEntryNode => MutationOperator::TopologyChangeEntryNode,
         TopologyOperator::SwapNodeBackend => MutationOperator::TopologySwapNodeBackend,
         TopologyOperator::RewriteNodeId => MutationOperator::TopologyRewriteNodeId,
+        TopologyOperator::CopyNode => MutationOperator::TopologyCopyNode,
     }
 }
 

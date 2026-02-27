@@ -17,12 +17,13 @@ pub enum TopologyOperator {
     ChangeEntryNode,
     SwapNodeBackend,
     RewriteNodeId,
+    CopyNode,
 }
 
 impl TopologyOperator {
     /// Pick a random topology operator uniformly.
     pub fn random(rng: &mut impl Rng) -> Self {
-        match rng.gen_range(0u8..8) {
+        match rng.gen_range(0u8..9) {
             0 => Self::AddNode,
             1 => Self::RemoveNode,
             2 => Self::RetargetNodeTarget,
@@ -30,7 +31,8 @@ impl TopologyOperator {
             4 => Self::RemoveRouteTarget,
             5 => Self::ChangeEntryNode,
             6 => Self::SwapNodeBackend,
-            _ => Self::RewriteNodeId,
+            7 => Self::RewriteNodeId,
+            _ => Self::CopyNode,
         }
     }
 }
@@ -56,6 +58,7 @@ impl TopologyMutator {
             TopologyOperator::ChangeEntryNode => apply_change_entry_node(genome, rng),
             TopologyOperator::SwapNodeBackend => apply_swap_node_backend(genome, rng),
             TopologyOperator::RewriteNodeId => apply_rewrite_node_id(genome, rng),
+            TopologyOperator::CopyNode => apply_copy_node(genome, rng),
         }
     }
 }
@@ -231,6 +234,42 @@ fn apply_rewrite_node_id(
     Ok(())
 }
 
+fn apply_copy_node(
+    genome: &mut CreatureGenome,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    if genome.nodes.is_empty() {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
+    let source_idx = rng.gen_range(0..genome.nodes.len());
+    let backend_def = genome.nodes[source_idx].backend_def.clone();
+    let new_id = next_node_id(genome);
+
+    let targets = if rng.gen_bool(0.5) {
+        genome.nodes[source_idx].targets.clone()
+    } else {
+        vec![]
+    };
+    let input_refs = if rng.gen_bool(0.5) {
+        genome.nodes[source_idx].input_refs.clone()
+    } else {
+        vec![]
+    };
+    let add_backlink = rng.gen_bool(0.5);
+
+    genome.nodes.push(NodeGenome {
+        node_id: new_id,
+        input_refs,
+        backend_def,
+        targets,
+    });
+
+    if add_backlink {
+        genome.nodes[source_idx].targets.push(new_id);
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -338,6 +377,7 @@ mod tests {
             TopologyOperator::ChangeEntryNode,
             TopologyOperator::SwapNodeBackend,
             TopologyOperator::RewriteNodeId,
+            TopologyOperator::CopyNode,
         ];
         for (i, &op) in operators.iter().enumerate() {
             let mut genome = v3alpha1_founder_genome();
@@ -392,5 +432,183 @@ mod tests {
             vec![new_id],
             "all target references should be rewritten"
         );
+    }
+
+    #[test]
+    fn copy_node_increases_node_count_by_one() {
+        let mut genome = v3alpha1_founder_genome();
+        let before = genome.nodes.len();
+        let mut r = rng(42);
+        TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &mut r).unwrap();
+        assert_eq!(genome.nodes.len(), before + 1);
+    }
+
+    #[test]
+    fn copy_node_assigns_different_node_id() {
+        let mut genome = v3alpha1_founder_genome();
+        let original_ids: Vec<NodeId> = genome.nodes.iter().map(|n| n.node_id).collect();
+        let mut r = rng(42);
+        TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &mut r).unwrap();
+        let new_node = genome.nodes.last().unwrap();
+        assert!(
+            !original_ids.contains(&new_node.node_id),
+            "copied node must have a fresh NodeId"
+        );
+    }
+
+    #[test]
+    fn copy_node_deep_copies_vm_backend() {
+        // The founder genome has VM nodes. Over seeds, find one that copies a VM node
+        // and verify backend equality.
+        let mut found = false;
+        for seed in 0u64..100 {
+            let mut genome = v3alpha1_founder_genome();
+            let mut r = rng(seed);
+            TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &mut r).unwrap();
+            let new_node = genome.nodes.last().unwrap();
+            if matches!(&new_node.backend_def, BackendDef::Vm(_)) {
+                // Find which source node has matching backend.
+                let has_match = genome
+                    .nodes
+                    .iter()
+                    .rev()
+                    .skip(1)
+                    .any(|n| n.backend_def == new_node.backend_def);
+                if has_match {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        assert!(
+            found,
+            "must find at least one seed that deep-copies a VM backend"
+        );
+    }
+
+    #[test]
+    fn copy_node_deep_copies_graph_backend() {
+        // Swap one founder node to Graph first, then copy.
+        let mut found = false;
+        for seed in 0u64..100 {
+            let mut genome = v3alpha1_founder_genome();
+            // Swap node 1 to Graph backend.
+            genome.nodes[1].backend_def = BackendDef::Graph(GraphBackendDef {
+                internal_nodes: vec![],
+            });
+            let mut r = rng(seed);
+            TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &mut r).unwrap();
+            let new_node = genome.nodes.last().unwrap();
+            if matches!(&new_node.backend_def, BackendDef::Graph(_)) {
+                let has_match = genome
+                    .nodes
+                    .iter()
+                    .rev()
+                    .skip(1)
+                    .any(|n| n.backend_def == new_node.backend_def);
+                if has_match {
+                    found = true;
+                    break;
+                }
+            }
+        }
+        assert!(
+            found,
+            "must find at least one seed that deep-copies a Graph backend"
+        );
+    }
+
+    #[test]
+    fn copy_node_sometimes_copies_targets_sometimes_not() {
+        let mut saw_copied = false;
+        let mut saw_empty = false;
+        for seed in 0u64..500 {
+            let mut genome = v3alpha1_founder_genome();
+            let mut r = rng(seed);
+            TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &mut r).unwrap();
+            let new_node = genome.nodes.last().unwrap();
+            if new_node.targets.is_empty() {
+                saw_empty = true;
+            } else {
+                saw_copied = true;
+            }
+            if saw_copied && saw_empty {
+                break;
+            }
+        }
+        assert!(saw_copied, "must observe at least one copy with targets");
+        assert!(
+            saw_empty,
+            "must observe at least one copy with empty targets"
+        );
+    }
+
+    #[test]
+    fn copy_node_sometimes_copies_input_refs_sometimes_not() {
+        let mut saw_copied = false;
+        let mut saw_empty = false;
+        for seed in 0u64..500 {
+            let mut genome = v3alpha1_founder_genome();
+            let mut r = rng(seed);
+            TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &mut r).unwrap();
+            let new_node = genome.nodes.last().unwrap();
+            if new_node.input_refs.is_empty() {
+                saw_empty = true;
+            } else {
+                saw_copied = true;
+            }
+            if saw_copied && saw_empty {
+                break;
+            }
+        }
+        assert!(saw_copied, "must observe at least one copy with input_refs");
+        assert!(
+            saw_empty,
+            "must observe at least one copy with empty input_refs"
+        );
+    }
+
+    #[test]
+    fn copy_node_sometimes_adds_backlink_sometimes_not() {
+        let mut saw_backlink = false;
+        let mut saw_no_backlink = false;
+        for seed in 0u64..500 {
+            let mut genome = v3alpha1_founder_genome();
+            let original_targets: Vec<Vec<NodeId>> =
+                genome.nodes.iter().map(|n| n.targets.clone()).collect();
+            let mut r = rng(seed);
+            TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &mut r).unwrap();
+            let new_id = genome.nodes.last().unwrap().node_id;
+            // Check if any original node gained the new_id in its targets.
+            let backlinked = genome.nodes.iter().enumerate().any(|(i, n)| {
+                i < original_targets.len()
+                    && n.targets.contains(&new_id)
+                    && !original_targets[i].contains(&new_id)
+            });
+            if backlinked {
+                saw_backlink = true;
+            } else {
+                saw_no_backlink = true;
+            }
+            if saw_backlink && saw_no_backlink {
+                break;
+            }
+        }
+        assert!(saw_backlink, "must observe at least one backlink addition");
+        assert!(
+            saw_no_backlink,
+            "must observe at least one case without backlink"
+        );
+    }
+
+    #[test]
+    fn copy_node_can_copy_entry_node() {
+        let mut genome = v3alpha1_founder_genome();
+        genome.nodes.truncate(1);
+        genome.entry_node_id = genome.nodes[0].node_id;
+        let before = genome.nodes.len();
+        let mut r = rng(99);
+        TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &mut r).unwrap();
+        assert_eq!(genome.nodes.len(), before + 1);
     }
 }
