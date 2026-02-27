@@ -405,6 +405,76 @@ pub fn mesh_reachable_nodes(genome: &CreatureGenome) -> Vec<usize> {
         .collect()
 }
 
+/// Backward-slice from an anchor node at the mesh level.
+///
+/// Finds all nodes whose `targets` transitively reach the anchor node
+/// (the "feeding pipeline"). Always includes the anchor itself. Returns
+/// sorted indices capped at `max_size`.
+#[must_use]
+pub fn mesh_backward_slice(
+    genome: &CreatureGenome,
+    anchor_idx: usize,
+    max_size: usize,
+) -> Option<DetectedGene> {
+    if anchor_idx >= genome.nodes.len() {
+        return None;
+    }
+
+    let mut included = vec![false; genome.nodes.len()];
+    included[anchor_idx] = true;
+    let mut count = 1usize;
+
+    // Fixpoint: find nodes whose targets contain any included node's node_id
+    loop {
+        let mut changed = false;
+        for i in 0..genome.nodes.len() {
+            if included[i] || count >= max_size {
+                continue;
+            }
+            let targets_included = genome.nodes[i].targets.iter().any(|target_id| {
+                genome
+                    .nodes
+                    .iter()
+                    .enumerate()
+                    .any(|(j, n)| included[j] && n.node_id == *target_id)
+            });
+            if targets_included {
+                included[i] = true;
+                count += 1;
+                changed = true;
+                if count >= max_size {
+                    break;
+                }
+            }
+        }
+        if !changed {
+            break;
+        }
+    }
+
+    let indices: Vec<usize> = included
+        .iter()
+        .enumerate()
+        .filter(|(_, &inc)| inc)
+        .map(|(i, _)| i)
+        .collect();
+    Some(DetectedGene { indices })
+}
+
+/// Backward-slice from a randomly chosen mesh node.
+#[must_use]
+pub fn mesh_backward_slice_random(
+    genome: &CreatureGenome,
+    rng: &mut impl Rng,
+    max_size: usize,
+) -> Option<DetectedGene> {
+    if genome.nodes.is_empty() {
+        return None;
+    }
+    let anchor_idx = rng.gen_range(0..genome.nodes.len());
+    mesh_backward_slice(genome, anchor_idx, max_size)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -894,5 +964,94 @@ mod tests {
             nodes: vec![simple_vm_node(0, vec![1]), simple_vm_node(1, vec![0])],
         };
         assert_eq!(mesh_reachable_nodes(&genome), vec![0, 1]);
+    }
+
+    // ── Mesh backward slice tests ───────────────────────────────────────
+
+    #[test]
+    fn mesh_backward_slice_finds_feeding_pipeline() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                simple_vm_node(0, vec![1]),
+                simple_vm_node(1, vec![2]),
+                simple_vm_node(2, vec![]),
+            ],
+        };
+        let gene = mesh_backward_slice(&genome, 2, 8).unwrap();
+        assert_eq!(gene.indices, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn mesh_backward_slice_excludes_unconnected_nodes() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                simple_vm_node(0, vec![1]),
+                simple_vm_node(1, vec![]),
+                simple_vm_node(2, vec![1]),
+                simple_vm_node(3, vec![]),
+            ],
+        };
+        let gene = mesh_backward_slice(&genome, 1, 8).unwrap();
+        assert_eq!(gene.indices, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn mesh_backward_slice_anchor_only_when_nothing_targets_it() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                simple_vm_node(0, vec![1]),
+                simple_vm_node(1, vec![]),
+            ],
+        };
+        let gene = mesh_backward_slice(&genome, 0, 8).unwrap();
+        assert_eq!(gene.indices, vec![0]);
+    }
+
+    #[test]
+    fn mesh_backward_slice_respects_max_size() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                simple_vm_node(0, vec![1]),
+                simple_vm_node(1, vec![2]),
+                simple_vm_node(2, vec![]),
+            ],
+        };
+        let gene = mesh_backward_slice(&genome, 2, 2).unwrap();
+        assert_eq!(gene.indices.len(), 2);
+    }
+
+    #[test]
+    fn mesh_backward_slice_out_of_bounds_returns_none() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![simple_vm_node(0, vec![])],
+        };
+        assert_eq!(mesh_backward_slice(&genome, 5, 8), None);
+    }
+
+    #[test]
+    fn mesh_backward_slice_empty_genome_returns_none() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![],
+        };
+        assert_eq!(mesh_backward_slice(&genome, 0, 8), None);
+    }
+
+    #[test]
+    fn mesh_backward_slice_handles_cycle() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                simple_vm_node(0, vec![1]),
+                simple_vm_node(1, vec![0]),
+            ],
+        };
+        let gene = mesh_backward_slice(&genome, 0, 8).unwrap();
+        assert_eq!(gene.indices, vec![0, 1]);
     }
 }
