@@ -307,26 +307,26 @@ pub fn execute_vm_node(
 
 /// Normalize a register index via rem_euclid wrapping.
 #[inline]
-fn nr(idx: u8, reg_count: usize) -> usize {
+pub(crate) fn nr(idx: u8, reg_count: usize) -> usize {
     (idx as usize).rem_euclid(reg_count)
 }
 
 /// Boolean truthiness: value >= 0.5.
 #[inline]
-fn is_truthy(v: f32) -> bool {
+pub(crate) fn is_truthy(v: f32) -> bool {
     v >= 0.5
 }
 
 /// Compute jump target PC with rem_euclid wrapping.
 /// `offset` is signed relative to the instruction AFTER the jump.
 #[inline]
-fn jump_target(pc: usize, offset: i32, program_len: usize) -> usize {
+pub(crate) fn jump_target(pc: usize, offset: i32, program_len: usize) -> usize {
     let provisional = pc as i64 + 1 + offset as i64;
     provisional.rem_euclid(program_len as i64) as usize
 }
 
 /// Base energy cost per opcode per v3-vm-isa-spec.md Section 6.
-fn opcode_base_cost(instr: &crate::creature::genome::VmInstruction) -> f32 {
+pub(crate) fn opcode_base_cost(instr: &crate::creature::genome::VmInstruction) -> f32 {
     use crate::creature::genome::VmInstruction;
     match instr {
         VmInstruction::Noop => 0.05,

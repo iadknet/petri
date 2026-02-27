@@ -332,11 +332,12 @@ async fn health_payload_contains_mutation_skip_by_reason() {
 
     let mut sim = seed_simulation(cfg, 42);
     for _ in 0..20 {
-        run_tick(&mut sim);
+        run_tick(&mut sim, &mut None);
     }
     let handle = SimHandle {
         sim,
         status: SimulationStatus::Paused,
+        active_trace: None,
     };
     let frame = build_ws_frame(&handle);
     // The field always exists as part of the typed struct; verify it's accessible.
@@ -356,6 +357,7 @@ async fn status_payload_includes_state() {
     let handle = SimHandle {
         sim,
         status: SimulationStatus::Paused,
+        active_trace: None,
     };
 
     let frame = build_ws_frame(&handle);
@@ -377,11 +379,12 @@ async fn ws_frame_msgpack_roundtrip() {
 
     let mut sim = seed_simulation(SimulationConfig::default(), 99);
     for _ in 0..5 {
-        run_tick(&mut sim);
+        run_tick(&mut sim, &mut None);
     }
     let handle = SimHandle {
         sim,
         status: SimulationStatus::Running,
+        active_trace: None,
     };
 
     let frame = build_ws_frame(&handle);
@@ -809,4 +812,153 @@ async fn paint_erase_barrier_clears_barrier() {
         body["stats"]["barrier_cleared_cells"].as_u64().unwrap_or(0) > 0,
         "expected barrier_cleared_cells > 0: {body}"
     );
+}
+
+// ── 30. start_sample_returns_recording ────────────────────────────────────────
+
+#[tokio::test]
+async fn start_sample_returns_recording() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":42}"#))
+        .await
+        .unwrap();
+
+    // Pause so we can step manually.
+    let (_, _) = do_request(a.clone(), post_req("/v3/simulation/start")).await;
+    let (_, _) = do_request(a.clone(), post_req("/v3/simulation/pause")).await;
+
+    // Find a creature ID.
+    let (_, frame_body) = do_request(a.clone(), get_req("/v3/simulation/frame")).await;
+    let creature_id = frame_body["creatures"][0]["id"].as_u64().unwrap();
+
+    // Start sample.
+    let uri = format!("/v3/simulation/creature/{creature_id}/sample");
+    let (status, body) = do_request(a.clone(), post_json(&uri, r#"{"ticks": 3}"#)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert_eq!(body["status"].as_str(), Some("recording"));
+    assert_eq!(body["ticks_requested"].as_u64(), Some(3));
+
+    // Step 3 ticks to complete the trace.
+    let (_, _) = do_request(
+        a.clone(),
+        post_json("/v3/simulation/step", r#"{"steps": 3}"#),
+    )
+    .await;
+
+    // Poll for completed sample.
+    let (status, body) = do_request(a, get_req(&uri)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert_eq!(body["status"].as_str(), Some("complete"));
+    assert!(body["sample"].is_object(), "missing sample");
+    assert_eq!(body["sample"]["creature_id"].as_u64(), Some(creature_id));
+
+    let ticks = body["sample"]["ticks"].as_array().expect("ticks array");
+    assert_eq!(ticks.len(), 3, "expected 3 tick traces");
+
+    // Each tick should have hops and action.
+    for tick in ticks {
+        assert!(tick["hops"].is_array(), "missing hops");
+        assert!(
+            tick["final_action"].is_string() || tick["final_action"].is_object(),
+            "missing final_action"
+        );
+    }
+}
+
+// ── 31. start_sample_invalid_creature_returns_404 ─────────────────────────────
+
+#[tokio::test]
+async fn start_sample_invalid_creature_returns_404() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":42}"#))
+        .await
+        .unwrap();
+    let (_, _) = do_request(a.clone(), post_req("/v3/simulation/start")).await;
+    let (_, _) = do_request(a.clone(), post_req("/v3/simulation/pause")).await;
+
+    let (status, _) = do_request(
+        a,
+        post_json(
+            "/v3/simulation/creature/999999999/sample",
+            r#"{"ticks": 5}"#,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+// ── 32. start_sample_while_idle_returns_409 ──────────────────────────────────
+
+#[tokio::test]
+async fn start_sample_while_idle_returns_409() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":42}"#))
+        .await
+        .unwrap();
+
+    // Get a creature ID (available even while idle).
+    let (_, frame_body) = do_request(a.clone(), get_req("/v3/simulation/frame")).await;
+    let creature_id = frame_body["creatures"][0]["id"].as_u64().unwrap();
+
+    let uri = format!("/v3/simulation/creature/{creature_id}/sample");
+    let (status, _) = do_request(a, post_json(&uri, r#"{"ticks": 5}"#)).await;
+    assert_eq!(status, StatusCode::CONFLICT);
+}
+
+// ── 33. get_sample_before_start_returns_idle ─────────────────────────────────
+
+#[tokio::test]
+async fn get_sample_before_start_returns_idle() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":42}"#))
+        .await
+        .unwrap();
+    let (_, _) = do_request(a.clone(), post_req("/v3/simulation/start")).await;
+    let (_, _) = do_request(a.clone(), post_req("/v3/simulation/pause")).await;
+
+    let (_, frame_body) = do_request(a.clone(), get_req("/v3/simulation/frame")).await;
+    let creature_id = frame_body["creatures"][0]["id"].as_u64().unwrap();
+
+    let uri = format!("/v3/simulation/creature/{creature_id}/sample");
+    let (status, body) = do_request(a, get_req(&uri)).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["status"].as_str(), Some("idle"));
+}
+
+// ── 34. get_sample_while_recording_returns_progress ──────────────────────────
+
+#[tokio::test]
+async fn get_sample_while_recording_returns_progress() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":42}"#))
+        .await
+        .unwrap();
+    let (_, _) = do_request(a.clone(), post_req("/v3/simulation/start")).await;
+    let (_, _) = do_request(a.clone(), post_req("/v3/simulation/pause")).await;
+
+    let (_, frame_body) = do_request(a.clone(), get_req("/v3/simulation/frame")).await;
+    let creature_id = frame_body["creatures"][0]["id"].as_u64().unwrap();
+
+    // Start sample with 5 ticks.
+    let uri = format!("/v3/simulation/creature/{creature_id}/sample");
+    let (_, _) = do_request(a.clone(), post_json(&uri, r#"{"ticks": 5}"#)).await;
+
+    // Step only 2 ticks.
+    let (_, _) = do_request(
+        a.clone(),
+        post_json("/v3/simulation/step", r#"{"steps": 2}"#),
+    )
+    .await;
+
+    // Poll — should be "recording" with progress.
+    let (status, body) = do_request(a, get_req(&uri)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert_eq!(body["status"].as_str(), Some("recording"));
+    assert_eq!(body["ticks_completed"].as_u64(), Some(2));
+    assert_eq!(body["ticks_remaining"].as_u64(), Some(3));
 }

@@ -30,7 +30,7 @@ fn bench_full_tick(c: &mut Criterion) {
             || seed_simulation(bench_config(), 42),
             |mut sim| {
                 for _ in 0..100 {
-                    run_tick(black_box(&mut sim));
+                    run_tick(black_box(&mut sim), &mut None);
                 }
             },
         );
@@ -75,7 +75,7 @@ fn bench_full_tick_large_population(c: &mut Criterion) {
             || seed_simulation(cfg.clone(), 42),
             |mut sim| {
                 for _ in 0..50 {
-                    run_tick(black_box(&mut sim));
+                    run_tick(black_box(&mut sim), &mut None);
                 }
             },
         );

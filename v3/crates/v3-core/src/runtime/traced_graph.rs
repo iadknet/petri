@@ -1,0 +1,396 @@
+//! Traced graph execution — identical logic to [`super::graph::execute_graph_node`]
+//! but records per-pass trace data for the Execution Sampler.
+
+use crate::config::RuntimeConfig;
+use crate::contracts::InputReference;
+use crate::creature::genome::GraphBackendDef;
+use crate::runtime::graph::{collect_weighted_inputs, evaluate_kind, EvalCtx};
+use crate::runtime::trace::{kind_label, GraphNodeEvalTrace, GraphPassTrace, GraphTrace};
+use crate::runtime::types::{sanitize_f32, NodeResult};
+use crate::sensors::static_inputs::StaticInputs;
+
+use crate::creature::genome::GraphNodeKind;
+
+/// Execute a graph-backend mesh node with trace recording.
+///
+/// Identical behavior to [`super::graph::execute_graph_node`] but additionally
+/// returns a [`GraphTrace`] capturing per-pass node evaluations, convergence
+/// status, and final outputs.
+#[allow(clippy::too_many_arguments)]
+pub fn execute_graph_node_traced(
+    def: &GraphBackendDef,
+    input_refs: &[InputReference],
+    upstream_slots: &[f32; 12],
+    energy: &mut f32,
+    energy_consumed: f32,
+    node_idx: usize,
+    graph_state: &mut Vec<Vec<f32>>,
+    static_inputs: &StaticInputs,
+    config: &RuntimeConfig,
+) -> (NodeResult, GraphTrace) {
+    let node_count = def.internal_nodes.len();
+
+    let empty_trace = || GraphTrace {
+        passes: Vec::new(),
+        converged: false,
+        stable_passes_count: 0,
+        final_outputs: Vec::new(),
+    };
+
+    if node_count == 0 {
+        return (NodeResult::halted(*upstream_slots, 0.0), empty_trace());
+    }
+
+    // Ensure graph_state has enough slots for this node index.
+    if graph_state.len() <= node_idx {
+        graph_state.resize(node_idx + 1, Vec::new());
+    }
+
+    // Snapshot state for atomic rollback on energy exhaustion.
+    let state_backup: Vec<f32> = graph_state[node_idx].clone();
+
+    // Ensure the state Vec for this node is long enough.
+    let state_vec = &mut graph_state[node_idx];
+    if state_vec.len() < node_count {
+        state_vec.resize(node_count, 0.0);
+    }
+
+    let max_passes = config.max_graph_relax_iters;
+    let epsilon = config.graph_convergence_epsilon;
+    let req_stable = config.graph_convergence_stable_passes;
+
+    let mut prev_outputs = vec![0.0f32; node_count];
+    let mut curr_outputs = vec![0.0f32; node_count];
+    let mut stable_passes: u32 = 0;
+    let mut w_inputs_buf: Vec<f32> = Vec::new();
+
+    // Trace recording
+    let mut trace_passes: Vec<GraphPassTrace> = Vec::with_capacity(max_passes as usize);
+
+    for pass in 0..max_passes {
+        let pass_cost = config.graph_node_base_cost * node_count as f32;
+        *energy -= pass_cost;
+        if *energy <= 0.0 {
+            graph_state[node_idx] = state_backup;
+            let trace = GraphTrace {
+                passes: trace_passes,
+                converged: false,
+                stable_passes_count: stable_passes,
+                final_outputs: curr_outputs,
+            };
+            return (NodeResult::exhausted(), trace);
+        }
+
+        let ctx = EvalCtx {
+            input_refs,
+            upstream_slots,
+            energy: *energy,
+            energy_consumed,
+            static_inputs,
+        };
+
+        let mut node_evaluations: Vec<GraphNodeEvalTrace> = Vec::with_capacity(node_count);
+
+        for current_idx in 0..node_count {
+            let node = &def.internal_nodes[current_idx];
+            collect_weighted_inputs(
+                node,
+                current_idx,
+                node_count,
+                &prev_outputs,
+                &curr_outputs,
+                &mut w_inputs_buf,
+            );
+            let wsum: f32 = w_inputs_buf.iter().sum();
+
+            let mut node_state = graph_state[node_idx][current_idx];
+            let state_before = node_state;
+
+            curr_outputs[current_idx] = sanitize_f32(evaluate_kind(
+                &node.kind,
+                &w_inputs_buf,
+                wsum,
+                &ctx,
+                &mut node_state,
+            ));
+
+            graph_state[node_idx][current_idx] = node_state;
+
+            node_evaluations.push(GraphNodeEvalTrace {
+                node_index: current_idx,
+                kind: kind_label(&node.kind),
+                weighted_inputs: w_inputs_buf.clone(),
+                weighted_sum: wsum,
+                state_before,
+                state_after: node_state,
+                output: curr_outputs[current_idx],
+            });
+        }
+
+        let delta = prev_outputs
+            .iter()
+            .zip(curr_outputs.iter())
+            .map(|(p, c)| (c - p).abs())
+            .fold(0.0f32, f32::max);
+
+        prev_outputs.clone_from(&curr_outputs);
+
+        if delta <= epsilon {
+            stable_passes += 1;
+        } else {
+            stable_passes = 0;
+        }
+
+        trace_passes.push(GraphPassTrace {
+            pass_index: pass,
+            energy_cost: pass_cost,
+            energy_after: *energy,
+            node_evaluations,
+            max_delta: delta,
+        });
+
+        if stable_passes >= req_stable {
+            break;
+        }
+    }
+
+    // Build NodeResult
+    let mut output_slots = *upstream_slots;
+    let mut route_target_idx: f32 = 0.0;
+
+    for (i, node) in def.internal_nodes.iter().enumerate() {
+        match &node.kind {
+            GraphNodeKind::CustomOutput(s) => {
+                if (*s as usize) < 12 {
+                    output_slots[*s as usize] = curr_outputs[i];
+                }
+            }
+            GraphNodeKind::RouterOutput => {
+                route_target_idx = curr_outputs[i];
+            }
+            _ => {}
+        }
+    }
+
+    let converged = stable_passes >= req_stable;
+    let trace = GraphTrace {
+        passes: trace_passes,
+        converged,
+        stable_passes_count: stable_passes,
+        final_outputs: curr_outputs,
+    };
+
+    let result = NodeResult {
+        output_slots,
+        route_target_idx,
+        world_action: None,
+        energy_exhausted: false,
+    };
+
+    (result, trace)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::config::RuntimeConfig;
+    use crate::creature::genome::{GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind};
+    use crate::runtime::graph::execute_graph_node;
+    use crate::sensors::static_inputs::StaticInputs;
+
+    fn default_config() -> RuntimeConfig {
+        RuntimeConfig::default()
+    }
+
+    fn make_si() -> StaticInputs {
+        StaticInputs {
+            food_here: 0.0,
+            neighbor_food: [0.0; 8],
+            neighbor_barrier: [0.0; 8],
+            neighbor_occupied: [0.0; 8],
+            generation: 0.0,
+            age_ticks: 0.0,
+        }
+    }
+
+    /// Result equivalence: Constant + CustomOutput + RouterOutput.
+    #[test]
+    fn result_equivalence_constant_custom_router() {
+        let def = GraphBackendDef {
+            internal_nodes: vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::Constant(2.0),
+                    inputs: vec![],
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::CustomOutput(0),
+                    inputs: vec![GraphInput {
+                        source_idx: 0,
+                        weight: 3.0,
+                    }],
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::RouterOutput,
+                    inputs: vec![GraphInput {
+                        source_idx: 0,
+                        weight: 1.5,
+                    }],
+                },
+            ],
+        };
+        let upstream = [0.0f32; 12];
+        let si = make_si();
+        let config = default_config();
+
+        let mut energy_a = 100.0f32;
+        let mut gs_a: Vec<Vec<f32>> = vec![];
+        let result_a = execute_graph_node(
+            &def,
+            &[],
+            &upstream,
+            &mut energy_a,
+            0.0,
+            0,
+            &mut gs_a,
+            &si,
+            &config,
+        );
+
+        let mut energy_b = 100.0f32;
+        let mut gs_b: Vec<Vec<f32>> = vec![];
+        let (result_b, trace) = execute_graph_node_traced(
+            &def,
+            &[],
+            &upstream,
+            &mut energy_b,
+            0.0,
+            0,
+            &mut gs_b,
+            &si,
+            &config,
+        );
+
+        assert_eq!(result_a, result_b);
+        assert!(
+            (energy_a - energy_b).abs() < 1e-6,
+            "energy: {energy_a} vs {energy_b}"
+        );
+        assert_eq!(gs_a, gs_b);
+        assert!(trace.converged);
+        assert!(!trace.passes.is_empty());
+    }
+
+    /// DecayIntegrator state transitions captured across 2 calls.
+    #[test]
+    fn decay_integrator_state_captured() {
+        let def = GraphBackendDef {
+            internal_nodes: vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::Constant(1.0),
+                    inputs: vec![],
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::DecayIntegrator(0.5),
+                    inputs: vec![GraphInput {
+                        source_idx: 0,
+                        weight: 1.0,
+                    }],
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::CustomOutput(0),
+                    inputs: vec![GraphInput {
+                        source_idx: 1,
+                        weight: 1.0,
+                    }],
+                },
+            ],
+        };
+        let upstream = [0.0f32; 12];
+        let si = make_si();
+        let mut config = default_config();
+        config.max_graph_relax_iters = 1;
+        config.graph_convergence_stable_passes = 1;
+
+        let mut energy = 1000.0f32;
+        let mut gs: Vec<Vec<f32>> = vec![];
+
+        // Call 1: state 0.0 → 0.5
+        let (r1, trace1) = execute_graph_node_traced(
+            &def,
+            &[],
+            &upstream,
+            &mut energy,
+            0.0,
+            0,
+            &mut gs,
+            &si,
+            &config,
+        );
+        assert!(!r1.energy_exhausted);
+        assert!((r1.output_slots[0] - 0.5).abs() < 1e-5);
+
+        // Check trace captured state transition
+        let decay_eval = &trace1.passes[0].node_evaluations[1]; // node 1 = DecayIntegrator
+        assert_eq!(decay_eval.kind, "DecayIntegrator");
+        assert!((decay_eval.state_before - 0.0).abs() < 1e-6);
+        assert!((decay_eval.state_after - 0.5).abs() < 1e-6);
+
+        // Call 2: state 0.5 → 0.75
+        let (_r2, trace2) = execute_graph_node_traced(
+            &def,
+            &[],
+            &upstream,
+            &mut energy,
+            0.0,
+            0,
+            &mut gs,
+            &si,
+            &config,
+        );
+        let decay_eval2 = &trace2.passes[0].node_evaluations[1];
+        assert!((decay_eval2.state_before - 0.5).abs() < 1e-6);
+        assert!((decay_eval2.state_after - 0.75).abs() < 1e-6);
+    }
+
+    /// Convergence status captured correctly.
+    #[test]
+    fn convergence_status_captured() {
+        // A graph with only Constant nodes converges immediately
+        let def = GraphBackendDef {
+            internal_nodes: vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::Constant(1.0),
+                    inputs: vec![],
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::CustomOutput(0),
+                    inputs: vec![GraphInput {
+                        source_idx: 0,
+                        weight: 1.0,
+                    }],
+                },
+            ],
+        };
+        let upstream = [0.0f32; 12];
+        let si = make_si();
+        let config = default_config();
+
+        let mut energy = 1000.0f32;
+        let mut gs: Vec<Vec<f32>> = vec![];
+
+        let (_result, trace) = execute_graph_node_traced(
+            &def,
+            &[],
+            &upstream,
+            &mut energy,
+            0.0,
+            0,
+            &mut gs,
+            &si,
+            &config,
+        );
+
+        assert!(trace.converged);
+        assert!(trace.stable_passes_count >= config.graph_convergence_stable_passes);
+    }
+}

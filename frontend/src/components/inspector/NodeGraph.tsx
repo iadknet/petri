@@ -1,14 +1,10 @@
 import { memo, useCallback, useMemo, useState } from "react";
-import type {
-	BackendDef,
-	CreatureGenome,
-	GraphNodeKind,
-	InputReference,
-	NodeGenome,
-} from "../../types/api.ts";
+import type { BackendDef, CreatureGenome, GraphNodeKind, NodeGenome } from "../../types/api.ts";
+import { formatInputRef, inputRefColor } from "./inputRefUtils.ts";
 
 interface NodeGraphProps {
 	genome: CreatureGenome;
+	activeNodeId?: number | null;
 }
 
 // Layout constants
@@ -146,33 +142,12 @@ function getNodeColor(def: BackendDef): string {
 	return "Vm" in def ? VM_NODE_COLOR : GRAPH_NODE_COLOR;
 }
 
-function formatInputRef(ref: InputReference): string {
-	if ("World" in ref) {
-		const w = ref.World;
-		if (typeof w === "string") return w;
-		if ("NeighborCellFood" in w) return `Food.${w.NeighborCellFood}`;
-		if ("NeighborCellBarrier" in w) return `Barrier.${w.NeighborCellBarrier}`;
-		if ("NeighborCellOccupied" in w) return `Occ.${w.NeighborCellOccupied}`;
-		return "World:?";
-	}
-	if ("StaticIntrospection" in ref) return ref.StaticIntrospection;
-	if ("DynamicIntrospection" in ref) return ref.DynamicIntrospection;
-	if ("UpstreamSlot" in ref) return `slot[${ref.UpstreamSlot}]`;
-	return "?";
-}
-
-function inputRefColor(ref: InputReference): string {
-	if ("World" in ref) return "#34d399"; // green
-	if ("StaticIntrospection" in ref || "DynamicIntrospection" in ref) return "#60a5fa"; // blue
-	return "#94a3b8"; // gray for upstream
-}
-
 function getGraphNodeKindLabel(kind: GraphNodeKind): string {
 	if (typeof kind === "string") return kind;
 	return Object.keys(kind)[0] ?? "?";
 }
 
-export const NodeGraph = memo(function NodeGraph({ genome }: NodeGraphProps) {
+export const NodeGraph = memo(function NodeGraph({ genome, activeNodeId }: NodeGraphProps) {
 	const [hoveredNodeId, setHoveredNodeId] = useState<number | null>(null);
 
 	const layout = useMemo(() => computeLayout(genome), [genome]);
@@ -264,6 +239,22 @@ export const NodeGraph = memo(function NodeGraph({ genome }: NodeGraphProps) {
 									/>
 								)}
 
+								{/* Active node glow */}
+								{activeNodeId != null && activeNodeId === ln.nodeGenome.node_id && (
+									<rect
+										x={ln.x - 4}
+										y={ln.y - 4}
+										width={NODE_WIDTH + 8}
+										height={NODE_HEIGHT + 8}
+										rx={12}
+										ry={12}
+										fill="none"
+										stroke="#38bdf8"
+										strokeWidth={2}
+										style={{ opacity: 0.7, transition: "opacity 0.3s" }}
+									/>
+								)}
+
 								{/* Node body */}
 								<rect
 									x={ln.x}
@@ -276,7 +267,13 @@ export const NodeGraph = memo(function NodeGraph({ genome }: NodeGraphProps) {
 									stroke={color}
 									strokeWidth={1.2}
 									opacity={
-										hoveredNodeId !== null && hoveredNodeId !== ln.nodeGenome.node_id ? 0.4 : 1
+										activeNodeId != null
+											? activeNodeId === ln.nodeGenome.node_id
+												? 1
+												: 0.3
+											: hoveredNodeId !== null && hoveredNodeId !== ln.nodeGenome.node_id
+												? 0.4
+												: 1
 									}
 								/>
 

@@ -6,12 +6,12 @@ use crate::runtime::types::{sanitize_f32, NodeResult};
 use crate::sensors::static_inputs::StaticInputs;
 
 /// Immutable context for resolving `InputRef` nodes during graph evaluation.
-struct EvalCtx<'a> {
-    input_refs: &'a [InputReference],
-    upstream_slots: &'a [f32; 12],
-    energy: f32,
-    energy_consumed: f32,
-    static_inputs: &'a StaticInputs,
+pub(crate) struct EvalCtx<'a> {
+    pub(crate) input_refs: &'a [InputReference],
+    pub(crate) upstream_slots: &'a [f32; 12],
+    pub(crate) energy: f32,
+    pub(crate) energy_consumed: f32,
+    pub(crate) static_inputs: &'a StaticInputs,
 }
 
 /// Evaluate one internal graph node's kind, returning the scalar output.
@@ -20,7 +20,7 @@ struct EvalCtx<'a> {
 /// `wsum` is `w_inputs.iter().sum()`.
 /// `state` is the node's mutable persistent scalar state (for stateful operators).
 #[inline]
-fn evaluate_kind(
+pub(crate) fn evaluate_kind(
     kind: &GraphNodeKind,
     w_inputs: &[f32],
     wsum: f32,
@@ -113,7 +113,7 @@ fn evaluate_kind(
 /// `buf` is cleared and filled with one entry per input edge. The caller
 /// should allocate `buf` once and reuse it across nodes/passes.
 #[inline]
-fn collect_weighted_inputs(
+pub(crate) fn collect_weighted_inputs(
     node: &GraphInternalNode,
     current_idx: usize,
     node_count: usize,

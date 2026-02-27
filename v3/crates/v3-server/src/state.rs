@@ -17,6 +17,7 @@ pub enum SimulationStatus {
 pub struct SimHandle {
     pub sim: Simulation,
     pub status: SimulationStatus,
+    pub active_trace: Option<v3_core::runtime::trace::ActiveTrace>,
 }
 
 impl SimHandle {
@@ -26,6 +27,7 @@ impl SimHandle {
         Self {
             sim,
             status: SimulationStatus::Idle,
+            active_trace: None,
         }
     }
 }
