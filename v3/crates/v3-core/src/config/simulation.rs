@@ -137,6 +137,9 @@ pub struct RuntimeConfig {
     pub graph_convergence_epsilon: f32,
     pub graph_convergence_stable_passes: u32,
     pub graph_node_base_cost: f32,
+    /// Energy cost per Hebbian weight update. Default 0.0 (free during initial rollout).
+    #[serde(default)]
+    pub hebbian_update_cost: f32,
     pub vm: VmRuntimeConfig,
 }
 
@@ -149,6 +152,7 @@ impl Default for RuntimeConfig {
             graph_convergence_epsilon: 1e-3,
             graph_convergence_stable_passes: 2,
             graph_node_base_cost: 1e-5,
+            hebbian_update_cost: 0.0,
             vm: VmRuntimeConfig::default(),
         }
     }
@@ -289,6 +293,7 @@ impl SimulationConfig {
             rt.graph_convergence_stable_passes = 2;
         }
         rt.graph_node_base_cost = normalize_f32_nonneg(rt.graph_node_base_cost, 1e-5);
+        rt.hebbian_update_cost = normalize_f32_finite_nonneg(rt.hebbian_update_cost, 0.0);
         rt.vm.opcode_cost_multiplier =
             normalize_f32_finite_nonneg(rt.vm.opcode_cost_multiplier, 1e-6);
 

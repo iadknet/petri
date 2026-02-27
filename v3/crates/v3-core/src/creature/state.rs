@@ -1,6 +1,33 @@
 use crate::contracts::{CreatureId, Position};
 use crate::creature::genome::CreatureGenome;
 
+/// Per-creature runtime state for Graph backends.
+/// Groups all mutable state that graph evaluation reads/writes.
+pub struct GraphRuntimeState {
+    /// Per-node stateful operator state. Indexed [mesh_node_idx][internal_node_idx].
+    pub node_state: Vec<Vec<f32>>,
+    /// Per-edge learned Hebbian weights. Indexed [mesh_node_idx][internal_node_idx][edge_idx].
+    /// Empty inner vec = use genome weights. Lazily initialized on first Hebbian evaluation.
+    /// Uses `Box<[f32]>` since edge count per node is fixed after init.
+    pub hebbian_weights: Vec<Vec<Box<[f32]>>>,
+}
+
+impl GraphRuntimeState {
+    /// Create a new empty graph runtime state.
+    pub fn new() -> Self {
+        Self {
+            node_state: Vec::new(),
+            hebbian_weights: Vec::new(),
+        }
+    }
+}
+
+impl Default for GraphRuntimeState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Full runtime state of a creature in the simulation.
 pub struct CreatureState {
     pub id: CreatureId,
@@ -11,9 +38,8 @@ pub struct CreatureState {
     pub generation: u64,
     /// 1024-byte persistent memory, copied on reproduction.
     pub memory: [u8; 1024],
-    /// Per-node stateful operator state for the Graph backend.
-    /// Indexed by node position within `genome.nodes`; lazily resized on first access.
-    pub graph_state: Vec<Vec<f32>>,
+    /// Per-node runtime state for Graph backends (stateful operators + Hebbian weights).
+    pub graph_runtime: GraphRuntimeState,
     /// 6-channel internal phenotype (HSL-mapped). Converted to RGB for wire format.
     pub phenotype_channels: [u8; 6],
     /// Active channel for phenotype mutation (0..6; internal, not API-exposed).
@@ -23,7 +49,7 @@ pub struct CreatureState {
 }
 
 impl CreatureState {
-    /// Create a new creature with zeroed memory and empty graph state.
+    /// Create a new creature with zeroed memory and empty graph runtime state.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: CreatureId,
@@ -43,7 +69,7 @@ impl CreatureState {
             age: 0,
             generation,
             memory: [0u8; 1024],
-            graph_state: Vec::new(),
+            graph_runtime: GraphRuntimeState::new(),
             phenotype_channels,
             phenotype_active_channel,
             phenotype_channel_polarity,
@@ -92,7 +118,8 @@ mod tests {
         );
         assert_eq!(state.age, 0);
         assert_eq!(state.memory, [0u8; 1024]);
-        assert!(state.graph_state.is_empty());
+        assert!(state.graph_runtime.node_state.is_empty());
+        assert!(state.graph_runtime.hebbian_weights.is_empty());
         assert_eq!(state.generation, 0);
         assert!((state.energy - 20.0).abs() < f32::EPSILON);
         assert_eq!(state.phenotype_channels, [128, 64, 32, 10, 20, 30]);

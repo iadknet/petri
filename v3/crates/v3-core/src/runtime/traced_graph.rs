@@ -9,6 +9,7 @@
 use crate::config::RuntimeConfig;
 use crate::contracts::InputReference;
 use crate::creature::genome::GraphBackendDef;
+use crate::creature::state::GraphRuntimeState;
 use crate::runtime::graph::{collect_weighted_inputs, evaluate_kind, EvalCtx};
 use crate::runtime::trace::{kind_label, GraphNodeEvalTrace, GraphPassTrace, GraphTrace};
 use crate::runtime::types::{sanitize_f32, NodeResult};
@@ -29,7 +30,7 @@ pub fn execute_graph_node_traced(
     energy: &mut f32,
     energy_consumed: f32,
     node_idx: usize,
-    graph_state: &mut Vec<Vec<f32>>,
+    graph_runtime: &mut GraphRuntimeState,
     static_inputs: &StaticInputs,
     config: &RuntimeConfig,
 ) -> (NodeResult, GraphTrace) {
@@ -46,16 +47,16 @@ pub fn execute_graph_node_traced(
         return (NodeResult::halted(*upstream_slots, 0.0), empty_trace());
     }
 
-    // Ensure graph_state has enough slots for this node index.
-    if graph_state.len() <= node_idx {
-        graph_state.resize(node_idx + 1, Vec::new());
+    // Ensure node_state has enough slots for this node index.
+    if graph_runtime.node_state.len() <= node_idx {
+        graph_runtime.node_state.resize(node_idx + 1, Vec::new());
     }
 
     // Snapshot state for atomic rollback on energy exhaustion.
-    let state_backup: Vec<f32> = graph_state[node_idx].clone();
+    let state_backup: Vec<f32> = graph_runtime.node_state[node_idx].clone();
 
     // Ensure the state Vec for this node is long enough.
-    let state_vec = &mut graph_state[node_idx];
+    let state_vec = &mut graph_runtime.node_state[node_idx];
     if state_vec.len() < node_count {
         state_vec.resize(node_count, 0.0);
     }
@@ -76,7 +77,7 @@ pub fn execute_graph_node_traced(
         let pass_cost = config.graph_node_base_cost * node_count as f32;
         *energy -= pass_cost;
         if *energy <= 0.0 {
-            graph_state[node_idx] = state_backup;
+            graph_runtime.node_state[node_idx] = state_backup;
             let trace = GraphTrace {
                 passes: trace_passes,
                 converged: false,
@@ -108,7 +109,7 @@ pub fn execute_graph_node_traced(
             );
             let wsum: f32 = w_inputs_buf.iter().sum();
 
-            let mut node_state = graph_state[node_idx][current_idx];
+            let mut node_state = graph_runtime.node_state[node_idx][current_idx];
             let state_before = node_state;
 
             curr_outputs[current_idx] = sanitize_f32(evaluate_kind(
@@ -119,7 +120,7 @@ pub fn execute_graph_node_traced(
                 &mut node_state,
             ));
 
-            graph_state[node_idx][current_idx] = node_state;
+            graph_runtime.node_state[node_idx][current_idx] = node_state;
 
             node_evaluations.push(GraphNodeEvalTrace {
                 node_index: current_idx,
@@ -200,6 +201,7 @@ mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
     use crate::creature::genome::{GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind};
+    use crate::creature::state::GraphRuntimeState;
     use crate::runtime::graph::execute_graph_node;
     use crate::sensors::static_inputs::StaticInputs;
 
@@ -226,6 +228,7 @@ mod tests {
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(2.0),
                     inputs: vec![],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(0),
@@ -233,6 +236,7 @@ mod tests {
                         source_idx: 0,
                         weight: 3.0,
                     }],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::RouterOutput,
@@ -240,6 +244,7 @@ mod tests {
                         source_idx: 0,
                         weight: 1.5,
                     }],
+                    hebbian: None,
                 },
             ],
         };
@@ -248,7 +253,7 @@ mod tests {
         let config = default_config();
 
         let mut energy_a = 100.0f32;
-        let mut gs_a: Vec<Vec<f32>> = vec![];
+        let mut gr_a = GraphRuntimeState::new();
         let result_a = execute_graph_node(
             &def,
             &[],
@@ -256,13 +261,13 @@ mod tests {
             &mut energy_a,
             0.0,
             0,
-            &mut gs_a,
+            &mut gr_a,
             &si,
             &config,
         );
 
         let mut energy_b = 100.0f32;
-        let mut gs_b: Vec<Vec<f32>> = vec![];
+        let mut gr_b = GraphRuntimeState::new();
         let (result_b, trace) = execute_graph_node_traced(
             &def,
             &[],
@@ -270,7 +275,7 @@ mod tests {
             &mut energy_b,
             0.0,
             0,
-            &mut gs_b,
+            &mut gr_b,
             &si,
             &config,
         );
@@ -280,7 +285,7 @@ mod tests {
             (energy_a - energy_b).abs() < 1e-6,
             "energy: {energy_a} vs {energy_b}"
         );
-        assert_eq!(gs_a, gs_b);
+        assert_eq!(gr_a.node_state, gr_b.node_state);
         assert!(trace.converged);
         assert!(!trace.passes.is_empty());
     }
@@ -293,6 +298,7 @@ mod tests {
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(1.0),
                     inputs: vec![],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::DecayIntegrator(0.5),
@@ -300,6 +306,7 @@ mod tests {
                         source_idx: 0,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(0),
@@ -307,6 +314,7 @@ mod tests {
                         source_idx: 1,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
             ],
         };
@@ -317,7 +325,7 @@ mod tests {
         config.graph_convergence_stable_passes = 1;
 
         let mut energy = 1000.0f32;
-        let mut gs: Vec<Vec<f32>> = vec![];
+        let mut gr = GraphRuntimeState::new();
 
         // Call 1: state 0.0 → 0.5
         let (r1, trace1) = execute_graph_node_traced(
@@ -327,7 +335,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut gs,
+            &mut gr,
             &si,
             &config,
         );
@@ -348,7 +356,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut gs,
+            &mut gr,
             &si,
             &config,
         );
@@ -366,6 +374,7 @@ mod tests {
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(1.0),
                     inputs: vec![],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(0),
@@ -373,6 +382,7 @@ mod tests {
                         source_idx: 0,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
             ],
         };
@@ -381,7 +391,7 @@ mod tests {
         let config = default_config();
 
         let mut energy = 1000.0f32;
-        let mut gs: Vec<Vec<f32>> = vec![];
+        let mut gr = GraphRuntimeState::new();
 
         let (_result, trace) = execute_graph_node_traced(
             &def,
@@ -390,7 +400,7 @@ mod tests {
             &mut energy,
             0.0,
             0,
-            &mut gs,
+            &mut gr,
             &si,
             &config,
         );

@@ -36,6 +36,7 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(0.8),
                     inputs: vec![],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(2),
@@ -43,10 +44,12 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
                         source_idx: 0,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::RouterOutput,
                     inputs: vec![],
+                    hebbian: None,
                 },
             ],
         }),
@@ -62,6 +65,7 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
                 GraphInternalNode {
                     kind: GraphNodeKind::InputRef(0),
                     inputs: vec![],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(4),
@@ -69,10 +73,12 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
                         source_idx: 0,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::RouterOutput,
                     inputs: vec![],
+                    hebbian: None,
                 },
             ],
         }),
@@ -181,6 +187,7 @@ fn vm_reads_all_inputs_e2e() {
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(0.73),
                     inputs: vec![],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(11),
@@ -188,10 +195,12 @@ fn vm_reads_all_inputs_e2e() {
                         source_idx: 0,
                         weight: 1.0,
                     }],
+                    hebbian: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::RouterOutput,
                     inputs: vec![],
+                    hebbian: None,
                 },
             ],
         }),

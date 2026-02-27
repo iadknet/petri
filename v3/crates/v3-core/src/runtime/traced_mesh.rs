@@ -10,6 +10,7 @@ use std::collections::HashMap;
 use crate::config::RuntimeConfig;
 use crate::contracts::{NodeId, WorldAction};
 use crate::creature::genome::{BackendDef, CreatureGenome};
+use crate::creature::state::GraphRuntimeState;
 use crate::runtime::trace::{BackendTrace, MeshHopTrace, TerminationReason};
 use crate::runtime::traced_graph::execute_graph_node_traced;
 use crate::runtime::traced_vm::execute_vm_node_traced;
@@ -26,7 +27,7 @@ pub fn execute_creature_mesh_traced(
     static_inputs: &StaticInputs,
     energy: &mut f32,
     memory: &mut [u8; 1024],
-    graph_state: &mut Vec<Vec<f32>>,
+    graph_runtime: &mut GraphRuntimeState,
     config: &RuntimeConfig,
 ) -> (
     WorldAction,
@@ -96,7 +97,7 @@ pub fn execute_creature_mesh_traced(
                     energy,
                     energy_consumed,
                     current_idx,
-                    graph_state,
+                    graph_runtime,
                     static_inputs,
                     config,
                 );
@@ -184,6 +185,7 @@ mod tests {
         BackendDef, CreatureGenome, GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind,
         NodeGenome, VmBackendDef, VmInstruction,
     };
+    use crate::creature::state::GraphRuntimeState;
     use crate::runtime::mesh::execute_creature_mesh;
     use crate::sensors::static_inputs::StaticInputs;
 
@@ -229,6 +231,7 @@ mod tests {
                     GraphInternalNode {
                         kind: GraphNodeKind::Constant(0.0),
                         inputs: vec![],
+                        hebbian: None,
                     },
                     GraphInternalNode {
                         kind: GraphNodeKind::RouterOutput,
@@ -236,6 +239,7 @@ mod tests {
                             source_idx: 0,
                             weight: 1.0,
                         }],
+                        hebbian: None,
                     },
                 ],
             }),
@@ -254,26 +258,26 @@ mod tests {
         // Run non-traced
         let mut energy_a = 100.0f32;
         let mut memory_a = [0u8; 1024];
-        let mut gs_a = vec![];
+        let mut gr_a = GraphRuntimeState::new();
         let (action_a, report_a) = execute_creature_mesh(
             &genome,
             &si,
             &mut energy_a,
             &mut memory_a,
-            &mut gs_a,
+            &mut gr_a,
             &config,
         );
 
         // Run traced
         let mut energy_b = 100.0f32;
         let mut memory_b = [0u8; 1024];
-        let mut gs_b = vec![];
+        let mut gr_b = GraphRuntimeState::new();
         let (action_b, report_b, hops, reason) = execute_creature_mesh_traced(
             &genome,
             &si,
             &mut energy_b,
             &mut memory_b,
-            &mut gs_b,
+            &mut gr_b,
             &config,
         );
 
@@ -310,6 +314,7 @@ mod tests {
                     GraphInternalNode {
                         kind: GraphNodeKind::Constant(9.0),
                         inputs: vec![],
+                        hebbian: None,
                     },
                     GraphInternalNode {
                         kind: GraphNodeKind::CustomOutput(5),
@@ -317,10 +322,12 @@ mod tests {
                             source_idx: 0,
                             weight: 1.0,
                         }],
+                        hebbian: None,
                     },
                     GraphInternalNode {
                         kind: GraphNodeKind::RouterOutput,
                         inputs: vec![],
+                        hebbian: None,
                     },
                 ],
             }),
@@ -353,10 +360,10 @@ mod tests {
         let config = default_config();
         let mut energy = 1000.0f32;
         let mut memory = [0u8; 1024];
-        let mut gs = vec![];
+        let mut gr = GraphRuntimeState::new();
 
         let (action, _, hops, _) =
-            execute_creature_mesh_traced(&genome, &si, &mut energy, &mut memory, &mut gs, &config);
+            execute_creature_mesh_traced(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
 
         assert_eq!(action, WorldAction::Eat);
         // Hop 1 (VM) should have upstream_slots[5] = 9.0
@@ -386,10 +393,10 @@ mod tests {
         config.vm.opcode_cost_multiplier = 1.0;
         let mut energy = 0.01f32;
         let mut memory = [0u8; 1024];
-        let mut gs = vec![];
+        let mut gr = GraphRuntimeState::new();
 
         let (action, _, hops, reason) =
-            execute_creature_mesh_traced(&genome, &si, &mut energy, &mut memory, &mut gs, &config);
+            execute_creature_mesh_traced(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
 
         assert_eq!(action, WorldAction::NoOp);
         assert!(

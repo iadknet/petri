@@ -1277,6 +1277,7 @@ mod tests {
                     internal_nodes: vec![GraphInternalNode {
                         kind: GraphNodeKind::CustomOutput(2),
                         inputs: vec![],
+                        hebbian: None,
                     }],
                 }),
                 targets: vec![],
@@ -1314,6 +1315,7 @@ mod tests {
                     internal_nodes: vec![GraphInternalNode {
                         kind: GraphNodeKind::CustomOutput(2),
                         inputs: vec![],
+                        hebbian: None,
                     }],
                 }),
                 targets: vec![],
