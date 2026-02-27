@@ -66,12 +66,8 @@ impl TopologyMutator {
             TopologyOperator::SwapNodeBackend => apply_swap_node_backend(genome, rng),
             TopologyOperator::RewriteNodeId => apply_rewrite_node_id(genome, rng),
             TopologyOperator::CopyNode => apply_copy_node(genome, rng),
-            TopologyOperator::CopyMeshBackwardSlice => {
-                apply_copy_mesh_backward_slice(genome, rng)
-            }
-            TopologyOperator::CopyMeshForwardSlice => {
-                apply_copy_mesh_forward_slice(genome, rng)
-            }
+            TopologyOperator::CopyMeshBackwardSlice => apply_copy_mesh_backward_slice(genome, rng),
+            TopologyOperator::CopyMeshForwardSlice => apply_copy_mesh_forward_slice(genome, rng),
         }
     }
 }
@@ -290,22 +286,15 @@ const MESH_SLICE_MAX_SIZE: usize = 8;
 /// target references to fresh NodeIds. Appends cloned nodes to the genome.
 /// With 50% probability, adds a backlink from a random pre-existing node
 /// to a random cloned node.
-fn clone_and_remap_slice(
-    genome: &mut CreatureGenome,
-    gene_indices: &[usize],
-    rng: &mut impl Rng,
-) {
+fn clone_and_remap_slice(genome: &mut CreatureGenome, gene_indices: &[usize], rng: &mut impl Rng) {
     // Build old_id -> new_id mapping
-    let mut id_map = HashMap::new();
+    let mut id_map = HashMap::with_capacity(gene_indices.len());
     let mut next_id = next_node_id(genome);
     for &idx in gene_indices {
         let old_id = genome.nodes[idx].node_id;
         id_map.insert(old_id, next_id);
         next_id = NodeId::new(next_id.0.wrapping_add(1));
     }
-
-    // Collect old IDs for checking whether a target is internal
-    let old_ids: std::collections::HashSet<NodeId> = id_map.keys().copied().collect();
 
     let cloned: Vec<NodeGenome> = gene_indices
         .iter()
@@ -319,8 +308,8 @@ fn clone_and_remap_slice(
                     .targets
                     .iter()
                     .map(|t| {
-                        if old_ids.contains(t) {
-                            id_map[t]
+                        if let Some(&new_id) = id_map.get(t) {
+                            new_id // internal target remapped
                         } else {
                             *t // external target preserved
                         }
@@ -808,8 +797,7 @@ mod tests {
                     .filter(|n| !original_ids.contains(&n.node_id))
                     .collect();
                 assert_eq!(new_nodes.len(), 2);
-                if let Some(cloned_with_targets) =
-                    new_nodes.iter().find(|n| !n.targets.is_empty())
+                if let Some(cloned_with_targets) = new_nodes.iter().find(|n| !n.targets.is_empty())
                 {
                     for target in &cloned_with_targets.targets {
                         if !original_ids.contains(target) {
@@ -904,12 +892,8 @@ mod tests {
             }],
         };
         let mut r = rng(42);
-        TopologyMutator::apply(
-            &mut genome,
-            TopologyOperator::CopyMeshBackwardSlice,
-            &mut r,
-        )
-        .unwrap();
+        TopologyMutator::apply(&mut genome, TopologyOperator::CopyMeshBackwardSlice, &mut r)
+            .unwrap();
         assert_eq!(genome.nodes.len(), 2);
         assert_ne!(genome.nodes[0].node_id, genome.nodes[1].node_id);
     }
