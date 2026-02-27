@@ -444,44 +444,334 @@ fn apply_instruction_raw_field_mutation(
     Ok(())
 }
 
+// ── Helper: register_write ──
+
+/// Returns the `dst` register if the instruction writes one, `None` otherwise.
+fn register_write(instr: &VmInstruction) -> Option<u8> {
+    match instr {
+        VmInstruction::LoadConst { dst, .. }
+        | VmInstruction::Move { dst, .. }
+        | VmInstruction::Add { dst, .. }
+        | VmInstruction::Sub { dst, .. }
+        | VmInstruction::Mul { dst, .. }
+        | VmInstruction::Div { dst, .. }
+        | VmInstruction::Min { dst, .. }
+        | VmInstruction::Max { dst, .. }
+        | VmInstruction::Abs { dst, .. }
+        | VmInstruction::Neg { dst, .. }
+        | VmInstruction::Clamp01 { dst, .. }
+        | VmInstruction::CmpGt { dst, .. }
+        | VmInstruction::CmpLt { dst, .. }
+        | VmInstruction::CmpEq { dst, .. }
+        | VmInstruction::And { dst, .. }
+        | VmInstruction::Or { dst, .. }
+        | VmInstruction::Not { dst, .. }
+        | VmInstruction::ToI32 { dst, .. }
+        | VmInstruction::ToU8 { dst, .. }
+        | VmInstruction::ToBool { dst, .. }
+        | VmInstruction::ReadInput { dst, .. }
+        | VmInstruction::LoadMem8 { dst, .. }
+        | VmInstruction::LoadMem8Imm { dst, .. } => Some(*dst),
+        VmInstruction::Noop
+        | VmInstruction::Halt
+        | VmInstruction::Jump { .. }
+        | VmInstruction::JumpIfZero { .. }
+        | VmInstruction::WriteInternalPayload { .. }
+        | VmInstruction::WriteWorldActionMeta { .. }
+        | VmInstruction::EmitWorldAction { .. }
+        | VmInstruction::WriteRouteTarget { .. }
+        | VmInstruction::StoreMem8 { .. }
+        | VmInstruction::StoreMem8Imm { .. } => None,
+    }
+}
+
+/// Returns a `u32` bitmask of registers read by the instruction.
+/// Bit `i` set means register `i` is read.
+fn register_read_mask(instr: &VmInstruction) -> u32 {
+    match instr {
+        VmInstruction::Noop | VmInstruction::Halt | VmInstruction::Jump { .. } => 0,
+        VmInstruction::LoadConst { .. } | VmInstruction::LoadMem8Imm { .. } => 0,
+        VmInstruction::EmitWorldAction { .. } => 0,
+        VmInstruction::Move { src, .. }
+        | VmInstruction::Abs { src, .. }
+        | VmInstruction::Neg { src, .. }
+        | VmInstruction::Clamp01 { src, .. }
+        | VmInstruction::Not { src, .. }
+        | VmInstruction::ToI32 { src, .. }
+        | VmInstruction::ToU8 { src, .. }
+        | VmInstruction::ToBool { src, .. } => 1u32 << src,
+        VmInstruction::ReadInput { .. } => 0,
+        VmInstruction::Add { a, b, .. }
+        | VmInstruction::Sub { a, b, .. }
+        | VmInstruction::Mul { a, b, .. }
+        | VmInstruction::Div { a, b, .. }
+        | VmInstruction::Min { a, b, .. }
+        | VmInstruction::Max { a, b, .. }
+        | VmInstruction::CmpGt { a, b, .. }
+        | VmInstruction::CmpLt { a, b, .. }
+        | VmInstruction::And { a, b, .. }
+        | VmInstruction::Or { a, b, .. } => (1u32 << a) | (1u32 << b),
+        VmInstruction::CmpEq { a, b, eps, .. } => {
+            (1u32 << a) | (1u32 << b) | (1u32 << eps)
+        }
+        VmInstruction::JumpIfZero { cond, .. } => 1u32 << cond,
+        VmInstruction::WriteInternalPayload { src, .. }
+        | VmInstruction::WriteWorldActionMeta { src, .. }
+        | VmInstruction::WriteRouteTarget { src } => 1u32 << src,
+        VmInstruction::StoreMem8Imm { src, .. } => 1u32 << src,
+        VmInstruction::LoadMem8 { addr_reg, .. } => 1u32 << addr_reg,
+        VmInstruction::StoreMem8 { addr_reg, src } => (1u32 << addr_reg) | (1u32 << src),
+    }
+}
+
+/// Remap all register-typed fields: `(reg + offset) % register_count`.
+fn remap_register_refs(instr: &mut VmInstruction, offset: u8, register_count: u8) {
+    let rc = register_count.max(1);
+    let remap = |reg: &mut u8| {
+        *reg = (*reg).wrapping_add(offset) % rc;
+    };
+    match instr {
+        VmInstruction::Noop | VmInstruction::Halt => {}
+        VmInstruction::LoadConst { dst, .. } => remap(dst),
+        VmInstruction::Move { dst, src }
+        | VmInstruction::Abs { dst, src }
+        | VmInstruction::Neg { dst, src }
+        | VmInstruction::Clamp01 { dst, src }
+        | VmInstruction::Not { dst, src }
+        | VmInstruction::ToI32 { dst, src }
+        | VmInstruction::ToU8 { dst, src }
+        | VmInstruction::ToBool { dst, src } => {
+            remap(dst);
+            remap(src);
+        }
+        VmInstruction::Add { dst, a, b }
+        | VmInstruction::Sub { dst, a, b }
+        | VmInstruction::Mul { dst, a, b }
+        | VmInstruction::Div { dst, a, b }
+        | VmInstruction::Min { dst, a, b }
+        | VmInstruction::Max { dst, a, b }
+        | VmInstruction::CmpGt { dst, a, b }
+        | VmInstruction::CmpLt { dst, a, b }
+        | VmInstruction::And { dst, a, b }
+        | VmInstruction::Or { dst, a, b } => {
+            remap(dst);
+            remap(a);
+            remap(b);
+        }
+        VmInstruction::CmpEq { dst, a, b, eps } => {
+            remap(dst);
+            remap(a);
+            remap(b);
+            remap(eps);
+        }
+        VmInstruction::JumpIfZero { cond, .. } => remap(cond),
+        VmInstruction::Jump { .. } => {}
+        VmInstruction::ReadInput { dst, .. } => remap(dst),
+        VmInstruction::WriteInternalPayload { src, .. }
+        | VmInstruction::WriteWorldActionMeta { src, .. }
+        | VmInstruction::WriteRouteTarget { src } => remap(src),
+        VmInstruction::EmitWorldAction { .. } => {}
+        VmInstruction::LoadMem8 { dst, addr_reg } => {
+            remap(dst);
+            remap(addr_reg);
+        }
+        VmInstruction::StoreMem8 { addr_reg, src } => {
+            remap(addr_reg);
+            remap(src);
+        }
+        VmInstruction::LoadMem8Imm { dst, .. } => remap(dst),
+        VmInstruction::StoreMem8Imm { src, .. } => remap(src),
+    }
+}
+
+/// Adjust jump offsets for Jump and JumpIfZero instructions.
+fn adjust_jump_offset(instr: &mut VmInstruction, delta: i32) {
+    match instr {
+        VmInstruction::Jump { offset } | VmInstruction::JumpIfZero { offset, .. } => {
+            *offset = offset.wrapping_add(delta);
+        }
+        _ => {}
+    }
+}
+
+/// Returns true if the instruction is an "output" (side-effecting write).
+fn is_output_instruction(instr: &VmInstruction) -> bool {
+    matches!(
+        instr,
+        VmInstruction::WriteInternalPayload { .. }
+            | VmInstruction::WriteWorldActionMeta { .. }
+            | VmInstruction::EmitWorldAction { .. }
+            | VmInstruction::WriteRouteTarget { .. }
+            | VmInstruction::StoreMem8 { .. }
+            | VmInstruction::StoreMem8Imm { .. }
+    )
+}
+
+// ── VM Copy Operators ──
+
 fn apply_copy_instruction_block(
-    _genome: &mut CreatureGenome,
-    _node_idx: usize,
-    _rng: &mut impl Rng,
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    Err(MutationSkipReason::NoApplicableTarget)
+    let node = &mut genome.nodes[node_idx];
+    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+        if vm.program.is_empty() {
+            return Err(MutationSkipReason::NoApplicableTarget);
+        }
+        let block_size = rng.gen_range(2..=32).min(vm.program.len());
+        let source_start = rng.gen_range(0..=vm.program.len() - block_size);
+        let block: Vec<VmInstruction> = vm.program[source_start..source_start + block_size].to_vec();
+        let insert_at = rng.gen_range(0..=vm.program.len());
+        for (i, instr) in block.into_iter().enumerate() {
+            vm.program.insert(insert_at + i, instr);
+        }
+    }
+    Ok(())
 }
 
 fn apply_copy_instruction_block_remapped(
-    _genome: &mut CreatureGenome,
-    _node_idx: usize,
-    _rng: &mut impl Rng,
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    Err(MutationSkipReason::NoApplicableTarget)
+    let register_count = if let BackendDef::Vm(ref vm) = genome.nodes[node_idx].backend_def {
+        vm.register_count
+    } else {
+        return Ok(());
+    };
+
+    let node = &mut genome.nodes[node_idx];
+    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+        if vm.program.is_empty() {
+            return Err(MutationSkipReason::NoApplicableTarget);
+        }
+        let block_size = rng.gen_range(2..=32).min(vm.program.len());
+        let source_start = rng.gen_range(0..=vm.program.len() - block_size);
+        let mut block: Vec<VmInstruction> =
+            vm.program[source_start..source_start + block_size].to_vec();
+        let reg_offset = rng.gen_range(1..register_count.max(2));
+        let insert_at = rng.gen_range(0..=vm.program.len());
+        let delta = insert_at as i32 - source_start as i32;
+        for instr in &mut block {
+            remap_register_refs(instr, reg_offset, register_count);
+            adjust_jump_offset(instr, delta);
+        }
+        for (i, instr) in block.into_iter().enumerate() {
+            vm.program.insert(insert_at + i, instr);
+        }
+    }
+    Ok(())
 }
 
 fn apply_copy_constant_block(
-    _genome: &mut CreatureGenome,
-    _node_idx: usize,
-    _rng: &mut impl Rng,
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    Err(MutationSkipReason::NoApplicableTarget)
+    let node = &mut genome.nodes[node_idx];
+    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+        if vm.constants.is_empty() {
+            return Err(MutationSkipReason::NoApplicableTarget);
+        }
+        let block_size = rng.gen_range(1..=16).min(vm.constants.len());
+        let source_start = rng.gen_range(0..=vm.constants.len() - block_size);
+        let block: Vec<f32> = vm.constants[source_start..source_start + block_size].to_vec();
+        vm.constants.extend_from_slice(&block);
+    }
+    Ok(())
 }
 
 fn apply_copy_gene_backward_slice(
-    _genome: &mut CreatureGenome,
-    _node_idx: usize,
-    _rng: &mut impl Rng,
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    Err(MutationSkipReason::NoApplicableTarget)
+    let node = &mut genome.nodes[node_idx];
+    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+        if vm.program.is_empty() {
+            return Err(MutationSkipReason::NoApplicableTarget);
+        }
+        // Find output instructions.
+        let outputs: Vec<usize> = vm
+            .program
+            .iter()
+            .enumerate()
+            .filter(|(_, instr)| is_output_instruction(instr))
+            .map(|(i, _)| i)
+            .collect();
+        if outputs.is_empty() {
+            return Err(MutationSkipReason::NoApplicableTarget);
+        }
+        let anchor = outputs[rng.gen_range(0..outputs.len())];
+        // Backward trace using u32 bitset.
+        let mut needed: u32 = register_read_mask(&vm.program[anchor]);
+        let mut gene_indices = vec![anchor];
+        for i in (0..anchor).rev() {
+            if let Some(dst) = register_write(&vm.program[i]) {
+                if needed & (1u32 << dst) != 0 {
+                    needed |= register_read_mask(&vm.program[i]);
+                    gene_indices.push(i);
+                    if gene_indices.len() >= 32 {
+                        break;
+                    }
+                }
+            }
+        }
+        gene_indices.reverse();
+        let gene: Vec<VmInstruction> = gene_indices.iter().map(|&i| vm.program[i].clone()).collect();
+        let insert_at = rng.gen_range(0..=vm.program.len());
+        for (i, instr) in gene.into_iter().enumerate() {
+            vm.program.insert(insert_at + i, instr);
+        }
+    }
+    Ok(())
 }
 
 fn apply_copy_gene_forward_slice(
-    _genome: &mut CreatureGenome,
-    _node_idx: usize,
-    _rng: &mut impl Rng,
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    Err(MutationSkipReason::NoApplicableTarget)
+    let node = &mut genome.nodes[node_idx];
+    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+        if vm.program.is_empty() {
+            return Err(MutationSkipReason::NoApplicableTarget);
+        }
+        // Find instructions that write a register.
+        let writers: Vec<usize> = vm
+            .program
+            .iter()
+            .enumerate()
+            .filter(|(_, instr)| register_write(instr).is_some())
+            .map(|(i, _)| i)
+            .collect();
+        if writers.is_empty() {
+            return Err(MutationSkipReason::NoApplicableTarget);
+        }
+        let seed_idx = writers[rng.gen_range(0..writers.len())];
+        let seed_dst = register_write(&vm.program[seed_idx]).unwrap();
+        // Forward trace using u32 bitset.
+        let mut produced: u32 = 1u32 << seed_dst;
+        let mut gene_indices = vec![seed_idx];
+        for i in (seed_idx + 1)..vm.program.len() {
+            if register_read_mask(&vm.program[i]) & produced != 0 {
+                if let Some(dst) = register_write(&vm.program[i]) {
+                    produced |= 1u32 << dst;
+                }
+                gene_indices.push(i);
+                if gene_indices.len() >= 32 {
+                    break;
+                }
+            }
+        }
+        let gene: Vec<VmInstruction> = gene_indices.iter().map(|&i| vm.program[i].clone()).collect();
+        let insert_at = rng.gen_range(0..=vm.program.len());
+        for (i, instr) in gene.into_iter().enumerate() {
+            vm.program.insert(insert_at + i, instr);
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -860,5 +1150,465 @@ mod tests {
                 assert!(vm.register_count <= 32, "register_count must be <= 32");
             }
         }
+    }
+
+    // ── VmCopyInstructionBlock tests ──
+
+    #[test]
+    fn copy_instruction_block_increases_program_length() {
+        let mut genome = v3alpha1_founder_genome();
+        let before = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+            vm.program.len()
+        } else {
+            panic!()
+        };
+        let mut r = rng(42);
+        let result = VmMutator::apply(&mut genome, VmOperator::VmCopyInstructionBlock, &mut r);
+        assert!(result.is_ok());
+        let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+            vm.program.len()
+        } else {
+            panic!()
+        };
+        assert!(after > before, "program must grow after copy block");
+    }
+
+    #[test]
+    fn copy_instruction_block_on_empty_returns_no_applicable_target() {
+        let mut genome = v3alpha1_founder_genome();
+        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+            vm.program.clear();
+        }
+        let mut r = rng(0);
+        let result = VmMutator::apply(&mut genome, VmOperator::VmCopyInstructionBlock, &mut r);
+        assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+    }
+
+    #[test]
+    fn copy_instruction_block_preserves_content() {
+        // All original instructions must still be present somewhere after copy.
+        let mut genome = v3alpha1_founder_genome();
+        let original = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+            vm.program.clone()
+        } else {
+            panic!()
+        };
+        let mut r = rng(7);
+        VmMutator::apply(&mut genome, VmOperator::VmCopyInstructionBlock, &mut r).unwrap();
+        let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+            vm.program.clone()
+        } else {
+            panic!()
+        };
+        // Every original instruction must appear in the result.
+        for (i, instr) in original.iter().enumerate() {
+            assert!(
+                after.contains(instr),
+                "original instruction at index {} not found in result",
+                i
+            );
+        }
+    }
+
+    #[test]
+    fn copy_instruction_block_respects_max_32() {
+        // With a small program, block size is clamped.
+        let mut genome = v3alpha1_founder_genome();
+        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+            vm.program = vec![VmInstruction::Noop; 3];
+        }
+        let mut r = rng(0);
+        VmMutator::apply(&mut genome, VmOperator::VmCopyInstructionBlock, &mut r).unwrap();
+        let after_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+            vm.program.len()
+        } else {
+            panic!()
+        };
+        // Original 3 + at most 3 copied = max 6.
+        assert!(after_len <= 6, "block copy clamped to program len");
+    }
+
+    // ── VmCopyInstructionBlockRemapped tests ──
+
+    #[test]
+    fn copy_instruction_block_remapped_shifts_registers() {
+        let mut genome = v3alpha1_founder_genome();
+        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+            vm.program = vec![
+                VmInstruction::Add { dst: 0, a: 1, b: 2 },
+                VmInstruction::Sub { dst: 1, a: 2, b: 3 },
+            ];
+            vm.register_count = 8;
+        }
+        let before = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+            vm.program.len()
+        } else {
+            panic!()
+        };
+        let mut r = rng(42);
+        VmMutator::apply(
+            &mut genome,
+            VmOperator::VmCopyInstructionBlockRemapped,
+            &mut r,
+        )
+        .unwrap();
+        let after_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+            vm.program.len()
+        } else {
+            panic!()
+        };
+        assert!(after_len > before, "program must grow");
+    }
+
+    #[test]
+    fn copy_instruction_block_remapped_wraps_registers() {
+        // Register remapping must wrap within register_count.
+        let mut genome = v3alpha1_founder_genome();
+        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+            vm.program = vec![VmInstruction::Move { dst: 3, src: 3 }];
+            vm.register_count = 4;
+        }
+        for seed in 0u64..50 {
+            let mut g = genome.clone();
+            let mut r = rng(seed);
+            let _ = VmMutator::apply(
+                &mut g,
+                VmOperator::VmCopyInstructionBlockRemapped,
+                &mut r,
+            );
+            if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+                for instr in &vm.program {
+                    if let VmInstruction::Move { dst, src } = instr {
+                        assert!(*dst < 4, "dst must be < register_count");
+                        assert!(*src < 4, "src must be < register_count");
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn copy_instruction_block_remapped_preserves_non_register_fields() {
+        // Non-register fields (const_idx, action_type, etc.) must not change.
+        let mut genome = v3alpha1_founder_genome();
+        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+            vm.program = vec![VmInstruction::EmitWorldAction { action_type: 42 }];
+            vm.register_count = 4;
+        }
+        let mut r = rng(0);
+        let _ = VmMutator::apply(
+            &mut genome,
+            VmOperator::VmCopyInstructionBlockRemapped,
+            &mut r,
+        );
+        if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+            // The original instruction must still exist unchanged.
+            assert!(
+                vm.program
+                    .iter()
+                    .any(|i| matches!(i, VmInstruction::EmitWorldAction { action_type: 42 })),
+                "EmitWorldAction with action_type 42 must be preserved"
+            );
+        }
+    }
+
+    #[test]
+    fn copy_instruction_block_remapped_adjusts_jump_offsets() {
+        let mut genome = v3alpha1_founder_genome();
+        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+            vm.program = vec![
+                VmInstruction::Jump { offset: 5 },
+                VmInstruction::Noop,
+            ];
+            vm.register_count = 4;
+        }
+        let mut found_different_offset = false;
+        for seed in 0u64..100 {
+            let mut g = genome.clone();
+            let mut r = rng(seed);
+            let _ = VmMutator::apply(
+                &mut g,
+                VmOperator::VmCopyInstructionBlockRemapped,
+                &mut r,
+            );
+            if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+                for instr in &vm.program {
+                    if let VmInstruction::Jump { offset } = instr {
+                        if *offset != 5 {
+                            found_different_offset = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if found_different_offset {
+                break;
+            }
+        }
+        assert!(
+            found_different_offset,
+            "remapped copy must adjust jump offsets"
+        );
+    }
+
+    #[test]
+    fn copy_instruction_block_remapped_on_empty_returns_no_applicable_target() {
+        let mut genome = v3alpha1_founder_genome();
+        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+            vm.program.clear();
+        }
+        let mut r = rng(0);
+        let result = VmMutator::apply(
+            &mut genome,
+            VmOperator::VmCopyInstructionBlockRemapped,
+            &mut r,
+        );
+        assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+    }
+
+    // ── VmCopyConstantBlock tests ──
+
+    #[test]
+    fn copy_constant_block_increases_length() {
+        let mut genome = v3alpha1_founder_genome();
+        let before = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+            vm.constants.len()
+        } else {
+            panic!()
+        };
+        let mut r = rng(0);
+        VmMutator::apply(&mut genome, VmOperator::VmCopyConstantBlock, &mut r).unwrap();
+        let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+            vm.constants.len()
+        } else {
+            panic!()
+        };
+        assert!(after > before, "constants pool must grow");
+    }
+
+    #[test]
+    fn copy_constant_block_on_empty_returns_no_applicable_target() {
+        let mut genome = v3alpha1_founder_genome();
+        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+            vm.constants.clear();
+        }
+        let mut r = rng(0);
+        let result = VmMutator::apply(&mut genome, VmOperator::VmCopyConstantBlock, &mut r);
+        assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+    }
+
+    #[test]
+    fn copy_constant_block_preserves_original() {
+        let mut genome = v3alpha1_founder_genome();
+        let original = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+            vm.constants.clone()
+        } else {
+            panic!()
+        };
+        let mut r = rng(0);
+        VmMutator::apply(&mut genome, VmOperator::VmCopyConstantBlock, &mut r).unwrap();
+        let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+            vm.constants.clone()
+        } else {
+            panic!()
+        };
+        // Original constants must be a prefix of the result.
+        assert_eq!(&after[..original.len()], &original[..]);
+    }
+
+    #[test]
+    fn copy_constant_block_copies_correct_values() {
+        let mut genome = v3alpha1_founder_genome();
+        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+            vm.constants = vec![10.0, 20.0, 30.0];
+        }
+        let mut r = rng(0);
+        VmMutator::apply(&mut genome, VmOperator::VmCopyConstantBlock, &mut r).unwrap();
+        let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+            vm.constants.clone()
+        } else {
+            panic!()
+        };
+        // The appended constants must be values from the original [10.0, 20.0, 30.0].
+        for &val in &after[3..] {
+            assert!(
+                val == 10.0 || val == 20.0 || val == 30.0,
+                "copied constant {} must come from original pool",
+                val
+            );
+        }
+    }
+
+    // ── VmCopyGeneBackwardSlice tests ──
+
+    #[test]
+    fn copy_gene_backward_slice_increases_program_length() {
+        let mut genome = v3alpha1_founder_genome();
+        // Ensure program has an output instruction.
+        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+            vm.program = vec![
+                VmInstruction::ReadInput {
+                    dst: 0,
+                    input_idx: 0,
+                },
+                VmInstruction::Add { dst: 1, a: 0, b: 0 },
+                VmInstruction::WriteInternalPayload { slot_idx: 0, src: 1 },
+            ];
+            vm.register_count = 4;
+        }
+        let before = 3;
+        let mut r = rng(42);
+        VmMutator::apply(
+            &mut genome,
+            VmOperator::VmCopyGeneBackwardSlice,
+            &mut r,
+        )
+        .unwrap();
+        let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+            vm.program.len()
+        } else {
+            panic!()
+        };
+        assert!(after > before, "backward slice must increase program length");
+    }
+
+    #[test]
+    fn copy_gene_backward_slice_no_output_returns_no_applicable_target() {
+        let mut genome = v3alpha1_founder_genome();
+        // Program with no output instructions.
+        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+            vm.program = vec![
+                VmInstruction::Noop,
+                VmInstruction::Add { dst: 0, a: 1, b: 2 },
+            ];
+        }
+        let mut r = rng(0);
+        let result = VmMutator::apply(
+            &mut genome,
+            VmOperator::VmCopyGeneBackwardSlice,
+            &mut r,
+        );
+        assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+    }
+
+    #[test]
+    fn copy_gene_backward_slice_captures_dependency_chain() {
+        let mut genome = v3alpha1_founder_genome();
+        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+            vm.program = vec![
+                VmInstruction::ReadInput {
+                    dst: 0,
+                    input_idx: 0,
+                },
+                VmInstruction::Neg { dst: 1, src: 0 },
+                VmInstruction::WriteInternalPayload { slot_idx: 0, src: 1 },
+            ];
+            vm.register_count = 4;
+        }
+        let mut r = rng(42);
+        VmMutator::apply(
+            &mut genome,
+            VmOperator::VmCopyGeneBackwardSlice,
+            &mut r,
+        )
+        .unwrap();
+        let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+            vm.program.clone()
+        } else {
+            panic!()
+        };
+        // The gene slice should capture at least the output + one dependency.
+        // Program grew by at least 2 (the dependency chain).
+        assert!(after.len() >= 5, "gene slice must capture dependency chain; got len {}", after.len());
+    }
+
+    // ── VmCopyGeneForwardSlice tests ──
+
+    #[test]
+    fn copy_gene_forward_slice_increases_program_length() {
+        let mut genome = v3alpha1_founder_genome();
+        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+            vm.program = vec![
+                VmInstruction::ReadInput {
+                    dst: 0,
+                    input_idx: 0,
+                },
+                VmInstruction::Neg { dst: 1, src: 0 },
+                VmInstruction::WriteInternalPayload { slot_idx: 0, src: 1 },
+            ];
+            vm.register_count = 4;
+        }
+        let before = 3;
+        let mut r = rng(42);
+        VmMutator::apply(
+            &mut genome,
+            VmOperator::VmCopyGeneForwardSlice,
+            &mut r,
+        )
+        .unwrap();
+        let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+            vm.program.len()
+        } else {
+            panic!()
+        };
+        assert!(after > before, "forward slice must increase program length");
+    }
+
+    #[test]
+    fn copy_gene_forward_slice_no_dst_returns_no_applicable_target() {
+        let mut genome = v3alpha1_founder_genome();
+        // Program with no register-writing instructions.
+        if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+            vm.program = vec![
+                VmInstruction::Noop,
+                VmInstruction::EmitWorldAction { action_type: 0 },
+                VmInstruction::Halt,
+            ];
+        }
+        let mut r = rng(0);
+        let result = VmMutator::apply(
+            &mut genome,
+            VmOperator::VmCopyGeneForwardSlice,
+            &mut r,
+        );
+        assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+    }
+
+    #[test]
+    fn copy_gene_forward_slice_captures_dependency_chain() {
+        // Over multiple seeds, forward slice must sometimes capture a multi-instruction chain.
+        let mut max_growth = 0usize;
+        for seed in 0u64..100 {
+            let mut genome = v3alpha1_founder_genome();
+            if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+                vm.program = vec![
+                    VmInstruction::ReadInput {
+                        dst: 0,
+                        input_idx: 0,
+                    },
+                    VmInstruction::Neg { dst: 1, src: 0 },
+                    VmInstruction::Abs { dst: 2, src: 1 },
+                ];
+                vm.register_count = 4;
+            }
+            let mut r = rng(seed);
+            VmMutator::apply(
+                &mut genome,
+                VmOperator::VmCopyGeneForwardSlice,
+                &mut r,
+            )
+            .unwrap();
+            let after_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+                vm.program.len()
+            } else {
+                panic!()
+            };
+            let growth = after_len - 3;
+            if growth > max_growth {
+                max_growth = growth;
+            }
+        }
+        // Must sometimes capture a chain of 2+ instructions (ReadInput→Neg→Abs).
+        assert!(max_growth >= 2, "forward slice must capture multi-instruction chain; max growth was {}", max_growth);
     }
 }
