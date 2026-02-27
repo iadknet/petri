@@ -1,10 +1,63 @@
 use rand::Rng;
 
 use crate::contracts::{CreatureId, Direction};
+use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::creature::state::CreatureState;
 use crate::mutation::phenotype::mutate_phenotype;
 use crate::mutation::MutationEngine;
 use crate::simulation::simulation::Simulation;
+
+/// Build child Hebbian weights from parent state, respecting Lamarckian/Darwinian inheritance.
+///
+/// For each mesh node with a Graph backend, inspects each internal node:
+/// - `hebbian.lamarckian == true`: copies parent's learned weights if available
+/// - `hebbian.lamarckian == false` or `hebbian == None`: empty `Box<[f32]>` (reinit from genome on first tick)
+fn build_child_hebbian_weights(
+    child_genome: &CreatureGenome,
+    parent_hebbian: &[Vec<Box<[f32]>>],
+) -> Vec<Vec<Box<[f32]>>> {
+    let mut result: Vec<Vec<Box<[f32]>>> = Vec::new();
+
+    for (mesh_idx, mesh_node) in child_genome.nodes.iter().enumerate() {
+        let graph_def = match &mesh_node.backend_def {
+            BackendDef::Graph(g) => g,
+            _ => continue, // VM nodes have no Hebbian weights
+        };
+
+        // Ensure result covers this mesh node index.
+        if result.len() <= mesh_idx {
+            result.resize_with(mesh_idx + 1, Vec::new);
+        }
+
+        let node_count = graph_def.internal_nodes.len();
+        let mut inner: Vec<Box<[f32]>> = Vec::with_capacity(node_count);
+
+        for (inode_idx, inode) in graph_def.internal_nodes.iter().enumerate() {
+            let should_copy = inode.hebbian.as_ref().is_some_and(|cfg| cfg.lamarckian);
+
+            if should_copy {
+                // Try to copy parent's learned weights for this mesh+internal node.
+                let parent_weights = parent_hebbian
+                    .get(mesh_idx)
+                    .and_then(|v| v.get(inode_idx))
+                    .filter(|w| !w.is_empty());
+
+                if let Some(pw) = parent_weights {
+                    inner.push(pw.clone());
+                } else {
+                    // Parent had no learned weights yet — child will lazy-init from genome.
+                    inner.push(Box::new([]));
+                }
+            } else {
+                inner.push(Box::new([]));
+            }
+        }
+
+        result[mesh_idx] = inner;
+    }
+
+    result
+}
 
 /// Result of an attempted reproduction action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -117,6 +170,11 @@ pub fn apply_reproduce(
     let child_channels = sim.creatures[parent_id].phenotype_channels;
     let child_active_channel = sim.creatures[parent_id].phenotype_active_channel;
     let child_polarity = sim.creatures[parent_id].phenotype_channel_polarity;
+    // Snapshot parent's learned Hebbian weights before genome mutation.
+    let parent_hebbian = sim.creatures[parent_id]
+        .graph_runtime
+        .hebbian_weights
+        .clone();
 
     // Step 9: Apply genome mutations.
     let mut child_genome = child_genome;
@@ -174,7 +232,10 @@ pub fn apply_reproduce(
         (child_channels, child_active_channel, child_polarity)
     };
 
-    // Step 11–12: Spawn child in slotmap + world.
+    // Step 11: Build child's Hebbian weights (Lamarckian inheritance).
+    let child_hebbian = build_child_hebbian_weights(&child_genome, &parent_hebbian);
+
+    // Step 12–13: Spawn child in slotmap + world.
     let child_id = sim.creatures.insert_with_key(|id| {
         let mut child = CreatureState::new(
             id,
@@ -187,10 +248,167 @@ pub fn apply_reproduce(
             child_polarity,
         );
         child.memory = child_memory;
+        child.graph_runtime.hebbian_weights = child_hebbian;
         child
     });
     sim.world.place_creature(target, child_id);
 
     sim.stats.reproduction_actions_spawned_total += 1;
     ReproductionActionResult::Spawned
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::creature::genome::{
+        GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind, HebbianConfig, HebbianRule,
+    };
+
+    /// Helper: builds a genome with a single Graph mesh node containing the given internal nodes.
+    fn genome_with_graph_nodes(nodes: Vec<GraphInternalNode>) -> CreatureGenome {
+        use crate::contracts::NodeId;
+        use crate::creature::genome::NodeGenome;
+
+        CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Graph(GraphBackendDef {
+                    internal_nodes: nodes,
+                }),
+                targets: vec![],
+            }],
+        }
+    }
+
+    #[test]
+    fn lamarckian_copies_parent_learned_weights() {
+        let genome = genome_with_graph_nodes(vec![
+            GraphInternalNode {
+                kind: GraphNodeKind::Constant(1.0),
+                inputs: vec![],
+                hebbian: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::Add,
+                inputs: vec![GraphInput {
+                    source_idx: 0,
+                    weight: 0.5,
+                }],
+                hebbian: Some(HebbianConfig {
+                    rule: HebbianRule::Classic,
+                    learning_rate: 0.1,
+                    weight_clamp: 5.0,
+                    lamarckian: true,
+                }),
+            },
+        ]);
+
+        // Parent has learned weight 0.9 (drifted from genome 0.5).
+        let parent_hebbian: Vec<Vec<Box<[f32]>>> = vec![vec![
+            Box::new([]) as Box<[f32]>, // node 0: no Hebbian
+            Box::new([0.9]),            // node 1: learned weight
+        ]];
+
+        let child_hw = build_child_hebbian_weights(&genome, &parent_hebbian);
+
+        assert_eq!(child_hw.len(), 1);
+        assert_eq!(child_hw[0].len(), 2);
+        // Node 0 (no Hebbian): empty
+        assert!(child_hw[0][0].is_empty());
+        // Node 1 (Lamarckian): copied from parent
+        assert_eq!(child_hw[0][1].len(), 1);
+        assert!((child_hw[0][1][0] - 0.9).abs() < 1e-6);
+    }
+
+    #[test]
+    fn darwinian_resets_to_empty() {
+        let genome = genome_with_graph_nodes(vec![
+            GraphInternalNode {
+                kind: GraphNodeKind::Constant(1.0),
+                inputs: vec![],
+                hebbian: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::Add,
+                inputs: vec![GraphInput {
+                    source_idx: 0,
+                    weight: 0.5,
+                }],
+                hebbian: Some(HebbianConfig {
+                    rule: HebbianRule::Classic,
+                    learning_rate: 0.1,
+                    weight_clamp: 5.0,
+                    lamarckian: false, // Darwinian
+                }),
+            },
+        ]);
+
+        // Parent has learned weight 0.9.
+        let parent_hebbian: Vec<Vec<Box<[f32]>>> =
+            vec![vec![Box::new([]) as Box<[f32]>, Box::new([0.9])]];
+
+        let child_hw = build_child_hebbian_weights(&genome, &parent_hebbian);
+
+        assert_eq!(child_hw.len(), 1);
+        assert_eq!(child_hw[0].len(), 2);
+        // Node 0 (no Hebbian): empty
+        assert!(child_hw[0][0].is_empty());
+        // Node 1 (Darwinian): empty — will lazy-init from genome weights on first tick
+        assert!(child_hw[0][1].is_empty());
+    }
+
+    #[test]
+    fn lamarckian_with_no_parent_weights_returns_empty() {
+        let genome = genome_with_graph_nodes(vec![GraphInternalNode {
+            kind: GraphNodeKind::Add,
+            inputs: vec![GraphInput {
+                source_idx: 0,
+                weight: 0.5,
+            }],
+            hebbian: Some(HebbianConfig {
+                rule: HebbianRule::Oja,
+                learning_rate: 0.1,
+                weight_clamp: 5.0,
+                lamarckian: true,
+            }),
+        }]);
+
+        // Parent never ran graph execution — no Hebbian weights.
+        let parent_hebbian: Vec<Vec<Box<[f32]>>> = Vec::new();
+
+        let child_hw = build_child_hebbian_weights(&genome, &parent_hebbian);
+
+        // Result should have entry for mesh node 0 with empty inner (lazy init)
+        assert_eq!(child_hw.len(), 1);
+        assert_eq!(child_hw[0].len(), 1);
+        assert!(child_hw[0][0].is_empty());
+    }
+
+    #[test]
+    fn vm_nodes_skipped() {
+        use crate::contracts::NodeId;
+        use crate::creature::genome::{NodeGenome, VmBackendDef, VmInstruction};
+
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![VmInstruction::Halt],
+                }),
+                targets: vec![],
+            }],
+        };
+
+        let parent_hebbian: Vec<Vec<Box<[f32]>>> = Vec::new();
+        let child_hw = build_child_hebbian_weights(&genome, &parent_hebbian);
+
+        // VM nodes produce no Hebbian weight entries
+        assert!(child_hw.is_empty());
+    }
 }
