@@ -102,6 +102,7 @@ impl WorldState {
 
         let spread_threshold =
             max_density * config.world.food.spread_threshold_ratio.clamp(0.0, 1.0);
+        let spread_density_ratio = config.world.food.spread_density_ratio.clamp(0.0, 1.0);
         let recovery_floor = config.world.food.recovery_floor_ratio.clamp(0.0, 1.0);
         let recovery_spawn_rate = config.world.food.recovery_spawn_rate.clamp(0.0, 1.0);
         // Snapshot food densities into a reusable buffer (avoids per-tick allocation).
@@ -147,7 +148,7 @@ impl WorldState {
                 continue;
             }
             let target = neighbors[rng.gen_range(0..neighbors.len())];
-            self.add_food_clamped(target, delta, max_density);
+            self.add_food_clamped(target, delta * spread_density_ratio, max_density);
         }
 
         if average_density_ratio >= recovery_floor {
@@ -407,6 +408,7 @@ mod tests {
         let mut cfg = default_config();
         cfg.world.food.growth_rate = 0.2;
         cfg.world.food.spread_threshold_ratio = 0.75;
+        cfg.world.food.spread_density_ratio = 1.0;
         cfg.world.food.recovery_floor_ratio = 0.0;
         let mut rng = SmallRng::seed_from_u64(1);
         w.grow_food(&mut rng, &cfg);
@@ -426,11 +428,49 @@ mod tests {
         let mut cfg = default_config();
         cfg.world.food.growth_rate = 0.2;
         cfg.world.food.spread_threshold_ratio = 0.75;
+        cfg.world.food.spread_density_ratio = 1.0;
         cfg.world.food.recovery_floor_ratio = 0.0;
         let mut rng = SmallRng::seed_from_u64(3);
         w.grow_food(&mut rng, &cfg);
 
         assert!(w.food_at(occupied) > 0.0);
+    }
+
+    #[test]
+    fn spread_amount_reduced_by_density_ratio() {
+        // source=0.75, growth_rate=0.2, spread_density_ratio=0.25
+        // delta = 0.75 * 0.2 = 0.15
+        // spread deposit = 0.15 * 0.25 = 0.0375
+        let mut w = WorldState::new(2, 1, WorldEdgeMode::Bounded);
+        w.food_density.set(0, 0, 0.75);
+        let mut cfg = default_config();
+        cfg.world.food.growth_rate = 0.2;
+        cfg.world.food.spread_threshold_ratio = 0.75;
+        cfg.world.food.spread_density_ratio = 0.25;
+        cfg.world.food.recovery_floor_ratio = 0.0;
+        let mut rng = SmallRng::seed_from_u64(1);
+        w.grow_food(&mut rng, &cfg);
+        // Source gets local growth: 0.75 + 0.15 = 0.9
+        assert!((w.food_at(Position::new(0, 0)) - 0.9).abs() < 1e-6);
+        // Neighbor gets spread deposit: 0.15 * 0.25 = 0.0375
+        assert!((w.food_at(Position::new(1, 0)) - 0.0375).abs() < 1e-6);
+    }
+
+    #[test]
+    fn spread_density_ratio_zero_deposits_nothing() {
+        let mut w = WorldState::new(2, 1, WorldEdgeMode::Bounded);
+        w.food_density.set(0, 0, 0.9);
+        let mut cfg = default_config();
+        cfg.world.food.growth_rate = 0.2;
+        cfg.world.food.spread_threshold_ratio = 0.75;
+        cfg.world.food.spread_density_ratio = 0.0;
+        cfg.world.food.recovery_floor_ratio = 0.0;
+        let mut rng = SmallRng::seed_from_u64(1);
+        w.grow_food(&mut rng, &cfg);
+        // Source gets local growth
+        assert!(w.food_at(Position::new(0, 0)) > 0.9);
+        // Neighbor gets nothing because ratio is 0
+        assert!((w.food_at(Position::new(1, 0)) - 0.0).abs() < 1e-6);
     }
 
     #[test]

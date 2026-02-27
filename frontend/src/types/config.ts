@@ -3,6 +3,7 @@ export interface FoodConfig {
 	initial_density: number;
 	initial_coverage: number;
 	spread_threshold_ratio: number;
+	spread_density_ratio: number;
 	recovery_spawn_rate: number;
 	recovery_floor_ratio: number;
 	max_density: number;
