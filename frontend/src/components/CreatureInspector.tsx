@@ -161,7 +161,7 @@ function CreatureInspector() {
 						)}
 
 						{/* Execution sampler */}
-						{!isDead && (
+						{(!isDead || playbackState !== "idle") && (
 							<div className="border-t border-slate-800">
 								<SamplerControls
 									playbackState={playbackState}

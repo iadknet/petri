@@ -72,7 +72,7 @@ export const useExecutionSamplerStore = create<ExecutionSamplerState>()((set, ge
 	},
 
 	stepForward: () => {
-		const { sample, position } = get();
+		const { sample, position, playbackState } = get();
 		if (!sample) return;
 
 		const { tickIndex, hopIndex, detailIndex } = position;
@@ -82,11 +82,14 @@ export const useExecutionSamplerStore = create<ExecutionSamplerState>()((set, ge
 		const hop = tick.hops[hopIndex];
 		const totalDetails = hop ? getDetailCount(hop.backend_trace) : 0;
 
+		// Preserve "playing" state during auto-advance; otherwise transition to "stepping".
+		const nextState = playbackState === "playing" ? "playing" : "stepping";
+
 		// Try advancing detail within current hop.
 		if (detailIndex < totalDetails - 1) {
 			set({
 				position: { tickIndex, hopIndex, detailIndex: detailIndex + 1 },
-				playbackState: "stepping",
+				playbackState: nextState,
 			});
 			return;
 		}
@@ -95,7 +98,7 @@ export const useExecutionSamplerStore = create<ExecutionSamplerState>()((set, ge
 		if (hopIndex < tick.hops.length - 1) {
 			set({
 				position: { tickIndex, hopIndex: hopIndex + 1, detailIndex: 0 },
-				playbackState: "stepping",
+				playbackState: nextState,
 			});
 			return;
 		}
@@ -106,7 +109,7 @@ export const useExecutionSamplerStore = create<ExecutionSamplerState>()((set, ge
 			if (nt && nt.hops.length > 0) {
 				set({
 					position: { tickIndex: nextTick, hopIndex: 0, detailIndex: 0 },
-					playbackState: "stepping",
+					playbackState: nextState,
 				});
 				return;
 			}
@@ -117,16 +120,19 @@ export const useExecutionSamplerStore = create<ExecutionSamplerState>()((set, ge
 	},
 
 	stepBackward: () => {
-		const { sample, position } = get();
+		const { sample, position, playbackState } = get();
 		if (!sample) return;
 
 		const { tickIndex, hopIndex, detailIndex } = position;
+
+		// Preserve "playing" state during auto-advance; otherwise transition to "stepping".
+		const nextState = playbackState === "playing" ? "playing" : "stepping";
 
 		// Try going back within current hop.
 		if (detailIndex > 0) {
 			set({
 				position: { tickIndex, hopIndex, detailIndex: detailIndex - 1 },
-				playbackState: "stepping",
+				playbackState: nextState,
 			});
 			return;
 		}
@@ -138,7 +144,7 @@ export const useExecutionSamplerStore = create<ExecutionSamplerState>()((set, ge
 			const prevDetails = prevHop ? getDetailCount(prevHop.backend_trace) : 0;
 			set({
 				position: { tickIndex, hopIndex: hopIndex - 1, detailIndex: Math.max(0, prevDetails - 1) },
-				playbackState: "stepping",
+				playbackState: nextState,
 			});
 			return;
 		}
@@ -156,7 +162,7 @@ export const useExecutionSamplerStore = create<ExecutionSamplerState>()((set, ge
 						hopIndex: lastHopIdx,
 						detailIndex: Math.max(0, lastDetails - 1),
 					},
-					playbackState: "stepping",
+					playbackState: nextState,
 				});
 				return;
 			}
