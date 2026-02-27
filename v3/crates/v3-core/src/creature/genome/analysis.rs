@@ -485,6 +485,76 @@ pub fn mesh_backward_slice_random(
     mesh_backward_slice(genome, anchor_idx, max_size)
 }
 
+/// Forward-slice from a seed node at the mesh level.
+///
+/// BFS forward from the seed through `targets` edges, collecting the
+/// downstream subtree. Always includes the seed itself. Returns sorted
+/// indices capped at `max_size`.
+#[must_use]
+pub fn mesh_forward_slice(
+    genome: &CreatureGenome,
+    seed_idx: usize,
+    max_size: usize,
+) -> Option<DetectedGene> {
+    if seed_idx >= genome.nodes.len() {
+        return None;
+    }
+
+    let node_id_to_idx: HashMap<NodeId, usize> = genome
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.node_id, i))
+        .collect();
+
+    let mut visited = vec![false; genome.nodes.len()];
+    visited[seed_idx] = true;
+    let mut queue = VecDeque::new();
+    queue.push_back(seed_idx);
+    let mut count = 1usize;
+
+    while let Some(idx) = queue.pop_front() {
+        for target_id in &genome.nodes[idx].targets {
+            if count >= max_size {
+                break;
+            }
+            if let Some(&target_idx) = node_id_to_idx.get(target_id) {
+                if !visited[target_idx] {
+                    visited[target_idx] = true;
+                    queue.push_back(target_idx);
+                    count += 1;
+                }
+            }
+        }
+        if count >= max_size {
+            break;
+        }
+    }
+
+    let indices: Vec<usize> = visited
+        .iter()
+        .enumerate()
+        .filter(|(_, &v)| v)
+        .map(|(i, _)| i)
+        .collect();
+    Some(DetectedGene { indices })
+}
+
+/// Forward-slice from a randomly chosen mesh node.
+#[inline]
+#[must_use]
+pub fn mesh_forward_slice_random(
+    genome: &CreatureGenome,
+    rng: &mut impl Rng,
+    max_size: usize,
+) -> Option<DetectedGene> {
+    if genome.nodes.is_empty() {
+        return None;
+    }
+    let seed_idx = rng.gen_range(0..genome.nodes.len());
+    mesh_forward_slice(genome, seed_idx, max_size)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1062,6 +1132,109 @@ mod tests {
             ],
         };
         let gene = mesh_backward_slice(&genome, 0, 8).unwrap();
+        assert_eq!(gene.indices, vec![0, 1]);
+    }
+
+    // ── Mesh forward slice tests ────────────────────────────────────────
+
+    #[test]
+    fn mesh_forward_slice_finds_downstream_subtree() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                simple_vm_node(0, vec![1]),
+                simple_vm_node(1, vec![2]),
+                simple_vm_node(2, vec![]),
+            ],
+        };
+        let gene = mesh_forward_slice(&genome, 0, 8).unwrap();
+        assert_eq!(gene.indices, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn mesh_forward_slice_excludes_upstream_nodes() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                simple_vm_node(0, vec![1]),
+                simple_vm_node(1, vec![2]),
+                simple_vm_node(2, vec![]),
+            ],
+        };
+        let gene = mesh_forward_slice(&genome, 1, 8).unwrap();
+        assert_eq!(gene.indices, vec![1, 2]);
+    }
+
+    #[test]
+    fn mesh_forward_slice_seed_only_when_no_targets() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                simple_vm_node(0, vec![1]),
+                simple_vm_node(1, vec![]),
+            ],
+        };
+        let gene = mesh_forward_slice(&genome, 1, 8).unwrap();
+        assert_eq!(gene.indices, vec![1]);
+    }
+
+    #[test]
+    fn mesh_forward_slice_handles_branching() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                simple_vm_node(0, vec![1, 2]),
+                simple_vm_node(1, vec![]),
+                simple_vm_node(2, vec![]),
+            ],
+        };
+        let gene = mesh_forward_slice(&genome, 0, 8).unwrap();
+        assert_eq!(gene.indices, vec![0, 1, 2]);
+    }
+
+    #[test]
+    fn mesh_forward_slice_respects_max_size() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                simple_vm_node(0, vec![1]),
+                simple_vm_node(1, vec![2]),
+                simple_vm_node(2, vec![]),
+            ],
+        };
+        let gene = mesh_forward_slice(&genome, 0, 2).unwrap();
+        assert_eq!(gene.indices.len(), 2);
+    }
+
+    #[test]
+    fn mesh_forward_slice_out_of_bounds_returns_none() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![simple_vm_node(0, vec![])],
+        };
+        assert_eq!(mesh_forward_slice(&genome, 5, 8), None);
+    }
+
+    #[test]
+    fn mesh_forward_slice_handles_dangling_target() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![simple_vm_node(0, vec![99])],
+        };
+        let gene = mesh_forward_slice(&genome, 0, 8).unwrap();
+        assert_eq!(gene.indices, vec![0]);
+    }
+
+    #[test]
+    fn mesh_forward_slice_handles_cycle() {
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                simple_vm_node(0, vec![1]),
+                simple_vm_node(1, vec![0]),
+            ],
+        };
+        let gene = mesh_forward_slice(&genome, 0, 8).unwrap();
         assert_eq!(gene.indices, vec![0, 1]);
     }
 }
