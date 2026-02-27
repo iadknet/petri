@@ -195,6 +195,13 @@ fn vm_operator_key(op: VmOperator) -> MutationOperator {
         VmOperator::VmInstructionRawFieldMutation => {
             MutationOperator::VmInstructionRawFieldMutation
         }
+        VmOperator::VmCopyInstructionBlock => MutationOperator::VmCopyInstructionBlock,
+        VmOperator::VmCopyInstructionBlockRemapped => {
+            MutationOperator::VmCopyInstructionBlockRemapped
+        }
+        VmOperator::VmCopyConstantBlock => MutationOperator::VmCopyConstantBlock,
+        VmOperator::VmCopyGeneBackwardSlice => MutationOperator::VmCopyGeneBackwardSlice,
+        VmOperator::VmCopyGeneForwardSlice => MutationOperator::VmCopyGeneForwardSlice,
     }
 }
 
@@ -209,6 +216,9 @@ fn graph_operator_key(op: GraphOperator) -> MutationOperator {
         GraphOperator::RetargetGraphEdge => MutationOperator::GraphRetargetGraphEdge,
         GraphOperator::RemoveGraphEdge => MutationOperator::GraphRemoveGraphEdge,
         GraphOperator::GraphRawFieldMutation => MutationOperator::GraphRawFieldMutation,
+        GraphOperator::CopyInternalNode => MutationOperator::GraphCopyInternalNode,
+        GraphOperator::CopySubgraph => MutationOperator::GraphCopySubgraph,
+        GraphOperator::CopyEdgeBundle => MutationOperator::GraphCopyEdgeBundle,
     }
 }
 

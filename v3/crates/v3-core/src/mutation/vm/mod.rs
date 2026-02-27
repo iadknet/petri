@@ -10,16 +10,26 @@ pub enum VmOperator {
     VmInstructionMutation,
     VmRegisterCountMutation,
     VmInstructionRawFieldMutation,
+    VmCopyInstructionBlock,
+    VmCopyInstructionBlockRemapped,
+    VmCopyConstantBlock,
+    VmCopyGeneBackwardSlice,
+    VmCopyGeneForwardSlice,
 }
 
 impl VmOperator {
     /// Pick a random VM operator uniformly.
     pub fn random(rng: &mut impl Rng) -> Self {
-        match rng.gen_range(0u8..4) {
+        match rng.gen_range(0u8..9) {
             0 => Self::VmConstantMutation,
             1 => Self::VmInstructionMutation,
             2 => Self::VmRegisterCountMutation,
-            _ => Self::VmInstructionRawFieldMutation,
+            3 => Self::VmInstructionRawFieldMutation,
+            4 => Self::VmCopyInstructionBlock,
+            5 => Self::VmCopyInstructionBlockRemapped,
+            6 => Self::VmCopyConstantBlock,
+            7 => Self::VmCopyGeneBackwardSlice,
+            _ => Self::VmCopyGeneForwardSlice,
         }
     }
 }
@@ -58,6 +68,21 @@ impl VmMutator {
             }
             VmOperator::VmInstructionRawFieldMutation => {
                 apply_instruction_raw_field_mutation(genome, node_idx, rng)
+            }
+            VmOperator::VmCopyInstructionBlock => {
+                apply_copy_instruction_block(genome, node_idx, rng)
+            }
+            VmOperator::VmCopyInstructionBlockRemapped => {
+                apply_copy_instruction_block_remapped(genome, node_idx, rng)
+            }
+            VmOperator::VmCopyConstantBlock => {
+                apply_copy_constant_block(genome, node_idx, rng)
+            }
+            VmOperator::VmCopyGeneBackwardSlice => {
+                apply_copy_gene_backward_slice(genome, node_idx, rng)
+            }
+            VmOperator::VmCopyGeneForwardSlice => {
+                apply_copy_gene_forward_slice(genome, node_idx, rng)
             }
         }
     }
@@ -419,6 +444,46 @@ fn apply_instruction_raw_field_mutation(
     Ok(())
 }
 
+fn apply_copy_instruction_block(
+    _genome: &mut CreatureGenome,
+    _node_idx: usize,
+    _rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    Err(MutationSkipReason::NoApplicableTarget)
+}
+
+fn apply_copy_instruction_block_remapped(
+    _genome: &mut CreatureGenome,
+    _node_idx: usize,
+    _rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    Err(MutationSkipReason::NoApplicableTarget)
+}
+
+fn apply_copy_constant_block(
+    _genome: &mut CreatureGenome,
+    _node_idx: usize,
+    _rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    Err(MutationSkipReason::NoApplicableTarget)
+}
+
+fn apply_copy_gene_backward_slice(
+    _genome: &mut CreatureGenome,
+    _node_idx: usize,
+    _rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    Err(MutationSkipReason::NoApplicableTarget)
+}
+
+fn apply_copy_gene_forward_slice(
+    _genome: &mut CreatureGenome,
+    _node_idx: usize,
+    _rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    Err(MutationSkipReason::NoApplicableTarget)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -529,6 +594,11 @@ mod tests {
             VmOperator::VmInstructionMutation,
             VmOperator::VmRegisterCountMutation,
             VmOperator::VmInstructionRawFieldMutation,
+            VmOperator::VmCopyInstructionBlock,
+            VmOperator::VmCopyInstructionBlockRemapped,
+            VmOperator::VmCopyConstantBlock,
+            VmOperator::VmCopyGeneBackwardSlice,
+            VmOperator::VmCopyGeneForwardSlice,
         ];
         for (i, &op) in operators.iter().enumerate() {
             let mut genome = v3alpha1_founder_genome();
