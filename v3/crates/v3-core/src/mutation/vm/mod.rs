@@ -631,9 +631,7 @@ fn apply_copy_instruction_block(
         let block: Vec<VmInstruction> =
             vm.program[source_start..source_start + block_size].to_vec();
         let insert_at = rng.gen_range(0..=vm.program.len());
-        for (i, instr) in block.into_iter().enumerate() {
-            vm.program.insert(insert_at + i, instr);
-        }
+        vm.program.splice(insert_at..insert_at, block);
     }
     Ok(())
 }
@@ -665,9 +663,7 @@ fn apply_copy_instruction_block_remapped(
             remap_register_refs(instr, reg_offset, register_count);
             adjust_jump_offset(instr, delta);
         }
-        for (i, instr) in block.into_iter().enumerate() {
-            vm.program.insert(insert_at + i, instr);
-        }
+        vm.program.splice(insert_at..insert_at, block);
     }
     Ok(())
 }
@@ -685,6 +681,7 @@ fn apply_copy_constant_block(
         let block_size = rng.gen_range(1..=16).min(vm.constants.len());
         let source_start = rng.gen_range(0..=vm.constants.len() - block_size);
         let block: Vec<f32> = vm.constants[source_start..source_start + block_size].to_vec();
+        // Append-only: inserting mid-pool would invalidate existing const_idx references.
         vm.constants.extend_from_slice(&block);
     }
     Ok(())
@@ -732,9 +729,7 @@ fn apply_copy_gene_backward_slice(
             .map(|&i| vm.program[i].clone())
             .collect();
         let insert_at = rng.gen_range(0..=vm.program.len());
-        for (i, instr) in gene.into_iter().enumerate() {
-            vm.program.insert(insert_at + i, instr);
-        }
+        vm.program.splice(insert_at..insert_at, gene);
     }
     Ok(())
 }
@@ -781,9 +776,7 @@ fn apply_copy_gene_forward_slice(
             .map(|&i| vm.program[i].clone())
             .collect();
         let insert_at = rng.gen_range(0..=vm.program.len());
-        for (i, instr) in gene.into_iter().enumerate() {
-            vm.program.insert(insert_at + i, instr);
-        }
+        vm.program.splice(insert_at..insert_at, gene);
     }
     Ok(())
 }
