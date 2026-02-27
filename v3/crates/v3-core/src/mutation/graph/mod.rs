@@ -16,12 +16,13 @@ pub enum GraphOperator {
     AddGraphEdge,
     RetargetGraphEdge,
     RemoveGraphEdge,
+    GraphRawFieldMutation,
 }
 
 impl GraphOperator {
     /// Pick a random graph operator uniformly.
     pub fn random(rng: &mut impl Rng) -> Self {
-        match rng.gen_range(0u8..8) {
+        match rng.gen_range(0u8..9) {
             0 => Self::AlterGraphEdgeWeight,
             1 => Self::SwapGraphOperator,
             2 => Self::MutateGraphOperatorParam,
@@ -29,7 +30,8 @@ impl GraphOperator {
             4 => Self::RemoveInternalGraphNode,
             5 => Self::AddGraphEdge,
             6 => Self::RetargetGraphEdge,
-            _ => Self::RemoveGraphEdge,
+            7 => Self::RemoveGraphEdge,
+            _ => Self::GraphRawFieldMutation,
         }
     }
 }
@@ -69,6 +71,9 @@ impl GraphMutator {
             GraphOperator::AddGraphEdge => add_graph_edge(genome, node_idx, rng),
             GraphOperator::RetargetGraphEdge => retarget_graph_edge(genome, node_idx, rng),
             GraphOperator::RemoveGraphEdge => remove_graph_edge(genome, node_idx, rng),
+            GraphOperator::GraphRawFieldMutation => {
+                apply_graph_raw_field_mutation(genome, node_idx, rng)
+            }
         }
     }
 }
@@ -238,10 +243,59 @@ fn remove_graph_edge(
     Ok(())
 }
 
+fn apply_graph_raw_field_mutation(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
+        let mut target_count: usize = 0;
+        for internal in &g.internal_nodes {
+            if matches!(
+                &internal.kind,
+                GraphNodeKind::InputRef(_) | GraphNodeKind::CustomOutput(_)
+            ) {
+                target_count += 1;
+            }
+            target_count += internal.inputs.len();
+        }
+        if target_count == 0 {
+            return Err(MutationSkipReason::NoApplicableTarget);
+        }
+
+        let mut pick = rng.gen_range(0..target_count);
+        for int_idx in 0..g.internal_nodes.len() {
+            if matches!(
+                &g.internal_nodes[int_idx].kind,
+                GraphNodeKind::InputRef(_) | GraphNodeKind::CustomOutput(_)
+            ) {
+                if pick == 0 {
+                    if matches!(&g.internal_nodes[int_idx].kind, GraphNodeKind::InputRef(_)) {
+                        g.internal_nodes[int_idx].kind = GraphNodeKind::InputRef(rng.gen());
+                    } else {
+                        g.internal_nodes[int_idx].kind = GraphNodeKind::CustomOutput(rng.gen());
+                    }
+                    return Ok(());
+                }
+                pick -= 1;
+            }
+
+            for edge_idx in 0..g.internal_nodes[int_idx].inputs.len() {
+                if pick == 0 {
+                    g.internal_nodes[int_idx].inputs[edge_idx].source_idx = rng.gen();
+                    return Ok(());
+                }
+                pick -= 1;
+            }
+        }
+    }
+    Ok(())
+}
+
 /// Return a random GraphNodeKind covering all 22 variants with random initial params.
 fn random_graph_node_kind(rng: &mut impl Rng) -> GraphNodeKind {
     match rng.gen_range(0u8..22) {
-        0 => GraphNodeKind::InputRef(rng.gen_range(0u8..8)),
+        0 => GraphNodeKind::InputRef(rng.gen()),
         1 => GraphNodeKind::Constant(rng.gen_range(-1.0f32..=1.0)),
         2 => GraphNodeKind::Add,
         3 => GraphNodeKind::Multiply,
@@ -261,7 +315,7 @@ fn random_graph_node_kind(rng: &mut impl Rng) -> GraphNodeKind {
         17 => GraphNodeKind::Momentum(rng.gen_range(0.0f32..=1.0)),
         18 => GraphNodeKind::Oscillator(rng.gen_range(0.01f32..=10.0)),
         19 => GraphNodeKind::AdaptiveGain,
-        20 => GraphNodeKind::CustomOutput(rng.gen_range(0u8..8)),
+        20 => GraphNodeKind::CustomOutput(rng.gen()),
         _ => GraphNodeKind::RouterOutput,
     }
 }
@@ -284,7 +338,8 @@ mod tests {
     use crate::contracts::NodeId;
     use crate::creature::founder::v3alpha1_founder_genome;
     use crate::creature::genome::{
-        BackendDef, GraphInternalNode, NodeGenome, VmBackendDef, VmInstruction,
+        BackendDef, CreatureGenome, GraphBackendDef, GraphInput, GraphInternalNode, NodeGenome,
+        VmBackendDef, VmInstruction,
     };
     use crate::creature::parseability::ParseabilityGate;
     use rand::rngs::SmallRng;
@@ -307,6 +362,18 @@ mod tests {
                 }
             })
             .sum()
+    }
+
+    fn graph_only_genome(internal_nodes: Vec<GraphInternalNode>) -> CreatureGenome {
+        CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Graph(GraphBackendDef { internal_nodes }),
+                targets: vec![],
+            }],
+        }
     }
 
     #[test]
@@ -575,6 +642,33 @@ mod tests {
     }
 
     #[test]
+    fn random_graph_node_kind_reaches_out_of_range_input_ref_and_custom_output() {
+        let mut saw_out_of_range_input_ref = false;
+        let mut saw_out_of_range_custom_output = false;
+        for seed in 0u64..20_000 {
+            let mut r = rng(seed);
+            match random_graph_node_kind(&mut r) {
+                GraphNodeKind::InputRef(idx) if idx > 11 => saw_out_of_range_input_ref = true,
+                GraphNodeKind::CustomOutput(idx) if idx > 11 => {
+                    saw_out_of_range_custom_output = true
+                }
+                _ => {}
+            }
+            if saw_out_of_range_input_ref && saw_out_of_range_custom_output {
+                break;
+            }
+        }
+        assert!(
+            saw_out_of_range_input_ref,
+            "InputRef mutation surface must include out-of-range u8 values"
+        );
+        assert!(
+            saw_out_of_range_custom_output,
+            "CustomOutput mutation surface must include out-of-range u8 values"
+        );
+    }
+
+    #[test]
     fn retarget_graph_edge_changes_source_idx() {
         let genome = v3alpha1_founder_genome();
         // Founder graph node 0 has internal nodes with inputs.
@@ -666,6 +760,89 @@ mod tests {
     }
 
     #[test]
+    fn raw_field_mutation_can_set_input_ref_out_of_range() {
+        let mut found_out_of_range = false;
+        for seed in 0u64..512 {
+            let mut genome = graph_only_genome(vec![GraphInternalNode {
+                kind: GraphNodeKind::InputRef(0),
+                inputs: vec![],
+            }]);
+            let mut r = rng(seed);
+            GraphMutator::apply(&mut genome, GraphOperator::GraphRawFieldMutation, &mut r).unwrap();
+            if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
+                if let GraphNodeKind::InputRef(idx) = g.internal_nodes[0].kind {
+                    if idx > 11 {
+                        found_out_of_range = true;
+                        break;
+                    }
+                }
+            }
+        }
+        assert!(
+            found_out_of_range,
+            "raw graph mutation must reach InputRef values above output slot range"
+        );
+    }
+
+    #[test]
+    fn raw_field_mutation_can_set_custom_output_out_of_range() {
+        let mut found_out_of_range = false;
+        for seed in 0u64..512 {
+            let mut genome = graph_only_genome(vec![GraphInternalNode {
+                kind: GraphNodeKind::CustomOutput(0),
+                inputs: vec![],
+            }]);
+            let mut r = rng(seed);
+            GraphMutator::apply(&mut genome, GraphOperator::GraphRawFieldMutation, &mut r).unwrap();
+            if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
+                if let GraphNodeKind::CustomOutput(slot) = g.internal_nodes[0].kind {
+                    if slot > 11 {
+                        found_out_of_range = true;
+                        break;
+                    }
+                }
+            }
+        }
+        assert!(
+            found_out_of_range,
+            "raw graph mutation must reach CustomOutput values above output slot range"
+        );
+    }
+
+    #[test]
+    fn raw_field_mutation_can_set_edge_source_out_of_range() {
+        let mut found_out_of_range = false;
+        for seed in 0u64..512 {
+            let mut genome = graph_only_genome(vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::Constant(1.0),
+                    inputs: vec![],
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::Add,
+                    inputs: vec![GraphInput {
+                        source_idx: 0,
+                        weight: 1.0,
+                    }],
+                },
+            ]);
+            let mut r = rng(seed);
+            GraphMutator::apply(&mut genome, GraphOperator::GraphRawFieldMutation, &mut r).unwrap();
+            if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
+                let source_idx = g.internal_nodes[1].inputs[0].source_idx as usize;
+                if source_idx >= g.internal_nodes.len() {
+                    found_out_of_range = true;
+                    break;
+                }
+            }
+        }
+        assert!(
+            found_out_of_range,
+            "raw graph mutation must reach edge source indices outside internal node bounds"
+        );
+    }
+
+    #[test]
     fn graph_after_mutation_passes_parseability_gate() {
         let operators = [
             GraphOperator::AlterGraphEdgeWeight,
@@ -676,6 +853,7 @@ mod tests {
             GraphOperator::AddGraphEdge,
             GraphOperator::RetargetGraphEdge,
             GraphOperator::RemoveGraphEdge,
+            GraphOperator::GraphRawFieldMutation,
         ];
         for (i, &op) in operators.iter().enumerate() {
             let mut genome = v3alpha1_founder_genome();

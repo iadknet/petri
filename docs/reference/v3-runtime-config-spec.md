@@ -56,13 +56,13 @@ Transport posture note:
 
 | Key | Type | Default | Constraint / normalization | Used by |
 | --- | --- | --- | --- | --- |
-| `runtime.max_mesh_hops` | `u32` | `128` | Must be `>= 1`; invalid values fall back to `128`. | `v3-mesh-execution-spec.md` |
-| `runtime.max_vm_steps` | `u32` | `1024` | Must be `>= 1`; invalid values fall back to `1024`. | `v3-vm-isa-spec.md` |
-| `runtime.max_graph_relax_iters` | `u32` | `4` | Must be `>= 1`; invalid values fall back to `4`. | `v3-graph-backend-spec.md` |
+| `runtime.max_mesh_hops` | `u32` | `1024` | Must be `>= 1`; invalid values fall back to `1024`. | `v3-mesh-execution-spec.md` |
+| `runtime.max_vm_steps` | `u32` | `10000` | Must be `>= 1`; invalid values fall back to `10000`. | `v3-vm-isa-spec.md` |
+| `runtime.max_graph_relax_iters` | `u32` | `15` | Must be `>= 1`; invalid values fall back to `15`. | `v3-graph-backend-spec.md` |
 | `runtime.graph_convergence_epsilon` | `f32` | `1e-3` | Must be `>= 0.0`; invalid values fall back to `1e-3`. | `v3-graph-backend-spec.md` |
-| `runtime.graph_convergence_stable_passes` | `u32` | `1` | Must be `>= 1`; invalid values fall back to `1`. | `v3-graph-backend-spec.md` |
-| `runtime.graph_node_base_cost` | `f32` | `0.05` | Must be `>= 0.0`; invalid values fall back to `0.05`. | `v3-graph-backend-spec.md` |
-| `runtime.vm.opcode_cost_multiplier` | `f32` | `0.5` | Must be finite and `>= 0.0`; invalid values fall back to `0.5`. `0.0` is allowed and means zero opcode energy spend. | `v3-vm-isa-spec.md` |
+| `runtime.graph_convergence_stable_passes` | `u32` | `2` | Must be `>= 1`; invalid values fall back to `2`. | `v3-graph-backend-spec.md` |
+| `runtime.graph_node_base_cost` | `f32` | `1e-5` | Must be `>= 0.0`; invalid values fall back to `1e-5`. | `v3-graph-backend-spec.md` |
+| `runtime.vm.opcode_cost_multiplier` | `f32` | `1e-6` | Must be finite and `>= 0.0`; invalid values fall back to `1e-6`. `0.0` is allowed and means zero opcode energy spend. | `v3-vm-isa-spec.md` |
 
 If implementation structs use different nesting, a one-to-one semantic mapping
 to these keys must exist.
@@ -77,15 +77,12 @@ Type posture:
 
 | Key | Type | Default | Constraint / normalization |
 | --- | --- | --- | --- |
-| `runtime.mutation.mutation_probability` | `f64` | `0.01` | Clamp to `[0.0, 1.0]`. Uses `f64` (not `f32`) to preserve precision for very small probability values used in low-mutation-rate experiments. |
-| `runtime.mutation.per_birth_mutation_events_min` | `u32` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
-| `runtime.mutation.per_birth_mutation_events_max` | `u32` | `4` | Must be `>= per_birth_mutation_events_min`; lower values normalize to min. |
-| `runtime.mutation.domain_selection_weights` | `map<MutationDomain,f32>` | Equal weights across enabled genome domains (Topology, Vm, Graph) | Weights must be non-negative; all-zero set falls back to equal enabled-domain weights. Phenotype is not a mutation domain; see `v3-phenotype-spec.md`. |
-| `runtime.mutation.operator_selection_weights` | `map<MutationDomain,map<Operator,f32>>` | Equal weights across enabled operators in each domain | Weights must be non-negative; missing/all-zero domain map falls back to equal enabled-operator weights for that domain. |
-| `runtime.mutation.operator_modifier_scale` | `f32` | `1.0` | Must be `>= 0.0`; negative values clamp to `0.0`. |
-| `runtime.mutation.phenotype.channel_step` | `u8` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
-| `runtime.mutation.phenotype.channel_change_chance` | `f32` | `0.001` | Clamp to `[0.0, 1.0]`. |
-| `runtime.mutation.phenotype.polarity_flip_chance` | `f32` | `0.0002` | Clamp to `[0.0, 1.0]`. |
+| `mutation.mutation_probability` | `f64` | `0.303` | Clamp to `[0.0, 1.0]`. Uses `f64` (not `f32`) to preserve precision for very small probability values used in low-mutation-rate experiments. |
+| `mutation.per_birth_mutation_events_min` | `u32` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
+| `mutation.per_birth_mutation_events_max` | `u32` | `10` | Must be `>= per_birth_mutation_events_min`; lower values normalize to min. |
+| `mutation.phenotype.channel_step` | `u8` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
+| `mutation.phenotype.channel_change_chance` | `f32` | `0.001` | Clamp to `[0.0, 1.0]`. |
+| `mutation.phenotype.polarity_flip_chance` | `f32` | `0.0002` | Clamp to `[0.0, 1.0]`. |
 
 Phenotype mutation is not a mutation engine domain; it is a separate pathway
 triggered by genome mutation. Phenotype algorithm and trigger semantics are
@@ -95,9 +92,11 @@ Mutation randomization semantics:
 1. Roll mutation trigger from `mutation_probability`.
 2. If triggered, sample event count in
    `[per_birth_mutation_events_min, per_birth_mutation_events_max]` (inclusive).
-3. For each event, sample mutation domain and operator from configured weights.
-4. Sample operator-specific numeric modifiers randomly and apply
-   `operator_modifier_scale` as a global multiplier.
+3. For each event, sample mutation domain uniformly across enabled domains.
+4. For each event, sample mutation operator uniformly across the selected
+   domain's enabled operators.
+5. Sample operator-specific numeric fields according to each mutator's local
+   randomization rules.
 
 Mutation behavior semantics remain canonical in `v3-mutation-spec.md`; this
 section only owns config contract shape/defaults.
@@ -109,14 +108,14 @@ section only owns config contract shape/defaults.
 | Key | Type | Default | Constraint / normalization |
 | --- | --- | --- | --- |
 | `energy.lifecycle.initial_energy` | `f32` | `20.0` | Must be finite and `>= 0.0`; invalid values fall back to `20.0`. |
-| `energy.lifecycle.max_energy` | `f32` | `100.0` | Must be finite and `>= 1.0`; invalid values fall back to `100.0`. |
-| `energy.lifecycle.energy_decay_per_tick` | `f32` | `0.01` | Must be finite and `>= 0.0`; invalid values fall back to `0.01`. |
+| `energy.lifecycle.max_energy` | `f32` | `200.0` | Must be finite and `>= 1.0`; invalid values fall back to `200.0`. |
+| `energy.lifecycle.energy_decay_per_tick` | `f32` | `0.5` | Must be finite and `>= 0.0`; invalid values fall back to `0.5`. |
 | `energy.lifecycle.min_reproduce_energy` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. |
 | `energy.lifecycle.default_offspring_energy` | `f32` | `8.0` | Must be finite and `>= 0.0`; invalid values fall back to `8.0`. |
-| `energy.costs.move_cost` | `f32` | `0.02` | Must be finite and `>= 0.0`; invalid values fall back to `0.02`. |
+| `energy.costs.move_cost` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. |
 | `energy.costs.eat_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; invalid values fall back to `0.0`. |
-| `energy.costs.noop_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; invalid values fall back to `0.0`. |
-| `energy.costs.reproduce_cost` | `f32` | `0.12` | Must be finite and `>= 0.0`; invalid values fall back to `0.12`. |
+| `energy.costs.noop_cost` | `f32` | `0.05` | Must be finite and `>= 0.0`; invalid values fall back to `0.05`. |
+| `energy.costs.reproduce_cost` | `f32` | `0.1` | Must be finite and `>= 0.0`; invalid values fall back to `0.1`. |
 | `energy.costs.eat_reward_per_food` | `f32` | `12.0` | Must be finite and `>= 0.0`; invalid values fall back to `12.0`. |
 
 Energy posture:
@@ -150,8 +149,8 @@ field names/defaults and transfer-gate config semantics.
 
 | Key | Type | Default | Constraint / normalization |
 | --- | --- | --- | --- |
-| `population.initial_creatures` | `u32` | `50` | Must be `>= 1`; invalid values fall back to `50`. |
-| `population.max_creatures` | `u32` | `1000` | Must be `>= population.initial_creatures`; invalid values fall back to `1000`. |
+| `population.initial_creatures` | `u32` | `2000` | Must be `>= 1`; invalid values fall back to `2000`. |
+| `population.max_creatures` | `u32` | `100000` | Must be `>= population.initial_creatures`; invalid values fall back to `100000`. |
 
 Population config governs startup seeding targets and runtime population caps.
 

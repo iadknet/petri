@@ -80,19 +80,39 @@ Core rule:
 - `AddRouteTarget`
 - `RemoveRouteTarget`
 - `ChangeEntryNode`
+- `SwapNodeBackend`
+- `RewriteNodeId`
 
 ### VM domain
 
 - `VmInstructionMutation` (insert/delete/replace opcode, mutate operands)
 - `VmConstantMutation`
+- `VmRegisterCountMutation`
+- `VmInstructionRawFieldMutation` (raw representable-field mutation for
+  tolerant runtime decoders, including fields such as `action_type` and
+  immediate memory addresses)
 
 ### Graph domain
 
-- `AddInternalGraphNode(kind)`
-- `RemoveInternalGraphNode`
 - `AlterGraphEdgeWeight`
 - `SwapGraphOperator`
 - `MutateGraphOperatorParam`
+- `AddInternalGraphNode(kind)`
+- `RemoveInternalGraphNode`
+- `AddGraphEdge`
+- `RetargetGraphEdge`
+- `RemoveGraphEdge`
+- `GraphRawFieldMutation` (raw representable-field mutation for tolerant graph
+  encodings, including `InputRef(u8)`, `CustomOutput(u8)`, and edge source
+  indices)
+
+### InputRef domain
+
+- `Add`
+- `Remove`
+- `Swap`
+- `RawFieldMutation` (raw representable-field mutation for tolerant
+  `UpstreamSlot(usize)` values)
 
 Phenotype mutation is not a mutation engine domain. It is a separate pathway
 triggered by genome mutation; see `v3-phenotype-spec.md`.
@@ -121,6 +141,12 @@ Call semantics:
 - `applied_events: u32`
 - `skipped_events: u32`
 - `skip_reasons: map<MutationSkipReason, u32>`
+- `attempted_by_domain: map<MutationDomain, u32>`
+- `applied_by_domain: map<MutationDomain, u32>`
+- `attempted_by_operator: map<MutationOperator, u32>`
+- `applied_by_operator: map<MutationOperator, u32>`
+- `applied_semantic_noop_events: u32`
+- `applied_semantic_change_events: u32`
 
 Accounting invariant:
 - `attempted_events = applied_events + skipped_events`.
@@ -146,9 +172,12 @@ Selection randomization rules (internal to `MutationEngine`):
   fails, `MutationEngine` returns `MutationSummary { attempted_events: 0,
   applied_events: 0, skipped_events: 0, ... }` immediately.
 - If triggered, event count is sampled from configured inclusive min/max bounds.
-- For each event, domain/operator are sampled from configured weights.
-- Operator modifiers are randomized per event (subject to operator-specific
-  constraints and global modifier scaling).
+- For each event, domain is sampled uniformly across enabled domains
+  (`Topology`, `Vm`, `Graph`, `InputRef`).
+- For each event, operator is sampled uniformly across the selected domain's
+  operators.
+- Operator-specific mutation fields are randomized per event according to that
+  operator's mutator implementation.
 - Canonical owner for mutation config keys/defaults: `v3-runtime-config-spec.md`.
 
 ---
@@ -213,6 +242,14 @@ At minimum:
 - Per-event outcome (applied or skipped).
 - Skip reason when skipped.
 - Domain and operator identity for each attempted event.
+- Semantic category identity (`SemanticNoop` vs `SemanticChange`) for each
+  applied event.
+
+Semantic category rule:
+- `Topology.RewriteNodeId` is semantic-noop-capable and must be counted under
+  `SemanticNoop` when applied.
+- Applied semantic-noop events still count as applied mutation events and remain
+  eligible to trigger phenotype mutation through reproduction policy.
 
 ---
 
