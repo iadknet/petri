@@ -711,7 +711,8 @@ fn apply_copy_gene_backward_slice(
         let anchor = outputs[rng.gen_range(0..outputs.len())];
         // Backward trace using u32 bitset.
         let mut needed: u32 = register_read_mask(&vm.program[anchor]);
-        let mut gene_indices = vec![anchor];
+        let mut gene_indices = Vec::with_capacity(32);
+        gene_indices.push(anchor);
         for i in (0..anchor).rev() {
             if let Some(dst) = register_write(&vm.program[i]) {
                 if needed & reg_bit(dst) != 0 {
@@ -760,7 +761,8 @@ fn apply_copy_gene_forward_slice(
             .expect("seed_idx drawn from writers filtered on register_write().is_some()");
         // Forward trace using u32 bitset.
         let mut produced: u32 = reg_bit(seed_dst);
-        let mut gene_indices = vec![seed_idx];
+        let mut gene_indices = Vec::with_capacity(32);
+        gene_indices.push(seed_idx);
         for i in (seed_idx + 1)..vm.program.len() {
             if register_read_mask(&vm.program[i]) & produced != 0 {
                 if let Some(dst) = register_write(&vm.program[i]) {
