@@ -226,6 +226,11 @@ fn graph_operator_key(op: GraphOperator) -> MutationOperator {
         GraphOperator::CopyInternalNode => MutationOperator::GraphCopyInternalNode,
         GraphOperator::CopySubgraph => MutationOperator::GraphCopySubgraph,
         GraphOperator::CopyEdgeBundle => MutationOperator::GraphCopyEdgeBundle,
+        GraphOperator::EnableHebbian => MutationOperator::GraphEnableHebbian,
+        GraphOperator::DisableHebbian => MutationOperator::GraphDisableHebbian,
+        GraphOperator::MutateHebbianRule => MutationOperator::GraphMutateHebbianRule,
+        GraphOperator::MutateHebbianRate => MutationOperator::GraphMutateHebbianRate,
+        GraphOperator::ToggleHebbianLamarckian => MutationOperator::GraphToggleHebbianLamarckian,
     }
 }
 

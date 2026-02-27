@@ -1,3 +1,5 @@
+pub mod hebbian;
+
 use rand::Rng;
 
 use crate::creature::genome::{
@@ -20,10 +22,15 @@ pub enum GraphOperator {
     CopyInternalNode,
     CopySubgraph,
     CopyEdgeBundle,
+    EnableHebbian,
+    DisableHebbian,
+    MutateHebbianRule,
+    MutateHebbianRate,
+    ToggleHebbianLamarckian,
 }
 
 impl GraphOperator {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 17] = [
         Self::AlterGraphEdgeWeight,
         Self::SwapGraphOperator,
         Self::MutateGraphOperatorParam,
@@ -36,6 +43,11 @@ impl GraphOperator {
         Self::CopyInternalNode,
         Self::CopySubgraph,
         Self::CopyEdgeBundle,
+        Self::EnableHebbian,
+        Self::DisableHebbian,
+        Self::MutateHebbianRule,
+        Self::MutateHebbianRate,
+        Self::ToggleHebbianLamarckian,
     ];
 
     /// Per-operator weight reflecting impact tier.
@@ -55,12 +67,17 @@ impl GraphOperator {
             Self::CopyInternalNode => 1,
             Self::CopySubgraph => 1,
             Self::CopyEdgeBundle => 2,
+            Self::EnableHebbian => 1,
+            Self::DisableHebbian => 1,
+            Self::MutateHebbianRule => 2,
+            Self::MutateHebbianRate => 4,
+            Self::ToggleHebbianLamarckian => 2,
         }
     }
 
     const TOTAL_WEIGHT: u16 = {
         assert!(
-            Self::ALL.len() == 12,
+            Self::ALL.len() == 17,
             "ALL must cover every GraphOperator variant"
         );
         let mut sum = 0u16;
@@ -127,6 +144,13 @@ impl GraphMutator {
             GraphOperator::CopyInternalNode => apply_copy_internal_node(genome, node_idx, rng),
             GraphOperator::CopySubgraph => apply_copy_subgraph(genome, node_idx, rng),
             GraphOperator::CopyEdgeBundle => apply_copy_edge_bundle(genome, node_idx, rng),
+            GraphOperator::EnableHebbian => hebbian::enable_hebbian(genome, node_idx, rng),
+            GraphOperator::DisableHebbian => hebbian::disable_hebbian(genome, node_idx, rng),
+            GraphOperator::MutateHebbianRule => hebbian::mutate_hebbian_rule(genome, node_idx, rng),
+            GraphOperator::MutateHebbianRate => hebbian::mutate_hebbian_rate(genome, node_idx, rng),
+            GraphOperator::ToggleHebbianLamarckian => {
+                hebbian::toggle_hebbian_lamarckian(genome, node_idx, rng)
+            }
         }
     }
 }
@@ -1769,7 +1793,7 @@ mod tests {
     #[test]
     fn graph_operator_weights_are_positive() {
         let all = GraphOperator::ALL;
-        assert_eq!(all.len(), 12, "ALL must cover every GraphOperator variant");
+        assert_eq!(all.len(), 17, "ALL must cover every GraphOperator variant");
         for &op in &all {
             assert!(op.weight() > 0, "weight must be positive for {:?}", op);
         }

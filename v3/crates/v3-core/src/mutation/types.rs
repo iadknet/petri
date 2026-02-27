@@ -103,6 +103,11 @@ pub enum MutationOperator {
     GraphCopyInternalNode,
     GraphCopySubgraph,
     GraphCopyEdgeBundle,
+    GraphEnableHebbian,
+    GraphDisableHebbian,
+    GraphMutateHebbianRule,
+    GraphMutateHebbianRate,
+    GraphToggleHebbianLamarckian,
     // InputRef
     InputRefAdd,
     InputRefRemove,
@@ -148,6 +153,11 @@ impl MutationOperator {
             Self::GraphCopyInternalNode => "Graph.CopyInternalNode",
             Self::GraphCopySubgraph => "Graph.CopySubgraph",
             Self::GraphCopyEdgeBundle => "Graph.CopyEdgeBundle",
+            Self::GraphEnableHebbian => "Graph.EnableHebbian",
+            Self::GraphDisableHebbian => "Graph.DisableHebbian",
+            Self::GraphMutateHebbianRule => "Graph.MutateHebbianRule",
+            Self::GraphMutateHebbianRate => "Graph.MutateHebbianRate",
+            Self::GraphToggleHebbianLamarckian => "Graph.ToggleHebbianLamarckian",
             Self::InputRefAdd => "InputRef.Add",
             Self::InputRefRemove => "InputRef.Remove",
             Self::InputRefSwap => "InputRef.Swap",
@@ -191,7 +201,12 @@ impl MutationOperator {
             | Self::GraphRawFieldMutation
             | Self::GraphCopyInternalNode
             | Self::GraphCopySubgraph
-            | Self::GraphCopyEdgeBundle => MutationDomain::Graph,
+            | Self::GraphCopyEdgeBundle
+            | Self::GraphEnableHebbian
+            | Self::GraphDisableHebbian
+            | Self::GraphMutateHebbianRule
+            | Self::GraphMutateHebbianRate
+            | Self::GraphToggleHebbianLamarckian => MutationDomain::Graph,
             Self::InputRefAdd
             | Self::InputRefRemove
             | Self::InputRefSwap
@@ -208,7 +223,7 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 38] {
+    pub const fn all() -> [Self; 43] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
@@ -244,6 +259,11 @@ impl MutationOperator {
             Self::GraphCopyInternalNode,
             Self::GraphCopySubgraph,
             Self::GraphCopyEdgeBundle,
+            Self::GraphEnableHebbian,
+            Self::GraphDisableHebbian,
+            Self::GraphMutateHebbianRule,
+            Self::GraphMutateHebbianRate,
+            Self::GraphToggleHebbianLamarckian,
             Self::InputRefAdd,
             Self::InputRefRemove,
             Self::InputRefSwap,
@@ -396,7 +416,12 @@ mod tests {
                 | MutationOperator::GraphRawFieldMutation
                 | MutationOperator::GraphCopyInternalNode
                 | MutationOperator::GraphCopySubgraph
-                | MutationOperator::GraphCopyEdgeBundle => {
+                | MutationOperator::GraphCopyEdgeBundle
+                | MutationOperator::GraphEnableHebbian
+                | MutationOperator::GraphDisableHebbian
+                | MutationOperator::GraphMutateHebbianRule
+                | MutationOperator::GraphMutateHebbianRate
+                | MutationOperator::GraphToggleHebbianLamarckian => {
                     assert_eq!(operator.domain(), MutationDomain::Graph)
                 }
                 MutationOperator::InputRefAdd
