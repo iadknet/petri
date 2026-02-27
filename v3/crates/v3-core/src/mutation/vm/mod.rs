@@ -75,9 +75,7 @@ impl VmMutator {
             VmOperator::VmCopyInstructionBlockRemapped => {
                 apply_copy_instruction_block_remapped(genome, node_idx, rng)
             }
-            VmOperator::VmCopyConstantBlock => {
-                apply_copy_constant_block(genome, node_idx, rng)
-            }
+            VmOperator::VmCopyConstantBlock => apply_copy_constant_block(genome, node_idx, rng),
             VmOperator::VmCopyGeneBackwardSlice => {
                 apply_copy_gene_backward_slice(genome, node_idx, rng)
             }
@@ -485,6 +483,17 @@ fn register_write(instr: &VmInstruction) -> Option<u8> {
     }
 }
 
+/// Safe bit-shift: returns `1u32 << reg` if `reg < 32`, else `0`.
+/// Prevents panics when raw field mutations produce out-of-range register indices.
+#[inline]
+fn reg_bit(reg: u8) -> u32 {
+    if reg < 32 {
+        1u32 << reg
+    } else {
+        0
+    }
+}
+
 /// Returns a `u32` bitmask of registers read by the instruction.
 /// Bit `i` set means register `i` is read.
 fn register_read_mask(instr: &VmInstruction) -> u32 {
@@ -499,7 +508,7 @@ fn register_read_mask(instr: &VmInstruction) -> u32 {
         | VmInstruction::Not { src, .. }
         | VmInstruction::ToI32 { src, .. }
         | VmInstruction::ToU8 { src, .. }
-        | VmInstruction::ToBool { src, .. } => 1u32 << src,
+        | VmInstruction::ToBool { src, .. } => reg_bit(*src),
         VmInstruction::ReadInput { .. } => 0,
         VmInstruction::Add { a, b, .. }
         | VmInstruction::Sub { a, b, .. }
@@ -510,17 +519,15 @@ fn register_read_mask(instr: &VmInstruction) -> u32 {
         | VmInstruction::CmpGt { a, b, .. }
         | VmInstruction::CmpLt { a, b, .. }
         | VmInstruction::And { a, b, .. }
-        | VmInstruction::Or { a, b, .. } => (1u32 << a) | (1u32 << b),
-        VmInstruction::CmpEq { a, b, eps, .. } => {
-            (1u32 << a) | (1u32 << b) | (1u32 << eps)
-        }
-        VmInstruction::JumpIfZero { cond, .. } => 1u32 << cond,
+        | VmInstruction::Or { a, b, .. } => reg_bit(*a) | reg_bit(*b),
+        VmInstruction::CmpEq { a, b, eps, .. } => reg_bit(*a) | reg_bit(*b) | reg_bit(*eps),
+        VmInstruction::JumpIfZero { cond, .. } => reg_bit(*cond),
         VmInstruction::WriteInternalPayload { src, .. }
         | VmInstruction::WriteWorldActionMeta { src, .. }
-        | VmInstruction::WriteRouteTarget { src } => 1u32 << src,
-        VmInstruction::StoreMem8Imm { src, .. } => 1u32 << src,
-        VmInstruction::LoadMem8 { addr_reg, .. } => 1u32 << addr_reg,
-        VmInstruction::StoreMem8 { addr_reg, src } => (1u32 << addr_reg) | (1u32 << src),
+        | VmInstruction::WriteRouteTarget { src } => reg_bit(*src),
+        VmInstruction::StoreMem8Imm { src, .. } => reg_bit(*src),
+        VmInstruction::LoadMem8 { addr_reg, .. } => reg_bit(*addr_reg),
+        VmInstruction::StoreMem8 { addr_reg, src } => reg_bit(*addr_reg) | reg_bit(*src),
     }
 }
 
@@ -621,7 +628,8 @@ fn apply_copy_instruction_block(
         }
         let block_size = rng.gen_range(2..=32).min(vm.program.len());
         let source_start = rng.gen_range(0..=vm.program.len() - block_size);
-        let block: Vec<VmInstruction> = vm.program[source_start..source_start + block_size].to_vec();
+        let block: Vec<VmInstruction> =
+            vm.program[source_start..source_start + block_size].to_vec();
         let insert_at = rng.gen_range(0..=vm.program.len());
         for (i, instr) in block.into_iter().enumerate() {
             vm.program.insert(insert_at + i, instr);
@@ -709,7 +717,7 @@ fn apply_copy_gene_backward_slice(
         let mut gene_indices = vec![anchor];
         for i in (0..anchor).rev() {
             if let Some(dst) = register_write(&vm.program[i]) {
-                if needed & (1u32 << dst) != 0 {
+                if needed & reg_bit(dst) != 0 {
                     needed |= register_read_mask(&vm.program[i]);
                     gene_indices.push(i);
                     if gene_indices.len() >= 32 {
@@ -719,7 +727,10 @@ fn apply_copy_gene_backward_slice(
             }
         }
         gene_indices.reverse();
-        let gene: Vec<VmInstruction> = gene_indices.iter().map(|&i| vm.program[i].clone()).collect();
+        let gene: Vec<VmInstruction> = gene_indices
+            .iter()
+            .map(|&i| vm.program[i].clone())
+            .collect();
         let insert_at = rng.gen_range(0..=vm.program.len());
         for (i, instr) in gene.into_iter().enumerate() {
             vm.program.insert(insert_at + i, instr);
@@ -752,12 +763,12 @@ fn apply_copy_gene_forward_slice(
         let seed_idx = writers[rng.gen_range(0..writers.len())];
         let seed_dst = register_write(&vm.program[seed_idx]).unwrap();
         // Forward trace using u32 bitset.
-        let mut produced: u32 = 1u32 << seed_dst;
+        let mut produced: u32 = reg_bit(seed_dst);
         let mut gene_indices = vec![seed_idx];
         for i in (seed_idx + 1)..vm.program.len() {
             if register_read_mask(&vm.program[i]) & produced != 0 {
                 if let Some(dst) = register_write(&vm.program[i]) {
-                    produced |= 1u32 << dst;
+                    produced |= reg_bit(dst);
                 }
                 gene_indices.push(i);
                 if gene_indices.len() >= 32 {
@@ -765,7 +776,10 @@ fn apply_copy_gene_forward_slice(
                 }
             }
         }
-        let gene: Vec<VmInstruction> = gene_indices.iter().map(|&i| vm.program[i].clone()).collect();
+        let gene: Vec<VmInstruction> = gene_indices
+            .iter()
+            .map(|&i| vm.program[i].clone())
+            .collect();
         let insert_at = rng.gen_range(0..=vm.program.len());
         for (i, instr) in gene.into_iter().enumerate() {
             vm.program.insert(insert_at + i, instr);
@@ -1271,11 +1285,7 @@ mod tests {
         for seed in 0u64..50 {
             let mut g = genome.clone();
             let mut r = rng(seed);
-            let _ = VmMutator::apply(
-                &mut g,
-                VmOperator::VmCopyInstructionBlockRemapped,
-                &mut r,
-            );
+            let _ = VmMutator::apply(&mut g, VmOperator::VmCopyInstructionBlockRemapped, &mut r);
             if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
                 for instr in &vm.program {
                     if let VmInstruction::Move { dst, src } = instr {
@@ -1316,21 +1326,14 @@ mod tests {
     fn copy_instruction_block_remapped_adjusts_jump_offsets() {
         let mut genome = v3alpha1_founder_genome();
         if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
-            vm.program = vec![
-                VmInstruction::Jump { offset: 5 },
-                VmInstruction::Noop,
-            ];
+            vm.program = vec![VmInstruction::Jump { offset: 5 }, VmInstruction::Noop];
             vm.register_count = 4;
         }
         let mut found_different_offset = false;
         for seed in 0u64..100 {
             let mut g = genome.clone();
             let mut r = rng(seed);
-            let _ = VmMutator::apply(
-                &mut g,
-                VmOperator::VmCopyInstructionBlockRemapped,
-                &mut r,
-            );
+            let _ = VmMutator::apply(&mut g, VmOperator::VmCopyInstructionBlockRemapped, &mut r);
             if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
                 for instr in &vm.program {
                     if let VmInstruction::Jump { offset } = instr {
@@ -1452,24 +1455,25 @@ mod tests {
                     input_idx: 0,
                 },
                 VmInstruction::Add { dst: 1, a: 0, b: 0 },
-                VmInstruction::WriteInternalPayload { slot_idx: 0, src: 1 },
+                VmInstruction::WriteInternalPayload {
+                    slot_idx: 0,
+                    src: 1,
+                },
             ];
             vm.register_count = 4;
         }
         let before = 3;
         let mut r = rng(42);
-        VmMutator::apply(
-            &mut genome,
-            VmOperator::VmCopyGeneBackwardSlice,
-            &mut r,
-        )
-        .unwrap();
+        VmMutator::apply(&mut genome, VmOperator::VmCopyGeneBackwardSlice, &mut r).unwrap();
         let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
             vm.program.len()
         } else {
             panic!()
         };
-        assert!(after > before, "backward slice must increase program length");
+        assert!(
+            after > before,
+            "backward slice must increase program length"
+        );
     }
 
     #[test]
@@ -1483,11 +1487,7 @@ mod tests {
             ];
         }
         let mut r = rng(0);
-        let result = VmMutator::apply(
-            &mut genome,
-            VmOperator::VmCopyGeneBackwardSlice,
-            &mut r,
-        );
+        let result = VmMutator::apply(&mut genome, VmOperator::VmCopyGeneBackwardSlice, &mut r);
         assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
     }
 
@@ -1501,17 +1501,15 @@ mod tests {
                     input_idx: 0,
                 },
                 VmInstruction::Neg { dst: 1, src: 0 },
-                VmInstruction::WriteInternalPayload { slot_idx: 0, src: 1 },
+                VmInstruction::WriteInternalPayload {
+                    slot_idx: 0,
+                    src: 1,
+                },
             ];
             vm.register_count = 4;
         }
         let mut r = rng(42);
-        VmMutator::apply(
-            &mut genome,
-            VmOperator::VmCopyGeneBackwardSlice,
-            &mut r,
-        )
-        .unwrap();
+        VmMutator::apply(&mut genome, VmOperator::VmCopyGeneBackwardSlice, &mut r).unwrap();
         let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
             vm.program.clone()
         } else {
@@ -1519,7 +1517,11 @@ mod tests {
         };
         // The gene slice should capture at least the output + one dependency.
         // Program grew by at least 2 (the dependency chain).
-        assert!(after.len() >= 5, "gene slice must capture dependency chain; got len {}", after.len());
+        assert!(
+            after.len() >= 5,
+            "gene slice must capture dependency chain; got len {}",
+            after.len()
+        );
     }
 
     // ── VmCopyGeneForwardSlice tests ──
@@ -1534,18 +1536,16 @@ mod tests {
                     input_idx: 0,
                 },
                 VmInstruction::Neg { dst: 1, src: 0 },
-                VmInstruction::WriteInternalPayload { slot_idx: 0, src: 1 },
+                VmInstruction::WriteInternalPayload {
+                    slot_idx: 0,
+                    src: 1,
+                },
             ];
             vm.register_count = 4;
         }
         let before = 3;
         let mut r = rng(42);
-        VmMutator::apply(
-            &mut genome,
-            VmOperator::VmCopyGeneForwardSlice,
-            &mut r,
-        )
-        .unwrap();
+        VmMutator::apply(&mut genome, VmOperator::VmCopyGeneForwardSlice, &mut r).unwrap();
         let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
             vm.program.len()
         } else {
@@ -1566,11 +1566,7 @@ mod tests {
             ];
         }
         let mut r = rng(0);
-        let result = VmMutator::apply(
-            &mut genome,
-            VmOperator::VmCopyGeneForwardSlice,
-            &mut r,
-        );
+        let result = VmMutator::apply(&mut genome, VmOperator::VmCopyGeneForwardSlice, &mut r);
         assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
     }
 
@@ -1592,12 +1588,7 @@ mod tests {
                 vm.register_count = 4;
             }
             let mut r = rng(seed);
-            VmMutator::apply(
-                &mut genome,
-                VmOperator::VmCopyGeneForwardSlice,
-                &mut r,
-            )
-            .unwrap();
+            VmMutator::apply(&mut genome, VmOperator::VmCopyGeneForwardSlice, &mut r).unwrap();
             let after_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
                 vm.program.len()
             } else {
@@ -1609,6 +1600,10 @@ mod tests {
             }
         }
         // Must sometimes capture a chain of 2+ instructions (ReadInput→Neg→Abs).
-        assert!(max_growth >= 2, "forward slice must capture multi-instruction chain; max growth was {}", max_growth);
+        assert!(
+            max_growth >= 2,
+            "forward slice must capture multi-instruction chain; max growth was {}",
+            max_growth
+        );
     }
 }
