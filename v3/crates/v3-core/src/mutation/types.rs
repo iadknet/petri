@@ -59,6 +59,8 @@ pub enum MutationOperator {
     TopologySwapNodeBackend,
     TopologyRewriteNodeId,
     TopologyCopyNode,
+    TopologyCopyMeshBackwardSlice,
+    TopologyCopyMeshForwardSlice,
     // VM
     VmConstantMutation,
     VmInstructionMutation,
@@ -102,6 +104,8 @@ impl MutationOperator {
             Self::TopologySwapNodeBackend => "Topology.SwapNodeBackend",
             Self::TopologyRewriteNodeId => "Topology.RewriteNodeId",
             Self::TopologyCopyNode => "Topology.CopyNode",
+            Self::TopologyCopyMeshBackwardSlice => "Topology.CopyMeshBackwardSlice",
+            Self::TopologyCopyMeshForwardSlice => "Topology.CopyMeshForwardSlice",
             Self::VmConstantMutation => "Vm.VmConstantMutation",
             Self::VmInstructionMutation => "Vm.VmInstructionMutation",
             Self::VmRegisterCountMutation => "Vm.VmRegisterCountMutation",
@@ -141,7 +145,9 @@ impl MutationOperator {
             | Self::TopologyChangeEntryNode
             | Self::TopologySwapNodeBackend
             | Self::TopologyRewriteNodeId
-            | Self::TopologyCopyNode => MutationDomain::Topology,
+            | Self::TopologyCopyNode
+            | Self::TopologyCopyMeshBackwardSlice
+            | Self::TopologyCopyMeshForwardSlice => MutationDomain::Topology,
             Self::VmConstantMutation
             | Self::VmInstructionMutation
             | Self::VmRegisterCountMutation
@@ -179,7 +185,7 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 34] {
+    pub const fn all() -> [Self; 36] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
@@ -190,6 +196,8 @@ impl MutationOperator {
             Self::TopologySwapNodeBackend,
             Self::TopologyRewriteNodeId,
             Self::TopologyCopyNode,
+            Self::TopologyCopyMeshBackwardSlice,
+            Self::TopologyCopyMeshForwardSlice,
             Self::VmConstantMutation,
             Self::VmInstructionMutation,
             Self::VmRegisterCountMutation,
@@ -334,7 +342,9 @@ mod tests {
                 | MutationOperator::TopologyChangeEntryNode
                 | MutationOperator::TopologySwapNodeBackend
                 | MutationOperator::TopologyRewriteNodeId
-                | MutationOperator::TopologyCopyNode => {
+                | MutationOperator::TopologyCopyNode
+                | MutationOperator::TopologyCopyMeshBackwardSlice
+                | MutationOperator::TopologyCopyMeshForwardSlice => {
                     assert_eq!(operator.domain(), MutationDomain::Topology)
                 }
                 MutationOperator::VmConstantMutation
