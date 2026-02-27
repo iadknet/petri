@@ -11,6 +11,20 @@ import { SamplerControls } from "./inspector/SamplerControls.tsx";
 import { SamplerPlaybackPanel } from "./inspector/SamplerPlaybackPanel.tsx";
 import { StatsSection } from "./inspector/StatsSection.tsx";
 
+// Stable action refs accessed via getState() — no need to subscribe.
+const samplerActions = () => {
+	const s = useExecutionSamplerStore.getState();
+	return {
+		clearSample: s.clearSample,
+		setPlaying: s.setPlaying,
+		setPaused: s.setPaused,
+		stepForward: s.stepForward,
+		stepBackward: s.stepBackward,
+		setPlaybackSpeed: s.setPlaybackSpeed,
+		jumpToPosition: s.jumpToPosition,
+	};
+};
+
 function CreatureInspector() {
 	useCreatureDetail();
 	const { startSampling } = useExecutionSampler();
@@ -23,17 +37,11 @@ function CreatureInspector() {
 	const error = useCreatureInspectorStore((s) => s.error);
 	const clearSelection = useCreatureInspectorStore((s) => s.clearSelection);
 
+	// Subscribe only to state used in rendering.
 	const sample = useExecutionSamplerStore((s) => s.sample);
 	const playbackState = useExecutionSamplerStore((s) => s.playbackState);
 	const position = useExecutionSamplerStore((s) => s.position);
 	const playbackSpeed = useExecutionSamplerStore((s) => s.playbackSpeed);
-	const clearSample = useExecutionSamplerStore((s) => s.clearSample);
-	const setPlaying = useExecutionSamplerStore((s) => s.setPlaying);
-	const setPaused = useExecutionSamplerStore((s) => s.setPaused);
-	const stepForward = useExecutionSamplerStore((s) => s.stepForward);
-	const stepBackward = useExecutionSamplerStore((s) => s.stepBackward);
-	const setPlaybackSpeed = useExecutionSamplerStore((s) => s.setPlaybackSpeed);
-	const jumpToPosition = useExecutionSamplerStore((s) => s.jumpToPosition);
 
 	const creatureId = stats?.id ?? null;
 	const prevCreatureIdRef = useRef(creatureId);
@@ -41,19 +49,19 @@ function CreatureInspector() {
 	// Clear sample when selected creature changes.
 	useEffect(() => {
 		if (prevCreatureIdRef.current !== null && prevCreatureIdRef.current !== creatureId) {
-			clearSample();
+			samplerActions().clearSample();
 		}
 		prevCreatureIdRef.current = creatureId;
-	}, [creatureId, clearSample]);
+	}, [creatureId]);
 
 	const handleSample = useCallback(() => {
 		if (creatureId !== null) startSampling(creatureId);
 	}, [creatureId, startSampling]);
 
 	const handleResample = useCallback(() => {
-		clearSample();
+		samplerActions().clearSample();
 		if (creatureId !== null) startSampling(creatureId);
-	}, [creatureId, clearSample, startSampling]);
+	}, [creatureId, startSampling]);
 
 	// Derive totals for SamplerControls position indicator.
 	const totalTicks = sample?.ticks.length ?? 0;
@@ -66,17 +74,18 @@ function CreatureInspector() {
 	const activeNodeId = currentHop?.node_id ?? null;
 
 	const handleTickSelect = useCallback(
-		(index: number) => jumpToPosition({ tickIndex: index, hopIndex: 0, detailIndex: 0 }),
-		[jumpToPosition],
+		(index: number) =>
+			samplerActions().jumpToPosition({ tickIndex: index, hopIndex: 0, detailIndex: 0 }),
+		[],
 	);
 
-	const handleHopSelect = useCallback(
-		(index: number) => {
-			const currentPos = useExecutionSamplerStore.getState().position;
-			jumpToPosition({ ...currentPos, hopIndex: index, detailIndex: 0 });
-		},
-		[jumpToPosition],
-	);
+	const handleHopSelect = useCallback((index: number) => {
+		const currentPos = useExecutionSamplerStore.getState().position;
+		samplerActions().jumpToPosition({ ...currentPos, hopIndex: index, detailIndex: 0 });
+	}, []);
+
+	const { clearSample, setPlaying, setPaused, stepForward, stepBackward, setPlaybackSpeed } =
+		samplerActions();
 
 	return (
 		<div

@@ -118,29 +118,24 @@ pub async fn get_sample(
     let creature_id: CreatureId = KeyData::from_ffi(id).into();
 
     // Check if there's an active trace for this creature.
-    let matches = handle
+    let Some(active) = handle
         .active_trace
         .as_ref()
-        .is_some_and(|t| t.creature_id == creature_id);
-
-    if !matches {
+        .filter(|t| t.creature_id == creature_id)
+    else {
         return Ok(Json(serde_json::json!({
             "protocol_version": PROTOCOL_VERSION,
             "status": "idle",
         })));
-    }
-
-    // Safety: `matches` guard above guarantees active_trace is Some with matching creature_id.
-    let Some(active) = handle.active_trace.as_ref() else {
-        unreachable!("active_trace confirmed Some by matches guard");
     };
 
     if active.is_complete() {
         // Take the completed trace and convert to sample.
         let ffi_id = active.creature_id.data().as_ffi();
-        let Some(trace) = handle.active_trace.take() else {
-            unreachable!("active_trace confirmed Some by matches guard");
-        };
+        let trace = handle
+            .active_trace
+            .take()
+            .expect("active_trace confirmed Some above");
         let sample = trace.into_sample(ffi_id);
 
         Ok(Json(serde_json::json!({
