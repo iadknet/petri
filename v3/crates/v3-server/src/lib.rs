@@ -26,6 +26,14 @@ pub fn router(state: state::AppState) -> axum::Router {
             "/v3/simulation/creature/:id",
             get(handlers::creature::get_creature),
         )
+        .route(
+            "/v3/simulation/creature/:id/sample",
+            post(handlers::creature::start_sample),
+        )
+        .route(
+            "/v3/simulation/creature/:id/sample",
+            get(handlers::creature::get_sample),
+        )
         .route("/v3/ws", get(ws::ws_handler))
         .with_state(state)
 }

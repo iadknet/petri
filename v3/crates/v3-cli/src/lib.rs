@@ -86,7 +86,7 @@ pub fn run_simulation<W: std::io::Write>(
     let mut last_sampled_tick: Option<u64> = None;
 
     for _ in 0..ticks {
-        run_tick(&mut sim);
+        run_tick(&mut sim, &mut None);
         let current_tick = sim.tick;
 
         let should_sample = current_tick.is_multiple_of(sample_every) || current_tick == ticks;

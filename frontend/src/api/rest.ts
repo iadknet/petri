@@ -6,7 +6,9 @@ import type {
 	LifecycleResponse,
 	PaintRequest,
 	PaintResponse,
+	SampleResponse,
 	SimulationConfig,
+	StartSampleResponse,
 	StartupRequest,
 	StartupResponse,
 	StatusResponse,
@@ -85,6 +87,18 @@ class ApiClient {
 			method: "POST",
 			body: JSON.stringify(req),
 		});
+	}
+
+	async startSample(id: number, ticks = 5, signal?: AbortSignal): Promise<StartSampleResponse> {
+		return this.request(`/v3/simulation/creature/${id}/sample`, {
+			method: "POST",
+			body: JSON.stringify({ ticks }),
+			signal,
+		});
+	}
+
+	async getSample(id: number, signal?: AbortSignal): Promise<SampleResponse> {
+		return this.request(`/v3/simulation/creature/${id}/sample`, { signal });
 	}
 }
 

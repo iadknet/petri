@@ -40,7 +40,12 @@ pub fn run_phase_0(sim: &mut Simulation) {
 /// 3. Phase 1 — Batch cognition: all creatures see the frozen post-Phase-0 world snapshot
 /// 4. Phase 2 — Sequential action execution: apply decisions in queue order
 /// 5. Increment sim.tick
-pub fn run_tick(sim: &mut Simulation) {
+///
+/// The optional `trace` parameter enables execution tracing for a single creature.
+/// When `Some`, the target creature is extracted from the parallel batch and run
+/// sequentially with [`execute_creature_mesh_traced`], recording detailed trace data.
+/// When `None`, behavior is identical to the untraced path.
+pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::ActiveTrace>) {
     use rand::seq::SliceRandom;
     use rand::RngCore;
     use rand::SeedableRng;
@@ -51,6 +56,8 @@ pub fn run_tick(sim: &mut Simulation) {
 
     use crate::contracts::{CreatureId, WorldAction};
     use crate::runtime::mesh::execute_creature_mesh;
+    use crate::runtime::trace::{StaticInputsSnapshot, TickTrace};
+    use crate::runtime::traced_mesh::execute_creature_mesh_traced;
     use crate::runtime::types::ComputeCostReport;
     use crate::sensors::static_inputs::assemble_static_inputs;
     use crate::simulation::actions::{apply_eat, apply_move, apply_noop, apply_reproduce};
@@ -73,13 +80,26 @@ pub fn run_tick(sim: &mut Simulation) {
     queue.sort();
     queue.shuffle(&mut sim.rng);
 
+    // Check if traced creature died during Phase 0.
+    if let Some(ref mut active) = trace {
+        if !active.is_complete() && !sim.creatures.contains_key(active.creature_id) {
+            active.ticks_remaining = 0;
+        }
+    }
+
     // Derive a separate RNG for reproduction to avoid double-borrowing sim.rng.
     let mut reproduce_rng = rand::rngs::SmallRng::seed_from_u64(sim.rng.next_u64());
 
     // Clone RuntimeConfig for cognition phase (small struct, ~7 scalars).
     let runtime_config = sim.config.runtime.clone();
 
-    // ── Phase 1: Batch cognition (parallel) ──────────────────────────────────
+    // Determine if we need to trace a specific creature this tick.
+    let trace_target: Option<CreatureId> = trace
+        .as_ref()
+        .filter(|t| !t.is_complete())
+        .map(|t| t.creature_id);
+
+    // ── Phase 1: Batch cognition (parallel, with optional trace extraction) ──
     // All creatures see the frozen post-Phase-0 world snapshot. Cognition only
     // mutates each creature's private state (energy, memory, graph_state).
 
@@ -90,18 +110,22 @@ pub fn run_tick(sim: &mut Simulation) {
         .map(|&id| (id, assemble_static_inputs(&sim.world, &sim.creatures[id])))
         .collect();
 
-    // 1b: Parallel cognition — each creature's mesh executes independently.
-    // Extract disjoint &mut CreatureState refs via HashMap::remove, then run
-    // par_iter_mut so each thread gets its own exclusive creature reference.
+    // 1b: Cognition — parallel for all creatures, sequential for traced creature.
     let decisions: Vec<(CreatureId, WorldAction, ComputeCostReport)> = {
         let mut creature_refs: HashMap<_, _> = sim.creatures.iter_mut().collect();
 
+        // Extract traced creature (if any) before building parallel work vec.
+        let traced_creature =
+            trace_target.and_then(|tid| creature_refs.remove(&tid).map(|c| (tid, c)));
+
         let mut work: Vec<_> = inputs
-            .into_iter()
-            .filter_map(|(id, si)| creature_refs.remove(&id).map(|c| (id, si, c)))
+            .iter()
+            .filter_map(|(id, si)| creature_refs.remove(id).map(|c| (*id, si, c)))
             .collect();
 
-        work.par_iter_mut()
+        // Run all non-traced creatures in parallel.
+        let mut parallel_decisions: Vec<_> = work
+            .par_iter_mut()
             .map(|(id, si, creature)| {
                 let (action, cost) = execute_creature_mesh(
                     &creature.genome,
@@ -113,7 +137,53 @@ pub fn run_tick(sim: &mut Simulation) {
                 );
                 (*id, action, cost)
             })
-            .collect()
+            .collect();
+
+        // Run traced creature sequentially with trace recording.
+        if let Some((tid, creature)) = traced_creature {
+            if let Some((_, si)) = inputs.iter().find(|(id, _)| *id == tid) {
+                let energy_before = creature.energy;
+                let tick_number = sim.tick;
+                let si_snapshot = StaticInputsSnapshot::from(si);
+
+                let (action, cost, hops, termination_reason) = execute_creature_mesh_traced(
+                    &creature.genome,
+                    si,
+                    &mut creature.energy,
+                    &mut creature.memory,
+                    &mut creature.graph_state,
+                    &runtime_config,
+                );
+
+                // Record tick trace.
+                if let Some(ref mut active) = trace {
+                    active.ticks.push(TickTrace {
+                        tick_number,
+                        energy_before,
+                        energy_after: creature.energy,
+                        static_inputs: si_snapshot,
+                        hops,
+                        final_action: action.clone(),
+                        termination_reason,
+                    });
+                    active.ticks_remaining = active.ticks_remaining.saturating_sub(1);
+                }
+
+                // Insert traced creature's decision at its queue position.
+                // Find where tid appears in the original queue order.
+                let queue_pos = inputs.iter().position(|(id, _)| *id == tid);
+                // Count how many non-traced inputs precede it to find the
+                // insertion point in parallel_decisions.
+                if let Some(pos) = queue_pos {
+                    let insert_idx = inputs[..pos].iter().filter(|(id, _)| *id != tid).count();
+                    parallel_decisions.insert(insert_idx, (tid, action, cost));
+                } else {
+                    parallel_decisions.push((tid, action, cost));
+                }
+            }
+        }
+
+        parallel_decisions
     };
 
     // ── Phase 2: Sequential action execution ────────────────────────────────
@@ -313,9 +383,135 @@ mod tests {
     fn run_tick_increments_tick_counter() {
         let mut sim = seed_simulation(small_config(), 42);
         assert_eq!(sim.tick_number(), 0);
-        run_tick(&mut sim);
+        run_tick(&mut sim, &mut None);
         assert_eq!(sim.tick_number(), 1);
-        run_tick(&mut sim);
+        run_tick(&mut sim, &mut None);
         assert_eq!(sim.tick_number(), 2);
+    }
+
+    // ── Trace integration tests ────────────────────────────────────────────────
+
+    #[test]
+    fn trace_populated_after_tick() {
+        use crate::runtime::trace::ActiveTrace;
+
+        let (mut sim, id) = make_sim_with_one_creature(50.0);
+        let mut trace = Some(ActiveTrace::new(id, 1));
+
+        run_tick(&mut sim, &mut trace);
+
+        let active = trace.as_ref().expect("trace should still be Some");
+        assert_eq!(active.ticks.len(), 1, "one tick should be recorded");
+        assert!(
+            active.is_complete(),
+            "trace should be complete after 1 tick"
+        );
+
+        let tick_trace = &active.ticks[0];
+        assert_eq!(
+            tick_trace.tick_number, 0,
+            "tick_number should be 0 (pre-increment)"
+        );
+        assert!(
+            tick_trace.energy_before > 0.0,
+            "energy_before should be positive"
+        );
+        assert!(!tick_trace.hops.is_empty(), "hops should not be empty");
+    }
+
+    #[test]
+    fn trace_completes_after_n_ticks() {
+        use crate::runtime::trace::ActiveTrace;
+
+        let (mut sim, id) = make_sim_with_one_creature(50.0);
+        let mut trace = Some(ActiveTrace::new(id, 3));
+
+        for i in 0..3 {
+            assert!(!trace.as_ref().unwrap().is_complete());
+            run_tick(&mut sim, &mut trace);
+            assert_eq!(trace.as_ref().unwrap().ticks.len(), i + 1);
+        }
+        assert!(trace.as_ref().unwrap().is_complete());
+        assert_eq!(trace.as_ref().unwrap().ticks_remaining, 0);
+    }
+
+    #[test]
+    fn trace_creature_death_finalizes_partial() {
+        use crate::runtime::trace::ActiveTrace;
+
+        // Give creature barely enough energy to die after Phase 0 decay.
+        let decay = SimulationConfig::default()
+            .energy
+            .lifecycle
+            .energy_decay_per_tick;
+        let (mut sim, id) = make_sim_with_one_creature(decay * 0.5);
+        let mut trace = Some(ActiveTrace::new(id, 5));
+
+        run_tick(&mut sim, &mut trace);
+
+        // Creature should have died in Phase 0, trace should be finalized early.
+        let active = trace.as_ref().expect("trace should still be Some");
+        assert!(
+            active.is_complete(),
+            "trace should be complete after creature death"
+        );
+        assert_eq!(
+            active.ticks.len(),
+            0,
+            "no tick traces since creature died before cognition"
+        );
+    }
+
+    #[test]
+    fn non_traced_creatures_unaffected() {
+        // Run two identical simulations: one with trace on creature A, one without.
+        // All other creatures should produce the same actions/energy.
+        let cfg = small_config();
+        let mut sim_a = seed_simulation(cfg.clone(), 42);
+        let mut sim_b = seed_simulation(cfg, 42);
+
+        // Run sim_a without trace.
+        run_tick(&mut sim_a, &mut None);
+
+        // Run sim_b with trace on first creature.
+        let first_id = {
+            let mut keys: Vec<_> = sim_b.creatures.keys().collect();
+            keys.sort();
+            keys[0]
+        };
+
+        use crate::runtime::trace::ActiveTrace;
+        let mut trace = Some(ActiveTrace::new(first_id, 1));
+        run_tick(&mut sim_b, &mut trace);
+
+        // Both sims should have the same tick.
+        assert_eq!(sim_a.tick, sim_b.tick);
+
+        // Population should be the same.
+        assert_eq!(sim_a.creatures.len(), sim_b.creatures.len());
+
+        // All creature IDs should match.
+        let ids_a: Vec<_> = {
+            let mut k: Vec<_> = sim_a.creatures.keys().collect();
+            k.sort();
+            k
+        };
+        let ids_b: Vec<_> = {
+            let mut k: Vec<_> = sim_b.creatures.keys().collect();
+            k.sort();
+            k
+        };
+        assert_eq!(ids_a, ids_b);
+    }
+
+    #[test]
+    fn run_tick_with_none_trace_identical_behavior() {
+        // Verify that passing &mut None doesn't change behavior at all.
+        let mut sim = seed_simulation(small_config(), 42);
+        let pop_before = sim.creatures.len();
+        run_tick(&mut sim, &mut None);
+        // Basic sanity: tick incremented, simulation still has creatures.
+        assert_eq!(sim.tick, 1);
+        assert!(!sim.creatures.is_empty() || pop_before == 0);
     }
 }

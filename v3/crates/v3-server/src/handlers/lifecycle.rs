@@ -62,6 +62,7 @@ pub async fn startup(
     let mut handle = app.sim.lock().await;
     handle.status = SimulationStatus::Idle;
     handle.sim = new_sim;
+    handle.active_trace = None;
     drop(handle);
 
     Ok(Json(serde_json::json!({
@@ -145,10 +146,11 @@ pub async fn step(
         });
     }
 
+    let h = &mut *handle;
     for _ in 0..req.steps {
-        run_tick(&mut handle.sim);
+        run_tick(&mut h.sim, &mut h.active_trace);
     }
-    let tick = handle.sim.tick;
+    let tick = h.sim.tick;
 
     Ok(Json(serde_json::json!({
         "protocol_version": PROTOCOL_VERSION,
@@ -165,7 +167,8 @@ pub(crate) async fn run_loop(app: AppState) {
         if handle.status != SimulationStatus::Running {
             break;
         }
-        run_tick(&mut handle.sim);
+        let h = &mut *handle;
+        run_tick(&mut h.sim, &mut h.active_trace);
         if last_frame.elapsed() >= FRAME_INTERVAL {
             let frame = build_ws_frame(&handle);
             let bytes = rmp_serde::to_vec_named(&frame).unwrap_or_default();

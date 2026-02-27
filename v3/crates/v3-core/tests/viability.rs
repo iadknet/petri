@@ -86,7 +86,7 @@ fn run_ticks_with_metrics(sim: &mut Simulation, ticks: usize) -> Vec<TickMetrics
     let mut metrics = Vec::with_capacity(ticks);
 
     for _ in 0..ticks {
-        run_tick(sim);
+        run_tick(sim, &mut None);
         let current_positions = creature_positions(sim);
 
         let newborns = current_positions
@@ -143,7 +143,7 @@ fn format_tick_metrics(metrics: &[TickMetrics]) -> String {
 fn sim_runs_40_ticks_without_panic() {
     let mut sim = seed_simulation(viability_config(), 42);
     for _ in 0..40 {
-        run_tick(&mut sim);
+        run_tick(&mut sim, &mut None);
     }
 }
 
@@ -212,7 +212,7 @@ fn high_coverage_economics_survive_and_reproduce_short_horizon() {
 fn food_gets_consumed_and_regrows() {
     let mut sim = seed_simulation(viability_config(), 42);
     let food_initial = sim.world.total_food();
-    run_tick(&mut sim);
+    run_tick(&mut sim, &mut None);
     assert_ne!(
         sim.world.total_food(),
         food_initial,
@@ -288,7 +288,7 @@ fn creatures_can_eat_food() {
     let energy_before = creatures[creature_id].energy;
 
     let mut sim = Simulation::new(world, creatures, 0, cfg, 42);
-    run_tick(&mut sim);
+    run_tick(&mut sim, &mut None);
 
     let food_after = sim.world.food_at(pos);
     let energy_after = if sim.creatures.contains_key(creature_id) {
@@ -342,7 +342,7 @@ fn founder_reproduces_when_energy_allows_and_target_is_open() {
     world.place_creature(pos, parent_id);
 
     let mut sim = Simulation::new(world, creatures, 0, cfg, 7);
-    run_tick(&mut sim);
+    run_tick(&mut sim, &mut None);
 
     let generation_one = sim
         .creatures
@@ -392,7 +392,7 @@ fn founder_moves_when_no_food_and_below_reproduce_threshold() {
     world.place_creature(start, creature_id);
 
     let mut sim = Simulation::new(world, creatures, 0, cfg, 11);
-    run_tick(&mut sim);
+    run_tick(&mut sim, &mut None);
 
     assert_eq!(
         sim.creature_count(),
@@ -424,7 +424,7 @@ fn mutation_offspring_diverge_from_parent_over_time() {
     let mut sim = seed_simulation(cfg, 42);
     let mut ever_diverged = false;
     for _ in 0..30 {
-        run_tick(&mut sim);
+        run_tick(&mut sim, &mut None);
         if sim
             .creatures
             .values()
@@ -501,7 +501,7 @@ fn phenotype_inherits_unchanged_when_no_genome_mutation() {
     world.place_creature(pos, parent_id);
 
     let mut sim = Simulation::new(world, creatures, 0, cfg, 7);
-    run_tick(&mut sim);
+    run_tick(&mut sim, &mut None);
 
     // Find the child (generation == 1).
     let child = sim.creatures.values().find(|c| c.generation == 1);
@@ -589,7 +589,7 @@ fn deterministic_seeding_reproducible() {
 fn stats_accounting_invariant_holds_over_50_ticks() {
     let mut sim = seed_simulation(viability_config(), 77);
     for _ in 0..50 {
-        run_tick(&mut sim);
+        run_tick(&mut sim, &mut None);
     }
     let s = &sim.stats;
     assert_eq!(
@@ -603,11 +603,11 @@ fn stats_accounting_invariant_holds_over_50_ticks() {
 fn stats_last_tick_counters_reset_each_tick() {
     let mut sim = seed_simulation(viability_config(), 88);
     // Run tick 1 and capture last_tick_reproduce.
-    run_tick(&mut sim);
+    run_tick(&mut sim, &mut None);
     let tick1_reproduce = sim.stats.last_tick_reproduce;
     let tick1_attempted = sim.stats.reproduction_actions_attempted_total;
     // Run tick 2.
-    run_tick(&mut sim);
+    run_tick(&mut sim, &mut None);
     let tick2_reproduce = sim.stats.last_tick_reproduce;
     // Per-tick counter must not be cumulative from tick 1.
     // Total cumulative must have grown by tick2_reproduce.
@@ -631,7 +631,7 @@ fn stats_last_tick_counters_reset_each_tick() {
 fn mean_energy_is_positive_in_viable_sim() {
     let mut sim = seed_simulation(viability_config(), 99);
     for _ in 0..10 {
-        run_tick(&mut sim);
+        run_tick(&mut sim, &mut None);
     }
     assert!(
         sim.mean_energy() > 0.0,
@@ -659,7 +659,7 @@ fn mutation_skip_reason_tracking_accumulates_correctly() {
     cfg.energy.costs.reproduce_cost = 1.0;
     let mut sim = seed_simulation(cfg, 42);
     for _ in 0..50 {
-        run_tick(&mut sim);
+        run_tick(&mut sim, &mut None);
     }
     let stats = &sim.stats;
     // If any skips occurred, all keys must be valid reason names.

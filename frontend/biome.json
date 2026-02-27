@@ -18,6 +18,9 @@
         "useExhaustiveDependencies": "warn",
         "noUnusedImports": "error"
       },
+      "suspicious": {
+        "noArrayIndexKey": "warn"
+      },
       "style": {
         "noNonNullAssertion": "off"
       }

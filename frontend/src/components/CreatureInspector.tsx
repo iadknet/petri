@@ -1,13 +1,27 @@
+import { useCallback, useEffect, useRef } from "react";
 import { useCreatureDetail } from "../hooks/useCreatureDetail.ts";
+import { useExecutionSampler } from "../hooks/useExecutionSampler.ts";
 import { useCreatureInspectorStore } from "../stores/creatureInspector.ts";
+import { useExecutionSamplerStore } from "../stores/executionSampler.ts";
 import { InspectorHeader } from "./inspector/InspectorHeader.tsx";
 import { MemoryHexView } from "./inspector/MemoryHexView.tsx";
 import { NodeGraph } from "./inspector/NodeGraph.tsx";
 import { PhenotypeDetail } from "./inspector/PhenotypeDetail.tsx";
+import { SamplerControls } from "./inspector/SamplerControls.tsx";
+import { SamplerPlaybackPanel } from "./inspector/SamplerPlaybackPanel.tsx";
 import { StatsSection } from "./inspector/StatsSection.tsx";
+
+function getDetailCount(
+	trace: { Vm: { steps: unknown[] } } | { Graph: { passes: unknown[] } },
+): number {
+	if ("Vm" in trace) return trace.Vm.steps.length;
+	if ("Graph" in trace) return trace.Graph.passes.length;
+	return 0;
+}
 
 function CreatureInspector() {
 	useCreatureDetail();
+	const { startSampling } = useExecutionSampler();
 
 	const stats = useCreatureInspectorStore((s) => s.creatureStats);
 	const genome = useCreatureInspectorStore((s) => s.creatureGenome);
@@ -16,6 +30,58 @@ function CreatureInspector() {
 	const isDead = useCreatureInspectorStore((s) => s.isDead);
 	const error = useCreatureInspectorStore((s) => s.error);
 	const clearSelection = useCreatureInspectorStore((s) => s.clearSelection);
+
+	const sample = useExecutionSamplerStore((s) => s.sample);
+	const playbackState = useExecutionSamplerStore((s) => s.playbackState);
+	const position = useExecutionSamplerStore((s) => s.position);
+	const playbackSpeed = useExecutionSamplerStore((s) => s.playbackSpeed);
+	const clearSample = useExecutionSamplerStore((s) => s.clearSample);
+	const setPlaying = useExecutionSamplerStore((s) => s.setPlaying);
+	const setPaused = useExecutionSamplerStore((s) => s.setPaused);
+	const stepForward = useExecutionSamplerStore((s) => s.stepForward);
+	const stepBackward = useExecutionSamplerStore((s) => s.stepBackward);
+	const setPlaybackSpeed = useExecutionSamplerStore((s) => s.setPlaybackSpeed);
+	const jumpToPosition = useExecutionSamplerStore((s) => s.jumpToPosition);
+
+	const creatureId = stats?.id ?? null;
+	const prevCreatureIdRef = useRef(creatureId);
+
+	// Clear sample when selected creature changes.
+	useEffect(() => {
+		if (prevCreatureIdRef.current !== null && prevCreatureIdRef.current !== creatureId) {
+			clearSample();
+		}
+		prevCreatureIdRef.current = creatureId;
+	}, [creatureId, clearSample]);
+
+	const handleSample = useCallback(() => {
+		if (creatureId !== null) startSampling(creatureId);
+	}, [creatureId, startSampling]);
+
+	const handleResample = useCallback(() => {
+		clearSample();
+		if (creatureId !== null) startSampling(creatureId);
+	}, [creatureId, clearSample, startSampling]);
+
+	// Derive totals for SamplerControls position indicator.
+	const totalTicks = sample?.ticks.length ?? 0;
+	const currentTick = sample?.ticks[position.tickIndex];
+	const totalHops = currentTick?.hops.length ?? 0;
+	const currentHop = currentTick?.hops[position.hopIndex];
+	const totalDetails = currentHop ? getDetailCount(currentHop.backend_trace) : 0;
+
+	// Derive activeNodeId from current hop for NodeGraph glow.
+	const activeNodeId = currentHop?.node_id ?? null;
+
+	const handleTickSelect = useCallback(
+		(index: number) => jumpToPosition({ tickIndex: index, hopIndex: 0, detailIndex: 0 }),
+		[jumpToPosition],
+	);
+
+	const handleHopSelect = useCallback(
+		(index: number) => jumpToPosition({ ...position, hopIndex: index, detailIndex: 0 }),
+		[jumpToPosition, position],
+	);
 
 	return (
 		<div
@@ -74,7 +140,12 @@ function CreatureInspector() {
 						{/* Genome mesh graph */}
 						{genome && (
 							<div className="border-t border-slate-800">
-								<NodeGraph genome={genome} />
+								<NodeGraph
+									genome={genome}
+									activeNodeId={
+										playbackState !== "idle" && playbackState !== "sampling" ? activeNodeId : null
+									}
+								/>
 							</div>
 						)}
 
@@ -83,6 +154,38 @@ function CreatureInspector() {
 							<div className="border-t border-slate-800">
 								<MemoryHexView memory={memory} />
 							</div>
+						)}
+
+						{/* Execution sampler */}
+						{!isDead && (
+							<div className="border-t border-slate-800">
+								<SamplerControls
+									playbackState={playbackState}
+									position={position}
+									totalTicks={totalTicks}
+									totalHops={totalHops}
+									totalDetails={totalDetails}
+									playbackSpeed={playbackSpeed}
+									onSample={handleSample}
+									onResample={handleResample}
+									onClear={clearSample}
+									onPlay={setPlaying}
+									onPause={setPaused}
+									onStepForward={stepForward}
+									onStepBackward={stepBackward}
+									onSpeedChange={setPlaybackSpeed}
+								/>
+							</div>
+						)}
+
+						{/* Sampler playback panel */}
+						{sample && currentTick && (
+							<SamplerPlaybackPanel
+								sample={sample}
+								position={position}
+								onTickSelect={handleTickSelect}
+								onHopSelect={handleHopSelect}
+							/>
 						)}
 					</div>
 				</>
