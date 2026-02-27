@@ -183,6 +183,9 @@ pub struct MutationConfig {
     pub mutation_probability: f64,
     pub per_birth_mutation_events_min: u32,
     pub per_birth_mutation_events_max: u32,
+    /// Probability of selecting the mesh (Topology) layer per mutation event.
+    /// Complement (1 - this) selects the node-internal layer (VM/Graph/InputRef).
+    pub mesh_layer_probability: f64,
     pub phenotype: PhenotypeConfig,
 }
 
@@ -192,6 +195,7 @@ impl Default for MutationConfig {
             mutation_probability: 0.303,
             per_birth_mutation_events_min: 1,
             per_birth_mutation_events_max: 10,
+            mesh_layer_probability: 0.2,
             phenotype: PhenotypeConfig::default(),
         }
     }
@@ -290,6 +294,7 @@ impl SimulationConfig {
 
         let m = &mut self.mutation;
         m.mutation_probability = m.mutation_probability.clamp(0.0, 1.0);
+        m.mesh_layer_probability = m.mesh_layer_probability.clamp(0.0, 1.0);
         if m.per_birth_mutation_events_min < 1 {
             m.per_birth_mutation_events_min = 1;
         }
@@ -396,6 +401,7 @@ mod tests {
         assert!((cfg.mutation.mutation_probability - 0.303).abs() < 1e-9);
         assert_eq!(cfg.mutation.per_birth_mutation_events_min, 1);
         assert_eq!(cfg.mutation.per_birth_mutation_events_max, 10);
+        assert!((cfg.mutation.mesh_layer_probability - 0.2).abs() < 1e-9);
         // Phenotype
         assert_eq!(cfg.mutation.phenotype.channel_step, 1);
         assert!((cfg.mutation.phenotype.channel_change_chance - 0.001).abs() < 1e-6);

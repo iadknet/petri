@@ -6,7 +6,7 @@ use crate::creature::genome::{
 use crate::mutation::types::MutationSkipReason;
 
 /// Graph mutation operator variants.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GraphOperator {
     AlterGraphEdgeWeight,
     SwapGraphOperator,
@@ -23,22 +23,53 @@ pub enum GraphOperator {
 }
 
 impl GraphOperator {
-    /// Pick a random graph operator uniformly.
-    pub fn random(rng: &mut impl Rng) -> Self {
-        match rng.gen_range(0u8..12) {
-            0 => Self::AlterGraphEdgeWeight,
-            1 => Self::SwapGraphOperator,
-            2 => Self::MutateGraphOperatorParam,
-            3 => Self::AddInternalGraphNode,
-            4 => Self::RemoveInternalGraphNode,
-            5 => Self::AddGraphEdge,
-            6 => Self::RetargetGraphEdge,
-            7 => Self::RemoveGraphEdge,
-            8 => Self::GraphRawFieldMutation,
-            9 => Self::CopyInternalNode,
-            10 => Self::CopySubgraph,
-            _ => Self::CopyEdgeBundle,
+    pub const ALL: [Self; 12] = [
+        Self::AlterGraphEdgeWeight,
+        Self::SwapGraphOperator,
+        Self::MutateGraphOperatorParam,
+        Self::AddInternalGraphNode,
+        Self::RemoveInternalGraphNode,
+        Self::AddGraphEdge,
+        Self::RetargetGraphEdge,
+        Self::RemoveGraphEdge,
+        Self::GraphRawFieldMutation,
+        Self::CopyInternalNode,
+        Self::CopySubgraph,
+        Self::CopyEdgeBundle,
+    ];
+
+    /// Per-operator weight reflecting impact tier.
+    /// 4 = refinement, 2 = moderate, 1 = structural.
+    #[must_use]
+    pub const fn weight(self) -> u8 {
+        match self {
+            Self::AlterGraphEdgeWeight => 4,
+            Self::SwapGraphOperator => 2,
+            Self::MutateGraphOperatorParam => 4,
+            Self::AddInternalGraphNode => 1,
+            Self::RemoveInternalGraphNode => 1,
+            Self::AddGraphEdge => 2,
+            Self::RetargetGraphEdge => 2,
+            Self::RemoveGraphEdge => 2,
+            Self::GraphRawFieldMutation => 4,
+            Self::CopyInternalNode => 1,
+            Self::CopySubgraph => 1,
+            Self::CopyEdgeBundle => 2,
         }
+    }
+
+    /// Pick a random graph operator weighted by impact tier.
+    pub fn random(rng: &mut impl Rng) -> Self {
+        let total: u16 = Self::ALL.iter().map(|op| op.weight() as u16).sum();
+        let mut r = rng.gen_range(0..total);
+        for &op in &Self::ALL {
+            let w = op.weight() as u16;
+            if r < w {
+                return op;
+            }
+            r -= w;
+        }
+        unreachable!()
     }
 }
 
@@ -1662,6 +1693,37 @@ mod tests {
                     );
                 }
             }
+        }
+    }
+
+    #[test]
+    fn graph_weighted_random_favors_refinement() {
+        let mut counts = std::collections::HashMap::new();
+        let mut r = rng(42);
+        for _ in 0..10_000 {
+            let op = GraphOperator::random(&mut r);
+            *counts.entry(op).or_insert(0u32) += 1;
+        }
+        let alter = counts
+            .get(&GraphOperator::AlterGraphEdgeWeight)
+            .copied()
+            .unwrap_or(0);
+        let add_node = counts
+            .get(&GraphOperator::AddInternalGraphNode)
+            .copied()
+            .unwrap_or(0);
+        assert!(
+            alter > add_node * 2,
+            "AlterGraphEdgeWeight (weight 4) must appear >2x AddInternalGraphNode (weight 1); got {} vs {}",
+            alter, add_node,
+        );
+    }
+
+    #[test]
+    fn graph_operator_weights_are_positive() {
+        let all = GraphOperator::ALL;
+        for &op in &all {
+            assert!(op.weight() > 0, "weight must be positive for {:?}", op);
         }
     }
 }

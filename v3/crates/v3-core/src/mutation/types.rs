@@ -1,5 +1,14 @@
 use std::collections::HashMap;
 
+/// The two architectural layers of genome mutation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum MutationLayer {
+    /// Mesh-level: add/remove/rewire nodes in the topology graph.
+    Mesh,
+    /// Node-internal: modify VM programs, graph weights, input references within a node.
+    NodeInternal,
+}
+
 /// Reason a mutation event was skipped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum MutationSkipReason {
@@ -43,6 +52,14 @@ impl MutationDomain {
     #[must_use]
     pub const fn all() -> [Self; 4] {
         [Self::Topology, Self::Vm, Self::Graph, Self::InputRef]
+    }
+
+    #[must_use]
+    pub const fn layer(self) -> MutationLayer {
+        match self {
+            Self::Topology => MutationLayer::Mesh,
+            Self::Vm | Self::Graph | Self::InputRef => MutationLayer::NodeInternal,
+        }
     }
 }
 
@@ -390,5 +407,16 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn mutation_domain_layer_mapping() {
+        assert_eq!(MutationDomain::Topology.layer(), MutationLayer::Mesh);
+        assert_eq!(MutationDomain::Vm.layer(), MutationLayer::NodeInternal);
+        assert_eq!(MutationDomain::Graph.layer(), MutationLayer::NodeInternal);
+        assert_eq!(
+            MutationDomain::InputRef.layer(),
+            MutationLayer::NodeInternal
+        );
     }
 }

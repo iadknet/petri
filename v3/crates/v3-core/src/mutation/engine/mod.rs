@@ -34,39 +34,42 @@ impl MutationEngine {
 
         let mut summary = MutationSummary::zero();
         for _ in 0..event_count {
-            // Pick domain uniformly: 0=Topology, 1=VM, 2=Graph, 3=InputRef.
-            let (domain, operator, result) = match rng.gen_range(0u8..4) {
-                0 => {
-                    let op = TopologyOperator::random(rng);
-                    (
-                        MutationDomain::Topology,
-                        topology_operator_key(op),
-                        apply_topology_event(genome, op, rng),
-                    )
-                }
-                1 => {
-                    let op = VmOperator::random(rng);
-                    (
-                        MutationDomain::Vm,
-                        vm_operator_key(op),
-                        apply_vm_event(genome, op, rng),
-                    )
-                }
-                2 => {
-                    let op = GraphOperator::random(rng);
-                    (
-                        MutationDomain::Graph,
-                        graph_operator_key(op),
-                        apply_graph_event(genome, op, rng),
-                    )
-                }
-                _ => {
-                    let op = InputRefOperator::random(rng);
-                    (
-                        MutationDomain::InputRef,
-                        input_ref_operator_key(op),
-                        apply_input_ref_event(genome, op, rng),
-                    )
+            // Two-layer dispatch: mesh (Topology) vs node-internal (VM/Graph/InputRef).
+            let (domain, operator, result) = if rng.gen_bool(config.mesh_layer_probability) {
+                // Layer 1: Mesh (Topology)
+                let op = TopologyOperator::random(rng);
+                (
+                    MutationDomain::Topology,
+                    topology_operator_key(op),
+                    apply_topology_event(genome, op, rng),
+                )
+            } else {
+                // Layer 2: Node-internal (VM, Graph, InputRef — equal probability)
+                match rng.gen_range(0u8..3) {
+                    0 => {
+                        let op = VmOperator::random(rng);
+                        (
+                            MutationDomain::Vm,
+                            vm_operator_key(op),
+                            apply_vm_event(genome, op, rng),
+                        )
+                    }
+                    1 => {
+                        let op = GraphOperator::random(rng);
+                        (
+                            MutationDomain::Graph,
+                            graph_operator_key(op),
+                            apply_graph_event(genome, op, rng),
+                        )
+                    }
+                    _ => {
+                        let op = InputRefOperator::random(rng);
+                        (
+                            MutationDomain::InputRef,
+                            input_ref_operator_key(op),
+                            apply_input_ref_event(genome, op, rng),
+                        )
+                    }
                 }
             };
             summary.record_attempt(domain, operator);
@@ -494,5 +497,89 @@ mod tests {
             change_total > 0,
             "expected at least one applied semantic-change mutation across long run"
         );
+    }
+
+    #[test]
+    fn engine_mesh_layer_fires_less_than_node_internal() {
+        let mut config = SimulationConfig::default().mutation;
+        config.mutation_probability = 1.0;
+        config.per_birth_mutation_events_min = 1;
+        config.per_birth_mutation_events_max = 1;
+        // mesh_layer_probability defaults to 0.2
+
+        let mut topology_attempts: u64 = 0;
+        let mut total_attempts: u64 = 0;
+        for seed in 0u64..20_000 {
+            let mut genome = v3alpha1_founder_genome();
+            let mut r = rng(seed);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            topology_attempts += summary
+                .attempted_by_domain
+                .get(&MutationDomain::Topology)
+                .copied()
+                .unwrap_or(0) as u64;
+            total_attempts += summary.attempted_events as u64;
+        }
+        let topology_ratio = topology_attempts as f64 / total_attempts as f64;
+        assert!(
+            topology_ratio < 0.30,
+            "topology should be ~20% of attempts; got {:.1}%",
+            topology_ratio * 100.0,
+        );
+        assert!(
+            topology_ratio > 0.10,
+            "topology should be ~20% of attempts; got {:.1}%",
+            topology_ratio * 100.0,
+        );
+    }
+
+    #[test]
+    fn engine_mesh_layer_probability_zero_never_selects_topology() {
+        let mut config = SimulationConfig::default().mutation;
+        config.mutation_probability = 1.0;
+        config.per_birth_mutation_events_min = 1;
+        config.per_birth_mutation_events_max = 1;
+        config.mesh_layer_probability = 0.0;
+
+        for seed in 0u64..1000 {
+            let mut genome = v3alpha1_founder_genome();
+            let mut r = rng(seed);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            assert_eq!(
+                summary
+                    .attempted_by_domain
+                    .get(&MutationDomain::Topology)
+                    .copied()
+                    .unwrap_or(0),
+                0,
+                "topology must never be selected with mesh_layer_probability=0 at seed {}",
+                seed,
+            );
+        }
+    }
+
+    #[test]
+    fn engine_mesh_layer_probability_one_always_selects_topology() {
+        let mut config = SimulationConfig::default().mutation;
+        config.mutation_probability = 1.0;
+        config.per_birth_mutation_events_min = 1;
+        config.per_birth_mutation_events_max = 1;
+        config.mesh_layer_probability = 1.0;
+
+        for seed in 0u64..1000 {
+            let mut genome = v3alpha1_founder_genome();
+            let mut r = rng(seed);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            assert_eq!(
+                summary
+                    .attempted_by_domain
+                    .get(&MutationDomain::Topology)
+                    .copied()
+                    .unwrap_or(0),
+                1,
+                "topology must always be selected with mesh_layer_probability=1 at seed {}",
+                seed,
+            );
+        }
     }
 }
