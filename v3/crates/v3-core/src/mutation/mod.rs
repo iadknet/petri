@@ -1,5 +1,6 @@
 pub mod engine;
 pub mod graph_mutator;
+pub mod input_ref_mutator;
 pub mod phenotype;
 pub mod topology;
 pub mod types;

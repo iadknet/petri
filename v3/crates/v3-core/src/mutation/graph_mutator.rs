@@ -1,6 +1,8 @@
 use rand::Rng;
 
-use crate::creature::genome::{BackendDef, CreatureGenome, GraphInternalNode, GraphNodeKind};
+use crate::creature::genome::{
+    BackendDef, CreatureGenome, GraphInput, GraphInternalNode, GraphNodeKind,
+};
 use crate::mutation::types::MutationSkipReason;
 
 /// Graph mutation operator variants.
@@ -11,17 +13,23 @@ pub enum GraphOperator {
     MutateGraphOperatorParam,
     AddInternalGraphNode,
     RemoveInternalGraphNode,
+    AddGraphEdge,
+    RetargetGraphEdge,
+    RemoveGraphEdge,
 }
 
 impl GraphOperator {
     /// Pick a random graph operator uniformly.
     pub fn random(rng: &mut impl Rng) -> Self {
-        match rng.gen_range(0u8..5) {
+        match rng.gen_range(0u8..8) {
             0 => Self::AlterGraphEdgeWeight,
             1 => Self::SwapGraphOperator,
             2 => Self::MutateGraphOperatorParam,
             3 => Self::AddInternalGraphNode,
-            _ => Self::RemoveInternalGraphNode,
+            4 => Self::RemoveInternalGraphNode,
+            5 => Self::AddGraphEdge,
+            6 => Self::RetargetGraphEdge,
+            _ => Self::RemoveGraphEdge,
         }
     }
 }
@@ -58,6 +66,9 @@ impl GraphMutator {
             GraphOperator::MutateGraphOperatorParam => mutate_operator_param(genome, node_idx, rng),
             GraphOperator::AddInternalGraphNode => add_internal_node(genome, node_idx, rng),
             GraphOperator::RemoveInternalGraphNode => remove_internal_node(genome, node_idx, rng),
+            GraphOperator::AddGraphEdge => add_graph_edge(genome, node_idx, rng),
+            GraphOperator::RetargetGraphEdge => retarget_graph_edge(genome, node_idx, rng),
+            GraphOperator::RemoveGraphEdge => remove_graph_edge(genome, node_idx, rng),
         }
     }
 }
@@ -96,7 +107,7 @@ fn swap_operator(
             return Err(MutationSkipReason::NoApplicableTarget);
         }
         let int_idx = rng.gen_range(0..g.internal_nodes.len());
-        g.internal_nodes[int_idx].kind = random_non_parameterized_kind(rng);
+        g.internal_nodes[int_idx].kind = random_graph_node_kind(rng);
     }
     Ok(())
 }
@@ -121,7 +132,8 @@ fn mutate_operator_param(
         let int_idx = eligible[rng.gen_range(0..eligible.len())];
         let delta = rng.gen_range(-0.1f32..=0.1);
         match &mut g.internal_nodes[int_idx].kind {
-            GraphNodeKind::Threshold(ref mut p)
+            GraphNodeKind::Constant(ref mut p)
+            | GraphNodeKind::Threshold(ref mut p)
             | GraphNodeKind::DecayIntegrator(ref mut p)
             | GraphNodeKind::Momentum(ref mut p)
             | GraphNodeKind::Oscillator(ref mut p) => *p += delta,
@@ -145,6 +157,25 @@ fn add_internal_node(
     Ok(())
 }
 
+fn add_graph_edge(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
+        if g.internal_nodes.is_empty() {
+            return Err(MutationSkipReason::NoApplicableTarget);
+        }
+        let int_idx = rng.gen_range(0..g.internal_nodes.len());
+        let source_idx = rng.gen_range(0..g.internal_nodes.len() as u16);
+        let weight = rng.gen_range(-1.0f32..=1.0);
+        g.internal_nodes[int_idx]
+            .inputs
+            .push(GraphInput { source_idx, weight });
+    }
+    Ok(())
+}
+
 fn remove_internal_node(
     genome: &mut CreatureGenome,
     node_idx: usize,
@@ -160,23 +191,77 @@ fn remove_internal_node(
     Ok(())
 }
 
-/// Return a random non-parameterized GraphNodeKind (safe to swap without context).
-fn random_non_parameterized_kind(rng: &mut impl Rng) -> GraphNodeKind {
-    match rng.gen_range(0u8..15) {
-        0 => GraphNodeKind::Add,
-        1 => GraphNodeKind::Multiply,
-        2 => GraphNodeKind::Negate,
-        3 => GraphNodeKind::Abs,
-        4 => GraphNodeKind::Min,
-        5 => GraphNodeKind::Max,
-        6 => GraphNodeKind::Relu,
-        7 => GraphNodeKind::Sigmoid,
-        8 => GraphNodeKind::Tanh,
+fn retarget_graph_edge(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
+        let eligible: Vec<usize> = g
+            .internal_nodes
+            .iter()
+            .enumerate()
+            .filter(|(_, n)| !n.inputs.is_empty())
+            .map(|(i, _)| i)
+            .collect();
+        if eligible.is_empty() {
+            return Err(MutationSkipReason::NoApplicableTarget);
+        }
+        let int_idx = eligible[rng.gen_range(0..eligible.len())];
+        let edge_idx = rng.gen_range(0..g.internal_nodes[int_idx].inputs.len());
+        let new_source = rng.gen_range(0..g.internal_nodes.len() as u16);
+        g.internal_nodes[int_idx].inputs[edge_idx].source_idx = new_source;
+    }
+    Ok(())
+}
+
+fn remove_graph_edge(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
+        let eligible: Vec<usize> = g
+            .internal_nodes
+            .iter()
+            .enumerate()
+            .filter(|(_, n)| !n.inputs.is_empty())
+            .map(|(i, _)| i)
+            .collect();
+        if eligible.is_empty() {
+            return Err(MutationSkipReason::NoApplicableTarget);
+        }
+        let int_idx = eligible[rng.gen_range(0..eligible.len())];
+        let edge_idx = rng.gen_range(0..g.internal_nodes[int_idx].inputs.len());
+        g.internal_nodes[int_idx].inputs.remove(edge_idx);
+    }
+    Ok(())
+}
+
+/// Return a random GraphNodeKind covering all 22 variants with random initial params.
+fn random_graph_node_kind(rng: &mut impl Rng) -> GraphNodeKind {
+    match rng.gen_range(0u8..22) {
+        0 => GraphNodeKind::InputRef(rng.gen_range(0u8..8)),
+        1 => GraphNodeKind::Constant(rng.gen_range(-1.0f32..=1.0)),
+        2 => GraphNodeKind::Add,
+        3 => GraphNodeKind::Multiply,
+        4 => GraphNodeKind::Negate,
+        5 => GraphNodeKind::Abs,
+        6 => GraphNodeKind::Min,
+        7 => GraphNodeKind::Max,
+        8 => GraphNodeKind::Threshold(rng.gen_range(-1.0f32..=1.0)),
         9 => GraphNodeKind::GreaterThan,
-        10 => GraphNodeKind::Select,
-        11 => GraphNodeKind::Clamp01,
-        12 => GraphNodeKind::WeightedSum,
-        13 => GraphNodeKind::AdaptiveGain,
+        10 => GraphNodeKind::Sigmoid,
+        11 => GraphNodeKind::Tanh,
+        12 => GraphNodeKind::Relu,
+        13 => GraphNodeKind::Select,
+        14 => GraphNodeKind::Clamp01,
+        15 => GraphNodeKind::WeightedSum,
+        16 => GraphNodeKind::DecayIntegrator(rng.gen_range(0.0f32..=1.0)),
+        17 => GraphNodeKind::Momentum(rng.gen_range(0.0f32..=1.0)),
+        18 => GraphNodeKind::Oscillator(rng.gen_range(0.01f32..=10.0)),
+        19 => GraphNodeKind::AdaptiveGain,
+        20 => GraphNodeKind::CustomOutput(rng.gen_range(0u8..8)),
         _ => GraphNodeKind::RouterOutput,
     }
 }
@@ -185,7 +270,8 @@ fn random_non_parameterized_kind(rng: &mut impl Rng) -> GraphNodeKind {
 fn is_parameterized(kind: &GraphNodeKind) -> bool {
     matches!(
         kind,
-        GraphNodeKind::Threshold(_)
+        GraphNodeKind::Constant(_)
+            | GraphNodeKind::Threshold(_)
             | GraphNodeKind::DecayIntegrator(_)
             | GraphNodeKind::Momentum(_)
             | GraphNodeKind::Oscillator(_)
@@ -197,7 +283,9 @@ mod tests {
     use super::*;
     use crate::contracts::NodeId;
     use crate::creature::founder::v3alpha1_founder_genome;
-    use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
+    use crate::creature::genome::{
+        BackendDef, GraphInternalNode, NodeGenome, VmBackendDef, VmInstruction,
+    };
     use crate::creature::parseability::ParseabilityGate;
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
@@ -343,6 +431,241 @@ mod tests {
     }
 
     #[test]
+    fn add_graph_edge_increases_input_count() {
+        let mut genome = v3alpha1_founder_genome();
+        // Count total inputs across all graph internal nodes before.
+        let before: usize = genome
+            .nodes
+            .iter()
+            .filter_map(|n| {
+                if let BackendDef::Graph(ref g) = n.backend_def {
+                    Some(
+                        g.internal_nodes
+                            .iter()
+                            .map(|i| i.inputs.len())
+                            .sum::<usize>(),
+                    )
+                } else {
+                    None
+                }
+            })
+            .sum();
+        let mut r = rng(0);
+        GraphMutator::apply(&mut genome, GraphOperator::AddGraphEdge, &mut r).unwrap();
+        let after: usize = genome
+            .nodes
+            .iter()
+            .filter_map(|n| {
+                if let BackendDef::Graph(ref g) = n.backend_def {
+                    Some(
+                        g.internal_nodes
+                            .iter()
+                            .map(|i| i.inputs.len())
+                            .sum::<usize>(),
+                    )
+                } else {
+                    None
+                }
+            })
+            .sum();
+        assert_eq!(
+            after,
+            before + 1,
+            "add_graph_edge must add exactly one input"
+        );
+    }
+
+    #[test]
+    fn add_graph_edge_on_empty_internals_returns_no_applicable_target() {
+        let mut genome = v3alpha1_founder_genome();
+        // Clear all internal nodes from graph backends.
+        for node in &mut genome.nodes {
+            if let BackendDef::Graph(ref mut g) = node.backend_def {
+                g.internal_nodes.clear();
+            }
+        }
+        let mut r = rng(0);
+        let result = GraphMutator::apply(&mut genome, GraphOperator::AddGraphEdge, &mut r);
+        assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+    }
+
+    #[test]
+    fn constant_is_parameterized() {
+        assert!(
+            is_parameterized(&GraphNodeKind::Constant(1.0)),
+            "Constant must be parameterized"
+        );
+    }
+
+    #[test]
+    fn mutate_operator_param_changes_constant_value() {
+        let mut genome = v3alpha1_founder_genome();
+        // Add a Constant internal node to the graph node.
+        if let BackendDef::Graph(ref mut g) = genome.nodes[0].backend_def {
+            g.internal_nodes.push(GraphInternalNode {
+                kind: GraphNodeKind::Constant(0.5),
+                inputs: vec![],
+            });
+        }
+        let original = 0.5f32;
+        let mut changed = false;
+        for seed in 0u64..100 {
+            let mut g = genome.clone();
+            let mut r = rng(seed);
+            if GraphMutator::apply(&mut g, GraphOperator::MutateGraphOperatorParam, &mut r).is_ok()
+            {
+                if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
+                    // Check last internal node (the Constant we added).
+                    let last = gd.internal_nodes.last().unwrap();
+                    if let GraphNodeKind::Constant(p) = last.kind {
+                        if (p - original).abs() > 1e-7 {
+                            changed = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        assert!(changed, "mutate_operator_param must change Constant value");
+    }
+
+    #[test]
+    fn swap_operator_can_produce_parameterized_kinds() {
+        // Over many seeds, swap must sometimes produce parameterized kinds
+        // (Threshold, DecayIntegrator, Momentum, Oscillator, Constant).
+        let mut found_parameterized = false;
+        for seed in 0u64..200 {
+            let mut genome = v3alpha1_founder_genome();
+            let mut r = rng(seed);
+            if GraphMutator::apply(&mut genome, GraphOperator::SwapGraphOperator, &mut r).is_ok() {
+                if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
+                    for node in &g.internal_nodes {
+                        if is_parameterized(&node.kind) {
+                            found_parameterized = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            if found_parameterized {
+                break;
+            }
+        }
+        assert!(
+            found_parameterized,
+            "swap must sometimes produce parameterized kinds"
+        );
+    }
+
+    #[test]
+    fn random_graph_node_kind_covers_all_22_variants() {
+        use std::collections::HashSet;
+        let mut discriminants: HashSet<std::mem::Discriminant<GraphNodeKind>> = HashSet::new();
+        for seed in 0u64..2000 {
+            let mut r = rng(seed);
+            let kind = random_graph_node_kind(&mut r);
+            discriminants.insert(std::mem::discriminant(&kind));
+        }
+        assert_eq!(
+            discriminants.len(),
+            22,
+            "all 22 GraphNodeKind variants must be reachable; got {}",
+            discriminants.len()
+        );
+    }
+
+    #[test]
+    fn retarget_graph_edge_changes_source_idx() {
+        let genome = v3alpha1_founder_genome();
+        // Founder graph node 0 has internal nodes with inputs.
+        let mut changed = false;
+        for seed in 0u64..100 {
+            let mut g = genome.clone();
+            let mut r = rng(seed);
+            if GraphMutator::apply(&mut g, GraphOperator::RetargetGraphEdge, &mut r).is_ok() {
+                // Check if any edge source_idx differs from original.
+                if let (BackendDef::Graph(ref orig), BackendDef::Graph(ref mutated)) =
+                    (&genome.nodes[0].backend_def, &g.nodes[0].backend_def)
+                {
+                    for (o, m) in orig
+                        .internal_nodes
+                        .iter()
+                        .zip(mutated.internal_nodes.iter())
+                    {
+                        for (oi, mi) in o.inputs.iter().zip(m.inputs.iter()) {
+                            if oi.source_idx != mi.source_idx {
+                                changed = true;
+                                break;
+                            }
+                        }
+                        if changed {
+                            break;
+                        }
+                    }
+                }
+            }
+            if changed {
+                break;
+            }
+        }
+        assert!(changed, "retarget must change a source_idx");
+    }
+
+    #[test]
+    fn retarget_graph_edge_no_edges_returns_no_applicable_target() {
+        let mut genome = v3alpha1_founder_genome();
+        // Clear all inputs from graph internal nodes.
+        if let BackendDef::Graph(ref mut g) = genome.nodes[0].backend_def {
+            for node in &mut g.internal_nodes {
+                node.inputs.clear();
+            }
+        }
+        let mut r = rng(0);
+        let result = GraphMutator::apply(&mut genome, GraphOperator::RetargetGraphEdge, &mut r);
+        assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+    }
+
+    #[test]
+    fn remove_graph_edge_decreases_input_count() {
+        let genome = v3alpha1_founder_genome();
+        let before: usize = if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
+            g.internal_nodes.iter().map(|n| n.inputs.len()).sum()
+        } else {
+            panic!("expected graph backend");
+        };
+        assert!(before > 0, "founder graph must have edges");
+        let mut success = false;
+        for seed in 0u64..100 {
+            let mut g = genome.clone();
+            let mut r = rng(seed);
+            if GraphMutator::apply(&mut g, GraphOperator::RemoveGraphEdge, &mut r).is_ok() {
+                let after: usize = if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
+                    gd.internal_nodes.iter().map(|n| n.inputs.len()).sum()
+                } else {
+                    before
+                };
+                assert_eq!(after, before - 1, "remove_graph_edge must remove one input");
+                success = true;
+                break;
+            }
+        }
+        assert!(success, "remove_graph_edge must succeed on founder genome");
+    }
+
+    #[test]
+    fn remove_graph_edge_no_edges_returns_no_applicable_target() {
+        let mut genome = v3alpha1_founder_genome();
+        if let BackendDef::Graph(ref mut g) = genome.nodes[0].backend_def {
+            for node in &mut g.internal_nodes {
+                node.inputs.clear();
+            }
+        }
+        let mut r = rng(0);
+        let result = GraphMutator::apply(&mut genome, GraphOperator::RemoveGraphEdge, &mut r);
+        assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+    }
+
+    #[test]
     fn graph_after_mutation_passes_parseability_gate() {
         let operators = [
             GraphOperator::AlterGraphEdgeWeight,
@@ -350,6 +673,9 @@ mod tests {
             GraphOperator::MutateGraphOperatorParam,
             GraphOperator::AddInternalGraphNode,
             GraphOperator::RemoveInternalGraphNode,
+            GraphOperator::AddGraphEdge,
+            GraphOperator::RetargetGraphEdge,
+            GraphOperator::RemoveGraphEdge,
         ];
         for (i, &op) in operators.iter().enumerate() {
             let mut genome = v3alpha1_founder_genome();
