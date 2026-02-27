@@ -97,6 +97,68 @@ fn stats_accounting_invariant_in_cli_output() {
         spawned + rejected,
         "accounting invariant: attempted({attempted}) == spawned({spawned}) + rejected({rejected})"
     );
+
+    let mutation_attempted = sample["mutation_events_attempted_total"].as_u64().unwrap();
+    let mutation_applied = sample["mutation_events_applied_total"].as_u64().unwrap();
+    let mutation_skipped = sample["mutation_events_skipped_total"].as_u64().unwrap();
+    assert_eq!(
+        mutation_attempted,
+        mutation_applied + mutation_skipped,
+        "mutation accounting invariant: attempted({mutation_attempted}) == applied({mutation_applied}) + skipped({mutation_skipped})"
+    );
+
+    let attempted_by_domain: u64 = sample["mutation_events_attempted_total_by_domain"]
+        .as_object()
+        .unwrap()
+        .values()
+        .map(|v| v.as_u64().unwrap())
+        .sum();
+    let applied_by_domain: u64 = sample["mutation_events_applied_total_by_domain"]
+        .as_object()
+        .unwrap()
+        .values()
+        .map(|v| v.as_u64().unwrap())
+        .sum();
+    let attempted_by_operator: u64 = sample["mutation_events_attempted_total_by_operator"]
+        .as_object()
+        .unwrap()
+        .values()
+        .map(|v| v.as_u64().unwrap())
+        .sum();
+    let applied_by_operator: u64 = sample["mutation_events_applied_total_by_operator"]
+        .as_object()
+        .unwrap()
+        .values()
+        .map(|v| v.as_u64().unwrap())
+        .sum();
+    assert_eq!(
+        attempted_by_domain, mutation_attempted,
+        "attempted_by_domain must reconcile to mutation_events_attempted_total"
+    );
+    assert_eq!(
+        applied_by_domain, mutation_applied,
+        "applied_by_domain must reconcile to mutation_events_applied_total"
+    );
+    assert_eq!(
+        attempted_by_operator, mutation_attempted,
+        "attempted_by_operator must reconcile to mutation_events_attempted_total"
+    );
+    assert_eq!(
+        applied_by_operator, mutation_applied,
+        "applied_by_operator must reconcile to mutation_events_applied_total"
+    );
+
+    let semantic_noop = sample["mutation_events_applied_total_semantic_noop"]
+        .as_u64()
+        .unwrap();
+    let semantic_change = sample["mutation_events_applied_total_semantic_change"]
+        .as_u64()
+        .unwrap();
+    assert_eq!(
+        semantic_noop + semantic_change,
+        mutation_applied,
+        "semantic categories must reconcile to mutation_events_applied_total"
+    );
 }
 
 #[test]

@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::Serialize;
 use v3_core::config::SimulationConfig;
 use v3_core::simulation::{run_tick, seed_simulation};
@@ -44,6 +46,12 @@ pub struct TickSampleEvent {
     pub mutation_events_attempted_total: u64,
     pub mutation_events_applied_total: u64,
     pub mutation_events_skipped_total: u64,
+    pub mutation_events_attempted_total_by_domain: HashMap<String, u64>,
+    pub mutation_events_applied_total_by_domain: HashMap<String, u64>,
+    pub mutation_events_attempted_total_by_operator: HashMap<String, u64>,
+    pub mutation_events_applied_total_by_operator: HashMap<String, u64>,
+    pub mutation_events_applied_total_semantic_noop: u64,
+    pub mutation_events_applied_total_semantic_change: u64,
 }
 
 #[derive(Debug, Serialize)]
@@ -129,6 +137,36 @@ fn build_tick_sample(sim: &v3_core::simulation::Simulation, tick: u64) -> TickSa
         mutation_events_attempted_total: sim.stats.mutation_events_attempted_total,
         mutation_events_applied_total: sim.stats.mutation_events_applied_total,
         mutation_events_skipped_total: sim.stats.mutation_events_skipped_total,
+        mutation_events_attempted_total_by_domain: sim
+            .stats
+            .mutation_events_attempted_total_by_domain
+            .iter()
+            .map(|(domain, count)| (domain.as_key().to_string(), *count))
+            .collect(),
+        mutation_events_applied_total_by_domain: sim
+            .stats
+            .mutation_events_applied_total_by_domain
+            .iter()
+            .map(|(domain, count)| (domain.as_key().to_string(), *count))
+            .collect(),
+        mutation_events_attempted_total_by_operator: sim
+            .stats
+            .mutation_events_attempted_total_by_operator
+            .iter()
+            .map(|(operator, count)| (operator.as_key().to_string(), *count))
+            .collect(),
+        mutation_events_applied_total_by_operator: sim
+            .stats
+            .mutation_events_applied_total_by_operator
+            .iter()
+            .map(|(operator, count)| (operator.as_key().to_string(), *count))
+            .collect(),
+        mutation_events_applied_total_semantic_noop: sim
+            .stats
+            .mutation_events_applied_total_semantic_noop,
+        mutation_events_applied_total_semantic_change: sim
+            .stats
+            .mutation_events_applied_total_semantic_change,
     }
 }
 

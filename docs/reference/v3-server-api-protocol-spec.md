@@ -80,75 +80,58 @@ Request (conceptual v3alpha1 shape):
 {
   "seed": 42,
   "population": {
-    "initial_creatures": 50,
-    "max_creatures": 1000
+    "initial_creatures": 2000,
+    "max_creatures": 100000
   },
   "world": {
     "width": 400,
     "height": 400,
     "edge_mode": "wrap",
     "food": {
-      "growth_rate": 0.25,
+      "growth_rate": 0.096,
       "initial_density": 1.0,
       "initial_coverage": 0.15,
-      "spread_threshold_ratio": 0.75,
-      "recovery_spawn_rate": 0.02,
-      "recovery_floor_ratio": 0.03,
+      "spread_threshold_ratio": 0.8,
+      "recovery_spawn_rate": 0.01,
+      "recovery_floor_ratio": 0.01,
       "max_density": 1.0
     }
   },
   "energy": {
     "lifecycle": {
       "initial_energy": 20.0,
-      "max_energy": 100.0,
-      "energy_decay_per_tick": 0.01,
+      "max_energy": 200.0,
+      "energy_decay_per_tick": 0.5,
       "min_reproduce_energy": 1.0,
       "default_offspring_energy": 8.0
     },
     "costs": {
-      "move_cost": 0.02,
+      "move_cost": 1.0,
       "eat_cost": 0.0,
-      "noop_cost": 0.0,
-      "reproduce_cost": 0.12,
+      "noop_cost": 0.05,
+      "reproduce_cost": 0.1,
       "eat_reward_per_food": 12.0
     }
   },
   "runtime": {
-    "max_mesh_hops": 128,
-    "max_vm_steps": 1024,
-    "max_graph_relax_iters": 4,
+    "max_mesh_hops": 1024,
+    "max_vm_steps": 10000,
+    "max_graph_relax_iters": 15,
     "graph_convergence_epsilon": 0.001,
-    "graph_convergence_stable_passes": 1,
-    "graph_node_base_cost": 0.05,
+    "graph_convergence_stable_passes": 2,
+    "graph_node_base_cost": 0.00001,
     "vm": {
-      "opcode_cost_multiplier": 0.5
-    },
-    "mutation": {
-      "mutation_probability": 0.01,
-      "per_birth_mutation_events_min": 1,
-      "per_birth_mutation_events_max": 4,
-      "domain_selection_weights": {
-        "Topology": 1.0,
-        "Vm": 1.0,
-        "Graph": 1.0
-      },
-      "operator_selection_weights": {
-        "Topology": { "AddNode": 1.0, "RemoveNode": 1.0 },
-        "Vm": {
-          "VmInstructionMutation": 1.0,
-          "VmConstantMutation": 1.0
-        },
-        "Graph": {
-          "AddInternalGraphNode": 1.0,
-          "RemoveInternalGraphNode": 1.0
-        }
-      },
-      "operator_modifier_scale": 1.0,
-      "phenotype": {
-        "channel_step": 1,
-        "channel_change_chance": 0.001,
-        "polarity_flip_chance": 0.0002
-      }
+      "opcode_cost_multiplier": 0.000001
+    }
+  },
+  "mutation": {
+    "mutation_probability": 0.303,
+    "per_birth_mutation_events_min": 1,
+    "per_birth_mutation_events_max": 10,
+    "phenotype": {
+      "channel_step": 1,
+      "channel_change_chance": 0.001,
+      "polarity_flip_chance": 0.0002
     }
   }
 }
@@ -161,8 +144,8 @@ Request rules:
   specs.
 - Startup/config keyspace is canonical from `v3-world-grid-spec.md` and
   `v3-runtime-config-spec.md`.
-- `runtime.mutation` accepts the full canonical key set, including
-  `domain_selection_weights` and `operator_selection_weights`.
+- Mutation tuning lives at top-level `mutation.*` in the startup/config keyspace
+  (not under `runtime.*`).
 - No `founder_profile` request field is supported in v3alpha1.
 - Unknown request fields are rejected.
 - Invalid/non-viable startup requests are rejected with
@@ -176,7 +159,7 @@ Response:
   "state": "idle",
   "tick": 0,
   "config_digest": "sha256:<hex>",
-  "seeded_creatures": 50
+  "seeded_creatures": 2000
 }
 ```
 
@@ -263,7 +246,37 @@ Response:
   },
   "reproduction_actions_attempted_total": 721,
   "reproduction_actions_spawned_total": 129,
-  "reproduction_actions_rejected_total": 592
+  "reproduction_actions_rejected_total": 592,
+  "mutation_events_attempted_total": 509,
+  "mutation_events_applied_total": 321,
+  "mutation_events_skipped_total": 188,
+  "mutation_events_attempted_total_by_domain": {
+    "Topology": 164,
+    "Vm": 129,
+    "Graph": 116,
+    "InputRef": 100
+  },
+  "mutation_events_applied_total_by_domain": {
+    "Topology": 102,
+    "Vm": 83,
+    "Graph": 74,
+    "InputRef": 62
+  },
+  "mutation_events_attempted_total_by_operator": {
+    "Topology.AddNode": 21,
+    "Vm.VmInstructionMutation": 40
+  },
+  "mutation_events_applied_total_by_operator": {
+    "Topology.AddNode": 13,
+    "Vm.VmInstructionMutation": 25
+  },
+  "mutation_events_applied_total_semantic_noop": 37,
+  "mutation_events_applied_total_semantic_change": 284,
+  "last_tick_compute_total_mean": 18.7,
+  "last_tick_compute_total_min": 0.0,
+  "last_tick_compute_total_max": 52.0,
+  "last_tick_compute_vm_mean": 8.1,
+  "last_tick_compute_graph_mean": 10.6
 }
 ```
 
@@ -274,6 +287,7 @@ Response (full sparse frame):
 ```json
 {
   "protocol_version": "v3alpha1",
+  "state": "running",
   "tick": 124,
   "width": 400,
   "height": 400,
@@ -311,75 +325,58 @@ Response:
   "state": "paused",
   "config": {
     "population": {
-      "initial_creatures": 50,
-      "max_creatures": 1000
+      "initial_creatures": 2000,
+      "max_creatures": 100000
     },
     "world": {
       "width": 400,
       "height": 400,
       "edge_mode": "wrap",
       "food": {
-        "growth_rate": 0.25,
+        "growth_rate": 0.096,
         "initial_density": 1.0,
         "initial_coverage": 0.15,
-        "spread_threshold_ratio": 0.75,
-        "recovery_spawn_rate": 0.02,
-        "recovery_floor_ratio": 0.03,
+        "spread_threshold_ratio": 0.8,
+        "recovery_spawn_rate": 0.01,
+        "recovery_floor_ratio": 0.01,
         "max_density": 1.0
       }
     },
     "energy": {
       "lifecycle": {
         "initial_energy": 20.0,
-        "max_energy": 100.0,
-        "energy_decay_per_tick": 0.01,
+        "max_energy": 200.0,
+        "energy_decay_per_tick": 0.5,
         "min_reproduce_energy": 1.0,
         "default_offspring_energy": 8.0
       },
       "costs": {
-        "move_cost": 0.02,
+        "move_cost": 1.0,
         "eat_cost": 0.0,
-        "noop_cost": 0.0,
-        "reproduce_cost": 0.12,
+        "noop_cost": 0.05,
+        "reproduce_cost": 0.1,
         "eat_reward_per_food": 12.0
       }
     },
     "runtime": {
-      "max_mesh_hops": 128,
-      "max_vm_steps": 1024,
-      "max_graph_relax_iters": 4,
+      "max_mesh_hops": 1024,
+      "max_vm_steps": 10000,
+      "max_graph_relax_iters": 15,
       "graph_convergence_epsilon": 0.001,
-      "graph_convergence_stable_passes": 1,
-      "graph_node_base_cost": 0.05,
+      "graph_convergence_stable_passes": 2,
+      "graph_node_base_cost": 0.00001,
       "vm": {
-        "opcode_cost_multiplier": 0.5
-      },
-      "mutation": {
-        "mutation_probability": 0.01,
-        "per_birth_mutation_events_min": 1,
-        "per_birth_mutation_events_max": 4,
-        "domain_selection_weights": {
-          "Topology": 1.0,
-          "Vm": 1.0,
-          "Graph": 1.0
-        },
-        "operator_selection_weights": {
-          "Topology": { "AddNode": 1.0, "RemoveNode": 1.0 },
-          "Vm": {
-            "VmInstructionMutation": 1.0,
-            "VmConstantMutation": 1.0
-          },
-          "Graph": {
-            "AddInternalGraphNode": 1.0,
-            "RemoveInternalGraphNode": 1.0
-          }
-        },
-        "operator_modifier_scale": 1.0,
-        "phenotype": {
-          "channel_step": 1,
-          "channel_change_chance": 0.01,
-          "polarity_flip_chance": 0.002
-        }
+        "opcode_cost_multiplier": 0.000001
+      }
+    },
+    "mutation": {
+      "mutation_probability": 0.303,
+      "per_birth_mutation_events_min": 1,
+      "per_birth_mutation_events_max": 10,
+      "phenotype": {
+        "channel_step": 1,
+        "channel_change_chance": 0.001,
+        "polarity_flip_chance": 0.0002
       }
     }
   }
@@ -394,7 +391,7 @@ Request shape:
 Rules:
 - Unknown fields rejected.
 - PATCH supports the full canonical keyspace from `GET /config`, including all
-  runtime mutation keys owned by `v3-runtime-config-spec.md`.
+  top-level `mutation.*` keys owned by `v3-runtime-config-spec.md`.
 - PATCH uses deep merge: only specified keys are updated; unspecified keys
   retain their existing values at every nesting level.
 - Invalid values rejected with `422 validation_rejected`; transport does not
@@ -436,10 +433,11 @@ Allowed events:
 - `health`
 
 Payload mapping:
-- `status` payload uses `GET /v3/simulation/status` schema excluding top-level
-  `protocol_version` and `tick` fields.
-- `frame` payload uses `GET /v3/simulation/frame` schema excluding top-level
-  `protocol_version` and `tick` fields.
+- `status` payload is the compact status payload (`state`, `population`,
+  `mean_energy`, `last_tick_actions`, reproduction totals, and last-tick
+  compute summaries).
+- `frame` payload is the compact frame payload (`width`, `height`, `creatures`,
+  `food`, `barriers`).
 - `health` payload:
 
 ```json
@@ -449,15 +447,50 @@ Payload mapping:
   "mutation_events_attempted_total": 509,
   "mutation_events_applied_total": 321,
   "mutation_events_skipped_total": 188,
+  "mutation_events_attempted_total_by_domain": {
+    "Topology": 164,
+    "Vm": 129,
+    "Graph": 116,
+    "InputRef": 100
+  },
+  "mutation_events_applied_total_by_domain": {
+    "Topology": 102,
+    "Vm": 83,
+    "Graph": 74,
+    "InputRef": 62
+  },
+  "mutation_events_attempted_total_by_operator": {
+    "Topology.AddNode": 21,
+    "Vm.VmInstructionMutation": 40
+  },
+  "mutation_events_applied_total_by_operator": {
+    "Topology.AddNode": 13,
+    "Vm.VmInstructionMutation": 25
+  },
+  "mutation_events_applied_total_semantic_noop": 37,
+  "mutation_events_applied_total_semantic_change": 284,
   "reproduction_actions_attempted_total": 721,
   "reproduction_actions_spawned_total": 129,
   "reproduction_actions_rejected_total": 592,
   "reproduction_actions_rejected_total_by_reason": {
     "RejectedInvalidTarget": 512,
     "RejectedEnergyConstraints": 80
-  }
+  },
+  "mutation_events_skipped_total_by_reason": {
+    "ParseabilityViolation": 58,
+    "NoApplicableTarget": 130
+  },
+  "genome_complexity_mean": 21.4,
+  "genome_complexity_min": 3,
+  "genome_complexity_max": 91
 }
 ```
+
+Mutation map-key rules:
+- Domain map keys use stable domain strings (`Topology`, `Vm`, `Graph`,
+  `InputRef`).
+- Operator map keys use stable `Domain.Operator` strings (for example
+  `Topology.AddNode`, `Vm.VmInstructionMutation`).
 
 Envelope/payload consistency rules:
 - Envelope `tick` is canonical for each event.

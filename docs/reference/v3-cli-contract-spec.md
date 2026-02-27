@@ -113,9 +113,37 @@ minimal contract.
   "reproduction_actions_rejected_total": 592,
   "mutation_events_attempted_total": 509,
   "mutation_events_applied_total": 321,
-  "mutation_events_skipped_total": 188
+  "mutation_events_skipped_total": 188,
+  "mutation_events_attempted_total_by_domain": {
+    "Topology": 164,
+    "Vm": 129,
+    "Graph": 116,
+    "InputRef": 100
+  },
+  "mutation_events_applied_total_by_domain": {
+    "Topology": 102,
+    "Vm": 83,
+    "Graph": 74,
+    "InputRef": 62
+  },
+  "mutation_events_attempted_total_by_operator": {
+    "Topology.AddNode": 21,
+    "Vm.VmInstructionMutation": 40
+  },
+  "mutation_events_applied_total_by_operator": {
+    "Topology.AddNode": 13,
+    "Vm.VmInstructionMutation": 25
+  },
+  "mutation_events_applied_total_semantic_noop": 37,
+  "mutation_events_applied_total_semantic_change": 284
 }
 ```
+
+Mutation map-key rules:
+- Domain map keys use stable domain strings (`Topology`, `Vm`, `Graph`,
+  `InputRef`).
+- Operator map keys use stable `Domain.Operator` strings (for example
+  `Topology.AddNode`, `Vm.VmInstructionMutation`).
 
 ### 5.3 `run_completed`
 

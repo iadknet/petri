@@ -1,3 +1,8 @@
+use std::collections::HashMap;
+
+use crate::mutation::{MutationDomain, MutationOperator, MutationSkipReason};
+use crate::simulation::actions::ReproductionActionResult;
+
 /// Observability counters for the simulation.
 ///
 /// Cumulative counters never reset. Per-tick counters are reset at the start
@@ -11,10 +16,22 @@ pub struct SimStats {
     pub mutation_events_attempted_total: u64,
     pub mutation_events_applied_total: u64,
     pub mutation_events_skipped_total: u64,
+    /// Per-domain attempted mutation event breakdown (cumulative).
+    pub mutation_events_attempted_total_by_domain: HashMap<MutationDomain, u64>,
+    /// Per-domain applied mutation event breakdown (cumulative).
+    pub mutation_events_applied_total_by_domain: HashMap<MutationDomain, u64>,
+    /// Per-operator attempted mutation event breakdown (cumulative).
+    pub mutation_events_attempted_total_by_operator: HashMap<MutationOperator, u64>,
+    /// Per-operator applied mutation event breakdown (cumulative).
+    pub mutation_events_applied_total_by_operator: HashMap<MutationOperator, u64>,
+    /// Applied events classified as semantic-noop.
+    pub mutation_events_applied_total_semantic_noop: u64,
+    /// Applied events classified as semantic-change.
+    pub mutation_events_applied_total_semantic_change: u64,
     /// Per-reason mutation skip breakdown (cumulative).
-    pub mutation_events_skipped_by_reason: std::collections::HashMap<String, u64>,
+    pub mutation_events_skipped_by_reason: HashMap<MutationSkipReason, u64>,
     /// Per-reason rejection breakdown (cumulative).
-    pub reproduction_actions_rejected_by_reason: std::collections::HashMap<String, u64>,
+    pub reproduction_actions_rejected_by_reason: HashMap<ReproductionActionResult, u64>,
 
     // ── Per-tick (reset at start of each tick) ───────────────────────────────
     pub last_tick_move: u32,
