@@ -101,6 +101,7 @@ This file is the canonical owner for world/grid config keys/defaults.
 | `world.food.initial_density` | `f32` | `1.0` | Clamp to `[0.0, max_density]`; invalid falls back to `max_density`. |
 | `world.food.initial_coverage` | `f32` | `0.15` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.15`. |
 | `world.food.spread_threshold_ratio` | `f32` | `0.75` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.75`. |
+| `world.food.spread_density_ratio` | `f32` | `0.25` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.25`. Fraction of growth delta deposited to neighbor during spread. |
 | `world.food.recovery_spawn_rate` | `f32` | `0.02` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.02`. |
 | `world.food.recovery_floor_ratio` | `f32` | `0.03` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.03`. |
 | `world.food.max_density` | `f32` | `1.0` | Must be finite and `> 0.0`; invalid falls back to `1.0`. |
@@ -138,7 +139,7 @@ For each non-barrier cell:
 - Apply local growth: `food_density[cell] = clamp(food_density[cell] + delta, 0.0, max_density)`.
 - If `source >= max_density * world.food.spread_threshold_ratio` and
   `delta > 0.0`, pick one random valid cardinal neighbor (non-barrier) and add
-  the same `delta` (clamped to `max_density`).
+  `delta * world.food.spread_density_ratio` (clamped to `max_density`).
 
 After local growth/spread pass:
 - Compute `average_density_ratio = sum(snapshot_food) / (total_cells * max_density)`.
