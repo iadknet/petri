@@ -9,7 +9,9 @@
 
 use rand::Rng;
 
-use crate::creature::genome::{BackendDef, CreatureGenome, HebbianConfig, HebbianRule};
+use crate::creature::genome::{
+    BackendDef, CreatureGenome, GraphInternalNode, HebbianConfig, HebbianRule,
+};
 use crate::mutation::types::MutationSkipReason;
 
 const ALL_RULES: [HebbianRule; 4] = [
@@ -19,6 +21,28 @@ const ALL_RULES: [HebbianRule; 4] = [
     HebbianRule::Covariance,
 ];
 
+/// Pick a random internal node matching `predicate`. Returns its index or
+/// `NoApplicableTarget` if none match. Uses two-pass count-then-select to
+/// avoid allocating a Vec of eligible indices.
+fn select_eligible(
+    nodes: &[GraphInternalNode],
+    predicate: impl Fn(&GraphInternalNode) -> bool,
+    rng: &mut impl Rng,
+) -> Result<usize, MutationSkipReason> {
+    let count = nodes.iter().filter(|n| predicate(n)).count();
+    if count == 0 {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
+    let target = rng.gen_range(0..count);
+    nodes
+        .iter()
+        .enumerate()
+        .filter(|(_, n)| predicate(n))
+        .nth(target)
+        .map(|(i, _)| i)
+        .ok_or(MutationSkipReason::NoApplicableTarget)
+}
+
 /// Add HebbianConfig to a random non-Hebbian internal node.
 pub fn enable_hebbian(
     genome: &mut CreatureGenome,
@@ -26,25 +50,11 @@ pub fn enable_hebbian(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
-        // Two-pass: count eligible, then select.
-        let eligible_count = g
-            .internal_nodes
-            .iter()
-            .filter(|n| n.hebbian.is_none() && !n.inputs.is_empty())
-            .count();
-        if eligible_count == 0 {
-            return Err(MutationSkipReason::NoApplicableTarget);
-        }
-
-        let target = rng.gen_range(0..eligible_count);
-        let int_idx = g
-            .internal_nodes
-            .iter()
-            .enumerate()
-            .filter(|(_, n)| n.hebbian.is_none() && !n.inputs.is_empty())
-            .nth(target)
-            .map(|(i, _)| i)
-            .expect("target within counted range");
+        let int_idx = select_eligible(
+            &g.internal_nodes,
+            |n| n.hebbian.is_none() && !n.inputs.is_empty(),
+            rng,
+        )?;
 
         let rule = ALL_RULES[rng.gen_range(0..ALL_RULES.len())];
         g.internal_nodes[int_idx].hebbian = Some(HebbianConfig {
@@ -64,25 +74,7 @@ pub fn disable_hebbian(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
-        let eligible_count = g
-            .internal_nodes
-            .iter()
-            .filter(|n| n.hebbian.is_some())
-            .count();
-        if eligible_count == 0 {
-            return Err(MutationSkipReason::NoApplicableTarget);
-        }
-
-        let target = rng.gen_range(0..eligible_count);
-        let int_idx = g
-            .internal_nodes
-            .iter()
-            .enumerate()
-            .filter(|(_, n)| n.hebbian.is_some())
-            .nth(target)
-            .map(|(i, _)| i)
-            .expect("target within counted range");
-
+        let int_idx = select_eligible(&g.internal_nodes, |n| n.hebbian.is_some(), rng)?;
         g.internal_nodes[int_idx].hebbian = None;
     }
     Ok(())
@@ -95,24 +87,7 @@ pub fn mutate_hebbian_rule(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
-        let eligible_count = g
-            .internal_nodes
-            .iter()
-            .filter(|n| n.hebbian.is_some())
-            .count();
-        if eligible_count == 0 {
-            return Err(MutationSkipReason::NoApplicableTarget);
-        }
-
-        let target = rng.gen_range(0..eligible_count);
-        let int_idx = g
-            .internal_nodes
-            .iter()
-            .enumerate()
-            .filter(|(_, n)| n.hebbian.is_some())
-            .nth(target)
-            .map(|(i, _)| i)
-            .expect("target within counted range");
+        let int_idx = select_eligible(&g.internal_nodes, |n| n.hebbian.is_some(), rng)?;
 
         if let Some(ref mut cfg) = g.internal_nodes[int_idx].hebbian {
             // Pick a different rule.
@@ -139,24 +114,7 @@ pub fn mutate_hebbian_rate(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
-        let eligible_count = g
-            .internal_nodes
-            .iter()
-            .filter(|n| n.hebbian.is_some())
-            .count();
-        if eligible_count == 0 {
-            return Err(MutationSkipReason::NoApplicableTarget);
-        }
-
-        let target = rng.gen_range(0..eligible_count);
-        let int_idx = g
-            .internal_nodes
-            .iter()
-            .enumerate()
-            .filter(|(_, n)| n.hebbian.is_some())
-            .nth(target)
-            .map(|(i, _)| i)
-            .expect("target within counted range");
+        let int_idx = select_eligible(&g.internal_nodes, |n| n.hebbian.is_some(), rng)?;
 
         if let Some(ref mut cfg) = g.internal_nodes[int_idx].hebbian {
             if cfg.learning_rate.abs() > 0.01 {
@@ -177,24 +135,7 @@ pub fn toggle_hebbian_lamarckian(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
-        let eligible_count = g
-            .internal_nodes
-            .iter()
-            .filter(|n| n.hebbian.is_some())
-            .count();
-        if eligible_count == 0 {
-            return Err(MutationSkipReason::NoApplicableTarget);
-        }
-
-        let target = rng.gen_range(0..eligible_count);
-        let int_idx = g
-            .internal_nodes
-            .iter()
-            .enumerate()
-            .filter(|(_, n)| n.hebbian.is_some())
-            .nth(target)
-            .map(|(i, _)| i)
-            .expect("target within counted range");
+        let int_idx = select_eligible(&g.internal_nodes, |n| n.hebbian.is_some(), rng)?;
 
         if let Some(ref mut cfg) = g.internal_nodes[int_idx].hebbian {
             cfg.lamarckian = !cfg.lamarckian;

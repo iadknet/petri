@@ -281,6 +281,9 @@ pub fn execute_graph_node(
     }
 
     // Apply Hebbian weight updates after convergence.
+    // NOTE: If energy goes negative here, we do not roll back weight changes or
+    // return exhausted. Acceptable while hebbian_update_cost defaults to 0.0.
+    // When a nonzero cost is introduced, add exhaustion handling here.
     if use_hebbian {
         let hebb_cost = hebbian::apply_hebbian_updates(
             def,
