@@ -31,6 +31,10 @@ impl InputRefOperator {
     }
 
     const TOTAL_WEIGHT: u16 = {
+        assert!(
+            Self::ALL.len() == 4,
+            "ALL must cover every InputRefOperator variant"
+        );
         let mut sum = 0u16;
         let mut i = 0;
         while i < Self::ALL.len() {

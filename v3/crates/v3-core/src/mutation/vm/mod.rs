@@ -49,6 +49,10 @@ impl VmOperator {
     }
 
     const TOTAL_WEIGHT: u16 = {
+        assert!(
+            Self::ALL.len() == 9,
+            "ALL must cover every VmOperator variant"
+        );
         let mut sum = 0u16;
         let mut i = 0;
         while i < Self::ALL.len() {
