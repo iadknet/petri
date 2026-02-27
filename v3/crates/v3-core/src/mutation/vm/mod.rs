@@ -1,5 +1,6 @@
 use rand::Rng;
 
+use crate::creature::genome::analysis::{vm_backward_slice_random, vm_forward_slice_random};
 use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
 use crate::mutation::types::MutationSkipReason;
 
@@ -442,95 +443,6 @@ fn apply_instruction_raw_field_mutation(
     Ok(())
 }
 
-// ── Helper: register_write ──
-
-/// Returns the `dst` register if the instruction writes one, `None` otherwise.
-fn register_write(instr: &VmInstruction) -> Option<u8> {
-    match instr {
-        VmInstruction::LoadConst { dst, .. }
-        | VmInstruction::Move { dst, .. }
-        | VmInstruction::Add { dst, .. }
-        | VmInstruction::Sub { dst, .. }
-        | VmInstruction::Mul { dst, .. }
-        | VmInstruction::Div { dst, .. }
-        | VmInstruction::Min { dst, .. }
-        | VmInstruction::Max { dst, .. }
-        | VmInstruction::Abs { dst, .. }
-        | VmInstruction::Neg { dst, .. }
-        | VmInstruction::Clamp01 { dst, .. }
-        | VmInstruction::CmpGt { dst, .. }
-        | VmInstruction::CmpLt { dst, .. }
-        | VmInstruction::CmpEq { dst, .. }
-        | VmInstruction::And { dst, .. }
-        | VmInstruction::Or { dst, .. }
-        | VmInstruction::Not { dst, .. }
-        | VmInstruction::ToI32 { dst, .. }
-        | VmInstruction::ToU8 { dst, .. }
-        | VmInstruction::ToBool { dst, .. }
-        | VmInstruction::ReadInput { dst, .. }
-        | VmInstruction::LoadMem8 { dst, .. }
-        | VmInstruction::LoadMem8Imm { dst, .. } => Some(*dst),
-        VmInstruction::Noop
-        | VmInstruction::Halt
-        | VmInstruction::Jump { .. }
-        | VmInstruction::JumpIfZero { .. }
-        | VmInstruction::WriteInternalPayload { .. }
-        | VmInstruction::WriteWorldActionMeta { .. }
-        | VmInstruction::EmitWorldAction { .. }
-        | VmInstruction::WriteRouteTarget { .. }
-        | VmInstruction::StoreMem8 { .. }
-        | VmInstruction::StoreMem8Imm { .. } => None,
-    }
-}
-
-/// Safe bit-shift: returns `1u32 << reg` if `reg < 32`, else `0`.
-/// Prevents panics when raw field mutations produce out-of-range register indices.
-#[inline]
-fn reg_bit(reg: u8) -> u32 {
-    if reg < 32 {
-        1u32 << reg
-    } else {
-        0
-    }
-}
-
-/// Returns a `u32` bitmask of registers read by the instruction.
-/// Bit `i` set means register `i` is read.
-fn register_read_mask(instr: &VmInstruction) -> u32 {
-    match instr {
-        VmInstruction::Noop | VmInstruction::Halt | VmInstruction::Jump { .. } => 0,
-        VmInstruction::LoadConst { .. } | VmInstruction::LoadMem8Imm { .. } => 0,
-        VmInstruction::EmitWorldAction { .. } => 0,
-        VmInstruction::Move { src, .. }
-        | VmInstruction::Abs { src, .. }
-        | VmInstruction::Neg { src, .. }
-        | VmInstruction::Clamp01 { src, .. }
-        | VmInstruction::Not { src, .. }
-        | VmInstruction::ToI32 { src, .. }
-        | VmInstruction::ToU8 { src, .. }
-        | VmInstruction::ToBool { src, .. } => reg_bit(*src),
-        VmInstruction::ReadInput { .. } => 0,
-        VmInstruction::Add { a, b, .. }
-        | VmInstruction::Sub { a, b, .. }
-        | VmInstruction::Mul { a, b, .. }
-        | VmInstruction::Div { a, b, .. }
-        | VmInstruction::Min { a, b, .. }
-        | VmInstruction::Max { a, b, .. }
-        | VmInstruction::CmpGt { a, b, .. }
-        | VmInstruction::CmpLt { a, b, .. }
-        | VmInstruction::And { a, b, .. }
-        | VmInstruction::Or { a, b, .. } => reg_bit(*a) | reg_bit(*b),
-        VmInstruction::CmpEq { a, b, eps, .. } => reg_bit(*a) | reg_bit(*b) | reg_bit(*eps),
-        VmInstruction::JumpIfZero { cond, .. } => reg_bit(*cond),
-        VmInstruction::WriteInternalPayload { src, .. }
-        | VmInstruction::WriteWorldActionMeta { src, .. }
-        | VmInstruction::WriteRouteTarget { src } => reg_bit(*src),
-        VmInstruction::StoreMem8Imm { src, .. } => reg_bit(*src),
-        VmInstruction::LoadMem8 { addr_reg, .. } => reg_bit(*addr_reg),
-        VmInstruction::StoreMem8 { addr_reg, src } => reg_bit(*addr_reg) | reg_bit(*src),
-    }
-}
-
 /// Remap all register-typed fields: `(reg + offset) % register_count`.
 fn remap_register_refs(instr: &mut VmInstruction, offset: u8, register_count: u8) {
     let rc = register_count.max(1);
@@ -599,19 +511,6 @@ fn adjust_jump_offset(instr: &mut VmInstruction, delta: i32) {
         }
         _ => {}
     }
-}
-
-/// Returns true if the instruction is an "output" (side-effecting write).
-fn is_output_instruction(instr: &VmInstruction) -> bool {
-    matches!(
-        instr,
-        VmInstruction::WriteInternalPayload { .. }
-            | VmInstruction::WriteWorldActionMeta { .. }
-            | VmInstruction::EmitWorldAction { .. }
-            | VmInstruction::WriteRouteTarget { .. }
-            | VmInstruction::StoreMem8 { .. }
-            | VmInstruction::StoreMem8Imm { .. }
-    )
 }
 
 // ── VM Copy Operators ──
@@ -697,40 +596,17 @@ fn apply_copy_gene_backward_slice(
         if vm.program.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
-        // Find output instructions.
-        let outputs: Vec<usize> = vm
-            .program
-            .iter()
-            .enumerate()
-            .filter(|(_, instr)| is_output_instruction(instr))
-            .map(|(i, _)| i)
-            .collect();
-        if outputs.is_empty() {
+        if let Some(gene) = vm_backward_slice_random(&vm.program, rng) {
+            let extracted: Vec<VmInstruction> = gene
+                .indices
+                .iter()
+                .map(|&i| vm.program[i].clone())
+                .collect();
+            let insert_at = rng.gen_range(0..=vm.program.len());
+            vm.program.splice(insert_at..insert_at, extracted);
+        } else {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
-        let anchor = outputs[rng.gen_range(0..outputs.len())];
-        // Backward trace using u32 bitset.
-        let mut needed: u32 = register_read_mask(&vm.program[anchor]);
-        let mut gene_indices = Vec::with_capacity(32);
-        gene_indices.push(anchor);
-        for i in (0..anchor).rev() {
-            if let Some(dst) = register_write(&vm.program[i]) {
-                if needed & reg_bit(dst) != 0 {
-                    needed |= register_read_mask(&vm.program[i]);
-                    gene_indices.push(i);
-                    if gene_indices.len() >= 32 {
-                        break;
-                    }
-                }
-            }
-        }
-        gene_indices.reverse();
-        let gene: Vec<VmInstruction> = gene_indices
-            .iter()
-            .map(|&i| vm.program[i].clone())
-            .collect();
-        let insert_at = rng.gen_range(0..=vm.program.len());
-        vm.program.splice(insert_at..insert_at, gene);
     }
     Ok(())
 }
@@ -745,41 +621,17 @@ fn apply_copy_gene_forward_slice(
         if vm.program.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
-        // Find instructions that write a register.
-        let writers: Vec<usize> = vm
-            .program
-            .iter()
-            .enumerate()
-            .filter(|(_, instr)| register_write(instr).is_some())
-            .map(|(i, _)| i)
-            .collect();
-        if writers.is_empty() {
+        if let Some(gene) = vm_forward_slice_random(&vm.program, rng) {
+            let extracted: Vec<VmInstruction> = gene
+                .indices
+                .iter()
+                .map(|&i| vm.program[i].clone())
+                .collect();
+            let insert_at = rng.gen_range(0..=vm.program.len());
+            vm.program.splice(insert_at..insert_at, extracted);
+        } else {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
-        let seed_idx = writers[rng.gen_range(0..writers.len())];
-        let seed_dst = register_write(&vm.program[seed_idx])
-            .expect("seed_idx drawn from writers filtered on register_write().is_some()");
-        // Forward trace using u32 bitset.
-        let mut produced: u32 = reg_bit(seed_dst);
-        let mut gene_indices = Vec::with_capacity(32);
-        gene_indices.push(seed_idx);
-        for i in (seed_idx + 1)..vm.program.len() {
-            if register_read_mask(&vm.program[i]) & produced != 0 {
-                if let Some(dst) = register_write(&vm.program[i]) {
-                    produced |= reg_bit(dst);
-                }
-                gene_indices.push(i);
-                if gene_indices.len() >= 32 {
-                    break;
-                }
-            }
-        }
-        let gene: Vec<VmInstruction> = gene_indices
-            .iter()
-            .map(|&i| vm.program[i].clone())
-            .collect();
-        let insert_at = rng.gen_range(0..=vm.program.len());
-        vm.program.splice(insert_at..insert_at, gene);
     }
     Ok(())
 }

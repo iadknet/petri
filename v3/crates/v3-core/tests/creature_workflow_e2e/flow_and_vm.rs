@@ -333,3 +333,88 @@ fn vm_reads_all_inputs_e2e() {
 
     assert!((observed[29] - 0.73).abs() < 1e-6, "UpstreamSlot(11)");
 }
+
+#[test]
+fn vm_uses_neighbor_barrier_sensor_to_choose_action_e2e() {
+    for (north_barrier, expected_action, expected_barrier_value) in [
+        (false, WorldAction::Eat, 0.0f32),
+        (true, WorldAction::NoOp, 1.0f32),
+    ] {
+        let cfg = test_config();
+        let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
+        let pos = Position::new(6, 6);
+        world.set_food(pos, 1.0);
+        let north = world
+            .resolve_neighbor(pos, Direction::N)
+            .expect("center position should have north neighbor");
+        world.set_barrier(north, north_barrier);
+
+        let vm_node = NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![InputReference::World(WorldInputKey::NeighborCellBarrier(
+                Direction::N,
+            ))],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 3,
+                constants: vec![99.0, 0.5],
+                program: vec![
+                    VmInstruction::LoadConst {
+                        dst: 0,
+                        const_idx: 0,
+                    },
+                    VmInstruction::ReadInput {
+                        dst: 0,
+                        input_idx: 0,
+                    },
+                    VmInstruction::LoadConst {
+                        dst: 1,
+                        const_idx: 1,
+                    },
+                    VmInstruction::CmpGt { dst: 2, a: 0, b: 1 },
+                    VmInstruction::JumpIfZero { cond: 2, offset: 1 },
+                    VmInstruction::EmitWorldAction { action_type: 0 }, // NoOp when barrier present
+                    VmInstruction::EmitWorldAction { action_type: 1 }, // Eat when barrier absent
+                ],
+            }),
+            targets: vec![],
+        };
+
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![vm_node],
+        };
+
+        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let target = insert_creature(&mut creatures, &mut world, genome, pos, 100.0, 0);
+        let mut sim = Simulation::new(world, creatures, 0, cfg, 29);
+        let tick = run_one_traced_tick(&mut sim, target);
+
+        assert_eq!(tick.hops.len(), 1);
+        assert_eq!(tick.final_action, expected_action);
+
+        let trace = vm_hop(&tick, 0);
+        let read_step = trace
+            .steps
+            .iter()
+            .find(|s| {
+                matches!(
+                    s.instruction,
+                    VmInstruction::ReadInput {
+                        dst: 0,
+                        input_idx: 0
+                    }
+                )
+            })
+            .expect("missing ReadInput step");
+        let (_, read_value) = read_step
+            .register_changes
+            .iter()
+            .find(|(reg, _)| *reg == 0)
+            .copied()
+            .expect("ReadInput should update register 0");
+        assert!(
+            (read_value - expected_barrier_value).abs() < 1e-6,
+            "VM should read NeighborCellBarrier(N) accurately"
+        );
+    }
+}

@@ -1,3 +1,5 @@
+pub mod analysis;
+
 use crate::contracts::{InputReference, NodeId};
 
 /// A single VM instruction. 33 opcodes per v3-vm-isa-spec.md.
