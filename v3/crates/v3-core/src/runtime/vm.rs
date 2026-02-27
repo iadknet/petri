@@ -585,6 +585,46 @@ mod tests {
     }
 
     #[test]
+    fn move_copies_register_value() {
+        let program = vec![
+            VmInstruction::LoadConst {
+                dst: 0,
+                const_idx: 0,
+            }, // r0 = 9.5
+            VmInstruction::Move { dst: 1, src: 0 }, // r1 = r0
+            VmInstruction::WriteInternalPayload {
+                slot_idx: 0,
+                src: 1,
+            },
+            VmInstruction::Halt,
+        ];
+        let (r, _) = run_vm(program, 2, vec![9.5], &[], zeroed_upstream(), 100.0);
+        assert!((r.output_slots[0] - 9.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn mul_result() {
+        let program = vec![
+            VmInstruction::LoadConst {
+                dst: 0,
+                const_idx: 0,
+            }, // r0 = 3.0
+            VmInstruction::LoadConst {
+                dst: 1,
+                const_idx: 1,
+            }, // r1 = 4.0
+            VmInstruction::Mul { dst: 2, a: 0, b: 1 }, // r2 = 12.0
+            VmInstruction::WriteInternalPayload {
+                slot_idx: 1,
+                src: 2,
+            },
+            VmInstruction::Halt,
+        ];
+        let (r, _) = run_vm(program, 3, vec![3.0, 4.0], &[], zeroed_upstream(), 100.0);
+        assert!((r.output_slots[1] - 12.0).abs() < 1e-6);
+    }
+
+    #[test]
     fn sub_result() {
         let program = vec![
             VmInstruction::LoadConst {
