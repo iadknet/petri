@@ -6,7 +6,10 @@
 
 use rand::Rng;
 
+use std::collections::HashMap;
 use std::collections::VecDeque;
+
+use crate::contracts::NodeId;
 
 use super::{CreatureGenome, GraphInternalNode, GraphNodeKind, VmInstruction};
 
@@ -420,6 +423,14 @@ pub fn mesh_backward_slice(
         return None;
     }
 
+    // Pre-build node_id -> index map for O(1) lookups
+    let node_id_to_idx: HashMap<NodeId, usize> = genome
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.node_id, i))
+        .collect();
+
     let mut included = vec![false; genome.nodes.len()];
     included[anchor_idx] = true;
     let mut count = 1usize;
@@ -427,16 +438,14 @@ pub fn mesh_backward_slice(
     // Fixpoint: find nodes whose targets contain any included node's node_id
     loop {
         let mut changed = false;
-        for i in 0..genome.nodes.len() {
+        for (i, node) in genome.nodes.iter().enumerate() {
             if included[i] || count >= max_size {
                 continue;
             }
-            let targets_included = genome.nodes[i].targets.iter().any(|target_id| {
-                genome
-                    .nodes
-                    .iter()
-                    .enumerate()
-                    .any(|(j, n)| included[j] && n.node_id == *target_id)
+            let targets_included = node.targets.iter().any(|target_id| {
+                node_id_to_idx
+                    .get(target_id)
+                    .is_some_and(|&j| included[j])
             });
             if targets_included {
                 included[i] = true;
@@ -462,6 +471,7 @@ pub fn mesh_backward_slice(
 }
 
 /// Backward-slice from a randomly chosen mesh node.
+#[inline]
 #[must_use]
 pub fn mesh_backward_slice_random(
     genome: &CreatureGenome,
