@@ -82,23 +82,34 @@ The VM defines **38 opcodes**.
 |---|---|---|---|
 | 24 | `WriteInternalPayload` | slot_idx, src | overwrites payload slot value (payload buffer starts from incoming `upstream_slots`; invalid slot write ignored) |
 | 25 | `WriteWorldActionMeta` | slot_idx, src | writes world-action metadata slot (`slot_idx` in `0..7`; invalid slot write ignored) |
-| 26 | `EmitWorldAction` | action_type | emit world action and halt |
-| 27 | `WriteRouteTarget` | src_reg | write candidate route target value (`f32`) |
+| 26 | `WriteRouteTarget` | src_reg | write candidate route target value (`f32`) |
+
+### Action Queue
+
+| # | Opcode | Operands | Semantics |
+|---|---|---|---|
+| 27 | `PushAction` | action_type | decode meta buffer and push action onto queue; silent no-op if at cap |
+| 28 | `PopAction` | none | remove last action from queue; no-op if empty |
+| 29 | `ReadActionQueueLength` | dst | `dst = queue.len() as f32` |
+| 30 | `ReadActionQueueType` | index_src, dst | `dst = queue[reg[index_src]].action_type()` (OOB yields `0.0`) |
+| 31 | `ReadActionQueueParam` | index_src, param_slot, dst | `dst = queue[reg[index_src]].param(param_slot)` (OOB yields `0.0`) |
+| 32 | `ExecuteActionQueue` | none | terminal: return accumulated action queue for execution |
 
 ### Halt and Memory
 
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
-| 28 | `Halt` | none | stop VM execution |
-| 29 | `LoadMem8` | dst, addr_reg | read byte at wrapped address |
-| 30 | `StoreMem8` | addr_reg, src | write byte at wrapped address |
-| 31 | `LoadMem8Imm` | dst, imm_addr | read byte at wrapped immediate address |
-| 32 | `StoreMem8Imm` | imm_addr, src | write byte at wrapped immediate address |
+| 33 | `Halt` | none | stop VM execution |
+| 34 | `LoadMem8` | dst, addr_reg | read byte at wrapped address |
+| 35 | `StoreMem8` | addr_reg, src | write byte at wrapped address |
+| 36 | `LoadMem8Imm` | dst, imm_addr | read byte at wrapped immediate address |
+| 37 | `StoreMem8Imm` | imm_addr, src | write byte at wrapped immediate address |
 
 Removed from active V3 mesh ISA:
 - `ReadSensorCell`, `ReadSensorCreature`, `ReadSensorSummary`
 - `ReadNeighborCell`, `ReadNeighborCreature`
 - `EmitInternal`
+- `EmitWorldAction` (replaced by `PushAction` + `ExecuteActionQueue`)
 
 These were replaced by unified `ReadInput` + `InputReference` dataflow and
 `output_slots` routing semantics.
@@ -109,8 +120,8 @@ These were replaced by unified `ReadInput` + `InputReference` dataflow and
 
 - PC starts at `0`; normal step increments by `+1`.
 - Per-opcode energy metering applies; exhausted energy halts node execution.
-- `EmitWorldAction` halts VM immediately.
-- `Halt` halts VM without emitting a world action.
+- `ExecuteActionQueue` is terminal: halts VM and returns accumulated actions.
+- `Halt` halts VM without returning actions (mesh uses action queue state).
 - VM runtime enforces a configurable step cap `max_vm_steps` per node
   evaluation (default `1024`; canonical owner:
   `v3-runtime-config-spec.md`).
@@ -238,8 +249,13 @@ Defined numeric rules:
 | ReadInput | 0.12 |
 | WriteInternalPayload | 0.14 |
 | WriteWorldActionMeta | 0.14 |
-| EmitWorldAction | 0.24 |
 | WriteRouteTarget | 0.10 |
+| PushAction | 0.24 |
+| PopAction | 0.10 |
+| ReadActionQueueLength | 0.08 |
+| ReadActionQueueType | 0.12 |
+| ReadActionQueueParam | 0.12 |
+| ExecuteActionQueue | 0.24 |
 | Halt | 0.05 |
 | LoadMem8 | 0.16 |
 | StoreMem8 | 0.18 |
@@ -280,7 +296,8 @@ World-action metadata buffer size is fixed:
 
 ### Action encoding and metadata mapping
 
-`EmitWorldAction(action_type)` decodes using the canonical mapping below:
+`PushAction(action_type)` decodes using the metadata buffer and the canonical
+mapping below:
 
 | `action_type` | Decoded `WorldAction` | Metadata usage |
 |---|---|---|
@@ -288,7 +305,12 @@ World-action metadata buffer size is fixed:
 | `1` | `Eat` | none |
 | `2` | `Move` | `meta[0]` = direction index |
 | `3` | `Reproduce` | `meta[0]` = direction index, `meta[1]` = offspring transfer energy (scalar `f32`) |
+| `4` | `StealEnergy` | `meta[0]` = direction index, `meta[1]` = steal amount |
 | other | `NoOp` | none |
+
+Each `PushAction` decodes from the *current* metadata buffer state and appends
+to the action queue. The metadata buffer can be overwritten between pushes to
+encode different actions.
 
 Metadata decode rules:
 - direction index uses `meta[0].round().clamp(0.0, 7.0)` and maps to
@@ -300,12 +322,19 @@ Metadata decode rules:
 - `WriteWorldActionMeta` to `slot_idx >= 8` is ignored
 
 At node end:
-- if world action emitted: action returned; routing ignored
+- if `ExecuteActionQueue` was called: `NodeResult.terminal` is true, mesh
+  returns accumulated action queue
 - otherwise internal payload buffer is emitted as `NodeResult.output_slots`
 - route target is returned in `NodeResult.route_target_idx`
 - payload/meta buffers are discarded after node dispatch
 
 This makes `WriteInternalPayload` the VM path for producing routed output slots.
+
+### Removed opcodes
+
+`EmitWorldAction` was replaced by the action queue model
+(`PushAction` + `ExecuteActionQueue`). The action queue allows multiple actions
+per VM evaluation, with a configurable cap (`max_actions_per_turn`).
 
 ---
 
