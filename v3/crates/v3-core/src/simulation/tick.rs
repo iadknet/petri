@@ -60,13 +60,16 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
     use crate::runtime::traced_mesh::execute_creature_mesh_traced;
     use crate::runtime::types::ComputeCostReport;
     use crate::sensors::static_inputs::assemble_static_inputs;
-    use crate::simulation::actions::{apply_eat, apply_move, apply_noop, apply_reproduce};
+    use crate::simulation::actions::{
+        apply_eat, apply_move, apply_noop, apply_reproduce, apply_steal_energy,
+    };
 
     // Reset per-tick counters at the start of each tick.
     sim.stats.last_tick_move = 0;
     sim.stats.last_tick_eat = 0;
     sim.stats.last_tick_noop = 0;
     sim.stats.last_tick_reproduce = 0;
+    sim.stats.last_tick_steal = 0;
     sim.stats.last_tick_compute_total_mean = 0.0;
     sim.stats.last_tick_compute_total_min = 0.0;
     sim.stats.last_tick_compute_total_max = 0.0;
@@ -242,6 +245,9 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                 energy_transfer,
             } => {
                 apply_reproduce(id, sim, direction, energy_transfer, &mut reproduce_rng);
+            }
+            WorldAction::StealEnergy { direction, amount } => {
+                apply_steal_energy(id, sim, direction, amount);
             }
         }
     }
@@ -502,6 +508,90 @@ mod tests {
             k
         };
         assert_eq!(ids_a, ids_b);
+    }
+
+    #[test]
+    fn last_tick_steal_resets_each_tick() {
+        let mut sim = seed_simulation(small_config(), 42);
+        // Manually set last_tick_steal to a nonzero value
+        sim.stats.last_tick_steal = 5;
+        run_tick(&mut sim, &mut None);
+        // Should be reset to 0 (founders don't emit StealEnergy)
+        assert_eq!(sim.stats.last_tick_steal, 0);
+    }
+
+    #[test]
+    fn steal_energy_dispatch_transfers_and_removes_victim() {
+        use crate::contracts::Direction;
+        use crate::simulation::actions::apply_steal_energy;
+
+        // Attacker at (5,5), victim at (5,4) = N of attacker
+        let mut cfg = small_config();
+        cfg.world.food.growth_rate = 0.0;
+        cfg.world.food.initial_coverage = 0.0;
+        cfg.predation.steal_cost_rate = 0.0;
+
+        let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
+        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let victim_pos = Position::new(5, 4);
+
+        let attacker_id = creatures.insert_with_key(|id| {
+            CreatureState::new(
+                id,
+                v3alpha1_founder_genome(),
+                Position::new(5, 5),
+                50.0,
+                0,
+                [0, 0, 92, 92, 138, 138],
+                0,
+                [true; 6],
+            )
+        });
+        world.place_creature(Position::new(5, 5), attacker_id);
+
+        let victim_id = creatures.insert_with_key(|id| {
+            CreatureState::new(
+                id,
+                v3alpha1_founder_genome(),
+                victim_pos,
+                5.0, // will be fully drained
+                0,
+                [0, 0, 92, 92, 138, 138],
+                0,
+                [true; 6],
+            )
+        });
+        world.place_creature(victim_pos, victim_id);
+
+        let mut sim = Simulation {
+            world,
+            creatures,
+            tick: 0,
+            config: cfg,
+            stats: crate::simulation::stats::SimStats::default(),
+            rng: rand::rngs::SmallRng::seed_from_u64(42),
+        };
+
+        let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 20.0);
+
+        assert_eq!(
+            result,
+            crate::simulation::actions::PredationActionResult::TransferredAndKilled
+        );
+        assert!(
+            !sim.creatures.contains_key(victim_id),
+            "victim should be removed from slotmap"
+        );
+        assert!(
+            sim.world.creature_at(victim_pos).is_none(),
+            "victim should be removed from world occupancy"
+        );
+        assert!(
+            sim.creatures[attacker_id].energy > 50.0,
+            "attacker should have gained energy"
+        );
+        assert_eq!(sim.stats.predation_kills_total, 1);
+        assert_eq!(sim.stats.predation_actions_attempted_total, 1);
     }
 
     #[test]

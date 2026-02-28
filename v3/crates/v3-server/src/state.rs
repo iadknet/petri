@@ -39,6 +39,7 @@ pub struct LastTickActions {
     pub eat: u32,
     pub reproduce: u32,
     pub noop: u32,
+    pub steal: u32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -50,6 +51,10 @@ pub struct StatusPayload {
     pub reproduction_actions_attempted_total: u64,
     pub reproduction_actions_spawned_total: u64,
     pub reproduction_actions_rejected_total: u64,
+    pub predation_actions_attempted_total: u64,
+    pub predation_actions_transferred_total: u64,
+    pub predation_actions_rejected_total: u64,
+    pub predation_kills_total: u64,
     pub last_tick_compute_total_mean: f32,
     pub last_tick_compute_total_min: f32,
     pub last_tick_compute_total_max: f32,
@@ -107,6 +112,11 @@ pub struct HealthPayload {
     pub reproduction_actions_rejected_total: u64,
     pub reproduction_actions_rejected_total_by_reason: HashMap<String, u64>,
     pub mutation_events_skipped_total_by_reason: HashMap<String, u64>,
+    pub predation_actions_attempted_total: u64,
+    pub predation_actions_transferred_total: u64,
+    pub predation_actions_rejected_total: u64,
+    pub predation_kills_total: u64,
+    pub predation_actions_by_result: HashMap<String, u64>,
     pub genome_complexity_mean: f32,
     pub genome_complexity_min: u32,
     pub genome_complexity_max: u32,
