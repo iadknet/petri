@@ -1,8 +1,8 @@
 //! End-to-end VM opcode coverage test.
 //!
-//! Uses one sample VM program containing all 33 opcodes. The program's final
-//! branch reads `FoodHere`: with food it executes `EmitWorldAction`, without
-//! food it executes `Halt`. Running both scenarios yields full opcode coverage
+//! Uses one sample VM program containing all 38 opcodes. The program's final
+//! branch reads `FoodHere`: with food it executes `PushAction` + `ExecuteActionQueue`,
+//! without food it executes `Halt`. Running both scenarios yields full opcode coverage
 //! through the simulation tick path.
 
 use std::collections::HashSet;
@@ -116,6 +116,19 @@ fn sample_vm_program() -> Vec<VmInstruction> {
             src: 14,
         },
         VmInstruction::WriteRouteTarget { src: 0 },
+        // ── Action queue introspection opcodes ──────────────────────────────
+        VmInstruction::PushAction { action_type: 0 }, // push test NoOp action
+        VmInstruction::ReadActionQueueLength { dst: 14 }, // r14 = 1.0
+        VmInstruction::ReadActionQueueType {
+            index_src: 14,
+            dst: 14,
+        },
+        VmInstruction::ReadActionQueueParam {
+            index_src: 14,
+            param_slot: 0,
+            dst: 14,
+        },
+        VmInstruction::PopAction, // remove the test action
         // ── Branch to terminal opcode based on FoodHere ─────────────────────
         VmInstruction::ReadInput {
             dst: 15,
@@ -126,7 +139,8 @@ fn sample_vm_program() -> Vec<VmInstruction> {
             cond: 15,
             offset: 2,
         }, // jump to Halt when no food
-        VmInstruction::EmitWorldAction { action_type: 1 }, // Eat when food exists
+        VmInstruction::PushAction { action_type: 1 }, // Eat when food exists
+        VmInstruction::ExecuteActionQueue,            // terminal: return queue
         VmInstruction::Noop,
         VmInstruction::Halt,
     ]
@@ -193,8 +207,20 @@ fn expected_all_opcode_discriminants() -> HashSet<Discriminant<VmInstruction>> {
             slot_idx: 0,
             src: 0,
         },
-        VmInstruction::EmitWorldAction { action_type: 0 },
         VmInstruction::WriteRouteTarget { src: 0 },
+        VmInstruction::PushAction { action_type: 0 },
+        VmInstruction::PopAction,
+        VmInstruction::ReadActionQueueLength { dst: 0 },
+        VmInstruction::ReadActionQueueType {
+            index_src: 0,
+            dst: 0,
+        },
+        VmInstruction::ReadActionQueueParam {
+            index_src: 0,
+            param_slot: 0,
+            dst: 0,
+        },
+        VmInstruction::ExecuteActionQueue,
         VmInstruction::Halt,
         VmInstruction::LoadMem8 {
             dst: 0,
@@ -215,7 +241,7 @@ fn expected_all_opcode_discriminants() -> HashSet<Discriminant<VmInstruction>> {
     ];
 
     let set: HashSet<Discriminant<VmInstruction>> = instructions.iter().map(discriminant).collect();
-    assert_eq!(set.len(), 33, "expected 33 unique VM opcode discriminants");
+    assert_eq!(set.len(), 38, "expected 38 unique VM opcode discriminants");
     set
 }
 
@@ -293,7 +319,7 @@ where
 fn sample_program_exercises_all_vm_opcodes_e2e() {
     let expected = expected_all_opcode_discriminants();
 
-    // Scenario A: food present -> EmitWorldAction path (Eat).
+    // Scenario A: food present -> PushAction+ExecuteActionQueue path (Eat).
     let (mut sim_emit, emit_id, emit_pos) = build_simulation(1.0);
     let mut emit_trace = Some(ActiveTrace::new(emit_id, 1));
     run_tick(&mut sim_emit, &mut emit_trace);
@@ -335,7 +361,7 @@ fn sample_program_exercises_all_vm_opcodes_e2e() {
         emit_seen.union(&halt_seen).copied().collect();
     assert_eq!(
         observed, expected,
-        "sample VM program should cover all 33 opcodes across emit/halt runs"
+        "sample VM program should cover all 38 opcodes across emit/halt runs"
     );
 
     // Verify unconditional Jump was actually taken (pc + 2 because offset=1).
@@ -371,27 +397,23 @@ fn sample_program_exercises_all_vm_opcodes_e2e() {
     assert_eq!(
         after_jiz_halt,
         jiz_pc_halt + 3,
-        "JumpIfZero should jump over EmitWorldAction + Noop on zero FoodHere (halt path)"
+        "JumpIfZero should jump over PushAction + ExecuteActionQueue on zero FoodHere (halt path)"
     );
 
     assert!(
-        emit_seen.contains(&discriminant(&VmInstruction::EmitWorldAction {
-            action_type: 0
-        })),
-        "emit scenario must execute EmitWorldAction"
+        emit_seen.contains(&discriminant(&VmInstruction::ExecuteActionQueue)),
+        "emit scenario must execute ExecuteActionQueue"
     );
     assert!(
         !emit_seen.contains(&discriminant(&VmInstruction::Halt)),
-        "emit scenario should terminate at EmitWorldAction before Halt"
+        "emit scenario should terminate at ExecuteActionQueue before Halt"
     );
     assert!(
         halt_seen.contains(&discriminant(&VmInstruction::Halt)),
         "halt scenario must execute Halt"
     );
     assert!(
-        !halt_seen.contains(&discriminant(&VmInstruction::EmitWorldAction {
-            action_type: 0
-        })),
-        "halt scenario should skip EmitWorldAction via JumpIfZero"
+        !halt_seen.contains(&discriminant(&VmInstruction::ExecuteActionQueue)),
+        "halt scenario should skip ExecuteActionQueue via JumpIfZero"
     );
 }

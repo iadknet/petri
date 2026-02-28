@@ -933,10 +933,7 @@ async fn start_sample_returns_recording() {
     // Each tick should have hops and action.
     for tick in ticks {
         assert!(tick["hops"].is_array(), "missing hops");
-        assert!(
-            tick["final_actions"].is_array(),
-            "missing final_actions"
-        );
+        assert!(tick["final_actions"].is_array(), "missing final_actions");
     }
 }
 

@@ -2,7 +2,7 @@ pub mod analysis;
 
 use crate::contracts::{InputReference, NodeId};
 
-/// A single VM instruction. 33 opcodes per v3-vm-isa-spec.md.
+/// A single VM instruction. 38 opcodes per v3-vm-isa-spec.md.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum VmInstruction {
     // ── Arithmetic and Data Movement ─────────────────────────────────────────
@@ -68,8 +68,6 @@ pub enum VmInstruction {
     WriteInternalPayload { slot_idx: u8, src: u8 },
     /// Write world-action metadata slot (0..7); invalid slot write ignored.
     WriteWorldActionMeta { slot_idx: u8, src: u8 },
-    /// Emit world action by discriminant and halt (DEPRECATED — compat shim for push+execute).
-    EmitWorldAction { action_type: u8 },
     /// Write candidate route target value.
     WriteRouteTarget { src: u8 },
 
@@ -308,7 +306,7 @@ mod tests {
     use crate::contracts::{DynamicIntrospectionKey, StaticIntrospectionKey, WorldInputKey};
 
     #[test]
-    fn vm_instruction_all_33_variants_constructible() {
+    fn vm_instruction_all_38_variants_constructible() {
         let instructions: Vec<VmInstruction> = vec![
             VmInstruction::Noop,
             VmInstruction::LoadConst {
@@ -353,8 +351,20 @@ mod tests {
                 slot_idx: 0,
                 src: 1,
             },
-            VmInstruction::EmitWorldAction { action_type: 1 },
             VmInstruction::WriteRouteTarget { src: 0 },
+            VmInstruction::PushAction { action_type: 1 },
+            VmInstruction::PopAction,
+            VmInstruction::ReadActionQueueLength { dst: 0 },
+            VmInstruction::ReadActionQueueType {
+                index_src: 0,
+                dst: 0,
+            },
+            VmInstruction::ReadActionQueueParam {
+                index_src: 0,
+                param_slot: 0,
+                dst: 0,
+            },
+            VmInstruction::ExecuteActionQueue,
             VmInstruction::Halt,
             VmInstruction::LoadMem8 {
                 dst: 0,
@@ -373,7 +383,7 @@ mod tests {
                 src: 1,
             },
         ];
-        assert_eq!(instructions.len(), 33, "must have exactly 33 opcodes");
+        assert_eq!(instructions.len(), 38, "must have exactly 38 opcodes");
     }
 
     #[test]
@@ -439,7 +449,10 @@ mod tests {
                     backend_def: BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],
-                        program: vec![VmInstruction::EmitWorldAction { action_type: 0 }],
+                        program: vec![
+                            VmInstruction::PushAction { action_type: 0 },
+                            VmInstruction::ExecuteActionQueue,
+                        ],
                     }),
                     targets: vec![],
                 },

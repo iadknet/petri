@@ -49,7 +49,10 @@ fn routing_wraps_negative_index_to_reachable_downstream_node_e2e() {
         backend_def: BackendDef::Vm(VmBackendDef {
             register_count: 1,
             constants: vec![],
-            program: vec![VmInstruction::EmitWorldAction { action_type: 0 }],
+            program: vec![
+                VmInstruction::PushAction { action_type: 0 },
+                VmInstruction::ExecuteActionQueue,
+            ],
         }),
         targets: vec![],
     };
@@ -59,7 +62,10 @@ fn routing_wraps_negative_index_to_reachable_downstream_node_e2e() {
         backend_def: BackendDef::Vm(VmBackendDef {
             register_count: 1,
             constants: vec![],
-            program: vec![VmInstruction::EmitWorldAction { action_type: 1 }],
+            program: vec![
+                VmInstruction::PushAction { action_type: 1 },
+                VmInstruction::ExecuteActionQueue,
+            ],
         }),
         targets: vec![],
     };

@@ -9,7 +9,7 @@ pub struct NodeResult {
     pub output_slots: [f32; 12],
     /// Routing target index (f32). Mesh executor applies rem_euclid over targets.len().
     pub route_target_idx: f32,
-    /// True when execution should stop (EmitWorldAction, ExecuteActionQueue, or Halt).
+    /// True when execution should stop (ExecuteActionQueue or Halt).
     pub terminal: bool,
     /// True when the node was halted due to energy exhaustion.
     /// When true, the mesh executor MUST discard the action queue and return `[NoOp]`.

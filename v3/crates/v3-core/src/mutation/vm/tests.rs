@@ -188,20 +188,18 @@ fn random_vm_instruction_covers_all_families() {
     }
     assert_eq!(
         discriminants.len(),
-        33,
-        "all 33 VmInstruction variants must be reachable; got {}",
+        38,
+        "all 38 VmInstruction variants must be reachable; got {}",
         discriminants.len()
     );
 }
 
 #[test]
-fn random_vm_instruction_widens_emit_world_action_range() {
+fn random_vm_instruction_widens_push_action_range() {
     let mut saw_above_3 = false;
     for seed in 0u64..1024 {
         let mut r = rng(seed);
-        if let VmInstruction::EmitWorldAction { action_type } =
-            random_vm_instruction(&mut r, 4, 4, 4)
-        {
+        if let VmInstruction::PushAction { action_type } = random_vm_instruction(&mut r, 4, 4, 4) {
             if action_type > 3 {
                 saw_above_3 = true;
                 break;
@@ -240,7 +238,7 @@ fn random_vm_instruction_widens_imm_addr_range() {
 fn raw_field_mutation_can_produce_out_of_range_action_type() {
     let mut genome = v3alpha1_founder_genome();
     if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
-        vm.program = vec![VmInstruction::EmitWorldAction { action_type: 0 }];
+        vm.program = vec![VmInstruction::PushAction { action_type: 0 }];
     }
 
     let mut saw_out_of_range = false;
@@ -249,7 +247,7 @@ fn raw_field_mutation_can_produce_out_of_range_action_type() {
         let mut r = rng(seed);
         VmMutator::apply(&mut g, VmOperator::VmInstructionRawFieldMutation, &mut r).unwrap();
         if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
-            if let VmInstruction::EmitWorldAction { action_type } = vm.program[0] {
+            if let VmInstruction::PushAction { action_type } = vm.program[0] {
                 if action_type > 3 {
                     saw_out_of_range = true;
                     break;
@@ -510,7 +508,7 @@ fn copy_instruction_block_remapped_preserves_non_register_fields() {
     // Non-register fields (const_idx, action_type, etc.) must not change.
     let mut genome = v3alpha1_founder_genome();
     if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
-        vm.program = vec![VmInstruction::EmitWorldAction { action_type: 42 }];
+        vm.program = vec![VmInstruction::PushAction { action_type: 42 }];
         vm.register_count = 4;
     }
     let mut r = rng(0);
@@ -524,8 +522,8 @@ fn copy_instruction_block_remapped_preserves_non_register_fields() {
         assert!(
             vm.program
                 .iter()
-                .any(|i| matches!(i, VmInstruction::EmitWorldAction { action_type: 42 })),
-            "EmitWorldAction with action_type 42 must be preserved"
+                .any(|i| matches!(i, VmInstruction::PushAction { action_type: 42 })),
+            "PushAction with action_type 42 must be preserved"
         );
     }
 }
@@ -769,7 +767,7 @@ fn copy_gene_forward_slice_no_dst_returns_no_applicable_target() {
     if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
         vm.program = vec![
             VmInstruction::Noop,
-            VmInstruction::EmitWorldAction { action_type: 0 },
+            VmInstruction::PushAction { action_type: 0 },
             VmInstruction::Halt,
         ];
     }
