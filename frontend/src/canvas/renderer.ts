@@ -191,6 +191,9 @@ export class WorldRenderer {
 		}
 
 		const hasPreview = this.previewCells !== null && this.previewCells.size > 0;
+		// Re-render when: new tick, active paint preview, or decaying flash animations.
+		// Setting lastRenderedTick here is correct even during flash-only frames — once
+		// flashes finish decaying, the guard skips re-renders until the next real tick.
 		if (tick === this.lastRenderedTick && !hasPreview && !this.flashOverlay.hasActiveFlashes) return;
 		this.lastRenderedTick = tick;
 

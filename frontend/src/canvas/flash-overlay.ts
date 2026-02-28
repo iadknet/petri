@@ -1,4 +1,4 @@
-import type { PredationEvent } from "../types/protocol.ts";
+import type { PredationEvent } from "../types/api.ts";
 import type { Camera } from "./renderer.ts";
 
 /** Attacker flash: red */
@@ -41,23 +41,29 @@ export class FlashOverlay {
 			}
 		}
 
-		// Add new flashes from events
+		// Add new flashes from events (reuse existing entries to reduce GC pressure)
 		for (const e of events) {
 			const attackerKey = e.attacker_y * worldWidth + e.attacker_x;
-			this.flashMap.set(attackerKey, {
-				r: ATTACKER_R,
-				g: ATTACKER_G,
-				b: ATTACKER_B,
-				framesLeft: FLASH_FRAMES,
-			});
+			const existingAttacker = this.flashMap.get(attackerKey);
+			if (existingAttacker) {
+				existingAttacker.r = ATTACKER_R;
+				existingAttacker.g = ATTACKER_G;
+				existingAttacker.b = ATTACKER_B;
+				existingAttacker.framesLeft = FLASH_FRAMES;
+			} else {
+				this.flashMap.set(attackerKey, { r: ATTACKER_R, g: ATTACKER_G, b: ATTACKER_B, framesLeft: FLASH_FRAMES });
+			}
 
 			const victimKey = e.victim_y * worldWidth + e.victim_x;
-			this.flashMap.set(victimKey, {
-				r: VICTIM_R,
-				g: VICTIM_G,
-				b: VICTIM_B,
-				framesLeft: FLASH_FRAMES,
-			});
+			const existingVictim = this.flashMap.get(victimKey);
+			if (existingVictim) {
+				existingVictim.r = VICTIM_R;
+				existingVictim.g = VICTIM_G;
+				existingVictim.b = VICTIM_B;
+				existingVictim.framesLeft = FLASH_FRAMES;
+			} else {
+				this.flashMap.set(victimKey, { r: VICTIM_R, g: VICTIM_G, b: VICTIM_B, framesLeft: FLASH_FRAMES });
+			}
 		}
 	}
 

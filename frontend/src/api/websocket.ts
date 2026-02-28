@@ -154,6 +154,8 @@ export class WsClient {
 				food: frame.food,
 				barriers: frame.barriers,
 			});
+			// Clear transient events — REST status does not include per-tick events
+			sim.setPredationEvents([]);
 		} catch {
 			// Resync failure is non-fatal; next WS events will update state
 		}
