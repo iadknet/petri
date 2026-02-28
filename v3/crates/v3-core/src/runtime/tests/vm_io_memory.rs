@@ -1,44 +1,59 @@
 use super::*;
 
-// ── EmitWorldAction ───────────────────────────────────────────────────────
+// ── PushAction + ExecuteActionQueue ────────────────────────────────────────
 
 #[test]
 fn emit_noop_action_type_0() {
-    let (r, _) = run_vm(
-        vec![VmInstruction::EmitWorldAction { action_type: 0 }],
+    let (_r, _, aq) = run_vm(
+        vec![
+            VmInstruction::PushAction { action_type: 0 },
+            VmInstruction::ExecuteActionQueue,
+        ],
         1,
         vec![],
         &[],
         zeroed_upstream(),
         100.0,
     );
-    assert_eq!(r.world_action, Some(crate::contracts::WorldAction::NoOp));
+    let actions = aq.into_actions();
+    assert_eq!(actions.len(), 1);
+    assert_eq!(actions[0], crate::contracts::WorldAction::NoOp);
 }
 
 #[test]
 fn emit_eat_action_type_1() {
-    let (r, _) = run_vm(
-        vec![VmInstruction::EmitWorldAction { action_type: 1 }],
+    let (_r, _, aq) = run_vm(
+        vec![
+            VmInstruction::PushAction { action_type: 1 },
+            VmInstruction::ExecuteActionQueue,
+        ],
         1,
         vec![],
         &[],
         zeroed_upstream(),
         100.0,
     );
-    assert_eq!(r.world_action, Some(crate::contracts::WorldAction::Eat));
+    let actions = aq.into_actions();
+    assert_eq!(actions.len(), 1);
+    assert_eq!(actions[0], crate::contracts::WorldAction::Eat);
 }
 
 #[test]
 fn emit_unknown_action_type_255_defaults_to_noop() {
-    let (r, _) = run_vm(
-        vec![VmInstruction::EmitWorldAction { action_type: 255 }],
+    let (_r, _, aq) = run_vm(
+        vec![
+            VmInstruction::PushAction { action_type: 255 },
+            VmInstruction::ExecuteActionQueue,
+        ],
         1,
         vec![],
         &[],
         zeroed_upstream(),
         100.0,
     );
-    assert_eq!(r.world_action, Some(crate::contracts::WorldAction::NoOp));
+    let actions = aq.into_actions();
+    assert_eq!(actions.len(), 1);
+    assert_eq!(actions[0], crate::contracts::WorldAction::NoOp);
 }
 
 #[test]
@@ -53,12 +68,15 @@ fn emit_move_with_meta() {
             slot_idx: 0,
             src: 0,
         },
-        VmInstruction::EmitWorldAction { action_type: 2 },
+        VmInstruction::PushAction { action_type: 2 },
+        VmInstruction::ExecuteActionQueue,
     ];
-    let (r, _) = run_vm(program, 1, vec![2.0], &[], zeroed_upstream(), 100.0);
+    let (_r, _, aq) = run_vm(program, 1, vec![2.0], &[], zeroed_upstream(), 100.0);
+    let actions = aq.into_actions();
+    assert_eq!(actions.len(), 1);
     assert_eq!(
-        r.world_action,
-        Some(crate::contracts::WorldAction::Move(Direction::E))
+        actions[0],
+        crate::contracts::WorldAction::Move(Direction::E)
     );
 }
 
@@ -90,6 +108,8 @@ fn read_input_upstream_slot() {
     let si = empty_static_inputs();
     let mut e = 100.0;
     let mut mem = [0u8; 1024];
+    let cfg = config();
+    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
         &input_refs,
@@ -98,7 +118,8 @@ fn read_input_upstream_slot() {
         0.0,
         &mut mem,
         &si,
-        &config(),
+        &cfg,
+        &mut action_queue,
     );
     assert!((r.output_slots[0] - 42.0).abs() < 1e-6);
 }
@@ -117,7 +138,7 @@ fn read_input_out_of_range_yields_zero() {
         },
         VmInstruction::Halt,
     ];
-    let (r, _) = run_vm(program, 1, vec![], &[], zeroed_upstream(), 100.0);
+    let (r, _, _aq) = run_vm(program, 1, vec![], &[], zeroed_upstream(), 100.0);
     assert_eq!(r.output_slots[0], 0.0);
 }
 
@@ -128,7 +149,7 @@ fn payload_initialized_from_upstream_slots() {
     let mut upstream = zeroed_upstream();
     upstream[3] = 7.7;
     let program = vec![VmInstruction::Halt];
-    let (r, _) = run_vm(program, 1, vec![], &[], upstream, 100.0);
+    let (r, _, _aq) = run_vm(program, 1, vec![], &[], upstream, 100.0);
     assert!((r.output_slots[3] - 7.7).abs() < 1e-6);
 }
 
@@ -145,7 +166,7 @@ fn write_internal_payload_updates_slot() {
         },
         VmInstruction::Halt,
     ];
-    let (r, _) = run_vm(program, 1, vec![3.5], &[], zeroed_upstream(), 100.0);
+    let (r, _, _aq) = run_vm(program, 1, vec![3.5], &[], zeroed_upstream(), 100.0);
     assert!((r.output_slots[5] - 3.5).abs() < 1e-4);
 }
 
@@ -162,7 +183,7 @@ fn write_internal_payload_invalid_slot_ignored() {
         }, // ignored
         VmInstruction::Halt,
     ];
-    let (r, _) = run_vm(program, 1, vec![99.0], &[], zeroed_upstream(), 100.0);
+    let (r, _, _aq) = run_vm(program, 1, vec![99.0], &[], zeroed_upstream(), 100.0);
     for s in r.output_slots {
         assert_eq!(s, 0.0);
     }
@@ -178,7 +199,7 @@ fn write_route_target_sets_output() {
         VmInstruction::WriteRouteTarget { src: 0 },
         VmInstruction::Halt,
     ];
-    let (r, _) = run_vm(program, 1, vec![2.0], &[], zeroed_upstream(), 100.0);
+    let (r, _, _aq) = run_vm(program, 1, vec![2.0], &[], zeroed_upstream(), 100.0);
     assert!((r.route_target_idx - 2.0).abs() < 1e-6);
 }
 
@@ -216,6 +237,8 @@ fn store_and_load_mem8() {
     let si = empty_static_inputs();
     let mut e = 100.0;
     let mut mem = [0u8; 1024];
+    let cfg = config();
+    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
         &[],
@@ -224,7 +247,8 @@ fn store_and_load_mem8() {
         0.0,
         &mut mem,
         &si,
-        &config(),
+        &cfg,
+        &mut action_queue,
     );
     assert!((r.output_slots[0] - 42.0).abs() < 1e-6);
     assert_eq!(mem[42], 42); // memory committed
@@ -258,6 +282,8 @@ fn store_and_load_mem8_imm() {
     let si = empty_static_inputs();
     let mut e = 100.0;
     let mut mem = [0u8; 1024];
+    let cfg = config();
+    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
         &[],
@@ -266,7 +292,8 @@ fn store_and_load_mem8_imm() {
         0.0,
         &mut mem,
         &si,
-        &config(),
+        &cfg,
+        &mut action_queue,
     );
     assert!((r.output_slots[0] - 77.0).abs() < 1e-6);
     assert_eq!(mem[100], 77);
@@ -304,6 +331,8 @@ fn memory_address_wraps_via_rem_euclid() {
     let si = empty_static_inputs();
     let mut e = 100.0;
     let mut mem = [0u8; 1024];
+    let cfg = config();
+    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
         &[],
@@ -312,7 +341,8 @@ fn memory_address_wraps_via_rem_euclid() {
         0.0,
         &mut mem,
         &si,
-        &config(),
+        &cfg,
+        &mut action_queue,
     );
     assert!((r.output_slots[0] - 55.0).abs() < 1e-6);
 }
@@ -363,9 +393,11 @@ fn vm_eats_when_food_here() {
                     }, // r0 = food_here
                     // r1 is 0.0; compare r0 > r1
                     VmInstruction::CmpGt { dst: 0, a: 0, b: 1 }, // r0 = (food > 0)?
-                    VmInstruction::JumpIfZero { cond: 0, offset: 1 }, // skip Eat if no food
-                    VmInstruction::EmitWorldAction { action_type: 1 }, // Eat
-                    VmInstruction::EmitWorldAction { action_type: 0 }, // NoOp fallback
+                    VmInstruction::JumpIfZero { cond: 0, offset: 2 }, // skip Eat if no food
+                    VmInstruction::PushAction { action_type: 1 }, // Eat
+                    VmInstruction::ExecuteActionQueue,
+                    VmInstruction::PushAction { action_type: 0 }, // NoOp fallback
+                    VmInstruction::ExecuteActionQueue,
                 ],
             }),
             targets: vec![],
@@ -386,7 +418,9 @@ fn vm_eats_when_food_here() {
     let upstream = [0.0f32; 12];
     let mut energy = creature.energy;
     let mut mem = [0u8; 1024];
-    let result = execute_vm_node(
+    let cfg = config();
+    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
+    let _result = execute_vm_node(
         def,
         &creature.genome.nodes[0].input_refs,
         &upstream,
@@ -394,11 +428,13 @@ fn vm_eats_when_food_here() {
         0.0,
         &mut mem,
         &si,
-        &config(),
+        &cfg,
+        &mut action_queue,
     );
+    let actions = action_queue.into_actions();
     assert_eq!(
-        result.world_action,
-        Some(crate::contracts::WorldAction::Eat),
+        actions.first(),
+        Some(&crate::contracts::WorldAction::Eat),
         "Expected Eat when food is present"
     );
 }
@@ -437,9 +473,11 @@ fn vm_noop_when_no_food() {
                         sub_idx: 0,
                     }, // r0 = food_here = 0
                     VmInstruction::CmpGt { dst: 0, a: 0, b: 1 }, // r0 = (0 > 0) = 0
-                    VmInstruction::JumpIfZero { cond: 0, offset: 1 }, // fires → skip Eat
-                    VmInstruction::EmitWorldAction { action_type: 1 }, // Eat (skipped)
-                    VmInstruction::EmitWorldAction { action_type: 0 }, // NoOp fallback
+                    VmInstruction::JumpIfZero { cond: 0, offset: 2 }, // fires → skip Eat
+                    VmInstruction::PushAction { action_type: 1 }, // Eat (skipped)
+                    VmInstruction::ExecuteActionQueue,
+                    VmInstruction::PushAction { action_type: 0 }, // NoOp fallback
+                    VmInstruction::ExecuteActionQueue,
                 ],
             }),
             targets: vec![],
@@ -458,7 +496,9 @@ fn vm_noop_when_no_food() {
     let upstream = [0.0f32; 12];
     let mut energy = 30.0;
     let mut mem = [0u8; 1024];
-    let result = execute_vm_node(
+    let cfg = config();
+    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
+    let _result = execute_vm_node(
         def,
         &creature.genome.nodes[0].input_refs,
         &upstream,
@@ -466,11 +506,13 @@ fn vm_noop_when_no_food() {
         0.0,
         &mut mem,
         &si,
-        &config(),
+        &cfg,
+        &mut action_queue,
     );
+    let actions = action_queue.into_actions();
     assert_eq!(
-        result.world_action,
-        Some(crate::contracts::WorldAction::NoOp),
+        actions.first(),
+        Some(&crate::contracts::WorldAction::NoOp),
         "Expected NoOp when no food"
     );
 }

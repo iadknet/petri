@@ -58,7 +58,7 @@ fn empty_graph_returns_halted_and_no_energy_charged() {
     assert!((energy - 50.0).abs() < 1e-6, "energy should be unchanged");
     // Returns halted (not exhausted).
     assert!(!result.energy_exhausted);
-    assert!(result.world_action.is_none());
+    assert!(!result.terminal);
     // Upstream slots passed through.
     assert_eq!(result.output_slots, upstream);
     assert_eq!(result.route_target_idx, 0.0);
@@ -90,7 +90,7 @@ fn energy_exhaustion_returns_exhausted() {
     );
 
     assert!(result.energy_exhausted);
-    assert!(result.world_action.is_none());
+    assert!(result.terminal);
 }
 
 // ─── Test 3: Constant node — output_slots unchanged (no CustomOutput write) ───
@@ -118,7 +118,7 @@ fn constant_node_does_not_write_output_slots() {
     // No CustomOutput → output_slots stays = upstream.
     assert_eq!(result.output_slots, upstream);
     assert!(!result.energy_exhausted);
-    assert!(result.world_action.is_none());
+    assert!(!result.terminal);
 }
 
 // ─── Test 4: Add + CustomOutput combo writes output_slots[0] = 6.0 ──────────
@@ -244,7 +244,7 @@ fn graph_never_emits_world_action() {
         &config,
     );
 
-    assert!(result.world_action.is_none());
+    assert!(!result.terminal);
 }
 
 // ─── Test 7: DecayIntegrator accumulates state across two calls ───────────

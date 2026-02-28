@@ -143,7 +143,14 @@ pub struct RuntimeConfig {
     /// Energy cost per Hebbian weight update. Default 0.0 (free during initial rollout).
     #[serde(default)]
     pub hebbian_update_cost: f32,
+    /// Maximum number of actions a creature can queue per turn.
+    #[serde(default = "default_max_actions_per_turn")]
+    pub max_actions_per_turn: usize,
     pub vm: VmRuntimeConfig,
+}
+
+fn default_max_actions_per_turn() -> usize {
+    10
 }
 
 impl Default for RuntimeConfig {
@@ -156,6 +163,7 @@ impl Default for RuntimeConfig {
             graph_convergence_stable_passes: 2,
             graph_node_base_cost: 1e-5,
             hebbian_update_cost: 0.0,
+            max_actions_per_turn: default_max_actions_per_turn(),
             vm: VmRuntimeConfig::default(),
         }
     }
@@ -325,6 +333,9 @@ impl SimulationConfig {
         }
         rt.graph_node_base_cost = normalize_f32_nonneg(rt.graph_node_base_cost, 1e-5);
         rt.hebbian_update_cost = normalize_f32_finite_nonneg(rt.hebbian_update_cost, 0.0);
+        if rt.max_actions_per_turn < 1 {
+            rt.max_actions_per_turn = 10;
+        }
         rt.vm.opcode_cost_multiplier =
             normalize_f32_finite_nonneg(rt.vm.opcode_cost_multiplier, 1e-6);
 
@@ -441,6 +452,7 @@ mod tests {
         assert_eq!(cfg.runtime.graph_convergence_stable_passes, 2);
         assert!((cfg.runtime.graph_node_base_cost - 1e-5).abs() < 1e-9);
         assert!((cfg.runtime.vm.opcode_cost_multiplier - 1e-6).abs() < 1e-12);
+        assert_eq!(cfg.runtime.max_actions_per_turn, 10);
         // Mutation
         assert!((cfg.mutation.mutation_probability - 0.303).abs() < 1e-9);
         assert_eq!(cfg.mutation.per_birth_mutation_events_min, 1);

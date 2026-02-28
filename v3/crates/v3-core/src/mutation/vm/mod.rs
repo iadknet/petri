@@ -229,7 +229,7 @@ fn random_vm_instruction(
     let cl = constants_len.clamp(1, 255) as u8;
     let il = input_refs_len.clamp(1, 255) as u8;
 
-    match rng.gen_range(0u8..33) {
+    match rng.gen_range(0u8..38) {
         0 => VmInstruction::Noop,
         1 => VmInstruction::LoadConst {
             dst: rng.gen_range(0..rc),
@@ -343,22 +343,36 @@ fn random_vm_instruction(
             slot_idx: rng.gen_range(0u8..8),
             src: rng.gen_range(0..rc),
         },
-        26 => VmInstruction::EmitWorldAction {
-            action_type: rng.gen(),
-        },
-        27 => VmInstruction::WriteRouteTarget {
+        26 => VmInstruction::WriteRouteTarget {
             src: rng.gen_range(0..rc),
         },
-        28 => VmInstruction::Halt,
-        29 => VmInstruction::LoadMem8 {
+        27 => VmInstruction::PushAction {
+            action_type: rng.gen(),
+        },
+        28 => VmInstruction::PopAction,
+        29 => VmInstruction::ReadActionQueueLength {
+            dst: rng.gen_range(0..rc),
+        },
+        30 => VmInstruction::ReadActionQueueType {
+            index_src: rng.gen_range(0..rc),
+            dst: rng.gen_range(0..rc),
+        },
+        31 => VmInstruction::ReadActionQueueParam {
+            index_src: rng.gen_range(0..rc),
+            param_slot: rng.gen_range(0..8),
+            dst: rng.gen_range(0..rc),
+        },
+        32 => VmInstruction::ExecuteActionQueue,
+        33 => VmInstruction::Halt,
+        34 => VmInstruction::LoadMem8 {
             dst: rng.gen_range(0..rc),
             addr_reg: rng.gen_range(0..rc),
         },
-        30 => VmInstruction::StoreMem8 {
+        35 => VmInstruction::StoreMem8 {
             addr_reg: rng.gen_range(0..rc),
             src: rng.gen_range(0..rc),
         },
-        31 => VmInstruction::LoadMem8Imm {
+        36 => VmInstruction::LoadMem8Imm {
             dst: rng.gen_range(0..rc),
             imm_addr: rng.gen(),
         },
@@ -372,7 +386,7 @@ fn random_vm_instruction(
 fn mutate_instruction_raw_fields(instr: &mut VmInstruction, rng: &mut impl Rng) {
     match instr {
         VmInstruction::Noop | VmInstruction::Halt => {
-            *instr = VmInstruction::EmitWorldAction {
+            *instr = VmInstruction::PushAction {
                 action_type: rng.gen(),
             };
         }
@@ -432,9 +446,6 @@ fn mutate_instruction_raw_fields(instr: &mut VmInstruction, rng: &mut impl Rng) 
             *slot_idx = rng.gen();
             *src = rng.gen();
         }
-        VmInstruction::EmitWorldAction { action_type } => {
-            *action_type = rng.gen();
-        }
         VmInstruction::WriteRouteTarget { src } => {
             *src = rng.gen();
         }
@@ -453,6 +464,37 @@ fn mutate_instruction_raw_fields(instr: &mut VmInstruction, rng: &mut impl Rng) 
         VmInstruction::StoreMem8Imm { imm_addr, src } => {
             *imm_addr = rng.gen();
             *src = rng.gen();
+        }
+        VmInstruction::PushAction { action_type } => {
+            *action_type = rng.gen();
+        }
+        VmInstruction::PopAction => {
+            // No fields to mutate; swap to a different instruction.
+            *instr = VmInstruction::PushAction {
+                action_type: rng.gen(),
+            };
+        }
+        VmInstruction::ReadActionQueueLength { dst } => {
+            *dst = rng.gen();
+        }
+        VmInstruction::ReadActionQueueType { index_src, dst } => {
+            *index_src = rng.gen();
+            *dst = rng.gen();
+        }
+        VmInstruction::ReadActionQueueParam {
+            index_src,
+            param_slot,
+            dst,
+        } => {
+            *index_src = rng.gen();
+            *param_slot = rng.gen();
+            *dst = rng.gen();
+        }
+        VmInstruction::ExecuteActionQueue => {
+            // No fields to mutate; swap to a different instruction.
+            *instr = VmInstruction::PushAction {
+                action_type: rng.gen(),
+            };
         }
     }
 }
@@ -527,7 +569,7 @@ fn apply_instruction_raw_field_mutation(
     let node = &mut genome.nodes[node_idx];
     if let BackendDef::Vm(ref mut vm) = node.backend_def {
         if vm.program.is_empty() {
-            vm.program.push(VmInstruction::EmitWorldAction {
+            vm.program.push(VmInstruction::PushAction {
                 action_type: rng.gen(),
             });
             return Ok(());
@@ -584,7 +626,18 @@ fn remap_register_refs(instr: &mut VmInstruction, offset: u8, register_count: u8
         VmInstruction::WriteInternalPayload { src, .. }
         | VmInstruction::WriteWorldActionMeta { src, .. }
         | VmInstruction::WriteRouteTarget { src } => remap(src),
-        VmInstruction::EmitWorldAction { .. } => {}
+        VmInstruction::PushAction { .. }
+        | VmInstruction::PopAction
+        | VmInstruction::ExecuteActionQueue => {}
+        VmInstruction::ReadActionQueueLength { dst } => remap(dst),
+        VmInstruction::ReadActionQueueType { index_src, dst } => {
+            remap(index_src);
+            remap(dst);
+        }
+        VmInstruction::ReadActionQueueParam { index_src, dst, .. } => {
+            remap(index_src);
+            remap(dst);
+        }
         VmInstruction::LoadMem8 { dst, addr_reg } => {
             remap(dst);
             remap(addr_reg);
