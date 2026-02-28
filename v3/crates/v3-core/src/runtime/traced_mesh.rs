@@ -30,7 +30,7 @@ pub fn execute_creature_mesh_traced(
     graph_runtime: &mut GraphRuntimeState,
     config: &RuntimeConfig,
 ) -> (
-    WorldAction,
+    Vec<WorldAction>,
     ComputeCostReport,
     Vec<MeshHopTrace>,
     TerminationReason,
@@ -54,7 +54,7 @@ pub fn execute_creature_mesh_traced(
 
     if !node_index.contains_key(&current_node_id) {
         return (
-            WorldAction::NoOp,
+            vec![WorldAction::NoOp],
             report,
             hop_traces,
             TerminationReason::MissingNode,
@@ -63,12 +63,13 @@ pub fn execute_creature_mesh_traced(
 
     loop {
         if hops >= max_hops {
-            return (
-                WorldAction::NoOp,
-                report,
-                hop_traces,
-                TerminationReason::MaxHopsReached,
-            );
+            let actions = action_queue.into_actions();
+            let actions = if actions.is_empty() {
+                vec![WorldAction::NoOp]
+            } else {
+                actions
+            };
+            return (actions, report, hop_traces, TerminationReason::MaxHopsReached);
         }
 
         let node = &genome.nodes[node_index[&current_node_id]];
@@ -127,7 +128,7 @@ pub fn execute_creature_mesh_traced(
 
         if result.energy_exhausted {
             return (
-                WorldAction::NoOp,
+                vec![WorldAction::NoOp],
                 report,
                 hop_traces,
                 TerminationReason::EnergyExhausted,
@@ -135,21 +136,23 @@ pub fn execute_creature_mesh_traced(
         }
 
         if result.terminal {
-            return (
-                action_queue.into_actions().pop().unwrap_or(WorldAction::NoOp),
-                report,
-                hop_traces,
-                TerminationReason::ActionEmitted,
-            );
+            let actions = action_queue.into_actions();
+            let actions = if actions.is_empty() {
+                vec![WorldAction::NoOp]
+            } else {
+                actions
+            };
+            return (actions, report, hop_traces, TerminationReason::ActionEmitted);
         }
 
         if node.targets.is_empty() {
-            return (
-                WorldAction::NoOp,
-                report,
-                hop_traces,
-                TerminationReason::NoTargets,
-            );
+            let actions = action_queue.into_actions();
+            let actions = if actions.is_empty() {
+                vec![WorldAction::NoOp]
+            } else {
+                actions
+            };
+            return (actions, report, hop_traces, TerminationReason::NoTargets);
         }
 
         let route_target_idx = result.route_target_idx;
@@ -169,12 +172,13 @@ pub fn execute_creature_mesh_traced(
         let target_id = node.targets[target_pos];
 
         if !node_index.contains_key(&target_id) {
-            return (
-                WorldAction::NoOp,
-                report,
-                hop_traces,
-                TerminationReason::MissingNode,
-            );
+            let actions = action_queue.into_actions();
+            let actions = if actions.is_empty() {
+                vec![WorldAction::NoOp]
+            } else {
+                actions
+            };
+            return (actions, report, hop_traces, TerminationReason::MissingNode);
         }
 
         upstream_slots = result.output_slots;
@@ -289,7 +293,7 @@ mod tests {
         );
 
         assert_eq!(action_a, action_b);
-        assert_eq!(action_b, WorldAction::Eat);
+        assert_eq!(action_b, vec![WorldAction::Eat]);
         assert!(
             (energy_a - energy_b).abs() < 1e-6,
             "energy: {energy_a} vs {energy_b}"
@@ -372,7 +376,7 @@ mod tests {
         let (action, _, hops, _) =
             execute_creature_mesh_traced(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
 
-        assert_eq!(action, WorldAction::Eat);
+        assert_eq!(action, vec![WorldAction::Eat]);
         // Hop 1 (VM) should have upstream_slots[5] = 9.0
         assert!((hops[1].upstream_slots[5] - 9.0).abs() < 1e-5);
     }
@@ -405,7 +409,7 @@ mod tests {
         let (action, _, hops, reason) =
             execute_creature_mesh_traced(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
 
-        assert_eq!(action, WorldAction::NoOp);
+        assert_eq!(action, vec![WorldAction::NoOp]);
         assert!(
             matches!(reason, TerminationReason::EnergyExhausted),
             "expected EnergyExhausted, got {:?}",

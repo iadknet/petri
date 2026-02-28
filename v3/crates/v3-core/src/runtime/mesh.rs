@@ -16,15 +16,17 @@ use crate::runtime::types::ComputeCostReport;
 use crate::runtime::vm::execute_vm_node;
 use crate::sensors::static_inputs::StaticInputs;
 
-/// Execute the creature's mesh chain for one tick, returning the chosen [`WorldAction`]
+/// Execute the creature's mesh chain for one tick, returning the queued actions
 /// and a [`ComputeCostReport`] of energy spent on VM and graph node execution.
 ///
 /// The function walks the genome's node chain starting at `entry_node_id`,
 /// dispatching each node to its VM or Graph backend, routing to subsequent
 /// nodes via the `route_target_idx` field of [`NodeResult`], and terminating
-/// when a `WorldAction` is emitted or a soft-default condition fires.
+/// when a terminal instruction is reached or a soft-default condition fires.
 ///
-/// All soft-default termination conditions return [`WorldAction::NoOp`].
+/// All soft-default termination conditions return `vec![WorldAction::NoOp]`.
+/// Energy exhaustion discards the queue and returns `vec![WorldAction::NoOp]`.
+/// Halt without ExecuteActionQueue preserves the accumulated queue (forgiving).
 ///
 /// # Arguments
 /// - `genome`: the creature's node graph
@@ -41,7 +43,7 @@ pub fn execute_creature_mesh(
     memory: &mut [u8; 1024],
     graph_runtime: &mut GraphRuntimeState,
     config: &RuntimeConfig,
-) -> (WorldAction, ComputeCostReport) {
+) -> (Vec<WorldAction>, ComputeCostReport) {
     let mut current_node_id = genome.entry_node_id;
     let mut upstream_slots = [0.0f32; 12];
     let mut hops: usize = 0;
@@ -60,12 +62,17 @@ pub fn execute_creature_mesh(
 
     // Soft default: entry_node_id missing from node set → return NoOp immediately.
     if !node_index.contains_key(&current_node_id) {
-        return (WorldAction::NoOp, report);
+        return (vec![WorldAction::NoOp], report);
     }
 
     loop {
         if hops >= max_hops {
-            return (WorldAction::NoOp, report);
+            let actions = action_queue.into_actions();
+            return if actions.is_empty() {
+                (vec![WorldAction::NoOp], report)
+            } else {
+                (actions, report)
+            };
         }
 
         // Invariant: verified present before the loop, and after every routing step.
@@ -111,19 +118,26 @@ pub fn execute_creature_mesh(
 
         // Check exhaustion first: NodeResult::exhausted() discards the action queue.
         if result.energy_exhausted {
-            return (WorldAction::NoOp, report);
+            return (vec![WorldAction::NoOp], report);
         }
 
         if result.terminal {
-            return (
-                action_queue.into_actions().pop().unwrap_or(WorldAction::NoOp),
-                report,
-            );
+            let actions = action_queue.into_actions();
+            return if actions.is_empty() {
+                (vec![WorldAction::NoOp], report)
+            } else {
+                (actions, report)
+            };
         }
 
-        // Routing: if no targets, the chain terminates with NoOp.
+        // Routing: if no targets, the chain terminates — preserve accumulated queue.
         if node.targets.is_empty() {
-            return (WorldAction::NoOp, report);
+            let actions = action_queue.into_actions();
+            return if actions.is_empty() {
+                (vec![WorldAction::NoOp], report)
+            } else {
+                (actions, report)
+            };
         }
 
         // Convert route_target_idx (f32) to i64 with special-case handling for
@@ -145,9 +159,14 @@ pub fn execute_creature_mesh(
         let target_pos = route_idx_i64.rem_euclid(node.targets.len() as i64) as usize;
         let target_id = node.targets[target_pos];
 
-        // Soft default: routed target id missing from node set → return NoOp.
+        // Soft default: routed target id missing from node set.
         if !node_index.contains_key(&target_id) {
-            return (WorldAction::NoOp, report);
+            let actions = action_queue.into_actions();
+            return if actions.is_empty() {
+                (vec![WorldAction::NoOp], report)
+            } else {
+                (actions, report)
+            };
         }
 
         upstream_slots = result.output_slots;
@@ -237,9 +256,9 @@ mod tests {
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (action, _report) =
+        let (actions, _report) =
             execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
-        assert_eq!(action, WorldAction::NoOp);
+        assert_eq!(actions, vec![WorldAction::NoOp]);
     }
 
     // ── Test 2: max_hops_exceeded_returns_noop ────────────────────────────────
@@ -273,9 +292,9 @@ mod tests {
             ..RuntimeConfig::default()
         };
 
-        let (action, _report) =
+        let (actions, _report) =
             execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
-        assert_eq!(action, WorldAction::NoOp);
+        assert_eq!(actions, vec![WorldAction::NoOp]);
     }
 
     // ── Test 3: empty_targets_returns_noop ───────────────────────────────────
@@ -303,9 +322,9 @@ mod tests {
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (action, _report) =
+        let (actions, _report) =
             execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
-        assert_eq!(action, WorldAction::NoOp);
+        assert_eq!(actions, vec![WorldAction::NoOp]);
     }
 
     // ── Test 4: energy_exhaustion_returns_noop ────────────────────────────────
@@ -334,9 +353,9 @@ mod tests {
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (action, _report) =
+        let (actions, _report) =
             execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
-        assert_eq!(action, WorldAction::NoOp);
+        assert_eq!(actions, vec![WorldAction::NoOp]);
     }
 
     // ── Test 5: vm_node_emits_eat_action ─────────────────────────────────────
@@ -355,9 +374,9 @@ mod tests {
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (action, _report) =
+        let (actions, _report) =
             execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
-        assert_eq!(action, WorldAction::Eat);
+        assert_eq!(actions, vec![WorldAction::Eat]);
     }
 
     // ── Test 6: graph_node_routes_to_vm_node_which_emits_action ──────────────
@@ -406,9 +425,9 @@ mod tests {
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (action, _report) =
+        let (actions, _report) =
             execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
-        assert_eq!(action, WorldAction::Eat);
+        assert_eq!(actions, vec![WorldAction::Eat]);
     }
 
     // ── Test 7: route_wrapping_rem_euclid ────────────────────────────────────
@@ -442,11 +461,11 @@ mod tests {
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (action, _report) =
+        let (actions, _report) =
             execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(
-            action,
-            WorldAction::Eat,
+            actions,
+            vec![WorldAction::Eat],
             "route=3.7 should select targets[0]"
         );
     }
@@ -481,11 +500,11 @@ mod tests {
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (action, _report) =
+        let (actions, _report) =
             execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(
-            action,
-            WorldAction::Eat,
+            actions,
+            vec![WorldAction::Eat],
             "route=-1.0 should wrap via rem_euclid and select targets[1]"
         );
     }
@@ -563,11 +582,11 @@ mod tests {
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (action, _report) =
+        let (actions, _report) =
             execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(
-            action,
-            WorldAction::Eat,
+            actions,
+            vec![WorldAction::Eat],
             "slot 5 should carry 9.0 from graph to VM node"
         );
     }

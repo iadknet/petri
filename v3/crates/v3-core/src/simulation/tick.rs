@@ -133,7 +133,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
         let mut parallel_decisions: Vec<_> = work
             .par_iter_mut()
             .map(|(id, si, creature)| {
-                let (action, cost) = execute_creature_mesh(
+                let (actions, cost) = execute_creature_mesh(
                     &creature.genome,
                     si,
                     &mut creature.energy,
@@ -141,7 +141,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                     &mut creature.graph_runtime,
                     &runtime_config,
                 );
-                (*id, vec![action], cost)
+                (*id, actions, cost)
             })
             .collect();
 
@@ -152,7 +152,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                 let tick_number = sim.tick;
                 let si_snapshot = StaticInputsSnapshot::from(si);
 
-                let (action, cost, hops, termination_reason) = execute_creature_mesh_traced(
+                let (actions, cost, hops, termination_reason) = execute_creature_mesh_traced(
                     &creature.genome,
                     si,
                     &mut creature.energy,
@@ -160,8 +160,6 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                     &mut creature.graph_runtime,
                     &runtime_config,
                 );
-
-                let actions = vec![action];
 
                 // Record tick trace.
                 if let Some(ref mut active) = trace {
