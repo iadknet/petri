@@ -3,7 +3,7 @@ use rand::Rng;
 use crate::contracts::{
     Direction, DynamicIntrospectionKey, InputReference, StaticIntrospectionKey, WorldInputKey,
 };
-use crate::creature::genome::CreatureGenome;
+use crate::creature::genome::{BackendDef, CreatureGenome, GraphNodeKind, VmInstruction};
 use crate::mutation::types::MutationSkipReason;
 
 /// Input reference mutation operator variants.
@@ -123,6 +123,47 @@ impl InputRefMutator {
     }
 }
 
+/// After removing `input_refs[removed_ref_idx]` from `genome.nodes[node_idx]`,
+/// update all internal references (graph InputRef nodes and VM ReadInput instructions)
+/// so they stay consistent:
+/// - `ref_idx == removed_ref_idx` → set to `u16::MAX` (invalidated → resolves to 0.0)
+/// - `ref_idx > removed_ref_idx` → decrement by 1
+/// - `ref_idx < removed_ref_idx` → unchanged
+///
+/// `sub_idx` is unaffected — it indexes within a compound input, not across `input_refs`.
+pub(crate) fn reindex_after_removal(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    removed_ref_idx: u16,
+) {
+    debug_assert!(node_idx < genome.nodes.len(), "node_idx out of bounds");
+    let node = &mut genome.nodes[node_idx];
+    match &mut node.backend_def {
+        BackendDef::Graph(gd) => {
+            for internal in &mut gd.internal_nodes {
+                if let GraphNodeKind::InputRef { ref_idx, .. } = &mut internal.kind {
+                    if *ref_idx == removed_ref_idx {
+                        *ref_idx = u16::MAX;
+                    } else if *ref_idx > removed_ref_idx {
+                        *ref_idx -= 1;
+                    }
+                }
+            }
+        }
+        BackendDef::Vm(vm) => {
+            for instr in &mut vm.program {
+                if let VmInstruction::ReadInput { ref_idx, .. } = instr {
+                    if *ref_idx == removed_ref_idx {
+                        *ref_idx = u16::MAX;
+                    } else if *ref_idx > removed_ref_idx {
+                        *ref_idx -= 1;
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn apply_add(genome: &mut CreatureGenome, rng: &mut impl Rng) -> Result<(), MutationSkipReason> {
     let node_idx = rng.gen_range(0..genome.nodes.len());
     genome.nodes[node_idx]
@@ -145,6 +186,8 @@ fn apply_remove(genome: &mut CreatureGenome, rng: &mut impl Rng) -> Result<(), M
     let node_idx = eligible[rng.gen_range(0..eligible.len())];
     let ref_idx = rng.gen_range(0..genome.nodes[node_idx].input_refs.len());
     genome.nodes[node_idx].input_refs.remove(ref_idx);
+    debug_assert!(ref_idx <= u16::MAX as usize, "input_refs index exceeds u16");
+    reindex_after_removal(genome, node_idx, ref_idx as u16);
     Ok(())
 }
 
@@ -233,7 +276,8 @@ mod tests {
     use crate::contracts::NodeId;
     use crate::creature::founder::v3alpha1_founder_genome;
     use crate::creature::genome::{
-        BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
+        BackendDef, CreatureGenome, GraphBackendDef, GraphInternalNode, GraphNodeKind, NodeGenome,
+        VmBackendDef, VmInstruction,
     };
     use crate::creature::parseability::ParseabilityGate;
     use rand::rngs::SmallRng;
@@ -498,5 +542,295 @@ mod tests {
             saw_decreasing,
             "must produce at least one decreasing operator"
         );
+    }
+
+    // ── reindex_after_removal tests ──────────────────────────────────────
+
+    fn graph_genome_with_input_refs(
+        input_refs: Vec<InputReference>,
+        nodes: Vec<GraphInternalNode>,
+    ) -> CreatureGenome {
+        CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs,
+                backend_def: BackendDef::Graph(GraphBackendDef {
+                    internal_nodes: nodes,
+                }),
+                targets: vec![],
+            }],
+        }
+    }
+
+    #[test]
+    fn reindex_graph_decrements_refs_above_removed() {
+        let genome = graph_genome_with_input_refs(
+            vec![
+                InputReference::World(WorldInputKey::FoodHere),
+                InputReference::UpstreamSlot(0),
+                InputReference::UpstreamSlot(1),
+            ],
+            vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 0,
+                        sub_idx: 0,
+                    },
+                    inputs: vec![],
+                    hebbian: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 2,
+                        sub_idx: 0,
+                    },
+                    inputs: vec![],
+                    hebbian: None,
+                },
+            ],
+        );
+        let mut g = genome;
+        // Remove input ref at index 1 → ref_idx 0 stays, ref_idx 2 → 1
+        reindex_after_removal(&mut g, 0, 1);
+        if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
+            // ref_idx 0 < removed(1) → unchanged
+            assert_eq!(
+                gd.internal_nodes[0].kind,
+                GraphNodeKind::InputRef {
+                    ref_idx: 0,
+                    sub_idx: 0
+                }
+            );
+            // ref_idx 2 > removed(1) → decremented to 1
+            assert_eq!(
+                gd.internal_nodes[1].kind,
+                GraphNodeKind::InputRef {
+                    ref_idx: 1,
+                    sub_idx: 0
+                }
+            );
+        } else {
+            panic!("expected Graph backend");
+        }
+    }
+
+    #[test]
+    fn reindex_graph_invalidates_removed_ref() {
+        let genome = graph_genome_with_input_refs(
+            vec![
+                InputReference::World(WorldInputKey::FoodHere),
+                InputReference::UpstreamSlot(0),
+            ],
+            vec![GraphInternalNode {
+                kind: GraphNodeKind::InputRef {
+                    ref_idx: 1,
+                    sub_idx: 3,
+                },
+                inputs: vec![],
+                hebbian: None,
+            }],
+        );
+        let mut g = genome;
+        // Remove the ref at index 1 → ref_idx 1 == removed → invalidate
+        reindex_after_removal(&mut g, 0, 1);
+        if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
+            assert_eq!(
+                gd.internal_nodes[0].kind,
+                GraphNodeKind::InputRef {
+                    ref_idx: u16::MAX,
+                    sub_idx: 3
+                }
+            );
+        } else {
+            panic!("expected Graph backend");
+        }
+    }
+
+    #[test]
+    fn reindex_vm_decrements_and_invalidates() {
+        let mut genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![
+                    InputReference::World(WorldInputKey::FoodHere),
+                    InputReference::UpstreamSlot(0),
+                    InputReference::UpstreamSlot(1),
+                ],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 2,
+                    constants: vec![],
+                    program: vec![
+                        VmInstruction::ReadInput {
+                            dst: 0,
+                            ref_idx: 0,
+                            sub_idx: 0,
+                        },
+                        VmInstruction::ReadInput {
+                            dst: 1,
+                            ref_idx: 1,
+                            sub_idx: 0,
+                        },
+                        VmInstruction::ReadInput {
+                            dst: 0,
+                            ref_idx: 2,
+                            sub_idx: 5,
+                        },
+                        VmInstruction::Halt,
+                    ],
+                }),
+                targets: vec![],
+            }],
+        };
+        // Remove input ref at index 1
+        reindex_after_removal(&mut genome, 0, 1);
+        if let BackendDef::Vm(ref vm) = genome.nodes[0].backend_def {
+            // ref_idx 0 < 1 → unchanged
+            assert!(matches!(
+                vm.program[0],
+                VmInstruction::ReadInput {
+                    ref_idx: 0,
+                    sub_idx: 0,
+                    ..
+                }
+            ));
+            // ref_idx 1 == removed → invalidated to u16::MAX
+            assert!(matches!(
+                vm.program[1],
+                VmInstruction::ReadInput {
+                    ref_idx: u16::MAX,
+                    sub_idx: 0,
+                    ..
+                }
+            ));
+            // ref_idx 2 > 1 → decremented to 1
+            assert!(matches!(
+                vm.program[2],
+                VmInstruction::ReadInput {
+                    ref_idx: 1,
+                    sub_idx: 5,
+                    ..
+                }
+            ));
+        } else {
+            panic!("expected VM backend");
+        }
+    }
+
+    #[test]
+    fn remove_operator_calls_reindex() {
+        // Build a genome with 2 input refs and a graph node referencing ref_idx 1.
+        // After Remove removes ref at index 0, the graph node's ref_idx should be 0 (decremented).
+        let genome = graph_genome_with_input_refs(
+            vec![
+                InputReference::World(WorldInputKey::FoodHere),
+                InputReference::UpstreamSlot(0),
+            ],
+            vec![GraphInternalNode {
+                kind: GraphNodeKind::InputRef {
+                    ref_idx: 1,
+                    sub_idx: 0,
+                },
+                inputs: vec![],
+                hebbian: None,
+            }],
+        );
+        // Force rng to pick node 0 and ref_idx 0 for removal.
+        // With seed search, find one that removes index 0.
+        let mut found = false;
+        for seed in 0u64..200 {
+            let mut g = genome.clone();
+            let mut r = rng(seed);
+            if InputRefMutator::apply(&mut g, InputRefOperator::Remove, &mut r).is_ok()
+                && g.nodes[0].input_refs.len() == 1
+            {
+                // Removed one ref. Check if the remaining is UpstreamSlot(0)
+                // meaning we removed index 0 (FoodHere).
+                if g.nodes[0].input_refs[0] == InputReference::UpstreamSlot(0) {
+                    // Ref at index 0 was removed → old ref_idx 1 should be 0 now.
+                    if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
+                        assert_eq!(
+                            gd.internal_nodes[0].kind,
+                            GraphNodeKind::InputRef {
+                                ref_idx: 0,
+                                sub_idx: 0,
+                            },
+                            "Remove must call reindex to decrement ref_idx above removed"
+                        );
+                        found = true;
+                        break;
+                    }
+                }
+            }
+        }
+        assert!(found, "must find a seed that removes index 0");
+    }
+
+    #[test]
+    fn reindex_noop_on_empty_graph_backend() {
+        let mut genome = graph_genome_with_input_refs(
+            vec![InputReference::World(WorldInputKey::FoodHere)],
+            vec![], // no internal nodes
+        );
+        reindex_after_removal(&mut genome, 0, 0); // should not panic
+    }
+
+    #[test]
+    fn reindex_noop_on_empty_vm_program() {
+        let mut genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![], // empty program
+                }),
+                targets: vec![],
+            }],
+        };
+        reindex_after_removal(&mut genome, 0, 0); // should not panic
+    }
+
+    #[test]
+    fn reindex_graph_invalidates_all_matching_refs() {
+        let mut genome = graph_genome_with_input_refs(
+            vec![InputReference::World(WorldInputKey::FoodHere)],
+            vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 0,
+                        sub_idx: 0,
+                    },
+                    inputs: vec![],
+                    hebbian: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 0,
+                        sub_idx: 1,
+                    },
+                    inputs: vec![],
+                    hebbian: None,
+                },
+            ],
+        );
+        reindex_after_removal(&mut genome, 0, 0);
+        if let BackendDef::Graph(ref gd) = genome.nodes[0].backend_def {
+            for (i, node) in gd.internal_nodes.iter().enumerate() {
+                if let GraphNodeKind::InputRef { ref_idx, .. } = node.kind {
+                    assert_eq!(
+                        ref_idx,
+                        u16::MAX,
+                        "internal node {} should be invalidated",
+                        i
+                    );
+                }
+            }
+        } else {
+            panic!("expected Graph backend");
+        }
     }
 }
