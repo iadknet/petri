@@ -102,6 +102,7 @@ pub fn execute_creature_mesh_traced(
                     graph_runtime,
                     static_inputs,
                     config,
+                    &action_queue,
                 );
                 (result, BackendTrace::Graph(graph_trace))
             }

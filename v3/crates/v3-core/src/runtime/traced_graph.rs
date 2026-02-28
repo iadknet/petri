@@ -7,7 +7,7 @@
 //! with equivalence tests.
 
 use crate::config::RuntimeConfig;
-use crate::contracts::InputReference;
+use crate::contracts::{ActionQueue, InputReference};
 use crate::creature::genome::GraphBackendDef;
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::graph::{collect_weighted_inputs, evaluate_kind, EvalCtx};
@@ -35,6 +35,7 @@ pub fn execute_graph_node_traced(
     graph_runtime: &mut GraphRuntimeState,
     static_inputs: &StaticInputs,
     config: &RuntimeConfig,
+    action_queue: &ActionQueue,
 ) -> (NodeResult, GraphTrace) {
     let node_count = def.internal_nodes.len();
 
@@ -102,6 +103,7 @@ pub fn execute_graph_node_traced(
                 upstream_slots,
                 energy: *energy,
                 energy_consumed,
+                action_queue,
             },
         };
 
@@ -240,6 +242,7 @@ pub fn execute_graph_node_traced(
 mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
+    use crate::contracts::ActionQueue;
     use crate::creature::genome::{GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind};
     use crate::creature::state::GraphRuntimeState;
     use crate::runtime::graph::execute_graph_node;
@@ -304,6 +307,7 @@ mod tests {
             &mut gr_a,
             &si,
             &config,
+            &ActionQueue::new(4),
         );
 
         let mut energy_b = 100.0f32;
@@ -318,6 +322,7 @@ mod tests {
             &mut gr_b,
             &si,
             &config,
+            &ActionQueue::new(4),
         );
 
         assert_eq!(result_a, result_b);
@@ -378,6 +383,7 @@ mod tests {
             &mut gr,
             &si,
             &config,
+            &ActionQueue::new(4),
         );
         assert!(!r1.energy_exhausted);
         assert!((r1.output_slots[0] - 0.5).abs() < 1e-5);
@@ -399,6 +405,7 @@ mod tests {
             &mut gr,
             &si,
             &config,
+            &ActionQueue::new(4),
         );
         let decay_eval2 = &trace2.passes[0].node_evaluations[1];
         assert!((decay_eval2.state_before - 0.5).abs() < 1e-6);
@@ -443,6 +450,7 @@ mod tests {
             &mut gr,
             &si,
             &config,
+            &ActionQueue::new(4),
         );
 
         assert!(trace.converged);

@@ -1,4 +1,4 @@
-use crate::contracts::{DynamicIntrospectionKey, InputReference};
+use crate::contracts::{ActionQueue, DynamicIntrospectionKey, InputReference};
 use crate::sensors::static_inputs::StaticInputs;
 
 /// Shared resolution context for input references.
@@ -12,6 +12,7 @@ pub struct ResolveCtx<'a> {
     pub upstream_slots: &'a [f32; 12],
     pub energy: f32,
     pub energy_consumed: f32,
+    pub action_queue: &'a ActionQueue,
 }
 
 /// Resolve an `InputReference` to its current f32 value.
@@ -25,11 +26,18 @@ pub struct ResolveCtx<'a> {
 #[inline]
 #[must_use]
 pub fn resolve_input(reference: &InputReference, sub_idx: u16, ctx: &ResolveCtx<'_>) -> f32 {
-    // All current input types are scalar: sub_idx > 0 returns 0.0.
-    if sub_idx > 0 {
-        return 0.0;
-    }
     match reference {
+        // Compound input: ActionQueue uses sub_idx for two-level addressing.
+        InputReference::ActionQueue => {
+            let slot = (sub_idx / 3) as usize;
+            match sub_idx % 3 {
+                0 => ctx.action_queue.action_type_at(slot),
+                1 => ctx.action_queue.param_at(slot, 0),
+                _ => ctx.action_queue.param_at(slot, 1),
+            }
+        }
+        // All other input types are scalar: sub_idx > 0 returns 0.0.
+        _ if sub_idx > 0 => 0.0,
         InputReference::World(key) => ctx.static_inputs.resolve_world(key),
         InputReference::StaticIntrospection(key) => ctx.static_inputs.resolve_static(key),
         InputReference::DynamicIntrospection(key) => match key {
@@ -50,7 +58,8 @@ pub fn resolve_input(reference: &InputReference, sub_idx: u16, ctx: &ResolveCtx<
 mod tests {
     use super::*;
     use crate::contracts::{
-        Direction, DynamicIntrospectionKey, InputReference, StaticIntrospectionKey, WorldInputKey,
+        ActionQueue, Direction, DynamicIntrospectionKey, InputReference, StaticIntrospectionKey,
+        WorldAction, WorldInputKey,
     };
     use crate::sensors::static_inputs::StaticInputs;
 
@@ -71,11 +80,16 @@ mod tests {
         energy: f32,
         energy_consumed: f32,
     ) -> ResolveCtx<'a> {
+        // Leak a default ActionQueue for test convenience (tests don't need to
+        // read action queue via this helper).
+        static EMPTY_AQ: std::sync::LazyLock<ActionQueue> =
+            std::sync::LazyLock::new(|| ActionQueue::new(4));
         ResolveCtx {
             static_inputs: si,
             upstream_slots: upstream,
             energy,
             energy_consumed,
+            action_queue: &EMPTY_AQ,
         }
     }
 
@@ -189,6 +203,93 @@ mod tests {
         let ctx = make_ctx(&si, &upstream, 20.0, 0.0);
         let v = resolve_input(&InputReference::UpstreamSlot(999), 0, &ctx);
         assert_eq!(v, 0.0);
+    }
+
+    // ── ActionQueue compound input tests ────────────────────────────────
+
+    #[test]
+    fn action_queue_sub_idx_0_returns_action_type() {
+        let si = make_static_inputs(0.0);
+        let upstream = [0.0f32; 12];
+        let mut aq = ActionQueue::new(4);
+        aq.push(WorldAction::Eat); // type 1
+        let ctx = ResolveCtx {
+            static_inputs: &si,
+            upstream_slots: &upstream,
+            energy: 50.0,
+            energy_consumed: 0.0,
+            action_queue: &aq,
+        };
+        // sub_idx=0 → slot 0, field 0 (action_type)
+        let v = resolve_input(&InputReference::ActionQueue, 0, &ctx);
+        assert!((v - 1.0).abs() < f32::EPSILON, "Eat action type = 1.0");
+    }
+
+    #[test]
+    fn action_queue_sub_idx_maps_slot_and_field() {
+        let si = make_static_inputs(0.0);
+        let upstream = [0.0f32; 12];
+        let mut aq = ActionQueue::new(4);
+        aq.push(WorldAction::NoOp); // slot 0: type=0
+        aq.push(WorldAction::Move(Direction::E)); // slot 1: type=2, param0=2.0 (E direction index)
+        let ctx = ResolveCtx {
+            static_inputs: &si,
+            upstream_slots: &upstream,
+            energy: 50.0,
+            energy_consumed: 0.0,
+            action_queue: &aq,
+        };
+        // sub_idx=3 → slot 1 (3/3=1), field 0 (3%3=0) = action_type = 2.0 (Move)
+        let v = resolve_input(&InputReference::ActionQueue, 3, &ctx);
+        assert!((v - 2.0).abs() < f32::EPSILON, "Move action type = 2.0");
+        // sub_idx=4 → slot 1, field 1 = param0 = direction = 2.0 (E)
+        let v = resolve_input(&InputReference::ActionQueue, 4, &ctx);
+        assert!(
+            (v - 2.0).abs() < f32::EPSILON,
+            "Move param0 = E direction = 2.0"
+        );
+    }
+
+    #[test]
+    fn action_queue_param1_field_coverage() {
+        let si = make_static_inputs(0.0);
+        let upstream = [0.0f32; 12];
+        let mut aq = ActionQueue::new(4);
+        aq.push(WorldAction::Reproduce {
+            direction: Direction::N,
+            energy_transfer: 0.42,
+        });
+        let ctx = ResolveCtx {
+            static_inputs: &si,
+            upstream_slots: &upstream,
+            energy: 50.0,
+            energy_consumed: 0.0,
+            action_queue: &aq,
+        };
+        // sub_idx=2 → slot 0, field 2 = param1 = energy_transfer = 0.42
+        let v = resolve_input(&InputReference::ActionQueue, 2, &ctx);
+        assert!(
+            (v - 0.42).abs() < f32::EPSILON,
+            "Reproduce param1 = energy_transfer = 0.42, got {v}"
+        );
+    }
+
+    #[test]
+    fn action_queue_oob_returns_zero() {
+        let si = make_static_inputs(0.0);
+        let upstream = [0.0f32; 12];
+        let aq = ActionQueue::new(4); // empty queue
+        let ctx = ResolveCtx {
+            static_inputs: &si,
+            upstream_slots: &upstream,
+            energy: 50.0,
+            energy_consumed: 0.0,
+            action_queue: &aq,
+        };
+        // Any sub_idx on empty queue returns 0.0
+        assert_eq!(resolve_input(&InputReference::ActionQueue, 0, &ctx), 0.0);
+        assert_eq!(resolve_input(&InputReference::ActionQueue, 5, &ctx), 0.0);
+        assert_eq!(resolve_input(&InputReference::ActionQueue, 100, &ctx), 0.0);
     }
 
     #[test]

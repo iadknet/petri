@@ -1,5 +1,6 @@
 use super::*;
 use crate::config::RuntimeConfig;
+use crate::contracts::ActionQueue;
 use crate::creature::genome::{GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind};
 use crate::creature::state::GraphRuntimeState;
 use crate::sensors::static_inputs::StaticInputs;
@@ -52,6 +53,7 @@ fn empty_graph_returns_halted_and_no_energy_charged() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
 
     // No energy consumed.
@@ -87,6 +89,7 @@ fn energy_exhaustion_returns_exhausted() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
 
     assert!(result.energy_exhausted);
@@ -113,6 +116,7 @@ fn constant_node_does_not_write_output_slots() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
 
     // No CustomOutput → output_slots stays = upstream.
@@ -166,6 +170,7 @@ fn add_custom_output_writes_correct_slot() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
 
     assert!(!result.energy_exhausted);
@@ -212,6 +217,7 @@ fn router_output_sets_route_target_idx() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
 
     assert!(!result.energy_exhausted);
@@ -242,6 +248,7 @@ fn graph_never_emits_world_action() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
 
     assert!(!result.terminal);
@@ -302,6 +309,7 @@ fn decay_integrator_accumulates_state() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
     assert!(!result1.energy_exhausted);
     assert!(
@@ -320,6 +328,7 @@ fn decay_integrator_accumulates_state() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
     assert!(!result2.energy_exhausted);
     assert!(
@@ -363,6 +372,7 @@ fn state_not_mutated_on_energy_exhaustion() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
 
     assert!(result.energy_exhausted);
@@ -396,6 +406,7 @@ fn output_slots_initialized_from_upstream_passthrough() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
 
     assert!(!result.energy_exhausted);
@@ -442,6 +453,7 @@ fn energy_deducted_per_pass_on_success() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
 
     // 2 nodes * 1.0 cost = 2.0 consumed in exactly 1 pass.
@@ -502,6 +514,7 @@ fn decay_integrator_formula_correct() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
     assert!(
         (r1.output_slots[0] - 0.5).abs() < 1e-5,
@@ -519,6 +532,7 @@ fn decay_integrator_formula_correct() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
     assert!(
         (r2.output_slots[0] - 0.75).abs() < 1e-5,
@@ -579,6 +593,7 @@ fn momentum_formula_correct() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
     assert!(
         (r1.output_slots[0] - 0.2).abs() < 1e-5,
@@ -634,6 +649,7 @@ fn oscillator_nan_safe() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
 
     assert!(
@@ -695,6 +711,7 @@ fn threshold_formula_correct() {
         &mut GraphRuntimeState::new(),
         &si,
         &config,
+        &ActionQueue::new(4),
     );
     assert_eq!(r.output_slots[0], 1.0, "wsum=0.6 should fire");
 
@@ -710,6 +727,7 @@ fn threshold_formula_correct() {
         &mut GraphRuntimeState::new(),
         &si,
         &config,
+        &ActionQueue::new(4),
     );
     assert_eq!(
         r.output_slots[0], 0.0,
@@ -728,6 +746,7 @@ fn threshold_formula_correct() {
         &mut GraphRuntimeState::new(),
         &si,
         &config,
+        &ActionQueue::new(4),
     );
     assert_eq!(r.output_slots[0], 0.0, "wsum=0.4 should NOT fire");
 }
@@ -772,6 +791,7 @@ fn multiply_empty_inputs_is_one() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
 
     assert_eq!(
@@ -840,6 +860,7 @@ fn greater_than_formula() {
         &mut GraphRuntimeState::new(),
         &si,
         &config,
+        &ActionQueue::new(4),
     );
     assert_eq!(r.output_slots[0], 1.0, "2.0 > 1.0 should produce 1.0");
 
@@ -855,6 +876,7 @@ fn greater_than_formula() {
         &mut GraphRuntimeState::new(),
         &si,
         &config,
+        &ActionQueue::new(4),
     );
     assert_eq!(r.output_slots[0], 0.0, "1.0 == 1.0 should produce 0.0");
 
@@ -870,6 +892,7 @@ fn greater_than_formula() {
         &mut GraphRuntimeState::new(),
         &si,
         &config,
+        &ActionQueue::new(4),
     );
     assert_eq!(r.output_slots[0], 0.0, "0.5 < 1.0 should produce 0.0");
 }
@@ -952,6 +975,7 @@ fn select_formula() {
         &mut GraphRuntimeState::new(),
         &si,
         &config,
+        &ActionQueue::new(4),
     );
     assert_eq!(
         r.output_slots[0], 10.0,
@@ -971,6 +995,7 @@ fn select_formula() {
         &mut GraphRuntimeState::new(),
         &si,
         &config,
+        &ActionQueue::new(4),
     );
     assert_eq!(
         r.output_slots[0], 20.0,
@@ -1027,6 +1052,7 @@ fn router_output_last_write_wins() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
 
     assert!(!result.energy_exhausted);
@@ -1075,6 +1101,7 @@ fn input_ref_255_soft_defaults_to_zero() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
 
     assert!(!result.energy_exhausted);
@@ -1119,6 +1146,7 @@ fn custom_output_255_does_not_write_output_slots() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
 
     assert!(!result.energy_exhausted);
@@ -1166,6 +1194,7 @@ fn edge_source_65535_soft_defaults_to_zero() {
         &mut gr,
         &si,
         &config,
+        &ActionQueue::new(4),
     );
 
     assert!(!result.energy_exhausted);

@@ -1,5 +1,5 @@
 use crate::config::RuntimeConfig;
-use crate::contracts::InputReference;
+use crate::contracts::{ActionQueue, InputReference};
 use crate::creature::genome::{GraphBackendDef, GraphInternalNode, GraphNodeKind};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::hebbian;
@@ -154,6 +154,7 @@ pub fn execute_graph_node(
     graph_runtime: &mut GraphRuntimeState,
     static_inputs: &StaticInputs,
     config: &RuntimeConfig,
+    action_queue: &ActionQueue,
 ) -> NodeResult {
     let node_count = def.internal_nodes.len();
 
@@ -209,6 +210,7 @@ pub fn execute_graph_node(
                 upstream_slots,
                 energy: *energy,
                 energy_consumed,
+                action_queue,
             },
         };
 
