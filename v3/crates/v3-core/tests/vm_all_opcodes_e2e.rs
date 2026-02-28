@@ -300,7 +300,7 @@ fn sample_program_exercises_all_vm_opcodes_e2e() {
     let emit_trace = emit_trace.expect("trace should remain available");
     assert!(emit_trace.is_complete());
     assert_eq!(emit_trace.ticks.len(), 1);
-    assert_eq!(emit_trace.ticks[0].final_action, WorldAction::Eat);
+    assert_eq!(emit_trace.ticks[0].final_actions[0], WorldAction::Eat);
     assert!(
         (sim_emit.world.food_at(emit_pos) - 0.0).abs() < 1e-6,
         "Eat path should consume food"
@@ -319,7 +319,7 @@ fn sample_program_exercises_all_vm_opcodes_e2e() {
     let halt_trace = halt_trace.expect("trace should remain available");
     assert!(halt_trace.is_complete());
     assert_eq!(halt_trace.ticks.len(), 1);
-    assert_eq!(halt_trace.ticks[0].final_action, WorldAction::NoOp);
+    assert_eq!(halt_trace.ticks[0].final_actions[0], WorldAction::NoOp);
     assert!(
         (sim_halt.world.food_at(halt_pos) - 0.0).abs() < 1e-6,
         "Halt path should leave no food on an empty cell"

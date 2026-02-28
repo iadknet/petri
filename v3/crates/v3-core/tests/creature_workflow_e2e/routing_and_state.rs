@@ -75,7 +75,7 @@ fn routing_wraps_negative_index_to_reachable_downstream_node_e2e() {
     let tick = run_one_traced_tick(&mut sim, target);
 
     assert_eq!(tick.hops.len(), 2);
-    assert_eq!(tick.final_action, WorldAction::Eat);
+    assert_eq!(tick.final_actions[0], WorldAction::Eat);
     assert!((tick.hops[0].route_target_idx - (-1.0)).abs() < 1e-6);
     assert_eq!(
         tick.hops[1].node_id, id_eat,
