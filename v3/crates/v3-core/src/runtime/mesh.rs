@@ -67,12 +67,7 @@ pub fn execute_creature_mesh(
 
     loop {
         if hops >= max_hops {
-            let actions = action_queue.into_actions();
-            return if actions.is_empty() {
-                (vec![WorldAction::NoOp], report)
-            } else {
-                (actions, report)
-            };
+            return (action_queue.into_actions_or_noop(), report);
         }
 
         // Invariant: verified present before the loop, and after every routing step.
@@ -122,22 +117,12 @@ pub fn execute_creature_mesh(
         }
 
         if result.terminal {
-            let actions = action_queue.into_actions();
-            return if actions.is_empty() {
-                (vec![WorldAction::NoOp], report)
-            } else {
-                (actions, report)
-            };
+            return (action_queue.into_actions_or_noop(), report);
         }
 
         // Routing: if no targets, the chain terminates — preserve accumulated queue.
         if node.targets.is_empty() {
-            let actions = action_queue.into_actions();
-            return if actions.is_empty() {
-                (vec![WorldAction::NoOp], report)
-            } else {
-                (actions, report)
-            };
+            return (action_queue.into_actions_or_noop(), report);
         }
 
         // Convert route_target_idx (f32) to i64 with special-case handling for
@@ -161,12 +146,7 @@ pub fn execute_creature_mesh(
 
         // Soft default: routed target id missing from node set.
         if !node_index.contains_key(&target_id) {
-            let actions = action_queue.into_actions();
-            return if actions.is_empty() {
-                (vec![WorldAction::NoOp], report)
-            } else {
-                (actions, report)
-            };
+            return (action_queue.into_actions_or_noop(), report);
         }
 
         upstream_slots = result.output_slots;

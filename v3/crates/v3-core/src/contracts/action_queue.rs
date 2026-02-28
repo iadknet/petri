@@ -64,6 +64,16 @@ impl ActionQueue {
         self.actions
     }
 
+    /// Consume the queue and return the accumulated actions, or `vec![NoOp]` if empty.
+    #[inline]
+    pub fn into_actions_or_noop(self) -> Vec<WorldAction> {
+        if self.actions.is_empty() {
+            vec![WorldAction::NoOp]
+        } else {
+            self.actions
+        }
+    }
+
     /// Clear all actions from the queue.
     pub fn clear(&mut self) {
         self.actions.clear();
@@ -150,6 +160,25 @@ mod tests {
         q.push(WorldAction::Eat);
         assert!((q.param_at(99, 0) - 0.0).abs() < f32::EPSILON); // OOB index
         assert!((q.param_at(0, 99) - 0.0).abs() < f32::EPSILON); // OOB slot
+    }
+
+    #[test]
+    fn into_actions_or_noop_empty_returns_noop() {
+        let q = ActionQueue::new(10);
+        let actions = q.into_actions_or_noop();
+        assert_eq!(actions, vec![WorldAction::NoOp]);
+    }
+
+    #[test]
+    fn into_actions_or_noop_non_empty_returns_actions() {
+        let mut q = ActionQueue::new(10);
+        q.push(WorldAction::Eat);
+        q.push(WorldAction::Move(Direction::N));
+        let actions = q.into_actions_or_noop();
+        assert_eq!(
+            actions,
+            vec![WorldAction::Eat, WorldAction::Move(Direction::N)]
+        );
     }
 
     #[test]
