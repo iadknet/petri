@@ -168,8 +168,15 @@ pub fn execute_graph_node(
         graph_runtime.node_state.resize(node_idx + 1, Vec::new());
     }
 
+    // Extract scratch buffers (leaves empty Vecs in graph_runtime, avoids
+    // borrow conflicts with graph_runtime.node_state).
+    let mut prev_outputs = std::mem::take(&mut graph_runtime.scratch_prev);
+    let mut curr_outputs = std::mem::take(&mut graph_runtime.scratch_curr);
+    let mut state_backup = std::mem::take(&mut graph_runtime.scratch_backup);
+
     // Snapshot state for atomic rollback on energy exhaustion.
-    let state_backup: Vec<f32> = graph_runtime.node_state[node_idx].clone();
+    state_backup.clear();
+    state_backup.extend_from_slice(&graph_runtime.node_state[node_idx]);
 
     // Ensure the state Vec for this node is long enough.
     let state_vec = &mut graph_runtime.node_state[node_idx];
@@ -187,10 +194,13 @@ pub fn execute_graph_node(
     let epsilon = config.graph_convergence_epsilon;
     let req_stable = config.graph_convergence_stable_passes;
 
-    let mut prev_outputs = vec![0.0f32; node_count];
-    let mut curr_outputs = vec![0.0f32; node_count];
+    // Prepare output buffers (reuses capacity from previous calls).
+    prev_outputs.clear();
+    prev_outputs.resize(node_count, 0.0);
+    curr_outputs.clear();
+    curr_outputs.resize(node_count, 0.0);
     let mut stable_passes: u32 = 0;
-    let mut w_inputs_buf: Vec<f32> = Vec::new();
+    let mut w_inputs_buf = std::mem::take(&mut graph_runtime.scratch_w_inputs);
 
     for _pass in 0..max_passes {
         // Charge energy BEFORE evaluating this pass.
@@ -198,7 +208,14 @@ pub fn execute_graph_node(
         *energy -= pass_cost;
         if *energy <= 0.0 {
             // Restore state snapshot.
-            graph_runtime.node_state[node_idx] = state_backup;
+            graph_runtime.node_state[node_idx].clone_from(&state_backup);
+            restore_scratch(
+                graph_runtime,
+                prev_outputs,
+                curr_outputs,
+                state_backup,
+                w_inputs_buf,
+            );
             return NodeResult::exhausted();
         }
 
@@ -263,7 +280,7 @@ pub fn execute_graph_node(
             .map(|(p, c)| (c - p).abs())
             .fold(0.0f32, f32::max);
 
-        prev_outputs.clone_from(&curr_outputs);
+        prev_outputs.copy_from_slice(&curr_outputs);
 
         if delta <= epsilon {
             stable_passes += 1;
@@ -308,12 +325,36 @@ pub fn execute_graph_node(
         }
     }
 
+    // Restore scratch buffers before returning.
+    restore_scratch(
+        graph_runtime,
+        prev_outputs,
+        curr_outputs,
+        state_backup,
+        w_inputs_buf,
+    );
+
     NodeResult {
         output_slots,
         route_target_idx,
         terminal: false,
         energy_exhausted: false,
     }
+}
+
+/// Restore scratch buffers to `GraphRuntimeState` (must be called on all return paths).
+#[inline]
+fn restore_scratch(
+    graph_runtime: &mut GraphRuntimeState,
+    prev: Vec<f32>,
+    curr: Vec<f32>,
+    backup: Vec<f32>,
+    w_inputs: Vec<f32>,
+) {
+    graph_runtime.scratch_prev = prev;
+    graph_runtime.scratch_curr = curr;
+    graph_runtime.scratch_backup = backup;
+    graph_runtime.scratch_w_inputs = w_inputs;
 }
 
 #[cfg(test)]
