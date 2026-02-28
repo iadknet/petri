@@ -15,34 +15,48 @@ pub fn apply_noop(creature: &mut CreatureState, config: &SimulationConfig) {
 }
 
 /// Apply an Eat action: consume all food on the creature's cell, reward energy, cap at max.
-pub fn apply_eat(creature: &mut CreatureState, world: &mut WorldState, config: &SimulationConfig) {
+///
+/// Returns `true` if food was consumed, `false` if the cell had no food.
+#[must_use]
+pub fn apply_eat(
+    creature: &mut CreatureState,
+    world: &mut WorldState,
+    config: &SimulationConfig,
+) -> bool {
     let food = world.consume_food(creature.position);
     creature.energy += food * config.energy.costs.eat_reward_per_food;
     creature.energy = creature.energy.min(config.energy.lifecycle.max_energy);
     creature.energy -= config.energy.costs.eat_cost;
+    food > 0.0
 }
 
 /// Apply a Move action: move one step in `dir` if the target is valid.
 ///
 /// Energy cost is always deducted even if the move is rejected (blocked cell).
+/// Returns `true` if the creature actually moved, `false` if the target was invalid.
+#[must_use]
 pub fn apply_move(
     id: CreatureId,
     creature: &mut CreatureState,
     world: &mut WorldState,
     dir: Direction,
     config: &SimulationConfig,
-) {
+) -> bool {
     let target = world
         .resolve_neighbor(creature.position, dir)
         .filter(|&p| world.is_valid_target_cell(p));
 
-    if let Some(target_pos) = target {
+    let succeeded = if let Some(target_pos) = target {
         world.remove_creature(creature.position);
         world.place_creature(target_pos, id);
         creature.position = target_pos;
-    }
+        true
+    } else {
+        false
+    };
 
     creature.energy -= config.energy.costs.move_cost;
+    succeeded
 }
 
 #[cfg(test)]
@@ -111,7 +125,7 @@ mod tests {
             });
         let energy_before = sim.creatures[id].energy;
         let creature = sim.creatures.get_mut(id).unwrap();
-        apply_eat(creature, &mut sim.world, &sim.config);
+        let _ = apply_eat(creature, &mut sim.world, &sim.config);
         assert!(
             sim.creatures[id].energy > energy_before,
             "eat should increase energy"
@@ -137,7 +151,7 @@ mod tests {
         }
         let max = sim.config.energy.lifecycle.max_energy;
         let creature = sim.creatures.get_mut(id).unwrap();
-        apply_eat(creature, &mut sim.world, &sim.config);
+        let _ = apply_eat(creature, &mut sim.world, &sim.config);
         assert!(
             sim.creatures[id].energy <= max,
             "energy {} should be <= max {}",
@@ -156,7 +170,7 @@ mod tests {
         let energy_before = sim.creatures[id].energy;
         {
             let creature = sim.creatures.get_mut(id).unwrap();
-            apply_move(id, creature, &mut sim.world, Direction::N, &sim.config);
+            let _ = apply_move(id, creature, &mut sim.world, Direction::N, &sim.config);
         }
         // In wrap mode, N of (5,5) on a 10×10 world is (5,4).
         let expected = Position::new(5, 4);
@@ -176,7 +190,7 @@ mod tests {
         let move_cost = sim.config.energy.costs.move_cost;
         {
             let creature = sim.creatures.get_mut(id).unwrap();
-            apply_move(id, creature, &mut sim.world, Direction::N, &sim.config);
+            let _ = apply_move(id, creature, &mut sim.world, Direction::N, &sim.config);
         }
         assert_eq!(
             sim.creatures[id].position, start,
@@ -231,7 +245,7 @@ mod tests {
         };
         {
             let creature = sim.creatures.get_mut(id1).unwrap();
-            apply_move(id1, creature, &mut sim.world, Direction::N, &sim.config);
+            let _ = apply_move(id1, creature, &mut sim.world, Direction::N, &sim.config);
         }
         assert_eq!(
             sim.creatures[id1].position, pos1,
@@ -533,6 +547,101 @@ mod tests {
                 .is_empty(),
             "expected at least one attempted operator counter entry"
         );
+    }
+
+    // ── apply_move return value ─────────────────────────────────────────────
+
+    #[test]
+    fn apply_move_returns_true_on_success() {
+        let start = Position::new(5, 5);
+        let (mut sim, id) = make_sim_one_creature(start, 50.0);
+        let creature = sim.creatures.get_mut(id).unwrap();
+        let result = apply_move(id, creature, &mut sim.world, Direction::N, &sim.config);
+        assert!(result, "successful move should return true");
+    }
+
+    #[test]
+    fn apply_move_returns_false_on_barrier() {
+        let start = Position::new(5, 5);
+        let (mut sim, id) = make_sim_one_creature(start, 50.0);
+        sim.world.set_barrier(Position::new(5, 4), true);
+        let creature = sim.creatures.get_mut(id).unwrap();
+        let result = apply_move(id, creature, &mut sim.world, Direction::N, &sim.config);
+        assert!(!result, "blocked move should return false");
+    }
+
+    #[test]
+    fn apply_move_returns_false_on_occupied() {
+        let pos1 = Position::new(5, 5);
+        let pos2 = Position::new(5, 4);
+        let cfg = small_config();
+        let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
+        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let id1 = creatures.insert_with_key(|id| {
+            CreatureState::new(
+                id,
+                v3alpha1_founder_genome(),
+                pos1,
+                50.0,
+                0,
+                [0, 0, 92, 92, 138, 138],
+                0,
+                [true; 6],
+            )
+        });
+        let _id2 = creatures.insert_with_key(|id| {
+            CreatureState::new(
+                id,
+                v3alpha1_founder_genome(),
+                pos2,
+                50.0,
+                0,
+                [0, 0, 92, 92, 138, 138],
+                0,
+                [true; 6],
+            )
+        });
+        world.place_creature(pos1, id1);
+        world.place_creature(pos2, _id2);
+        let mut sim = Simulation {
+            world,
+            creatures,
+            tick: 0,
+            config: cfg,
+            stats: crate::simulation::stats::SimStats::default(),
+            rng: rand::rngs::SmallRng::seed_from_u64(0),
+        };
+        let creature = sim.creatures.get_mut(id1).unwrap();
+        let result = apply_move(id1, creature, &mut sim.world, Direction::N, &sim.config);
+        assert!(!result, "move into occupied cell should return false");
+    }
+
+    // ── apply_eat return value ──────────────────────────────────────────────
+
+    #[test]
+    fn apply_eat_returns_true_with_food() {
+        let pos = Position::new(3, 3);
+        let (mut sim, id) = make_sim_one_creature(pos, 10.0);
+        sim.world
+            .seed_food(&mut rand::rngs::SmallRng::seed_from_u64(0), &{
+                let mut cfg = small_config();
+                cfg.world.food.initial_coverage = 1.0;
+                cfg.world.food.initial_density = 0.5;
+                cfg
+            });
+        let creature = sim.creatures.get_mut(id).unwrap();
+        let result = apply_eat(creature, &mut sim.world, &sim.config);
+        assert!(result, "eating food should return true");
+    }
+
+    #[test]
+    fn apply_eat_returns_false_without_food() {
+        let pos = Position::new(3, 3);
+        let (mut sim, id) = make_sim_one_creature(pos, 10.0);
+        // No food seeded — cell has 0 food
+        let creature = sim.creatures.get_mut(id).unwrap();
+        let result = apply_eat(creature, &mut sim.world, &sim.config);
+        assert!(!result, "eating empty cell should return false");
     }
 
     #[test]
