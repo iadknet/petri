@@ -46,12 +46,16 @@ const MOCK_CONFIG: SimulationConfig = {
 		graph_convergence_epsilon: 0.001,
 		graph_convergence_stable_passes: 1,
 		graph_node_base_cost: 0.05,
+		hebbian_update_cost: 0.0,
 		vm: { opcode_cost_multiplier: 0.5 },
 	},
 	mutation: {
 		mutation_probability: 0.01,
 		per_birth_mutation_events_min: 1,
 		per_birth_mutation_events_max: 4,
+		mesh_layer_probability: 0.2,
+		complexity_cap: 1200,
+		complexity_pressure_enabled: true,
 		phenotype: {
 			channel_step: 1,
 			channel_change_chance: 0.001,
