@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 
 use crate::config::RuntimeConfig;
-use crate::contracts::{NodeId, WorldAction};
+use crate::contracts::{ActionQueue, NodeId, WorldAction};
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::trace::{BackendTrace, MeshHopTrace, TerminationReason};
@@ -30,7 +30,7 @@ pub fn execute_creature_mesh_traced(
     graph_runtime: &mut GraphRuntimeState,
     config: &RuntimeConfig,
 ) -> (
-    WorldAction,
+    Vec<WorldAction>,
     ComputeCostReport,
     Vec<MeshHopTrace>,
     TerminationReason,
@@ -49,11 +49,12 @@ pub fn execute_creature_mesh_traced(
         .map(|(i, n)| (n.node_id, i))
         .collect();
 
+    let mut action_queue = ActionQueue::new(config.max_actions_per_turn);
     let mut hop_traces: Vec<MeshHopTrace> = Vec::with_capacity(max_hops);
 
     if !node_index.contains_key(&current_node_id) {
         return (
-            WorldAction::NoOp,
+            vec![WorldAction::NoOp],
             report,
             hop_traces,
             TerminationReason::MissingNode,
@@ -63,7 +64,7 @@ pub fn execute_creature_mesh_traced(
     loop {
         if hops >= max_hops {
             return (
-                WorldAction::NoOp,
+                action_queue.into_actions_or_noop(),
                 report,
                 hop_traces,
                 TerminationReason::MaxHopsReached,
@@ -86,6 +87,7 @@ pub fn execute_creature_mesh_traced(
                     memory,
                     static_inputs,
                     config,
+                    &mut action_queue,
                 );
                 (result, BackendTrace::Vm(vm_trace))
             }
@@ -125,20 +127,25 @@ pub fn execute_creature_mesh_traced(
 
         if result.energy_exhausted {
             return (
-                WorldAction::NoOp,
+                vec![WorldAction::NoOp],
                 report,
                 hop_traces,
                 TerminationReason::EnergyExhausted,
             );
         }
 
-        if let Some(action) = result.world_action {
-            return (action, report, hop_traces, TerminationReason::ActionEmitted);
+        if result.terminal {
+            return (
+                action_queue.into_actions_or_noop(),
+                report,
+                hop_traces,
+                TerminationReason::ActionEmitted,
+            );
         }
 
         if node.targets.is_empty() {
             return (
-                WorldAction::NoOp,
+                action_queue.into_actions_or_noop(),
                 report,
                 hop_traces,
                 TerminationReason::NoTargets,
@@ -163,7 +170,7 @@ pub fn execute_creature_mesh_traced(
 
         if !node_index.contains_key(&target_id) {
             return (
-                WorldAction::NoOp,
+                action_queue.into_actions_or_noop(),
                 report,
                 hop_traces,
                 TerminationReason::MissingNode,
@@ -211,7 +218,10 @@ mod tests {
             backend_def: BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
-                program: vec![VmInstruction::EmitWorldAction { action_type }],
+                program: vec![
+                    VmInstruction::PushAction { action_type },
+                    VmInstruction::ExecuteActionQueue,
+                ],
             }),
             targets,
         }
@@ -282,7 +292,7 @@ mod tests {
         );
 
         assert_eq!(action_a, action_b);
-        assert_eq!(action_b, WorldAction::Eat);
+        assert_eq!(action_b, vec![WorldAction::Eat]);
         assert!(
             (energy_a - energy_b).abs() < 1e-6,
             "energy: {energy_a} vs {energy_b}"
@@ -347,7 +357,8 @@ mod tests {
                         ref_idx: 0,
                         sub_idx: 0,
                     },
-                    VmInstruction::EmitWorldAction { action_type: 1 },
+                    VmInstruction::PushAction { action_type: 1 },
+                    VmInstruction::ExecuteActionQueue,
                 ],
             }),
             targets: vec![],
@@ -366,7 +377,7 @@ mod tests {
         let (action, _, hops, _) =
             execute_creature_mesh_traced(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
 
-        assert_eq!(action, WorldAction::Eat);
+        assert_eq!(action, vec![WorldAction::Eat]);
         // Hop 1 (VM) should have upstream_slots[5] = 9.0
         assert!((hops[1].upstream_slots[5] - 9.0).abs() < 1e-5);
     }
@@ -399,7 +410,7 @@ mod tests {
         let (action, _, hops, reason) =
             execute_creature_mesh_traced(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
 
-        assert_eq!(action, WorldAction::NoOp);
+        assert_eq!(action, vec![WorldAction::NoOp]);
         assert!(
             matches!(reason, TerminationReason::EnergyExhausted),
             "expected EnergyExhausted, got {:?}",

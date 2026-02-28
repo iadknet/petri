@@ -117,7 +117,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
         .collect();
 
     // 1b: Cognition — parallel for all creatures, sequential for traced creature.
-    let decisions: Vec<(CreatureId, WorldAction, ComputeCostReport)> = {
+    let decisions: Vec<(CreatureId, Vec<WorldAction>, ComputeCostReport)> = {
         let mut creature_refs: HashMap<_, _> = sim.creatures.iter_mut().collect();
 
         // Extract traced creature (if any) before building parallel work vec.
@@ -133,7 +133,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
         let mut parallel_decisions: Vec<_> = work
             .par_iter_mut()
             .map(|(id, si, creature)| {
-                let (action, cost) = execute_creature_mesh(
+                let (actions, cost) = execute_creature_mesh(
                     &creature.genome,
                     si,
                     &mut creature.energy,
@@ -141,7 +141,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                     &mut creature.graph_runtime,
                     &runtime_config,
                 );
-                (*id, action, cost)
+                (*id, actions, cost)
             })
             .collect();
 
@@ -152,7 +152,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                 let tick_number = sim.tick;
                 let si_snapshot = StaticInputsSnapshot::from(si);
 
-                let (action, cost, hops, termination_reason) = execute_creature_mesh_traced(
+                let (actions, cost, hops, termination_reason) = execute_creature_mesh_traced(
                     &creature.genome,
                     si,
                     &mut creature.energy,
@@ -169,7 +169,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                         energy_after: creature.energy,
                         static_inputs: si_snapshot,
                         hops,
-                        final_action: action.clone(),
+                        final_actions: actions.clone(),
                         termination_reason,
                     });
                     active.ticks_remaining = active.ticks_remaining.saturating_sub(1);
@@ -182,9 +182,9 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                 // insertion point in parallel_decisions.
                 if let Some(pos) = queue_pos {
                     let insert_idx = inputs[..pos].iter().filter(|(id, _)| *id != tid).count();
-                    parallel_decisions.insert(insert_idx, (tid, action, cost));
+                    parallel_decisions.insert(insert_idx, (tid, actions, cost));
                 } else {
-                    parallel_decisions.push((tid, action, cost));
+                    parallel_decisions.push((tid, actions, cost));
                 }
             }
         }
@@ -203,7 +203,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
     let mut compute_graph_count = 0u32;
     let mut compute_creature_count = 0u32;
 
-    for (id, action, compute_cost) in decisions {
+    for (id, actions, compute_cost) in decisions {
         // Accumulate compute cost for this creature.
         let total_cost = compute_cost.vm_cost + compute_cost.graph_cost;
         compute_total_sum += total_cost;
@@ -223,52 +223,54 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
         }
         compute_creature_count += 1;
 
-        // Apply the chosen action using the factored apply_* functions.
-        match action {
-            WorldAction::NoOp => {
-                // NoOp cannot fail; no failed_action_penalty possible.
-                if let Some(creature) = sim.creatures.get_mut(id) {
-                    apply_noop(creature, &sim.config);
-                    sim.stats.last_tick_noop += 1;
-                }
-            }
-            WorldAction::Eat => {
-                if let Some(creature) = sim.creatures.get_mut(id) {
-                    let succeeded = apply_eat(creature, &mut sim.world, &sim.config);
-                    sim.stats.last_tick_eat += 1;
-                    if !succeeded {
-                        creature.energy -= sim.config.energy.costs.failed_action_penalty;
-                    }
-                }
-            }
-            WorldAction::Move(dir) => {
-                if let Some(creature) = sim.creatures.get_mut(id) {
-                    let succeeded = apply_move(id, creature, &mut sim.world, dir, &sim.config);
-                    sim.stats.last_tick_move += 1;
-                    if !succeeded {
-                        creature.energy -= sim.config.energy.costs.failed_action_penalty;
-                    }
-                }
-            }
-            WorldAction::Reproduce {
-                direction,
-                energy_transfer,
-            } => {
-                let result =
-                    apply_reproduce(id, sim, direction, energy_transfer, &mut reproduce_rng);
-                // Note: reproduce_cost is already deducted inside apply_reproduce,
-                // so a failed reproduction pays reproduce_cost + failed_action_penalty.
-                if result != ReproductionActionResult::Spawned {
+        // Apply each queued action sequentially.
+        for action in &actions {
+            match *action {
+                WorldAction::NoOp => {
+                    // NoOp cannot fail; no failed_action_penalty possible.
                     if let Some(creature) = sim.creatures.get_mut(id) {
-                        creature.energy -= sim.config.energy.costs.failed_action_penalty;
+                        apply_noop(creature, &sim.config);
+                        sim.stats.last_tick_noop += 1;
                     }
                 }
-            }
-            WorldAction::StealEnergy { direction, amount } => {
-                let result = apply_steal_energy(id, sim, direction, amount);
-                if result == PredationActionResult::RejectedNoVictim {
+                WorldAction::Eat => {
                     if let Some(creature) = sim.creatures.get_mut(id) {
-                        creature.energy -= sim.config.energy.costs.failed_action_penalty;
+                        let succeeded = apply_eat(creature, &mut sim.world, &sim.config);
+                        sim.stats.last_tick_eat += 1;
+                        if !succeeded {
+                            creature.energy -= sim.config.energy.costs.failed_action_penalty;
+                        }
+                    }
+                }
+                WorldAction::Move(dir) => {
+                    if let Some(creature) = sim.creatures.get_mut(id) {
+                        let succeeded = apply_move(id, creature, &mut sim.world, dir, &sim.config);
+                        sim.stats.last_tick_move += 1;
+                        if !succeeded {
+                            creature.energy -= sim.config.energy.costs.failed_action_penalty;
+                        }
+                    }
+                }
+                WorldAction::Reproduce {
+                    direction,
+                    energy_transfer,
+                } => {
+                    let result =
+                        apply_reproduce(id, sim, direction, energy_transfer, &mut reproduce_rng);
+                    // Note: reproduce_cost is already deducted inside apply_reproduce,
+                    // so a failed reproduction pays reproduce_cost + failed_action_penalty.
+                    if result != ReproductionActionResult::Spawned {
+                        if let Some(creature) = sim.creatures.get_mut(id) {
+                            creature.energy -= sim.config.energy.costs.failed_action_penalty;
+                        }
+                    }
+                }
+                WorldAction::StealEnergy { direction, amount } => {
+                    let result = apply_steal_energy(id, sim, direction, amount);
+                    if result == PredationActionResult::RejectedNoVictim {
+                        if let Some(creature) = sim.creatures.get_mut(id) {
+                            creature.energy -= sim.config.energy.costs.failed_action_penalty;
+                        }
                     }
                 }
             }

@@ -1,9 +1,11 @@
+pub mod action_queue;
 mod actions;
 mod direction;
 mod ids;
 mod inputs;
 mod position;
 
+pub use action_queue::ActionQueue;
 pub use actions::WorldAction;
 pub use direction::Direction;
 pub use ids::{CreatureId, NodeId};

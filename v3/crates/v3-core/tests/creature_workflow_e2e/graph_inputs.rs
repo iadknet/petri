@@ -92,7 +92,7 @@ fn graph_reads_all_neighbor_sensor_directions_e2e() {
     let mut sim = Simulation::new(world, creatures, 0, cfg, 31);
     let tick = run_one_traced_tick(&mut sim, target);
 
-    assert_eq!(tick.final_action, WorldAction::NoOp);
+    assert_eq!(tick.final_actions[0], WorldAction::NoOp);
     assert_eq!(tick.hops.len(), 1);
     let gtrace = graph_hop(&tick, 0);
     assert_eq!(gtrace.passes.len(), 1, "forced to single graph pass");
@@ -216,7 +216,7 @@ fn graph_reads_inputs_and_writes_outputs_e2e() {
     let mut sim = Simulation::new(world, creatures, 0, cfg, 7);
     let tick = run_one_traced_tick(&mut sim, target);
 
-    assert_eq!(tick.final_action, WorldAction::NoOp);
+    assert_eq!(tick.final_actions[0], WorldAction::NoOp);
     assert_eq!(tick.hops.len(), 1);
     assert!(!graph_hop(&tick, 0).passes.is_empty());
 

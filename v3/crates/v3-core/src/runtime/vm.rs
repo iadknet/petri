@@ -1,5 +1,5 @@
 use crate::config::RuntimeConfig;
-use crate::contracts::InputReference;
+use crate::contracts::{ActionQueue, InputReference};
 use crate::creature::genome::VmBackendDef;
 use crate::runtime::action_decode::decode_world_action;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
@@ -17,9 +17,10 @@ use crate::sensors::static_inputs::StaticInputs;
 /// - `memory`: creature's persistent 1024-byte memory; NOT modified on energy exhaustion
 /// - `static_inputs`: pre-assembled world/static sensor snapshot
 /// - `config`: runtime config (max_vm_steps, vm.opcode_cost_multiplier)
+/// - `action_queue`: shared action queue that persists across mesh hops
 ///
 /// # Returns
-/// `NodeResult` — the mesh executor checks `energy_exhausted` and routes accordingly.
+/// `NodeResult` — the mesh executor checks `terminal` and `energy_exhausted` to decide routing.
 #[allow(clippy::too_many_arguments)]
 pub fn execute_vm_node(
     def: &VmBackendDef,
@@ -30,6 +31,7 @@ pub fn execute_vm_node(
     memory: &mut [u8; 1024],
     static_inputs: &StaticInputs,
     config: &RuntimeConfig,
+    action_queue: &mut ActionQueue,
 ) -> NodeResult {
     // Safety: register_count == 0 → immediate halt.
     let reg_count = def.register_count as usize;
@@ -267,10 +269,36 @@ pub fn execute_vm_node(
                 // invalid slot: write ignored
             }
 
-            VmInstruction::EmitWorldAction { action_type } => {
+            VmInstruction::PushAction { action_type } => {
                 let action = decode_world_action(*action_type, &meta);
+                action_queue.push(action);
+            }
+
+            VmInstruction::PopAction => {
+                action_queue.pop();
+            }
+
+            VmInstruction::ReadActionQueueLength { dst } => {
+                regs[nr(*dst, reg_count)] = action_queue.len() as f32;
+            }
+
+            VmInstruction::ReadActionQueueType { index_src, dst } => {
+                let idx = regs[nr(*index_src, reg_count)] as usize;
+                regs[nr(*dst, reg_count)] = action_queue.action_type_at(idx);
+            }
+
+            VmInstruction::ReadActionQueueParam {
+                index_src,
+                param_slot,
+                dst,
+            } => {
+                let idx = regs[nr(*index_src, reg_count)] as usize;
+                regs[nr(*dst, reg_count)] = action_queue.param_at(idx, *param_slot as usize);
+            }
+
+            VmInstruction::ExecuteActionQueue => {
                 commit_memory!();
-                return NodeResult::action(payload, route_target, action);
+                return NodeResult::terminal(payload, route_target);
             }
 
             VmInstruction::WriteRouteTarget { src } => {
@@ -359,7 +387,12 @@ pub(crate) fn opcode_base_cost(instr: &crate::creature::genome::VmInstruction) -
         VmInstruction::ReadInput { .. } => 0.12,
         VmInstruction::WriteInternalPayload { .. } => 0.14,
         VmInstruction::WriteWorldActionMeta { .. } => 0.14,
-        VmInstruction::EmitWorldAction { .. } => 0.24,
+        VmInstruction::PushAction { .. } => 0.24,
+        VmInstruction::PopAction => 0.10,
+        VmInstruction::ReadActionQueueLength { .. } => 0.08,
+        VmInstruction::ReadActionQueueType { .. } => 0.12,
+        VmInstruction::ReadActionQueueParam { .. } => 0.12,
+        VmInstruction::ExecuteActionQueue => 0.24,
         VmInstruction::WriteRouteTarget { .. } => 0.10,
         VmInstruction::Halt => 0.05,
         VmInstruction::LoadMem8 { .. } => 0.16,

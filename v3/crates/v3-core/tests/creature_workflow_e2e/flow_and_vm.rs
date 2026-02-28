@@ -115,9 +115,11 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
                     const_idx: 0,
                 },
                 VmInstruction::CmpGt { dst: 2, a: 2, b: 3 },
-                VmInstruction::JumpIfZero { cond: 2, offset: 1 },
-                VmInstruction::EmitWorldAction { action_type: 1 }, // Eat
-                VmInstruction::EmitWorldAction { action_type: 0 }, // NoOp fallback
+                VmInstruction::JumpIfZero { cond: 2, offset: 2 },
+                VmInstruction::PushAction { action_type: 1 }, // Eat
+                VmInstruction::ExecuteActionQueue,
+                VmInstruction::PushAction { action_type: 0 }, // NoOp fallback
+                VmInstruction::ExecuteActionQueue,
             ],
         }),
         targets: vec![],
@@ -134,7 +136,7 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
 
     let tick = run_one_traced_tick(&mut sim, target);
 
-    assert_eq!(tick.final_action, WorldAction::Eat);
+    assert_eq!(tick.final_actions[0], WorldAction::Eat);
     assert_eq!(tick.hops.len(), 3);
     assert!(matches!(tick.hops[0].backend_trace, BackendTrace::Graph(_)));
     assert!(matches!(tick.hops[1].backend_trace, BackendTrace::Graph(_)));
@@ -252,7 +254,8 @@ fn vm_reads_all_inputs_e2e() {
             sub_idx: 0,
         });
     }
-    program.push(VmInstruction::EmitWorldAction { action_type: 0 });
+    program.push(VmInstruction::PushAction { action_type: 0 });
+    program.push(VmInstruction::ExecuteActionQueue);
 
     let vm_node = NodeGenome {
         node_id: id_vm,
@@ -277,7 +280,7 @@ fn vm_reads_all_inputs_e2e() {
     let tick = run_one_traced_tick(&mut sim, target);
 
     assert_eq!(tick.hops.len(), 2);
-    assert_eq!(tick.final_action, WorldAction::NoOp);
+    assert_eq!(tick.final_actions[0], WorldAction::NoOp);
     assert!(matches!(tick.hops[0].backend_trace, BackendTrace::Graph(_)));
     assert!(matches!(tick.hops[1].backend_trace, BackendTrace::Vm(_)));
     assert!((tick.hops[1].upstream_slots[11] - 0.73).abs() < 1e-6);
@@ -387,9 +390,11 @@ fn vm_uses_neighbor_barrier_sensor_to_choose_action_e2e() {
                         const_idx: 1,
                     },
                     VmInstruction::CmpGt { dst: 2, a: 0, b: 1 },
-                    VmInstruction::JumpIfZero { cond: 2, offset: 1 },
-                    VmInstruction::EmitWorldAction { action_type: 0 }, // NoOp when barrier present
-                    VmInstruction::EmitWorldAction { action_type: 1 }, // Eat when barrier absent
+                    VmInstruction::JumpIfZero { cond: 2, offset: 2 },
+                    VmInstruction::PushAction { action_type: 0 }, // NoOp when barrier present
+                    VmInstruction::ExecuteActionQueue,
+                    VmInstruction::PushAction { action_type: 1 }, // Eat when barrier absent
+                    VmInstruction::ExecuteActionQueue,
                 ],
             }),
             targets: vec![],
@@ -406,7 +411,7 @@ fn vm_uses_neighbor_barrier_sensor_to_choose_action_e2e() {
         let tick = run_one_traced_tick(&mut sim, target);
 
         assert_eq!(tick.hops.len(), 1);
-        assert_eq!(tick.final_action, expected_action);
+        assert_eq!(tick.final_actions[0], expected_action);
 
         let trace = vm_hop(&tick, 0);
         let read_step = trace
