@@ -214,46 +214,31 @@ NodeGenome {
 
       // Priority 1: Reproduce if energy sufficient
       CmpGt(r6, r1, r7),     // r6 = can_reproduce?
-      JumpIfZero(r6, +8),     // skip reproduce block + reset
+      JumpIfZero(r6, +6),     // skip reproduce block
 
-      // Find least-occupied cardinal direction for reproduce
-      // Use food dirs as proxy (food = likely unoccupied)
-      Max(r6, r2, r3),       // r6 = max(food_N, food_E)
-      Max(r7, r4, r5),       // r7 = max(food_S, food_W)
-      // Pick best cardinal: N=0, E=2, S=4, W=6
-      CmpGt(r6, r2, r3),     // r6 = food_N > food_E?
-      // Default direction North (0.0 in meta[0])
-      WriteWorldActionMeta(0, r7),  // direction placeholder
+      // Set up reproduce action with direction + energy
+      WriteWorldActionMeta(0, r7),  // direction placeholder (N)
       LoadConst(r6, 4),       // const[4] = 20.0 offspring energy
       WriteWorldActionMeta(1, r6),  // offspring energy
-      EmitWorldAction(3),     // Reproduce
-      Sub(r7, r7, r7),        // r7 = 0.0 (clean up for Eat check)
+      PushAction(3),          // push Reproduce onto action queue
 
       // Priority 2: Eat if food here
-      CmpGt(r6, r0, r7),     // r6 = (food_here > 0)? r7 starts at 0
-      JumpIfZero(r6, +2),     // skip eat if no food
-      EmitWorldAction(1),     // Eat
-      Noop,                   // (jumped past)
+      Sub(r7, r7, r7),        // r7 = 0.0
+      CmpGt(r6, r0, r7),     // r6 = (food_here > 0)?
+      JumpIfZero(r6, +1),     // skip eat if no food
+      PushAction(1),          // push Eat onto action queue
 
       // Priority 3: Move toward highest food direction
-      // Find max food cardinal
-      Max(r6, r2, r3),       // max(food_N, food_E)
-      Max(r7, r4, r5),       // max(food_S, food_W)
-      // Simple direction select: compare N vs S, E vs W
       CmpGt(r6, r2, r4),     // r6 = food_N > food_S?
-      CmpGt(r7, r3, r5),     // r7 = food_E > food_W?
-      // Build direction: 0=N, 2=E, 4=S, 6=W
-      LoadConst(r0, 0),       // const[0] = 0.5, but we need 0
       Sub(r0, r0, r0),        // r0 = 0 (N)
-      JumpIfZero(r6, +2),     // if food_S >= food_N, skip
+      JumpIfZero(r6, +2),     // if food_S >= food_N, jump to S
       Jump(+2),               // food_N wins, keep r0=0
       LoadConst(r0, 3),       // const[3] = 3.0 ~ S direction idx
-      // Check E/W axis
       WriteWorldActionMeta(0, r0),  // set direction
-      EmitWorldAction(2),     // Move
+      PushAction(2),          // push Move onto action queue
 
-      // Priority 4: Fallback NoOp
-      EmitWorldAction(0),     // NoOp
+      // Execute all queued actions
+      ExecuteActionQueue,
     ],
   }),
   targets: [],
@@ -261,10 +246,11 @@ NodeGenome {
 ```
 
 **Behavioral intent:**
-- Founders reproduce when energy is sufficient (above 24.0 threshold) (highest priority).
+- Founders build a multi-action queue each tick using `PushAction` + `ExecuteActionQueue`.
+- Founders reproduce when energy is sufficient (highest priority).
 - Founders eat when standing on food (second priority).
 - Founders move toward the cardinal direction with highest visible food.
-- Founders emit NoOp as a last resort.
+- Multiple actions can execute per tick (up to `max_actions_per_turn`).
 
 This gives natural selection immediate material to work with: creatures that
 find food and reproduce efficiently will out-compete those that do not.
