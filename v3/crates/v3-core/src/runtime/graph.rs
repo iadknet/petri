@@ -3,17 +3,14 @@ use crate::contracts::InputReference;
 use crate::creature::genome::{GraphBackendDef, GraphInternalNode, GraphNodeKind};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::hebbian;
-use crate::runtime::inputs::resolve_input;
+use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::types::{sanitize_f32, NodeResult};
 use crate::sensors::static_inputs::StaticInputs;
 
 /// Immutable context for resolving `InputRef` nodes during graph evaluation.
 pub(crate) struct EvalCtx<'a> {
     pub(crate) input_refs: &'a [InputReference],
-    pub(crate) upstream_slots: &'a [f32; 12],
-    pub(crate) energy: f32,
-    pub(crate) energy_consumed: f32,
-    pub(crate) static_inputs: &'a StaticInputs,
+    pub(crate) resolve: ResolveCtx<'a>,
 }
 
 /// Evaluate one internal graph node's kind, returning the scalar output.
@@ -32,13 +29,7 @@ pub(crate) fn evaluate_kind(
     match kind {
         GraphNodeKind::InputRef(u) => {
             let resolved = if (*u as usize) < ctx.input_refs.len() {
-                resolve_input(
-                    &ctx.input_refs[*u as usize],
-                    ctx.static_inputs,
-                    ctx.upstream_slots,
-                    ctx.energy,
-                    ctx.energy_consumed,
-                )
+                resolve_input(&ctx.input_refs[*u as usize], 0, &ctx.resolve)
             } else {
                 0.0
             };
@@ -213,10 +204,12 @@ pub fn execute_graph_node(
         // Rebuild the eval context with the live energy value after the pass charge.
         let ctx = EvalCtx {
             input_refs,
-            upstream_slots,
-            energy: *energy,
-            energy_consumed,
-            static_inputs,
+            resolve: ResolveCtx {
+                static_inputs,
+                upstream_slots,
+                energy: *energy,
+                energy_consumed,
+            },
         };
 
         for current_idx in 0..node_count {
