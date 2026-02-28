@@ -25,10 +25,19 @@ pub enum InputReference {
     StaticIntrospection(StaticIntrospectionKey),
     DynamicIntrospection(DynamicIntrospectionKey),
     UpstreamSlot(usize),
+    ActionQueue,
 }
 ```
 
 All node backends consume the same `input_refs` vector.
+
+### Compound vs Scalar Inputs
+
+Most `InputReference` variants are **scalar**: they resolve to a single `f32`.
+**Compound** variants (currently `ActionQueue`) resolve to multiple sub-values
+addressed via a `sub_idx` parameter. For scalar inputs, `sub_idx > 0` returns
+`0.0`. Backends use two-level indexing `(ref_idx, sub_idx)` to address
+sub-values within a compound input.
 
 ---
 
@@ -99,6 +108,20 @@ These values may change between node hops during the same tick.
 `UpstreamSlot(slot)` reads routing-parent output slots.
 If `slot >= 12`, value is `0.0`.
 
+### Action Queue (Compound)
+
+`ActionQueue` is a compound input that exposes the creature's action queue
+contents via two-level sub-value addressing:
+
+- `sub_idx / 3` = queue slot index
+- `sub_idx % 3`: `0` = action_type, `1` = param0, `2` = param1
+
+Out-of-bounds queue indices return `0.0`. The total number of sub-values
+is `action_queue_cap * 3` (default: `4 * 3 = 12`).
+
+Resolution uses `ResolveCtx.action_queue`, which holds the live action
+queue state during mesh evaluation.
+
 ---
 
 ## 3. Resolution Timing
@@ -120,6 +143,8 @@ Canonical turn timing and action-application order are specified in
 
 - Missing `input_refs` index: `0.0`.
 - Invalid upstream slot: `0.0`.
+- Compound input out-of-bounds sub_idx: `0.0`.
+- Scalar input with `sub_idx > 0`: `0.0`.
 - Unknown/unsupported key variant at runtime boundary: `0.0`.
 
 Soft defaults are deliberate to support junk-DNA evolution without crashes.
@@ -128,8 +153,29 @@ Soft defaults are deliberate to support junk-DNA evolution without crashes.
 
 ## 5. Backend Access Paths
 
-- VM: `ReadInput(dst, idx)` reads `input_refs[idx]`.
-- Graph: `InputRef(idx)` reads `input_refs[idx]`.
+- VM: `ReadInput { dst, ref_idx, sub_idx }` reads `input_refs[ref_idx]`
+  with sub-value index `sub_idx`.
+- Graph: `InputRef { ref_idx, sub_idx }` reads `input_refs[ref_idx]`
+  with sub-value index `sub_idx`.
 
 No backend reads world state directly. All access is through `InputReference`
 runtime dataflow.
+
+---
+
+## 6. Resolution Context (ResolveCtx)
+
+Input resolution uses a shared `ResolveCtx` struct containing:
+
+```rust
+pub struct ResolveCtx<'a> {
+    pub static_inputs: &'a StaticInputs,
+    pub upstream_slots: &'a [f32; 12],
+    pub energy: f32,
+    pub energy_consumed: f32,
+    pub action_queue: &'a ActionQueue,
+}
+```
+
+This struct is shared between graph evaluation (via `EvalCtx`) and VM
+execution, ensuring consistent resolution semantics across backends.
