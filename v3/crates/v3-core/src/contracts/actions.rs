@@ -1,7 +1,7 @@
 use crate::contracts::Direction;
 
 /// The action a creature emits at the end of mesh execution for one tick.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum WorldAction {
     /// Do nothing this tick.
     NoOp,
@@ -21,6 +21,34 @@ pub enum WorldAction {
 impl WorldAction {
     pub fn is_noop(&self) -> bool {
         matches!(self, WorldAction::NoOp)
+    }
+
+    /// Return the action type discriminant matching the decode_world_action encoding.
+    /// 0=NoOp, 1=Eat, 2=Move, 3=Reproduce, 4=StealEnergy.
+    #[inline]
+    pub fn action_type(&self) -> u8 {
+        match self {
+            WorldAction::NoOp => 0,
+            WorldAction::Eat => 1,
+            WorldAction::Move(_) => 2,
+            WorldAction::Reproduce { .. } => 3,
+            WorldAction::StealEnergy { .. } => 4,
+        }
+    }
+
+    /// Read back a parameter slot, mirroring the meta buffer layout used during encoding.
+    /// Slot 0 = direction index (as f32), slot 1 = amount/energy_transfer. Returns 0.0 for
+    /// unknown slots or variants without that parameter.
+    #[inline]
+    pub fn param(&self, slot: usize) -> f32 {
+        match (self, slot) {
+            (WorldAction::Move(dir), 0) => dir.to_index() as f32,
+            (WorldAction::Reproduce { direction, .. }, 0) => direction.to_index() as f32,
+            (WorldAction::Reproduce { energy_transfer, .. }, 1) => *energy_transfer,
+            (WorldAction::StealEnergy { direction, .. }, 0) => direction.to_index() as f32,
+            (WorldAction::StealEnergy { amount, .. }, 1) => *amount,
+            _ => 0.0,
+        }
     }
 }
 
