@@ -35,6 +35,7 @@ export interface CostsConfig {
 	noop_cost: number;
 	reproduce_cost: number;
 	eat_reward_per_food: number;
+	failed_action_penalty: number;
 }
 
 export interface EnergyConfig {

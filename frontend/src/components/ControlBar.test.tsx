@@ -50,6 +50,7 @@ const MOCK_CONFIG: SimulationConfig = {
 			noop_cost: 0,
 			reproduce_cost: 0.12,
 			eat_reward_per_food: 12,
+			failed_action_penalty: 5,
 		},
 	},
 	runtime: {
