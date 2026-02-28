@@ -6,7 +6,7 @@
 //! semantics, apply the same changes here and verify with equivalence tests.
 
 use crate::config::RuntimeConfig;
-use crate::contracts::InputReference;
+use crate::contracts::{ActionQueue, InputReference};
 use crate::creature::genome::VmBackendDef;
 use crate::runtime::action_decode::decode_world_action;
 use crate::runtime::inputs::resolve_input;
@@ -30,6 +30,7 @@ pub fn execute_vm_node_traced(
     memory: &mut [u8; 1024],
     static_inputs: &StaticInputs,
     config: &RuntimeConfig,
+    action_queue: &mut ActionQueue,
 ) -> (NodeResult, VmTrace) {
     let reg_count = def.register_count as usize;
 
@@ -106,6 +107,9 @@ pub fn execute_vm_node_traced(
                 | VmInstruction::ToU8 { dst, .. }
                 | VmInstruction::ToBool { dst, .. }
                 | VmInstruction::ReadInput { dst, .. }
+                | VmInstruction::ReadActionQueueLength { dst, .. }
+                | VmInstruction::ReadActionQueueType { dst, .. }
+                | VmInstruction::ReadActionQueueParam { dst, .. }
                 | VmInstruction::LoadMem8 { dst, .. }
                 | VmInstruction::LoadMem8Imm { dst, .. } => Some(nr(*dst, $reg_count)),
                 _ => None,
@@ -337,7 +341,9 @@ pub fn execute_vm_node_traced(
             }
 
             VmInstruction::EmitWorldAction { action_type } => {
+                // Compat shim: push action to queue, then terminate.
                 let action = decode_world_action(*action_type, &meta);
+                action_queue.push(action);
                 commit_memory!();
                 // Record this final step
                 trace_steps.push(VmStepTrace {
@@ -348,7 +354,49 @@ pub fn execute_vm_node_traced(
                     register_changes: Vec::new(),
                 });
                 return (
-                    NodeResult::action(payload, route_target, action),
+                    NodeResult::terminal(payload, route_target),
+                    build_trace!(trace_steps, mem_writes),
+                );
+            }
+
+            VmInstruction::PushAction { action_type } => {
+                let action = decode_world_action(*action_type, &meta);
+                action_queue.push(action);
+            }
+
+            VmInstruction::PopAction => {
+                action_queue.pop();
+            }
+
+            VmInstruction::ReadActionQueueLength { dst } => {
+                regs[nr(*dst, reg_count)] = action_queue.len() as f32;
+            }
+
+            VmInstruction::ReadActionQueueType { index_src, dst } => {
+                let idx = regs[nr(*index_src, reg_count)] as usize;
+                regs[nr(*dst, reg_count)] = action_queue.action_type_at(idx);
+            }
+
+            VmInstruction::ReadActionQueueParam {
+                index_src,
+                param_slot,
+                dst,
+            } => {
+                let idx = regs[nr(*index_src, reg_count)] as usize;
+                regs[nr(*dst, reg_count)] = action_queue.param_at(idx, *param_slot as usize);
+            }
+
+            VmInstruction::ExecuteActionQueue => {
+                commit_memory!();
+                trace_steps.push(VmStepTrace {
+                    pc,
+                    instruction: instr.clone(),
+                    energy_cost: opcode_cost,
+                    energy_after: *energy,
+                    register_changes: Vec::new(),
+                });
+                return (
+                    NodeResult::terminal(payload, route_target),
                     build_trace!(trace_steps, mem_writes),
                 );
             }
@@ -427,10 +475,12 @@ pub fn execute_vm_node_traced(
             }
         }
 
-        // Don't re-record EmitWorldAction/Halt (already recorded above)
+        // Don't re-record EmitWorldAction/ExecuteActionQueue/Halt (already recorded above)
         if !matches!(
             instr,
-            VmInstruction::EmitWorldAction { .. } | VmInstruction::Halt
+            VmInstruction::EmitWorldAction { .. }
+                | VmInstruction::ExecuteActionQueue
+                | VmInstruction::Halt
         ) {
             trace_steps.push(VmStepTrace {
                 pc,

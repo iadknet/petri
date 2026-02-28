@@ -448,6 +448,37 @@ fn mutate_instruction_raw_fields(instr: &mut VmInstruction, rng: &mut impl Rng) 
             *imm_addr = rng.gen();
             *src = rng.gen();
         }
+        VmInstruction::PushAction { action_type } => {
+            *action_type = rng.gen();
+        }
+        VmInstruction::PopAction => {
+            // No fields to mutate; swap to a different instruction.
+            *instr = VmInstruction::PushAction {
+                action_type: rng.gen(),
+            };
+        }
+        VmInstruction::ReadActionQueueLength { dst } => {
+            *dst = rng.gen();
+        }
+        VmInstruction::ReadActionQueueType { index_src, dst } => {
+            *index_src = rng.gen();
+            *dst = rng.gen();
+        }
+        VmInstruction::ReadActionQueueParam {
+            index_src,
+            param_slot,
+            dst,
+        } => {
+            *index_src = rng.gen();
+            *param_slot = rng.gen();
+            *dst = rng.gen();
+        }
+        VmInstruction::ExecuteActionQueue => {
+            // No fields to mutate; swap to a different instruction.
+            *instr = VmInstruction::PushAction {
+                action_type: rng.gen(),
+            };
+        }
     }
 }
 
@@ -579,6 +610,16 @@ fn remap_register_refs(instr: &mut VmInstruction, offset: u8, register_count: u8
         | VmInstruction::WriteWorldActionMeta { src, .. }
         | VmInstruction::WriteRouteTarget { src } => remap(src),
         VmInstruction::EmitWorldAction { .. } => {}
+        VmInstruction::PushAction { .. } | VmInstruction::PopAction | VmInstruction::ExecuteActionQueue => {}
+        VmInstruction::ReadActionQueueLength { dst } => remap(dst),
+        VmInstruction::ReadActionQueueType { index_src, dst } => {
+            remap(index_src);
+            remap(dst);
+        }
+        VmInstruction::ReadActionQueueParam { index_src, dst, .. } => {
+            remap(index_src);
+            remap(dst);
+        }
         VmInstruction::LoadMem8 { dst, addr_reg } => {
             remap(dst);
             remap(addr_reg);
