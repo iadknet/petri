@@ -309,15 +309,19 @@ pub fn execute_vm_node_traced(
                 next_pc = jump_target(pc, *offset, program_len);
             }
 
-            VmInstruction::ReadInput { dst, input_idx } => {
-                let val = if (*input_idx as usize) < input_refs.len() {
+            VmInstruction::ReadInput {
+                dst,
+                ref_idx,
+                sub_idx,
+            } => {
+                let val = if (*ref_idx as usize) < input_refs.len() {
                     let ctx = ResolveCtx {
                         static_inputs,
                         upstream_slots,
                         energy: *energy,
                         energy_consumed,
                     };
-                    resolve_input(&input_refs[*input_idx as usize], 0, &ctx)
+                    resolve_input(&input_refs[*ref_idx as usize], *sub_idx, &ctx)
                 } else {
                     0.0
                 };

@@ -274,11 +274,20 @@ fn mutate_operator_param(
         }
         let int_idx = eligible[rng.gen_range(0..eligible.len())];
         match &mut g.internal_nodes[int_idx].kind {
-            GraphNodeKind::CustomOutput(ref mut slot) | GraphNodeKind::InputRef(ref mut slot) => {
+            GraphNodeKind::CustomOutput(ref mut slot) => {
                 if rng.gen_bool(0.5) {
                     *slot = slot.wrapping_add(1);
                 } else {
                     *slot = slot.wrapping_sub(1);
+                }
+            }
+            GraphNodeKind::InputRef {
+                ref mut ref_idx, ..
+            } => {
+                if rng.gen_bool(0.5) {
+                    *ref_idx = ref_idx.wrapping_add(1);
+                } else {
+                    *ref_idx = ref_idx.wrapping_sub(1);
                 }
             }
             GraphNodeKind::Constant(ref mut p)
@@ -410,7 +419,7 @@ fn apply_graph_raw_field_mutation(
         for internal in &g.internal_nodes {
             if matches!(
                 &internal.kind,
-                GraphNodeKind::InputRef(_) | GraphNodeKind::CustomOutput(_)
+                GraphNodeKind::InputRef { .. } | GraphNodeKind::CustomOutput(_)
             ) {
                 target_count += 1;
             }
@@ -424,11 +433,17 @@ fn apply_graph_raw_field_mutation(
         for int_idx in 0..g.internal_nodes.len() {
             if matches!(
                 &g.internal_nodes[int_idx].kind,
-                GraphNodeKind::InputRef(_) | GraphNodeKind::CustomOutput(_)
+                GraphNodeKind::InputRef { .. } | GraphNodeKind::CustomOutput(_)
             ) {
                 if pick == 0 {
-                    if matches!(&g.internal_nodes[int_idx].kind, GraphNodeKind::InputRef(_)) {
-                        g.internal_nodes[int_idx].kind = GraphNodeKind::InputRef(rng.gen());
+                    if matches!(
+                        &g.internal_nodes[int_idx].kind,
+                        GraphNodeKind::InputRef { .. }
+                    ) {
+                        g.internal_nodes[int_idx].kind = GraphNodeKind::InputRef {
+                            ref_idx: rng.gen(),
+                            sub_idx: 0,
+                        };
                     } else {
                         g.internal_nodes[int_idx].kind = GraphNodeKind::CustomOutput(rng.gen());
                     }
@@ -452,7 +467,10 @@ fn apply_graph_raw_field_mutation(
 /// Return a random GraphNodeKind covering all 22 variants with random initial params.
 fn random_graph_node_kind(rng: &mut impl Rng) -> GraphNodeKind {
     match rng.gen_range(0u8..22) {
-        0 => GraphNodeKind::InputRef(rng.gen()),
+        0 => GraphNodeKind::InputRef {
+            ref_idx: rng.gen(),
+            sub_idx: 0,
+        },
         1 => GraphNodeKind::Constant(rng.gen_range(-1.0f32..=1.0)),
         2 => GraphNodeKind::Add,
         3 => GraphNodeKind::Multiply,
@@ -487,7 +505,7 @@ fn is_parameterized(kind: &GraphNodeKind) -> bool {
             | GraphNodeKind::Momentum(_)
             | GraphNodeKind::Oscillator(_)
             | GraphNodeKind::CustomOutput(_)
-            | GraphNodeKind::InputRef(_)
+            | GraphNodeKind::InputRef { .. }
     )
 }
 

@@ -152,7 +152,10 @@ fn custom_output_is_parameterized() {
 #[test]
 fn input_ref_is_parameterized() {
     assert!(
-        is_parameterized(&GraphNodeKind::InputRef(3)),
+        is_parameterized(&GraphNodeKind::InputRef {
+            ref_idx: 3,
+            sub_idx: 0
+        }),
         "InputRef must be parameterized"
     );
 }
@@ -185,7 +188,10 @@ fn mutate_operator_param_changes_custom_output_slot() {
 #[test]
 fn mutate_operator_param_changes_input_ref_index() {
     let genome = graph_only_genome(vec![GraphInternalNode {
-        kind: GraphNodeKind::InputRef(3),
+        kind: GraphNodeKind::InputRef {
+            ref_idx: 3,
+            sub_idx: 0,
+        },
         inputs: vec![],
         hebbian: None,
     }]);
@@ -195,8 +201,8 @@ fn mutate_operator_param_changes_input_ref_index() {
         let mut r = rng(seed);
         if GraphMutator::apply(&mut g, GraphOperator::MutateGraphOperatorParam, &mut r).is_ok() {
             if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
-                if let GraphNodeKind::InputRef(idx) = gd.internal_nodes[0].kind {
-                    if idx != 3 {
+                if let GraphNodeKind::InputRef { ref_idx, .. } = gd.internal_nodes[0].kind {
+                    if ref_idx != 3 {
                         changed = true;
                         break;
                     }
@@ -235,9 +241,12 @@ fn mutate_operator_param_wraps_custom_output_at_boundary() {
 
 #[test]
 fn mutate_operator_param_wraps_input_ref_at_boundary() {
-    // InputRef(255) should eventually wrap to 0.
+    // InputRef ref_idx=u16::MAX should eventually wrap to 0.
     let genome = graph_only_genome(vec![GraphInternalNode {
-        kind: GraphNodeKind::InputRef(255),
+        kind: GraphNodeKind::InputRef {
+            ref_idx: u16::MAX,
+            sub_idx: 0,
+        },
         inputs: vec![],
         hebbian: None,
     }]);
@@ -247,8 +256,8 @@ fn mutate_operator_param_wraps_input_ref_at_boundary() {
         let mut r = rng(seed);
         if GraphMutator::apply(&mut g, GraphOperator::MutateGraphOperatorParam, &mut r).is_ok() {
             if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
-                if let GraphNodeKind::InputRef(idx) = gd.internal_nodes[0].kind {
-                    if idx == 0 {
+                if let GraphNodeKind::InputRef { ref_idx, .. } = gd.internal_nodes[0].kind {
+                    if ref_idx == 0 {
                         saw_0 = true;
                         break;
                     }
@@ -256,7 +265,10 @@ fn mutate_operator_param_wraps_input_ref_at_boundary() {
             }
         }
     }
-    assert!(saw_0, "InputRef(255) must wrap to 0 via wrapping_add");
+    assert!(
+        saw_0,
+        "InputRef ref_idx=u16::MAX must wrap to 0 via wrapping_add"
+    );
 }
 
 #[test]

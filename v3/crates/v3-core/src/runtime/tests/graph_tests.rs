@@ -1042,7 +1042,10 @@ fn input_ref_255_soft_defaults_to_zero() {
     let def = GraphBackendDef {
         internal_nodes: vec![
             GraphInternalNode {
-                kind: GraphNodeKind::InputRef(255),
+                kind: GraphNodeKind::InputRef {
+                    ref_idx: 255,
+                    sub_idx: 0,
+                },
                 inputs: vec![],
                 hebbian: None,
             },

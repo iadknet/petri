@@ -165,7 +165,7 @@ pub struct GraphNodeEvalTrace {
 #[inline]
 pub fn kind_label(kind: &GraphNodeKind) -> &'static str {
     match kind {
-        GraphNodeKind::InputRef(_) => "InputRef",
+        GraphNodeKind::InputRef { .. } => "InputRef",
         GraphNodeKind::Constant(_) => "Constant",
         GraphNodeKind::Add => "Add",
         GraphNodeKind::Multiply => "Multiply",
@@ -312,7 +312,13 @@ mod tests {
 
     #[test]
     fn kind_label_covers_all_variants() {
-        assert_eq!(kind_label(&GraphNodeKind::InputRef(0)), "InputRef");
+        assert_eq!(
+            kind_label(&GraphNodeKind::InputRef {
+                ref_idx: 0,
+                sub_idx: 0
+            }),
+            "InputRef"
+        );
         assert_eq!(kind_label(&GraphNodeKind::Constant(1.0)), "Constant");
         assert_eq!(kind_label(&GraphNodeKind::Add), "Add");
         assert_eq!(kind_label(&GraphNodeKind::Multiply), "Multiply");

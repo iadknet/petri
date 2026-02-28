@@ -27,9 +27,9 @@ pub(crate) fn evaluate_kind(
     state: &mut f32,
 ) -> f32 {
     match kind {
-        GraphNodeKind::InputRef(u) => {
-            let resolved = if (*u as usize) < ctx.input_refs.len() {
-                resolve_input(&ctx.input_refs[*u as usize], 0, &ctx.resolve)
+        GraphNodeKind::InputRef { ref_idx, sub_idx } => {
+            let resolved = if (*ref_idx as usize) < ctx.input_refs.len() {
+                resolve_input(&ctx.input_refs[*ref_idx as usize], *sub_idx, &ctx.resolve)
             } else {
                 0.0
             };

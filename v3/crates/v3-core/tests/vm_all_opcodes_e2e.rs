@@ -119,7 +119,8 @@ fn sample_vm_program() -> Vec<VmInstruction> {
         // ── Branch to terminal opcode based on FoodHere ─────────────────────
         VmInstruction::ReadInput {
             dst: 15,
-            input_idx: 0,
+            ref_idx: 0,
+            sub_idx: 0,
         }, // FoodHere
         VmInstruction::ToBool { dst: 15, src: 15 },
         VmInstruction::JumpIfZero {
@@ -183,7 +184,8 @@ fn expected_all_opcode_discriminants() -> HashSet<Discriminant<VmInstruction>> {
         VmInstruction::Jump { offset: 0 },
         VmInstruction::ReadInput {
             dst: 0,
-            input_idx: 0,
+            ref_idx: 0,
+            sub_idx: 0,
         },
         VmInstruction::WriteInternalPayload {
             slot_idx: 0,

@@ -263,7 +263,10 @@ fn make_graph_nodes() -> Vec<GraphInternalNode> {
     // Node 2: CustomOutput(0) — inputs from node 1 (output node)
     vec![
         GraphInternalNode {
-            kind: GraphNodeKind::InputRef(0),
+            kind: GraphNodeKind::InputRef {
+                ref_idx: 0,
+                sub_idx: 0,
+            },
             inputs: vec![],
             hebbian: None,
         },
@@ -291,7 +294,10 @@ fn graph_is_output_node_matches_outputs() {
     assert!(graph_is_output_node(&GraphNodeKind::CustomOutput(0)));
     assert!(graph_is_output_node(&GraphNodeKind::RouterOutput));
     assert!(!graph_is_output_node(&GraphNodeKind::Add));
-    assert!(!graph_is_output_node(&GraphNodeKind::InputRef(0)));
+    assert!(!graph_is_output_node(&GraphNodeKind::InputRef {
+        ref_idx: 0,
+        sub_idx: 0
+    }));
 }
 
 #[test]
@@ -315,12 +321,18 @@ fn graph_backward_slice_excludes_disconnected() {
     // Node 2: CustomOutput — inputs from node 0 only
     let nodes = vec![
         GraphInternalNode {
-            kind: GraphNodeKind::InputRef(0),
+            kind: GraphNodeKind::InputRef {
+                ref_idx: 0,
+                sub_idx: 0,
+            },
             inputs: vec![],
             hebbian: None,
         },
         GraphInternalNode {
-            kind: GraphNodeKind::InputRef(1),
+            kind: GraphNodeKind::InputRef {
+                ref_idx: 1,
+                sub_idx: 0,
+            },
             inputs: vec![],
             hebbian: None,
         },
@@ -365,12 +377,18 @@ fn graph_forward_slice_excludes_disconnected() {
     // Node 2: Add — reads from node 0
     let nodes = vec![
         GraphInternalNode {
-            kind: GraphNodeKind::InputRef(0),
+            kind: GraphNodeKind::InputRef {
+                ref_idx: 0,
+                sub_idx: 0,
+            },
             inputs: vec![],
             hebbian: None,
         },
         GraphInternalNode {
-            kind: GraphNodeKind::InputRef(1),
+            kind: GraphNodeKind::InputRef {
+                ref_idx: 1,
+                sub_idx: 0,
+            },
             inputs: vec![],
             hebbian: None,
         },
