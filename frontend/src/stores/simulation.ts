@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Frame, HealthPayload, SimState, StatusPayload } from "../types/api.ts";
+import type { Frame, HealthPayload, PredationEvent, SimState, StatusPayload } from "../types/api.ts";
 
 export type ConnectionStatus = "disconnected" | "connecting" | "connected";
 
@@ -17,6 +17,7 @@ export interface SimulationState {
 	frame: Frame | null;
 	status: StatusPayload | null;
 	health: HealthPayload | null;
+	predationEvents: PredationEvent[];
 
 	// Actions
 	setConnectionStatus: (status: ConnectionStatus) => void;
@@ -25,6 +26,7 @@ export interface SimulationState {
 	setFrame: (tick: number, frame: Frame) => void;
 	setStatus: (tick: number, status: StatusPayload) => void;
 	setHealth: (tick: number, health: HealthPayload) => void;
+	setPredationEvents: (events: PredationEvent[]) => void;
 	reset: () => void;
 }
 
@@ -37,6 +39,7 @@ const initialState = {
 	frame: null,
 	status: null,
 	health: null,
+	predationEvents: [] as PredationEvent[],
 };
 
 export const useSimulationStore = create<SimulationState>()((set) => ({
@@ -81,6 +84,7 @@ export const useSimulationStore = create<SimulationState>()((set) => ({
 			return { tick, simState, status, ticksPerSecond, _tpsSample };
 		}),
 	setHealth: (tick, health) => set({ tick, health }),
+	setPredationEvents: (predationEvents) => set({ predationEvents }),
 
 	reset: () => set(initialState),
 }));

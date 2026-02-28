@@ -57,6 +57,13 @@ export interface StatsHistoryState {
 	mutationApplied: number;
 	mutationSkipped: number;
 
+	// Cumulative predation stats (from health events)
+	predationAttempted: number;
+	predationTransferred: number;
+	predationRejected: number;
+	predationKills: number;
+	predationByResult: Record<string, number>;
+
 	// Actions
 	pushStats: (tick: number, population: number, meanEnergy: number) => void;
 	pushActions: (tick: number, actions: LastTickActions) => void;
@@ -76,6 +83,13 @@ export interface StatsHistoryState {
 		byReason: Record<string, number>,
 	) => void;
 	setMutationStats: (attempted: number, applied: number, skipped: number) => void;
+	setPredationStats: (
+		attempted: number,
+		transferred: number,
+		rejected: number,
+		kills: number,
+		byResult: Record<string, number>,
+	) => void;
 	reset: () => void;
 }
 
@@ -91,6 +105,11 @@ export const useStatsHistoryStore = create<StatsHistoryState>()((set) => ({
 	mutationAttempted: 0,
 	mutationApplied: 0,
 	mutationSkipped: 0,
+	predationAttempted: 0,
+	predationTransferred: 0,
+	predationRejected: 0,
+	predationKills: 0,
+	predationByResult: {},
 
 	pushStats: (tick, population, meanEnergy) =>
 		set((s) => ({
@@ -131,6 +150,15 @@ export const useStatsHistoryStore = create<StatsHistoryState>()((set) => ({
 			mutationSkipped: skipped,
 		}),
 
+	setPredationStats: (attempted, transferred, rejected, kills, byResult) =>
+		set({
+			predationAttempted: attempted,
+			predationTransferred: transferred,
+			predationRejected: rejected,
+			predationKills: kills,
+			predationByResult: byResult,
+		}),
+
 	reset: () =>
 		set({
 			statsHistory: [],
@@ -144,5 +172,10 @@ export const useStatsHistoryStore = create<StatsHistoryState>()((set) => ({
 			mutationAttempted: 0,
 			mutationApplied: 0,
 			mutationSkipped: 0,
+			predationAttempted: 0,
+			predationTransferred: 0,
+			predationRejected: 0,
+			predationKills: 0,
+			predationByResult: {},
 		}),
 }));

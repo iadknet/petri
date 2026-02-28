@@ -109,6 +109,14 @@ export class WsClient {
 			frame.health.mutation_events_applied_total,
 			frame.health.mutation_events_skipped_total,
 		);
+		stats.setPredationStats(
+			frame.health.predation_actions_attempted_total,
+			frame.health.predation_actions_transferred_total,
+			frame.health.predation_actions_rejected_total,
+			frame.health.predation_kills_total,
+			frame.health.predation_actions_by_result,
+		);
+		sim.setPredationEvents(frame.predation_events);
 		stats.pushComplexity(
 			frame.tick,
 			frame.health.genome_complexity_mean,
@@ -129,6 +137,10 @@ export class WsClient {
 				reproduction_actions_attempted_total: status.reproduction_actions_attempted_total,
 				reproduction_actions_spawned_total: status.reproduction_actions_spawned_total,
 				reproduction_actions_rejected_total: status.reproduction_actions_rejected_total,
+				predation_actions_attempted_total: status.predation_actions_attempted_total,
+				predation_actions_transferred_total: status.predation_actions_transferred_total,
+				predation_actions_rejected_total: status.predation_actions_rejected_total,
+				predation_kills_total: status.predation_kills_total,
 				last_tick_compute_total_mean: status.last_tick_compute_total_mean,
 				last_tick_compute_total_min: status.last_tick_compute_total_min,
 				last_tick_compute_total_max: status.last_tick_compute_total_max,

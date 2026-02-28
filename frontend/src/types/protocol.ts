@@ -35,6 +35,8 @@ export interface LastTickActions {
 	eat: number;
 	reproduce: number;
 	noop: number;
+	steal: number;
+	predation_kills: number;
 }
 
 export interface StatusPayload {
@@ -45,6 +47,10 @@ export interface StatusPayload {
 	reproduction_actions_attempted_total: number;
 	reproduction_actions_spawned_total: number;
 	reproduction_actions_rejected_total: number;
+	predation_actions_attempted_total: number;
+	predation_actions_transferred_total: number;
+	predation_actions_rejected_total: number;
+	predation_kills_total: number;
 	last_tick_compute_total_mean: number;
 	last_tick_compute_total_min: number;
 	last_tick_compute_total_max: number;
@@ -69,9 +75,23 @@ export interface HealthPayload {
 	reproduction_actions_rejected_total: number;
 	reproduction_actions_rejected_total_by_reason: Record<string, number>;
 	mutation_events_skipped_total_by_reason: Record<string, number>;
+	predation_actions_attempted_total: number;
+	predation_actions_transferred_total: number;
+	predation_actions_rejected_total: number;
+	predation_kills_total: number;
+	predation_actions_by_result: Record<string, number>;
 	genome_complexity_mean: number;
 	genome_complexity_min: number;
 	genome_complexity_max: number;
+}
+
+export interface PredationEvent {
+	attacker_x: number;
+	attacker_y: number;
+	victim_x: number;
+	victim_y: number;
+	energy_stolen: number;
+	killed: boolean;
 }
 
 export interface WsFrame {
@@ -79,6 +99,7 @@ export interface WsFrame {
 	status: StatusPayload;
 	frame: Frame;
 	health: HealthPayload;
+	predation_events: PredationEvent[];
 }
 
 export type WsEventType = "status" | "frame" | "health";

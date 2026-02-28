@@ -11,7 +11,7 @@ use v3_core::simulation::{run_tick, seed_simulation};
 use crate::error::{AppError, FieldError};
 use crate::state::{
     AppState, BarrierCell, CreatureSnapshot, FoodCell, FramePayload, HealthPayload,
-    LastTickActions, SimHandle, SimulationStatus, StatusPayload, WsFrame,
+    LastTickActions, PredationEventSnapshot, SimHandle, SimulationStatus, StatusPayload, WsFrame,
 };
 use crate::types::{config_digest, deep_merge, StepRequest, PROTOCOL_VERSION};
 
@@ -194,6 +194,7 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             reproduce: stats.last_tick_reproduce,
             noop: stats.last_tick_noop,
             steal: stats.last_tick_steal,
+            predation_kills: stats.last_tick_predation_kills,
         },
         reproduction_actions_attempted_total: stats.reproduction_actions_attempted_total,
         reproduction_actions_spawned_total: stats.reproduction_actions_spawned_total,
@@ -317,10 +318,24 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
         genome_complexity_max: complexity_max,
     };
 
+    let predation_events: Vec<PredationEventSnapshot> = stats
+        .last_tick_predation_events
+        .iter()
+        .map(|e| PredationEventSnapshot {
+            attacker_x: e.attacker_x,
+            attacker_y: e.attacker_y,
+            victim_x: e.victim_x,
+            victim_y: e.victim_y,
+            energy_stolen: e.energy_stolen,
+            killed: e.killed,
+        })
+        .collect();
+
     WsFrame {
         tick: sim.tick,
         status,
         frame,
         health,
+        predation_events,
     }
 }

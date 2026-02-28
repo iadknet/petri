@@ -3,8 +3,9 @@ import { ActionsTab } from "./stats/ActionsTab.tsx";
 import { ComputationTab } from "./stats/ComputationTab.tsx";
 import { EvolutionTab } from "./stats/EvolutionTab.tsx";
 import { OverviewTab } from "./stats/OverviewTab.tsx";
+import { PredationTab } from "./stats/PredationTab.tsx";
 
-type Tab = "overview" | "actions" | "evolution" | "computation";
+type Tab = "overview" | "actions" | "evolution" | "computation" | "predation";
 
 export function StatsPanel() {
 	const [tab, setTab] = useState<Tab>("overview");
@@ -36,12 +37,14 @@ export function StatsPanel() {
 				{tabButton("actions", "Actions", "stats-tab-actions")}
 				{tabButton("evolution", "Evolution", "stats-tab-evolution")}
 				{tabButton("computation", "Computation", "stats-tab-computation")}
+				{tabButton("predation", "Predation", "stats-tab-predation")}
 			</div>
 			<div className="flex-1 overflow-y-auto">
 				{tab === "overview" && <OverviewTab />}
 				{tab === "actions" && <ActionsTab />}
 				{tab === "evolution" && <EvolutionTab />}
 				{tab === "computation" && <ComputationTab />}
+				{tab === "predation" && <PredationTab />}
 			</div>
 		</div>
 	);

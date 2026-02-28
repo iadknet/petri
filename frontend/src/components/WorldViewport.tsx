@@ -34,7 +34,7 @@ export function WorldViewport() {
 
 		const renderer = new WorldRenderer(canvas, () => {
 			const state = useSimulationStore.getState();
-			return { frame: state.frame, tick: state.tick };
+			return { frame: state.frame, tick: state.tick, predationEvents: state.predationEvents };
 		});
 
 		rendererRef.current = renderer;
