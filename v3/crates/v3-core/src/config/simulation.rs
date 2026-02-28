@@ -356,9 +356,8 @@ impl SimulationConfig {
         if m.per_birth_mutation_events_max < m.per_birth_mutation_events_min {
             m.per_birth_mutation_events_max = m.per_birth_mutation_events_min;
         }
-        if m.action_queue_cap < 1 {
-            m.action_queue_cap = 4;
-        }
+        // Cap must be >= 1; upper bound prevents u16 overflow in sub_value_count.
+        m.action_queue_cap = m.action_queue_cap.clamp(1, 21845);
         // complexity_cap: 0 disables pressure (handled by is_restricted), no normalization needed.
         // complexity_pressure_enabled: bool, no normalization needed.
         let ph = &mut m.phenotype;
@@ -576,6 +575,22 @@ mod tests {
             cfg.mutation.per_birth_mutation_events_max
                 >= cfg.mutation.per_birth_mutation_events_min
         );
+    }
+
+    #[test]
+    fn normalize_zero_action_queue_cap_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.mutation.action_queue_cap = 0;
+        cfg.normalize();
+        assert_eq!(cfg.mutation.action_queue_cap, 1);
+    }
+
+    #[test]
+    fn normalize_huge_action_queue_cap_clamped() {
+        let mut cfg = SimulationConfig::default();
+        cfg.mutation.action_queue_cap = 100_000;
+        cfg.normalize();
+        assert_eq!(cfg.mutation.action_queue_cap, 21845);
     }
 
     #[test]

@@ -103,7 +103,7 @@ Core rule:
 - `RetargetGraphEdge`
 - `RemoveGraphEdge`
 - `GraphRawFieldMutation` (raw representable-field mutation for tolerant graph
-  encodings, including `InputRef(u8)`, `CustomOutput(u8)`, and edge source
+  encodings, including `InputRef { ref_idx, sub_idx }`, `CustomOutput(u8)`, and edge source
   indices)
 
 ### InputRef domain
