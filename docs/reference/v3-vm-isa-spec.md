@@ -74,7 +74,7 @@ The VM defines **33 opcodes**.
 
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
-| 23 | `ReadInput` | dst, input_idx | reads `NodeGenome.input_refs[input_idx]`; invalid index yields `0.0` |
+| 23 | `ReadInput` | dst, ref_idx, sub_idx | reads `input_refs[ref_idx]` with sub-value index `sub_idx`; invalid index yields `0.0` |
 
 ### Output and Routing Writes
 
@@ -149,13 +149,17 @@ If `register_count == 0`, VM halts immediately (no action emission).
 
 ### `ReadInput` and Upstream Slot Resolution
 
-`ReadInput(dst, input_idx)` resolves through `NodeGenome.input_refs`.
+`ReadInput { dst, ref_idx, sub_idx }` resolves through `NodeGenome.input_refs`.
 
-If the referenced variant is `InputReference::UpstreamOutput { slot }`:
+- `ref_idx` selects the `InputReference` from `input_refs`.
+- `sub_idx` selects a sub-value within compound inputs (e.g. `ActionQueue`).
+  For scalar inputs, `sub_idx > 0` returns `0.0`.
+
+If the referenced variant is `InputReference::UpstreamSlot(slot)`:
 - value is `upstream_slots[slot]` when `slot < 12`
 - otherwise `0.0`
 
-Invalid `input_idx` is a soft default and yields `0.0`.
+Invalid `ref_idx` is a soft default and yields `0.0`.
 
 ### Routing Write Semantics
 
@@ -179,7 +183,7 @@ Soft defaults / graceful behavior:
 - invalid register/constant/index operands use normalization rules
 - invalid payload/meta writes are ignored
 - out-of-range jump targets wrap into valid program range (when program non-empty)
-- invalid `ReadInput` index yields `0.0`
+- invalid `ReadInput` `ref_idx` or `sub_idx` yields `0.0`
 
 Implementation bugs outside mutation-space (for example corrupted in-memory
 instruction representation) are still defects, but evolved operands do not

@@ -153,6 +153,10 @@ fn default_max_actions_per_turn() -> usize {
     10
 }
 
+fn default_action_queue_cap() -> usize {
+    4
+}
+
 impl Default for RuntimeConfig {
     fn default() -> Self {
         Self {
@@ -206,6 +210,7 @@ pub struct MutationConfig {
     /// Whether the complexity pressure gate is active.
     pub complexity_pressure_enabled: bool,
     /// Capacity of the action queue. Compound input fan-out counts depend on this.
+    #[serde(default = "default_action_queue_cap")]
     pub action_queue_cap: usize,
     pub phenotype: PhenotypeConfig,
 }
@@ -351,6 +356,9 @@ impl SimulationConfig {
         if m.per_birth_mutation_events_max < m.per_birth_mutation_events_min {
             m.per_birth_mutation_events_max = m.per_birth_mutation_events_min;
         }
+        if m.action_queue_cap < 1 {
+            m.action_queue_cap = 4;
+        }
         // complexity_cap: 0 disables pressure (handled by is_restricted), no normalization needed.
         // complexity_pressure_enabled: bool, no normalization needed.
         let ph = &mut m.phenotype;
@@ -461,6 +469,7 @@ mod tests {
         assert_eq!(cfg.mutation.per_birth_mutation_events_min, 1);
         assert_eq!(cfg.mutation.per_birth_mutation_events_max, 10);
         assert!((cfg.mutation.mesh_layer_probability - 0.2).abs() < 1e-9);
+        assert_eq!(cfg.mutation.action_queue_cap, 4);
         // Complexity pressure
         assert_eq!(cfg.mutation.complexity_cap, 1200);
         assert!(cfg.mutation.complexity_pressure_enabled);

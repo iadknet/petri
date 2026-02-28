@@ -143,8 +143,10 @@ behavior.
 | Routed index (negative, out-of-range, or non-finite) | Map to signed route index and wrap with `rem_euclid(targets.len())` |
 | Routed target id missing | Return `WorldAction::NoOp` |
 | Routing requested but `targets` is empty | Return `WorldAction::NoOp` |
-| `ReadInput` index out of range | Yield `0.0` |
-| `UpstreamOutput` slot out of range | Yield `0.0` |
+| `ReadInput` `ref_idx` out of range | Yield `0.0` |
+| `ReadInput` `sub_idx` out of range (compound) | Yield `0.0` |
+| Scalar input with `sub_idx > 0` | Yield `0.0` |
+| `UpstreamSlot` slot out of range | Yield `0.0` |
 | Node backend does not write an output slot | Preserve incoming `upstream_slots[slot]` |
 | Graph edge source out of bounds | Input contributes `0.0` |
 | Graph convergence not reached before `max_graph_relax_iters` | Use last computed pass outputs and continue |

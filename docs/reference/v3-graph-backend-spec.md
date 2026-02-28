@@ -101,7 +101,7 @@ Canonical owner for graph convergence budget/config defaults:
 
 ```rust
 pub enum GraphNodeKind {
-    InputRef(u8),
+    InputRef { ref_idx: u16, sub_idx: u16 },
 
     Constant(f32),
     Add,
@@ -129,14 +129,18 @@ pub enum GraphNodeKind {
 }
 ```
 
-`InputRef(u8)` reads through `NodeGenome.input_refs` and combines it with the
-node's internal weighted aggregate:
+`InputRef { ref_idx, sub_idx }` reads `input_refs[ref_idx]` with sub-value
+index `sub_idx` and combines it with the node's internal weighted aggregate:
 
-`output = input_ref_value + weighted_input_sum`
+`output = resolve_input(input_refs[ref_idx], sub_idx, ctx) + weighted_input_sum`
 
-Missing input refs read as `0.0`.
+For scalar inputs (all variants except `ActionQueue`), `sub_idx > 0` returns
+`0.0`. For compound inputs (e.g. `ActionQueue`), `sub_idx` addresses
+individual sub-values within the compound (see `v3-sensor-spec.md`).
 
-When `InputRef(u8)` resolves to `InputReference::UpstreamOutput { slot }`, the
+Missing input refs read as `0.0`. Out-of-bounds `ref_idx` reads as `0.0`.
+
+When `InputRef` resolves to `InputReference::UpstreamSlot(slot)`, the
 base value is routing-parent `upstream_slots[slot]` (invalid slot -> `0.0`),
 then combined with internal weighted aggregate using the same rule.
 
