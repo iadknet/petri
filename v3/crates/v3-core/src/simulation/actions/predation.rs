@@ -445,4 +445,55 @@ mod tests {
             "victim unchanged"
         );
     }
+
+    #[test]
+    fn event_record_pushed_on_successful_transfer() {
+        let (mut sim, attacker_id, _victim_id) =
+            make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 30.0);
+        sim.config.predation.steal_cost_rate = 0.0;
+
+        let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 10.0);
+
+        assert_eq!(result, PredationActionResult::Transferred);
+        assert_eq!(sim.stats.last_tick_predation_events.len(), 1);
+        let event = &sim.stats.last_tick_predation_events[0];
+        assert_eq!(event.attacker_x, 5);
+        assert_eq!(event.attacker_y, 5);
+        assert_eq!(event.victim_x, 5);
+        assert_eq!(event.victim_y, 4);
+        assert!((event.energy_stolen - 10.0).abs() < 1e-6);
+        assert!(!event.killed);
+    }
+
+    #[test]
+    fn event_record_pushed_on_kill() {
+        let (mut sim, attacker_id, _victim_id) =
+            make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 5.0);
+        sim.config.predation.steal_cost_rate = 0.0;
+
+        let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 10.0);
+
+        assert_eq!(result, PredationActionResult::TransferredAndKilled);
+        assert_eq!(sim.stats.last_tick_predation_events.len(), 1);
+        let event = &sim.stats.last_tick_predation_events[0];
+        assert_eq!(event.attacker_x, 5);
+        assert_eq!(event.attacker_y, 5);
+        assert_eq!(event.victim_x, 5);
+        assert_eq!(event.victim_y, 4);
+        assert!((event.energy_stolen - 5.0).abs() < 1e-6);
+        assert!(event.killed);
+        assert_eq!(sim.stats.last_tick_predation_kills, 1);
+    }
+
+    #[test]
+    fn no_event_record_on_rejection() {
+        let (mut sim, attacker_id) = make_sim_one_creature(Position::new(5, 5), 50.0);
+        sim.config.predation.steal_cost_rate = 0.0;
+
+        let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 10.0);
+
+        assert_eq!(result, PredationActionResult::RejectedNoVictim);
+        assert!(sim.stats.last_tick_predation_events.is_empty());
+        assert_eq!(sim.stats.last_tick_predation_kills, 0);
+    }
 }
