@@ -63,14 +63,8 @@ pub fn execute_creature_mesh_traced(
 
     loop {
         if hops >= max_hops {
-            let actions = action_queue.into_actions();
-            let actions = if actions.is_empty() {
-                vec![WorldAction::NoOp]
-            } else {
-                actions
-            };
             return (
-                actions,
+                action_queue.into_actions_or_noop(),
                 report,
                 hop_traces,
                 TerminationReason::MaxHopsReached,
@@ -141,14 +135,8 @@ pub fn execute_creature_mesh_traced(
         }
 
         if result.terminal {
-            let actions = action_queue.into_actions();
-            let actions = if actions.is_empty() {
-                vec![WorldAction::NoOp]
-            } else {
-                actions
-            };
             return (
-                actions,
+                action_queue.into_actions_or_noop(),
                 report,
                 hop_traces,
                 TerminationReason::ActionEmitted,
@@ -156,13 +144,12 @@ pub fn execute_creature_mesh_traced(
         }
 
         if node.targets.is_empty() {
-            let actions = action_queue.into_actions();
-            let actions = if actions.is_empty() {
-                vec![WorldAction::NoOp]
-            } else {
-                actions
-            };
-            return (actions, report, hop_traces, TerminationReason::NoTargets);
+            return (
+                action_queue.into_actions_or_noop(),
+                report,
+                hop_traces,
+                TerminationReason::NoTargets,
+            );
         }
 
         let route_target_idx = result.route_target_idx;
@@ -182,13 +169,12 @@ pub fn execute_creature_mesh_traced(
         let target_id = node.targets[target_pos];
 
         if !node_index.contains_key(&target_id) {
-            let actions = action_queue.into_actions();
-            let actions = if actions.is_empty() {
-                vec![WorldAction::NoOp]
-            } else {
-                actions
-            };
-            return (actions, report, hop_traces, TerminationReason::MissingNode);
+            return (
+                action_queue.into_actions_or_noop(),
+                report,
+                hop_traces,
+                TerminationReason::MissingNode,
+            );
         }
 
         upstream_slots = result.output_slots;
