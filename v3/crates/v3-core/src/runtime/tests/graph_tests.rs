@@ -356,6 +356,10 @@ fn state_not_mutated_on_energy_exhaustion() {
     let mut gr = GraphRuntimeState {
         node_state: vec![vec![42.0f32]],
         hebbian_weights: Vec::new(),
+        scratch_prev: Vec::new(),
+        scratch_curr: Vec::new(),
+        scratch_backup: Vec::new(),
+        scratch_w_inputs: Vec::new(),
     };
 
     let si = make_static_inputs();
@@ -637,6 +641,10 @@ fn oscillator_nan_safe() {
     let mut gr = GraphRuntimeState {
         node_state: vec![vec![f32::INFINITY, 0.0]],
         hebbian_weights: Vec::new(),
+        scratch_prev: Vec::new(),
+        scratch_curr: Vec::new(),
+        scratch_backup: Vec::new(),
+        scratch_w_inputs: Vec::new(),
     };
 
     let r = execute_graph_node(

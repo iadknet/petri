@@ -10,6 +10,14 @@ pub struct GraphRuntimeState {
     /// Empty inner vec = use genome weights. Lazily initialized on first Hebbian evaluation.
     /// Uses `Box<[f32]>` since edge count per node is fixed after init.
     pub hebbian_weights: Vec<Vec<Box<[f32]>>>,
+    /// Scratch: prev_outputs buffer reused across graph evaluations.
+    pub(crate) scratch_prev: Vec<f32>,
+    /// Scratch: curr_outputs buffer reused across graph evaluations.
+    pub(crate) scratch_curr: Vec<f32>,
+    /// Scratch: state backup for energy-exhaustion rollback.
+    pub(crate) scratch_backup: Vec<f32>,
+    /// Scratch: weighted-inputs buffer reused across graph evaluations.
+    pub(crate) scratch_w_inputs: Vec<f32>,
 }
 
 impl GraphRuntimeState {
@@ -18,6 +26,10 @@ impl GraphRuntimeState {
         Self {
             node_state: Vec::new(),
             hebbian_weights: Vec::new(),
+            scratch_prev: Vec::new(),
+            scratch_curr: Vec::new(),
+            scratch_backup: Vec::new(),
+            scratch_w_inputs: Vec::new(),
         }
     }
 }
