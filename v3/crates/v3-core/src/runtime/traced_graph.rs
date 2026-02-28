@@ -12,6 +12,7 @@ use crate::creature::genome::GraphBackendDef;
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::graph::{collect_weighted_inputs, evaluate_kind, EvalCtx};
 use crate::runtime::hebbian;
+use crate::runtime::inputs::ResolveCtx;
 use crate::runtime::trace::{kind_label, GraphNodeEvalTrace, GraphPassTrace, GraphTrace};
 use crate::runtime::types::{sanitize_f32, NodeResult};
 use crate::sensors::static_inputs::StaticInputs;
@@ -96,10 +97,12 @@ pub fn execute_graph_node_traced(
 
         let ctx = EvalCtx {
             input_refs,
-            upstream_slots,
-            energy: *energy,
-            energy_consumed,
-            static_inputs,
+            resolve: ResolveCtx {
+                static_inputs,
+                upstream_slots,
+                energy: *energy,
+                energy_consumed,
+            },
         };
 
         let mut node_evaluations: Vec<GraphNodeEvalTrace> = Vec::with_capacity(node_count);

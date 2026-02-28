@@ -9,7 +9,7 @@ use crate::config::RuntimeConfig;
 use crate::contracts::InputReference;
 use crate::creature::genome::VmBackendDef;
 use crate::runtime::action_decode::decode_world_action;
-use crate::runtime::inputs::resolve_input;
+use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::trace::{MemoryWrite, VmStepTrace, VmTrace};
 use crate::runtime::types::{sanitize_f32, NodeResult};
 use crate::runtime::vm::{is_truthy, jump_target, nr, opcode_base_cost};
@@ -311,13 +311,13 @@ pub fn execute_vm_node_traced(
 
             VmInstruction::ReadInput { dst, input_idx } => {
                 let val = if (*input_idx as usize) < input_refs.len() {
-                    resolve_input(
-                        &input_refs[*input_idx as usize],
+                    let ctx = ResolveCtx {
                         static_inputs,
                         upstream_slots,
-                        *energy,
+                        energy: *energy,
                         energy_consumed,
-                    )
+                    };
+                    resolve_input(&input_refs[*input_idx as usize], 0, &ctx)
                 } else {
                     0.0
                 };
