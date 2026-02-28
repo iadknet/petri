@@ -324,6 +324,7 @@ pub fn execute_vm_node_traced(
                         upstream_slots,
                         energy: *energy,
                         energy_consumed,
+                        action_queue,
                     };
                     resolve_input(&input_refs[*ref_idx as usize], *sub_idx, &ctx)
                 } else {

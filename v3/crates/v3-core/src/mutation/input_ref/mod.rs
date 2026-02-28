@@ -383,13 +383,15 @@ mod tests {
                 InputReference::StaticIntrospection(_) => "StaticIntrospection".to_string(),
                 InputReference::DynamicIntrospection(_) => "DynamicIntrospection".to_string(),
                 InputReference::UpstreamSlot(_) => "UpstreamSlot".to_string(),
+                InputReference::ActionQueue => "ActionQueue".to_string(),
             };
             categories.insert(cat);
         }
-        assert_eq!(
-            categories.len(),
-            7,
-            "all 7 input reference categories must be reachable; got {:?}",
+        // ActionQueue will be added to the random pool in Phase 2b.
+        // For now, assert the 7 existing categories are reachable.
+        assert!(
+            categories.len() >= 7,
+            "at least 7 input reference categories must be reachable; got {:?}",
             categories
         );
     }

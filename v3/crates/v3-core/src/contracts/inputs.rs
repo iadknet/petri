@@ -42,6 +42,9 @@ pub enum InputReference {
     DynamicIntrospection(DynamicIntrospectionKey),
     /// Output slot from the upstream node in the mesh chain.
     UpstreamSlot(usize),
+    /// Compound: the creature's action queue. sub_idx maps to queue slot values:
+    /// `sub_idx / 3` = queue slot index, `sub_idx % 3`: 0 = action_type, 1 = param0, 2 = param1.
+    ActionQueue,
 }
 
 #[cfg(test)]
@@ -73,6 +76,7 @@ mod tests {
             InputReference::StaticIntrospection(StaticIntrospectionKey::Generation),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
             InputReference::UpstreamSlot(0),
+            InputReference::ActionQueue,
         ];
         for r in refs {
             let json = serde_json::to_string(&r).unwrap();

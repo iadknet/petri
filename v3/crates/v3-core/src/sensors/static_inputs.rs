@@ -109,6 +109,7 @@ pub fn resolve_static_ref(
                 0.0
             }
         }
+        InputReference::ActionQueue => 0.0,
     }
 }
 

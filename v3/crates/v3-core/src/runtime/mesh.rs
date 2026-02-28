@@ -101,6 +101,7 @@ pub fn execute_creature_mesh(
                 graph_runtime,
                 static_inputs,
                 config,
+                &action_queue,
             ),
         };
 
