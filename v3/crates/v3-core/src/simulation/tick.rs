@@ -169,7 +169,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                         energy_after: creature.energy,
                         static_inputs: si_snapshot,
                         hops,
-                        final_action: action.clone(),
+                        final_action: action,
                         termination_reason,
                     });
                     active.ticks_remaining = active.ticks_remaining.saturating_sub(1);
