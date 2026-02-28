@@ -934,8 +934,8 @@ async fn start_sample_returns_recording() {
     for tick in ticks {
         assert!(tick["hops"].is_array(), "missing hops");
         assert!(
-            tick["final_action"].is_string() || tick["final_action"].is_object(),
-            "missing final_action"
+            tick["final_actions"].is_array(),
+            "missing final_actions"
         );
     }
 }

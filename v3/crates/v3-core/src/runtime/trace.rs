@@ -26,7 +26,7 @@ pub struct TickTrace {
     pub energy_after: f32,
     pub static_inputs: StaticInputsSnapshot,
     pub hops: Vec<MeshHopTrace>,
-    pub final_action: WorldAction,
+    pub final_actions: Vec<WorldAction>,
     pub termination_reason: TerminationReason,
 }
 
