@@ -56,6 +56,9 @@ export interface MutationConfig {
 	mutation_probability: number;
 	per_birth_mutation_events_min: number;
 	per_birth_mutation_events_max: number;
+	mesh_layer_probability: number;
+	complexity_cap: number;
+	complexity_pressure_enabled: boolean;
 	phenotype: PhenotypeConfig;
 }
 
@@ -66,6 +69,7 @@ export interface RuntimeConfig {
 	graph_convergence_epsilon: number;
 	graph_convergence_stable_passes: number;
 	graph_node_base_cost: number;
+	hebbian_update_cost: number;
 	vm: VmConfig;
 }
 
