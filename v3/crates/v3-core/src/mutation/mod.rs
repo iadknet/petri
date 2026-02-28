@@ -1,3 +1,4 @@
+pub mod compound;
 pub mod engine;
 pub mod graph;
 pub mod input_ref;

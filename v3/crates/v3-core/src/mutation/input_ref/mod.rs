@@ -1,9 +1,11 @@
 use rand::Rng;
 
+use crate::config::MutationConfig;
 use crate::contracts::{
     Direction, DynamicIntrospectionKey, InputReference, StaticIntrospectionKey, WorldInputKey,
 };
 use crate::creature::genome::{BackendDef, CreatureGenome, GraphNodeKind, VmInstruction};
+use crate::mutation::compound;
 use crate::mutation::types::MutationSkipReason;
 
 /// Input reference mutation operator variants.
@@ -109,15 +111,16 @@ impl InputRefMutator {
         genome: &mut CreatureGenome,
         op: InputRefOperator,
         rng: &mut impl Rng,
+        config: &MutationConfig,
     ) -> Result<(), MutationSkipReason> {
         if genome.nodes.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
 
         match op {
-            InputRefOperator::Add => apply_add(genome, rng),
+            InputRefOperator::Add => apply_add(genome, rng, config),
             InputRefOperator::Remove => apply_remove(genome, rng),
-            InputRefOperator::Swap => apply_swap(genome, rng),
+            InputRefOperator::Swap => apply_swap(genome, rng, config),
             InputRefOperator::RawFieldMutation => apply_raw_field_mutation(genome, rng),
         }
     }
@@ -164,11 +167,19 @@ pub(crate) fn reindex_after_removal(
     }
 }
 
-fn apply_add(genome: &mut CreatureGenome, rng: &mut impl Rng) -> Result<(), MutationSkipReason> {
+fn apply_add(
+    genome: &mut CreatureGenome,
+    rng: &mut impl Rng,
+    config: &MutationConfig,
+) -> Result<(), MutationSkipReason> {
     let node_idx = rng.gen_range(0..genome.nodes.len());
-    genome.nodes[node_idx]
-        .input_refs
-        .push(random_input_reference(rng));
+    let new_ref = random_input_reference(rng);
+    let count = compound::sub_value_count(&new_ref, config);
+    let ref_idx = genome.nodes[node_idx].input_refs.len() as u16;
+    genome.nodes[node_idx].input_refs.push(new_ref);
+    if count > 1 {
+        compound::create_fan_out_nodes(&mut genome.nodes[node_idx], ref_idx, count);
+    }
     Ok(())
 }
 
@@ -191,7 +202,11 @@ fn apply_remove(genome: &mut CreatureGenome, rng: &mut impl Rng) -> Result<(), M
     Ok(())
 }
 
-fn apply_swap(genome: &mut CreatureGenome, rng: &mut impl Rng) -> Result<(), MutationSkipReason> {
+fn apply_swap(
+    genome: &mut CreatureGenome,
+    rng: &mut impl Rng,
+    config: &MutationConfig,
+) -> Result<(), MutationSkipReason> {
     let eligible: Vec<usize> = genome
         .nodes
         .iter()
@@ -204,17 +219,22 @@ fn apply_swap(genome: &mut CreatureGenome, rng: &mut impl Rng) -> Result<(), Mut
     }
     let node_idx = eligible[rng.gen_range(0..eligible.len())];
     let ref_idx = rng.gen_range(0..genome.nodes[node_idx].input_refs.len());
-    genome.nodes[node_idx].input_refs[ref_idx] = random_input_reference(rng);
+    let new_ref = random_input_reference(rng);
+    let count = compound::sub_value_count(&new_ref, config);
+    genome.nodes[node_idx].input_refs[ref_idx] = new_ref;
+    if count > 1 {
+        compound::create_fan_out_nodes(&mut genome.nodes[node_idx], ref_idx as u16, count);
+    }
     Ok(())
 }
 
-/// Generate a random input reference from the full set of 37 possible values.
+/// Generate a random input reference from the full set of 38 possible values.
 ///
 /// Distribution: FoodHere (1) + NeighborCellFood (8) + NeighborCellBarrier (8) +
 /// NeighborCellOccupied (8) + StaticIntrospection (2) + DynamicIntrospection (2) +
-/// UpstreamSlot(usize) raw values (8 weighted slots) = 37 total.
+/// ActionQueue (1) + UpstreamSlot(usize) raw values (8 weighted slots) = 38 total.
 fn random_input_reference(rng: &mut impl Rng) -> InputReference {
-    let idx = rng.gen_range(0u8..37);
+    let idx = rng.gen_range(0u8..38);
     match idx {
         0 => InputReference::World(WorldInputKey::FoodHere),
         1..=8 => {
@@ -230,6 +250,7 @@ fn random_input_reference(rng: &mut impl Rng) -> InputReference {
         26 => InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
         27 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
         28 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),
+        29 => InputReference::ActionQueue,
         _ => InputReference::UpstreamSlot(rng.gen::<u8>() as usize),
     }
 }
@@ -238,27 +259,57 @@ fn apply_raw_field_mutation(
     genome: &mut CreatureGenome,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let mut eligible_count: usize = 0;
+    // Count eligible targets: UpstreamSlot input_refs + InputRef graph nodes (for sub_idx mutation).
+    let mut upstream_count: usize = 0;
+    let mut graph_input_ref_count: usize = 0;
     for node in &genome.nodes {
-        eligible_count += node
+        upstream_count += node
             .input_refs
             .iter()
             .filter(|r| matches!(r, InputReference::UpstreamSlot(_)))
             .count();
+        if let BackendDef::Graph(ref gd) = node.backend_def {
+            graph_input_ref_count += gd
+                .internal_nodes
+                .iter()
+                .filter(|n| matches!(n.kind, GraphNodeKind::InputRef { .. }))
+                .count();
+        }
     }
-    if eligible_count == 0 {
+    let total = upstream_count + graph_input_ref_count;
+    if total == 0 {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
 
-    let mut pick = rng.gen_range(0..eligible_count);
-    for node in &mut genome.nodes {
-        for input_ref in &mut node.input_refs {
-            if matches!(input_ref, InputReference::UpstreamSlot(_)) {
-                if pick == 0 {
-                    *input_ref = InputReference::UpstreamSlot(rng.gen::<u16>() as usize);
-                    return Ok(());
+    let mut pick = rng.gen_range(0..total);
+
+    // First pool: UpstreamSlot input_refs.
+    if pick < upstream_count {
+        for node in &mut genome.nodes {
+            for input_ref in &mut node.input_refs {
+                if matches!(input_ref, InputReference::UpstreamSlot(_)) {
+                    if pick == 0 {
+                        *input_ref = InputReference::UpstreamSlot(rng.gen::<u16>() as usize);
+                        return Ok(());
+                    }
+                    pick -= 1;
                 }
-                pick -= 1;
+            }
+        }
+    }
+
+    // Second pool: InputRef graph node sub_idx mutation.
+    pick -= upstream_count;
+    for node in &mut genome.nodes {
+        if let BackendDef::Graph(ref mut gd) = node.backend_def {
+            for internal in &mut gd.internal_nodes {
+                if let GraphNodeKind::InputRef { sub_idx, .. } = &mut internal.kind {
+                    if pick == 0 {
+                        *sub_idx = rng.gen::<u16>();
+                        return Ok(());
+                    }
+                    pick -= 1;
+                }
             }
         }
     }
@@ -273,6 +324,7 @@ fn direction_from_idx(idx: u8) -> Direction {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::MutationConfig;
     use crate::contracts::NodeId;
     use crate::creature::founder::v3alpha1_founder_genome;
     use crate::creature::genome::{
@@ -285,6 +337,10 @@ mod tests {
 
     fn rng(seed: u64) -> SmallRng {
         SmallRng::seed_from_u64(seed)
+    }
+
+    fn default_config() -> MutationConfig {
+        MutationConfig::default()
     }
 
     fn single_node_genome_with_input_ref(input_ref: InputReference) -> CreatureGenome {
@@ -308,7 +364,13 @@ mod tests {
         let mut genome = v3alpha1_founder_genome();
         let before: usize = genome.nodes.iter().map(|n| n.input_refs.len()).sum();
         let mut r = rng(0);
-        InputRefMutator::apply(&mut genome, InputRefOperator::Add, &mut r).unwrap();
+        InputRefMutator::apply(
+            &mut genome,
+            InputRefOperator::Add,
+            &mut r,
+            &default_config(),
+        )
+        .unwrap();
         let after: usize = genome.nodes.iter().map(|n| n.input_refs.len()).sum();
         assert_eq!(after, before + 1);
     }
@@ -319,7 +381,13 @@ mod tests {
         let before: usize = genome.nodes.iter().map(|n| n.input_refs.len()).sum();
         assert!(before > 0, "founder must have input_refs");
         let mut r = rng(0);
-        InputRefMutator::apply(&mut genome, InputRefOperator::Remove, &mut r).unwrap();
+        InputRefMutator::apply(
+            &mut genome,
+            InputRefOperator::Remove,
+            &mut r,
+            &default_config(),
+        )
+        .unwrap();
         let after: usize = genome.nodes.iter().map(|n| n.input_refs.len()).sum();
         assert_eq!(after, before - 1);
     }
@@ -331,7 +399,12 @@ mod tests {
             node.input_refs.clear();
         }
         let mut r = rng(0);
-        let result = InputRefMutator::apply(&mut genome, InputRefOperator::Remove, &mut r);
+        let result = InputRefMutator::apply(
+            &mut genome,
+            InputRefOperator::Remove,
+            &mut r,
+            &default_config(),
+        );
         assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
     }
 
@@ -347,7 +420,9 @@ mod tests {
         for seed in 0u64..100 {
             let mut g = genome.clone();
             let mut r = rng(seed);
-            if InputRefMutator::apply(&mut g, InputRefOperator::Swap, &mut r).is_ok() {
+            if InputRefMutator::apply(&mut g, InputRefOperator::Swap, &mut r, &default_config())
+                .is_ok()
+            {
                 let new_refs: Vec<InputReference> = g
                     .nodes
                     .iter()
@@ -387,11 +462,10 @@ mod tests {
             };
             categories.insert(cat);
         }
-        // ActionQueue will be added to the random pool in Phase 2b.
-        // For now, assert the 7 existing categories are reachable.
-        assert!(
-            categories.len() >= 7,
-            "at least 7 input reference categories must be reachable; got {:?}",
+        assert_eq!(
+            categories.len(),
+            8,
+            "all 8 input reference categories must be reachable; got {:?}",
             categories
         );
     }
@@ -420,8 +494,13 @@ mod tests {
         for seed in 0u64..512 {
             let mut genome = single_node_genome_with_input_ref(InputReference::UpstreamSlot(0));
             let mut r = rng(seed);
-            InputRefMutator::apply(&mut genome, InputRefOperator::RawFieldMutation, &mut r)
-                .unwrap();
+            InputRefMutator::apply(
+                &mut genome,
+                InputRefOperator::RawFieldMutation,
+                &mut r,
+                &default_config(),
+            )
+            .unwrap();
             if let InputReference::UpstreamSlot(slot) = genome.nodes[0].input_refs[0] {
                 if slot > 11 {
                     found_out_of_range = true;
@@ -446,7 +525,7 @@ mod tests {
         for (i, &op) in operators.iter().enumerate() {
             let mut genome = v3alpha1_founder_genome();
             let mut r = rng(i as u64 + 400);
-            let _ = InputRefMutator::apply(&mut genome, op, &mut r);
+            let _ = InputRefMutator::apply(&mut genome, op, &mut r, &default_config());
             assert!(
                 ParseabilityGate::validate(&genome).is_ok(),
                 "parseability failed after {:?}",
@@ -744,7 +823,8 @@ mod tests {
         for seed in 0u64..200 {
             let mut g = genome.clone();
             let mut r = rng(seed);
-            if InputRefMutator::apply(&mut g, InputRefOperator::Remove, &mut r).is_ok()
+            if InputRefMutator::apply(&mut g, InputRefOperator::Remove, &mut r, &default_config())
+                .is_ok()
                 && g.nodes[0].input_refs.len() == 1
             {
                 // Removed one ref. Check if the remaining is UpstreamSlot(0)
@@ -834,5 +914,135 @@ mod tests {
         } else {
             panic!("expected Graph backend");
         }
+    }
+
+    // ── Phase 2b compound-aware tests ──────────────────────────────────
+
+    #[test]
+    fn add_compound_input_creates_fan_out_nodes() {
+        // Build a graph genome with no input refs. Force Add to pick ActionQueue.
+        // Since random_input_reference picks ActionQueue at idx 29, we search seeds.
+        let mut found = false;
+        for seed in 0u64..2000 {
+            let mut genome = graph_genome_with_input_refs(vec![], vec![]);
+            let mut r = rng(seed);
+            InputRefMutator::apply(
+                &mut genome,
+                InputRefOperator::Add,
+                &mut r,
+                &default_config(),
+            )
+            .unwrap();
+            if genome.nodes[0].input_refs.last() == Some(&InputReference::ActionQueue) {
+                // ActionQueue was added — should have fan-out nodes
+                if let BackendDef::Graph(ref gd) = genome.nodes[0].backend_def {
+                    // default config: action_queue_cap=4 → 12 fan-out nodes
+                    assert_eq!(
+                        gd.internal_nodes.len(),
+                        12,
+                        "compound Add must create 4*3=12 fan-out InputRef nodes"
+                    );
+                    for (i, n) in gd.internal_nodes.iter().enumerate() {
+                        assert_eq!(
+                            n.kind,
+                            GraphNodeKind::InputRef {
+                                ref_idx: 0,
+                                sub_idx: i as u16,
+                            }
+                        );
+                    }
+                    found = true;
+                    break;
+                }
+            }
+        }
+        assert!(found, "must find a seed producing ActionQueue input ref");
+    }
+
+    #[test]
+    fn swap_to_compound_creates_fan_out_nodes() {
+        // Start with a scalar input ref, swap to ActionQueue.
+        let mut found = false;
+        for seed in 0u64..2000 {
+            let mut genome = graph_genome_with_input_refs(
+                vec![InputReference::World(WorldInputKey::FoodHere)],
+                vec![],
+            );
+            let mut r = rng(seed);
+            InputRefMutator::apply(
+                &mut genome,
+                InputRefOperator::Swap,
+                &mut r,
+                &default_config(),
+            )
+            .unwrap();
+            if genome.nodes[0].input_refs[0] == InputReference::ActionQueue {
+                if let BackendDef::Graph(ref gd) = genome.nodes[0].backend_def {
+                    assert_eq!(
+                        gd.internal_nodes.len(),
+                        12,
+                        "compound Swap must create fan-out nodes"
+                    );
+                    found = true;
+                    break;
+                }
+            }
+        }
+        assert!(found, "must find a seed swapping to ActionQueue");
+    }
+
+    #[test]
+    fn raw_field_mutation_mutates_sub_idx_on_graph_input_ref() {
+        // Create a genome with a graph InputRef node — RawFieldMutation should
+        // be able to mutate its sub_idx.
+        let mut found_changed = false;
+        for seed in 0u64..500 {
+            let mut genome = graph_genome_with_input_refs(
+                vec![InputReference::ActionQueue],
+                vec![GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 0,
+                        sub_idx: 5,
+                    },
+                    inputs: vec![],
+                    hebbian: None,
+                }],
+            );
+            let mut r = rng(seed);
+            let _ = InputRefMutator::apply(
+                &mut genome,
+                InputRefOperator::RawFieldMutation,
+                &mut r,
+                &default_config(),
+            );
+            if let BackendDef::Graph(ref gd) = genome.nodes[0].backend_def {
+                if let GraphNodeKind::InputRef { sub_idx, .. } = gd.internal_nodes[0].kind {
+                    if sub_idx != 5 {
+                        found_changed = true;
+                        break;
+                    }
+                }
+            }
+        }
+        assert!(
+            found_changed,
+            "RawFieldMutation must be able to mutate sub_idx on graph InputRef nodes"
+        );
+    }
+
+    #[test]
+    fn action_queue_appears_in_random_input_reference_pool() {
+        let mut found_aq = false;
+        for seed in 0u64..500 {
+            let mut r = rng(seed);
+            if random_input_reference(&mut r) == InputReference::ActionQueue {
+                found_aq = true;
+                break;
+            }
+        }
+        assert!(
+            found_aq,
+            "ActionQueue must be reachable from random_input_reference"
+        );
     }
 }
