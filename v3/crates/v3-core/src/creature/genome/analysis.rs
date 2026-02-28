@@ -47,6 +47,9 @@ pub fn vm_register_write(instr: &VmInstruction) -> Option<u8> {
         | VmInstruction::ToU8 { dst, .. }
         | VmInstruction::ToBool { dst, .. }
         | VmInstruction::ReadInput { dst, .. }
+        | VmInstruction::ReadActionQueueLength { dst, .. }
+        | VmInstruction::ReadActionQueueType { dst, .. }
+        | VmInstruction::ReadActionQueueParam { dst, .. }
         | VmInstruction::LoadMem8 { dst, .. }
         | VmInstruction::LoadMem8Imm { dst, .. } => Some(*dst),
         VmInstruction::Noop
@@ -56,6 +59,9 @@ pub fn vm_register_write(instr: &VmInstruction) -> Option<u8> {
         | VmInstruction::WriteInternalPayload { .. }
         | VmInstruction::WriteWorldActionMeta { .. }
         | VmInstruction::EmitWorldAction { .. }
+        | VmInstruction::PushAction { .. }
+        | VmInstruction::PopAction
+        | VmInstruction::ExecuteActionQueue
         | VmInstruction::WriteRouteTarget { .. }
         | VmInstruction::StoreMem8 { .. }
         | VmInstruction::StoreMem8Imm { .. } => None,
@@ -77,9 +83,15 @@ pub fn vm_reg_bit(reg: u8) -> u32 {
 /// Bit `i` set means register `i` is read.
 pub fn vm_register_read_mask(instr: &VmInstruction) -> u32 {
     match instr {
-        VmInstruction::Noop | VmInstruction::Halt | VmInstruction::Jump { .. } => 0,
-        VmInstruction::LoadConst { .. } | VmInstruction::LoadMem8Imm { .. } => 0,
-        VmInstruction::EmitWorldAction { .. } => 0,
+        VmInstruction::Noop
+        | VmInstruction::Halt
+        | VmInstruction::Jump { .. }
+        | VmInstruction::PopAction
+        | VmInstruction::ExecuteActionQueue => 0,
+        VmInstruction::LoadConst { .. }
+        | VmInstruction::LoadMem8Imm { .. }
+        | VmInstruction::ReadActionQueueLength { .. } => 0,
+        VmInstruction::EmitWorldAction { .. } | VmInstruction::PushAction { .. } => 0,
         VmInstruction::Move { src, .. }
         | VmInstruction::Abs { src, .. }
         | VmInstruction::Neg { src, .. }
@@ -109,6 +121,8 @@ pub fn vm_register_read_mask(instr: &VmInstruction) -> u32 {
         VmInstruction::StoreMem8Imm { src, .. } => vm_reg_bit(*src),
         VmInstruction::LoadMem8 { addr_reg, .. } => vm_reg_bit(*addr_reg),
         VmInstruction::StoreMem8 { addr_reg, src } => vm_reg_bit(*addr_reg) | vm_reg_bit(*src),
+        VmInstruction::ReadActionQueueType { index_src, .. } => vm_reg_bit(*index_src),
+        VmInstruction::ReadActionQueueParam { index_src, .. } => vm_reg_bit(*index_src),
     }
 }
 
@@ -119,6 +133,9 @@ pub fn vm_is_output_instruction(instr: &VmInstruction) -> bool {
         VmInstruction::WriteInternalPayload { .. }
             | VmInstruction::WriteWorldActionMeta { .. }
             | VmInstruction::EmitWorldAction { .. }
+            | VmInstruction::PushAction { .. }
+            | VmInstruction::PopAction
+            | VmInstruction::ExecuteActionQueue
             | VmInstruction::WriteRouteTarget { .. }
             | VmInstruction::StoreMem8 { .. }
             | VmInstruction::StoreMem8Imm { .. }

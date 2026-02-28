@@ -1,7 +1,6 @@
-use crate::contracts::WorldAction;
-
 /// Result returned by a single node evaluation.
-/// The mesh executor uses this to decide routing and final WorldAction.
+/// The mesh executor uses this to decide routing. Action queue lives in the
+/// mesh executor, not inside NodeResult.
 #[must_use]
 #[derive(Debug, Clone, PartialEq)]
 pub struct NodeResult {
@@ -10,20 +9,20 @@ pub struct NodeResult {
     pub output_slots: [f32; 12],
     /// Routing target index (f32). Mesh executor applies rem_euclid over targets.len().
     pub route_target_idx: f32,
-    /// World action emitted by this node, if any.
-    pub world_action: Option<WorldAction>,
+    /// True when execution should stop (EmitWorldAction, ExecuteActionQueue, or Halt).
+    pub terminal: bool,
     /// True when the node was halted due to energy exhaustion.
-    /// When true, the mesh executor MUST return WorldAction::NoOp immediately.
+    /// When true, the mesh executor MUST discard the action queue and return `[NoOp]`.
     pub energy_exhausted: bool,
 }
 
 impl NodeResult {
-    /// Create a no-action result (halt or step cap reached).
+    /// Create a non-terminal result (halt or step cap reached — node finished but mesh continues).
     pub fn halted(output_slots: [f32; 12], route_target_idx: f32) -> Self {
         Self {
             output_slots,
             route_target_idx,
-            world_action: None,
+            terminal: false,
             energy_exhausted: false,
         }
     }
@@ -33,17 +32,17 @@ impl NodeResult {
         Self {
             output_slots: [0.0; 12],
             route_target_idx: 0.0,
-            world_action: None,
+            terminal: true,
             energy_exhausted: true,
         }
     }
 
-    /// Create a result with an emitted world action.
-    pub fn action(output_slots: [f32; 12], route_target_idx: f32, action: WorldAction) -> Self {
+    /// Create a terminal result (action emitted or ExecuteActionQueue).
+    pub fn terminal(output_slots: [f32; 12], route_target_idx: f32) -> Self {
         Self {
             output_slots,
             route_target_idx,
-            world_action: Some(action),
+            terminal: true,
             energy_exhausted: false,
         }
     }
@@ -116,9 +115,9 @@ mod tests {
     }
 
     #[test]
-    fn node_result_halted_has_no_action() {
+    fn node_result_halted_is_not_terminal() {
         let r = NodeResult::halted([0.0; 12], 0.0);
-        assert!(r.world_action.is_none());
+        assert!(!r.terminal);
         assert!(!r.energy_exhausted);
     }
 
@@ -126,13 +125,13 @@ mod tests {
     fn node_result_exhausted_has_flag() {
         let r = NodeResult::exhausted();
         assert!(r.energy_exhausted);
-        assert!(r.world_action.is_none());
+        assert!(r.terminal);
     }
 
     #[test]
-    fn node_result_action_carries_action() {
-        let r = NodeResult::action([0.0; 12], 0.0, WorldAction::Eat);
-        assert_eq!(r.world_action, Some(WorldAction::Eat));
+    fn node_result_terminal_is_terminal() {
+        let r = NodeResult::terminal([0.0; 12], 0.0);
+        assert!(r.terminal);
         assert!(!r.energy_exhausted);
     }
 }

@@ -68,10 +68,28 @@ pub enum VmInstruction {
     WriteInternalPayload { slot_idx: u8, src: u8 },
     /// Write world-action metadata slot (0..7); invalid slot write ignored.
     WriteWorldActionMeta { slot_idx: u8, src: u8 },
-    /// Emit world action by discriminant and halt.
+    /// Emit world action by discriminant and halt (DEPRECATED — compat shim for push+execute).
     EmitWorldAction { action_type: u8 },
     /// Write candidate route target value.
     WriteRouteTarget { src: u8 },
+
+    // ── Action Queue ──────────────────────────────────────────────────────────
+    /// Decode meta buffer and push action onto queue. Silent no-op if at cap.
+    PushAction { action_type: u8 },
+    /// Remove last action from queue. No-op if empty.
+    PopAction,
+    /// Write `queue.len() as f32` to register `dst`.
+    ReadActionQueueLength { dst: u8 },
+    /// Write action type discriminant at `queue[reg[index_src]]` to register `dst`.
+    ReadActionQueueType { index_src: u8, dst: u8 },
+    /// Write action param at `queue[reg[index_src]].param(param_slot)` to register `dst`.
+    ReadActionQueueParam {
+        index_src: u8,
+        param_slot: u8,
+        dst: u8,
+    },
+    /// Terminal: return accumulated action queue for execution.
+    ExecuteActionQueue,
 
     // ── Halt and Memory ───────────────────────────────────────────────────────
     /// Stop VM execution without emitting a world action.

@@ -1,6 +1,6 @@
 use super::*;
 use crate::config::RuntimeConfig;
-use crate::contracts::InputReference;
+use crate::contracts::{ActionQueue, InputReference};
 use crate::creature::genome::{VmBackendDef, VmInstruction};
 use crate::runtime::vm::execute_vm_node;
 use crate::sensors::static_inputs::StaticInputs;
@@ -32,6 +32,7 @@ fn assert_equivalent(
 
     let mut energy_a = 100.0f32;
     let mut memory_a = memory_seed;
+    let mut aq_a = ActionQueue::new(cfg.max_actions_per_turn);
     let result_a = execute_vm_node(
         &def,
         &input_refs,
@@ -41,10 +42,12 @@ fn assert_equivalent(
         &mut memory_a,
         &si,
         &cfg,
+        &mut aq_a,
     );
 
     let mut energy_b = 100.0f32;
     let mut memory_b = memory_seed;
+    let mut aq_b = ActionQueue::new(cfg.max_actions_per_turn);
     let (result_b, _trace) = execute_vm_node_traced(
         &def,
         &input_refs,
@@ -54,6 +57,7 @@ fn assert_equivalent(
         &mut memory_b,
         &si,
         &cfg,
+        &mut aq_b,
     );
 
     assert_eq!(result_a, result_b, "{label}: NodeResult mismatch");
@@ -88,6 +92,7 @@ fn result_equivalence_emit_eat() {
     // Run non-traced
     let mut energy_a = 100.0f32;
     let mut memory_a = [0u8; 1024];
+    let mut aq_a = ActionQueue::new(cfg.max_actions_per_turn);
     let result_a = execute_vm_node(
         &def,
         &input_refs,
@@ -97,11 +102,13 @@ fn result_equivalence_emit_eat() {
         &mut memory_a,
         &si,
         &cfg,
+        &mut aq_a,
     );
 
     // Run traced
     let mut energy_b = 100.0f32;
     let mut memory_b = [0u8; 1024];
+    let mut aq_b = ActionQueue::new(cfg.max_actions_per_turn);
     let (result_b, _trace) = execute_vm_node_traced(
         &def,
         &input_refs,
@@ -111,6 +118,7 @@ fn result_equivalence_emit_eat() {
         &mut memory_b,
         &si,
         &cfg,
+        &mut aq_b,
     );
 
     assert_eq!(result_a, result_b);
@@ -140,6 +148,7 @@ fn trace_contains_correct_instructions() {
     let cfg = config();
     let mut energy = 100.0f32;
     let mut memory = [0u8; 1024];
+    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
 
     let (_result, trace) = execute_vm_node_traced(
         &def,
@@ -150,6 +159,7 @@ fn trace_contains_correct_instructions() {
         &mut memory,
         &si,
         &cfg,
+        &mut action_queue,
     );
 
     assert_eq!(trace.steps.len(), 3);
@@ -185,6 +195,7 @@ fn register_changes_captured() {
     let cfg = config();
     let mut energy = 100.0f32;
     let mut memory = [0u8; 1024];
+    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
 
     let (_result, trace) = execute_vm_node_traced(
         &def,
@@ -195,6 +206,7 @@ fn register_changes_captured() {
         &mut memory,
         &si,
         &cfg,
+        &mut action_queue,
     );
 
     // LoadConst should change r0 from 0.0 to 3.5
@@ -236,6 +248,7 @@ fn memory_writes_tracked() {
     let cfg = config();
     let mut energy = 100.0f32;
     let mut memory = [0u8; 1024];
+    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
 
     let (_result, trace) = execute_vm_node_traced(
         &def,
@@ -246,6 +259,7 @@ fn memory_writes_tracked() {
         &mut memory,
         &si,
         &cfg,
+        &mut action_queue,
     );
 
     assert_eq!(trace.memory_writes.len(), 1);
@@ -275,6 +289,7 @@ fn result_equivalence_energy_exhaustion() {
     // Energy just enough for ~1 Noop (0.05), second will exhaust
     let mut energy_a = 0.06f32;
     let mut memory_a = [0u8; 1024];
+    let mut aq_a = ActionQueue::new(cfg.max_actions_per_turn);
     let result_a = execute_vm_node(
         &def,
         &[],
@@ -284,10 +299,12 @@ fn result_equivalence_energy_exhaustion() {
         &mut memory_a,
         &si,
         &cfg,
+        &mut aq_a,
     );
 
     let mut energy_b = 0.06f32;
     let mut memory_b = [0u8; 1024];
+    let mut aq_b = ActionQueue::new(cfg.max_actions_per_turn);
     let (result_b, _trace) = execute_vm_node_traced(
         &def,
         &[],
@@ -297,6 +314,7 @@ fn result_equivalence_energy_exhaustion() {
         &mut memory_b,
         &si,
         &cfg,
+        &mut aq_b,
     );
 
     assert_eq!(result_a, result_b);
@@ -326,6 +344,7 @@ fn result_equivalence_routing() {
 
     let mut energy_a = 100.0f32;
     let mut memory_a = [0u8; 1024];
+    let mut aq_a = ActionQueue::new(cfg.max_actions_per_turn);
     let result_a = execute_vm_node(
         &def,
         &[],
@@ -335,10 +354,12 @@ fn result_equivalence_routing() {
         &mut memory_a,
         &si,
         &cfg,
+        &mut aq_a,
     );
 
     let mut energy_b = 100.0f32;
     let mut memory_b = [0u8; 1024];
+    let mut aq_b = ActionQueue::new(cfg.max_actions_per_turn);
     let (result_b, trace) = execute_vm_node_traced(
         &def,
         &[],
@@ -348,6 +369,7 @@ fn result_equivalence_routing() {
         &mut memory_b,
         &si,
         &cfg,
+        &mut aq_b,
     );
 
     assert_eq!(result_a, result_b);

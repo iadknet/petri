@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 
 use crate::config::RuntimeConfig;
-use crate::contracts::{NodeId, WorldAction};
+use crate::contracts::{ActionQueue, NodeId, WorldAction};
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::graph::execute_graph_node;
@@ -48,6 +48,7 @@ pub fn execute_creature_mesh(
     let max_hops = config.max_mesh_hops.max(1) as usize;
     let start_energy = *energy;
     let mut report = ComputeCostReport::default();
+    let mut action_queue = ActionQueue::new(config.max_actions_per_turn);
 
     // Build a NodeId → index map for O(1) lookups instead of O(n) find_node per hop.
     let node_index: HashMap<NodeId, usize> = genome
@@ -86,6 +87,7 @@ pub fn execute_creature_mesh(
                 memory,
                 static_inputs,
                 config,
+                &mut action_queue,
             ),
             BackendDef::Graph(def) => execute_graph_node(
                 def,
@@ -107,13 +109,16 @@ pub fn execute_creature_mesh(
             BackendDef::Graph(_) => report.graph_cost += node_cost,
         }
 
-        // Check exhaustion before world_action: NodeResult::exhausted() never carries a valid action.
+        // Check exhaustion first: NodeResult::exhausted() discards the action queue.
         if result.energy_exhausted {
             return (WorldAction::NoOp, report);
         }
 
-        if let Some(action) = result.world_action {
-            return (action, report);
+        if result.terminal {
+            return (
+                action_queue.into_actions().pop().unwrap_or(WorldAction::NoOp),
+                report,
+            );
         }
 
         // Routing: if no targets, the chain terminates with NoOp.

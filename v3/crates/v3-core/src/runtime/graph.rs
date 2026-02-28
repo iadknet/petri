@@ -316,7 +316,7 @@ pub fn execute_graph_node(
     NodeResult {
         output_slots,
         route_target_idx,
-        world_action: None,
+        terminal: false,
         energy_exhausted: false,
     }
 }

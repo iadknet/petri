@@ -8,7 +8,7 @@
 use std::collections::HashMap;
 
 use crate::config::RuntimeConfig;
-use crate::contracts::{NodeId, WorldAction};
+use crate::contracts::{ActionQueue, NodeId, WorldAction};
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::trace::{BackendTrace, MeshHopTrace, TerminationReason};
@@ -49,6 +49,7 @@ pub fn execute_creature_mesh_traced(
         .map(|(i, n)| (n.node_id, i))
         .collect();
 
+    let mut action_queue = ActionQueue::new(config.max_actions_per_turn);
     let mut hop_traces: Vec<MeshHopTrace> = Vec::with_capacity(max_hops);
 
     if !node_index.contains_key(&current_node_id) {
@@ -86,6 +87,7 @@ pub fn execute_creature_mesh_traced(
                     memory,
                     static_inputs,
                     config,
+                    &mut action_queue,
                 );
                 (result, BackendTrace::Vm(vm_trace))
             }
@@ -132,8 +134,13 @@ pub fn execute_creature_mesh_traced(
             );
         }
 
-        if let Some(action) = result.world_action {
-            return (action, report, hop_traces, TerminationReason::ActionEmitted);
+        if result.terminal {
+            return (
+                action_queue.into_actions().pop().unwrap_or(WorldAction::NoOp),
+                report,
+                hop_traces,
+                TerminationReason::ActionEmitted,
+            );
         }
 
         if node.targets.is_empty() {

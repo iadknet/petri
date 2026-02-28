@@ -12,6 +12,8 @@ fn register_count_zero_halts_immediately() {
     let si = empty_static_inputs();
     let mut e = 100.0;
     let mut mem = [0u8; 1024];
+    let cfg = config();
+    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
         &[],
@@ -20,21 +22,22 @@ fn register_count_zero_halts_immediately() {
         0.0,
         &mut mem,
         &si,
-        &config(),
+        &cfg,
+        &mut action_queue,
     );
-    assert!(r.world_action.is_none());
+    assert!(!r.terminal);
     assert!(!r.energy_exhausted);
 }
 
 #[test]
 fn empty_program_halts_immediately() {
-    let (r, _) = run_vm(vec![], 1, vec![], &[], zeroed_upstream(), 100.0);
-    assert!(r.world_action.is_none());
+    let (r, _, _) = run_vm(vec![], 1, vec![], &[], zeroed_upstream(), 100.0);
+    assert!(!r.terminal);
 }
 
 #[test]
 fn halt_returns_no_action() {
-    let (r, _) = run_vm(
+    let (r, _, _) = run_vm(
         vec![VmInstruction::Halt],
         2,
         vec![],
@@ -42,7 +45,7 @@ fn halt_returns_no_action() {
         zeroed_upstream(),
         100.0,
     );
-    assert!(r.world_action.is_none());
+    assert!(!r.terminal);
     assert!(!r.energy_exhausted);
 }
 
@@ -61,6 +64,7 @@ fn program_counter_past_program_len_soft_halts() {
     let mut mem = [0u8; 1024];
     let mut cfg = config();
     cfg.vm.opcode_cost_multiplier = 1.0;
+    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
         &[],
@@ -70,8 +74,9 @@ fn program_counter_past_program_len_soft_halts() {
         &mut mem,
         &si,
         &cfg,
+        &mut action_queue,
     );
-    assert!(r.world_action.is_none());
+    assert!(!r.terminal);
     assert!(!r.energy_exhausted);
     // Noop base cost = 0.05, multiplier = 1.0 → energy = 99.95
     assert!(e < 100.0);
@@ -93,7 +98,7 @@ fn jump_skips_instructions() {
         },
         VmInstruction::Halt,
     ];
-    let (r, _) = run_vm(program, 1, vec![99.0], &[], zeroed_upstream(), 100.0);
+    let (r, _, _) = run_vm(program, 1, vec![99.0], &[], zeroed_upstream(), 100.0);
     assert_eq!(r.output_slots[0], 0.0);
 }
 
@@ -111,7 +116,7 @@ fn jump_if_zero_fires_when_false() {
         },
         VmInstruction::Halt,
     ];
-    let (r, _) = run_vm(program, 1, vec![99.0], &[], zeroed_upstream(), 100.0);
+    let (r, _, _) = run_vm(program, 1, vec![99.0], &[], zeroed_upstream(), 100.0);
     assert_eq!(r.output_slots[0], 0.0);
 }
 
@@ -133,7 +138,7 @@ fn jump_if_zero_not_fires_when_truthy() {
         },
         VmInstruction::Halt,
     ];
-    let (r, _) = run_vm(program, 2, vec![1.0, 99.0], &[], zeroed_upstream(), 100.0);
+    let (r, _, _) = run_vm(program, 2, vec![1.0, 99.0], &[], zeroed_upstream(), 100.0);
     assert!((r.output_slots[0] - 99.0).abs() < 1e-6);
 }
 
@@ -142,8 +147,8 @@ fn jump_target_wraps_via_rem_euclid() {
     // Program of 2 instructions: Jump(offset=2), Halt
     // provisional_pc = 0 + 1 + 2 = 3; 3 % 2 = 1 (Halt)
     let program = vec![VmInstruction::Jump { offset: 2 }, VmInstruction::Halt];
-    let (r, _) = run_vm(program, 1, vec![], &[], zeroed_upstream(), 100.0);
-    assert!(r.world_action.is_none());
+    let (r, _, _) = run_vm(program, 1, vec![], &[], zeroed_upstream(), 100.0);
+    assert!(!r.terminal);
 }
 
 // ── Energy metering ───────────────────────────────────────────────────────
@@ -162,6 +167,7 @@ fn energy_is_deducted_per_opcode() {
     let mut mem = [0u8; 1024];
     let mut cfg = config();
     cfg.vm.opcode_cost_multiplier = 1.0;
+    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
     let _ = execute_vm_node(
         &def,
         &[],
@@ -171,6 +177,7 @@ fn energy_is_deducted_per_opcode() {
         &mut mem,
         &si,
         &cfg,
+        &mut action_queue,
     );
     assert!(e < 100.0);
     assert!(e > 99.0);
@@ -189,6 +196,7 @@ fn energy_exhaustion_returns_exhausted() {
     let mut mem = [0u8; 1024];
     let mut cfg = config();
     cfg.vm.opcode_cost_multiplier = 1.0;
+    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
         &[],
@@ -198,6 +206,7 @@ fn energy_exhaustion_returns_exhausted() {
         &mut mem,
         &si,
         &cfg,
+        &mut action_queue,
     );
     assert!(r.energy_exhausted);
 }
@@ -226,6 +235,7 @@ fn energy_exhaustion_does_not_commit_memory_writes() {
     let mut mem = [0u8; 1024];
     let mut cfg = config();
     cfg.vm.opcode_cost_multiplier = 1.0;
+    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
         &[],
@@ -235,6 +245,7 @@ fn energy_exhaustion_does_not_commit_memory_writes() {
         &mut mem,
         &si,
         &cfg,
+        &mut action_queue,
     );
     assert!(r.energy_exhausted);
     // mem[10] should still be 0 (not written)
@@ -257,6 +268,7 @@ fn max_vm_steps_enforced() {
     let si = empty_static_inputs();
     let mut e = 1000.0;
     let mut mem = [0u8; 1024];
+    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
         &[],
@@ -266,8 +278,9 @@ fn max_vm_steps_enforced() {
         &mut mem,
         &si,
         &cfg,
+        &mut action_queue,
     );
-    assert!(r.world_action.is_none());
+    assert!(!r.terminal);
     assert!(!r.energy_exhausted);
 }
 
@@ -286,7 +299,7 @@ fn register_index_wraps_via_rem_euclid() {
         }, // src=2 wraps to 0 → 7.0
         VmInstruction::Halt,
     ];
-    let (r, _) = run_vm(program, 2, vec![7.0], &[], zeroed_upstream(), 100.0);
+    let (r, _, _) = run_vm(program, 2, vec![7.0], &[], zeroed_upstream(), 100.0);
     assert!((r.output_slots[0] - 7.0).abs() < 1e-6);
 }
 
@@ -304,7 +317,7 @@ fn constant_index_wraps_via_rem_euclid() {
         },
         VmInstruction::Halt,
     ];
-    let (r, _) = run_vm(program, 1, vec![3.0, 5.0], &[], zeroed_upstream(), 100.0);
+    let (r, _, _) = run_vm(program, 1, vec![3.0, 5.0], &[], zeroed_upstream(), 100.0);
     assert!((r.output_slots[0] - 5.0).abs() < 1e-6);
 }
 
@@ -321,7 +334,7 @@ fn constant_empty_pool_yields_zero() {
         },
         VmInstruction::Halt,
     ];
-    let (r, _) = run_vm(program, 1, vec![], &[], zeroed_upstream(), 100.0);
+    let (r, _, _) = run_vm(program, 1, vec![], &[], zeroed_upstream(), 100.0);
     assert_eq!(r.output_slots[0], 0.0);
 }
 
@@ -342,6 +355,6 @@ fn nan_in_add_becomes_zero() {
         },
         VmInstruction::Halt,
     ];
-    let (r, _) = run_vm(program, 2, vec![2e9_f32], &[], zeroed_upstream(), 100.0);
+    let (r, _, _) = run_vm(program, 2, vec![2e9_f32], &[], zeroed_upstream(), 100.0);
     assert!((r.output_slots[0] - 1_000_000_000.0).abs() < 1.0);
 }
