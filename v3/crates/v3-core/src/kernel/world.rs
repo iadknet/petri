@@ -134,7 +134,8 @@ impl WorldState {
                 continue;
             }
 
-            let mut neighbors = Vec::with_capacity(4);
+            let mut neighbors = [Position::new(0, 0); 4];
+            let mut ncount = 0;
             for dir in [Direction::N, Direction::E, Direction::S, Direction::W] {
                 let Some(npos) = self.resolve_neighbor(pos, dir) else {
                     continue;
@@ -142,12 +143,13 @@ impl WorldState {
                 if self.is_barrier(npos) {
                     continue;
                 }
-                neighbors.push(npos);
+                neighbors[ncount] = npos;
+                ncount += 1;
             }
-            if neighbors.is_empty() {
+            if ncount == 0 {
                 continue;
             }
-            let target = neighbors[rng.gen_range(0..neighbors.len())];
+            let target = neighbors[rng.gen_range(0..ncount)];
             self.add_food_clamped(target, delta * spread_density_ratio, max_density);
         }
 
