@@ -5,11 +5,9 @@
 //! and routing to the next node via the returned `route_target_idx` until a
 //! [`WorldAction`] is emitted or a soft-default termination condition fires.
 
-use std::collections::HashMap;
-
 use crate::config::RuntimeConfig;
 use crate::contracts::{ActionQueue, NodeId, WorldAction};
-use crate::creature::genome::{BackendDef, CreatureGenome};
+use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::graph::execute_graph_node;
 use crate::runtime::types::ComputeCostReport;
@@ -52,16 +50,8 @@ pub fn execute_creature_mesh(
     let mut report = ComputeCostReport::default();
     let mut action_queue = ActionQueue::new(config.max_actions_per_turn);
 
-    // Build a NodeId → index map for O(1) lookups instead of O(n) find_node per hop.
-    let node_index: HashMap<NodeId, usize> = genome
-        .nodes
-        .iter()
-        .enumerate()
-        .map(|(i, n)| (n.node_id, i))
-        .collect();
-
     // Soft default: entry_node_id missing from node set → return NoOp immediately.
-    if !node_index.contains_key(&current_node_id) {
+    if find_node_index(&genome.nodes, current_node_id).is_none() {
         return (vec![WorldAction::NoOp], report);
     }
 
@@ -71,14 +61,14 @@ pub fn execute_creature_mesh(
         }
 
         // Invariant: verified present before the loop, and after every routing step.
-        let node = &genome.nodes[node_index[&current_node_id]];
+        let current_idx =
+            find_node_index(&genome.nodes, current_node_id).expect("node must exist in genome");
+        let node = &genome.nodes[current_idx];
 
         let energy_consumed = (start_energy - *energy).max(0.0);
 
         // Snapshot energy before node dispatch to attribute cost to the correct backend.
         let node_energy_before = *energy;
-
-        let current_idx = node_index[&current_node_id];
         let result = match &node.backend_def {
             BackendDef::Vm(def) => execute_vm_node(
                 def,
@@ -146,7 +136,7 @@ pub fn execute_creature_mesh(
         let target_id = node.targets[target_pos];
 
         // Soft default: routed target id missing from node set.
-        if !node_index.contains_key(&target_id) {
+        if find_node_index(&genome.nodes, target_id).is_none() {
             return (action_queue.into_actions_or_noop(), report);
         }
 
@@ -154,6 +144,15 @@ pub fn execute_creature_mesh(
         current_node_id = target_id;
         hops += 1;
     }
+}
+
+/// Find the index of a node by its `NodeId` via linear scan.
+///
+/// For typical genomes (2-10 nodes), linear scan is faster than HashMap
+/// due to cache locality and zero heap allocation.
+#[inline]
+fn find_node_index(nodes: &[NodeGenome], id: NodeId) -> Option<usize> {
+    nodes.iter().position(|n| n.node_id == id)
 }
 
 #[cfg(test)]

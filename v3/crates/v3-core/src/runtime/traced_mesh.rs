@@ -5,11 +5,9 @@
 //! with trace recording. When updating mesh routing logic, apply the same changes
 //! here and verify with equivalence tests.
 
-use std::collections::HashMap;
-
 use crate::config::RuntimeConfig;
 use crate::contracts::{ActionQueue, NodeId, WorldAction};
-use crate::creature::genome::{BackendDef, CreatureGenome};
+use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::trace::{BackendTrace, MeshHopTrace, TerminationReason};
 use crate::runtime::traced_graph::execute_graph_node_traced;
@@ -42,17 +40,10 @@ pub fn execute_creature_mesh_traced(
     let start_energy = *energy;
     let mut report = ComputeCostReport::default();
 
-    let node_index: HashMap<NodeId, usize> = genome
-        .nodes
-        .iter()
-        .enumerate()
-        .map(|(i, n)| (n.node_id, i))
-        .collect();
-
     let mut action_queue = ActionQueue::new(config.max_actions_per_turn);
     let mut hop_traces: Vec<MeshHopTrace> = Vec::with_capacity(max_hops);
 
-    if !node_index.contains_key(&current_node_id) {
+    if find_node_index(&genome.nodes, current_node_id).is_none() {
         return (
             vec![WorldAction::NoOp],
             report,
@@ -71,10 +62,11 @@ pub fn execute_creature_mesh_traced(
             );
         }
 
-        let node = &genome.nodes[node_index[&current_node_id]];
+        let current_idx =
+            find_node_index(&genome.nodes, current_node_id).expect("node must exist in genome");
+        let node = &genome.nodes[current_idx];
         let energy_consumed = (start_energy - *energy).max(0.0);
         let node_energy_before = *energy;
-        let current_idx = node_index[&current_node_id];
 
         let (result, backend_trace) = match &node.backend_def {
             BackendDef::Vm(def) => {
@@ -169,7 +161,7 @@ pub fn execute_creature_mesh_traced(
         let target_pos = route_idx_i64.rem_euclid(node.targets.len() as i64) as usize;
         let target_id = node.targets[target_pos];
 
-        if !node_index.contains_key(&target_id) {
+        if find_node_index(&genome.nodes, target_id).is_none() {
             return (
                 action_queue.into_actions_or_noop(),
                 report,
@@ -182,6 +174,15 @@ pub fn execute_creature_mesh_traced(
         current_node_id = target_id;
         hops += 1;
     }
+}
+
+/// Find the index of a node by its `NodeId` via linear scan.
+///
+/// For typical genomes (2-10 nodes), linear scan is faster than HashMap
+/// due to cache locality and zero heap allocation.
+#[inline]
+fn find_node_index(nodes: &[NodeGenome], id: NodeId) -> Option<usize> {
+    nodes.iter().position(|n| n.node_id == id)
 }
 
 #[cfg(test)]
