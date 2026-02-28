@@ -40,6 +40,17 @@ pub struct LastTickActions {
     pub reproduce: u32,
     pub noop: u32,
     pub steal: u32,
+    pub predation_kills: u32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct PredationEventSnapshot {
+    pub attacker_x: u16,
+    pub attacker_y: u16,
+    pub victim_x: u16,
+    pub victim_y: u16,
+    pub energy_stolen: f32,
+    pub killed: bool,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -128,6 +139,7 @@ pub struct WsFrame {
     pub status: StatusPayload,
     pub frame: FramePayload,
     pub health: HealthPayload,
+    pub predation_events: Vec<PredationEventSnapshot>,
 }
 
 #[derive(Clone)]

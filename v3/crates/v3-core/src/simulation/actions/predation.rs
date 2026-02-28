@@ -1,6 +1,17 @@
 use crate::contracts::{CreatureId, Direction};
 use crate::simulation::simulation::Simulation;
 
+/// Spatial record of a single predation event for frontend visualization.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct PredationEventRecord {
+    pub attacker_x: u16,
+    pub attacker_y: u16,
+    pub victim_x: u16,
+    pub victim_y: u16,
+    pub energy_stolen: f32,
+    pub killed: bool,
+}
+
 /// Result of an attempted predation (StealEnergy) action.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum PredationActionResult {
@@ -110,11 +121,22 @@ pub fn apply_steal_energy(
         sim.creatures.remove(victim_id);
 
         sim.stats.predation_kills_total += 1;
+        sim.stats.last_tick_predation_kills += 1;
         sim.stats.predation_actions_transferred_total += 1;
         *sim.stats
             .predation_actions_by_result
             .entry(PredationActionResult::TransferredAndKilled)
             .or_insert(0) += 1;
+        sim.stats
+            .last_tick_predation_events
+            .push(PredationEventRecord {
+                attacker_x: attacker_pos.x,
+                attacker_y: attacker_pos.y,
+                victim_x: victim_pos.x,
+                victim_y: victim_pos.y,
+                energy_stolen: actual,
+                killed: true,
+            });
         return PredationActionResult::TransferredAndKilled;
     }
 
@@ -124,6 +146,17 @@ pub fn apply_steal_energy(
         .predation_actions_by_result
         .entry(PredationActionResult::Transferred)
         .or_insert(0) += 1;
+    let victim_pos = sim.creatures[victim_id].position;
+    sim.stats
+        .last_tick_predation_events
+        .push(PredationEventRecord {
+            attacker_x: attacker_pos.x,
+            attacker_y: attacker_pos.y,
+            victim_x: victim_pos.x,
+            victim_y: victim_pos.y,
+            energy_stolen: actual,
+            killed: false,
+        });
     PredationActionResult::Transferred
 }
 

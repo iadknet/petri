@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use crate::mutation::{MutationDomain, MutationOperator, MutationSkipReason};
-use crate::simulation::actions::{PredationActionResult, ReproductionActionResult};
+use crate::simulation::actions::{
+    PredationActionResult, PredationEventRecord, ReproductionActionResult,
+};
 
 /// Observability counters for the simulation.
 ///
@@ -47,6 +49,10 @@ pub struct SimStats {
     pub last_tick_noop: u32,
     pub last_tick_reproduce: u32,
     pub last_tick_steal: u32,
+    /// Per-tick predation event buffer for frontend visualization.
+    pub last_tick_predation_events: Vec<PredationEventRecord>,
+    /// Per-tick kill count for time-series charting.
+    pub last_tick_predation_kills: u32,
 
     // ── Per-tick compute cost (reset at start of each tick) ──────────────────
     /// Mean total (vm + graph) compute energy cost across all creatures that ran the mesh.

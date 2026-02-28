@@ -1,4 +1,5 @@
-import type { Creature, Frame, PaintTool } from "../types/api.ts";
+import type { Creature, Frame, PaintTool, PredationEvent } from "../types/api.ts";
+import { FlashOverlay } from "./flash-overlay.ts";
 
 /** Background color: slate-950 (#020617) */
 const BG_R = 2;
@@ -31,14 +32,15 @@ export class WorldRenderer {
 	private offscreenCtx: OffscreenCanvasRenderingContext2D | null = null;
 	private lastRenderedTick = -1;
 	private rafId = 0;
-	private getFrame: () => { frame: Frame | null; tick: number };
+	private getFrame: () => { frame: Frame | null; tick: number; predationEvents: PredationEvent[] };
+	private flashOverlay = new FlashOverlay();
 
 	camera: Camera = { x: 0, y: 0, zoom: 1 };
 	private previewCells: Set<string> | null = null;
 	private previewTool: PaintTool | null = null;
 	private selectedCreatureId: number | null = null;
 
-	constructor(canvas: HTMLCanvasElement, getFrame: () => { frame: Frame | null; tick: number }) {
+	constructor(canvas: HTMLCanvasElement, getFrame: () => { frame: Frame | null; tick: number; predationEvents: PredationEvent[] }) {
 		this.canvas = canvas;
 		this.ctx = canvas.getContext("2d", { alpha: false })!;
 		this.getFrame = getFrame;
@@ -177,10 +179,19 @@ export class WorldRenderer {
 	}
 
 	private render(): void {
-		const { frame, tick } = this.getFrame();
+		const { frame, tick, predationEvents } = this.getFrame();
 		if (!frame) return;
+
+		// Feed events to flash overlay on new ticks
+		if (tick !== this.lastRenderedTick) {
+			this.flashOverlay.update(predationEvents, frame.width);
+		} else {
+			// Decay flashes even on same tick (animation frames)
+			this.flashOverlay.update([], frame.width);
+		}
+
 		const hasPreview = this.previewCells !== null && this.previewCells.size > 0;
-		if (tick === this.lastRenderedTick && !hasPreview) return;
+		if (tick === this.lastRenderedTick && !hasPreview && !this.flashOverlay.hasActiveFlashes) return;
 		this.lastRenderedTick = tick;
 
 		const { ctx, canvas } = this;
@@ -243,6 +254,9 @@ export class WorldRenderer {
 			data[idx + 2] = c.phenotype_rgb[2];
 			data[idx + 3] = 255;
 		}
+
+		// Predation flash overlay
+		this.flashOverlay.applyToImageData(data);
 
 		// Paint preview overlay (40% alpha blend)
 		if (this.previewCells && this.previewTool) {
@@ -316,6 +330,9 @@ export class WorldRenderer {
 				this.drawCreatureDetail(c, cx + c.x * zoom, cy + c.y * zoom, zoom);
 			}
 		}
+
+		// Predation flash overlay
+		this.flashOverlay.drawRects(ctx, this.camera);
 
 		// Grid lines in detailed mode
 		if (detailed) {

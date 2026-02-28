@@ -70,6 +70,8 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
     sim.stats.last_tick_noop = 0;
     sim.stats.last_tick_reproduce = 0;
     sim.stats.last_tick_steal = 0;
+    sim.stats.last_tick_predation_events.clear();
+    sim.stats.last_tick_predation_kills = 0;
     sim.stats.last_tick_compute_total_mean = 0.0;
     sim.stats.last_tick_compute_total_min = 0.0;
     sim.stats.last_tick_compute_total_max = 0.0;
