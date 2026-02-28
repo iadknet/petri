@@ -660,7 +660,8 @@ fn copy_gene_backward_slice_increases_program_length() {
         vm.program = vec![
             VmInstruction::ReadInput {
                 dst: 0,
-                input_idx: 0,
+                ref_idx: 0,
+                sub_idx: 0,
             },
             VmInstruction::Add { dst: 1, a: 0, b: 0 },
             VmInstruction::WriteInternalPayload {
@@ -706,7 +707,8 @@ fn copy_gene_backward_slice_captures_dependency_chain() {
         vm.program = vec![
             VmInstruction::ReadInput {
                 dst: 0,
-                input_idx: 0,
+                ref_idx: 0,
+                sub_idx: 0,
             },
             VmInstruction::Neg { dst: 1, src: 0 },
             VmInstruction::WriteInternalPayload {
@@ -741,7 +743,8 @@ fn copy_gene_forward_slice_increases_program_length() {
         vm.program = vec![
             VmInstruction::ReadInput {
                 dst: 0,
-                input_idx: 0,
+                ref_idx: 0,
+                sub_idx: 0,
             },
             VmInstruction::Neg { dst: 1, src: 0 },
             VmInstruction::WriteInternalPayload {
@@ -788,7 +791,8 @@ fn copy_gene_forward_slice_captures_dependency_chain() {
             vm.program = vec![
                 VmInstruction::ReadInput {
                     dst: 0,
-                    input_idx: 0,
+                    ref_idx: 0,
+                    sub_idx: 0,
                 },
                 VmInstruction::Neg { dst: 1, src: 0 },
                 VmInstruction::Abs { dst: 2, src: 1 },

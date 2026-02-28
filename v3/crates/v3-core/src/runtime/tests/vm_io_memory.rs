@@ -73,7 +73,8 @@ fn read_input_upstream_slot() {
     let program = vec![
         VmInstruction::ReadInput {
             dst: 0,
-            input_idx: 0,
+            ref_idx: 0,
+            sub_idx: 0,
         },
         VmInstruction::WriteInternalPayload {
             slot_idx: 0,
@@ -107,7 +108,8 @@ fn read_input_out_of_range_yields_zero() {
     let program = vec![
         VmInstruction::ReadInput {
             dst: 0,
-            input_idx: 5,
+            ref_idx: 5,
+            sub_idx: 0,
         }, // no input_refs at all
         VmInstruction::WriteInternalPayload {
             slot_idx: 0,
@@ -356,7 +358,8 @@ fn vm_eats_when_food_here() {
                 program: vec![
                     VmInstruction::ReadInput {
                         dst: 0,
-                        input_idx: 0,
+                        ref_idx: 0,
+                        sub_idx: 0,
                     }, // r0 = food_here
                     // r1 is 0.0; compare r0 > r1
                     VmInstruction::CmpGt { dst: 0, a: 0, b: 1 }, // r0 = (food > 0)?
@@ -430,7 +433,8 @@ fn vm_noop_when_no_food() {
                 program: vec![
                     VmInstruction::ReadInput {
                         dst: 0,
-                        input_idx: 0,
+                        ref_idx: 0,
+                        sub_idx: 0,
                     }, // r0 = food_here = 0
                     VmInstruction::CmpGt { dst: 0, a: 0, b: 1 }, // r0 = (0 > 0) = 0
                     VmInstruction::JumpIfZero { cond: 0, offset: 1 }, // fires → skip Eat

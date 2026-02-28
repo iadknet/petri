@@ -271,7 +271,9 @@ fn random_graph_node_kind_reaches_out_of_range_input_ref_and_custom_output() {
     for seed in 0u64..20_000 {
         let mut r = rng(seed);
         match random_graph_node_kind(&mut r) {
-            GraphNodeKind::InputRef(idx) if idx > 11 => saw_out_of_range_input_ref = true,
+            GraphNodeKind::InputRef { ref_idx, .. } if ref_idx > 11 => {
+                saw_out_of_range_input_ref = true
+            }
             GraphNodeKind::CustomOutput(idx) if idx > 11 => saw_out_of_range_custom_output = true,
             _ => {}
         }
@@ -385,15 +387,18 @@ fn raw_field_mutation_can_set_input_ref_out_of_range() {
     let mut found_out_of_range = false;
     for seed in 0u64..512 {
         let mut genome = graph_only_genome(vec![GraphInternalNode {
-            kind: GraphNodeKind::InputRef(0),
+            kind: GraphNodeKind::InputRef {
+                ref_idx: 0,
+                sub_idx: 0,
+            },
             inputs: vec![],
             hebbian: None,
         }]);
         let mut r = rng(seed);
         GraphMutator::apply(&mut genome, GraphOperator::GraphRawFieldMutation, &mut r).unwrap();
         if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
-            if let GraphNodeKind::InputRef(idx) = g.internal_nodes[0].kind {
-                if idx > 11 {
+            if let GraphNodeKind::InputRef { ref_idx, .. } = g.internal_nodes[0].kind {
+                if ref_idx > 11 {
                     found_out_of_range = true;
                     break;
                 }

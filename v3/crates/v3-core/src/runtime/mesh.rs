@@ -537,7 +537,8 @@ mod tests {
                 program: vec![
                     VmInstruction::ReadInput {
                         dst: 0,
-                        input_idx: 0,
+                        ref_idx: 0,
+                        sub_idx: 0,
                     }, // r0 = upstream_slots[5] = 9.0
                     VmInstruction::ToBool { dst: 1, src: 0 }, // r1 = 1.0
                     VmInstruction::JumpIfZero { cond: 1, offset: 1 }, // skip Eat if r1==0

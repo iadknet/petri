@@ -34,13 +34,19 @@ fn node0_graph_sensor() -> NodeGenome {
             internal_nodes: vec![
                 // idx 0: food_here signal
                 GraphInternalNode {
-                    kind: GraphNodeKind::InputRef(0),
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 0,
+                        sub_idx: 0,
+                    },
                     inputs: vec![],
                     hebbian: None,
                 },
                 // idx 1: energy_current signal
                 GraphInternalNode {
-                    kind: GraphNodeKind::InputRef(1),
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 1,
+                        sub_idx: 0,
+                    },
                     inputs: vec![],
                     hebbian: None,
                 },
@@ -55,43 +61,67 @@ fn node0_graph_sensor() -> NodeGenome {
                 },
                 // idx 3-6: neighbor food N/E/S/W
                 GraphInternalNode {
-                    kind: GraphNodeKind::InputRef(2),
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 2,
+                        sub_idx: 0,
+                    },
                     inputs: vec![],
                     hebbian: None,
                 },
                 GraphInternalNode {
-                    kind: GraphNodeKind::InputRef(3),
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 3,
+                        sub_idx: 0,
+                    },
                     inputs: vec![],
                     hebbian: None,
                 },
                 GraphInternalNode {
-                    kind: GraphNodeKind::InputRef(4),
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 4,
+                        sub_idx: 0,
+                    },
                     inputs: vec![],
                     hebbian: None,
                 },
                 GraphInternalNode {
-                    kind: GraphNodeKind::InputRef(5),
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 5,
+                        sub_idx: 0,
+                    },
                     inputs: vec![],
                     hebbian: None,
                 },
                 // idx 7-10: neighbor occupied N/E/S/W
                 GraphInternalNode {
-                    kind: GraphNodeKind::InputRef(6),
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 6,
+                        sub_idx: 0,
+                    },
                     inputs: vec![],
                     hebbian: None,
                 },
                 GraphInternalNode {
-                    kind: GraphNodeKind::InputRef(7),
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 7,
+                        sub_idx: 0,
+                    },
                     inputs: vec![],
                     hebbian: None,
                 },
                 GraphInternalNode {
-                    kind: GraphNodeKind::InputRef(8),
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 8,
+                        sub_idx: 0,
+                    },
                     inputs: vec![],
                     hebbian: None,
                 },
                 GraphInternalNode {
-                    kind: GraphNodeKind::InputRef(9),
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 9,
+                        sub_idx: 0,
+                    },
                     inputs: vec![],
                     hebbian: None,
                 },
@@ -180,27 +210,33 @@ fn node1_vm_decision() -> NodeGenome {
                 // Read inputs into registers
                 VmInstruction::ReadInput {
                     dst: 0,
-                    input_idx: 0,
+                    ref_idx: 0,
+                    sub_idx: 0,
                 }, // r0 = food_here
                 VmInstruction::ReadInput {
                     dst: 1,
-                    input_idx: 1,
+                    ref_idx: 1,
+                    sub_idx: 0,
                 }, // r1 = can_reproduce
                 VmInstruction::ReadInput {
                     dst: 2,
-                    input_idx: 2,
+                    ref_idx: 2,
+                    sub_idx: 0,
                 }, // r2 = food_N
                 VmInstruction::ReadInput {
                     dst: 3,
-                    input_idx: 3,
+                    ref_idx: 3,
+                    sub_idx: 0,
                 }, // r3 = food_E
                 VmInstruction::ReadInput {
                     dst: 4,
-                    input_idx: 4,
+                    ref_idx: 4,
+                    sub_idx: 0,
                 }, // r4 = food_S
                 VmInstruction::ReadInput {
                     dst: 5,
-                    input_idx: 5,
+                    ref_idx: 5,
+                    sub_idx: 0,
                 }, // r5 = food_W
                 // Priority 1: Reproduce if energy sufficient
                 VmInstruction::CmpGt { dst: 6, a: 1, b: 7 }, // r6 = can_reproduce?

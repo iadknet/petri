@@ -834,7 +834,8 @@ fn result_equivalence_all_33_opcodes() {
                 program: vec![
                     VmInstruction::ReadInput {
                         dst: 0,
-                        input_idx: 0,
+                        ref_idx: 0,
+                        sub_idx: 0,
                     },
                     VmInstruction::Halt,
                 ],

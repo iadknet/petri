@@ -63,7 +63,10 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
         backend_def: BackendDef::Graph(GraphBackendDef {
             internal_nodes: vec![
                 GraphInternalNode {
-                    kind: GraphNodeKind::InputRef(0),
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 0,
+                        sub_idx: 0,
+                    },
                     inputs: vec![],
                     hebbian: None,
                 },
@@ -98,11 +101,13 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
             program: vec![
                 VmInstruction::ReadInput {
                     dst: 0,
-                    input_idx: 0,
+                    ref_idx: 0,
+                    sub_idx: 0,
                 },
                 VmInstruction::ReadInput {
                     dst: 1,
-                    input_idx: 1,
+                    ref_idx: 1,
+                    sub_idx: 0,
                 },
                 VmInstruction::Add { dst: 2, a: 0, b: 1 },
                 VmInstruction::LoadConst {
@@ -243,7 +248,8 @@ fn vm_reads_all_inputs_e2e() {
         });
         program.push(VmInstruction::ReadInput {
             dst: 0,
-            input_idx: idx as u8,
+            ref_idx: idx as u16,
+            sub_idx: 0,
         });
     }
     program.push(VmInstruction::EmitWorldAction { action_type: 0 });
@@ -281,14 +287,14 @@ fn vm_reads_all_inputs_e2e() {
     let mut seen_reads = 0usize;
 
     for step in &trace.steps {
-        if let VmInstruction::ReadInput { input_idx, .. } = &step.instruction {
+        if let VmInstruction::ReadInput { ref_idx, .. } = &step.instruction {
             let (_, value) = step
                 .register_changes
                 .iter()
                 .find(|(reg, _)| *reg == 0)
                 .copied()
                 .expect("ReadInput should update register 0");
-            observed[*input_idx as usize] = value;
+            observed[*ref_idx as usize] = value;
             seen_reads += 1;
         }
     }
@@ -373,7 +379,8 @@ fn vm_uses_neighbor_barrier_sensor_to_choose_action_e2e() {
                     },
                     VmInstruction::ReadInput {
                         dst: 0,
-                        input_idx: 0,
+                        ref_idx: 0,
+                        sub_idx: 0,
                     },
                     VmInstruction::LoadConst {
                         dst: 1,
@@ -410,7 +417,8 @@ fn vm_uses_neighbor_barrier_sensor_to_choose_action_e2e() {
                     s.instruction,
                     VmInstruction::ReadInput {
                         dst: 0,
-                        input_idx: 0
+                        ref_idx: 0,
+                        sub_idx: 0,
                     }
                 )
             })

@@ -332,7 +332,8 @@ fn random_vm_instruction(
         },
         23 => VmInstruction::ReadInput {
             dst: rng.gen_range(0..rc),
-            input_idx: rng.gen_range(0..il),
+            ref_idx: rng.gen_range(0..il) as u16,
+            sub_idx: 0,
         },
         24 => VmInstruction::WriteInternalPayload {
             slot_idx: rng.gen_range(0u8..8),
@@ -417,9 +418,14 @@ fn mutate_instruction_raw_fields(instr: &mut VmInstruction, rng: &mut impl Rng) 
         VmInstruction::Jump { offset } => {
             *offset = rng.gen();
         }
-        VmInstruction::ReadInput { dst, input_idx } => {
+        VmInstruction::ReadInput {
+            dst,
+            ref_idx,
+            sub_idx,
+        } => {
             *dst = rng.gen();
-            *input_idx = rng.gen();
+            *ref_idx = rng.gen();
+            *sub_idx = rng.gen();
         }
         VmInstruction::WriteInternalPayload { slot_idx, src }
         | VmInstruction::WriteWorldActionMeta { slot_idx, src } => {

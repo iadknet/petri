@@ -69,7 +69,10 @@ fn graph_reads_all_neighbor_sensor_directions_e2e() {
 
     let internal_nodes: Vec<GraphInternalNode> = (0..input_refs.len())
         .map(|i| GraphInternalNode {
-            kind: GraphNodeKind::InputRef(i as u8),
+            kind: GraphNodeKind::InputRef {
+                ref_idx: i as u16,
+                sub_idx: 0,
+            },
             inputs: vec![],
             hebbian: None,
         })
@@ -163,7 +166,10 @@ fn graph_reads_inputs_and_writes_outputs_e2e() {
     for i in 0..input_refs.len() {
         let input_node_idx = (i * 2) as u16;
         internal_nodes.push(GraphInternalNode {
-            kind: GraphNodeKind::InputRef(i as u8),
+            kind: GraphNodeKind::InputRef {
+                ref_idx: i as u16,
+                sub_idx: 0,
+            },
             inputs: vec![],
             hebbian: None,
         });

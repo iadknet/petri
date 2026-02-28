@@ -60,8 +60,8 @@ pub enum VmInstruction {
     Jump { offset: i32 },
 
     // ── Input Reads ───────────────────────────────────────────────────────────
-    /// `dst = resolve(input_refs[input_idx])`; invalid index yields `0.0`.
-    ReadInput { dst: u8, input_idx: u8 },
+    /// `dst = resolve(input_refs[ref_idx], sub_idx)`; invalid index yields `0.0`.
+    ReadInput { dst: u8, ref_idx: u16, sub_idx: u16 },
 
     // ── Output and Routing Writes ─────────────────────────────────────────────
     /// Overwrite internal payload slot; invalid slot write ignored.
@@ -151,8 +151,11 @@ pub struct GraphInput {
 /// The kind of operation performed by a graph internal node.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum GraphNodeKind {
-    /// Read from `NodeGenome.input_refs[u8]` + weighted_input_sum.
-    InputRef(u8),
+    /// Read from `NodeGenome.input_refs[ref_idx]` with `sub_idx` for compound inputs.
+    InputRef {
+        ref_idx: u16,
+        sub_idx: u16,
+    },
     /// Constant output value (ignores inputs).
     Constant(f32),
     /// Sum all weighted inputs.
@@ -325,7 +328,8 @@ mod tests {
             VmInstruction::Jump { offset: -1 },
             VmInstruction::ReadInput {
                 dst: 0,
-                input_idx: 0,
+                ref_idx: 0,
+                sub_idx: 0,
             },
             VmInstruction::WriteInternalPayload {
                 slot_idx: 0,
@@ -374,7 +378,10 @@ mod tests {
     #[test]
     fn graph_node_kinds_all_22_constructible() {
         let kinds: Vec<GraphNodeKind> = vec![
-            GraphNodeKind::InputRef(0),
+            GraphNodeKind::InputRef {
+                ref_idx: 0,
+                sub_idx: 0,
+            },
             GraphNodeKind::Constant(1.0),
             GraphNodeKind::Add,
             GraphNodeKind::Multiply,
@@ -481,7 +488,10 @@ mod tests {
                 backend_def: BackendDef::Graph(GraphBackendDef {
                     internal_nodes: vec![
                         GraphInternalNode {
-                            kind: GraphNodeKind::InputRef(0),
+                            kind: GraphNodeKind::InputRef {
+                                ref_idx: 0,
+                                sub_idx: 0,
+                            },
                             inputs: vec![GraphInput {
                                 source_idx: 0,
                                 weight: 1.0,
