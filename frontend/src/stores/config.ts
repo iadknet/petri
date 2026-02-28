@@ -14,7 +14,7 @@ export interface ConfigState {
 
 	setServerConfig: (config: SimulationConfig, simState: SimState) => void;
 	commitServerConfig: (config: SimulationConfig, simState: SimState) => void;
-	updateDraft: (path: string, value: number | string) => void;
+	updateDraft: (path: string, value: number | string | boolean) => void;
 	resetDraft: () => void;
 	reset: () => void;
 }

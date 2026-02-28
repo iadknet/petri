@@ -9,7 +9,7 @@ export function getByPath(obj: unknown, path: string): unknown {
 	return current;
 }
 
-export function buildPatch(path: string, value: number): Record<string, unknown> {
+export function buildPatch(path: string, value: number | boolean): Record<string, unknown> {
 	const keys = path.split(".");
 	const result: Record<string, unknown> = {};
 	let current = result;
