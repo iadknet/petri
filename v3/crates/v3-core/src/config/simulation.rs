@@ -90,6 +90,8 @@ pub struct EnergyCostsConfig {
     pub noop_cost: f32,
     pub reproduce_cost: f32,
     pub eat_reward_per_food: f32,
+    /// Additional energy penalty applied when an action fails (move blocked, eat empty cell, etc.).
+    pub failed_action_penalty: f32,
 }
 
 impl Default for EnergyCostsConfig {
@@ -100,6 +102,7 @@ impl Default for EnergyCostsConfig {
             noop_cost: 0.05,
             reproduce_cost: 0.1,
             eat_reward_per_food: 12.0,
+            failed_action_penalty: 5.0,
         }
     }
 }
@@ -304,6 +307,7 @@ impl SimulationConfig {
         ec.noop_cost = normalize_f32_finite_nonneg(ec.noop_cost, 0.05);
         ec.reproduce_cost = normalize_f32_finite_nonneg(ec.reproduce_cost, 0.1);
         ec.eat_reward_per_food = normalize_f32_finite_nonneg(ec.eat_reward_per_food, 12.0);
+        ec.failed_action_penalty = normalize_f32_finite_nonneg(ec.failed_action_penalty, 5.0);
 
         let rt = &mut self.runtime;
         if rt.max_mesh_hops < 1 {
@@ -428,6 +432,7 @@ mod tests {
         assert!((cfg.energy.costs.noop_cost - 0.05).abs() < 1e-6);
         assert!((cfg.energy.costs.reproduce_cost - 0.1).abs() < 1e-6);
         assert!((cfg.energy.costs.eat_reward_per_food - 12.0).abs() < 1e-6);
+        assert!((cfg.energy.costs.failed_action_penalty - 5.0).abs() < 1e-6);
         // Runtime
         assert_eq!(cfg.runtime.max_mesh_hops, 1024);
         assert_eq!(cfg.runtime.max_vm_steps, 10000);
@@ -592,6 +597,28 @@ mod tests {
             (cfg.mutation.mutation_probability - cfg2.mutation.mutation_probability).abs() < 1e-12
         );
         assert!((cfg.predation.steal_cost_rate - cfg2.predation.steal_cost_rate).abs() < 1e-6);
+    }
+
+    #[test]
+    fn config_default_failed_action_penalty() {
+        let cfg = SimulationConfig::default();
+        assert!((cfg.energy.costs.failed_action_penalty - 5.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn config_normalize_failed_action_penalty_nan() {
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.costs.failed_action_penalty = f32::NAN;
+        cfg.normalize();
+        assert!((cfg.energy.costs.failed_action_penalty - 5.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn config_normalize_failed_action_penalty_negative_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.costs.failed_action_penalty = -3.0;
+        cfg.normalize();
+        assert!((cfg.energy.costs.failed_action_penalty - 5.0).abs() < 1e-6);
     }
 
     #[test]

@@ -47,4 +47,15 @@ export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 		defaultValue: 12.0,
 		tooltip: "Energy gained per unit of food density consumed",
 	},
+	{
+		path: "energy.costs.failed_action_penalty",
+		label: "Failed Action Penalty",
+		min: 0,
+		max: 20,
+		step: 0.1,
+		defaultValue: 5.0,
+		testId: "config-field-energy-costs-failed-action-penalty",
+		tooltip:
+			"Additional energy penalty when an action fails (move blocked, eat empty cell, etc.)",
+	},
 ];

@@ -12,25 +12,6 @@
 
 ## Major New Features
 
-### Creature inspector
-  - click on creature to open new modal or window with creature inspector
-  - a fun whimsical illustration representation of node graph
-  - Panels with additional creature metadata
-  - Live updating up creature stats
-  - have the ability to visualize and inspect creature memory somehow
-  
-### Creature inspector execution sampler
-  - In creature inspector have an "execution sampler" button.
-  - captures full execution over a few ticks.
-  - Pauses world after capturing.
-  - Have the ability to visualize the execution in slow motion or step-by-step
-    - "zoom in" on each node as it is evaluated
-    - show all inputs used by node
-    - for graph nodes show a visualization of the graph
-    - for vm nodes, show the code
-  - Show all inputs that are used for that node on the left, show outputs on the right
-  - As the node "executes" highlight that particular part of the node, highlight all values changed
-
 ### Storage slots
   - add the ability for creatures to pick up and place food and barriers
   - This was implemented in v1, we can refrence v1 implementation
@@ -40,9 +21,16 @@
   - When determining action order, the actions with the most extra energy are evaluated first
   - The order of ties should be randomized
 
+### Multiple action queue
+  - give the creature an option to perform multiple actions in one turn
+  - actions can stack (so it can move n, move e, eat) all in one turn
+  - There should be an additional energy penalty for each action after the first
+  
 ### Predation
   - Creature can "steal" energy from neighbors
-  - steal action has target square, energy amount
+  - steal action has target direction, energy amount
+  - steal action costs energy proportional to energy amount attempted to be stolen
+  - this percentage should be configuration (maybe 10% is a good default?)
   - significant energy bonus for killing a creature (based on creature genome complexity)
   
 ### More advanced sensors

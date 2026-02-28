@@ -84,6 +84,7 @@ impl ReproductionActionResult {
 /// Apply a Reproduce action per v3-reproduction-spec.md Section 6 unified sequence.
 ///
 /// Returns the outcome indicating whether offspring was spawned or why it was rejected.
+#[must_use]
 pub fn apply_reproduce(
     parent_id: CreatureId,
     sim: &mut Simulation,
