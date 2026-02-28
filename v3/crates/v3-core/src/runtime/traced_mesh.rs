@@ -69,7 +69,12 @@ pub fn execute_creature_mesh_traced(
             } else {
                 actions
             };
-            return (actions, report, hop_traces, TerminationReason::MaxHopsReached);
+            return (
+                actions,
+                report,
+                hop_traces,
+                TerminationReason::MaxHopsReached,
+            );
         }
 
         let node = &genome.nodes[node_index[&current_node_id]];
@@ -142,7 +147,12 @@ pub fn execute_creature_mesh_traced(
             } else {
                 actions
             };
-            return (actions, report, hop_traces, TerminationReason::ActionEmitted);
+            return (
+                actions,
+                report,
+                hop_traces,
+                TerminationReason::ActionEmitted,
+            );
         }
 
         if node.targets.is_empty() {
@@ -222,7 +232,10 @@ mod tests {
             backend_def: BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
-                program: vec![VmInstruction::EmitWorldAction { action_type }],
+                program: vec![
+                    VmInstruction::PushAction { action_type },
+                    VmInstruction::ExecuteActionQueue,
+                ],
             }),
             targets,
         }
@@ -357,7 +370,8 @@ mod tests {
                         dst: 0,
                         input_idx: 0,
                     },
-                    VmInstruction::EmitWorldAction { action_type: 1 },
+                    VmInstruction::PushAction { action_type: 1 },
+                    VmInstruction::ExecuteActionQueue,
                 ],
             }),
             targets: vec![],

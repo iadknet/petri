@@ -1,11 +1,14 @@
 use super::*;
 
-// ── EmitWorldAction ───────────────────────────────────────────────────────
+// ── PushAction + ExecuteActionQueue ────────────────────────────────────────
 
 #[test]
 fn emit_noop_action_type_0() {
     let (_r, _, aq) = run_vm(
-        vec![VmInstruction::EmitWorldAction { action_type: 0 }],
+        vec![
+            VmInstruction::PushAction { action_type: 0 },
+            VmInstruction::ExecuteActionQueue,
+        ],
         1,
         vec![],
         &[],
@@ -20,7 +23,10 @@ fn emit_noop_action_type_0() {
 #[test]
 fn emit_eat_action_type_1() {
     let (_r, _, aq) = run_vm(
-        vec![VmInstruction::EmitWorldAction { action_type: 1 }],
+        vec![
+            VmInstruction::PushAction { action_type: 1 },
+            VmInstruction::ExecuteActionQueue,
+        ],
         1,
         vec![],
         &[],
@@ -35,7 +41,10 @@ fn emit_eat_action_type_1() {
 #[test]
 fn emit_unknown_action_type_255_defaults_to_noop() {
     let (_r, _, aq) = run_vm(
-        vec![VmInstruction::EmitWorldAction { action_type: 255 }],
+        vec![
+            VmInstruction::PushAction { action_type: 255 },
+            VmInstruction::ExecuteActionQueue,
+        ],
         1,
         vec![],
         &[],
@@ -59,7 +68,8 @@ fn emit_move_with_meta() {
             slot_idx: 0,
             src: 0,
         },
-        VmInstruction::EmitWorldAction { action_type: 2 },
+        VmInstruction::PushAction { action_type: 2 },
+        VmInstruction::ExecuteActionQueue,
     ];
     let (_r, _, aq) = run_vm(program, 1, vec![2.0], &[], zeroed_upstream(), 100.0);
     let actions = aq.into_actions();
@@ -380,9 +390,11 @@ fn vm_eats_when_food_here() {
                     }, // r0 = food_here
                     // r1 is 0.0; compare r0 > r1
                     VmInstruction::CmpGt { dst: 0, a: 0, b: 1 }, // r0 = (food > 0)?
-                    VmInstruction::JumpIfZero { cond: 0, offset: 1 }, // skip Eat if no food
-                    VmInstruction::EmitWorldAction { action_type: 1 }, // Eat
-                    VmInstruction::EmitWorldAction { action_type: 0 }, // NoOp fallback
+                    VmInstruction::JumpIfZero { cond: 0, offset: 2 }, // skip Eat if no food
+                    VmInstruction::PushAction { action_type: 1 }, // Eat
+                    VmInstruction::ExecuteActionQueue,
+                    VmInstruction::PushAction { action_type: 0 }, // NoOp fallback
+                    VmInstruction::ExecuteActionQueue,
                 ],
             }),
             targets: vec![],
@@ -457,9 +469,11 @@ fn vm_noop_when_no_food() {
                         input_idx: 0,
                     }, // r0 = food_here = 0
                     VmInstruction::CmpGt { dst: 0, a: 0, b: 1 }, // r0 = (0 > 0) = 0
-                    VmInstruction::JumpIfZero { cond: 0, offset: 1 }, // fires → skip Eat
-                    VmInstruction::EmitWorldAction { action_type: 1 }, // Eat (skipped)
-                    VmInstruction::EmitWorldAction { action_type: 0 }, // NoOp fallback
+                    VmInstruction::JumpIfZero { cond: 0, offset: 2 }, // fires → skip Eat
+                    VmInstruction::PushAction { action_type: 1 }, // Eat (skipped)
+                    VmInstruction::ExecuteActionQueue,
+                    VmInstruction::PushAction { action_type: 0 }, // NoOp fallback
+                    VmInstruction::ExecuteActionQueue,
                 ],
             }),
             targets: vec![],

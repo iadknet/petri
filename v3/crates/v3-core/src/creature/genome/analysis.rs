@@ -58,7 +58,6 @@ pub fn vm_register_write(instr: &VmInstruction) -> Option<u8> {
         | VmInstruction::JumpIfZero { .. }
         | VmInstruction::WriteInternalPayload { .. }
         | VmInstruction::WriteWorldActionMeta { .. }
-        | VmInstruction::EmitWorldAction { .. }
         | VmInstruction::PushAction { .. }
         | VmInstruction::PopAction
         | VmInstruction::ExecuteActionQueue
@@ -91,7 +90,7 @@ pub fn vm_register_read_mask(instr: &VmInstruction) -> u32 {
         VmInstruction::LoadConst { .. }
         | VmInstruction::LoadMem8Imm { .. }
         | VmInstruction::ReadActionQueueLength { .. } => 0,
-        VmInstruction::EmitWorldAction { .. } | VmInstruction::PushAction { .. } => 0,
+        VmInstruction::PushAction { .. } => 0,
         VmInstruction::Move { src, .. }
         | VmInstruction::Abs { src, .. }
         | VmInstruction::Neg { src, .. }
@@ -132,7 +131,6 @@ pub fn vm_is_output_instruction(instr: &VmInstruction) -> bool {
         instr,
         VmInstruction::WriteInternalPayload { .. }
             | VmInstruction::WriteWorldActionMeta { .. }
-            | VmInstruction::EmitWorldAction { .. }
             | VmInstruction::PushAction { .. }
             | VmInstruction::PopAction
             | VmInstruction::ExecuteActionQueue

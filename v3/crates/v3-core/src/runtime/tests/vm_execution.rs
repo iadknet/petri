@@ -7,7 +7,10 @@ fn register_count_zero_halts_immediately() {
     let def = VmBackendDef {
         register_count: 0,
         constants: vec![],
-        program: vec![VmInstruction::EmitWorldAction { action_type: 1 }],
+        program: vec![
+            VmInstruction::PushAction { action_type: 1 },
+            VmInstruction::ExecuteActionQueue,
+        ],
     };
     let si = empty_static_inputs();
     let mut e = 100.0;

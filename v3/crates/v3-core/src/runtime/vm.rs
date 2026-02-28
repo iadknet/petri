@@ -265,14 +265,6 @@ pub fn execute_vm_node(
                 // invalid slot: write ignored
             }
 
-            VmInstruction::EmitWorldAction { action_type } => {
-                // Compat shim: push action to queue, then terminate.
-                let action = decode_world_action(*action_type, &meta);
-                action_queue.push(action);
-                commit_memory!();
-                return NodeResult::terminal(payload, route_target);
-            }
-
             VmInstruction::PushAction { action_type } => {
                 let action = decode_world_action(*action_type, &meta);
                 action_queue.push(action);
@@ -391,7 +383,6 @@ pub(crate) fn opcode_base_cost(instr: &crate::creature::genome::VmInstruction) -
         VmInstruction::ReadInput { .. } => 0.12,
         VmInstruction::WriteInternalPayload { .. } => 0.14,
         VmInstruction::WriteWorldActionMeta { .. } => 0.14,
-        VmInstruction::EmitWorldAction { .. } => 0.24,
         VmInstruction::PushAction { .. } => 0.24,
         VmInstruction::PopAction => 0.10,
         VmInstruction::ReadActionQueueLength { .. } => 0.08,

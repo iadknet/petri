@@ -81,7 +81,8 @@ fn result_equivalence_emit_eat() {
                 const_idx: 0,
             },
             VmInstruction::ToBool { dst: 1, src: 0 },
-            VmInstruction::EmitWorldAction { action_type: 1 },
+            VmInstruction::PushAction { action_type: 1 },
+            VmInstruction::ExecuteActionQueue,
         ],
     };
     let input_refs: Vec<InputReference> = vec![];
@@ -381,7 +382,7 @@ fn result_equivalence_routing() {
 }
 
 #[test]
-fn result_equivalence_all_33_opcodes() {
+fn result_equivalence_all_38_opcodes() {
     let zero_upstream = [0.0f32; 12];
     let mut read_input_upstream = [0.0f32; 12];
     read_input_upstream[3] = 42.0;
@@ -900,7 +901,8 @@ fn result_equivalence_all_33_opcodes() {
                         slot_idx: 0,
                         src: 0,
                     },
-                    VmInstruction::EmitWorldAction { action_type: 2 },
+                    VmInstruction::PushAction { action_type: 2 },
+                    VmInstruction::ExecuteActionQueue,
                 ],
             },
             vec![],
@@ -908,11 +910,89 @@ fn result_equivalence_all_33_opcodes() {
             zero_mem,
         ),
         (
-            "EmitWorldAction",
+            "PushAction",
             VmBackendDef {
                 register_count: 1,
                 constants: vec![],
-                program: vec![VmInstruction::EmitWorldAction { action_type: 1 }],
+                program: vec![
+                    VmInstruction::PushAction { action_type: 1 },
+                    VmInstruction::ExecuteActionQueue,
+                ],
+            },
+            vec![],
+            zero_upstream,
+            zero_mem,
+        ),
+        (
+            "PopAction",
+            VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![
+                    VmInstruction::PushAction { action_type: 0 },
+                    VmInstruction::PopAction,
+                    VmInstruction::Halt,
+                ],
+            },
+            vec![],
+            zero_upstream,
+            zero_mem,
+        ),
+        (
+            "ReadActionQueueLength",
+            VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![
+                    VmInstruction::ReadActionQueueLength { dst: 0 },
+                    VmInstruction::Halt,
+                ],
+            },
+            vec![],
+            zero_upstream,
+            zero_mem,
+        ),
+        (
+            "ReadActionQueueType",
+            VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![
+                    VmInstruction::ReadActionQueueType {
+                        index_src: 0,
+                        dst: 0,
+                    },
+                    VmInstruction::Halt,
+                ],
+            },
+            vec![],
+            zero_upstream,
+            zero_mem,
+        ),
+        (
+            "ReadActionQueueParam",
+            VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![
+                    VmInstruction::ReadActionQueueParam {
+                        index_src: 0,
+                        param_slot: 0,
+                        dst: 0,
+                    },
+                    VmInstruction::Halt,
+                ],
+            },
+            vec![],
+            zero_upstream,
+            zero_mem,
+        ),
+        (
+            "ExecuteActionQueue",
+            VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![VmInstruction::ExecuteActionQueue],
             },
             vec![],
             zero_upstream,
@@ -1035,7 +1115,7 @@ fn result_equivalence_all_33_opcodes() {
 
     assert_eq!(
         cases.len(),
-        33,
+        38,
         "every VmInstruction opcode must be covered"
     );
 

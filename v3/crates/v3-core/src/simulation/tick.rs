@@ -244,8 +244,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                 }
                 WorldAction::Move(dir) => {
                     if let Some(creature) = sim.creatures.get_mut(id) {
-                        let succeeded =
-                            apply_move(id, creature, &mut sim.world, dir, &sim.config);
+                        let succeeded = apply_move(id, creature, &mut sim.world, dir, &sim.config);
                         sim.stats.last_tick_move += 1;
                         if !succeeded {
                             creature.energy -= sim.config.energy.costs.failed_action_penalty;

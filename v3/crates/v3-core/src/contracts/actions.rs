@@ -44,7 +44,12 @@ impl WorldAction {
         match (self, slot) {
             (WorldAction::Move(dir), 0) => dir.to_index() as f32,
             (WorldAction::Reproduce { direction, .. }, 0) => direction.to_index() as f32,
-            (WorldAction::Reproduce { energy_transfer, .. }, 1) => *energy_transfer,
+            (
+                WorldAction::Reproduce {
+                    energy_transfer, ..
+                },
+                1,
+            ) => *energy_transfer,
             (WorldAction::StealEnergy { direction, .. }, 0) => direction.to_index() as f32,
             (WorldAction::StealEnergy { amount, .. }, 1) => *amount,
             _ => 0.0,

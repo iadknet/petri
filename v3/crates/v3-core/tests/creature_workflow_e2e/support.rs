@@ -33,7 +33,10 @@ pub(crate) fn vm_emit_noop_genome() -> CreatureGenome {
             backend_def: BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
-                program: vec![VmInstruction::EmitWorldAction { action_type: 0 }],
+                program: vec![
+                    VmInstruction::PushAction { action_type: 0 },
+                    VmInstruction::ExecuteActionQueue,
+                ],
             }),
             targets: vec![],
         }],

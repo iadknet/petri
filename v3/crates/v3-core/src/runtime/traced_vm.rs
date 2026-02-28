@@ -340,25 +340,6 @@ pub fn execute_vm_node_traced(
                 }
             }
 
-            VmInstruction::EmitWorldAction { action_type } => {
-                // Compat shim: push action to queue, then terminate.
-                let action = decode_world_action(*action_type, &meta);
-                action_queue.push(action);
-                commit_memory!();
-                // Record this final step
-                trace_steps.push(VmStepTrace {
-                    pc,
-                    instruction: instr.clone(),
-                    energy_cost: opcode_cost,
-                    energy_after: *energy,
-                    register_changes: Vec::new(),
-                });
-                return (
-                    NodeResult::terminal(payload, route_target),
-                    build_trace!(trace_steps, mem_writes),
-                );
-            }
-
             VmInstruction::PushAction { action_type } => {
                 let action = decode_world_action(*action_type, &meta);
                 action_queue.push(action);
@@ -475,12 +456,10 @@ pub fn execute_vm_node_traced(
             }
         }
 
-        // Don't re-record EmitWorldAction/ExecuteActionQueue/Halt (already recorded above)
+        // Don't re-record ExecuteActionQueue/Halt (already recorded above)
         if !matches!(
             instr,
-            VmInstruction::EmitWorldAction { .. }
-                | VmInstruction::ExecuteActionQueue
-                | VmInstruction::Halt
+            VmInstruction::ExecuteActionQueue | VmInstruction::Halt
         ) {
             trace_steps.push(VmStepTrace {
                 pc,

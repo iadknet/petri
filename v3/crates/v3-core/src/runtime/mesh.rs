@@ -204,8 +204,8 @@ mod tests {
         }
     }
 
-    /// Build a minimal VM node that emits `EmitWorldAction { action_type }` and
-    /// then halts. The node has `register_count=1` so the VM will run.
+    /// Build a minimal VM node that pushes an action and executes the queue.
+    /// The node has `register_count=1` so the VM will run.
     fn vm_emit_node(node_id: NodeId, action_type: u8, targets: Vec<NodeId>) -> NodeGenome {
         NodeGenome {
             node_id,
@@ -213,7 +213,10 @@ mod tests {
             backend_def: BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
-                program: vec![VmInstruction::EmitWorldAction { action_type }],
+                program: vec![
+                    VmInstruction::PushAction { action_type },
+                    VmInstruction::ExecuteActionQueue,
+                ],
             }),
             targets,
         }
@@ -360,7 +363,7 @@ mod tests {
 
     // ── Test 5: vm_node_emits_eat_action ─────────────────────────────────────
 
-    /// A VM node that emits EmitWorldAction{action_type: 1} → WorldAction::Eat.
+    /// A VM node that pushes action_type 1 and executes queue → WorldAction::Eat.
     #[test]
     fn vm_node_emits_eat_action() {
         let id0 = NodeId::new(0);
@@ -551,7 +554,7 @@ mod tests {
         };
 
         // VM node: ReadInput(0) → UpstreamSlot(5) → r0 = 9.0
-        // ToBool(r0) → 1.0 → EmitWorldAction(1)=Eat
+        // ToBool(r0) → 1.0 → PushAction(1)+ExecuteActionQueue=Eat
         let vm_node = NodeGenome {
             node_id: id_vm,
             input_refs: vec![InputReference::UpstreamSlot(5)],
@@ -564,9 +567,11 @@ mod tests {
                         input_idx: 0,
                     }, // r0 = upstream_slots[5] = 9.0
                     VmInstruction::ToBool { dst: 1, src: 0 }, // r1 = 1.0
-                    VmInstruction::JumpIfZero { cond: 1, offset: 1 }, // skip Eat if r1==0
-                    VmInstruction::EmitWorldAction { action_type: 1 }, // Eat
-                    VmInstruction::EmitWorldAction { action_type: 0 }, // NoOp fallback
+                    VmInstruction::JumpIfZero { cond: 1, offset: 2 }, // skip Eat if r1==0
+                    VmInstruction::PushAction { action_type: 1 }, // Eat
+                    VmInstruction::ExecuteActionQueue,
+                    VmInstruction::PushAction { action_type: 0 }, // NoOp fallback
+                    VmInstruction::ExecuteActionQueue,
                 ],
             }),
             targets: vec![],
