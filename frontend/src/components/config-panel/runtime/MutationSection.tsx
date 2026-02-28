@@ -1,4 +1,8 @@
-import type { FieldDef } from "../shared/types.ts";
+import { FieldGroup } from "../shared/FieldGroup.tsx";
+import { FieldRow } from "../shared/FieldRow.tsx";
+import { ToggleRow } from "../shared/ToggleRow.tsx";
+import { getByPath } from "../shared/pathUtils.ts";
+import type { BooleanFieldDef, FieldDef, RuntimePanelProps } from "../shared/types.ts";
 
 export const MUTATION_FIELDS: FieldDef[] = [
 	{
@@ -32,6 +36,24 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		tooltip: "Maximum number of mutation events per birth when mutation triggers",
 	},
 	{
+		path: "mutation.mesh_layer_probability",
+		label: "Mesh Layer Prob.",
+		min: 0,
+		max: 1,
+		step: 0.01,
+		defaultValue: 0.2,
+		tooltip: "Probability of adding a mesh layer during genome mutation",
+	},
+	{
+		path: "mutation.complexity_cap",
+		label: "Complexity Cap",
+		min: 1,
+		max: 5000,
+		step: 1,
+		defaultValue: 1200,
+		tooltip: "Maximum genome complexity before complexity pressure suppresses growth mutations",
+	},
+	{
 		path: "mutation.phenotype.channel_step",
 		label: "Channel Step",
 		min: 1,
@@ -62,3 +84,55 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		tooltip: "Probability of switching to a different active color channel (R/G/B)",
 	},
 ];
+
+export const MUTATION_TOGGLES: BooleanFieldDef[] = [
+	{
+		path: "mutation.complexity_pressure_enabled",
+		label: "Complexity Pressure",
+		testId: "config-field-mutation-complexity-pressure-enabled",
+		defaultValue: true,
+		tooltip:
+			"When enabled, genomes near the complexity cap are less likely to gain growth mutations",
+	},
+];
+
+export const MUTATION_ALL_FIELDS: (FieldDef | BooleanFieldDef)[] = [
+	...MUTATION_FIELDS,
+	...MUTATION_TOGGLES,
+];
+
+export function MutationFieldGroup({
+	localDraft,
+	serverConfig,
+	simState,
+	updateDraft,
+}: RuntimePanelProps) {
+	return (
+		<FieldGroup title="Mutation">
+			{MUTATION_FIELDS.map((field) => (
+				<FieldRow
+					key={`runtime-${field.path}`}
+					field={field}
+					id={`runtime-${field.path.replaceAll(".", "-")}`}
+					value={getByPath(localDraft, field.path) as number}
+					serverValue={getByPath(serverConfig, field.path) as number}
+					disabled={simState === "running"}
+					onChange={updateDraft}
+					testId={field.testId}
+				/>
+			))}
+			{MUTATION_TOGGLES.map((field) => (
+				<ToggleRow
+					key={`runtime-${field.path}`}
+					field={field}
+					id={`runtime-${field.path.replaceAll(".", "-")}`}
+					value={getByPath(localDraft, field.path) as boolean}
+					serverValue={getByPath(serverConfig, field.path) as boolean}
+					disabled={simState === "running"}
+					onChange={updateDraft}
+					testId={field.testId}
+				/>
+			))}
+		</FieldGroup>
+	);
+}

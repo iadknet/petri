@@ -39,7 +39,7 @@ export function ConfigPanel() {
 				const draft = getByPath(localDraft, field.path);
 				const server = getByPath(serverConfig, field.path);
 				if (draft !== server) {
-					mergePatch(patch, buildPatch(field.path, draft as number));
+					mergePatch(patch, buildPatch(field.path, draft as number | boolean));
 				}
 			}
 
