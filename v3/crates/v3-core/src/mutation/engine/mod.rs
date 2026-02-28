@@ -92,7 +92,7 @@ impl MutationEngine {
                         (
                             MutationDomain::InputRef,
                             input_ref_operator_key(op),
-                            apply_input_ref_event(genome, op, rng),
+                            apply_input_ref_event(genome, op, rng, config),
                         )
                     }
                 }
@@ -183,9 +183,10 @@ fn apply_input_ref_event(
     genome: &mut CreatureGenome,
     op: InputRefOperator,
     rng: &mut impl Rng,
+    config: &MutationConfig,
 ) -> Result<(), MutationSkipReason> {
     let snapshot = genome.clone();
-    match InputRefMutator::apply(genome, op, rng) {
+    match InputRefMutator::apply(genome, op, rng, config) {
         Ok(()) => {
             if ParseabilityGate::validate(genome).is_ok() {
                 Ok(())

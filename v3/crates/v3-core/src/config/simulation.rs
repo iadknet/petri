@@ -205,6 +205,8 @@ pub struct MutationConfig {
     pub complexity_cap: u32,
     /// Whether the complexity pressure gate is active.
     pub complexity_pressure_enabled: bool,
+    /// Capacity of the action queue. Compound input fan-out counts depend on this.
+    pub action_queue_cap: usize,
     pub phenotype: PhenotypeConfig,
 }
 
@@ -217,6 +219,7 @@ impl Default for MutationConfig {
             mesh_layer_probability: 0.2,
             complexity_cap: 1200,
             complexity_pressure_enabled: true,
+            action_queue_cap: 4,
             phenotype: PhenotypeConfig::default(),
         }
     }
