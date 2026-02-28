@@ -193,24 +193,24 @@ NodeGenome {
 NodeGenome {
   node_id: 1,
   input_refs: [
-    0: UpstreamOutput { slot: 0 },  // food_here
-    1: UpstreamOutput { slot: 1 },  // can_reproduce
-    2: UpstreamOutput { slot: 2 },  // food_N
-    3: UpstreamOutput { slot: 3 },  // food_E
-    4: UpstreamOutput { slot: 4 },  // food_S
-    5: UpstreamOutput { slot: 5 },  // food_W
+    0: UpstreamSlot(0),  // food_here
+    1: UpstreamSlot(1),  // can_reproduce
+    2: UpstreamSlot(2),  // food_N
+    3: UpstreamSlot(3),  // food_E
+    4: UpstreamSlot(4),  // food_S
+    5: UpstreamSlot(5),  // food_W
   ],
   backend_def: Vm(VmBackendDef {
     registers: 8,
     constants: [0.5, 1.0, 2.0, 3.0, 20.0],
     program: [
       // Read inputs into registers
-      ReadInput(r0, 0),       // r0 = food_here
-      ReadInput(r1, 1),       // r1 = can_reproduce
-      ReadInput(r2, 2),       // r2 = food_N
-      ReadInput(r3, 3),       // r3 = food_E
-      ReadInput(r4, 4),       // r4 = food_S
-      ReadInput(r5, 5),       // r5 = food_W
+      ReadInput(r0, 0, 0),    // r0 = food_here
+      ReadInput(r1, 1, 0),    // r1 = can_reproduce
+      ReadInput(r2, 2, 0),    // r2 = food_N
+      ReadInput(r3, 3, 0),    // r3 = food_E
+      ReadInput(r4, 4, 0),    // r4 = food_S
+      ReadInput(r5, 5, 0),    // r5 = food_W
 
       // Priority 1: Reproduce if energy sufficient
       CmpGt(r6, r1, r7),     // r6 = can_reproduce?

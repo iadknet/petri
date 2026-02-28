@@ -25,7 +25,7 @@ Related references:
 
 ## 2. Instruction Set
 
-The VM defines **33 opcodes**.
+The VM defines **38 opcodes**.
 
 ### Arithmetic and Data Movement
 

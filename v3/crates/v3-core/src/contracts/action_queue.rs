@@ -15,7 +15,7 @@ impl ActionQueue {
     #[inline]
     pub fn new(cap: usize) -> Self {
         Self {
-            actions: Vec::with_capacity(4),
+            actions: Vec::with_capacity(cap.min(16)),
             cap,
         }
     }
@@ -35,17 +35,20 @@ impl ActionQueue {
     }
 
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.actions.len()
     }
 
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.actions.is_empty()
     }
 
     /// Return the action type discriminant at `index` as f32, or 0.0 if OOB.
     #[inline]
+    #[must_use]
     pub fn action_type_at(&self, index: usize) -> f32 {
         self.actions
             .get(index)
@@ -54,18 +57,21 @@ impl ActionQueue {
 
     /// Return the action parameter at `index` and `slot`, or 0.0 if OOB.
     #[inline]
+    #[must_use]
     pub fn param_at(&self, index: usize, slot: usize) -> f32 {
         self.actions.get(index).map_or(0.0, |a| a.param(slot))
     }
 
     /// Consume the queue and return the accumulated actions.
     #[inline]
+    #[must_use]
     pub fn into_actions(self) -> Vec<WorldAction> {
         self.actions
     }
 
     /// Consume the queue and return the accumulated actions, or `vec![NoOp]` if empty.
     #[inline]
+    #[must_use]
     pub fn into_actions_or_noop(self) -> Vec<WorldAction> {
         if self.actions.is_empty() {
             vec![WorldAction::NoOp]
