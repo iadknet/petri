@@ -89,6 +89,62 @@ impl GraphOperator {
         sum
     };
 
+    /// Whether this operator increases, decreases, or preserves genome complexity.
+    #[must_use]
+    pub const fn complexity_effect(self) -> crate::mutation::types::ComplexityEffect {
+        use crate::mutation::types::ComplexityEffect;
+        match self {
+            Self::AddInternalGraphNode
+            | Self::AddGraphEdge
+            | Self::CopyInternalNode
+            | Self::CopySubgraph
+            | Self::CopyEdgeBundle
+            | Self::EnableHebbian => ComplexityEffect::Increasing,
+            Self::RemoveInternalGraphNode | Self::RemoveGraphEdge | Self::DisableHebbian => {
+                ComplexityEffect::Decreasing
+            }
+            Self::AlterGraphEdgeWeight
+            | Self::SwapGraphOperator
+            | Self::MutateGraphOperatorParam
+            | Self::RetargetGraphEdge
+            | Self::GraphRawFieldMutation
+            | Self::MutateHebbianRule
+            | Self::MutateHebbianRate
+            | Self::ToggleHebbianLamarckian => ComplexityEffect::Neutral,
+        }
+    }
+
+    const NON_INCREASING_WEIGHT: u16 = {
+        let mut sum = 0u16;
+        let mut i = 0;
+        while i < Self::ALL.len() {
+            if !Self::ALL[i].complexity_effect().is_increasing() {
+                sum += Self::ALL[i].weight() as u16;
+            }
+            i += 1;
+        }
+        sum
+    };
+
+    /// Pick a random non-increasing operator (Neutral or Decreasing) weighted by impact tier.
+    pub fn random_non_increasing(rng: &mut impl Rng) -> Option<Self> {
+        if Self::NON_INCREASING_WEIGHT == 0 {
+            return None;
+        }
+        let mut r = rng.gen_range(0..Self::NON_INCREASING_WEIGHT);
+        for &op in &Self::ALL {
+            if op.complexity_effect().is_increasing() {
+                continue;
+            }
+            let w = op.weight() as u16;
+            if r < w {
+                return Some(op);
+            }
+            r -= w;
+        }
+        unreachable!()
+    }
+
     /// Pick a random graph operator weighted by impact tier.
     pub fn random(rng: &mut impl Rng) -> Self {
         let mut r = rng.gen_range(0..Self::TOTAL_WEIGHT);

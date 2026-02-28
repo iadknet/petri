@@ -5,6 +5,7 @@ use crate::creature::genome::CreatureGenome;
 use crate::creature::parseability::ParseabilityGate;
 use crate::mutation::graph::{GraphMutator, GraphOperator};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
+use crate::mutation::pressure;
 use crate::mutation::topology::{TopologyMutator, TopologyOperator};
 use crate::mutation::types::{
     MutationDomain, MutationOperator, MutationSkipReason, MutationSummary,
@@ -32,12 +33,21 @@ impl MutationEngine {
         let event_count = rng
             .gen_range(config.per_birth_mutation_events_min..=config.per_birth_mutation_events_max);
 
+        // Complexity pressure: compute once before the event loop.
+        let restricted = config.complexity_pressure_enabled
+            && pressure::is_restricted(genome.complexity(), config.complexity_cap, rng);
+
         let mut summary = MutationSummary::zero();
         for _ in 0..event_count {
             // Two-layer dispatch: mesh (Topology) vs node-internal (VM/Graph/InputRef).
             let (domain, operator, result) = if rng.gen_bool(config.mesh_layer_probability) {
                 // Layer 1: Mesh (Topology)
-                let op = TopologyOperator::random(rng);
+                let op = if restricted {
+                    TopologyOperator::random_non_increasing(rng)
+                        .unwrap_or_else(|| TopologyOperator::random(rng))
+                } else {
+                    TopologyOperator::random(rng)
+                };
                 (
                     MutationDomain::Topology,
                     topology_operator_key(op),
@@ -47,7 +57,12 @@ impl MutationEngine {
                 // Layer 2: Node-internal (VM, Graph, InputRef — equal probability)
                 match rng.gen_range(0u8..3) {
                     0 => {
-                        let op = VmOperator::random(rng);
+                        let op = if restricted {
+                            VmOperator::random_non_increasing(rng)
+                                .unwrap_or_else(|| VmOperator::random(rng))
+                        } else {
+                            VmOperator::random(rng)
+                        };
                         (
                             MutationDomain::Vm,
                             vm_operator_key(op),
@@ -55,7 +70,12 @@ impl MutationEngine {
                         )
                     }
                     1 => {
-                        let op = GraphOperator::random(rng);
+                        let op = if restricted {
+                            GraphOperator::random_non_increasing(rng)
+                                .unwrap_or_else(|| GraphOperator::random(rng))
+                        } else {
+                            GraphOperator::random(rng)
+                        };
                         (
                             MutationDomain::Graph,
                             graph_operator_key(op),
@@ -63,7 +83,12 @@ impl MutationEngine {
                         )
                     }
                     _ => {
-                        let op = InputRefOperator::random(rng);
+                        let op = if restricted {
+                            InputRefOperator::random_non_increasing(rng)
+                                .unwrap_or_else(|| InputRefOperator::random(rng))
+                        } else {
+                            InputRefOperator::random(rng)
+                        };
                         (
                             MutationDomain::InputRef,
                             input_ref_operator_key(op),
@@ -584,6 +609,110 @@ mod tests {
                 1,
                 "topology must always be selected with mesh_layer_probability=1 at seed {}",
                 seed,
+            );
+        }
+    }
+
+    #[test]
+    fn engine_pressure_disabled_does_not_restrict() {
+        use crate::mutation::types::ComplexityEffect;
+
+        let mut config = SimulationConfig::default().mutation;
+        config.mutation_probability = 1.0;
+        config.per_birth_mutation_events_min = 1;
+        config.per_birth_mutation_events_max = 1;
+        config.complexity_pressure_enabled = false;
+        config.complexity_cap = 1; // absurdly low cap
+
+        // Even with a cap of 1, if pressure is disabled, increasing operators must still appear.
+        let mut has_increasing = false;
+        for seed in 0u64..5000 {
+            let mut genome = v3alpha1_founder_genome();
+            let mut r = rng(seed);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            for (op, &count) in &summary.attempted_by_operator {
+                if count > 0 && op.complexity_effect() == ComplexityEffect::Increasing {
+                    has_increasing = true;
+                }
+            }
+            if has_increasing {
+                break;
+            }
+        }
+        assert!(
+            has_increasing,
+            "with pressure disabled, increasing operators must still be selected"
+        );
+    }
+
+    #[test]
+    fn engine_pressure_at_cap_selects_only_non_increasing() {
+        use crate::mutation::types::ComplexityEffect;
+
+        let mut config = SimulationConfig::default().mutation;
+        config.mutation_probability = 1.0;
+        config.per_birth_mutation_events_min = 1;
+        config.per_birth_mutation_events_max = 1;
+        config.complexity_pressure_enabled = true;
+        config.complexity_cap = 1; // founder genome is well above 1
+
+        for seed in 0u64..2000 {
+            let mut genome = v3alpha1_founder_genome();
+            let mut r = rng(seed);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            for (op, &count) in &summary.attempted_by_operator {
+                if count > 0 {
+                    assert_ne!(
+                        op.complexity_effect(),
+                        ComplexityEffect::Increasing,
+                        "at cap, increasing operator {:?} must not be selected (seed {})",
+                        op,
+                        seed
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn engine_pressure_accounting_invariant_holds_when_restricted() {
+        let mut config = SimulationConfig::default().mutation;
+        config.mutation_probability = 1.0;
+        config.per_birth_mutation_events_min = 1;
+        config.per_birth_mutation_events_max = 5;
+        config.complexity_pressure_enabled = true;
+        config.complexity_cap = 1;
+
+        for seed in 0u64..100 {
+            let mut genome = v3alpha1_founder_genome();
+            let mut r = rng(seed);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            assert_eq!(
+                summary.attempted_events,
+                summary.applied_events + summary.skipped_events,
+                "accounting invariant violated at seed {} with pressure enabled",
+                seed
+            );
+        }
+    }
+
+    #[test]
+    fn engine_pressure_preserves_parseability_when_restricted() {
+        let mut config = SimulationConfig::default().mutation;
+        config.mutation_probability = 1.0;
+        config.per_birth_mutation_events_min = 1;
+        config.per_birth_mutation_events_max = 4;
+        config.complexity_pressure_enabled = true;
+        config.complexity_cap = 1;
+
+        for seed in 0u64..50 {
+            let mut genome = v3alpha1_founder_genome();
+            let mut r = rng(seed);
+            MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            assert!(
+                ParseabilityGate::validate(&genome).is_ok(),
+                "parseability violated at seed {} with pressure enabled",
+                seed
             );
         }
     }

@@ -44,6 +44,48 @@ impl InputRefOperator {
         sum
     };
 
+    /// Whether this operator increases, decreases, or preserves genome complexity.
+    #[must_use]
+    pub const fn complexity_effect(self) -> crate::mutation::types::ComplexityEffect {
+        use crate::mutation::types::ComplexityEffect;
+        match self {
+            Self::Add => ComplexityEffect::Increasing,
+            Self::Remove => ComplexityEffect::Decreasing,
+            Self::Swap | Self::RawFieldMutation => ComplexityEffect::Neutral,
+        }
+    }
+
+    const NON_INCREASING_WEIGHT: u16 = {
+        let mut sum = 0u16;
+        let mut i = 0;
+        while i < Self::ALL.len() {
+            if !Self::ALL[i].complexity_effect().is_increasing() {
+                sum += Self::ALL[i].weight() as u16;
+            }
+            i += 1;
+        }
+        sum
+    };
+
+    /// Pick a random non-increasing operator (Neutral or Decreasing) weighted by impact tier.
+    pub fn random_non_increasing(rng: &mut impl Rng) -> Option<Self> {
+        if Self::NON_INCREASING_WEIGHT == 0 {
+            return None;
+        }
+        let mut r = rng.gen_range(0..Self::NON_INCREASING_WEIGHT);
+        for &op in &Self::ALL {
+            if op.complexity_effect().is_increasing() {
+                continue;
+            }
+            let w = op.weight() as u16;
+            if r < w {
+                return Some(op);
+            }
+            r -= w;
+        }
+        unreachable!()
+    }
+
     /// Pick a random input ref operator weighted by impact tier.
     pub fn random(rng: &mut impl Rng) -> Self {
         let mut r = rng.gen_range(0..Self::TOTAL_WEIGHT);
@@ -396,5 +438,65 @@ mod tests {
         for &op in &all {
             assert!(op.weight() > 0, "weight must be positive for {:?}", op);
         }
+    }
+
+    #[test]
+    fn complexity_effect_consistent_with_types() {
+        use crate::mutation::types::ComplexityEffect;
+        for &op in &InputRefOperator::ALL {
+            let effect = op.complexity_effect();
+            assert!(
+                matches!(
+                    effect,
+                    ComplexityEffect::Increasing
+                        | ComplexityEffect::Decreasing
+                        | ComplexityEffect::Neutral
+                ),
+                "complexity_effect must return valid effect for {:?}",
+                op
+            );
+        }
+    }
+
+    #[test]
+    fn random_non_increasing_never_returns_increasing() {
+        use crate::mutation::types::ComplexityEffect;
+        for seed in 0u64..200 {
+            let mut r = rng(seed);
+            if let Some(op) = InputRefOperator::random_non_increasing(&mut r) {
+                assert_ne!(
+                    op.complexity_effect(),
+                    ComplexityEffect::Increasing,
+                    "random_non_increasing returned Increasing operator {:?} at seed {}",
+                    op,
+                    seed
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn random_non_increasing_covers_neutral_and_decreasing() {
+        use crate::mutation::types::ComplexityEffect;
+        let mut saw_neutral = false;
+        let mut saw_decreasing = false;
+        for seed in 0u64..1000 {
+            let mut r = rng(seed);
+            if let Some(op) = InputRefOperator::random_non_increasing(&mut r) {
+                match op.complexity_effect() {
+                    ComplexityEffect::Neutral => saw_neutral = true,
+                    ComplexityEffect::Decreasing => saw_decreasing = true,
+                    ComplexityEffect::Increasing => unreachable!(),
+                }
+            }
+            if saw_neutral && saw_decreasing {
+                break;
+            }
+        }
+        assert!(saw_neutral, "must produce at least one neutral operator");
+        assert!(
+            saw_decreasing,
+            "must produce at least one decreasing operator"
+        );
     }
 }

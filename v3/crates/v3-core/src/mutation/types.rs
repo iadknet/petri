@@ -1,5 +1,21 @@
 use std::collections::HashMap;
 
+/// Whether a mutation operator increases, decreases, or preserves genome complexity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ComplexityEffect {
+    Increasing,
+    Decreasing,
+    Neutral,
+}
+
+impl ComplexityEffect {
+    /// Returns true if this effect is `Increasing`.
+    #[must_use]
+    pub const fn is_increasing(self) -> bool {
+        matches!(self, Self::Increasing)
+    }
+}
+
 /// The two architectural layers of genome mutation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum MutationLayer {
@@ -223,6 +239,64 @@ impl MutationOperator {
     }
 
     #[must_use]
+    pub const fn complexity_effect(self) -> ComplexityEffect {
+        match self {
+            // Topology: structural additions
+            Self::TopologyAddNode
+            | Self::TopologyCopyNode
+            | Self::TopologyCopyMeshBackwardSlice
+            | Self::TopologyCopyMeshForwardSlice
+            | Self::TopologySpliceNode
+            | Self::TopologyAddRouteTarget => ComplexityEffect::Increasing,
+            // Topology: structural removals
+            Self::TopologyRemoveNode | Self::TopologyRemoveRouteTarget => {
+                ComplexityEffect::Decreasing
+            }
+            // Topology: rewiring / neutral
+            Self::TopologyRetargetNodeTarget
+            | Self::TopologyChangeEntryNode
+            | Self::TopologySwapNodeBackend
+            | Self::TopologyRewriteNodeId
+            | Self::TopologySwapRouteTargets => ComplexityEffect::Neutral,
+            // VM: copy operators are increasing
+            Self::VmCopyInstructionBlock
+            | Self::VmCopyInstructionBlockRemapped
+            | Self::VmCopyConstantBlock
+            | Self::VmCopyGeneBackwardSlice
+            | Self::VmCopyGeneForwardSlice => ComplexityEffect::Increasing,
+            // VM: all others neutral (mutate existing content, no structural growth)
+            Self::VmConstantMutation
+            | Self::VmInstructionMutation
+            | Self::VmRegisterCountMutation
+            | Self::VmInstructionRawFieldMutation => ComplexityEffect::Neutral,
+            // Graph: structural additions
+            Self::GraphAddInternalGraphNode
+            | Self::GraphAddGraphEdge
+            | Self::GraphCopyInternalNode
+            | Self::GraphCopySubgraph
+            | Self::GraphCopyEdgeBundle
+            | Self::GraphEnableHebbian => ComplexityEffect::Increasing,
+            // Graph: structural removals
+            Self::GraphRemoveInternalGraphNode
+            | Self::GraphRemoveGraphEdge
+            | Self::GraphDisableHebbian => ComplexityEffect::Decreasing,
+            // Graph: rewiring / neutral
+            Self::GraphAlterGraphEdgeWeight
+            | Self::GraphSwapGraphOperator
+            | Self::GraphMutateGraphOperatorParam
+            | Self::GraphRetargetGraphEdge
+            | Self::GraphRawFieldMutation
+            | Self::GraphMutateHebbianRule
+            | Self::GraphMutateHebbianRate
+            | Self::GraphToggleHebbianLamarckian => ComplexityEffect::Neutral,
+            // InputRef: add / remove / neutral
+            Self::InputRefAdd => ComplexityEffect::Increasing,
+            Self::InputRefRemove => ComplexityEffect::Decreasing,
+            Self::InputRefSwap | Self::InputRefRawFieldMutation => ComplexityEffect::Neutral,
+        }
+    }
+
+    #[must_use]
     pub const fn all() -> [Self; 43] {
         [
             Self::TopologyAddNode,
@@ -376,6 +450,91 @@ mod tests {
     }
 
     #[test]
+    fn complexity_effect_covers_all_operators() {
+        for op in MutationOperator::all() {
+            let effect = op.complexity_effect();
+            assert!(
+                matches!(
+                    effect,
+                    ComplexityEffect::Increasing
+                        | ComplexityEffect::Decreasing
+                        | ComplexityEffect::Neutral
+                ),
+                "complexity_effect must return a valid effect for {:?}",
+                op
+            );
+        }
+    }
+
+    #[test]
+    fn complexity_effect_has_at_least_one_of_each_kind() {
+        let mut has_increasing = false;
+        let mut has_decreasing = false;
+        let mut has_neutral = false;
+        for op in MutationOperator::all() {
+            match op.complexity_effect() {
+                ComplexityEffect::Increasing => has_increasing = true,
+                ComplexityEffect::Decreasing => has_decreasing = true,
+                ComplexityEffect::Neutral => has_neutral = true,
+            }
+        }
+        assert!(has_increasing, "must have at least one Increasing operator");
+        assert!(has_decreasing, "must have at least one Decreasing operator");
+        assert!(has_neutral, "must have at least one Neutral operator");
+    }
+
+    #[test]
+    fn complexity_effect_known_classifications() {
+        // Spot-check known classifications
+        assert_eq!(
+            MutationOperator::TopologyAddNode.complexity_effect(),
+            ComplexityEffect::Increasing
+        );
+        assert_eq!(
+            MutationOperator::TopologyRemoveNode.complexity_effect(),
+            ComplexityEffect::Decreasing
+        );
+        assert_eq!(
+            MutationOperator::TopologyRetargetNodeTarget.complexity_effect(),
+            ComplexityEffect::Neutral
+        );
+        assert_eq!(
+            MutationOperator::InputRefAdd.complexity_effect(),
+            ComplexityEffect::Increasing
+        );
+        assert_eq!(
+            MutationOperator::InputRefRemove.complexity_effect(),
+            ComplexityEffect::Decreasing
+        );
+        // Copy operators are increasing
+        assert_eq!(
+            MutationOperator::TopologyCopyNode.complexity_effect(),
+            ComplexityEffect::Increasing
+        );
+        assert_eq!(
+            MutationOperator::VmCopyInstructionBlock.complexity_effect(),
+            ComplexityEffect::Increasing
+        );
+        assert_eq!(
+            MutationOperator::GraphCopySubgraph.complexity_effect(),
+            ComplexityEffect::Increasing
+        );
+        // Hebbian rule/rate mutations are neutral
+        assert_eq!(
+            MutationOperator::GraphMutateHebbianRule.complexity_effect(),
+            ComplexityEffect::Neutral
+        );
+        assert_eq!(
+            MutationOperator::GraphEnableHebbian.complexity_effect(),
+            ComplexityEffect::Increasing
+        );
+        assert_eq!(
+            MutationOperator::GraphDisableHebbian.complexity_effect(),
+            ComplexityEffect::Decreasing
+        );
+    }
+
+    #[test]
     fn operator_domain_mapping_is_consistent() {
         for operator in MutationOperator::all() {
             match operator {
@@ -431,6 +590,117 @@ mod tests {
                     assert_eq!(operator.domain(), MutationDomain::InputRef)
                 }
             }
+        }
+    }
+
+    #[test]
+    fn complexity_effect_cross_consistency_with_domain_operators() {
+        use crate::mutation::graph::GraphOperator;
+        use crate::mutation::input_ref::InputRefOperator;
+        use crate::mutation::topology::TopologyOperator;
+        use crate::mutation::vm::VmOperator;
+
+        for &top in &TopologyOperator::ALL {
+            let mo = match top {
+                TopologyOperator::AddNode => MutationOperator::TopologyAddNode,
+                TopologyOperator::RemoveNode => MutationOperator::TopologyRemoveNode,
+                TopologyOperator::RetargetNodeTarget => {
+                    MutationOperator::TopologyRetargetNodeTarget
+                }
+                TopologyOperator::AddRouteTarget => MutationOperator::TopologyAddRouteTarget,
+                TopologyOperator::RemoveRouteTarget => MutationOperator::TopologyRemoveRouteTarget,
+                TopologyOperator::ChangeEntryNode => MutationOperator::TopologyChangeEntryNode,
+                TopologyOperator::SwapNodeBackend => MutationOperator::TopologySwapNodeBackend,
+                TopologyOperator::RewriteNodeId => MutationOperator::TopologyRewriteNodeId,
+                TopologyOperator::CopyNode => MutationOperator::TopologyCopyNode,
+                TopologyOperator::CopyMeshBackwardSlice => {
+                    MutationOperator::TopologyCopyMeshBackwardSlice
+                }
+                TopologyOperator::CopyMeshForwardSlice => {
+                    MutationOperator::TopologyCopyMeshForwardSlice
+                }
+                TopologyOperator::SpliceNode => MutationOperator::TopologySpliceNode,
+                TopologyOperator::SwapRouteTargets => MutationOperator::TopologySwapRouteTargets,
+            };
+            assert_eq!(
+                mo.complexity_effect(),
+                top.complexity_effect(),
+                "MutationOperator and TopologyOperator disagree for {:?}",
+                top
+            );
+        }
+
+        for &vm in &VmOperator::ALL {
+            let mo = match vm {
+                VmOperator::VmConstantMutation => MutationOperator::VmConstantMutation,
+                VmOperator::VmInstructionMutation => MutationOperator::VmInstructionMutation,
+                VmOperator::VmRegisterCountMutation => MutationOperator::VmRegisterCountMutation,
+                VmOperator::VmInstructionRawFieldMutation => {
+                    MutationOperator::VmInstructionRawFieldMutation
+                }
+                VmOperator::VmCopyInstructionBlock => MutationOperator::VmCopyInstructionBlock,
+                VmOperator::VmCopyInstructionBlockRemapped => {
+                    MutationOperator::VmCopyInstructionBlockRemapped
+                }
+                VmOperator::VmCopyConstantBlock => MutationOperator::VmCopyConstantBlock,
+                VmOperator::VmCopyGeneBackwardSlice => MutationOperator::VmCopyGeneBackwardSlice,
+                VmOperator::VmCopyGeneForwardSlice => MutationOperator::VmCopyGeneForwardSlice,
+            };
+            assert_eq!(
+                mo.complexity_effect(),
+                vm.complexity_effect(),
+                "MutationOperator and VmOperator disagree for {:?}",
+                vm
+            );
+        }
+
+        for &graph in &GraphOperator::ALL {
+            let mo = match graph {
+                GraphOperator::AlterGraphEdgeWeight => MutationOperator::GraphAlterGraphEdgeWeight,
+                GraphOperator::SwapGraphOperator => MutationOperator::GraphSwapGraphOperator,
+                GraphOperator::MutateGraphOperatorParam => {
+                    MutationOperator::GraphMutateGraphOperatorParam
+                }
+                GraphOperator::AddInternalGraphNode => MutationOperator::GraphAddInternalGraphNode,
+                GraphOperator::RemoveInternalGraphNode => {
+                    MutationOperator::GraphRemoveInternalGraphNode
+                }
+                GraphOperator::AddGraphEdge => MutationOperator::GraphAddGraphEdge,
+                GraphOperator::RetargetGraphEdge => MutationOperator::GraphRetargetGraphEdge,
+                GraphOperator::RemoveGraphEdge => MutationOperator::GraphRemoveGraphEdge,
+                GraphOperator::GraphRawFieldMutation => MutationOperator::GraphRawFieldMutation,
+                GraphOperator::CopyInternalNode => MutationOperator::GraphCopyInternalNode,
+                GraphOperator::CopySubgraph => MutationOperator::GraphCopySubgraph,
+                GraphOperator::CopyEdgeBundle => MutationOperator::GraphCopyEdgeBundle,
+                GraphOperator::EnableHebbian => MutationOperator::GraphEnableHebbian,
+                GraphOperator::DisableHebbian => MutationOperator::GraphDisableHebbian,
+                GraphOperator::MutateHebbianRule => MutationOperator::GraphMutateHebbianRule,
+                GraphOperator::MutateHebbianRate => MutationOperator::GraphMutateHebbianRate,
+                GraphOperator::ToggleHebbianLamarckian => {
+                    MutationOperator::GraphToggleHebbianLamarckian
+                }
+            };
+            assert_eq!(
+                mo.complexity_effect(),
+                graph.complexity_effect(),
+                "MutationOperator and GraphOperator disagree for {:?}",
+                graph
+            );
+        }
+
+        for &ir in &InputRefOperator::ALL {
+            let mo = match ir {
+                InputRefOperator::Add => MutationOperator::InputRefAdd,
+                InputRefOperator::Remove => MutationOperator::InputRefRemove,
+                InputRefOperator::Swap => MutationOperator::InputRefSwap,
+                InputRefOperator::RawFieldMutation => MutationOperator::InputRefRawFieldMutation,
+            };
+            assert_eq!(
+                mo.complexity_effect(),
+                ir.complexity_effect(),
+                "MutationOperator and InputRefOperator disagree for {:?}",
+                ir
+            );
         }
     }
 

@@ -43,3 +43,63 @@ fn graph_only_genome(internal_nodes: Vec<GraphInternalNode>) -> CreatureGenome {
         }],
     }
 }
+
+#[test]
+fn complexity_effect_consistent_with_types() {
+    use crate::mutation::types::ComplexityEffect;
+    for &op in &GraphOperator::ALL {
+        let effect = op.complexity_effect();
+        assert!(
+            matches!(
+                effect,
+                ComplexityEffect::Increasing
+                    | ComplexityEffect::Decreasing
+                    | ComplexityEffect::Neutral
+            ),
+            "complexity_effect must return valid effect for {:?}",
+            op
+        );
+    }
+}
+
+#[test]
+fn random_non_increasing_never_returns_increasing() {
+    use crate::mutation::types::ComplexityEffect;
+    for seed in 0u64..200 {
+        let mut r = rng(seed);
+        if let Some(op) = GraphOperator::random_non_increasing(&mut r) {
+            assert_ne!(
+                op.complexity_effect(),
+                ComplexityEffect::Increasing,
+                "random_non_increasing returned Increasing operator {:?} at seed {}",
+                op,
+                seed
+            );
+        }
+    }
+}
+
+#[test]
+fn random_non_increasing_covers_neutral_and_decreasing() {
+    use crate::mutation::types::ComplexityEffect;
+    let mut saw_neutral = false;
+    let mut saw_decreasing = false;
+    for seed in 0u64..1000 {
+        let mut r = rng(seed);
+        if let Some(op) = GraphOperator::random_non_increasing(&mut r) {
+            match op.complexity_effect() {
+                ComplexityEffect::Neutral => saw_neutral = true,
+                ComplexityEffect::Decreasing => saw_decreasing = true,
+                ComplexityEffect::Increasing => unreachable!(),
+            }
+        }
+        if saw_neutral && saw_decreasing {
+            break;
+        }
+    }
+    assert!(saw_neutral, "must produce at least one neutral operator");
+    assert!(
+        saw_decreasing,
+        "must produce at least one decreasing operator"
+    );
+}
