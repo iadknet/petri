@@ -14,6 +14,8 @@ pub enum WorldAction {
         direction: Direction,
         energy_transfer: f32,
     },
+    /// Attempt to steal energy from a neighbor in the given direction.
+    StealEnergy { direction: Direction, amount: f32 },
 }
 
 impl WorldAction {
@@ -40,6 +42,11 @@ mod tests {
             energy_transfer: 5.0
         }
         .is_noop());
+        assert!(!WorldAction::StealEnergy {
+            direction: Direction::E,
+            amount: 10.0
+        }
+        .is_noop());
     }
 
     #[test]
@@ -61,6 +68,20 @@ mod tests {
     }
 
     #[test]
+    fn steal_energy_fields_accessible() {
+        let action = WorldAction::StealEnergy {
+            direction: Direction::NW,
+            amount: 7.5,
+        };
+        if let WorldAction::StealEnergy { direction, amount } = action {
+            assert_eq!(direction, Direction::NW);
+            assert!((amount - 7.5).abs() < f32::EPSILON);
+        } else {
+            panic!("expected StealEnergy variant");
+        }
+    }
+
+    #[test]
     fn world_action_serde_roundtrip() {
         let actions = vec![
             WorldAction::NoOp,
@@ -69,6 +90,10 @@ mod tests {
             WorldAction::Reproduce {
                 direction: Direction::NE,
                 energy_transfer: 15.5,
+            },
+            WorldAction::StealEnergy {
+                direction: Direction::S,
+                amount: 8.0,
             },
         ];
         for action in actions {

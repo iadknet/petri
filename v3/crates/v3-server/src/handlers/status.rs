@@ -25,10 +25,20 @@ pub async fn get_status(State(app): State<AppState>) -> impl IntoResponse {
             "eat": stats.last_tick_eat,
             "reproduce": stats.last_tick_reproduce,
             "noop": stats.last_tick_noop,
+            "steal": stats.last_tick_steal,
         },
         "reproduction_actions_attempted_total": stats.reproduction_actions_attempted_total,
         "reproduction_actions_spawned_total": stats.reproduction_actions_spawned_total,
         "reproduction_actions_rejected_total": stats.reproduction_actions_rejected_total,
+        "predation_actions_attempted_total": stats.predation_actions_attempted_total,
+        "predation_actions_transferred_total": stats.predation_actions_transferred_total,
+        "predation_actions_rejected_total": stats.predation_actions_rejected_total,
+        "predation_kills_total": stats.predation_kills_total,
+        "predation_actions_by_result": stats
+            .predation_actions_by_result
+            .iter()
+            .map(|(result, count)| (result.as_key().to_string(), *count))
+            .collect::<std::collections::HashMap<_, _>>(),
         "mutation_events_attempted_total": stats.mutation_events_attempted_total,
         "mutation_events_applied_total": stats.mutation_events_applied_total,
         "mutation_events_skipped_total": stats.mutation_events_skipped_total,

@@ -193,10 +193,15 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             eat: stats.last_tick_eat,
             reproduce: stats.last_tick_reproduce,
             noop: stats.last_tick_noop,
+            steal: stats.last_tick_steal,
         },
         reproduction_actions_attempted_total: stats.reproduction_actions_attempted_total,
         reproduction_actions_spawned_total: stats.reproduction_actions_spawned_total,
         reproduction_actions_rejected_total: stats.reproduction_actions_rejected_total,
+        predation_actions_attempted_total: stats.predation_actions_attempted_total,
+        predation_actions_transferred_total: stats.predation_actions_transferred_total,
+        predation_actions_rejected_total: stats.predation_actions_rejected_total,
+        predation_kills_total: stats.predation_kills_total,
         last_tick_compute_total_mean: stats.last_tick_compute_total_mean,
         last_tick_compute_total_min: stats.last_tick_compute_total_min,
         last_tick_compute_total_max: stats.last_tick_compute_total_max,
@@ -297,6 +302,15 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             .mutation_events_skipped_by_reason
             .iter()
             .map(|(reason, count)| (reason.as_key().to_string(), *count))
+            .collect(),
+        predation_actions_attempted_total: stats.predation_actions_attempted_total,
+        predation_actions_transferred_total: stats.predation_actions_transferred_total,
+        predation_actions_rejected_total: stats.predation_actions_rejected_total,
+        predation_kills_total: stats.predation_kills_total,
+        predation_actions_by_result: stats
+            .predation_actions_by_result
+            .iter()
+            .map(|(result, count)| (result.as_key().to_string(), *count))
             .collect(),
         genome_complexity_mean: complexity_mean,
         genome_complexity_min: complexity_min,

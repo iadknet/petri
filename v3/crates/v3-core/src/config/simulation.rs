@@ -211,6 +211,25 @@ impl Default for MutationConfig {
     }
 }
 
+/// Predation config for the StealEnergy action.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PredationConfig {
+    /// Fraction of attempted steal amount paid as attacker cost.
+    pub steal_cost_rate: f32,
+    /// Energy bonus per unit of victim genome complexity on kill.
+    pub kill_complexity_bonus_multiplier: f32,
+}
+
+impl Default for PredationConfig {
+    fn default() -> Self {
+        Self {
+            steal_cost_rate: 0.2,
+            kill_complexity_bonus_multiplier: 0.05,
+        }
+    }
+}
+
 /// Population caps. Canonical owner: v3-runtime-config-spec.md Section 5.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -240,6 +259,8 @@ pub struct SimulationConfig {
     pub runtime: RuntimeConfig,
     pub mutation: MutationConfig,
     pub population: PopulationConfig,
+    #[serde(default)]
+    pub predation: PredationConfig,
 }
 
 impl SimulationConfig {
@@ -320,6 +341,11 @@ impl SimulationConfig {
         }
         ph.channel_change_chance = ph.channel_change_chance.clamp(0.0, 1.0);
         ph.polarity_flip_chance = ph.polarity_flip_chance.clamp(0.0, 1.0);
+
+        let pred = &mut self.predation;
+        pred.steal_cost_rate = normalize_f32_clamp(pred.steal_cost_rate, 0.0, 1.0, 0.2);
+        pred.kill_complexity_bonus_multiplier =
+            normalize_f32_finite_nonneg(pred.kill_complexity_bonus_multiplier, 0.05);
 
         let p = &mut self.population;
         if p.initial_creatures < 1 {
@@ -422,6 +448,9 @@ mod tests {
         assert_eq!(cfg.mutation.phenotype.channel_step, 1);
         assert!((cfg.mutation.phenotype.channel_change_chance - 0.001).abs() < 1e-6);
         assert!((cfg.mutation.phenotype.polarity_flip_chance - 0.0002).abs() < 1e-6);
+        // Predation
+        assert!((cfg.predation.steal_cost_rate - 0.2).abs() < 1e-6);
+        assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.05).abs() < 1e-6);
         // Population
         assert_eq!(cfg.population.initial_creatures, 2000);
         assert_eq!(cfg.population.max_creatures, 100000);
@@ -562,11 +591,76 @@ mod tests {
         assert!(
             (cfg.mutation.mutation_probability - cfg2.mutation.mutation_probability).abs() < 1e-12
         );
+        assert!((cfg.predation.steal_cost_rate - cfg2.predation.steal_cost_rate).abs() < 1e-6);
     }
 
     #[test]
     fn deny_unknown_fields_rejects_extra_key() {
         let result = serde_json::from_str::<SimulationConfig>(r#"{"unknown_key": 1}"#);
         assert!(result.is_err(), "unknown key must be rejected");
+    }
+
+    // ── PredationConfig tests ──────────────────────────────────────────────
+
+    #[test]
+    fn predation_config_default_values() {
+        let cfg = PredationConfig::default();
+        assert!((cfg.steal_cost_rate - 0.2).abs() < 1e-6);
+        assert!((cfg.kill_complexity_bonus_multiplier - 0.05).abs() < 1e-6);
+    }
+
+    #[test]
+    fn simulation_config_has_predation_field() {
+        let cfg = SimulationConfig::default();
+        assert!((cfg.predation.steal_cost_rate - 0.2).abs() < 1e-6);
+        assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.05).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_predation_steal_cost_rate_clamped_above_one() {
+        let mut cfg = SimulationConfig::default();
+        cfg.predation.steal_cost_rate = 1.5;
+        cfg.normalize();
+        assert!((cfg.predation.steal_cost_rate - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_predation_steal_cost_rate_clamped_negative() {
+        let mut cfg = SimulationConfig::default();
+        cfg.predation.steal_cost_rate = -0.5;
+        cfg.normalize();
+        assert!((cfg.predation.steal_cost_rate - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_predation_steal_cost_rate_nan_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.predation.steal_cost_rate = f32::NAN;
+        cfg.normalize();
+        assert!((cfg.predation.steal_cost_rate - 0.2).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_predation_kill_bonus_negative_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.predation.kill_complexity_bonus_multiplier = -1.0;
+        cfg.normalize();
+        assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.05).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_predation_kill_bonus_nan_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.predation.kill_complexity_bonus_multiplier = f32::NAN;
+        cfg.normalize();
+        assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.05).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_predation_kill_bonus_infinity_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.predation.kill_complexity_bonus_multiplier = f32::INFINITY;
+        cfg.normalize();
+        assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.05).abs() < 1e-6);
     }
 }

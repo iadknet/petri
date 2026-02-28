@@ -14,6 +14,10 @@ pub fn decode_world_action(action_type: u8, meta: &[f32; 8]) -> WorldAction {
             direction: decode_direction(meta[0]),
             energy_transfer: clamp_non_negative_finite(meta[1]),
         },
+        4 => WorldAction::StealEnergy {
+            direction: decode_direction(meta[0]),
+            amount: clamp_non_negative_finite(meta[1]),
+        },
         _ => WorldAction::NoOp,
     }
 }
@@ -89,8 +93,55 @@ mod tests {
     }
 
     #[test]
+    fn action_type_4_is_steal_energy() {
+        let mut meta = zero_meta();
+        meta[0] = 4.0; // S = index 4
+        meta[1] = 12.0;
+        let action = decode_world_action(4, &meta);
+        if let WorldAction::StealEnergy { direction, amount } = action {
+            assert_eq!(direction, Direction::S);
+            assert!((amount - 12.0).abs() < 1e-6);
+        } else {
+            panic!("expected StealEnergy, got {action:?}");
+        }
+    }
+
+    #[test]
+    fn steal_energy_negative_amount_becomes_zero() {
+        let mut meta = zero_meta();
+        meta[1] = -5.0;
+        if let WorldAction::StealEnergy { amount, .. } = decode_world_action(4, &meta) {
+            assert_eq!(amount, 0.0);
+        } else {
+            panic!("expected StealEnergy");
+        }
+    }
+
+    #[test]
+    fn steal_energy_nan_amount_becomes_zero() {
+        let mut meta = zero_meta();
+        meta[1] = f32::NAN;
+        if let WorldAction::StealEnergy { amount, .. } = decode_world_action(4, &meta) {
+            assert_eq!(amount, 0.0);
+        } else {
+            panic!("expected StealEnergy");
+        }
+    }
+
+    #[test]
+    fn steal_energy_inf_amount_becomes_zero() {
+        let mut meta = zero_meta();
+        meta[1] = f32::INFINITY;
+        if let WorldAction::StealEnergy { amount, .. } = decode_world_action(4, &meta) {
+            assert_eq!(amount, 0.0);
+        } else {
+            panic!("expected StealEnergy");
+        }
+    }
+
+    #[test]
     fn unknown_action_type_is_noop() {
-        assert_eq!(decode_world_action(4, &zero_meta()), WorldAction::NoOp);
+        assert_eq!(decode_world_action(5, &zero_meta()), WorldAction::NoOp);
         assert_eq!(decode_world_action(255, &zero_meta()), WorldAction::NoOp);
     }
 

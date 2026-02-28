@@ -1,5 +1,7 @@
+mod predation;
 mod reproduction;
 
+pub use predation::{apply_steal_energy, PredationActionResult};
 pub use reproduction::{apply_reproduce, ReproductionActionResult};
 
 use crate::config::SimulationConfig;
