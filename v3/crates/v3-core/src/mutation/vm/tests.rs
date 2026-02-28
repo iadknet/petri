@@ -846,3 +846,56 @@ fn vm_operator_weights_are_positive() {
         assert!(op.weight() > 0, "weight must be positive for {:?}", op);
     }
 }
+
+#[test]
+fn complexity_effect_consistent_with_types() {
+    use crate::mutation::types::ComplexityEffect;
+    for &op in &VmOperator::ALL {
+        let effect = op.complexity_effect();
+        assert!(
+            matches!(
+                effect,
+                ComplexityEffect::Increasing
+                    | ComplexityEffect::Decreasing
+                    | ComplexityEffect::Neutral
+            ),
+            "complexity_effect must return valid effect for {:?}",
+            op
+        );
+    }
+}
+
+#[test]
+fn random_non_increasing_never_returns_increasing() {
+    use crate::mutation::types::ComplexityEffect;
+    for seed in 0u64..200 {
+        let mut r = rng(seed);
+        if let Some(op) = VmOperator::random_non_increasing(&mut r) {
+            assert_ne!(
+                op.complexity_effect(),
+                ComplexityEffect::Increasing,
+                "random_non_increasing returned Increasing operator {:?} at seed {}",
+                op,
+                seed
+            );
+        }
+    }
+}
+
+#[test]
+fn random_non_increasing_only_returns_neutral_for_vm() {
+    // VM has no Decreasing operators, so all non-increasing should be Neutral.
+    use crate::mutation::types::ComplexityEffect;
+    for seed in 0u64..200 {
+        let mut r = rng(seed);
+        if let Some(op) = VmOperator::random_non_increasing(&mut r) {
+            assert_eq!(
+                op.complexity_effect(),
+                ComplexityEffect::Neutral,
+                "VM non-increasing must be neutral, got {:?} at seed {}",
+                op,
+                seed
+            );
+        }
+    }
+}
