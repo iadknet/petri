@@ -6,6 +6,7 @@
 
 use crate::contracts::{InputReference, NodeId, WorldAction};
 use crate::creature::genome::{GraphNodeKind, VmInstruction};
+use crate::sensors::perception::PerceptionSnapshot;
 use crate::sensors::static_inputs::StaticInputs;
 use serde::Serialize;
 
@@ -25,6 +26,9 @@ pub struct TickTrace {
     pub energy_before: f32,
     pub energy_after: f32,
     pub static_inputs: StaticInputsSnapshot,
+    /// Optional extended perception debug snapshot.
+    /// `null` when the sample request did not set `include_perception_debug = true`.
+    pub debug_perception: Option<PerceptionDebugSnapshot>,
     pub hops: Vec<MeshHopTrace>,
     pub final_actions: Vec<WorldAction>,
     pub termination_reason: TerminationReason,
@@ -67,6 +71,35 @@ impl From<&StaticInputs> for StaticInputsSnapshot {
             neighbor_occupied: si.neighbor_occupied,
             generation: si.generation,
             age_ticks: si.age_ticks,
+        }
+    }
+}
+
+// ─── Perception debug snapshot ───────────────────────────────────────────────
+
+/// Serializable mirror of [`PerceptionSnapshot`] for trace debug output.
+///
+/// Per v3-server-api-protocol-spec.md Section 4.9: only included when
+/// `include_perception_debug = true` in the sample request.
+#[derive(Debug, Clone, Serialize)]
+pub struct PerceptionDebugSnapshot {
+    pub area_food: [f32; 7],
+    pub area_barrier: [f32; 7],
+    pub area_occupancy: [f32; 7],
+    pub nearby_core: [f32; 16],
+    pub nearby_vitals: [f32; 8],
+    pub nearby_identity: [f32; 12],
+}
+
+impl From<&PerceptionSnapshot> for PerceptionDebugSnapshot {
+    fn from(p: &PerceptionSnapshot) -> Self {
+        Self {
+            area_food: p.area_food,
+            area_barrier: p.area_barrier,
+            area_occupancy: p.area_occupancy,
+            nearby_core: p.nearby_core,
+            nearby_vitals: p.nearby_vitals,
+            nearby_identity: p.nearby_identity,
         }
     }
 }
@@ -231,6 +264,8 @@ pub struct ActiveTrace {
     pub creature_id: CreatureId,
     pub ticks_remaining: u32,
     pub ticks: Vec<TickTrace>,
+    /// Whether to capture extended perception debug snapshots per tick.
+    pub include_perception_debug: bool,
 }
 
 impl ActiveTrace {
@@ -240,6 +275,7 @@ impl ActiveTrace {
             creature_id,
             ticks_remaining: num_ticks,
             ticks: Vec::with_capacity(num_ticks as usize),
+            include_perception_debug: false,
         }
     }
 
@@ -345,6 +381,29 @@ mod tests {
         assert_eq!(kind_label(&GraphNodeKind::AdaptiveGain), "AdaptiveGain");
         assert_eq!(kind_label(&GraphNodeKind::CustomOutput(0)), "CustomOutput");
         assert_eq!(kind_label(&GraphNodeKind::RouterOutput), "RouterOutput");
+    }
+
+    #[test]
+    fn perception_debug_snapshot_from_perception_snapshot() {
+        let mut p = PerceptionSnapshot::zero();
+        p.area_food[0] = 0.5;
+        p.nearby_core[3] = 0.8;
+        p.nearby_identity[11] = 0.9;
+        let debug = PerceptionDebugSnapshot::from(&p);
+        assert!((debug.area_food[0] - 0.5).abs() < f32::EPSILON);
+        assert_eq!(debug.area_barrier, [0.0; 7]);
+        assert_eq!(debug.area_occupancy, [0.0; 7]);
+        assert!((debug.nearby_core[3] - 0.8).abs() < f32::EPSILON);
+        assert_eq!(debug.nearby_vitals, [0.0; 8]);
+        assert!((debug.nearby_identity[11] - 0.9).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn active_trace_defaults_perception_debug_off() {
+        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
+        let id = sm.insert(());
+        let trace = ActiveTrace::new(id, 3);
+        assert!(!trace.include_perception_debug);
     }
 
     #[test]
