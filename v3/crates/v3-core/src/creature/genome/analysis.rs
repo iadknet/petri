@@ -62,6 +62,7 @@ pub fn vm_register_write(instr: &VmInstruction) -> Option<u8> {
         | VmInstruction::PopAction
         | VmInstruction::ExecuteActionQueue
         | VmInstruction::WriteRouteTarget { .. }
+        | VmInstruction::SetPriorityBid { .. }
         | VmInstruction::StoreMem8 { .. }
         | VmInstruction::StoreMem8Imm { .. } => None,
     }
@@ -116,7 +117,8 @@ pub fn vm_register_read_mask(instr: &VmInstruction) -> u32 {
         VmInstruction::JumpIfZero { cond, .. } => vm_reg_bit(*cond),
         VmInstruction::WriteInternalPayload { src, .. }
         | VmInstruction::WriteWorldActionMeta { src, .. }
-        | VmInstruction::WriteRouteTarget { src } => vm_reg_bit(*src),
+        | VmInstruction::WriteRouteTarget { src }
+        | VmInstruction::SetPriorityBid { src } => vm_reg_bit(*src),
         VmInstruction::StoreMem8Imm { src, .. } => vm_reg_bit(*src),
         VmInstruction::LoadMem8 { addr_reg, .. } => vm_reg_bit(*addr_reg),
         VmInstruction::StoreMem8 { addr_reg, src } => vm_reg_bit(*addr_reg) | vm_reg_bit(*src),
@@ -135,6 +137,7 @@ pub fn vm_is_output_instruction(instr: &VmInstruction) -> bool {
             | VmInstruction::PopAction
             | VmInstruction::ExecuteActionQueue
             | VmInstruction::WriteRouteTarget { .. }
+            | VmInstruction::SetPriorityBid { .. }
             | VmInstruction::StoreMem8 { .. }
             | VmInstruction::StoreMem8Imm { .. }
     )

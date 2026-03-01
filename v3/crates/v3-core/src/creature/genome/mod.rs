@@ -2,7 +2,7 @@ pub mod analysis;
 
 use crate::contracts::{InputReference, NodeId};
 
-/// A single VM instruction. 38 opcodes per v3-vm-isa-spec.md.
+/// A single VM instruction. 39 opcodes per v3-vm-isa-spec.md.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum VmInstruction {
     // ── Arithmetic and Data Movement ─────────────────────────────────────────
@@ -86,6 +86,10 @@ pub enum VmInstruction {
         param_slot: u8,
         dst: u8,
     },
+    /// Set the creature's priority bid for turn-order execution.
+    /// Reads `regs[src]`, clamps to non-negative, deducts from energy.
+    /// Last-write-wins if called multiple times.
+    SetPriorityBid { src: u8 },
     /// Terminal: return accumulated action queue for execution.
     ExecuteActionQueue,
 
@@ -309,7 +313,7 @@ mod tests {
     use crate::contracts::{DynamicIntrospectionKey, StaticIntrospectionKey, WorldInputKey};
 
     #[test]
-    fn vm_instruction_all_38_variants_constructible() {
+    fn vm_instruction_all_39_variants_constructible() {
         let instructions: Vec<VmInstruction> = vec![
             VmInstruction::Noop,
             VmInstruction::LoadConst {
@@ -368,6 +372,7 @@ mod tests {
                 param_slot: 0,
                 dst: 0,
             },
+            VmInstruction::SetPriorityBid { src: 0 },
             VmInstruction::ExecuteActionQueue,
             VmInstruction::Halt,
             VmInstruction::LoadMem8 {
@@ -387,7 +392,7 @@ mod tests {
                 src: 1,
             },
         ];
-        assert_eq!(instructions.len(), 38, "must have exactly 38 opcodes");
+        assert_eq!(instructions.len(), 39, "must have exactly 39 opcodes");
     }
 
     #[test]

@@ -6,13 +6,13 @@
 //! here and verify with equivalence tests.
 
 use crate::config::RuntimeConfig;
-use crate::contracts::{ActionQueue, NodeId, WorldAction};
+use crate::contracts::{NodeId, WorldAction};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::trace::{BackendTrace, MeshHopTrace, TerminationReason};
 use crate::runtime::traced_graph::execute_graph_node_traced;
 use crate::runtime::traced_vm::execute_vm_node_traced;
-use crate::runtime::types::ComputeCostReport;
+use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs};
 use crate::sensors::static_inputs::StaticInputs;
 
 /// Execute the creature's mesh chain with trace recording.
@@ -27,12 +27,7 @@ pub fn execute_creature_mesh_traced(
     memory: &mut [u8; 1024],
     graph_runtime: &mut GraphRuntimeState,
     config: &RuntimeConfig,
-) -> (
-    Vec<WorldAction>,
-    ComputeCostReport,
-    Vec<MeshHopTrace>,
-    TerminationReason,
-) {
+) -> (MeshOutput, Vec<MeshHopTrace>, TerminationReason) {
     let mut current_node_id = genome.entry_node_id;
     let mut upstream_slots = [0.0f32; 12];
     let mut hops: usize = 0;
@@ -40,13 +35,22 @@ pub fn execute_creature_mesh_traced(
     let start_energy = *energy;
     let mut report = ComputeCostReport::default();
 
-    let mut action_queue = ActionQueue::new(config.max_actions_per_turn);
+    let mut side_outputs = MeshSideOutputs::new(config.max_actions_per_turn);
     let mut hop_traces: Vec<MeshHopTrace> = Vec::with_capacity(max_hops);
+
+    macro_rules! mesh_output {
+        ($actions:expr) => {
+            MeshOutput {
+                actions: $actions,
+                cost_report: report,
+                priority_bid: side_outputs.priority_bid,
+            }
+        };
+    }
 
     if find_node_index(&genome.nodes, current_node_id).is_none() {
         return (
-            vec![WorldAction::NoOp],
-            report,
+            mesh_output!(vec![WorldAction::NoOp]),
             hop_traces,
             TerminationReason::MissingNode,
         );
@@ -55,8 +59,7 @@ pub fn execute_creature_mesh_traced(
     loop {
         if hops >= max_hops {
             return (
-                action_queue.into_actions_or_noop(),
-                report,
+                mesh_output!(side_outputs.action_queue.into_actions_or_noop()),
                 hop_traces,
                 TerminationReason::MaxHopsReached,
             );
@@ -79,7 +82,7 @@ pub fn execute_creature_mesh_traced(
                     memory,
                     static_inputs,
                     config,
-                    &mut action_queue,
+                    &mut side_outputs,
                 );
                 (result, BackendTrace::Vm(vm_trace))
             }
@@ -94,7 +97,7 @@ pub fn execute_creature_mesh_traced(
                     graph_runtime,
                     static_inputs,
                     config,
-                    &action_queue,
+                    &side_outputs.action_queue,
                 );
                 (result, BackendTrace::Graph(graph_trace))
             }
@@ -120,8 +123,7 @@ pub fn execute_creature_mesh_traced(
 
         if result.energy_exhausted {
             return (
-                vec![WorldAction::NoOp],
-                report,
+                mesh_output!(vec![WorldAction::NoOp]),
                 hop_traces,
                 TerminationReason::EnergyExhausted,
             );
@@ -129,8 +131,7 @@ pub fn execute_creature_mesh_traced(
 
         if result.terminal {
             return (
-                action_queue.into_actions_or_noop(),
-                report,
+                mesh_output!(side_outputs.action_queue.into_actions_or_noop()),
                 hop_traces,
                 TerminationReason::ActionEmitted,
             );
@@ -138,8 +139,7 @@ pub fn execute_creature_mesh_traced(
 
         if node.targets.is_empty() {
             return (
-                action_queue.into_actions_or_noop(),
-                report,
+                mesh_output!(side_outputs.action_queue.into_actions_or_noop()),
                 hop_traces,
                 TerminationReason::NoTargets,
             );
@@ -163,8 +163,7 @@ pub fn execute_creature_mesh_traced(
 
         if find_node_index(&genome.nodes, target_id).is_none() {
             return (
-                action_queue.into_actions_or_noop(),
-                report,
+                mesh_output!(side_outputs.action_queue.into_actions_or_noop()),
                 hop_traces,
                 TerminationReason::MissingNode,
             );
@@ -271,7 +270,7 @@ mod tests {
         let mut energy_a = 100.0f32;
         let mut memory_a = [0u8; 1024];
         let mut gr_a = GraphRuntimeState::new();
-        let (action_a, report_a) = execute_creature_mesh(
+        let output_a = execute_creature_mesh(
             &genome,
             &si,
             &mut energy_a,
@@ -284,7 +283,7 @@ mod tests {
         let mut energy_b = 100.0f32;
         let mut memory_b = [0u8; 1024];
         let mut gr_b = GraphRuntimeState::new();
-        let (action_b, report_b, hops, reason) = execute_creature_mesh_traced(
+        let (output_b, hops, reason) = execute_creature_mesh_traced(
             &genome,
             &si,
             &mut energy_b,
@@ -293,14 +292,14 @@ mod tests {
             &config,
         );
 
-        assert_eq!(action_a, action_b);
-        assert_eq!(action_b, vec![WorldAction::Eat]);
+        assert_eq!(output_a.actions, output_b.actions);
+        assert_eq!(output_b.actions, vec![WorldAction::Eat]);
         assert!(
             (energy_a - energy_b).abs() < 1e-6,
             "energy: {energy_a} vs {energy_b}"
         );
-        assert!((report_a.vm_cost - report_b.vm_cost).abs() < 1e-6);
-        assert!((report_a.graph_cost - report_b.graph_cost).abs() < 1e-6);
+        assert!((output_a.cost_report.vm_cost - output_b.cost_report.vm_cost).abs() < 1e-6);
+        assert!((output_a.cost_report.graph_cost - output_b.cost_report.graph_cost).abs() < 1e-6);
 
         // 2 hops: Graph(hop 0) → VM(hop 1)
         assert_eq!(hops.len(), 2);
@@ -376,10 +375,10 @@ mod tests {
         let mut memory = [0u8; 1024];
         let mut gr = GraphRuntimeState::new();
 
-        let (action, _, hops, _) =
+        let (output, hops, _) =
             execute_creature_mesh_traced(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
 
-        assert_eq!(action, vec![WorldAction::Eat]);
+        assert_eq!(output.actions, vec![WorldAction::Eat]);
         // Hop 1 (VM) should have upstream_slots[5] = 9.0
         assert!((hops[1].upstream_slots[5] - 9.0).abs() < 1e-5);
     }
@@ -409,15 +408,89 @@ mod tests {
         let mut memory = [0u8; 1024];
         let mut gr = GraphRuntimeState::new();
 
-        let (action, _, hops, reason) =
+        let (output, hops, reason) =
             execute_creature_mesh_traced(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
 
-        assert_eq!(action, vec![WorldAction::NoOp]);
+        assert_eq!(output.actions, vec![WorldAction::NoOp]);
         assert!(
             matches!(reason, TerminationReason::EnergyExhausted),
             "expected EnergyExhausted, got {:?}",
             reason
         );
         assert_eq!(hops.len(), 1);
+    }
+
+    /// Traced and non-traced paths produce identical MeshOutput when priority bid is used.
+    #[test]
+    fn traced_and_untraced_priority_bid_equivalence() {
+        use crate::runtime::mesh::execute_creature_mesh;
+
+        let id0 = NodeId::new(0);
+        // Genome that loads 3.0, sets priority bid, then emits Eat.
+        let genome = CreatureGenome {
+            entry_node_id: id0,
+            nodes: vec![NodeGenome {
+                node_id: id0,
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![3.0],
+                    program: vec![
+                        VmInstruction::LoadConst {
+                            dst: 0,
+                            const_idx: 0,
+                        },
+                        VmInstruction::SetPriorityBid { src: 0 },
+                        VmInstruction::PushAction { action_type: 1 },
+                        VmInstruction::ExecuteActionQueue,
+                    ],
+                }),
+                targets: vec![],
+            }],
+        };
+
+        let si = empty_si();
+        let config = default_config();
+
+        // Run non-traced path.
+        let mut energy_a = 100.0f32;
+        let mut mem_a = [0u8; 1024];
+        let mut gr_a = GraphRuntimeState::new();
+        let output_a =
+            execute_creature_mesh(&genome, &si, &mut energy_a, &mut mem_a, &mut gr_a, &config);
+
+        // Run traced path.
+        let mut energy_b = 100.0f32;
+        let mut mem_b = [0u8; 1024];
+        let mut gr_b = GraphRuntimeState::new();
+        let (output_b, _, _) = execute_creature_mesh_traced(
+            &genome,
+            &si,
+            &mut energy_b,
+            &mut mem_b,
+            &mut gr_b,
+            &config,
+        );
+
+        // Assert full MeshOutput equivalence.
+        assert_eq!(output_a.actions, output_b.actions, "actions must match");
+        assert!(
+            (output_a.cost_report.vm_cost - output_b.cost_report.vm_cost).abs() < 1e-6,
+            "VM cost must match: {} vs {}",
+            output_a.cost_report.vm_cost,
+            output_b.cost_report.vm_cost
+        );
+        assert_eq!(
+            output_a.priority_bid, output_b.priority_bid,
+            "priority_bid must match: {} vs {}",
+            output_a.priority_bid, output_b.priority_bid
+        );
+        assert_eq!(output_a.priority_bid, 3.0, "bid should be 3.0");
+        assert!(
+            (energy_a - energy_b).abs() < 1e-6,
+            "final energy must match: {} vs {}",
+            energy_a,
+            energy_b
+        );
     }
 }

@@ -15,7 +15,7 @@ fn emit_noop_action_type_0() {
         zeroed_upstream(),
         100.0,
     );
-    let actions = aq.into_actions();
+    let actions = aq.action_queue.into_actions();
     assert_eq!(actions.len(), 1);
     assert_eq!(actions[0], crate::contracts::WorldAction::NoOp);
 }
@@ -33,7 +33,7 @@ fn emit_eat_action_type_1() {
         zeroed_upstream(),
         100.0,
     );
-    let actions = aq.into_actions();
+    let actions = aq.action_queue.into_actions();
     assert_eq!(actions.len(), 1);
     assert_eq!(actions[0], crate::contracts::WorldAction::Eat);
 }
@@ -51,7 +51,7 @@ fn emit_unknown_action_type_255_defaults_to_noop() {
         zeroed_upstream(),
         100.0,
     );
-    let actions = aq.into_actions();
+    let actions = aq.action_queue.into_actions();
     assert_eq!(actions.len(), 1);
     assert_eq!(actions[0], crate::contracts::WorldAction::NoOp);
 }
@@ -72,7 +72,7 @@ fn emit_move_with_meta() {
         VmInstruction::ExecuteActionQueue,
     ];
     let (_r, _, aq) = run_vm(program, 1, vec![2.0], &[], zeroed_upstream(), 100.0);
-    let actions = aq.into_actions();
+    let actions = aq.action_queue.into_actions();
     assert_eq!(actions.len(), 1);
     assert_eq!(
         actions[0],
@@ -109,7 +109,7 @@ fn read_input_upstream_slot() {
     let mut e = 100.0;
     let mut mem = [0u8; 1024];
     let cfg = config();
-    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
+    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
         &input_refs,
@@ -119,7 +119,7 @@ fn read_input_upstream_slot() {
         &mut mem,
         &si,
         &cfg,
-        &mut action_queue,
+        &mut side_outputs,
     );
     assert!((r.output_slots[0] - 42.0).abs() < 1e-6);
 }
@@ -238,7 +238,7 @@ fn store_and_load_mem8() {
     let mut e = 100.0;
     let mut mem = [0u8; 1024];
     let cfg = config();
-    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
+    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
         &[],
@@ -248,7 +248,7 @@ fn store_and_load_mem8() {
         &mut mem,
         &si,
         &cfg,
-        &mut action_queue,
+        &mut side_outputs,
     );
     assert!((r.output_slots[0] - 42.0).abs() < 1e-6);
     assert_eq!(mem[42], 42); // memory committed
@@ -283,7 +283,7 @@ fn store_and_load_mem8_imm() {
     let mut e = 100.0;
     let mut mem = [0u8; 1024];
     let cfg = config();
-    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
+    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
         &[],
@@ -293,7 +293,7 @@ fn store_and_load_mem8_imm() {
         &mut mem,
         &si,
         &cfg,
-        &mut action_queue,
+        &mut side_outputs,
     );
     assert!((r.output_slots[0] - 77.0).abs() < 1e-6);
     assert_eq!(mem[100], 77);
@@ -332,7 +332,7 @@ fn memory_address_wraps_via_rem_euclid() {
     let mut e = 100.0;
     let mut mem = [0u8; 1024];
     let cfg = config();
-    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
+    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
         &[],
@@ -342,7 +342,7 @@ fn memory_address_wraps_via_rem_euclid() {
         &mut mem,
         &si,
         &cfg,
-        &mut action_queue,
+        &mut side_outputs,
     );
     assert!((r.output_slots[0] - 55.0).abs() < 1e-6);
 }
@@ -419,7 +419,7 @@ fn vm_eats_when_food_here() {
     let mut energy = creature.energy;
     let mut mem = [0u8; 1024];
     let cfg = config();
-    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
+    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let _result = execute_vm_node(
         def,
         &creature.genome.nodes[0].input_refs,
@@ -429,9 +429,9 @@ fn vm_eats_when_food_here() {
         &mut mem,
         &si,
         &cfg,
-        &mut action_queue,
+        &mut side_outputs,
     );
-    let actions = action_queue.into_actions();
+    let actions = side_outputs.action_queue.into_actions();
     assert_eq!(
         actions.first(),
         Some(&crate::contracts::WorldAction::Eat),
@@ -497,7 +497,7 @@ fn vm_noop_when_no_food() {
     let mut energy = 30.0;
     let mut mem = [0u8; 1024];
     let cfg = config();
-    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
+    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let _result = execute_vm_node(
         def,
         &creature.genome.nodes[0].input_refs,
@@ -507,9 +507,9 @@ fn vm_noop_when_no_food() {
         &mut mem,
         &si,
         &cfg,
-        &mut action_queue,
+        &mut side_outputs,
     );
-    let actions = action_queue.into_actions();
+    let actions = side_outputs.action_queue.into_actions();
     assert_eq!(
         actions.first(),
         Some(&crate::contracts::WorldAction::NoOp),

@@ -16,7 +16,7 @@ fn register_count_zero_halts_immediately() {
     let mut e = 100.0;
     let mut mem = [0u8; 1024];
     let cfg = config();
-    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
+    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
         &[],
@@ -26,7 +26,7 @@ fn register_count_zero_halts_immediately() {
         &mut mem,
         &si,
         &cfg,
-        &mut action_queue,
+        &mut side_outputs,
     );
     assert!(!r.terminal);
     assert!(!r.energy_exhausted);
@@ -67,7 +67,7 @@ fn program_counter_past_program_len_soft_halts() {
     let mut mem = [0u8; 1024];
     let mut cfg = config();
     cfg.vm.opcode_cost_multiplier = 1.0;
-    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
+    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
         &[],
@@ -77,7 +77,7 @@ fn program_counter_past_program_len_soft_halts() {
         &mut mem,
         &si,
         &cfg,
-        &mut action_queue,
+        &mut side_outputs,
     );
     assert!(!r.terminal);
     assert!(!r.energy_exhausted);
@@ -170,7 +170,7 @@ fn energy_is_deducted_per_opcode() {
     let mut mem = [0u8; 1024];
     let mut cfg = config();
     cfg.vm.opcode_cost_multiplier = 1.0;
-    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
+    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let _ = execute_vm_node(
         &def,
         &[],
@@ -180,7 +180,7 @@ fn energy_is_deducted_per_opcode() {
         &mut mem,
         &si,
         &cfg,
-        &mut action_queue,
+        &mut side_outputs,
     );
     assert!(e < 100.0);
     assert!(e > 99.0);
@@ -199,7 +199,7 @@ fn energy_exhaustion_returns_exhausted() {
     let mut mem = [0u8; 1024];
     let mut cfg = config();
     cfg.vm.opcode_cost_multiplier = 1.0;
-    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
+    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
         &[],
@@ -209,7 +209,7 @@ fn energy_exhaustion_returns_exhausted() {
         &mut mem,
         &si,
         &cfg,
-        &mut action_queue,
+        &mut side_outputs,
     );
     assert!(r.energy_exhausted);
 }
@@ -238,7 +238,7 @@ fn energy_exhaustion_does_not_commit_memory_writes() {
     let mut mem = [0u8; 1024];
     let mut cfg = config();
     cfg.vm.opcode_cost_multiplier = 1.0;
-    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
+    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
         &[],
@@ -248,7 +248,7 @@ fn energy_exhaustion_does_not_commit_memory_writes() {
         &mut mem,
         &si,
         &cfg,
-        &mut action_queue,
+        &mut side_outputs,
     );
     assert!(r.energy_exhausted);
     // mem[10] should still be 0 (not written)
@@ -271,7 +271,7 @@ fn max_vm_steps_enforced() {
     let si = empty_static_inputs();
     let mut e = 1000.0;
     let mut mem = [0u8; 1024];
-    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
+    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
         &[],
@@ -281,7 +281,7 @@ fn max_vm_steps_enforced() {
         &mut mem,
         &si,
         &cfg,
-        &mut action_queue,
+        &mut side_outputs,
     );
     assert!(!r.terminal);
     assert!(!r.energy_exhausted);

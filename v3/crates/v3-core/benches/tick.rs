@@ -50,7 +50,7 @@ fn bench_mesh_execution_only(c: &mut Criterion) {
                 for id in ids {
                     let si = assemble_static_inputs(&sim.world, &sim.creatures[id]);
                     let creature = sim.creatures.get_mut(id).unwrap();
-                    black_box(execute_creature_mesh(
+                    let _ = black_box(execute_creature_mesh(
                         &creature.genome,
                         &si,
                         &mut creature.energy,

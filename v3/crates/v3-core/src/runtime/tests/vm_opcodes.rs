@@ -466,3 +466,73 @@ fn to_bool_one_is_truthy() {
     let (r, _, _) = run_vm(program, 2, vec![0.6], &[], zeroed_upstream(), 100.0);
     assert_eq!(r.output_slots[0], 1.0);
 }
+
+// ── SetPriorityBid opcode ─────────────────────────────────────────────
+
+#[test]
+fn set_priority_bid_deducts_energy_and_sets_bid() {
+    // Load 5.0 into r0, then SetPriorityBid { src: 0 }.
+    // Should deduct 5.0 from energy (plus opcode costs) and set side_outputs.priority_bid = 5.0.
+    let program = vec![
+        VmInstruction::LoadConst {
+            dst: 0,
+            const_idx: 0,
+        },
+        VmInstruction::SetPriorityBid { src: 0 },
+        VmInstruction::Halt,
+    ];
+    let (_, energy, side_outputs) = run_vm(program, 1, vec![5.0], &[], zeroed_upstream(), 100.0);
+    assert_eq!(side_outputs.priority_bid, 5.0);
+    // Energy should be 100.0 minus opcode costs (LoadConst=0.08 + SetPriorityBid=0.20 + Halt=0.05)
+    // minus the bid deduction (5.0), all times the opcode_cost_multiplier for opcode costs.
+    // The bid deduction of 5.0 is separate from the opcode cost.
+    let multiplier = config().vm.opcode_cost_multiplier;
+    let expected = 100.0 - (0.08 + 0.20 + 0.05) * multiplier - 5.0;
+    assert!(
+        (energy - expected).abs() < 1e-4,
+        "energy {} vs expected {}",
+        energy,
+        expected
+    );
+}
+
+#[test]
+fn set_priority_bid_negative_clamps_to_zero() {
+    // Load -3.0 into r0, then SetPriorityBid { src: 0 }.
+    // Negative bid should be clamped to 0.0 — no energy deducted beyond opcode cost.
+    let program = vec![
+        VmInstruction::LoadConst {
+            dst: 0,
+            const_idx: 0,
+        },
+        VmInstruction::SetPriorityBid { src: 0 },
+        VmInstruction::Halt,
+    ];
+    let (_, energy, side_outputs) = run_vm(program, 1, vec![-3.0], &[], zeroed_upstream(), 100.0);
+    assert_eq!(side_outputs.priority_bid, 0.0);
+    // Only opcode costs should be deducted, no bid energy.
+    let multiplier = config().vm.opcode_cost_multiplier;
+    let expected = 100.0 - (0.08 + 0.20 + 0.05) * multiplier;
+    assert!(
+        (energy - expected).abs() < 1e-4,
+        "energy {} vs expected {}",
+        energy,
+        expected
+    );
+}
+
+#[test]
+fn set_priority_bid_exceeding_energy_causes_exhaustion() {
+    // Load 200.0 into r0 with only 10.0 energy. Bid should exhaust energy.
+    let program = vec![
+        VmInstruction::LoadConst {
+            dst: 0,
+            const_idx: 0,
+        },
+        VmInstruction::SetPriorityBid { src: 0 },
+        VmInstruction::Halt, // should never reach
+    ];
+    let (result, energy, _) = run_vm(program, 1, vec![200.0], &[], zeroed_upstream(), 10.0);
+    assert!(result.energy_exhausted, "should be exhausted");
+    assert!(energy <= 0.0, "energy should be non-positive: {}", energy);
+}

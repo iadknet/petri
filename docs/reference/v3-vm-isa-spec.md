@@ -25,7 +25,7 @@ Related references:
 
 ## 2. Instruction Set
 
-The VM defines **38 opcodes**.
+The VM defines **39 opcodes**.
 
 ### Arithmetic and Data Movement
 
@@ -93,17 +93,18 @@ The VM defines **38 opcodes**.
 | 29 | `ReadActionQueueLength` | dst | `dst = queue.len() as f32` |
 | 30 | `ReadActionQueueType` | index_src, dst | `dst = queue[reg[index_src]].action_type()` (OOB yields `0.0`) |
 | 31 | `ReadActionQueueParam` | index_src, param_slot, dst | `dst = queue[reg[index_src]].param(param_slot)` (OOB yields `0.0`) |
-| 32 | `ExecuteActionQueue` | none | terminal: return accumulated action queue for execution |
+| 32 | `SetPriorityBid` | src | read `regs[src]`, clamp non-negative, deduct bid from energy, set creature's turn-order priority bid (last-write-wins) |
+| 33 | `ExecuteActionQueue` | none | terminal: return accumulated action queue for execution |
 
 ### Halt and Memory
 
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
-| 33 | `Halt` | none | stop VM execution |
-| 34 | `LoadMem8` | dst, addr_reg | read byte at wrapped address |
-| 35 | `StoreMem8` | addr_reg, src | write byte at wrapped address |
-| 36 | `LoadMem8Imm` | dst, imm_addr | read byte at wrapped immediate address |
-| 37 | `StoreMem8Imm` | imm_addr, src | write byte at wrapped immediate address |
+| 34 | `Halt` | none | stop VM execution |
+| 35 | `LoadMem8` | dst, addr_reg | read byte at wrapped address |
+| 36 | `StoreMem8` | addr_reg, src | write byte at wrapped address |
+| 37 | `LoadMem8Imm` | dst, imm_addr | read byte at wrapped immediate address |
+| 38 | `StoreMem8Imm` | imm_addr, src | write byte at wrapped immediate address |
 
 Removed from active V3 mesh ISA:
 - `ReadSensorCell`, `ReadSensorCreature`, `ReadSensorSummary`
@@ -255,6 +256,7 @@ Defined numeric rules:
 | ReadActionQueueLength | 0.08 |
 | ReadActionQueueType | 0.12 |
 | ReadActionQueueParam | 0.12 |
+| SetPriorityBid | 0.20 |
 | ExecuteActionQueue | 0.24 |
 | Halt | 0.05 |
 | LoadMem8 | 0.16 |
@@ -344,3 +346,29 @@ per VM evaluation, with a configurable cap (`max_actions_per_turn`).
 - Persists across ticks for same creature.
 - Copied byte-for-byte on reproduction.
 - Addressing wraps with `rem_euclid(1024)`.
+
+---
+
+## 9. Priority Bid Mechanics
+
+`SetPriorityBid { src }` allows creatures to bid energy for earlier execution in
+Phase 2 (action resolution). Higher bidders act first, gaining priority access to
+contested resources like food.
+
+Semantics:
+- Reads `regs[src]`, clamps to non-negative (`max(0.0, value)`).
+- Deducts bid amount from creature energy (on top of the 0.20 opcode cost).
+- If energy drops to zero or below after deduction, the creature is exhausted
+  (`NodeResult::exhausted()`).
+- Sets the creature's priority bid for this tick. Last-write-wins if called
+  multiple times (consistent with `WriteRouteTarget`).
+
+Turn ordering:
+- After cognition (Phase 1), decisions are stable-sorted by bid descending.
+- Stable sort preserves the pre-existing random shuffle order among creatures
+  with equal bids (including the default 0.0).
+- Creatures that never call `SetPriorityBid` have bid 0.0 (no cost, no priority).
+
+There is no cap on bid amount — creatures can bid up to their remaining energy.
+Natural selection handles the economics: overbidding wastes energy and leads to
+extinction.

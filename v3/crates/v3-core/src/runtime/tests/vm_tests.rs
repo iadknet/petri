@@ -1,7 +1,8 @@
 use super::*;
 use crate::config::RuntimeConfig;
-use crate::contracts::{ActionQueue, Direction};
+use crate::contracts::Direction;
 use crate::creature::genome::{VmBackendDef, VmInstruction};
+use crate::runtime::types::MeshSideOutputs;
 use crate::sensors::static_inputs::StaticInputs;
 
 fn config() -> RuntimeConfig {
@@ -30,7 +31,7 @@ fn run_vm(
     input_refs: &[InputReference],
     upstream: [f32; 12],
     energy: f32,
-) -> (NodeResult, f32, ActionQueue) {
+) -> (NodeResult, f32, MeshSideOutputs) {
     let def = VmBackendDef {
         register_count,
         constants,
@@ -40,7 +41,7 @@ fn run_vm(
     let mut e = energy;
     let mut mem = [0u8; 1024];
     let cfg = config();
-    let mut action_queue = ActionQueue::new(cfg.max_actions_per_turn);
+    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let result = execute_vm_node(
         &def,
         input_refs,
@@ -50,9 +51,9 @@ fn run_vm(
         &mut mem,
         &si,
         &cfg,
-        &mut action_queue,
+        &mut side_outputs,
     );
-    (result, e, action_queue)
+    (result, e, side_outputs)
 }
 
 #[path = "vm_opcodes.rs"]

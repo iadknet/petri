@@ -1,3 +1,5 @@
+use crate::contracts::CreatureId;
+use crate::runtime::types::MeshOutput;
 use crate::simulation::simulation::Simulation;
 
 /// Run Phase 0 of a tick: food growth, creature aging, energy decay, dead-creature removal.
@@ -58,7 +60,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
     use crate::runtime::mesh::execute_creature_mesh;
     use crate::runtime::trace::{StaticInputsSnapshot, TickTrace};
     use crate::runtime::traced_mesh::execute_creature_mesh_traced;
-    use crate::runtime::types::ComputeCostReport;
+    use crate::runtime::types::MeshOutput;
     use crate::sensors::static_inputs::assemble_static_inputs;
     use crate::simulation::actions::{
         apply_eat, apply_move, apply_noop, apply_reproduce, apply_steal_energy,
@@ -78,6 +80,8 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
     sim.stats.last_tick_compute_total_max = 0.0;
     sim.stats.last_tick_compute_vm_mean = 0.0;
     sim.stats.last_tick_compute_graph_mean = 0.0;
+    sim.stats.last_tick_priority_bid_mean = 0.0;
+    sim.stats.last_tick_priority_bidders_count = 0;
 
     run_phase_0(sim);
 
@@ -117,7 +121,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
         .collect();
 
     // 1b: Cognition — parallel for all creatures, sequential for traced creature.
-    let decisions: Vec<(CreatureId, Vec<WorldAction>, ComputeCostReport)> = {
+    let mut decisions: Vec<(CreatureId, MeshOutput)> = {
         let mut creature_refs: HashMap<_, _> = sim.creatures.iter_mut().collect();
 
         // Extract traced creature (if any) before building parallel work vec.
@@ -133,7 +137,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
         let mut parallel_decisions: Vec<_> = work
             .par_iter_mut()
             .map(|(id, si, creature)| {
-                let (actions, cost) = execute_creature_mesh(
+                let output = execute_creature_mesh(
                     &creature.genome,
                     si,
                     &mut creature.energy,
@@ -141,7 +145,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                     &mut creature.graph_runtime,
                     &runtime_config,
                 );
-                (*id, actions, cost)
+                (*id, output)
             })
             .collect();
 
@@ -152,7 +156,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                 let tick_number = sim.tick;
                 let si_snapshot = StaticInputsSnapshot::from(si);
 
-                let (actions, cost, hops, termination_reason) = execute_creature_mesh_traced(
+                let (output, hops, termination_reason) = execute_creature_mesh_traced(
                     &creature.genome,
                     si,
                     &mut creature.energy,
@@ -169,8 +173,9 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                         energy_after: creature.energy,
                         static_inputs: si_snapshot,
                         hops,
-                        final_actions: actions.clone(),
+                        final_actions: output.actions.clone(),
                         termination_reason,
+                        priority_bid: output.priority_bid,
                     });
                     active.ticks_remaining = active.ticks_remaining.saturating_sub(1);
                 }
@@ -182,15 +187,19 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                 // insertion point in parallel_decisions.
                 if let Some(pos) = queue_pos {
                     let insert_idx = inputs[..pos].iter().filter(|(id, _)| *id != tid).count();
-                    parallel_decisions.insert(insert_idx, (tid, actions, cost));
+                    parallel_decisions.insert(insert_idx, (tid, output));
                 } else {
-                    parallel_decisions.push((tid, actions, cost));
+                    parallel_decisions.push((tid, output));
                 }
             }
         }
 
         parallel_decisions
     };
+
+    // Sort decisions by priority bid descending. Stable sort preserves the
+    // pre-existing random shuffle order among creatures with equal bids.
+    sort_by_priority_bid(&mut decisions);
 
     // ── Phase 2: Sequential action execution ────────────────────────────────
     // Apply decisions in queue order. Compute cost stats are accumulated here.
@@ -202,8 +211,11 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
     let mut compute_graph_sum = 0.0f32;
     let mut compute_graph_count = 0u32;
     let mut compute_creature_count = 0u32;
+    let mut priority_bid_sum = 0.0f32;
+    let mut priority_bid_count = 0u32;
 
-    for (id, actions, compute_cost) in decisions {
+    for (id, output) in decisions {
+        let compute_cost = &output.cost_report;
         // Accumulate compute cost for this creature.
         let total_cost = compute_cost.vm_cost + compute_cost.graph_cost;
         compute_total_sum += total_cost;
@@ -223,8 +235,14 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
         }
         compute_creature_count += 1;
 
+        // Accumulate priority bid stats.
+        priority_bid_sum += output.priority_bid;
+        if output.priority_bid > 0.0 {
+            priority_bid_count += 1;
+        }
+
         // Apply each queued action sequentially.
-        for action in &actions {
+        for action in &output.actions {
             match *action {
                 WorldAction::NoOp => {
                     // NoOp cannot fail; no failed_action_penalty possible.
@@ -292,9 +310,21 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
         } else {
             0.0
         };
+        sim.stats.last_tick_priority_bid_mean = priority_bid_sum / compute_creature_count as f32;
+        sim.stats.last_tick_priority_bidders_count = priority_bid_count;
     }
 
     sim.tick += 1;
+}
+
+/// Sort decisions by priority bid descending. Stable sort preserves the
+/// pre-existing random shuffle order among creatures with equal bids.
+fn sort_by_priority_bid(decisions: &mut [(CreatureId, MeshOutput)]) {
+    decisions.sort_by(|a, b| {
+        b.1.priority_bid
+            .partial_cmp(&a.1.priority_bid)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 }
 
 #[cfg(test)]
@@ -708,5 +738,147 @@ mod tests {
         // Basic sanity: tick incremented, simulation still has creatures.
         assert_eq!(sim.tick, 1);
         assert!(!sim.creatures.is_empty() || pop_before == 0);
+    }
+
+    // ── Priority bid sort tests ──────────────────────────────────────────
+
+    #[test]
+    fn sort_by_priority_bid_orders_descending() {
+        use crate::contracts::WorldAction;
+        use crate::runtime::types::{ComputeCostReport, MeshOutput};
+
+        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let id_a = creatures.insert_with_key(|id| {
+            CreatureState::new(
+                id,
+                v3alpha1_founder_genome(),
+                Position::new(0, 0),
+                50.0,
+                0,
+                [0, 0, 92, 92, 138, 138],
+                0,
+                [true; 6],
+            )
+        });
+        let id_b = creatures.insert_with_key(|id| {
+            CreatureState::new(
+                id,
+                v3alpha1_founder_genome(),
+                Position::new(1, 0),
+                50.0,
+                0,
+                [0, 0, 92, 92, 138, 138],
+                0,
+                [true; 6],
+            )
+        });
+        let id_c = creatures.insert_with_key(|id| {
+            CreatureState::new(
+                id,
+                v3alpha1_founder_genome(),
+                Position::new(2, 0),
+                50.0,
+                0,
+                [0, 0, 92, 92, 138, 138],
+                0,
+                [true; 6],
+            )
+        });
+
+        let make_output = |bid: f32| MeshOutput {
+            actions: vec![WorldAction::Eat],
+            cost_report: ComputeCostReport::default(),
+            priority_bid: bid,
+        };
+
+        // Creature A bids 0, B bids 10, C bids 5.
+        let mut decisions = vec![
+            (id_a, make_output(0.0)),
+            (id_b, make_output(10.0)),
+            (id_c, make_output(5.0)),
+        ];
+
+        sort_by_priority_bid(&mut decisions);
+
+        // Expected order: B(10), C(5), A(0)
+        assert_eq!(decisions[0].0, id_b, "highest bidder should be first");
+        assert_eq!(
+            decisions[1].0, id_c,
+            "second highest bidder should be second"
+        );
+        assert_eq!(decisions[2].0, id_a, "zero bidder should be last");
+    }
+
+    #[test]
+    fn sort_by_priority_bid_stable_for_equal_bids() {
+        use crate::contracts::WorldAction;
+        use crate::runtime::types::{ComputeCostReport, MeshOutput};
+
+        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let id_a = creatures.insert_with_key(|id| {
+            CreatureState::new(
+                id,
+                v3alpha1_founder_genome(),
+                Position::new(0, 0),
+                50.0,
+                0,
+                [0, 0, 92, 92, 138, 138],
+                0,
+                [true; 6],
+            )
+        });
+        let id_b = creatures.insert_with_key(|id| {
+            CreatureState::new(
+                id,
+                v3alpha1_founder_genome(),
+                Position::new(1, 0),
+                50.0,
+                0,
+                [0, 0, 92, 92, 138, 138],
+                0,
+                [true; 6],
+            )
+        });
+        let id_c = creatures.insert_with_key(|id| {
+            CreatureState::new(
+                id,
+                v3alpha1_founder_genome(),
+                Position::new(2, 0),
+                50.0,
+                0,
+                [0, 0, 92, 92, 138, 138],
+                0,
+                [true; 6],
+            )
+        });
+
+        let make_output = |bid: f32| MeshOutput {
+            actions: vec![WorldAction::Eat],
+            cost_report: ComputeCostReport::default(),
+            priority_bid: bid,
+        };
+
+        // All bid 0.0. Original order is A, B, C.
+        let mut decisions = vec![
+            (id_a, make_output(0.0)),
+            (id_b, make_output(0.0)),
+            (id_c, make_output(0.0)),
+        ];
+
+        sort_by_priority_bid(&mut decisions);
+
+        // Stable sort should preserve original order.
+        assert_eq!(decisions[0].0, id_a);
+        assert_eq!(decisions[1].0, id_b);
+        assert_eq!(decisions[2].0, id_c);
+    }
+
+    #[test]
+    fn priority_bid_stats_tracked_after_tick() {
+        // Founders don't call SetPriorityBid, so bid_mean should be 0.0 and count 0.
+        let mut sim = seed_simulation(small_config(), 42);
+        run_tick(&mut sim, &mut None);
+        assert_eq!(sim.stats.last_tick_priority_bid_mean, 0.0);
+        assert_eq!(sim.stats.last_tick_priority_bidders_count, 0);
     }
 }
