@@ -27,10 +27,14 @@ pub enum GraphOperator {
     MutateHebbianRule,
     MutateHebbianRate,
     ToggleHebbianLamarckian,
+    EnableRewardModulation,
+    DisableRewardModulation,
+    MutateRewardSource,
+    MutateTraceDecay,
 }
 
 impl GraphOperator {
-    pub const ALL: [Self; 17] = [
+    pub const ALL: [Self; 21] = [
         Self::AlterGraphEdgeWeight,
         Self::SwapGraphOperator,
         Self::MutateGraphOperatorParam,
@@ -48,6 +52,10 @@ impl GraphOperator {
         Self::MutateHebbianRule,
         Self::MutateHebbianRate,
         Self::ToggleHebbianLamarckian,
+        Self::EnableRewardModulation,
+        Self::DisableRewardModulation,
+        Self::MutateRewardSource,
+        Self::MutateTraceDecay,
     ];
 
     /// Per-operator weight reflecting impact tier.
@@ -72,12 +80,16 @@ impl GraphOperator {
             Self::MutateHebbianRule => 2,
             Self::MutateHebbianRate => 4,
             Self::ToggleHebbianLamarckian => 2,
+            Self::EnableRewardModulation => 1,
+            Self::DisableRewardModulation => 1,
+            Self::MutateRewardSource => 2,
+            Self::MutateTraceDecay => 4,
         }
     }
 
     const TOTAL_WEIGHT: u16 = {
         assert!(
-            Self::ALL.len() == 17,
+            Self::ALL.len() == 21,
             "ALL must cover every GraphOperator variant"
         );
         let mut sum = 0u16;
@@ -99,10 +111,12 @@ impl GraphOperator {
             | Self::CopyInternalNode
             | Self::CopySubgraph
             | Self::CopyEdgeBundle
-            | Self::EnableHebbian => ComplexityEffect::Increasing,
-            Self::RemoveInternalGraphNode | Self::RemoveGraphEdge | Self::DisableHebbian => {
-                ComplexityEffect::Decreasing
-            }
+            | Self::EnableHebbian
+            | Self::EnableRewardModulation => ComplexityEffect::Increasing,
+            Self::RemoveInternalGraphNode
+            | Self::RemoveGraphEdge
+            | Self::DisableHebbian
+            | Self::DisableRewardModulation => ComplexityEffect::Decreasing,
             Self::AlterGraphEdgeWeight
             | Self::SwapGraphOperator
             | Self::MutateGraphOperatorParam
@@ -110,7 +124,9 @@ impl GraphOperator {
             | Self::GraphRawFieldMutation
             | Self::MutateHebbianRule
             | Self::MutateHebbianRate
-            | Self::ToggleHebbianLamarckian => ComplexityEffect::Neutral,
+            | Self::ToggleHebbianLamarckian
+            | Self::MutateRewardSource
+            | Self::MutateTraceDecay => ComplexityEffect::Neutral,
         }
     }
 
@@ -207,6 +223,16 @@ impl GraphMutator {
             GraphOperator::ToggleHebbianLamarckian => {
                 hebbian::toggle_hebbian_lamarckian(genome, node_idx, rng)
             }
+            GraphOperator::EnableRewardModulation => {
+                hebbian::enable_reward_modulation(genome, node_idx, rng)
+            }
+            GraphOperator::DisableRewardModulation => {
+                hebbian::disable_reward_modulation(genome, node_idx, rng)
+            }
+            GraphOperator::MutateRewardSource => {
+                hebbian::mutate_reward_source(genome, node_idx, rng)
+            }
+            GraphOperator::MutateTraceDecay => hebbian::mutate_trace_decay(genome, node_idx, rng),
         }
     }
 }

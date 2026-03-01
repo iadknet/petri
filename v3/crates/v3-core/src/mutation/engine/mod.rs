@@ -257,6 +257,10 @@ fn graph_operator_key(op: GraphOperator) -> MutationOperator {
         GraphOperator::MutateHebbianRule => MutationOperator::GraphMutateHebbianRule,
         GraphOperator::MutateHebbianRate => MutationOperator::GraphMutateHebbianRate,
         GraphOperator::ToggleHebbianLamarckian => MutationOperator::GraphToggleHebbianLamarckian,
+        GraphOperator::EnableRewardModulation => MutationOperator::GraphEnableRewardModulation,
+        GraphOperator::DisableRewardModulation => MutationOperator::GraphDisableRewardModulation,
+        GraphOperator::MutateRewardSource => MutationOperator::GraphMutateRewardSource,
+        GraphOperator::MutateTraceDecay => MutationOperator::GraphMutateTraceDecay,
     }
 }
 
