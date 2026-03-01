@@ -11,6 +11,13 @@ rand = { workspace = true }
 rayon = { workspace = true }
 slotmap = { workspace = true }
 
+[features]
+dhat-heap = ["dep:dhat"]
+
+[dependencies.dhat]
+version = "0.3"
+optional = true
+
 [dev-dependencies]
 serde_json = { workspace = true }
 criterion = "0.5"

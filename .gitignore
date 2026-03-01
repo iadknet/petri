@@ -1,6 +1,10 @@
 .DS_Store
 .worktrees/
+.claude/
 target/
+
+# Profiling output
+dhat-heap.json
 
 # Node/frontend dependencies and build artifacts
 node_modules/

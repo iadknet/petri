@@ -2,15 +2,26 @@
 
 ## Small Modifications
 
-### Allow creatures to move more than one space
-  - add metadata to move action for number of spaces.
-  - Extra energy penalty for each additional space
-
-### Add a failed action penalty configuration
-  - Is there any existing penalty for failed actions other than the action cost?
-  - Add a configuration for an extra energy penalty on failed actions
-
 ## Major New Features
+
+### Graph nodes can execute actions through deferred queue outputs
+
+Instead of emitting a `WorldAction` directly, graph backends would gain a small set of **deferred action-effect outputs** that mirror the VM’s action-queue behavior. During graph relaxation, these nodes behave like normal graph nodes and only produce scalar values. After the graph converges, the runtime performs a single post-convergence effect pass that interprets specific graph node kinds as queue operations. This keeps graph evaluation deterministic, avoids repeated side effects across relaxation passes, and fits the `multi-action-queue` model where the action queue is owned by the mesh executor rather than by an individual node result.
+
+Proposed graph-side effects:
+- `WriteActionMeta(slot)`: write a value into a staged action metadata buffer
+- `PushAction(action_type)`: decode an action from the staged metadata and push it onto the mesh-owned action queue
+- `PopAction`: remove the most recently queued action
+- `ExecuteActionQueue`: mark the current mesh hop as terminal and return the queued actions for Phase 2 execution
+
+Ordering must be explicit and deterministic. Recommended rule:
+1. Run graph relaxation to convergence
+2. Apply staged-value writes first (`CustomOutput`, `RouterOutput`, `WriteActionMeta`)
+3. Apply queue mutations next (`PushAction`, `PopAction`)
+4. Apply terminal check last (`ExecuteActionQueue`)
+
+Within each phase, process internal graph nodes in internal-node-index order. This means conflicts like “push and pop are both active” are resolved by node order, not by ambiguous graph topology. If energy is exhausted before convergence completes, none of the deferred action effects are committed.
+
 
 ### Storage slots
   - add the ability for creatures to pick up and place food and barriers
@@ -21,18 +32,12 @@
   - When determining action order, the actions with the most extra energy are evaluated first
   - The order of ties should be randomized
 
-### Multiple action queue
-  - give the creature an option to perform multiple actions in one turn
-  - actions can stack (so it can move n, move e, eat) all in one turn
-  - There should be an additional energy penalty for each action after the first
-  
-### Predation
-  - Creature can "steal" energy from neighbors
-  - steal action has target direction, energy amount
-  - steal action costs energy proportional to energy amount attempted to be stolen
-  - this percentage should be configuration (maybe 10% is a good default?)
-  - significant energy bonus for killing a creature (based on creature genome complexity)
-  
+### Refactor movement
+  - This is going to be a big change that we will have to execute carefully.  I want to refactor the movement actions. Instead of being able to move in different cardinal directions, I want there to be a sense of "Forward" for creatures and  
+  then have a two turn actions (turn left, turn right). And "move foward". The turn actions should have small default energy cost, but should still cost something.
+  - The zoomed in view of creatures can have a pointy tip for the direction they are facing.
+  - Predation should also be forward-facing.
+
 ### More advanced sensors
   - area sensor (provides a "map" of surrounding area in radius)
 
