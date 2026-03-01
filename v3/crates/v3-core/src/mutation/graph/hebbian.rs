@@ -1,8 +1,8 @@
-//! Hebbian-specific mutation operators for graph internal nodes.
+//! Plasticity mutation operators for graph internal nodes.
 //!
-//! Five operators that evolve per-node Hebbian learning parameters:
-//! - EnableHebbian: add HebbianConfig to a non-Hebbian node
-//! - DisableHebbian: remove HebbianConfig from a Hebbian node
+//! Five operators that evolve per-node plasticity learning parameters:
+//! - EnableHebbian: add PlasticityConfig to a non-plasticity node
+//! - DisableHebbian: remove PlasticityConfig from a plasticity node
 //! - MutateHebbianRule: change the learning rule variant
 //! - MutateHebbianRate: perturb the learning rate
 //! - ToggleHebbianLamarckian: flip the inheritance flag
@@ -10,7 +10,7 @@
 use rand::Rng;
 
 use crate::creature::genome::{
-    BackendDef, CreatureGenome, GraphInternalNode, HebbianConfig, HebbianRule,
+    BackendDef, CreatureGenome, GraphInternalNode, HebbianRule, PlasticityConfig,
 };
 use crate::mutation::types::MutationSkipReason;
 
@@ -43,7 +43,7 @@ fn select_eligible(
         .ok_or(MutationSkipReason::NoApplicableTarget)
 }
 
-/// Add HebbianConfig to a random non-Hebbian internal node.
+/// Add PlasticityConfig to a random non-plasticity internal node.
 pub fn enable_hebbian(
     genome: &mut CreatureGenome,
     node_idx: usize,
@@ -52,30 +52,31 @@ pub fn enable_hebbian(
     if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
         let int_idx = select_eligible(
             &g.internal_nodes,
-            |n| n.hebbian.is_none() && !n.inputs.is_empty(),
+            |n| n.plasticity.is_none() && !n.inputs.is_empty(),
             rng,
         )?;
 
         let rule = ALL_RULES[rng.gen_range(0..ALL_RULES.len())];
-        g.internal_nodes[int_idx].hebbian = Some(HebbianConfig {
+        g.internal_nodes[int_idx].plasticity = Some(PlasticityConfig {
             rule,
             learning_rate: rng.gen_range(0.01f32..0.2),
             weight_clamp: rng.gen_range(1.0f32..5.0),
             lamarckian: rng.gen_bool(0.5),
+            modulation: None,
         });
     }
     Ok(())
 }
 
-/// Remove HebbianConfig from a random Hebbian internal node.
+/// Remove PlasticityConfig from a random plasticity internal node.
 pub fn disable_hebbian(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
-        let int_idx = select_eligible(&g.internal_nodes, |n| n.hebbian.is_some(), rng)?;
-        g.internal_nodes[int_idx].hebbian = None;
+        let int_idx = select_eligible(&g.internal_nodes, |n| n.plasticity.is_some(), rng)?;
+        g.internal_nodes[int_idx].plasticity = None;
     }
     Ok(())
 }
@@ -87,9 +88,9 @@ pub fn mutate_hebbian_rule(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
-        let int_idx = select_eligible(&g.internal_nodes, |n| n.hebbian.is_some(), rng)?;
+        let int_idx = select_eligible(&g.internal_nodes, |n| n.plasticity.is_some(), rng)?;
 
-        if let Some(ref mut cfg) = g.internal_nodes[int_idx].hebbian {
+        if let Some(ref mut cfg) = g.internal_nodes[int_idx].plasticity {
             // Pick a different rule.
             let others: Vec<HebbianRule> = ALL_RULES
                 .iter()
@@ -114,9 +115,9 @@ pub fn mutate_hebbian_rate(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
-        let int_idx = select_eligible(&g.internal_nodes, |n| n.hebbian.is_some(), rng)?;
+        let int_idx = select_eligible(&g.internal_nodes, |n| n.plasticity.is_some(), rng)?;
 
-        if let Some(ref mut cfg) = g.internal_nodes[int_idx].hebbian {
+        if let Some(ref mut cfg) = g.internal_nodes[int_idx].plasticity {
             if cfg.learning_rate.abs() > 0.01 {
                 cfg.learning_rate *= 1.0 + rng.gen_range(-0.3f32..=0.3);
             } else {
@@ -135,9 +136,9 @@ pub fn toggle_hebbian_lamarckian(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
-        let int_idx = select_eligible(&g.internal_nodes, |n| n.hebbian.is_some(), rng)?;
+        let int_idx = select_eligible(&g.internal_nodes, |n| n.plasticity.is_some(), rng)?;
 
-        if let Some(ref mut cfg) = g.internal_nodes[int_idx].hebbian {
+        if let Some(ref mut cfg) = g.internal_nodes[int_idx].plasticity {
             cfg.lamarckian = !cfg.lamarckian;
         }
     }
@@ -179,7 +180,7 @@ mod tests {
                 source_idx: 0,
                 weight: 1.0,
             }],
-            hebbian: None,
+            plasticity: None,
         }
     }
 
@@ -190,11 +191,12 @@ mod tests {
                 source_idx: 0,
                 weight: 1.0,
             }],
-            hebbian: Some(HebbianConfig {
+            plasticity: Some(PlasticityConfig {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 5.0,
                 lamarckian: false,
+                modulation: None,
             }),
         }
     }
@@ -207,7 +209,7 @@ mod tests {
         assert!(result.is_ok());
 
         if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
-            assert!(g.internal_nodes[0].hebbian.is_some());
+            assert!(g.internal_nodes[0].plasticity.is_some());
         } else {
             panic!("expected Graph backend");
         }
@@ -229,7 +231,7 @@ mod tests {
         assert!(result.is_ok());
 
         if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
-            assert!(g.internal_nodes[0].hebbian.is_none());
+            assert!(g.internal_nodes[0].plasticity.is_none());
         } else {
             panic!("expected Graph backend");
         }
@@ -252,7 +254,7 @@ mod tests {
         assert!(result.is_ok());
 
         if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
-            let new_rule = g.internal_nodes[0].hebbian.as_ref().unwrap().rule;
+            let new_rule = g.internal_nodes[0].plasticity.as_ref().unwrap().rule;
             assert_ne!(new_rule, original_rule);
         }
     }
@@ -265,7 +267,11 @@ mod tests {
             mutate_hebbian_rate(&mut genome, 0, &mut r).unwrap();
 
             if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
-                let rate = g.internal_nodes[0].hebbian.as_ref().unwrap().learning_rate;
+                let rate = g.internal_nodes[0]
+                    .plasticity
+                    .as_ref()
+                    .unwrap()
+                    .learning_rate;
                 assert!(
                     (0.0..=1.0).contains(&rate),
                     "rate {rate} out of bounds at seed {seed}"
@@ -281,21 +287,21 @@ mod tests {
 
         // Initially false
         if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
-            assert!(!g.internal_nodes[0].hebbian.as_ref().unwrap().lamarckian);
+            assert!(!g.internal_nodes[0].plasticity.as_ref().unwrap().lamarckian);
         }
 
         toggle_hebbian_lamarckian(&mut genome, 0, &mut r).unwrap();
 
         // Now true
         if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
-            assert!(g.internal_nodes[0].hebbian.as_ref().unwrap().lamarckian);
+            assert!(g.internal_nodes[0].plasticity.as_ref().unwrap().lamarckian);
         }
 
         toggle_hebbian_lamarckian(&mut genome, 0, &mut r).unwrap();
 
         // Back to false
         if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
-            assert!(!g.internal_nodes[0].hebbian.as_ref().unwrap().lamarckian);
+            assert!(!g.internal_nodes[0].plasticity.as_ref().unwrap().lamarckian);
         }
     }
 
@@ -313,7 +319,7 @@ mod tests {
         let node = GraphInternalNode {
             kind: GraphNodeKind::Constant(1.0),
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         };
         let mut genome = genome_with_graph(vec![node]);
         let mut r = rng(42);

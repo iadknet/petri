@@ -27,7 +27,7 @@ fn copy_internal_node_preserves_kind() {
         let mut genome = graph_only_genome(vec![GraphInternalNode {
             kind: GraphNodeKind::Sigmoid,
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         }]);
         let mut r = rng(seed);
         GraphMutator::apply(&mut genome, GraphOperator::CopyInternalNode, &mut r).unwrap();
@@ -49,7 +49,7 @@ fn copy_internal_node_sometimes_copies_edges_sometimes_not() {
             source_idx: 0,
             weight: 1.0,
         }],
-        hebbian: None,
+        plasticity: None,
     };
     let mut saw_with_edges = false;
     let mut saw_without_edges = false;
@@ -78,7 +78,7 @@ fn copy_internal_node_sometimes_adds_backlink_sometimes_not() {
     let source_node = GraphInternalNode {
         kind: GraphNodeKind::Relu,
         inputs: vec![],
-        hebbian: None,
+        plasticity: None,
     };
     let mut saw_backlink = false;
     let mut saw_no_backlink = false;
@@ -125,7 +125,7 @@ fn copy_subgraph_fewer_than_2_returns_no_applicable_target() {
     let mut genome = graph_only_genome(vec![GraphInternalNode {
         kind: GraphNodeKind::Add,
         inputs: vec![],
-        hebbian: None,
+        plasticity: None,
     }]);
     let mut r = rng(0);
     let result = GraphMutator::apply(&mut genome, GraphOperator::CopySubgraph, &mut r);
@@ -139,7 +139,7 @@ fn copy_subgraph_remaps_intra_cluster_edges() {
         GraphInternalNode {
             kind: GraphNodeKind::Constant(1.0),
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         },
         GraphInternalNode {
             kind: GraphNodeKind::Add,
@@ -147,7 +147,7 @@ fn copy_subgraph_remaps_intra_cluster_edges() {
                 source_idx: 0,
                 weight: 1.0,
             }],
-            hebbian: None,
+            plasticity: None,
         },
     ];
     let mut found_remapped = false;
@@ -186,7 +186,7 @@ fn copy_subgraph_preserves_external_edges() {
         GraphInternalNode {
             kind: GraphNodeKind::Constant(1.0),
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         },
         GraphInternalNode {
             kind: GraphNodeKind::Relu,
@@ -194,7 +194,7 @@ fn copy_subgraph_preserves_external_edges() {
                 source_idx: 0,
                 weight: 0.5,
             }],
-            hebbian: None,
+            plasticity: None,
         },
         GraphInternalNode {
             kind: GraphNodeKind::Add,
@@ -202,7 +202,7 @@ fn copy_subgraph_preserves_external_edges() {
                 source_idx: 1,
                 weight: 1.0,
             }],
-            hebbian: None,
+            plasticity: None,
         },
     ];
     let mut found_external_preserved = false;
@@ -237,7 +237,7 @@ fn copy_subgraph_preserves_node_kinds() {
         GraphInternalNode {
             kind: GraphNodeKind::Sigmoid,
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         },
         GraphInternalNode {
             kind: GraphNodeKind::Tanh,
@@ -245,7 +245,7 @@ fn copy_subgraph_preserves_node_kinds() {
                 source_idx: 0,
                 weight: 1.0,
             }],
-            hebbian: None,
+            plasticity: None,
         },
     ];
     let mut r = rng(0);
@@ -276,7 +276,7 @@ fn copy_edge_bundle_copies_all_edges() {
         GraphInternalNode {
             kind: GraphNodeKind::Constant(1.0),
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         },
         GraphInternalNode {
             kind: GraphNodeKind::Add,
@@ -290,12 +290,12 @@ fn copy_edge_bundle_copies_all_edges() {
                     weight: 2.0,
                 },
             ],
-            hebbian: None,
+            plasticity: None,
         },
         GraphInternalNode {
             kind: GraphNodeKind::Relu,
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         },
     ];
     let mut found_copied = false;
@@ -325,7 +325,7 @@ fn copy_edge_bundle_fewer_than_2_returns_no_applicable_target() {
             source_idx: 0,
             weight: 1.0,
         }],
-        hebbian: None,
+        plasticity: None,
     }]);
     let mut r = rng(0);
     let result = GraphMutator::apply(&mut genome, GraphOperator::CopyEdgeBundle, &mut r);
@@ -338,12 +338,12 @@ fn copy_edge_bundle_source_no_edges_returns_no_applicable_target() {
         GraphInternalNode {
             kind: GraphNodeKind::Constant(1.0),
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         },
         GraphInternalNode {
             kind: GraphNodeKind::Relu,
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         },
     ];
     let mut all_skip = true;

@@ -408,7 +408,7 @@ mod tests {
                     GraphInternalNode {
                         kind: GraphNodeKind::Constant(0.0),
                         inputs: vec![],
-                        hebbian: None,
+                        plasticity: None,
                     },
                     GraphInternalNode {
                         kind: GraphNodeKind::RouterOutput,
@@ -416,7 +416,7 @@ mod tests {
                             source_idx: 0,
                             weight: 1.0,
                         }],
-                        hebbian: None,
+                        plasticity: None,
                     },
                 ],
             }),
@@ -540,7 +540,7 @@ mod tests {
                     GraphInternalNode {
                         kind: GraphNodeKind::Constant(9.0),
                         inputs: vec![],
-                        hebbian: None,
+                        plasticity: None,
                     },
                     GraphInternalNode {
                         kind: GraphNodeKind::CustomOutput(5),
@@ -548,13 +548,13 @@ mod tests {
                             source_idx: 0,
                             weight: 1.0,
                         }],
-                        hebbian: None,
+                        plasticity: None,
                     },
                     // RouterOutput: 0.0 → targets[0]
                     GraphInternalNode {
                         kind: GraphNodeKind::RouterOutput,
                         inputs: vec![],
-                        hebbian: None,
+                        plasticity: None,
                     },
                 ],
             }),
@@ -743,12 +743,12 @@ mod tests {
                         GraphInternalNode {
                             kind: GraphNodeKind::PushAction(1), // Eat
                             inputs: vec![],
-                            hebbian: None,
+                            plasticity: None,
                         },
                         GraphInternalNode {
                             kind: GraphNodeKind::ExecuteActionQueue,
                             inputs: vec![],
-                            hebbian: None,
+                            plasticity: None,
                         },
                     ],
                 }),

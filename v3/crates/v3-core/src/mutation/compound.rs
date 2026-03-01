@@ -36,7 +36,7 @@ pub fn create_fan_out_nodes(node: &mut NodeGenome, ref_idx: u16, count: u16) {
                     sub_idx: sub,
                 },
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             });
         }
     }
@@ -151,7 +151,7 @@ mod tests {
                     }
                 );
                 assert!(n.inputs.is_empty());
-                assert!(n.hebbian.is_none());
+                assert!(n.plasticity.is_none());
             }
         } else {
             panic!("expected Graph backend");

@@ -195,7 +195,7 @@ fn mutate_operator_param_changes_constant_value() {
         g.internal_nodes.push(GraphInternalNode {
             kind: GraphNodeKind::Constant(0.5),
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         });
     }
     let original = 0.5f32;
@@ -392,7 +392,7 @@ fn raw_field_mutation_can_set_input_ref_out_of_range() {
                 sub_idx: 0,
             },
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         }]);
         let mut r = rng(seed);
         GraphMutator::apply(&mut genome, GraphOperator::GraphRawFieldMutation, &mut r).unwrap();
@@ -418,7 +418,7 @@ fn raw_field_mutation_can_set_custom_output_out_of_range() {
         let mut genome = graph_only_genome(vec![GraphInternalNode {
             kind: GraphNodeKind::CustomOutput(0),
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         }]);
         let mut r = rng(seed);
         GraphMutator::apply(&mut genome, GraphOperator::GraphRawFieldMutation, &mut r).unwrap();
@@ -445,7 +445,7 @@ fn raw_field_mutation_can_set_edge_source_out_of_range() {
             GraphInternalNode {
                 kind: GraphNodeKind::Constant(1.0),
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::Add,
@@ -453,7 +453,7 @@ fn raw_field_mutation_can_set_edge_source_out_of_range() {
                     source_idx: 0,
                     weight: 1.0,
                 }],
-                hebbian: None,
+                plasticity: None,
             },
         ]);
         let mut r = rng(seed);

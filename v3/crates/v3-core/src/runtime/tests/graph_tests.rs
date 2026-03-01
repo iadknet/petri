@@ -30,7 +30,7 @@ fn single_node_graph(kind: GraphNodeKind) -> GraphBackendDef {
         internal_nodes: vec![GraphInternalNode {
             kind,
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         }],
     }
 }
@@ -146,7 +146,7 @@ fn add_custom_output_writes_correct_slot() {
             GraphInternalNode {
                 kind: GraphNodeKind::Constant(2.0),
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::CustomOutput(0),
@@ -154,7 +154,7 @@ fn add_custom_output_writes_correct_slot() {
                     source_idx: 0,
                     weight: 3.0,
                 }],
-                hebbian: None,
+                plasticity: None,
             },
         ],
     };
@@ -193,7 +193,7 @@ fn router_output_sets_route_target_idx() {
             GraphInternalNode {
                 kind: GraphNodeKind::Constant(3.5),
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::RouterOutput,
@@ -201,7 +201,7 @@ fn router_output_sets_route_target_idx() {
                     source_idx: 0,
                     weight: 1.0,
                 }],
-                hebbian: None,
+                plasticity: None,
             },
         ],
     };
@@ -272,7 +272,7 @@ fn decay_integrator_accumulates_state() {
             GraphInternalNode {
                 kind: GraphNodeKind::Constant(1.0),
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::DecayIntegrator(0.5),
@@ -280,7 +280,7 @@ fn decay_integrator_accumulates_state() {
                     source_idx: 0,
                     weight: 1.0,
                 }],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::CustomOutput(0),
@@ -288,7 +288,7 @@ fn decay_integrator_accumulates_state() {
                     source_idx: 1,
                     weight: 1.0,
                 }],
-                hebbian: None,
+                plasticity: None,
             },
         ],
     };
@@ -349,7 +349,7 @@ fn state_not_mutated_on_energy_exhaustion() {
         internal_nodes: vec![GraphInternalNode {
             kind: GraphNodeKind::DecayIntegrator(0.9),
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         }],
     };
     let nid: usize = 0;
@@ -359,7 +359,7 @@ fn state_not_mutated_on_energy_exhaustion() {
     // Pre-populate state with a known sentinel.
     let mut gr = GraphRuntimeState {
         node_state: vec![vec![42.0f32]],
-        hebbian_weights: Vec::new(),
+        plasticity_weights: Vec::new(),
         scratch_prev: Vec::new(),
         scratch_curr: Vec::new(),
         scratch_backup: Vec::new(),
@@ -433,12 +433,12 @@ fn energy_deducted_per_pass_on_success() {
             GraphInternalNode {
                 kind: GraphNodeKind::Constant(1.0),
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::Constant(2.0),
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             },
         ],
     };
@@ -482,7 +482,7 @@ fn decay_integrator_formula_correct() {
             GraphInternalNode {
                 kind: GraphNodeKind::Constant(1.0),
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::DecayIntegrator(0.5),
@@ -490,7 +490,7 @@ fn decay_integrator_formula_correct() {
                     source_idx: 0,
                     weight: 1.0,
                 }],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::CustomOutput(0),
@@ -498,7 +498,7 @@ fn decay_integrator_formula_correct() {
                     source_idx: 1,
                     weight: 1.0,
                 }],
-                hebbian: None,
+                plasticity: None,
             },
         ],
     };
@@ -561,7 +561,7 @@ fn momentum_formula_correct() {
             GraphInternalNode {
                 kind: GraphNodeKind::Constant(1.0),
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::Momentum(0.8),
@@ -569,7 +569,7 @@ fn momentum_formula_correct() {
                     source_idx: 0,
                     weight: 1.0,
                 }],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::CustomOutput(0),
@@ -577,7 +577,7 @@ fn momentum_formula_correct() {
                     source_idx: 1,
                     weight: 1.0,
                 }],
-                hebbian: None,
+                plasticity: None,
             },
         ],
     };
@@ -621,7 +621,7 @@ fn oscillator_nan_safe() {
             GraphInternalNode {
                 kind: GraphNodeKind::Oscillator(0.0),
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::CustomOutput(0),
@@ -629,7 +629,7 @@ fn oscillator_nan_safe() {
                     source_idx: 0,
                     weight: 1.0,
                 }],
-                hebbian: None,
+                plasticity: None,
             },
         ],
     };
@@ -644,7 +644,7 @@ fn oscillator_nan_safe() {
     // Pre-set state slot 0 to INFINITY to simulate the corrupted state case.
     let mut gr = GraphRuntimeState {
         node_state: vec![vec![f32::INFINITY, 0.0]],
-        hebbian_weights: Vec::new(),
+        plasticity_weights: Vec::new(),
         scratch_prev: Vec::new(),
         scratch_curr: Vec::new(),
         scratch_backup: Vec::new(),
@@ -683,7 +683,7 @@ fn threshold_formula_correct() {
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(1.0),
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::Threshold(0.5),
@@ -691,7 +691,7 @@ fn threshold_formula_correct() {
                         source_idx: 0,
                         weight: input_weight,
                     }],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(0),
@@ -699,7 +699,7 @@ fn threshold_formula_correct() {
                         source_idx: 1,
                         weight: 1.0,
                     }],
-                    hebbian: None,
+                    plasticity: None,
                 },
             ],
         }
@@ -773,7 +773,7 @@ fn multiply_empty_inputs_is_one() {
             GraphInternalNode {
                 kind: GraphNodeKind::Multiply,
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::CustomOutput(0),
@@ -781,7 +781,7 @@ fn multiply_empty_inputs_is_one() {
                     source_idx: 0,
                     weight: 1.0,
                 }],
-                hebbian: None,
+                plasticity: None,
             },
         ],
     };
@@ -825,7 +825,7 @@ fn greater_than_formula() {
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(1.0),
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 // node 1: GreaterThan — two edges from node 0, weights wa and wb
                 GraphInternalNode {
@@ -840,7 +840,7 @@ fn greater_than_formula() {
                             weight: wb,
                         },
                     ],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(0),
@@ -848,7 +848,7 @@ fn greater_than_formula() {
                         source_idx: 1,
                         weight: 1.0,
                     }],
-                    hebbian: None,
+                    plasticity: None,
                 },
             ],
         }
@@ -927,17 +927,17 @@ fn select_formula() {
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(cond),
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(10.0),
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(20.0),
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::Select,
@@ -955,7 +955,7 @@ fn select_formula() {
                             weight: 1.0,
                         },
                     ],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(0),
@@ -963,7 +963,7 @@ fn select_formula() {
                         source_idx: 3,
                         weight: 1.0,
                     }],
-                    hebbian: None,
+                    plasticity: None,
                 },
             ],
         }
@@ -1028,7 +1028,7 @@ fn router_output_last_write_wins() {
             GraphInternalNode {
                 kind: GraphNodeKind::Constant(7.0),
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::RouterOutput,
@@ -1036,7 +1036,7 @@ fn router_output_last_write_wins() {
                     source_idx: 0,
                     weight: 1.0,
                 }],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::RouterOutput,
@@ -1044,7 +1044,7 @@ fn router_output_last_write_wins() {
                     source_idx: 0,
                     weight: 2.0,
                 }],
-                hebbian: None,
+                plasticity: None,
             },
         ],
     };
@@ -1085,7 +1085,7 @@ fn input_ref_255_soft_defaults_to_zero() {
                     sub_idx: 0,
                 },
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::CustomOutput(0),
@@ -1093,7 +1093,7 @@ fn input_ref_255_soft_defaults_to_zero() {
                     source_idx: 0,
                     weight: 1.0,
                 }],
-                hebbian: None,
+                plasticity: None,
             },
         ],
     };
@@ -1130,7 +1130,7 @@ fn custom_output_255_does_not_write_output_slots() {
             GraphInternalNode {
                 kind: GraphNodeKind::Constant(7.0),
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::CustomOutput(255),
@@ -1138,7 +1138,7 @@ fn custom_output_255_does_not_write_output_slots() {
                     source_idx: 0,
                     weight: 1.0,
                 }],
-                hebbian: None,
+                plasticity: None,
             },
         ],
     };
@@ -1178,7 +1178,7 @@ fn edge_source_65535_soft_defaults_to_zero() {
                     source_idx: u16::MAX,
                     weight: 1.0,
                 }],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::CustomOutput(0),
@@ -1186,7 +1186,7 @@ fn edge_source_65535_soft_defaults_to_zero() {
                     source_idx: 0,
                     weight: 1.0,
                 }],
-                hebbian: None,
+                plasticity: None,
             },
         ],
     };
@@ -1226,12 +1226,12 @@ fn graph_push_action_and_terminate() {
             GraphInternalNode {
                 kind: GraphNodeKind::PushAction(1), // Eat
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::ExecuteActionQueue,
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             },
         ],
     };
@@ -1272,7 +1272,7 @@ fn energy_exhaustion_prevents_effects() {
         internal_nodes: vec![GraphInternalNode {
             kind: GraphNodeKind::PushAction(1), // Eat
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         }],
     };
     let upstream = [0.0f32; 12];

@@ -96,7 +96,7 @@ fn alter_edge_weight_proportional_for_large_weights() {
             source_idx: 0,
             weight: 10.0,
         }],
-        hebbian: None,
+        plasticity: None,
     }]);
     for seed in 0u64..50 {
         let mut g = genome.clone();
@@ -122,7 +122,7 @@ fn alter_edge_weight_absolute_for_near_zero_weights() {
             source_idx: 0,
             weight: 0.0,
         }],
-        hebbian: None,
+        plasticity: None,
     }]);
     for seed in 0u64..50 {
         let mut g = genome.clone();
@@ -165,7 +165,7 @@ fn mutate_operator_param_changes_custom_output_slot() {
     let genome = graph_only_genome(vec![GraphInternalNode {
         kind: GraphNodeKind::CustomOutput(5),
         inputs: vec![],
-        hebbian: None,
+        plasticity: None,
     }]);
     let mut changed = false;
     for seed in 0u64..50 {
@@ -193,7 +193,7 @@ fn mutate_operator_param_changes_input_ref_index() {
             sub_idx: 0,
         },
         inputs: vec![],
-        hebbian: None,
+        plasticity: None,
     }]);
     let mut changed = false;
     for seed in 0u64..50 {
@@ -219,7 +219,7 @@ fn mutate_operator_param_wraps_custom_output_at_boundary() {
     let genome = graph_only_genome(vec![GraphInternalNode {
         kind: GraphNodeKind::CustomOutput(0),
         inputs: vec![],
-        hebbian: None,
+        plasticity: None,
     }]);
     let mut saw_255 = false;
     for seed in 0u64..200 {
@@ -248,7 +248,7 @@ fn mutate_operator_param_wraps_input_ref_at_boundary() {
             sub_idx: 0,
         },
         inputs: vec![],
-        hebbian: None,
+        plasticity: None,
     }]);
     let mut saw_0 = false;
     for seed in 0u64..200 {
@@ -280,12 +280,12 @@ fn copy_edge_bundle_preserves_source_edges() {
                 source_idx: 0,
                 weight: 3.0,
             }],
-            hebbian: None,
+            plasticity: None,
         },
         GraphInternalNode {
             kind: GraphNodeKind::Relu,
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         },
     ];
     for seed in 0u64..100 {

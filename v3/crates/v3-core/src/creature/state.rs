@@ -7,10 +7,10 @@ use crate::creature::identity::CreatureIdentityState;
 pub struct GraphRuntimeState {
     /// Per-node stateful operator state. Indexed [mesh_node_idx][internal_node_idx].
     pub node_state: Vec<Vec<f32>>,
-    /// Per-edge learned Hebbian weights. Indexed [mesh_node_idx][internal_node_idx][edge_idx].
-    /// Empty inner vec = use genome weights. Lazily initialized on first Hebbian evaluation.
+    /// Per-edge learned plasticity weights. Indexed [mesh_node_idx][internal_node_idx][edge_idx].
+    /// Empty inner vec = use genome weights. Lazily initialized on first plasticity evaluation.
     /// Uses `Box<[f32]>` since edge count per node is fixed after init.
-    pub hebbian_weights: Vec<Vec<Box<[f32]>>>,
+    pub plasticity_weights: Vec<Vec<Box<[f32]>>>,
     /// Scratch: prev_outputs buffer reused across graph evaluations.
     pub(crate) scratch_prev: Vec<f32>,
     /// Scratch: curr_outputs buffer reused across graph evaluations.
@@ -26,7 +26,7 @@ impl GraphRuntimeState {
     pub fn new() -> Self {
         Self {
             node_state: Vec::new(),
-            hebbian_weights: Vec::new(),
+            plasticity_weights: Vec::new(),
             scratch_prev: Vec::new(),
             scratch_curr: Vec::new(),
             scratch_backup: Vec::new(),
@@ -51,7 +51,7 @@ pub struct CreatureState {
     pub generation: u64,
     /// 1024-byte persistent memory, copied on reproduction.
     pub memory: [u8; 1024],
-    /// Per-node runtime state for Graph backends (stateful operators + Hebbian weights).
+    /// Per-node runtime state for Graph backends (stateful operators + plasticity weights).
     pub graph_runtime: GraphRuntimeState,
     /// Lifecycle-owned identity state for kin recognition and lineage tracking.
     pub identity: CreatureIdentityState,
@@ -137,7 +137,7 @@ mod tests {
         assert_eq!(state.age, 0);
         assert_eq!(state.memory, [0u8; 1024]);
         assert!(state.graph_runtime.node_state.is_empty());
-        assert!(state.graph_runtime.hebbian_weights.is_empty());
+        assert!(state.graph_runtime.plasticity_weights.is_empty());
         assert_eq!(state.generation, 0);
         assert!((state.energy - 20.0).abs() < f32::EPSILON);
         assert_eq!(state.phenotype_channels, [128, 64, 32, 10, 20, 30]);

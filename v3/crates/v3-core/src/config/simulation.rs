@@ -161,9 +161,9 @@ pub struct RuntimeConfig {
     pub graph_convergence_epsilon: f32,
     pub graph_convergence_stable_passes: u32,
     pub graph_node_base_cost: f32,
-    /// Energy cost per Hebbian weight update. Default 0.0 (free during initial rollout).
-    #[serde(default)]
-    pub hebbian_update_cost: f32,
+    /// Energy cost per plasticity weight update. Default 0.0 (free during initial rollout).
+    #[serde(default, alias = "hebbian_update_cost")]
+    pub plasticity_update_cost: f32,
     /// Maximum number of actions a creature can queue per turn.
     #[serde(default = "default_max_actions_per_turn")]
     pub max_actions_per_turn: usize,
@@ -190,7 +190,7 @@ impl Default for RuntimeConfig {
             graph_convergence_epsilon: 1e-3,
             graph_convergence_stable_passes: 2,
             graph_node_base_cost: 1e-5,
-            hebbian_update_cost: 0.0,
+            plasticity_update_cost: 0.0,
             max_actions_per_turn: default_max_actions_per_turn(),
             vm: VmRuntimeConfig::default(),
             perception: PerceptionRuntimeConfig::default(),
@@ -365,7 +365,7 @@ impl SimulationConfig {
             rt.graph_convergence_stable_passes = 2;
         }
         rt.graph_node_base_cost = normalize_f32_nonneg(rt.graph_node_base_cost, 1e-5);
-        rt.hebbian_update_cost = normalize_f32_finite_nonneg(rt.hebbian_update_cost, 0.0);
+        rt.plasticity_update_cost = normalize_f32_finite_nonneg(rt.plasticity_update_cost, 0.0);
         if rt.max_actions_per_turn < 1 {
             rt.max_actions_per_turn = 10;
         }

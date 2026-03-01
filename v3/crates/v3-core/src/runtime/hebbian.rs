@@ -34,7 +34,7 @@ pub(crate) fn ensure_hebbian_weights(
 
     // Lazily initialize weights for Hebbian nodes from genome.
     for (i, inode) in def.internal_nodes.iter().enumerate() {
-        if inode.hebbian.is_some() && node_weights[i].is_empty() && !inode.inputs.is_empty() {
+        if inode.plasticity.is_some() && node_weights[i].is_empty() && !inode.inputs.is_empty() {
             let weights: Vec<f32> = inode.inputs.iter().map(|inp| inp.weight).collect();
             node_weights[i] = weights.into_boxed_slice();
         }
@@ -74,7 +74,7 @@ pub(crate) fn apply_hebbian_updates(
     let mut total_cost: f32 = 0.0;
 
     for (i, inode) in def.internal_nodes.iter().enumerate() {
-        let cfg = match &inode.hebbian {
+        let cfg = match &inode.plasticity {
             Some(c) => c,
             None => continue,
         };
@@ -162,14 +162,15 @@ pub(crate) fn collect_weighted_inputs_hebbian(
 /// Returns `true` if any internal node in this graph def has Hebbian learning enabled.
 #[inline]
 pub(crate) fn has_any_hebbian(def: &GraphBackendDef) -> bool {
-    def.internal_nodes.iter().any(|n| n.hebbian.is_some())
+    def.internal_nodes.iter().any(|n| n.plasticity.is_some())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::creature::genome::{
-        GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind, HebbianConfig, HebbianRule,
+        GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind, HebbianRule,
+        PlasticityConfig,
     };
 
     fn make_hebbian_def(rule: HebbianRule, rate: f32, clamp: f32) -> GraphBackendDef {
@@ -179,7 +180,7 @@ mod tests {
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(1.0),
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 // Node 1: Hebbian node with one input from node 0
                 GraphInternalNode {
@@ -188,11 +189,12 @@ mod tests {
                         source_idx: 0,
                         weight: 0.5,
                     }],
-                    hebbian: Some(HebbianConfig {
+                    plasticity: Some(PlasticityConfig {
                         rule,
                         learning_rate: rate,
                         weight_clamp: clamp,
                         lamarckian: false,
+                        modulation: None,
                     }),
                 },
             ],
@@ -336,7 +338,7 @@ mod tests {
                     source_idx: 0,
                     weight: 1.0,
                 }],
-                hebbian: None,
+                plasticity: None,
             }],
         };
         let mut hw: Vec<Vec<Box<[f32]>>> = Vec::new();
@@ -359,7 +361,7 @@ mod tests {
             internal_nodes: vec![GraphInternalNode {
                 kind: GraphNodeKind::Add,
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             }],
         };
         assert!(!has_any_hebbian(&def_without));
@@ -379,11 +381,12 @@ mod tests {
                     weight: 2.0,
                 },
             ],
-            hebbian: Some(HebbianConfig {
+            plasticity: Some(PlasticityConfig {
                 rule: HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 5.0,
                 lamarckian: false,
+                modulation: None,
             }),
         };
 

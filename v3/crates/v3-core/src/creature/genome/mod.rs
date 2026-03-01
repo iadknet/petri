@@ -147,9 +147,37 @@ pub enum HebbianRule {
     Covariance,
 }
 
-/// Per-node Hebbian learning configuration stored in the genome.
+/// Outcome channel for reward-modulated learning.
+///
+/// Describes **what happened** (not what should matter). Evolution discovers
+/// which circuits listen to which signals.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub enum OutcomeChannel {
+    EnergyDelta = 0,
+    ActionSuccess = 1,
+    DamageDelta = 2,
+    OffspringSuccess = 3,
+}
+
+/// Number of outcome channels.
+pub const OUTCOME_CHANNEL_COUNT: usize = 4;
+
+/// Reward modulation config for three-factor plasticity.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct HebbianConfig {
+pub struct RewardModulationConfig {
+    pub reward_source: OutcomeChannel,
+    /// Eligibility trace decay factor, clamped to [0.0, 1.0] at runtime.
+    pub trace_decay: f32,
+}
+
+/// Per-node plasticity configuration stored in the genome.
+///
+/// Governs both pure Hebbian and reward-modulated (three-factor) learning.
+/// When `modulation` is `None`, this is pure Hebbian learning. When `Some`,
+/// the Hebbian delta is accumulated into an eligibility trace and weight
+/// updates are deferred to the reward-modulated learning pass.
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct PlasticityConfig {
     pub rule: HebbianRule,
     /// Learning rate, clamped to [0.0, 1.0] at runtime.
     pub learning_rate: f32,
@@ -158,6 +186,9 @@ pub struct HebbianConfig {
     /// If true, offspring inherit learned weights (Lamarckian); otherwise
     /// offspring start from genome birth weights (Darwinian).
     pub lamarckian: bool,
+    /// Reward modulation config. `None` = pure Hebbian (default).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub modulation: Option<RewardModulationConfig>,
 }
 
 /// A weighted edge in a graph internal node's input list.
@@ -222,9 +253,9 @@ pub enum GraphNodeKind {
 pub struct GraphInternalNode {
     pub kind: GraphNodeKind,
     pub inputs: Vec<GraphInput>,
-    /// Per-node Hebbian learning config. `None` = immutable weights (default).
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub hebbian: Option<HebbianConfig>,
+    /// Per-node plasticity config. `None` = immutable weights (default).
+    #[serde(default, skip_serializing_if = "Option::is_none", alias = "hebbian")]
+    pub plasticity: Option<PlasticityConfig>,
 }
 
 /// Graph backend definition for a mesh node.
@@ -545,7 +576,7 @@ mod tests {
                                 source_idx: 0,
                                 weight: 1.0,
                             }],
-                            hebbian: None,
+                            plasticity: None,
                         },
                         GraphInternalNode {
                             kind: GraphNodeKind::Sigmoid,
@@ -559,7 +590,7 @@ mod tests {
                                     weight: -0.3,
                                 },
                             ],
-                            hebbian: None,
+                            plasticity: None,
                         },
                     ],
                 }),
@@ -594,7 +625,7 @@ mod tests {
                         internal_nodes: vec![GraphInternalNode {
                             kind: GraphNodeKind::Constant(1.0),
                             inputs: vec![],
-                            hebbian: None,
+                            plasticity: None,
                         }],
                     }),
                     targets: vec![],
@@ -612,7 +643,7 @@ mod tests {
             internal_nodes: vec![GraphInternalNode {
                 kind: GraphNodeKind::CustomOutput(2),
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             }],
         });
         backend.remap_output_slots(3);
@@ -631,7 +662,7 @@ mod tests {
             internal_nodes: vec![GraphInternalNode {
                 kind: GraphNodeKind::CustomOutput(10),
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             }],
         });
         backend.remap_output_slots(5);
@@ -650,7 +681,7 @@ mod tests {
             internal_nodes: vec![GraphInternalNode {
                 kind: GraphNodeKind::CustomOutput(200),
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             }],
         });
         backend.remap_output_slots(5);
@@ -696,5 +727,69 @@ mod tests {
         let json = serde_json::to_string(&genome).unwrap();
         let genome2: CreatureGenome = serde_json::from_str(&json).unwrap();
         assert_eq!(genome, genome2);
+    }
+
+    #[test]
+    fn hebbian_alias_deserializes_to_plasticity_field() {
+        // Old JSON with "hebbian" key must deserialize into the renamed "plasticity" field.
+        let json = r#"{
+            "kind": "Add",
+            "inputs": [{"source_idx": 0, "weight": 1.0}],
+            "hebbian": {"rule": "Classic", "learning_rate": 0.1, "weight_clamp": 5.0, "lamarckian": false}
+        }"#;
+        let node: GraphInternalNode = serde_json::from_str(json).unwrap();
+        assert!(node.plasticity.is_some());
+        let cfg = node.plasticity.unwrap();
+        assert_eq!(cfg.rule, HebbianRule::Classic);
+        assert!((cfg.learning_rate - 0.1).abs() < 1e-6);
+        assert!(cfg.modulation.is_none());
+    }
+
+    #[test]
+    fn plasticity_config_serde_roundtrip_with_modulation() {
+        let cfg = PlasticityConfig {
+            rule: HebbianRule::Oja,
+            learning_rate: 0.05,
+            weight_clamp: 3.0,
+            lamarckian: true,
+            modulation: Some(RewardModulationConfig {
+                reward_source: OutcomeChannel::EnergyDelta,
+                trace_decay: 0.9,
+            }),
+        };
+        let json = serde_json::to_string(&cfg).unwrap();
+        let cfg2: PlasticityConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(cfg, cfg2);
+    }
+
+    #[test]
+    fn plasticity_config_serde_roundtrip_without_modulation() {
+        let cfg = PlasticityConfig {
+            rule: HebbianRule::Classic,
+            learning_rate: 0.1,
+            weight_clamp: 5.0,
+            lamarckian: false,
+            modulation: None,
+        };
+        let json = serde_json::to_string(&cfg).unwrap();
+        // modulation: None should be skipped in serialization
+        assert!(!json.contains("modulation"));
+        let cfg2: PlasticityConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(cfg, cfg2);
+    }
+
+    #[test]
+    fn outcome_channel_serde_roundtrip() {
+        let channels = [
+            OutcomeChannel::EnergyDelta,
+            OutcomeChannel::ActionSuccess,
+            OutcomeChannel::DamageDelta,
+            OutcomeChannel::OffspringSuccess,
+        ];
+        for ch in channels {
+            let json = serde_json::to_string(&ch).unwrap();
+            let ch2: OutcomeChannel = serde_json::from_str(&json).unwrap();
+            assert_eq!(ch, ch2);
+        }
     }
 }
