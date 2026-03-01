@@ -297,6 +297,14 @@ fn mutate_operator_param(
             | GraphNodeKind::Oscillator(ref mut p) => {
                 *p += rng.gen_range(-0.1f32..=0.1);
             }
+            GraphNodeKind::WriteActionMeta(ref mut slot)
+            | GraphNodeKind::PushAction(ref mut slot) => {
+                if rng.gen_bool(0.5) {
+                    *slot = slot.wrapping_add(1);
+                } else {
+                    *slot = slot.wrapping_sub(1);
+                }
+            }
             _ => unreachable!("is_parameterized filter should prevent reaching here"),
         }
     }
@@ -419,7 +427,10 @@ fn apply_graph_raw_field_mutation(
         for internal in &g.internal_nodes {
             if matches!(
                 &internal.kind,
-                GraphNodeKind::InputRef { .. } | GraphNodeKind::CustomOutput(_)
+                GraphNodeKind::InputRef { .. }
+                    | GraphNodeKind::CustomOutput(_)
+                    | GraphNodeKind::WriteActionMeta(_)
+                    | GraphNodeKind::PushAction(_)
             ) {
                 target_count += 1;
             }
@@ -433,19 +444,30 @@ fn apply_graph_raw_field_mutation(
         for int_idx in 0..g.internal_nodes.len() {
             if matches!(
                 &g.internal_nodes[int_idx].kind,
-                GraphNodeKind::InputRef { .. } | GraphNodeKind::CustomOutput(_)
+                GraphNodeKind::InputRef { .. }
+                    | GraphNodeKind::CustomOutput(_)
+                    | GraphNodeKind::WriteActionMeta(_)
+                    | GraphNodeKind::PushAction(_)
             ) {
                 if pick == 0 {
-                    if matches!(
-                        &g.internal_nodes[int_idx].kind,
-                        GraphNodeKind::InputRef { .. }
-                    ) {
-                        g.internal_nodes[int_idx].kind = GraphNodeKind::InputRef {
-                            ref_idx: rng.gen(),
-                            sub_idx: 0,
-                        };
-                    } else {
-                        g.internal_nodes[int_idx].kind = GraphNodeKind::CustomOutput(rng.gen());
+                    match &g.internal_nodes[int_idx].kind {
+                        GraphNodeKind::InputRef { .. } => {
+                            g.internal_nodes[int_idx].kind = GraphNodeKind::InputRef {
+                                ref_idx: rng.gen(),
+                                sub_idx: 0,
+                            };
+                        }
+                        GraphNodeKind::CustomOutput(_) => {
+                            g.internal_nodes[int_idx].kind = GraphNodeKind::CustomOutput(rng.gen());
+                        }
+                        GraphNodeKind::WriteActionMeta(_) => {
+                            g.internal_nodes[int_idx].kind =
+                                GraphNodeKind::WriteActionMeta(rng.gen());
+                        }
+                        GraphNodeKind::PushAction(_) => {
+                            g.internal_nodes[int_idx].kind = GraphNodeKind::PushAction(rng.gen());
+                        }
+                        _ => unreachable!(),
                     }
                     return Ok(());
                 }
@@ -464,9 +486,9 @@ fn apply_graph_raw_field_mutation(
     Ok(())
 }
 
-/// Return a random GraphNodeKind covering all 22 variants with random initial params.
+/// Return a random GraphNodeKind covering all 26 variants with random initial params.
 fn random_graph_node_kind(rng: &mut impl Rng) -> GraphNodeKind {
-    match rng.gen_range(0u8..22) {
+    match rng.gen_range(0u8..26) {
         0 => GraphNodeKind::InputRef {
             ref_idx: rng.gen(),
             sub_idx: 0,
@@ -491,7 +513,11 @@ fn random_graph_node_kind(rng: &mut impl Rng) -> GraphNodeKind {
         18 => GraphNodeKind::Oscillator(rng.gen_range(0.01f32..=10.0)),
         19 => GraphNodeKind::AdaptiveGain,
         20 => GraphNodeKind::CustomOutput(rng.gen()),
-        _ => GraphNodeKind::RouterOutput,
+        21 => GraphNodeKind::RouterOutput,
+        22 => GraphNodeKind::WriteActionMeta(rng.gen_range(0u8..8)),
+        23 => GraphNodeKind::PushAction(rng.gen_range(0u8..5)),
+        24 => GraphNodeKind::PopAction,
+        _ => GraphNodeKind::ExecuteActionQueue,
     }
 }
 
@@ -506,6 +532,8 @@ fn is_parameterized(kind: &GraphNodeKind) -> bool {
             | GraphNodeKind::Oscillator(_)
             | GraphNodeKind::CustomOutput(_)
             | GraphNodeKind::InputRef { .. }
+            | GraphNodeKind::WriteActionMeta(_)
+            | GraphNodeKind::PushAction(_)
     )
 }
 

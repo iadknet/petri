@@ -248,7 +248,7 @@ fn swap_operator_can_produce_parameterized_kinds() {
 }
 
 #[test]
-fn random_graph_node_kind_covers_all_22_variants() {
+fn random_graph_node_kind_covers_all_26_variants() {
     use std::collections::HashSet;
     let mut discriminants: HashSet<std::mem::Discriminant<GraphNodeKind>> = HashSet::new();
     for seed in 0u64..2000 {
@@ -258,8 +258,8 @@ fn random_graph_node_kind_covers_all_22_variants() {
     }
     assert_eq!(
         discriminants.len(),
-        22,
-        "all 22 GraphNodeKind variants must be reachable; got {}",
+        26,
+        "all 26 GraphNodeKind variants must be reachable; got {}",
         discriminants.len()
     );
 }
