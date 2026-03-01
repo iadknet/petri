@@ -121,6 +121,7 @@ mod tests {
     use crate::creature::genome::{
         BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
     };
+    use crate::creature::identity::CreatureIdentityState;
     use crate::creature::state::CreatureState;
     use crate::kernel::WorldState;
     use slotmap::SlotMap;
@@ -152,6 +153,7 @@ mod tests {
             [128, 64, 32, 10, 20, 30],
             0,
             [true; 6],
+            CreatureIdentityState::default(),
         )
     }
 
@@ -257,6 +259,7 @@ mod tests {
             [0; 6],
             0,
             [true; 6],
+            CreatureIdentityState::default(),
         );
         creature.age = 42;
         let si = assemble_static_inputs(&world, &creature);

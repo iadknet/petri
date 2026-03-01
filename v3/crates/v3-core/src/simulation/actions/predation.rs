@@ -166,6 +166,7 @@ mod tests {
     use crate::config::SimulationConfig;
     use crate::contracts::{CreatureId, Position};
     use crate::creature::founder::v3alpha1_founder_genome;
+    use crate::creature::identity::CreatureIdentityState;
     use crate::creature::state::CreatureState;
     use crate::kernel::WorldState;
     use crate::simulation::simulation::Simulation;
@@ -198,6 +199,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         world.place_creature(pos_a, attacker_id);
@@ -212,6 +214,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         world.place_creature(pos_v, victim_id);
@@ -248,6 +251,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         world.place_creature(pos, id);

@@ -67,6 +67,7 @@ mod tests {
     use crate::config::SimulationConfig;
     use crate::contracts::Position;
     use crate::creature::founder::v3alpha1_founder_genome;
+    use crate::creature::identity::CreatureIdentityState;
     use crate::kernel::WorldState;
     use crate::simulation::seeding::seed_simulation;
     use crate::simulation::simulation::Simulation;
@@ -97,6 +98,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         world.place_creature(pos, id);
@@ -221,6 +223,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         let id2 = creatures.insert_with_key(|id| {
@@ -233,6 +236,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         world.place_creature(pos1, id1);
@@ -285,6 +289,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         let blocker = creatures.insert_with_key(|id| {
@@ -297,6 +302,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         world.place_creature(pos, parent);
@@ -589,6 +595,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         let _id2 = creatures.insert_with_key(|id| {
@@ -601,6 +608,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         world.place_creature(pos1, id1);
