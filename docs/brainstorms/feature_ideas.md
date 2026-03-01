@@ -2,6 +2,16 @@
 
 ## Small Modifications
 
+### Deduplicate graph relaxation loop via tracer trait
+
+`graph.rs` and `traced_graph.rs` duplicate the entire relaxation loop (~100 lines each). The traced version adds per-pass `GraphPassTrace` recording but is otherwise identical. A tracer trait pattern (`NoopTracer` vs `RecordingTracer`) with a single generic `execute_graph_node_impl<T: GraphTracer>()` would eliminate the duplication, prevent future divergence, and ensure every graph feature only needs one implementation.
+
+Design considerations:
+- `graph.rs` uses scratch buffer reuse (`std::mem::take` from `GraphRuntimeState`); `traced_graph.rs` allocates fresh vecs. The generic implementation should support the optimized path.
+- The tracer trait needs methods for: pass start (energy cost), per-node evaluation (weighted inputs, state transitions, output), pass end (max delta).
+- `NoopTracer` methods should be `#[inline]` and zero-cost (no allocation, no recording).
+- State backup differs: `graph.rs` uses `extend_from_slice` into a scratch buffer; `traced_graph.rs` uses `clone()`. The generic version should use the scratch-buffer approach.
+
 ## Major New Features
 
 ### Graph nodes can execute actions through deferred queue outputs
