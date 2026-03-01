@@ -61,8 +61,12 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
     use crate::runtime::trace::{StaticInputsSnapshot, TickTrace};
     use crate::runtime::traced_mesh::execute_creature_mesh_traced;
     use crate::runtime::types::MeshOutput;
-    use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
+    use crate::sensors::perception::{
+        genome_uses_extended_perception, PerceptionConfig, PerceptionSnapshot, SensorSnapshot,
+    };
+    use crate::sensors::reducers::assemble_perception;
     use crate::sensors::static_inputs::assemble_static_inputs;
+    use crate::sensors::visibility::{compute_visible_cells, get_visibility_table};
     use crate::simulation::actions::{
         apply_eat, apply_move, apply_noop, apply_reproduce, apply_steal_energy,
         PredationActionResult, ReproductionActionResult,
@@ -115,17 +119,30 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
     // mutates each creature's private state (energy, memory, graph_runtime).
 
     // 1a: Assemble sensor inputs sequentially (needs &sim.world + &sim.creatures).
-    // Build SensorSnapshot with PerceptionSnapshot::zero() — actual perception
-    // assembly is deferred to Step 4.
+    // Conditional perception: only assemble full visibility + area reduction for
+    // genomes that reference extended perception keys. Others use zero() fallback.
+    let perception_config = PerceptionConfig::from_sim_config(&sim.config);
+    let vis_table = get_visibility_table(perception_config.vision_radius);
     let inputs: Vec<_> = queue
         .iter()
         .filter(|&&id| sim.creatures.contains_key(id))
         .map(|&id| {
-            let local = assemble_static_inputs(&sim.world, &sim.creatures[id]);
-            let ss = SensorSnapshot {
-                local,
-                perception: PerceptionSnapshot::zero(),
+            let creature = &sim.creatures[id];
+            let local = assemble_static_inputs(&sim.world, creature);
+            let perception = if genome_uses_extended_perception(&creature.genome) {
+                let visible = compute_visible_cells(creature.position, &sim.world, vis_table);
+                assemble_perception(
+                    id,
+                    creature,
+                    &visible,
+                    &sim.world,
+                    &sim.creatures,
+                    &perception_config,
+                )
+            } else {
+                PerceptionSnapshot::zero()
             };
+            let ss = SensorSnapshot { local, perception };
             (id, ss)
         })
         .collect();

@@ -189,6 +189,18 @@ impl PerceptionConfig {
     }
 }
 
+/// Check if a creature genome references any extended perception world keys.
+///
+/// Used for conditional assembly: only genomes that actually read extended
+/// perception inputs need full visibility computation and area reduction.
+pub fn genome_uses_extended_perception(genome: &crate::creature::genome::CreatureGenome) -> bool {
+    genome.nodes.iter().any(|node| {
+        node.input_refs
+            .iter()
+            .any(|r| matches!(r, crate::contracts::InputReference::World(key) if PerceptionSnapshot::is_extended_key(key)))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -295,5 +307,52 @@ mod tests {
             (p.min_reproduce_energy - sim_cfg.energy.lifecycle.min_reproduce_energy).abs()
                 < f32::EPSILON
         );
+    }
+
+    #[test]
+    fn genome_uses_extended_perception_false_for_local_only() {
+        use crate::contracts::{InputReference, NodeId};
+        use crate::creature::genome::{
+            BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
+        };
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![VmInstruction::Halt],
+                }),
+                targets: vec![],
+            }],
+        };
+        assert!(!genome_uses_extended_perception(&genome));
+    }
+
+    #[test]
+    fn genome_uses_extended_perception_true_for_area_food() {
+        use crate::contracts::{InputReference, NodeId};
+        use crate::creature::genome::{
+            BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
+        };
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![
+                    InputReference::World(WorldInputKey::FoodHere),
+                    InputReference::World(WorldInputKey::AreaFoodSummary),
+                ],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![VmInstruction::Halt],
+                }),
+                targets: vec![],
+            }],
+        };
+        assert!(genome_uses_extended_perception(&genome));
     }
 }
