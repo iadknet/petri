@@ -1,5 +1,4 @@
 pub mod actions;
-#[allow(dead_code)] // Wired in Stage 2
 pub(crate) mod outcomes;
 pub mod seeding;
 #[allow(clippy::module_inception)]

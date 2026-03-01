@@ -31,7 +31,8 @@ pub(crate) struct OutcomeRecord {
 
 /// Tick-level outcome accumulator for all creatures.
 ///
-/// Reused across ticks via [`clear`](OutcomeAccumulator::clear) to avoid
+/// Currently created fresh per tick. If moved into `Simulation` for
+/// cross-tick reuse, call [`clear`](OutcomeAccumulator::clear) to avoid
 /// reallocation (`mem-reuse-collections`).
 #[derive(Debug, Clone, Default)]
 pub(crate) struct OutcomeAccumulator {
@@ -40,6 +41,7 @@ pub(crate) struct OutcomeAccumulator {
 
 impl OutcomeAccumulator {
     /// Reset for a new tick without deallocating.
+    #[allow(dead_code)] // Used when accumulator is stored in Simulation for reuse.
     pub(crate) fn clear(&mut self) {
         self.records.clear();
     }

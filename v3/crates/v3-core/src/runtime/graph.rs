@@ -5,6 +5,7 @@ use crate::creature::state::GraphRuntimeState;
 use crate::runtime::graph_effects::apply_graph_effects;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::plasticity::hebbian;
+use crate::runtime::plasticity::traces;
 use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult};
 use crate::sensors::perception::SensorSnapshot;
 
@@ -262,6 +263,12 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
         hebbian::ensure_hebbian_weights(def, node_idx, &mut graph_runtime.plasticity_weights);
     }
 
+    // Check if any node uses reward-modulated plasticity and prepare traces.
+    let use_reward_modulated = traces::has_any_reward_modulated(def);
+    if use_reward_modulated {
+        traces::ensure_eligibility_traces(def, node_idx, &mut graph_runtime.eligibility_traces);
+    }
+
     let max_passes = config.max_graph_relax_iters;
     let epsilon = config.graph_convergence_epsilon;
     let req_stable = config.graph_convergence_stable_passes;
@@ -397,6 +404,19 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
             config.plasticity_update_cost,
         );
         *energy -= plasticity_cost;
+    }
+
+    // Update eligibility traces for reward-modulated nodes.
+    // Traces accumulate Hebbian deltas with decay; actual weight updates happen
+    // in Phase 2.5 (reward::apply_reward_modulated_updates).
+    if use_reward_modulated {
+        traces::update_eligibility_traces(
+            def,
+            node_idx,
+            &mut graph_runtime.eligibility_traces,
+            &graph_runtime.plasticity_weights,
+            &curr_outputs,
+        );
     }
 
     // Build NodeResult via the shared 3-phase effect pass.

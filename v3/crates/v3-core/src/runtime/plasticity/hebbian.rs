@@ -79,6 +79,12 @@ pub(crate) fn apply_hebbian_updates(
             None => continue,
         };
 
+        // Skip reward-modulated nodes — they are updated in Phase 2.5 via
+        // reward::apply_reward_modulated_updates(), not here.
+        if cfg.modulation.is_some() {
+            continue;
+        }
+
         if inode.inputs.is_empty() {
             continue;
         }
