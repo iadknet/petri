@@ -6,12 +6,12 @@
 //! semantics, apply the same changes here and verify with equivalence tests.
 
 use crate::config::RuntimeConfig;
-use crate::contracts::{ActionQueue, InputReference};
+use crate::contracts::InputReference;
 use crate::creature::genome::VmBackendDef;
 use crate::runtime::action_decode::decode_world_action;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::trace::{MemoryWrite, VmStepTrace, VmTrace};
-use crate::runtime::types::{sanitize_f32, NodeResult};
+use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult};
 use crate::runtime::vm::{is_truthy, jump_target, nr, opcode_base_cost};
 use crate::sensors::static_inputs::StaticInputs;
 
@@ -30,7 +30,7 @@ pub fn execute_vm_node_traced(
     memory: &mut [u8; 1024],
     static_inputs: &StaticInputs,
     config: &RuntimeConfig,
-    action_queue: &mut ActionQueue,
+    side_outputs: &mut MeshSideOutputs,
 ) -> (NodeResult, VmTrace) {
     let reg_count = def.register_count as usize;
 
@@ -324,7 +324,7 @@ pub fn execute_vm_node_traced(
                         upstream_slots,
                         energy: *energy,
                         energy_consumed,
-                        action_queue,
+                        action_queue: &side_outputs.action_queue,
                     };
                     resolve_input(&input_refs[*ref_idx as usize], *sub_idx, &ctx)
                 } else {
@@ -347,20 +347,20 @@ pub fn execute_vm_node_traced(
 
             VmInstruction::PushAction { action_type } => {
                 let action = decode_world_action(*action_type, &meta);
-                action_queue.push(action);
+                side_outputs.action_queue.push(action);
             }
 
             VmInstruction::PopAction => {
-                action_queue.pop();
+                side_outputs.action_queue.pop();
             }
 
             VmInstruction::ReadActionQueueLength { dst } => {
-                regs[nr(*dst, reg_count)] = action_queue.len() as f32;
+                regs[nr(*dst, reg_count)] = side_outputs.action_queue.len() as f32;
             }
 
             VmInstruction::ReadActionQueueType { index_src, dst } => {
                 let idx = regs[nr(*index_src, reg_count)] as usize;
-                regs[nr(*dst, reg_count)] = action_queue.action_type_at(idx);
+                regs[nr(*dst, reg_count)] = side_outputs.action_queue.action_type_at(idx);
             }
 
             VmInstruction::ReadActionQueueParam {
@@ -369,7 +369,37 @@ pub fn execute_vm_node_traced(
                 dst,
             } => {
                 let idx = regs[nr(*index_src, reg_count)] as usize;
-                regs[nr(*dst, reg_count)] = action_queue.param_at(idx, *param_slot as usize);
+                regs[nr(*dst, reg_count)] = side_outputs
+                    .action_queue
+                    .param_at(idx, *param_slot as usize);
+            }
+
+            VmInstruction::SetPriorityBid { src } => {
+                let raw = regs[nr(*src, reg_count)];
+                let bid = if raw > 0.0 { raw } else { 0.0 };
+                *energy -= bid;
+                if *energy <= 0.0 {
+                    trace_steps.push(VmStepTrace {
+                        pc,
+                        instruction: instr.clone(),
+                        energy_cost: opcode_cost + bid,
+                        energy_after: *energy,
+                        register_changes: Vec::new(),
+                    });
+                    return (
+                        NodeResult::exhausted(),
+                        build_trace!(trace_steps, mem_writes),
+                    );
+                }
+                side_outputs.priority_bid = bid;
+                // Record with total cost (opcode + bid) since both are deducted.
+                trace_steps.push(VmStepTrace {
+                    pc,
+                    instruction: instr.clone(),
+                    energy_cost: opcode_cost + bid,
+                    energy_after: *energy,
+                    register_changes: Vec::new(),
+                });
             }
 
             VmInstruction::ExecuteActionQueue => {
@@ -464,7 +494,9 @@ pub fn execute_vm_node_traced(
         // Don't re-record ExecuteActionQueue/Halt (already recorded above)
         if !matches!(
             instr,
-            VmInstruction::ExecuteActionQueue | VmInstruction::Halt
+            VmInstruction::ExecuteActionQueue
+                | VmInstruction::Halt
+                | VmInstruction::SetPriorityBid { .. }
         ) {
             trace_steps.push(VmStepTrace {
                 pc,

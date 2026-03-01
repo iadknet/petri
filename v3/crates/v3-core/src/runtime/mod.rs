@@ -10,4 +10,4 @@ pub mod traced_vm;
 pub mod types;
 pub mod vm;
 pub use mesh::execute_creature_mesh;
-pub use types::{sanitize_f32, NodeResult};
+pub use types::{sanitize_f32, MeshOutput, MeshSideOutputs, NodeResult};

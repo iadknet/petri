@@ -28,6 +28,8 @@ pub struct TickTrace {
     pub hops: Vec<MeshHopTrace>,
     pub final_actions: Vec<WorldAction>,
     pub termination_reason: TerminationReason,
+    /// Energy bid for turn-order priority (0.0 if none).
+    pub priority_bid: f32,
 }
 
 /// Why the mesh chain terminated for this tick.

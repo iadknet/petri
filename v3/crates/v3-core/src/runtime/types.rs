@@ -1,3 +1,5 @@
+use crate::contracts::{ActionQueue, WorldAction};
+
 /// Result returned by a single node evaluation.
 /// The mesh executor uses this to decide routing. Action queue lives in the
 /// mesh executor, not inside NodeResult.
@@ -58,6 +60,38 @@ pub struct ComputeCostReport {
     pub vm_cost: f32,
     /// Total energy deducted from executing Graph nodes this tick.
     pub graph_cost: f32,
+}
+
+/// Accumulated side outputs from VM/graph node execution within a single mesh evaluation.
+/// Passed as `&mut` through the mesh hop chain; consumed by the mesh executor on return.
+#[derive(Debug)]
+pub struct MeshSideOutputs {
+    /// Action queue that persists across mesh hops.
+    pub action_queue: ActionQueue,
+    /// Energy bid for turn-order priority. 0.0 = no bid (default).
+    pub priority_bid: f32,
+}
+
+impl MeshSideOutputs {
+    /// Create a new `MeshSideOutputs` with an empty action queue.
+    pub fn new(max_actions: usize) -> Self {
+        Self {
+            action_queue: ActionQueue::new(max_actions),
+            priority_bid: 0.0,
+        }
+    }
+}
+
+/// Complete output of one creature's mesh evaluation for a single tick.
+#[derive(Debug, Clone)]
+#[must_use]
+pub struct MeshOutput {
+    /// Actions queued for Phase 2 execution.
+    pub actions: Vec<WorldAction>,
+    /// Energy cost attribution (VM vs graph).
+    pub cost_report: ComputeCostReport,
+    /// Energy bid for turn-order priority. 0.0 = no bid (default).
+    pub priority_bid: f32,
 }
 
 /// Sanitize an f32 value per v3-vm-isa-spec.md Section 5:

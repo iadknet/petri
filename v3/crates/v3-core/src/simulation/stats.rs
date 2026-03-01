@@ -65,4 +65,10 @@ pub struct SimStats {
     pub last_tick_compute_vm_mean: f32,
     /// Mean graph-node compute cost across creatures that executed at least one graph node.
     pub last_tick_compute_graph_mean: f32,
+
+    // ── Per-tick priority bid stats (reset at start of each tick) ─────────────
+    /// Mean priority bid energy across all creatures (including 0-bidders).
+    pub last_tick_priority_bid_mean: f32,
+    /// Number of creatures that bid > 0 this tick.
+    pub last_tick_priority_bidders_count: u32,
 }

@@ -229,7 +229,7 @@ fn random_vm_instruction(
     let cl = constants_len.clamp(1, 255) as u8;
     let il = input_refs_len.clamp(1, 255) as u8;
 
-    match rng.gen_range(0u8..38) {
+    match rng.gen_range(0u8..39) {
         0 => VmInstruction::Noop,
         1 => VmInstruction::LoadConst {
             dst: rng.gen_range(0..rc),
@@ -376,10 +376,14 @@ fn random_vm_instruction(
             dst: rng.gen_range(0..rc),
             imm_addr: rng.gen(),
         },
-        _ => VmInstruction::StoreMem8Imm {
+        37 => VmInstruction::StoreMem8Imm {
             imm_addr: rng.gen(),
             src: rng.gen_range(0..rc),
         },
+        38 => VmInstruction::SetPriorityBid {
+            src: rng.gen_range(0..rc),
+        },
+        _ => unreachable!("gen_range(0..39) cannot produce values >= 39"),
     }
 }
 
@@ -495,6 +499,9 @@ fn mutate_instruction_raw_fields(instr: &mut VmInstruction, rng: &mut impl Rng) 
             *instr = VmInstruction::PushAction {
                 action_type: rng.gen(),
             };
+        }
+        VmInstruction::SetPriorityBid { src } => {
+            *src = rng.gen();
         }
     }
 }
@@ -629,6 +636,7 @@ fn remap_register_refs(instr: &mut VmInstruction, offset: u8, register_count: u8
         VmInstruction::PushAction { .. }
         | VmInstruction::PopAction
         | VmInstruction::ExecuteActionQueue => {}
+        VmInstruction::SetPriorityBid { src } => remap(src),
         VmInstruction::ReadActionQueueLength { dst } => remap(dst),
         VmInstruction::ReadActionQueueType { index_src, dst } => {
             remap(index_src);

@@ -6,16 +6,16 @@
 //! [`WorldAction`] is emitted or a soft-default termination condition fires.
 
 use crate::config::RuntimeConfig;
-use crate::contracts::{ActionQueue, NodeId, WorldAction};
+use crate::contracts::{NodeId, WorldAction};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::graph::execute_graph_node;
-use crate::runtime::types::ComputeCostReport;
+use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs};
 use crate::runtime::vm::execute_vm_node;
 use crate::sensors::static_inputs::StaticInputs;
 
-/// Execute the creature's mesh chain for one tick, returning the queued actions
-/// and a [`ComputeCostReport`] of energy spent on VM and graph node execution.
+/// Execute the creature's mesh chain for one tick, returning a [`MeshOutput`]
+/// containing the queued actions, a [`ComputeCostReport`], and the priority bid.
 ///
 /// The function walks the genome's node chain starting at `entry_node_id`,
 /// dispatching each node to its VM or Graph backend, routing to subsequent
@@ -41,23 +41,31 @@ pub fn execute_creature_mesh(
     memory: &mut [u8; 1024],
     graph_runtime: &mut GraphRuntimeState,
     config: &RuntimeConfig,
-) -> (Vec<WorldAction>, ComputeCostReport) {
+) -> MeshOutput {
     let mut current_node_id = genome.entry_node_id;
     let mut upstream_slots = [0.0f32; 12];
     let mut hops: usize = 0;
     let max_hops = config.max_mesh_hops.max(1) as usize;
     let start_energy = *energy;
     let mut report = ComputeCostReport::default();
-    let mut action_queue = ActionQueue::new(config.max_actions_per_turn);
+    let mut side_outputs = MeshSideOutputs::new(config.max_actions_per_turn);
 
     // Soft default: entry_node_id missing from node set → return NoOp immediately.
     if find_node_index(&genome.nodes, current_node_id).is_none() {
-        return (vec![WorldAction::NoOp], report);
+        return MeshOutput {
+            actions: vec![WorldAction::NoOp],
+            cost_report: report,
+            priority_bid: side_outputs.priority_bid,
+        };
     }
 
     loop {
         if hops >= max_hops {
-            return (action_queue.into_actions_or_noop(), report);
+            return MeshOutput {
+                actions: side_outputs.action_queue.into_actions_or_noop(),
+                cost_report: report,
+                priority_bid: side_outputs.priority_bid,
+            };
         }
 
         // Invariant: verified present before the loop, and after every routing step.
@@ -79,7 +87,7 @@ pub fn execute_creature_mesh(
                 memory,
                 static_inputs,
                 config,
-                &mut action_queue,
+                &mut side_outputs,
             ),
             BackendDef::Graph(def) => execute_graph_node(
                 def,
@@ -91,7 +99,7 @@ pub fn execute_creature_mesh(
                 graph_runtime,
                 static_inputs,
                 config,
-                &action_queue,
+                &side_outputs.action_queue,
             ),
         };
 
@@ -104,16 +112,28 @@ pub fn execute_creature_mesh(
 
         // Check exhaustion first: NodeResult::exhausted() discards the action queue.
         if result.energy_exhausted {
-            return (vec![WorldAction::NoOp], report);
+            return MeshOutput {
+                actions: vec![WorldAction::NoOp],
+                cost_report: report,
+                priority_bid: side_outputs.priority_bid,
+            };
         }
 
         if result.terminal {
-            return (action_queue.into_actions_or_noop(), report);
+            return MeshOutput {
+                actions: side_outputs.action_queue.into_actions_or_noop(),
+                cost_report: report,
+                priority_bid: side_outputs.priority_bid,
+            };
         }
 
         // Routing: if no targets, the chain terminates — preserve accumulated queue.
         if node.targets.is_empty() {
-            return (action_queue.into_actions_or_noop(), report);
+            return MeshOutput {
+                actions: side_outputs.action_queue.into_actions_or_noop(),
+                cost_report: report,
+                priority_bid: side_outputs.priority_bid,
+            };
         }
 
         // Convert route_target_idx (f32) to i64 with special-case handling for
@@ -137,7 +157,11 @@ pub fn execute_creature_mesh(
 
         // Soft default: routed target id missing from node set.
         if find_node_index(&genome.nodes, target_id).is_none() {
-            return (action_queue.into_actions_or_noop(), report);
+            return MeshOutput {
+                actions: side_outputs.action_queue.into_actions_or_noop(),
+                cost_report: report,
+                priority_bid: side_outputs.priority_bid,
+            };
         }
 
         upstream_slots = result.output_slots;
@@ -239,9 +263,9 @@ mod tests {
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (actions, _report) =
+        let output =
             execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
-        assert_eq!(actions, vec![WorldAction::NoOp]);
+        assert_eq!(output.actions, vec![WorldAction::NoOp]);
     }
 
     // ── Test 2: max_hops_exceeded_returns_noop ────────────────────────────────
@@ -275,9 +299,9 @@ mod tests {
             ..RuntimeConfig::default()
         };
 
-        let (actions, _report) =
+        let output =
             execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
-        assert_eq!(actions, vec![WorldAction::NoOp]);
+        assert_eq!(output.actions, vec![WorldAction::NoOp]);
     }
 
     // ── Test 3: empty_targets_returns_noop ───────────────────────────────────
@@ -305,9 +329,9 @@ mod tests {
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (actions, _report) =
+        let output =
             execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
-        assert_eq!(actions, vec![WorldAction::NoOp]);
+        assert_eq!(output.actions, vec![WorldAction::NoOp]);
     }
 
     // ── Test 4: energy_exhaustion_returns_noop ────────────────────────────────
@@ -336,9 +360,9 @@ mod tests {
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (actions, _report) =
+        let output =
             execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
-        assert_eq!(actions, vec![WorldAction::NoOp]);
+        assert_eq!(output.actions, vec![WorldAction::NoOp]);
     }
 
     // ── Test 5: vm_node_emits_eat_action ─────────────────────────────────────
@@ -357,9 +381,9 @@ mod tests {
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (actions, _report) =
+        let output =
             execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
-        assert_eq!(actions, vec![WorldAction::Eat]);
+        assert_eq!(output.actions, vec![WorldAction::Eat]);
     }
 
     // ── Test 6: graph_node_routes_to_vm_node_which_emits_action ──────────────
@@ -408,9 +432,9 @@ mod tests {
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (actions, _report) =
+        let output =
             execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
-        assert_eq!(actions, vec![WorldAction::Eat]);
+        assert_eq!(output.actions, vec![WorldAction::Eat]);
     }
 
     // ── Test 7: route_wrapping_rem_euclid ────────────────────────────────────
@@ -444,10 +468,10 @@ mod tests {
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (actions, _report) =
+        let output =
             execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(
-            actions,
+            output.actions,
             vec![WorldAction::Eat],
             "route=3.7 should select targets[0]"
         );
@@ -483,10 +507,10 @@ mod tests {
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (actions, _report) =
+        let output =
             execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(
-            actions,
+            output.actions,
             vec![WorldAction::Eat],
             "route=-1.0 should wrap via rem_euclid and select targets[1]"
         );
@@ -568,12 +592,133 @@ mod tests {
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
-        let (actions, _report) =
+        let output =
             execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(
-            actions,
+            output.actions,
             vec![WorldAction::Eat],
             "slot 5 should carry 9.0 from graph to VM node"
+        );
+    }
+
+    // ── Priority bid tests ───────────────────────────────────────────────
+
+    #[test]
+    fn default_priority_bid_is_zero() {
+        // A genome with no SetPriorityBid instruction should return priority_bid == 0.0.
+        let id0 = NodeId::new(0);
+        let genome = CreatureGenome {
+            entry_node_id: id0,
+            nodes: vec![vm_emit_node(id0, 1, vec![])],
+        };
+        let si = empty_static_inputs();
+        let mut energy = 100.0f32;
+        let mut memory = [0u8; 1024];
+        let mut gr = GraphRuntimeState::new();
+        let config = default_config();
+
+        let output =
+            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
+        assert_eq!(output.priority_bid, 0.0);
+    }
+
+    #[test]
+    fn priority_bid_propagates_to_mesh_output() {
+        // A VM node loads 3.0 into r0, calls SetPriorityBid, then emits Eat.
+        let id0 = NodeId::new(0);
+        let genome = CreatureGenome {
+            entry_node_id: id0,
+            nodes: vec![NodeGenome {
+                node_id: id0,
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![3.0],
+                    program: vec![
+                        VmInstruction::LoadConst {
+                            dst: 0,
+                            const_idx: 0,
+                        },
+                        VmInstruction::SetPriorityBid { src: 0 },
+                        VmInstruction::PushAction { action_type: 1 },
+                        VmInstruction::ExecuteActionQueue,
+                    ],
+                }),
+                targets: vec![],
+            }],
+        };
+        let si = empty_static_inputs();
+        let mut energy = 100.0f32;
+        let mut memory = [0u8; 1024];
+        let mut gr = GraphRuntimeState::new();
+        let config = default_config();
+
+        let output =
+            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
+        assert_eq!(output.priority_bid, 3.0);
+        assert_eq!(output.actions, vec![WorldAction::Eat]);
+    }
+
+    #[test]
+    fn priority_bid_last_write_wins_across_hops() {
+        // Two VM nodes both call SetPriorityBid. The second (downstream) value should win.
+        let id0 = NodeId::new(0);
+        let id1 = NodeId::new(1);
+
+        // First node: bid 5.0, then halt and route to id1
+        let node0 = NodeGenome {
+            node_id: id0,
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                constants: vec![5.0],
+                program: vec![
+                    VmInstruction::LoadConst {
+                        dst: 0,
+                        const_idx: 0,
+                    },
+                    VmInstruction::SetPriorityBid { src: 0 },
+                    VmInstruction::Halt,
+                ],
+            }),
+            targets: vec![id1],
+        };
+
+        // Second node: bid 2.0, then emit Eat
+        let node1 = NodeGenome {
+            node_id: id1,
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                constants: vec![2.0],
+                program: vec![
+                    VmInstruction::LoadConst {
+                        dst: 0,
+                        const_idx: 0,
+                    },
+                    VmInstruction::SetPriorityBid { src: 0 },
+                    VmInstruction::PushAction { action_type: 1 },
+                    VmInstruction::ExecuteActionQueue,
+                ],
+            }),
+            targets: vec![],
+        };
+
+        let genome = CreatureGenome {
+            entry_node_id: id0,
+            nodes: vec![node0, node1],
+        };
+        let si = empty_static_inputs();
+        let mut energy = 100.0f32;
+        let mut memory = [0u8; 1024];
+        let mut gr = GraphRuntimeState::new();
+        let config = default_config();
+
+        let output =
+            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
+        assert_eq!(
+            output.priority_bid, 2.0,
+            "last-write-wins: second node's bid should be returned"
         );
     }
 }

@@ -188,8 +188,8 @@ fn random_vm_instruction_covers_all_families() {
     }
     assert_eq!(
         discriminants.len(),
-        38,
-        "all 38 VmInstruction variants must be reachable; got {}",
+        39,
+        "all 39 VmInstruction variants must be reachable; got {}",
         discriminants.len()
     );
 }

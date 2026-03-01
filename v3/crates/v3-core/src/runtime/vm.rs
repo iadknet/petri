@@ -1,9 +1,9 @@
 use crate::config::RuntimeConfig;
-use crate::contracts::{ActionQueue, InputReference};
+use crate::contracts::InputReference;
 use crate::creature::genome::VmBackendDef;
 use crate::runtime::action_decode::decode_world_action;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
-use crate::runtime::types::{sanitize_f32, NodeResult};
+use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult};
 use crate::sensors::static_inputs::StaticInputs;
 
 /// Execute a VM backend node.
@@ -17,7 +17,7 @@ use crate::sensors::static_inputs::StaticInputs;
 /// - `memory`: creature's persistent 1024-byte memory; NOT modified on energy exhaustion
 /// - `static_inputs`: pre-assembled world/static sensor snapshot
 /// - `config`: runtime config (max_vm_steps, vm.opcode_cost_multiplier)
-/// - `action_queue`: shared action queue that persists across mesh hops
+/// - `side_outputs`: mesh-scoped side outputs (action queue, priority bid) that persist across hops
 ///
 /// # Returns
 /// `NodeResult` — the mesh executor checks `terminal` and `energy_exhausted` to decide routing.
@@ -31,7 +31,7 @@ pub fn execute_vm_node(
     memory: &mut [u8; 1024],
     static_inputs: &StaticInputs,
     config: &RuntimeConfig,
-    action_queue: &mut ActionQueue,
+    side_outputs: &mut MeshSideOutputs,
 ) -> NodeResult {
     // Safety: register_count == 0 → immediate halt.
     let reg_count = def.register_count as usize;
@@ -247,7 +247,7 @@ pub fn execute_vm_node(
                         upstream_slots,
                         energy: *energy,
                         energy_consumed,
-                        action_queue,
+                        action_queue: &side_outputs.action_queue,
                     };
                     resolve_input(&input_refs[*ref_idx as usize], *sub_idx, &ctx)
                 } else {
@@ -272,20 +272,20 @@ pub fn execute_vm_node(
 
             VmInstruction::PushAction { action_type } => {
                 let action = decode_world_action(*action_type, &meta);
-                action_queue.push(action);
+                side_outputs.action_queue.push(action);
             }
 
             VmInstruction::PopAction => {
-                action_queue.pop();
+                side_outputs.action_queue.pop();
             }
 
             VmInstruction::ReadActionQueueLength { dst } => {
-                regs[nr(*dst, reg_count)] = action_queue.len() as f32;
+                regs[nr(*dst, reg_count)] = side_outputs.action_queue.len() as f32;
             }
 
             VmInstruction::ReadActionQueueType { index_src, dst } => {
                 let idx = regs[nr(*index_src, reg_count)] as usize;
-                regs[nr(*dst, reg_count)] = action_queue.action_type_at(idx);
+                regs[nr(*dst, reg_count)] = side_outputs.action_queue.action_type_at(idx);
             }
 
             VmInstruction::ReadActionQueueParam {
@@ -294,7 +294,19 @@ pub fn execute_vm_node(
                 dst,
             } => {
                 let idx = regs[nr(*index_src, reg_count)] as usize;
-                regs[nr(*dst, reg_count)] = action_queue.param_at(idx, *param_slot as usize);
+                regs[nr(*dst, reg_count)] = side_outputs
+                    .action_queue
+                    .param_at(idx, *param_slot as usize);
+            }
+
+            VmInstruction::SetPriorityBid { src } => {
+                let raw = regs[nr(*src, reg_count)];
+                let bid = if raw > 0.0 { raw } else { 0.0 };
+                *energy -= bid;
+                if *energy <= 0.0 {
+                    return NodeResult::exhausted();
+                }
+                side_outputs.priority_bid = bid;
             }
 
             VmInstruction::ExecuteActionQueue => {
@@ -393,6 +405,7 @@ pub(crate) fn opcode_base_cost(instr: &crate::creature::genome::VmInstruction) -
         VmInstruction::ReadActionQueueLength { .. } => 0.08,
         VmInstruction::ReadActionQueueType { .. } => 0.12,
         VmInstruction::ReadActionQueueParam { .. } => 0.12,
+        VmInstruction::SetPriorityBid { .. } => 0.20,
         VmInstruction::ExecuteActionQueue => 0.24,
         VmInstruction::WriteRouteTarget { .. } => 0.10,
         VmInstruction::Halt => 0.05,
