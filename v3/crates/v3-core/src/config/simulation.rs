@@ -130,6 +130,27 @@ impl Default for VmRuntimeConfig {
     }
 }
 
+/// Perception runtime config. Canonical owner: v3-runtime-config-spec.md.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PerceptionRuntimeConfig {
+    /// Vision radius for extended perception area summaries. Default 5, valid 1..=8.
+    #[serde(default = "default_vision_radius")]
+    pub vision_radius: u8,
+}
+
+fn default_vision_radius() -> u8 {
+    5
+}
+
+impl Default for PerceptionRuntimeConfig {
+    fn default() -> Self {
+        Self {
+            vision_radius: default_vision_radius(),
+        }
+    }
+}
+
 /// Mesh/VM/graph execution limits. Canonical owner: v3-runtime-config-spec.md Section 2.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -147,6 +168,9 @@ pub struct RuntimeConfig {
     #[serde(default = "default_max_actions_per_turn")]
     pub max_actions_per_turn: usize,
     pub vm: VmRuntimeConfig,
+    /// Extended perception config.
+    #[serde(default)]
+    pub perception: PerceptionRuntimeConfig,
 }
 
 fn default_max_actions_per_turn() -> usize {
@@ -169,6 +193,7 @@ impl Default for RuntimeConfig {
             hebbian_update_cost: 0.0,
             max_actions_per_turn: default_max_actions_per_turn(),
             vm: VmRuntimeConfig::default(),
+            perception: PerceptionRuntimeConfig::default(),
         }
     }
 }
@@ -346,6 +371,7 @@ impl SimulationConfig {
         }
         rt.vm.opcode_cost_multiplier =
             normalize_f32_finite_nonneg(rt.vm.opcode_cost_multiplier, 1e-6);
+        rt.perception.vision_radius = rt.perception.vision_radius.clamp(1, 8);
 
         let m = &mut self.mutation;
         m.mutation_probability = m.mutation_probability.clamp(0.0, 1.0);
@@ -463,6 +489,8 @@ mod tests {
         assert!((cfg.runtime.graph_node_base_cost - 1e-5).abs() < 1e-9);
         assert!((cfg.runtime.vm.opcode_cost_multiplier - 1e-6).abs() < 1e-12);
         assert_eq!(cfg.runtime.max_actions_per_turn, 10);
+        // Perception
+        assert_eq!(cfg.runtime.perception.vision_radius, 5);
         // Mutation
         assert!((cfg.mutation.mutation_probability - 0.303).abs() < 1e-9);
         assert_eq!(cfg.mutation.per_birth_mutation_events_min, 1);
@@ -591,6 +619,22 @@ mod tests {
         cfg.mutation.action_queue_cap = 100_000;
         cfg.normalize();
         assert_eq!(cfg.mutation.action_queue_cap, 21845);
+    }
+
+    #[test]
+    fn normalize_vision_radius_zero_clamped_to_one() {
+        let mut cfg = SimulationConfig::default();
+        cfg.runtime.perception.vision_radius = 0;
+        cfg.normalize();
+        assert_eq!(cfg.runtime.perception.vision_radius, 1);
+    }
+
+    #[test]
+    fn normalize_vision_radius_above_eight_clamped() {
+        let mut cfg = SimulationConfig::default();
+        cfg.runtime.perception.vision_radius = 20;
+        cfg.normalize();
+        assert_eq!(cfg.runtime.perception.vision_radius, 8);
     }
 
     #[test]

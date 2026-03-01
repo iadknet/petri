@@ -24,6 +24,7 @@ This document is the canonical owner for config keys/defaults used by:
 - mesh chain execution limits,
 - VM step limits and opcode cost scaling,
 - graph convergence budget controls,
+- perception radius for frozen extended sensing,
 - mutation tuning,
 - reproduction energy transfer gates/caps.
 
@@ -63,6 +64,7 @@ Transport posture note:
 | `runtime.graph_convergence_stable_passes` | `u32` | `2` | Must be `>= 1`; invalid values fall back to `2`. | `v3-graph-backend-spec.md` |
 | `runtime.graph_node_base_cost` | `f32` | `1e-5` | Must be `>= 0.0`; invalid values fall back to `1e-5`. | `v3-graph-backend-spec.md` |
 | `runtime.vm.opcode_cost_multiplier` | `f32` | `1e-6` | Must be finite and `>= 0.0`; invalid values fall back to `1e-6`. `0.0` is allowed and means zero opcode energy spend. | `v3-vm-isa-spec.md` |
+| `runtime.perception.vision_radius` | `u8` | `5` | Must be in `1..=8`; out-of-range values are clamped to the nearest valid bound. | `v3-sensor-spec.md` |
 
 If implementation structs use different nesting, a one-to-one semantic mapping
 to these keys must exist.
@@ -70,6 +72,8 @@ to these keys must exist.
 Type posture:
 - Use `f32` for tunable scalar magnitudes.
 - Use integers (`u32`) only for clearly discrete counts/limits.
+- `runtime.perception.vision_radius` is intentionally discrete and globally
+  scoped for the run in v1.
 
 ---
 
