@@ -249,7 +249,12 @@ pub fn vm_forward_slice_random(
 pub fn graph_is_output_node(kind: &GraphNodeKind) -> bool {
     matches!(
         kind,
-        GraphNodeKind::CustomOutput(_) | GraphNodeKind::RouterOutput
+        GraphNodeKind::CustomOutput(_)
+            | GraphNodeKind::RouterOutput
+            | GraphNodeKind::WriteActionMeta(_)
+            | GraphNodeKind::PushAction(_)
+            | GraphNodeKind::PopAction
+            | GraphNodeKind::ExecuteActionQueue
     )
 }
 

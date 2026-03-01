@@ -206,6 +206,15 @@ pub enum GraphNodeKind {
     CustomOutput(u8),
     /// Write computed value to `route_target_idx`.
     RouterOutput,
+    // ── Action-queue outputs (deferred effect, post-convergence) ──────────────
+    /// Write computed value to staged action meta buffer slot (0..7).
+    WriteActionMeta(u8),
+    /// Decode staged meta buffer and push action onto mesh-owned action queue.
+    PushAction(u8),
+    /// Remove most recently queued action.
+    PopAction,
+    /// Mark mesh hop as terminal; return accumulated action queue.
+    ExecuteActionQueue,
 }
 
 /// A single internal node in the graph backend.
@@ -409,7 +418,7 @@ mod tests {
     }
 
     #[test]
-    fn graph_node_kinds_all_22_constructible() {
+    fn graph_node_kinds_all_26_constructible() {
         let kinds: Vec<GraphNodeKind> = vec![
             GraphNodeKind::InputRef {
                 ref_idx: 0,
@@ -436,8 +445,12 @@ mod tests {
             GraphNodeKind::AdaptiveGain,
             GraphNodeKind::CustomOutput(0),
             GraphNodeKind::RouterOutput,
+            GraphNodeKind::WriteActionMeta(0),
+            GraphNodeKind::PushAction(1),
+            GraphNodeKind::PopAction,
+            GraphNodeKind::ExecuteActionQueue,
         ];
-        assert_eq!(kinds.len(), 22);
+        assert_eq!(kinds.len(), 26);
     }
 
     #[test]
