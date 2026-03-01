@@ -24,6 +24,7 @@ pub struct GraphBackendDef {
 pub struct GraphInternalNode {
     pub kind: GraphNodeKind,
     pub inputs: Vec<GraphInput>,
+    pub plasticity: Option<PlasticityConfig>,
 }
 
 pub struct GraphInput {
@@ -198,7 +199,65 @@ execution returns `WorldAction::NoOp`.
 
 ---
 
-## 7. Backend-Local Soft Defaults
+## 7. Plasticity
+
+### PlasticityConfig
+
+Per-node learning configuration:
+
+```rust
+pub struct PlasticityConfig {
+    pub rule: HebbianRule,        // Classic, Oja, AntiHebb, Covariance
+    pub learning_rate: f32,
+    pub weight_clamp: f32,
+    pub lamarckian: bool,
+    pub modulation: Option<RewardModulationConfig>,
+}
+
+pub struct RewardModulationConfig {
+    pub reward_source: OutcomeChannel,  // EnergyDelta, ActionSuccess, DamageDelta, OffspringSuccess
+    pub trace_decay: f32,               // [0.0, 1.0]
+}
+```
+
+When `modulation` is `None`: pure Hebbian learning (weight updates applied
+during Phase 1 post-convergence pass).
+
+When `modulation` is `Some`: reward-modulated three-factor learning (eligibility
+traces updated during Phase 1; weight updates deferred to Phase 2.5).
+
+### Runtime state
+
+Plasticity weights (`plasticity_weights`) and eligibility traces
+(`eligibility_traces`) are stored parallel to `node_state` in
+`GraphRuntimeState`. Both use `Vec<Vec<Box<[f32]>>>` layout — one `Box<[f32]>`
+per node, one `f32` per input edge.
+
+- Plasticity weights are lazy-initialized to `1.0` on first use.
+- Eligibility traces are lazy-initialized to `0.0` on first use.
+- Offspring start with empty traces. Plasticity weights are inherited only
+  if `lamarckian` is true.
+
+### Eligibility trace update (Phase 1, post-convergence)
+
+After graph convergence, for each reward-modulated node:
+
+```text
+trace[edge] = decay * old_trace + hebbian_delta(pre, post, weight)
+```
+
+where `hebbian_delta` applies the node's `HebbianRule` (Classic, Oja, etc.).
+
+### Reward-modulated weight update (Phase 2.5)
+
+```text
+dw = learning_rate * outcome_signal[reward_source] * trace[edge]
+new_weight = clamp(weight + dw, -weight_clamp, weight_clamp)
+```
+
+---
+
+## 8. Backend-Local Soft Defaults
 
 Determinism scope is canonical in `AGENTS.md`; V3 harness reproducibility
 controls are specified in `v3-mesh-execution-spec.md`

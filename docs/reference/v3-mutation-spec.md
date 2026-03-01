@@ -105,6 +105,18 @@ Core rule:
 - `GraphRawFieldMutation` (raw representable-field mutation for tolerant graph
   encodings, including `InputRef { ref_idx, sub_idx }`, `CustomOutput(u8)`, and edge source
   indices)
+- `CopyInternalNode`
+- `CopySubgraph`
+- `CopyEdgeBundle`
+- `EnableHebbian` (add `PlasticityConfig` to a non-plasticity node)
+- `DisableHebbian` (remove `PlasticityConfig` from a plasticity node)
+- `MutateHebbianRule` (change the `HebbianRule` variant)
+- `MutateHebbianRate` (perturb the `learning_rate`)
+- `ToggleHebbianLamarckian` (flip the `lamarckian` inheritance flag)
+- `EnableRewardModulation` (add `RewardModulationConfig` to a pure Hebbian node)
+- `DisableRewardModulation` (remove reward modulation from a modulated node)
+- `MutateRewardSource` (change the `OutcomeChannel` a modulated node listens to)
+- `MutateTraceDecay` (perturb the `trace_decay` rate on a modulated node)
 
 ### InputRef domain
 

@@ -2,15 +2,13 @@
 
 ## Small Modifications
 
-### Deduplicate graph relaxation loop via tracer trait
+### Tick phase system
 
-`graph.rs` and `traced_graph.rs` duplicate the entire relaxation loop (~100 lines each). The traced version adds per-pass `GraphPassTrace` recording but is otherwise identical. A tracer trait pattern (`NoopTracer` vs `RecordingTracer`) with a single generic `execute_graph_node_impl<T: GraphTracer>()` would eliminate the duplication, prevent future divergence, and ensure every graph feature only needs one implementation.
+The tick loop now has 5 phases (0, 1, 2, 2.5, 3). A phase-based system where phases are registered handlers would improve extensibility and make it easier to add future tick-level passes without growing the monolithic `run_tick` function.
 
-Design considerations:
-- `graph.rs` uses scratch buffer reuse (`std::mem::take` from `GraphRuntimeState`); `traced_graph.rs` allocates fresh vecs. The generic implementation should support the optimized path.
-- The tracer trait needs methods for: pass start (energy cost), per-node evaluation (weighted inputs, state transitions, output), pass end (max delta).
-- `NoopTracer` methods should be `#[inline]` and zero-cost (no allocation, no recording).
-- State backup differs: `graph.rs` uses `extend_from_slice` into a scratch buffer; `traced_graph.rs` uses `clone()`. The generic version should use the scratch-buffer approach.
+### Graph evaluation → plasticity decoupling
+
+Currently `graph.rs` calls directly into plasticity modules for post-convergence updates (Hebbian weight updates, eligibility trace updates). A more extensible design would have graph evaluation produce "learning events" dispatched to registered plasticity backends, decoupling the graph relaxation loop from the specifics of any learning algorithm.
 
 ## Major New Features
 
@@ -45,27 +43,6 @@ Recommended shape:
 - keep the current junk-DNA mutation path too; this should be an additional mutation mode, not a replacement
 
 This would make graph evolution less brittle by reducing the number of independent mutations required before a new node can do anything adaptive. It also gives us a cleaner place to experiment with higher-level birth patterns later, like "add a comparator node already wired to food-gradient and occupancy inputs" without needing to change the runtime model.
-
-
-### Generic outcome-modulated learning for open-ended creatures
-
-Instead of teaching creatures that "food is good" or "movement was correct", we could add a **generic outcome signal bank** that exposes a small set of post-tick consequences, then let evolution decide which circuits use those signals for plasticity. This keeps learning open-ended and ecology-driven rather than baking a hand-written objective into the runtime.
-
-Recommended shape:
-- add a fixed-width `OutcomeSignalBank` with generic channels such as `energy_delta`, `action_success`, `damage_delta`, and `offspring_success`
-- these signals should describe **what happened**, not **what should matter**
-- graph internal nodes or edges with plasticity enabled can choose one `reward_source` from that bank
-- plastic edges maintain an eligibility trace so that a later outcome can reinforce or weaken earlier activity
-- delayed reward should work by updating traces when a circuit is active, then applying reward later with something like `dw = learning_rate * outcome_signal * eligibility_trace`
-- this lets earlier sensing and routing decisions receive credit when the payoff only appears a tick or two later, such as spotting food, moving toward it, and only then eating
-- keep the current unsupervised Hebbian rules too; reward-modulated plasticity should be an additional learning mode, not a replacement
-
-This would fit Petri well because it preserves the existing three-loop model:
-- evolution discovers which circuits are plastic and which outcome channels they listen to
-- within-lifetime learning adapts those circuits based on actual consequences
-- ecology determines which generic signals end up being useful in practice
-
-The main tradeoff is complexity: we would be adding more per-creature runtime state, more delayed-credit machinery, and more room for strange learned strategies. But that is also the point. It gives creatures a path to develop local habits and niche-specific adaptations without forcing the engine to define one universal reward function.
 
 
 ### Storage slots
