@@ -27,6 +27,10 @@ use crate::runtime::types::{MeshSideOutputs, NodeResult};
 ///
 /// **Phase 3 — Terminal check:**
 /// - `terminal = true` if any node is `ExecuteActionQueue`
+///
+/// The `action_meta` buffer is scoped per graph-node evaluation; it does not
+/// persist across mesh hops. Each graph mesh node starts with a zeroed meta
+/// buffer and writes to it independently.
 #[inline]
 pub(crate) fn apply_graph_effects(
     def: &GraphBackendDef,
