@@ -97,7 +97,7 @@ pub fn execute_creature_mesh_traced(
                     graph_runtime,
                     sensors,
                     config,
-                    &side_outputs.action_queue,
+                    &mut side_outputs,
                 );
                 (result, BackendTrace::Graph(graph_trace))
             }

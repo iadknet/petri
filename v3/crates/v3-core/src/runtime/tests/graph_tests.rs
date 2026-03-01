@@ -1,8 +1,8 @@
 use super::*;
 use crate::config::RuntimeConfig;
-use crate::contracts::ActionQueue;
 use crate::creature::genome::{GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind};
 use crate::creature::state::GraphRuntimeState;
+use crate::runtime::types::MeshSideOutputs;
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;
 
@@ -57,7 +57,7 @@ fn empty_graph_returns_halted_and_no_energy_charged() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
 
     // No energy consumed.
@@ -93,7 +93,7 @@ fn energy_exhaustion_returns_exhausted() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
 
     assert!(result.energy_exhausted);
@@ -120,7 +120,7 @@ fn constant_node_does_not_write_output_slots() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
 
     // No CustomOutput → output_slots stays = upstream.
@@ -174,7 +174,7 @@ fn add_custom_output_writes_correct_slot() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
 
     assert!(!result.energy_exhausted);
@@ -221,7 +221,7 @@ fn router_output_sets_route_target_idx() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
 
     assert!(!result.energy_exhausted);
@@ -252,7 +252,7 @@ fn graph_never_emits_world_action() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
 
     assert!(!result.terminal);
@@ -313,7 +313,7 @@ fn decay_integrator_accumulates_state() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
     assert!(!result1.energy_exhausted);
     assert!(
@@ -332,7 +332,7 @@ fn decay_integrator_accumulates_state() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
     assert!(!result2.energy_exhausted);
     assert!(
@@ -380,7 +380,7 @@ fn state_not_mutated_on_energy_exhaustion() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
 
     assert!(result.energy_exhausted);
@@ -414,7 +414,7 @@ fn output_slots_initialized_from_upstream_passthrough() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
 
     assert!(!result.energy_exhausted);
@@ -461,7 +461,7 @@ fn energy_deducted_per_pass_on_success() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
 
     // 2 nodes * 1.0 cost = 2.0 consumed in exactly 1 pass.
@@ -522,7 +522,7 @@ fn decay_integrator_formula_correct() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
     assert!(
         (r1.output_slots[0] - 0.5).abs() < 1e-5,
@@ -540,7 +540,7 @@ fn decay_integrator_formula_correct() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
     assert!(
         (r2.output_slots[0] - 0.75).abs() < 1e-5,
@@ -601,7 +601,7 @@ fn momentum_formula_correct() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
     assert!(
         (r1.output_slots[0] - 0.2).abs() < 1e-5,
@@ -661,7 +661,7 @@ fn oscillator_nan_safe() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
 
     assert!(
@@ -723,7 +723,7 @@ fn threshold_formula_correct() {
         &mut GraphRuntimeState::new(),
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
     assert_eq!(r.output_slots[0], 1.0, "wsum=0.6 should fire");
 
@@ -739,7 +739,7 @@ fn threshold_formula_correct() {
         &mut GraphRuntimeState::new(),
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
     assert_eq!(
         r.output_slots[0], 0.0,
@@ -758,7 +758,7 @@ fn threshold_formula_correct() {
         &mut GraphRuntimeState::new(),
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
     assert_eq!(r.output_slots[0], 0.0, "wsum=0.4 should NOT fire");
 }
@@ -803,7 +803,7 @@ fn multiply_empty_inputs_is_one() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
 
     assert_eq!(
@@ -872,7 +872,7 @@ fn greater_than_formula() {
         &mut GraphRuntimeState::new(),
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
     assert_eq!(r.output_slots[0], 1.0, "2.0 > 1.0 should produce 1.0");
 
@@ -888,7 +888,7 @@ fn greater_than_formula() {
         &mut GraphRuntimeState::new(),
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
     assert_eq!(r.output_slots[0], 0.0, "1.0 == 1.0 should produce 0.0");
 
@@ -904,7 +904,7 @@ fn greater_than_formula() {
         &mut GraphRuntimeState::new(),
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
     assert_eq!(r.output_slots[0], 0.0, "0.5 < 1.0 should produce 0.0");
 }
@@ -987,7 +987,7 @@ fn select_formula() {
         &mut GraphRuntimeState::new(),
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
     assert_eq!(
         r.output_slots[0], 10.0,
@@ -1007,7 +1007,7 @@ fn select_formula() {
         &mut GraphRuntimeState::new(),
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
     assert_eq!(
         r.output_slots[0], 20.0,
@@ -1064,7 +1064,7 @@ fn router_output_last_write_wins() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
 
     assert!(!result.energy_exhausted);
@@ -1113,7 +1113,7 @@ fn input_ref_255_soft_defaults_to_zero() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
 
     assert!(!result.energy_exhausted);
@@ -1158,7 +1158,7 @@ fn custom_output_255_does_not_write_output_slots() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
 
     assert!(!result.energy_exhausted);
@@ -1206,12 +1206,101 @@ fn edge_source_65535_soft_defaults_to_zero() {
         &mut gr,
         &ss,
         &config,
-        &ActionQueue::new(4),
+        &mut MeshSideOutputs::new(4),
     );
 
     assert!(!result.energy_exhausted);
     assert_eq!(
         result.output_slots[0], 0.0,
         "out-of-range edge sources must soft-default to zero"
+    );
+}
+
+// ─── Graph action-queue tests ────────────────────────────────────────────
+
+/// PushAction + ExecuteActionQueue → terminal with action queued.
+#[test]
+fn graph_push_action_and_terminate() {
+    let def = GraphBackendDef {
+        internal_nodes: vec![
+            GraphInternalNode {
+                kind: GraphNodeKind::PushAction(1), // Eat
+                inputs: vec![],
+                hebbian: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::ExecuteActionQueue,
+                inputs: vec![],
+                hebbian: None,
+            },
+        ],
+    };
+    let upstream = [0.0f32; 12];
+    let mut energy = 100.0f32;
+    let mut gr = GraphRuntimeState::new();
+    let ss = make_sensor_snapshot();
+    let config = default_config();
+    let mut so = MeshSideOutputs::new(4);
+
+    let result = execute_graph_node(
+        &def,
+        &[],
+        &upstream,
+        &mut energy,
+        0.0,
+        0,
+        &mut gr,
+        &ss,
+        &config,
+        &mut so,
+    );
+
+    assert!(result.terminal);
+    assert!(!result.energy_exhausted);
+    let actions = so.action_queue.into_actions_or_noop();
+    assert_eq!(
+        actions,
+        vec![crate::contracts::WorldAction::Eat],
+        "graph should queue Eat via PushAction(1)"
+    );
+}
+
+/// Energy exhaustion prevents effects from being applied.
+#[test]
+fn energy_exhaustion_prevents_effects() {
+    let def = GraphBackendDef {
+        internal_nodes: vec![GraphInternalNode {
+            kind: GraphNodeKind::PushAction(1), // Eat
+            inputs: vec![],
+            hebbian: None,
+        }],
+    };
+    let upstream = [0.0f32; 12];
+    let mut energy = 0.5f32;
+    let mut gr = GraphRuntimeState::new();
+    let ss = make_sensor_snapshot();
+    let mut config = default_config();
+    config.graph_node_base_cost = 1.0; // 1 node × 1.0 > energy (0.5) → exhausted
+
+    let mut so = MeshSideOutputs::new(4);
+
+    let result = execute_graph_node(
+        &def,
+        &[],
+        &upstream,
+        &mut energy,
+        0.0,
+        0,
+        &mut gr,
+        &ss,
+        &config,
+        &mut so,
+    );
+
+    assert!(result.energy_exhausted);
+    // Action queue should be empty since energy exhaustion prevents effect application
+    assert!(
+        so.action_queue.into_actions_or_noop() == vec![crate::contracts::WorldAction::NoOp],
+        "exhausted graph must not push actions"
     );
 }

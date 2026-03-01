@@ -1,11 +1,11 @@
 use crate::config::RuntimeConfig;
-use crate::contracts::{ActionQueue, InputReference};
+use crate::contracts::InputReference;
 use crate::creature::genome::{GraphBackendDef, GraphInternalNode, GraphNodeKind};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::graph_effects::apply_graph_effects;
 use crate::runtime::hebbian;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
-use crate::runtime::types::{sanitize_f32, NodeResult};
+use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult};
 use crate::sensors::perception::SensorSnapshot;
 
 /// Immutable context for resolving `InputRef` nodes during graph evaluation.
@@ -161,7 +161,7 @@ pub fn execute_graph_node(
     graph_runtime: &mut GraphRuntimeState,
     sensors: &SensorSnapshot,
     config: &RuntimeConfig,
-    action_queue: &ActionQueue,
+    side_outputs: &mut MeshSideOutputs,
 ) -> NodeResult {
     let node_count = def.internal_nodes.len();
 
@@ -234,7 +234,7 @@ pub fn execute_graph_node(
                 upstream_slots,
                 energy: *energy,
                 energy_consumed,
-                action_queue,
+                action_queue: &side_outputs.action_queue,
             },
         };
 
@@ -314,8 +314,8 @@ pub fn execute_graph_node(
         *energy -= hebb_cost;
     }
 
-    // Build NodeResult via the shared effect pass.
-    let result = apply_graph_effects(def, &curr_outputs, upstream_slots);
+    // Build NodeResult via the shared 3-phase effect pass.
+    let result = apply_graph_effects(def, &curr_outputs, upstream_slots, side_outputs);
 
     // Restore scratch buffers before returning.
     restore_scratch(
