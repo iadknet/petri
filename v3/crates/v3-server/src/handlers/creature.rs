@@ -52,6 +52,8 @@ pub async fn get_creature(
 struct StartSampleRequest {
     #[serde(default = "default_sample_ticks")]
     ticks: u32,
+    #[serde(default)]
+    include_perception_debug: bool,
 }
 
 fn default_sample_ticks() -> u32 {
@@ -65,7 +67,10 @@ pub async fn start_sample(
     body: axum::body::Bytes,
 ) -> Result<impl IntoResponse, AppError> {
     let req: StartSampleRequest = if body.is_empty() {
-        StartSampleRequest { ticks: 5 }
+        StartSampleRequest {
+            ticks: 5,
+            include_perception_debug: false,
+        }
     } else {
         serde_json::from_slice(&body)
             .map_err(|e| AppError::InvalidRequest(format!("invalid JSON: {e}")))?
@@ -99,12 +104,15 @@ pub async fn start_sample(
     }
 
     // Start recording (replaces any existing trace).
-    handle.active_trace = Some(ActiveTrace::new(creature_id, req.ticks));
+    let mut active = ActiveTrace::new(creature_id, req.ticks);
+    active.include_perception_debug = req.include_perception_debug;
+    handle.active_trace = Some(active);
 
     Ok(Json(serde_json::json!({
         "protocol_version": PROTOCOL_VERSION,
         "status": "recording",
         "ticks_requested": req.ticks,
+        "include_perception_debug": req.include_perception_debug,
     })))
 }
 

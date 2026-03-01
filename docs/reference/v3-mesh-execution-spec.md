@@ -30,7 +30,7 @@ eligibility are owned by `v3-tick-orchestration-spec.md`.
 ```rust
 pub fn execute_creature_mesh(
     genome: &CreatureGenome,
-    static_inputs: &StaticInputs,
+    sensors: &SensorSnapshot,
     energy: &mut Energy,
     memory: &mut [u8; 1024],
     graph_state: &mut HashMap<NodeId, Vec<f32>>,
@@ -39,7 +39,7 @@ pub fn execute_creature_mesh(
 ```
 
 Boundary intent:
-- `sensors/` owns static snapshot assembly.
+- `sensors/` owns local and extended perception snapshot assembly.
 - `runtime/` owns node evaluation, routing, and soft-default behavior.
 - `contracts/` boundary remains `WorldAction` only.
 - `tick/orchestrator` owns turn ordering and immediate action application.

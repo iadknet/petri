@@ -4,6 +4,7 @@ use v3_core::contracts::{CreatureId, NodeId, Position};
 use v3_core::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
+use v3_core::creature::identity::CreatureIdentityState;
 use v3_core::creature::state::CreatureState;
 use v3_core::kernel::WorldState;
 use v3_core::runtime::trace::{ActiveTrace, BackendTrace, TickTrace};
@@ -61,6 +62,7 @@ pub(crate) fn insert_creature(
             FOUNDER_CHANNELS,
             FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
+            CreatureIdentityState::default(),
         )
     });
     world.place_creature(position, id);

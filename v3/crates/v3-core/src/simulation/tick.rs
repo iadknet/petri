@@ -61,7 +61,12 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
     use crate::runtime::trace::{StaticInputsSnapshot, TickTrace};
     use crate::runtime::traced_mesh::execute_creature_mesh_traced;
     use crate::runtime::types::MeshOutput;
+    use crate::sensors::perception::{
+        genome_uses_extended_perception, PerceptionConfig, PerceptionSnapshot, SensorSnapshot,
+    };
+    use crate::sensors::reducers::assemble_perception;
     use crate::sensors::static_inputs::assemble_static_inputs;
+    use crate::sensors::visibility::{compute_visible_cells, get_visibility_table};
     use crate::simulation::actions::{
         apply_eat, apply_move, apply_noop, apply_reproduce, apply_steal_energy,
         PredationActionResult, ReproductionActionResult,
@@ -114,10 +119,32 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
     // mutates each creature's private state (energy, memory, graph_runtime).
 
     // 1a: Assemble sensor inputs sequentially (needs &sim.world + &sim.creatures).
+    // Conditional perception: only assemble full visibility + area reduction for
+    // genomes that reference extended perception keys. Others use zero() fallback.
+    let perception_config = PerceptionConfig::from_sim_config(&sim.config);
+    let vis_table = get_visibility_table(perception_config.vision_radius);
     let inputs: Vec<_> = queue
         .iter()
         .filter(|&&id| sim.creatures.contains_key(id))
-        .map(|&id| (id, assemble_static_inputs(&sim.world, &sim.creatures[id])))
+        .map(|&id| {
+            let creature = &sim.creatures[id];
+            let local = assemble_static_inputs(&sim.world, creature);
+            let perception = if genome_uses_extended_perception(&creature.genome) {
+                let visible = compute_visible_cells(creature.position, &sim.world, vis_table);
+                assemble_perception(
+                    id,
+                    creature,
+                    &visible,
+                    &sim.world,
+                    &sim.creatures,
+                    &perception_config,
+                )
+            } else {
+                PerceptionSnapshot::zero()
+            };
+            let ss = SensorSnapshot { local, perception };
+            (id, ss)
+        })
         .collect();
 
     // 1b: Cognition — parallel for all creatures, sequential for traced creature.
@@ -130,16 +157,16 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
 
         let mut work: Vec<_> = inputs
             .iter()
-            .filter_map(|(id, si)| creature_refs.remove(id).map(|c| (*id, si, c)))
+            .filter_map(|(id, ss)| creature_refs.remove(id).map(|c| (*id, ss, c)))
             .collect();
 
         // Run all non-traced creatures in parallel.
         let mut parallel_decisions: Vec<_> = work
             .par_iter_mut()
-            .map(|(id, si, creature)| {
+            .map(|(id, ss, creature)| {
                 let output = execute_creature_mesh(
                     &creature.genome,
-                    si,
+                    ss,
                     &mut creature.energy,
                     &mut creature.memory,
                     &mut creature.graph_runtime,
@@ -151,14 +178,14 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
 
         // Run traced creature sequentially with trace recording.
         if let Some((tid, creature)) = traced_creature {
-            if let Some((_, si)) = inputs.iter().find(|(id, _)| *id == tid) {
+            if let Some((_, ss)) = inputs.iter().find(|(id, _)| *id == tid) {
                 let energy_before = creature.energy;
                 let tick_number = sim.tick;
-                let si_snapshot = StaticInputsSnapshot::from(si);
+                let si_snapshot = StaticInputsSnapshot::from(&ss.local);
 
                 let (output, hops, termination_reason) = execute_creature_mesh_traced(
                     &creature.genome,
-                    si,
+                    ss,
                     &mut creature.energy,
                     &mut creature.memory,
                     &mut creature.graph_runtime,
@@ -167,11 +194,19 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
 
                 // Record tick trace.
                 if let Some(ref mut active) = trace {
+                    let debug_perception = if active.include_perception_debug {
+                        Some(crate::runtime::trace::PerceptionDebugSnapshot::from(
+                            &ss.perception,
+                        ))
+                    } else {
+                        None
+                    };
                     active.ticks.push(TickTrace {
                         tick_number,
                         energy_before,
                         energy_after: creature.energy,
                         static_inputs: si_snapshot,
+                        debug_perception,
                         hops,
                         final_actions: output.actions.clone(),
                         termination_reason,
@@ -333,6 +368,7 @@ mod tests {
     use crate::config::SimulationConfig;
     use crate::contracts::{CreatureId, Position};
     use crate::creature::founder::v3alpha1_founder_genome;
+    use crate::creature::identity::CreatureIdentityState;
     use crate::creature::state::CreatureState;
     use crate::kernel::WorldState;
     use crate::simulation::seeding::seed_simulation;
@@ -366,6 +402,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         world.place_creature(pos, id);
@@ -680,6 +717,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         world.place_creature(Position::new(5, 5), attacker_id);
@@ -694,6 +732,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         world.place_creature(victim_pos, victim_id);
@@ -758,6 +797,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         let id_b = creatures.insert_with_key(|id| {
@@ -770,6 +810,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         let id_c = creatures.insert_with_key(|id| {
@@ -782,6 +823,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
 
@@ -825,6 +867,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         let id_b = creatures.insert_with_key(|id| {
@@ -837,6 +880,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         let id_c = creatures.insert_with_key(|id| {
@@ -849,6 +893,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
 

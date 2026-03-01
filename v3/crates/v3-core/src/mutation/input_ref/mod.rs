@@ -228,13 +228,15 @@ fn apply_swap(
     Ok(())
 }
 
-/// Generate a random input reference from the full set of 38 possible values.
+/// Generate a random input reference from the full set of 44 possible values.
 ///
 /// Distribution: FoodHere (1) + NeighborCellFood (8) + NeighborCellBarrier (8) +
 /// NeighborCellOccupied (8) + StaticIntrospection (2) + DynamicIntrospection (2) +
-/// ActionQueue (1) + UpstreamSlot(usize) raw values (8 weighted slots) = 38 total.
+/// ActionQueue (1) + AreaFoodSummary (1) + AreaBarrierSummary (1) +
+/// AreaOccupancySummary (1) + NearbyCreatureCore (1) + NearbyCreatureVitals (1) +
+/// NearbyCreatureIdentity (1) + UpstreamSlot(usize) raw values (8 weighted slots) = 44 total.
 fn random_input_reference(rng: &mut impl Rng) -> InputReference {
-    let idx = rng.gen_range(0u8..38);
+    let idx = rng.gen_range(0u8..44);
     match idx {
         0 => InputReference::World(WorldInputKey::FoodHere),
         1..=8 => {
@@ -251,6 +253,12 @@ fn random_input_reference(rng: &mut impl Rng) -> InputReference {
         27 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
         28 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),
         29 => InputReference::ActionQueue,
+        30 => InputReference::World(WorldInputKey::AreaFoodSummary),
+        31 => InputReference::World(WorldInputKey::AreaBarrierSummary),
+        32 => InputReference::World(WorldInputKey::AreaOccupancySummary),
+        33 => InputReference::World(WorldInputKey::NearbyCreatureCore),
+        34 => InputReference::World(WorldInputKey::NearbyCreatureVitals),
+        35 => InputReference::World(WorldInputKey::NearbyCreatureIdentity),
         _ => InputReference::UpstreamSlot(rng.gen::<u8>() as usize),
     }
 }
@@ -455,6 +463,24 @@ mod tests {
                 InputReference::World(WorldInputKey::NeighborCellOccupied(_)) => {
                     "NeighborCellOccupied".to_string()
                 }
+                InputReference::World(WorldInputKey::AreaFoodSummary) => {
+                    "AreaFoodSummary".to_string()
+                }
+                InputReference::World(WorldInputKey::AreaBarrierSummary) => {
+                    "AreaBarrierSummary".to_string()
+                }
+                InputReference::World(WorldInputKey::AreaOccupancySummary) => {
+                    "AreaOccupancySummary".to_string()
+                }
+                InputReference::World(WorldInputKey::NearbyCreatureCore) => {
+                    "NearbyCreatureCore".to_string()
+                }
+                InputReference::World(WorldInputKey::NearbyCreatureVitals) => {
+                    "NearbyCreatureVitals".to_string()
+                }
+                InputReference::World(WorldInputKey::NearbyCreatureIdentity) => {
+                    "NearbyCreatureIdentity".to_string()
+                }
                 InputReference::StaticIntrospection(_) => "StaticIntrospection".to_string(),
                 InputReference::DynamicIntrospection(_) => "DynamicIntrospection".to_string(),
                 InputReference::UpstreamSlot(_) => "UpstreamSlot".to_string(),
@@ -462,10 +488,11 @@ mod tests {
             };
             categories.insert(cat);
         }
+        // 14 categories: 8 original + 6 extended perception families
         assert_eq!(
             categories.len(),
-            8,
-            "all 8 input reference categories must be reachable; got {:?}",
+            14,
+            "all 14 input reference categories must be reachable; got {:?}",
             categories
         );
     }
@@ -1028,6 +1055,72 @@ mod tests {
             found_changed,
             "RawFieldMutation must be able to mutate sub_idx on graph InputRef nodes"
         );
+    }
+
+    #[test]
+    fn extended_perception_families_reachable_in_pool() {
+        let mut found = [false; 6]; // Food, Barrier, Occupancy, Core, Vitals, Identity
+        for seed in 0u64..5000 {
+            let mut r = rng(seed);
+            match random_input_reference(&mut r) {
+                InputReference::World(WorldInputKey::AreaFoodSummary) => found[0] = true,
+                InputReference::World(WorldInputKey::AreaBarrierSummary) => found[1] = true,
+                InputReference::World(WorldInputKey::AreaOccupancySummary) => found[2] = true,
+                InputReference::World(WorldInputKey::NearbyCreatureCore) => found[3] = true,
+                InputReference::World(WorldInputKey::NearbyCreatureVitals) => found[4] = true,
+                InputReference::World(WorldInputKey::NearbyCreatureIdentity) => found[5] = true,
+                _ => {}
+            }
+            if found.iter().all(|&f| f) {
+                break;
+            }
+        }
+        let names = [
+            "AreaFoodSummary",
+            "AreaBarrierSummary",
+            "AreaOccupancySummary",
+            "NearbyCreatureCore",
+            "NearbyCreatureVitals",
+            "NearbyCreatureIdentity",
+        ];
+        for (i, &f) in found.iter().enumerate() {
+            assert!(
+                f,
+                "{} must be reachable from random_input_reference",
+                names[i]
+            );
+        }
+    }
+
+    #[test]
+    fn add_extended_perception_compound_creates_correct_fan_out() {
+        // Verify that adding a NearbyCreatureCore input creates 16 fan-out nodes
+        let mut found = false;
+        for seed in 0u64..5000 {
+            let mut genome = graph_genome_with_input_refs(vec![], vec![]);
+            let mut r = rng(seed);
+            InputRefMutator::apply(
+                &mut genome,
+                InputRefOperator::Add,
+                &mut r,
+                &default_config(),
+            )
+            .unwrap();
+            if genome.nodes[0].input_refs.last()
+                == Some(&InputReference::World(WorldInputKey::NearbyCreatureCore))
+            {
+                if let BackendDef::Graph(ref gd) = genome.nodes[0].backend_def {
+                    assert_eq!(
+                        gd.internal_nodes.len(),
+                        16,
+                        "NearbyCreatureCore compound Add must create 16 fan-out nodes"
+                    );
+                    found = true;
+                    break;
+                }
+            }
+        }
+        assert!(found, "must find a seed producing NearbyCreatureCore");
     }
 
     #[test]

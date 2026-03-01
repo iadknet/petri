@@ -29,12 +29,22 @@ pub struct StaticInputs {
 
 impl StaticInputs {
     /// Look up a resolved f32 value by WorldInputKey.
+    ///
+    /// Extended perception compound keys return 0.0 here — they are resolved
+    /// through `PerceptionSnapshot::resolve()` in the `SensorSnapshot` path.
     pub fn resolve_world(&self, key: &WorldInputKey) -> f32 {
         match key {
             WorldInputKey::FoodHere => self.food_here,
             WorldInputKey::NeighborCellFood(dir) => self.neighbor_food[dir.to_index()],
             WorldInputKey::NeighborCellBarrier(dir) => self.neighbor_barrier[dir.to_index()],
             WorldInputKey::NeighborCellOccupied(dir) => self.neighbor_occupied[dir.to_index()],
+            // Extended perception compounds — resolved via PerceptionSnapshot, not StaticInputs.
+            WorldInputKey::AreaFoodSummary
+            | WorldInputKey::AreaBarrierSummary
+            | WorldInputKey::AreaOccupancySummary
+            | WorldInputKey::NearbyCreatureCore
+            | WorldInputKey::NearbyCreatureVitals
+            | WorldInputKey::NearbyCreatureIdentity => 0.0,
         }
     }
 
@@ -121,6 +131,7 @@ mod tests {
     use crate::creature::genome::{
         BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
     };
+    use crate::creature::identity::CreatureIdentityState;
     use crate::creature::state::CreatureState;
     use crate::kernel::WorldState;
     use slotmap::SlotMap;
@@ -152,6 +163,7 @@ mod tests {
             [128, 64, 32, 10, 20, 30],
             0,
             [true; 6],
+            CreatureIdentityState::default(),
         )
     }
 
@@ -257,6 +269,7 @@ mod tests {
             [0; 6],
             0,
             [true; 6],
+            CreatureIdentityState::default(),
         );
         creature.age = 42;
         let si = assemble_static_inputs(&world, &creature);

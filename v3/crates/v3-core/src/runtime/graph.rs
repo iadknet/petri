@@ -5,7 +5,7 @@ use crate::creature::state::GraphRuntimeState;
 use crate::runtime::hebbian;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::types::{sanitize_f32, NodeResult};
-use crate::sensors::static_inputs::StaticInputs;
+use crate::sensors::perception::SensorSnapshot;
 
 /// Immutable context for resolving `InputRef` nodes during graph evaluation.
 pub(crate) struct EvalCtx<'a> {
@@ -152,7 +152,7 @@ pub fn execute_graph_node(
     energy_consumed: f32,
     node_idx: usize,
     graph_runtime: &mut GraphRuntimeState,
-    static_inputs: &StaticInputs,
+    sensors: &SensorSnapshot,
     config: &RuntimeConfig,
     action_queue: &ActionQueue,
 ) -> NodeResult {
@@ -223,7 +223,7 @@ pub fn execute_graph_node(
         let ctx = EvalCtx {
             input_refs,
             resolve: ResolveCtx {
-                static_inputs,
+                sensors,
                 upstream_slots,
                 energy: *energy,
                 energy_consumed,

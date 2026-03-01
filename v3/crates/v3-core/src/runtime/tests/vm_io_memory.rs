@@ -1,4 +1,5 @@
 use super::*;
+use crate::creature::identity::CreatureIdentityState;
 
 // ── PushAction + ExecuteActionQueue ────────────────────────────────────────
 
@@ -105,7 +106,7 @@ fn read_input_upstream_slot() {
         constants: vec![],
         program,
     };
-    let si = empty_static_inputs();
+    let ss = empty_sensor_snapshot();
     let mut e = 100.0;
     let mut mem = [0u8; 1024];
     let cfg = config();
@@ -117,7 +118,7 @@ fn read_input_upstream_slot() {
         &mut e,
         0.0,
         &mut mem,
-        &si,
+        &ss,
         &cfg,
         &mut side_outputs,
     );
@@ -234,7 +235,7 @@ fn store_and_load_mem8() {
             VmInstruction::Halt,
         ],
     };
-    let si = empty_static_inputs();
+    let ss = empty_sensor_snapshot();
     let mut e = 100.0;
     let mut mem = [0u8; 1024];
     let cfg = config();
@@ -246,7 +247,7 @@ fn store_and_load_mem8() {
         &mut e,
         0.0,
         &mut mem,
-        &si,
+        &ss,
         &cfg,
         &mut side_outputs,
     );
@@ -279,7 +280,7 @@ fn store_and_load_mem8_imm() {
             VmInstruction::Halt,
         ],
     };
-    let si = empty_static_inputs();
+    let ss = empty_sensor_snapshot();
     let mut e = 100.0;
     let mut mem = [0u8; 1024];
     let cfg = config();
@@ -291,7 +292,7 @@ fn store_and_load_mem8_imm() {
         &mut e,
         0.0,
         &mut mem,
-        &si,
+        &ss,
         &cfg,
         &mut side_outputs,
     );
@@ -328,7 +329,7 @@ fn memory_address_wraps_via_rem_euclid() {
             VmInstruction::Halt,
         ],
     };
-    let si = empty_static_inputs();
+    let ss = empty_sensor_snapshot();
     let mut e = 100.0;
     let mut mem = [0u8; 1024];
     let cfg = config();
@@ -340,7 +341,7 @@ fn memory_address_wraps_via_rem_euclid() {
         &mut e,
         0.0,
         &mut mem,
-        &si,
+        &ss,
         &cfg,
         &mut side_outputs,
     );
@@ -358,6 +359,7 @@ fn vm_eats_when_food_here() {
     };
     use crate::creature::state::CreatureState;
     use crate::kernel::WorldState;
+    use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::assemble_static_inputs;
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
@@ -403,11 +405,25 @@ fn vm_eats_when_food_here() {
             targets: vec![],
         }],
     };
-    let creature = CreatureState::new(id, genome, pos, 30.0, 0, [0; 6], 0, [true; 6]);
+    let creature = CreatureState::new(
+        id,
+        genome,
+        pos,
+        30.0,
+        0,
+        [0; 6],
+        0,
+        [true; 6],
+        CreatureIdentityState::default(),
+    );
 
-    let si = assemble_static_inputs(&world, &creature);
+    let local = assemble_static_inputs(&world, &creature);
     // food_here should be > 0.0
-    assert!(si.food_here > 0.0);
+    assert!(local.food_here > 0.0);
+    let ss = SensorSnapshot {
+        local,
+        perception: PerceptionSnapshot::zero(),
+    };
 
     let def = if let BackendDef::Vm(ref v) = creature.genome.nodes[0].backend_def {
         v
@@ -427,7 +443,7 @@ fn vm_eats_when_food_here() {
         &mut energy,
         0.0,
         &mut mem,
-        &si,
+        &ss,
         &cfg,
         &mut side_outputs,
     );
@@ -448,6 +464,7 @@ fn vm_noop_when_no_food() {
     };
     use crate::creature::state::CreatureState;
     use crate::kernel::WorldState;
+    use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::assemble_static_inputs;
     use slotmap::SlotMap;
 
@@ -483,9 +500,23 @@ fn vm_noop_when_no_food() {
             targets: vec![],
         }],
     };
-    let creature = CreatureState::new(id, genome, pos, 30.0, 0, [0; 6], 0, [true; 6]);
-    let si = assemble_static_inputs(&world, &creature);
-    assert_eq!(si.food_here, 0.0);
+    let creature = CreatureState::new(
+        id,
+        genome,
+        pos,
+        30.0,
+        0,
+        [0; 6],
+        0,
+        [true; 6],
+        CreatureIdentityState::default(),
+    );
+    let local = assemble_static_inputs(&world, &creature);
+    assert_eq!(local.food_here, 0.0);
+    let ss = SensorSnapshot {
+        local,
+        perception: PerceptionSnapshot::zero(),
+    };
 
     let def = if let BackendDef::Vm(ref v) = creature.genome.nodes[0].backend_def {
         v
@@ -505,7 +536,7 @@ fn vm_noop_when_no_food() {
         &mut energy,
         0.0,
         &mut mem,
-        &si,
+        &ss,
         &cfg,
         &mut side_outputs,
     );

@@ -39,6 +39,7 @@ fn bench_full_tick(c: &mut Criterion) {
 
 fn bench_mesh_execution_only(c: &mut Criterion) {
     use v3_core::runtime::mesh::execute_creature_mesh;
+    use v3_core::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use v3_core::sensors::static_inputs::assemble_static_inputs;
 
     c.bench_function("mesh_execution_200_creatures", |b| {
@@ -48,11 +49,15 @@ fn bench_mesh_execution_only(c: &mut Criterion) {
                 let config = sim.config.runtime.clone();
                 let ids: Vec<_> = sim.creatures.keys().collect();
                 for id in ids {
-                    let si = assemble_static_inputs(&sim.world, &sim.creatures[id]);
+                    let local = assemble_static_inputs(&sim.world, &sim.creatures[id]);
+                    let ss = SensorSnapshot {
+                        local,
+                        perception: PerceptionSnapshot::zero(),
+                    };
                     let creature = sim.creatures.get_mut(id).unwrap();
                     let _ = black_box(execute_creature_mesh(
                         &creature.genome,
-                        &si,
+                        &ss,
                         &mut creature.energy,
                         &mut creature.memory,
                         &mut creature.graph_runtime,
