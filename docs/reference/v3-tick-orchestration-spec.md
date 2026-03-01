@@ -89,6 +89,10 @@ runtime backends or reproduction internals.
   -> [Phase 2: Sequential action execution]
        For each decision in queue order:
          [apply action to current world state]
+  -> [Phase 2.5: Reward-modulated learning pass]
+       For each creature with reward-modulated plasticity nodes:
+         [compute OutcomeSignalBank from Phase 0 snapshot + Phase 2 outcomes]
+         [apply reward-modulated weight updates: dw = lr * outcome * trace]
   -> [tick ends; newborns eligible next tick]
 ```
 
@@ -140,6 +144,25 @@ Decisions are applied in queue order. Each action is applied immediately to
 current world state, and resulting mutations persist before the next action.
 
 This is the canonical first-processed-wins model.
+
+### Phase 2.5: Reward-Modulated Learning Pass
+
+After all actions are executed, creatures with reward-modulated plasticity
+nodes receive weight updates based on tick outcomes. For each such creature:
+
+1. Compute `OutcomeSignalBank` from Phase 0 energy snapshot and Phase 2
+   action results (energy delta, action success rate, damage received,
+   offspring spawned).
+2. For each reward-modulated edge, apply:
+   `dw = learning_rate * outcome_signal[channel] * eligibility_trace[edge]`.
+3. Clamp updated weight to `[-weight_clamp, weight_clamp]`.
+
+Eligibility traces are updated during Phase 1 graph evaluation
+(post-convergence) and persist across ticks with configurable decay.
+
+Creatures without reward-modulated nodes skip Phase 2.5 entirely.
+Newborns spawned during Phase 2 have no outcome accumulator entry and
+are naturally excluded.
 
 ---
 
