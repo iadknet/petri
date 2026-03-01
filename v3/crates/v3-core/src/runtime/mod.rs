@@ -1,7 +1,7 @@
 pub mod action_decode;
 pub mod graph;
 pub(crate) mod graph_effects;
-pub mod hebbian;
+pub(crate) mod plasticity;
 pub mod inputs;
 pub mod mesh;
 pub mod trace;

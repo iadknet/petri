@@ -12,7 +12,7 @@ use crate::creature::genome::GraphBackendDef;
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::graph::{collect_weighted_inputs, evaluate_kind, EvalCtx};
 use crate::runtime::graph_effects::apply_graph_effects;
-use crate::runtime::hebbian;
+use crate::runtime::plasticity::hebbian;
 use crate::runtime::inputs::ResolveCtx;
 use crate::runtime::trace::{kind_label, GraphNodeEvalTrace, GraphPassTrace, GraphTrace};
 use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult};
