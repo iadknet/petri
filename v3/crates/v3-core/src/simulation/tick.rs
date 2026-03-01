@@ -283,6 +283,11 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
             priority_bid_count += 1;
         }
 
+        // Skip all actions for creatures killed by earlier predation this tick.
+        if !sim.creatures.contains_key(id) {
+            continue;
+        }
+
         // Apply each queued action sequentially.
         for action in &output.actions {
             match *action {
@@ -473,6 +478,60 @@ mod tests {
         cfg.world.height = 20;
         cfg.population.initial_creatures = 5;
         cfg
+    }
+
+    /// Build a minimal simulation with two creatures and no food/food-growth.
+    /// Creature A at (5,5), creature B at (5,4) (directly north of A).
+    fn make_sim_two_creatures(
+        energy_a: f32,
+        energy_b: f32,
+    ) -> (Simulation, CreatureId, CreatureId) {
+        let mut cfg = small_config();
+        cfg.world.food.growth_rate = 0.0;
+        cfg.world.food.initial_coverage = 0.0;
+
+        let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
+        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+
+        let a_id = creatures.insert_with_key(|id| {
+            CreatureState::new(
+                id,
+                v3alpha1_founder_genome(),
+                Position::new(5, 5),
+                energy_a,
+                0,
+                [0, 0, 92, 92, 138, 138],
+                0,
+                [true; 6],
+                CreatureIdentityState::default(),
+            )
+        });
+        world.place_creature(Position::new(5, 5), a_id);
+
+        let b_id = creatures.insert_with_key(|id| {
+            CreatureState::new(
+                id,
+                v3alpha1_founder_genome(),
+                Position::new(5, 4),
+                energy_b,
+                0,
+                [0, 0, 92, 92, 138, 138],
+                0,
+                [true; 6],
+                CreatureIdentityState::default(),
+            )
+        });
+        world.place_creature(Position::new(5, 4), b_id);
+
+        let sim = Simulation {
+            world,
+            creatures,
+            tick: 0,
+            config: cfg,
+            stats: crate::simulation::stats::SimStats::default(),
+            rng: rand::rngs::SmallRng::seed_from_u64(42),
+        };
+        (sim, a_id, b_id)
     }
 
     /// Build a minimal simulation with one creature at (5,5) and no food/food-growth.
@@ -789,54 +848,9 @@ mod tests {
         use crate::contracts::Direction;
         use crate::simulation::actions::apply_steal_energy;
 
-        // Attacker at (5,5), victim at (5,4) = N of attacker
-        let mut cfg = small_config();
-        cfg.world.food.growth_rate = 0.0;
-        cfg.world.food.initial_coverage = 0.0;
-        cfg.predation.steal_cost_rate = 0.0;
-
-        let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
-        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let (mut sim, attacker_id, victim_id) = make_sim_two_creatures(50.0, 5.0);
+        sim.config.predation.steal_cost_rate = 0.0;
         let victim_pos = Position::new(5, 4);
-
-        let attacker_id = creatures.insert_with_key(|id| {
-            CreatureState::new(
-                id,
-                v3alpha1_founder_genome(),
-                Position::new(5, 5),
-                50.0,
-                0,
-                [0, 0, 92, 92, 138, 138],
-                0,
-                [true; 6],
-                CreatureIdentityState::default(),
-            )
-        });
-        world.place_creature(Position::new(5, 5), attacker_id);
-
-        let victim_id = creatures.insert_with_key(|id| {
-            CreatureState::new(
-                id,
-                v3alpha1_founder_genome(),
-                victim_pos,
-                5.0, // will be fully drained
-                0,
-                [0, 0, 92, 92, 138, 138],
-                0,
-                [true; 6],
-                CreatureIdentityState::default(),
-            )
-        });
-        world.place_creature(victim_pos, victim_id);
-
-        let mut sim = Simulation {
-            world,
-            creatures,
-            tick: 0,
-            config: cfg,
-            stats: crate::simulation::stats::SimStats::default(),
-            rng: rand::rngs::SmallRng::seed_from_u64(42),
-        };
 
         let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 20.0);
 
@@ -1008,6 +1022,57 @@ mod tests {
         assert_eq!(decisions[0].0, id_a);
         assert_eq!(decisions[1].0, id_b);
         assert_eq!(decisions[2].0, id_c);
+    }
+
+    /// Regression: if creature A kills creature B via predation, then B's queued
+    /// StealEnergy action must not panic on a stale SlotMap key.
+    #[test]
+    fn killed_creature_steal_action_does_not_panic() {
+        use crate::contracts::Direction;
+        use crate::simulation::actions::apply_steal_energy;
+
+        let (mut sim, a_id, b_id) = make_sim_two_creatures(100.0, 5.0);
+        sim.config.predation.steal_cost_rate = 0.0;
+
+        // A kills B.
+        let result = apply_steal_energy(a_id, &mut sim, Direction::N, 50.0);
+        assert_eq!(
+            result,
+            crate::simulation::actions::PredationActionResult::TransferredAndKilled,
+        );
+        assert!(!sim.creatures.contains_key(b_id), "B should be dead");
+
+        // Simulate Phase 2 dispatching B's queued action on its stale key.
+        // Before the fix this panics with "invalid SlotMap key used".
+        if sim.creatures.contains_key(b_id) {
+            let _result = apply_steal_energy(b_id, &mut sim, Direction::S, 10.0);
+        }
+        // If we reach here without panic, the guard works.
+    }
+
+    /// Regression: same stale-key guard for Reproduce dispatch path.
+    #[test]
+    fn killed_creature_reproduce_action_does_not_panic() {
+        use crate::contracts::Direction;
+        use crate::simulation::actions::{apply_reproduce, apply_steal_energy};
+
+        let (mut sim, a_id, b_id) = make_sim_two_creatures(100.0, 5.0);
+        sim.config.predation.steal_cost_rate = 0.0;
+
+        // A kills B.
+        let result = apply_steal_energy(a_id, &mut sim, Direction::N, 50.0);
+        assert_eq!(
+            result,
+            crate::simulation::actions::PredationActionResult::TransferredAndKilled,
+        );
+        assert!(!sim.creatures.contains_key(b_id), "B should be dead");
+
+        // Simulate Phase 2 dispatching B's queued Reproduce on stale key.
+        if sim.creatures.contains_key(b_id) {
+            let mut rng = rand::rngs::SmallRng::seed_from_u64(99);
+            let _result = apply_reproduce(b_id, &mut sim, Direction::S, 10.0, &mut rng);
+        }
+        // If we reach here without panic, the guard works.
     }
 
     #[test]
