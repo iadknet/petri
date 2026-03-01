@@ -13,6 +13,7 @@ use crate::runtime::types::NodeResult;
 ///
 /// - `CustomOutput(s)` writes `curr_outputs[i]` to `output_slots[s]` (s < 12 guard).
 /// - `RouterOutput` writes `curr_outputs[i]` to `route_target_idx`.
+#[inline]
 pub(crate) fn apply_graph_effects(
     def: &GraphBackendDef,
     curr_outputs: &[f32],
