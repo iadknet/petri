@@ -59,9 +59,39 @@ The main tradeoff is complexity: we would be adding more per-creature runtime st
 
 
 ### Storage slots
-  - add the ability for creatures to pick up and place food and barriers
-  - This was implemented in v1, we can refrence v1 implementation
-  
+
+- Add creature inventory with a fixed slot count, controlled by a new config option `inventory.slot_count` with default `5`.
+- Each slot stores one of:
+  - `Empty`
+  - `Barrier`
+  - `Food { density }`
+- Inventory is creature-local runtime state. Offspring spawn with empty inventory; slot count comes from config rather than inheritance.
+
+- Add two new actions:
+  - `Pickup { direction, slot }`
+  - `Place { direction, slot }`
+- Both actions use the existing 8-neighbor `Direction` model only. There is no self-cell pickup/place behavior.
+- Current-cell food remains `Eat`-only.
+
+- `Pickup(direction, slot)` semantics:
+  - Resolve the target neighbor using existing world edge rules.
+  - Fail if the target is unresolved, occupied by a creature, or the slot is invalid/full.
+  - If the target cell has a barrier, remove the barrier and store `Barrier` in the slot.
+  - Otherwise, if the target cell has food density `> 0.0`, clear that food from the cell and store `Food { density: previous_density }`.
+  - If the target has neither barrier nor food, the action fails.
+  - If a cell somehow has both barrier and food, barrier takes priority.
+
+- `Place(direction, slot)` semantics:
+  - Resolve the target neighbor using existing world edge rules.
+  - Fail if the target is unresolved or the slot is invalid/empty.
+  - If the slot contains `Barrier`, placement succeeds only if the target cell is unoccupied and barrier-free. On success, clear any food on that cell and place the barrier.
+  - If the slot contains `Food { density }`, placement succeeds only if the target cell is not a barrier and adding the stored density would not exceed `world.food.max_density`.
+  - Food placement should fail on overflow rather than clamp, so stored food density is conserved.
+
+- Add creature introspection inputs for storage slots.
+- Initial slot introspection should expose slot occupancy and item kind only, not stored food density.
+- Stored food density must still be preserved internally and should be visible in inspector/debug surfaces, just not exposed to creature cognition initially.
+
 ### Creatures can spend energy to "cut in line" during action execution
   - When selecting an action, a creature can dedicate "extra energy" to an action
   - When determining action order, the actions with the most extra energy are evaluated first
