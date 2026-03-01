@@ -12,7 +12,7 @@ use crate::creature::state::GraphRuntimeState;
 use crate::runtime::graph::execute_graph_node;
 use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs};
 use crate::runtime::vm::execute_vm_node;
-use crate::sensors::static_inputs::StaticInputs;
+use crate::sensors::perception::SensorSnapshot;
 
 /// Execute the creature's mesh chain for one tick, returning a [`MeshOutput`]
 /// containing the queued actions, a [`ComputeCostReport`], and the priority bid.
@@ -28,7 +28,7 @@ use crate::sensors::static_inputs::StaticInputs;
 ///
 /// # Arguments
 /// - `genome`: the creature's node graph
-/// - `static_inputs`: pre-assembled sensor snapshot for this tick
+/// - `sensors`: pre-assembled sensor snapshot (local + extended perception)
 /// - `energy`: creature's mutable energy; decremented by node evaluation costs
 /// - `memory`: creature's 1024-byte persistent memory
 /// - `graph_runtime`: per-node persistent runtime state for Graph backends
@@ -36,7 +36,7 @@ use crate::sensors::static_inputs::StaticInputs;
 #[allow(clippy::too_many_arguments)]
 pub fn execute_creature_mesh(
     genome: &CreatureGenome,
-    static_inputs: &StaticInputs,
+    sensors: &SensorSnapshot,
     energy: &mut f32,
     memory: &mut [u8; 1024],
     graph_runtime: &mut GraphRuntimeState,
@@ -85,7 +85,7 @@ pub fn execute_creature_mesh(
                 energy,
                 energy_consumed,
                 memory,
-                static_inputs,
+                sensors,
                 config,
                 &mut side_outputs,
             ),
@@ -97,7 +97,7 @@ pub fn execute_creature_mesh(
                 energy_consumed,
                 current_idx,
                 graph_runtime,
-                static_inputs,
+                sensors,
                 config,
                 &side_outputs.action_queue,
             ),
@@ -189,6 +189,7 @@ mod tests {
         NodeGenome, VmBackendDef, VmInstruction,
     };
     use crate::creature::state::GraphRuntimeState;
+    use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
 
     // ── Helpers ───────────────────────────────────────────────────────────────
@@ -197,14 +198,17 @@ mod tests {
         RuntimeConfig::default()
     }
 
-    fn empty_static_inputs() -> StaticInputs {
-        StaticInputs {
-            food_here: 0.0,
-            neighbor_food: [0.0; 8],
-            neighbor_barrier: [0.0; 8],
-            neighbor_occupied: [0.0; 8],
-            generation: 0.0,
-            age_ticks: 0.0,
+    fn empty_sensor_snapshot() -> SensorSnapshot {
+        SensorSnapshot {
+            local: StaticInputs {
+                food_here: 0.0,
+                neighbor_food: [0.0; 8],
+                neighbor_barrier: [0.0; 8],
+                neighbor_occupied: [0.0; 8],
+                generation: 0.0,
+                age_ticks: 0.0,
+            },
+            perception: PerceptionSnapshot::zero(),
         }
     }
 
@@ -257,14 +261,14 @@ mod tests {
             entry_node_id: NodeId::new(99),
             nodes: vec![],
         };
-        let si = empty_static_inputs();
+        let ss = empty_sensor_snapshot();
         let mut energy = 100.0f32;
         let mut memory = [0u8; 1024];
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
         let output =
-            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
+            execute_creature_mesh(&genome, &ss, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
     }
 
@@ -290,7 +294,7 @@ mod tests {
             entry_node_id: id0,
             nodes: vec![node],
         };
-        let si = empty_static_inputs();
+        let ss = empty_sensor_snapshot();
         let mut energy = 1000.0f32;
         let mut memory = [0u8; 1024];
         let mut gr = GraphRuntimeState::new();
@@ -300,7 +304,7 @@ mod tests {
         };
 
         let output =
-            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
+            execute_creature_mesh(&genome, &ss, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
     }
 
@@ -323,14 +327,14 @@ mod tests {
                 targets: vec![], // no targets
             }],
         };
-        let si = empty_static_inputs();
+        let ss = empty_sensor_snapshot();
         let mut energy = 100.0f32;
         let mut memory = [0u8; 1024];
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
         let output =
-            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
+            execute_creature_mesh(&genome, &ss, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
     }
 
@@ -354,14 +358,14 @@ mod tests {
                 targets: vec![],
             }],
         };
-        let si = empty_static_inputs();
+        let ss = empty_sensor_snapshot();
         let mut energy = 0.01f32; // way below the Noop cost of 0.05
         let mut memory = [0u8; 1024];
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
         let output =
-            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
+            execute_creature_mesh(&genome, &ss, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
     }
 
@@ -375,14 +379,14 @@ mod tests {
             entry_node_id: id0,
             nodes: vec![vm_emit_node(id0, 1, vec![])],
         };
-        let si = empty_static_inputs();
+        let ss = empty_sensor_snapshot();
         let mut energy = 100.0f32;
         let mut memory = [0u8; 1024];
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
         let output =
-            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
+            execute_creature_mesh(&genome, &ss, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(output.actions, vec![WorldAction::Eat]);
     }
 
@@ -426,14 +430,14 @@ mod tests {
             entry_node_id: id_graph,
             nodes: vec![graph_node, vm_node],
         };
-        let si = empty_static_inputs();
+        let ss = empty_sensor_snapshot();
         let mut energy = 100.0f32;
         let mut memory = [0u8; 1024];
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
         let output =
-            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
+            execute_creature_mesh(&genome, &ss, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(output.actions, vec![WorldAction::Eat]);
     }
 
@@ -462,14 +466,14 @@ mod tests {
             entry_node_id: id0,
             nodes: vec![entry, node_a, node_b, node_c],
         };
-        let si = empty_static_inputs();
+        let ss = empty_sensor_snapshot();
         let mut energy = 1000.0f32;
         let mut memory = [0u8; 1024];
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
         let output =
-            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
+            execute_creature_mesh(&genome, &ss, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(
             output.actions,
             vec![WorldAction::Eat],
@@ -501,14 +505,14 @@ mod tests {
             entry_node_id: id0,
             nodes: vec![entry, node_noop, node_eat],
         };
-        let si = empty_static_inputs();
+        let ss = empty_sensor_snapshot();
         let mut energy = 1000.0f32;
         let mut memory = [0u8; 1024];
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
         let output =
-            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
+            execute_creature_mesh(&genome, &ss, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(
             output.actions,
             vec![WorldAction::Eat],
@@ -586,14 +590,14 @@ mod tests {
             entry_node_id: id_graph,
             nodes: vec![graph_node, vm_node],
         };
-        let si = empty_static_inputs();
+        let ss = empty_sensor_snapshot();
         let mut energy = 1000.0f32;
         let mut memory = [0u8; 1024];
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
         let output =
-            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
+            execute_creature_mesh(&genome, &ss, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(
             output.actions,
             vec![WorldAction::Eat],
@@ -611,14 +615,14 @@ mod tests {
             entry_node_id: id0,
             nodes: vec![vm_emit_node(id0, 1, vec![])],
         };
-        let si = empty_static_inputs();
+        let ss = empty_sensor_snapshot();
         let mut energy = 100.0f32;
         let mut memory = [0u8; 1024];
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
         let output =
-            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
+            execute_creature_mesh(&genome, &ss, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(output.priority_bid, 0.0);
     }
 
@@ -647,14 +651,14 @@ mod tests {
                 targets: vec![],
             }],
         };
-        let si = empty_static_inputs();
+        let ss = empty_sensor_snapshot();
         let mut energy = 100.0f32;
         let mut memory = [0u8; 1024];
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
         let output =
-            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
+            execute_creature_mesh(&genome, &ss, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(output.priority_bid, 3.0);
         assert_eq!(output.actions, vec![WorldAction::Eat]);
     }
@@ -708,14 +712,14 @@ mod tests {
             entry_node_id: id0,
             nodes: vec![node0, node1],
         };
-        let si = empty_static_inputs();
+        let ss = empty_sensor_snapshot();
         let mut energy = 100.0f32;
         let mut memory = [0u8; 1024];
         let mut gr = GraphRuntimeState::new();
         let config = default_config();
 
         let output =
-            execute_creature_mesh(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
+            execute_creature_mesh(&genome, &ss, &mut energy, &mut memory, &mut gr, &config);
         assert_eq!(
             output.priority_bid, 2.0,
             "last-write-wins: second node's bid should be returned"

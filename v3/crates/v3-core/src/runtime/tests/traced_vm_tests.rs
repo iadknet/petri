@@ -4,20 +4,24 @@ use crate::contracts::InputReference;
 use crate::creature::genome::{VmBackendDef, VmInstruction};
 use crate::runtime::types::MeshSideOutputs;
 use crate::runtime::vm::execute_vm_node;
+use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;
 
 fn config() -> RuntimeConfig {
     RuntimeConfig::default()
 }
 
-fn empty_si() -> StaticInputs {
-    StaticInputs {
-        food_here: 0.0,
-        neighbor_food: [0.0; 8],
-        neighbor_barrier: [0.0; 8],
-        neighbor_occupied: [0.0; 8],
-        generation: 0.0,
-        age_ticks: 0.0,
+fn empty_ss() -> SensorSnapshot {
+    SensorSnapshot {
+        local: StaticInputs {
+            food_here: 0.0,
+            neighbor_food: [0.0; 8],
+            neighbor_barrier: [0.0; 8],
+            neighbor_occupied: [0.0; 8],
+            generation: 0.0,
+            age_ticks: 0.0,
+        },
+        perception: PerceptionSnapshot::zero(),
     }
 }
 
@@ -28,7 +32,7 @@ fn assert_equivalent(
     upstream: [f32; 12],
     memory_seed: [u8; 1024],
 ) {
-    let si = empty_si();
+    let ss = empty_ss();
     let cfg = config();
 
     let mut energy_a = 100.0f32;
@@ -41,7 +45,7 @@ fn assert_equivalent(
         &mut energy_a,
         0.0,
         &mut memory_a,
-        &si,
+        &ss,
         &cfg,
         &mut aq_a,
     );
@@ -56,7 +60,7 @@ fn assert_equivalent(
         &mut energy_b,
         0.0,
         &mut memory_b,
-        &si,
+        &ss,
         &cfg,
         &mut aq_b,
     );
@@ -88,7 +92,7 @@ fn result_equivalence_emit_eat() {
     };
     let input_refs: Vec<InputReference> = vec![];
     let upstream = [0.0f32; 12];
-    let si = empty_si();
+    let ss = empty_ss();
     let cfg = config();
 
     // Run non-traced
@@ -102,7 +106,7 @@ fn result_equivalence_emit_eat() {
         &mut energy_a,
         0.0,
         &mut memory_a,
-        &si,
+        &ss,
         &cfg,
         &mut aq_a,
     );
@@ -118,7 +122,7 @@ fn result_equivalence_emit_eat() {
         &mut energy_b,
         0.0,
         &mut memory_b,
-        &si,
+        &ss,
         &cfg,
         &mut aq_b,
     );
@@ -146,7 +150,7 @@ fn trace_contains_correct_instructions() {
             VmInstruction::Halt,
         ],
     };
-    let si = empty_si();
+    let ss = empty_ss();
     let cfg = config();
     let mut energy = 100.0f32;
     let mut memory = [0u8; 1024];
@@ -159,7 +163,7 @@ fn trace_contains_correct_instructions() {
         &mut energy,
         0.0,
         &mut memory,
-        &si,
+        &ss,
         &cfg,
         &mut side_outputs,
     );
@@ -193,7 +197,7 @@ fn register_changes_captured() {
             VmInstruction::Halt,
         ],
     };
-    let si = empty_si();
+    let ss = empty_ss();
     let cfg = config();
     let mut energy = 100.0f32;
     let mut memory = [0u8; 1024];
@@ -206,7 +210,7 @@ fn register_changes_captured() {
         &mut energy,
         0.0,
         &mut memory,
-        &si,
+        &ss,
         &cfg,
         &mut side_outputs,
     );
@@ -246,7 +250,7 @@ fn memory_writes_tracked() {
             VmInstruction::Halt,
         ],
     };
-    let si = empty_si();
+    let ss = empty_ss();
     let cfg = config();
     let mut energy = 100.0f32;
     let mut memory = [0u8; 1024];
@@ -259,7 +263,7 @@ fn memory_writes_tracked() {
         &mut energy,
         0.0,
         &mut memory,
-        &si,
+        &ss,
         &cfg,
         &mut side_outputs,
     );
@@ -285,7 +289,7 @@ fn result_equivalence_energy_exhaustion() {
             VmInstruction::Halt,
         ],
     };
-    let si = empty_si();
+    let ss = empty_ss();
     let cfg = config();
 
     // Energy just enough for ~1 Noop (0.05), second will exhaust
@@ -299,7 +303,7 @@ fn result_equivalence_energy_exhaustion() {
         &mut energy_a,
         0.0,
         &mut memory_a,
-        &si,
+        &ss,
         &cfg,
         &mut aq_a,
     );
@@ -314,7 +318,7 @@ fn result_equivalence_energy_exhaustion() {
         &mut energy_b,
         0.0,
         &mut memory_b,
-        &si,
+        &ss,
         &cfg,
         &mut aq_b,
     );
@@ -341,7 +345,7 @@ fn result_equivalence_routing() {
             VmInstruction::Halt,
         ],
     };
-    let si = empty_si();
+    let ss = empty_ss();
     let cfg = config();
 
     let mut energy_a = 100.0f32;
@@ -354,7 +358,7 @@ fn result_equivalence_routing() {
         &mut energy_a,
         0.0,
         &mut memory_a,
-        &si,
+        &ss,
         &cfg,
         &mut aq_a,
     );
@@ -369,7 +373,7 @@ fn result_equivalence_routing() {
         &mut energy_b,
         0.0,
         &mut memory_b,
-        &si,
+        &ss,
         &cfg,
         &mut aq_b,
     );

@@ -3,20 +3,24 @@ use crate::config::RuntimeConfig;
 use crate::contracts::Direction;
 use crate::creature::genome::{VmBackendDef, VmInstruction};
 use crate::runtime::types::MeshSideOutputs;
+use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;
 
 fn config() -> RuntimeConfig {
     RuntimeConfig::default()
 }
 
-fn empty_static_inputs() -> StaticInputs {
-    StaticInputs {
-        food_here: 0.0,
-        neighbor_food: [0.0; 8],
-        neighbor_barrier: [0.0; 8],
-        neighbor_occupied: [0.0; 8],
-        generation: 0.0,
-        age_ticks: 0.0,
+fn empty_sensor_snapshot() -> SensorSnapshot {
+    SensorSnapshot {
+        local: StaticInputs {
+            food_here: 0.0,
+            neighbor_food: [0.0; 8],
+            neighbor_barrier: [0.0; 8],
+            neighbor_occupied: [0.0; 8],
+            generation: 0.0,
+            age_ticks: 0.0,
+        },
+        perception: PerceptionSnapshot::zero(),
     }
 }
 
@@ -37,7 +41,7 @@ fn run_vm(
         constants,
         program,
     };
-    let si = empty_static_inputs();
+    let ss = empty_sensor_snapshot();
     let mut e = energy;
     let mut mem = [0u8; 1024];
     let cfg = config();
@@ -49,7 +53,7 @@ fn run_vm(
         &mut e,
         0.0,
         &mut mem,
-        &si,
+        &ss,
         &cfg,
         &mut side_outputs,
     );

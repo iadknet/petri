@@ -13,7 +13,7 @@ use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::trace::{MemoryWrite, VmStepTrace, VmTrace};
 use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult};
 use crate::runtime::vm::{is_truthy, jump_target, nr, opcode_base_cost};
-use crate::sensors::static_inputs::StaticInputs;
+use crate::sensors::perception::SensorSnapshot;
 
 /// Execute a VM backend node with trace recording.
 ///
@@ -28,7 +28,7 @@ pub fn execute_vm_node_traced(
     energy: &mut f32,
     energy_consumed: f32,
     memory: &mut [u8; 1024],
-    static_inputs: &StaticInputs,
+    sensors: &SensorSnapshot,
     config: &RuntimeConfig,
     side_outputs: &mut MeshSideOutputs,
 ) -> (NodeResult, VmTrace) {
@@ -320,7 +320,7 @@ pub fn execute_vm_node_traced(
             } => {
                 let val = if (*ref_idx as usize) < input_refs.len() {
                     let ctx = ResolveCtx {
-                        static_inputs,
+                        sensors,
                         upstream_slots,
                         energy: *energy,
                         energy_consumed,

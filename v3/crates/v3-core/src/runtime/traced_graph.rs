@@ -15,7 +15,7 @@ use crate::runtime::hebbian;
 use crate::runtime::inputs::ResolveCtx;
 use crate::runtime::trace::{kind_label, GraphNodeEvalTrace, GraphPassTrace, GraphTrace};
 use crate::runtime::types::{sanitize_f32, NodeResult};
-use crate::sensors::static_inputs::StaticInputs;
+use crate::sensors::perception::SensorSnapshot;
 
 use crate::creature::genome::GraphNodeKind;
 
@@ -33,7 +33,7 @@ pub fn execute_graph_node_traced(
     energy_consumed: f32,
     node_idx: usize,
     graph_runtime: &mut GraphRuntimeState,
-    static_inputs: &StaticInputs,
+    sensors: &SensorSnapshot,
     config: &RuntimeConfig,
     action_queue: &ActionQueue,
 ) -> (NodeResult, GraphTrace) {
@@ -99,7 +99,7 @@ pub fn execute_graph_node_traced(
         let ctx = EvalCtx {
             input_refs,
             resolve: ResolveCtx {
-                static_inputs,
+                sensors,
                 upstream_slots,
                 energy: *energy,
                 energy_consumed,
@@ -246,20 +246,24 @@ mod tests {
     use crate::creature::genome::{GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind};
     use crate::creature::state::GraphRuntimeState;
     use crate::runtime::graph::execute_graph_node;
+    use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
 
     fn default_config() -> RuntimeConfig {
         RuntimeConfig::default()
     }
 
-    fn make_si() -> StaticInputs {
-        StaticInputs {
-            food_here: 0.0,
-            neighbor_food: [0.0; 8],
-            neighbor_barrier: [0.0; 8],
-            neighbor_occupied: [0.0; 8],
-            generation: 0.0,
-            age_ticks: 0.0,
+    fn make_ss() -> SensorSnapshot {
+        SensorSnapshot {
+            local: StaticInputs {
+                food_here: 0.0,
+                neighbor_food: [0.0; 8],
+                neighbor_barrier: [0.0; 8],
+                neighbor_occupied: [0.0; 8],
+                generation: 0.0,
+                age_ticks: 0.0,
+            },
+            perception: PerceptionSnapshot::zero(),
         }
     }
 
@@ -292,7 +296,7 @@ mod tests {
             ],
         };
         let upstream = [0.0f32; 12];
-        let si = make_si();
+        let ss = make_ss();
         let config = default_config();
 
         let mut energy_a = 100.0f32;
@@ -305,7 +309,7 @@ mod tests {
             0.0,
             0,
             &mut gr_a,
-            &si,
+            &ss,
             &config,
             &ActionQueue::new(4),
         );
@@ -320,7 +324,7 @@ mod tests {
             0.0,
             0,
             &mut gr_b,
-            &si,
+            &ss,
             &config,
             &ActionQueue::new(4),
         );
@@ -364,7 +368,7 @@ mod tests {
             ],
         };
         let upstream = [0.0f32; 12];
-        let si = make_si();
+        let ss = make_ss();
         let mut config = default_config();
         config.max_graph_relax_iters = 1;
         config.graph_convergence_stable_passes = 1;
@@ -381,7 +385,7 @@ mod tests {
             0.0,
             0,
             &mut gr,
-            &si,
+            &ss,
             &config,
             &ActionQueue::new(4),
         );
@@ -403,7 +407,7 @@ mod tests {
             0.0,
             0,
             &mut gr,
-            &si,
+            &ss,
             &config,
             &ActionQueue::new(4),
         );
@@ -434,7 +438,7 @@ mod tests {
             ],
         };
         let upstream = [0.0f32; 12];
-        let si = make_si();
+        let ss = make_ss();
         let config = default_config();
 
         let mut energy = 1000.0f32;
@@ -448,7 +452,7 @@ mod tests {
             0.0,
             0,
             &mut gr,
-            &si,
+            &ss,
             &config,
             &ActionQueue::new(4),
         );

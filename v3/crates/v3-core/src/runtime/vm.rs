@@ -4,7 +4,7 @@ use crate::creature::genome::VmBackendDef;
 use crate::runtime::action_decode::decode_world_action;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult};
-use crate::sensors::static_inputs::StaticInputs;
+use crate::sensors::perception::SensorSnapshot;
 
 /// Execute a VM backend node.
 ///
@@ -15,7 +15,7 @@ use crate::sensors::static_inputs::StaticInputs;
 /// - `energy`: creature's current energy; decremented by opcode costs; NOT restored on exhaustion
 /// - `energy_consumed`: total energy consumed this tick so far (for dynamic introspection)
 /// - `memory`: creature's persistent 1024-byte memory; NOT modified on energy exhaustion
-/// - `static_inputs`: pre-assembled world/static sensor snapshot
+/// - `sensors`: pre-assembled sensor snapshot (local + extended perception)
 /// - `config`: runtime config (max_vm_steps, vm.opcode_cost_multiplier)
 /// - `side_outputs`: mesh-scoped side outputs (action queue, priority bid) that persist across hops
 ///
@@ -29,7 +29,7 @@ pub fn execute_vm_node(
     energy: &mut f32,
     energy_consumed: f32,
     memory: &mut [u8; 1024],
-    static_inputs: &StaticInputs,
+    sensors: &SensorSnapshot,
     config: &RuntimeConfig,
     side_outputs: &mut MeshSideOutputs,
 ) -> NodeResult {
@@ -243,7 +243,7 @@ pub fn execute_vm_node(
             } => {
                 let val = if (*ref_idx as usize) < input_refs.len() {
                     let ctx = ResolveCtx {
-                        static_inputs,
+                        sensors,
                         upstream_slots,
                         energy: *energy,
                         energy_consumed,
