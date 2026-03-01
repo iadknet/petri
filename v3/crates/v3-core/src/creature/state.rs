@@ -11,6 +11,12 @@ pub struct GraphRuntimeState {
     /// Empty inner vec = use genome weights. Lazily initialized on first plasticity evaluation.
     /// Uses `Box<[f32]>` since edge count per node is fixed after init.
     pub plasticity_weights: Vec<Vec<Box<[f32]>>>,
+    /// Per-edge eligibility traces for reward-modulated plasticity.
+    /// Indexed [mesh_node_idx][internal_node_idx][edge_idx], parallel to `plasticity_weights`.
+    /// Lazily initialized on first reward-modulated evaluation.
+    /// Uses `Box<[f32]>` since edge count per node is fixed after init.
+    /// Always reset (not inherited) on reproduction.
+    pub eligibility_traces: Vec<Vec<Box<[f32]>>>,
     /// Scratch: prev_outputs buffer reused across graph evaluations.
     pub(crate) scratch_prev: Vec<f32>,
     /// Scratch: curr_outputs buffer reused across graph evaluations.
@@ -27,6 +33,7 @@ impl GraphRuntimeState {
         Self {
             node_state: Vec::new(),
             plasticity_weights: Vec::new(),
+            eligibility_traces: Vec::new(),
             scratch_prev: Vec::new(),
             scratch_curr: Vec::new(),
             scratch_backup: Vec::new(),
@@ -138,6 +145,7 @@ mod tests {
         assert_eq!(state.memory, [0u8; 1024]);
         assert!(state.graph_runtime.node_state.is_empty());
         assert!(state.graph_runtime.plasticity_weights.is_empty());
+        assert!(state.graph_runtime.eligibility_traces.is_empty());
         assert_eq!(state.generation, 0);
         assert!((state.energy - 20.0).abs() < f32::EPSILON);
         assert_eq!(state.phenotype_channels, [128, 64, 32, 10, 20, 30]);
