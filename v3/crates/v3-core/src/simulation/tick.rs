@@ -194,11 +194,19 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
 
                 // Record tick trace.
                 if let Some(ref mut active) = trace {
+                    let debug_perception = if active.include_perception_debug {
+                        Some(crate::runtime::trace::PerceptionDebugSnapshot::from(
+                            &ss.perception,
+                        ))
+                    } else {
+                        None
+                    };
                     active.ticks.push(TickTrace {
                         tick_number,
                         energy_before,
                         energy_after: creature.energy,
                         static_inputs: si_snapshot,
+                        debug_perception,
                         hops,
                         final_actions: output.actions.clone(),
                         termination_reason,
