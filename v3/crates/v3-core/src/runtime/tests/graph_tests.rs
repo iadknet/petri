@@ -360,6 +360,7 @@ fn state_not_mutated_on_energy_exhaustion() {
     let mut gr = GraphRuntimeState {
         node_state: vec![vec![42.0f32]],
         plasticity_weights: Vec::new(),
+        eligibility_traces: Vec::new(),
         scratch_prev: Vec::new(),
         scratch_curr: Vec::new(),
         scratch_backup: Vec::new(),
@@ -645,6 +646,7 @@ fn oscillator_nan_safe() {
     let mut gr = GraphRuntimeState {
         node_state: vec![vec![f32::INFINITY, 0.0]],
         plasticity_weights: Vec::new(),
+        eligibility_traces: Vec::new(),
         scratch_prev: Vec::new(),
         scratch_curr: Vec::new(),
         scratch_backup: Vec::new(),

@@ -164,6 +164,9 @@ pub struct RuntimeConfig {
     /// Energy cost per plasticity weight update. Default 0.0 (free during initial rollout).
     #[serde(default, alias = "hebbian_update_cost")]
     pub plasticity_update_cost: f32,
+    /// Energy cost per reward-modulated weight update. Default 0.0 (free during initial rollout).
+    #[serde(default)]
+    pub reward_learning_cost: f32,
     /// Maximum number of actions a creature can queue per turn.
     #[serde(default = "default_max_actions_per_turn")]
     pub max_actions_per_turn: usize,
@@ -191,6 +194,7 @@ impl Default for RuntimeConfig {
             graph_convergence_stable_passes: 2,
             graph_node_base_cost: 1e-5,
             plasticity_update_cost: 0.0,
+            reward_learning_cost: 0.0,
             max_actions_per_turn: default_max_actions_per_turn(),
             vm: VmRuntimeConfig::default(),
             perception: PerceptionRuntimeConfig::default(),
@@ -366,6 +370,7 @@ impl SimulationConfig {
         }
         rt.graph_node_base_cost = normalize_f32_nonneg(rt.graph_node_base_cost, 1e-5);
         rt.plasticity_update_cost = normalize_f32_finite_nonneg(rt.plasticity_update_cost, 0.0);
+        rt.reward_learning_cost = normalize_f32_finite_nonneg(rt.reward_learning_cost, 0.0);
         if rt.max_actions_per_turn < 1 {
             rt.max_actions_per_turn = 10;
         }
@@ -489,6 +494,7 @@ mod tests {
         assert!((cfg.runtime.graph_node_base_cost - 1e-5).abs() < 1e-9);
         assert!((cfg.runtime.vm.opcode_cost_multiplier - 1e-6).abs() < 1e-12);
         assert_eq!(cfg.runtime.max_actions_per_turn, 10);
+        assert!((cfg.runtime.reward_learning_cost - 0.0).abs() < f32::EPSILON);
         // Perception
         assert_eq!(cfg.runtime.perception.vision_radius, 5);
         // Mutation
@@ -772,5 +778,13 @@ mod tests {
         cfg.predation.kill_complexity_bonus_multiplier = f32::INFINITY;
         cfg.normalize();
         assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.05).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_nan_reward_learning_cost_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.runtime.reward_learning_cost = f32::NAN;
+        cfg.normalize();
+        assert!((cfg.runtime.reward_learning_cost - 0.0).abs() < f32::EPSILON);
     }
 }
