@@ -6,6 +6,7 @@ execution.
 Status: Active
 
 Related references:
+- `v3-creature-identity-spec.md`
 - `v3-genome-spec.md`
 - `v3-mesh-execution-spec.md`
 - `v3-tick-orchestration-spec.md`
@@ -14,6 +15,7 @@ Related references:
 - `v3-mutation-spec.md`
 - `v3-reproduction-spec.md`
 - `v3-world-grid-spec.md`
+- `v3-runtime-config-spec.md`
 
 ---
 
@@ -34,19 +36,48 @@ All node backends consume the same `input_refs` vector.
 ### Compound vs Scalar Inputs
 
 Most `InputReference` variants are **scalar**: they resolve to a single `f32`.
-**Compound** variants (currently `ActionQueue`) resolve to multiple sub-values
-addressed via a `sub_idx` parameter. For scalar inputs, `sub_idx > 0` returns
-`0.0`. Backends use two-level indexing `(ref_idx, sub_idx)` to address
-sub-values within a compound input.
+Compound variants resolve to multiple sub-values addressed via `sub_idx`.
+
+Compound inputs in v3alpha1:
+- `ActionQueue`
+- `World(AreaFoodSummary)`
+- `World(AreaBarrierSummary)`
+- `World(AreaOccupancySummary)`
+- `World(NearbyCreatureCore)`
+- `World(NearbyCreatureVitals)`
+- `World(NearbyCreatureIdentity)`
+
+For scalar inputs, `sub_idx > 0` returns `0.0`.
 
 ---
 
-## 2. Categories
+## 2. Sensor Snapshot Boundary
 
-### World
+World and static-introspection values are resolved during cognition from the
+frozen post-Phase-0 snapshot described in `v3-tick-orchestration-spec.md`.
 
-Resolved once at the start of each acting-creature turn from current world
-state:
+Conceptual runtime-facing sensor bundle:
+
+```rust
+pub struct SensorSnapshot {
+    pub local: StaticInputs,
+    pub perception: PerceptionSnapshot,
+}
+```
+
+Boundary rules:
+- `sensors/` owns snapshot assembly.
+- `runtime/` reads already-frozen values only.
+- no backend reads live world state directly.
+- dynamic introspection and action queue remain live runtime reads.
+
+---
+
+## 3. Categories
+
+### 3.1 World
+
+Canonical conceptual world keys:
 
 ```rust
 pub enum WorldInputKey {
@@ -54,27 +85,40 @@ pub enum WorldInputKey {
     NeighborCellFood(Direction),
     NeighborCellBarrier(Direction),
     NeighborCellOccupied(Direction),
+    AreaFoodSummary,
+    AreaBarrierSummary,
+    AreaOccupancySummary,
+    NearbyCreatureCore,
+    NearbyCreatureVitals,
+    NearbyCreatureIdentity,
 }
 ```
 
-Resolved f32 values per key:
+#### Local scalar world sensors
+
+Resolved once per acting-creature turn from the frozen local snapshot:
 - `FoodHere`: `clamp(food_density[self_cell], 0.0, 1.0)` → `[0.0, 1.0]`
 - `NeighborCellFood(dir)`: `clamp(food_density[neighbor], 0.0, 1.0)` → `[0.0, 1.0]`
 - `NeighborCellBarrier(dir)`: `1.0` if barrier, else `0.0`
 - `NeighborCellOccupied(dir)`: `1.0` if occupied by any creature, else `0.0`
 
-Sensor rationale: food substrate is represented as continuous `f32` and sensor
-contracts stay bounded to `[0.0, 1.0]` for stable cognition inputs. Eat action
-reward mechanics still use the raw consumed food amount as defined in
-`v3-runtime-config-spec.md` (`eat_reward_per_food`).
-
 World neighbor semantics (coordinate system, direction mapping, and edge-mode
 resolution) are canonical in `v3-world-grid-spec.md`.
 
-### Static Introspection
+#### Extended perception world sensors
 
-Resolved once at the start of each acting-creature turn from current creature
-state:
+These are fixed-width compound inputs assembled from the frozen extended
+perception snapshot for the acting creature.
+
+Shared posture:
+- all values are finite `f32`
+- all invalid/missing compound accesses return `0.0`
+- area summaries use one global `runtime.perception.vision_radius`
+- visibility considers only cells visible under the contract in Section 4
+
+### 3.2 Static Introspection
+
+Resolved once per acting-creature turn from current creature state:
 
 ```rust
 pub enum StaticIntrospectionKey {
@@ -83,10 +127,9 @@ pub enum StaticIntrospectionKey {
 }
 ```
 
-Resolved f32 values: raw integer cast to f32. Values are unbounded and
-increase monotonically over the creature's lifetime.
+Resolved values are raw integer casts to `f32`.
 
-### Dynamic Introspection
+### 3.3 Dynamic Introspection
 
 Resolved live during mesh evaluation:
 
@@ -97,79 +140,259 @@ pub enum DynamicIntrospectionKey {
 }
 ```
 
-Resolved f32 values: raw energy units (same scale as `energy.*` config fields
-in `v3-runtime-config-spec.md`). `EnergyCurrent` is in `[0.0, max_energy]`;
-`EnergyConsumedThisTick` accumulates action/cognition costs since turn start.
+Resolved values:
+- `EnergyCurrent`: raw current energy, bounded by lifecycle config
+- `EnergyConsumedThisTick`: raw energy consumed since turn start
 
-These values may change between node hops during the same tick.
-
-### Upstream Output
+### 3.4 Upstream Output
 
 `UpstreamSlot(slot)` reads routing-parent output slots.
 If `slot >= 12`, value is `0.0`.
 
-### Action Queue (Compound)
+### 3.5 Action Queue (Compound)
 
-`ActionQueue` is a compound input that exposes the creature's action queue
-contents via two-level sub-value addressing:
-
-- `sub_idx / 3` = queue slot index
+`ActionQueue` exposes queue contents via two-level indexing:
+- `sub_idx / 3` = queue slot
 - `sub_idx % 3`: `0` = action_type, `1` = param0, `2` = param1
 
-Out-of-bounds queue indices return `0.0`. The total number of sub-values
-is `action_queue_cap * 3` (default: `4 * 3 = 12`).
-
-Resolution uses `ResolveCtx.action_queue`, which holds the live action
-queue state during mesh evaluation.
+Total sub-values: `action_queue_cap * 3` (default `12`).
 
 ---
 
-## 3. Resolution Timing
+## 4. Extended Perception Visibility Contract
 
-Per acting-creature turn, `tick/orchestrator` flow:
-1. Read world/static-introspection values from current world/creature state at
-   turn start (using world/grid semantics from `v3-world-grid-spec.md`).
-2. Call runtime mesh executor.
-3. Runtime resolves dynamic introspection and upstream slots per node evaluation.
+Canonical config owner for radius:
+- `runtime.perception.vision_radius` in `v3-runtime-config-spec.md`
+- default `5`
+- valid range `1..=8`
 
-This split keeps borrow boundaries explicit and easy to validate in tests.
+Candidate window:
+- all local offsets `(dx, dy)` where `dx in [-r, r]` and `dy in [-r, r]`
+- self cell `(0, 0)` is included for food calculations
+- self cell is excluded for non-self occupancy and nearby-creature ranking
 
-Canonical turn timing and action-application order are specified in
-`v3-tick-orchestration-spec.md`.
+Opacity rules:
+- barriers are visible and opaque
+- food is visible and non-opaque
+- creatures are visible and non-opaque
+
+LOS posture:
+- visibility is computed in local-offset space
+- `v3-world-grid-spec.md` owns `resolve_offset(origin, dx, dy, edge_mode)`
+- sensors own opacity, strict-corner policy, and visible-cell contribution rules
+- each local ray step is resolved through `resolve_offset`
+- in wrap worlds, wrapping applies per step, not only at the final target
+
+Strict-corner rule:
+- for a diagonal step `(sx, sy)`, inspect the two orthogonal side cells
+  `(x + sx, y)` and `(x, y + sy)`
+- if both side cells are blocking barriers, diagonal advance is blocked
+- if a side cell is unresolved in bounded mode, treat it as blocking for the
+  corner test
+
+Barrier visibility rule:
+- if LOS reaches a barrier cell, that barrier cell is visible and contributes to
+  barrier summaries
+- cells beyond it on that ray are hidden
+
+Hidden entities contribute nothing to area summaries or nearby-creature banks.
 
 ---
 
-## 4. Soft Defaults
+## 5. Extended Perception Compound Layout
 
-- Missing `input_refs` index: `0.0`.
-- Invalid upstream slot: `0.0`.
-- Compound input out-of-bounds sub_idx: `0.0`.
-- Scalar input with `sub_idx > 0`: `0.0`.
-- Unknown/unsupported key variant at runtime boundary: `0.0`.
+### 5.1 `AreaFoodSummary`
+
+`sub_value_count = 7`
+
+| `sub_idx` | field |
+| --- | --- |
+| 0 | `total_ratio` |
+| 1 | `gradient_x` |
+| 2 | `gradient_y` |
+| 3 | `nearest_dx` |
+| 4 | `nearest_dy` |
+| 5 | `nearest_dist` |
+| 6 | `max_value` |
+
+### 5.2 `AreaBarrierSummary`
+
+`sub_value_count = 7`
+
+| `sub_idx` | field |
+| --- | --- |
+| 0 | `density_ratio` |
+| 1 | `blocked_adjacent_ratio` |
+| 2 | `gradient_x` |
+| 3 | `gradient_y` |
+| 4 | `nearest_dx` |
+| 5 | `nearest_dy` |
+| 6 | `nearest_dist` |
+
+### 5.3 `AreaOccupancySummary`
+
+`sub_value_count = 7`
+
+| `sub_idx` | field |
+| --- | --- |
+| 0 | `count_ratio` |
+| 1 | `center_x` |
+| 2 | `center_y` |
+| 3 | `nearest_dx` |
+| 4 | `nearest_dy` |
+| 5 | `nearest_dist` |
+| 6 | `crowding_ratio` |
+
+### 5.4 `NearbyCreatureCore`
+
+4 ranked slots × 4 fields = `16`
+
+Per-slot order:
+- `present`
+- `rel_x`
+- `rel_y`
+- `dist`
+
+### 5.5 `NearbyCreatureVitals`
+
+4 ranked slots × 2 fields = `8`
+
+Per-slot order:
+- `energy_ratio`
+- `reproduce_ready`
+
+### 5.6 `NearbyCreatureIdentity`
+
+4 ranked slots × 3 fields = `12`
+
+Per-slot order:
+- `kin_affinity`
+- `lineage_match`
+- `phenotype_similarity`
+
+All nearby-creature banks share the same slot ordering.
+
+Ranking order:
+1. ascending Euclidean distance
+2. ascending Chebyshev distance
+3. ascending `(dy, dx)`
+4. ascending `CreatureId`
+
+Only visible non-self creatures participate.
+
+---
+
+## 6. Field Definitions and Normalization
+
+Let:
+- `r = runtime.perception.vision_radius as f32`
+- `max_candidate_cells = (2r + 1)^2`
+- `max_other_candidate_cells = max_candidate_cells - 1`
+- `max_dist = sqrt(2 * r * r)`
+- `dx_norm = dx as f32 / r`
+- `dy_norm = dy as f32 / r`
+- `dist_norm = euclidean_distance(dx, dy) / max_dist`
+
+Area-summary denominator rule:
+- density and gradient denominators use full candidate-window maxima, not
+  currently visible cell count
+
+### 6.1 Food
+
+- `total_ratio = visible_food_sum / (max_candidate_cells * world.food.max_density)`
+- `gradient_x = sum(dx_norm * food_ratio) / max_candidate_cells`
+- `gradient_y = sum(dy_norm * food_ratio) / max_candidate_cells`
+- `max_value = max visible food ratio`
+- nearest fields use the nearest visible cell with `food_ratio > 0.0`
+
+### 6.2 Barriers
+
+- `density_ratio = visible_barrier_count / max_candidate_cells`
+- `blocked_adjacent_ratio = adjacent visible barrier count among 8 immediate neighbors / 8.0`
+- gradients use barrier presence `0/1`
+- nearest fields use the nearest visible barrier
+
+### 6.3 Occupancy
+
+- `count_ratio = visible non-self creature count / max_other_candidate_cells`
+- `center_x`, `center_y` are means of normalized visible non-self offsets
+- `crowding_ratio = sum(1.0 - dist_norm) / max_other_candidate_cells`
+- nearest fields use the nearest visible non-self creature
+
+### 6.4 Nearby Creature Vitals
+
+- `energy_ratio = clamp(target.energy / energy.lifecycle.max_energy, 0.0, 1.0)`
+- `reproduce_ready = 1.0` if
+  `target.energy >= energy.lifecycle.min_reproduce_energy`, else `0.0`
+
+### 6.5 Nearby Creature Identity
+
+- `lineage_match = 1.0` if lineage IDs match, else `0.0`
+- `kin_affinity = 1.0 - (popcount(observer.kin_tag ^ target.kin_tag) / 32.0)`
+- `phenotype_similarity = 1.0 - (mean_abs_channel_delta / 255.0)`
+
+Clamp identity similarity values to `[0.0, 1.0]`.
+
+Missing/absent conventions:
+- out-of-range compound `sub_idx` returns `0.0`
+- missing nearby-creature slots return `0.0` for all fields
+- nearest-field absence convention is `nearest_dx = 0.0`,
+  `nearest_dy = 0.0`, `nearest_dist = 0.0`
+
+This absence convention is acceptable because:
+- barriers cannot occupy the observer cell
+- non-self creatures cannot occupy the observer cell
+- food-on-self remains disambiguated by `FoodHere`
+
+---
+
+## 7. Resolution Timing
+
+Per acting-creature turn, canonical timing is:
+1. Build frozen local and extended perception snapshots from the post-Phase-0
+   world state.
+2. Execute runtime mesh evaluation against those frozen snapshots.
+3. Resolve dynamic introspection and action queue live during evaluation.
+
+Canonical phase order remains in `v3-tick-orchestration-spec.md`.
+
+---
+
+## 8. Soft Defaults
+
+- Missing `input_refs` index: `0.0`
+- Invalid upstream slot: `0.0`
+- Compound input out-of-bounds `sub_idx`: `0.0`
+- Scalar input with `sub_idx > 0`: `0.0`
+- Unknown/unsupported key variant at runtime boundary: `0.0`
 
 Soft defaults are deliberate to support junk-DNA evolution without crashes.
 
 ---
 
-## 5. Backend Access Paths
+## 9. Backend Access Paths and Energy Cost
 
-- VM: `ReadInput { dst, ref_idx, sub_idx }` reads `input_refs[ref_idx]`
-  with sub-value index `sub_idx`.
-- Graph: `InputRef { ref_idx, sub_idx }` reads `input_refs[ref_idx]`
-  with sub-value index `sub_idx`.
+- VM: `ReadInput { dst, ref_idx, sub_idx }`
+- Graph: `InputRef { ref_idx, sub_idx }`
 
-No backend reads world state directly. All access is through `InputReference`
-runtime dataflow.
+Backend posture:
+- backends address the same compound layout using `(ref_idx, sub_idx)`
+- no backend reads world state directly
+
+Energy-cost decision for v1:
+- extended perception uses the same `ReadInput` energy cost as existing world
+  inputs
+- there is no extra creature-energy debit for larger perception families
 
 ---
 
-## 6. Resolution Context (ResolveCtx)
+## 10. Resolution Context (ResolveCtx)
 
-Input resolution uses a shared `ResolveCtx` struct containing:
+Input resolution uses a shared context containing the unified sensor snapshot:
 
 ```rust
 pub struct ResolveCtx<'a> {
-    pub static_inputs: &'a StaticInputs,
+    pub sensors: &'a SensorSnapshot,
     pub upstream_slots: &'a [f32; 12],
     pub energy: f32,
     pub energy_consumed: f32,
@@ -177,5 +400,5 @@ pub struct ResolveCtx<'a> {
 }
 ```
 
-This struct is shared between graph evaluation (via `EvalCtx`) and VM
-execution, ensuring consistent resolution semantics across backends.
+This struct is shared between graph evaluation and VM execution, ensuring
+consistent resolution semantics across backends.

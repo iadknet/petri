@@ -22,6 +22,8 @@ This document defines:
 - canonical world/grid configuration keys, defaults, and normalization;
 - world coordinate and direction mapping;
 - edge-mode behavior (`wrap` and `bounded`);
+- arbitrary local-offset resolution primitives consumed by perception and action
+  targeting;
 - food substrate growth/consume/seeding semantics;
 - occupancy and barrier invariants;
 - action-time target-validity primitives used by move and reproduce flows.
@@ -85,6 +87,21 @@ Delta mapping is canonical:
 Neighbor resolution:
 - compute `nx = x + dx`, `ny = y + dy`;
 - apply edge-mode behavior from Section 4.
+
+General local-offset resolution uses the same coordinate system and edge-mode
+contract:
+
+```text
+resolve_offset(origin, dx, dy, edge_mode) -> Option<Position>
+```
+
+Rules:
+- resolves arbitrary signed local offsets, not only 8-neighbor directions;
+- `wrap` applies modulo arithmetic per resolved step;
+- `bounded` returns `None` when the resolved position falls outside world
+  bounds;
+- this is the only geometry primitive that converts local signed offsets into
+  world positions for perception and other higher-level consumers.
 
 ---
 
@@ -195,16 +212,20 @@ Canonical primitive shape:
 
 ```text
 resolve_neighbor(position, direction, edge_mode) -> Option<Position>
+resolve_offset(position, dx, dy, edge_mode) -> Option<Position>
 is_passable_cell(resolved_position, world_state_now) -> bool
 is_valid_move_cell(resolved_position, world_state_now) -> bool
 is_valid_spawn_cell(resolved_position, world_state_now) -> bool
 ```
 
 Primitive responsibilities:
-1. `resolve_neighbor` is the only primitive that applies edge-mode behavior.
-2. `is_valid_move_cell` and `is_valid_spawn_cell` are cell-level checks and do
+1. `resolve_neighbor` and `resolve_offset` are the only primitives that apply
+   edge-mode behavior.
+2. `resolve_offset` is the arbitrary-offset analogue used by perception and
+   other local-space consumers.
+3. `is_valid_move_cell` and `is_valid_spawn_cell` are cell-level checks and do
    not perform neighbor/edge resolution.
-3. Cell-level checks require an in-bounds, resolved position.
+4. Cell-level checks require an in-bounds, resolved position.
 
 Canonical move/spawn gate algorithm:
 1. Resolve target neighbor using Section 4 edge-mode behavior.
@@ -218,13 +239,34 @@ Usage expectations:
   before occupancy mutation.
 - Reproduce action resolves a target neighbor, then applies cell-level validity
   before offspring drafting and mutation.
+- Perception and LOS consumers resolve each local ray step through
+  `resolve_offset(...)` and then apply their own visibility policy.
 
 Reproduction outcome reason mapping is owned by
 `v3-reproduction-spec.md`.
 
 ---
 
-## 8. Cross-Spec Ownership Map
+## 8. Perception Geometry Ownership
+
+This file owns geometry and edge-mode behavior only.
+
+Owned here:
+- coordinate system and direction mapping
+- `resolve_neighbor(...)`
+- `resolve_offset(...)`
+- per-step wrap/bounded resolution semantics for local-space consumers
+
+Not owned here:
+- opacity policy
+- strict-corner visibility rules
+- which visible cell contents contribute to sensor summaries
+
+Those perception-policy concerns are owned by `v3-sensor-spec.md`.
+
+---
+
+## 9. Cross-Spec Ownership Map
 
 - Tick phase order/arbitration: `v3-tick-orchestration-spec.md`
 - Sensor category semantics: `v3-sensor-spec.md`
@@ -238,7 +280,7 @@ semantics consumed by those specs.
 
 ---
 
-## 9. Policy References
+## 10. Policy References
 
 - Project-level determinism scope is canonical in `AGENTS.md`
   (`Determinism Scope (Canonical)`).

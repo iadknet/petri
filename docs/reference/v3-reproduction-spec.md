@@ -6,6 +6,7 @@ resolution in V3.
 Status: Active
 
 Related references:
+- `v3-creature-identity-spec.md`
 - `v3-creature-lifecycle-spec.md`
 - `v3-tick-orchestration-spec.md`
 - `v3-mutation-spec.md`
@@ -74,6 +75,7 @@ This document does not define:
 - `position` (target spawn position)
 - `initial_energy` (post-transfer child energy, scalar `f32`)
 - `generation` (`parent.generation + 1`)
+- `identity` (`CreatureIdentityState` derived during reproduction flow)
 - `phenotype` (inherited or mutated per `v3-phenotype-spec.md` trigger rules)
 - `genome` (parent genome copy after mutation application)
 - `memory` (byte-for-byte copy from parent)
@@ -81,8 +83,8 @@ This document does not define:
 
 Constraints:
 - Draft creation must not mutate world occupancy state.
-- Draft creation must not allocate creature identity key; identity is assigned on
-  successful immediate spawn.
+- Draft creation must not allocate `CreatureId`; that runtime identifier is
+  assigned on successful immediate spawn.
 
 ---
 
@@ -113,6 +115,17 @@ Constraints:
   parent phenotype exactly (RGB, channel weights, and channel polarity).
 - Phenotype mutation is NOT a mutation engine domain; it is a separate pathway
   evaluated in this reproduction flow after `MutationEngine` returns.
+
+### Identity
+
+- Child identity starts from parent identity.
+- Child inherits `lineage_id` unchanged from parent.
+- If `MutationSummary.applied_events == 0`, child inherits `kin_tag` unchanged.
+- If `MutationSummary.applied_events > 0`, child mutates `kin_tag` per
+  `v3-creature-identity-spec.md`.
+- Identity mutation is NOT a mutation engine domain; reproduction evaluates the
+  trigger after `MutationEngine` returns and delegates the mutation rule to the
+  identity domain.
 
 ### Inventory
 
@@ -158,8 +171,11 @@ runtime config contract: `v3-runtime-config-spec.md`.
   7. call MutationEngine unconditionally on child genome -> MutationSummary
      (MutationEngine internally handles the mutation_probability gate;
       see v3-mutation-spec.md Section 4.1)
-  8. if MutationSummary.applied_events > 0: mutate phenotype per v3-phenotype-spec.md
-  9. spawn child immediately; occupy cell now
+  8. derive child identity from parent identity:
+       - inherit lineage_id unchanged
+       - mutate kin_tag only if MutationSummary.applied_events > 0
+  9. if MutationSummary.applied_events > 0: mutate phenotype per v3-phenotype-spec.md
+ 10. spawn child immediately; occupy cell now
 ```
 
 Energy config field names/defaults are canonical in `v3-runtime-config-spec.md`
@@ -193,11 +209,13 @@ If target validation fails:
 ### Ownership boundary
 
 - Action ordering/arbitration is owned by `v3-tick-orchestration-spec.md`.
-- Reproduction owns child drafting/mutation and spawn-target validity checks
-  during reproduce action application.
+- Reproduction owns child drafting, identity/phenotype mutation trigger timing,
+  and spawn-target validity checks during reproduce action application.
 - World/grid low-level validity primitives are owned by
   `v3-world-grid-spec.md`; reproduction consumes those primitives via
   `resolve_neighbor(...)` + cell-level spawn validity checks.
+- Identity state and kin-tag mutation semantics are owned by
+  `v3-creature-identity-spec.md`.
 - Advisory prechecks may exist for UX/perf, but authoritative
   acceptance/rejection is emitted at action-application time.
 
