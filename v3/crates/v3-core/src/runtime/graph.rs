@@ -3,7 +3,7 @@ use crate::contracts::InputReference;
 use crate::creature::genome::{GraphBackendDef, GraphInternalNode, GraphNodeKind};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::graph_effects::apply_graph_effects;
-use crate::runtime::hebbian;
+use crate::runtime::plasticity::hebbian;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult};
 use crate::sensors::perception::SensorSnapshot;
