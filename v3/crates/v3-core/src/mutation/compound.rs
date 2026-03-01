@@ -3,10 +3,19 @@ use crate::contracts::InputReference;
 use crate::creature::genome::{BackendDef, GraphInternalNode, GraphNodeKind, NodeGenome};
 
 /// Number of sub-values for a compound input. Returns 1 for scalar inputs.
+///
+/// Extended perception compound widths per v3-sensor-spec.md Section 5.
 #[must_use]
 pub fn sub_value_count(reference: &InputReference, config: &MutationConfig) -> u16 {
+    use crate::contracts::WorldInputKey;
     match reference {
         InputReference::ActionQueue => (config.action_queue_cap as u16) * 3,
+        InputReference::World(WorldInputKey::AreaFoodSummary) => 7,
+        InputReference::World(WorldInputKey::AreaBarrierSummary) => 7,
+        InputReference::World(WorldInputKey::AreaOccupancySummary) => 7,
+        InputReference::World(WorldInputKey::NearbyCreatureCore) => 16,
+        InputReference::World(WorldInputKey::NearbyCreatureVitals) => 8,
+        InputReference::World(WorldInputKey::NearbyCreatureIdentity) => 12,
         _ => 1,
     }
 }
@@ -70,6 +79,53 @@ mod tests {
         assert_eq!(
             sub_value_count(&InputReference::ActionQueue, &config_8),
             24 // 8 * 3
+        );
+    }
+
+    #[test]
+    fn sub_value_count_extended_perception_widths() {
+        let config = MutationConfig::default();
+        assert_eq!(
+            sub_value_count(
+                &InputReference::World(WorldInputKey::AreaFoodSummary),
+                &config
+            ),
+            7
+        );
+        assert_eq!(
+            sub_value_count(
+                &InputReference::World(WorldInputKey::AreaBarrierSummary),
+                &config
+            ),
+            7
+        );
+        assert_eq!(
+            sub_value_count(
+                &InputReference::World(WorldInputKey::AreaOccupancySummary),
+                &config
+            ),
+            7
+        );
+        assert_eq!(
+            sub_value_count(
+                &InputReference::World(WorldInputKey::NearbyCreatureCore),
+                &config
+            ),
+            16
+        );
+        assert_eq!(
+            sub_value_count(
+                &InputReference::World(WorldInputKey::NearbyCreatureVitals),
+                &config
+            ),
+            8
+        );
+        assert_eq!(
+            sub_value_count(
+                &InputReference::World(WorldInputKey::NearbyCreatureIdentity),
+                &config
+            ),
+            12
         );
     }
 
