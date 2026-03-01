@@ -71,6 +71,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
         apply_eat, apply_move, apply_noop, apply_reproduce, apply_steal_energy,
         PredationActionResult, ReproductionActionResult,
     };
+    use crate::simulation::outcomes::OutcomeAccumulator;
 
     // Reset per-tick counters at the start of each tick.
     sim.stats.last_tick_move = 0;
@@ -89,6 +90,12 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
     sim.stats.last_tick_priority_bidders_count = 0;
 
     run_phase_0(sim);
+
+    // Snapshot surviving creature energies for Phase 2.5 reward learning.
+    let mut outcome_acc = OutcomeAccumulator::default();
+    for (id, creature) in sim.creatures.iter() {
+        outcome_acc.snapshot_energy(id, creature.energy);
+    }
 
     // Build turn queue: stable sort for reproducibility, then shuffle.
     let mut queue: Vec<_> = sim.creatures.keys().collect();
@@ -284,12 +291,14 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                     if let Some(creature) = sim.creatures.get_mut(id) {
                         apply_noop(creature, &sim.config);
                         sim.stats.last_tick_noop += 1;
+                        outcome_acc.record_action_result(id, true);
                     }
                 }
                 WorldAction::Eat => {
                     if let Some(creature) = sim.creatures.get_mut(id) {
                         let succeeded = apply_eat(creature, &mut sim.world, &sim.config);
                         sim.stats.last_tick_eat += 1;
+                        outcome_acc.record_action_result(id, succeeded);
                         if !succeeded {
                             creature.energy -= sim.config.energy.costs.failed_action_penalty;
                         }
@@ -299,6 +308,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                     if let Some(creature) = sim.creatures.get_mut(id) {
                         let succeeded = apply_move(id, creature, &mut sim.world, dir, &sim.config);
                         sim.stats.last_tick_move += 1;
+                        outcome_acc.record_action_result(id, succeeded);
                         if !succeeded {
                             creature.energy -= sim.config.energy.costs.failed_action_penalty;
                         }
@@ -310,16 +320,38 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                 } => {
                     let result =
                         apply_reproduce(id, sim, direction, energy_transfer, &mut reproduce_rng);
+                    let succeeded = result == ReproductionActionResult::Spawned;
+                    outcome_acc.record_action_result(id, succeeded);
+                    if succeeded {
+                        outcome_acc.record_offspring(id);
+                    }
                     // Note: reproduce_cost is already deducted inside apply_reproduce,
                     // so a failed reproduction pays reproduce_cost + failed_action_penalty.
-                    if result != ReproductionActionResult::Spawned {
+                    if !succeeded {
                         if let Some(creature) = sim.creatures.get_mut(id) {
                             creature.energy -= sim.config.energy.costs.failed_action_penalty;
                         }
                     }
                 }
                 WorldAction::StealEnergy { direction, amount } => {
+                    // Snapshot predation events length to extract damage info.
+                    let events_before = sim.stats.last_tick_predation_events.len();
                     let result = apply_steal_energy(id, sim, direction, amount);
+                    let succeeded = result != PredationActionResult::RejectedNoVictim;
+                    outcome_acc.record_action_result(id, succeeded);
+                    // Record damage to victim from predation event (if any).
+                    if succeeded {
+                        if let Some(event) = sim.stats.last_tick_predation_events.get(events_before)
+                        {
+                            // Resolve victim ID from world occupancy (if victim survived).
+                            let victim_pos =
+                                crate::contracts::Position::new(event.victim_x, event.victim_y);
+                            if let Some(victim_id) = sim.world.creature_at(victim_pos) {
+                                outcome_acc.record_damage(victim_id, event.energy_stolen);
+                            }
+                            // Killed victims are already removed — skip (they can't learn).
+                        }
+                    }
                     if result == PredationActionResult::RejectedNoVictim {
                         if let Some(creature) = sim.creatures.get_mut(id) {
                             creature.energy -= sim.config.energy.costs.failed_action_penalty;
@@ -347,6 +379,66 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
         };
         sim.stats.last_tick_priority_bid_mean = priority_bid_sum / compute_creature_count as f32;
         sim.stats.last_tick_priority_bidders_count = priority_bid_count;
+    }
+
+    // ── Phase 2.5: Reward-modulated learning pass ────────────────────────
+    // For each creature with reward-modulated graph nodes, compute outcome
+    // signals and apply three-factor weight updates using eligibility traces.
+    {
+        use crate::creature::genome::BackendDef;
+        use crate::runtime::plasticity::reward::apply_reward_modulated_updates;
+        use crate::runtime::plasticity::traces::has_any_reward_modulated;
+
+        let reward_cost = sim.config.runtime.reward_learning_cost;
+
+        // Collect IDs to avoid borrow conflict (need &mut creature + &sim.config).
+        let ids: Vec<CreatureId> = sim.creatures.keys().collect();
+        for id in ids {
+            let creature = match sim.creatures.get(id) {
+                Some(c) => c,
+                None => continue,
+            };
+
+            // Check if any mesh node has reward-modulated plasticity.
+            let has_reward = creature.genome.nodes.iter().any(|node| {
+                if let BackendDef::Graph(ref def) = node.backend_def {
+                    has_any_reward_modulated(def)
+                } else {
+                    false
+                }
+            });
+            if !has_reward {
+                continue;
+            }
+
+            // Compute outcome signal bank for this creature.
+            let energy_after = creature.energy;
+            let signals = match outcome_acc.compute_signal_bank(id, energy_after) {
+                Some(s) => s,
+                None => continue, // Newborn spawned this tick — no outcome record.
+            };
+
+            // Apply reward-modulated updates per mesh node.
+            let creature = match sim.creatures.get_mut(id) {
+                Some(c) => c,
+                None => continue,
+            };
+            for (node_idx, node) in creature.genome.nodes.iter().enumerate() {
+                if let BackendDef::Graph(ref def) = node.backend_def {
+                    if has_any_reward_modulated(def) {
+                        let update_cost = apply_reward_modulated_updates(
+                            def,
+                            node_idx,
+                            &mut creature.graph_runtime.plasticity_weights,
+                            &creature.graph_runtime.eligibility_traces,
+                            &signals,
+                            reward_cost,
+                        );
+                        creature.energy -= update_cost;
+                    }
+                }
+            }
+        }
     }
 
     sim.tick += 1;

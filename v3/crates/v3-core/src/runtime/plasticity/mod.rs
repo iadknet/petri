@@ -11,16 +11,16 @@ pub(crate) mod traces;
 
 use crate::creature::genome::{GraphBackendDef, OUTCOME_CHANNEL_COUNT};
 
-// Re-export genome-layer types for Stage 2+ consumers (reward.rs, traces.rs).
-#[allow(unused_imports)] // Wired in Stage 2
+// Re-export genome-layer types used by reward.rs and traces.rs tests.
+#[allow(unused_imports)]
 pub(crate) use crate::creature::genome::OutcomeChannel;
 
 /// Returns `true` if any internal node has plasticity config enabled.
 ///
-/// Used by Stage 2+ code paths; `hebbian::has_any_hebbian()` is the
-/// current production entry point (identical logic).
+/// Subsumes `hebbian::has_any_hebbian()` (identical logic). Available for
+/// callers that need to check for any plasticity mode (Hebbian or reward-modulated).
 #[inline]
-#[allow(dead_code)] // Wired in Stage 2
+#[allow(dead_code)]
 pub(crate) fn has_any_plasticity(def: &GraphBackendDef) -> bool {
     def.internal_nodes.iter().any(|n| n.plasticity.is_some())
 }
@@ -31,7 +31,6 @@ pub(crate) fn has_any_plasticity(def: &GraphBackendDef) -> bool {
 /// Computed on-the-fly by `simulation::outcomes::compute_signal_bank()` — not
 /// stored in `CreatureState`.
 #[derive(Debug, Clone, Copy, PartialEq, Default)]
-#[allow(dead_code)] // Wired in Stage 2
 pub(crate) struct OutcomeSignalBank {
     pub signals: [f32; OUTCOME_CHANNEL_COUNT],
 }
