@@ -2,6 +2,7 @@ use crate::config::RuntimeConfig;
 use crate::contracts::{ActionQueue, InputReference};
 use crate::creature::genome::{GraphBackendDef, GraphInternalNode, GraphNodeKind};
 use crate::creature::state::GraphRuntimeState;
+use crate::runtime::graph_effects::apply_graph_effects;
 use crate::runtime::hebbian;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::types::{sanitize_f32, NodeResult};
@@ -307,23 +308,8 @@ pub fn execute_graph_node(
         *energy -= hebb_cost;
     }
 
-    // Build NodeResult: start from upstream_slots, then apply deferred writes.
-    let mut output_slots = *upstream_slots;
-    let mut route_target_idx: f32 = 0.0;
-
-    for (i, node) in def.internal_nodes.iter().enumerate() {
-        match &node.kind {
-            GraphNodeKind::CustomOutput(s) => {
-                if (*s as usize) < 12 {
-                    output_slots[*s as usize] = curr_outputs[i];
-                }
-            }
-            GraphNodeKind::RouterOutput => {
-                route_target_idx = curr_outputs[i];
-            }
-            _ => {}
-        }
-    }
+    // Build NodeResult via the shared effect pass.
+    let result = apply_graph_effects(def, &curr_outputs, upstream_slots);
 
     // Restore scratch buffers before returning.
     restore_scratch(
@@ -334,12 +320,7 @@ pub fn execute_graph_node(
         w_inputs_buf,
     );
 
-    NodeResult {
-        output_slots,
-        route_target_idx,
-        terminal: false,
-        energy_exhausted: false,
-    }
+    result
 }
 
 /// Restore scratch buffers to `GraphRuntimeState` (must be called on all return paths).
