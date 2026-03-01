@@ -7,7 +7,7 @@
 //! with equivalence tests.
 
 use crate::config::RuntimeConfig;
-use crate::contracts::{ActionQueue, InputReference};
+use crate::contracts::InputReference;
 use crate::creature::genome::GraphBackendDef;
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::graph::{collect_weighted_inputs, evaluate_kind, EvalCtx};
@@ -15,7 +15,7 @@ use crate::runtime::graph_effects::apply_graph_effects;
 use crate::runtime::hebbian;
 use crate::runtime::inputs::ResolveCtx;
 use crate::runtime::trace::{kind_label, GraphNodeEvalTrace, GraphPassTrace, GraphTrace};
-use crate::runtime::types::{sanitize_f32, NodeResult};
+use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult};
 use crate::sensors::perception::SensorSnapshot;
 
 /// Execute a graph-backend mesh node with trace recording.
@@ -34,7 +34,7 @@ pub fn execute_graph_node_traced(
     graph_runtime: &mut GraphRuntimeState,
     sensors: &SensorSnapshot,
     config: &RuntimeConfig,
-    action_queue: &ActionQueue,
+    side_outputs: &mut MeshSideOutputs,
 ) -> (NodeResult, GraphTrace) {
     let node_count = def.internal_nodes.len();
 
@@ -102,7 +102,7 @@ pub fn execute_graph_node_traced(
                 upstream_slots,
                 energy: *energy,
                 energy_consumed,
-                action_queue,
+                action_queue: &side_outputs.action_queue,
             },
         };
 
@@ -201,8 +201,8 @@ pub fn execute_graph_node_traced(
         *energy -= hebb_cost;
     }
 
-    // Build NodeResult via the shared effect pass.
-    let result = apply_graph_effects(def, &curr_outputs, upstream_slots);
+    // Build NodeResult via the shared 3-phase effect pass.
+    let result = apply_graph_effects(def, &curr_outputs, upstream_slots, side_outputs);
 
     let converged = stable_passes >= req_stable;
     let trace = GraphTrace {
@@ -219,10 +219,10 @@ pub fn execute_graph_node_traced(
 mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
-    use crate::contracts::ActionQueue;
     use crate::creature::genome::{GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind};
     use crate::creature::state::GraphRuntimeState;
     use crate::runtime::graph::execute_graph_node;
+    use crate::runtime::types::MeshSideOutputs;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
 
@@ -288,7 +288,7 @@ mod tests {
             &mut gr_a,
             &ss,
             &config,
-            &ActionQueue::new(4),
+            &mut MeshSideOutputs::new(4),
         );
 
         let mut energy_b = 100.0f32;
@@ -303,7 +303,7 @@ mod tests {
             &mut gr_b,
             &ss,
             &config,
-            &ActionQueue::new(4),
+            &mut MeshSideOutputs::new(4),
         );
 
         assert_eq!(result_a, result_b);
@@ -364,7 +364,7 @@ mod tests {
             &mut gr,
             &ss,
             &config,
-            &ActionQueue::new(4),
+            &mut MeshSideOutputs::new(4),
         );
         assert!(!r1.energy_exhausted);
         assert!((r1.output_slots[0] - 0.5).abs() < 1e-5);
@@ -386,7 +386,7 @@ mod tests {
             &mut gr,
             &ss,
             &config,
-            &ActionQueue::new(4),
+            &mut MeshSideOutputs::new(4),
         );
         let decay_eval2 = &trace2.passes[0].node_evaluations[1];
         assert!((decay_eval2.state_before - 0.5).abs() < 1e-6);
@@ -431,10 +431,82 @@ mod tests {
             &mut gr,
             &ss,
             &config,
-            &ActionQueue::new(4),
+            &mut MeshSideOutputs::new(4),
         );
 
         assert!(trace.converged);
         assert!(trace.stable_passes_count >= config.graph_convergence_stable_passes);
+    }
+
+    /// Result equivalence with action-queue variants (PushAction + ExecuteActionQueue).
+    #[test]
+    fn result_equivalence_with_action_variants() {
+        let def = GraphBackendDef {
+            internal_nodes: vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::PushAction(1), // Eat
+                    inputs: vec![],
+                    hebbian: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::ExecuteActionQueue,
+                    inputs: vec![],
+                    hebbian: None,
+                },
+            ],
+        };
+        let upstream = [0.0f32; 12];
+        let ss = make_ss();
+        let config = default_config();
+
+        let mut energy_a = 100.0f32;
+        let mut gr_a = GraphRuntimeState::new();
+        let mut so_a = MeshSideOutputs::new(4);
+        let result_a = execute_graph_node(
+            &def,
+            &[],
+            &upstream,
+            &mut energy_a,
+            0.0,
+            0,
+            &mut gr_a,
+            &ss,
+            &config,
+            &mut so_a,
+        );
+
+        let mut energy_b = 100.0f32;
+        let mut gr_b = GraphRuntimeState::new();
+        let mut so_b = MeshSideOutputs::new(4);
+        let (result_b, trace) = execute_graph_node_traced(
+            &def,
+            &[],
+            &upstream,
+            &mut energy_b,
+            0.0,
+            0,
+            &mut gr_b,
+            &ss,
+            &config,
+            &mut so_b,
+        );
+
+        assert_eq!(result_a, result_b);
+        assert!(result_a.terminal, "should be terminal");
+        assert!(
+            (energy_a - energy_b).abs() < 1e-6,
+            "energy: {energy_a} vs {energy_b}"
+        );
+        assert!(trace.converged);
+
+        // Both should have Eat queued
+        let actions_a = so_a.action_queue.into_actions_or_noop();
+        let actions_b = so_b.action_queue.into_actions_or_noop();
+        assert_eq!(actions_a, actions_b);
+        assert_eq!(
+            actions_a,
+            vec![crate::contracts::WorldAction::Eat],
+            "both paths should queue Eat"
+        );
     }
 }

@@ -99,7 +99,7 @@ pub fn execute_creature_mesh(
                 graph_runtime,
                 sensors,
                 config,
-                &side_outputs.action_queue,
+                &mut side_outputs,
             ),
         };
 
@@ -724,5 +724,45 @@ mod tests {
             output.priority_bid, 2.0,
             "last-write-wins: second node's bid should be returned"
         );
+    }
+
+    // ── Graph action-queue integration tests ─────────────────────────────
+
+    /// A single graph mesh node with PushAction(1) + ExecuteActionQueue
+    /// should produce MeshOutput.actions == [Eat].
+    #[test]
+    fn graph_node_pushes_action_and_terminates() {
+        let id0 = NodeId::new(0);
+        let genome = CreatureGenome {
+            entry_node_id: id0,
+            nodes: vec![NodeGenome {
+                node_id: id0,
+                input_refs: vec![],
+                backend_def: BackendDef::Graph(GraphBackendDef {
+                    internal_nodes: vec![
+                        GraphInternalNode {
+                            kind: GraphNodeKind::PushAction(1), // Eat
+                            inputs: vec![],
+                            hebbian: None,
+                        },
+                        GraphInternalNode {
+                            kind: GraphNodeKind::ExecuteActionQueue,
+                            inputs: vec![],
+                            hebbian: None,
+                        },
+                    ],
+                }),
+                targets: vec![],
+            }],
+        };
+        let ss = empty_sensor_snapshot();
+        let mut energy = 100.0f32;
+        let mut memory = [0u8; 1024];
+        let mut gr = GraphRuntimeState::new();
+        let config = default_config();
+
+        let output =
+            execute_creature_mesh(&genome, &ss, &mut energy, &mut memory, &mut gr, &config);
+        assert_eq!(output.actions, vec![WorldAction::Eat]);
     }
 }
