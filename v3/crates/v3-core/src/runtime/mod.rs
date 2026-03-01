@@ -1,6 +1,6 @@
 pub mod action_decode;
 pub mod graph;
-pub mod graph_effects;
+pub(crate) mod graph_effects;
 pub mod hebbian;
 pub mod inputs;
 pub mod mesh;
