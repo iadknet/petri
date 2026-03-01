@@ -332,7 +332,7 @@ fn graph_weighted_random_favors_refinement() {
 #[test]
 fn graph_operator_weights_are_positive() {
     let all = GraphOperator::ALL;
-    assert_eq!(all.len(), 17, "ALL must cover every GraphOperator variant");
+    assert_eq!(all.len(), 21, "ALL must cover every GraphOperator variant");
     for &op in &all {
         assert!(op.weight() > 0, "weight must be positive for {:?}", op);
     }

@@ -1,16 +1,21 @@
 //! Plasticity mutation operators for graph internal nodes.
 //!
-//! Five operators that evolve per-node plasticity learning parameters:
+//! Nine operators that evolve per-node plasticity learning parameters:
 //! - EnableHebbian: add PlasticityConfig to a non-plasticity node
 //! - DisableHebbian: remove PlasticityConfig from a plasticity node
 //! - MutateHebbianRule: change the learning rule variant
 //! - MutateHebbianRate: perturb the learning rate
 //! - ToggleHebbianLamarckian: flip the inheritance flag
+//! - EnableRewardModulation: add reward modulation to a pure Hebbian node
+//! - DisableRewardModulation: remove reward modulation from a modulated node
+//! - MutateRewardSource: change the outcome channel a modulated node listens to
+//! - MutateTraceDecay: perturb the trace decay rate on a modulated node
 
 use rand::Rng;
 
 use crate::creature::genome::{
-    BackendDef, CreatureGenome, GraphInternalNode, HebbianRule, PlasticityConfig,
+    BackendDef, CreatureGenome, GraphInternalNode, HebbianRule, OutcomeChannel, PlasticityConfig,
+    RewardModulationConfig,
 };
 use crate::mutation::types::MutationSkipReason;
 
@@ -19,6 +24,13 @@ const ALL_RULES: [HebbianRule; 4] = [
     HebbianRule::Oja,
     HebbianRule::AntiHebb,
     HebbianRule::Covariance,
+];
+
+const ALL_CHANNELS: [OutcomeChannel; 4] = [
+    OutcomeChannel::EnergyDelta,
+    OutcomeChannel::ActionSuccess,
+    OutcomeChannel::DamageDelta,
+    OutcomeChannel::OffspringSuccess,
 ];
 
 /// Pick a random internal node matching `predicate`. Returns its index or
@@ -145,12 +157,132 @@ pub fn toggle_hebbian_lamarckian(
     Ok(())
 }
 
+/// Add reward modulation to a random plasticity node that has `modulation=None`.
+pub fn enable_reward_modulation(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
+        let int_idx = select_eligible(
+            &g.internal_nodes,
+            |n| {
+                n.plasticity
+                    .as_ref()
+                    .is_some_and(|p| p.modulation.is_none())
+            },
+            rng,
+        )?;
+
+        if let Some(ref mut cfg) = g.internal_nodes[int_idx].plasticity {
+            let channel = ALL_CHANNELS[rng.gen_range(0..ALL_CHANNELS.len())];
+            cfg.modulation = Some(RewardModulationConfig {
+                reward_source: channel,
+                trace_decay: rng.gen_range(0.5f32..0.99),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Remove reward modulation from a random reward-modulated node.
+pub fn disable_reward_modulation(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
+        let int_idx = select_eligible(
+            &g.internal_nodes,
+            |n| {
+                n.plasticity
+                    .as_ref()
+                    .is_some_and(|p| p.modulation.is_some())
+            },
+            rng,
+        )?;
+
+        if let Some(ref mut cfg) = g.internal_nodes[int_idx].plasticity {
+            cfg.modulation = None;
+        }
+    }
+    Ok(())
+}
+
+/// Switch the `reward_source` channel on a random reward-modulated node.
+pub fn mutate_reward_source(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
+        let int_idx = select_eligible(
+            &g.internal_nodes,
+            |n| {
+                n.plasticity
+                    .as_ref()
+                    .is_some_and(|p| p.modulation.is_some())
+            },
+            rng,
+        )?;
+
+        if let Some(ref mut cfg) = g.internal_nodes[int_idx].plasticity {
+            if let Some(ref mut modulation) = cfg.modulation {
+                let others: Vec<OutcomeChannel> = ALL_CHANNELS
+                    .iter()
+                    .copied()
+                    .filter(|c| *c != modulation.reward_source)
+                    .collect();
+                if !others.is_empty() {
+                    modulation.reward_source = others[rng.gen_range(0..others.len())];
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Perturb the `trace_decay` on a random reward-modulated node.
+///
+/// Uses ~30% multiplicative perturbation when decay is above a threshold,
+/// otherwise a small additive perturbation. Clamped to [0.0, 1.0].
+pub fn mutate_trace_decay(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
+        let int_idx = select_eligible(
+            &g.internal_nodes,
+            |n| {
+                n.plasticity
+                    .as_ref()
+                    .is_some_and(|p| p.modulation.is_some())
+            },
+            rng,
+        )?;
+
+        if let Some(ref mut cfg) = g.internal_nodes[int_idx].plasticity {
+            if let Some(ref mut modulation) = cfg.modulation {
+                if modulation.trace_decay.abs() > 0.01 {
+                    modulation.trace_decay *= 1.0 + rng.gen_range(-0.3f32..=0.3);
+                } else {
+                    modulation.trace_decay += rng.gen_range(-0.05f32..=0.05);
+                }
+                modulation.trace_decay = modulation.trace_decay.clamp(0.0, 1.0);
+            }
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::contracts::NodeId;
     use crate::creature::genome::{
-        GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind, NodeGenome,
+        GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind, NodeGenome, OutcomeChannel,
+        RewardModulationConfig,
     };
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
@@ -311,6 +443,107 @@ mod tests {
         let mut r = rng(42);
         let result = toggle_hebbian_lamarckian(&mut genome, 0, &mut r);
         assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+    }
+
+    fn node_with_reward_modulation() -> GraphInternalNode {
+        GraphInternalNode {
+            kind: GraphNodeKind::Add,
+            inputs: vec![GraphInput {
+                source_idx: 0,
+                weight: 1.0,
+            }],
+            plasticity: Some(PlasticityConfig {
+                rule: HebbianRule::Classic,
+                learning_rate: 0.1,
+                weight_clamp: 5.0,
+                lamarckian: false,
+                modulation: Some(RewardModulationConfig {
+                    reward_source: OutcomeChannel::EnergyDelta,
+                    trace_decay: 0.9,
+                }),
+            }),
+        }
+    }
+
+    #[test]
+    fn enable_reward_modulation_adds_config() {
+        let mut genome = genome_with_graph(vec![node_with_hebbian()]);
+        let mut r = rng(42);
+        let result = enable_reward_modulation(&mut genome, 0, &mut r);
+        assert!(result.is_ok());
+
+        if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
+            let cfg = g.internal_nodes[0].plasticity.as_ref().unwrap();
+            assert!(cfg.modulation.is_some());
+        }
+    }
+
+    #[test]
+    fn enable_reward_modulation_skips_already_modulated() {
+        let mut genome = genome_with_graph(vec![node_with_reward_modulation()]);
+        let mut r = rng(42);
+        let result = enable_reward_modulation(&mut genome, 0, &mut r);
+        assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+    }
+
+    #[test]
+    fn disable_reward_modulation_removes_config() {
+        let mut genome = genome_with_graph(vec![node_with_reward_modulation()]);
+        let mut r = rng(42);
+        let result = disable_reward_modulation(&mut genome, 0, &mut r);
+        assert!(result.is_ok());
+
+        if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
+            let cfg = g.internal_nodes[0].plasticity.as_ref().unwrap();
+            assert!(cfg.modulation.is_none());
+        }
+    }
+
+    #[test]
+    fn disable_reward_modulation_skips_pure_hebbian() {
+        let mut genome = genome_with_graph(vec![node_with_hebbian()]);
+        let mut r = rng(42);
+        let result = disable_reward_modulation(&mut genome, 0, &mut r);
+        assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+    }
+
+    #[test]
+    fn mutate_reward_source_changes_channel() {
+        let mut genome = genome_with_graph(vec![node_with_reward_modulation()]);
+        let original = OutcomeChannel::EnergyDelta;
+        let mut r = rng(42);
+        let result = mutate_reward_source(&mut genome, 0, &mut r);
+        assert!(result.is_ok());
+
+        if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
+            let cfg = g.internal_nodes[0].plasticity.as_ref().unwrap();
+            let new_channel = cfg.modulation.as_ref().unwrap().reward_source;
+            assert_ne!(new_channel, original);
+        }
+    }
+
+    #[test]
+    fn mutate_trace_decay_stays_in_bounds() {
+        let mut genome = genome_with_graph(vec![node_with_reward_modulation()]);
+        for seed in 0u64..100 {
+            let mut r = rng(seed);
+            mutate_trace_decay(&mut genome, 0, &mut r).unwrap();
+
+            if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
+                let decay = g.internal_nodes[0]
+                    .plasticity
+                    .as_ref()
+                    .unwrap()
+                    .modulation
+                    .as_ref()
+                    .unwrap()
+                    .trace_decay;
+                assert!(
+                    (0.0..=1.0).contains(&decay),
+                    "decay {decay} out of bounds at seed {seed}"
+                );
+            }
+        }
     }
 
     #[test]

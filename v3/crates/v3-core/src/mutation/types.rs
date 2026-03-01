@@ -124,6 +124,10 @@ pub enum MutationOperator {
     GraphMutateHebbianRule,
     GraphMutateHebbianRate,
     GraphToggleHebbianLamarckian,
+    GraphEnableRewardModulation,
+    GraphDisableRewardModulation,
+    GraphMutateRewardSource,
+    GraphMutateTraceDecay,
     // InputRef
     InputRefAdd,
     InputRefRemove,
@@ -174,6 +178,10 @@ impl MutationOperator {
             Self::GraphMutateHebbianRule => "Graph.MutateHebbianRule",
             Self::GraphMutateHebbianRate => "Graph.MutateHebbianRate",
             Self::GraphToggleHebbianLamarckian => "Graph.ToggleHebbianLamarckian",
+            Self::GraphEnableRewardModulation => "Graph.EnableRewardModulation",
+            Self::GraphDisableRewardModulation => "Graph.DisableRewardModulation",
+            Self::GraphMutateRewardSource => "Graph.MutateRewardSource",
+            Self::GraphMutateTraceDecay => "Graph.MutateTraceDecay",
             Self::InputRefAdd => "InputRef.Add",
             Self::InputRefRemove => "InputRef.Remove",
             Self::InputRefSwap => "InputRef.Swap",
@@ -222,7 +230,11 @@ impl MutationOperator {
             | Self::GraphDisableHebbian
             | Self::GraphMutateHebbianRule
             | Self::GraphMutateHebbianRate
-            | Self::GraphToggleHebbianLamarckian => MutationDomain::Graph,
+            | Self::GraphToggleHebbianLamarckian
+            | Self::GraphEnableRewardModulation
+            | Self::GraphDisableRewardModulation
+            | Self::GraphMutateRewardSource
+            | Self::GraphMutateTraceDecay => MutationDomain::Graph,
             Self::InputRefAdd
             | Self::InputRefRemove
             | Self::InputRefSwap
@@ -275,11 +287,13 @@ impl MutationOperator {
             | Self::GraphCopyInternalNode
             | Self::GraphCopySubgraph
             | Self::GraphCopyEdgeBundle
-            | Self::GraphEnableHebbian => ComplexityEffect::Increasing,
+            | Self::GraphEnableHebbian
+            | Self::GraphEnableRewardModulation => ComplexityEffect::Increasing,
             // Graph: structural removals
             Self::GraphRemoveInternalGraphNode
             | Self::GraphRemoveGraphEdge
-            | Self::GraphDisableHebbian => ComplexityEffect::Decreasing,
+            | Self::GraphDisableHebbian
+            | Self::GraphDisableRewardModulation => ComplexityEffect::Decreasing,
             // Graph: rewiring / neutral
             Self::GraphAlterGraphEdgeWeight
             | Self::GraphSwapGraphOperator
@@ -288,7 +302,9 @@ impl MutationOperator {
             | Self::GraphRawFieldMutation
             | Self::GraphMutateHebbianRule
             | Self::GraphMutateHebbianRate
-            | Self::GraphToggleHebbianLamarckian => ComplexityEffect::Neutral,
+            | Self::GraphToggleHebbianLamarckian
+            | Self::GraphMutateRewardSource
+            | Self::GraphMutateTraceDecay => ComplexityEffect::Neutral,
             // InputRef: add / remove / neutral
             Self::InputRefAdd => ComplexityEffect::Increasing,
             Self::InputRefRemove => ComplexityEffect::Decreasing,
@@ -297,7 +313,7 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 43] {
+    pub const fn all() -> [Self; 47] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
@@ -338,6 +354,10 @@ impl MutationOperator {
             Self::GraphMutateHebbianRule,
             Self::GraphMutateHebbianRate,
             Self::GraphToggleHebbianLamarckian,
+            Self::GraphEnableRewardModulation,
+            Self::GraphDisableRewardModulation,
+            Self::GraphMutateRewardSource,
+            Self::GraphMutateTraceDecay,
             Self::InputRefAdd,
             Self::InputRefRemove,
             Self::InputRefSwap,
@@ -580,7 +600,11 @@ mod tests {
                 | MutationOperator::GraphDisableHebbian
                 | MutationOperator::GraphMutateHebbianRule
                 | MutationOperator::GraphMutateHebbianRate
-                | MutationOperator::GraphToggleHebbianLamarckian => {
+                | MutationOperator::GraphToggleHebbianLamarckian
+                | MutationOperator::GraphEnableRewardModulation
+                | MutationOperator::GraphDisableRewardModulation
+                | MutationOperator::GraphMutateRewardSource
+                | MutationOperator::GraphMutateTraceDecay => {
                     assert_eq!(operator.domain(), MutationDomain::Graph)
                 }
                 MutationOperator::InputRefAdd
@@ -679,6 +703,14 @@ mod tests {
                 GraphOperator::ToggleHebbianLamarckian => {
                     MutationOperator::GraphToggleHebbianLamarckian
                 }
+                GraphOperator::EnableRewardModulation => {
+                    MutationOperator::GraphEnableRewardModulation
+                }
+                GraphOperator::DisableRewardModulation => {
+                    MutationOperator::GraphDisableRewardModulation
+                }
+                GraphOperator::MutateRewardSource => MutationOperator::GraphMutateRewardSource,
+                GraphOperator::MutateTraceDecay => MutationOperator::GraphMutateTraceDecay,
             };
             assert_eq!(
                 mo.complexity_effect(),
