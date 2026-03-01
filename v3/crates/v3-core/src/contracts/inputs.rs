@@ -11,6 +11,18 @@ pub enum WorldInputKey {
     NeighborCellBarrier(Direction),
     /// Whether neighbor cell is occupied by another creature: 1.0 = occupied, 0.0 = empty.
     NeighborCellOccupied(Direction),
+    /// Compound: area food summary (7 sub-values). See v3-sensor-spec.md Section 5.1.
+    AreaFoodSummary,
+    /// Compound: area barrier summary (7 sub-values). See v3-sensor-spec.md Section 5.2.
+    AreaBarrierSummary,
+    /// Compound: area occupancy summary (7 sub-values). See v3-sensor-spec.md Section 5.3.
+    AreaOccupancySummary,
+    /// Compound: nearby creature core (4 slots × 4 fields = 16 sub-values). See v3-sensor-spec.md Section 5.4.
+    NearbyCreatureCore,
+    /// Compound: nearby creature vitals (4 slots × 2 fields = 8 sub-values). See v3-sensor-spec.md Section 5.5.
+    NearbyCreatureVitals,
+    /// Compound: nearby creature identity (4 slots × 3 fields = 12 sub-values). See v3-sensor-spec.md Section 5.6.
+    NearbyCreatureIdentity,
 }
 
 /// Static introspection values assembled at tick start (snapshot).
@@ -73,6 +85,12 @@ mod tests {
     fn input_reference_serde_roundtrip() {
         let refs = vec![
             InputReference::World(WorldInputKey::FoodHere),
+            InputReference::World(WorldInputKey::AreaFoodSummary),
+            InputReference::World(WorldInputKey::AreaBarrierSummary),
+            InputReference::World(WorldInputKey::AreaOccupancySummary),
+            InputReference::World(WorldInputKey::NearbyCreatureCore),
+            InputReference::World(WorldInputKey::NearbyCreatureVitals),
+            InputReference::World(WorldInputKey::NearbyCreatureIdentity),
             InputReference::StaticIntrospection(StaticIntrospectionKey::Generation),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
             InputReference::UpstreamSlot(0),

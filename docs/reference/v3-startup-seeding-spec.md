@@ -6,6 +6,7 @@ policy, and startup viability posture in V3.
 Status: Active
 
 Related references:
+- `v3-creature-identity-spec.md`
 - `v3-world-grid-spec.md`
 - `v3-runtime-config-spec.md`
 - `v3-tick-orchestration-spec.md`
@@ -107,6 +108,10 @@ Rules:
 - All startup-seeded founders derive from the same baseline founder genome
   profile.
 - Startup-seeded founders begin at `generation = 0`.
+- Startup-seeded founders receive deterministic identity state per
+  `v3-creature-identity-spec.md`:
+  - `lineage_id` is assigned from final founder placement order
+  - `kin_tag` is derived deterministically from startup seed and `lineage_id`
 - Startup does not introduce per-founder profile selection via API.
 - Startup phenotype baseline is deterministic and uniform for seeded founders.
   Canonical founder phenotype baseline values (RGB, channel weights, polarity)
@@ -117,6 +122,8 @@ Rules:
 Founder genome structure, parseability, and runtime interpretation remain owned
 by `v3-genome-spec.md`, `v3-mutation-spec.md`, and
 `v3-mesh-execution-spec.md`.
+Founder identity state semantics remain owned by
+`v3-creature-identity-spec.md`.
 
 ### 5.1 Canonical v3alpha1 Founder Genome
 

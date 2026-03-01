@@ -6,6 +6,7 @@ mesh architecture.
 Status: Active
 
 Authoritative detailed contracts:
+- `v3-creature-identity-spec.md`
 - `v3-tick-orchestration-spec.md`
 - `v3-mutation-spec.md`
 - `v3-reproduction-spec.md`
@@ -100,6 +101,15 @@ matrix).
 ---
 
 ## 6. Reproduction Inheritance Summary
+
+### Identity
+
+- Offspring carries explicit identity state.
+- `lineage_id` is inherited unchanged from parent.
+- `kin_tag` mutates only when reproduction observes at least one applied genome
+  mutation event.
+- Identity state model and mutation semantics are canonical in
+  `v3-creature-identity-spec.md`.
 
 ### Memory
 

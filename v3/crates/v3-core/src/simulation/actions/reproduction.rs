@@ -2,6 +2,7 @@ use rand::Rng;
 
 use crate::contracts::{CreatureId, Direction};
 use crate::creature::genome::{BackendDef, CreatureGenome};
+use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::CreatureState;
 use crate::mutation::phenotype::mutate_phenotype;
 use crate::mutation::MutationEngine;
@@ -233,6 +234,14 @@ pub fn apply_reproduce(
         (child_channels, child_active_channel, child_polarity)
     };
 
+    // Step 10b: Identity inheritance — child inherits parent identity, kin-tag
+    // mutates only when genome mutation applied events.
+    let parent_identity = sim.creatures[parent_id].identity;
+    let mut child_identity = CreatureIdentityState::inherit(&parent_identity);
+    if summary.applied_events > 0 {
+        child_identity.mutate_kin_tag(rng);
+    }
+
     // Step 11: Build child's Hebbian weights (Lamarckian inheritance).
     let child_hebbian = build_child_hebbian_weights(&child_genome, &parent_hebbian);
 
@@ -247,6 +256,7 @@ pub fn apply_reproduce(
             child_channels,
             child_active_channel,
             child_polarity,
+            child_identity,
         );
         child.memory = child_memory;
         child.graph_runtime.hebbian_weights = child_hebbian;

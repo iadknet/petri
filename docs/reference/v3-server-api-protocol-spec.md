@@ -6,6 +6,7 @@ lifecycle transitions, and error semantics.
 Status: Active
 
 Related references:
+- `v3-sensor-spec.md`
 - `v3-startup-seeding-spec.md`
 - `v3-world-grid-spec.md`
 - `v3-runtime-config-spec.md`
@@ -414,6 +415,78 @@ Response:
 }
 ```
 
+### 4.9 `POST /v3/simulation/creature/:id/sample`
+
+Request:
+
+```json
+{
+  "ticks": 5,
+  "include_perception_debug": false
+}
+```
+
+Rules:
+- endpoint is allowed only when simulation state is `running` or `paused`
+- `ticks` defaults to `5`
+- valid range for `ticks` is `1..=10`
+- `include_perception_debug` is optional and defaults to `false`
+- starting a new sample replaces any existing active sample
+- when `include_perception_debug = true`, completed tick samples may include the
+  optional `debug_perception` payload defined by the execution-sampler contract
+  for each tick
+
+Response:
+
+```json
+{
+  "protocol_version": "v3alpha1",
+  "status": "recording",
+  "ticks_requested": 5,
+  "include_perception_debug": false
+}
+```
+
+### 4.10 `GET /v3/simulation/creature/:id/sample`
+
+Recording response:
+
+```json
+{
+  "protocol_version": "v3alpha1",
+  "status": "recording",
+  "ticks_completed": 2,
+  "ticks_remaining": 3
+}
+```
+
+Complete response:
+
+```json
+{
+  "protocol_version": "v3alpha1",
+  "status": "complete",
+  "sample": {
+    "creature_id": 7,
+    "ticks": [
+      {
+        "tick_number": 124,
+        "static_inputs": { "...": "existing local snapshot" },
+        "debug_perception": null
+      }
+    ]
+  }
+}
+```
+
+Execution-sampler rules:
+- when the request did not ask for perception debugging,
+  `debug_perception` is `null`
+- when the request asked for perception debugging, `debug_perception` contains
+  the extended-perception snapshot for that tick
+- existing sampler behavior remains otherwise unchanged
+- detailed perception field ownership remains in `v3-sensor-spec.md`
+
 ---
 
 ## 5. WebSocket Stream Contract (`/v3/ws`)
@@ -562,6 +635,7 @@ Snapshot import/export contracts require a follow-up spec.
   `v3-startup-seeding-spec.md`
 - World defaults and spatial validity behavior: `v3-world-grid-spec.md`
 - Runtime/energy/mutation key defaults: `v3-runtime-config-spec.md`
+- Extended-perception field layout and formulas: `v3-sensor-spec.md`
 - Phenotype state model and mutation algorithm: `v3-phenotype-spec.md`
 - Tick action ordering/arbitration: `v3-tick-orchestration-spec.md`
 - Required observability semantics: `v3-evolution-observability-spec.md`

@@ -237,6 +237,17 @@ impl WorldState {
         !self.is_barrier(pos) && self.creature_at(pos).is_none()
     }
 
+    /// Resolve an arbitrary signed local offset from an origin position.
+    ///
+    /// Per v3-world-grid-spec.md: the only geometry primitive that converts
+    /// local signed offsets into world positions for perception consumers.
+    pub fn resolve_offset(&self, origin: Position, dx: i32, dy: i32) -> Option<Position> {
+        match self.edge_mode {
+            WorldEdgeMode::Wrap => origin.neighbor_wrap(dx, dy, self.width, self.height),
+            WorldEdgeMode::Bounded => origin.neighbor_bounded(dx, dy, self.width, self.height),
+        }
+    }
+
     // ── Diagnostics ──────────────────────────────────────────────────────────
 
     /// Total food across all cells (for testing and diagnostics).
@@ -538,6 +549,37 @@ mod tests {
         assert!(w
             .resolve_neighbor(Position::new(9, 9), Direction::SE)
             .is_none());
+    }
+
+    #[test]
+    fn resolve_offset_wrap_arbitrary() {
+        let w = WorldState::new(10, 10, WorldEdgeMode::Wrap);
+        let origin = Position::new(2, 3);
+        // Normal in-bounds
+        let p = w.resolve_offset(origin, 3, 4).unwrap();
+        assert_eq!(p, Position::new(5, 7));
+        // Wrapping
+        let p = w.resolve_offset(origin, -5, -5).unwrap();
+        assert_eq!(p, Position::new(7, 8));
+    }
+
+    #[test]
+    fn resolve_offset_bounded_out_of_bounds() {
+        let w = WorldState::new(10, 10, WorldEdgeMode::Bounded);
+        assert!(w.resolve_offset(Position::new(2, 3), -5, 0).is_none());
+        assert!(w.resolve_offset(Position::new(2, 3), 0, -5).is_none());
+        // In-bounds
+        assert_eq!(
+            w.resolve_offset(Position::new(5, 5), -3, -3),
+            Some(Position::new(2, 2))
+        );
+    }
+
+    #[test]
+    fn resolve_offset_self_returns_self() {
+        let w = WorldState::new(10, 10, WorldEdgeMode::Wrap);
+        let origin = Position::new(4, 6);
+        assert_eq!(w.resolve_offset(origin, 0, 0), Some(origin));
     }
 
     #[test]
