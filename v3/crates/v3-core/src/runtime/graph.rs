@@ -95,6 +95,12 @@ pub(crate) fn evaluate_kind(
         // applied post-loop. During the loop their curr_outputs slot just holds wsum.
         GraphNodeKind::CustomOutput(_) => wsum,
         GraphNodeKind::RouterOutput => wsum,
+        // Action-queue outputs: deferred effect applied post-convergence.
+        // During relaxation they behave as passthrough (wsum).
+        GraphNodeKind::WriteActionMeta(_) => wsum,
+        GraphNodeKind::PushAction(_) => wsum,
+        GraphNodeKind::PopAction => wsum,
+        GraphNodeKind::ExecuteActionQueue => wsum,
     }
 }
 

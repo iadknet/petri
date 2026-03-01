@@ -222,6 +222,10 @@ pub fn kind_label(kind: &GraphNodeKind) -> &'static str {
         GraphNodeKind::AdaptiveGain => "AdaptiveGain",
         GraphNodeKind::CustomOutput(_) => "CustomOutput",
         GraphNodeKind::RouterOutput => "RouterOutput",
+        GraphNodeKind::WriteActionMeta(_) => "WriteActionMeta",
+        GraphNodeKind::PushAction(_) => "PushAction",
+        GraphNodeKind::PopAction => "PopAction",
+        GraphNodeKind::ExecuteActionQueue => "ExecuteActionQueue",
     }
 }
 
@@ -381,6 +385,16 @@ mod tests {
         assert_eq!(kind_label(&GraphNodeKind::AdaptiveGain), "AdaptiveGain");
         assert_eq!(kind_label(&GraphNodeKind::CustomOutput(0)), "CustomOutput");
         assert_eq!(kind_label(&GraphNodeKind::RouterOutput), "RouterOutput");
+        assert_eq!(
+            kind_label(&GraphNodeKind::WriteActionMeta(0)),
+            "WriteActionMeta"
+        );
+        assert_eq!(kind_label(&GraphNodeKind::PushAction(1)), "PushAction");
+        assert_eq!(kind_label(&GraphNodeKind::PopAction), "PopAction");
+        assert_eq!(
+            kind_label(&GraphNodeKind::ExecuteActionQueue),
+            "ExecuteActionQueue"
+        );
     }
 
     #[test]
