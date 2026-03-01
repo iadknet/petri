@@ -1,9 +1,9 @@
 pub mod action_decode;
 pub mod graph;
 pub(crate) mod graph_effects;
-pub(crate) mod plasticity;
 pub mod inputs;
 pub mod mesh;
+pub(crate) mod plasticity;
 pub mod trace;
 pub mod traced_graph;
 pub mod traced_mesh;

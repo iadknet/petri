@@ -3,10 +3,77 @@ use crate::contracts::InputReference;
 use crate::creature::genome::{GraphBackendDef, GraphInternalNode, GraphNodeKind};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::graph_effects::apply_graph_effects;
-use crate::runtime::plasticity::hebbian;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
+use crate::runtime::plasticity::hebbian;
 use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult};
 use crate::sensors::perception::SensorSnapshot;
+
+// ─── Tracer trait ────────────────────────────────────────────────────────────
+
+/// Callback trait for instrumenting the graph relaxation loop.
+///
+/// Two implementations exist:
+/// - [`NoopTracer`] — zero-cost (all methods are `#[inline]` no-ops), used by
+///   the production [`execute_graph_node`] path.
+/// - [`super::traced_graph::RecordingTracer`] — records per-pass trace data for
+///   the Execution Sampler.
+///
+/// Generic over `GraphTracer` so the compiler can monomorphize
+/// `execute_graph_impl` separately for each tracer, eliminating all tracing
+/// overhead on the hot path.
+#[allow(clippy::too_many_arguments)]
+pub(crate) trait GraphTracer {
+    /// Called before each relaxation pass. Record energy cost.
+    fn on_pass_start(&mut self, pass: u32, pass_cost: f32, energy_after: f32);
+    /// Called after each node evaluation. Record inputs, state, output.
+    fn on_node_eval(
+        &mut self,
+        node_index: usize,
+        kind: &GraphNodeKind,
+        weighted_inputs: &[f32],
+        weighted_sum: f32,
+        state_before: f32,
+        state_after: f32,
+        output: f32,
+    );
+    /// Called after each pass. Record convergence delta.
+    fn on_pass_end(&mut self, delta: f32);
+    /// Called once when the relaxation loop finishes (both normal and exhaustion paths).
+    ///
+    /// On the exhaustion path, `curr_outputs` reflects the state after the last
+    /// *completed* pass (or zeros if exhaustion occurred before any pass completed).
+    /// `converged` is always `false` on exhaustion.
+    fn on_finish(&mut self, curr_outputs: &[f32], stable_passes: u32, converged: bool);
+}
+
+/// Zero-cost tracer used by the production path.
+///
+/// All methods are `#[inline]` no-ops — the compiler eliminates them entirely
+/// when `execute_graph_impl` is monomorphized with `NoopTracer`.
+pub(crate) struct NoopTracer;
+
+impl GraphTracer for NoopTracer {
+    #[inline]
+    fn on_pass_start(&mut self, _: u32, _: f32, _: f32) {}
+    #[inline]
+    fn on_node_eval(
+        &mut self,
+        _: usize,
+        _: &GraphNodeKind,
+        _: &[f32],
+        _: f32,
+        _: f32,
+        _: f32,
+        _: f32,
+    ) {
+    }
+    #[inline]
+    fn on_pass_end(&mut self, _: f32) {}
+    #[inline]
+    fn on_finish(&mut self, _: &[f32], _: u32, _: bool) {}
+}
+
+// ─── Shared helpers ──────────────────────────────────────────────────────────
 
 /// Immutable context for resolving `InputRef` nodes during graph evaluation.
 pub(crate) struct EvalCtx<'a> {
@@ -135,23 +202,21 @@ pub(crate) fn collect_weighted_inputs(
     }));
 }
 
-/// Execute a graph-backend mesh node.
+// ─── Unified graph execution ─────────────────────────────────────────────────
+
+/// Core graph relaxation loop, generic over a [`GraphTracer`].
 ///
-/// Runs the relaxation loop (Gauss-Seidel style), handles stateful operators,
-/// charges energy per pass, and maps `CustomOutput`/`RouterOutput` nodes to the
-/// returned [`NodeResult`].
+/// Both [`execute_graph_node`] and [`super::traced_graph::execute_graph_node_traced`]
+/// delegate to this function. The tracer callbacks are monomorphized away for
+/// [`NoopTracer`], making the production path zero-cost.
 ///
-/// # Energy semantics
-/// Energy is charged **before** each pass. If energy drops to `<= 0` the
-/// function restores the pre-call graph state snapshot and returns
-/// [`NodeResult::exhausted`].
-///
-/// # Empty graph
-/// If `def.internal_nodes` is empty, no energy is charged and the function
-/// returns [`NodeResult::halted`] with the original `upstream_slots`.
-// The signature is mandated by the v3 spec / mesh executor calling convention.
+/// The tracer's [`on_finish`](GraphTracer::on_finish) callback receives
+/// `curr_outputs`, `stable_passes`, and `converged` on all return paths
+/// (both normal completion and energy exhaustion), so the caller can build
+/// trace metadata without fragile reconstruction.
 #[allow(clippy::too_many_arguments)]
-pub fn execute_graph_node(
+pub(crate) fn execute_graph_impl<T: GraphTracer>(
+    tracer: &mut T,
     def: &GraphBackendDef,
     input_refs: &[InputReference],
     upstream_slots: &[f32; 12],
@@ -209,11 +274,12 @@ pub fn execute_graph_node(
     let mut stable_passes: u32 = 0;
     let mut w_inputs_buf = std::mem::take(&mut graph_runtime.scratch_w_inputs);
 
-    for _pass in 0..max_passes {
+    for pass in 0..max_passes {
         // Charge energy BEFORE evaluating this pass.
         let pass_cost = config.graph_node_base_cost * node_count as f32;
         *energy -= pass_cost;
         if *energy <= 0.0 {
+            tracer.on_finish(&curr_outputs, stable_passes, false);
             // Restore state snapshot.
             graph_runtime.node_state[node_idx].clone_from(&state_backup);
             restore_scratch(
@@ -225,6 +291,8 @@ pub fn execute_graph_node(
             );
             return NodeResult::exhausted();
         }
+
+        tracer.on_pass_start(pass, pass_cost, *energy);
 
         // Rebuild the eval context with the live energy value after the pass charge.
         let ctx = EvalCtx {
@@ -267,6 +335,7 @@ pub fn execute_graph_node(
 
             // Load node-local state; write back after evaluate_kind updates it.
             let mut node_state = graph_runtime.node_state[node_idx][current_idx];
+            let state_before = node_state;
 
             curr_outputs[current_idx] = sanitize_f32(evaluate_kind(
                 &node.kind,
@@ -278,6 +347,16 @@ pub fn execute_graph_node(
 
             // Persist any state mutation from stateful operators.
             graph_runtime.node_state[node_idx][current_idx] = node_state;
+
+            tracer.on_node_eval(
+                current_idx,
+                &node.kind,
+                &w_inputs_buf,
+                wsum,
+                state_before,
+                node_state,
+                curr_outputs[current_idx],
+            );
         }
 
         // Convergence check: max absolute change across all outputs.
@@ -294,10 +373,16 @@ pub fn execute_graph_node(
         } else {
             stable_passes = 0;
         }
+
+        tracer.on_pass_end(delta);
+
         if stable_passes >= req_stable {
             break;
         }
     }
+
+    let converged = stable_passes >= req_stable;
+    tracer.on_finish(&curr_outputs, stable_passes, converged);
 
     // Apply plasticity weight updates after convergence.
     // NOTE: If energy goes negative here, we do not roll back weight changes or
@@ -327,6 +412,49 @@ pub fn execute_graph_node(
     );
 
     result
+}
+
+/// Execute a graph-backend mesh node.
+///
+/// Runs the relaxation loop (Gauss-Seidel style), handles stateful operators,
+/// charges energy per pass, and maps `CustomOutput`/`RouterOutput` nodes to the
+/// returned [`NodeResult`].
+///
+/// # Energy semantics
+/// Energy is charged **before** each pass. If energy drops to `<= 0` the
+/// function restores the pre-call graph state snapshot and returns
+/// [`NodeResult::exhausted`].
+///
+/// # Empty graph
+/// If `def.internal_nodes` is empty, no energy is charged and the function
+/// returns [`NodeResult::halted`] with the original `upstream_slots`.
+// The signature is mandated by the v3 spec / mesh executor calling convention.
+#[allow(clippy::too_many_arguments)]
+pub fn execute_graph_node(
+    def: &GraphBackendDef,
+    input_refs: &[InputReference],
+    upstream_slots: &[f32; 12],
+    energy: &mut f32,
+    energy_consumed: f32,
+    node_idx: usize,
+    graph_runtime: &mut GraphRuntimeState,
+    sensors: &SensorSnapshot,
+    config: &RuntimeConfig,
+    side_outputs: &mut MeshSideOutputs,
+) -> NodeResult {
+    execute_graph_impl(
+        &mut NoopTracer,
+        def,
+        input_refs,
+        upstream_slots,
+        energy,
+        energy_consumed,
+        node_idx,
+        graph_runtime,
+        sensors,
+        config,
+        side_outputs,
+    )
 }
 
 /// Restore scratch buffers to `GraphRuntimeState` (must be called on all return paths).

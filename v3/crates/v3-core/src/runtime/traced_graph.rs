@@ -1,22 +1,105 @@
-//! Traced graph execution — identical logic to [`super::graph::execute_graph_node`]
-//! but records per-pass trace data for the Execution Sampler.
+//! Traced graph execution — records per-pass trace data for the Execution Sampler.
 //!
-//! **Maintenance note:** This module reuses `evaluate_kind` and `collect_weighted_inputs`
-//! from `graph.rs`. Only the outer relaxation loop is duplicated with trace recording.
-//! When updating graph execution semantics, apply the same changes here and verify
-//! with equivalence tests.
+//! Uses [`RecordingTracer`] with the shared [`super::graph::execute_graph_impl`]
+//! to avoid duplicating the relaxation loop. The tracer callbacks record
+//! [`GraphNodeEvalTrace`] per node and [`GraphPassTrace`] per pass.
 
 use crate::config::RuntimeConfig;
 use crate::contracts::InputReference;
-use crate::creature::genome::GraphBackendDef;
+use crate::creature::genome::{GraphBackendDef, GraphNodeKind};
 use crate::creature::state::GraphRuntimeState;
-use crate::runtime::graph::{collect_weighted_inputs, evaluate_kind, EvalCtx};
-use crate::runtime::graph_effects::apply_graph_effects;
-use crate::runtime::plasticity::hebbian;
-use crate::runtime::inputs::ResolveCtx;
+use crate::runtime::graph::{execute_graph_impl, GraphTracer};
 use crate::runtime::trace::{kind_label, GraphNodeEvalTrace, GraphPassTrace, GraphTrace};
-use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult};
+use crate::runtime::types::{MeshSideOutputs, NodeResult};
 use crate::sensors::perception::SensorSnapshot;
+
+// ─── RecordingTracer ─────────────────────────────────────────────────────────
+
+/// Tracer that records per-pass trace data for the Execution Sampler.
+///
+/// Captures [`GraphNodeEvalTrace`] per node and [`GraphPassTrace`] per pass,
+/// assembled into a [`GraphTrace`] via [`into_trace`](RecordingTracer::into_trace).
+pub(crate) struct RecordingTracer {
+    passes: Vec<GraphPassTrace>,
+    current_pass_evals: Vec<GraphNodeEvalTrace>,
+    current_pass_cost: f32,
+    current_pass_energy: f32,
+    // Captured by on_finish — avoids fragile reconstruction from trace data.
+    final_outputs: Vec<f32>,
+    final_stable_passes: u32,
+    final_converged: bool,
+}
+
+impl RecordingTracer {
+    pub(crate) fn new(max_passes: u32, node_count: usize) -> Self {
+        Self {
+            passes: Vec::with_capacity(max_passes as usize),
+            current_pass_evals: Vec::with_capacity(node_count),
+            current_pass_cost: 0.0,
+            current_pass_energy: 0.0,
+            final_outputs: Vec::new(),
+            final_stable_passes: 0,
+            final_converged: false,
+        }
+    }
+
+    /// Consume the tracer and build the final [`GraphTrace`].
+    pub(crate) fn into_trace(self) -> GraphTrace {
+        GraphTrace {
+            passes: self.passes,
+            converged: self.final_converged,
+            stable_passes_count: self.final_stable_passes,
+            final_outputs: self.final_outputs,
+        }
+    }
+}
+
+impl GraphTracer for RecordingTracer {
+    fn on_pass_start(&mut self, _pass: u32, pass_cost: f32, energy_after: f32) {
+        self.current_pass_cost = pass_cost;
+        self.current_pass_energy = energy_after;
+        self.current_pass_evals.clear();
+    }
+
+    fn on_node_eval(
+        &mut self,
+        node_index: usize,
+        kind: &GraphNodeKind,
+        weighted_inputs: &[f32],
+        weighted_sum: f32,
+        state_before: f32,
+        state_after: f32,
+        output: f32,
+    ) {
+        self.current_pass_evals.push(GraphNodeEvalTrace {
+            node_index,
+            kind: kind_label(kind),
+            weighted_inputs: weighted_inputs.to_vec(),
+            weighted_sum,
+            state_before,
+            state_after,
+            output,
+        });
+    }
+
+    fn on_pass_end(&mut self, delta: f32) {
+        self.passes.push(GraphPassTrace {
+            pass_index: self.passes.len() as u32,
+            energy_cost: self.current_pass_cost,
+            energy_after: self.current_pass_energy,
+            node_evaluations: std::mem::take(&mut self.current_pass_evals),
+            max_delta: delta,
+        });
+    }
+
+    fn on_finish(&mut self, curr_outputs: &[f32], stable_passes: u32, converged: bool) {
+        self.final_outputs = curr_outputs.to_vec();
+        self.final_stable_passes = stable_passes;
+        self.final_converged = converged;
+    }
+}
+
+// ─── Public entry point ──────────────────────────────────────────────────────
 
 /// Execute a graph-backend mesh node with trace recording.
 ///
@@ -38,181 +121,33 @@ pub fn execute_graph_node_traced(
 ) -> (NodeResult, GraphTrace) {
     let node_count = def.internal_nodes.len();
 
-    let empty_trace = || GraphTrace {
-        passes: Vec::new(),
-        converged: false,
-        stable_passes_count: 0,
-        final_outputs: Vec::new(),
-    };
-
     if node_count == 0 {
-        return (NodeResult::halted(*upstream_slots, 0.0), empty_trace());
-    }
-
-    // Ensure node_state has enough slots for this node index.
-    if graph_runtime.node_state.len() <= node_idx {
-        graph_runtime.node_state.resize(node_idx + 1, Vec::new());
-    }
-
-    // Snapshot state for atomic rollback on energy exhaustion.
-    let state_backup: Vec<f32> = graph_runtime.node_state[node_idx].clone();
-
-    // Ensure the state Vec for this node is long enough.
-    let state_vec = &mut graph_runtime.node_state[node_idx];
-    if state_vec.len() < node_count {
-        state_vec.resize(node_count, 0.0);
-    }
-
-    // Check if any node uses plasticity learning and prepare weights if so.
-    let use_plasticity = hebbian::has_any_hebbian(def);
-    if use_plasticity {
-        hebbian::ensure_hebbian_weights(def, node_idx, &mut graph_runtime.plasticity_weights);
-    }
-
-    let max_passes = config.max_graph_relax_iters;
-    let epsilon = config.graph_convergence_epsilon;
-    let req_stable = config.graph_convergence_stable_passes;
-
-    let mut prev_outputs = vec![0.0f32; node_count];
-    let mut curr_outputs = vec![0.0f32; node_count];
-    let mut stable_passes: u32 = 0;
-    let mut w_inputs_buf: Vec<f32> = Vec::new();
-
-    // Trace recording
-    let mut trace_passes: Vec<GraphPassTrace> = Vec::with_capacity(max_passes as usize);
-
-    for pass in 0..max_passes {
-        let pass_cost = config.graph_node_base_cost * node_count as f32;
-        *energy -= pass_cost;
-        if *energy <= 0.0 {
-            graph_runtime.node_state[node_idx] = state_backup;
-            let trace = GraphTrace {
-                passes: trace_passes,
-                converged: false,
-                stable_passes_count: stable_passes,
-                final_outputs: curr_outputs,
-            };
-            return (NodeResult::exhausted(), trace);
-        }
-
-        let ctx = EvalCtx {
-            input_refs,
-            resolve: ResolveCtx {
-                sensors,
-                upstream_slots,
-                energy: *energy,
-                energy_consumed,
-                action_queue: &side_outputs.action_queue,
-            },
+        let trace = GraphTrace {
+            passes: Vec::new(),
+            converged: false,
+            stable_passes_count: 0,
+            final_outputs: Vec::new(),
         };
-
-        let mut node_evaluations: Vec<GraphNodeEvalTrace> = Vec::with_capacity(node_count);
-
-        for current_idx in 0..node_count {
-            let node = &def.internal_nodes[current_idx];
-
-            // Use learned weights for plasticity nodes, genome weights otherwise.
-            if use_plasticity && node.plasticity.is_some() {
-                let learned = &graph_runtime.plasticity_weights[node_idx][current_idx];
-                hebbian::collect_weighted_inputs_hebbian(
-                    node,
-                    current_idx,
-                    node_count,
-                    &prev_outputs,
-                    &curr_outputs,
-                    learned,
-                    &mut w_inputs_buf,
-                );
-            } else {
-                collect_weighted_inputs(
-                    node,
-                    current_idx,
-                    node_count,
-                    &prev_outputs,
-                    &curr_outputs,
-                    &mut w_inputs_buf,
-                );
-            }
-            let wsum: f32 = w_inputs_buf.iter().sum();
-
-            let mut node_state = graph_runtime.node_state[node_idx][current_idx];
-            let state_before = node_state;
-
-            curr_outputs[current_idx] = sanitize_f32(evaluate_kind(
-                &node.kind,
-                &w_inputs_buf,
-                wsum,
-                &ctx,
-                &mut node_state,
-            ));
-
-            graph_runtime.node_state[node_idx][current_idx] = node_state;
-
-            node_evaluations.push(GraphNodeEvalTrace {
-                node_index: current_idx,
-                kind: kind_label(&node.kind),
-                weighted_inputs: w_inputs_buf.clone(),
-                weighted_sum: wsum,
-                state_before,
-                state_after: node_state,
-                output: curr_outputs[current_idx],
-            });
-        }
-
-        let delta = prev_outputs
-            .iter()
-            .zip(curr_outputs.iter())
-            .map(|(p, c)| (c - p).abs())
-            .fold(0.0f32, f32::max);
-
-        prev_outputs.clone_from(&curr_outputs);
-
-        if delta <= epsilon {
-            stable_passes += 1;
-        } else {
-            stable_passes = 0;
-        }
-
-        trace_passes.push(GraphPassTrace {
-            pass_index: pass,
-            energy_cost: pass_cost,
-            energy_after: *energy,
-            node_evaluations,
-            max_delta: delta,
-        });
-
-        if stable_passes >= req_stable {
-            break;
-        }
+        return (NodeResult::halted(*upstream_slots, 0.0), trace);
     }
 
-    // Apply plasticity weight updates after convergence.
-    // NOTE: If energy goes negative here, we do not roll back weight changes or
-    // return exhausted. Acceptable while plasticity_update_cost defaults to 0.0.
-    // When a nonzero cost is introduced, add exhaustion handling here.
-    if use_plasticity {
-        let plasticity_cost = hebbian::apply_hebbian_updates(
-            def,
-            node_idx,
-            &mut graph_runtime.plasticity_weights,
-            &curr_outputs,
-            config.plasticity_update_cost,
-        );
-        *energy -= plasticity_cost;
-    }
+    let mut tracer = RecordingTracer::new(config.max_graph_relax_iters, node_count);
 
-    // Build NodeResult via the shared 3-phase effect pass.
-    let result = apply_graph_effects(def, &curr_outputs, upstream_slots, side_outputs);
+    let result = execute_graph_impl(
+        &mut tracer,
+        def,
+        input_refs,
+        upstream_slots,
+        energy,
+        energy_consumed,
+        node_idx,
+        graph_runtime,
+        sensors,
+        config,
+        side_outputs,
+    );
 
-    let converged = stable_passes >= req_stable;
-    let trace = GraphTrace {
-        passes: trace_passes,
-        converged,
-        stable_passes_count: stable_passes,
-        final_outputs: curr_outputs,
-    };
-
-    (result, trace)
+    (result, tracer.into_trace())
 }
 
 #[cfg(test)]
