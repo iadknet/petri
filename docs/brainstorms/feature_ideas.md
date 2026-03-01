@@ -23,6 +23,41 @@ Ordering must be explicit and deterministic. Recommended rule:
 Within each phase, process internal graph nodes in internal-node-index order. This means conflicts like “push and pop are both active” are resolved by node order, not by ambiguous graph topology. If energy is exhausted before convergence completes, none of the deferred action effects are committed.
 
 
+### New internal graph nodes can be born with attached inputs
+
+Right now a fresh internal graph node can be structurally valid but functionally useless for several mutation steps, because it may have no meaningful sensor signal attached yet. We could add a graph-specific mutation path where some node-add events create a **small input bundle** alongside the new internal node, so the new structure can start life with a readable signal instead of waiting for several follow-up mutations to line up.
+
+Recommended shape:
+- when adding a new internal compute node, optionally also create `1-2` `InputRef` leaves and wire them into the node immediately
+- those `InputRef` leaves should point at valid entries in the owning `NodeGenome.input_refs`
+- if the chosen input does not exist yet, append a new random `InputReference` first, then point the new leaf at that fresh `ref_idx`
+- for compound inputs, either fan out all sub-values through the existing compound mechanism or pick one explicit `sub_idx`
+- keep the current junk-DNA mutation path too; this should be an additional mutation mode, not a replacement
+
+This would make graph evolution less brittle by reducing the number of independent mutations required before a new node can do anything adaptive. It also gives us a cleaner place to experiment with higher-level birth patterns later, like "add a comparator node already wired to food-gradient and occupancy inputs" without needing to change the runtime model.
+
+
+### Generic outcome-modulated learning for open-ended creatures
+
+Instead of teaching creatures that "food is good" or "movement was correct", we could add a **generic outcome signal bank** that exposes a small set of post-tick consequences, then let evolution decide which circuits use those signals for plasticity. This keeps learning open-ended and ecology-driven rather than baking a hand-written objective into the runtime.
+
+Recommended shape:
+- add a fixed-width `OutcomeSignalBank` with generic channels such as `energy_delta`, `action_success`, `damage_delta`, and `offspring_success`
+- these signals should describe **what happened**, not **what should matter**
+- graph internal nodes or edges with plasticity enabled can choose one `reward_source` from that bank
+- plastic edges maintain an eligibility trace so that a later outcome can reinforce or weaken earlier activity
+- delayed reward should work by updating traces when a circuit is active, then applying reward later with something like `dw = learning_rate * outcome_signal * eligibility_trace`
+- this lets earlier sensing and routing decisions receive credit when the payoff only appears a tick or two later, such as spotting food, moving toward it, and only then eating
+- keep the current unsupervised Hebbian rules too; reward-modulated plasticity should be an additional learning mode, not a replacement
+
+This would fit Petri well because it preserves the existing three-loop model:
+- evolution discovers which circuits are plastic and which outcome channels they listen to
+- within-lifetime learning adapts those circuits based on actual consequences
+- ecology determines which generic signals end up being useful in practice
+
+The main tradeoff is complexity: we would be adding more per-creature runtime state, more delayed-credit machinery, and more room for strange learned strategies. But that is also the point. It gives creatures a path to develop local habits and niche-specific adaptations without forcing the engine to define one universal reward function.
+
+
 ### Storage slots
   - add the ability for creatures to pick up and place food and barriers
   - This was implemented in v1, we can refrence v1 implementation
