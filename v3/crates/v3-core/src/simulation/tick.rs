@@ -61,6 +61,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
     use crate::runtime::trace::{StaticInputsSnapshot, TickTrace};
     use crate::runtime::traced_mesh::execute_creature_mesh_traced;
     use crate::runtime::types::MeshOutput;
+    use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::assemble_static_inputs;
     use crate::simulation::actions::{
         apply_eat, apply_move, apply_noop, apply_reproduce, apply_steal_energy,
@@ -114,10 +115,19 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
     // mutates each creature's private state (energy, memory, graph_runtime).
 
     // 1a: Assemble sensor inputs sequentially (needs &sim.world + &sim.creatures).
+    // Build SensorSnapshot with PerceptionSnapshot::zero() — actual perception
+    // assembly is deferred to Step 4.
     let inputs: Vec<_> = queue
         .iter()
         .filter(|&&id| sim.creatures.contains_key(id))
-        .map(|&id| (id, assemble_static_inputs(&sim.world, &sim.creatures[id])))
+        .map(|&id| {
+            let local = assemble_static_inputs(&sim.world, &sim.creatures[id]);
+            let ss = SensorSnapshot {
+                local,
+                perception: PerceptionSnapshot::zero(),
+            };
+            (id, ss)
+        })
         .collect();
 
     // 1b: Cognition — parallel for all creatures, sequential for traced creature.
@@ -130,16 +140,16 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
 
         let mut work: Vec<_> = inputs
             .iter()
-            .filter_map(|(id, si)| creature_refs.remove(id).map(|c| (*id, si, c)))
+            .filter_map(|(id, ss)| creature_refs.remove(id).map(|c| (*id, ss, c)))
             .collect();
 
         // Run all non-traced creatures in parallel.
         let mut parallel_decisions: Vec<_> = work
             .par_iter_mut()
-            .map(|(id, si, creature)| {
+            .map(|(id, ss, creature)| {
                 let output = execute_creature_mesh(
                     &creature.genome,
-                    si,
+                    ss,
                     &mut creature.energy,
                     &mut creature.memory,
                     &mut creature.graph_runtime,
@@ -151,14 +161,14 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
 
         // Run traced creature sequentially with trace recording.
         if let Some((tid, creature)) = traced_creature {
-            if let Some((_, si)) = inputs.iter().find(|(id, _)| *id == tid) {
+            if let Some((_, ss)) = inputs.iter().find(|(id, _)| *id == tid) {
                 let energy_before = creature.energy;
                 let tick_number = sim.tick;
-                let si_snapshot = StaticInputsSnapshot::from(si);
+                let si_snapshot = StaticInputsSnapshot::from(&ss.local);
 
                 let (output, hops, termination_reason) = execute_creature_mesh_traced(
                     &creature.genome,
-                    si,
+                    ss,
                     &mut creature.energy,
                     &mut creature.memory,
                     &mut creature.graph_runtime,

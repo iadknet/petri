@@ -12,7 +12,7 @@ fn register_count_zero_halts_immediately() {
             VmInstruction::ExecuteActionQueue,
         ],
     };
-    let si = empty_static_inputs();
+    let ss = empty_sensor_snapshot();
     let mut e = 100.0;
     let mut mem = [0u8; 1024];
     let cfg = config();
@@ -24,7 +24,7 @@ fn register_count_zero_halts_immediately() {
         &mut e,
         0.0,
         &mut mem,
-        &si,
+        &ss,
         &cfg,
         &mut side_outputs,
     );
@@ -62,7 +62,7 @@ fn program_counter_past_program_len_soft_halts() {
         constants: vec![],
         program: vec![VmInstruction::Noop],
     };
-    let si = empty_static_inputs();
+    let ss = empty_sensor_snapshot();
     let mut e = 100.0;
     let mut mem = [0u8; 1024];
     let mut cfg = config();
@@ -75,7 +75,7 @@ fn program_counter_past_program_len_soft_halts() {
         &mut e,
         0.0,
         &mut mem,
-        &si,
+        &ss,
         &cfg,
         &mut side_outputs,
     );
@@ -165,7 +165,7 @@ fn energy_is_deducted_per_opcode() {
         constants: vec![],
         program: vec![VmInstruction::Noop, VmInstruction::Halt],
     };
-    let si = empty_static_inputs();
+    let ss = empty_sensor_snapshot();
     let mut e = 100.0;
     let mut mem = [0u8; 1024];
     let mut cfg = config();
@@ -178,7 +178,7 @@ fn energy_is_deducted_per_opcode() {
         &mut e,
         0.0,
         &mut mem,
-        &si,
+        &ss,
         &cfg,
         &mut side_outputs,
     );
@@ -194,7 +194,7 @@ fn energy_exhaustion_returns_exhausted() {
         constants: vec![],
         program: vec![VmInstruction::Noop, VmInstruction::Halt],
     };
-    let si = empty_static_inputs();
+    let ss = empty_sensor_snapshot();
     let mut e = 0.01;
     let mut mem = [0u8; 1024];
     let mut cfg = config();
@@ -207,7 +207,7 @@ fn energy_exhaustion_returns_exhausted() {
         &mut e,
         0.0,
         &mut mem,
-        &si,
+        &ss,
         &cfg,
         &mut side_outputs,
     );
@@ -231,7 +231,7 @@ fn energy_exhaustion_does_not_commit_memory_writes() {
             VmInstruction::Halt,
         ],
     };
-    let si = empty_static_inputs();
+    let ss = empty_sensor_snapshot();
     // Give 0.20 energy with opcode_cost_multiplier=1.0:
     // LoadConst(0.08) → 0.12 left; StoreMem8Imm(0.16) → -0.04 → exhausted
     let mut e = 0.20;
@@ -246,7 +246,7 @@ fn energy_exhaustion_does_not_commit_memory_writes() {
         &mut e,
         0.0,
         &mut mem,
-        &si,
+        &ss,
         &cfg,
         &mut side_outputs,
     );
@@ -268,7 +268,7 @@ fn max_vm_steps_enforced() {
         constants: vec![],
         program,
     };
-    let si = empty_static_inputs();
+    let ss = empty_sensor_snapshot();
     let mut e = 1000.0;
     let mut mem = [0u8; 1024];
     let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
@@ -279,7 +279,7 @@ fn max_vm_steps_enforced() {
         &mut e,
         0.0,
         &mut mem,
-        &si,
+        &ss,
         &cfg,
         &mut side_outputs,
     );

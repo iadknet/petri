@@ -13,7 +13,7 @@ use crate::runtime::trace::{BackendTrace, MeshHopTrace, TerminationReason};
 use crate::runtime::traced_graph::execute_graph_node_traced;
 use crate::runtime::traced_vm::execute_vm_node_traced;
 use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs};
-use crate::sensors::static_inputs::StaticInputs;
+use crate::sensors::perception::SensorSnapshot;
 
 /// Execute the creature's mesh chain with trace recording.
 ///
@@ -22,7 +22,7 @@ use crate::sensors::static_inputs::StaticInputs;
 #[allow(clippy::too_many_arguments)]
 pub fn execute_creature_mesh_traced(
     genome: &CreatureGenome,
-    static_inputs: &StaticInputs,
+    sensors: &SensorSnapshot,
     energy: &mut f32,
     memory: &mut [u8; 1024],
     graph_runtime: &mut GraphRuntimeState,
@@ -80,7 +80,7 @@ pub fn execute_creature_mesh_traced(
                     energy,
                     energy_consumed,
                     memory,
-                    static_inputs,
+                    sensors,
                     config,
                     &mut side_outputs,
                 );
@@ -95,7 +95,7 @@ pub fn execute_creature_mesh_traced(
                     energy_consumed,
                     current_idx,
                     graph_runtime,
-                    static_inputs,
+                    sensors,
                     config,
                     &side_outputs.action_queue,
                 );
@@ -195,20 +195,24 @@ mod tests {
     };
     use crate::creature::state::GraphRuntimeState;
     use crate::runtime::mesh::execute_creature_mesh;
+    use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
 
     fn default_config() -> RuntimeConfig {
         RuntimeConfig::default()
     }
 
-    fn empty_si() -> StaticInputs {
-        StaticInputs {
-            food_here: 0.0,
-            neighbor_food: [0.0; 8],
-            neighbor_barrier: [0.0; 8],
-            neighbor_occupied: [0.0; 8],
-            generation: 0.0,
-            age_ticks: 0.0,
+    fn empty_ss() -> SensorSnapshot {
+        SensorSnapshot {
+            local: StaticInputs {
+                food_here: 0.0,
+                neighbor_food: [0.0; 8],
+                neighbor_barrier: [0.0; 8],
+                neighbor_occupied: [0.0; 8],
+                generation: 0.0,
+                age_ticks: 0.0,
+            },
+            perception: PerceptionSnapshot::zero(),
         }
     }
 
@@ -263,7 +267,7 @@ mod tests {
             entry_node_id: id_graph,
             nodes: vec![graph_node, vm_node],
         };
-        let si = empty_si();
+        let ss = empty_ss();
         let config = default_config();
 
         // Run non-traced
@@ -272,7 +276,7 @@ mod tests {
         let mut gr_a = GraphRuntimeState::new();
         let output_a = execute_creature_mesh(
             &genome,
-            &si,
+            &ss,
             &mut energy_a,
             &mut memory_a,
             &mut gr_a,
@@ -285,7 +289,7 @@ mod tests {
         let mut gr_b = GraphRuntimeState::new();
         let (output_b, hops, reason) = execute_creature_mesh_traced(
             &genome,
-            &si,
+            &ss,
             &mut energy_b,
             &mut memory_b,
             &mut gr_b,
@@ -369,14 +373,14 @@ mod tests {
             entry_node_id: id_graph,
             nodes: vec![graph_node, vm_node],
         };
-        let si = empty_si();
+        let ss = empty_ss();
         let config = default_config();
         let mut energy = 1000.0f32;
         let mut memory = [0u8; 1024];
         let mut gr = GraphRuntimeState::new();
 
         let (output, hops, _) =
-            execute_creature_mesh_traced(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
+            execute_creature_mesh_traced(&genome, &ss, &mut energy, &mut memory, &mut gr, &config);
 
         assert_eq!(output.actions, vec![WorldAction::Eat]);
         // Hop 1 (VM) should have upstream_slots[5] = 9.0
@@ -400,7 +404,7 @@ mod tests {
                 targets: vec![],
             }],
         };
-        let si = empty_si();
+        let ss = empty_ss();
         // Boost opcode cost multiplier so Noop actually exhausts energy
         let mut config = default_config();
         config.vm.opcode_cost_multiplier = 1.0;
@@ -409,7 +413,7 @@ mod tests {
         let mut gr = GraphRuntimeState::new();
 
         let (output, hops, reason) =
-            execute_creature_mesh_traced(&genome, &si, &mut energy, &mut memory, &mut gr, &config);
+            execute_creature_mesh_traced(&genome, &ss, &mut energy, &mut memory, &mut gr, &config);
 
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
         assert!(
@@ -449,7 +453,7 @@ mod tests {
             }],
         };
 
-        let si = empty_si();
+        let ss = empty_ss();
         let config = default_config();
 
         // Run non-traced path.
@@ -457,7 +461,7 @@ mod tests {
         let mut mem_a = [0u8; 1024];
         let mut gr_a = GraphRuntimeState::new();
         let output_a =
-            execute_creature_mesh(&genome, &si, &mut energy_a, &mut mem_a, &mut gr_a, &config);
+            execute_creature_mesh(&genome, &ss, &mut energy_a, &mut mem_a, &mut gr_a, &config);
 
         // Run traced path.
         let mut energy_b = 100.0f32;
@@ -465,7 +469,7 @@ mod tests {
         let mut gr_b = GraphRuntimeState::new();
         let (output_b, _, _) = execute_creature_mesh_traced(
             &genome,
-            &si,
+            &ss,
             &mut energy_b,
             &mut mem_b,
             &mut gr_b,

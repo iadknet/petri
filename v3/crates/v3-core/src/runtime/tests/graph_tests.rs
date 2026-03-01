@@ -3,20 +3,24 @@ use crate::config::RuntimeConfig;
 use crate::contracts::ActionQueue;
 use crate::creature::genome::{GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind};
 use crate::creature::state::GraphRuntimeState;
+use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;
 
 fn default_config() -> RuntimeConfig {
     RuntimeConfig::default()
 }
 
-fn make_static_inputs() -> StaticInputs {
-    StaticInputs {
-        food_here: 0.0,
-        neighbor_food: [0.0; 8],
-        neighbor_barrier: [0.0; 8],
-        neighbor_occupied: [0.0; 8],
-        generation: 0.0,
-        age_ticks: 0.0,
+fn make_sensor_snapshot() -> SensorSnapshot {
+    SensorSnapshot {
+        local: StaticInputs {
+            food_here: 0.0,
+            neighbor_food: [0.0; 8],
+            neighbor_barrier: [0.0; 8],
+            neighbor_occupied: [0.0; 8],
+            generation: 0.0,
+            age_ticks: 0.0,
+        },
+        perception: PerceptionSnapshot::zero(),
     }
 }
 
@@ -40,7 +44,7 @@ fn empty_graph_returns_halted_and_no_energy_charged() {
     let upstream = [1.0, 2.0, 3.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0];
     let mut energy = 50.0f32;
     let mut gr = GraphRuntimeState::new();
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     let config = default_config();
 
     let result = execute_graph_node(
@@ -51,7 +55,7 @@ fn empty_graph_returns_halted_and_no_energy_charged() {
         0.0,
         0,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -75,7 +79,7 @@ fn energy_exhaustion_returns_exhausted() {
     let upstream = [0.0f32; 12];
     let mut energy = 0.5f32;
     let mut gr = GraphRuntimeState::new();
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     let mut config = default_config();
     config.graph_node_base_cost = 1.0;
 
@@ -87,7 +91,7 @@ fn energy_exhaustion_returns_exhausted() {
         0.0,
         0,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -103,7 +107,7 @@ fn constant_node_does_not_write_output_slots() {
     let upstream = [7.0f32; 12];
     let mut energy = 100.0f32;
     let mut gr = GraphRuntimeState::new();
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     let config = default_config();
 
     let result = execute_graph_node(
@@ -114,7 +118,7 @@ fn constant_node_does_not_write_output_slots() {
         0.0,
         0,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -157,7 +161,7 @@ fn add_custom_output_writes_correct_slot() {
     let upstream = [0.0f32; 12];
     let mut energy = 100.0f32;
     let mut gr = GraphRuntimeState::new();
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     let config = default_config();
 
     let result = execute_graph_node(
@@ -168,7 +172,7 @@ fn add_custom_output_writes_correct_slot() {
         0.0,
         0,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -204,7 +208,7 @@ fn router_output_sets_route_target_idx() {
     let upstream = [0.0f32; 12];
     let mut energy = 100.0f32;
     let mut gr = GraphRuntimeState::new();
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     let config = default_config();
 
     let result = execute_graph_node(
@@ -215,7 +219,7 @@ fn router_output_sets_route_target_idx() {
         0.0,
         0,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -235,7 +239,7 @@ fn graph_never_emits_world_action() {
     let upstream = [1.0f32; 12];
     let mut energy = 100.0f32;
     let mut gr = GraphRuntimeState::new();
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     let config = default_config();
 
     let result = execute_graph_node(
@@ -246,7 +250,7 @@ fn graph_never_emits_world_action() {
         0.0,
         0,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -291,7 +295,7 @@ fn decay_integrator_accumulates_state() {
     let upstream = [0.0f32; 12];
     let mut energy = 1000.0f32;
     let mut gr = GraphRuntimeState::new();
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     // One pass, converges immediately.
     let mut config = default_config();
     config.max_graph_relax_iters = 1;
@@ -307,7 +311,7 @@ fn decay_integrator_accumulates_state() {
         0.0,
         nid,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -326,7 +330,7 @@ fn decay_integrator_accumulates_state() {
         0.0,
         nid,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -362,7 +366,7 @@ fn state_not_mutated_on_energy_exhaustion() {
         scratch_w_inputs: Vec::new(),
     };
 
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     let mut config = default_config();
     config.graph_node_base_cost = 1.0; // 1 node × 1.0 > energy (0.5) → exhausted
 
@@ -374,7 +378,7 @@ fn state_not_mutated_on_energy_exhaustion() {
         0.0,
         nid,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -397,7 +401,7 @@ fn output_slots_initialized_from_upstream_passthrough() {
     let def = single_node_graph(GraphNodeKind::Sigmoid);
     let mut energy = 100.0f32;
     let mut gr = GraphRuntimeState::new();
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     let config = default_config();
 
     let result = execute_graph_node(
@@ -408,7 +412,7 @@ fn output_slots_initialized_from_upstream_passthrough() {
         0.0,
         0,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -445,7 +449,7 @@ fn energy_deducted_per_pass_on_success() {
     let upstream = [0.0f32; 12];
     let mut energy = 50.0f32;
     let mut gr = GraphRuntimeState::new();
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
 
     let _ = execute_graph_node(
         &def,
@@ -455,7 +459,7 @@ fn energy_deducted_per_pass_on_success() {
         0.0,
         0,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -501,7 +505,7 @@ fn decay_integrator_formula_correct() {
     let upstream = [0.0f32; 12];
     let mut energy = 1000.0f32;
     let mut gr = GraphRuntimeState::new();
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     let mut config = default_config();
     config.max_graph_relax_iters = 1;
     config.graph_convergence_stable_passes = 1;
@@ -516,7 +520,7 @@ fn decay_integrator_formula_correct() {
         0.0,
         nid,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -534,7 +538,7 @@ fn decay_integrator_formula_correct() {
         0.0,
         nid,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -580,7 +584,7 @@ fn momentum_formula_correct() {
     let upstream = [0.0f32; 12];
     let mut energy = 1000.0f32;
     let mut gr = GraphRuntimeState::new();
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     let mut config = default_config();
     config.max_graph_relax_iters = 1;
     config.graph_convergence_stable_passes = 1;
@@ -595,7 +599,7 @@ fn momentum_formula_correct() {
         0.0,
         nid,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -631,7 +635,7 @@ fn oscillator_nan_safe() {
     };
     let upstream = [0.0f32; 12];
     let mut energy = 1000.0f32;
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     let mut config = default_config();
     config.max_graph_relax_iters = 1;
     config.graph_convergence_stable_passes = 1;
@@ -655,7 +659,7 @@ fn oscillator_nan_safe() {
         0.0,
         nid,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -702,7 +706,7 @@ fn threshold_formula_correct() {
     };
 
     let upstream = [0.0f32; 12];
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     let mut config = default_config();
     config.max_graph_relax_iters = 1;
     config.graph_convergence_stable_passes = 1;
@@ -717,7 +721,7 @@ fn threshold_formula_correct() {
         0.0,
         0,
         &mut GraphRuntimeState::new(),
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -733,7 +737,7 @@ fn threshold_formula_correct() {
         0.0,
         0,
         &mut GraphRuntimeState::new(),
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -752,7 +756,7 @@ fn threshold_formula_correct() {
         0.0,
         0,
         &mut GraphRuntimeState::new(),
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -784,7 +788,7 @@ fn multiply_empty_inputs_is_one() {
     let upstream = [0.0f32; 12];
     let mut energy = 1000.0f32;
     let mut gr = GraphRuntimeState::new();
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     let mut config = default_config();
     config.max_graph_relax_iters = 1;
     config.graph_convergence_stable_passes = 1;
@@ -797,7 +801,7 @@ fn multiply_empty_inputs_is_one() {
         0.0,
         0,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -851,7 +855,7 @@ fn greater_than_formula() {
     };
 
     let upstream = [0.0f32; 12];
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     let mut config = default_config();
     config.max_graph_relax_iters = 1;
     config.graph_convergence_stable_passes = 1;
@@ -866,7 +870,7 @@ fn greater_than_formula() {
         0.0,
         0,
         &mut GraphRuntimeState::new(),
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -882,7 +886,7 @@ fn greater_than_formula() {
         0.0,
         0,
         &mut GraphRuntimeState::new(),
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -898,7 +902,7 @@ fn greater_than_formula() {
         0.0,
         0,
         &mut GraphRuntimeState::new(),
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -966,7 +970,7 @@ fn select_formula() {
     };
 
     let upstream = [0.0f32; 12];
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     let mut config = default_config();
     config.max_graph_relax_iters = 1;
     config.graph_convergence_stable_passes = 1;
@@ -981,7 +985,7 @@ fn select_formula() {
         0.0,
         0,
         &mut GraphRuntimeState::new(),
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -1001,7 +1005,7 @@ fn select_formula() {
         0.0,
         0,
         &mut GraphRuntimeState::new(),
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -1047,7 +1051,7 @@ fn router_output_last_write_wins() {
     let upstream = [0.0f32; 12];
     let mut energy = 100.0f32;
     let mut gr = GraphRuntimeState::new();
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     let config = default_config();
 
     let result = execute_graph_node(
@@ -1058,7 +1062,7 @@ fn router_output_last_write_wins() {
         0.0,
         0,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -1096,7 +1100,7 @@ fn input_ref_255_soft_defaults_to_zero() {
     let upstream = [0.0f32; 12];
     let mut energy = 100.0f32;
     let mut gr = GraphRuntimeState::new();
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     let config = default_config();
 
     let result = execute_graph_node(
@@ -1107,7 +1111,7 @@ fn input_ref_255_soft_defaults_to_zero() {
         0.0,
         0,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -1141,7 +1145,7 @@ fn custom_output_255_does_not_write_output_slots() {
     let upstream = [3.0f32; 12];
     let mut energy = 100.0f32;
     let mut gr = GraphRuntimeState::new();
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     let config = default_config();
 
     let result = execute_graph_node(
@@ -1152,7 +1156,7 @@ fn custom_output_255_does_not_write_output_slots() {
         0.0,
         0,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );
@@ -1189,7 +1193,7 @@ fn edge_source_65535_soft_defaults_to_zero() {
     let upstream = [0.0f32; 12];
     let mut energy = 100.0f32;
     let mut gr = GraphRuntimeState::new();
-    let si = make_static_inputs();
+    let ss = make_sensor_snapshot();
     let config = default_config();
 
     let result = execute_graph_node(
@@ -1200,7 +1204,7 @@ fn edge_source_65535_soft_defaults_to_zero() {
         0.0,
         0,
         &mut gr,
-        &si,
+        &ss,
         &config,
         &ActionQueue::new(4),
     );

@@ -1,5 +1,5 @@
 use crate::contracts::{ActionQueue, DynamicIntrospectionKey, InputReference};
-use crate::sensors::static_inputs::StaticInputs;
+use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 
 /// Shared resolution context for input references.
 ///
@@ -8,7 +8,7 @@ use crate::sensors::static_inputs::StaticInputs;
 /// snapshot and live energy values needed to resolve any `InputReference`.
 #[derive(Debug, Clone)]
 pub struct ResolveCtx<'a> {
-    pub static_inputs: &'a StaticInputs,
+    pub sensors: &'a SensorSnapshot,
     pub upstream_slots: &'a [f32; 12],
     pub energy: f32,
     pub energy_consumed: f32,
@@ -17,8 +17,8 @@ pub struct ResolveCtx<'a> {
 
 /// Resolve an `InputReference` to its current f32 value.
 ///
-/// - `sub_idx`: sub-value index for compound inputs. For scalar inputs
-///   (all current variants), `sub_idx > 0` returns `0.0`.
+/// - `sub_idx`: sub-value index for compound inputs (ActionQueue, extended
+///   perception world keys). For scalar inputs, `sub_idx > 0` returns `0.0`.
 /// - World and static introspection keys are read from the pre-assembled snapshot.
 /// - Dynamic introspection is resolved live from `ctx.energy` and `ctx.energy_consumed`.
 /// - UpstreamSlot: reads `upstream_slots[idx]`; idx >= 12 yields 0.0.
@@ -36,10 +36,14 @@ pub fn resolve_input(reference: &InputReference, sub_idx: u16, ctx: &ResolveCtx<
                 _ => ctx.action_queue.param_at(slot, 1),
             }
         }
+        // Extended perception compound keys: use sub_idx for multi-field addressing.
+        InputReference::World(key) if PerceptionSnapshot::is_extended_key(key) => {
+            ctx.sensors.perception.resolve(key, sub_idx)
+        }
         // All other input types are scalar: sub_idx > 0 returns 0.0.
         _ if sub_idx > 0 => 0.0,
-        InputReference::World(key) => ctx.static_inputs.resolve_world(key),
-        InputReference::StaticIntrospection(key) => ctx.static_inputs.resolve_static(key),
+        InputReference::World(key) => ctx.sensors.local.resolve_world(key),
+        InputReference::StaticIntrospection(key) => ctx.sensors.local.resolve_static(key),
         InputReference::DynamicIntrospection(key) => match key {
             DynamicIntrospectionKey::EnergyCurrent => ctx.energy,
             DynamicIntrospectionKey::EnergyConsumedThisTick => ctx.energy_consumed,
@@ -61,21 +65,25 @@ mod tests {
         ActionQueue, Direction, DynamicIntrospectionKey, InputReference, StaticIntrospectionKey,
         WorldAction, WorldInputKey,
     };
+    use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
 
-    fn make_static_inputs(food_here: f32) -> StaticInputs {
-        StaticInputs {
-            food_here,
-            neighbor_food: [0.5; 8],
-            neighbor_barrier: [0.0; 8],
-            neighbor_occupied: [0.0; 8],
-            generation: 3.0,
-            age_ticks: 10.0,
+    fn make_sensor_snapshot(food_here: f32) -> SensorSnapshot {
+        SensorSnapshot {
+            local: StaticInputs {
+                food_here,
+                neighbor_food: [0.5; 8],
+                neighbor_barrier: [0.0; 8],
+                neighbor_occupied: [0.0; 8],
+                generation: 3.0,
+                age_ticks: 10.0,
+            },
+            perception: PerceptionSnapshot::zero(),
         }
     }
 
     fn make_ctx<'a>(
-        si: &'a StaticInputs,
+        ss: &'a SensorSnapshot,
         upstream: &'a [f32; 12],
         energy: f32,
         energy_consumed: f32,
@@ -85,7 +93,7 @@ mod tests {
         static EMPTY_AQ: std::sync::LazyLock<ActionQueue> =
             std::sync::LazyLock::new(|| ActionQueue::new(4));
         ResolveCtx {
-            static_inputs: si,
+            sensors: ss,
             upstream_slots: upstream,
             energy,
             energy_consumed,
@@ -95,18 +103,18 @@ mod tests {
 
     #[test]
     fn world_food_here() {
-        let si = make_static_inputs(0.75);
+        let ss = make_sensor_snapshot(0.75);
         let upstream = [0.0f32; 12];
-        let ctx = make_ctx(&si, &upstream, 50.0, 0.0);
+        let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
         let v = resolve_input(&InputReference::World(WorldInputKey::FoodHere), 0, &ctx);
         assert!((v - 0.75).abs() < 1e-6);
     }
 
     #[test]
     fn world_neighbor_food() {
-        let si = make_static_inputs(0.0);
+        let ss = make_sensor_snapshot(0.0);
         let upstream = [0.0f32; 12];
-        let ctx = make_ctx(&si, &upstream, 50.0, 0.0);
+        let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
         let v = resolve_input(
             &InputReference::World(WorldInputKey::NeighborCellFood(Direction::N)),
             0,
@@ -117,9 +125,9 @@ mod tests {
 
     #[test]
     fn static_introspection_generation() {
-        let si = make_static_inputs(0.0);
+        let ss = make_sensor_snapshot(0.0);
         let upstream = [0.0f32; 12];
-        let ctx = make_ctx(&si, &upstream, 20.0, 0.0);
+        let ctx = make_ctx(&ss, &upstream, 20.0, 0.0);
         let v = resolve_input(
             &InputReference::StaticIntrospection(StaticIntrospectionKey::Generation),
             0,
@@ -130,9 +138,9 @@ mod tests {
 
     #[test]
     fn static_introspection_age_ticks() {
-        let si = make_static_inputs(0.0);
+        let ss = make_sensor_snapshot(0.0);
         let upstream = [0.0f32; 12];
-        let ctx = make_ctx(&si, &upstream, 20.0, 0.0);
+        let ctx = make_ctx(&ss, &upstream, 20.0, 0.0);
         let v = resolve_input(
             &InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
             0,
@@ -143,9 +151,9 @@ mod tests {
 
     #[test]
     fn dynamic_energy_current_live() {
-        let si = make_static_inputs(0.0);
+        let ss = make_sensor_snapshot(0.0);
         let upstream = [0.0f32; 12];
-        let ctx = make_ctx(&si, &upstream, 42.5, 0.0);
+        let ctx = make_ctx(&ss, &upstream, 42.5, 0.0);
         let v = resolve_input(
             &InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
             0,
@@ -156,9 +164,9 @@ mod tests {
 
     #[test]
     fn dynamic_energy_consumed_this_tick() {
-        let si = make_static_inputs(0.0);
+        let ss = make_sensor_snapshot(0.0);
         let upstream = [0.0f32; 12];
-        let ctx = make_ctx(&si, &upstream, 20.0, 5.5);
+        let ctx = make_ctx(&ss, &upstream, 20.0, 5.5);
         let v = resolve_input(
             &InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),
             0,
@@ -169,38 +177,38 @@ mod tests {
 
     #[test]
     fn upstream_slot_in_range() {
-        let si = make_static_inputs(0.0);
+        let ss = make_sensor_snapshot(0.0);
         let mut upstream = [0.0f32; 12];
         upstream[7] = 99.0;
-        let ctx = make_ctx(&si, &upstream, 20.0, 0.0);
+        let ctx = make_ctx(&ss, &upstream, 20.0, 0.0);
         let v = resolve_input(&InputReference::UpstreamSlot(7), 0, &ctx);
         assert!((v - 99.0).abs() < 1e-6);
     }
 
     #[test]
     fn upstream_slot_at_boundary_11() {
-        let si = make_static_inputs(0.0);
+        let ss = make_sensor_snapshot(0.0);
         let mut upstream = [0.0f32; 12];
         upstream[11] = 3.0;
-        let ctx = make_ctx(&si, &upstream, 20.0, 0.0);
+        let ctx = make_ctx(&ss, &upstream, 20.0, 0.0);
         let v = resolve_input(&InputReference::UpstreamSlot(11), 0, &ctx);
         assert!((v - 3.0).abs() < 1e-6);
     }
 
     #[test]
     fn upstream_slot_out_of_range_yields_zero() {
-        let si = make_static_inputs(0.0);
+        let ss = make_sensor_snapshot(0.0);
         let upstream = [1.0f32; 12];
-        let ctx = make_ctx(&si, &upstream, 20.0, 0.0);
+        let ctx = make_ctx(&ss, &upstream, 20.0, 0.0);
         let v = resolve_input(&InputReference::UpstreamSlot(12), 0, &ctx);
         assert_eq!(v, 0.0);
     }
 
     #[test]
     fn upstream_slot_large_index_yields_zero() {
-        let si = make_static_inputs(0.0);
+        let ss = make_sensor_snapshot(0.0);
         let upstream = [1.0f32; 12];
-        let ctx = make_ctx(&si, &upstream, 20.0, 0.0);
+        let ctx = make_ctx(&ss, &upstream, 20.0, 0.0);
         let v = resolve_input(&InputReference::UpstreamSlot(999), 0, &ctx);
         assert_eq!(v, 0.0);
     }
@@ -209,12 +217,12 @@ mod tests {
 
     #[test]
     fn action_queue_sub_idx_0_returns_action_type() {
-        let si = make_static_inputs(0.0);
+        let ss = make_sensor_snapshot(0.0);
         let upstream = [0.0f32; 12];
         let mut aq = ActionQueue::new(4);
         aq.push(WorldAction::Eat); // type 1
         let ctx = ResolveCtx {
-            static_inputs: &si,
+            sensors: &ss,
             upstream_slots: &upstream,
             energy: 50.0,
             energy_consumed: 0.0,
@@ -227,13 +235,13 @@ mod tests {
 
     #[test]
     fn action_queue_sub_idx_maps_slot_and_field() {
-        let si = make_static_inputs(0.0);
+        let ss = make_sensor_snapshot(0.0);
         let upstream = [0.0f32; 12];
         let mut aq = ActionQueue::new(4);
         aq.push(WorldAction::NoOp); // slot 0: type=0
         aq.push(WorldAction::Move(Direction::E)); // slot 1: type=2, param0=2.0 (E direction index)
         let ctx = ResolveCtx {
-            static_inputs: &si,
+            sensors: &ss,
             upstream_slots: &upstream,
             energy: 50.0,
             energy_consumed: 0.0,
@@ -252,7 +260,7 @@ mod tests {
 
     #[test]
     fn action_queue_param1_field_coverage() {
-        let si = make_static_inputs(0.0);
+        let ss = make_sensor_snapshot(0.0);
         let upstream = [0.0f32; 12];
         let mut aq = ActionQueue::new(4);
         aq.push(WorldAction::Reproduce {
@@ -260,7 +268,7 @@ mod tests {
             energy_transfer: 0.42,
         });
         let ctx = ResolveCtx {
-            static_inputs: &si,
+            sensors: &ss,
             upstream_slots: &upstream,
             energy: 50.0,
             energy_consumed: 0.0,
@@ -276,11 +284,11 @@ mod tests {
 
     #[test]
     fn action_queue_oob_returns_zero() {
-        let si = make_static_inputs(0.0);
+        let ss = make_sensor_snapshot(0.0);
         let upstream = [0.0f32; 12];
         let aq = ActionQueue::new(4); // empty queue
         let ctx = ResolveCtx {
-            static_inputs: &si,
+            sensors: &ss,
             upstream_slots: &upstream,
             energy: 50.0,
             energy_consumed: 0.0,
@@ -294,10 +302,10 @@ mod tests {
 
     #[test]
     fn sub_idx_nonzero_on_scalar_returns_zero() {
-        let si = make_static_inputs(0.75);
+        let ss = make_sensor_snapshot(0.75);
         let mut upstream = [0.0f32; 12];
         upstream[0] = 5.0;
-        let ctx = make_ctx(&si, &upstream, 50.0, 3.0);
+        let ctx = make_ctx(&ss, &upstream, 50.0, 3.0);
 
         let refs = vec![
             InputReference::World(WorldInputKey::FoodHere),
@@ -315,6 +323,111 @@ mod tests {
             for sub in [1u16, 2, 100, u16::MAX] {
                 let v = resolve_input(r, sub, &ctx);
                 assert_eq!(v, 0.0, "sub_idx={sub} should return 0.0 for scalar {:?}", r);
+            }
+        }
+    }
+
+    // ── Extended perception routing tests ─────────────────────────────────
+
+    #[test]
+    fn extended_key_routes_through_perception_snapshot() {
+        let mut ss = make_sensor_snapshot(0.0);
+        ss.perception.area_food[0] = 0.42;
+        ss.perception.area_food[6] = 0.88;
+        let upstream = [0.0f32; 12];
+        let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
+
+        let v0 = resolve_input(
+            &InputReference::World(WorldInputKey::AreaFoodSummary),
+            0,
+            &ctx,
+        );
+        assert!((v0 - 0.42).abs() < f32::EPSILON);
+
+        let v6 = resolve_input(
+            &InputReference::World(WorldInputKey::AreaFoodSummary),
+            6,
+            &ctx,
+        );
+        assert!((v6 - 0.88).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn extended_key_oob_sub_idx_returns_zero() {
+        let ss = make_sensor_snapshot(0.0);
+        let upstream = [0.0f32; 12];
+        let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
+
+        // area_food has 7 sub-values; sub_idx=7 is out of range
+        let v = resolve_input(
+            &InputReference::World(WorldInputKey::AreaFoodSummary),
+            7,
+            &ctx,
+        );
+        assert_eq!(v, 0.0);
+    }
+
+    #[test]
+    fn extended_key_nearby_core_routes_correctly() {
+        let mut ss = make_sensor_snapshot(0.0);
+        ss.perception.nearby_core[0] = 1.0; // present
+        ss.perception.nearby_core[3] = 0.75; // dist
+        let upstream = [0.0f32; 12];
+        let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
+
+        let present = resolve_input(
+            &InputReference::World(WorldInputKey::NearbyCreatureCore),
+            0,
+            &ctx,
+        );
+        assert!((present - 1.0).abs() < f32::EPSILON);
+
+        let dist = resolve_input(
+            &InputReference::World(WorldInputKey::NearbyCreatureCore),
+            3,
+            &ctx,
+        );
+        assert!((dist - 0.75).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn extended_key_identity_routes_correctly() {
+        let mut ss = make_sensor_snapshot(0.0);
+        ss.perception.nearby_identity[0] = 0.9; // kin_affinity slot 0
+        let upstream = [0.0f32; 12];
+        let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
+
+        let v = resolve_input(
+            &InputReference::World(WorldInputKey::NearbyCreatureIdentity),
+            0,
+            &ctx,
+        );
+        assert!((v - 0.9).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn zero_perception_returns_zeros_for_all_extended_keys() {
+        let ss = make_sensor_snapshot(0.0);
+        let upstream = [0.0f32; 12];
+        let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
+
+        let keys = [
+            WorldInputKey::AreaFoodSummary,
+            WorldInputKey::AreaBarrierSummary,
+            WorldInputKey::AreaOccupancySummary,
+            WorldInputKey::NearbyCreatureCore,
+            WorldInputKey::NearbyCreatureVitals,
+            WorldInputKey::NearbyCreatureIdentity,
+        ];
+
+        for key in &keys {
+            for sub in 0..20u16 {
+                let v = resolve_input(&InputReference::World(key.clone()), sub, &ctx);
+                assert_eq!(
+                    v, 0.0,
+                    "zero perception should return 0.0 for {:?} sub_idx={sub}",
+                    key
+                );
             }
         }
     }
