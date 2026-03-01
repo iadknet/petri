@@ -686,7 +686,7 @@ mod tests {
                         sub_idx: 0,
                     },
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::InputRef {
@@ -694,7 +694,7 @@ mod tests {
                         sub_idx: 0,
                     },
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
             ],
         );
@@ -736,7 +736,7 @@ mod tests {
                     sub_idx: 3,
                 },
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             }],
         );
         let mut g = genome;
@@ -841,7 +841,7 @@ mod tests {
                     sub_idx: 0,
                 },
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             }],
         );
         // Force rng to pick node 0 and ref_idx 0 for removal.
@@ -914,7 +914,7 @@ mod tests {
                         sub_idx: 0,
                     },
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::InputRef {
@@ -922,7 +922,7 @@ mod tests {
                         sub_idx: 1,
                     },
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
             ],
         );
@@ -1032,7 +1032,7 @@ mod tests {
                         sub_idx: 5,
                     },
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 }],
             );
             let mut r = rng(seed);

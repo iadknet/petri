@@ -29,7 +29,7 @@ fn routing_wraps_negative_index_to_reachable_downstream_node_e2e() {
                 GraphInternalNode {
                     kind: GraphNodeKind::Constant(-1.0),
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::RouterOutput,
@@ -37,7 +37,7 @@ fn routing_wraps_negative_index_to_reachable_downstream_node_e2e() {
                         source_idx: 0,
                         weight: 1.0,
                     }],
-                    hebbian: None,
+                    plasticity: None,
                 },
             ],
         }),
@@ -108,7 +108,7 @@ fn graph_state_persists_across_ticks_e2e() {
                     GraphInternalNode {
                         kind: GraphNodeKind::Constant(1.0),
                         inputs: vec![],
-                        hebbian: None,
+                        plasticity: None,
                     },
                     GraphInternalNode {
                         kind: GraphNodeKind::DecayIntegrator(0.5),
@@ -116,7 +116,7 @@ fn graph_state_persists_across_ticks_e2e() {
                             source_idx: 0,
                             weight: 1.0,
                         }],
-                        hebbian: None,
+                        plasticity: None,
                     },
                     GraphInternalNode {
                         kind: GraphNodeKind::CustomOutput(0),
@@ -124,7 +124,7 @@ fn graph_state_persists_across_ticks_e2e() {
                             source_idx: 1,
                             weight: 1.0,
                         }],
-                        hebbian: None,
+                        plasticity: None,
                     },
                 ],
             }),

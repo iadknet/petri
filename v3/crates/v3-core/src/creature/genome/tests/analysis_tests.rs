@@ -268,7 +268,7 @@ fn make_graph_nodes() -> Vec<GraphInternalNode> {
                 sub_idx: 0,
             },
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         },
         GraphInternalNode {
             kind: GraphNodeKind::Add,
@@ -276,7 +276,7 @@ fn make_graph_nodes() -> Vec<GraphInternalNode> {
                 source_idx: 0,
                 weight: 1.0,
             }],
-            hebbian: None,
+            plasticity: None,
         },
         GraphInternalNode {
             kind: GraphNodeKind::CustomOutput(0),
@@ -284,7 +284,7 @@ fn make_graph_nodes() -> Vec<GraphInternalNode> {
                 source_idx: 1,
                 weight: 1.0,
             }],
-            hebbian: None,
+            plasticity: None,
         },
     ]
 }
@@ -326,7 +326,7 @@ fn graph_backward_slice_excludes_disconnected() {
                 sub_idx: 0,
             },
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         },
         GraphInternalNode {
             kind: GraphNodeKind::InputRef {
@@ -334,7 +334,7 @@ fn graph_backward_slice_excludes_disconnected() {
                 sub_idx: 0,
             },
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         },
         GraphInternalNode {
             kind: GraphNodeKind::CustomOutput(0),
@@ -342,7 +342,7 @@ fn graph_backward_slice_excludes_disconnected() {
                 source_idx: 0,
                 weight: 1.0,
             }],
-            hebbian: None,
+            plasticity: None,
         },
     ];
     let gene = graph_backward_slice(&nodes, 2, 32).unwrap();
@@ -382,7 +382,7 @@ fn graph_forward_slice_excludes_disconnected() {
                 sub_idx: 0,
             },
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         },
         GraphInternalNode {
             kind: GraphNodeKind::InputRef {
@@ -390,7 +390,7 @@ fn graph_forward_slice_excludes_disconnected() {
                 sub_idx: 0,
             },
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         },
         GraphInternalNode {
             kind: GraphNodeKind::Add,
@@ -398,7 +398,7 @@ fn graph_forward_slice_excludes_disconnected() {
                 source_idx: 0,
                 weight: 1.0,
             }],
-            hebbian: None,
+            plasticity: None,
         },
     ];
     let gene = graph_forward_slice(&nodes, 0, 32).unwrap();
@@ -423,7 +423,7 @@ fn graph_backward_slice_random_returns_none_for_no_outputs() {
     let nodes = vec![GraphInternalNode {
         kind: GraphNodeKind::Add,
         inputs: vec![],
-        hebbian: None,
+        plasticity: None,
     }];
     let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
     assert_eq!(graph_backward_slice_random(&nodes, &mut rng, 32), None);

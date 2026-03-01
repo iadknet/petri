@@ -39,7 +39,7 @@ fn node0_graph_sensor() -> NodeGenome {
                         sub_idx: 0,
                     },
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 // idx 1: energy_current signal
                 GraphInternalNode {
@@ -48,7 +48,7 @@ fn node0_graph_sensor() -> NodeGenome {
                         sub_idx: 0,
                     },
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 // idx 2: reproduce gate (energy >= 24.0)
                 GraphInternalNode {
@@ -57,7 +57,7 @@ fn node0_graph_sensor() -> NodeGenome {
                         source_idx: 1,
                         weight: 1.0,
                     }],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 // idx 3-6: neighbor food N/E/S/W
                 GraphInternalNode {
@@ -66,7 +66,7 @@ fn node0_graph_sensor() -> NodeGenome {
                         sub_idx: 0,
                     },
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::InputRef {
@@ -74,7 +74,7 @@ fn node0_graph_sensor() -> NodeGenome {
                         sub_idx: 0,
                     },
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::InputRef {
@@ -82,7 +82,7 @@ fn node0_graph_sensor() -> NodeGenome {
                         sub_idx: 0,
                     },
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::InputRef {
@@ -90,7 +90,7 @@ fn node0_graph_sensor() -> NodeGenome {
                         sub_idx: 0,
                     },
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 // idx 7-10: neighbor occupied N/E/S/W
                 GraphInternalNode {
@@ -99,7 +99,7 @@ fn node0_graph_sensor() -> NodeGenome {
                         sub_idx: 0,
                     },
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::InputRef {
@@ -107,7 +107,7 @@ fn node0_graph_sensor() -> NodeGenome {
                         sub_idx: 0,
                     },
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::InputRef {
@@ -115,7 +115,7 @@ fn node0_graph_sensor() -> NodeGenome {
                         sub_idx: 0,
                     },
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::InputRef {
@@ -123,7 +123,7 @@ fn node0_graph_sensor() -> NodeGenome {
                         sub_idx: 0,
                     },
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 // idx 11-16: output writers
                 // slot 0 = food_here
@@ -133,7 +133,7 @@ fn node0_graph_sensor() -> NodeGenome {
                         source_idx: 0,
                         weight: 1.0,
                     }],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 // slot 1 = can_reproduce (0 or 1)
                 GraphInternalNode {
@@ -142,7 +142,7 @@ fn node0_graph_sensor() -> NodeGenome {
                         source_idx: 2,
                         weight: 1.0,
                     }],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 // slot 2 = food_N
                 GraphInternalNode {
@@ -151,7 +151,7 @@ fn node0_graph_sensor() -> NodeGenome {
                         source_idx: 3,
                         weight: 1.0,
                     }],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 // slot 3 = food_E
                 GraphInternalNode {
@@ -160,7 +160,7 @@ fn node0_graph_sensor() -> NodeGenome {
                         source_idx: 4,
                         weight: 1.0,
                     }],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 // slot 4 = food_S
                 GraphInternalNode {
@@ -169,7 +169,7 @@ fn node0_graph_sensor() -> NodeGenome {
                         source_idx: 5,
                         weight: 1.0,
                     }],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 // slot 5 = food_W
                 GraphInternalNode {
@@ -178,13 +178,13 @@ fn node0_graph_sensor() -> NodeGenome {
                         source_idx: 6,
                         weight: 1.0,
                     }],
-                    hebbian: None,
+                    plasticity: None,
                 },
                 // idx 17: route to node 1
                 GraphInternalNode {
                     kind: GraphNodeKind::RouterOutput,
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 },
             ],
         }),

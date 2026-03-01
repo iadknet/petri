@@ -8,21 +8,21 @@ use crate::mutation::phenotype::mutate_phenotype;
 use crate::mutation::MutationEngine;
 use crate::simulation::simulation::Simulation;
 
-/// Build child Hebbian weights from parent state, respecting Lamarckian/Darwinian inheritance.
+/// Build child plasticity weights from parent state, respecting Lamarckian/Darwinian inheritance.
 ///
 /// For each mesh node with a Graph backend, inspects each internal node:
-/// - `hebbian.lamarckian == true`: copies parent's learned weights if available
-/// - `hebbian.lamarckian == false` or `hebbian == None`: empty `Box<[f32]>` (reinit from genome on first tick)
-fn build_child_hebbian_weights(
+/// - `plasticity.lamarckian == true`: copies parent's learned weights if available
+/// - `plasticity.lamarckian == false` or `plasticity == None`: empty `Box<[f32]>` (reinit from genome on first tick)
+fn build_child_plasticity_weights(
     child_genome: &CreatureGenome,
-    parent_hebbian: &[Vec<Box<[f32]>>],
+    parent_plasticity: &[Vec<Box<[f32]>>],
 ) -> Vec<Vec<Box<[f32]>>> {
     let mut result: Vec<Vec<Box<[f32]>>> = Vec::new();
 
     for (mesh_idx, mesh_node) in child_genome.nodes.iter().enumerate() {
         let graph_def = match &mesh_node.backend_def {
             BackendDef::Graph(g) => g,
-            _ => continue, // VM nodes have no Hebbian weights
+            _ => continue, // VM nodes have no plasticity weights
         };
 
         // Ensure result covers this mesh node index.
@@ -34,11 +34,11 @@ fn build_child_hebbian_weights(
         let mut inner: Vec<Box<[f32]>> = Vec::with_capacity(node_count);
 
         for (inode_idx, inode) in graph_def.internal_nodes.iter().enumerate() {
-            let should_copy = inode.hebbian.as_ref().is_some_and(|cfg| cfg.lamarckian);
+            let should_copy = inode.plasticity.as_ref().is_some_and(|cfg| cfg.lamarckian);
 
             if should_copy {
                 // Try to copy parent's learned weights for this mesh+internal node.
-                let parent_weights = parent_hebbian
+                let parent_weights = parent_plasticity
                     .get(mesh_idx)
                     .and_then(|v| v.get(inode_idx))
                     .filter(|w| !w.is_empty());
@@ -172,10 +172,10 @@ pub fn apply_reproduce(
     let child_channels = sim.creatures[parent_id].phenotype_channels;
     let child_active_channel = sim.creatures[parent_id].phenotype_active_channel;
     let child_polarity = sim.creatures[parent_id].phenotype_channel_polarity;
-    // Snapshot parent's learned Hebbian weights before genome mutation.
-    let parent_hebbian = sim.creatures[parent_id]
+    // Snapshot parent's learned plasticity weights before genome mutation.
+    let parent_plasticity = sim.creatures[parent_id]
         .graph_runtime
-        .hebbian_weights
+        .plasticity_weights
         .clone();
 
     // Step 9: Apply genome mutations.
@@ -242,8 +242,8 @@ pub fn apply_reproduce(
         child_identity.mutate_kin_tag(rng);
     }
 
-    // Step 11: Build child's Hebbian weights (Lamarckian inheritance).
-    let child_hebbian = build_child_hebbian_weights(&child_genome, &parent_hebbian);
+    // Step 11: Build child's plasticity weights (Lamarckian inheritance).
+    let child_plasticity = build_child_plasticity_weights(&child_genome, &parent_plasticity);
 
     // Step 12–13: Spawn child in slotmap + world.
     let child_id = sim.creatures.insert_with_key(|id| {
@@ -259,7 +259,7 @@ pub fn apply_reproduce(
             child_identity,
         );
         child.memory = child_memory;
-        child.graph_runtime.hebbian_weights = child_hebbian;
+        child.graph_runtime.plasticity_weights = child_plasticity;
         child
     });
     sim.world.place_creature(target, child_id);
@@ -272,7 +272,8 @@ pub fn apply_reproduce(
 mod tests {
     use super::*;
     use crate::creature::genome::{
-        GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind, HebbianConfig, HebbianRule,
+        GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind, HebbianRule,
+        PlasticityConfig,
     };
 
     /// Helper: builds a genome with a single Graph mesh node containing the given internal nodes.
@@ -299,7 +300,7 @@ mod tests {
             GraphInternalNode {
                 kind: GraphNodeKind::Constant(1.0),
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::Add,
@@ -307,22 +308,23 @@ mod tests {
                     source_idx: 0,
                     weight: 0.5,
                 }],
-                hebbian: Some(HebbianConfig {
+                plasticity: Some(PlasticityConfig {
                     rule: HebbianRule::Classic,
                     learning_rate: 0.1,
                     weight_clamp: 5.0,
                     lamarckian: true,
+                    modulation: None,
                 }),
             },
         ]);
 
         // Parent has learned weight 0.9 (drifted from genome 0.5).
-        let parent_hebbian: Vec<Vec<Box<[f32]>>> = vec![vec![
+        let parent_plasticity: Vec<Vec<Box<[f32]>>> = vec![vec![
             Box::new([]) as Box<[f32]>, // node 0: no Hebbian
             Box::new([0.9]),            // node 1: learned weight
         ]];
 
-        let child_hw = build_child_hebbian_weights(&genome, &parent_hebbian);
+        let child_hw = build_child_plasticity_weights(&genome, &parent_plasticity);
 
         assert_eq!(child_hw.len(), 1);
         assert_eq!(child_hw[0].len(), 2);
@@ -339,7 +341,7 @@ mod tests {
             GraphInternalNode {
                 kind: GraphNodeKind::Constant(1.0),
                 inputs: vec![],
-                hebbian: None,
+                plasticity: None,
             },
             GraphInternalNode {
                 kind: GraphNodeKind::Add,
@@ -347,20 +349,21 @@ mod tests {
                     source_idx: 0,
                     weight: 0.5,
                 }],
-                hebbian: Some(HebbianConfig {
+                plasticity: Some(PlasticityConfig {
                     rule: HebbianRule::Classic,
                     learning_rate: 0.1,
                     weight_clamp: 5.0,
                     lamarckian: false, // Darwinian
+                    modulation: None,
                 }),
             },
         ]);
 
         // Parent has learned weight 0.9.
-        let parent_hebbian: Vec<Vec<Box<[f32]>>> =
+        let parent_plasticity: Vec<Vec<Box<[f32]>>> =
             vec![vec![Box::new([]) as Box<[f32]>, Box::new([0.9])]];
 
-        let child_hw = build_child_hebbian_weights(&genome, &parent_hebbian);
+        let child_hw = build_child_plasticity_weights(&genome, &parent_plasticity);
 
         assert_eq!(child_hw.len(), 1);
         assert_eq!(child_hw[0].len(), 2);
@@ -378,18 +381,19 @@ mod tests {
                 source_idx: 0,
                 weight: 0.5,
             }],
-            hebbian: Some(HebbianConfig {
+            plasticity: Some(PlasticityConfig {
                 rule: HebbianRule::Oja,
                 learning_rate: 0.1,
                 weight_clamp: 5.0,
                 lamarckian: true,
+                modulation: None,
             }),
         }]);
 
         // Parent never ran graph execution — no Hebbian weights.
-        let parent_hebbian: Vec<Vec<Box<[f32]>>> = Vec::new();
+        let parent_plasticity: Vec<Vec<Box<[f32]>>> = Vec::new();
 
-        let child_hw = build_child_hebbian_weights(&genome, &parent_hebbian);
+        let child_hw = build_child_plasticity_weights(&genome, &parent_plasticity);
 
         // Result should have entry for mesh node 0 with empty inner (lazy init)
         assert_eq!(child_hw.len(), 1);
@@ -416,8 +420,8 @@ mod tests {
             }],
         };
 
-        let parent_hebbian: Vec<Vec<Box<[f32]>>> = Vec::new();
-        let child_hw = build_child_hebbian_weights(&genome, &parent_hebbian);
+        let parent_plasticity: Vec<Vec<Box<[f32]>>> = Vec::new();
+        let child_hw = build_child_plasticity_weights(&genome, &parent_plasticity);
 
         // VM nodes produce no Hebbian weight entries
         assert!(child_hw.is_empty());

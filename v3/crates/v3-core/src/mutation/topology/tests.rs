@@ -790,7 +790,7 @@ fn clone_remap_slice_sometimes_offsets_custom_outputs() {
                 internal_nodes: vec![GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(2),
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 }],
             }),
             targets: vec![],
@@ -828,7 +828,7 @@ fn clone_remap_slice_sometimes_preserves_custom_outputs() {
                 internal_nodes: vec![GraphInternalNode {
                     kind: GraphNodeKind::CustomOutput(2),
                     inputs: vec![],
-                    hebbian: None,
+                    plasticity: None,
                 }],
             }),
             targets: vec![],

@@ -106,7 +106,7 @@ mod tests {
         GraphInternalNode {
             kind,
             inputs: vec![],
-            hebbian: None,
+            plasticity: None,
         }
     }
 
@@ -114,7 +114,7 @@ mod tests {
         GraphInternalNode {
             kind,
             inputs: vec![GraphInput { source_idx, weight }],
-            hebbian: None,
+            plasticity: None,
         }
     }
 

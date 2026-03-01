@@ -330,7 +330,7 @@ fn add_internal_node(
         g.internal_nodes.push(GraphInternalNode {
             kind,
             inputs,
-            hebbian: None,
+            plasticity: None,
         });
     }
     Ok(())
