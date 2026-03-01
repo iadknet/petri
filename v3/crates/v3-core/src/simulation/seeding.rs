@@ -6,6 +6,7 @@ use slotmap::SlotMap;
 use crate::config::SimulationConfig;
 use crate::contracts::{CreatureId, Position};
 use crate::creature::founder::v3alpha1_founder_genome;
+use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
 use crate::simulation::simulation::Simulation;
@@ -53,9 +54,10 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
 
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
 
-    for &pos in positions.iter().take(spawn_count) {
+    for (founder_index, &pos) in positions.iter().take(spawn_count).enumerate() {
         let genome = v3alpha1_founder_genome();
         let energy = config.energy.lifecycle.initial_energy;
+        let identity = CreatureIdentityState::founder(founder_index, seed);
         // Insert into slotmap to get an id, then fill with actual state.
         let id = creatures.insert_with_key(|id| {
             CreatureState::new(
@@ -67,6 +69,7 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
                 FOUNDER_CHANNELS,
                 FOUNDER_ACTIVE_CHANNEL,
                 FOUNDER_POLARITY,
+                identity,
             )
         });
         world.place_creature(pos, id);
@@ -164,5 +167,42 @@ mod tests {
                 expected_energy
             );
         }
+    }
+
+    #[test]
+    fn founder_lineage_ids_are_sequential() {
+        let sim = seed_simulation(small_config(), 42);
+        let mut lineage_ids: Vec<u32> = sim
+            .creatures
+            .values()
+            .map(|c| c.identity.lineage_id)
+            .collect();
+        lineage_ids.sort();
+        let expected: Vec<u32> = (0..lineage_ids.len() as u32).collect();
+        assert_eq!(lineage_ids, expected);
+    }
+
+    #[test]
+    fn founder_kin_tags_are_unique() {
+        let sim = seed_simulation(small_config(), 42);
+        let kin_tags: HashSet<u32> = sim.creatures.values().map(|c| c.identity.kin_tag).collect();
+        assert_eq!(
+            kin_tags.len(),
+            sim.creature_count(),
+            "kin_tags should be unique across founders"
+        );
+    }
+
+    #[test]
+    fn founder_identity_deterministic_across_runs() {
+        let cfg = small_config();
+        let s1 = seed_simulation(cfg.clone(), 42);
+        let s2 = seed_simulation(cfg, 42);
+        // Collect identities in lineage_id order for stable comparison.
+        let mut ids1: Vec<_> = s1.creatures.values().map(|c| c.identity).collect();
+        let mut ids2: Vec<_> = s2.creatures.values().map(|c| c.identity).collect();
+        ids1.sort_by_key(|i| i.lineage_id);
+        ids2.sort_by_key(|i| i.lineage_id);
+        assert_eq!(ids1, ids2);
     }
 }

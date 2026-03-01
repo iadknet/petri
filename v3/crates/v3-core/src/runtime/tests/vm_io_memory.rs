@@ -1,4 +1,5 @@
 use super::*;
+use crate::creature::identity::CreatureIdentityState;
 
 // ── PushAction + ExecuteActionQueue ────────────────────────────────────────
 
@@ -403,7 +404,17 @@ fn vm_eats_when_food_here() {
             targets: vec![],
         }],
     };
-    let creature = CreatureState::new(id, genome, pos, 30.0, 0, [0; 6], 0, [true; 6]);
+    let creature = CreatureState::new(
+        id,
+        genome,
+        pos,
+        30.0,
+        0,
+        [0; 6],
+        0,
+        [true; 6],
+        CreatureIdentityState::default(),
+    );
 
     let si = assemble_static_inputs(&world, &creature);
     // food_here should be > 0.0
@@ -483,7 +494,17 @@ fn vm_noop_when_no_food() {
             targets: vec![],
         }],
     };
-    let creature = CreatureState::new(id, genome, pos, 30.0, 0, [0; 6], 0, [true; 6]);
+    let creature = CreatureState::new(
+        id,
+        genome,
+        pos,
+        30.0,
+        0,
+        [0; 6],
+        0,
+        [true; 6],
+        CreatureIdentityState::default(),
+    );
     let si = assemble_static_inputs(&world, &creature);
     assert_eq!(si.food_here, 0.0);
 

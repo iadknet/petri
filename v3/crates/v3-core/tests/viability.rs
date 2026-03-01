@@ -25,6 +25,7 @@ use std::collections::HashMap;
 
 use v3_core::config::SimulationConfig;
 use v3_core::contracts::{CreatureId, Position};
+use v3_core::creature::identity::CreatureIdentityState;
 use v3_core::mutation::MutationEngine;
 use v3_core::simulation::{run_tick, seed_simulation, Simulation};
 
@@ -282,6 +283,7 @@ fn creatures_can_eat_food() {
             FOUNDER_CHANNELS,
             FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
+            CreatureIdentityState::default(),
         )
     });
     world.place_creature(pos, creature_id);
@@ -337,6 +339,7 @@ fn founder_reproduces_when_energy_allows_and_target_is_open() {
             FOUNDER_CHANNELS,
             FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
+            CreatureIdentityState::default(),
         )
     });
     world.place_creature(pos, parent_id);
@@ -387,6 +390,7 @@ fn founder_moves_when_no_food_and_below_reproduce_threshold() {
             FOUNDER_CHANNELS,
             FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
+            CreatureIdentityState::default(),
         )
     });
     world.place_creature(start, creature_id);
@@ -496,6 +500,7 @@ fn phenotype_inherits_unchanged_when_no_genome_mutation() {
             FOUNDER_CHANNELS,
             FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
+            CreatureIdentityState::default(),
         )
     });
     world.place_creature(pos, parent_id);
@@ -513,6 +518,60 @@ fn phenotype_inherits_unchanged_when_no_genome_mutation() {
         );
     }
     // If no child was produced this tick, the test is vacuously satisfied (no mutation check needed).
+}
+
+/// When mutation_probability=0.0, child must inherit parent identity unchanged
+/// (same lineage_id, same kin_tag since applied_events == 0).
+#[test]
+fn identity_inherits_unchanged_when_no_genome_mutation() {
+    use slotmap::SlotMap;
+    use v3_core::creature::founder::v3alpha1_founder_genome;
+    use v3_core::creature::identity::CreatureIdentityState;
+    use v3_core::creature::state::CreatureState;
+    use v3_core::kernel::WorldState;
+
+    let mut cfg = SimulationConfig::default();
+    cfg.world.width = 10;
+    cfg.world.height = 10;
+    cfg.mutation.mutation_probability = 0.0;
+    cfg.energy.lifecycle.initial_energy = 80.0;
+    cfg.energy.lifecycle.max_energy = 120.0;
+    cfg.energy.lifecycle.default_offspring_energy = 12.0;
+    cfg.energy.costs.reproduce_cost = 1.0;
+    cfg.runtime.graph_node_base_cost = 0.1;
+
+    let parent_identity = CreatureIdentityState::founder(0, 7);
+    let pos = Position::new(5, 5);
+    let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
+    let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+    let parent_id = creatures.insert_with_key(|id| {
+        CreatureState::new(
+            id,
+            v3alpha1_founder_genome(),
+            pos,
+            cfg.energy.lifecycle.initial_energy,
+            0,
+            FOUNDER_CHANNELS,
+            FOUNDER_ACTIVE_CHANNEL,
+            FOUNDER_POLARITY,
+            parent_identity,
+        )
+    });
+    world.place_creature(pos, parent_id);
+
+    let mut sim = Simulation::new(world, creatures, 0, cfg, 7);
+    run_tick(&mut sim, &mut None);
+
+    if let Some(child) = sim.creatures.values().find(|c| c.generation == 1) {
+        assert_eq!(
+            child.identity.lineage_id, parent_identity.lineage_id,
+            "child lineage_id must match parent"
+        );
+        assert_eq!(
+            child.identity.kin_tag, parent_identity.kin_tag,
+            "child kin_tag must be unchanged when mutation_probability=0.0"
+        );
+    }
 }
 
 /// Existing viability profile still works with real mutations enabled.

@@ -1,5 +1,6 @@
 use crate::contracts::{CreatureId, Position};
 use crate::creature::genome::CreatureGenome;
+use crate::creature::identity::CreatureIdentityState;
 
 /// Per-creature runtime state for Graph backends.
 /// Groups all mutable state that graph evaluation reads/writes.
@@ -52,6 +53,8 @@ pub struct CreatureState {
     pub memory: [u8; 1024],
     /// Per-node runtime state for Graph backends (stateful operators + Hebbian weights).
     pub graph_runtime: GraphRuntimeState,
+    /// Lifecycle-owned identity state for kin recognition and lineage tracking.
+    pub identity: CreatureIdentityState,
     /// 6-channel internal phenotype (HSL-mapped). Converted to RGB for wire format.
     pub phenotype_channels: [u8; 6],
     /// Active channel for phenotype mutation (0..6; internal, not API-exposed).
@@ -72,6 +75,7 @@ impl CreatureState {
         phenotype_channels: [u8; 6],
         phenotype_active_channel: usize,
         phenotype_channel_polarity: [bool; 6],
+        identity: CreatureIdentityState,
     ) -> Self {
         Self {
             id,
@@ -82,6 +86,7 @@ impl CreatureState {
             generation,
             memory: [0u8; 1024],
             graph_runtime: GraphRuntimeState::new(),
+            identity,
             phenotype_channels,
             phenotype_active_channel,
             phenotype_channel_polarity,
@@ -127,6 +132,7 @@ mod tests {
             [128, 64, 32, 10, 20, 30],
             0,
             [true; 6],
+            CreatureIdentityState::default(),
         );
         assert_eq!(state.age, 0);
         assert_eq!(state.memory, [0u8; 1024]);
@@ -152,6 +158,7 @@ mod tests {
             [0; 6],
             0,
             [true; 6],
+            CreatureIdentityState::default(),
         );
         assert_eq!(state.position, Position::new(3, 7));
         assert_eq!(state.generation, 2);

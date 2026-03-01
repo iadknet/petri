@@ -333,6 +333,7 @@ mod tests {
     use crate::config::SimulationConfig;
     use crate::contracts::{CreatureId, Position};
     use crate::creature::founder::v3alpha1_founder_genome;
+    use crate::creature::identity::CreatureIdentityState;
     use crate::creature::state::CreatureState;
     use crate::kernel::WorldState;
     use crate::simulation::seeding::seed_simulation;
@@ -366,6 +367,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         world.place_creature(pos, id);
@@ -680,6 +682,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         world.place_creature(Position::new(5, 5), attacker_id);
@@ -694,6 +697,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         world.place_creature(victim_pos, victim_id);
@@ -758,6 +762,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         let id_b = creatures.insert_with_key(|id| {
@@ -770,6 +775,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         let id_c = creatures.insert_with_key(|id| {
@@ -782,6 +788,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
 
@@ -825,6 +832,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         let id_b = creatures.insert_with_key(|id| {
@@ -837,6 +845,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
         let id_c = creatures.insert_with_key(|id| {
@@ -849,6 +858,7 @@ mod tests {
                 [0, 0, 92, 92, 138, 138],
                 0,
                 [true; 6],
+                CreatureIdentityState::default(),
             )
         });
 
