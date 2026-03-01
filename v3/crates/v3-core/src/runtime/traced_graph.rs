@@ -11,13 +11,12 @@ use crate::contracts::{ActionQueue, InputReference};
 use crate::creature::genome::GraphBackendDef;
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::graph::{collect_weighted_inputs, evaluate_kind, EvalCtx};
+use crate::runtime::graph_effects::apply_graph_effects;
 use crate::runtime::hebbian;
 use crate::runtime::inputs::ResolveCtx;
 use crate::runtime::trace::{kind_label, GraphNodeEvalTrace, GraphPassTrace, GraphTrace};
 use crate::runtime::types::{sanitize_f32, NodeResult};
 use crate::sensors::perception::SensorSnapshot;
-
-use crate::creature::genome::GraphNodeKind;
 
 /// Execute a graph-backend mesh node with trace recording.
 ///
@@ -202,23 +201,8 @@ pub fn execute_graph_node_traced(
         *energy -= hebb_cost;
     }
 
-    // Build NodeResult
-    let mut output_slots = *upstream_slots;
-    let mut route_target_idx: f32 = 0.0;
-
-    for (i, node) in def.internal_nodes.iter().enumerate() {
-        match &node.kind {
-            GraphNodeKind::CustomOutput(s) => {
-                if (*s as usize) < 12 {
-                    output_slots[*s as usize] = curr_outputs[i];
-                }
-            }
-            GraphNodeKind::RouterOutput => {
-                route_target_idx = curr_outputs[i];
-            }
-            _ => {}
-        }
-    }
+    // Build NodeResult via the shared effect pass.
+    let result = apply_graph_effects(def, &curr_outputs, upstream_slots);
 
     let converged = stable_passes >= req_stable;
     let trace = GraphTrace {
@@ -226,13 +210,6 @@ pub fn execute_graph_node_traced(
         converged,
         stable_passes_count: stable_passes,
         final_outputs: curr_outputs,
-    };
-
-    let result = NodeResult {
-        output_slots,
-        route_target_idx,
-        terminal: false,
-        energy_exhausted: false,
     };
 
     (result, trace)
