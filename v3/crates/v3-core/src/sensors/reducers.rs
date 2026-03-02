@@ -9,7 +9,7 @@ use crate::sensors::perception::{
     barrier_idx, core_idx, food_idx, identity_idx, occupancy_idx, vitals_idx, PerceptionConfig,
     PerceptionSnapshot, NEARBY_SLOTS,
 };
-use crate::sensors::visibility::VisibleCells;
+use crate::sensors::visibility::VisibleCell;
 
 use crate::kernel::WorldState;
 use slotmap::SlotMap;
@@ -23,7 +23,7 @@ use slotmap::SlotMap;
 pub fn assemble_perception(
     observer_id: CreatureId,
     observer: &CreatureState,
-    visible: &VisibleCells,
+    visible: &[VisibleCell],
     world: &WorldState,
     creatures: &SlotMap<CreatureId, CreatureState>,
     config: &PerceptionConfig,
@@ -32,7 +32,6 @@ pub fn assemble_perception(
     let max_candidate_cells = (2.0 * r + 1.0) * (2.0 * r + 1.0);
     let max_other_candidate_cells = max_candidate_cells - 1.0;
     let max_dist = (2.0 * r * r).sqrt();
-
     let area_food = reduce_food(visible, world, config, r, max_candidate_cells, max_dist);
     let area_barrier = reduce_barrier(visible, world, r, max_candidate_cells, max_dist);
     let area_occupancy = reduce_occupancy(
@@ -67,7 +66,7 @@ pub fn assemble_perception(
 
 /// Reduce food area summary per v3-sensor-spec.md Section 6.1.
 fn reduce_food(
-    visible: &VisibleCells,
+    visible: &[VisibleCell],
     world: &WorldState,
     config: &PerceptionConfig,
     r: f32,
@@ -88,7 +87,7 @@ fn reduce_food(
     let mut nearest_dx = 0.0f32;
     let mut nearest_dy = 0.0f32;
 
-    for cell in visible.iter() {
+    for cell in visible {
         let food = world.food_at(cell.pos);
         let food_ratio = (food / max_food).clamp(0.0, 1.0);
 
@@ -131,7 +130,7 @@ fn reduce_food(
 
 /// Reduce barrier area summary per v3-sensor-spec.md Section 6.2.
 fn reduce_barrier(
-    visible: &VisibleCells,
+    visible: &[VisibleCell],
     world: &WorldState,
     r: f32,
     max_candidate_cells: f32,
@@ -148,7 +147,7 @@ fn reduce_barrier(
 
     // Count blocked adjacent cells among 8 immediate neighbors.
     let mut adjacent_barrier_count = 0u32;
-    for cell in visible.iter() {
+    for cell in visible {
         let is_barrier = world.is_barrier(cell.pos);
         let barrier_val = if is_barrier { 1.0f32 } else { 0.0f32 };
 
@@ -194,7 +193,7 @@ fn reduce_barrier(
 
 /// Reduce occupancy area summary per v3-sensor-spec.md Section 6.3.
 fn reduce_occupancy(
-    visible: &VisibleCells,
+    visible: &[VisibleCell],
     world: &WorldState,
     observer_id: CreatureId,
     r: f32,
@@ -214,7 +213,7 @@ fn reduce_occupancy(
     let mut nearest_dx = 0.0f32;
     let mut nearest_dy = 0.0f32;
 
-    for cell in visible.iter() {
+    for cell in visible {
         // Skip self cell
         if cell.dx == 0 && cell.dy == 0 {
             continue;
@@ -284,7 +283,7 @@ struct NearbyCandidate {
 /// - Empty slots are all zeros
 #[allow(clippy::too_many_arguments)]
 fn rank_nearby_creatures(
-    visible: &VisibleCells,
+    visible: &[VisibleCell],
     world: &WorldState,
     observer_id: CreatureId,
     observer: &CreatureState,
@@ -293,13 +292,8 @@ fn rank_nearby_creatures(
     r: f32,
     max_dist: f32,
 ) -> ([f32; 16], [f32; 8], [f32; 12]) {
-    let mut core = [0.0f32; 16];
-    let mut vitals = [0.0f32; 8];
-    let mut identity = [0.0f32; 12];
-
-    // Collect candidates
     let mut candidates: Vec<NearbyCandidate> = Vec::new();
-    for cell in visible.iter() {
+    for cell in visible {
         if cell.dx == 0 && cell.dy == 0 {
             continue;
         }
@@ -320,7 +314,8 @@ fn rank_nearby_creatures(
         });
     }
 
-    // Sort: ascending euclidean, chebyshev, (dy, dx), creature_id
+    // Sensor ordering is contract-visible: tie-break by euclidean distance,
+    // then Chebyshev distance, then stable local offsets, then creature ID.
     candidates.sort_by(|a, b| {
         a.euclidean_dist
             .partial_cmp(&b.euclidean_dist)
@@ -331,7 +326,21 @@ fn rank_nearby_creatures(
             .then_with(|| a.creature_id.cmp(&b.creature_id))
     });
 
-    // Fill up to NEARBY_SLOTS
+    fill_nearby_banks(&candidates, observer, creatures, config, r, max_dist)
+}
+
+fn fill_nearby_banks(
+    candidates: &[NearbyCandidate],
+    observer: &CreatureState,
+    creatures: &SlotMap<CreatureId, CreatureState>,
+    config: &PerceptionConfig,
+    r: f32,
+    max_dist: f32,
+) -> ([f32; 16], [f32; 8], [f32; 12]) {
+    let mut core = [0.0f32; 16];
+    let mut vitals = [0.0f32; 8];
+    let mut identity = [0.0f32; 12];
+
     for (slot, candidate) in candidates.iter().take(NEARBY_SLOTS).enumerate() {
         let Some(target) = creatures.get(candidate.creature_id) else {
             continue;
@@ -473,7 +482,7 @@ mod tests {
         let visible = compute_visible_cells(origin, &world, table);
         let config = PerceptionConfig::default();
 
-        let food = reduce_food(&visible, &world, &config, 2.0, 25.0, (8.0f32).sqrt());
+        let food = reduce_food(visible.cells(), &world, &config, 2.0, 25.0, (8.0f32).sqrt());
         assert!((food[food_idx::TOTAL_RATIO] - 0.0).abs() < f32::EPSILON);
         assert!((food[food_idx::MAX_VALUE] - 0.0).abs() < f32::EPSILON);
     }
@@ -490,7 +499,7 @@ mod tests {
         let visible = compute_visible_cells(origin, &world, table);
         let config = PerceptionConfig::default();
 
-        let food = reduce_food(&visible, &world, &config, 2.0, 25.0, (8.0f32).sqrt());
+        let food = reduce_food(visible.cells(), &world, &config, 2.0, 25.0, (8.0f32).sqrt());
         // total_ratio = (0.5 + 1.0) / 25.0 = 0.06
         assert!((food[food_idx::TOTAL_RATIO] - 0.06).abs() < 1e-5);
         assert!((food[food_idx::MAX_VALUE] - 1.0).abs() < f32::EPSILON);
@@ -509,7 +518,14 @@ mod tests {
         let visible = compute_visible_cells(origin, &world, table);
         let config = PerceptionConfig::default();
 
-        let food = reduce_food(&visible, &world, &config, 3.0, 49.0, (18.0f32).sqrt());
+        let food = reduce_food(
+            visible.cells(),
+            &world,
+            &config,
+            3.0,
+            49.0,
+            (18.0f32).sqrt(),
+        );
         // Nearest food is at dx=1, dist=1/sqrt(18)
         assert!((food[food_idx::NEAREST_DX] - 1.0 / 3.0).abs() < 1e-5);
         assert!((food[food_idx::NEAREST_DY] - 0.0).abs() < f32::EPSILON);
@@ -525,7 +541,7 @@ mod tests {
         let table = get_visibility_table(2);
         let visible = compute_visible_cells(origin, &world, table);
 
-        let barrier = reduce_barrier(&visible, &world, 2.0, 25.0, (8.0f32).sqrt());
+        let barrier = reduce_barrier(visible.cells(), &world, 2.0, 25.0, (8.0f32).sqrt());
         // At least 1 barrier visible
         assert!(barrier[barrier_idx::DENSITY_RATIO] > 0.0);
         // Adjacent barrier count = 1/8
@@ -544,7 +560,14 @@ mod tests {
             make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
         });
 
-        let occ = reduce_occupancy(&visible, &world, observer_id, 2.0, 24.0, (8.0f32).sqrt());
+        let occ = reduce_occupancy(
+            visible.cells(),
+            &world,
+            observer_id,
+            2.0,
+            24.0,
+            (8.0f32).sqrt(),
+        );
         assert!((occ[occupancy_idx::COUNT_RATIO] - 0.0).abs() < f32::EPSILON);
     }
 
@@ -574,7 +597,14 @@ mod tests {
         let table = get_visibility_table(2);
         let visible = compute_visible_cells(origin, &world, table);
 
-        let occ = reduce_occupancy(&visible, &world, observer_id, 2.0, 24.0, (8.0f32).sqrt());
+        let occ = reduce_occupancy(
+            visible.cells(),
+            &world,
+            observer_id,
+            2.0,
+            24.0,
+            (8.0f32).sqrt(),
+        );
         // 1 non-self creature visible
         assert!((occ[occupancy_idx::COUNT_RATIO] - 1.0 / 24.0).abs() < 1e-5);
     }
@@ -622,7 +652,7 @@ mod tests {
         let observer = &creatures[observer_id];
 
         let (core, vitals, _identity) = rank_nearby_creatures(
-            &visible,
+            visible.cells(),
             &world,
             observer_id,
             observer,
@@ -650,6 +680,63 @@ mod tests {
     }
 
     #[test]
+    fn nearby_ranking_truncates_to_top_slots_with_stable_tiebreaks() {
+        let mut world = make_world(20, 20);
+        let origin = crate::contracts::Position::new(10, 10);
+
+        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let observer_id = creatures.insert_with_key(|id| {
+            make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
+        });
+        world.place_creature(origin, observer_id);
+
+        let positions = [
+            crate::contracts::Position::new(10, 9),
+            crate::contracts::Position::new(9, 10),
+            crate::contracts::Position::new(11, 10),
+            crate::contracts::Position::new(10, 11),
+            crate::contracts::Position::new(12, 10),
+        ];
+
+        for position in positions {
+            let creature_id = creatures.insert_with_key(|id| {
+                make_creature(id, position, 30.0, CreatureIdentityState::default(), [0; 6])
+            });
+            world.place_creature(position, creature_id);
+        }
+
+        let table = get_visibility_table(3);
+        let visible = compute_visible_cells(origin, &world, table);
+        let config = PerceptionConfig::default();
+        let observer = &creatures[observer_id];
+
+        let (core, _, _) = rank_nearby_creatures(
+            visible.cells(),
+            &world,
+            observer_id,
+            observer,
+            &creatures,
+            &config,
+            3.0,
+            (18.0f32).sqrt(),
+        );
+
+        let slot = |index: usize, field: usize| core[index * core_idx::FIELDS_PER_SLOT + field];
+
+        assert!((slot(0, core_idx::REL_X) - 0.0).abs() < 1e-5);
+        assert!((slot(0, core_idx::REL_Y) - (-1.0 / 3.0)).abs() < 1e-5);
+
+        assert!((slot(1, core_idx::REL_X) - (-1.0 / 3.0)).abs() < 1e-5);
+        assert!((slot(1, core_idx::REL_Y) - 0.0).abs() < 1e-5);
+
+        assert!((slot(2, core_idx::REL_X) - (1.0 / 3.0)).abs() < 1e-5);
+        assert!((slot(2, core_idx::REL_Y) - 0.0).abs() < 1e-5);
+
+        assert!((slot(3, core_idx::REL_X) - 0.0).abs() < 1e-5);
+        assert!((slot(3, core_idx::REL_Y) - (1.0 / 3.0)).abs() < 1e-5);
+    }
+
+    #[test]
     fn full_perception_assembly() {
         let mut world = make_world(20, 20);
         let origin = crate::contracts::Position::new(10, 10);
@@ -668,7 +755,7 @@ mod tests {
         let snap = assemble_perception(
             observer_id,
             &creatures[observer_id],
-            &visible,
+            visible.cells(),
             &world,
             &creatures,
             &config,
@@ -680,6 +767,121 @@ mod tests {
         assert!((snap.area_barrier[barrier_idx::DENSITY_RATIO] - 0.0).abs() < f32::EPSILON);
         assert!((snap.area_occupancy[occupancy_idx::COUNT_RATIO] - 0.0).abs() < f32::EPSILON);
         assert!((snap.nearby_core[core_idx::PRESENT] - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn assemble_perception_matches_reference_reducers() {
+        let mut world = make_world(20, 20);
+        let origin = crate::contracts::Position::new(10, 10);
+        world.set_food(origin, 0.5);
+        world.set_food(crate::contracts::Position::new(11, 10), 1.0);
+        world.set_barrier(crate::contracts::Position::new(10, 9), true);
+
+        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let observer_id = creatures.insert_with_key(|id| {
+            make_creature(
+                id,
+                origin,
+                50.0,
+                CreatureIdentityState {
+                    lineage_id: 7,
+                    kin_tag: 0xAAAA_AAAA,
+                },
+                [10, 20, 30, 40, 50, 60],
+            )
+        });
+        world.place_creature(origin, observer_id);
+
+        for (position, energy, lineage_id, kin_tag, phenotype) in [
+            (
+                crate::contracts::Position::new(11, 10),
+                30.0,
+                7,
+                0xAAAA_AAAA,
+                [10, 20, 30, 40, 50, 60],
+            ),
+            (
+                crate::contracts::Position::new(9, 10),
+                80.0,
+                9,
+                0x5555_5555,
+                [200, 180, 160, 140, 120, 100],
+            ),
+            (
+                crate::contracts::Position::new(10, 11),
+                120.0,
+                11,
+                0xAAAA_5555,
+                [30, 60, 90, 120, 150, 180],
+            ),
+        ] {
+            let creature_id = creatures.insert_with_key(|id| {
+                make_creature(
+                    id,
+                    position,
+                    energy,
+                    CreatureIdentityState {
+                        lineage_id,
+                        kin_tag,
+                    },
+                    phenotype,
+                )
+            });
+            world.place_creature(position, creature_id);
+        }
+
+        let table = get_visibility_table(5);
+        let visible = compute_visible_cells(origin, &world, table);
+        let config = PerceptionConfig::default();
+        let observer = &creatures[observer_id];
+        let r = config.vision_radius as f32;
+        let max_candidate_cells = (2.0 * r + 1.0) * (2.0 * r + 1.0);
+        let max_other_candidate_cells = max_candidate_cells - 1.0;
+        let max_dist = (2.0 * r * r).sqrt();
+        let (nearby_core, nearby_vitals, nearby_identity) = rank_nearby_creatures(
+            visible.cells(),
+            &world,
+            observer_id,
+            observer,
+            &creatures,
+            &config,
+            r,
+            max_dist,
+        );
+
+        let expected = PerceptionSnapshot {
+            area_food: reduce_food(
+                visible.cells(),
+                &world,
+                &config,
+                r,
+                max_candidate_cells,
+                max_dist,
+            ),
+            area_barrier: reduce_barrier(visible.cells(), &world, r, max_candidate_cells, max_dist),
+            area_occupancy: reduce_occupancy(
+                visible.cells(),
+                &world,
+                observer_id,
+                r,
+                max_other_candidate_cells,
+                max_dist,
+            ),
+            nearby_core,
+            nearby_vitals,
+            nearby_identity,
+        };
+
+        let actual = assemble_perception(
+            observer_id,
+            observer,
+            visible.cells(),
+            &world,
+            &creatures,
+            &config,
+        );
+
+        assert_eq!(actual, expected);
     }
 
     #[test]
@@ -713,7 +915,7 @@ mod tests {
         let snap = assemble_perception(
             observer_id,
             &creatures[observer_id],
-            &visible,
+            visible.cells(),
             &world,
             &creatures,
             &config,

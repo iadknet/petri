@@ -11,10 +11,15 @@ use v3_core::sensors::perception::{
 };
 use v3_core::sensors::reducers::assemble_perception;
 use v3_core::sensors::static_inputs::assemble_static_inputs;
-use v3_core::sensors::visibility::{compute_visible_cells, get_visibility_table};
-use v3_core::simulation::seeding::seed_simulation;
+use v3_core::sensors::visibility::{
+    compute_visible_cells_into, get_visibility_table, VisibilityScratch,
+};
+use v3_core::simulation::seeding::{seed_simulation, seed_simulation_with_perception_mix};
 use v3_core::simulation::tick::{run_phase_0, run_tick};
 use v3_core::simulation::Simulation;
+
+const RUNTIME_STRESS_PERCEPTION_CREATURES: usize = 200;
+const LARGE_TICK_PERCEPTION_CREATURES: usize = 500;
 
 fn runtime_stress_config() -> SimulationConfig {
     let mut config = SimulationConfig::default();
@@ -29,6 +34,14 @@ fn runtime_stress_simulation(seed: u64) -> Simulation {
     seed_simulation(runtime_stress_config(), seed)
 }
 
+fn runtime_stress_perception_simulation(seed: u64) -> Simulation {
+    seed_simulation_with_perception_mix(
+        runtime_stress_config(),
+        seed,
+        RUNTIME_STRESS_PERCEPTION_CREATURES,
+    )
+}
+
 fn bench_config() -> SimulationConfig {
     let mut config = runtime_stress_config();
     config.world.width = 200;
@@ -41,15 +54,17 @@ fn build_sensor_snapshot(sim: &Simulation, creature: &CreatureState) -> SensorSn
     let local = assemble_static_inputs(&sim.world, creature);
     let perception = if genome_uses_extended_perception(&creature.genome) {
         let config = PerceptionConfig::from_sim_config(&sim.config);
-        let visible = compute_visible_cells(
+        let mut visible_scratch = VisibilityScratch::default();
+        let visible = compute_visible_cells_into(
             creature.position,
             &sim.world,
             get_visibility_table(config.vision_radius),
+            &mut visible_scratch,
         );
         assemble_perception(
             creature.id,
             creature,
-            &visible,
+            visible,
             &sim.world,
             &sim.creatures,
             &config,
@@ -210,19 +225,37 @@ fn bench_full_tick_stress(c: &mut Criterion) {
 fn bench_perception_assembly_stress(c: &mut Criterion) {
     c.bench_function("perception_assembly_stress", |b| {
         b.iter_with_setup(
-            || runtime_stress_simulation(42),
+            || {
+                let sim = runtime_stress_perception_simulation(42);
+                let extended_count = sim
+                    .creatures
+                    .values()
+                    .filter(|creature| genome_uses_extended_perception(&creature.genome))
+                    .count();
+                assert_eq!(
+                    extended_count, RUNTIME_STRESS_PERCEPTION_CREATURES,
+                    "fixture must contain a stable mixed-perception population"
+                );
+                sim
+            },
             |sim| {
                 let config = PerceptionConfig::from_sim_config(&sim.config);
                 let table = get_visibility_table(config.vision_radius);
+                let mut visible_scratch = VisibilityScratch::default();
                 for (id, creature) in sim.creatures.iter() {
                     if !genome_uses_extended_perception(&creature.genome) {
                         continue;
                     }
-                    let visible = compute_visible_cells(creature.position, &sim.world, table);
+                    let visible = compute_visible_cells_into(
+                        creature.position,
+                        &sim.world,
+                        table,
+                        &mut visible_scratch,
+                    );
                     let perception = assemble_perception(
                         id,
                         creature,
-                        &visible,
+                        visible,
                         &sim.world,
                         &sim.creatures,
                         &config,
@@ -292,6 +325,33 @@ fn bench_full_tick_large_population(c: &mut Criterion) {
     c.bench_function("full_tick_2000_creatures_50_ticks", |b| {
         b.iter_with_setup(
             || seed_simulation(cfg.clone(), 42),
+            |mut sim| {
+                for _ in 0..50 {
+                    run_tick(black_box(&mut sim), &mut None);
+                }
+            },
+        );
+    });
+
+    c.bench_function("full_tick_2000_creatures_50_ticks_mixed_perception", |b| {
+        b.iter_with_setup(
+            || {
+                let sim = seed_simulation_with_perception_mix(
+                    cfg.clone(),
+                    42,
+                    LARGE_TICK_PERCEPTION_CREATURES,
+                );
+                let extended_count = sim
+                    .creatures
+                    .values()
+                    .filter(|creature| genome_uses_extended_perception(&creature.genome))
+                    .count();
+                assert_eq!(
+                    extended_count, LARGE_TICK_PERCEPTION_CREATURES,
+                    "fixture must contain a stable mixed-perception population"
+                );
+                sim
+            },
             |mut sim| {
                 for _ in 0..50 {
                     run_tick(black_box(&mut sim), &mut None);
