@@ -12,25 +12,6 @@ Currently `graph.rs` calls directly into plasticity modules for post-convergence
 
 ## Major New Features
 
-### Graph nodes can execute actions through deferred queue outputs
-
-Instead of emitting a `WorldAction` directly, graph backends would gain a small set of **deferred action-effect outputs** that mirror the VM’s action-queue behavior. During graph relaxation, these nodes behave like normal graph nodes and only produce scalar values. After the graph converges, the runtime performs a single post-convergence effect pass that interprets specific graph node kinds as queue operations. This keeps graph evaluation deterministic, avoids repeated side effects across relaxation passes, and fits the `multi-action-queue` model where the action queue is owned by the mesh executor rather than by an individual node result.
-
-Proposed graph-side effects:
-- `WriteActionMeta(slot)`: write a value into a staged action metadata buffer
-- `PushAction(action_type)`: decode an action from the staged metadata and push it onto the mesh-owned action queue
-- `PopAction`: remove the most recently queued action
-- `ExecuteActionQueue`: mark the current mesh hop as terminal and return the queued actions for Phase 2 execution
-
-Ordering must be explicit and deterministic. Recommended rule:
-1. Run graph relaxation to convergence
-2. Apply staged-value writes first (`CustomOutput`, `RouterOutput`, `WriteActionMeta`)
-3. Apply queue mutations next (`PushAction`, `PopAction`)
-4. Apply terminal check last (`ExecuteActionQueue`)
-
-Within each phase, process internal graph nodes in internal-node-index order. This means conflicts like “push and pop are both active” are resolved by node order, not by ambiguous graph topology. If energy is exhausted before convergence completes, none of the deferred action effects are committed.
-
-
 ### New internal graph nodes can be born with attached inputs
 
 Right now a fresh internal graph node can be structurally valid but functionally useless for several mutation steps, because it may have no meaningful sensor signal attached yet. We could add a graph-specific mutation path where some node-add events create a **small input bundle** alongside the new internal node, so the new structure can start life with a readable signal instead of waiting for several follow-up mutations to line up.
