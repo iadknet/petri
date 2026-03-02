@@ -39,6 +39,9 @@ Rules:
   `v3-startup-seeding-spec.md`.
 - CLI config semantics must align with `v3-runtime-config-spec.md` and
   `v3-world-grid-spec.md`.
+- Server HTTP/WS protocol version bumps do not automatically change the CLI
+  NDJSON contract; CLI versioning changes only when this file's event/output
+  contract changes.
 
 Remote server-client mode is out of scope for this spec version.
 

@@ -1,12 +1,27 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
+use tokio::net::TcpListener;
+use tokio::task::JoinHandle;
+use tokio::time::{timeout, Duration};
 use tower::ServiceExt;
 
-use v3_server::{router, state::AppState};
+use v3_server::{handlers::lifecycle::build_ws_frame, router, state::AppState};
 
 fn app() -> axum::Router {
     router(AppState::new())
+}
+
+async fn spawn_ws_app(state: AppState) -> (String, JoinHandle<()>) {
+    let listener = TcpListener::bind("127.0.0.1:0")
+        .await
+        .expect("bind test listener");
+    let addr = listener.local_addr().expect("listener address");
+    let app = router(state);
+    let handle = tokio::spawn(async move {
+        axum::serve(listener, app).await.expect("serve test app");
+    });
+    (format!("ws://{addr}/v3/ws"), handle)
 }
 
 async fn do_request(app: axum::Router, req: Request<Body>) -> (StatusCode, serde_json::Value) {
@@ -15,6 +30,42 @@ async fn do_request(app: axum::Router, req: Request<Body>) -> (StatusCode, serde
     let bytes = resp.into_body().collect().await.unwrap().to_bytes();
     let body: serde_json::Value = serde_json::from_slice(&bytes).unwrap_or(serde_json::Value::Null);
     (status, body)
+}
+
+async fn recv_server_messages(
+    socket: &mut tokio_tungstenite::WebSocketStream<
+        tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>,
+    >,
+) -> Vec<v3_server::transport::protocol::ServerMessage> {
+    use futures_util::StreamExt;
+    use tokio_tungstenite::tungstenite::Message;
+    use v3_server::transport::protocol::ServerMessage;
+
+    let mut messages = Vec::new();
+    let first = timeout(Duration::from_secs(1), socket.next())
+        .await
+        .expect("expected websocket payload")
+        .expect("socket stream item")
+        .expect("websocket message");
+    messages.push(match first {
+        Message::Binary(bytes) => rmp_serde::from_slice(&bytes).expect("decode server message"),
+        other => panic!("expected binary message, got {other:?}"),
+    });
+
+    loop {
+        match timeout(Duration::from_millis(50), socket.next()).await {
+            Ok(Some(Ok(Message::Binary(bytes)))) => {
+                let decoded: ServerMessage =
+                    rmp_serde::from_slice(&bytes).expect("decode server message");
+                messages.push(decoded);
+            }
+            Ok(Some(Ok(other))) => panic!("expected binary message, got {other:?}"),
+            Ok(Some(Err(error))) => panic!("websocket error: {error}"),
+            Ok(None) | Err(_) => break,
+        }
+    }
+
+    messages
 }
 
 fn startup_req(body: &str) -> Request<Body> {
@@ -261,10 +312,61 @@ async fn get_status_has_all_required_fields() {
     );
 }
 
-// ── 10. get_frame_returns_creature_food_barrier_arrays ──────────────────────
+// ── 9b. get_status_uses_energy_names_and_perf_block ────────────────────────
 
 #[tokio::test]
-async fn get_frame_returns_creature_food_barrier_arrays() {
+async fn get_status_uses_energy_names_and_perf_block() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":42}"#))
+        .await
+        .unwrap();
+
+    let (status, body) = do_request(a, get_req("/v3/simulation/status")).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert!(
+        body.get("last_tick_compute_total_mean").is_none(),
+        "legacy compute field must be removed: {body}"
+    );
+    assert!(
+        body["last_tick_compute_energy_total_mean"].is_number(),
+        "missing energy total mean: {body}"
+    );
+    assert!(
+        body["last_tick_compute_energy_total_min"].is_number(),
+        "missing energy total min: {body}"
+    );
+    assert!(
+        body["last_tick_compute_energy_total_max"].is_number(),
+        "missing energy total max: {body}"
+    );
+    assert!(
+        body["last_tick_compute_energy_vm_mean"].is_number(),
+        "missing energy vm mean: {body}"
+    );
+    assert!(
+        body["last_tick_compute_energy_graph_mean"].is_number(),
+        "missing energy graph mean: {body}"
+    );
+    assert!(body["perf"].is_object(), "missing perf block: {body}");
+    assert!(
+        body["perf"]["projection_publish_ms"].is_number(),
+        "missing projection_publish_ms: {body}"
+    );
+    assert!(
+        body["perf"]["ws_frame_publish_ms"].is_number(),
+        "missing ws_frame_publish_ms: {body}"
+    );
+    assert!(
+        body["perf"]["subscriber_count"].is_number(),
+        "missing subscriber_count: {body}"
+    );
+}
+
+// ── 10. get_frame_endpoint_is_removed ───────────────────────────────────────
+
+#[tokio::test]
+async fn get_frame_endpoint_is_removed() {
     let a = app();
     a.clone()
         .oneshot(startup_req(r#"{"seed":42}"#))
@@ -272,10 +374,141 @@ async fn get_frame_returns_creature_food_barrier_arrays() {
         .unwrap();
 
     let (status, body) = do_request(a, get_req("/v3/simulation/frame")).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "body: {body}");
+}
+
+// ── 10b. snapshot_bootstrap_returns_overview_and_revisions ─────────────────
+
+#[tokio::test]
+async fn snapshot_bootstrap_returns_overview_and_revisions() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":42}"#))
+        .await
+        .unwrap();
+
+    let (status, body) = do_request(a, get_req("/v3/simulation/snapshot")).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    assert!(body["creatures"].is_array(), "missing creatures array");
-    assert!(body["food"].is_array(), "missing food array");
-    assert!(body["barriers"].is_array(), "missing barriers array");
+    assert!(body["projection_revision"].is_number(), "body: {body}");
+    assert!(body["world_static_revision"].is_number(), "body: {body}");
+    assert_eq!(
+        body["view"]["kind"].as_str(),
+        Some("overview"),
+        "body: {body}"
+    );
+    assert!(body["world_static"]["width"].is_number(), "body: {body}");
+    assert!(body["world_static"]["height"].is_number(), "body: {body}");
+    assert!(
+        body["world_static"]["barrier_mask"].is_array(),
+        "body: {body}"
+    );
+    assert!(body["view"]["grid_width"].is_number(), "body: {body}");
+    assert!(body["view"]["grid_height"].is_number(), "body: {body}");
+    assert!(body["view"]["food_density_u8"].is_array(), "body: {body}");
+    assert!(
+        body["view"]["creature_count_u16"].is_array(),
+        "body: {body}"
+    );
+}
+
+// ── 10c. projection_revision_increases_after_step ───────────────────────────
+
+#[tokio::test]
+async fn projection_revision_increases_after_step() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":7}"#))
+        .await
+        .unwrap();
+    a.clone()
+        .oneshot(post_req("/v3/simulation/start"))
+        .await
+        .unwrap();
+    a.clone()
+        .oneshot(post_req("/v3/simulation/pause"))
+        .await
+        .unwrap();
+
+    let (_, before) = do_request(a.clone(), get_req("/v3/simulation/status")).await;
+    let before_revision = before["projection_revision"].as_u64().unwrap_or(0);
+    let before_tick = before["tick"].as_u64().unwrap_or(0);
+
+    let (step_status, _) = do_request(
+        a.clone(),
+        post_json("/v3/simulation/step", r#"{"steps":1}"#),
+    )
+    .await;
+    assert_eq!(step_status, StatusCode::OK);
+
+    let (_, after) = do_request(a, get_req("/v3/simulation/status")).await;
+    let after_revision = after["projection_revision"].as_u64().unwrap_or(0);
+    let after_tick = after["tick"].as_u64().unwrap_or(0);
+
+    assert!(
+        after_revision > before_revision,
+        "projection_revision must increase after step: before={before_revision}, after={after_revision}, body={after}"
+    );
+    assert!(
+        after_tick > before_tick,
+        "tick must increase after step: before={before_tick}, after={after_tick}, body={after}"
+    );
+}
+
+// ── 10d. world_static_revision_stays_stable_across_step ────────────────────
+
+#[tokio::test]
+async fn world_static_revision_stays_stable_across_step() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":13}"#))
+        .await
+        .unwrap();
+    a.clone()
+        .oneshot(post_req("/v3/simulation/start"))
+        .await
+        .unwrap();
+    a.clone()
+        .oneshot(post_req("/v3/simulation/pause"))
+        .await
+        .unwrap();
+
+    let (_, before) = do_request(a.clone(), get_req("/v3/simulation/snapshot")).await;
+    let before_static_revision = before["world_static_revision"].as_u64().unwrap_or(0);
+
+    let (step_status, _) = do_request(
+        a.clone(),
+        post_json("/v3/simulation/step", r#"{"steps":1}"#),
+    )
+    .await;
+    assert_eq!(step_status, StatusCode::OK);
+
+    let (_, after) = do_request(a, get_req("/v3/simulation/snapshot")).await;
+    let after_static_revision = after["world_static_revision"].as_u64().unwrap_or(0);
+
+    assert_eq!(
+        after_static_revision, before_static_revision,
+        "world_static_revision should not change on a pure tick without topology edits: before={before_static_revision}, after={after_static_revision}"
+    );
+}
+
+// ── 10e. status_and_snapshot_share_projection_when_not_mutating ────────────
+
+#[tokio::test]
+async fn status_and_snapshot_share_projection_when_not_mutating() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":21}"#))
+        .await
+        .unwrap();
+
+    let (_, status_body) = do_request(a.clone(), get_req("/v3/simulation/status")).await;
+    let (_, snapshot_body) = do_request(a, get_req("/v3/simulation/snapshot")).await;
+
+    assert_eq!(
+        status_body["projection_revision"], snapshot_body["projection_revision"],
+        "reads without an intervening mutation should come from the same published projection"
+    );
+    assert_eq!(status_body["tick"], snapshot_body["tick"]);
 }
 
 // ── 11. patch_config_world_field_while_running_returns_409 ──────────────────
@@ -501,7 +734,16 @@ async fn paint_on_idle_succeeds() {
         body["stats"]["barrier_set_cells"].as_u64().unwrap_or(0) > 0,
         "expected barrier_set_cells > 0: {body}"
     );
-    assert!(body["frame"].is_object(), "missing frame object");
+    assert!(
+        body.get("frame").is_none(),
+        "legacy frame object must be absent: {body}"
+    );
+    assert!(body["dirty_rect"].is_object(), "missing dirty_rect: {body}");
+    assert_eq!(
+        body["world_static_changed"].as_bool(),
+        Some(true),
+        "barrier paint must mark static invalidation: {body}"
+    );
 }
 
 // ── 18. paint_on_paused_succeeds ────────────────────────────────────────────
@@ -683,9 +925,15 @@ async fn paint_barrier_evicts_creature() {
         .await
         .unwrap();
 
-    // Get frame to find a creature position
-    let (_, frame_body) = do_request(a.clone(), get_req("/v3/simulation/frame")).await;
-    let creatures = frame_body["creatures"].as_array().expect("creatures array");
+    // Get snapshot to find a creature position
+    let (_, snapshot_body) = do_request(
+        a.clone(),
+        get_req("/v3/simulation/snapshot?zoom_tier=detail"),
+    )
+    .await;
+    let creatures = snapshot_body["view"]["creatures"]
+        .as_array()
+        .expect("creatures array");
     assert!(!creatures.is_empty(), "need at least one creature");
     let cx = creatures[0]["x"].as_u64().unwrap();
     let cy = creatures[0]["y"].as_u64().unwrap();
@@ -713,10 +961,10 @@ async fn paint_barrier_evicts_creature() {
     );
 }
 
-// ── 25. paint_response_includes_frame ───────────────────────────────────────
+// ── 25. paint_response_includes_invalidation_metadata ──────────────────────
 
 #[tokio::test]
-async fn paint_response_includes_frame() {
+async fn paint_response_includes_invalidation_metadata() {
     let a = app();
     a.clone()
         .oneshot(startup_req(r#"{"seed":1}"#))
@@ -732,18 +980,70 @@ async fn paint_response_includes_frame() {
     )
     .await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    let frame = &body["frame"];
     assert!(
-        frame["frame"]["creatures"].is_array(),
-        "missing frame.frame.creatures"
+        body.get("frame").is_none(),
+        "legacy embedded frame must be removed: {body}"
     );
+    assert!(body["dirty_rect"].is_object(), "missing dirty_rect");
     assert!(
-        frame["frame"]["food"].is_array(),
-        "missing frame.frame.food"
+        body["world_static_changed"].is_boolean(),
+        "missing world_static_changed"
     );
-    assert!(
-        frame["frame"]["barriers"].is_array(),
-        "missing frame.frame.barriers"
+}
+
+// ── 25b. paint_food_response_marks_only_dynamic_invalidation ────────────────
+
+#[tokio::test]
+async fn paint_food_response_marks_only_dynamic_invalidation() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let (status, body) = do_request(
+        a,
+        post_json(
+            "/v3/simulation/paint",
+            r#"{"tool":"food","brush_half_extent":1,"points":[{"x":1,"y":1}]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert_eq!(
+        body["world_static_changed"].as_bool(),
+        Some(false),
+        "body: {body}"
+    );
+    assert_eq!(body["dirty_rect"]["x"].as_u64(), Some(0));
+    assert_eq!(body["dirty_rect"]["y"].as_u64(), Some(0));
+    assert_eq!(body["dirty_rect"]["width"].as_u64(), Some(3));
+    assert_eq!(body["dirty_rect"]["height"].as_u64(), Some(3));
+}
+
+// ── 25c. paint_barrier_response_marks_world_static_changed ──────────────────
+
+#[tokio::test]
+async fn paint_barrier_response_marks_world_static_changed() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let (status, body) = do_request(
+        a,
+        post_json(
+            "/v3/simulation/paint",
+            r#"{"tool":"barrier","brush_half_extent":0,"points":[{"x":5,"y":5}]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert_eq!(
+        body["world_static_changed"].as_bool(),
+        Some(true),
+        "body: {body}"
     );
 }
 
@@ -757,9 +1057,15 @@ async fn get_creature_returns_full_detail() {
         .await
         .unwrap();
 
-    // Get frame to find a creature ID
-    let (_, frame_body) = do_request(a.clone(), get_req("/v3/simulation/frame")).await;
-    let creatures = frame_body["creatures"].as_array().expect("creatures array");
+    // Get snapshot to find a creature ID
+    let (_, snapshot_body) = do_request(
+        a.clone(),
+        get_req("/v3/simulation/snapshot?zoom_tier=detail"),
+    )
+    .await;
+    let creatures = snapshot_body["view"]["creatures"]
+        .as_array()
+        .expect("creatures array");
     assert!(!creatures.is_empty(), "need at least one creature");
     let creature_id = creatures[0]["id"].as_u64().unwrap();
 
@@ -839,9 +1145,15 @@ async fn get_creature_on_idle_state_works() {
     // Fresh default state has creatures from default seed
     let a = app();
 
-    // Get frame to find a creature (default state seeds creatures)
-    let (_, frame_body) = do_request(a.clone(), get_req("/v3/simulation/frame")).await;
-    let creatures = frame_body["creatures"].as_array().expect("creatures array");
+    // Get snapshot to find a creature (default state seeds creatures)
+    let (_, snapshot_body) = do_request(
+        a.clone(),
+        get_req("/v3/simulation/snapshot?zoom_tier=detail"),
+    )
+    .await;
+    let creatures = snapshot_body["view"]["creatures"]
+        .as_array()
+        .expect("creatures array");
     assert!(!creatures.is_empty(), "default state should have creatures");
     let creature_id = creatures[0]["id"].as_u64().unwrap();
 
@@ -903,8 +1215,14 @@ async fn start_sample_returns_recording() {
     let (_, _) = do_request(a.clone(), post_req("/v3/simulation/pause")).await;
 
     // Find a creature ID.
-    let (_, frame_body) = do_request(a.clone(), get_req("/v3/simulation/frame")).await;
-    let creature_id = frame_body["creatures"][0]["id"].as_u64().unwrap();
+    let (_, snapshot_body) = do_request(
+        a.clone(),
+        get_req("/v3/simulation/snapshot?zoom_tier=detail"),
+    )
+    .await;
+    let creature_id = snapshot_body["view"]["creatures"][0]["id"]
+        .as_u64()
+        .unwrap();
 
     // Start sample.
     let uri = format!("/v3/simulation/creature/{creature_id}/sample");
@@ -971,8 +1289,14 @@ async fn start_sample_while_idle_returns_409() {
         .unwrap();
 
     // Get a creature ID (available even while idle).
-    let (_, frame_body) = do_request(a.clone(), get_req("/v3/simulation/frame")).await;
-    let creature_id = frame_body["creatures"][0]["id"].as_u64().unwrap();
+    let (_, snapshot_body) = do_request(
+        a.clone(),
+        get_req("/v3/simulation/snapshot?zoom_tier=detail"),
+    )
+    .await;
+    let creature_id = snapshot_body["view"]["creatures"][0]["id"]
+        .as_u64()
+        .unwrap();
 
     let uri = format!("/v3/simulation/creature/{creature_id}/sample");
     let (status, _) = do_request(a, post_json(&uri, r#"{"ticks": 5}"#)).await;
@@ -991,8 +1315,14 @@ async fn get_sample_before_start_returns_idle() {
     let (_, _) = do_request(a.clone(), post_req("/v3/simulation/start")).await;
     let (_, _) = do_request(a.clone(), post_req("/v3/simulation/pause")).await;
 
-    let (_, frame_body) = do_request(a.clone(), get_req("/v3/simulation/frame")).await;
-    let creature_id = frame_body["creatures"][0]["id"].as_u64().unwrap();
+    let (_, snapshot_body) = do_request(
+        a.clone(),
+        get_req("/v3/simulation/snapshot?zoom_tier=detail"),
+    )
+    .await;
+    let creature_id = snapshot_body["view"]["creatures"][0]["id"]
+        .as_u64()
+        .unwrap();
 
     let uri = format!("/v3/simulation/creature/{creature_id}/sample");
     let (status, body) = do_request(a, get_req(&uri)).await;
@@ -1012,8 +1342,14 @@ async fn get_sample_while_recording_returns_progress() {
     let (_, _) = do_request(a.clone(), post_req("/v3/simulation/start")).await;
     let (_, _) = do_request(a.clone(), post_req("/v3/simulation/pause")).await;
 
-    let (_, frame_body) = do_request(a.clone(), get_req("/v3/simulation/frame")).await;
-    let creature_id = frame_body["creatures"][0]["id"].as_u64().unwrap();
+    let (_, snapshot_body) = do_request(
+        a.clone(),
+        get_req("/v3/simulation/snapshot?zoom_tier=detail"),
+    )
+    .await;
+    let creature_id = snapshot_body["view"]["creatures"][0]["id"]
+        .as_u64()
+        .unwrap();
 
     // Start sample with 5 ticks.
     let uri = format!("/v3/simulation/creature/{creature_id}/sample");
@@ -1032,4 +1368,399 @@ async fn get_sample_while_recording_returns_progress() {
     assert_eq!(body["status"].as_str(), Some("recording"));
     assert_eq!(body["ticks_completed"].as_u64(), Some(2));
     assert_eq!(body["ticks_remaining"].as_u64(), Some(3));
+}
+
+// ── 35. ws_updates_require_active_subscription ──────────────────────────────
+
+#[tokio::test]
+async fn ws_updates_require_active_subscription() {
+    use futures_util::{SinkExt, StreamExt};
+    use tokio_tungstenite::connect_async;
+    use tokio_tungstenite::tungstenite::Message;
+    use v3_server::transport::protocol::ServerMessage;
+
+    let state = AppState::new();
+    let (ws_url, server_task) = spawn_ws_app(state.clone()).await;
+    let (mut socket, _) = connect_async(ws_url).await.expect("connect websocket");
+
+    {
+        let handle = state.sim.lock().await;
+        state.publish_ws_frame(build_ws_frame(&handle));
+    }
+
+    assert!(
+        timeout(Duration::from_millis(150), socket.next())
+            .await
+            .is_err(),
+        "server should not deliver view updates before subscribe_view"
+    );
+
+    socket
+        .send(Message::Text(
+            serde_json::json!({
+                "type": "subscribe_view",
+                "request_id": 1u64,
+                "x": 0u16,
+                "y": 0u16,
+                "width": 8u16,
+                "height": 8u16,
+                "canvas_width": 320u16,
+                "canvas_height": 240u16,
+                "zoom_tier": "overview"
+            })
+            .to_string(),
+        ))
+        .await
+        .expect("send subscribe message");
+
+    {
+        let handle = state.sim.lock().await;
+        state.publish_ws_frame(build_ws_frame(&handle));
+    }
+
+    let messages = recv_server_messages(&mut socket).await;
+    assert!(
+        messages
+            .iter()
+            .any(|message| matches!(message, ServerMessage::WorldStatic { .. })),
+        "subscribe should prime a world_static event: {messages:?}"
+    );
+    assert!(
+        messages.iter().any(|message| matches!(
+            message,
+            ServerMessage::ViewOverview { request_id, .. } if *request_id == 1
+        )),
+        "subscribe should deliver an overview view event for request_id=1: {messages:?}"
+    );
+
+    server_task.abort();
+}
+
+// ── 36. ws_latest_request_id_wins ───────────────────────────────────────────
+
+#[tokio::test]
+async fn ws_latest_request_id_wins() {
+    use futures_util::SinkExt;
+    use tokio_tungstenite::connect_async;
+    use tokio_tungstenite::tungstenite::Message;
+    use v3_server::transport::protocol::ServerMessage;
+
+    let state = AppState::new();
+    let (ws_url, server_task) = spawn_ws_app(state.clone()).await;
+    let (mut socket, _) = connect_async(ws_url).await.expect("connect websocket");
+
+    socket
+        .send(Message::Text(
+            serde_json::json!({
+                "type": "subscribe_view",
+                "request_id": 2u64,
+                "x": 0u16,
+                "y": 0u16,
+                "width": 8u16,
+                "height": 8u16,
+                "canvas_width": 320u16,
+                "canvas_height": 240u16,
+                "zoom_tier": "detail"
+            })
+            .to_string(),
+        ))
+        .await
+        .expect("send latest subscribe");
+    socket
+        .send(Message::Text(
+            serde_json::json!({
+                "type": "subscribe_view",
+                "request_id": 1u64,
+                "x": 4u16,
+                "y": 4u16,
+                "width": 4u16,
+                "height": 4u16,
+                "canvas_width": 128u16,
+                "canvas_height": 128u16,
+                "zoom_tier": "overview"
+            })
+            .to_string(),
+        ))
+        .await
+        .expect("send stale subscribe");
+
+    {
+        let handle = state.sim.lock().await;
+        state.publish_ws_frame(build_ws_frame(&handle));
+    }
+
+    let messages = recv_server_messages(&mut socket).await;
+    assert!(
+        messages.iter().any(|message| matches!(
+            message,
+            ServerMessage::ViewDetail { request_id, .. } if *request_id == 2
+        )),
+        "latest subscription should own emitted detail views: {messages:?}"
+    );
+    assert!(
+        !messages.iter().any(|message| matches!(
+            message,
+            ServerMessage::ViewOverview { request_id, .. } | ServerMessage::ViewDetail { request_id, .. } if *request_id == 1
+        )),
+        "stale request_id=1 must not produce view messages: {messages:?}"
+    );
+
+    server_task.abort();
+}
+
+// ── 37. ws_unsubscribe_stops_delivery ───────────────────────────────────────
+
+#[tokio::test]
+async fn ws_unsubscribe_stops_delivery() {
+    use futures_util::{SinkExt, StreamExt};
+    use tokio_tungstenite::connect_async;
+    use tokio_tungstenite::tungstenite::Message;
+    use v3_server::transport::protocol::ServerMessage;
+
+    let state = AppState::new();
+    let (ws_url, server_task) = spawn_ws_app(state.clone()).await;
+    let (mut socket, _) = connect_async(ws_url).await.expect("connect websocket");
+
+    socket
+        .send(Message::Text(
+            serde_json::json!({
+                "type": "subscribe_view",
+                "request_id": 4u64,
+                "x": 0u16,
+                "y": 0u16,
+                "width": 8u16,
+                "height": 8u16,
+                "canvas_width": 320u16,
+                "canvas_height": 240u16,
+                "zoom_tier": "detail"
+            })
+            .to_string(),
+        ))
+        .await
+        .expect("send subscribe");
+
+    let initial_messages = recv_server_messages(&mut socket).await;
+    assert!(
+        initial_messages.iter().any(|message| matches!(
+            message,
+            ServerMessage::ViewDetail { request_id, .. } if *request_id == 4
+        )),
+        "initial subscribe should deliver a detail view: {initial_messages:?}"
+    );
+
+    socket
+        .send(Message::Text(
+            serde_json::json!({
+                "type": "unsubscribe_view"
+            })
+            .to_string(),
+        ))
+        .await
+        .expect("send unsubscribe");
+    tokio::time::sleep(Duration::from_millis(50)).await;
+
+    {
+        let handle = state.sim.lock().await;
+        state.publish_ws_frame(build_ws_frame(&handle));
+    }
+
+    assert!(
+        timeout(Duration::from_millis(150), socket.next())
+            .await
+            .is_err(),
+        "server should stop delivering after unsubscribe_view"
+    );
+
+    server_task.abort();
+}
+
+// ── 37b. ws_disconnect_cleans_up_session ───────────────────────────────────
+
+#[tokio::test]
+async fn ws_disconnect_cleans_up_session() {
+    use futures_util::SinkExt;
+    use tokio_tungstenite::connect_async;
+    use tokio_tungstenite::tungstenite::Message;
+
+    let state = AppState::new();
+    let (ws_url, server_task) = spawn_ws_app(state.clone()).await;
+    let (mut socket, _) = connect_async(ws_url).await.expect("connect websocket");
+
+    socket
+        .send(Message::Text(
+            serde_json::json!({
+                "type": "subscribe_view",
+                "request_id": 7u64,
+                "x": 0u16,
+                "y": 0u16,
+                "width": 8u16,
+                "height": 8u16,
+                "canvas_width": 320u16,
+                "canvas_height": 240u16,
+                "zoom_tier": "detail"
+            })
+            .to_string(),
+        ))
+        .await
+        .expect("send subscribe");
+
+    let _ = recv_server_messages(&mut socket).await;
+    assert_eq!(
+        state
+            .sessions
+            .read()
+            .expect("session registry lock poisoned")
+            .len(),
+        1,
+        "connected websocket should register a transport session"
+    );
+
+    socket.close(None).await.expect("close websocket");
+    drop(socket);
+
+    timeout(Duration::from_secs(1), async {
+        loop {
+            if state
+                .sessions
+                .read()
+                .expect("session registry lock poisoned")
+                .is_empty()
+            {
+                break;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
+    })
+    .await
+    .expect("server should remove the transport session after disconnect");
+
+    server_task.abort();
+}
+
+// ── 38. ws_non_overlapping_paint_does_not_refresh_view ─────────────────────
+
+#[tokio::test]
+async fn ws_non_overlapping_paint_does_not_refresh_view() {
+    use futures_util::{SinkExt, StreamExt};
+    use tokio_tungstenite::connect_async;
+    use tokio_tungstenite::tungstenite::Message;
+    use v3_server::transport::protocol::ServerMessage;
+
+    let state = AppState::new();
+    let (ws_url, server_task) = spawn_ws_app(state.clone()).await;
+    let (mut socket, _) = connect_async(ws_url).await.expect("connect websocket");
+
+    socket
+        .send(Message::Text(
+            serde_json::json!({
+                "type": "subscribe_view",
+                "request_id": 5u64,
+                "x": 40u16,
+                "y": 40u16,
+                "width": 8u16,
+                "height": 8u16,
+                "canvas_width": 320u16,
+                "canvas_height": 240u16,
+                "zoom_tier": "detail"
+            })
+            .to_string(),
+        ))
+        .await
+        .expect("send subscribe");
+
+    let initial_messages = recv_server_messages(&mut socket).await;
+    assert!(
+        initial_messages.iter().any(|message| matches!(
+            message,
+            ServerMessage::ViewDetail { request_id, .. } if *request_id == 5
+        )),
+        "initial subscribe should deliver a detail view: {initial_messages:?}"
+    );
+
+    let (paint_status, _) = do_request(
+        router(state),
+        post_json(
+            "/v3/simulation/paint",
+            r#"{"tool":"food","brush_half_extent":0,"points":[{"x":1,"y":1}]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(paint_status, StatusCode::OK);
+
+    assert!(
+        timeout(Duration::from_millis(150), socket.next())
+            .await
+            .is_err(),
+        "non-overlapping paint should not refresh an unrelated subscribed view"
+    );
+
+    server_task.abort();
+}
+
+// ── 39. ws_non_overlapping_barrier_paint_rebroadcasts_world_static_only ────
+
+#[tokio::test]
+async fn ws_non_overlapping_barrier_paint_rebroadcasts_world_static_only() {
+    use futures_util::SinkExt;
+    use tokio_tungstenite::connect_async;
+    use tokio_tungstenite::tungstenite::Message;
+    use v3_server::transport::protocol::ServerMessage;
+
+    let state = AppState::new();
+    let (ws_url, server_task) = spawn_ws_app(state.clone()).await;
+    let (mut socket, _) = connect_async(ws_url).await.expect("connect websocket");
+
+    socket
+        .send(Message::Text(
+            serde_json::json!({
+                "type": "subscribe_view",
+                "request_id": 6u64,
+                "x": 40u16,
+                "y": 40u16,
+                "width": 8u16,
+                "height": 8u16,
+                "canvas_width": 320u16,
+                "canvas_height": 240u16,
+                "zoom_tier": "detail"
+            })
+            .to_string(),
+        ))
+        .await
+        .expect("send subscribe");
+
+    let initial_messages = recv_server_messages(&mut socket).await;
+    assert!(
+        initial_messages.iter().any(|message| matches!(
+            message,
+            ServerMessage::ViewDetail { request_id, .. } if *request_id == 6
+        )),
+        "initial subscribe should deliver a detail view: {initial_messages:?}"
+    );
+
+    let (paint_status, _) = do_request(
+        router(state),
+        post_json(
+            "/v3/simulation/paint",
+            r#"{"tool":"barrier","brush_half_extent":0,"points":[{"x":1,"y":1}]}"#,
+        ),
+    )
+    .await;
+    assert_eq!(paint_status, StatusCode::OK);
+
+    let messages = recv_server_messages(&mut socket).await;
+    assert!(
+        messages
+            .iter()
+            .any(|message| matches!(message, ServerMessage::WorldStatic { .. })),
+        "barrier paint must rebroadcast world_static globally: {messages:?}"
+    );
+    assert!(
+        !messages.iter().any(|message| matches!(
+            message,
+            ServerMessage::ViewOverview { .. } | ServerMessage::ViewDetail { .. }
+        )),
+        "non-overlapping barrier paint must not resend the current viewport: {messages:?}"
+    );
+
+    server_task.abort();
 }

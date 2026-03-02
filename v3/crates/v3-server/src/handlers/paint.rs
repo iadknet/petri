@@ -6,7 +6,8 @@ use v3_core::kernel::paint::{PaintPoint, PaintStats, PaintTool};
 
 use crate::error::{AppError, FieldError};
 use crate::handlers::lifecycle::build_ws_frame;
-use crate::state::{AppState, SimulationStatus, WsFrame};
+use crate::query::cache::{paint_dirty_rect, world_static_changed, DirtyRect};
+use crate::state::{AppState, SimulationStatus};
 use crate::types::PROTOCOL_VERSION;
 
 #[derive(Debug, Deserialize)]
@@ -26,7 +27,8 @@ pub struct PaintPointDto {
 struct PaintResponse {
     protocol_version: &'static str,
     stats: PaintStats,
-    frame: WsFrame,
+    dirty_rect: DirtyRect,
+    world_static_changed: bool,
 }
 
 pub async fn paint(
@@ -85,23 +87,29 @@ pub async fn paint(
         .collect();
 
     if points.is_empty() {
-        let frame = build_ws_frame(&handle);
         return Ok(Json(PaintResponse {
             protocol_version: PROTOCOL_VERSION,
             stats: PaintStats::default(),
-            frame,
+            dirty_rect: DirtyRect::empty(),
+            world_static_changed: false,
         }));
     }
 
+    let dirty_rect =
+        paint_dirty_rect(w, h, req.brush_half_extent, &points).unwrap_or_else(DirtyRect::empty);
     let stats = handle
         .sim
         .apply_paint(req.tool, req.brush_half_extent, &points);
+    let static_changed = world_static_changed(req.tool, &stats);
 
     let frame = build_ws_frame(&handle);
+    drop(handle);
+    app.publish_ws_frame_update(frame, Some(dirty_rect), static_changed);
 
     Ok(Json(PaintResponse {
         protocol_version: PROTOCOL_VERSION,
         stats,
-        frame,
+        dirty_rect,
+        world_static_changed: static_changed,
     }))
 }

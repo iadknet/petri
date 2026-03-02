@@ -1,18 +1,23 @@
-import { decode } from "@msgpack/msgpack";
-import { useSimulationStore } from "../stores/simulation.ts";
-import { useStatsHistoryStore } from "../stores/stats.ts";
-import type { WsFrame } from "../types/api.ts";
-import { api } from "./rest.ts";
+import type { ClientMessage } from "../types/api.ts";
+import {
+	type WsClientEvent,
+	type WsConnectionStatus,
+	decodeServerMessage,
+	encodeClientMessage,
+} from "./protocol.ts";
 
 const BACKOFF_BASE = 1000;
 const BACKOFF_CAP = 10000;
+
+type WsListener = (event: WsClientEvent) => void;
 
 export class WsClient {
 	private ws: WebSocket | null = null;
 	private reconnectAttempt = 0;
 	private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
 	private disposed = false;
-	private url: string;
+	private readonly url: string;
+	private readonly listeners = new Set<WsListener>();
 
 	constructor(url?: string) {
 		const base = import.meta.env.VITE_API_URL ?? window.location.origin;
@@ -20,12 +25,18 @@ export class WsClient {
 		this.url = url ?? `${wsBase}/v3/ws`;
 	}
 
+	subscribe(listener: WsListener): () => void {
+		this.listeners.add(listener);
+		return () => {
+			this.listeners.delete(listener);
+		};
+	}
+
 	connect(): void {
 		this.disposed = false;
 		if (this.ws) return;
 
-		const sim = useSimulationStore.getState();
-		sim.setConnectionStatus("connecting");
+		this.emitConnection("connecting");
 
 		const socket = new WebSocket(this.url);
 		socket.binaryType = "arraybuffer";
@@ -34,8 +45,7 @@ export class WsClient {
 		socket.onopen = () => {
 			if (this.ws !== socket) return;
 			this.reconnectAttempt = 0;
-			useSimulationStore.getState().setConnectionStatus("connected");
-			this.resync();
+			this.emitConnection("connected");
 		};
 
 		socket.onmessage = (event) => {
@@ -46,7 +56,7 @@ export class WsClient {
 		socket.onclose = () => {
 			if (this.ws !== socket) return;
 			this.ws = null;
-			useSimulationStore.getState().setConnectionStatus("disconnected");
+			this.emitConnection("disconnected");
 			this.scheduleReconnect();
 		};
 
@@ -62,103 +72,44 @@ export class WsClient {
 			clearTimeout(this.reconnectTimer);
 			this.reconnectTimer = null;
 		}
-		if (this.ws) {
-			this.ws.onopen = null;
-			this.ws.onmessage = null;
-			this.ws.onclose = null;
-			this.ws.onerror = null;
-			this.ws.close();
-		}
-		this.ws = null;
-	}
 
-	private handleMessage(data: ArrayBuffer): void {
-		let frame: WsFrame;
-		try {
-			frame = decode(new Uint8Array(data)) as WsFrame;
-		} catch {
+		if (!this.ws) {
 			return;
 		}
 
-		const sim = useSimulationStore.getState();
-		const stats = useStatsHistoryStore.getState();
+		this.ws.onopen = null;
+		this.ws.onmessage = null;
+		this.ws.onclose = null;
+		this.ws.onerror = null;
+		this.ws.close();
 
-		sim.setStatus(frame.tick, frame.status);
-		stats.pushStats(frame.tick, frame.status.population, frame.status.mean_energy);
-		stats.pushActions(frame.tick, frame.status.last_tick_actions);
-		stats.pushCompute(
-			frame.tick,
-			frame.status.last_tick_compute_total_mean,
-			frame.status.last_tick_compute_total_min,
-			frame.status.last_tick_compute_total_max,
-			frame.status.last_tick_compute_vm_mean,
-			frame.status.last_tick_compute_graph_mean,
-		);
-
-		sim.setFrame(frame.tick, frame.frame);
-
-		sim.setHealth(frame.tick, frame.health);
-		stats.setReproStats(
-			frame.health.reproduction_actions_attempted_total,
-			frame.health.reproduction_actions_spawned_total,
-			frame.health.reproduction_actions_rejected_total,
-			frame.health.reproduction_actions_rejected_total_by_reason,
-		);
-		stats.setMutationStats(
-			frame.health.mutation_events_attempted_total,
-			frame.health.mutation_events_applied_total,
-			frame.health.mutation_events_skipped_total,
-		);
-		stats.setPredationStats(
-			frame.health.predation_actions_attempted_total,
-			frame.health.predation_actions_transferred_total,
-			frame.health.predation_actions_rejected_total,
-			frame.health.predation_kills_total,
-			frame.health.predation_actions_by_result,
-		);
-		sim.setPredationEvents(frame.predation_events);
-		stats.pushComplexity(
-			frame.tick,
-			frame.health.genome_complexity_mean,
-			frame.health.genome_complexity_min,
-			frame.health.genome_complexity_max,
-		);
+		this.ws = null;
+		this.emitConnection("disconnected");
 	}
 
-	private async resync(): Promise<void> {
-		try {
-			const [status, frame] = await Promise.all([api.getStatus(), api.getFrame()]);
-			const sim = useSimulationStore.getState();
-			sim.setStatus(status.tick, {
-				state: status.state,
-				population: status.population,
-				mean_energy: status.mean_energy,
-				last_tick_actions: status.last_tick_actions,
-				reproduction_actions_attempted_total: status.reproduction_actions_attempted_total,
-				reproduction_actions_spawned_total: status.reproduction_actions_spawned_total,
-				reproduction_actions_rejected_total: status.reproduction_actions_rejected_total,
-				predation_actions_attempted_total: status.predation_actions_attempted_total,
-				predation_actions_transferred_total: status.predation_actions_transferred_total,
-				predation_actions_rejected_total: status.predation_actions_rejected_total,
-				predation_kills_total: status.predation_kills_total,
-				last_tick_compute_total_mean: status.last_tick_compute_total_mean,
-				last_tick_compute_total_min: status.last_tick_compute_total_min,
-				last_tick_compute_total_max: status.last_tick_compute_total_max,
-				last_tick_compute_vm_mean: status.last_tick_compute_vm_mean,
-				last_tick_compute_graph_mean: status.last_tick_compute_graph_mean,
-			});
-			sim.setFrame(frame.tick, {
-				width: frame.width,
-				height: frame.height,
-				creatures: frame.creatures,
-				food: frame.food,
-				barriers: frame.barriers,
-			});
-			// Clear transient events — REST status does not include per-tick events
-			sim.setPredationEvents([]);
-		} catch {
-			// Resync failure is non-fatal; next WS events will update state
+	send(message: ClientMessage): boolean {
+		if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+			return false;
 		}
+
+		this.ws.send(encodeClientMessage(message));
+		return true;
+	}
+
+	private handleMessage(data: ArrayBuffer): void {
+		const message = decodeServerMessage(data);
+		if (!message) return;
+		this.emit({ type: "message", message });
+	}
+
+	private emit(event: WsClientEvent): void {
+		for (const listener of this.listeners) {
+			listener(event);
+		}
+	}
+
+	private emitConnection(status: WsConnectionStatus): void {
+		this.emit({ type: "connection", status });
 	}
 
 	private scheduleReconnect(): void {
@@ -172,5 +123,4 @@ export class WsClient {
 	}
 }
 
-/** Singleton instance */
 export const wsClient = new WsClient();

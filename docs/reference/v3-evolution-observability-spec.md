@@ -78,6 +78,8 @@ Core accounting representation guidance:
   on hot paths.
 - String-key maps are a transport concern and should be produced at API/CLI
   boundaries only.
+- Counters with `last_tick_compute_*` naming represent simulation energy-cost
+  accounting, not wall-clock latency.
 
 Mutation accounting invariants:
 - `mutation_events_attempted_total =
@@ -174,7 +176,23 @@ reason breakdowns remain mandatory.
 
 ---
 
-## 6. Counter Rename Note
+## 6. Transport-Facing Perf Telemetry
+
+Wall-clock transport/runtime timings are a separate concern from the required
+observability counters above.
+
+Rules:
+- Wall-clock timing fields (for example projection capture, view assembly, or
+  payload size metrics) are transport/runtime telemetry, not simulation
+  accounting.
+- Implementations must not relabel behavior-backed energy-cost counters as
+  wall-clock timings.
+- If both are exposed together, APIs should distinguish them clearly, for
+  example via separate field groups or unambiguous naming.
+
+---
+
+## 7. Counter Rename Note
 
 This immediate-action model replaces earlier counter names.
 
@@ -190,7 +208,7 @@ Removed from minimum required set:
 
 ---
 
-## 7. Policy References
+## 8. Policy References
 
 - Project-level determinism scope is canonical in `AGENTS.md`
   (`Determinism Scope (Canonical)`).

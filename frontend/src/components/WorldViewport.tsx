@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useRef } from "react";
+import { buildRenderModel } from "../canvas/renderModel.ts";
 import { WorldRenderer } from "../canvas/renderer.ts";
 import { useCreatureSelection } from "../hooks/useCreatureSelection.ts";
 import { usePaintInteraction } from "../hooks/usePaintInteraction.ts";
 import { useCreatureInspectorStore } from "../stores/creatureInspector.ts";
 import { usePaintStore } from "../stores/paint.ts";
 import { useSimulationStore } from "../stores/simulation.ts";
+import { useViewportStore } from "../stores/viewport.ts";
+import { useWorldViewStore } from "../stores/worldView.ts";
 import { PaintToolbar } from "./PaintToolbar.tsx";
 import { ZoomControls } from "./ZoomControls.tsx";
 
@@ -16,6 +19,8 @@ export function WorldViewport() {
 
 	const paintMode = usePaintStore((s) => s.paintMode);
 	const simState = useSimulationStore((s) => s.simState);
+	const setCamera = useViewportStore((s) => s.setCamera);
+	const setCanvasSize = useViewportStore((s) => s.setCanvasSize);
 
 	const {
 		handleMouseDown: paintMouseDown,
@@ -33,8 +38,17 @@ export function WorldViewport() {
 		if (!canvas) return;
 
 		const renderer = new WorldRenderer(canvas, () => {
-			const state = useSimulationStore.getState();
-			return { frame: state.frame, tick: state.tick, predationEvents: state.predationEvents };
+			const sim = useSimulationStore.getState();
+			const viewport = useViewportStore.getState();
+			const worldView = useWorldViewStore.getState();
+			return buildRenderModel({
+				frame: worldView.frame,
+				overviewView:
+					worldView.currentView?.kind === "overview" ? worldView.currentView.payload : null,
+				tick: sim.tick,
+				predationEvents: worldView.predationEvents,
+				camera: viewport.camera,
+			});
 		});
 
 		rendererRef.current = renderer;
@@ -56,10 +70,12 @@ export function WorldViewport() {
 			if (!entry) return;
 			const { width, height } = entry.contentRect;
 			renderer.resize(Math.floor(width), Math.floor(height));
+			setCanvasSize(Math.floor(width), Math.floor(height));
 
-			const frame = useSimulationStore.getState().frame;
+			const frame = useWorldViewStore.getState().frame;
 			if (frame) {
-				renderer.fitToWorld(frame.width, frame.height);
+				setCamera(renderer.fitToWorld(frame.width, frame.height));
+				renderer.invalidate();
 			}
 		});
 		observer.observe(container);
@@ -68,13 +84,35 @@ export function WorldViewport() {
 			renderer.stop();
 			observer.disconnect();
 		};
-	}, [initRenderer]);
+	}, [initRenderer, setCamera, setCanvasSize]);
 
 	// Fit to world when first frame arrives
 	useEffect(() => {
-		return useSimulationStore.subscribe((state, prev) => {
+		return useWorldViewStore.subscribe((state, prev) => {
 			if (!prev.frame && state.frame && rendererRef.current) {
-				rendererRef.current.fitToWorld(state.frame.width, state.frame.height);
+				setCamera(rendererRef.current.fitToWorld(state.frame.width, state.frame.height));
+				rendererRef.current.invalidate();
+				return;
+			}
+
+			if (
+				rendererRef.current &&
+				(state.frame !== prev.frame || state.predationEvents !== prev.predationEvents)
+			) {
+				rendererRef.current.invalidate();
+			}
+		});
+	}, [setCamera]);
+
+	// Re-render when camera changes
+	useEffect(() => {
+		return useViewportStore.subscribe((state, prev) => {
+			if (
+				state.camera.x !== prev.camera.x ||
+				state.camera.y !== prev.camera.y ||
+				state.camera.zoom !== prev.camera.zoom
+			) {
+				rendererRef.current?.invalidate();
 			}
 		});
 	}, []);
@@ -99,7 +137,11 @@ export function WorldViewport() {
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			if (e.key === "Home" && rendererRef.current) {
-				rendererRef.current.resetView();
+				const frame = useWorldViewStore.getState().frame;
+				if (frame) {
+					setCamera(rendererRef.current.resetView(frame));
+					rendererRef.current.invalidate();
+				}
 			}
 			if (e.key === "Escape") {
 				useCreatureInspectorStore.getState().clearSelection();
@@ -107,13 +149,20 @@ export function WorldViewport() {
 		};
 		window.addEventListener("keydown", handleKeyDown);
 		return () => window.removeEventListener("keydown", handleKeyDown);
-	}, []);
+	}, [setCamera]);
 
 	// Mouse wheel zoom
-	const handleWheel = useCallback((e: React.WheelEvent) => {
-		e.preventDefault();
-		rendererRef.current?.zoomAt(e.clientX, e.clientY, e.deltaY);
-	}, []);
+	const handleWheel = useCallback(
+		(e: React.WheelEvent) => {
+			e.preventDefault();
+			const renderer = rendererRef.current;
+			if (!renderer) return;
+			const camera = useViewportStore.getState().camera;
+			setCamera(renderer.zoomAt(camera, e.clientX, e.clientY, e.deltaY));
+			renderer.invalidate();
+		},
+		[setCamera],
+	);
 
 	// Pan: mouse down
 	const handleMouseDown = useCallback(
@@ -140,7 +189,11 @@ export function WorldViewport() {
 					const dx = e.clientX - dragRef.current.startX;
 					const dy = e.clientY - dragRef.current.startY;
 					dragRef.current = { startX: e.clientX, startY: e.clientY };
-					rendererRef.current?.pan(dx, dy);
+					const renderer = rendererRef.current;
+					if (renderer) {
+						setCamera(renderer.pan(useViewportStore.getState().camera, dx, dy));
+						renderer.invalidate();
+					}
 				}
 				return;
 			}
@@ -148,10 +201,14 @@ export function WorldViewport() {
 				const dx = e.clientX - dragRef.current.startX;
 				const dy = e.clientY - dragRef.current.startY;
 				dragRef.current = { startX: e.clientX, startY: e.clientY };
-				rendererRef.current?.pan(dx, dy);
+				const renderer = rendererRef.current;
+				if (renderer) {
+					setCamera(renderer.pan(useViewportStore.getState().camera, dx, dy));
+					renderer.invalidate();
+				}
 			}
 		},
-		[paintMode, paintMouseMove],
+		[paintMode, paintMouseMove, setCamera],
 	);
 
 	// Pan: mouse up
@@ -184,10 +241,12 @@ export function WorldViewport() {
 			if (paintMode) return;
 			const renderer = rendererRef.current;
 			if (!renderer) return;
-			const world = renderer.canvasToWorld(e.clientX, e.clientY);
-			renderer.centerOn(world.x, world.y, 4);
+			const camera = useViewportStore.getState().camera;
+			const world = renderer.canvasToWorld(camera, e.clientX, e.clientY);
+			setCamera(renderer.centerOn(world.x, world.y, 4));
+			renderer.invalidate();
 		},
-		[paintMode],
+		[paintMode, setCamera],
 	);
 
 	const handleMouseEnter = useCallback(
@@ -212,16 +271,26 @@ export function WorldViewport() {
 	}, [paintMode, paintMouseUp, clearPreview, brushOverlayRef]);
 
 	const handleZoomIn = useCallback(() => {
-		rendererRef.current?.zoomCenter(-1);
-	}, []);
+		const renderer = rendererRef.current;
+		if (!renderer) return;
+		setCamera(renderer.zoomCenter(useViewportStore.getState().camera, -1));
+		renderer.invalidate();
+	}, [setCamera]);
 
 	const handleZoomOut = useCallback(() => {
-		rendererRef.current?.zoomCenter(1);
-	}, []);
+		const renderer = rendererRef.current;
+		if (!renderer) return;
+		setCamera(renderer.zoomCenter(useViewportStore.getState().camera, 1));
+		renderer.invalidate();
+	}, [setCamera]);
 
 	const handleFitToWorld = useCallback(() => {
-		rendererRef.current?.resetView();
-	}, []);
+		const renderer = rendererRef.current;
+		const frame = useWorldViewStore.getState().frame;
+		if (!renderer || !frame) return;
+		setCamera(renderer.resetView(frame));
+		renderer.invalidate();
+	}, [setCamera]);
 
 	const canTogglePaint = simState === "idle" || simState === "paused";
 	const togglePaintMode = usePaintStore((s) => s.togglePaintMode);

@@ -1,5 +1,16 @@
-import type { Creature, Frame, PaintTool, PredationEvent } from "../types/api.ts";
+import type { Creature, Frame, PaintTool } from "../types/api.ts";
+import {
+	type CameraState,
+	canvasToViewportPoint,
+	canvasToWorldPoint,
+	centerCameraOnWorldPoint,
+	fitCameraToWorld,
+	panCamera,
+	zoomCameraAtCanvasPoint,
+	zoomCameraFromCenter,
+} from "./camera.ts";
 import { FlashOverlay } from "./flash-overlay.ts";
+import type { OverviewRenderLayer, RenderModel } from "./renderModel.ts";
 
 /** Background color: slate-950 (#020617) */
 const BG_R = 2;
@@ -16,15 +27,9 @@ const RECT_MODE_THRESHOLD = 4;
 /** Zoom threshold for detailed mode (energy bars, grid lines) */
 const DETAIL_MODE_THRESHOLD = 6;
 
-export interface Camera {
-	x: number;
-	y: number;
-	zoom: number;
-}
-
 export class WorldRenderer {
-	private canvas: HTMLCanvasElement;
-	private ctx: CanvasRenderingContext2D;
+	private readonly canvas: HTMLCanvasElement;
+	private readonly ctx: CanvasRenderingContext2D;
 	private imageData: ImageData | null = null;
 	private imageDataWidth = 0;
 	private imageDataHeight = 0;
@@ -32,18 +37,16 @@ export class WorldRenderer {
 	private offscreenCtx: OffscreenCanvasRenderingContext2D | null = null;
 	private lastRenderedTick = -1;
 	private rafId = 0;
-	private getFrame: () => { frame: Frame | null; tick: number; predationEvents: PredationEvent[] };
-	private flashOverlay = new FlashOverlay();
-
-	camera: Camera = { x: 0, y: 0, zoom: 1 };
+	private readonly getRenderModel: () => RenderModel | null;
+	private readonly flashOverlay = new FlashOverlay();
 	private previewCells: Set<string> | null = null;
 	private previewTool: PaintTool | null = null;
 	private selectedCreatureId: number | null = null;
 
-	constructor(canvas: HTMLCanvasElement, getFrame: () => { frame: Frame | null; tick: number; predationEvents: PredationEvent[] }) {
+	constructor(canvas: HTMLCanvasElement, getRenderModel: () => RenderModel | null) {
 		this.canvas = canvas;
 		this.ctx = canvas.getContext("2d", { alpha: false })!;
-		this.getFrame = getFrame;
+		this.getRenderModel = getRenderModel;
 	}
 
 	start(): void {
@@ -63,12 +66,71 @@ export class WorldRenderer {
 		this.canvas.height = height;
 	}
 
-	fitToWorld(worldWidth: number, worldHeight: number): void {
-		const scaleX = this.canvas.width / worldWidth;
-		const scaleY = this.canvas.height / worldHeight;
-		this.camera.zoom = Math.min(scaleX, scaleY);
-		this.camera.x = (this.canvas.width - worldWidth * this.camera.zoom) / 2;
-		this.camera.y = (this.canvas.height - worldHeight * this.camera.zoom) / 2;
+	fitToWorld(worldWidth: number, worldHeight: number): CameraState {
+		return fitCameraToWorld(
+			{ width: this.canvas.width, height: this.canvas.height },
+			{ width: worldWidth, height: worldHeight },
+		);
+	}
+
+	zoomAt(camera: CameraState, clientX: number, clientY: number, delta: number): CameraState {
+		const rect = this.canvas.getBoundingClientRect();
+		const scaleX = this.canvas.width / rect.width;
+		const scaleY = this.canvas.height / rect.height;
+		const canvasPoint = {
+			x: (clientX - rect.left) * scaleX,
+			y: (clientY - rect.top) * scaleY,
+		};
+
+		return zoomCameraAtCanvasPoint(camera, canvasPoint, delta);
+	}
+
+	zoomCenter(camera: CameraState, delta: number): CameraState {
+		return zoomCameraFromCenter(
+			camera,
+			{ width: this.canvas.width, height: this.canvas.height },
+			delta,
+		);
+	}
+
+	pan(camera: CameraState, dx: number, dy: number): CameraState {
+		return panCamera(camera, dx, dy);
+	}
+
+	centerOn(worldX: number, worldY: number, zoom?: number): CameraState {
+		return centerCameraOnWorldPoint(
+			{ width: this.canvas.width, height: this.canvas.height },
+			{ x: worldX, y: worldY },
+			zoom,
+		);
+	}
+
+	resetView(frame: Frame): CameraState {
+		return this.fitToWorld(frame.width, frame.height);
+	}
+
+	canvasToWorld(camera: CameraState, clientX: number, clientY: number): { x: number; y: number } {
+		return canvasToWorldPoint(this.canvas, camera, clientX, clientY);
+	}
+
+	canvasToViewport(canvasX: number, canvasY: number): { x: number; y: number } {
+		return canvasToViewportPoint(this.canvas, { x: canvasX, y: canvasY });
+	}
+
+	/** Force re-render on next frame (e.g. after camera change) */
+	invalidate(): void {
+		this.lastRenderedTick = -1;
+	}
+
+	/** Update paint preview overlay. Pass null to clear. */
+	setPreview(cells: Set<string> | null, tool: PaintTool | null): void {
+		this.previewCells = cells;
+		this.previewTool = tool;
+	}
+
+	setSelectedCreature(id: number | null): void {
+		this.selectedCreatureId = id;
+		this.invalidate();
 	}
 
 	private ensureImageData(w: number, h: number): ImageData {
@@ -88,139 +150,50 @@ export class WorldRenderer {
 		return this.offscreenCtx!;
 	}
 
-	/** Force re-render on next frame (e.g. after camera change) */
-	invalidate(): void {
-		this.lastRenderedTick = -1;
-	}
-
-	/** Update paint preview overlay. Pass null to clear. */
-	setPreview(cells: Set<string> | null, tool: PaintTool | null): void {
-		this.previewCells = cells;
-		this.previewTool = tool;
-	}
-
-	setSelectedCreature(id: number | null): void {
-		this.selectedCreatureId = id;
-		this.invalidate();
-	}
-
-	zoomAt(clientX: number, clientY: number, delta: number): void {
-		const rect = this.canvas.getBoundingClientRect();
-		const scaleX = this.canvas.width / rect.width;
-		const scaleY = this.canvas.height / rect.height;
-		const mx = (clientX - rect.left) * scaleX;
-		const my = (clientY - rect.top) * scaleY;
-
-		const factor = delta > 0 ? 0.9 : 1.1;
-		const newZoom = Math.max(0.5, Math.min(20, this.camera.zoom * factor));
-		const ratio = newZoom / this.camera.zoom;
-
-		this.camera.x = mx - (mx - this.camera.x) * ratio;
-		this.camera.y = my - (my - this.camera.y) * ratio;
-		this.camera.zoom = newZoom;
-		this.invalidate();
-	}
-
-	/** Zoom toward/from the canvas center */
-	zoomCenter(delta: number): void {
-		const cx = this.canvas.width / 2;
-		const cy = this.canvas.height / 2;
-		const factor = delta > 0 ? 0.9 : 1.1;
-		const newZoom = Math.max(0.5, Math.min(20, this.camera.zoom * factor));
-		const ratio = newZoom / this.camera.zoom;
-		this.camera.x = cx - (cx - this.camera.x) * ratio;
-		this.camera.y = cy - (cy - this.camera.y) * ratio;
-		this.camera.zoom = newZoom;
-		this.invalidate();
-	}
-
-	pan(dx: number, dy: number): void {
-		this.camera.x += dx;
-		this.camera.y += dy;
-		this.invalidate();
-	}
-
-	centerOn(worldX: number, worldY: number, zoom?: number): void {
-		const z = zoom ?? 4;
-		this.camera.zoom = z;
-		this.camera.x = this.canvas.width / 2 - worldX * z;
-		this.camera.y = this.canvas.height / 2 - worldY * z;
-		this.invalidate();
-	}
-
-	resetView(): void {
-		const { frame } = this.getFrame();
-		if (frame) {
-			this.fitToWorld(frame.width, frame.height);
-			this.invalidate();
-		}
-	}
-
-	/** Convert canvas pixel to world cell coordinates */
-	canvasToWorld(clientX: number, clientY: number): { x: number; y: number } {
-		const rect = this.canvas.getBoundingClientRect();
-		const scaleX = this.canvas.width / rect.width;
-		const scaleY = this.canvas.height / rect.height;
-		const mx = (clientX - rect.left) * scaleX;
-		const my = (clientY - rect.top) * scaleY;
-		return {
-			x: Math.floor((mx - this.camera.x) / this.camera.zoom),
-			y: Math.floor((my - this.camera.y) / this.camera.zoom),
-		};
-	}
-
-	/** Convert canvas-local pixel position to viewport CSS coordinates */
-	canvasToViewport(canvasX: number, canvasY: number): { x: number; y: number } {
-		const rect = this.canvas.getBoundingClientRect();
-		return {
-			x: rect.left + canvasX * (rect.width / this.canvas.width),
-			y: rect.top + canvasY * (rect.height / this.canvas.height),
-		};
-	}
-
 	private render(): void {
-		const { frame, tick, predationEvents } = this.getFrame();
-		if (!frame) return;
+		const model = this.getRenderModel();
+		if (!model) return;
 
-		// Feed events to flash overlay on new ticks
+		const { frame, overview, tick, predationEvents, camera } = model;
+
 		if (tick !== this.lastRenderedTick) {
 			this.flashOverlay.update(predationEvents, frame.width);
 		} else {
-			// Decay flashes even on same tick (animation frames)
 			this.flashOverlay.update([], frame.width);
 		}
 
 		const hasPreview = this.previewCells !== null && this.previewCells.size > 0;
-		// Re-render when: new tick, active paint preview, or decaying flash animations.
-		// Setting lastRenderedTick here is correct even during flash-only frames — once
-		// flashes finish decaying, the guard skips re-renders until the next real tick.
-		if (tick === this.lastRenderedTick && !hasPreview && !this.flashOverlay.hasActiveFlashes) return;
+		if (tick === this.lastRenderedTick && !hasPreview && !this.flashOverlay.hasActiveFlashes) {
+			return;
+		}
 		this.lastRenderedTick = tick;
 
 		const { ctx, canvas } = this;
-		const { zoom } = this.camera;
+		const { zoom } = camera;
 
 		if (zoom < RECT_MODE_THRESHOLD) {
-			this.renderPixelMode(frame);
+			this.renderPixelMode(frame, camera, overview);
 		} else {
 			ctx.fillStyle = "#020617";
 			ctx.fillRect(0, 0, canvas.width, canvas.height);
-			this.renderRectMode(frame, zoom >= DETAIL_MODE_THRESHOLD);
+			this.renderRectMode(frame, camera, zoom >= DETAIL_MODE_THRESHOLD);
 		}
 	}
 
-	private renderPixelMode(frame: Frame): void {
+	private renderPixelMode(
+		frame: Frame,
+		camera: CameraState,
+		overview: OverviewRenderLayer | null,
+	): void {
 		const { ctx, canvas } = this;
 		const { width, height } = frame;
 
-		// Clear canvas so stale pixels don't bleed through at sub-pixel camera offsets
 		ctx.fillStyle = "#020617";
 		ctx.fillRect(0, 0, canvas.width, canvas.height);
 
 		const img = this.ensureImageData(width, height);
 		const data = img.data;
 
-		// Fill background
 		for (let i = 0; i < width * height; i++) {
 			const offset = i * 4;
 			data[offset] = BG_R;
@@ -229,39 +202,38 @@ export class WorldRenderer {
 			data[offset + 3] = 255;
 		}
 
-		// Food: green intensity mapped from density
-		for (const food of frame.food) {
-			const idx = (food.y * width + food.x) * 4;
-			const density = Math.max(0, Math.min(1, food.density));
-			const intensity = Math.min(255, Math.round(density * 180) + 30);
-			data[idx] = 0;
-			data[idx + 1] = intensity;
-			data[idx + 2] = 0;
-			data[idx + 3] = 255;
+		if (overview) {
+			this.drawOverviewPixels(data, width, height, overview);
+		} else {
+			for (const food of frame.food) {
+				const idx = (food.y * width + food.x) * 4;
+				const density = Math.max(0, Math.min(1, food.density));
+				const intensity = Math.min(255, Math.round(density * 180) + 30);
+				data[idx] = 0;
+				data[idx + 1] = intensity;
+				data[idx + 2] = 0;
+				data[idx + 3] = 255;
+			}
 		}
 
-		// Barriers
-		for (const b of frame.barriers) {
-			const idx = (b.y * width + b.x) * 4;
+		for (const barrier of frame.barriers) {
+			const idx = (barrier.y * width + barrier.x) * 4;
 			data[idx] = BARRIER_R;
 			data[idx + 1] = BARRIER_G;
 			data[idx + 2] = BARRIER_B;
 			data[idx + 3] = 255;
 		}
 
-		// Creatures on top
-		for (const c of frame.creatures) {
-			const idx = (c.y * width + c.x) * 4;
-			data[idx] = c.phenotype_rgb[0];
-			data[idx + 1] = c.phenotype_rgb[1];
-			data[idx + 2] = c.phenotype_rgb[2];
+		for (const creature of frame.creatures) {
+			const idx = (creature.y * width + creature.x) * 4;
+			data[idx] = creature.phenotype_rgb[0];
+			data[idx + 1] = creature.phenotype_rgb[1];
+			data[idx + 2] = creature.phenotype_rgb[2];
 			data[idx + 3] = 255;
 		}
 
-		// Predation flash overlay
 		this.flashOverlay.applyToImageData(data);
 
-		// Paint preview overlay (40% alpha blend)
 		if (this.previewCells && this.previewTool) {
 			const [pr, pg, pb] = this.previewColor(this.previewTool);
 			for (const key of this.previewCells) {
@@ -270,7 +242,6 @@ export class WorldRenderer {
 				const py = Number.parseInt(key.substring(sep + 1), 10);
 				if (px < 0 || py < 0 || px >= width || py >= height) continue;
 				const idx = (py * width + px) * 4;
-				// Alpha blend at 40%
 				const alpha = 0.4;
 				data[idx] = Math.round(data[idx]! * (1 - alpha) + pr * alpha);
 				data[idx + 1] = Math.round(data[idx + 1]! * (1 - alpha) + pg * alpha);
@@ -278,12 +249,10 @@ export class WorldRenderer {
 			}
 		}
 
-		// Selection marker for selected creature
 		if (this.selectedCreatureId !== null) {
-			const sel = frame.creatures.find((c) => c.id === this.selectedCreatureId);
-			if (sel) {
-				const idx = (sel.y * width + sel.x) * 4;
-				// Emerald marker: override pixel to bright emerald
+			const selected = frame.creatures.find((creature) => creature.id === this.selectedCreatureId);
+			if (selected) {
+				const idx = (selected.y * width + selected.x) * 4;
 				data[idx] = 52;
 				data[idx + 1] = 211;
 				data[idx + 2] = 153;
@@ -291,25 +260,67 @@ export class WorldRenderer {
 			}
 		}
 
-		// Draw at world resolution then scale up
 		const offCtx = this.ensureOffscreen(width, height);
 		offCtx.putImageData(img, 0, 0);
 
 		ctx.imageSmoothingEnabled = false;
-		ctx.drawImage(
-			this.offscreen!,
-			this.camera.x,
-			this.camera.y,
-			width * this.camera.zoom,
-			height * this.camera.zoom,
-		);
+		ctx.drawImage(this.offscreen!, camera.x, camera.y, width * camera.zoom, height * camera.zoom);
 	}
 
-	private renderRectMode(frame: Frame, detailed: boolean): void {
-		const { ctx } = this;
-		const { x: cx, y: cy, zoom } = this.camera;
+	private drawOverviewPixels(
+		data: Uint8ClampedArray,
+		worldWidth: number,
+		worldHeight: number,
+		overview: OverviewRenderLayer,
+	): void {
+		const maxCreatureCount = overview.creatureCounts.reduce(
+			(max, count) => Math.max(max, count),
+			0,
+		);
 
-		// Food
+		for (let gridY = 0; gridY < overview.gridHeight; gridY++) {
+			const y0 = Math.floor(overview.rect.y + (gridY * overview.rect.height) / overview.gridHeight);
+			const y1 = Math.floor(
+				overview.rect.y + ((gridY + 1) * overview.rect.height) / overview.gridHeight,
+			);
+			const bucketTop = Math.max(0, Math.min(worldHeight, y0));
+			const bucketBottom = Math.max(bucketTop + 1, Math.min(worldHeight, Math.max(y1, y0 + 1)));
+
+			for (let gridX = 0; gridX < overview.gridWidth; gridX++) {
+				const index = gridY * overview.gridWidth + gridX;
+				const density = (overview.foodDensity[index] ?? 0) / 255;
+				const creatureCount = overview.creatureCounts[index] ?? 0;
+				if (density <= 0 && creatureCount <= 0) {
+					continue;
+				}
+
+				const x0 = Math.floor(overview.rect.x + (gridX * overview.rect.width) / overview.gridWidth);
+				const x1 = Math.floor(
+					overview.rect.x + ((gridX + 1) * overview.rect.width) / overview.gridWidth,
+				);
+				const bucketLeft = Math.max(0, Math.min(worldWidth, x0));
+				const bucketRight = Math.max(bucketLeft + 1, Math.min(worldWidth, Math.max(x1, x0 + 1)));
+				const creatureRatio = maxCreatureCount > 0 ? creatureCount / maxCreatureCount : 0;
+				const red = creatureCount > 0 ? Math.round(40 + creatureRatio * 180) : 0;
+				const green = Math.round(Math.max(density * 180 + 30, creatureRatio * 110));
+
+				for (let y = bucketTop; y < bucketBottom; y++) {
+					for (let x = bucketLeft; x < bucketRight; x++) {
+						const pixelIndex = (y * worldWidth + x) * 4;
+						data[pixelIndex] = red;
+						data[pixelIndex + 1] = green;
+						data[pixelIndex + 2] = 0;
+						data[pixelIndex + 3] = 255;
+					}
+				}
+			}
+		}
+	}
+
+	private renderRectMode(frame: Frame, camera: CameraState, detailed: boolean): void {
+		const { ctx } = this;
+		const { x: cx, y: cy, zoom } = camera;
+
 		for (const food of frame.food) {
 			const density = Math.max(0, Math.min(1, food.density));
 			const intensity = Math.min(255, Math.round(density * 180) + 30);
@@ -317,32 +328,27 @@ export class WorldRenderer {
 			ctx.fillRect(cx + food.x * zoom, cy + food.y * zoom, zoom, zoom);
 		}
 
-		// Barriers
 		ctx.fillStyle = `rgb(${BARRIER_R},${BARRIER_G},${BARRIER_B})`;
-		for (const b of frame.barriers) {
-			ctx.fillRect(cx + b.x * zoom, cy + b.y * zoom, zoom, zoom);
+		for (const barrier of frame.barriers) {
+			ctx.fillRect(cx + barrier.x * zoom, cy + barrier.y * zoom, zoom, zoom);
 		}
 
-		// Creatures
-		for (const c of frame.creatures) {
-			const [r, g, b] = c.phenotype_rgb;
+		for (const creature of frame.creatures) {
+			const [r, g, b] = creature.phenotype_rgb;
 			ctx.fillStyle = `rgb(${r},${g},${b})`;
-			ctx.fillRect(cx + c.x * zoom + 0.5, cy + c.y * zoom + 0.5, zoom - 1, zoom - 1);
+			ctx.fillRect(cx + creature.x * zoom + 0.5, cy + creature.y * zoom + 0.5, zoom - 1, zoom - 1);
 
 			if (detailed) {
-				this.drawCreatureDetail(c, cx + c.x * zoom, cy + c.y * zoom, zoom);
+				this.drawCreatureDetail(creature, cx + creature.x * zoom, cy + creature.y * zoom, zoom);
 			}
 		}
 
-		// Predation flash overlay
-		this.flashOverlay.drawRects(ctx, this.camera);
+		this.flashOverlay.drawRects(ctx, camera);
 
-		// Grid lines in detailed mode
 		if (detailed) {
-			this.drawGrid(frame.width, frame.height);
+			this.drawGrid(frame.width, frame.height, camera);
 		}
 
-		// Paint preview overlay
 		if (this.previewCells && this.previewTool) {
 			const [pr, pg, pb] = this.previewColor(this.previewTool);
 			ctx.fillStyle = `rgba(${pr},${pg},${pb},0.4)`;
@@ -354,23 +360,21 @@ export class WorldRenderer {
 			}
 		}
 
-		// Selection highlight for selected creature
 		if (this.selectedCreatureId !== null) {
-			const sel = frame.creatures.find((c) => c.id === this.selectedCreatureId);
-			if (sel) {
+			const selected = frame.creatures.find((creature) => creature.id === this.selectedCreatureId);
+			if (selected) {
 				ctx.strokeStyle = "#34d399";
 				ctx.lineWidth = 2;
-				ctx.strokeRect(cx + sel.x * zoom + 1, cy + sel.y * zoom + 1, zoom - 2, zoom - 2);
+				ctx.strokeRect(cx + selected.x * zoom + 1, cy + selected.y * zoom + 1, zoom - 2, zoom - 2);
 			}
 		}
 	}
 
-	private drawCreatureDetail(c: Creature, px: number, py: number, cellSize: number): void {
+	private drawCreatureDetail(creature: Creature, px: number, py: number, cellSize: number): void {
 		const { ctx } = this;
-		// Energy bar below creature
 		const barHeight = Math.max(2, cellSize * 0.15);
 		const barWidth = cellSize - 1;
-		const energyRatio = Math.min(1, c.energy / 100);
+		const energyRatio = Math.min(1, creature.energy / 100);
 
 		ctx.fillStyle = "rgba(0,0,0,0.6)";
 		ctx.fillRect(px + 0.5, py + cellSize - barHeight, barWidth, barHeight);
@@ -379,9 +383,9 @@ export class WorldRenderer {
 		ctx.fillRect(px + 0.5, py + cellSize - barHeight, barWidth * energyRatio, barHeight);
 	}
 
-	private drawGrid(worldWidth: number, worldHeight: number): void {
+	private drawGrid(worldWidth: number, worldHeight: number, camera: CameraState): void {
 		const { ctx } = this;
-		const { x: cx, y: cy, zoom } = this.camera;
+		const { x: cx, y: cy, zoom } = camera;
 
 		ctx.strokeStyle = "rgba(148,163,184,0.1)";
 		ctx.lineWidth = 0.5;
@@ -402,7 +406,7 @@ export class WorldRenderer {
 	private previewColor(tool: PaintTool): [number, number, number] {
 		switch (tool) {
 			case "barrier":
-				return [220, 120, 50]; // Bright orange preview (committed result stays dark rust)
+				return [220, 120, 50];
 			case "food":
 				return [0, 180, 0];
 			case "erase_barrier":

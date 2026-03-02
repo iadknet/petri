@@ -1,10 +1,16 @@
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
+use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
 use tokio::sync::{broadcast, Mutex};
 use v3_core::config::SimulationConfig;
 use v3_core::simulation::{seed_simulation, Simulation};
+
+use crate::query::cache::DirtyRect;
+use crate::query::projection::ProjectionStore;
+use crate::transport::session::ProjectionNotice;
+use crate::transport::session_registry::SessionRegistry;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -145,16 +151,59 @@ pub struct WsFrame {
 #[derive(Clone)]
 pub struct AppState {
     pub sim: Arc<Mutex<SimHandle>>,
-    pub ws_tx: broadcast::Sender<Vec<u8>>,
+    pub projection: Arc<RwLock<ProjectionStore>>,
+    pub perf: Arc<RwLock<TransportPerfSnapshot>>,
+    pub sessions: Arc<RwLock<SessionRegistry>>,
+    pub ws_tx: broadcast::Sender<ProjectionNotice>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct TransportPerfSnapshot {
+    pub projection_publish_ms: f64,
+    pub ws_frame_publish_ms: f64,
 }
 
 impl AppState {
     pub fn new() -> Self {
+        let handle = SimHandle::new_default();
         let (ws_tx, _) = broadcast::channel(16);
         Self {
-            sim: Arc::new(Mutex::new(SimHandle::new_default())),
+            projection: Arc::new(RwLock::new(ProjectionStore::from_handle(&handle))),
+            perf: Arc::new(RwLock::new(TransportPerfSnapshot::default())),
+            sessions: Arc::new(RwLock::new(SessionRegistry::default())),
+            sim: Arc::new(Mutex::new(handle)),
             ws_tx,
         }
+    }
+
+    pub fn publish_ws_frame(&self, frame: WsFrame) {
+        self.publish_ws_frame_update(frame, None, false);
+    }
+
+    pub fn publish_ws_frame_update(
+        &self,
+        frame: WsFrame,
+        dirty_rect: Option<DirtyRect>,
+        world_static_changed: bool,
+    ) {
+        let started = Instant::now();
+        let snapshot = self
+            .projection
+            .write()
+            .expect("projection lock poisoned")
+            .publish_ws_frame(frame);
+        let projection_publish_ms = started.elapsed().as_secs_f64() * 1_000.0;
+        // Perf timing is diagnostic telemetry only. Readers may briefly observe the
+        // new projection revision with the prior wall-clock timing until this write
+        // follows, which is acceptable for non-authoritative transport metrics.
+        let mut perf = self.perf.write().expect("perf lock poisoned");
+        perf.projection_publish_ms = projection_publish_ms;
+        perf.ws_frame_publish_ms = started.elapsed().as_secs_f64() * 1_000.0;
+        let _ = self.ws_tx.send(ProjectionNotice {
+            projection_revision: snapshot.projection_revision,
+            dirty_rect,
+            world_static_changed,
+        });
     }
 }
 

@@ -69,6 +69,13 @@ export function assertAgentBrowserSuccess(
 	return envelope;
 }
 
+export function unwrapAgentBrowserEvalResult<T>(data: unknown): T {
+	if (typeof data === "object" && data !== null && "result" in data) {
+		return (data as { result: T }).result;
+	}
+	return data as T;
+}
+
 interface AgentBrowserOptions {
 	session: string;
 	headed: boolean;
@@ -168,6 +175,30 @@ export class AgentBrowserClient {
 
 	scroll(direction: "up" | "down" | "left" | "right", pixels: number): Promise<unknown> {
 		return this.run(["scroll", direction, String(pixels)]);
+	}
+
+	mouseMove(x: number, y: number): Promise<unknown> {
+		return this.run(["mouse", "move", String(Math.round(x)), String(Math.round(y))]);
+	}
+
+	mouseDown(button: "left" | "right" | "middle" = "left"): Promise<unknown> {
+		return this.run(["mouse", "down", button]);
+	}
+
+	mouseUp(button: "left" | "right" | "middle" = "left"): Promise<unknown> {
+		return this.run(["mouse", "up", button]);
+	}
+
+	async clickAt(x: number, y: number): Promise<void> {
+		await this.mouseMove(x, y);
+		await this.mouseDown();
+		await this.mouseUp();
+	}
+
+	eval<T = unknown>(script: string): Promise<T> {
+		return this.run<{ result: T } | T>(["eval", script]).then((data) =>
+			unwrapAgentBrowserEvalResult<T>(data),
+		);
 	}
 
 	isEnabled(selector: string): Promise<{ enabled: boolean }> {
