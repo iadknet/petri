@@ -36,6 +36,33 @@ boundaries are still settling.
 
 ## Small Modifications
 
+### Add additional lifetime stats for creatures
+
+  - Counter for each action taken during lifetime (failed/succeeded)
+  - Min energy during lifetime
+  - Max energy during lifetime
+
+
+### Ability to paint complex barriers
+
+I'm imaginging this as a set of new barrier painting tools. That can create sections of the map with interesting unqiue "environments"
+
+
+  - Paint a maze
+  - Paint a spiral
+  - Paint random noise
+  - Paint a parralell squiggly/jagged lines
+  - Paint random star patterns
+  
+  Are there any other ideas I'm missing?
+
+This will be a more complicated tool than the other painting tools. Each of these probably needs some sub-configuration... like width of spaces between lines in the maze and spiral, density of random noise, etc.
+
+I'm imaging the tool will allow drawing a box on the map and then it will fill that area with the selected items.
+
+We need to think about how to organize the UI.
+
+
 ### Tick phase system
 
 The tick loop now has 5 phases (0, 1, 2, 2.5, 3). A phase-based system where phases are registered handlers would improve extensibility and make it easier to add future tick-level passes without growing the monolithic `run_tick` function.
@@ -43,6 +70,16 @@ The tick loop now has 5 phases (0, 1, 2, 2.5, 3). A phase-based system where pha
 ### Graph evaluation → plasticity decoupling
 
 Currently `graph.rs` calls directly into plasticity modules for post-convergence updates (Hebbian weight updates, eligibility trace updates). A more extensible design would have graph evaluation produce "learning events" dispatched to registered plasticity backends, decoupling the graph relaxation loop from the specifics of any learning algorithm.
+
+
+## Big refactors / changes
+
+### Refactor creature inspector
+
+Within the creature inspector have different tabs (creatur summary, mesh viewer, sampler).
+
+Need to brainstorm more on this.
+
 
 ## Major New Features
 
@@ -94,19 +131,11 @@ This would make graph evolution less brittle by reducing the number of independe
 - Initial slot introspection should expose slot occupancy and item kind only, not stored food density.
 - Stored food density must still be preserved internally and should be visible in inspector/debug surfaces, just not exposed to creature cognition initially.
 
-### Creatures can spend energy to "cut in line" during action execution
-  - When selecting an action, a creature can dedicate "extra energy" to an action
-  - When determining action order, the actions with the most extra energy are evaluated first
-  - The order of ties should be randomized
-
 ### Refactor movement
   - This is going to be a big change that we will have to execute carefully.  I want to refactor the movement actions. Instead of being able to move in different cardinal directions, I want there to be a sense of "Forward" for creatures and  
   then have a two turn actions (turn left, turn right). And "move foward". The turn actions should have small default energy cost, but should still cost something.
   - The zoomed in view of creatures can have a pointy tip for the direction they are facing.
   - Predation should also be forward-facing.
-
-### More advanced sensors
-  - area sensor (provides a "map" of surrounding area in radius)
 
 ### Communication
   - creature can modify some metadata fields about itself that are visible to other creatures that "see" it.

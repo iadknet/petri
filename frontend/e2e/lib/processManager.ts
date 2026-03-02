@@ -40,6 +40,7 @@ export async function startLocalStack(options: StartStackOptions): Promise<Manag
 	const scriptPath = path.join(options.repoRoot, "scripts", "dev.sh");
 	const child = spawn(scriptPath, {
 		cwd: options.repoRoot,
+		detached: true,
 		env: {
 			...process.env,
 			BACKEND_PORT: String(options.backendPort),
@@ -58,7 +59,7 @@ export async function startLocalStack(options: StartStackOptions): Promise<Manag
 			return;
 		}
 		stopped = true;
-		await terminateChild(child, 5_000);
+		await terminateProcessTree(child, 5_000);
 		logStream.end();
 	};
 
@@ -70,7 +71,7 @@ export async function startLocalStack(options: StartStackOptions): Promise<Manag
 	};
 }
 
-async function terminateChild(
+export async function terminateProcessTree(
 	child: ReturnType<typeof spawn>,
 	graceMs: number,
 ): Promise<void> {
@@ -78,14 +79,28 @@ async function terminateChild(
 		return;
 	}
 
-	child.kill("SIGTERM");
+	sendSignal(child, "SIGTERM");
 	const exited = await waitForExit(child, graceMs);
 	if (exited) {
 		return;
 	}
 
-	child.kill("SIGKILL");
+	sendSignal(child, "SIGKILL");
 	await waitForExit(child, graceMs);
+}
+
+function sendSignal(child: ReturnType<typeof spawn>, signal: NodeJS.Signals): void {
+	const pid = child.pid;
+	if (pid === undefined) {
+		child.kill(signal);
+		return;
+	}
+
+	try {
+		process.kill(-pid, signal);
+	} catch {
+		child.kill(signal);
+	}
 }
 
 async function waitForExit(child: ReturnType<typeof spawn>, timeoutMs: number): Promise<boolean> {
