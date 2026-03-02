@@ -2,18 +2,19 @@ import type {
 	ApiError,
 	ConfigResponse,
 	CreatureDetail,
-	FrameResponse,
 	LifecycleResponse,
 	PaintRequest,
 	PaintResponse,
 	SampleResponse,
 	SimulationConfig,
+	SnapshotResponse,
 	StartSampleResponse,
 	StartupRequest,
 	StartupResponse,
 	StatusResponse,
 	StepRequest,
 	StepResponse,
+	ZoomTier,
 } from "../types/api.ts";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "";
@@ -63,8 +64,24 @@ class ApiClient {
 		return this.request("/v3/simulation/status");
 	}
 
-	async getFrame(): Promise<FrameResponse> {
-		return this.request("/v3/simulation/frame");
+	async getSnapshot(query?: {
+		x?: number;
+		y?: number;
+		width?: number;
+		height?: number;
+		canvas_width?: number;
+		canvas_height?: number;
+		zoom_tier?: ZoomTier;
+	}): Promise<SnapshotResponse> {
+		const params = new URLSearchParams();
+		if (query) {
+			for (const [key, value] of Object.entries(query)) {
+				if (value === undefined) continue;
+				params.set(key, String(value));
+			}
+		}
+		const suffix = params.size > 0 ? `?${params.toString()}` : "";
+		return this.request(`/v3/simulation/snapshot${suffix}`);
 	}
 
 	async getConfig(): Promise<ConfigResponse> {

@@ -1,7 +1,7 @@
 use sha2::{Digest, Sha256};
 use v3_core::config::SimulationConfig;
 
-pub const PROTOCOL_VERSION: &str = "v3alpha1";
+pub const PROTOCOL_VERSION: &str = "v3alpha2";
 
 /// Deep-merge `patch` into `base` (recursive object merge; non-object values replace).
 pub fn deep_merge(base: &mut serde_json::Value, patch: serde_json::Value) {

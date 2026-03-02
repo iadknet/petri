@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Frame, HealthPayload, PredationEvent, SimState, StatusPayload } from "../types/api.ts";
+import type { HealthPayload, SimState, StatusPayload } from "../types/api.ts";
 
 export type ConnectionStatus = "disconnected" | "connecting" | "connected";
 
@@ -8,38 +8,33 @@ export interface SimulationState {
 	connectionStatus: ConnectionStatus;
 
 	// Simulation state
+	projectionRevision: number;
 	simState: SimState;
 	tick: number;
 	ticksPerSecond: number;
 	_tpsSample: { tick: number; timestamp: number } | null;
 
-	// Latest data from WebSocket events
-	frame: Frame | null;
 	status: StatusPayload | null;
 	health: HealthPayload | null;
-	predationEvents: PredationEvent[];
 
 	// Actions
 	setConnectionStatus: (status: ConnectionStatus) => void;
 	setSimState: (state: SimState) => void;
 	setTick: (tick: number) => void;
-	setFrame: (tick: number, frame: Frame) => void;
-	setStatus: (tick: number, status: StatusPayload) => void;
-	setHealth: (tick: number, health: HealthPayload) => void;
-	setPredationEvents: (events: PredationEvent[]) => void;
+	setStatus: (projectionRevision: number, tick: number, status: StatusPayload) => void;
+	setHealth: (projectionRevision: number, tick: number, health: HealthPayload) => void;
 	reset: () => void;
 }
 
 const initialState = {
 	connectionStatus: "disconnected" as ConnectionStatus,
+	projectionRevision: 0,
 	simState: "idle" as SimState,
 	tick: 0,
 	ticksPerSecond: 0,
 	_tpsSample: null as { tick: number; timestamp: number } | null,
-	frame: null,
 	status: null,
 	health: null,
-	predationEvents: [] as PredationEvent[],
 };
 
 export const useSimulationStore = create<SimulationState>()((set) => ({
@@ -49,10 +44,12 @@ export const useSimulationStore = create<SimulationState>()((set) => ({
 	setSimState: (simState) => set({ simState }),
 	setTick: (tick) => set({ tick }),
 
-	setFrame: (tick, frame) => set({ tick, frame }),
-	setStatus: (tick, status) =>
+	setStatus: (projectionRevision, tick, status) =>
 		set((prev) => {
-			if (tick < prev.tick) {
+			if (projectionRevision < prev.projectionRevision) {
+				return prev;
+			}
+			if (projectionRevision === prev.projectionRevision && tick < prev.tick) {
 				return prev;
 			}
 
@@ -70,7 +67,8 @@ export const useSimulationStore = create<SimulationState>()((set) => ({
 				if (_tpsSample && tick > _tpsSample.tick) {
 					const elapsed = (now - _tpsSample.timestamp) / 1000;
 					const rawTps = (tick - _tpsSample.tick) / elapsed;
-					ticksPerSecond = prev.ticksPerSecond === 0 ? rawTps : 0.2 * rawTps + 0.8 * prev.ticksPerSecond;
+					ticksPerSecond =
+						prev.ticksPerSecond === 0 ? rawTps : 0.2 * rawTps + 0.8 * prev.ticksPerSecond;
 					_tpsSample = { tick, timestamp: now };
 				} else if (!_tpsSample) {
 					_tpsSample = { tick, timestamp: Date.now() };
@@ -81,10 +79,30 @@ export const useSimulationStore = create<SimulationState>()((set) => ({
 				_tpsSample = null;
 			}
 
-			return { tick, simState, status, ticksPerSecond, _tpsSample };
+			return {
+				projectionRevision,
+				tick,
+				simState,
+				status,
+				ticksPerSecond,
+				_tpsSample,
+			};
 		}),
-	setHealth: (tick, health) => set({ tick, health }),
-	setPredationEvents: (predationEvents) => set({ predationEvents }),
+	setHealth: (projectionRevision, tick, health) =>
+		set((prev) => {
+			if (projectionRevision < prev.projectionRevision) {
+				return prev;
+			}
+			if (projectionRevision === prev.projectionRevision && tick < prev.tick) {
+				return prev;
+			}
+
+			return {
+				projectionRevision,
+				tick,
+				health,
+			};
+		}),
 
 	reset: () => set(initialState),
 }));

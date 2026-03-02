@@ -1,119 +1,24 @@
 use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::Json;
-use slotmap::Key;
 use v3_core::config::SimulationConfig;
-use v3_core::mutation::phenotype::channels_to_rgb;
 
 use crate::error::{AppError, FieldError};
-use crate::state::{AppState, SimulationStatus};
+use crate::state::{SimulationStatus, TransportPerfSnapshot};
+use crate::transport::protocol::build_status_event_payload;
 use crate::types::{deep_merge, PROTOCOL_VERSION};
+use crate::{app_state::AppState, query::projection::ProjectionSnapshot};
 
 pub async fn get_status(State(app): State<AppState>) -> impl IntoResponse {
-    let handle = app.sim.lock().await;
-    let sim = &handle.sim;
-    let stats = &sim.stats;
-
-    Json(serde_json::json!({
-        "protocol_version": PROTOCOL_VERSION,
-        "state": handle.status,
-        "tick": sim.tick,
-        "population": sim.creatures.len(),
-        "mean_energy": sim.mean_energy(),
-        "last_tick_actions": {
-            "move": stats.last_tick_move,
-            "eat": stats.last_tick_eat,
-            "reproduce": stats.last_tick_reproduce,
-            "noop": stats.last_tick_noop,
-            "steal": stats.last_tick_steal,
-        },
-        "reproduction_actions_attempted_total": stats.reproduction_actions_attempted_total,
-        "reproduction_actions_spawned_total": stats.reproduction_actions_spawned_total,
-        "reproduction_actions_rejected_total": stats.reproduction_actions_rejected_total,
-        "predation_actions_attempted_total": stats.predation_actions_attempted_total,
-        "predation_actions_transferred_total": stats.predation_actions_transferred_total,
-        "predation_actions_rejected_total": stats.predation_actions_rejected_total,
-        "predation_kills_total": stats.predation_kills_total,
-        "predation_actions_by_result": stats
-            .predation_actions_by_result
-            .iter()
-            .map(|(result, count)| (result.as_key().to_string(), *count))
-            .collect::<std::collections::HashMap<_, _>>(),
-        "mutation_events_attempted_total": stats.mutation_events_attempted_total,
-        "mutation_events_applied_total": stats.mutation_events_applied_total,
-        "mutation_events_skipped_total": stats.mutation_events_skipped_total,
-        "mutation_events_attempted_total_by_domain": stats
-            .mutation_events_attempted_total_by_domain
-            .iter()
-            .map(|(domain, count)| (domain.as_key().to_string(), *count))
-            .collect::<std::collections::HashMap<_, _>>(),
-        "mutation_events_applied_total_by_domain": stats
-            .mutation_events_applied_total_by_domain
-            .iter()
-            .map(|(domain, count)| (domain.as_key().to_string(), *count))
-            .collect::<std::collections::HashMap<_, _>>(),
-        "mutation_events_attempted_total_by_operator": stats
-            .mutation_events_attempted_total_by_operator
-            .iter()
-            .map(|(operator, count)| (operator.as_key().to_string(), *count))
-            .collect::<std::collections::HashMap<_, _>>(),
-        "mutation_events_applied_total_by_operator": stats
-            .mutation_events_applied_total_by_operator
-            .iter()
-            .map(|(operator, count)| (operator.as_key().to_string(), *count))
-            .collect::<std::collections::HashMap<_, _>>(),
-        "mutation_events_applied_total_semantic_noop": stats.mutation_events_applied_total_semantic_noop,
-        "mutation_events_applied_total_semantic_change": stats.mutation_events_applied_total_semantic_change,
-        "last_tick_compute_total_mean": stats.last_tick_compute_total_mean,
-        "last_tick_compute_total_min": stats.last_tick_compute_total_min,
-        "last_tick_compute_total_max": stats.last_tick_compute_total_max,
-        "last_tick_compute_vm_mean": stats.last_tick_compute_vm_mean,
-        "last_tick_compute_graph_mean": stats.last_tick_compute_graph_mean,
-    }))
-}
-
-pub async fn get_frame(State(app): State<AppState>) -> impl IntoResponse {
-    let handle = app.sim.lock().await;
-    let sim = &handle.sim;
-
-    let mut creatures = Vec::new();
-    for (id, creature) in &sim.creatures {
-        let numeric_id = id.data().as_ffi();
-        creatures.push(serde_json::json!({
-            "id": numeric_id,
-            "x": creature.position.x,
-            "y": creature.position.y,
-            "energy": creature.energy,
-            "generation": creature.generation,
-            "phenotype_rgb": channels_to_rgb(creature.phenotype_channels),
-        }));
-    }
-
-    let mut food_cells = Vec::new();
-    let mut barrier_cells = Vec::new();
-    for y in 0..sim.world.height {
-        for x in 0..sim.world.width {
-            let pos = v3_core::contracts::Position::new(x, y);
-            let density = sim.world.food_at(pos);
-            if density > 0.0 {
-                food_cells.push(serde_json::json!({"x": x, "y": y, "density": density}));
-            }
-            if sim.world.is_barrier(pos) {
-                barrier_cells.push(serde_json::json!({"x": x, "y": y}));
-            }
-        }
-    }
-
-    Json(serde_json::json!({
-        "protocol_version": PROTOCOL_VERSION,
-        "state": handle.status,
-        "tick": sim.tick,
-        "width": sim.world.width,
-        "height": sim.world.height,
-        "creatures": creatures,
-        "food": food_cells,
-        "barriers": barrier_cells,
-    }))
+    let snapshot = {
+        app.projection
+            .read()
+            .expect("projection lock poisoned")
+            .current()
+            .clone()
+    };
+    let perf = app.perf.read().expect("perf lock poisoned").clone();
+    Json(status_payload(&snapshot, &perf, app.ws_tx.receiver_count()))
 }
 
 pub async fn get_config(State(app): State<AppState>) -> impl IntoResponse {
@@ -161,10 +66,44 @@ pub async fn patch_config(
     merged_config.normalize();
 
     handle.sim.config = merged_config.clone();
+    let state = handle.status;
+    let frame = crate::handlers::lifecycle::build_ws_frame(&handle);
+    drop(handle);
+    app.publish_ws_frame(frame);
 
     Ok(Json(serde_json::json!({
         "protocol_version": PROTOCOL_VERSION,
-        "state": handle.status,
+        "state": state,
         "config": merged_config,
     })))
+}
+
+fn status_payload(
+    snapshot: &ProjectionSnapshot,
+    perf: &TransportPerfSnapshot,
+    subscriber_count: usize,
+) -> serde_json::Value {
+    let mut body =
+        serde_json::to_value(build_status_event_payload(snapshot, perf, subscriber_count))
+            .expect("status payload must serialize");
+    let object = body
+        .as_object_mut()
+        .expect("status payload must serialize to an object");
+    object.insert(
+        "protocol_version".into(),
+        serde_json::Value::String(PROTOCOL_VERSION.to_string()),
+    );
+    object.insert(
+        "projection_revision".into(),
+        serde_json::Value::from(snapshot.projection_revision),
+    );
+    object.insert(
+        "world_static_revision".into(),
+        serde_json::Value::from(snapshot.world_static_revision),
+    );
+    object.insert(
+        "tick".into(),
+        serde_json::Value::from(snapshot.ws_frame.tick),
+    );
+    body
 }

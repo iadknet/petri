@@ -1,5 +1,3 @@
-import type { WsFrame } from "./protocol.ts";
-
 export type PaintTool = "food" | "barrier" | "erase_food" | "erase_barrier";
 
 export interface PaintPoint {
@@ -22,8 +20,16 @@ export interface PaintStats {
 	creatures_removed: number;
 }
 
+export interface DirtyRect {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}
+
 export interface PaintResponse {
 	protocol_version: string;
 	stats: PaintStats;
-	frame: WsFrame;
+	dirty_rect: DirtyRect;
+	world_static_changed: boolean;
 }
