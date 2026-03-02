@@ -10,7 +10,13 @@ import type {
 	VmConfig,
 	WorldConfig,
 } from "./config.ts";
-import type { Frame, SimState, StatusPayload } from "./protocol.ts";
+import type {
+	HealthPayload,
+	SimState,
+	SnapshotView,
+	StatusPayload,
+	WorldStaticPayload,
+} from "./protocol.ts";
 
 export interface LifecycleResponse {
 	protocol_version: string;
@@ -32,9 +38,15 @@ export interface StatusResponse extends StatusPayload {
 	tick: number;
 }
 
-export interface FrameResponse extends Frame {
+export interface SnapshotResponse {
 	protocol_version: string;
+	projection_revision: number;
+	world_static_revision: number;
 	tick: number;
+	status: StatusPayload;
+	health: HealthPayload;
+	world_static: WorldStaticPayload;
+	view: SnapshotView;
 }
 
 export interface ConfigResponse {

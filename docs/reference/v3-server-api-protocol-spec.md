@@ -12,6 +12,7 @@ Related references:
 - `v3-runtime-config-spec.md`
 - `v3-tick-orchestration-spec.md`
 - `v3-evolution-observability-spec.md`
+- `v3-server-query-projection-spec.md`
 - `v3-cli-contract-spec.md`
 - `v3-phenotype-spec.md`
 
@@ -29,9 +30,18 @@ This document defines:
 
 This document does not define:
 - internal simulation execution logic;
+- server-local projection publication, freshness, or spatial-index semantics
+  (owned by `v3-server-query-projection-spec.md`);
 - startup seeding policy details (owned by `v3-startup-seeding-spec.md`);
 - world/runtime default tables (owned by `v3-world-grid-spec.md` and
   `v3-runtime-config-spec.md`).
+
+Current viewport-transport addenda:
+- overview transport is aggregate-only and intentionally omits predation-event
+  payloads;
+- paint responses return invalidation metadata, and the frontend follows with a
+  viewport-scoped `GET /v3/simulation/snapshot` refresh rather than receiving an
+  inline snapshot in the paint response.
 
 ---
 
@@ -42,6 +52,8 @@ Version contract:
   event envelopes.
 - Canonical value: `"v3alpha1"`.
 - Breaking payload changes require protocol-version bump.
+- Server transport versioning is independent from the CLI NDJSON contract; a
+  server bump does not automatically change the CLI protocol version.
 - Documented v3alpha1 exception: food-density payloads and food config shape
   are migrated in-place to normalized `f32` semantics (`density: f32`,
   world food recovery/spread/max fields) without a version bump, to keep core,

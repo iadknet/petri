@@ -1,30 +1,22 @@
 import { Component, type ErrorInfo, type ReactNode, Suspense, lazy, useEffect } from "react";
 import { api } from "./api/rest.ts";
-import { wsClient } from "./api/websocket.ts";
 import { ConfigPanel } from "./components/ConfigPanel.tsx";
 import { ControlBar } from "./components/ControlBar.tsx";
 import { StatsPanel } from "./components/StatsPanel.tsx";
 import { WorldViewport } from "./components/WorldViewport.tsx";
+import { useViewSubscription } from "./hooks/useViewSubscription.ts";
 import { useConfigStore } from "./stores/config.ts";
 import { useCreatureInspectorStore } from "./stores/creatureInspector.ts";
 import { PanelLayoutProvider, usePanelLayout } from "./stores/layout.tsx";
 import { useStartupConfigStore } from "./stores/startupConfig.ts";
 
-const LazyCreatureInspector = lazy(
-	() => import("./components/CreatureInspector.tsx"),
-);
+const LazyCreatureInspector = lazy(() => import("./components/CreatureInspector.tsx"));
 
 function Dashboard() {
 	const { configOpen, statsOpen } = usePanelLayout();
-	const inspectorOpen = useCreatureInspectorStore(
-		(s) => s.selectedCreatureId !== null,
-	);
+	const inspectorOpen = useCreatureInspectorStore((s) => s.selectedCreatureId !== null);
 
-	// Connect WebSocket on mount
-	useEffect(() => {
-		wsClient.connect();
-		return () => wsClient.disconnect();
-	}, []);
+	useViewSubscription();
 
 	// Fetch initial config
 	useEffect(() => {
@@ -93,10 +85,7 @@ function InspectorFallback() {
 	);
 }
 
-class InspectorErrorBoundary extends Component<
-	{ children: ReactNode },
-	{ hasError: boolean }
-> {
+class InspectorErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
 	state = { hasError: false };
 
 	static getDerivedStateFromError(): { hasError: boolean } {
@@ -112,9 +101,7 @@ class InspectorErrorBoundary extends Component<
 			return (
 				<div className="h-full bg-slate-900 border-l border-slate-800 flex items-center justify-center">
 					<div className="text-center px-4">
-						<p className="text-sm text-slate-400">
-							Failed to load inspector
-						</p>
+						<p className="text-sm text-slate-400">Failed to load inspector</p>
 						<button
 							type="button"
 							onClick={() => this.setState({ hasError: false })}

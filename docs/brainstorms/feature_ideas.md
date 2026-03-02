@@ -1,5 +1,39 @@
 # Feature ideas
 
+## Deferred Architecture Follow-Ups
+
+### Shared incremental query/projection platform
+
+The viewport transport refactor will add a server-local projection layer, but a
+larger follow-up still exists: a shared incremental query/projection platform
+for server, CLI, inspector, metrics, and future replay consumers.
+
+Potential shape:
+- shared projection types outside the current server-local module tree
+- reusable spatial indexes
+- common query surfaces for viewport transport and inspector reads
+- eventual compatibility with replay/export consumers
+
+### Event-driven projection invalidation
+
+The first viewport transport refactor will likely publish projections on a
+scheduled cadence plus synchronous mutation hooks. A cleaner follow-up would
+replace repeated projection rescans with event-driven invalidation and
+incremental updates.
+
+Potential shape:
+- topology-dirty tracking
+- food-region dirty tracking
+- creature-visualization dirty tracking
+- incremental cache updates instead of whole-snapshot rebuilds
+
+### Eventual multi-crate `v3-server` split
+
+If the internal command/query/transport boundaries stabilize, a later follow-up
+could split `v3-server` into multiple crates. That is intentionally deferred
+from the current refactor to avoid increasing migration scope while the new
+boundaries are still settling.
+
 ## Small Modifications
 
 ### Tick phase system

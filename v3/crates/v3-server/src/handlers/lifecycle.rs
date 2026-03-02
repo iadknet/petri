@@ -63,7 +63,9 @@ pub async fn startup(
     handle.status = SimulationStatus::Idle;
     handle.sim = new_sim;
     handle.active_trace = None;
+    let frame = build_ws_frame(&handle);
     drop(handle);
+    app.publish_ws_frame(frame);
 
     Ok(Json(serde_json::json!({
         "protocol_version": PROTOCOL_VERSION,
@@ -87,7 +89,11 @@ pub async fn start(State(app): State<AppState>) -> Result<impl IntoResponse, App
             })));
         }
         handle.status = SimulationStatus::Running;
-        handle.sim.tick
+        let frame = build_ws_frame(&handle);
+        let tick = handle.sim.tick;
+        drop(handle);
+        app.publish_ws_frame(frame);
+        tick
     };
 
     // Spawn run loop.
@@ -109,7 +115,10 @@ pub async fn pause_sim(State(app): State<AppState>) -> Result<impl IntoResponse,
         });
     }
     handle.status = SimulationStatus::Paused;
+    let frame = build_ws_frame(&handle);
     let tick = handle.sim.tick;
+    drop(handle);
+    app.publish_ws_frame(frame);
     Ok(Json(serde_json::json!({
         "protocol_version": PROTOCOL_VERSION,
         "state": "paused",
@@ -146,11 +155,18 @@ pub async fn step(
         });
     }
 
-    let h = &mut *handle;
-    for _ in 0..req.steps {
-        run_tick(&mut h.sim, &mut h.active_trace);
+    {
+        let SimHandle {
+            sim, active_trace, ..
+        } = &mut *handle;
+        for _ in 0..req.steps {
+            run_tick(sim, active_trace);
+        }
     }
-    let tick = h.sim.tick;
+    let frame = build_ws_frame(&handle);
+    let tick = handle.sim.tick;
+    drop(handle);
+    app.publish_ws_frame(frame);
 
     Ok(Json(serde_json::json!({
         "protocol_version": PROTOCOL_VERSION,
@@ -169,13 +185,19 @@ pub(crate) async fn run_loop(app: AppState) {
         }
         let h = &mut *handle;
         run_tick(&mut h.sim, &mut h.active_trace);
-        if last_frame.elapsed() >= FRAME_INTERVAL {
-            let frame = build_ws_frame(&handle);
-            let bytes = rmp_serde::to_vec_named(&frame).unwrap_or_default();
-            let _ = app.ws_tx.send(bytes);
+        let frame = if last_frame.elapsed() >= FRAME_INTERVAL {
+            // Transitional projection refresh is allowed to be slightly stale while
+            // the sim is running, but it should not force a full frame rebuild on
+            // every tick.
+            Some(build_ws_frame(&handle))
+        } else {
+            None
+        };
+        drop(handle);
+        if let Some(frame) = frame {
+            app.publish_ws_frame(frame);
             last_frame = Instant::now();
         }
-        drop(handle);
         tokio::task::yield_now().await;
     }
 }

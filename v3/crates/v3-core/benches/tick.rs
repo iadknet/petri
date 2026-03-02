@@ -1,14 +1,141 @@
-use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use v3_core::config::SimulationConfig;
+use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
+use v3_core::config::{RuntimeConfig, SimulationConfig};
+use v3_core::contracts::InputReference;
+use v3_core::creature::genome::{BackendDef, GraphBackendDef, VmBackendDef};
+use v3_core::creature::state::{CreatureState, GraphRuntimeState};
+use v3_core::runtime::graph::execute_graph_node;
+use v3_core::runtime::types::MeshSideOutputs;
+use v3_core::runtime::vm::execute_vm_node;
+use v3_core::sensors::perception::{
+    genome_uses_extended_perception, PerceptionConfig, PerceptionSnapshot, SensorSnapshot,
+};
+use v3_core::sensors::reducers::assemble_perception;
+use v3_core::sensors::static_inputs::assemble_static_inputs;
+use v3_core::sensors::visibility::{compute_visible_cells, get_visibility_table};
 use v3_core::simulation::seeding::seed_simulation;
 use v3_core::simulation::tick::{run_phase_0, run_tick};
+use v3_core::simulation::Simulation;
+
+fn runtime_stress_config() -> SimulationConfig {
+    let mut config = SimulationConfig::default();
+    config.world.width = 240;
+    config.world.height = 240;
+    config.population.initial_creatures = 400;
+    config.runtime.perception.vision_radius = 5;
+    config
+}
+
+fn runtime_stress_simulation(seed: u64) -> Simulation {
+    seed_simulation(runtime_stress_config(), seed)
+}
 
 fn bench_config() -> SimulationConfig {
-    let mut cfg = SimulationConfig::default();
-    cfg.world.width = 200;
-    cfg.world.height = 200;
-    cfg.population.initial_creatures = 200;
-    cfg
+    let mut config = runtime_stress_config();
+    config.world.width = 200;
+    config.world.height = 200;
+    config.population.initial_creatures = 200;
+    config
+}
+
+fn build_sensor_snapshot(sim: &Simulation, creature: &CreatureState) -> SensorSnapshot {
+    let local = assemble_static_inputs(&sim.world, creature);
+    let perception = if genome_uses_extended_perception(&creature.genome) {
+        let config = PerceptionConfig::from_sim_config(&sim.config);
+        let visible = compute_visible_cells(
+            creature.position,
+            &sim.world,
+            get_visibility_table(config.vision_radius),
+        );
+        assemble_perception(
+            creature.id,
+            creature,
+            &visible,
+            &sim.world,
+            &sim.creatures,
+            &config,
+        )
+    } else {
+        PerceptionSnapshot::zero()
+    };
+
+    SensorSnapshot { local, perception }
+}
+
+struct VmBenchFixture {
+    def: VmBackendDef,
+    input_refs: Vec<InputReference>,
+    sensors: SensorSnapshot,
+    runtime_config: RuntimeConfig,
+    energy: f32,
+    memory: [u8; 1024],
+}
+
+fn build_vm_fixture() -> VmBenchFixture {
+    let sim = runtime_stress_simulation(42);
+    let creature = sim
+        .creatures
+        .values()
+        .next()
+        .expect("runtime stress sim has creatures");
+    let sensors = build_sensor_snapshot(&sim, creature);
+    let (def, input_refs) = creature
+        .genome
+        .nodes
+        .iter()
+        .find_map(|node| match &node.backend_def {
+            BackendDef::Vm(def) => Some((def.clone(), node.input_refs.clone())),
+            BackendDef::Graph(_) => None,
+        })
+        .expect("founder genome contains a VM node");
+
+    VmBenchFixture {
+        def,
+        input_refs,
+        sensors,
+        runtime_config: sim.config.runtime.clone(),
+        energy: creature.energy.max(1.0),
+        memory: creature.memory,
+    }
+}
+
+struct GraphBenchFixture {
+    def: GraphBackendDef,
+    input_refs: Vec<InputReference>,
+    sensors: SensorSnapshot,
+    runtime_config: RuntimeConfig,
+    energy: f32,
+    node_idx: usize,
+    graph_runtime: GraphRuntimeState,
+}
+
+fn build_graph_fixture() -> GraphBenchFixture {
+    let sim = runtime_stress_simulation(42);
+    let creature = sim
+        .creatures
+        .values()
+        .next()
+        .expect("runtime stress sim has creatures");
+    let sensors = build_sensor_snapshot(&sim, creature);
+    let (node_idx, def, input_refs) = creature
+        .genome
+        .nodes
+        .iter()
+        .enumerate()
+        .find_map(|(node_idx, node)| match &node.backend_def {
+            BackendDef::Graph(def) => Some((node_idx, def.clone(), node.input_refs.clone())),
+            BackendDef::Vm(_) => None,
+        })
+        .expect("founder genome contains a graph node");
+
+    GraphBenchFixture {
+        def,
+        input_refs,
+        sensors,
+        runtime_config: sim.config.runtime.clone(),
+        energy: creature.energy.max(1.0),
+        node_idx,
+        graph_runtime: GraphRuntimeState::new(),
+    }
 }
 
 fn bench_phase_0_only(c: &mut Criterion) {
@@ -39,8 +166,6 @@ fn bench_full_tick(c: &mut Criterion) {
 
 fn bench_mesh_execution_only(c: &mut Criterion) {
     use v3_core::runtime::mesh::execute_creature_mesh;
-    use v3_core::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
-    use v3_core::sensors::static_inputs::assemble_static_inputs;
 
     c.bench_function("mesh_execution_200_creatures", |b| {
         b.iter_with_setup(
@@ -69,6 +194,95 @@ fn bench_mesh_execution_only(c: &mut Criterion) {
     });
 }
 
+fn bench_full_tick_stress(c: &mut Criterion) {
+    c.bench_function("full_tick_stress", |b| {
+        b.iter_with_setup(
+            || runtime_stress_simulation(42),
+            |mut sim| {
+                for _ in 0..50 {
+                    run_tick(black_box(&mut sim), &mut None);
+                }
+            },
+        );
+    });
+}
+
+fn bench_perception_assembly_stress(c: &mut Criterion) {
+    c.bench_function("perception_assembly_stress", |b| {
+        b.iter_with_setup(
+            || runtime_stress_simulation(42),
+            |sim| {
+                let config = PerceptionConfig::from_sim_config(&sim.config);
+                let table = get_visibility_table(config.vision_radius);
+                for (id, creature) in sim.creatures.iter() {
+                    if !genome_uses_extended_perception(&creature.genome) {
+                        continue;
+                    }
+                    let visible = compute_visible_cells(creature.position, &sim.world, table);
+                    let perception = assemble_perception(
+                        id,
+                        creature,
+                        &visible,
+                        &sim.world,
+                        &sim.creatures,
+                        &config,
+                    );
+                    black_box(perception);
+                }
+            },
+        );
+    });
+}
+
+fn bench_vm_execute_stress(c: &mut Criterion) {
+    c.bench_function("vm_execute_stress", |b| {
+        b.iter_batched(
+            build_vm_fixture,
+            |mut fixture| {
+                let mut side_outputs =
+                    MeshSideOutputs::new(fixture.runtime_config.max_actions_per_turn);
+                let _ = black_box(execute_vm_node(
+                    &fixture.def,
+                    &fixture.input_refs,
+                    &[0.0; 12],
+                    &mut fixture.energy,
+                    0.0,
+                    &mut fixture.memory,
+                    &fixture.sensors,
+                    &fixture.runtime_config,
+                    &mut side_outputs,
+                ));
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
+fn bench_graph_execute_stress(c: &mut Criterion) {
+    c.bench_function("graph_execute_stress", |b| {
+        b.iter_batched(
+            build_graph_fixture,
+            |mut fixture| {
+                let mut side_outputs =
+                    MeshSideOutputs::new(fixture.runtime_config.max_actions_per_turn);
+                let _ = black_box(execute_graph_node(
+                    &fixture.def,
+                    &fixture.input_refs,
+                    &[0.0; 12],
+                    &mut fixture.energy,
+                    0.0,
+                    fixture.node_idx,
+                    &mut fixture.graph_runtime,
+                    &fixture.sensors,
+                    &fixture.runtime_config,
+                    &mut side_outputs,
+                ));
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 fn bench_full_tick_large_population(c: &mut Criterion) {
     let mut cfg = SimulationConfig::default();
     cfg.world.width = 400;
@@ -92,6 +306,10 @@ criterion_group!(
     bench_phase_0_only,
     bench_full_tick,
     bench_mesh_execution_only,
+    bench_full_tick_stress,
+    bench_perception_assembly_stress,
+    bench_vm_execute_stress,
+    bench_graph_execute_stress,
     bench_full_tick_large_population
 );
 criterion_main!(benches);

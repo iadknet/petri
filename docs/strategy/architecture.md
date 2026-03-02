@@ -27,6 +27,16 @@ Active dependency direction in V3 core:
 - `tick` -> orchestration and action application
 - `contracts` -> shared boundary types (`WorldAction` and related)
 
+Active service/UI dependency direction for the viewport transport refactor:
+- `v3-core` -> authoritative simulation behavior only
+- `v3-server::command` -> mutates and advances `v3-core`
+- `v3-server::query` -> reads command-published projection state only
+- `v3-server::transport` -> assembles and delivers view payloads from query state only
+- `v3-server::http` -> validates requests and delegates to command/query/transport services
+- `frontend viewport state` -> computes desired view rect and fidelity tier
+- `frontend world-view state` -> stores static world state plus the latest accepted view payload
+- `frontend renderer` -> draws from a render model and camera state only
+
 ## Existing Boundary Recheck
 
 | area | decision | rationale |
@@ -35,6 +45,8 @@ Active dependency direction in V3 core:
 | `v3/crates/v3-core/src/sensors` | keep | snapshot assembly separated from runtime mutation logic |
 | `v3/crates/v3-core/src/runtime` | keep | owns chain evaluation, routing, VM/graph execution |
 | `v3/crates/v3-core/src/tick` | keep | phase orchestration and action application stay outside runtime internals |
+| `v3/crates/v3-server` | change | server command/query/transport boundaries are now explicit instead of living in a flat transport shell |
+| `frontend/src` viewport transport path | change | viewport state, world-view state, and renderer input boundaries are now first-class |
 | `docs/reference/*.md` | keep | executable contracts stay centralized under active V3 reference specs |
 
 ## Open Questions
@@ -57,7 +69,8 @@ petri/
 |  |     |- runtime/
 |  |     |- tick/
 |  |     \- contracts/
-|  \- crates/v3-server/    # service surfaces over v3-core
+|  \- crates/v3-server/    # command/query/transport surfaces over v3-core
+\- frontend/               # viewport/world-view/render client
 \- docs/                   # canonical strategy/reference docs
 ```
 

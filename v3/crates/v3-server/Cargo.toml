@@ -20,6 +20,8 @@ tower = { workspace = true }
 slotmap = { workspace = true }
 hex = "0.4"
 rmp-serde = { workspace = true }
+futures-util = { workspace = true }
+tracing = { workspace = true }
 
 [dev-dependencies]
 tokio = { workspace = true }
@@ -27,3 +29,9 @@ tower = "0.5"
 http-body-util = "0.1"
 axum = { workspace = true }
 rmp-serde = { workspace = true }
+criterion = "0.5"
+tokio-tungstenite = "0.24"
+
+[[bench]]
+name = "transport"
+harness = false

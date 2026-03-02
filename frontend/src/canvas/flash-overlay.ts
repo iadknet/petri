@@ -1,5 +1,5 @@
 import type { PredationEvent } from "../types/api.ts";
-import type { Camera } from "./renderer.ts";
+import type { CameraState } from "./camera.ts";
 
 /** Attacker flash: red */
 const ATTACKER_R = 255;
@@ -51,7 +51,12 @@ export class FlashOverlay {
 				existingAttacker.b = ATTACKER_B;
 				existingAttacker.framesLeft = FLASH_FRAMES;
 			} else {
-				this.flashMap.set(attackerKey, { r: ATTACKER_R, g: ATTACKER_G, b: ATTACKER_B, framesLeft: FLASH_FRAMES });
+				this.flashMap.set(attackerKey, {
+					r: ATTACKER_R,
+					g: ATTACKER_G,
+					b: ATTACKER_B,
+					framesLeft: FLASH_FRAMES,
+				});
 			}
 
 			const victimKey = e.victim_y * worldWidth + e.victim_x;
@@ -62,7 +67,12 @@ export class FlashOverlay {
 				existingVictim.b = VICTIM_B;
 				existingVictim.framesLeft = FLASH_FRAMES;
 			} else {
-				this.flashMap.set(victimKey, { r: VICTIM_R, g: VICTIM_G, b: VICTIM_B, framesLeft: FLASH_FRAMES });
+				this.flashMap.set(victimKey, {
+					r: VICTIM_R,
+					g: VICTIM_G,
+					b: VICTIM_B,
+					framesLeft: FLASH_FRAMES,
+				});
 			}
 		}
 	}
@@ -81,7 +91,7 @@ export class FlashOverlay {
 	}
 
 	/** Draw flash rects on canvas context (rect mode). */
-	drawRects(ctx: CanvasRenderingContext2D, camera: Camera): void {
+	drawRects(ctx: CanvasRenderingContext2D, camera: CameraState): void {
 		const { x: cx, y: cy, zoom } = camera;
 		for (const [key, entry] of this.flashMap) {
 			const cellX = key % this.worldWidth;

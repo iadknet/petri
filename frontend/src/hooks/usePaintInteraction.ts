@@ -1,9 +1,14 @@
 import { type RefObject, useCallback, useRef } from "react";
-import type { WorldRenderer } from "../canvas/renderer.ts";
 import { api } from "../api/rest.ts";
+import type { WorldRenderer } from "../canvas/renderer.ts";
 import { usePaintStore } from "../stores/paint.ts";
-import { useSimulationStore } from "../stores/simulation.ts";
+import type { ViewRequest } from "../stores/viewport.ts";
+import { useViewportStore } from "../stores/viewport.ts";
+import { useWorldViewStore } from "../stores/worldView.ts";
 import type { PaintPoint, PaintTool } from "../types/api.ts";
+import { applySnapshotToStores } from "./useViewSubscription.ts";
+
+type SnapshotQuery = Parameters<typeof api.getSnapshot>[0];
 
 /** Border color for the brush overlay, keyed by active tool. */
 const BORDER_COLORS: Record<PaintTool, string> = {
@@ -19,8 +24,8 @@ const BORDER_COLORS: Record<PaintTool, string> = {
  */
 function bresenhamLine(x0: number, y0: number, x1: number, y1: number): PaintPoint[] {
 	const points: PaintPoint[] = [];
-	let dx = Math.abs(x1 - x0);
-	let dy = Math.abs(y1 - y0);
+	const dx = Math.abs(x1 - x0);
+	const dy = Math.abs(y1 - y0);
 	const sx = x0 < x1 ? 1 : -1;
 	const sy = y0 < y1 ? 1 : -1;
 	let err = dx - dy;
@@ -71,6 +76,22 @@ export interface PaintInteractionHandlers {
 	clearPreview: () => void;
 }
 
+export function buildSnapshotQuery(request: ViewRequest | null): SnapshotQuery {
+	if (!request) {
+		return undefined;
+	}
+
+	return {
+		x: request.rect.x,
+		y: request.rect.y,
+		width: request.rect.width,
+		height: request.rect.height,
+		canvas_width: request.canvas.width,
+		canvas_height: request.canvas.height,
+		zoom_tier: request.zoomTier,
+	};
+}
+
 export function usePaintInteraction(
 	rendererRef: RefObject<WorldRenderer | null>,
 ): PaintInteractionHandlers {
@@ -89,8 +110,8 @@ export function usePaintInteraction(
 			const overlay = brushOverlayRef.current;
 			if (!renderer || !overlay) return;
 
-			const world = renderer.canvasToWorld(clientX, clientY);
-			const { camera } = renderer;
+			const camera = useViewportStore.getState().camera;
+			const world = renderer.canvasToWorld(camera, clientX, clientY);
 
 			const store = usePaintStore.getState();
 			const halfExt = store.brushHalfExtent;
@@ -131,17 +152,18 @@ export function usePaintInteraction(
 
 		// Use tool + brush captured at drag start for consistency with preview
 		try {
-			const resp = await api.paint({
+			await api.paint({
 				tool: dragToolRef.current,
 				brush_half_extent: dragBrushRef.current,
 				points: unique,
 			});
 
-			// Update simulation store from paint response
-			const simStore = useSimulationStore.getState();
-			simStore.setFrame(resp.frame.tick, resp.frame.frame);
-			simStore.setStatus(resp.frame.tick, resp.frame.status);
-			simStore.setHealth(resp.frame.tick, resp.frame.health);
+			const snapshot = await api.getSnapshot(
+				buildSnapshotQuery(useViewportStore.getState().getViewRequest()),
+			);
+			// Paint refreshes are local invalidation repairs, not websocket reconnects, so
+			// the snapshot should apply immediately without borrowing a request-id floor.
+			applySnapshotToStores(snapshot);
 
 			// Force re-render since tick may not change
 			rendererRef.current?.invalidate();
@@ -151,7 +173,7 @@ export function usePaintInteraction(
 	}, [rendererRef]);
 
 	const worldBounds = useCallback(() => {
-		const frame = useSimulationStore.getState().frame;
+		const frame = useWorldViewStore.getState().frame;
 		return frame ? { w: frame.width, h: frame.height } : null;
 	}, []);
 
@@ -176,7 +198,8 @@ export function usePaintInteraction(
 			const renderer = rendererRef.current;
 			if (!renderer) return;
 
-			const world = renderer.canvasToWorld(e.clientX, e.clientY);
+			const camera = useViewportStore.getState().camera;
+			const world = renderer.canvasToWorld(camera, e.clientX, e.clientY);
 			if (!isInBounds(world.x, world.y)) return;
 
 			isPaintingRef.current = true;
@@ -192,7 +215,14 @@ export function usePaintInteraction(
 			const bounds = worldBounds();
 			if (bounds) {
 				previewCellsRef.current.clear();
-				expandBrush(world.x, world.y, dragBrushRef.current, bounds.w, bounds.h, previewCellsRef.current);
+				expandBrush(
+					world.x,
+					world.y,
+					dragBrushRef.current,
+					bounds.w,
+					bounds.h,
+					previewCellsRef.current,
+				);
 				renderer.setPreview(previewCellsRef.current, dragToolRef.current);
 			}
 		},
@@ -206,7 +236,8 @@ export function usePaintInteraction(
 			const renderer = rendererRef.current;
 			if (!renderer) return;
 
-			const world = renderer.canvasToWorld(e.clientX, e.clientY);
+			const camera = useViewportStore.getState().camera;
+			const world = renderer.canvasToWorld(camera, e.clientX, e.clientY);
 			const store = usePaintStore.getState();
 			const bounds = worldBounds();
 
@@ -214,7 +245,14 @@ export function usePaintInteraction(
 				// Hover preview: show single brush footprint under cursor
 				if (bounds) {
 					previewCellsRef.current.clear();
-					expandBrush(world.x, world.y, store.brushHalfExtent, bounds.w, bounds.h, previewCellsRef.current);
+					expandBrush(
+						world.x,
+						world.y,
+						store.brushHalfExtent,
+						bounds.w,
+						bounds.h,
+						previewCellsRef.current,
+					);
 					renderer.setPreview(previewCellsRef.current, store.tool);
 				}
 				return;
@@ -228,7 +266,14 @@ export function usePaintInteraction(
 					const pt = interpolated[i];
 					if (pt && isInBounds(pt.x, pt.y)) strokePointsRef.current.push(pt);
 					if (pt && bounds) {
-						expandBrush(pt.x, pt.y, dragBrushRef.current, bounds.w, bounds.h, previewCellsRef.current);
+						expandBrush(
+							pt.x,
+							pt.y,
+							dragBrushRef.current,
+							bounds.w,
+							bounds.h,
+							previewCellsRef.current,
+						);
 					}
 				}
 				if (isInBounds(world.x, world.y)) {
@@ -246,7 +291,7 @@ export function usePaintInteraction(
 		// Clear preview — flush will update the real frame
 		previewCellsRef.current.clear();
 		rendererRef.current?.setPreview(null, null);
-		flushStroke();
+		void flushStroke();
 	}, [flushStroke, rendererRef]);
 
 	return { handleMouseDown, handleMouseMove, handleMouseUp, brushOverlayRef, clearPreview };
