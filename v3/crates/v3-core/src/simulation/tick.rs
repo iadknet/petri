@@ -66,7 +66,9 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
     };
     use crate::sensors::reducers::assemble_perception;
     use crate::sensors::static_inputs::assemble_static_inputs;
-    use crate::sensors::visibility::{compute_visible_cells, get_visibility_table};
+    use crate::sensors::visibility::{
+        compute_visible_cells_into, get_visibility_table, VisibilityScratch,
+    };
     use crate::simulation::actions::{
         apply_eat, apply_move, apply_noop, apply_reproduce, apply_steal_energy,
         PredationActionResult, ReproductionActionResult,
@@ -130,6 +132,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
     // genomes that reference extended perception keys. Others use zero() fallback.
     let perception_config = PerceptionConfig::from_sim_config(&sim.config);
     let vis_table = get_visibility_table(perception_config.vision_radius);
+    let mut visible_scratch = VisibilityScratch::default();
     let inputs: Vec<_> = queue
         .iter()
         .filter(|&&id| sim.creatures.contains_key(id))
@@ -137,11 +140,16 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
             let creature = &sim.creatures[id];
             let local = assemble_static_inputs(&sim.world, creature);
             let perception = if genome_uses_extended_perception(&creature.genome) {
-                let visible = compute_visible_cells(creature.position, &sim.world, vis_table);
+                let visible = compute_visible_cells_into(
+                    creature.position,
+                    &sim.world,
+                    vis_table,
+                    &mut visible_scratch,
+                );
                 assemble_perception(
                     id,
                     creature,
-                    &visible,
+                    visible,
                     &sim.world,
                     &sim.creatures,
                     &perception_config,

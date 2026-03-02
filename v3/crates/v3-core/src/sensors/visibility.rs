@@ -136,8 +136,15 @@ pub struct VisibleCells {
     cells: Vec<VisibleCell>,
 }
 
+/// Reusable buffers for sequential visibility assembly.
+#[derive(Debug, Default)]
+pub struct VisibilityScratch {
+    seen: Vec<bool>,
+    cells: Vec<VisibleCell>,
+}
+
 /// A single visible cell with its local offset and resolved world position.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct VisibleCell {
     pub dx: i32,
     pub dy: i32,
@@ -145,6 +152,11 @@ pub struct VisibleCell {
 }
 
 impl VisibleCells {
+    /// Borrow the visible cells as a slice.
+    pub fn cells(&self) -> &[VisibleCell] {
+        &self.cells
+    }
+
     /// Iterate over all visible cells.
     pub fn iter(&self) -> impl Iterator<Item = &VisibleCell> {
         self.cells.iter()
@@ -161,31 +173,30 @@ impl VisibleCells {
     }
 }
 
-/// Compute the set of visible cells for a creature at `origin` using the
-/// given visibility table and world state.
-///
-/// Per v3-sensor-spec.md Section 4:
-/// - Self cell (0,0) is always visible (included for food)
-/// - Barriers are visible and opaque (cells beyond are hidden)
-/// - Strict-corner rule for diagonal steps
-pub fn compute_visible_cells(
+fn fill_visible_cells(
     origin: Position,
     world: &WorldState,
     table: &VisibilityTable,
-) -> VisibleCells {
+    scratch: &mut VisibilityScratch,
+) {
     let r = table.radius as i32;
     let total = ((2 * r + 1) * (2 * r + 1)) as usize;
 
     // Track which offsets have been marked visible to avoid duplicates.
     // Use a flat grid indexed by (dx + r, dy + r).
     let side = (2 * r + 1) as usize;
-    let mut seen = vec![false; side * side];
-    let mut cells = Vec::with_capacity(total);
+    let seen_len = side * side;
+    scratch.seen.resize(seen_len, false);
+    scratch.seen[..seen_len].fill(false);
+    scratch.cells.clear();
+    if scratch.cells.capacity() < total {
+        scratch.cells.reserve(total - scratch.cells.capacity());
+    }
 
     // Self cell is always visible.
     let self_idx = (r as usize) * side + (r as usize);
-    seen[self_idx] = true;
-    cells.push(VisibleCell {
+    scratch.seen[self_idx] = true;
+    scratch.cells.push(VisibleCell {
         dx: 0,
         dy: 0,
         pos: origin,
@@ -204,7 +215,6 @@ pub fn compute_visible_cells(
             // Check strict-corner rule for diagonal steps.
             let is_diagonal = step_dx != prev_x && step_dy != prev_y;
             if is_diagonal {
-                // The two orthogonal side cells from the previous position.
                 let side1 = world.resolve_offset(origin, step_dx, prev_y);
                 let side2 = world.resolve_offset(origin, prev_x, step_dy);
 
@@ -221,13 +231,13 @@ pub fn compute_visible_cells(
                 break;
             };
 
-            // Mark as visible if not already seen.
             let grid_x = (step_dx + r) as usize;
             let grid_y = (step_dy + r) as usize;
             let idx = grid_y * side + grid_x;
-            if !seen[idx] {
-                seen[idx] = true;
-                cells.push(VisibleCell {
+            // Mark as visible if not already seen.
+            if !scratch.seen[idx] {
+                scratch.seen[idx] = true;
+                scratch.cells.push(VisibleCell {
                     dx: step_dx,
                     dy: step_dy,
                     pos,
@@ -243,8 +253,36 @@ pub fn compute_visible_cells(
             prev_y = step_dy;
         }
     }
+}
 
-    VisibleCells { cells }
+/// Compute the set of visible cells for a creature at `origin` using the
+/// given visibility table and world state.
+///
+/// Per v3-sensor-spec.md Section 4:
+/// - Self cell (0,0) is always visible (included for food)
+/// - Barriers are visible and opaque (cells beyond are hidden)
+/// - Strict-corner rule for diagonal steps
+pub fn compute_visible_cells(
+    origin: Position,
+    world: &WorldState,
+    table: &VisibilityTable,
+) -> VisibleCells {
+    let mut scratch = VisibilityScratch::default();
+    fill_visible_cells(origin, world, table, &mut scratch);
+    VisibleCells {
+        cells: scratch.cells,
+    }
+}
+
+/// Compute visible cells into reusable scratch storage and return a borrowed slice.
+pub fn compute_visible_cells_into<'a>(
+    origin: Position,
+    world: &WorldState,
+    table: &VisibilityTable,
+    scratch: &'a mut VisibilityScratch,
+) -> &'a [VisibleCell] {
+    fill_visible_cells(origin, world, table, scratch);
+    &scratch.cells
 }
 
 #[cfg(test)]
@@ -399,5 +437,41 @@ mod tests {
                 cell.dy
             );
         }
+    }
+
+    #[test]
+    fn scratch_visibility_matches_owned_visibility() {
+        let mut world = WorldState::new(20, 20, WorldEdgeMode::Wrap);
+        world.set_barrier(Position::new(11, 10), true);
+        world.set_barrier(Position::new(9, 9), true);
+
+        let table = get_visibility_table(5);
+        let origin = Position::new(10, 10);
+        let owned = compute_visible_cells(origin, &world, table);
+
+        let mut scratch = VisibilityScratch::default();
+        let borrowed = compute_visible_cells_into(origin, &world, table, &mut scratch);
+
+        assert_eq!(owned.cells(), borrowed);
+    }
+
+    #[test]
+    fn scratch_visibility_resets_seen_when_radius_changes() {
+        let mut world = WorldState::new(20, 20, WorldEdgeMode::Wrap);
+        world.set_barrier(Position::new(10, 9), true);
+
+        let origin = Position::new(10, 10);
+        let smaller_table = get_visibility_table(2);
+        let larger_table = get_visibility_table(3);
+        let mut scratch = VisibilityScratch::default();
+
+        let smaller_len =
+            compute_visible_cells_into(origin, &world, smaller_table, &mut scratch).len();
+        assert!(smaller_len > 0);
+
+        let reused = compute_visible_cells_into(origin, &world, larger_table, &mut scratch);
+        let owned = compute_visible_cells(origin, &world, larger_table);
+
+        assert_eq!(owned.cells(), reused);
     }
 }

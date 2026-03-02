@@ -4,8 +4,9 @@ use rand::SeedableRng;
 use slotmap::SlotMap;
 
 use crate::config::SimulationConfig;
-use crate::contracts::{CreatureId, Position};
+use crate::contracts::{CreatureId, InputReference, Position, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
+use crate::creature::genome::CreatureGenome;
 use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
@@ -85,10 +86,48 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
     }
 }
 
+fn inject_extended_perception_input(genome: &mut CreatureGenome) {
+    let marker = InputReference::World(WorldInputKey::AreaFoodSummary);
+    if genome
+        .nodes
+        .iter()
+        .any(|node| node.input_refs.iter().any(|input_ref| input_ref == &marker))
+    {
+        return;
+    }
+
+    if let Some(node) = genome.nodes.first_mut() {
+        if let Some(first_input_ref) = node.input_refs.first_mut() {
+            *first_input_ref = marker;
+        } else {
+            node.input_refs.push(marker);
+        }
+    }
+}
+
+/// Seed a deterministic simulation and force the first `perception_creatures`
+/// founders to use extended perception inputs.
+///
+/// This exists for tests and benchmarks that need a stable perception-heavy
+/// workload from tick 0, instead of relying on evolution to discover those
+/// inputs during the benchmark horizon.
+pub fn seed_simulation_with_perception_mix(
+    config: SimulationConfig,
+    seed: u64,
+    perception_creatures: usize,
+) -> Simulation {
+    let mut sim = seed_simulation(config, seed);
+    for (_, creature) in sim.creatures.iter_mut().take(perception_creatures) {
+        inject_extended_perception_input(&mut creature.genome);
+    }
+    sim
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::config::SimulationConfig;
+    use crate::sensors::perception::genome_uses_extended_perception;
     use std::collections::HashSet;
 
     fn small_config() -> SimulationConfig {
@@ -204,5 +243,67 @@ mod tests {
         ids1.sort_by_key(|i| i.lineage_id);
         ids2.sort_by_key(|i| i.lineage_id);
         assert_eq!(ids1, ids2);
+    }
+
+    #[test]
+    fn founder_baseline_does_not_use_extended_perception() {
+        let sim = seed_simulation(small_config(), 42);
+        assert_eq!(
+            sim.creatures
+                .values()
+                .filter(|creature| genome_uses_extended_perception(&creature.genome))
+                .count(),
+            0
+        );
+    }
+
+    #[test]
+    fn perception_mix_marks_requested_number_of_founders() {
+        let sim = seed_simulation_with_perception_mix(small_config(), 42, 2);
+        assert_eq!(
+            sim.creatures
+                .values()
+                .filter(|creature| genome_uses_extended_perception(&creature.genome))
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn perception_mix_rewrites_a_live_input_ref_to_extended_perception() {
+        let sim = seed_simulation_with_perception_mix(small_config(), 42, 1);
+        let creature = sim.creatures.values().next().expect("seeded creature");
+        assert_eq!(
+            creature.genome.nodes[0].input_refs[0],
+            InputReference::World(WorldInputKey::AreaFoodSummary)
+        );
+    }
+
+    #[test]
+    fn perception_mix_clamps_to_population_size() {
+        let sim = seed_simulation_with_perception_mix(small_config(), 42, 99);
+        assert_eq!(
+            sim.creatures
+                .values()
+                .filter(|creature| genome_uses_extended_perception(&creature.genome))
+                .count(),
+            sim.creature_count()
+        );
+    }
+
+    #[test]
+    fn perception_mix_scales_to_benchmark_population() {
+        let mut cfg = SimulationConfig::default();
+        cfg.world.width = 240;
+        cfg.world.height = 240;
+        cfg.population.initial_creatures = 400;
+        let sim = seed_simulation_with_perception_mix(cfg, 42, 200);
+        assert_eq!(
+            sim.creatures
+                .values()
+                .filter(|creature| genome_uses_extended_perception(&creature.genome))
+                .count(),
+            200
+        );
     }
 }
