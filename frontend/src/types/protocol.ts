@@ -1,6 +1,8 @@
-export const PROTOCOL_VERSION = "v3alpha1" as const;
+export const PROTOCOL_VERSION = "v3alpha2" as const;
 
 export type SimState = "idle" | "running" | "paused";
+export type ZoomTier = "overview" | "detail" | "inspect";
+export type ByteArrayLike = Uint8Array | number[];
 
 export interface Creature {
 	id: number;
@@ -39,6 +41,12 @@ export interface LastTickActions {
 	predation_kills: number;
 }
 
+export interface PerfPayload {
+	projection_publish_ms: number;
+	ws_frame_publish_ms: number;
+	subscriber_count: number;
+}
+
 export interface StatusPayload {
 	state: SimState;
 	population: number;
@@ -51,11 +59,22 @@ export interface StatusPayload {
 	predation_actions_transferred_total: number;
 	predation_actions_rejected_total: number;
 	predation_kills_total: number;
-	last_tick_compute_total_mean: number;
-	last_tick_compute_total_min: number;
-	last_tick_compute_total_max: number;
-	last_tick_compute_vm_mean: number;
-	last_tick_compute_graph_mean: number;
+	predation_actions_by_result: Record<string, number>;
+	mutation_events_attempted_total: number;
+	mutation_events_applied_total: number;
+	mutation_events_skipped_total: number;
+	mutation_events_attempted_total_by_domain: Record<string, number>;
+	mutation_events_applied_total_by_domain: Record<string, number>;
+	mutation_events_attempted_total_by_operator: Record<string, number>;
+	mutation_events_applied_total_by_operator: Record<string, number>;
+	mutation_events_applied_total_semantic_noop: number;
+	mutation_events_applied_total_semantic_change: number;
+	last_tick_compute_energy_total_mean: number;
+	last_tick_compute_energy_total_min: number;
+	last_tick_compute_energy_total_max: number;
+	last_tick_compute_energy_vm_mean: number;
+	last_tick_compute_energy_graph_mean: number;
+	perf: PerfPayload;
 }
 
 export interface HealthPayload {
@@ -94,19 +113,95 @@ export interface PredationEvent {
 	killed: boolean;
 }
 
-export interface WsFrame {
-	tick: number;
-	status: StatusPayload;
-	frame: Frame;
-	health: HealthPayload;
+export interface WorldStaticPayload {
+	width: number;
+	height: number;
+	barrier_mask: ByteArrayLike;
+}
+
+export interface ViewRect {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}
+
+export interface ViewOverviewPayload {
+	rect: ViewRect;
+	grid_width: number;
+	grid_height: number;
+	food_density_u8: ByteArrayLike;
+	creature_count_u16: number[];
+}
+
+export interface ViewDetailPayload {
+	rect: ViewRect;
+	width: number;
+	height: number;
+	food_density_u8: ByteArrayLike;
+	creatures: Creature[];
 	predation_events: PredationEvent[];
 }
 
-export type WsEventType = "status" | "frame" | "health";
+export type SnapshotView =
+	| ({ kind: "overview" } & ViewOverviewPayload)
+	| ({ kind: "detail" } & ViewDetailPayload);
 
-export interface WsEnvelope<T = unknown> {
-	protocol_version: string;
-	event: WsEventType;
-	tick: number;
-	payload: T;
+export interface SubscribeViewMessage {
+	type: "subscribe_view";
+	request_id: number;
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+	canvas_width: number;
+	canvas_height: number;
+	zoom_tier: ZoomTier;
 }
+
+export interface UnsubscribeViewMessage {
+	type: "unsubscribe_view";
+}
+
+export type ClientMessage = SubscribeViewMessage | UnsubscribeViewMessage;
+
+interface ServerMessageBase {
+	protocol_version: string;
+	projection_revision: number;
+	world_static_revision: number;
+	tick: number;
+}
+
+export interface StatusServerMessage extends ServerMessageBase {
+	type: "status";
+	payload: StatusPayload;
+}
+
+export interface HealthServerMessage extends ServerMessageBase {
+	type: "health";
+	payload: HealthPayload;
+}
+
+export interface WorldStaticServerMessage extends ServerMessageBase {
+	type: "world_static";
+	payload: WorldStaticPayload;
+}
+
+export interface ViewOverviewServerMessage extends ServerMessageBase {
+	type: "view_overview";
+	request_id: number;
+	payload: ViewOverviewPayload;
+}
+
+export interface ViewDetailServerMessage extends ServerMessageBase {
+	type: "view_detail";
+	request_id: number;
+	payload: ViewDetailPayload;
+}
+
+export type ServerMessage =
+	| StatusServerMessage
+	| HealthServerMessage
+	| WorldStaticServerMessage
+	| ViewOverviewServerMessage
+	| ViewDetailServerMessage;

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { loadE2EConfig, parseCliArgs } from "./config.ts";
 import { AgentBrowserClient } from "./lib/agentBrowser.ts";
 import { ensureRunDirectory, maybeWriteFailureArtifacts } from "./lib/artifacts.ts";
 import { allocatePorts } from "./lib/ports.ts";
 import { startLocalStack, withManagedStack } from "./lib/processManager.ts";
 import { waitForHttpOk } from "./lib/wait.ts";
-import { loadE2EConfig, parseCliArgs } from "./config.ts";
 import { scenarioBootConnectivity } from "./scenarios/e2e-01-boot-connectivity.ts";
 import { scenarioStartupLifecycleStep } from "./scenarios/e2e-02-startup-lifecycle-step.ts";
 import { scenarioConfigApplyResetLocks } from "./scenarios/e2e-03-config-apply-reset-locks.ts";
@@ -14,6 +14,7 @@ import { scenarioStatsAndPanels } from "./scenarios/e2e-04-stats-and-panels.ts";
 import { scenarioViewportSmoke } from "./scenarios/e2e-05-viewport-smoke.ts";
 import { scenarioMutationConfig } from "./scenarios/e2e-06-mutation-config.ts";
 import { scenarioPaintDrawing } from "./scenarios/e2e-07-paint-drawing.ts";
+import { scenarioViewportSelection } from "./scenarios/e2e-08-viewport-selection.ts";
 import type { ScenarioDefinition } from "./types.ts";
 
 const scenarios: ScenarioDefinition[] = [
@@ -24,6 +25,7 @@ const scenarios: ScenarioDefinition[] = [
 	scenarioViewportSmoke,
 	scenarioMutationConfig,
 	scenarioPaintDrawing,
+	scenarioViewportSelection,
 ];
 
 async function main(): Promise<void> {
@@ -44,19 +46,19 @@ async function main(): Promise<void> {
 
 	const failures: Array<{ id: string; reason: string; artifactsPath?: string }> = [];
 
-	await withManagedStack(
-		() =>
-			startLocalStack({
-				repoRoot: config.repoRoot,
-				artifactBaseDir: runDir,
-				backendPort: ports.backendPort,
-				frontendPort: ports.frontendPort,
-			}),
-		async (stack) => {
-			await waitForHttpOk(`${stack.backendUrl}/v3/simulation/status`, config.startupTimeoutMs);
-			await waitForHttpOk(stack.frontendUrl, config.startupTimeoutMs);
+	for (const scenario of selected) {
+		await withManagedStack(
+			() =>
+				startLocalStack({
+					repoRoot: config.repoRoot,
+					artifactBaseDir: runDir,
+					backendPort: ports.backendPort,
+					frontendPort: ports.frontendPort,
+				}),
+			async (stack) => {
+				await waitForHttpOk(`${stack.backendUrl}/v3/simulation/status`, config.startupTimeoutMs);
+				await waitForHttpOk(stack.frontendUrl, config.startupTimeoutMs);
 
-			for (const scenario of selected) {
 				const commands: string[] = [];
 				const session = `petri-${scenario.id.toLowerCase()}-${Date.now()}`;
 				const browser = new AgentBrowserClient({
@@ -80,7 +82,7 @@ async function main(): Promise<void> {
 					console.log(`PASS ${scenario.id}`);
 				} catch (error) {
 					status = "failed";
-					errorReason = error instanceof Error ? error.stack ?? error.message : String(error);
+					errorReason = error instanceof Error ? (error.stack ?? error.message) : String(error);
 					console.error(`FAIL ${scenario.id}: ${errorReason}`);
 				} finally {
 					let artifactsPath: string | null = null;
@@ -108,13 +110,17 @@ async function main(): Promise<void> {
 							const screenshotPath = path.join(artifactsPath, "annotated.png");
 							await browser.screenshotAnnotated(screenshotPath).catch(() => undefined);
 						}
-						failures.push({ id: scenario.id, reason: errorReason, artifactsPath: artifactsPath ?? undefined });
+						failures.push({
+							id: scenario.id,
+							reason: errorReason,
+							artifactsPath: artifactsPath ?? undefined,
+						});
 					}
 					await browser.close().catch(() => undefined);
 				}
-			}
-		},
-	);
+			},
+		);
+	}
 
 	console.log(`\nE2E Summary: ${selected.length - failures.length}/${selected.length} passed`);
 	if (failures.length > 0) {
@@ -135,7 +141,9 @@ async function collectDiagnostics(browser: AgentBrowserClient): Promise<{
 	errors: unknown;
 	console: unknown;
 }> {
-	const snapshotInteractive = await browser.snapshotInteractive().catch((error) => toErrorArtifact(error));
+	const snapshotInteractive = await browser
+		.snapshotInteractive()
+		.catch((error) => toErrorArtifact(error));
 	const snapshotInteractiveCursor = await browser
 		.snapshotInteractiveCursor()
 		.catch((error) => toErrorArtifact(error));
@@ -160,6 +168,6 @@ function toErrorArtifact(error: unknown): { error: string } {
 }
 
 main().catch((error) => {
-	console.error(error instanceof Error ? error.stack ?? error.message : String(error));
+	console.error(error instanceof Error ? (error.stack ?? error.message) : String(error));
 	process.exitCode = 1;
 });

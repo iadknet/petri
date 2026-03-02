@@ -13,6 +13,12 @@ const queryClient = new QueryClient({
 	},
 });
 
+if (import.meta.env.DEV) {
+	void import("./testing/e2eHooks.ts").then(({ installE2ETestHooks }) => {
+		installE2ETestHooks();
+	});
+}
+
 createRoot(document.getElementById("root")!).render(
 	<StrictMode>
 		<QueryClientProvider client={queryClient}>

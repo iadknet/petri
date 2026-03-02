@@ -10,13 +10,31 @@ export function ZoomControls({ onZoomIn, onZoomOut, onFitToWorld }: ZoomControls
 
 	return (
 		<div className="absolute top-3 right-3 flex flex-col gap-1 z-10">
-			<button type="button" onClick={onZoomIn} className={btnClass} title="Zoom in">
+			<button
+				type="button"
+				data-testid="zoom-in"
+				onClick={onZoomIn}
+				className={btnClass}
+				title="Zoom in"
+			>
 				+
 			</button>
-			<button type="button" onClick={onZoomOut} className={btnClass} title="Zoom out">
+			<button
+				type="button"
+				data-testid="zoom-out"
+				onClick={onZoomOut}
+				className={btnClass}
+				title="Zoom out"
+			>
 				&minus;
 			</button>
-			<button type="button" onClick={onFitToWorld} className={btnClass} title="Fit to world (Home)">
+			<button
+				type="button"
+				data-testid="zoom-fit"
+				onClick={onFitToWorld}
+				className={btnClass}
+				title="Fit to world (Home)"
+			>
 				&#x2B1C;
 			</button>
 		</div>

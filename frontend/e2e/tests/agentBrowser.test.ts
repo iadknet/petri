@@ -4,6 +4,7 @@ import {
 	AgentBrowserCommandError,
 	assertAgentBrowserSuccess,
 	parseAgentBrowserJson,
+	unwrapAgentBrowserEvalResult,
 } from "../lib/agentBrowser.ts";
 
 describe("agent-browser JSON parser", () => {
@@ -21,5 +22,13 @@ describe("agent-browser JSON parser", () => {
 		expect(() =>
 			assertAgentBrowserSuccess({ success: false, data: null, error: "boom" }, "snapshot"),
 		).toThrow(AgentBrowserCommandError);
+	});
+
+	it("unwraps eval result payloads", () => {
+		expect(unwrapAgentBrowserEvalResult({ result: { zoom: 4 } })).toEqual({ zoom: 4 });
+	});
+
+	it("passes through non-wrapped eval payloads", () => {
+		expect(unwrapAgentBrowserEvalResult({ zoom: 4 })).toEqual({ zoom: 4 });
 	});
 });
