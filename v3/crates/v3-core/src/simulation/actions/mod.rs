@@ -273,6 +273,26 @@ mod tests {
     }
 
     #[test]
+    fn apply_reproduce_default_cap_allows_twenty_energy_transfer() {
+        let pos = Position::new(5, 5);
+        let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(11);
+
+        let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
+
+        assert_eq!(result, ReproductionActionResult::Spawned);
+        let child = sim
+            .creatures
+            .values()
+            .find(|creature| creature.generation == 1)
+            .expect("child not found");
+        assert!(
+            (child.energy - 20.0).abs() < 1e-6,
+            "default offspring cap should not clamp a 20.0 transfer request"
+        );
+    }
+
+    #[test]
     fn apply_reproduce_fails_when_target_occupied() {
         let pos = Position::new(5, 5);
         let north = Position::new(5, 4);
