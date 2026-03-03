@@ -27,6 +27,14 @@ Potential shape:
 - creature-visualization dirty tracking
 - incremental cache updates instead of whole-snapshot rebuilds
 
+### Tick phase system
+
+The tick loop now has 5 phases (0, 1, 2, 2.5, 3). A phase-based system where phases are registered handlers would improve extensibility and make it easier to add future tick-level passes without growing the monolithic `run_tick` function.
+
+### Graph evaluation → plasticity decoupling
+
+Currently `graph.rs` calls directly into plasticity modules for post-convergence updates (Hebbian weight updates, eligibility trace updates). A more extensible design would have graph evaluation produce "learning events" dispatched to registered plasticity backends, decoupling the graph relaxation loop from the specifics of any learning algorithm.
+
 ### Eventual multi-crate `v3-server` split
 
 If the internal command/query/transport boundaries stabilize, a later follow-up
@@ -34,13 +42,22 @@ could split `v3-server` into multiple crates. That is intentionally deferred
 from the current refactor to avoid increasing migration scope while the new
 boundaries are still settling.
 
-## Small Modifications
 
-### Add additional lifetime stats for creatures
+## Feature ideas
 
-  - Counter for each action taken during lifetime (failed/succeeded)
-  - Min energy during lifetime
-  - Max energy during lifetime
+### Complexity energy cost
+ - companion to complexity cap that magnifies the energy cost of all actions based on complexity
+
+### Age energy cost
+ - Set an "age cap"
+ - Energy cost for actions increaseses when you get close to age cape
+ - Gradual increase, then bigger increase closer to cap
+ - Configureable age and max energy penalty multiplier.
+ - Sane defaults - something like age 500, multiplier maxes out at x10
+
+### Add a action log for  creature
+
+Each creature will maintain an log of all its actions and action metadata.
 
 
 ### Ability to paint complex barriers
@@ -54,7 +71,7 @@ I'm imaginging this as a set of new barrier painting tools. That can create sect
   - Paint a parralell squiggly/jagged lines
   - Paint random star patterns
   
-  Are there any other ideas I'm missing?
+  Are there any other interesting ideas I'm missing?
 
 This will be a more complicated tool than the other painting tools. Each of these probably needs some sub-configuration... like width of spaces between lines in the maze and spiral, density of random noise, etc.
 
@@ -62,15 +79,42 @@ I'm imaging the tool will allow drawing a box on the map and then it will fill t
 
 We need to think about how to organize the UI.
 
+### Ability to generate map with configurable barrier topology
 
-### Tick phase system
+In the startup config, add a section for configuring inital barrier topology.
 
-The tick loop now has 5 phases (0, 1, 2, 2.5, 3). A phase-based system where phases are registered handlers would improve extensibility and make it easier to add future tick-level passes without growing the monolithic `run_tick` function.
+This will be a completely different type of configuration that will need a lot of thought on how to design it.
 
-### Graph evaluation → plasticity decoupling
+I'm thinking there will be a way to "add" features to be generated.
 
-Currently `graph.rs` calls directly into plasticity modules for post-convergence updates (Hebbian weight updates, eligibility trace updates). A more extensible design would have graph evaluation produce "learning events" dispatched to registered plasticity backends, decoupling the graph relaxation loop from the specifics of any learning algorithm.
+For example, you can "add" a maze and configure its size and other maze configuration values.
 
+There should be options for adding all the different barrier configurations.
+
+There should also be an option for "empty space" which defines a large/medium/small area of space with no barriers.
+
+
+The algorithm for generating the map might get complex with competing requirements. If there are 5 large open spaces, 5 large mazes, and 5 large areas of random noise... how does it fit them all?   I'm thinking it takes all the sizes of the different features and adds them all up, then divides it proportionally based on all the demands.
+
+
+### Food growth layer
+
+Add a new layer overalay to the map that has variable growth rates for food.
+
+There would be a new brush for painting on this layer.  The brush would need to be able to be resized with configurable size, growth rate modifier, and guassian blur.
+
+Could paint on positive and negative growth rate modifiers.
+
+
+### World startup config for food growth layer.
+
+Add config section for configuring food growth layer generation on new map.
+
+Can set different noise patterns?  This needs refinement.
+
+### Add time variation for food growth barrier
+
+This needs further thought and refinement.  Allow food growth barrier to "drift" over time? Should there be an option for seasonality?  What kind of configuration can we do?
 
 ## Big refactors / changes
 
@@ -79,22 +123,6 @@ Currently `graph.rs` calls directly into plasticity modules for post-convergence
 Within the creature inspector have different tabs (creatur summary, mesh viewer, sampler).
 
 Need to brainstorm more on this.
-
-
-## Major New Features
-
-### New internal graph nodes can be born with attached inputs
-
-Right now a fresh internal graph node can be structurally valid but functionally useless for several mutation steps, because it may have no meaningful sensor signal attached yet. We could add a graph-specific mutation path where some node-add events create a **small input bundle** alongside the new internal node, so the new structure can start life with a readable signal instead of waiting for several follow-up mutations to line up.
-
-Recommended shape:
-- when adding a new internal compute node, optionally also create `1-2` `InputRef` leaves and wire them into the node immediately
-- those `InputRef` leaves should point at valid entries in the owning `NodeGenome.input_refs`
-- if the chosen input does not exist yet, append a new random `InputReference` first, then point the new leaf at that fresh `ref_idx`
-- for compound inputs, either fan out all sub-values through the existing compound mechanism or pick one explicit `sub_idx`
-- keep the current junk-DNA mutation path too; this should be an additional mutation mode, not a replacement
-
-This would make graph evolution less brittle by reducing the number of independent mutations required before a new node can do anything adaptive. It also gives us a cleaner place to experiment with higher-level birth patterns later, like "add a comparator node already wired to food-gradient and occupancy inputs" without needing to change the runtime model.
 
 
 ### Storage slots
@@ -154,8 +182,6 @@ This would make graph evolution less brittle by reducing the number of independe
 
 ### Sexual reproduction
   - creatures can reproduce sexually
-  
-    
 
 ### Massive introduction of Neural nets
 
