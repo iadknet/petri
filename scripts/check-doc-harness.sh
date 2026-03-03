@@ -60,22 +60,10 @@ check_claude_adapter() {
     return
   fi
 
-  local required_pointer='Read `AGENTS.md` first.'
-  local required_minimal="This file is intentionally minimal."
-
-  if ! grep -Fq "$required_pointer" "CLAUDE.md"; then
-    report_violation "CLAUDE.md must include required pointer text: $required_pointer"
-  fi
-
-  if ! grep -Fq "$required_minimal" "CLAUDE.md"; then
-    report_violation "CLAUDE.md must include required minimal-adapter text"
-  fi
-
-  local line_count
-  line_count="$(wc -l < "CLAUDE.md" | tr -d ' ')"
-  local max_lines=40
-  if (( line_count > max_lines )); then
-    report_violation "CLAUDE.md should stay minimal (<= ${max_lines} lines, found ${line_count})"
+  local content
+  content="$(tr -d '\r' < "CLAUDE.md")"
+  if [[ "$content" != "@AGENTS.md" ]]; then
+    report_violation "CLAUDE.md must contain only @AGENTS.md"
   fi
 }
 
