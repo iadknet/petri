@@ -117,7 +117,7 @@ Request (conceptual v3alpha1 shape):
       "max_energy": 200.0,
       "energy_decay_per_tick": 0.5,
       "min_reproduce_energy": 1.0,
-      "default_offspring_energy": 8.0
+      "default_offspring_energy": 100.0
     },
     "costs": {
       "move_cost": 1.0,
@@ -363,7 +363,7 @@ Response:
         "max_energy": 200.0,
         "energy_decay_per_tick": 0.5,
         "min_reproduce_energy": 1.0,
-        "default_offspring_energy": 8.0
+        "default_offspring_energy": 100.0
       },
       "costs": {
         "move_cost": 1.0,

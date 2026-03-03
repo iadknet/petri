@@ -116,7 +116,7 @@ section only owns config contract shape/defaults.
 | `energy.lifecycle.max_energy` | `f32` | `200.0` | Must be finite and `>= 1.0`; invalid values fall back to `200.0`. |
 | `energy.lifecycle.energy_decay_per_tick` | `f32` | `0.5` | Must be finite and `>= 0.0`; invalid values fall back to `0.5`. |
 | `energy.lifecycle.min_reproduce_energy` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. |
-| `energy.lifecycle.default_offspring_energy` | `f32` | `8.0` | Must be finite and `>= 0.0`; invalid values fall back to `8.0`. |
+| `energy.lifecycle.default_offspring_energy` | `f32` | `100.0` | Must be finite and `>= 0.0`; invalid values fall back to `100.0`. |
 | `energy.costs.move_cost` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. |
 | `energy.costs.eat_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; invalid values fall back to `0.0`. |
 | `energy.costs.noop_cost` | `f32` | `0.05` | Must be finite and `>= 0.0`; invalid values fall back to `0.05`. |

@@ -76,7 +76,7 @@ impl Default for EnergyLifecycleConfig {
             max_energy: 200.0,
             energy_decay_per_tick: 0.5,
             min_reproduce_energy: 1.0,
-            default_offspring_energy: 8.0,
+            default_offspring_energy: 100.0,
         }
     }
 }
@@ -344,7 +344,8 @@ impl SimulationConfig {
         el.max_energy = normalize_f32_finite_min(el.max_energy, 1.0, 200.0);
         el.energy_decay_per_tick = normalize_f32_finite_nonneg(el.energy_decay_per_tick, 0.5);
         el.min_reproduce_energy = normalize_f32_finite_nonneg(el.min_reproduce_energy, 1.0);
-        el.default_offspring_energy = normalize_f32_finite_nonneg(el.default_offspring_energy, 8.0);
+        el.default_offspring_energy =
+            normalize_f32_finite_nonneg(el.default_offspring_energy, 100.0);
 
         let ec = &mut self.energy.costs;
         ec.move_cost = normalize_f32_finite_nonneg(ec.move_cost, 1.0);
@@ -477,7 +478,7 @@ mod tests {
         assert!((cfg.energy.lifecycle.max_energy - 200.0).abs() < 1e-6);
         assert!((cfg.energy.lifecycle.energy_decay_per_tick - 0.5).abs() < 1e-6);
         assert!((cfg.energy.lifecycle.min_reproduce_energy - 1.0).abs() < 1e-6);
-        assert!((cfg.energy.lifecycle.default_offspring_energy - 8.0).abs() < 1e-6);
+        assert!((cfg.energy.lifecycle.default_offspring_energy - 100.0).abs() < 1e-6);
         // Energy costs
         assert!((cfg.energy.costs.move_cost - 1.0).abs() < 1e-6);
         assert!((cfg.energy.costs.eat_cost - 0.0).abs() < 1e-6);
