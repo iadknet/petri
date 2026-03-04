@@ -183,8 +183,7 @@ mod tests {
         let mult = sim
             .config
             .energy
-            .complexity_cost
-            .multiplier(sim.creatures[id].genome.complexity());
+            .action_cost_multiplier(sim.creatures[id].genome.complexity(), sim.creatures[id].age);
         let energy_before = sim.creatures[id].energy;
         {
             let creature = sim.creatures.get_mut(id).unwrap();
@@ -209,8 +208,7 @@ mod tests {
         let mult = sim
             .config
             .energy
-            .complexity_cost
-            .multiplier(sim.creatures[id].genome.complexity());
+            .action_cost_multiplier(sim.creatures[id].genome.complexity(), sim.creatures[id].age);
         {
             let creature = sim.creatures.get_mut(id).unwrap();
             let _ = apply_move(id, creature, &mut sim.world, Direction::N, &sim.config);
