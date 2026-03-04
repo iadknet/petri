@@ -96,7 +96,8 @@ export type InputReference =
 	  }
 	| { StaticIntrospection: string }
 	| { DynamicIntrospection: string }
-	| { UpstreamSlot: number };
+	| { UpstreamSlot: number }
+	| "ActionQueue";
 
 export interface NodeGenome {
 	node_id: number;
