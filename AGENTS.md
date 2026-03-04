@@ -66,6 +66,11 @@ as items in `## Implementation Steps`:
 5. An inline prose comment ("looks clean") is NOT a review. A review means
    dispatching the `superpowers:code-reviewer` subagent or running domain skills
    and documenting findings.
+6. **Re-verification after review-introduced changes.** If a code review finding
+   leads to a code change, any previously-passed verification steps that cover
+   the changed code MUST be re-run. A verification step checked off before the
+   change does not count as verification of the post-change code. This includes
+   build checks, test suites, and type checking.
 
 ## Determinism Scope (Canonical)
 
@@ -167,14 +172,13 @@ Agents must invoke the appropriate installed skills during architecture, plannin
 
 Before claiming completion, run and confirm all pass:
 
-1. `scripts/check-doc-harness.sh --mode warn` (through February 27, 2026)
-2. `scripts/check-architecture-harness.sh --mode warn` (through February 27, 2026)
-3. `scripts/check-doc-harness.sh --mode strict` (starting February 28, 2026)
-4. `scripts/check-architecture-harness.sh --mode strict` (starting February 28, 2026)
-5. `scripts/check-plan-harness.sh --mode strict` (effective immediately)
-6. `cd v3 && cargo fmt --all -- --check`
-7. `cd v3 && cargo test --workspace`
-8. `cd v3 && cargo clippy --workspace --all-targets -- -D warnings`
+1. `scripts/check-doc-harness.sh --mode strict`
+2. `scripts/check-architecture-harness.sh --mode strict`
+3. `scripts/check-plan-harness.sh --mode strict`
+4. `cd v3 && cargo fmt --all -- --check`
+5. `cd v3 && cargo test --workspace`
+6. `cd v3 && cargo clippy --workspace --all-targets -- -D warnings`
+7. `cd frontend && npm run build` (if any frontend files were touched)
 
 ## Doc Touch Policy
 

@@ -9,12 +9,12 @@ description: Use when returning to a feature after a session break, or when pick
 
 ## Overview
 
-Loads an in-progress feature's `master_plan.md`, checks for uncommitted work, summarizes state, re-invokes applicable domain skills, and hands off to continue from the next unchecked step.
+Reloads an in-progress feature's context, checks for uncommitted work, summarizes state, and hands off to continue from the next unchecked step.
 
 ## Steps
 
 1. **Read** `docs/features/in_progress/FEATURE-NAME/master_plan.md`
-2. **Check for uncommitted work:** Run `git status` and `git diff --stat` to detect any partial/uncommitted changes from the previous session. If dirty state exists, summarize it for the user and ask how to proceed (commit, stash, or discard).
+2. **Check for uncommitted work:** Run `git status` and `git diff --stat`. If dirty state exists, summarize it for the user and ask how to proceed (commit, stash, or discard).
 3. **Identify state:**
    - All `- [x]` (completed) steps
    - All `- [ ]` (unchecked) steps
@@ -22,22 +22,10 @@ Loads an in-progress feature's `master_plan.md`, checks for uncommitted work, su
 4. **Summarize for the user:**
    - What has been completed
    - What the next step is
-   - Any in-flight state to be aware of (partial work, open questions, etc.)
-5. **Re-read policies** from master_plan.md:
-   - `## TDD Policy`
-   - `## Code Review Policy`
-   - `## Commit Policy`
-   - `## Required Skills`
-   Remind the agent of all applicable policies before starting.
-6. **Invoke domain skills** based on the next step's domain:
-   - **REQUIRED SUB-SKILL:** Rust/backend → invoke `rust-skills`
-   - **REQUIRED SUB-SKILL:** Frontend → invoke `vercel-react-best-practices` + `vercel-composition-patterns`
-   - **REQUIRED SUB-SKILL:** UI/design → also invoke `web-design-guidelines` + `frontend-design`
-7. **Hand off**: Continue from the first unchecked `- [ ]` step, following all policies in `master_plan.md`.
-
-## Reminder: Policies Always Apply
-
-- TDD is mandatory for behavior changes/bug fixes (test first)
-- Checkmarks must be updated in master_plan.md as each step completes
-- One commit per step
-- **Review Gate checkmarks are mandatory steps** — they must be completed like any other checkmark. Do NOT skip to `feature-6-complete` or `finishing-a-development-branch` until all Review Gate checkmarks are checked off.
+   - Any in-flight state to be aware of (partial work, open questions)
+5. **Re-read all policy sections** from `master_plan.md` (TDD, Code Review, Commit, Required Skills, etc.). Remind the agent of all applicable policies before starting.
+6. **Invoke domain skills** based on the next step's domain, following the same rules as `feature-4-implement` per-step workflow:
+   - Rust/backend: `rust-skills`
+   - Frontend: `vercel-react-best-practices` + `vercel-composition-patterns`
+   - UI/design: also `web-design-guidelines` + `frontend-design`
+7. **Hand off**: Continue from the first unchecked `- [ ]` step, following `feature-4-implement` per-step workflow (implementation, review gates, checkmark update, commit).
