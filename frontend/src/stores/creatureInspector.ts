@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { CreatureGenome, CreaturePhenotype } from "../types/api.ts";
+import type { ActionLogEntry, CreatureGenome, CreaturePhenotype } from "../types/api.ts";
 
 export interface CreatureStats {
 	id: number;
@@ -17,6 +17,7 @@ interface CreatureInspectorState {
 	creatureStats: CreatureStats | null;
 	creatureGenome: CreatureGenome | null;
 	creatureMemory: number[] | null;
+	actionLog: ActionLogEntry[] | null;
 	isLoading: boolean;
 	error: string | null;
 	isDead: boolean;
@@ -34,6 +35,7 @@ interface CreatureInspectorState {
 		phenotype: CreaturePhenotype;
 		genome: CreatureGenome;
 		memory: number[];
+		actionLog: ActionLogEntry[];
 	}) => void;
 	setDead: () => void;
 	setError: (error: string) => void;
@@ -53,6 +55,7 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 	creatureStats: null,
 	creatureGenome: null,
 	creatureMemory: null,
+	actionLog: null,
 	isLoading: false,
 	error: null,
 	isDead: false,
@@ -63,6 +66,7 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 			creatureStats: null,
 			creatureGenome: null,
 			creatureMemory: null,
+			actionLog: null,
 			isLoading: true,
 			error: null,
 			isDead: false,
@@ -74,6 +78,7 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 			creatureStats: null,
 			creatureGenome: null,
 			creatureMemory: null,
+			actionLog: null,
 			isLoading: false,
 			error: null,
 			isDead: false,
@@ -108,6 +113,7 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 			creatureStats: stats,
 			creatureGenome: genome,
 			creatureMemory: memory,
+			actionLog: detail.actionLog,
 			isLoading: false,
 			error: null,
 		});

@@ -123,4 +123,5 @@ export interface CreatureDetail {
 	phenotype: CreaturePhenotype;
 	genome: CreatureGenome;
 	memory: number[];
+	action_log: import("./action-log.ts").ActionLogEntry[];
 }

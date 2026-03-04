@@ -1,3 +1,4 @@
+export * from "./action-log.ts";
 export * from "./config.ts";
 export * from "./errors.ts";
 export * from "./genome.ts";
