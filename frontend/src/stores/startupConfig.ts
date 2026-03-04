@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { SimulationConfig } from "../types/api.ts";
+import type { WorldEdgeMode } from "../types/config.ts";
 import { deepSet } from "../utils/deepSet.ts";
 
 export interface StartupPreset {
@@ -10,7 +11,7 @@ export interface StartupPreset {
 	world: {
 		width: number;
 		height: number;
-		edge_mode: string;
+		edge_mode: WorldEdgeMode;
 		food: {
 			initial_density: number;
 			initial_coverage: number;

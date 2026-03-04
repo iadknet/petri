@@ -9,10 +9,12 @@ export interface FoodConfig {
 	max_density: number;
 }
 
+export type WorldEdgeMode = "Wrap" | "Bounded";
+
 export interface WorldConfig {
 	width: number;
 	height: number;
-	edge_mode: string;
+	edge_mode: WorldEdgeMode;
 	food: FoodConfig;
 }
 
