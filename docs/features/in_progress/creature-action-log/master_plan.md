@@ -190,8 +190,8 @@ Extend `get_creature` response with an `"action_log"` field containing the seria
 - [x] Step 4: Extend `get_creature` handler in `v3-server` to include `action_log` field in JSON response (read from `sim.action_logs`). `serde::Serialize` is already derived on `ActionLogEntry`/`ActionType`/`ActionResult` from Step 1. Write server test verifying the endpoint returns action log data.
 - [x] Review Gate: Interim code review — review Steps 1-4 changes. Invoke `rust-skills`. Fix findings, re-review until clean.
 - [x] Step 5: Run viability tests (`cargo test -p v3-core --test viability`) and full workspace tests. Fix any regressions.
-- [ ] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke `rust-skills`. Fix all findings. Re-review until clean pass.
-- [ ] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
-- [ ] Completion gate — run all checks from AGENTS.md Completion Gate section
+- [x] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke `rust-skills`. Fix all findings. Re-review until clean pass.
+- [x] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
+- [x] Completion gate — run all checks from AGENTS.md Completion Gate section
 
 **Review cycles:** 3 (cycle 1: initial plan with action log on CreatureState. Cycle 2: moved to parallel SlotMap on Simulation for cleaner separation. Cycle 3: rust-skills review — replaced raw u8 fields with `#[repr(u8)]` enums per `type-no-stringly`, fixed SlotMap→SecondaryMap per slotmap API semantics, pinned size assertion to exactly 32, noted VecDeque pre-allocation — clean pass)
