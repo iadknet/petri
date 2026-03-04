@@ -1,4 +1,5 @@
 use crate::contracts::CreatureId;
+use crate::creature::action_log::{ActionLogEntry, ActionResult, ActionType};
 use crate::runtime::types::MeshOutput;
 use crate::simulation::simulation::Simulation;
 
@@ -297,8 +298,16 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
             continue;
         }
 
-        // Apply each queued action sequentially.
+        // Apply each queued action sequentially, recording to action log.
+        let current_tick = sim.tick;
+        let priority_bid = output.priority_bid;
         for action in &output.actions {
+            // Capture energy before action (creature may have been killed).
+            let energy_before = match sim.creatures.get(id) {
+                Some(c) => c.energy,
+                None => break,
+            };
+
             match *action {
                 WorldAction::NoOp => {
                     // NoOp cannot fail; no failed_action_penalty possible.
@@ -307,13 +316,31 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                         sim.stats.last_tick_noop += 1;
                         outcome_acc.record_action_result(id, true);
                     }
+                    if let Some(log) = sim.action_logs.get_mut(id) {
+                        log.push(ActionLogEntry {
+                            tick: current_tick,
+                            action_type: ActionType::NoOp,
+                            result: ActionResult::Success,
+                            direction: 255,
+                            energy_before,
+                            energy_after: sim.creatures.get(id).map_or(0.0, |c| c.energy),
+                            amount: 0.0,
+                            priority_bid,
+                        });
+                    }
                 }
                 WorldAction::Eat => {
+                    let mut action_result = ActionResult::Success;
+                    let mut amount = 0.0;
                     if let Some(creature) = sim.creatures.get_mut(id) {
+                        let food_before = sim.world.food_at(creature.position);
                         let succeeded = apply_eat(creature, &mut sim.world, &sim.config);
                         sim.stats.last_tick_eat += 1;
                         outcome_acc.record_action_result(id, succeeded);
-                        if !succeeded {
+                        if succeeded {
+                            amount = food_before;
+                        } else {
+                            action_result = ActionResult::NoFood;
                             let mult = sim
                                 .config
                                 .energy
@@ -321,19 +348,45 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                             creature.energy -= sim.config.energy.costs.failed_action_penalty * mult;
                         }
                     }
+                    if let Some(log) = sim.action_logs.get_mut(id) {
+                        log.push(ActionLogEntry {
+                            tick: current_tick,
+                            action_type: ActionType::Eat,
+                            result: action_result,
+                            direction: 255,
+                            energy_before,
+                            energy_after: sim.creatures.get(id).map_or(0.0, |c| c.energy),
+                            amount,
+                            priority_bid,
+                        });
+                    }
                 }
                 WorldAction::Move(dir) => {
+                    let mut action_result = ActionResult::Success;
                     if let Some(creature) = sim.creatures.get_mut(id) {
                         let succeeded = apply_move(id, creature, &mut sim.world, dir, &sim.config);
                         sim.stats.last_tick_move += 1;
                         outcome_acc.record_action_result(id, succeeded);
                         if !succeeded {
+                            action_result = ActionResult::Blocked;
                             let mult = sim
                                 .config
                                 .energy
                                 .action_cost_multiplier(creature.genome.complexity(), creature.age);
                             creature.energy -= sim.config.energy.costs.failed_action_penalty * mult;
                         }
+                    }
+                    if let Some(log) = sim.action_logs.get_mut(id) {
+                        log.push(ActionLogEntry {
+                            tick: current_tick,
+                            action_type: ActionType::Move,
+                            result: action_result,
+                            direction: dir.to_index() as u8,
+                            energy_before,
+                            energy_after: sim.creatures.get(id).map_or(0.0, |c| c.energy),
+                            amount: 0.0,
+                            priority_bid,
+                        });
                     }
                 }
                 WorldAction::Reproduce {
@@ -347,8 +400,18 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                     if succeeded {
                         outcome_acc.record_offspring(id);
                     }
-                    // Note: reproduce_cost is already deducted inside apply_reproduce,
-                    // so a failed reproduction pays reproduce_cost + failed_action_penalty.
+                    let action_result = match result {
+                        ReproductionActionResult::Spawned => ActionResult::Success,
+                        ReproductionActionResult::RejectedInvalidTarget => {
+                            ActionResult::InvalidTarget
+                        }
+                        ReproductionActionResult::RejectedEnergyConstraints => {
+                            ActionResult::EnergyConstraints
+                        }
+                        ReproductionActionResult::RejectedPopulationCap => {
+                            ActionResult::PopulationCap
+                        }
+                    };
                     if !succeeded {
                         if let Some(creature) = sim.creatures.get_mut(id) {
                             let mult = sim
@@ -358,34 +421,74 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                             creature.energy -= sim.config.energy.costs.failed_action_penalty * mult;
                         }
                     }
+                    if let Some(log) = sim.action_logs.get_mut(id) {
+                        log.push(ActionLogEntry {
+                            tick: current_tick,
+                            action_type: ActionType::Reproduce,
+                            result: action_result,
+                            direction: direction.to_index() as u8,
+                            energy_before,
+                            energy_after: sim.creatures.get(id).map_or(0.0, |c| c.energy),
+                            amount: energy_transfer,
+                            priority_bid,
+                        });
+                    }
                 }
                 WorldAction::StealEnergy { direction, amount } => {
                     // Snapshot predation events length to extract damage info.
-                    let events_before = sim.stats.last_tick_predation_events.len();
+                    let pred_events_before = sim.stats.last_tick_predation_events.len();
                     let result = apply_steal_energy(id, sim, direction, amount);
                     let succeeded = result != PredationActionResult::RejectedNoVictim;
                     outcome_acc.record_action_result(id, succeeded);
                     // Record damage to victim from predation event (if any).
                     if succeeded {
-                        if let Some(event) = sim.stats.last_tick_predation_events.get(events_before)
+                        if let Some(event) =
+                            sim.stats.last_tick_predation_events.get(pred_events_before)
                         {
-                            // Resolve victim ID from world occupancy (if victim survived).
                             let victim_pos =
                                 crate::contracts::Position::new(event.victim_x, event.victim_y);
                             if let Some(victim_id) = sim.world.creature_at(victim_pos) {
                                 outcome_acc.record_damage(victim_id, event.energy_stolen);
                             }
-                            // Killed victims are already removed — skip (they can't learn).
                         }
                     }
-                    if result == PredationActionResult::RejectedNoVictim {
-                        if let Some(creature) = sim.creatures.get_mut(id) {
-                            let mult = sim
-                                .config
-                                .energy
-                                .action_cost_multiplier(creature.genome.complexity(), creature.age);
-                            creature.energy -= sim.config.energy.costs.failed_action_penalty * mult;
+                    // Extract stolen amount from predation event (if any).
+                    let actual_stolen = sim
+                        .stats
+                        .last_tick_predation_events
+                        .get(pred_events_before)
+                        .map_or(0.0, |e| e.energy_stolen);
+                    let action_result = match result {
+                        PredationActionResult::Transferred => ActionResult::Success,
+                        PredationActionResult::TransferredAndKilled => {
+                            ActionResult::TransferredAndKilled
                         }
+                        PredationActionResult::RejectedNoVictim => {
+                            if let Some(creature) = sim.creatures.get_mut(id) {
+                                let mult = sim
+                                    .config
+                                    .energy
+                                    .action_cost_multiplier(
+                                        creature.genome.complexity(),
+                                        creature.age,
+                                    );
+                                creature.energy -=
+                                    sim.config.energy.costs.failed_action_penalty * mult;
+                            }
+                            ActionResult::NoVictim
+                        }
+                    };
+                    if let Some(log) = sim.action_logs.get_mut(id) {
+                        log.push(ActionLogEntry {
+                            tick: current_tick,
+                            action_type: ActionType::StealEnergy,
+                            result: action_result,
+                            direction: direction.to_index() as u8,
+                            energy_before,
+                            energy_after: sim.creatures.get(id).map_or(0.0, |c| c.energy),
+                            amount: actual_stolen,
+                            priority_bid,
+                        });
                     }
                 }
             }
@@ -1164,5 +1267,79 @@ mod tests {
         run_tick(&mut sim, &mut None);
         assert_eq!(sim.stats.last_tick_priority_bid_mean, 0.0);
         assert_eq!(sim.stats.last_tick_priority_bidders_count, 0);
+    }
+
+    // ── Action log integration tests ────────────────────────────────────────
+
+    #[test]
+    fn action_log_populated_after_tick() {
+        let mut sim = seed_simulation(small_config(), 42);
+        run_tick(&mut sim, &mut None);
+
+        // Every surviving creature should have at least one action log entry.
+        let mut creatures_with_log = 0;
+        for (id, _) in sim.creatures.iter() {
+            if let Some(log) = sim.action_logs.get(id) {
+                if !log.is_empty() {
+                    creatures_with_log += 1;
+                    // Verify entry structure.
+                    let entry = &log.entries()[0];
+                    assert_eq!(entry.tick, 0, "first tick should be 0");
+                    // energy_before should be positive (founders start with energy).
+                    assert!(
+                        entry.energy_before > 0.0,
+                        "energy_before should be > 0"
+                    );
+                }
+            }
+        }
+        assert!(
+            creatures_with_log > 0,
+            "at least one creature should have action log entries after a tick"
+        );
+    }
+
+    #[test]
+    fn action_log_records_correct_action_types() {
+        use crate::creature::action_log::ActionType;
+
+        let mut sim = seed_simulation(small_config(), 42);
+        run_tick(&mut sim, &mut None);
+
+        // All entries should have valid action types.
+        for (id, _) in sim.creatures.iter() {
+            if let Some(log) = sim.action_logs.get(id) {
+                for entry in log.entries() {
+                    // Verify action type is one of the known variants.
+                    matches!(
+                        entry.action_type,
+                        ActionType::NoOp
+                            | ActionType::Eat
+                            | ActionType::Move
+                            | ActionType::Reproduce
+                            | ActionType::StealEnergy
+                    );
+                    // energy_after should differ from energy_before (action costs).
+                    // (NoOp has a cost too, so they should always differ.)
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn dead_creature_action_log_removed() {
+        let decay = SimulationConfig::default()
+            .energy
+            .lifecycle
+            .energy_decay_per_tick;
+        // Insert action log for the creature too.
+        let (mut sim, id) = make_sim_with_one_creature(decay * 0.5);
+        sim.action_logs
+            .insert(id, crate::creature::action_log::ActionLog::new(500));
+
+        assert!(sim.action_logs.contains_key(id));
+        run_phase_0(&mut sim);
+        assert!(!sim.creatures.contains_key(id));
+        assert!(!sim.action_logs.contains_key(id));
     }
 }
