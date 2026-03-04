@@ -196,7 +196,7 @@ After completing each implementation step:
 - [x] Step 5: Write integration tests that verify each action type deducts age-adjusted costs (create creature with age=400 vs age=0, assert different energy deductions for the same action). Cover: noop, eat, move, reproduce, steal_energy.
 - [x] Step 6: Verify all tests pass — unit tests, integration tests, and `cargo test -p v3-core --test viability` (merge gate). If viability fails, adjust `age_cap`/`max_multiplier` defaults until population sustains — do not weaken viability assertions.
 - [x] Step 7: Update `docs/reference/v3-runtime-config-spec.md` Section 4 with new `energy.age_cost.*` fields, defaults, normalization rules, and `action_cost_multiplier()` composition description.
-- [ ] Step 8: Run full completion gate: `cargo fmt --all -- --check`, `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `scripts/check-plan-harness.sh --mode strict`.
+- [x] Step 8: Run full completion gate: `cargo fmt --all -- --check`, `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `scripts/check-plan-harness.sh --mode strict`.
 
 ---
 
