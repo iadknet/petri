@@ -167,16 +167,18 @@ Accounting invariant:
 
 ```text
 for each selected event:
-  1) choose mutation domain + operator
-  2) run domain pre-guards (construction constraints)
-  3) snapshot local mutation target (or full genome)
-  4) apply candidate mutation
-  5) run ParseabilityGate
-  6) if parseability fails:
+  1) choose mutation domain
+  2) choose operator (may fail under complexity restriction if the
+     domain has no eligible operators — skip with NoApplicableTarget)
+  3) run domain pre-guards (construction constraints)
+  4) snapshot local mutation target (or full genome)
+  5) apply candidate mutation
+  6) run ParseabilityGate
+  7) if parseability fails:
        rollback event
        mark skipped(ParseabilityViolation)
        continue
-  7) commit event
+  8) commit event
 ```
 
 Selection randomization rules (internal to `MutationEngine`):
