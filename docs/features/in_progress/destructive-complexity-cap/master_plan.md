@@ -8,7 +8,7 @@
 - In: Change restricted operator selection from `random_non_increasing()` (Neutral+Decreasing) to `random_decreasing()` (Decreasing-only) in the mutation engine. Add `random_decreasing()` to each domain operator enum. Add `is_decreasing()` helper to `ComplexityEffect`. Skip event when no Decreasing operators exist for a domain.
 - Out: Pressure curve changes, cap value changes, config toggles, complexity scoring changes.
 
-**Docs Impact:** None — no canonical docs touched. This is a behavioral change within existing mutation engine internals.
+**Docs Impact:** Updated `v3-evolution-observability-spec.md` (operator-level accounting invariant now allows domain-level skips) and `v3-mutation-spec.md` (event processing sequence includes operator selection failure under complexity restriction).
 
 **Supersedes:** none
 
