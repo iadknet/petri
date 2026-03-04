@@ -169,6 +169,6 @@ The `GET /v3/simulation/creature/:id` endpoint returns the full action_log (up t
 
 - [x] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
 
-- [ ] Completion gate — run all checks from AGENTS.md Completion Gate section: `scripts/check-doc-harness.sh --mode warn`, `scripts/check-architecture-harness.sh --mode warn`, `scripts/check-plan-harness.sh --mode strict`, `cd frontend && npm run lint && npm run test && npm run build`
+- [x] Completion gate — run all checks from AGENTS.md Completion Gate section: `scripts/check-doc-harness.sh --mode warn`, `scripts/check-architecture-harness.sh --mode warn`, `scripts/check-plan-harness.sh --mode strict`, `cd frontend && npm run lint && npm run test && npm run build`
 
 **Review cycles:** 4
