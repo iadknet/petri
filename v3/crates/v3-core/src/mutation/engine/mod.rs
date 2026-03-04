@@ -37,17 +37,34 @@ impl MutationEngine {
         let restricted = config.complexity_pressure_enabled
             && pressure::is_restricted(genome.complexity(), config.complexity_cap, rng);
 
+        // Select an operator: Decreasing-only when restricted, unrestricted otherwise.
+        // Skips the event (continue) when no Decreasing operator exists for the domain.
+        macro_rules! select_operator {
+            ($Op:ty, $domain:expr, $summary:expr, $rng:expr) => {
+                if restricted {
+                    match <$Op>::random_decreasing($rng) {
+                        Some(op) => op,
+                        None => {
+                            $summary.record_domain_skip(
+                                $domain,
+                                MutationSkipReason::NoApplicableTarget,
+                            );
+                            continue;
+                        }
+                    }
+                } else {
+                    <$Op>::random($rng)
+                }
+            };
+        }
+
         let mut summary = MutationSummary::zero();
         for _ in 0..event_count {
             // Two-layer dispatch: mesh (Topology) vs node-internal (VM/Graph/InputRef).
             let (domain, operator, result) = if rng.gen_bool(config.mesh_layer_probability) {
                 // Layer 1: Mesh (Topology)
-                let op = if restricted {
-                    TopologyOperator::random_non_increasing(rng)
-                        .unwrap_or_else(|| TopologyOperator::random(rng))
-                } else {
-                    TopologyOperator::random(rng)
-                };
+                let op =
+                    select_operator!(TopologyOperator, MutationDomain::Topology, summary, rng);
                 (
                     MutationDomain::Topology,
                     topology_operator_key(op),
@@ -57,12 +74,7 @@ impl MutationEngine {
                 // Layer 2: Node-internal (VM, Graph, InputRef — equal probability)
                 match rng.gen_range(0u8..3) {
                     0 => {
-                        let op = if restricted {
-                            VmOperator::random_non_increasing(rng)
-                                .unwrap_or_else(|| VmOperator::random(rng))
-                        } else {
-                            VmOperator::random(rng)
-                        };
+                        let op = select_operator!(VmOperator, MutationDomain::Vm, summary, rng);
                         (
                             MutationDomain::Vm,
                             vm_operator_key(op),
@@ -70,12 +82,8 @@ impl MutationEngine {
                         )
                     }
                     1 => {
-                        let op = if restricted {
-                            GraphOperator::random_non_increasing(rng)
-                                .unwrap_or_else(|| GraphOperator::random(rng))
-                        } else {
-                            GraphOperator::random(rng)
-                        };
+                        let op =
+                            select_operator!(GraphOperator, MutationDomain::Graph, summary, rng);
                         (
                             MutationDomain::Graph,
                             graph_operator_key(op),
@@ -83,12 +91,12 @@ impl MutationEngine {
                         )
                     }
                     _ => {
-                        let op = if restricted {
-                            InputRefOperator::random_non_increasing(rng)
-                                .unwrap_or_else(|| InputRefOperator::random(rng))
-                        } else {
-                            InputRefOperator::random(rng)
-                        };
+                        let op = select_operator!(
+                            InputRefOperator,
+                            MutationDomain::InputRef,
+                            summary,
+                            rng
+                        );
                         (
                             MutationDomain::InputRef,
                             input_ref_operator_key(op),
@@ -457,9 +465,19 @@ mod tests {
         let attempted_by_operator: u32 = summary.attempted_by_operator.values().sum();
         let applied_by_operator: u32 = summary.applied_by_operator.values().sum();
 
+        // Domain-level attempts include domain-skips (no applicable operator).
         assert_eq!(attempted_by_domain, summary.attempted_events);
         assert_eq!(applied_by_domain, summary.applied_events);
-        assert_eq!(attempted_by_operator, summary.attempted_events);
+        // Operator-level attempts exclude domain-skips (no operator was selected).
+        let domain_skips = summary
+            .skip_reasons
+            .get(&MutationSkipReason::NoApplicableTarget)
+            .copied()
+            .unwrap_or(0);
+        assert_eq!(
+            attempted_by_operator + domain_skips,
+            summary.attempted_events
+        );
         assert_eq!(applied_by_operator, summary.applied_events);
 
         assert_eq!(
@@ -651,7 +669,7 @@ mod tests {
     }
 
     #[test]
-    fn engine_pressure_at_cap_selects_only_non_increasing() {
+    fn engine_pressure_at_cap_selects_only_decreasing() {
         use crate::mutation::types::ComplexityEffect;
 
         let mut config = SimulationConfig::default().mutation;
@@ -667,15 +685,77 @@ mod tests {
             let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
             for (op, &count) in &summary.attempted_by_operator {
                 if count > 0 {
-                    assert_ne!(
+                    assert_eq!(
                         op.complexity_effect(),
-                        ComplexityEffect::Increasing,
-                        "at cap, increasing operator {:?} must not be selected (seed {})",
+                        ComplexityEffect::Decreasing,
+                        "at cap, only Decreasing operators allowed; got {:?} (seed {})",
                         op,
                         seed
                     );
                 }
             }
+        }
+    }
+
+    #[test]
+    fn engine_restricted_vm_mutations_always_skipped() {
+        // VM has 0 Decreasing operators, so restricted VM events must always be skipped.
+        let mut config = SimulationConfig::default().mutation;
+        config.mutation_probability = 1.0;
+        config.per_birth_mutation_events_min = 1;
+        config.per_birth_mutation_events_max = 1;
+        config.complexity_pressure_enabled = true;
+        config.complexity_cap = 1;
+        config.mesh_layer_probability = 0.0; // force node-internal only
+
+        let mut vm_attempted: u64 = 0;
+        let mut vm_applied: u64 = 0;
+        for seed in 0u64..3000 {
+            let mut genome = v3alpha1_founder_genome();
+            let mut r = rng(seed);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            vm_attempted += summary
+                .attempted_by_domain
+                .get(&MutationDomain::Vm)
+                .copied()
+                .unwrap_or(0) as u64;
+            vm_applied += summary
+                .applied_by_domain
+                .get(&MutationDomain::Vm)
+                .copied()
+                .unwrap_or(0) as u64;
+        }
+        assert!(
+            vm_attempted > 0,
+            "VM domain must be attempted at least once over 3000 seeds"
+        );
+        assert_eq!(
+            vm_applied, 0,
+            "VM domain must never apply when restricted (0 Decreasing operators)"
+        );
+    }
+
+    #[test]
+    fn engine_accounting_invariant_holds_with_decreasing_skips() {
+        // When events are skipped due to no Decreasing operators (e.g. VM),
+        // the accounting invariant must still hold.
+        let mut config = SimulationConfig::default().mutation;
+        config.mutation_probability = 1.0;
+        config.per_birth_mutation_events_min = 1;
+        config.per_birth_mutation_events_max = 5;
+        config.complexity_pressure_enabled = true;
+        config.complexity_cap = 1;
+
+        for seed in 0u64..200 {
+            let mut genome = v3alpha1_founder_genome();
+            let mut r = rng(seed);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            assert_eq!(
+                summary.attempted_events,
+                summary.applied_events + summary.skipped_events,
+                "accounting invariant violated at seed {} with decreasing-only restriction",
+                seed
+            );
         }
     }
 
