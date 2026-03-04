@@ -172,9 +172,9 @@ After completing each implementation step:
 - [x] Step 4d: Update `apply_reproduce` in `actions/reproduction.rs` to apply complexity multiplier to `reproduce_cost`.
 - [x] Step 4e: Update `apply_steal_energy` in `actions/predation.rs` to apply complexity multiplier to the steal cost calculation.
 - [x] Step 4f: Update `failed_action_penalty` deductions in `tick.rs` (4 sites: eat, move, reproduce, steal_energy) to apply complexity multiplier.
-- [ ] Step 5: Verify all tests pass — unit tests, integration tests, and `cargo test -p v3-core --test viability` (merge gate).
-- [ ] Step 6: Update `docs/reference/v3-runtime-config-spec.md` Section 4 with new `energy.complexity_cost.*` fields, defaults, and normalization rules.
-- [ ] Step 7: Run full completion gate: `cargo fmt --all -- --check`, `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `scripts/check-plan-harness.sh --mode strict`.
+- [x] Step 5: Verify all tests pass — unit tests, integration tests, and `cargo test -p v3-core --test viability` (merge gate).
+- [x] Step 6: Update `docs/reference/v3-runtime-config-spec.md` Section 4 with new `energy.complexity_cost.*` fields, defaults, and normalization rules.
+- [x] Step 7: Run full completion gate: `cargo fmt --all -- --check`, `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `scripts/check-plan-harness.sh --mode strict`.
 
 ---
 

@@ -122,6 +122,19 @@ section only owns config contract shape/defaults.
 | `energy.costs.noop_cost` | `f32` | `0.05` | Must be finite and `>= 0.0`; invalid values fall back to `0.05`. |
 | `energy.costs.reproduce_cost` | `f32` | `0.1` | Must be finite and `>= 0.0`; invalid values fall back to `0.1`. |
 | `energy.costs.eat_reward_per_food` | `f32` | `12.0` | Must be finite and `>= 0.0`; invalid values fall back to `12.0`. |
+| `energy.complexity_cost.enabled` | `bool` | `true` | When `true`, genome complexity scales action energy costs via a linear multiplier. |
+| `energy.complexity_cost.threshold` | `u32` | `50` | Complexity at or below this value incurs no extra cost (multiplier = 1.0). |
+| `energy.complexity_cost.scaling_factor` | `f32` | `0.002` | Must be finite and `>= 0.0`; invalid values fall back to `0.002`. Linear scaling: multiplier = `1.0 + max(0, complexity - threshold) * scaling_factor`. |
+
+Complexity energy cost:
+- When enabled, all action energy costs (noop, eat, move, reproduce, steal, and
+  failed_action_penalty) are multiplied by
+  `1.0 + max(0, genome_complexity - threshold) * scaling_factor`.
+- Creatures at or below the threshold pay standard costs (multiplier = 1.0).
+- Does NOT apply to `energy_decay_per_tick` (world-level phase 0 cost) or
+  `eat_reward_per_food` (reward, not cost).
+- At default settings: founder genomes (~10 complexity) pay 1.0x; complexity 550
+  pays 2.0x; complexity 1050 pays 3.0x.
 
 Energy posture:
 - Energy lifecycle and action-cost config values are continuous scalar units
