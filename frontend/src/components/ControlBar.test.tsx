@@ -24,7 +24,7 @@ const MOCK_CONFIG: SimulationConfig = {
 	world: {
 		width: 512,
 		height: 384,
-		edge_mode: "wrap",
+		edge_mode: "Wrap",
 		food: {
 			growth_rate: 0.2,
 			initial_density: 1.0,
