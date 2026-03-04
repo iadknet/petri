@@ -96,6 +96,43 @@ Interactive tree/graph view:
 ### Map species overlay
 Toggle-able overlay on the world viewport that colors creatures by species rather than individual phenotype. When a species is selected (from tree or dashboard), its members pulse/glow on the map. Could also show species "territory" as a translucent hull around clusters of same-species creatures.
 
+### Genome behavioral summary (stat card)
+Compact card in the creature inspector showing derived stats at a glance:
+- Sensor coverage — which sensor categories the genome actually reads (local food, neighbors, area summaries, creature detection, introspection) shown as lit/unlit icons
+- Action profile — pie chart or bar of action distribution from recent ticks (or static analysis of which actions the genome can produce)
+- Memory usage — what % of the 1024-byte memory buffer is written to (does the creature use memory at all?)
+- Complexity breakdown — total complexity score split by node count, edge count, VM instruction count, graph node count
+- Node type distribution — VM nodes vs graph nodes; within graph: math ops vs stateful ops vs plasticity-enabled edges
+
+Relatively cheap — mostly static genome analysis plus recent action history.
+
+### Annotated mesh diagram
+Enhanced NodeGraph in the creature inspector:
+- Each node gets a human-readable label derived from its function (e.g., "Food Scanner", "Move Decider", "Memory Writer") based on sensors read and actions/targets written
+- Data flow arrows colored by signal type (sensor input = green, action output = red, internal routing = grey)
+- Sensor inputs labeled at entry points ("FoodHere", "NeighborOccupied[N]", etc.)
+- Action outputs labeled at exit points ("Move(N)", "Eat", "Reproduce")
+- Active path highlighting — when combined with execution sampler, the path taken through the mesh is highlighted
+
+Key challenge is auto-labeling heuristics for nodes from bytecode/graph structure. Even rough labels ("reads 3 food sensors → outputs to action queue") are far more useful than raw node IDs.
+
+### Genome diff / comparison tool
+Select two creatures (or a parent-offspring pair) and see:
+- Structural diff — nodes added/removed/rewired
+- Behavioral diff — action profile differences, sensor coverage changes
+- Mutation history — what mutations were applied at birth (may need to store mutation events at reproduction time)
+
+Accessible from creature inspector ("Compare with...") or species dashboard ("Compare species representatives").
+
+### Genome search / filter
+Find creatures by genome characteristics and highlight results on the map:
+- "Show me all creatures that use memory"
+- "Show me all creatures with predation actions"
+- "Show me creatures with >5 nodes"
+- "Show me creatures that read area food sensors"
+
+Needs a query UI and efficient filtering over potentially 100K creatures. Powerful for finding interesting specimens.
+
 ### Expose predation config in UI
 PredationConfig (steal_cost_rate, kill_complexity_bonus_multiplier) exists in the backend but has no controls in the runtime config panel. Add it.
 
