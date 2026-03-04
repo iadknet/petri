@@ -78,19 +78,13 @@ If frontend changes were made: confirm all `agent-browser` e2e tests pass.
 After the worktree is merged and closed (you are now on main):
 
 ```bash
-# Move feature to completed
+# Move feature to completed (refinement.md is already inside from feature-3-plan)
 mv docs/features/in_progress/FEATURE-NAME/ docs/features/completed/FEATURE-NAME/
 
-# Archive refinement doc with the feature (if it exists)
-[ -f docs/features/needs_refinement/FEATURE-NAME.md ] && \
-  mv docs/features/needs_refinement/FEATURE-NAME.md docs/features/completed/FEATURE-NAME/refinement.md
+# Maintain .gitkeep so empty directory stays tracked
+[ -z "$(ls -A docs/features/in_progress/ 2>/dev/null)" ] && touch docs/features/in_progress/.gitkeep
 
-# Maintain .gitkeep in directories that may now be empty
-for dir in docs/features/in_progress docs/features/needs_refinement; do
-  [ -z "$(ls -A "$dir" 2>/dev/null)" ] && touch "$dir/.gitkeep"
-done
-
-git add docs/features/completed/FEATURE-NAME/ docs/features/in_progress/ docs/features/needs_refinement/
+git add docs/features/completed/FEATURE-NAME/ docs/features/in_progress/
 git commit -m "feat: mark FEATURE-NAME as completed"
 ```
 

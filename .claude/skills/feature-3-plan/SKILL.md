@@ -137,12 +137,20 @@ Before writing the file, verify the draft enforces:
 
 ## Final Action — Commit All Planning Artifacts
 
-1. Set `status: ready` in `docs/features/needs_refinement/FEATURE-NAME.md`.
+1. **Archive the refinement doc** into the plan directory so it travels with the feature through the lifecycle:
+
+```bash
+mv docs/features/needs_refinement/FEATURE-NAME.md docs/features/ready_to_implement/FEATURE-NAME/refinement.md
+
+# Maintain .gitkeep so empty directory stays tracked
+[ -z "$(ls -A docs/features/needs_refinement/ 2>/dev/null)" ] && touch docs/features/needs_refinement/.gitkeep
+```
+
 2. **Commit ALL artifacts** created during planning on the current branch:
 
 ```bash
 git add docs/features/ready_to_implement/FEATURE-NAME/
-git add docs/features/needs_refinement/FEATURE-NAME.md
+git add docs/features/needs_refinement/
 git add docs/features/brainstorms/ideas.md  # if modified
 git commit -m "plan: FEATURE-NAME — architectural review and implementation plan"
 ```
