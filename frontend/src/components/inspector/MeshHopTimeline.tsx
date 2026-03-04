@@ -44,7 +44,7 @@ export const MeshHopTimeline = memo(function MeshHopTimeline({
 			<div className="flex items-center gap-1 overflow-x-auto pb-1">
 				{hops.map((hop, i) => {
 					const type = hopBackendType(hop);
-					const color = type === "Vm" ? VM_COLOR : GRAPH_COLOR;
+					const color = type === "Vm" ? VM_COLOR : type === "Graph" ? GRAPH_COLOR : "#94a3b8";
 					const isActive = i === activeHopIndex;
 
 					return (

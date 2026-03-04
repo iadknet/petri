@@ -24,7 +24,7 @@ describe("formatInputRef", () => {
 	});
 
 	it("handles ActionQueue string variant without crashing", () => {
-		const ref = "ActionQueue" as unknown as InputReference;
+		const ref: InputReference = "ActionQueue";
 		expect(formatInputRef(ref)).toBe("ActionQueue");
 	});
 
@@ -51,7 +51,7 @@ describe("inputRefColor", () => {
 	});
 
 	it("returns amber for ActionQueue string variant", () => {
-		const ref = "ActionQueue" as unknown as InputReference;
+		const ref: InputReference = "ActionQueue";
 		expect(inputRefColor(ref)).toBe("#f59e0b");
 	});
 
