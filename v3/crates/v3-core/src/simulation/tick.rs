@@ -487,7 +487,7 @@ fn sort_by_priority_bid(decisions: &mut [(CreatureId, MeshOutput)]) {
 mod tests {
     use super::*;
     use crate::config::SimulationConfig;
-    use crate::contracts::{CreatureId, Position};
+    use crate::contracts::{CreatureId, Direction, Position};
     use crate::creature::founder::v3alpha1_founder_genome;
     use crate::creature::identity::CreatureIdentityState;
     use crate::creature::state::CreatureState;
@@ -798,14 +798,13 @@ mod tests {
         let mult = sim
             .config
             .energy
-            .complexity_cost
-            .multiplier(sim.creatures[id].genome.complexity());
+            .action_cost_multiplier(sim.creatures[id].genome.complexity(), sim.creatures[id].age);
 
         // Simulate what the tick dispatch does: move north into barrier.
         let creature = sim.creatures.get_mut(id).unwrap();
         let succeeded = apply_move(id, creature, &mut sim.world, Direction::N, &sim.config);
         assert!(!succeeded, "move into barrier should fail");
-        // Apply penalty for failed action (scaled by complexity multiplier).
+        // Apply penalty for failed action (scaled by action cost multiplier).
         if !succeeded {
             sim.creatures.get_mut(id).unwrap().energy -= penalty * mult;
         }
@@ -860,6 +859,57 @@ mod tests {
                 energy
             );
         }
+    }
+
+    #[test]
+    fn failed_action_penalty_increases_with_age() {
+        use crate::simulation::actions::apply_move;
+        let (mut sim_young, id_young) = make_sim_with_one_creature(100.0);
+        sim_young.world.set_barrier(Position::new(5, 4), true);
+        let penalty = sim_young.config.energy.costs.failed_action_penalty;
+        let mult_young = sim_young
+            .config
+            .energy
+            .action_cost_multiplier(sim_young.creatures[id_young].genome.complexity(), 0);
+        let energy_before_young = sim_young.creatures[id_young].energy;
+        {
+            let creature = sim_young.creatures.get_mut(id_young).unwrap();
+            let _ = apply_move(
+                id_young,
+                creature,
+                &mut sim_young.world,
+                Direction::N,
+                &sim_young.config,
+            );
+        }
+        sim_young.creatures[id_young].energy -= penalty * mult_young;
+        let cost_young = energy_before_young - sim_young.creatures[id_young].energy;
+
+        let (mut sim_old, id_old) = make_sim_with_one_creature(100.0);
+        sim_old.world.set_barrier(Position::new(5, 4), true);
+        sim_old.creatures[id_old].age = 400;
+        let mult_old = sim_old
+            .config
+            .energy
+            .action_cost_multiplier(sim_old.creatures[id_old].genome.complexity(), 400);
+        let energy_before_old = sim_old.creatures[id_old].energy;
+        {
+            let creature = sim_old.creatures.get_mut(id_old).unwrap();
+            let _ = apply_move(
+                id_old,
+                creature,
+                &mut sim_old.world,
+                Direction::N,
+                &sim_old.config,
+            );
+        }
+        sim_old.creatures[id_old].energy -= penalty * mult_old;
+        let cost_old = energy_before_old - sim_old.creatures[id_old].energy;
+
+        assert!(
+            cost_old > cost_young,
+            "old creature should pay more for failed action: young={cost_young}, old={cost_old}"
+        );
     }
 
     #[test]

@@ -296,11 +296,10 @@ mod tests {
         let (mut sim, attacker_id, _victim_id) =
             make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 30.0);
         sim.config.predation.steal_cost_rate = 0.2;
-        let mult = sim
-            .config
-            .energy
-            .complexity_cost
-            .multiplier(sim.creatures[attacker_id].genome.complexity());
+        let mult = sim.config.energy.action_cost_multiplier(
+            sim.creatures[attacker_id].genome.complexity(),
+            sim.creatures[attacker_id].age,
+        );
 
         let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 10.0);
 
@@ -321,11 +320,10 @@ mod tests {
         let (mut sim, attacker_id, victim_id) =
             make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 5.0);
         sim.config.predation.steal_cost_rate = 0.2;
-        let mult = sim
-            .config
-            .energy
-            .complexity_cost
-            .multiplier(sim.creatures[attacker_id].genome.complexity());
+        let mult = sim.config.energy.action_cost_multiplier(
+            sim.creatures[attacker_id].genome.complexity(),
+            sim.creatures[attacker_id].age,
+        );
 
         let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 20.0);
 
@@ -353,11 +351,10 @@ mod tests {
         // Only attacker, no victim to the north
         let (mut sim, attacker_id) = make_sim_one_creature(Position::new(5, 5), 50.0);
         sim.config.predation.steal_cost_rate = 0.2;
-        let mult = sim
-            .config
-            .energy
-            .complexity_cost
-            .multiplier(sim.creatures[attacker_id].genome.complexity());
+        let mult = sim.config.energy.action_cost_multiplier(
+            sim.creatures[attacker_id].genome.complexity(),
+            sim.creatures[attacker_id].age,
+        );
 
         let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 10.0);
 
