@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { ActionTimeline, directionLabel, tickLabels } from "./ActionTimeline.tsx";
+import { ActionTimeline, directionLabel, energyPath, tickLabels } from "./ActionTimeline.tsx";
 import { ActionType, ActionResult } from "../../types/action-log.ts";
 import type { ActionLogEntry } from "../../types/action-log.ts";
 
@@ -194,6 +194,51 @@ describe("TickAxis", () => {
 		const entries = Array.from({ length: 60 }, (_, i) => makeEntry({ tick: i + 1 }));
 		render(<ActionTimeline actionLog={entries} maxEnergy={200} />);
 		expect(screen.getByText("50")).toBeDefined();
+	});
+});
+
+describe("EnergyOverlay", () => {
+	it("generates SVG path from energy data", () => {
+		const entries = [
+			makeEntry({ energy_after: 100 }),
+			makeEntry({ energy_after: 50 }),
+			makeEntry({ energy_after: 0 }),
+		];
+		const path = energyPath(entries, 100, 20);
+		// entry 0: x = (0*6 + 3) = 3.0, y = 20*(1 - 100/100) = 0.0
+		// entry 1: x = (1*6 + 3) = 9.0, y = 20*(1 - 50/100) = 10.0
+		// entry 2: x = (2*6 + 3) = 15.0, y = 20*(1 - 0/100) = 20.0
+		expect(path).toBe("M3.0,0.0L9.0,10.0L15.0,20.0");
+	});
+
+	it("returns empty string for empty entries", () => {
+		expect(energyPath([], 100, 20)).toBe("");
+	});
+
+	it("returns empty string for zero maxEnergy", () => {
+		expect(energyPath([makeEntry()], 0, 20)).toBe("");
+	});
+
+	it("clamps energy ratio to 1.0", () => {
+		const entries = [makeEntry({ energy_after: 200 })];
+		const path = energyPath(entries, 100, 20);
+		// ratio clamped to 1.0, y = 20*(1-1) = 0.0
+		expect(path).toBe("M3.0,0.0");
+	});
+
+	it("rounds coordinates to 1 decimal place", () => {
+		const entries = [makeEntry({ energy_after: 33 })];
+		const path = energyPath(entries, 100, 20);
+		// y = 20 * (1 - 0.33) = 13.4
+		expect(path).toBe("M3.0,13.4");
+	});
+
+	it("renders SVG element in the DOM", () => {
+		const entries = [makeEntry({ energy_after: 50 })];
+		render(<ActionTimeline actionLog={entries} maxEnergy={100} />);
+		const svg = screen.getByTestId("energy-overlay");
+		expect(svg).toBeDefined();
+		expect(svg.querySelector("path")).toBeDefined();
 	});
 });
 
