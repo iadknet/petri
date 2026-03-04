@@ -21,7 +21,7 @@ export interface BooleanFieldDef {
 	tooltip?: string;
 }
 
-export type StartupUpdater = (path: string, value: number) => void;
+export type StartupUpdater = (path: string, value: number | string) => void;
 export type RuntimeUpdater = (path: string, value: number | string | boolean) => void;
 
 export interface StartupPanelProps {

@@ -9,10 +9,12 @@ export interface FoodConfig {
 	max_density: number;
 }
 
+export type WorldEdgeMode = "Wrap" | "Bounded";
+
 export interface WorldConfig {
 	width: number;
 	height: number;
-	edge_mode: string;
+	edge_mode: WorldEdgeMode;
 	food: FoodConfig;
 }
 
@@ -44,10 +46,17 @@ export interface ComplexityEnergyCostConfig {
 	scaling_factor: number;
 }
 
+export interface AgeEnergyCostConfig {
+	enabled: boolean;
+	age_cap: number;
+	max_multiplier: number;
+}
+
 export interface EnergyConfig {
 	lifecycle: LifecycleEnergyConfig;
 	costs: CostsConfig;
 	complexity_cost: ComplexityEnergyCostConfig;
+	age_cost: AgeEnergyCostConfig;
 }
 
 export interface VmConfig {
@@ -67,7 +76,12 @@ export interface MutationConfig {
 	mesh_layer_probability: number;
 	complexity_cap: number;
 	complexity_pressure_enabled: boolean;
+	action_queue_cap: number;
 	phenotype: PhenotypeConfig;
+}
+
+export interface PerceptionRuntimeConfig {
+	vision_radius: number;
 }
 
 export interface RuntimeConfig {
@@ -77,8 +91,16 @@ export interface RuntimeConfig {
 	graph_convergence_epsilon: number;
 	graph_convergence_stable_passes: number;
 	graph_node_base_cost: number;
-	hebbian_update_cost: number;
+	plasticity_update_cost: number;
+	reward_learning_cost: number;
+	max_actions_per_turn: number;
 	vm: VmConfig;
+	perception: PerceptionRuntimeConfig;
+}
+
+export interface PredationConfig {
+	steal_cost_rate: number;
+	kill_complexity_bonus_multiplier: number;
 }
 
 export interface SimulationConfig {
@@ -87,4 +109,5 @@ export interface SimulationConfig {
 	energy: EnergyConfig;
 	runtime: RuntimeConfig;
 	mutation: MutationConfig;
+	predation: PredationConfig;
 }

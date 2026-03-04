@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import type { SimulationConfig } from "../types/api.ts";
+import type { WorldEdgeMode } from "../types/config.ts";
 import { deepSet } from "../utils/deepSet.ts";
 
 export interface StartupPreset {
@@ -10,6 +11,7 @@ export interface StartupPreset {
 	world: {
 		width: number;
 		height: number;
+		edge_mode: WorldEdgeMode;
 		food: {
 			initial_density: number;
 			initial_coverage: number;
@@ -26,7 +28,7 @@ export interface StartupConfigState {
 	hydrated: boolean;
 
 	setPreset: (next: StartupPreset) => void;
-	updatePreset: (path: string, value: number) => void;
+	updatePreset: (path: string, value: number | string) => void;
 	randomizeSeed: () => void;
 	hydrateFromServerConfig: (config: SimulationConfig) => void;
 	reset: () => void;
@@ -43,6 +45,7 @@ function buildDefaultPreset(): StartupPreset {
 		world: {
 			width: 400,
 			height: 400,
+			edge_mode: "Wrap",
 			food: {
 				initial_density: 1.0,
 				initial_coverage: 0.15,
@@ -59,6 +62,7 @@ function fromServerConfig(config: SimulationConfig): StartupPreset {
 		world: {
 			width: config.world.width,
 			height: config.world.height,
+			edge_mode: config.world.edge_mode,
 			food: {
 				initial_density: config.world.food.initial_density,
 				initial_coverage: config.world.food.initial_coverage,
@@ -125,6 +129,7 @@ export function buildStartupRequest(preset: StartupPreset) {
 		world: {
 			width: preset.world.width,
 			height: preset.world.height,
+			edge_mode: preset.world.edge_mode,
 			food: { ...preset.world.food },
 		},
 		energy: {
