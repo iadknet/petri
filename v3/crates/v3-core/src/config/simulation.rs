@@ -107,12 +107,51 @@ impl Default for EnergyCostsConfig {
     }
 }
 
+/// Complexity-based energy cost multiplier config.
+/// Canonical owner: v3-runtime-config-spec.md Section 4.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ComplexityEnergyCostConfig {
+    /// Whether the complexity energy cost multiplier is active.
+    pub enabled: bool,
+    /// Genome complexity score at or below which no penalty applies.
+    pub threshold: u32,
+    /// Multiplier per complexity point above the threshold.
+    pub scaling_factor: f32,
+}
+
+impl Default for ComplexityEnergyCostConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            threshold: 50,
+            scaling_factor: 0.002,
+        }
+    }
+}
+
+impl ComplexityEnergyCostConfig {
+    /// Returns the energy cost multiplier for a creature with the given complexity score.
+    ///
+    /// Formula: `1.0 + max(0, complexity - threshold) * scaling_factor`
+    /// Returns 1.0 (no penalty) when disabled or complexity is at or below threshold.
+    #[inline]
+    pub fn multiplier(&self, complexity: u32) -> f32 {
+        if !self.enabled || complexity <= self.threshold {
+            return 1.0;
+        }
+        1.0 + (complexity - self.threshold) as f32 * self.scaling_factor
+    }
+}
+
 /// Combined energy config.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct EnergyConfig {
     pub lifecycle: EnergyLifecycleConfig,
     pub costs: EnergyCostsConfig,
+    #[serde(default)]
+    pub complexity_cost: ComplexityEnergyCostConfig,
 }
 
 /// VM runtime config. Canonical owner: v3-runtime-config-spec.md Section 2.
@@ -355,6 +394,9 @@ impl SimulationConfig {
         ec.eat_reward_per_food = normalize_f32_finite_nonneg(ec.eat_reward_per_food, 12.0);
         ec.failed_action_penalty = normalize_f32_finite_nonneg(ec.failed_action_penalty, 5.0);
 
+        let cc = &mut self.energy.complexity_cost;
+        cc.scaling_factor = normalize_f32_finite_nonneg(cc.scaling_factor, 0.002);
+
         let rt = &mut self.runtime;
         if rt.max_mesh_hops < 1 {
             rt.max_mesh_hops = 1024;
@@ -479,6 +521,10 @@ mod tests {
         assert!((cfg.energy.lifecycle.energy_decay_per_tick - 0.5).abs() < 1e-6);
         assert!((cfg.energy.lifecycle.min_reproduce_energy - 1.0).abs() < 1e-6);
         assert!((cfg.energy.lifecycle.default_offspring_energy - 100.0).abs() < 1e-6);
+        // Complexity energy cost
+        assert!(cfg.energy.complexity_cost.enabled);
+        assert_eq!(cfg.energy.complexity_cost.threshold, 50);
+        assert!((cfg.energy.complexity_cost.scaling_factor - 0.002).abs() < 1e-6);
         // Energy costs
         assert!((cfg.energy.costs.move_cost - 1.0).abs() < 1e-6);
         assert!((cfg.energy.costs.eat_cost - 0.0).abs() < 1e-6);
@@ -787,5 +833,69 @@ mod tests {
         cfg.runtime.reward_learning_cost = f32::NAN;
         cfg.normalize();
         assert!((cfg.runtime.reward_learning_cost - 0.0).abs() < f32::EPSILON);
+    }
+
+    // ── ComplexityEnergyCostConfig tests ───────────────────────────────────
+
+    #[test]
+    fn complexity_multiplier_below_threshold_returns_one() {
+        let cc = ComplexityEnergyCostConfig::default();
+        assert!((cc.multiplier(0) - 1.0).abs() < f32::EPSILON);
+        assert!((cc.multiplier(30) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn complexity_multiplier_at_threshold_returns_one() {
+        let cc = ComplexityEnergyCostConfig::default(); // threshold = 50
+        assert!((cc.multiplier(50) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn complexity_multiplier_above_threshold_scales_linearly() {
+        let cc = ComplexityEnergyCostConfig::default();
+        // threshold=50, scaling=0.002
+        // complexity 200: 1.0 + (200-50) * 0.002 = 1.3
+        assert!((cc.multiplier(200) - 1.3).abs() < 1e-6);
+        // complexity 550: 1.0 + (550-50) * 0.002 = 1.0 + 1.0 = 2.0
+        assert!((cc.multiplier(550) - 2.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn complexity_multiplier_disabled_returns_one() {
+        let cc = ComplexityEnergyCostConfig {
+            enabled: false,
+            threshold: 50,
+            scaling_factor: 0.002,
+        };
+        assert!((cc.multiplier(1000) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn complexity_multiplier_threshold_zero_penalizes_all() {
+        let cc = ComplexityEnergyCostConfig {
+            enabled: true,
+            threshold: 0,
+            scaling_factor: 0.01,
+        };
+        // complexity 0: at threshold, returns 1.0
+        assert!((cc.multiplier(0) - 1.0).abs() < f32::EPSILON);
+        // complexity 100: 1.0 + 100 * 0.01 = 2.0
+        assert!((cc.multiplier(100) - 2.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_complexity_cost_nan_scaling_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.complexity_cost.scaling_factor = f32::NAN;
+        cfg.normalize();
+        assert!((cfg.energy.complexity_cost.scaling_factor - 0.002).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_complexity_cost_negative_scaling_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.complexity_cost.scaling_factor = -0.5;
+        cfg.normalize();
+        assert!((cfg.energy.complexity_cost.scaling_factor - 0.002).abs() < 1e-6);
     }
 }

@@ -163,8 +163,8 @@ After completing each implementation step:
 
 ## Implementation Steps
 
-- [ ] Step 1: Add `ComplexityEnergyCostConfig` struct to `config/simulation.rs` with `Default`, serde derives, normalization in `SimulationConfig::normalize()`, and add `complexity_cost: ComplexityEnergyCostConfig` field to `EnergyConfig`. Write config default tests.
-- [ ] Step 2: Add `multiplier(&self, complexity: u32) -> f32` method on `ComplexityEnergyCostConfig`. Write TDD unit tests: below threshold returns 1.0, at threshold returns 1.0, above threshold returns correct value, disabled returns 1.0, threshold=0 works correctly.
+- [x] Step 1: Add `ComplexityEnergyCostConfig` struct to `config/simulation.rs` with `Default`, serde derives, normalization in `SimulationConfig::normalize()`, and add `complexity_cost: ComplexityEnergyCostConfig` field to `EnergyConfig`. Write config default tests.
+- [x] Step 2: Add `multiplier(&self, complexity: u32) -> f32` method on `ComplexityEnergyCostConfig`. Write TDD unit tests: below threshold returns 1.0, at threshold returns 1.0, above threshold returns correct value, disabled returns 1.0, threshold=0 works correctly.
 - [ ] Step 3: Write failing integration tests that verify each action type deducts complexity-adjusted costs (use a high-complexity genome fixture vs a low-complexity genome, assert different energy deductions for the same action). Cover: noop, eat, move, reproduce, steal_energy, failed_action_penalty.
 - [ ] [parallel] Step 4a: Update `apply_noop` in `actions/mod.rs` to apply complexity multiplier.
 - [ ] [parallel] Step 4b: Update `apply_eat` in `actions/mod.rs` to apply complexity multiplier to `eat_cost` (NOT to `eat_reward_per_food`).
