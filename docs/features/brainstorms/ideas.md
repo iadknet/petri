@@ -6,11 +6,13 @@
 
 ## Core Simulation
 
-### Destructive-only complexity cap
-Change complexity cap so it only does destructive changes. Creates room for new additive changes to fit within the complexity cap.
 
 ### Creature action log
-Each creature maintains a log of all its actions and action metadata. Needs detail on storage limits, what metadata to track, and UI surface.
+Each creature maintains a log of all its actions and action metadata. Needs detail on storage limits (set cap on ticks?), what metadata to track, and UI surface.
+
+I'm imagining a timeline color-coded bar for showing the actions the creature took over its lifetime.
+Indicator, maybe a thin read line at top of action when it failed.
+Some way of displaying/inspecting individual action metadata.
 
 ### Communication
 - Creature can modify metadata fields about itself that are visible to other creatures that "see" it.
@@ -203,3 +205,4 @@ The following ideas have been promoted to `docs/features/needs_refinement/`:
 - **Age energy cost** → `needs_refinement/age-energy-cost.md`
 - **Refactor movement** → `needs_refinement/refactor-movement.md`
 - **Complexity energy cost** → `needs_refinement/complexity-energy-cost.md`
+- **Destructive-only complexity cap** → `needs_refinement/destructive-complexity-cap.md`
