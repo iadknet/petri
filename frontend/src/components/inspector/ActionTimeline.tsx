@@ -1,4 +1,4 @@
-import { memo, useState } from "react";
+import { memo, useEffect, useState } from "react";
 import { ActionResult, ActionType } from "../../types/action-log.ts";
 import type { ActionLogEntry } from "../../types/action-log.ts";
 
@@ -47,6 +47,12 @@ export const ActionTimeline = memo(function ActionTimeline({
 	actionLog,
 }: ActionTimelineProps) {
 	const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+
+	// Reset selection when the log data changes (new fetch cycle)
+	useEffect(() => {
+		setSelectedIndex(null);
+	}, [actionLog]);
+
 	const selectedEntry = selectedIndex !== null ? actionLog[selectedIndex] ?? null : null;
 
 	return (
@@ -77,6 +83,8 @@ function TimelineBar({
 		<div
 			className="flex overflow-x-auto"
 			style={{ minHeight: 20 }}
+			role="toolbar"
+			aria-label="Action timeline"
 		>
 			{entries.map((entry, i) => {
 				const color = ACTION_COLORS[entry.action_type] ?? ACTION_COLORS[ActionType.NoOp];
@@ -121,7 +129,7 @@ function ActionDetail({ entry }: { entry: ActionLogEntry }) {
 	const deltaColor = delta >= 0 ? "text-emerald-400" : "text-red-400";
 
 	return (
-		<div className="rounded bg-slate-800 p-2 text-xs space-y-1" data-testid="action-detail">
+		<div className="rounded bg-slate-800 p-2 text-xs space-y-1" data-testid="action-detail" role="region" aria-label={`Details for tick ${entry.tick}`}>
 			<div className="flex justify-between">
 				<span className="text-slate-400">Tick</span>
 				<span className="text-slate-200 font-mono">{entry.tick}</span>
