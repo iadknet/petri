@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { fireEvent, render, screen } from "@testing-library/react";
-import { ActionTimeline, directionLabel } from "./ActionTimeline.tsx";
+import { ActionTimeline, directionLabel, tickLabels } from "./ActionTimeline.tsx";
 import { ActionType, ActionResult } from "../../types/action-log.ts";
 import type { ActionLogEntry } from "../../types/action-log.ts";
 
@@ -165,6 +165,35 @@ describe("ActionDetail", () => {
 		fireEvent.click(seg);
 		const detail = screen.getByTestId("action-detail");
 		expect(detail.textContent).toContain("-10.0");
+	});
+});
+
+describe("TickAxis", () => {
+	it("generates labels at tick multiples of 50", () => {
+		const entries = Array.from({ length: 100 }, (_, i) => makeEntry({ tick: i + 1 }));
+		const labels = tickLabels(entries);
+		expect(labels.map((l) => l.tick)).toEqual([50, 100]);
+	});
+
+	it("positions labels based on entry index", () => {
+		const entries = Array.from({ length: 100 }, (_, i) => makeEntry({ tick: i + 1 }));
+		const labels = tickLabels(entries);
+		// tick 50 is at index 49 => 49 * 6 = 294px
+		expect(labels[0]?.offsetPx).toBe(294);
+		// tick 100 is at index 99 => 99 * 6 = 594px
+		expect(labels[1]?.offsetPx).toBe(594);
+	});
+
+	it("returns empty array when no ticks are multiples of 50", () => {
+		const entries = [makeEntry({ tick: 1 }), makeEntry({ tick: 2 })];
+		const labels = tickLabels(entries);
+		expect(labels).toHaveLength(0);
+	});
+
+	it("renders tick labels in the DOM", () => {
+		const entries = Array.from({ length: 60 }, (_, i) => makeEntry({ tick: i + 1 }));
+		render(<ActionTimeline actionLog={entries} maxEnergy={200} />);
+		expect(screen.getByText("50")).toBeDefined();
 	});
 });
 
