@@ -65,12 +65,12 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		tooltip: "Multiplier applied to each VM opcode's compute cost",
 	},
 	{
-		path: "runtime.hebbian_update_cost",
-		label: "Hebbian Update Cost",
+		path: "runtime.plasticity_update_cost",
+		label: "Plasticity Update Cost",
 		min: 0,
 		max: 10,
 		step: 0.001,
 		defaultValue: 0.0,
-		tooltip: "Energy cost per Hebbian weight update during neural processing",
+		tooltip: "Energy cost per plasticity weight update during neural processing",
 	},
 ];

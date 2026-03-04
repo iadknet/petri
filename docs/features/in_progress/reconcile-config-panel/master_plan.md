@@ -82,7 +82,7 @@ After completing each implementation step:
 
 ### Phase 2: Fix existing stale control
 
-- [ ] **Fix Runtime section stale field** (`frontend/src/components/config-panel/runtime/RuntimeSection.tsx`):
+- [x] **Fix Runtime section stale field** (`frontend/src/components/config-panel/runtime/RuntimeSection.tsx`):
   - Change path from `runtime.hebbian_update_cost` → `runtime.plasticity_update_cost`
   - Change label from "Hebbian Update Cost" → "Plasticity Update Cost"
   - Update tooltip text accordingly
