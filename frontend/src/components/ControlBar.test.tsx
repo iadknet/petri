@@ -52,6 +52,11 @@ const MOCK_CONFIG: SimulationConfig = {
 			eat_reward_per_food: 12,
 			failed_action_penalty: 5,
 		},
+		complexity_cost: {
+			enabled: true,
+			threshold: 50,
+			scaling_factor: 0.002,
+		},
 	},
 	runtime: {
 		max_mesh_hops: 128,
