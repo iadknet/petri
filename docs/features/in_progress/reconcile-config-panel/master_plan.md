@@ -112,7 +112,7 @@ After completing each implementation step:
 
 ### Phase 4: Add startup control
 
-- [ ] **Add edge_mode to startup panel** (`WorldTopologySection.tsx`):
+- [x] **Add edge_mode to startup panel** (`WorldTopologySection.tsx`):
   - Add a select/dropdown for `world.edge_mode` with options "Wrap" (default) and "Bounded"
   - This needs a new `SelectFieldDef` type or inline implementation since existing `FieldDef` only supports numeric inputs
   - Wire the value through the startup preset → config path
