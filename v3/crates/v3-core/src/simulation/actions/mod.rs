@@ -674,6 +674,256 @@ mod tests {
         assert!(!result, "eating empty cell should return false");
     }
 
+    // ── complexity energy cost integration tests ────────────────────────────
+
+    /// Build a genome with a specific minimum complexity by adding VM nodes
+    /// with enough instructions.
+    fn genome_with_complexity(min_complexity: u32) -> crate::creature::genome::CreatureGenome {
+        use crate::contracts::NodeId;
+        use crate::creature::genome::{
+            BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
+        };
+
+        // Each node contributes: 1 (node) + instructions.len()
+        // A single node with (min_complexity - 1) Halt instructions reaches the target.
+        let instruction_count = (min_complexity.saturating_sub(1)) as usize;
+        let program = vec![VmInstruction::Halt; instruction_count];
+        CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program,
+                }),
+                targets: vec![],
+            }],
+        }
+    }
+
+    /// Create a sim with one creature that has the given genome.
+    fn make_sim_with_genome(
+        pos: Position,
+        energy: f32,
+        genome: crate::creature::genome::CreatureGenome,
+    ) -> (Simulation, CreatureId) {
+        let cfg = small_config();
+        let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
+        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let id = creatures.insert_with_key(|id| {
+            CreatureState::new(
+                id,
+                genome,
+                pos,
+                energy,
+                0,
+                [0, 0, 92, 92, 138, 138],
+                0,
+                [true; 6],
+                CreatureIdentityState::default(),
+            )
+        });
+        world.place_creature(pos, id);
+        let sim = Simulation {
+            world,
+            creatures,
+            tick: 0,
+            config: cfg,
+            stats: crate::simulation::stats::SimStats::default(),
+            rng: rand::rngs::SmallRng::seed_from_u64(42),
+        };
+        (sim, id)
+    }
+
+    #[test]
+    fn complexity_noop_cost_scales_with_genome_complexity() {
+        // Low-complexity creature (below threshold=50): pays base noop_cost
+        let low_genome = genome_with_complexity(10);
+        assert!(low_genome.complexity() <= 50);
+        let (mut sim_low, id_low) = make_sim_with_genome(Position::new(5, 5), 100.0, low_genome);
+        let energy_before_low = sim_low.creatures[id_low].energy;
+        apply_noop(sim_low.creatures.get_mut(id_low).unwrap(), &sim_low.config);
+        let cost_low = energy_before_low - sim_low.creatures[id_low].energy;
+
+        // High-complexity creature (well above threshold): pays more
+        let high_genome = genome_with_complexity(300);
+        assert!(high_genome.complexity() > 50);
+        let (mut sim_high, id_high) = make_sim_with_genome(Position::new(5, 5), 100.0, high_genome);
+        let energy_before_high = sim_high.creatures[id_high].energy;
+        apply_noop(
+            sim_high.creatures.get_mut(id_high).unwrap(),
+            &sim_high.config,
+        );
+        let cost_high = energy_before_high - sim_high.creatures[id_high].energy;
+
+        assert!(
+            cost_high > cost_low,
+            "high-complexity creature should pay more for noop: low={cost_low}, high={cost_high}"
+        );
+    }
+
+    #[test]
+    fn complexity_eat_cost_scales_with_genome_complexity() {
+        let low_genome = genome_with_complexity(10);
+        let high_genome = genome_with_complexity(300);
+
+        // Low-complexity
+        let (mut sim_low, id_low) = make_sim_with_genome(Position::new(3, 3), 100.0, low_genome);
+        sim_low.config.energy.costs.eat_cost = 2.0; // non-zero eat cost
+        let energy_before_low = sim_low.creatures[id_low].energy;
+        {
+            let creature = sim_low.creatures.get_mut(id_low).unwrap();
+            let _ = apply_eat(creature, &mut sim_low.world, &sim_low.config);
+        }
+        let cost_low = energy_before_low - sim_low.creatures[id_low].energy;
+
+        // High-complexity
+        let (mut sim_high, id_high) = make_sim_with_genome(Position::new(3, 3), 100.0, high_genome);
+        sim_high.config.energy.costs.eat_cost = 2.0;
+        let energy_before_high = sim_high.creatures[id_high].energy;
+        {
+            let creature = sim_high.creatures.get_mut(id_high).unwrap();
+            let _ = apply_eat(creature, &mut sim_high.world, &sim_high.config);
+        }
+        let cost_high = energy_before_high - sim_high.creatures[id_high].energy;
+
+        // Both ate from empty cells (no food), so only eat_cost applies.
+        // High complexity should pay more.
+        assert!(
+            cost_high > cost_low,
+            "high-complexity creature should pay more eat_cost: low={cost_low}, high={cost_high}"
+        );
+    }
+
+    #[test]
+    fn complexity_move_cost_scales_with_genome_complexity() {
+        let low_genome = genome_with_complexity(10);
+        let high_genome = genome_with_complexity(300);
+
+        // Low-complexity
+        let (mut sim_low, id_low) = make_sim_with_genome(Position::new(5, 5), 100.0, low_genome);
+        let energy_before_low = sim_low.creatures[id_low].energy;
+        {
+            let creature = sim_low.creatures.get_mut(id_low).unwrap();
+            let _ = apply_move(
+                id_low,
+                creature,
+                &mut sim_low.world,
+                Direction::N,
+                &sim_low.config,
+            );
+        }
+        let cost_low = energy_before_low - sim_low.creatures[id_low].energy;
+
+        // High-complexity
+        let (mut sim_high, id_high) = make_sim_with_genome(Position::new(5, 5), 100.0, high_genome);
+        let energy_before_high = sim_high.creatures[id_high].energy;
+        {
+            let creature = sim_high.creatures.get_mut(id_high).unwrap();
+            let _ = apply_move(
+                id_high,
+                creature,
+                &mut sim_high.world,
+                Direction::N,
+                &sim_high.config,
+            );
+        }
+        let cost_high = energy_before_high - sim_high.creatures[id_high].energy;
+
+        assert!(
+            cost_high > cost_low,
+            "high-complexity creature should pay more move_cost: low={cost_low}, high={cost_high}"
+        );
+    }
+
+    #[test]
+    fn complexity_reproduce_cost_scales_with_genome_complexity() {
+        let low_genome = genome_with_complexity(10);
+        let high_genome = genome_with_complexity(300);
+
+        // Low-complexity parent — record energy after reproduce
+        let (mut sim_low, parent_low) = make_sim_with_genome(Position::new(5, 5), 80.0, low_genome);
+        let energy_before_low = sim_low.creatures[parent_low].energy;
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
+        let _ = apply_reproduce(parent_low, &mut sim_low, Direction::N, 20.0, &mut rng);
+        let cost_low = energy_before_low - sim_low.creatures[parent_low].energy;
+
+        // High-complexity parent
+        let (mut sim_high, parent_high) =
+            make_sim_with_genome(Position::new(5, 5), 80.0, high_genome);
+        let energy_before_high = sim_high.creatures[parent_high].energy;
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
+        let _ = apply_reproduce(parent_high, &mut sim_high, Direction::N, 20.0, &mut rng);
+        let cost_high = energy_before_high - sim_high.creatures[parent_high].energy;
+
+        // The reproduce_cost portion should be higher for complex creatures.
+        // Both deduct transfer + cost, but the cost portion should scale.
+        assert!(
+            cost_high > cost_low,
+            "high-complexity creature should pay more reproduce_cost: low={cost_low}, high={cost_high}"
+        );
+    }
+
+    #[test]
+    fn complexity_steal_cost_scales_with_genome_complexity() {
+        let low_genome = genome_with_complexity(10);
+        let high_genome = genome_with_complexity(300);
+
+        // Set up low-complexity attacker with victim
+        let (mut sim_low, attacker_low) =
+            make_sim_with_genome(Position::new(5, 5), 100.0, low_genome);
+        // Add a victim to the north
+        let victim_pos = Position::new(5, 4);
+        let victim_id_low = sim_low.creatures.insert_with_key(|id| {
+            CreatureState::new(
+                id,
+                v3alpha1_founder_genome(),
+                victim_pos,
+                50.0,
+                0,
+                [0, 0, 92, 92, 138, 138],
+                0,
+                [true; 6],
+                CreatureIdentityState::default(),
+            )
+        });
+        sim_low.world.place_creature(victim_pos, victim_id_low);
+        let energy_before_low = sim_low.creatures[attacker_low].energy;
+        let _ = apply_steal_energy(attacker_low, &mut sim_low, Direction::N, 10.0);
+        let cost_low = energy_before_low - sim_low.creatures[attacker_low].energy;
+
+        // Set up high-complexity attacker with victim
+        let (mut sim_high, attacker_high) =
+            make_sim_with_genome(Position::new(5, 5), 100.0, high_genome);
+        let victim_id_high = sim_high.creatures.insert_with_key(|id| {
+            CreatureState::new(
+                id,
+                v3alpha1_founder_genome(),
+                victim_pos,
+                50.0,
+                0,
+                [0, 0, 92, 92, 138, 138],
+                0,
+                [true; 6],
+                CreatureIdentityState::default(),
+            )
+        });
+        sim_high.world.place_creature(victim_pos, victim_id_high);
+        let energy_before_high = sim_high.creatures[attacker_high].energy;
+        let _ = apply_steal_energy(attacker_high, &mut sim_high, Direction::N, 10.0);
+        let cost_high = energy_before_high - sim_high.creatures[attacker_high].energy;
+
+        // Both steal 10.0 from victim and get 10.0 back, but the cost (steal_cost_rate * amount)
+        // should be higher for complex creatures. Net cost = steal_cost - stolen_energy.
+        // Since stolen amounts are equal, the difference is in the steal_cost.
+        assert!(
+            cost_high > cost_low,
+            "high-complexity attacker should pay more steal cost: low={cost_low}, high={cost_high}"
+        );
+    }
+
     #[test]
     fn seeded_founders_start_with_correct_energy() {
         let cfg = {
