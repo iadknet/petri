@@ -38,7 +38,7 @@ No backend changes. No new API endpoints. No new dependencies.
 
 | Question | Decision | Owner | Status |
 |----------|----------|-------|--------|
-| Tab vs inline section? | Inline collapsible section (consistent with existing inspector pattern — no tab system exists) | plan | resolved |
+| Tab vs inline section? | Inline section, always visible when data present (consistent with existing inspector pattern — genome, memory, phenotype all render unconditionally) | plan | resolved |
 | Canvas, SVG, or HTML divs for timeline bar? | HTML divs with flexbox — 500 entries is well within DOM performance, consistent with existing inspector components, most accessible | plan | resolved |
 | Energy overlay line? | Yes — thin SVG line overlay showing energy curve over time; placed in its own sub-component for clean separation | plan | resolved |
 | Multiple actions per tick display? | N/A — data model records exactly one action per creature per tick | plan | resolved |
@@ -108,7 +108,7 @@ A thin (2px) red bar at the top of each failed action segment. Uses `ActionResul
 - Auto-scroll uses "following" mode: only auto-scrolls to the right edge when the user is already at the right edge; if the user has scrolled left to inspect history, hold their scroll position
 - Tick numbers shown at regular intervals above the bar
 - Energy line is an SVG overlay showing `energy_after` normalized against `max_energy`; SVG path coordinates rounded to 1 decimal place to reduce DOM size
-- Section collapse/expand uses CSS `grid-template-rows: 0fr → 1fr` transition for smooth animation
+- Section renders unconditionally when `actionLog` is present (no collapse — consistent with all other inspector sections)
 
 ### Detail Panel
 
@@ -122,17 +122,17 @@ On hover/click of a segment, a tooltip/popover shows:
 
 ### Component Decomposition
 
-ActionTimeline is decomposed into focused sub-components for testability and separation of concerns:
+ActionTimeline is a single file (`ActionTimeline.tsx`) with co-located internal helper components — following the established pattern (PhenotypeDetail has `ChannelBar`, MemoryHexView has `HexRow`/`ByteTooltip`, NodeGraph has `NodeTooltip`):
 
 ```
-ActionTimeline (collapsible section wrapper, subscribes to store directly)
-├── TimelineBar (colored div segments, flush layout)
-├── TickAxis (tick number labels at regular intervals)
-├── EnergyOverlay (SVG line sub-component)
-└── ActionDetail (tooltip/popover on hover/click)
+ActionTimeline.tsx (exported, props-only interface)
+├── TimelineBar (internal, unexported — colored div segments)
+├── TickAxis (internal, unexported — tick number labels)
+├── EnergyOverlay (internal, unexported — SVG line)
+└── ActionDetail (internal, unexported — tooltip/popover)
 ```
 
-ActionTimeline subscribes to `actionLog` directly from the store (`useCreatureInspectorStore((s) => s.actionLog)`) — it is NOT prop-drilled from CreatureInspector. This follows `rerender-defer-reads`: the parent does not subscribe to action log state, avoiding unnecessary re-renders of the entire inspector tree on every 10Hz update.
+ActionTimeline receives `actionLog` and `maxEnergy` as props from CreatureInspector — following the established boundary where all inspector sub-components are pure presentational and CreatureInspector.tsx is the sole store integration point. The inspector parent already re-renders at fetch rate (~10Hz) for stats, so passing actionLog as a prop adds no meaningful cost.
 
 ### Store Design
 
@@ -140,7 +140,6 @@ The action log updates every fetch cycle (up to 10Hz), same as other creature da
 
 ### Performance Notes
 
-- `content-visibility: auto` on the collapsible section container skips layout/paint when scrolled out of view
 - SVG path coordinates rounded to 1 decimal place (`toFixed(1)`) to minimize DOM size
 - Timeline bar uses flush div segments (no gaps) — 500 × 6px = 3000px total scrollable width
 
@@ -148,17 +147,17 @@ The action log updates every fetch cycle (up to 10Hz), same as other creature da
 
 - [ ] Step 1: **TypeScript types and data plumbing** — Add `ActionLogEntry`, `ActionType`, `ActionResult` types to `src/types/genome.ts`. Extend `CreatureDetail` to include `action_log: ActionLogEntry[]`. Add `actionLog: ActionLogEntry[] | null` field to `creatureInspectorStore`. Wire `action_log` through `setDetail()` in the store (always replace array reference, no deep equality check) and `useCreatureDetail` hook. Reset `actionLog` to null in `selectCreature()` and `clearSelection()`. Add unit tests verifying the store correctly stores and updates action log data.
 
-- [ ] Step 2: **TimelineBar and ActionTimeline section** — Create `src/components/inspector/ActionTimeline.tsx` as the section wrapper with collapsible header ("Action Timeline"). Create `TimelineBar` sub-component rendering flush, colored div segments (6px wide each, no gaps). Color-code by `action_type` using the -400 shade palette. Add a 2px red top border on segments where `result !== "Success"`. ActionTimeline subscribes to store directly via `useCreatureInspectorStore((s) => s.actionLog)` — not prop-drilled from parent. Add `content-visibility: auto` on the section container. Collapse/expand uses CSS `grid-template-rows: 0fr → 1fr` transition. Add unit tests verifying correct color mapping and failure indicators.
+- [ ] Step 2: **TimelineBar and ActionTimeline section** — Create `src/components/inspector/ActionTimeline.tsx` as a props-only component accepting `actionLog: ActionLogEntry[]` and `maxEnergy: number`. Use canonical section header: `<span className="text-xs text-slate-500 uppercase tracking-wider font-medium">Action Timeline</span>` with `px-4 py-3` outer padding. Create co-located internal `TimelineBar` helper rendering flush, colored div segments (6px wide each, no gaps). Color-code by `action_type` using the -400 shade palette. Add a 2px red top border on segments where `result !== "Success"`. Add unit tests verifying correct color mapping and failure indicators.
 
-- [ ] Step 3: **ActionDetail tooltip** — Create `ActionDetail` sub-component as a tooltip/popover that appears on hover/click of a timeline segment. Show full action metadata: tick number, action type + result, direction (0-7 → N/NE/E/SE/S/SW/W/NW, 255 → "N/A"), energy before → after with colored delta (green positive, red negative), amount (if non-zero), priority bid. Add unit test for detail panel content rendering.
+- [ ] Step 3: **ActionDetail tooltip** — Create co-located internal `ActionDetail` helper as a tooltip/popover that appears on hover/click of a timeline segment. Show full action metadata: tick number, action type + result, direction (0-7 → N/NE/E/SE/S/SW/W/NW, 255 → "N/A"), energy before → after with colored delta (green positive, red negative), amount (if non-zero), priority bid. Add unit test for detail panel content rendering.
 
 - [ ] Review Gate: Interim code review — review Steps 1-3 changes using `vercel-react-best-practices` + `vercel-composition-patterns`. Fix findings, re-review until clean.
 
-- [ ] Step 4: **TickAxis and scrolling** — Create `TickAxis` sub-component rendering tick number labels at regular intervals above the timeline bar. Implement horizontal scrolling via `overflow-x-auto` container. Auto-scroll uses "following" mode: only scroll to right edge when user is already there; hold position if user has scrolled left to inspect history. Ensure the timeline handles the full 500-entry buffer smoothly. Add unit test for axis label rendering and scroll behavior.
+- [ ] Step 4: **TickAxis and scrolling** — Create co-located internal `TickAxis` helper rendering tick number labels at regular intervals above the timeline bar. Implement horizontal scrolling via `overflow-x-auto` container. Auto-scroll uses "following" mode: only scroll to right edge when user is already there; hold position if user has scrolled left to inspect history. Ensure the timeline handles the full 500-entry buffer smoothly. Add unit test for axis label rendering and scroll behavior.
 
-- [ ] Step 5: **EnergyOverlay** — Create `EnergyOverlay` sub-component as a thin SVG line overlay showing the creature's energy curve. Normalize `energy_after` against `max_energy` (0-100% height). Use a semi-transparent stroke so it doesn't obscure the action bar. Round SVG path coordinates to 1 decimal place (`toFixed(1)`). Add unit test verifying SVG path generation from energy data.
+- [ ] Step 5: **EnergyOverlay** — Create co-located internal `EnergyOverlay` helper as a thin SVG line overlay showing the creature's energy curve. Normalize `energy_after` against `maxEnergy` prop (0-100% height). Use a semi-transparent stroke so it doesn't obscure the action bar. Round SVG path coordinates to 1 decimal place (`toFixed(1)`). Add unit test verifying SVG path generation from energy data.
 
-- [ ] Step 6: **Integration and polish** — Import and render `ActionTimeline` in `CreatureInspector.tsx` as a section (placed after StatsSection, before PhenotypeDetail — behavioral data before structural data). ActionTimeline reads its own data from the store, so CreatureInspector only needs to render `<ActionTimeline />` with no props. Verify keyboard accessibility (tab focus, Enter to expand/collapse section). Run full frontend verification (`npm run lint`, `npm run test`, `npm run build`).
+- [ ] Step 6: **Integration and polish** — Import and render `ActionTimeline` in `CreatureInspector.tsx` as a section (placed after StatsSection, before PhenotypeDetail — behavioral data before structural data). Subscribe to `actionLog` in CreatureInspector and pass as prop, following the established pattern where CreatureInspector is the sole store integration point. Wrap in conditional render: `{actionLog && <ActionTimeline actionLog={actionLog} maxEnergy={stats.maxEnergy} />}` with `border-t border-slate-800` divider — consistent with genome/memory sections. Run full frontend verification (`npm run lint`, `npm run test`, `npm run build`).
 
 - [ ] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke `vercel-react-best-practices` + `vercel-composition-patterns`. Fix all findings. Re-review until clean pass.
 
@@ -166,4 +165,4 @@ The action log updates every fetch cycle (up to 10Hz), same as other creature da
 
 - [ ] Completion gate — run all checks from AGENTS.md Completion Gate section: `scripts/check-doc-harness.sh --mode warn`, `scripts/check-architecture-harness.sh --mode warn`, `scripts/check-plan-harness.sh --mode strict`, `cd frontend && npm run lint && npm run test && npm run build`
 
-**Review cycles:** 2
+**Review cycles:** 3
