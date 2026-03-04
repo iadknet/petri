@@ -2,16 +2,22 @@ import { Section } from "../shared/Section.tsx";
 import type { BooleanFieldDef, FieldDef, RuntimePanelProps } from "../shared/types.ts";
 import {
 	AGE_COST_ALL_FIELDS,
-	AgeEnergyCostFieldGroup,
+	AGE_COST_FIELDS,
+	AGE_COST_TOGGLES,
 } from "./AgeEnergyCostSection.tsx";
 import {
 	COMPLEXITY_COST_ALL_FIELDS,
-	ComplexityEnergyCostFieldGroup,
+	COMPLEXITY_COST_FIELDS,
+	COMPLEXITY_COST_TOGGLES,
 } from "./ComplexityEnergyCostSection.tsx";
 import { ENERGY_COSTS_FIELDS } from "./EnergyCostsSection.tsx";
 import { ENERGY_LIFECYCLE_FIELDS } from "./EnergyLifecycleSection.tsx";
 import { FOOD_PARAMETERS_FIELDS } from "./FoodParametersSection.tsx";
-import { MUTATION_ALL_FIELDS, MutationFieldGroup } from "./MutationSection.tsx";
+import {
+	MUTATION_ALL_FIELDS,
+	MUTATION_FIELDS,
+	MUTATION_TOGGLES,
+} from "./MutationSection.tsx";
 import { POPULATION_FIELDS } from "./PopulationSection.tsx";
 import { PREDATION_FIELDS } from "./PredationSection.tsx";
 import { RuntimeFieldGroup } from "./RuntimeFieldGroup.tsx";
@@ -87,13 +93,19 @@ export function RuntimeConfigPanel({
 						simState={simState}
 						updateDraft={updateDraft}
 					/>
-					<ComplexityEnergyCostFieldGroup
+					<RuntimeFieldGroup
+						title="Energy > Complexity Cost"
+						fields={COMPLEXITY_COST_FIELDS}
+						toggles={COMPLEXITY_COST_TOGGLES}
 						localDraft={localDraft}
 						serverConfig={serverConfig}
 						simState={simState}
 						updateDraft={updateDraft}
 					/>
-					<AgeEnergyCostFieldGroup
+					<RuntimeFieldGroup
+						title="Energy > Age Cost"
+						fields={AGE_COST_FIELDS}
+						toggles={AGE_COST_TOGGLES}
 						localDraft={localDraft}
 						serverConfig={serverConfig}
 						simState={simState}
@@ -107,7 +119,10 @@ export function RuntimeConfigPanel({
 						simState={simState}
 						updateDraft={updateDraft}
 					/>
-					<MutationFieldGroup
+					<RuntimeFieldGroup
+						title="Mutation"
+						fields={MUTATION_FIELDS}
+						toggles={MUTATION_TOGGLES}
 						localDraft={localDraft}
 						serverConfig={serverConfig}
 						simState={simState}

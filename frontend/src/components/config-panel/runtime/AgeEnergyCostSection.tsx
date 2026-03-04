@@ -1,8 +1,4 @@
-import { FieldGroup } from "../shared/FieldGroup.tsx";
-import { FieldRow } from "../shared/FieldRow.tsx";
-import { ToggleRow } from "../shared/ToggleRow.tsx";
-import { getByPath } from "../shared/pathUtils.ts";
-import type { BooleanFieldDef, FieldDef, RuntimePanelProps } from "../shared/types.ts";
+import type { BooleanFieldDef, FieldDef } from "../shared/types.ts";
 
 export const AGE_COST_FIELDS: FieldDef[] = [
 	{
@@ -43,39 +39,3 @@ export const AGE_COST_ALL_FIELDS: (FieldDef | BooleanFieldDef)[] = [
 	...AGE_COST_FIELDS,
 	...AGE_COST_TOGGLES,
 ];
-
-export function AgeEnergyCostFieldGroup({
-	localDraft,
-	serverConfig,
-	simState,
-	updateDraft,
-}: RuntimePanelProps) {
-	return (
-		<FieldGroup title="Energy > Age Cost">
-			{AGE_COST_TOGGLES.map((field) => (
-				<ToggleRow
-					key={`runtime-${field.path}`}
-					field={field}
-					id={`runtime-${field.path.replaceAll(".", "-")}`}
-					value={getByPath(localDraft, field.path) as boolean}
-					serverValue={getByPath(serverConfig, field.path) as boolean}
-					disabled={simState === "running"}
-					onChange={updateDraft}
-					testId={field.testId}
-				/>
-			))}
-			{AGE_COST_FIELDS.map((field) => (
-				<FieldRow
-					key={`runtime-${field.path}`}
-					field={field}
-					id={`runtime-${field.path.replaceAll(".", "-")}`}
-					value={getByPath(localDraft, field.path) as number}
-					serverValue={getByPath(serverConfig, field.path) as number}
-					disabled={simState === "running"}
-					onChange={updateDraft}
-					testId={field.testId}
-				/>
-			))}
-		</FieldGroup>
-	);
-}
