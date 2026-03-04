@@ -210,6 +210,16 @@ The tick loop has 5 phases (0, 1, 2, 2.5, 3). A phase-based system where phases 
 ### Graph evaluation / plasticity decoupling
 Currently `graph.rs` calls directly into plasticity modules for post-convergence updates. A more extensible design would have graph evaluation produce "learning events" dispatched to registered plasticity backends, decoupling the graph relaxation loop from the specifics of any learning algorithm.
 
+### Action timeline segment virtualization
+At 500 entries × 10Hz, the ActionTimeline re-renders 500 DOM segments each cycle. If profiling shows jank, a windowed/virtualized renderer (only rendering visible segments) could reduce DOM work significantly. Currently acceptable.
+
+Discovered during creature-action-timeline code review (performance assessment).
+
+### Creature detail API spec documentation
+The `GET /v3/simulation/creature/:id` endpoint is not documented in `docs/reference/v3-server-api-protocol-spec.md`. The `action_log` field (added by the creature-action-log feature) has no reference spec entry. Should be documented alongside the existing sample sub-endpoint docs.
+
+Discovered during creature-action-timeline architecture review.
+
 ### Eventual multi-crate v3-server split
 If the internal command/query/transport boundaries stabilize, a later follow-up could split `v3-server` into multiple crates. Intentionally deferred to avoid increasing migration scope while boundaries are settling.
 
