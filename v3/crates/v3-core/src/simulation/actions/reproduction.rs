@@ -132,8 +132,13 @@ pub fn apply_reproduce(
         return ReproductionActionResult::RejectedPopulationCap;
     }
 
-    // Step 4: Deduct reproduce_cost from parent.
-    sim.creatures[parent_id].energy -= sim.config.energy.costs.reproduce_cost;
+    // Step 4: Deduct reproduce_cost from parent (scaled by genome complexity).
+    let complexity_mult = sim
+        .config
+        .energy
+        .complexity_cost
+        .multiplier(sim.creatures[parent_id].genome.complexity());
+    sim.creatures[parent_id].energy -= sim.config.energy.costs.reproduce_cost * complexity_mult;
 
     // Step 5: Check parent has sufficient energy after cost deduction.
     if sim.creatures[parent_id].energy < sim.config.energy.lifecycle.min_reproduce_energy {

@@ -313,7 +313,12 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                         sim.stats.last_tick_eat += 1;
                         outcome_acc.record_action_result(id, succeeded);
                         if !succeeded {
-                            creature.energy -= sim.config.energy.costs.failed_action_penalty;
+                            let mult = sim
+                                .config
+                                .energy
+                                .complexity_cost
+                                .multiplier(creature.genome.complexity());
+                            creature.energy -= sim.config.energy.costs.failed_action_penalty * mult;
                         }
                     }
                 }
@@ -323,7 +328,12 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                         sim.stats.last_tick_move += 1;
                         outcome_acc.record_action_result(id, succeeded);
                         if !succeeded {
-                            creature.energy -= sim.config.energy.costs.failed_action_penalty;
+                            let mult = sim
+                                .config
+                                .energy
+                                .complexity_cost
+                                .multiplier(creature.genome.complexity());
+                            creature.energy -= sim.config.energy.costs.failed_action_penalty * mult;
                         }
                     }
                 }
@@ -342,7 +352,12 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                     // so a failed reproduction pays reproduce_cost + failed_action_penalty.
                     if !succeeded {
                         if let Some(creature) = sim.creatures.get_mut(id) {
-                            creature.energy -= sim.config.energy.costs.failed_action_penalty;
+                            let mult = sim
+                                .config
+                                .energy
+                                .complexity_cost
+                                .multiplier(creature.genome.complexity());
+                            creature.energy -= sim.config.energy.costs.failed_action_penalty * mult;
                         }
                     }
                 }
@@ -367,7 +382,12 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                     }
                     if result == PredationActionResult::RejectedNoVictim {
                         if let Some(creature) = sim.creatures.get_mut(id) {
-                            creature.energy -= sim.config.energy.costs.failed_action_penalty;
+                            let mult = sim
+                                .config
+                                .energy
+                                .complexity_cost
+                                .multiplier(creature.genome.complexity());
+                            creature.energy -= sim.config.energy.costs.failed_action_penalty * mult;
                         }
                     }
                 }
@@ -779,25 +799,30 @@ mod tests {
         let energy_before = sim.creatures[id].energy;
         let move_cost = sim.config.energy.costs.move_cost;
         let penalty = sim.config.energy.costs.failed_action_penalty;
+        let mult = sim
+            .config
+            .energy
+            .complexity_cost
+            .multiplier(sim.creatures[id].genome.complexity());
 
         // Simulate what the tick dispatch does: move north into barrier.
         let creature = sim.creatures.get_mut(id).unwrap();
         let succeeded = apply_move(id, creature, &mut sim.world, Direction::N, &sim.config);
         assert!(!succeeded, "move into barrier should fail");
-        // Apply penalty for failed action (this is what we're implementing in tick.rs).
+        // Apply penalty for failed action (scaled by complexity multiplier).
         if !succeeded {
-            sim.creatures.get_mut(id).unwrap().energy -= penalty;
+            sim.creatures.get_mut(id).unwrap().energy -= penalty * mult;
         }
 
-        let expected = energy_before - move_cost - penalty;
+        let expected = energy_before - move_cost * mult - penalty * mult;
         assert!(
-            (sim.creatures[id].energy - expected).abs() < f32::EPSILON,
+            (sim.creatures[id].energy - expected).abs() < 1e-4,
             "energy {} should be {} (start {} - move {} - penalty {})",
             sim.creatures[id].energy,
             expected,
             energy_before,
-            move_cost,
-            penalty
+            move_cost * mult,
+            penalty * mult
         );
 
         // Also test failed eat.
@@ -807,11 +832,11 @@ mod tests {
         let eat_succeeded = apply_eat(creature, &mut sim.world, &sim.config);
         assert!(!eat_succeeded, "eat on empty cell should fail");
         if !eat_succeeded {
-            sim.creatures.get_mut(id).unwrap().energy -= penalty;
+            sim.creatures.get_mut(id).unwrap().energy -= penalty * mult;
         }
-        let expected_eat = energy_before_eat - eat_cost - penalty;
+        let expected_eat = energy_before_eat - eat_cost * mult - penalty * mult;
         assert!(
-            (sim.creatures[id].energy - expected_eat).abs() < f32::EPSILON,
+            (sim.creatures[id].energy - expected_eat).abs() < 1e-4,
             "energy {} should be {} after failed eat",
             sim.creatures[id].energy,
             expected_eat

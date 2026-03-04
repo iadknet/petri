@@ -58,8 +58,13 @@ pub fn apply_steal_energy(
     sim.stats.predation_actions_attempted_total += 1;
     sim.stats.last_tick_steal += 1;
 
-    // Step 2: Deduct cost (based on attempted amount, not actual).
-    let cost = sim.config.predation.steal_cost_rate * requested_amount;
+    // Step 2: Deduct cost (based on attempted amount, not actual; scaled by genome complexity).
+    let complexity_mult = sim
+        .config
+        .energy
+        .complexity_cost
+        .multiplier(sim.creatures[attacker_id].genome.complexity());
+    let cost = sim.config.predation.steal_cost_rate * requested_amount * complexity_mult;
     sim.creatures[attacker_id].energy -= cost;
 
     // Step 3: Resolve target cell.
@@ -292,15 +297,22 @@ mod tests {
         let (mut sim, attacker_id, _victim_id) =
             make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 30.0);
         sim.config.predation.steal_cost_rate = 0.2;
+        let mult = sim
+            .config
+            .energy
+            .complexity_cost
+            .multiplier(sim.creatures[attacker_id].genome.complexity());
 
         let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 10.0);
 
         assert_eq!(result, PredationActionResult::Transferred);
-        // attacker: 50 - cost(0.2*10=2) + gain(10) = 58
+        // attacker: 50 - cost(0.2*10*mult) + gain(10)
+        let expected = 50.0 - (0.2 * 10.0 * mult) + 10.0;
         assert!(
-            (sim.creatures[attacker_id].energy - 58.0).abs() < 1e-6,
-            "attacker energy {} should be 58.0",
-            sim.creatures[attacker_id].energy
+            (sim.creatures[attacker_id].energy - expected).abs() < 1e-4,
+            "attacker energy {} should be {}",
+            sim.creatures[attacker_id].energy,
+            expected
         );
     }
 
@@ -310,19 +322,23 @@ mod tests {
         let (mut sim, attacker_id, victim_id) =
             make_sim_two_creatures(Position::new(5, 5), 50.0, Position::new(5, 4), 5.0);
         sim.config.predation.steal_cost_rate = 0.2;
+        let mult = sim
+            .config
+            .energy
+            .complexity_cost
+            .multiplier(sim.creatures[attacker_id].genome.complexity());
 
         let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 20.0);
 
-        // Cost = 0.2 * 20 (attempted) = 4.0 (not 0.2 * 5)
+        // Cost = 0.2 * 20 (attempted) * mult (not 0.2 * 5)
         // Actual transfer = min(20, 5) = 5.0
         // Victim killed: energy goes to 0 → TransferredAndKilled
         assert_eq!(result, PredationActionResult::TransferredAndKilled);
-        // attacker: 50 - 4 (cost) + 5 (actual) + bonus
+        // attacker: 50 - cost + 5 (actual) + bonus
+        let cost = 0.2 * 20.0 * mult;
         let bonus = sim.creatures[attacker_id].genome.complexity() as f32
             * sim.config.predation.kill_complexity_bonus_multiplier;
-        // We just check cost is based on 20 (attempted), not 5 (actual)
-        // Without bonus: 50 - 4 + 5 = 51. With bonus: 51 + bonus.
-        let expected = 50.0 - 4.0 + 5.0 + bonus;
+        let expected = 50.0 - cost + 5.0 + bonus;
         assert!(
             (sim.creatures[attacker_id].energy - expected).abs() < 1e-4,
             "attacker energy {} should be ~{}, cost on attempted not actual",
@@ -338,13 +354,19 @@ mod tests {
         // Only attacker, no victim to the north
         let (mut sim, attacker_id) = make_sim_one_creature(Position::new(5, 5), 50.0);
         sim.config.predation.steal_cost_rate = 0.2;
+        let mult = sim
+            .config
+            .energy
+            .complexity_cost
+            .multiplier(sim.creatures[attacker_id].genome.complexity());
 
         let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 10.0);
 
         assert_eq!(result, PredationActionResult::RejectedNoVictim);
-        // Cost still deducted: 50 - (0.2 * 10) = 48
+        // Cost still deducted: 50 - (0.2 * 10 * mult)
+        let expected = 50.0 - (0.2 * 10.0 * mult);
         assert!(
-            (sim.creatures[attacker_id].energy - 48.0).abs() < 1e-6,
+            (sim.creatures[attacker_id].energy - expected).abs() < 1e-4,
             "cost should still be deducted: got {}",
             sim.creatures[attacker_id].energy
         );

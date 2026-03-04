@@ -166,12 +166,12 @@ After completing each implementation step:
 - [x] Step 1: Add `ComplexityEnergyCostConfig` struct to `config/simulation.rs` with `Default`, serde derives, normalization in `SimulationConfig::normalize()`, and add `complexity_cost: ComplexityEnergyCostConfig` field to `EnergyConfig`. Write config default tests.
 - [x] Step 2: Add `multiplier(&self, complexity: u32) -> f32` method on `ComplexityEnergyCostConfig`. Write TDD unit tests: below threshold returns 1.0, at threshold returns 1.0, above threshold returns correct value, disabled returns 1.0, threshold=0 works correctly.
 - [x] Step 3: Write failing integration tests that verify each action type deducts complexity-adjusted costs (use a high-complexity genome fixture vs a low-complexity genome, assert different energy deductions for the same action). Cover: noop, eat, move, reproduce, steal_energy, failed_action_penalty.
-- [ ] [parallel] Step 4a: Update `apply_noop` in `actions/mod.rs` to apply complexity multiplier.
-- [ ] [parallel] Step 4b: Update `apply_eat` in `actions/mod.rs` to apply complexity multiplier to `eat_cost` (NOT to `eat_reward_per_food`).
-- [ ] [parallel] Step 4c: Update `apply_move` in `actions/mod.rs` to apply complexity multiplier to `move_cost`.
-- [ ] Step 4d: Update `apply_reproduce` in `actions/reproduction.rs` to apply complexity multiplier to `reproduce_cost`.
-- [ ] Step 4e: Update `apply_steal_energy` in `actions/predation.rs` to apply complexity multiplier to the steal cost calculation.
-- [ ] Step 4f: Update `failed_action_penalty` deductions in `tick.rs` (4 sites: eat, move, reproduce, steal_energy) to apply complexity multiplier.
+- [x] [parallel] Step 4a: Update `apply_noop` in `actions/mod.rs` to apply complexity multiplier.
+- [x] [parallel] Step 4b: Update `apply_eat` in `actions/mod.rs` to apply complexity multiplier to `eat_cost` (NOT to `eat_reward_per_food`).
+- [x] [parallel] Step 4c: Update `apply_move` in `actions/mod.rs` to apply complexity multiplier to `move_cost`.
+- [x] Step 4d: Update `apply_reproduce` in `actions/reproduction.rs` to apply complexity multiplier to `reproduce_cost`.
+- [x] Step 4e: Update `apply_steal_energy` in `actions/predation.rs` to apply complexity multiplier to the steal cost calculation.
+- [x] Step 4f: Update `failed_action_penalty` deductions in `tick.rs` (4 sites: eat, move, reproduce, steal_energy) to apply complexity multiplier.
 - [ ] Step 5: Verify all tests pass — unit tests, integration tests, and `cargo test -p v3-core --test viability` (merge gate).
 - [ ] Step 6: Update `docs/reference/v3-runtime-config-spec.md` Section 4 with new `energy.complexity_cost.*` fields, defaults, and normalization rules.
 - [ ] Step 7: Run full completion gate: `cargo fmt --all -- --check`, `cargo test --workspace`, `cargo clippy --workspace --all-targets -- -D warnings`, `scripts/check-plan-harness.sh --mode strict`.
