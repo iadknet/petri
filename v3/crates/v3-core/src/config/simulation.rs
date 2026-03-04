@@ -168,6 +168,22 @@ impl Default for AgeEnergyCostConfig {
     }
 }
 
+impl AgeEnergyCostConfig {
+    /// Returns the energy cost multiplier for a creature of the given age.
+    ///
+    /// Formula: `1.0 + (max_multiplier - 1.0) * min(1.0, age / age_cap)^2`
+    /// Returns 1.0 (no penalty) when disabled or age_cap is 0.
+    #[inline]
+    #[must_use]
+    pub fn multiplier(&self, age: u64) -> f32 {
+        if !self.enabled || self.age_cap == 0 {
+            return 1.0;
+        }
+        let ratio = (age as f32 / self.age_cap as f32).min(1.0);
+        1.0 + (self.max_multiplier - 1.0) * ratio * ratio
+    }
+}
+
 /// Combined energy config.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -998,5 +1014,50 @@ mod tests {
         let ec: EnergyConfig = serde_json::from_str(json).unwrap();
         assert!(ec.age_cost.enabled);
         assert_eq!(ec.age_cost.age_cap, 500);
+    }
+
+    #[test]
+    fn age_multiplier_at_age_zero_returns_one() {
+        let ac = AgeEnergyCostConfig::default();
+        assert!((ac.multiplier(0) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn age_multiplier_mid_range_quadratic() {
+        let ac = AgeEnergyCostConfig::default(); // age_cap=500, max_multiplier=10.0
+        // age=250: ratio=0.5, 1.0 + 9.0 * 0.25 = 3.25
+        assert!((ac.multiplier(250) - 3.25).abs() < 1e-4);
+    }
+
+    #[test]
+    fn age_multiplier_at_cap_returns_max() {
+        let ac = AgeEnergyCostConfig::default();
+        assert!((ac.multiplier(500) - 10.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn age_multiplier_above_cap_clamped() {
+        let ac = AgeEnergyCostConfig::default();
+        assert!((ac.multiplier(1000) - 10.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn age_multiplier_disabled_returns_one() {
+        let ac = AgeEnergyCostConfig {
+            enabled: false,
+            age_cap: 500,
+            max_multiplier: 10.0,
+        };
+        assert!((ac.multiplier(400) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn age_multiplier_zero_cap_returns_one() {
+        let ac = AgeEnergyCostConfig {
+            enabled: true,
+            age_cap: 0,
+            max_multiplier: 10.0,
+        };
+        assert!((ac.multiplier(100) - 1.0).abs() < f32::EPSILON);
     }
 }
