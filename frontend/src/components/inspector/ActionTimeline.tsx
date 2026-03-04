@@ -44,8 +44,11 @@ interface ActionTimelineProps {
 	maxEnergy: number;
 }
 
+const ENERGY_OVERLAY_HEIGHT = 20; // matches TimelineBar height
+
 export const ActionTimeline = memo(function ActionTimeline({
 	actionLog,
+	maxEnergy,
 }: ActionTimelineProps) {
 	const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 	const scrollRef = useRef<HTMLDivElement>(null);
@@ -87,11 +90,14 @@ export const ActionTimeline = memo(function ActionTimeline({
 			>
 				<div style={{ width: totalWidth, minWidth: "100%" }}>
 					<TickAxis entries={actionLog} />
-					<TimelineBar
-						entries={actionLog}
-						selectedIndex={selectedIndex}
-						onSelect={setSelectedIndex}
-					/>
+					<div className="relative">
+						<TimelineBar
+							entries={actionLog}
+							selectedIndex={selectedIndex}
+							onSelect={setSelectedIndex}
+						/>
+						<EnergyOverlay entries={actionLog} maxEnergy={maxEnergy} />
+					</div>
 				</div>
 			</div>
 			{selectedEntry ? <ActionDetail entry={selectedEntry} /> : null}
@@ -175,6 +181,39 @@ function TimelineBar({
 				);
 			})}
 		</div>
+	);
+}
+
+export function energyPath(entries: ActionLogEntry[], maxEnergy: number, height: number): string {
+	if (entries.length === 0 || maxEnergy <= 0) return "";
+	const points: string[] = [];
+	for (let i = 0; i < entries.length; i++) {
+		const entry = entries[i];
+		if (!entry) continue;
+		const x = (i * SEGMENT_WIDTH + SEGMENT_WIDTH / 2).toFixed(1);
+		const ratio = Math.min(entry.energy_after / maxEnergy, 1);
+		const y = (height * (1 - ratio)).toFixed(1);
+		points.push(`${x},${y}`);
+	}
+	if (points.length === 0) return "";
+	return `M${points.join("L")}`;
+}
+
+function EnergyOverlay({ entries, maxEnergy }: { entries: ActionLogEntry[]; maxEnergy: number }) {
+	const totalWidth = entries.length * SEGMENT_WIDTH;
+	const d = energyPath(entries, maxEnergy, ENERGY_OVERLAY_HEIGHT);
+	if (!d) return null;
+
+	return (
+		<svg
+			className="absolute inset-0 pointer-events-none"
+			width={totalWidth}
+			height={ENERGY_OVERLAY_HEIGHT}
+			aria-hidden="true"
+			data-testid="energy-overlay"
+		>
+			<path d={d} fill="none" stroke="#facc15" strokeWidth={1.5} strokeOpacity={0.6} />
+		</svg>
 	);
 }
 
