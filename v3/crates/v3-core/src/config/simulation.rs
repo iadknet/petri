@@ -1036,7 +1036,7 @@ mod tests {
     #[test]
     fn age_multiplier_mid_range_quadratic() {
         let ac = AgeEnergyCostConfig::default(); // age_cap=500, max_multiplier=10.0
-        // age=250: ratio=0.5, 1.0 + 9.0 * 0.25 = 3.25
+                                                 // age=250: ratio=0.5, 1.0 + 9.0 * 0.25 = 3.25
         assert!((ac.multiplier(250) - 3.25).abs() < 1e-4);
     }
 

@@ -972,10 +972,7 @@ mod tests {
         let (mut sim_old, id_old) = make_sim_one_creature(Position::new(5, 5), 100.0);
         sim_old.creatures[id_old].age = 400;
         let energy_before_old = sim_old.creatures[id_old].energy;
-        apply_noop(
-            sim_old.creatures.get_mut(id_old).unwrap(),
-            &sim_old.config,
-        );
+        apply_noop(sim_old.creatures.get_mut(id_old).unwrap(), &sim_old.config);
         let cost_old = energy_before_old - sim_old.creatures[id_old].energy;
 
         assert!(
