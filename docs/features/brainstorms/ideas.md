@@ -115,6 +115,9 @@ Compact card in the creature inspector showing derived stats at a glance:
 
 Relatively cheap — mostly static genome analysis plus recent action history.
 
+### Fade junk DNA in genome viewer
+In the genome/mesh viewer, display "junk" DNA as slightly faded — junk mesh nodes, junk VM instructions, etc. Visually distinguishes functional genome elements from non-functional ones, making it easier to see the creature's actual working circuitry at a glance.
+
 ### Annotated mesh diagram
 Enhanced NodeGraph in the creature inspector:
 - Each node gets a human-readable label derived from its function (e.g., "Food Scanner", "Move Decider", "Memory Writer") based on sensors read and actions/targets written
@@ -141,6 +144,9 @@ Find creatures by genome characteristics and highlight results on the map:
 - "Show me creatures that read area food sensors"
 
 Needs a query UI and efficient filtering over potentially 100K creatures. Powerful for finding interesting specimens.
+
+### Reconcile config panel with all backend options
+Audit the frontend config panel against all backend configuration options. Ensure every config option has a corresponding frontend control, verify all existing controls are functional, and reassess the logical groupings of config elements in the UI. This subsumes the "Expose predation config in UI" idea below — predation config is one example of a missing control, but the full reconciliation should catch all gaps.
 
 ### Expose predation config in UI
 PredationConfig (steal_cost_rate, kill_complexity_bonus_multiplier) exists in the backend but has no controls in the runtime config panel. Add it.
@@ -205,3 +211,4 @@ The Grand Unified Architecture — mapping biological intelligence to CPU-optimi
 ## Promoted
 
 - **Fix creature inspector** → `docs/features/needs_refinement/fix-creature-inspector.md`
+- **Reconcile config panel** → `docs/features/needs_refinement/reconcile-config-panel.md`
