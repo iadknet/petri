@@ -627,9 +627,12 @@ async fn health_payload_contains_mutation_skip_by_reason() {
         applied_by_domain, frame.health.mutation_events_applied_total,
         "applied_by_domain must reconcile to mutation_events_applied_total"
     );
-    assert_eq!(
-        attempted_by_operator, frame.health.mutation_events_attempted_total,
-        "attempted_by_operator must reconcile to mutation_events_attempted_total"
+    // Operator-level attempts may be less than total when events are skipped at
+    // the domain level (no applicable operator under complexity pressure).
+    assert!(
+        attempted_by_operator <= frame.health.mutation_events_attempted_total,
+        "attempted_by_operator ({attempted_by_operator}) must not exceed mutation_events_attempted_total ({})",
+        frame.health.mutation_events_attempted_total
     );
     assert_eq!(
         applied_by_operator, frame.health.mutation_events_applied_total,

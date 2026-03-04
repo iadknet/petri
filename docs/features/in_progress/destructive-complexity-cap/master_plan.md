@@ -8,7 +8,7 @@
 - In: Change restricted operator selection from `random_non_increasing()` (Neutral+Decreasing) to `random_decreasing()` (Decreasing-only) in the mutation engine. Add `random_decreasing()` to each domain operator enum. Add `is_decreasing()` helper to `ComplexityEffect`. Skip event when no Decreasing operators exist for a domain.
 - Out: Pressure curve changes, cap value changes, config toggles, complexity scoring changes.
 
-**Docs Impact:** None — no canonical docs touched. This is a behavioral change within existing mutation engine internals.
+**Docs Impact:** Updated `v3-evolution-observability-spec.md` (operator-level accounting invariant now allows domain-level skips) and `v3-mutation-spec.md` (event processing sequence includes operator selection failure under complexity restriction).
 
 **Supersedes:** none
 
@@ -71,11 +71,11 @@ After completing each implementation step:
 
 ## Implementation Steps
 
-- [ ] Step 1: Add `is_decreasing()` helper to `ComplexityEffect` in `types.rs`
+- [x] Step 1: Add `is_decreasing()` helper to `ComplexityEffect` in `types.rs`
   - Add `pub const fn is_decreasing(self) -> bool` to `ComplexityEffect` impl block
   - Add unit test verifying `is_decreasing()` returns true only for `Decreasing`
 
-- [ ] Step 2: Add `random_decreasing()` to all four domain operator enums
+- [x] Step 2: Add `random_decreasing()` to all four domain operator enums
   - In each of `TopologyOperator`, `VmOperator`, `GraphOperator`, `InputRefOperator`:
     - Add `DECREASING_WEIGHT` compile-time const (sum of weights for Decreasing-only operators)
     - Add `pub fn random_decreasing(rng) -> Option<Self>` that filters to `ComplexityEffect::Decreasing` only
@@ -84,7 +84,7 @@ After completing each implementation step:
     - `random_decreasing` returns `None` for VM domain (0 Decreasing operators)
     - `random_decreasing` covers all Decreasing operators for Topology, Graph, InputRef over enough seeds
 
-- [ ] Step 3: Change engine restricted branches to use `random_decreasing()` with skip fallback
+- [x] Step 3: Change engine restricted branches to use `random_decreasing()` with skip fallback
   - In `engine/mod.rs`, for each domain's restricted branch:
     - Replace `XOperator::random_non_increasing(rng).unwrap_or_else(|| XOperator::random(rng))` with:
       - Call `XOperator::random_decreasing(rng)`
@@ -94,7 +94,7 @@ After completing each implementation step:
   - Add new test: restricted VM mutations are always skipped (VM has 0 Decreasing operators)
   - Add new test: accounting invariant still holds when events are skipped due to no Decreasing operators
 
-- [ ] Step 4: Run viability tests and full test suite
+- [x] Step 4: Run viability tests and full test suite
   - `cargo test -p v3-core --test viability` — must pass (viability gate)
   - `cargo test --workspace` — must pass
   - `cargo clippy --workspace --all-targets -- -D warnings` — must pass
