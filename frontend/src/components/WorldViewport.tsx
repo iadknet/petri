@@ -169,7 +169,7 @@ export function WorldViewport() {
 		const canvas = canvasRef.current;
 		if (!canvas) return;
 		canvas.addEventListener("wheel", handleWheel, { passive: false });
-		return () => canvas.removeEventListener("wheel", handleWheel, { passive: false });
+		return () => canvas.removeEventListener("wheel", handleWheel);
 	}, [handleWheel]);
 
 	// Pan: mouse down
