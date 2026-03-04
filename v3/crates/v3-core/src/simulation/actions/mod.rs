@@ -956,4 +956,169 @@ mod tests {
             assert!((c.energy - expected).abs() < f32::EPSILON);
         }
     }
+
+    // ── Age-adjusted cost integration tests ───────────────────────────────
+
+    #[test]
+    fn age_noop_cost_increases_with_age() {
+        let (mut sim_young, id_young) = make_sim_one_creature(Position::new(5, 5), 100.0);
+        let energy_before_young = sim_young.creatures[id_young].energy;
+        apply_noop(
+            sim_young.creatures.get_mut(id_young).unwrap(),
+            &sim_young.config,
+        );
+        let cost_young = energy_before_young - sim_young.creatures[id_young].energy;
+
+        let (mut sim_old, id_old) = make_sim_one_creature(Position::new(5, 5), 100.0);
+        sim_old.creatures[id_old].age = 400;
+        let energy_before_old = sim_old.creatures[id_old].energy;
+        apply_noop(
+            sim_old.creatures.get_mut(id_old).unwrap(),
+            &sim_old.config,
+        );
+        let cost_old = energy_before_old - sim_old.creatures[id_old].energy;
+
+        assert!(
+            cost_old > cost_young,
+            "old creature (age=400) should pay more for noop: young={cost_young}, old={cost_old}"
+        );
+    }
+
+    #[test]
+    fn age_eat_cost_increases_with_age() {
+        let (mut sim_young, id_young) = make_sim_one_creature(Position::new(3, 3), 100.0);
+        sim_young.config.energy.costs.eat_cost = 2.0;
+        let energy_before_young = sim_young.creatures[id_young].energy;
+        {
+            let creature = sim_young.creatures.get_mut(id_young).unwrap();
+            let _ = apply_eat(creature, &mut sim_young.world, &sim_young.config);
+        }
+        let cost_young = energy_before_young - sim_young.creatures[id_young].energy;
+
+        let (mut sim_old, id_old) = make_sim_one_creature(Position::new(3, 3), 100.0);
+        sim_old.config.energy.costs.eat_cost = 2.0;
+        sim_old.creatures[id_old].age = 400;
+        let energy_before_old = sim_old.creatures[id_old].energy;
+        {
+            let creature = sim_old.creatures.get_mut(id_old).unwrap();
+            let _ = apply_eat(creature, &mut sim_old.world, &sim_old.config);
+        }
+        let cost_old = energy_before_old - sim_old.creatures[id_old].energy;
+
+        assert!(
+            cost_old > cost_young,
+            "old creature should pay more eat_cost: young={cost_young}, old={cost_old}"
+        );
+    }
+
+    #[test]
+    fn age_move_cost_increases_with_age() {
+        let (mut sim_young, id_young) = make_sim_one_creature(Position::new(5, 5), 100.0);
+        let energy_before_young = sim_young.creatures[id_young].energy;
+        {
+            let creature = sim_young.creatures.get_mut(id_young).unwrap();
+            let _ = apply_move(
+                id_young,
+                creature,
+                &mut sim_young.world,
+                Direction::N,
+                &sim_young.config,
+            );
+        }
+        let cost_young = energy_before_young - sim_young.creatures[id_young].energy;
+
+        let (mut sim_old, id_old) = make_sim_one_creature(Position::new(5, 5), 100.0);
+        sim_old.creatures[id_old].age = 400;
+        let energy_before_old = sim_old.creatures[id_old].energy;
+        {
+            let creature = sim_old.creatures.get_mut(id_old).unwrap();
+            let _ = apply_move(
+                id_old,
+                creature,
+                &mut sim_old.world,
+                Direction::N,
+                &sim_old.config,
+            );
+        }
+        let cost_old = energy_before_old - sim_old.creatures[id_old].energy;
+
+        assert!(
+            cost_old > cost_young,
+            "old creature should pay more move_cost: young={cost_young}, old={cost_old}"
+        );
+    }
+
+    #[test]
+    fn age_reproduce_cost_increases_with_age() {
+        let (mut sim_young, parent_young) = make_sim_one_creature(Position::new(5, 5), 80.0);
+        let energy_before_young = sim_young.creatures[parent_young].energy;
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
+        let _ = apply_reproduce(parent_young, &mut sim_young, Direction::N, 20.0, &mut rng);
+        let cost_young = energy_before_young - sim_young.creatures[parent_young].energy;
+
+        let (mut sim_old, parent_old) = make_sim_one_creature(Position::new(5, 5), 80.0);
+        sim_old.creatures[parent_old].age = 400;
+        let energy_before_old = sim_old.creatures[parent_old].energy;
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
+        let _ = apply_reproduce(parent_old, &mut sim_old, Direction::N, 20.0, &mut rng);
+        let cost_old = energy_before_old - sim_old.creatures[parent_old].energy;
+
+        assert!(
+            cost_old > cost_young,
+            "old creature should pay more reproduce_cost: young={cost_young}, old={cost_old}"
+        );
+    }
+
+    #[test]
+    fn age_steal_cost_increases_with_age() {
+        let victim_pos = Position::new(5, 4);
+
+        // Young attacker
+        let (mut sim_young, attacker_young) = make_sim_one_creature(Position::new(5, 5), 100.0);
+        let victim_young = sim_young.creatures.insert_with_key(|id| {
+            CreatureState::new(
+                id,
+                v3alpha1_founder_genome(),
+                victim_pos,
+                50.0,
+                0,
+                [0, 0, 92, 92, 138, 138],
+                0,
+                [true; 6],
+                CreatureIdentityState::default(),
+            )
+        });
+        sim_young.world.place_creature(victim_pos, victim_young);
+        let energy_before_young = sim_young.creatures[attacker_young].energy;
+        let _ = apply_steal_energy(attacker_young, &mut sim_young, Direction::N, 10.0);
+        let cost_young = energy_before_young - sim_young.creatures[attacker_young].energy;
+
+        // Old attacker
+        let (mut sim_old, attacker_old) = make_sim_one_creature(Position::new(5, 5), 100.0);
+        sim_old.creatures[attacker_old].age = 400;
+        let victim_old = sim_old.creatures.insert_with_key(|id| {
+            CreatureState::new(
+                id,
+                v3alpha1_founder_genome(),
+                victim_pos,
+                50.0,
+                0,
+                [0, 0, 92, 92, 138, 138],
+                0,
+                [true; 6],
+                CreatureIdentityState::default(),
+            )
+        });
+        sim_old.world.place_creature(victim_pos, victim_old);
+        let energy_before_old = sim_old.creatures[attacker_old].energy;
+        let _ = apply_steal_energy(attacker_old, &mut sim_old, Direction::N, 10.0);
+        let cost_old = energy_before_old - sim_old.creatures[attacker_old].energy;
+
+        // Both steal from victim, but old attacker's cost portion is higher.
+        // Net energy change = -cost + stolen. Cost is higher for old, so net is more negative.
+        assert!(
+            cost_old > cost_young,
+            "old attacker should have higher net cost: young={cost_young}, old={cost_old}"
+        );
+    }
 }
