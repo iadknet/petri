@@ -1,11 +1,11 @@
 ---
-name: promote-to-refinement
+name: feature-2-refine
 description: Use when a feature idea is ready to be fleshed out with problem statement, acceptance criteria, sizing, and dependencies before planning implementation.
 ---
 
-# features:promote-to-refinement
+# feature-2-refine
 
-**Announce:** "Using features:promote-to-refinement to create a structured refinement doc."
+**Announce:** "Using feature-2-refine to create a structured refinement doc."
 
 ## Overview
 
@@ -60,6 +60,6 @@ Why does this feature exist? What problem does it solve?
 
 ## Status Lifecycle
 
-`draft` (created) → `needs-review` (all fields filled) → `ready` (only set by `features:promote-to-ready`)
+`draft` (created) → `needs-review` (all fields filled) → `ready` (only set by `feature-3-plan`)
 
 Never manually set status to `ready`.

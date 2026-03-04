@@ -1,11 +1,11 @@
 ---
-name: resume-feature
+name: feature-5-resume
 description: Use when returning to a feature after a session break, or when picking up an in-progress feature that was started in a previous conversation.
 ---
 
-# features:resume-feature
+# feature-5-resume
 
-**Announce:** "Using features:resume-feature to pick up where we left off on FEATURE-NAME."
+**Announce:** "Using feature-5-resume to pick up where we left off on FEATURE-NAME."
 
 ## Overview
 

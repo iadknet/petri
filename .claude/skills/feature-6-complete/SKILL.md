@@ -1,11 +1,11 @@
 ---
-name: complete-feature
+name: feature-6-complete
 description: Use when all implementation steps in an in-progress feature's master_plan.md are checked off and the feature is ready for final quality gates.
 ---
 
-# features:complete-feature
+# feature-6-complete
 
-**Announce:** "Using features:complete-feature to run final gates and close out FEATURE-NAME."
+**Announce:** "Using feature-6-complete to run final gates and close out FEATURE-NAME."
 
 ## Overview
 

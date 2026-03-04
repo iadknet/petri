@@ -144,7 +144,7 @@ Before claiming completion, run and confirm all pass:
 
 ## Doc Touch Policy
 
-- For any non-trivial plan, follow the `features:` skill workflow and metadata/section requirements enforced by `features:promote-to-ready`.
+- For any non-trivial plan, follow the `feature-*` skill workflow and metadata/section requirements enforced by `feature-3-plan`.
 - Use `Goal IDs` from the active goals catalog in `docs/strategy/` and include explicit `Goal Alignment`, `Existing Boundary Recheck`, and `Open Questions` sections.
 - Include a `Docs Impact` section listing canonical docs touched and stale docs retired/superseded.
 - Prefer references to canonical docs over repeating the same narrative in multiple files.
