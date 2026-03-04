@@ -69,9 +69,9 @@ After completing each implementation step:
 
 - [x] **Step 3: Add defensive guards to `NodeGraph.tsx`** — Add `typeof def === "string"` guards before `"Vm" in def` and `"Graph" in backendDef` checks (lines 127, 142, 439, 445). If `def` is a string, treat it as an unknown backend type with a neutral display.
 
-- [ ] [parallel] **Step 4: Add defensive guards to `SamplerPlaybackPanel.tsx` and `MeshHopTimeline.tsx`** — Add `typeof backend_trace === "string"` guards before `"Vm" in backend_trace` / `"Graph" in backend_trace` checks. If string, show a fallback "unsupported trace type" message.
+- [x] [parallel] **Step 4: Add defensive guards to `SamplerPlaybackPanel.tsx` and `MeshHopTimeline.tsx`** — Add `typeof backend_trace === "string"` guards before `"Vm" in backend_trace` / `"Graph" in backend_trace` checks. If string, show a fallback "unsupported trace type" message.
 
-- [ ] **Step 5: Run lint, tests, and build** — `cd frontend && npm run lint && npm run test && npm run build`. Fix any issues.
+- [x] **Step 5: Run lint, tests, and build** — `cd frontend && npm run lint && npm run test && npm run build`. Fix any issues.
 
 - [ ] **Step 6: E2E validation with `agent-browser`** — Start the simulation, seed or find a creature with `ActionQueue` input refs, click to open inspector, verify it renders without errors, verify `ActionQueue` displays with amber color in node graph tooltip, check browser console for no TypeErrors.
 
