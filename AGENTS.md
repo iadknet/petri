@@ -22,7 +22,7 @@ See canonical policy set: `docs/strategy/` and `docs/reference/`.
 ## Repository Map
 
 - `v3/`: active implementation target
-- `docs/`: canonical strategy/reference/plans docs
+- `docs/`: canonical strategy/reference/features docs
 
 ## Non-Negotiable Invariants
 
@@ -77,7 +77,7 @@ a real regression — not a test maintenance issue.
 ## Required Workflow
 
 1. Read `README.md` and relevant local `AGENTS.md` before editing.
-2. For multi-step changes, write or update a plan in `docs/plans/`.
+2. For multi-step changes, use the `features:` skill workflow (see `docs/features/`).
 3. Use isolated branches/worktrees with `codex/` branch prefix.
 4. For behavior changes and bug fixes, use TDD (failing test first).
 5. For feature/checkpoint completion claims, require intent-level + integration-level regression evidence (not only contract tests).
@@ -89,9 +89,9 @@ a real regression — not a test maintenance issue.
 
 Large plans **must** be split into multiple files:
 
-- If a plan exceeds ~200 lines or covers more than one stage/checkpoint, split it.
-- Use a **main plan file** that defines scope, goals, and a high-level task outline.
-- Place detailed designs, specs, or per-stage breakdowns in **separate companion files** in the same directory.
+- If a plan exceeds ~500 lines or covers more than one major area, split it.
+- Use a **main plan file** (`master_plan.md`) that defines scope, goals, and a high-level task outline.
+- Place detailed designs, specs, or per-stage breakdowns in **separate companion files** in the same `FEATURE-NAME/` directory.
 - The main plan must include explicit `**See also:**` references linking to each companion file.
 - Companion files must include a `**Parent plan:**` back-reference to the main plan.
 - Each file (main and companion) must independently satisfy the required metadata and structure rules (Goal IDs, Goal Alignment, Boundary Impact, etc.).
@@ -101,7 +101,7 @@ Large plans **must** be split into multiple files:
 After writing or substantially revising any plan, agents **must** run a review cycle before the plan is considered ready for implementation:
 
 1. **Draft** the plan (main file + any companions).
-2. **Architecture review**: Re-read active architecture and planning docs in `docs/strategy/` and `docs/plans/` (exclude `docs/plans/archive/` unless doing historical comparison), the relevant crate/module `AGENTS.md` files, and the Non-Negotiable Invariants in this file. Verify every proposed change is consistent with existing boundaries, dependency directions, and module responsibilities. Document any tensions found.
+2. **Architecture review**: Re-read active architecture and planning docs in `docs/strategy/` and `docs/features/in_progress/` (exclude `docs/features/completed/` and `docs/features/cancelled/` unless doing historical comparison), the relevant crate/module `AGENTS.md` files, and the Non-Negotiable Invariants in this file. Verify every proposed change is consistent with existing boundaries, dependency directions, and module responsibilities. Document any tensions found.
 3. **Goal alignment review**: Re-read active strategy docs in `docs/strategy/` (including the goals catalog) and verify that the plan's Goal Alignment section accurately maps work items to goal IDs. Confirm no goal is undermined or ignored by the proposed changes.
 4. **Revise** the plan to resolve any issues found in steps 2–3.
 5. **Repeat** steps 2–4 until a clean pass (no architecture conflicts, no goal misalignment). Record the number of review cycles performed at the bottom of the plan in a `**Review cycles:** N` metadata line.
@@ -144,7 +144,7 @@ Before claiming completion, run and confirm all pass:
 
 ## Doc Touch Policy
 
-- For any non-trivial plan, follow metadata and section requirements in `docs/plans/` (template rules are maintained there).
+- For any non-trivial plan, follow the `features:` skill workflow and metadata/section requirements enforced by `features:promote-to-ready`.
 - Use `Goal IDs` from the active goals catalog in `docs/strategy/` and include explicit `Goal Alignment`, `Existing Boundary Recheck`, and `Open Questions` sections.
 - Include a `Docs Impact` section listing canonical docs touched and stale docs retired/superseded.
 - Prefer references to canonical docs over repeating the same narrative in multiple files.
@@ -157,8 +157,12 @@ Before claiming completion, run and confirm all pass:
 - Active strategy docs: `docs/strategy/`
 - Active reference specs: `docs/reference/`
 - Archived reference specs: `docs/reference/archive/`
-- Active plans: `docs/plans/`
-- Archived plans: `docs/plans/archive/`
+- Feature ideas: `docs/features/brainstorms/ideas.md`
+- Features in refinement: `docs/features/needs_refinement/`
+- Features ready to implement: `docs/features/ready_to_implement/`
+- Features in progress: `docs/features/in_progress/`
+- Completed features: `docs/features/completed/`
+- Cancelled features: `docs/features/cancelled/`
 
 ## Git Hygiene
 

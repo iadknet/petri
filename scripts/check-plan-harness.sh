@@ -314,7 +314,7 @@ check_file() {
   local file="$1"
   files_checked=$((files_checked + 1))
 
-  if [[ "$file" == docs/plans/*.md ]]; then
+  if [[ "$file" == docs/features/ready_to_implement/*/master_plan.md || "$file" == docs/features/in_progress/*/master_plan.md ]]; then
     check_plan_file_requirements "$file"
   fi
 
@@ -334,7 +334,12 @@ collect_target_files() {
     report_violation "missing required architecture doc target: docs/strategy/architecture.md"
   fi
 
-  find docs/plans -maxdepth 1 -type f -name '*.md' ! -name 'README.md' | sort >> "$FILES_TMP"
+  # Scan master_plan.md files in docs/features/ready_to_implement/ and docs/features/in_progress/
+  for stage_dir in docs/features/ready_to_implement docs/features/in_progress; do
+    if [[ -d "$stage_dir" ]]; then
+      find "$stage_dir" -mindepth 2 -maxdepth 2 -type f -name 'master_plan.md' | sort >> "$FILES_TMP"
+    fi
+  done
 }
 
 parse_goals_catalog
