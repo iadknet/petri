@@ -267,10 +267,8 @@ pub fn apply_reproduce(
         child.graph_runtime.plasticity_weights = child_plasticity;
         child
     });
-    sim.action_logs.insert(
-        child_id,
-        ActionLog::new(sim.config.action_log.capacity),
-    );
+    sim.action_logs
+        .insert(child_id, ActionLog::new(sim.config.action_log.capacity));
     sim.world.place_creature(target, child_id);
 
     sim.stats.reproduction_actions_spawned_total += 1;

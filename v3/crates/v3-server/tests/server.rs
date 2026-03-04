@@ -1226,10 +1226,7 @@ async fn get_creature_includes_action_log() {
     assert!(entry["energy_before"].is_number(), "missing energy_before");
     assert!(entry["energy_after"].is_number(), "missing energy_after");
     assert!(entry["amount"].is_number(), "missing amount");
-    assert!(
-        entry["priority_bid"].is_number(),
-        "missing priority_bid"
-    );
+    assert!(entry["priority_bid"].is_number(), "missing priority_bid");
 }
 
 // ── 29. paint_erase_barrier_clears_barrier ──────────────────────────────────
