@@ -120,9 +120,10 @@ pub fn apply_steal_energy(
             sim.creatures[attacker_id].energy = max_energy;
         }
 
-        // Remove victim from world and slotmap.
+        // Remove victim from world, slotmap, and action logs.
         sim.world.remove_creature(victim_pos);
         sim.creatures.remove(victim_id);
+        sim.action_logs.remove(victim_id);
 
         sim.stats.predation_kills_total += 1;
         sim.stats.last_tick_predation_kills += 1;
@@ -226,6 +227,7 @@ mod tests {
         let sim = Simulation {
             world,
             creatures,
+            action_logs: slotmap::SecondaryMap::new(),
             tick: 0,
             config: cfg,
             stats: crate::simulation::stats::SimStats::default(),
@@ -263,6 +265,7 @@ mod tests {
         let sim = Simulation {
             world,
             creatures,
+            action_logs: slotmap::SecondaryMap::new(),
             tick: 0,
             config: cfg,
             stats: crate::simulation::stats::SimStats::default(),

@@ -1166,6 +1166,69 @@ async fn get_creature_on_idle_state_works() {
     assert_eq!(body["id"].as_u64(), Some(creature_id));
 }
 
+// ── 28b. get_creature_includes_action_log ─────────────────────────────────
+
+#[tokio::test]
+async fn get_creature_includes_action_log() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":42}"#))
+        .await
+        .unwrap();
+    a.clone()
+        .oneshot(post_req("/v3/simulation/start"))
+        .await
+        .unwrap();
+    a.clone()
+        .oneshot(post_req("/v3/simulation/pause"))
+        .await
+        .unwrap();
+
+    // Run one tick so creatures have action log entries.
+    let (status, _) = do_request(
+        a.clone(),
+        post_json("/v3/simulation/step", r#"{"steps":1}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Get a creature ID from snapshot.
+    let (_, snapshot_body) = do_request(
+        a.clone(),
+        get_req("/v3/simulation/snapshot?zoom_tier=detail"),
+    )
+    .await;
+    let creatures = snapshot_body["view"]["creatures"]
+        .as_array()
+        .expect("creatures array");
+    assert!(!creatures.is_empty());
+    let creature_id = creatures[0]["id"].as_u64().unwrap();
+
+    let uri = format!("/v3/simulation/creature/{creature_id}");
+    let (status, body) = do_request(a, get_req(&uri)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+
+    // action_log must be an array.
+    let action_log = body["action_log"]
+        .as_array()
+        .expect("action_log should be an array");
+    assert!(
+        !action_log.is_empty(),
+        "action_log should have entries after one tick"
+    );
+
+    // Verify entry structure.
+    let entry = &action_log[0];
+    assert!(entry["tick"].is_number(), "missing tick");
+    assert!(entry["action_type"].is_string(), "missing action_type");
+    assert!(entry["result"].is_string(), "missing result");
+    assert!(entry["direction"].is_number(), "missing direction");
+    assert!(entry["energy_before"].is_number(), "missing energy_before");
+    assert!(entry["energy_after"].is_number(), "missing energy_after");
+    assert!(entry["amount"].is_number(), "missing amount");
+    assert!(entry["priority_bid"].is_number(), "missing priority_bid");
+}
+
 // ── 29. paint_erase_barrier_clears_barrier ──────────────────────────────────
 
 #[tokio::test]

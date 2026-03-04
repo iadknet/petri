@@ -351,6 +351,20 @@ impl Default for MutationConfig {
     }
 }
 
+/// Action log configuration.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ActionLogConfig {
+    /// Maximum entries per creature. Default: 500.
+    pub capacity: usize,
+}
+
+impl Default for ActionLogConfig {
+    fn default() -> Self {
+        Self { capacity: 500 }
+    }
+}
+
 /// Predation config for the StealEnergy action.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -401,6 +415,8 @@ pub struct SimulationConfig {
     pub population: PopulationConfig,
     #[serde(default)]
     pub predation: PredationConfig,
+    #[serde(default)]
+    pub action_log: ActionLogConfig,
 }
 
 impl SimulationConfig {
@@ -496,6 +512,10 @@ impl SimulationConfig {
         }
         ph.channel_change_chance = ph.channel_change_chance.clamp(0.0, 1.0);
         ph.polarity_flip_chance = ph.polarity_flip_chance.clamp(0.0, 1.0);
+
+        if self.action_log.capacity < 1 {
+            self.action_log.capacity = 500;
+        }
 
         let pred = &mut self.predation;
         pred.steal_cost_rate = normalize_f32_clamp(pred.steal_cost_rate, 0.0, 1.0, 0.2);
