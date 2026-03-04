@@ -2,8 +2,6 @@
 
 ## Bug Fixes
 
-- Fix creature inspector. Creature inspector breaks when creatures use newer attributes.
-
 ## Core Simulation
 
 
@@ -60,6 +58,13 @@ Each needs sub-configuration (spacing, density, etc.). Tool allows drawing a box
 In the startup config, add a section for configuring initial barrier topology. Way to "add" features (mazes, open spaces, noise) with size/configuration. Algorithm needs to handle competing spatial requirements proportionally.
 
 ## Frontend & UI
+
+### Death statistics and lifespan reporting
+Capture and report on creature death statistics. Track causes of death (starvation, predation, etc.) and report aggregate lifespan statistics — mean, median, min, max age at death across the population and over time. Include age-at-death distributions.
+
+Brainstorm how to distinguish "old age" deaths from regular starvation. Currently creatures that die old likely just run out of energy, but it would be valuable to identify whether a creature lived a "full life" vs dying young. Possible approaches: track age relative to some expected lifespan threshold, flag deaths where age exceeds a configurable percentile, or introduce an explicit aging/senescence mechanic that makes old age a distinct death cause.
+
+Surface as a stats panel with historical trends.
 
 ### General statistics and observability improvements
 - Brainstorm other metrics and observability opportunities
@@ -196,3 +201,7 @@ The Grand Unified Architecture — mapping biological intelligence to CPU-optimi
 | NeuralMatrix | Prefrontal Cortex | Dense FF / RNN | Mix inputs, apply fuzzy logic, learn |
 | Neuromodulator | Endocrine System | FiLM / Hypernetwork | Global state shifts |
 | SpikingAccumulator | Action Potentials | Integrate-and-Fire | Halt execution to save energy |
+
+## Promoted
+
+- **Fix creature inspector** → `docs/features/needs_refinement/fix-creature-inspector.md`
