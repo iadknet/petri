@@ -8,6 +8,7 @@ export function formatAction(action: WorldAction): string {
 }
 
 export function formatInputRef(ref: InputReference): string {
+	if (typeof ref === "string") return ref;
 	if ("World" in ref) {
 		const w = ref.World;
 		if (typeof w === "string") return w;
@@ -23,6 +24,7 @@ export function formatInputRef(ref: InputReference): string {
 }
 
 export function inputRefColor(ref: InputReference): string {
+	if (typeof ref === "string") return ref === "ActionQueue" ? "#f59e0b" : "#94a3b8";
 	if ("World" in ref) return "#34d399"; // green
 	if ("StaticIntrospection" in ref || "DynamicIntrospection" in ref) return "#60a5fa"; // blue
 	return "#94a3b8"; // gray for upstream
