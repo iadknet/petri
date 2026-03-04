@@ -1,5 +1,9 @@
 import { Section } from "../shared/Section.tsx";
 import type { BooleanFieldDef, FieldDef, RuntimePanelProps } from "../shared/types.ts";
+import {
+	COMPLEXITY_COST_ALL_FIELDS,
+	ComplexityEnergyCostFieldGroup,
+} from "./ComplexityEnergyCostSection.tsx";
 import { ENERGY_COSTS_FIELDS } from "./EnergyCostsSection.tsx";
 import { ENERGY_LIFECYCLE_FIELDS } from "./EnergyLifecycleSection.tsx";
 import { FOOD_PARAMETERS_FIELDS } from "./FoodParametersSection.tsx";
@@ -13,6 +17,7 @@ export const RUNTIME_PATCH_FIELDS: (FieldDef | BooleanFieldDef)[] = [
 	...POPULATION_FIELDS,
 	...ENERGY_LIFECYCLE_FIELDS,
 	...ENERGY_COSTS_FIELDS,
+	...COMPLEXITY_COST_ALL_FIELDS,
 	...RUNTIME_FIELDS,
 	...MUTATION_ALL_FIELDS,
 ];
@@ -70,6 +75,12 @@ export function RuntimeConfigPanel({
 					<RuntimeFieldGroup
 						title="Energy > Costs"
 						fields={ENERGY_COSTS_FIELDS}
+						localDraft={localDraft}
+						serverConfig={serverConfig}
+						simState={simState}
+						updateDraft={updateDraft}
+					/>
+					<ComplexityEnergyCostFieldGroup
 						localDraft={localDraft}
 						serverConfig={serverConfig}
 						simState={simState}
