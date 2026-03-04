@@ -1,0 +1,152 @@
+**Goal:** Add per-creature action log ring buffer with rich metadata, exposed via server API for creature inspection.
+**Goal IDs:** GP-04, GP-02
+**Scope:** v3-core (action log struct, ring buffer, tick integration) and v3-server (API endpoint). No frontend changes.
+**Docs Impact:** `docs/reference/v3-evolution-observability-spec.md` (add action log section)
+**Supersedes:** none
+**Superseded-By:** none
+
+## Goal Alignment
+
+- **GP-04** (Keep Behavior Observable): The action log is a direct observability feature — it records per-creature action history with rich metadata (result, energy delta, direction, amounts) for debugging and behavioral analysis.
+- **GP-02** (Maintain Clean Architecture Boundaries): The log struct lives in `v3-core::creature`, recording happens in `v3-core::simulation::tick` (the action execution owner), and the API surface lives in `v3-server::handlers`. No boundary violations.
+
+## Boundary Impact
+
+- **v3-core::creature**: New `ActionLog` and `ActionLogEntry` types added to creature module. New field on `CreatureState`.
+- **v3-core::simulation::tick**: Phase 2 action execution records entries after each action — tick owns action application, so it owns log recording.
+- **v3-core::config**: New `ActionLogConfig` with `capacity` field added to `SimulationConfig`.
+- **v3-server::handlers**: New or extended creature endpoint returns action log data for selected creature.
+- **No changes** to: kernel, sensors, runtime, contracts, mutation modules.
+
+## Existing Boundary Recheck
+
+| Area | Decision | Rationale |
+|------|----------|-----------|
+| `v3-core::creature` | keep | CreatureState is the canonical owner of per-creature runtime state. Action log is runtime state, not inherited on reproduction. New types added within existing boundary. |
+| `v3-core::simulation::tick` | keep | Tick Phase 2 owns action execution and outcome recording. Log recording is a natural extension of the existing `outcome_acc.record_action_result()` pattern. |
+| `v3-core::contracts` | keep | WorldAction and result enums already exist. ActionLogEntry references them by value, not by adding to contracts. |
+| `v3-server::handlers::creature` | keep | Existing `get_creature` endpoint returns per-creature detail. Action log is added to this response within existing boundary. |
+
+## Open Questions
+
+| Question | Decision | Owner | Status |
+|----------|----------|-------|--------|
+| Default ring buffer capacity? | 500 entries (not ticks — a creature with 3 actions/tick fills faster). Configurable via `ActionLogConfig.capacity`. | agent | resolved |
+| Fixed struct or generic/extensible? | Fixed struct `ActionLogEntry`. The action set is known and stable. If actions are added later, the struct is extended then. | agent | resolved |
+| Log NoOp actions? | Yes. NoOps show "idle" patterns and are cheap to store. | agent | resolved |
+| Interaction with outcome/reward system? | Independent. OutcomeRecord is computed separately for plasticity. The log is purely observational. | agent | resolved |
+| Per-action or per-tick granularity? | Per-action. Multiple actions per tick are stored as separate entries, each with the tick number. | agent | resolved |
+| Reproduction inheritance semantics? | Not inherited. Action log is reset (empty) for newborns, like `eligibility_traces`. A creature's log records only its own lifetime. | agent | resolved |
+| Ring buffer implementation? | `VecDeque<ActionLogEntry>` with manual cap enforcement (pop_front when at capacity). Simple, no external deps, cache-friendly. | agent | resolved |
+| ActionLogEntry size? | Target ≤32 bytes. Use `u8` for action type and result code, `u16` for direction, `f32` for energy/amounts. Assert size with `mem-assert-type-size`. | agent | resolved |
+
+## Required Skills
+
+- Rust/backend changes: invoke `rust-skills` BEFORE writing any Rust code and before each review
+
+## TDD Policy
+
+For all behavior changes and bug fixes: write a failing test FIRST, then implement.
+A step is not complete until:
+1. The failing test exists and is committed
+2. The implementation makes it pass
+3. No existing tests regress
+
+## Code Review Policy
+
+After completing each implementation step:
+1. Run a thorough code review (backend: `rust-skills`)
+2. Fix ALL findings
+3. Run review AGAIN — repeat until no new findings (clean recursive pass)
+4. Only after clean pass: commit the step
+
+## Commit Policy
+
+- Commits happen AFTER a clean code review pass, never before
+- One commit per implementation step (focused, atomic)
+- Do NOT advance to the next step until current step is committed and reviewed clean
+
+## Design
+
+### ActionLogEntry struct
+
+```rust
+/// Single action record in a creature's action log.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ActionLogEntry {
+    /// Simulation tick when this action was executed.
+    pub tick: u64,
+    /// Action type discriminant (0=NoOp, 1=Eat, 2=Move, 3=Reproduce, 4=StealEnergy).
+    pub action_type: u8,
+    /// Result code. Meaning depends on action_type:
+    /// - NoOp: 0=ok
+    /// - Eat: 0=consumed, 1=no_food
+    /// - Move: 0=moved, 1=blocked
+    /// - Reproduce: 0=spawned, 1=invalid_target, 2=energy, 3=pop_cap
+    /// - StealEnergy: 0=transferred, 1=transferred_and_killed, 2=no_victim
+    pub result_code: u8,
+    /// Direction parameter (0-7 for cardinal+diagonal, 255=N/A).
+    pub direction: u8,
+    /// Creature energy BEFORE this action was applied.
+    pub energy_before: f32,
+    /// Creature energy AFTER this action was applied (includes costs and penalties).
+    pub energy_after: f32,
+    /// Action-specific amount:
+    /// - Eat: food consumed
+    /// - Reproduce: energy transferred to offspring
+    /// - StealEnergy: energy actually stolen
+    /// - Move/NoOp: 0.0
+    pub amount: f32,
+    /// Priority bid value for this tick (same for all actions in a tick).
+    pub priority_bid: f32,
+}
+```
+
+Size: 4×f32 (16) + u64 (8) + 3×u8 (3) + padding = 28-32 bytes. Will assert with compile-time check.
+
+### ActionLog struct
+
+```rust
+/// Ring-buffer action log for a single creature.
+pub struct ActionLog {
+    entries: VecDeque<ActionLogEntry>,
+    capacity: usize,
+}
+```
+
+Methods: `new(capacity)`, `push(entry)` (auto-evicts oldest), `entries() -> &VecDeque<ActionLogEntry>`, `len()`, `is_empty()`.
+
+### Config
+
+```rust
+/// Action log configuration.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct ActionLogConfig {
+    /// Maximum entries per creature. Default: 500.
+    pub capacity: usize,
+}
+```
+
+Added to `SimulationConfig` as `pub action_log: ActionLogConfig` with `#[serde(default)]`.
+
+### Recording in tick.rs
+
+In Phase 2, after each action is applied and outcome recorded, build an `ActionLogEntry` and push it to the creature's action log. The `energy_before` is captured before calling `apply_*`, and `energy_after` is read after (including penalty). The `priority_bid` is available from the `MeshOutput`.
+
+### Server API
+
+Extend `get_creature` response with an `"action_log"` field containing the serialized entries array. The entry struct gets `serde::Serialize` for JSON transport.
+
+## Implementation Steps
+
+- [ ] Step 1: Define `ActionLogEntry` and `ActionLog` types in new file `v3/crates/v3-core/src/creature/action_log.rs`. Include compile-time size assertion. Write unit tests for ring buffer behavior (push, eviction, capacity).
+- [ ] Step 2: Add `ActionLogConfig` to `v3/crates/v3-core/src/config/simulation.rs` with default. Add `action_log: ActionLog` field to `CreatureState`. Update `CreatureState::new()` to accept capacity and initialize empty log. Update all call sites (seeding, reproduction, test fixtures).
+- [ ] Step 3: Record action log entries in `tick.rs` Phase 2. For each action branch, capture `energy_before`, execute action, capture `energy_after` (including penalty), build `ActionLogEntry`, push to creature's log. Write integration test: run a tick, verify creature has log entries with correct action types and energy deltas.
+- [ ] Step 4: Add `serde::Serialize` to `ActionLogEntry`. Extend `get_creature` handler in `v3-server` to include `action_log` field in JSON response. Write server test verifying the endpoint returns action log data.
+- [ ] Review Gate: Interim code review — review Steps 1-4 changes. Invoke `rust-skills`. Fix findings, re-review until clean.
+- [ ] Step 5: Run viability tests (`cargo test -p v3-core --test viability`) and full workspace tests. Fix any regressions.
+- [ ] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke `rust-skills`. Fix all findings. Re-review until clean pass.
+- [ ] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
+- [ ] Completion gate — run all checks from AGENTS.md Completion Gate section
+
+**Review cycles:** 1 (clean pass — no architecture conflicts, no goal misalignment, no boundary violations)

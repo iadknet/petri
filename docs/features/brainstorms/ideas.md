@@ -5,13 +5,6 @@
 ## Core Simulation
 
 
-### Creature action log
-Each creature maintains a log of all its actions and action metadata. Needs detail on storage limits (set cap on ticks?), what metadata to track, and UI surface.
-
-I'm imagining a timeline color-coded bar for showing the actions the creature took over its lifetime.
-Indicator, maybe a thin read line at top of action when it failed.
-Some way of displaying/inspecting individual action metadata.
-
 ### Communication
 - Creature can modify metadata fields about itself that are visible to other creatures that "see" it.
 - Creature can write to communication channels:
@@ -223,3 +216,5 @@ The Grand Unified Architecture — mapping biological intelligence to CPU-optimi
 - **Fix creature inspector** → `docs/features/needs_refinement/fix-creature-inspector.md`
 - **Reconcile config panel** → `docs/features/needs_refinement/reconcile-config-panel.md`
 - **Fix passive event listener warnings** → `docs/features/needs_refinement/fix-passive-event-listeners.md`
+- **Creature action log** → `docs/features/needs_refinement/creature-action-log.md`
+- **Creature action timeline** → `docs/features/needs_refinement/creature-action-timeline.md`
