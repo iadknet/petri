@@ -25,6 +25,11 @@ pub async fn get_creature(
 
     let rgb = channels_to_rgb(creature.phenotype_channels);
     let memory: &[u8] = &creature.memory;
+    let action_log: Vec<_> = sim
+        .action_logs
+        .get(creature_id)
+        .map(|log| log.entries().iter().collect())
+        .unwrap_or_default();
 
     Ok(Json(serde_json::json!({
         "protocol_version": PROTOCOL_VERSION,
@@ -43,6 +48,7 @@ pub async fn get_creature(
         },
         "genome": creature.genome,
         "memory": memory,
+        "action_log": action_log,
     })))
 }
 
