@@ -14,6 +14,12 @@ impl ComplexityEffect {
     pub const fn is_increasing(self) -> bool {
         matches!(self, Self::Increasing)
     }
+
+    /// Returns true if this effect is `Decreasing`.
+    #[must_use]
+    pub const fn is_decreasing(self) -> bool {
+        matches!(self, Self::Decreasing)
+    }
 }
 
 /// The two architectural layers of genome mutation.
@@ -467,6 +473,13 @@ mod tests {
     fn zero_summary_accounting_invariant() {
         let s = MutationSummary::zero();
         assert_eq!(s.attempted_events, s.applied_events + s.skipped_events);
+    }
+
+    #[test]
+    fn is_decreasing_returns_true_only_for_decreasing() {
+        assert!(!ComplexityEffect::Increasing.is_decreasing());
+        assert!(ComplexityEffect::Decreasing.is_decreasing());
+        assert!(!ComplexityEffect::Neutral.is_decreasing());
     }
 
     #[test]
