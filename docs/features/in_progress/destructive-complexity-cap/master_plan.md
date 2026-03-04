@@ -71,11 +71,11 @@ After completing each implementation step:
 
 ## Implementation Steps
 
-- [ ] Step 1: Add `is_decreasing()` helper to `ComplexityEffect` in `types.rs`
+- [x] Step 1: Add `is_decreasing()` helper to `ComplexityEffect` in `types.rs`
   - Add `pub const fn is_decreasing(self) -> bool` to `ComplexityEffect` impl block
   - Add unit test verifying `is_decreasing()` returns true only for `Decreasing`
 
-- [ ] Step 2: Add `random_decreasing()` to all four domain operator enums
+- [x] Step 2: Add `random_decreasing()` to all four domain operator enums
   - In each of `TopologyOperator`, `VmOperator`, `GraphOperator`, `InputRefOperator`:
     - Add `DECREASING_WEIGHT` compile-time const (sum of weights for Decreasing-only operators)
     - Add `pub fn random_decreasing(rng) -> Option<Self>` that filters to `ComplexityEffect::Decreasing` only
@@ -84,7 +84,7 @@ After completing each implementation step:
     - `random_decreasing` returns `None` for VM domain (0 Decreasing operators)
     - `random_decreasing` covers all Decreasing operators for Topology, Graph, InputRef over enough seeds
 
-- [ ] Step 3: Change engine restricted branches to use `random_decreasing()` with skip fallback
+- [x] Step 3: Change engine restricted branches to use `random_decreasing()` with skip fallback
   - In `engine/mod.rs`, for each domain's restricted branch:
     - Replace `XOperator::random_non_increasing(rng).unwrap_or_else(|| XOperator::random(rng))` with:
       - Call `XOperator::random_decreasing(rng)`

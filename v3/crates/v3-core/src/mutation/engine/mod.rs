@@ -63,8 +63,7 @@ impl MutationEngine {
             // Two-layer dispatch: mesh (Topology) vs node-internal (VM/Graph/InputRef).
             let (domain, operator, result) = if rng.gen_bool(config.mesh_layer_probability) {
                 // Layer 1: Mesh (Topology)
-                let op =
-                    select_operator!(TopologyOperator, MutationDomain::Topology, summary, rng);
+                let op = select_operator!(TopologyOperator, MutationDomain::Topology, summary, rng);
                 (
                     MutationDomain::Topology,
                     topology_operator_key(op),
