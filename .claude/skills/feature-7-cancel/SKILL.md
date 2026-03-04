@@ -35,6 +35,7 @@ Works from any stage. Prompts for cancellation reason, adds a note to the file/d
    - Single file stages (`needs_refinement`): move file to `docs/features/cancelled/FEATURE-NAME.md`
    - Directory stages (`ready_to_implement`, `in_progress`): move directory to `docs/features/cancelled/FEATURE-NAME/`
    - Ideas in `brainstorms/ideas.md`: add a strikethrough or "(cancelled)" annotation inline; no file to move.
+   - **Maintain .gitkeep** in any source directory that is now empty so git continues to track it.
 
 5. **Commit** the move with message: `"chore: cancel FEATURE-NAME — [brief reason]"`
 
