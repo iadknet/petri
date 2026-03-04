@@ -1,11 +1,11 @@
 ---
-name: start-implementation
+name: feature-4-implement
 description: Use when a feature has a validated master_plan.md in ready_to_implement/ and you are ready to begin coding in a worktree.
 ---
 
-# features:start-implementation
+# feature-4-implement
 
-**Announce:** "Using features:start-implementation to begin implementing FEATURE-NAME."
+**Announce:** "Using feature-4-implement to begin implementing FEATURE-NAME."
 
 ## Overview
 

@@ -12,14 +12,14 @@ The plans system has moved to the unified feature lifecycle hierarchy.
 
 ## Skills
 
-Use the `features:` skills to move features through the workflow:
-- `features:capture-idea` — add an idea to brainstorms
-- `features:promote-to-refinement` — create a structured refinement doc
-- `features:promote-to-ready` — create a full master_plan.md
-- `features:start-implementation` — move to in_progress and begin
-- `features:resume-feature` — resume an in-progress feature
-- `features:complete-feature` — finalize and move to completed
-- `features:cancel-feature` — cancel from any stage
+Use the `feature-*` skills to move features through the workflow:
+- `feature-1-capture` — add an idea to brainstorms
+- `feature-2-refine` — create a structured refinement doc
+- `feature-3-plan` — create a full master_plan.md
+- `feature-4-implement` — move to in_progress and begin
+- `feature-5-resume` — resume an in-progress feature
+- `feature-6-complete` — finalize and move to completed
+- `feature-7-cancel` — cancel from any stage
 
 ## Plan Harness
 

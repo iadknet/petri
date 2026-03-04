@@ -1,11 +1,11 @@
 ---
-name: cancel-feature
+name: feature-7-cancel
 description: Use when a feature at any lifecycle stage needs to be abandoned, deprioritized, or marked as no longer relevant.
 ---
 
-# features:cancel-feature
+# feature-7-cancel
 
-**Announce:** "Using features:cancel-feature to cancel FEATURE-NAME."
+**Announce:** "Using feature-7-cancel to cancel FEATURE-NAME."
 
 ## Overview
 

@@ -1,11 +1,11 @@
 ---
-name: promote-to-ready
+name: feature-3-plan
 description: Use when a needs_refinement feature has its problem statement, acceptance criteria, and sizing complete, and is ready for full architectural review and implementation planning.
 ---
 
-# features:promote-to-ready
+# feature-3-plan
 
-**Announce:** "Using features:promote-to-ready to run architectural review and create the implementation plan."
+**Announce:** "Using feature-3-plan to run architectural review and create the implementation plan."
 
 ## Overview
 

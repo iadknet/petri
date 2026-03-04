@@ -1,11 +1,11 @@
 ---
-name: capture-idea
+name: feature-1-capture
 description: Use when a new feature idea surfaces during conversation or implementation work and should be recorded for future consideration.
 ---
 
-# features:capture-idea
+# feature-1-capture
 
-**Announce:** "Using features:capture-idea to record this idea."
+**Announce:** "Using feature-1-capture to record this idea."
 
 ## Overview
 
