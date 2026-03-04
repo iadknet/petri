@@ -196,6 +196,17 @@ pub struct EnergyConfig {
     pub age_cost: AgeEnergyCostConfig,
 }
 
+impl EnergyConfig {
+    /// Combined multiplier for all action energy costs.
+    ///
+    /// Composes complexity-based and age-based multipliers multiplicatively.
+    #[inline]
+    #[must_use]
+    pub fn action_cost_multiplier(&self, complexity: u32, age: u64) -> f32 {
+        self.complexity_cost.multiplier(complexity) * self.age_cost.multiplier(age)
+    }
+}
+
 /// VM runtime config. Canonical owner: v3-runtime-config-spec.md Section 2.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -1059,5 +1070,26 @@ mod tests {
             max_multiplier: 10.0,
         };
         assert!((ac.multiplier(100) - 1.0).abs() < f32::EPSILON);
+    }
+
+    // ── EnergyConfig::action_cost_multiplier tests ────────────────────────
+
+    #[test]
+    fn action_cost_multiplier_composes_complexity_and_age() {
+        let ec = EnergyConfig::default();
+        // complexity=200, age=250
+        // complexity_mult = 1.0 + (200-50)*0.002 = 1.3
+        // age_mult = 1.0 + 9.0 * 0.25 = 3.25
+        // combined = 1.3 * 3.25 = 4.225
+        let mult = ec.action_cost_multiplier(200, 250);
+        assert!((mult - 4.225).abs() < 1e-3);
+    }
+
+    #[test]
+    fn action_cost_multiplier_baseline_returns_one() {
+        let ec = EnergyConfig::default();
+        // complexity=0 (below threshold), age=0 → both return 1.0
+        let mult = ec.action_cost_multiplier(0, 0);
+        assert!((mult - 1.0).abs() < f32::EPSILON);
     }
 }
