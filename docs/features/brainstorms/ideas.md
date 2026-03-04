@@ -2,10 +2,6 @@
 
 ## Bug Fixes
 
-### Passive event listener preventDefault warnings
-
-Console spams "Unable to preventDefault inside passive event listener invocation" repeatedly. Likely a touch or wheel event handler on the canvas/map component calling `preventDefault()` on an event that the browser registers as passive by default. Fix by either adding `{ passive: false }` to the event listener registration, or restructuring the handler to avoid calling `preventDefault()` where it's not needed. Investigate which component(s) trigger this — stack trace points through minified bundle but likely originates in a Pixi.js or custom canvas interaction handler.
-
 ## Core Simulation
 
 
