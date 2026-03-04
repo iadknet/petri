@@ -151,9 +151,10 @@ export function WorldViewport() {
 		return () => window.removeEventListener("keydown", handleKeyDown);
 	}, [setCamera]);
 
-	// Mouse wheel zoom
+	// Mouse wheel zoom — attached as native listener with { passive: false }
+	// so preventDefault() works (React registers wheel listeners as passive)
 	const handleWheel = useCallback(
-		(e: React.WheelEvent) => {
+		(e: WheelEvent) => {
 			e.preventDefault();
 			const renderer = rendererRef.current;
 			if (!renderer) return;
@@ -163,6 +164,13 @@ export function WorldViewport() {
 		},
 		[setCamera],
 	);
+
+	useEffect(() => {
+		const canvas = canvasRef.current;
+		if (!canvas) return;
+		canvas.addEventListener("wheel", handleWheel, { passive: false });
+		return () => canvas.removeEventListener("wheel", handleWheel);
+	}, [handleWheel]);
 
 	// Pan: mouse down
 	const handleMouseDown = useCallback(
@@ -301,7 +309,6 @@ export function WorldViewport() {
 				ref={canvasRef}
 				data-testid="world-canvas"
 				className={`absolute inset-0 ${paintMode ? "cursor-none" : "cursor-crosshair"}`}
-				onWheel={handleWheel}
 				onMouseDown={handleMouseDown}
 				onMouseMove={handleMouseMove}
 				onMouseUp={handleMouseUp}
