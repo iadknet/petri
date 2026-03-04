@@ -196,13 +196,3 @@ The Grand Unified Architecture — mapping biological intelligence to CPU-optimi
 | NeuralMatrix | Prefrontal Cortex | Dense FF / RNN | Mix inputs, apply fuzzy logic, learn |
 | Neuromodulator | Endocrine System | FiLM / Hypernetwork | Global state shifts |
 | SpikingAccumulator | Action Potentials | Integrate-and-Fire | Halt execution to save energy |
-
-## Promoted
-
-The following ideas have been promoted to `docs/features/needs_refinement/`:
-
-- **Storage slots** → `needs_refinement/storage-slots.md`
-- **Age energy cost** → `needs_refinement/age-energy-cost.md`
-- **Refactor movement** → `needs_refinement/refactor-movement.md`
-- **Complexity energy cost** → `needs_refinement/complexity-energy-cost.md`
-- **Destructive-only complexity cap** → `needs_refinement/destructive-complexity-cap.md`
