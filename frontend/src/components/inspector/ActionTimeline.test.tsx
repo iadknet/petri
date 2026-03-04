@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { render, screen } from "@testing-library/react";
-import { ActionTimeline } from "./ActionTimeline.tsx";
+import { fireEvent, render, screen } from "@testing-library/react";
+import { ActionTimeline, directionLabel } from "./ActionTimeline.tsx";
 import { ActionType, ActionResult } from "../../types/action-log.ts";
 import type { ActionLogEntry } from "../../types/action-log.ts";
 
@@ -106,5 +106,85 @@ describe("ActionTimeline", () => {
 		const seg = container.querySelector("[title]") as HTMLElement;
 		expect(seg.style.width).toBe("6px");
 		expect(seg.style.minWidth).toBe("6px");
+	});
+});
+
+describe("ActionDetail", () => {
+	it("shows detail panel when a segment is clicked", () => {
+		const entry = makeEntry({
+			tick: 42,
+			action_type: ActionType.Eat,
+			result: ActionResult.Success,
+			direction: 3,
+			energy_before: 100,
+			energy_after: 110,
+			amount: 10,
+			priority_bid: 0.75,
+		});
+		const { container } = render(<ActionTimeline actionLog={[entry]} maxEnergy={200} />);
+		const seg = container.querySelector("[title]") as HTMLElement;
+		fireEvent.click(seg);
+		const detail = screen.getByTestId("action-detail");
+		expect(detail).toBeDefined();
+		expect(detail.textContent).toContain("42");
+		expect(detail.textContent).toContain("Eat");
+		expect(detail.textContent).toContain("Success");
+		expect(detail.textContent).toContain("SE");
+		expect(detail.textContent).toContain("100.0");
+		expect(detail.textContent).toContain("110.0");
+		expect(detail.textContent).toContain("+10.0");
+		expect(detail.textContent).toContain("10.0");
+		expect(detail.textContent).toContain("0.75");
+	});
+
+	it("hides detail panel when same segment is clicked again", () => {
+		const { container } = render(
+			<ActionTimeline actionLog={[makeEntry()]} maxEnergy={200} />,
+		);
+		const seg = container.querySelector("[title]") as HTMLElement;
+		fireEvent.click(seg);
+		expect(screen.getByTestId("action-detail")).toBeDefined();
+		fireEvent.click(seg);
+		expect(screen.queryByTestId("action-detail")).toBeNull();
+	});
+
+	it("hides amount row when amount is zero", () => {
+		const { container } = render(
+			<ActionTimeline actionLog={[makeEntry({ amount: 0 })]} maxEnergy={200} />,
+		);
+		const seg = container.querySelector("[title]") as HTMLElement;
+		fireEvent.click(seg);
+		const detail = screen.getByTestId("action-detail");
+		expect(detail.textContent).not.toContain("Amount");
+	});
+
+	it("shows negative energy delta in red", () => {
+		const entry = makeEntry({ energy_before: 100, energy_after: 90 });
+		const { container } = render(<ActionTimeline actionLog={[entry]} maxEnergy={200} />);
+		const seg = container.querySelector("[title]") as HTMLElement;
+		fireEvent.click(seg);
+		const detail = screen.getByTestId("action-detail");
+		expect(detail.textContent).toContain("-10.0");
+	});
+});
+
+describe("directionLabel", () => {
+	it("maps 0-7 to compass directions", () => {
+		expect(directionLabel(0)).toBe("N");
+		expect(directionLabel(1)).toBe("NE");
+		expect(directionLabel(2)).toBe("E");
+		expect(directionLabel(3)).toBe("SE");
+		expect(directionLabel(4)).toBe("S");
+		expect(directionLabel(5)).toBe("SW");
+		expect(directionLabel(6)).toBe("W");
+		expect(directionLabel(7)).toBe("NW");
+	});
+
+	it("returns N/A for 255", () => {
+		expect(directionLabel(255)).toBe("N/A");
+	});
+
+	it("returns number string for unknown values", () => {
+		expect(directionLabel(99)).toBe("99");
 	});
 });
