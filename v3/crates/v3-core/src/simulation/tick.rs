@@ -316,8 +316,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                             let mult = sim
                                 .config
                                 .energy
-                                .complexity_cost
-                                .multiplier(creature.genome.complexity());
+                                .action_cost_multiplier(creature.genome.complexity(), creature.age);
                             creature.energy -= sim.config.energy.costs.failed_action_penalty * mult;
                         }
                     }
@@ -331,8 +330,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                             let mult = sim
                                 .config
                                 .energy
-                                .complexity_cost
-                                .multiplier(creature.genome.complexity());
+                                .action_cost_multiplier(creature.genome.complexity(), creature.age);
                             creature.energy -= sim.config.energy.costs.failed_action_penalty * mult;
                         }
                     }
@@ -355,8 +353,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                             let mult = sim
                                 .config
                                 .energy
-                                .complexity_cost
-                                .multiplier(creature.genome.complexity());
+                                .action_cost_multiplier(creature.genome.complexity(), creature.age);
                             creature.energy -= sim.config.energy.costs.failed_action_penalty * mult;
                         }
                     }
@@ -385,8 +382,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                             let mult = sim
                                 .config
                                 .energy
-                                .complexity_cost
-                                .multiplier(creature.genome.complexity());
+                                .action_cost_multiplier(creature.genome.complexity(), creature.age);
                             creature.energy -= sim.config.energy.costs.failed_action_penalty * mult;
                         }
                     }

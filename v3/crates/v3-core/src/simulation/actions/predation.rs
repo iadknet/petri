@@ -58,13 +58,12 @@ pub fn apply_steal_energy(
     sim.stats.predation_actions_attempted_total += 1;
     sim.stats.last_tick_steal += 1;
 
-    // Step 2: Deduct cost (based on attempted amount, not actual; scaled by genome complexity).
-    let complexity_mult = sim
-        .config
-        .energy
-        .complexity_cost
-        .multiplier(sim.creatures[attacker_id].genome.complexity());
-    let cost = sim.config.predation.steal_cost_rate * requested_amount * complexity_mult;
+    // Step 2: Deduct cost (based on attempted amount, not actual; scaled by genome complexity and age).
+    let mult = sim.config.energy.action_cost_multiplier(
+        sim.creatures[attacker_id].genome.complexity(),
+        sim.creatures[attacker_id].age,
+    );
+    let cost = sim.config.predation.steal_cost_rate * requested_amount * mult;
     sim.creatures[attacker_id].energy -= cost;
 
     // Step 3: Resolve target cell.

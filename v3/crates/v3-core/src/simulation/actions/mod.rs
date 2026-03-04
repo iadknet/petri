@@ -11,12 +11,11 @@ use crate::kernel::WorldState;
 
 // ─── Action application functions ─────────────────────────────────────────────
 
-/// Apply a NoOp action (deduct noop cost, scaled by genome complexity).
+/// Apply a NoOp action (deduct noop cost, scaled by genome complexity and age).
 pub fn apply_noop(creature: &mut CreatureState, config: &SimulationConfig) {
     let mult = config
         .energy
-        .complexity_cost
-        .multiplier(creature.genome.complexity());
+        .action_cost_multiplier(creature.genome.complexity(), creature.age);
     creature.energy -= config.energy.costs.noop_cost * mult;
 }
 
@@ -34,8 +33,7 @@ pub fn apply_eat(
     creature.energy = creature.energy.min(config.energy.lifecycle.max_energy);
     let mult = config
         .energy
-        .complexity_cost
-        .multiplier(creature.genome.complexity());
+        .action_cost_multiplier(creature.genome.complexity(), creature.age);
     creature.energy -= config.energy.costs.eat_cost * mult;
     food > 0.0
 }
@@ -67,8 +65,7 @@ pub fn apply_move(
 
     let mult = config
         .energy
-        .complexity_cost
-        .multiplier(creature.genome.complexity());
+        .action_cost_multiplier(creature.genome.complexity(), creature.age);
     creature.energy -= config.energy.costs.move_cost * mult;
     succeeded
 }
