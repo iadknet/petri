@@ -70,6 +70,12 @@ Surface as a stats panel with historical trends.
 - Brainstorm other metrics and observability opportunities
 - Refactor stats panels to be better organized and have better coverage
 
+### SelectRow shared component for enum config fields
+Uncovered during reconcile-config-panel: the `edge_mode` select was implemented inline in `WorldTopologySection.tsx`. If a second string-enum config field is added to either panel, extract a reusable `SelectRow` component in `config-panel/shared/` following the same data-driven pattern as `FieldRow` and `ToggleRow`.
+
+### FieldLabel primitive extraction
+Uncovered during reconcile-config-panel: the label+tooltip+lock-icon layout is duplicated across `FieldRow.tsx`, `ToggleRow.tsx`, and the inline edge_mode select in `WorldTopologySection.tsx`. Extract a `FieldLabel` subcomponent to eliminate the three-site JSX duplication.
+
 ### Refactor creature inspector
 Within the creature inspector have different tabs (creature summary, mesh viewer, sampler). Needs more brainstorming on tab organization and content.
 
