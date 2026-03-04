@@ -3,6 +3,7 @@ use std::mem::size_of;
 
 /// Action type discriminant for log entries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[non_exhaustive]
 #[repr(u8)]
 pub enum ActionType {
     NoOp = 0,
@@ -14,6 +15,7 @@ pub enum ActionType {
 
 /// Outcome of an action for log entries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[non_exhaustive]
 #[repr(u8)]
 pub enum ActionResult {
     Success = 0,
@@ -50,7 +52,7 @@ pub struct ActionLogEntry {
 const _: () = assert!(size_of::<ActionLogEntry>() == 32);
 
 /// Ring-buffer action log for a single creature.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ActionLog {
     entries: VecDeque<ActionLogEntry>,
     capacity: usize,
@@ -58,6 +60,7 @@ pub struct ActionLog {
 
 impl ActionLog {
     /// Create a new action log with the given capacity, pre-allocated.
+    #[must_use]
     pub fn new(capacity: usize) -> Self {
         Self {
             entries: VecDeque::with_capacity(capacity),
@@ -67,6 +70,9 @@ impl ActionLog {
 
     /// Push an entry, evicting the oldest if at capacity.
     pub fn push(&mut self, entry: ActionLogEntry) {
+        if self.capacity == 0 {
+            return;
+        }
         if self.entries.len() == self.capacity {
             self.entries.pop_front();
         }
@@ -79,11 +85,13 @@ impl ActionLog {
     }
 
     /// Number of entries currently stored.
+    #[must_use]
     pub fn len(&self) -> usize {
         self.entries.len()
     }
 
     /// Whether the log is empty.
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.entries.is_empty()
     }
