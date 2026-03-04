@@ -182,6 +182,7 @@ export const useExecutionSamplerStore = create<ExecutionSamplerState>()((set, ge
 export function getDetailCount(
 	trace: ExecutionSample["ticks"][0]["hops"][0]["backend_trace"],
 ): number {
+	if (typeof trace === "string") return 0;
 	if ("Vm" in trace) return trace.Vm.steps.length;
 	if ("Graph" in trace) return trace.Graph.passes.length;
 	return 0;
