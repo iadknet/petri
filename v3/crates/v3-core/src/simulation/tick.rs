@@ -465,13 +465,10 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                         }
                         PredationActionResult::RejectedNoVictim => {
                             if let Some(creature) = sim.creatures.get_mut(id) {
-                                let mult = sim
-                                    .config
-                                    .energy
-                                    .action_cost_multiplier(
-                                        creature.genome.complexity(),
-                                        creature.age,
-                                    );
+                                let mult = sim.config.energy.action_cost_multiplier(
+                                    creature.genome.complexity(),
+                                    creature.age,
+                                );
                                 creature.energy -=
                                     sim.config.energy.costs.failed_action_penalty * mult;
                             }
@@ -1286,10 +1283,7 @@ mod tests {
                     let entry = &log.entries()[0];
                     assert_eq!(entry.tick, 0, "first tick should be 0");
                     // energy_before should be positive (founders start with energy).
-                    assert!(
-                        entry.energy_before > 0.0,
-                        "energy_before should be > 0"
-                    );
+                    assert!(entry.energy_before > 0.0, "energy_before should be > 0");
                 }
             }
         }
