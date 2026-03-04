@@ -901,3 +901,16 @@ fn random_non_increasing_only_returns_neutral_for_vm() {
         }
     }
 }
+
+#[test]
+fn random_decreasing_returns_none_for_vm() {
+    // VM has 0 Decreasing operators, so random_decreasing() must always return None.
+    for seed in 0u64..200 {
+        let mut r = rng(seed);
+        assert!(
+            VmOperator::random_decreasing(&mut r).is_none(),
+            "VM random_decreasing must return None (0 Decreasing operators), seed {}",
+            seed
+        );
+    }
+}
