@@ -38,9 +38,16 @@ export interface CostsConfig {
 	failed_action_penalty: number;
 }
 
+export interface ComplexityEnergyCostConfig {
+	enabled: boolean;
+	threshold: number;
+	scaling_factor: number;
+}
+
 export interface EnergyConfig {
 	lifecycle: LifecycleEnergyConfig;
 	costs: CostsConfig;
+	complexity_cost: ComplexityEnergyCostConfig;
 }
 
 export interface VmConfig {
