@@ -16,7 +16,7 @@ function makeEntry(tick: number, actionType: ActionType = ActionType.Move): Acti
 	};
 }
 
-function makeDetail(overrides: Partial<Parameters<typeof useCreatureInspectorStore.getState>["0"]["setDetail"] extends (d: infer D) => void ? D : never> = {}) {
+function makeDetail(overrides: Record<string, unknown> = {}) {
 	return {
 		id: 1,
 		position: { x: 10, y: 20 },
@@ -52,10 +52,10 @@ describe("creatureInspectorStore actionLog", () => {
 		useCreatureInspectorStore.getState().setDetail(detail);
 		const log = useCreatureInspectorStore.getState().actionLog;
 		expect(log).toHaveLength(2);
-		expect(log![0].tick).toBe(1);
-		expect(log![0].action_type).toBe(ActionType.Move);
-		expect(log![1].tick).toBe(2);
-		expect(log![1].action_type).toBe(ActionType.Eat);
+		expect(log?.[0]?.tick).toBe(1);
+		expect(log?.[0]?.action_type).toBe(ActionType.Move);
+		expect(log?.[1]?.tick).toBe(2);
+		expect(log?.[1]?.action_type).toBe(ActionType.Eat);
 	});
 
 	it("replaces actionLog reference on every setDetail call", () => {
@@ -69,7 +69,7 @@ describe("creatureInspectorStore actionLog", () => {
 
 		expect(ref1).not.toBe(ref2);
 		expect(ref2).toHaveLength(1);
-		expect(ref2![0].tick).toBe(3);
+		expect(ref2?.[0]?.tick).toBe(3);
 	});
 
 	it("resets actionLog to null on selectCreature", () => {
