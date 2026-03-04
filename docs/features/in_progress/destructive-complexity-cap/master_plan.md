@@ -94,7 +94,7 @@ After completing each implementation step:
   - Add new test: restricted VM mutations are always skipped (VM has 0 Decreasing operators)
   - Add new test: accounting invariant still holds when events are skipped due to no Decreasing operators
 
-- [ ] Step 4: Run viability tests and full test suite
+- [x] Step 4: Run viability tests and full test suite
   - `cargo test -p v3-core --test viability` — must pass (viability gate)
   - `cargo test --workspace` — must pass
   - `cargo clippy --workspace --all-targets -- -D warnings` — must pass
