@@ -119,6 +119,6 @@ After completing each implementation step:
 
 ### Phase 5: Verification
 
-- [ ] **Verify all controls work end-to-end**: start the app, confirm each new control appears, modify values, apply, and verify the server receives correct patches
+- [x] **Verify all controls work end-to-end**: start the app, confirm each new control appears, modify values, apply, and verify the server receives correct patches
 
 **Review cycles:** 1
