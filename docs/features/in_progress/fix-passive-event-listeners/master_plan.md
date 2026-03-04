@@ -64,7 +64,7 @@ After completing each implementation step:
 - [x] Step 1: Replace React `onWheel` prop with native `useEffect` listener — In `WorldViewport.tsx`: (a) Remove `onWheel={handleWheel}` from the `<canvas>` JSX. (b) Change `handleWheel` from `React.WheelEvent` to native `WheelEvent` parameter type (drop the `React.` prefix). (c) Add a new `useEffect` that calls `canvasRef.current.addEventListener('wheel', handleWheel, { passive: false })` and returns a cleanup that removes the listener. Dependencies: `[handleWheel]`.
 - [x] Step 2: Verify fix — Run `cd frontend && npm run lint && npm run test && npm run build` to confirm no regressions. Run `agent-browser` e2e smoke test on map zoom to confirm no console warnings and correct zoom behavior.
 - [x] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke `vercel-react-best-practices` + `vercel-composition-patterns`. Fix all findings. Re-review until clean pass.
-- [ ] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
-- [ ] Completion gate — run all checks from AGENTS.md Completion Gate section
+- [x] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
+- [x] Completion gate — run all checks from AGENTS.md Completion Gate section
 
 **Review cycles:** 1
