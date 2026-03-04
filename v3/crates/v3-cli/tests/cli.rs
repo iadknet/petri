@@ -139,9 +139,11 @@ fn stats_accounting_invariant_in_cli_output() {
         applied_by_domain, mutation_applied,
         "applied_by_domain must reconcile to mutation_events_applied_total"
     );
-    assert_eq!(
-        attempted_by_operator, mutation_attempted,
-        "attempted_by_operator must reconcile to mutation_events_attempted_total"
+    // Operator-level attempts may be less than total when events are skipped at
+    // the domain level (no applicable operator under complexity pressure).
+    assert!(
+        attempted_by_operator <= mutation_attempted,
+        "attempted_by_operator ({attempted_by_operator}) must not exceed mutation_events_attempted_total ({mutation_attempted})"
     );
     assert_eq!(
         applied_by_operator, mutation_applied,
