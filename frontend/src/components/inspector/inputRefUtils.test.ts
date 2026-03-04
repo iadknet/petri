@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { formatInputRef, inputRefColor } from "./inputRefUtils.ts";
 import type { InputReference } from "../../types/api.ts";
+import { formatInputRef, inputRefColor } from "./inputRefUtils.ts";
 
 describe("formatInputRef", () => {
 	it("formats World string variant", () => {
