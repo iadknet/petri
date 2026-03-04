@@ -124,6 +124,7 @@ function computeLayout(genome: CreatureGenome): {
 }
 
 function getBackendLabel(def: BackendDef): { type: string; detail: string } {
+	if (typeof def === "string") return { type: def, detail: "" };
 	if ("Vm" in def) {
 		const vm = def.Vm;
 		return {
@@ -139,6 +140,7 @@ function getBackendLabel(def: BackendDef): { type: string; detail: string } {
 }
 
 function getNodeColor(def: BackendDef): string {
+	if (typeof def === "string") return "#94a3b8"; // gray for unknown backend types
 	return "Vm" in def ? VM_NODE_COLOR : GRAPH_NODE_COLOR;
 }
 
@@ -436,13 +438,15 @@ function NodeTooltip({
 			</div>
 
 			{/* Graph internal nodes breakdown */}
-			{"Graph" in node.backend_def && <GraphNodesBreakdown backendDef={node.backend_def} />}
+			{typeof node.backend_def !== "string" && "Graph" in node.backend_def && (
+				<GraphNodesBreakdown backendDef={node.backend_def} />
+			)}
 		</div>
 	);
 }
 
 function GraphNodesBreakdown({ backendDef }: { backendDef: BackendDef }) {
-	if (!("Graph" in backendDef)) return null;
+	if (typeof backendDef === "string" || !("Graph" in backendDef)) return null;
 	const { internal_nodes } = backendDef.Graph;
 	if (internal_nodes.length === 0) return null;
 
