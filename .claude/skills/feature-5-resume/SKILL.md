@@ -38,6 +38,6 @@ Loads an in-progress feature's `master_plan.md`, checks for uncommitted work, su
 ## Reminder: Policies Always Apply
 
 - TDD is mandatory for behavior changes/bug fixes (test first)
-- Per-step code review is recursive (run until clean pass, then commit)
 - Checkmarks must be updated in master_plan.md as each step completes
-- One commit per step, only after clean review
+- One commit per step
+- **Review Gate checkmarks are mandatory steps** — they must be completed like any other checkmark. Do NOT skip to `feature-6-complete` or `finishing-a-development-branch` until all Review Gate checkmarks are checked off.

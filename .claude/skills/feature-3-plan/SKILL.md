@@ -9,7 +9,7 @@ description: Use when a needs_refinement feature has its problem statement, acce
 
 ## Overview
 
-Runs a mandatory recursive architectural decomposition review, then creates `docs/features/ready_to_implement/FEATURE-NAME/master_plan.md` satisfying the full plan-harness schema.
+Runs a mandatory recursive architectural decomposition review, then creates `docs/features/ready_to_implement/FEATURE-NAME/master_plan.md` satisfying the full plan-harness schema. The plan MUST include review gate checkmarks as explicit steps.
 
 ## Pre-Promotion Checklist
 
@@ -21,17 +21,34 @@ Before starting the review cycle, verify:
 
 ## Architectural Decomposition Review (Mandatory, Recursive)
 
-Repeat until a clean pass (no new major findings). Record cycle count.
+This review MUST happen during planning — not deferred to implementation.
 
-1. Review the feature for decomposition opportunities, separation of concerns, and domain boundaries.
-2. If refactoring is needed to support this feature: include it in `master_plan.md` scope.
-3. If a major architecture change is needed outside this feature's scope: add it to `docs/features/brainstorms/ideas.md` and note in Open Questions.
-4. **Domain skill review of current plan draft:**
+```dot
+digraph arch_review {
+  rankdir=TB;
+  node [shape=box];
+  "Read refinement doc" -> "Review decomposition\n& boundaries";
+  "Review decomposition\n& boundaries" -> "Invoke domain skills\non plan draft";
+  "Invoke domain skills\non plan draft" -> "Re-read docs/strategy/\n& AGENTS.md files";
+  "Re-read docs/strategy/\n& AGENTS.md files" -> "New findings?";
+  "New findings?" [shape=diamond];
+  "New findings?" -> "Revise plan draft" [label="yes"];
+  "Revise plan draft" -> "Review decomposition\n& boundaries";
+  "New findings?" -> "Record cycle count\nProceed to write plan" [label="no — clean pass"];
+}
+```
+
+### Review Checklist (all mandatory)
+
+1. **Decomposition:** Review for separation of concerns, single-responsibility violations, and opportunities to split work into smaller units.
+2. **Boundary check:** Verify proposed changes respect existing crate/module boundaries and dependency directions.
+3. **Domain skill review:**
    - **REQUIRED SUB-SKILL:** Rust/backend in scope → invoke `rust-skills`, review plan against it
    - **REQUIRED SUB-SKILL:** Frontend in scope → invoke `vercel-react-best-practices` + `vercel-composition-patterns`, review
    - Incorporate findings into plan scope or Open Questions
-5. Re-read `docs/strategy/` architecture docs and relevant crate/module `AGENTS.md` files. Verify no conflicts.
-6. Repeat from step 1 until a clean pass with no new findings.
+4. **Architecture docs:** Re-read `docs/strategy/` architecture docs and relevant crate/module `AGENTS.md` files. Verify no conflicts with existing boundaries, dependency directions, or module responsibilities.
+5. **Goal alignment:** Re-read `docs/strategy/goals.md` and verify Goal IDs map accurately.
+6. **Repeat** from step 1 until a clean pass (no new findings).
 
 Record: `**Review cycles:** N` in `master_plan.md`.
 
@@ -58,7 +75,7 @@ Create `docs/features/ready_to_implement/FEATURE-NAME/master_plan.md` with:
 - `## TDD Policy` — see template below
 - `## Code Review Policy` — see template below
 - `## Commit Policy` — see template below
-- `## Implementation Steps` — `- [ ]` checkmark format (not numbered list); mark parallelizable steps with `[parallel]`
+- `## Implementation Steps` — `- [ ]` checkmark format with **mandatory review gate checkmarks** (see below)
 
 ### Required Skills Section Template
 ```markdown
@@ -103,12 +120,34 @@ After completing each implementation step:
 - Do NOT advance to the next step until current step is committed and reviewed clean
 ```
 
-### Implementation Steps Format
+### Implementation Steps Format — WITH MANDATORY REVIEW GATES
+
+**CRITICAL:** Every plan MUST include review gate checkmarks as `- [ ]` items within `## Implementation Steps`. These are not optional. The plan harness validates their presence.
+
 ```markdown
 ## Implementation Steps
-- [ ] [parallel] Step A description (mark independent steps with [parallel])
-- [ ] [parallel] Step B description
-- [ ] Step C description (depends on A and B)
+- [ ] Step 1: ...
+- [ ] Step 2: ...
+- [ ] Step N: ... (last implementation step)
+- [ ] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke domain skills (backend: `rust-skills`; frontend: `vercel-react-best-practices` + `vercel-composition-patterns`). Fix all findings. Re-review until clean pass.
+- [ ] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
+- [ ] Completion gate — run all checks from AGENTS.md Completion Gate section
+```
+
+**Agents follow checkmarks. If it is not a checkmark, it will be skipped.** This is why review gates MUST be checkmarks, not prose policies.
+
+For large features (6+ implementation steps), add an **interim review gate** after every 3-4 steps:
+```markdown
+- [ ] Step 1: ...
+- [ ] Step 2: ...
+- [ ] Step 3: ...
+- [ ] Review Gate: Interim code review — review Steps 1-3 changes. Fix findings, re-review until clean.
+- [ ] Step 4: ...
+- [ ] Step 5: ...
+- [ ] Step 6: ...
+- [ ] Review Gate: Code review — full branch diff review (see above)
+- [ ] Review Gate: Architecture & decomposition review (see above)
+- [ ] Completion gate — run all AGENTS.md completion checks
 ```
 
 ## Plan Splitting Rule
@@ -127,12 +166,13 @@ Before writing the file, verify the draft enforces:
 - [ ] `frontend-design` + `web-design-guidelines` if any UI/design changes in scope
 - [ ] `agent-browser` for e2e tests per frontend step (not as afterthought)
 - [ ] `superpowers:using-git-worktrees` mentioned in implementation setup
-- [ ] Recursive code review gate noted (`superpowers:requesting-code-review`)
 - [ ] `## TDD Policy` section present
 - [ ] `## Required Skills` section present
 - [ ] `## Code Review Policy` with recursive gate
 - [ ] `## Commit Policy`
 - [ ] Implementation Steps use `- [ ]` format
+- [ ] **Review Gate checkmarks present in Implementation Steps** (code review + architecture review)
+- [ ] Interim review gates added for features with 6+ steps
 - [ ] `**Review cycles:** N` at bottom
 
 ## Final Action — Commit All Planning Artifacts

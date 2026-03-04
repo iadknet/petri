@@ -32,6 +32,40 @@ See canonical policy set: `docs/strategy/` and `docs/reference/`.
   behavior (no synthetic placeholder metrics).
 - Viability tests (`v3/crates/v3-core/tests/viability.rs`) must pass before any
   branch merge. See **Viability Test Policy** below.
+- **Implementation plans MUST include review gate checkmarks.** Every
+  `master_plan.md` must contain explicit `- [ ] Review Gate:` checkmark items
+  within `## Implementation Steps`. These are not optional polish — they are
+  mandatory steps that must be completed (checked off) before invoking
+  `feature-6-complete` or `finishing-a-development-branch`. See **Review Gate
+  Policy** below.
+
+## Review Gate Policy
+
+Every `master_plan.md` must include **at minimum** these review gate checkmarks
+as items in `## Implementation Steps`:
+
+1. **Code review gate** — recursive code review using domain skills
+   (`rust-skills`, `vercel-react-best-practices`, `vercel-composition-patterns`
+   as applicable). Dispatch `superpowers:code-reviewer` subagent. Fix all
+   findings, re-review until clean pass.
+2. **Architecture & decomposition review gate** — review for boundary violations,
+   decomposition opportunities, separation of concerns, and consistency with
+   `docs/strategy/` architecture docs and relevant `AGENTS.md` files.
+
+### Rules
+
+1. Review gates are checkmark items (`- [ ] Review Gate: ...`), not prose
+   policies. Agents follow checkmarks — if it is not a checkmark, it will be
+   skipped.
+2. Review gates must appear AFTER the implementation steps they cover, not in a
+   separate section.
+3. `feature-3-plan` must generate these checkmarks in every plan. The plan
+   harness (`scripts/check-plan-harness.sh`) validates their presence.
+4. Agents must NOT invoke `feature-6-complete` or `finishing-a-development-branch`
+   until all review gate checkmarks are checked off in `master_plan.md`.
+5. An inline prose comment ("looks clean") is NOT a review. A review means
+   dispatching the `superpowers:code-reviewer` subagent or running domain skills
+   and documenting findings.
 
 ## Determinism Scope (Canonical)
 

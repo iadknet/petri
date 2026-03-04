@@ -9,48 +9,33 @@ description: Use when all implementation steps in an in-progress feature's maste
 
 ## Overview
 
-Five mandatory steps in order. Do not skip or reorder.
+Three mandatory steps in order. Do not skip or reorder.
 
 ```dot
 digraph completion {
   rankdir=TB;
   node [shape=box];
-  "Step 1\nArchitecture Review\n(recursive)" -> "Step 2\nCode Review\n(recursive)";
-  "Step 2\nCode Review\n(recursive)" -> "STOP\nBoth clean?";
-  "STOP\nBoth clean?" [shape=diamond];
-  "STOP\nBoth clean?" -> "Step 3\nCompletion Gates" [label="yes"];
-  "STOP\nBoth clean?" -> "Step 1\nArchitecture Review\n(recursive)" [label="no — fix and repeat"];
-  "Step 3\nCompletion Gates" -> "Step 4\nFinish Branch";
-  "Step 4\nFinish Branch" -> "Step 5\nMove to Completed";
+  "Step 1\nVerify review gates" -> "All gates checked?";
+  "All gates checked?" [shape=diamond];
+  "All gates checked?" -> "STOP\nGo back and\ncomplete them" [label="no"];
+  "All gates checked?" -> "Step 2\nCompletion Gates" [label="yes"];
+  "Step 2\nCompletion Gates" -> "Step 3\nFinish Branch\n& Move to Completed";
 }
 ```
 
-## Step 1: Post-Implementation Architecture Review (Recursive, Mandatory)
+## Step 1: Verify Review Gates Were Completed
 
-Review the completed implementation holistically. Repeat until clean pass.
+**Before anything else**, read `master_plan.md` and verify:
 
-1. Review for decomposition opportunities, separation of concerns, and domain boundary issues uncovered during implementation.
-2. Re-read `docs/strategy/` architecture docs and relevant crate/module `AGENTS.md` files. Verify no conflicts with existing boundaries.
-3. **Easy fixes** (cosmetic, obvious): fix immediately and commit.
-4. **Larger enhancements or refactors**: add each as a new entry in `docs/features/brainstorms/ideas.md` with context ("uncovered during FEATURE-NAME implementation").
-5. Repeat from step 1 until a clean pass (no new decomposition/boundary findings).
+1. ALL `Review Gate:` checkmarks are `- [x]` (checked off)
+2. If ANY review gate is unchecked (`- [ ]`): **STOP. Go back to `feature-4-implement` and complete them.** Do not proceed.
 
-## Step 2: Final Code Review (Recursive, Mandatory)
+If the plan has no review gate checkmarks at all (legacy plan created before this policy), you MUST run them now:
+1. **Code review:** Dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke domain skills. Fix all findings, re-review until clean pass.
+2. **Architecture & decomposition review:** Review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
+3. Check them off in `master_plan.md` and commit.
 
-**REQUIRED SUB-SKILL:** Run code review via `superpowers:requesting-code-review`.
-
-This is a FULL recursive code review of the entire feature branch diff (holistic, not per-step):
-
-1. Review all changes against domain skills (backend: `rust-skills`; frontend: `vercel-react-best-practices` + `vercel-composition-patterns`)
-2. Fix ALL findings
-3. Run review AGAIN — repeat until clean pass (no new findings)
-4. Commit any fixes
-
-**STOP. Do NOT proceed to Step 3 until Steps 1 and 2 are both clean.**
-
-## Step 3: Completion Gate (Full AGENTS.md Gate)
-
-Before running gates, confirm: "Step 1 architecture review produced a clean pass. Step 2 code review produced a clean pass." If you cannot confirm both, go back and do them.
+## Step 2: Completion Gate (Full AGENTS.md Gate)
 
 Run ALL of the following and confirm they pass:
 
@@ -69,11 +54,9 @@ If frontend changes were made: confirm all `agent-browser` e2e tests pass.
 
 **Do not proceed until all gates pass with confirmed output.**
 
-## Step 4: Finish Development Branch
+## Step 3: Finish Branch & Move to Completed
 
 **REQUIRED SUB-SKILL:** Use `superpowers:finishing-a-development-branch` to handle merge, PR creation, and worktree cleanup.
-
-## Step 5: Move to Completed
 
 After the worktree is merged and closed (you are now on main):
 
@@ -87,16 +70,3 @@ mv docs/features/in_progress/FEATURE-NAME/ docs/features/completed/FEATURE-NAME/
 git add docs/features/completed/FEATURE-NAME/ docs/features/in_progress/
 git commit -m "feat: mark FEATURE-NAME as completed"
 ```
-
-## Red Flags — STOP and Re-Read Steps 1-2
-
-If you catch yourself thinking any of these, you are about to skip a mandatory review:
-
-| Thought | Reality |
-|---------|---------|
-| "Gates passed, we're done" | Gates are Step 3. Reviews are Steps 1-2. Did you do them FIRST? |
-| "The per-step reviews already caught everything" | Per-step reviews catch step-level issues. Holistic review catches cross-step issues. |
-| "Let me just merge and clean up" | Merge is Step 4. Steps 1-3 come first. Follow the numbers. |
-| "Architecture review was done during planning" | Planning review was pre-implementation. This is POST-implementation. Different code exists now. |
-| "I'll do a quick scan" | "Quick scan" is not a recursive review. Run domain skills. Document findings. Repeat until clean. |
-| "I can skip straight to the gates" | Steps 1-2 exist because they catch things gates don't. Do them. |

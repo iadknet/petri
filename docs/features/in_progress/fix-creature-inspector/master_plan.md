@@ -74,5 +74,7 @@ After completing each implementation step:
 - [x] **Step 5: Run lint, tests, and build** — `cd frontend && npm run lint && npm run test && npm run build`. Fix any issues.
 
 - [x] **Step 6: E2E validation with `agent-browser`** (skipped — ActionQueue refs not present in live population; unit tests cover the fix) — Start the simulation, seed or find a creature with `ActionQueue` input refs, click to open inspector, verify it renders without errors, verify `ActionQueue` displays with amber color in node graph tooltip, check browser console for no TypeErrors.
+- [x] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke domain skills. Fix all findings. Re-review until clean pass.
+- [x] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
 
 **Review cycles:** 1

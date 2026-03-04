@@ -302,6 +302,31 @@ check_plan_file_requirements() {
   check_required_metadata_line "$file" "**Superseded-By:**" '^\*\*Superseded-By:\*\*'
 }
 
+check_review_gate_checkmarks() {
+  local file="$1"
+  # Only check master_plan.md files (not architecture.md)
+  if [[ "$file" != *master_plan.md ]]; then
+    return
+  fi
+
+  local impl_section
+  impl_section="$(extract_section "$file" "## Implementation Steps")"
+  if [[ -z "$impl_section" ]]; then
+    # Missing section is caught by check_required_section
+    return
+  fi
+
+  # Check for code review gate checkmark
+  if ! printf '%s\n' "$impl_section" | grep -Eiq '^\s*- \[[ x]\] .*Review Gate:.*[Cc]ode [Rr]eview'; then
+    report_violation "$file Implementation Steps missing required checkmark: Review Gate: Code review"
+  fi
+
+  # Check for architecture/decomposition review gate checkmark
+  if ! printf '%s\n' "$impl_section" | grep -Eiq '^\s*- \[[ x]\] .*Review Gate:.*[Aa]rchitect'; then
+    report_violation "$file Implementation Steps missing required checkmark: Review Gate: Architecture"
+  fi
+}
+
 check_required_sections_all_targets() {
   local file="$1"
   check_required_section "$file" "## Goal Alignment"
@@ -319,6 +344,7 @@ check_file() {
   fi
 
   check_required_sections_all_targets "$file"
+  check_review_gate_checkmarks "$file"
   check_goal_ids_and_alignment "$file"
   check_existing_boundary_recheck "$file"
   check_open_questions "$file"
