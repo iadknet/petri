@@ -1,5 +1,10 @@
 # Feature ideas
 
+## Bug fixes
+ - Fix creature inspector. Creature is inspector when creatures use newer attributes.
+
+
+
 ## Small tasks
  - Change complexity cap so it only does destructive changes. We want to create room for new addative changes to fit in the complexity cap.
 
@@ -48,6 +53,11 @@ boundaries are still settling.
 
 
 ## Feature ideas
+
+### General statistics and observability improvements
+  - Brainstorm other metrics and observability opportunities
+  - Refactor stats panels to be better organized and have better coverage
+
 
 ### Complexity energy cost
  - companion to complexity cap that magnifies the energy cost of all actions based on complexity
