@@ -448,6 +448,17 @@ impl MutationSummary {
         self.skipped_events += 1;
         *self.skip_reasons.entry(reason).or_insert(0) += 1;
     }
+
+    /// Record a skip where no operator could be selected for a domain.
+    ///
+    /// Increments attempted_events, attempted_by_domain, and skipped_events
+    /// without recording an operator-level attempt (since none was selected).
+    pub fn record_domain_skip(&mut self, domain: MutationDomain, reason: MutationSkipReason) {
+        self.attempted_events += 1;
+        *self.attempted_by_domain.entry(domain).or_insert(0) += 1;
+        self.skipped_events += 1;
+        *self.skip_reasons.entry(reason).or_insert(0) += 1;
+    }
 }
 
 #[cfg(test)]
