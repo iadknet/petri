@@ -1,3 +1,5 @@
+import type { ActionLogEntry } from "./action-log.ts";
+
 export interface CreaturePhenotype {
 	channels: [number, number, number, number, number, number];
 	active_channel: number;
@@ -123,4 +125,5 @@ export interface CreatureDetail {
 	phenotype: CreaturePhenotype;
 	genome: CreatureGenome;
 	memory: number[];
+	action_log: ActionLogEntry[];
 }

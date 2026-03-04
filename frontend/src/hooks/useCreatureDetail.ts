@@ -41,6 +41,7 @@ export function useCreatureDetail() {
 					phenotype: detail.phenotype,
 					genome: detail.genome,
 					memory: detail.memory,
+					actionLog: detail.action_log,
 				});
 			} catch (err) {
 				if (controller.signal.aborted) return;
