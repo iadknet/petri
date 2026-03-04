@@ -165,6 +165,24 @@ Save and load complete world state (all creatures, map, world state) to/from a c
 
 ## Architecture
 
+### Creature endpoint sparse field selection and compression
+The `GET /v3/simulation/creature/:id` endpoint returns the full payload (genome, memory, action_log) on every poll at up to 10Hz. With a full 500-entry action_log (~75KB JSON) and no server-side compression, this is ~750KB/s per inspected creature. Three improvements:
+1. **`since_tick` query parameter** — return only action_log entries newer than the specified tick. Reduces action_log transfer by ~98% in steady-state (only ~0-10 new entries per poll vs 500).
+2. **`tower-http` CompressionLayer** — add gzip/brotli middleware to the Axum server. JSON action logs are highly compressible (repeated field names, similar float patterns). Would reduce payload 80-90%.
+3. **Sparse field selection** — query parameter to include/exclude heavy fields (action_log, genome, memory). The frontend already caches genome (set-once) so it doesn't need it after first fetch.
+
+Discovered during creature-action-timeline planning (data transfer analysis).
+
+### Frontend type file domain cleanup
+`CreatureDetail` (the HTTP response type for `GET /creature/:id`) lives in `src/types/genome.ts` but is not a genome type — it's an HTTP response envelope. Should be moved to `src/types/http.ts` alongside `LifecycleResponse`, `ConfigResponse`, etc. Touches many import sites so should be a standalone cleanup task.
+
+Discovered during creature-action-timeline planning (type decomposition review).
+
+### Split CreatureInspector into data display and sampler sections
+`CreatureInspector.tsx` (220+ lines) mixes two distinct concerns: data display orchestration (stats, phenotype, genome, memory, action timeline) and execution sampler controls/playback (own store, hooks, complex transport state machine). As the inspector grows, splitting into `InspectorDataSections` and `SamplerSection` sub-orchestrators would improve separation of concerns.
+
+Discovered during creature-action-timeline planning (component decomposition review).
+
 ### Action cost helper refactor
 The complexity multiplier pattern `config.energy.complexity_cost.multiplier(creature.genome.complexity())` is repeated ~10 times across action cost deduction sites in `actions/mod.rs`, `actions/reproduction.rs`, `actions/predation.rs`, and `tick.rs`. A helper method on `Simulation` or a utility function could centralize the cost-deduction-with-multiplier logic and reduce duplication.
 

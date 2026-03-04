@@ -17,10 +17,12 @@
 ## Boundary Impact
 
 No crate or module boundary changes. All work is in `frontend/`:
-- New types added to `src/types/genome.ts` (where `CreatureDetail` lives)
+- New type file `src/types/action-log.ts` for action log domain types
+- `CreatureDetail` extended in `src/types/genome.ts` to include the new field
+- Barrel re-export added in `src/types/api.ts`
 - Store extension in `src/stores/creatureInspector.ts`
 - Hook extension in `src/hooks/useCreatureDetail.ts`
-- New component(s) in `src/components/inspector/`
+- New component in `src/components/inspector/ActionTimeline.tsx`
 - Integration in `src/components/CreatureInspector.tsx`
 
 No backend changes. No new API endpoints. No new dependencies.
@@ -29,7 +31,7 @@ No backend changes. No new API endpoints. No new dependencies.
 
 | Area | Decision | Rationale |
 |------|----------|-----------|
-| `src/types/` — API type definitions | Keep | `ActionLogEntry` types extend `CreatureDetail` in the existing `genome.ts` file |
+| `src/types/` — API type definitions | Change | New `action-log.ts` file for action log domain types (ActionType, ActionResult, ActionLogEntry). `genome.ts` imports from it to extend `CreatureDetail`. Respects domain boundaries — action log is behavioral telemetry, not genome structure. |
 | `src/stores/creatureInspector.ts` — inspector state | Keep | Action log data follows the same pattern as genome/memory: fetched via `setDetail()`, stored alongside creature stats |
 | `src/components/inspector/` — inspector sub-components | Keep | New `ActionTimeline.tsx` follows same pattern as `PhenotypeDetail.tsx`, `MemoryHexView.tsx` |
 | `src/api/rest.ts` — API client | Keep | No changes needed — `getCreature()` already returns `action_log` from server |
@@ -143,9 +145,13 @@ The action log updates every fetch cycle (up to 10Hz), same as other creature da
 - SVG path coordinates rounded to 1 decimal place (`toFixed(1)`) to minimize DOM size
 - Timeline bar uses flush div segments (no gaps) — 500 × 6px = 3000px total scrollable width
 
+### Data Transfer Note
+
+The `GET /v3/simulation/creature/:id` endpoint returns the full action_log (up to 500 entries, ~75KB JSON) on every poll at up to 10Hz. This is ~750KB/s per inspected creature with no server-side compression. The frontend handles this gracefully (always replaces array reference, no deep compare), but future optimizations are captured in `docs/features/brainstorms/ideas.md`: incremental `since_tick` parameter, server compression middleware, and sparse field selection.
+
 ## Implementation Steps
 
-- [ ] Step 1: **TypeScript types and data plumbing** — Add `ActionLogEntry`, `ActionType`, `ActionResult` types to `src/types/genome.ts`. Extend `CreatureDetail` to include `action_log: ActionLogEntry[]`. Add `actionLog: ActionLogEntry[] | null` field to `creatureInspectorStore`. Wire `action_log` through `setDetail()` in the store (always replace array reference, no deep equality check) and `useCreatureDetail` hook. Reset `actionLog` to null in `selectCreature()` and `clearSelection()`. Add unit tests verifying the store correctly stores and updates action log data.
+- [ ] Step 1: **TypeScript types and data plumbing** — Create `src/types/action-log.ts` with `ActionType`, `ActionResult`, and `ActionLogEntry` types. Add re-export to `src/types/api.ts`. Import `ActionLogEntry` in `src/types/genome.ts` and extend `CreatureDetail` to include `action_log: ActionLogEntry[]`. Add `actionLog: ActionLogEntry[] | null` field to `creatureInspectorStore`. Wire `action_log` through `setDetail()` in the store (always replace array reference, no deep equality check) and `useCreatureDetail` hook. Reset `actionLog` to null in `selectCreature()` and `clearSelection()`. Add unit tests verifying the store correctly stores and updates action log data.
 
 - [ ] Step 2: **TimelineBar and ActionTimeline section** — Create `src/components/inspector/ActionTimeline.tsx` as a props-only component accepting `actionLog: ActionLogEntry[]` and `maxEnergy: number`. Use canonical section header: `<span className="text-xs text-slate-500 uppercase tracking-wider font-medium">Action Timeline</span>` with `px-4 py-3` outer padding. Create co-located internal `TimelineBar` helper rendering flush, colored div segments (6px wide each, no gaps). Color-code by `action_type` using the -400 shade palette. Add a 2px red top border on segments where `result !== "Success"`. Add unit tests verifying correct color mapping and failure indicators.
 
@@ -165,4 +171,4 @@ The action log updates every fetch cycle (up to 10Hz), same as other creature da
 
 - [ ] Completion gate — run all checks from AGENTS.md Completion Gate section: `scripts/check-doc-harness.sh --mode warn`, `scripts/check-architecture-harness.sh --mode warn`, `scripts/check-plan-harness.sh --mode strict`, `cd frontend && npm run lint && npm run test && npm run build`
 
-**Review cycles:** 3
+**Review cycles:** 4
