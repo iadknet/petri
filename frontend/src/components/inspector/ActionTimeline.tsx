@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { memo, useCallback, useLayoutEffect, useRef, useState } from "react";
 import { ActionResult, ActionType } from "../../types/action-log.ts";
 import type { ActionLogEntry } from "../../types/action-log.ts";
 
@@ -50,14 +50,9 @@ export const ActionTimeline = memo(function ActionTimeline({
 	actionLog,
 	maxEnergy,
 }: ActionTimelineProps) {
-	const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+	const [selectedTick, setSelectedTick] = useState<number | null>(null);
 	const scrollRef = useRef<HTMLDivElement>(null);
 	const isFollowingRef = useRef(true);
-
-	// Reset selection when the log data changes (new fetch cycle)
-	useEffect(() => {
-		setSelectedIndex(null);
-	}, [actionLog]);
 
 	// "Following" auto-scroll: only scroll to right edge when user is already there
 	useLayoutEffect(() => {
@@ -75,7 +70,16 @@ export const ActionTimeline = memo(function ActionTimeline({
 		isFollowingRef.current = atEnd;
 	}, []);
 
-	const selectedEntry = selectedIndex !== null ? actionLog[selectedIndex] ?? null : null;
+	// Find the selected entry by tick (survives across actionLog reference changes)
+	const selectedEntry = selectedTick !== null
+		? actionLog.find((e) => e.tick === selectedTick) ?? null
+		: null;
+	const selectedIndex = selectedEntry ? actionLog.indexOf(selectedEntry) : null;
+
+	const handleSelect = useCallback((_index: number | null, tick: number | null) => {
+		setSelectedTick(tick);
+	}, []);
+
 	const totalWidth = actionLog.length * SEGMENT_WIDTH;
 
 	return (
@@ -94,7 +98,7 @@ export const ActionTimeline = memo(function ActionTimeline({
 						<TimelineBar
 							entries={actionLog}
 							selectedIndex={selectedIndex}
-							onSelect={setSelectedIndex}
+							onSelect={handleSelect}
 						/>
 						<EnergyOverlay entries={actionLog} maxEnergy={maxEnergy} />
 					</div>
@@ -141,7 +145,7 @@ function TimelineBar({
 }: {
 	entries: ActionLogEntry[];
 	selectedIndex: number | null;
-	onSelect: (index: number | null) => void;
+	onSelect: (index: number | null, tick: number | null) => void;
 }) {
 	return (
 		<div
@@ -160,11 +164,11 @@ function TimelineBar({
 						role="button"
 						tabIndex={0}
 						aria-label={`Tick ${entry.tick}: ${ACTION_NAMES[entry.action_type] ?? "Unknown"}`}
-						onClick={() => onSelect(isSelected ? null : i)}
+						onClick={() => onSelect(isSelected ? null : i, isSelected ? null : entry.tick)}
 						onKeyDown={(e) => {
 							if (e.key === "Enter" || e.key === " ") {
 								e.preventDefault();
-								onSelect(isSelected ? null : i);
+								onSelect(isSelected ? null : i, isSelected ? null : entry.tick);
 							}
 						}}
 						style={{
