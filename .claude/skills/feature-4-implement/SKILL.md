@@ -1,6 +1,6 @@
 ---
 name: feature-4-implement
-description: Use when a feature has a validated master_plan.md in ready_to_implement/ and you are ready to begin coding in a worktree.
+description: Use when a feature has a validated master_plan.md in ready_to_implement/ and you are ready to begin coding in a worktree. Moves feature to in_progress/ on main before creating worktree to avoid merge conflicts.
 ---
 
 # feature-4-implement
@@ -9,18 +9,19 @@ description: Use when a feature has a validated master_plan.md in ready_to_imple
 
 ## Overview
 
-Validates the plan, moves the feature to `in_progress/`, sets up execution context, dispatches parallel agents where possible, and begins from the first unchecked step.
+Validates the plan, moves the feature to `in_progress/` on main (before worktree creation to avoid merge conflicts), sets up execution context, dispatches parallel agents where possible, and begins from the first unchecked step.
 
 ## Pre-Implementation Checklist
 
 1. **Planning artifacts are committed** on the current branch (verify with `git status` — if `ready_to_implement/FEATURE-NAME/` has uncommitted changes, commit them first)
 2. `scripts/check-plan-harness.sh --mode strict` passes against `master_plan.md`
 3. `master_plan.md` has an `## Implementation Steps` section with `- [ ]` checkmark items
-4. **REQUIRED SUB-SKILL:** Worktree created via `superpowers:using-git-worktrees`
 
 If any check fails, resolve it before proceeding.
 
-## Move to In-Progress
+## Move to In-Progress (on main, BEFORE worktree)
+
+**IMPORTANT:** This move MUST happen on main before creating the worktree. If you move the directory on the worktree branch, it will cause merge conflicts when merging back to main (main still has the old path).
 
 ```bash
 mv docs/features/ready_to_implement/FEATURE-NAME/ docs/features/in_progress/FEATURE-NAME/
@@ -30,6 +31,12 @@ mv docs/features/ready_to_implement/FEATURE-NAME/ docs/features/in_progress/FEAT
 git add docs/features/ready_to_implement/ docs/features/in_progress/FEATURE-NAME/
 git commit -m "chore: move FEATURE-NAME to in_progress"
 ```
+
+## Create Worktree
+
+4. **REQUIRED SUB-SKILL:** Worktree created via `superpowers:using-git-worktrees`
+
+The worktree branch will inherit the `in_progress/` location from main, so both branches agree on the directory path. No merge conflicts on completion.
 
 ## The Commit Gate (Mandatory for Every Step)
 
