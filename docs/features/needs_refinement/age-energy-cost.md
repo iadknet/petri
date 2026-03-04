@@ -3,7 +3,7 @@ title: Age Energy Cost
 tags: [simulation, core]
 size: S
 depends-on: []
-status: needs-review
+status: ready
 ---
 
 ## Problem Statement
