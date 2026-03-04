@@ -64,6 +64,50 @@ In the startup config, add a section for configuring initial barrier topology. W
 ### Refactor creature inspector
 Within the creature inspector have different tabs (creature summary, mesh viewer, sampler). Needs more brainstorming on tab organization and content.
 
+### Lineage ancestry tracking
+Each creature stores its parent_id (some of this exists via CreatureIdentityState). The server maintains a compressed ancestry graph — not every individual, but enough to answer "trace this creature back to its founder" and "find the common ancestor of creatures A and B." Pruned over time: drop branches where all descendants are dead. Pure data infrastructure — no UI, but everything in the species/phylogeny features builds on it.
+
+### Species classification system
+Algorithm that groups living creatures into "species" using a multi-signal fingerprint:
+- Phenotype similarity (color distance)
+- Behavioral profile (action distribution over recent ticks — % move/eat/reproduce/steal)
+- Sensor usage (which WorldInputKey values their genome actually reads)
+- Lineage proximity (share a recent common ancestor)
+
+Species are dynamic — they form, split, merge, go extinct. Each gets an auto-assigned label and representative color (average phenotype). Weighting of signals could be configurable. For efficiency: assign offspring to parent's species by default, re-cluster periodically (every 100-500 ticks) to detect splits/merges.
+
+### Species stats dashboard
+New stats panel tab showing:
+- Active species list sorted by population: name/color, population count, mean energy, dominant action profile, dominant sensors, age of oldest member
+- Historical species: extinct species with peak population, lifespan (tick born → tick extinct), cause of extinction heuristic (starved? out-competed? predated?)
+- Species population chart: stacked area chart over time showing relative population of top N species
+
+### Phylogenetic tree visualization
+Interactive tree/graph view:
+- Nodes = species (not individual creatures)
+- Node size = current population (0 for extinct, but still shown)
+- Node color = representative phenotype color
+- Edges = lineage descent (species A split into A and B)
+- Active species glow, extinct species fade
+- Click a species → show stats + highlight members on world map
+- Pan/zoom navigation (tree can get large)
+- Layout: force-directed graph or top-down timeline tree (time on Y, branching on X)
+
+### Map species overlay
+Toggle-able overlay on the world viewport that colors creatures by species rather than individual phenotype. When a species is selected (from tree or dashboard), its members pulse/glow on the map. Could also show species "territory" as a translucent hull around clusters of same-species creatures.
+
+### Expose predation config in UI
+PredationConfig (steal_cost_rate, kill_complexity_bonus_multiplier) exists in the backend but has no controls in the runtime config panel. Add it.
+
+### Replay / time travel
+Record simulation history to allow rewinding, replaying from checkpoints, or exporting timelapse. Could range from simple periodic snapshots to full tick-level recording. Large design space — needs significant refinement.
+
+### Save / load world config
+UI ability to save the current simulation config state to a file and load a previously saved config file. On load, apply config values that match current options and silently ignore any that no longer exist or have changed shape — graceful handling of config drift over time.
+
+### Save / load world state
+Save and load complete world state (all creatures, map, world state) to/from a compact binary file. Must handle the full simulation snapshot — potentially large data. On load, best-effort restoration: apply what can be mapped to the current schema and gracefully skip or default anything that has changed. Strict backward compatibility is explicitly not a goal given the rapid pace of changes. Lower priority than save/load config.
+
 ## Architecture
 
 ### Action cost helper refactor
