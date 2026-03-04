@@ -114,6 +114,7 @@ mod tests {
         let sim = Simulation {
             world,
             creatures,
+            action_logs: slotmap::SecondaryMap::new(),
             tick: 0,
             config: cfg,
             stats: crate::simulation::stats::SimStats::default(),
@@ -261,6 +262,7 @@ mod tests {
         let mut sim = Simulation {
             world,
             creatures,
+            action_logs: slotmap::SecondaryMap::new(),
             tick: 0,
             config: cfg,
             stats: crate::simulation::stats::SimStats::default(),
@@ -347,6 +349,7 @@ mod tests {
         let mut sim = Simulation {
             world,
             creatures,
+            action_logs: slotmap::SecondaryMap::new(),
             tick: 0,
             config: cfg,
             stats: crate::simulation::stats::SimStats::default(),
@@ -653,6 +656,7 @@ mod tests {
         let mut sim = Simulation {
             world,
             creatures,
+            action_logs: slotmap::SecondaryMap::new(),
             tick: 0,
             config: cfg,
             stats: crate::simulation::stats::SimStats::default(),
@@ -746,6 +750,7 @@ mod tests {
         let sim = Simulation {
             world,
             creatures,
+            action_logs: slotmap::SecondaryMap::new(),
             tick: 0,
             config: cfg,
             stats: crate::simulation::stats::SimStats::default(),

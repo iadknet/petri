@@ -1,10 +1,11 @@
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::SeedableRng;
-use slotmap::SlotMap;
+use slotmap::{SecondaryMap, SlotMap};
 
 use crate::config::SimulationConfig;
 use crate::contracts::{CreatureId, InputReference, Position, WorldInputKey};
+use crate::creature::action_log::ActionLog;
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::CreatureGenome;
 use crate::creature::identity::CreatureIdentityState;
@@ -54,6 +55,8 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
     let spawn_count = desired.min(positions.len());
 
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+    let mut action_logs: SecondaryMap<CreatureId, ActionLog> = SecondaryMap::new();
+    let log_capacity = config.action_log.capacity;
 
     for (founder_index, &pos) in positions.iter().take(spawn_count).enumerate() {
         let genome = v3alpha1_founder_genome();
@@ -73,12 +76,14 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
                 identity,
             )
         });
+        action_logs.insert(id, ActionLog::new(log_capacity));
         world.place_creature(pos, id);
     }
 
     Simulation {
         world,
         creatures,
+        action_logs,
         tick: 0,
         config,
         stats: crate::simulation::stats::SimStats::default(),

@@ -31,6 +31,7 @@ pub fn run_phase_0(sim: &mut Simulation) {
         if let Some(creature) = sim.creatures.remove(id) {
             sim.world.remove_creature(creature.position);
         }
+        sim.action_logs.remove(id);
     }
 }
 
@@ -550,6 +551,7 @@ mod tests {
         let sim = Simulation {
             world,
             creatures,
+            action_logs: slotmap::SecondaryMap::new(),
             tick: 0,
             config: cfg,
             stats: crate::simulation::stats::SimStats::default(),
@@ -585,6 +587,7 @@ mod tests {
         let sim = Simulation {
             world,
             creatures,
+            action_logs: slotmap::SecondaryMap::new(),
             tick: 0,
             config: cfg,
             stats: crate::simulation::stats::SimStats::default(),
