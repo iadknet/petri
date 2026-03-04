@@ -89,25 +89,25 @@ After completing each implementation step:
 
 ### Phase 3: Add missing runtime controls
 
-- [ ] [parallel] **Add Age Cost section** — new `AgeEnergyCostSection.tsx` following `ComplexityEnergyCostSection.tsx` pattern:
+- [x] [parallel] **Add Age Cost section** — new `AgeEnergyCostSection.tsx` following `ComplexityEnergyCostSection.tsx` pattern:
   - Toggle: `energy.age_cost.enabled` (default: true, tooltip: "When enabled, older creatures pay higher energy costs for all actions")
   - Field: `energy.age_cost.age_cap` (min: 1, max: 5000, step: 10, default: 500, tooltip: "Age in ticks at which the maximum cost multiplier applies")
   - Field: `energy.age_cost.max_multiplier` (min: 1, max: 50, step: 0.5, default: 10, tooltip: "Maximum energy cost multiplier applied to creatures at or beyond age cap")
   - Wire into `RuntimeConfigPanel.tsx` after Complexity Cost section
   - Add fields to `RUNTIME_PATCH_FIELDS`
 
-- [ ] [parallel] **Add Predation section** — new `PredationSection.tsx` following `RuntimeFieldGroup` pattern:
+- [x] [parallel] **Add Predation section** — new `PredationSection.tsx` following `RuntimeFieldGroup` pattern:
   - Field: `predation.steal_cost_rate` (min: 0, max: 1, step: 0.01, default: 0.2, tooltip: "Fraction of attempted steal amount paid as attacker energy cost")
   - Field: `predation.kill_complexity_bonus_multiplier` (min: 0, max: 1, step: 0.01, default: 0.05, tooltip: "Energy bonus per unit of victim genome complexity on kill")
   - Wire into `RuntimeConfigPanel.tsx` after Mutation section
   - Add fields to `RUNTIME_PATCH_FIELDS`
 
-- [ ] [parallel] **Add missing Runtime fields** to `RuntimeSection.tsx`:
+- [x] [parallel] **Add missing Runtime fields** to `RuntimeSection.tsx`:
   - Field: `runtime.reward_learning_cost` (min: 0, max: 10, step: 0.001, default: 0, tooltip: "Energy cost per reward-modulated weight update during learning")
   - Field: `runtime.max_actions_per_turn` (min: 1, max: 20, step: 1, default: 10, tooltip: "Maximum number of actions a creature can queue per turn")
   - Field: `runtime.perception.vision_radius` (min: 1, max: 8, step: 1, default: 5, tooltip: "Vision radius for extended perception area summaries")
 
-- [ ] [parallel] **Add missing Mutation field** to `MutationSection.tsx`:
+- [x] [parallel] **Add missing Mutation field** to `MutationSection.tsx`:
   - Field: `mutation.action_queue_cap` (min: 1, max: 16, step: 1, default: 4, tooltip: "Maximum number of actions in the creature action queue")
 
 ### Phase 4: Add startup control

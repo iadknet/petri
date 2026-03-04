@@ -1,6 +1,10 @@
 import { Section } from "../shared/Section.tsx";
 import type { BooleanFieldDef, FieldDef, RuntimePanelProps } from "../shared/types.ts";
 import {
+	AGE_COST_ALL_FIELDS,
+	AgeEnergyCostFieldGroup,
+} from "./AgeEnergyCostSection.tsx";
+import {
 	COMPLEXITY_COST_ALL_FIELDS,
 	ComplexityEnergyCostFieldGroup,
 } from "./ComplexityEnergyCostSection.tsx";
@@ -9,6 +13,7 @@ import { ENERGY_LIFECYCLE_FIELDS } from "./EnergyLifecycleSection.tsx";
 import { FOOD_PARAMETERS_FIELDS } from "./FoodParametersSection.tsx";
 import { MUTATION_ALL_FIELDS, MutationFieldGroup } from "./MutationSection.tsx";
 import { POPULATION_FIELDS } from "./PopulationSection.tsx";
+import { PREDATION_FIELDS } from "./PredationSection.tsx";
 import { RuntimeFieldGroup } from "./RuntimeFieldGroup.tsx";
 import { RUNTIME_FIELDS } from "./RuntimeSection.tsx";
 
@@ -18,8 +23,10 @@ export const RUNTIME_PATCH_FIELDS: (FieldDef | BooleanFieldDef)[] = [
 	...ENERGY_LIFECYCLE_FIELDS,
 	...ENERGY_COSTS_FIELDS,
 	...COMPLEXITY_COST_ALL_FIELDS,
+	...AGE_COST_ALL_FIELDS,
 	...RUNTIME_FIELDS,
 	...MUTATION_ALL_FIELDS,
+	...PREDATION_FIELDS,
 ];
 
 interface RuntimeConfigPanelProps {
@@ -86,6 +93,12 @@ export function RuntimeConfigPanel({
 						simState={simState}
 						updateDraft={updateDraft}
 					/>
+					<AgeEnergyCostFieldGroup
+						localDraft={localDraft}
+						serverConfig={serverConfig}
+						simState={simState}
+						updateDraft={updateDraft}
+					/>
 					<RuntimeFieldGroup
 						title="Runtime"
 						fields={RUNTIME_FIELDS}
@@ -95,6 +108,14 @@ export function RuntimeConfigPanel({
 						updateDraft={updateDraft}
 					/>
 					<MutationFieldGroup
+						localDraft={localDraft}
+						serverConfig={serverConfig}
+						simState={simState}
+						updateDraft={updateDraft}
+					/>
+					<RuntimeFieldGroup
+						title="Predation"
+						fields={PREDATION_FIELDS}
 						localDraft={localDraft}
 						serverConfig={serverConfig}
 						simState={simState}
