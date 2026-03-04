@@ -3,6 +3,7 @@ import { useCreatureDetail } from "../hooks/useCreatureDetail.ts";
 import { useExecutionSampler } from "../hooks/useExecutionSampler.ts";
 import { useCreatureInspectorStore } from "../stores/creatureInspector.ts";
 import { getDetailCount, useExecutionSamplerStore } from "../stores/executionSampler.ts";
+import { ActionTimeline } from "./inspector/ActionTimeline.tsx";
 import { InspectorHeader } from "./inspector/InspectorHeader.tsx";
 import { MemoryHexView } from "./inspector/MemoryHexView.tsx";
 import { NodeGraph } from "./inspector/NodeGraph.tsx";
@@ -32,6 +33,7 @@ function CreatureInspector() {
 	const stats = useCreatureInspectorStore((s) => s.creatureStats);
 	const genome = useCreatureInspectorStore((s) => s.creatureGenome);
 	const memory = useCreatureInspectorStore((s) => s.creatureMemory);
+	const actionLog = useCreatureInspectorStore((s) => s.actionLog);
 	const isLoading = useCreatureInspectorStore((s) => s.isLoading);
 	const isDead = useCreatureInspectorStore((s) => s.isDead);
 	const error = useCreatureInspectorStore((s) => s.error);
@@ -135,6 +137,13 @@ function CreatureInspector() {
 								generation={stats.generation}
 							/>
 						</div>
+
+						{/* Action timeline */}
+						{actionLog && actionLog.length > 0 && (
+							<div className="border-t border-slate-800">
+								<ActionTimeline actionLog={actionLog} maxEnergy={stats.maxEnergy} />
+							</div>
+						)}
 
 						{/* Phenotype channels */}
 						<div className="border-t border-slate-800">
