@@ -1,5 +1,9 @@
 # Feature ideas
 
+## Small tasks
+ - Change complexity cap so it only does destructive changes. We want to create room for new addative changes to fit in the complexity cap.
+
+
 ## Deferred Architecture Follow-Ups
 
 ### Shared incremental query/projection platform

@@ -291,8 +291,10 @@ check_markdown_links() {
   done < <(find . -type f -name '*.md' \
     -not -path './.git/*' \
     -not -path './.worktrees/*' \
+    -not -path './.claude/worktrees/*' \
     -not -path './target/*' \
     -not -path './node_modules/*' \
+    -not -path '*/node_modules/*' \
     -print0)
 }
 

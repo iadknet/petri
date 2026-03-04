@@ -1,71 +1,27 @@
-# Plans Metadata and Template Rules
+# Plans (Moved)
 
-Use `docs/plans/YYYY-MM-DD-<topic>.md` for non-trivial, multi-step work.
+The plans system has moved to the unified feature lifecycle hierarchy.
 
-Archived historical plans live under `docs/plans/archive/` and are excluded from plan-quality harness enforcement.
+**New locations:**
+- Feature ideas: [`docs/features/brainstorms/ideas.md`](../features/brainstorms/ideas.md)
+- Features in refinement: [`docs/features/needs_refinement/`](../features/needs_refinement/)
+- Features ready to implement: [`docs/features/ready_to_implement/`](../features/ready_to_implement/)
+- Features in progress: [`docs/features/in_progress/`](../features/in_progress/)
+- Completed features: [`docs/features/completed/`](../features/completed/)
+- Cancelled features: [`docs/features/cancelled/`](../features/cancelled/)
 
-## Required metadata
+## Skills
 
-Each active non-trivial plan must include:
+Use the `features:` skills to move features through the workflow:
+- `features:capture-idea` — add an idea to brainstorms
+- `features:promote-to-refinement` — create a structured refinement doc
+- `features:promote-to-ready` — create a full master_plan.md
+- `features:start-implementation` — move to in_progress and begin
+- `features:resume-feature` — resume an in-progress feature
+- `features:complete-feature` — finalize and move to completed
+- `features:cancel-feature` — cancel from any stage
 
-- `Goal`: one-sentence outcome statement
-- `Goal IDs`: one or more IDs from `docs/strategy/goals.md`
-- `Scope`: what is included and excluded
-- `Docs Impact`: canonical docs touched and stale docs retired/superseded
-- `Supersedes`: older plan IDs/files being replaced (or `none`)
-- `Superseded-By`: newer plan file when this plan is replaced (or `none`)
+## Plan Harness
 
-## Required structure
-
-At minimum include:
-
-1. `## Goal Alignment`
-2. `## Boundary Impact`
-3. `## Existing Boundary Recheck`
-4. `## Open Questions`
-5. Task list with explicit file targets
-6. Verification commands
-7. Risks/rollback notes when applicable
-
-Verification command DRY rule:
-- If a shared checkpoint matrix exists, use it as command source-of-truth and reference matrix sections from stage/spec plans instead of duplicating long command lists.
-
-## Existing Boundary Recheck requirements
-
-Include at least two reviewed existing areas (crate/module/file), each with:
-
-- decision (`keep` or `change`)
-- rationale
-
-## Open Questions table format
-
-`## Open Questions` must use a Markdown table with columns:
-
-- `question`
-- `decision`
-- `owner`
-- `status` (use `resolved` or `unresolved`)
-
-## Docs Impact section
-
-Use a compact table or bullet list with:
-
-- updated canonical docs
-- compatibility stubs (if any)
-- retired or superseded docs/plans
-
-This keeps plan output aligned with docs and plan harness checks and avoids silent drift.
-
-## Plan Lifecycle
-
-- Active plans in `docs/plans/` should reflect the current product direction.
-- When strategy changes (for example, a greenfield reset), move stale plans to `docs/plans/archive/`.
-- Prefer replacing one large plan with stage/checkpoint plans so ownership and go/stop boundaries are explicit.
-- For multi-checkpoint programs, maintain one shared verification matrix plan and reference it from each stage.
-
-## Intent-First Execution Policy
-
-- Treat functional and architectural intent as the primary completion criterion for every task.
-- If a checklist instruction conflicts with the wider architecture, system constraints, or project goals, stop and ask for guidance before proceeding.
-- Prefer red-green when a behavior gap exists; if behavior is already correct, add/adjust regression coverage and record verification evidence instead of forcing artificial failures.
-- Update checklist wording/checkmarks to reflect the actual verification path taken so status remains accurate.
+`scripts/check-plan-harness.sh` now scans `docs/features/ready_to_implement/` and
+`docs/features/in_progress/` for `master_plan.md` files.
