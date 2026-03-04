@@ -136,6 +136,7 @@ describe("ControlBar", () => {
 			world: {
 				width: 512,
 				height: 384,
+				edge_mode: "Wrap",
 				food: {
 					initial_density: 1.0,
 					initial_coverage: 0.4,
@@ -173,6 +174,7 @@ describe("ControlBar", () => {
 				world: {
 					width: 512,
 					height: 384,
+					edge_mode: "Wrap",
 					food: {
 						initial_density: 1.0,
 						initial_coverage: 0.4,
