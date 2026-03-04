@@ -49,7 +49,11 @@ export const SamplerPlaybackPanel = memo(function SamplerPlaybackPanel({
 
 			{currentHop && (
 				<div className="border-t border-slate-800">
-					{"Vm" in currentHop.backend_trace ? (
+					{typeof currentHop.backend_trace === "string" ? (
+						<div className="px-3 py-2 text-[10px] text-slate-500 font-mono">
+							Unsupported trace type: {currentHop.backend_trace}
+						</div>
+					) : "Vm" in currentHop.backend_trace ? (
 						<VmExecutionView
 							trace={currentHop.backend_trace.Vm}
 							inputRefs={currentHop.input_refs}

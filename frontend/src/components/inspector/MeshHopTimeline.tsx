@@ -13,6 +13,7 @@ const VM_COLOR = "#f59e0b";
 const GRAPH_COLOR = "#8b5cf6";
 
 function hopSummary(hop: MeshHopTrace): string {
+	if (typeof hop.backend_trace === "string") return "";
 	if ("Vm" in hop.backend_trace) {
 		return `${hop.backend_trace.Vm.steps.length} ops`;
 	}
@@ -23,7 +24,8 @@ function hopSummary(hop: MeshHopTrace): string {
 	return "";
 }
 
-function hopBackendType(hop: MeshHopTrace): "Vm" | "Graph" {
+function hopBackendType(hop: MeshHopTrace): string {
+	if (typeof hop.backend_trace === "string") return hop.backend_trace;
 	return "Vm" in hop.backend_trace ? "Vm" : "Graph";
 }
 
