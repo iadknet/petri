@@ -103,3 +103,44 @@ fn random_non_increasing_covers_neutral_and_decreasing() {
         "must produce at least one decreasing operator"
     );
 }
+
+#[test]
+fn random_decreasing_never_returns_non_decreasing() {
+    use crate::mutation::types::ComplexityEffect;
+    for seed in 0u64..200 {
+        let mut r = rng(seed);
+        if let Some(op) = GraphOperator::random_decreasing(&mut r) {
+            assert_eq!(
+                op.complexity_effect(),
+                ComplexityEffect::Decreasing,
+                "random_decreasing returned non-Decreasing operator {:?} at seed {}",
+                op,
+                seed
+            );
+        }
+    }
+}
+
+#[test]
+fn random_decreasing_covers_all_decreasing_operators() {
+    use std::collections::HashSet;
+    let expected: HashSet<GraphOperator> = GraphOperator::ALL
+        .iter()
+        .copied()
+        .filter(|op| op.complexity_effect().is_decreasing())
+        .collect();
+    let mut seen = HashSet::new();
+    for seed in 0u64..2000 {
+        let mut r = rng(seed);
+        if let Some(op) = GraphOperator::random_decreasing(&mut r) {
+            seen.insert(op);
+        }
+        if seen == expected {
+            break;
+        }
+    }
+    assert_eq!(
+        seen, expected,
+        "random_decreasing must cover all Decreasing operators"
+    );
+}

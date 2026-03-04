@@ -114,6 +114,37 @@ impl TopologyOperator {
         sum
     };
 
+    const DECREASING_WEIGHT: u16 = {
+        let mut sum = 0u16;
+        let mut i = 0;
+        while i < Self::ALL.len() {
+            if Self::ALL[i].complexity_effect().is_decreasing() {
+                sum += Self::ALL[i].weight() as u16;
+            }
+            i += 1;
+        }
+        sum
+    };
+
+    /// Pick a random Decreasing-only operator weighted by impact tier.
+    pub fn random_decreasing(rng: &mut impl Rng) -> Option<Self> {
+        if Self::DECREASING_WEIGHT == 0 {
+            return None;
+        }
+        let mut r = rng.gen_range(0..Self::DECREASING_WEIGHT);
+        for &op in &Self::ALL {
+            if !op.complexity_effect().is_decreasing() {
+                continue;
+            }
+            let w = op.weight() as u16;
+            if r < w {
+                return Some(op);
+            }
+            r -= w;
+        }
+        unreachable!()
+    }
+
     /// Pick a random non-increasing operator (Neutral or Decreasing) weighted by impact tier.
     pub fn random_non_increasing(rng: &mut impl Rng) -> Option<Self> {
         if Self::NON_INCREASING_WEIGHT == 0 {
