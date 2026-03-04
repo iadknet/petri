@@ -125,6 +125,9 @@ section only owns config contract shape/defaults.
 | `energy.complexity_cost.enabled` | `bool` | `true` | When `true`, genome complexity scales action energy costs via a linear multiplier. |
 | `energy.complexity_cost.threshold` | `u32` | `50` | Complexity at or below this value incurs no extra cost (multiplier = 1.0). |
 | `energy.complexity_cost.scaling_factor` | `f32` | `0.002` | Must be finite and `>= 0.0`; invalid values fall back to `0.002`. Linear scaling: multiplier = `1.0 + max(0, complexity - threshold) * scaling_factor`. |
+| `energy.age_cost.enabled` | `bool` | `true` | When `true`, creature age scales action energy costs via a quadratic multiplier. |
+| `energy.age_cost.age_cap` | `u64` | `500` | Age (in ticks) at which the maximum multiplier applies. Ages beyond this are clamped. `0` disables the multiplier (returns 1.0). |
+| `energy.age_cost.max_multiplier` | `f32` | `10.0` | Must be finite and `>= 1.0`; invalid values fall back to `10.0`. Maximum multiplier reached at or beyond `age_cap`. |
 
 Complexity energy cost:
 - When enabled, all action energy costs (noop, eat, move, reproduce, steal, and
@@ -135,6 +138,24 @@ Complexity energy cost:
   `eat_reward_per_food` (reward, not cost).
 - At default settings: founder genomes (~10 complexity) pay 1.0x; complexity 550
   pays 2.0x; complexity 1050 pays 3.0x.
+
+Age energy cost:
+- When enabled, creature age adds a quadratic multiplier to action energy costs.
+- Formula: `1.0 + (max_multiplier - 1.0) * min(1.0, age / age_cap)^2`.
+- Returns 1.0 (no penalty) when disabled or `age_cap` is 0.
+- Does NOT apply to `energy_decay_per_tick` (world-level phase 0 cost) or
+  `eat_reward_per_food` (reward, not cost).
+- At default settings (age_cap=500, max_multiplier=10.0): age 0 pays 1.0x;
+  age 100 pays 1.36x; age 250 pays 3.25x; age 400 pays 6.76x; age 500+ pays
+  10.0x (clamped).
+
+Action cost multiplier composition:
+- All action energy costs are scaled by a combined multiplier computed as:
+  `complexity_multiplier * age_multiplier`.
+- Both multipliers compose multiplicatively — independent pressures combine
+  naturally.
+- Applied to: noop, eat, move, reproduce, steal, and failed_action_penalty costs.
+- Centralized via `EnergyConfig::action_cost_multiplier(complexity, age)`.
 
 Energy posture:
 - Energy lifecycle and action-cost config values are continuous scalar units
