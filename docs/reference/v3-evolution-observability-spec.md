@@ -88,8 +88,12 @@ Mutation accounting invariants:
   mutation_events_attempted_total`
 - `sum(mutation_events_applied_total_by_domain) =
   mutation_events_applied_total`
-- `sum(mutation_events_attempted_total_by_operator) =
-  mutation_events_attempted_total`
+- `sum(mutation_events_attempted_total_by_operator) +
+  domain_level_skips <= mutation_events_attempted_total`
+  (Domain-level skips occur when complexity pressure restricts a domain
+  that has no eligible operators, e.g. VM under Decreasing-only restriction.
+  These events are counted in `attempted_total` and `attempted_by_domain`
+  but not in `attempted_by_operator` since no operator was selected.)
 - `sum(mutation_events_applied_total_by_operator) =
   mutation_events_applied_total`
 - `mutation_events_applied_total_semantic_noop +

@@ -14,6 +14,12 @@ impl ComplexityEffect {
     pub const fn is_increasing(self) -> bool {
         matches!(self, Self::Increasing)
     }
+
+    /// Returns true if this effect is `Decreasing`.
+    #[must_use]
+    pub const fn is_decreasing(self) -> bool {
+        matches!(self, Self::Decreasing)
+    }
 }
 
 /// The two architectural layers of genome mutation.
@@ -442,6 +448,17 @@ impl MutationSummary {
         self.skipped_events += 1;
         *self.skip_reasons.entry(reason).or_insert(0) += 1;
     }
+
+    /// Record a skip where no operator could be selected for a domain.
+    ///
+    /// Increments attempted_events, attempted_by_domain, and skipped_events
+    /// without recording an operator-level attempt (since none was selected).
+    pub fn record_domain_skip(&mut self, domain: MutationDomain, reason: MutationSkipReason) {
+        self.attempted_events += 1;
+        *self.attempted_by_domain.entry(domain).or_insert(0) += 1;
+        self.skipped_events += 1;
+        *self.skip_reasons.entry(reason).or_insert(0) += 1;
+    }
 }
 
 #[cfg(test)]
@@ -467,6 +484,13 @@ mod tests {
     fn zero_summary_accounting_invariant() {
         let s = MutationSummary::zero();
         assert_eq!(s.attempted_events, s.applied_events + s.skipped_events);
+    }
+
+    #[test]
+    fn is_decreasing_returns_true_only_for_decreasing() {
+        assert!(!ComplexityEffect::Increasing.is_decreasing());
+        assert!(ComplexityEffect::Decreasing.is_decreasing());
+        assert!(!ComplexityEffect::Neutral.is_decreasing());
     }
 
     #[test]

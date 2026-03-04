@@ -69,6 +69,37 @@ impl InputRefOperator {
         sum
     };
 
+    const DECREASING_WEIGHT: u16 = {
+        let mut sum = 0u16;
+        let mut i = 0;
+        while i < Self::ALL.len() {
+            if Self::ALL[i].complexity_effect().is_decreasing() {
+                sum += Self::ALL[i].weight() as u16;
+            }
+            i += 1;
+        }
+        sum
+    };
+
+    /// Pick a random Decreasing-only operator weighted by impact tier.
+    pub fn random_decreasing(rng: &mut impl Rng) -> Option<Self> {
+        if Self::DECREASING_WEIGHT == 0 {
+            return None;
+        }
+        let mut r = rng.gen_range(0..Self::DECREASING_WEIGHT);
+        for &op in &Self::ALL {
+            if !op.complexity_effect().is_decreasing() {
+                continue;
+            }
+            let w = op.weight() as u16;
+            if r < w {
+                return Some(op);
+            }
+            r -= w;
+        }
+        unreachable!()
+    }
+
     /// Pick a random non-increasing operator (Neutral or Decreasing) weighted by impact tier.
     pub fn random_non_increasing(rng: &mut impl Rng) -> Option<Self> {
         if Self::NON_INCREASING_WEIGHT == 0 {
@@ -649,6 +680,47 @@ mod tests {
         assert!(
             saw_decreasing,
             "must produce at least one decreasing operator"
+        );
+    }
+
+    #[test]
+    fn random_decreasing_never_returns_non_decreasing() {
+        use crate::mutation::types::ComplexityEffect;
+        for seed in 0u64..200 {
+            let mut r = rng(seed);
+            if let Some(op) = InputRefOperator::random_decreasing(&mut r) {
+                assert_eq!(
+                    op.complexity_effect(),
+                    ComplexityEffect::Decreasing,
+                    "random_decreasing returned non-Decreasing operator {:?} at seed {}",
+                    op,
+                    seed
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn random_decreasing_covers_all_decreasing_operators() {
+        use std::collections::HashSet;
+        let expected: HashSet<InputRefOperator> = InputRefOperator::ALL
+            .iter()
+            .copied()
+            .filter(|op| op.complexity_effect().is_decreasing())
+            .collect();
+        let mut seen = HashSet::new();
+        for seed in 0u64..2000 {
+            let mut r = rng(seed);
+            if let Some(op) = InputRefOperator::random_decreasing(&mut r) {
+                seen.insert(op);
+            }
+            if seen == expected {
+                break;
+            }
+        }
+        assert_eq!(
+            seen, expected,
+            "random_decreasing must cover all Decreasing operators"
         );
     }
 
