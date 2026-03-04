@@ -1,4 +1,4 @@
-import { memo, useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { ActionResult, ActionType } from "../../types/action-log.ts";
 import type { ActionLogEntry } from "../../types/action-log.ts";
 
@@ -37,6 +37,7 @@ export function directionLabel(dir: number): string {
 }
 
 const SEGMENT_WIDTH = 6;
+const TICK_LABEL_INTERVAL = 50;
 
 interface ActionTimelineProps {
 	actionLog: ActionLogEntry[];
@@ -47,28 +48,85 @@ export const ActionTimeline = memo(function ActionTimeline({
 	actionLog,
 }: ActionTimelineProps) {
 	const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
+	const scrollRef = useRef<HTMLDivElement>(null);
+	const isFollowingRef = useRef(true);
 
 	// Reset selection when the log data changes (new fetch cycle)
 	useEffect(() => {
 		setSelectedIndex(null);
 	}, [actionLog]);
 
+	// "Following" auto-scroll: only scroll to right edge when user is already there
+	useLayoutEffect(() => {
+		const el = scrollRef.current;
+		if (el && isFollowingRef.current) {
+			el.scrollLeft = el.scrollWidth - el.clientWidth;
+		}
+	}, [actionLog]);
+
+	const handleScroll = useCallback(() => {
+		const el = scrollRef.current;
+		if (!el) return;
+		// Consider "at right edge" if within 2px tolerance
+		const atEnd = el.scrollLeft + el.clientWidth >= el.scrollWidth - 2;
+		isFollowingRef.current = atEnd;
+	}, []);
+
 	const selectedEntry = selectedIndex !== null ? actionLog[selectedIndex] ?? null : null;
+	const totalWidth = actionLog.length * SEGMENT_WIDTH;
 
 	return (
 		<div className="px-4 py-3 space-y-2">
 			<span className="text-xs text-slate-500 uppercase tracking-wider font-medium">
 				Action Timeline
 			</span>
-			<TimelineBar
-				entries={actionLog}
-				selectedIndex={selectedIndex}
-				onSelect={setSelectedIndex}
-			/>
+			<div
+				ref={scrollRef}
+				className="overflow-x-auto"
+				onScroll={handleScroll}
+			>
+				<div style={{ width: totalWidth, minWidth: "100%" }}>
+					<TickAxis entries={actionLog} />
+					<TimelineBar
+						entries={actionLog}
+						selectedIndex={selectedIndex}
+						onSelect={setSelectedIndex}
+					/>
+				</div>
+			</div>
 			{selectedEntry ? <ActionDetail entry={selectedEntry} /> : null}
 		</div>
 	);
 });
+
+export function tickLabels(entries: ActionLogEntry[]): { tick: number; offsetPx: number }[] {
+	const labels: { tick: number; offsetPx: number }[] = [];
+	for (let i = 0; i < entries.length; i++) {
+		const entry = entries[i];
+		if (entry && entry.tick % TICK_LABEL_INTERVAL === 0) {
+			labels.push({ tick: entry.tick, offsetPx: i * SEGMENT_WIDTH });
+		}
+	}
+	return labels;
+}
+
+function TickAxis({ entries }: { entries: ActionLogEntry[] }) {
+	const labels = tickLabels(entries);
+
+	return (
+		<div className="relative h-3 text-[9px] text-slate-500 font-mono select-none" aria-hidden="true">
+			{labels.map((label) => (
+				<span
+					key={label.tick}
+					className="absolute whitespace-nowrap"
+					style={{ left: label.offsetPx }}
+				>
+					{label.tick}
+				</span>
+			))}
+		</div>
+	);
+}
 
 function TimelineBar({
 	entries,
@@ -81,7 +139,7 @@ function TimelineBar({
 }) {
 	return (
 		<div
-			className="flex overflow-x-auto"
+			className="flex"
 			style={{ minHeight: 20 }}
 			role="toolbar"
 			aria-label="Action timeline"
