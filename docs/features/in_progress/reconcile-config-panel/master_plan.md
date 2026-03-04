@@ -70,7 +70,7 @@ After completing each implementation step:
 
 ### Phase 1: Type alignment
 
-- [ ] **Fix TypeScript config types** (`frontend/src/types/config.ts`):
+- [x] **Fix TypeScript config types** (`frontend/src/types/config.ts`):
   - Rename `hebbian_update_cost` → `plasticity_update_cost` in `RuntimeConfig`
   - Add `reward_learning_cost: number` to `RuntimeConfig`
   - Add `max_actions_per_turn: number` to `RuntimeConfig`
