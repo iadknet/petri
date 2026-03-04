@@ -100,6 +100,8 @@ After completing each implementation step:
 - [x] Step 3: Register the new section in `RuntimeConfigPanel.tsx` — import `ComplexityEnergyCostSection`, spread its `ALL_FIELDS` into `RUNTIME_PATCH_FIELDS`, and render `<ComplexityEnergyCostFieldGroup>` in the panel JSX within the energy config area.
 - [x] Step 4: Verify all tests pass: `cd frontend && npm test`, `cd v3 && cargo test --workspace` (backend unchanged, sanity check). Fix any test fixture issues.
 - [x] Step 5: Run full completion gate: `scripts/check-plan-harness.sh --mode strict`, `cd v3 && cargo fmt --all -- --check`, `cd v3 && cargo test --workspace`, `cd v3 && cargo clippy --workspace --all-targets -- -D warnings`.
+- [x] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke domain skills. Fix all findings. Re-review until clean pass.
+- [x] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
 
 ---
 

@@ -134,6 +134,10 @@ Enhanced NodeGraph in the creature inspector:
 
 Key challenge is auto-labeling heuristics for nodes from bytecode/graph structure. Even rough labels ("reads 3 food sensors → outputs to action queue") are far more useful than raw node IDs.
 
+### Genome viewer connection directionality and downstream tree highlighting
+
+In the genome/mesh viewer, better distinguish the directionality of connections (e.g., arrowheads, gradient coloring, or animated flow indicators). When clicking on a node, highlight the full "tree" of interconnected downstream nodes and the connections between them — making it easy to trace signal flow from any point in the mesh.
+
 ### Genome diff / comparison tool
 Select two creatures (or a parent-offspring pair) and see:
 - Structural diff — nodes added/removed/rewired
