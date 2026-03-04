@@ -13,7 +13,7 @@
 ## Boundary Impact
 
 - **v3-core::creature**: New `ActionLog` and `ActionLogEntry` types added to creature module. These are data definitions only — no new field on `CreatureState`.
-- **v3-core::simulation**: `Simulation` struct gains a parallel `SlotMap<CreatureId, ActionLog>` field (`action_logs`). This keeps observational infrastructure separate from simulation state. Lifecycle managed at spawn (insert empty log) and death (remove log).
+- **v3-core::simulation**: `Simulation` struct gains a parallel `SecondaryMap<CreatureId, ActionLog>` field (`action_logs`). This keeps observational infrastructure separate from simulation state. Lifecycle managed at spawn (insert empty log) and death (remove log).
 - **v3-core::simulation::tick**: Phase 2 action execution records entries after each action — tick owns action application, so it owns log recording. Writes to `sim.action_logs` instead of creature state.
 - **v3-core::config**: New `ActionLogConfig` with `capacity` field added to `SimulationConfig`.
 - **v3-server::handlers**: Extended creature endpoint returns action log data for selected creature.
@@ -24,7 +24,7 @@
 | Area | Decision | Rationale |
 |------|----------|-----------|
 | `v3-core::creature` | keep | CreatureState remains pure simulation state. Action log types (ActionLogEntry, ActionLog) are defined in the creature module as data types but not added as fields on CreatureState. |
-| `v3-core::simulation` | keep | Simulation gains a parallel `action_logs: SlotMap<CreatureId, ActionLog>` for observational state. Keeps observation separate from simulation state, following the same pattern as `stats: SimStats`. |
+| `v3-core::simulation` | keep | Simulation gains a parallel `action_logs: SecondaryMap<CreatureId, ActionLog>` for observational state. Keeps observation separate from simulation state, following the same pattern as `stats: SimStats`. |
 | `v3-core::simulation::tick` | keep | Tick Phase 2 owns action execution and outcome recording. Log recording is a natural extension of the existing `outcome_acc.record_action_result()` pattern. |
 | `v3-core::contracts` | keep | WorldAction and result enums already exist. ActionLogEntry references them by value, not by adding to contracts. |
 | `v3-server::handlers::creature` | keep | Existing `get_creature` endpoint returns per-creature detail. Action log is added to this response within existing boundary. |
@@ -39,9 +39,9 @@
 | Interaction with outcome/reward system? | Independent. OutcomeRecord is computed separately for plasticity. The log is purely observational. | agent | resolved |
 | Per-action or per-tick granularity? | Per-action. Multiple actions per tick are stored as separate entries, each with the tick number. | agent | resolved |
 | Reproduction inheritance semantics? | Not inherited. A new empty ActionLog is inserted into `sim.action_logs` at spawn. Removed at death. A creature's log records only its own lifetime. | agent | resolved |
-| Where do action logs live? | Parallel `SlotMap<CreatureId, ActionLog>` on `Simulation`, not on `CreatureState`. Keeps CreatureState as pure simulation state and avoids touching every test fixture that constructs creatures. | agent | resolved |
+| Where do action logs live? | Parallel `SecondaryMap<CreatureId, ActionLog>` on `Simulation`, not on `CreatureState`. Keeps CreatureState as pure simulation state and avoids touching every test fixture that constructs creatures. | agent | resolved |
 | Ring buffer implementation? | `VecDeque<ActionLogEntry>` with manual cap enforcement (pop_front when at capacity). Simple, no external deps, cache-friendly. | agent | resolved |
-| ActionLogEntry size? | Target ≤32 bytes. Use `u8` for action type and result code, `u16` for direction, `f32` for energy/amounts. Assert size with `mem-assert-type-size`. | agent | resolved |
+| ActionLogEntry size? | Target exactly 32 bytes. Use `#[repr(u8)]` enums for action type and result (type-safe, 1 byte each), `u8` for direction, `f32` for energy/amounts. Assert size with compile-time `const _: () = assert!(size_of::<ActionLogEntry>() == 32);`. | agent | resolved |
 
 ## Required Skills
 
@@ -74,20 +74,40 @@ After completing each implementation step:
 ### ActionLogEntry struct
 
 ```rust
+/// Action type discriminant for log entries.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[repr(u8)]
+pub enum ActionType {
+    NoOp = 0,
+    Eat = 1,
+    Move = 2,
+    Reproduce = 3,
+    StealEnergy = 4,
+}
+
+/// Outcome of an action for log entries. Covers all action-specific result variants.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
+#[repr(u8)]
+pub enum ActionResult {
+    Success = 0,
+    NoFood = 1,
+    Blocked = 2,
+    InvalidTarget = 3,
+    EnergyConstraints = 4,
+    PopulationCap = 5,
+    TransferredAndKilled = 6,
+    NoVictim = 7,
+}
+
 /// Single action record in a creature's action log.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
 pub struct ActionLogEntry {
     /// Simulation tick when this action was executed.
     pub tick: u64,
-    /// Action type discriminant (0=NoOp, 1=Eat, 2=Move, 3=Reproduce, 4=StealEnergy).
-    pub action_type: u8,
-    /// Result code. Meaning depends on action_type:
-    /// - NoOp: 0=ok
-    /// - Eat: 0=consumed, 1=no_food
-    /// - Move: 0=moved, 1=blocked
-    /// - Reproduce: 0=spawned, 1=invalid_target, 2=energy, 3=pop_cap
-    /// - StealEnergy: 0=transferred, 1=transferred_and_killed, 2=no_victim
-    pub result_code: u8,
+    /// Action type.
+    pub action_type: ActionType,
+    /// Action result.
+    pub result: ActionResult,
     /// Direction parameter (0-7 for cardinal+diagonal, 255=N/A).
     pub direction: u8,
     /// Creature energy BEFORE this action was applied.
@@ -105,7 +125,7 @@ pub struct ActionLogEntry {
 }
 ```
 
-Size: 4×f32 (16) + u64 (8) + 3×u8 (3) + padding = 28-32 bytes. Will assert with compile-time check.
+Size: 4×f32 (16) + u64 (8) + 3×u8 (3) + padding = 32 bytes. Assert exactly 32 at compile time with `const _: () = assert!(size_of::<ActionLogEntry>() == 32);`.
 
 ### ActionLog struct
 
@@ -117,7 +137,7 @@ pub struct ActionLog {
 }
 ```
 
-Methods: `new(capacity)`, `push(entry)` (auto-evicts oldest), `entries() -> &VecDeque<ActionLogEntry>`, `len()`, `is_empty()`.
+Methods: `new(capacity)` (uses `VecDeque::with_capacity(capacity)` to pre-allocate), `push(entry)` (auto-evicts oldest), `entries() -> &VecDeque<ActionLogEntry>`, `len()`, `is_empty()`.
 
 ### Config
 
@@ -134,13 +154,13 @@ Added to `SimulationConfig` as `pub action_log: ActionLogConfig` with `#[serde(d
 
 ### Storage on Simulation
 
-Action logs live in a parallel `SlotMap<CreatureId, ActionLog>` on `Simulation`:
+Action logs live in a parallel `SecondaryMap<CreatureId, ActionLog>` on `Simulation`:
 
 ```rust
 pub struct Simulation {
     pub world: WorldState,
     pub creatures: SlotMap<CreatureId, CreatureState>,
-    pub action_logs: SlotMap<CreatureId, ActionLog>,  // NEW
+    pub action_logs: SecondaryMap<CreatureId, ActionLog>,  // NEW — slotmap::SecondaryMap
     pub tick: u64,
     pub config: SimulationConfig,
     pub stats: SimStats,
@@ -152,7 +172,7 @@ This keeps `CreatureState` as pure simulation state. Lifecycle:
 - **Spawn** (seeding + reproduction): insert `ActionLog` keyed to match the creature's `CreatureId`.
 - **Death** (Phase 0 removal + predation kill): remove corresponding `action_logs` entry.
 
-Note: `SlotMap` requires matching keys. Use the creature's `CreatureId` to insert into `action_logs` at the same sites where creatures are inserted/removed.
+`SecondaryMap` is the idiomatic slotmap companion type — it accepts keys from the primary `SlotMap<CreatureId, CreatureState>` and validates them against it. Insert with `action_logs.insert(creature_id, log)` at spawn sites; remove with `action_logs.remove(creature_id)` at death sites.
 
 ### Recording in tick.rs
 
@@ -164,14 +184,14 @@ Extend `get_creature` response with an `"action_log"` field containing the seria
 
 ## Implementation Steps
 
-- [ ] Step 1: Define `ActionLogEntry` and `ActionLog` types in new file `v3/crates/v3-core/src/creature/action_log.rs`. Include compile-time size assertion. Write unit tests for ring buffer behavior (push, eviction, capacity).
-- [ ] Step 2: Add `ActionLogConfig` to `v3/crates/v3-core/src/config/simulation.rs` with default. Add `action_logs: SlotMap<CreatureId, ActionLog>` field to `Simulation`. Update `Simulation::new()` to initialize empty slotmap. Update spawn sites (seeding, reproduction) to insert empty `ActionLog` keyed to the creature's ID. Update death sites (Phase 0 removal, predation kill) to remove corresponding log entry.
+- [ ] Step 1: Define `ActionType` enum, `ActionResult` enum, `ActionLogEntry` struct, and `ActionLog` ring buffer in new file `v3/crates/v3-core/src/creature/action_log.rs`. Include compile-time size assertion (`size_of::<ActionLogEntry>() == 32`). Write unit tests for ring buffer behavior (push, eviction at capacity, pre-allocation with `VecDeque::with_capacity`).
+- [ ] Step 2: Add `ActionLogConfig` to `v3/crates/v3-core/src/config/simulation.rs` with default. Add `action_logs: SecondaryMap<CreatureId, ActionLog>` field to `Simulation`. Update `Simulation::new()` to initialize empty `SecondaryMap`. Update spawn sites (seeding, reproduction) to insert empty `ActionLog` keyed to the creature's ID. Update death sites (Phase 0 removal, predation kill) to remove corresponding log entry.
 - [ ] Step 3: Record action log entries in `tick.rs` Phase 2. For each action branch, capture `energy_before`, execute action, capture `energy_after` (including penalty), build `ActionLogEntry`, push to `sim.action_logs[id]`. Write integration test: run a tick, verify creature has log entries with correct action types and energy deltas.
-- [ ] Step 4: Add `serde::Serialize` to `ActionLogEntry`. Extend `get_creature` handler in `v3-server` to include `action_log` field in JSON response (read from `sim.action_logs`). Write server test verifying the endpoint returns action log data.
+- [ ] Step 4: Extend `get_creature` handler in `v3-server` to include `action_log` field in JSON response (read from `sim.action_logs`). `serde::Serialize` is already derived on `ActionLogEntry`/`ActionType`/`ActionResult` from Step 1. Write server test verifying the endpoint returns action log data.
 - [ ] Review Gate: Interim code review — review Steps 1-4 changes. Invoke `rust-skills`. Fix findings, re-review until clean.
 - [ ] Step 5: Run viability tests (`cargo test -p v3-core --test viability`) and full workspace tests. Fix any regressions.
 - [ ] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke `rust-skills`. Fix all findings. Re-review until clean pass.
 - [ ] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
 - [ ] Completion gate — run all checks from AGENTS.md Completion Gate section
 
-**Review cycles:** 2 (cycle 1: initial plan with action log on CreatureState. Cycle 2: moved to parallel SlotMap on Simulation for cleaner separation of observational vs simulation state — clean pass)
+**Review cycles:** 3 (cycle 1: initial plan with action log on CreatureState. Cycle 2: moved to parallel SlotMap on Simulation for cleaner separation. Cycle 3: rust-skills review — replaced raw u8 fields with `#[repr(u8)]` enums per `type-no-stringly`, fixed SlotMap→SecondaryMap per slotmap API semantics, pinned size assertion to exactly 32, noted VecDeque pre-allocation — clean pass)
