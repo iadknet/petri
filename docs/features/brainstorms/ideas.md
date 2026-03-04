@@ -23,6 +23,8 @@ Each creature maintains a log of all its actions and action metadata. Needs deta
 - Creatures have an output ability to copy parts of their genome into other creatures
 - Can take source node ID, target node ID
 - Open question: can it copy whole parts of the mesh?
+  - Maybe have a branch-depth value. Starts with node id and copies all nodes to specified depth?
+  - This whole copying of a "unit" of the mesh feels like it would be best abstracted out into its own thing so that it can be used by multiple features.
 
 ### Additional asexual reproduction options
 - Creatures can choose to produce offspring with only certain sections of their mesh
