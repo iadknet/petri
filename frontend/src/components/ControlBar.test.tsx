@@ -24,7 +24,7 @@ const MOCK_CONFIG: SimulationConfig = {
 	world: {
 		width: 512,
 		height: 384,
-		edge_mode: "wrap",
+		edge_mode: "Wrap",
 		food: {
 			growth_rate: 0.2,
 			initial_density: 1.0,
@@ -57,6 +57,11 @@ const MOCK_CONFIG: SimulationConfig = {
 			threshold: 50,
 			scaling_factor: 0.002,
 		},
+		age_cost: {
+			enabled: true,
+			age_cap: 500,
+			max_multiplier: 10.0,
+		},
 	},
 	runtime: {
 		max_mesh_hops: 128,
@@ -65,8 +70,11 @@ const MOCK_CONFIG: SimulationConfig = {
 		graph_convergence_epsilon: 0.001,
 		graph_convergence_stable_passes: 1,
 		graph_node_base_cost: 0.05,
-		hebbian_update_cost: 0.0,
+		plasticity_update_cost: 0.0,
+		reward_learning_cost: 0.0,
+		max_actions_per_turn: 10,
 		vm: { opcode_cost_multiplier: 0.5 },
+		perception: { vision_radius: 5 },
 	},
 	mutation: {
 		mutation_probability: 0.01,
@@ -75,11 +83,16 @@ const MOCK_CONFIG: SimulationConfig = {
 		mesh_layer_probability: 0.2,
 		complexity_cap: 1200,
 		complexity_pressure_enabled: true,
+		action_queue_cap: 4,
 		phenotype: {
 			channel_step: 1,
 			channel_change_chance: 0.001,
 			polarity_flip_chance: 0.0002,
 		},
+	},
+	predation: {
+		steal_cost_rate: 0.2,
+		kill_complexity_bonus_multiplier: 0.05,
 	},
 };
 
@@ -123,6 +136,7 @@ describe("ControlBar", () => {
 			world: {
 				width: 512,
 				height: 384,
+				edge_mode: "Wrap",
 				food: {
 					initial_density: 1.0,
 					initial_coverage: 0.4,
@@ -160,6 +174,7 @@ describe("ControlBar", () => {
 				world: {
 					width: 512,
 					height: 384,
+					edge_mode: "Wrap",
 					food: {
 						initial_density: 1.0,
 						initial_coverage: 0.4,
