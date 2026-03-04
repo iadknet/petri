@@ -1,8 +1,9 @@
 use rand::rngs::SmallRng;
-use slotmap::SlotMap;
+use slotmap::{SecondaryMap, SlotMap};
 
 use crate::config::SimulationConfig;
 use crate::contracts::CreatureId;
+use crate::creature::action_log::ActionLog;
 use crate::creature::state::CreatureState;
 use crate::kernel::paint::{PaintPoint, PaintStats, PaintTool};
 use crate::kernel::WorldState;
@@ -16,6 +17,8 @@ use crate::simulation::stats::SimStats;
 pub struct Simulation {
     pub world: WorldState,
     pub creatures: SlotMap<CreatureId, CreatureState>,
+    /// Per-creature action logs, parallel to `creatures`. Observational only.
+    pub action_logs: SecondaryMap<CreatureId, ActionLog>,
     pub tick: u64,
     pub config: SimulationConfig,
     pub stats: SimStats,
@@ -39,6 +42,7 @@ impl Simulation {
         Self {
             world,
             creatures,
+            action_logs: SecondaryMap::new(),
             tick,
             config,
             stats: SimStats::default(),
@@ -69,6 +73,7 @@ impl Simulation {
                 .apply_paint_stroke(tool, brush_half_extent, points, max_density);
         for id in evicted {
             self.creatures.remove(id);
+            self.action_logs.remove(id);
         }
         stats
     }
