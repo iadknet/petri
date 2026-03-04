@@ -145,6 +145,45 @@ impl ComplexityEnergyCostConfig {
     }
 }
 
+/// Age-based energy cost multiplier config.
+/// Canonical owner: v3-runtime-config-spec.md Section 4.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AgeEnergyCostConfig {
+    /// Whether the age energy cost multiplier is active.
+    pub enabled: bool,
+    /// Age (in ticks) at which the maximum multiplier applies.
+    pub age_cap: u64,
+    /// Maximum energy cost multiplier at or beyond age_cap.
+    pub max_multiplier: f32,
+}
+
+impl Default for AgeEnergyCostConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            age_cap: 500,
+            max_multiplier: 10.0,
+        }
+    }
+}
+
+impl AgeEnergyCostConfig {
+    /// Returns the energy cost multiplier for a creature of the given age.
+    ///
+    /// Formula: `1.0 + (max_multiplier - 1.0) * min(1.0, age / age_cap)^2`
+    /// Returns 1.0 (no penalty) when disabled or age_cap is 0.
+    #[inline]
+    #[must_use]
+    pub fn multiplier(&self, age: u64) -> f32 {
+        if !self.enabled || self.age_cap == 0 {
+            return 1.0;
+        }
+        let ratio = (age as f32 / self.age_cap as f32).min(1.0);
+        1.0 + (self.max_multiplier - 1.0) * ratio * ratio
+    }
+}
+
 /// Combined energy config.
 #[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -153,6 +192,19 @@ pub struct EnergyConfig {
     pub costs: EnergyCostsConfig,
     #[serde(default)]
     pub complexity_cost: ComplexityEnergyCostConfig,
+    #[serde(default)]
+    pub age_cost: AgeEnergyCostConfig,
+}
+
+impl EnergyConfig {
+    /// Combined multiplier for all action energy costs.
+    ///
+    /// Composes complexity-based and age-based multipliers multiplicatively.
+    #[inline]
+    #[must_use]
+    pub fn action_cost_multiplier(&self, complexity: u32, age: u64) -> f32 {
+        self.complexity_cost.multiplier(complexity) * self.age_cost.multiplier(age)
+    }
 }
 
 /// VM runtime config. Canonical owner: v3-runtime-config-spec.md Section 2.
@@ -398,6 +450,9 @@ impl SimulationConfig {
         let cc = &mut self.energy.complexity_cost;
         cc.scaling_factor = normalize_f32_finite_nonneg(cc.scaling_factor, 0.002);
 
+        let ac = &mut self.energy.age_cost;
+        ac.max_multiplier = normalize_f32_finite_min(ac.max_multiplier, 1.0, 10.0);
+
         let rt = &mut self.runtime;
         if rt.max_mesh_hops < 1 {
             rt.max_mesh_hops = 1024;
@@ -526,6 +581,10 @@ mod tests {
         assert!(cfg.energy.complexity_cost.enabled);
         assert_eq!(cfg.energy.complexity_cost.threshold, 50);
         assert!((cfg.energy.complexity_cost.scaling_factor - 0.002).abs() < 1e-6);
+        // Age energy cost
+        assert!(cfg.energy.age_cost.enabled);
+        assert_eq!(cfg.energy.age_cost.age_cap, 500);
+        assert!((cfg.energy.age_cost.max_multiplier - 10.0).abs() < 1e-6);
         // Energy costs
         assert!((cfg.energy.costs.move_cost - 1.0).abs() < 1e-6);
         assert!((cfg.energy.costs.eat_cost - 0.0).abs() < 1e-6);
@@ -898,5 +957,139 @@ mod tests {
         cfg.energy.complexity_cost.scaling_factor = -0.5;
         cfg.normalize();
         assert!((cfg.energy.complexity_cost.scaling_factor - 0.002).abs() < 1e-6);
+    }
+
+    // ── AgeEnergyCostConfig tests ─────────────────────────────────────────
+
+    #[test]
+    fn age_cost_config_default_values() {
+        let ac = AgeEnergyCostConfig::default();
+        assert!(ac.enabled);
+        assert_eq!(ac.age_cap, 500);
+        assert!((ac.max_multiplier - 10.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn energy_config_has_age_cost_field() {
+        let cfg = SimulationConfig::default();
+        assert!(cfg.energy.age_cost.enabled);
+        assert_eq!(cfg.energy.age_cost.age_cap, 500);
+        assert!((cfg.energy.age_cost.max_multiplier - 10.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_age_cost_max_multiplier_nan_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.age_cost.max_multiplier = f32::NAN;
+        cfg.normalize();
+        assert!((cfg.energy.age_cost.max_multiplier - 10.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_age_cost_max_multiplier_below_one_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.age_cost.max_multiplier = 0.5;
+        cfg.normalize();
+        assert!((cfg.energy.age_cost.max_multiplier - 10.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_age_cost_max_multiplier_infinity_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.age_cost.max_multiplier = f32::INFINITY;
+        cfg.normalize();
+        assert!((cfg.energy.age_cost.max_multiplier - 10.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_age_cost_max_multiplier_exactly_one_kept() {
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.age_cost.max_multiplier = 1.0;
+        cfg.normalize();
+        assert!((cfg.energy.age_cost.max_multiplier - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn age_cost_config_serde_roundtrip() {
+        let cfg = SimulationConfig::default();
+        let json = serde_json::to_string(&cfg).unwrap();
+        let cfg2: SimulationConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(cfg2.energy.age_cost.age_cap, 500);
+        assert!((cfg2.energy.age_cost.max_multiplier - 10.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn age_cost_config_serde_default_when_missing() {
+        // EnergyConfig without age_cost field should get defaults via #[serde(default)]
+        let json = r#"{"lifecycle":{"initial_energy":20.0,"max_energy":200.0,"energy_decay_per_tick":0.5,"min_reproduce_energy":1.0,"default_offspring_energy":100.0},"costs":{"move_cost":1.0,"eat_cost":0.0,"noop_cost":0.05,"reproduce_cost":0.1,"eat_reward_per_food":12.0,"failed_action_penalty":5.0},"complexity_cost":{"enabled":true,"threshold":50,"scaling_factor":0.002}}"#;
+        let ec: EnergyConfig = serde_json::from_str(json).unwrap();
+        assert!(ec.age_cost.enabled);
+        assert_eq!(ec.age_cost.age_cap, 500);
+    }
+
+    #[test]
+    fn age_multiplier_at_age_zero_returns_one() {
+        let ac = AgeEnergyCostConfig::default();
+        assert!((ac.multiplier(0) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn age_multiplier_mid_range_quadratic() {
+        let ac = AgeEnergyCostConfig::default(); // age_cap=500, max_multiplier=10.0
+                                                 // age=250: ratio=0.5, 1.0 + 9.0 * 0.25 = 3.25
+        assert!((ac.multiplier(250) - 3.25).abs() < 1e-4);
+    }
+
+    #[test]
+    fn age_multiplier_at_cap_returns_max() {
+        let ac = AgeEnergyCostConfig::default();
+        assert!((ac.multiplier(500) - 10.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn age_multiplier_above_cap_clamped() {
+        let ac = AgeEnergyCostConfig::default();
+        assert!((ac.multiplier(1000) - 10.0).abs() < 1e-4);
+    }
+
+    #[test]
+    fn age_multiplier_disabled_returns_one() {
+        let ac = AgeEnergyCostConfig {
+            enabled: false,
+            age_cap: 500,
+            max_multiplier: 10.0,
+        };
+        assert!((ac.multiplier(400) - 1.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn age_multiplier_zero_cap_returns_one() {
+        let ac = AgeEnergyCostConfig {
+            enabled: true,
+            age_cap: 0,
+            max_multiplier: 10.0,
+        };
+        assert!((ac.multiplier(100) - 1.0).abs() < f32::EPSILON);
+    }
+
+    // ── EnergyConfig::action_cost_multiplier tests ────────────────────────
+
+    #[test]
+    fn action_cost_multiplier_composes_complexity_and_age() {
+        let ec = EnergyConfig::default();
+        // complexity=200, age=250
+        // complexity_mult = 1.0 + (200-50)*0.002 = 1.3
+        // age_mult = 1.0 + 9.0 * 0.25 = 3.25
+        // combined = 1.3 * 3.25 = 4.225
+        let mult = ec.action_cost_multiplier(200, 250);
+        assert!((mult - 4.225).abs() < 1e-3);
+    }
+
+    #[test]
+    fn action_cost_multiplier_baseline_returns_one() {
+        let ec = EnergyConfig::default();
+        // complexity=0 (below threshold), age=0 → both return 1.0
+        let mult = ec.action_cost_multiplier(0, 0);
+        assert!((mult - 1.0).abs() < f32::EPSILON);
     }
 }
