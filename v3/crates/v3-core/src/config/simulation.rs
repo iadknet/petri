@@ -136,6 +136,7 @@ impl ComplexityEnergyCostConfig {
     /// Formula: `1.0 + max(0, complexity - threshold) * scaling_factor`
     /// Returns 1.0 (no penalty) when disabled or complexity is at or below threshold.
     #[inline]
+    #[must_use]
     pub fn multiplier(&self, complexity: u32) -> f32 {
         if !self.enabled || complexity <= self.threshold {
             return 1.0;
