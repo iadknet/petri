@@ -20,9 +20,9 @@ No crate or module boundaries change. This is a frontend-only bug fix affecting 
 
 | Area | Decision | Rationale |
 |------|----------|-----------|
-| Frontend type contract (`types/genome.ts`) | Change — add `"ActionQueue"` variant | Must match backend `InputReference` enum |
-| Inspector display utilities (`inputRefUtils.ts`) | Change — add string guards | Must handle unit enum variants before `in` operator |
-| Backend `InputReference` serialization | Keep | Serde's default externally-tagged representation is correct; frontend must adapt |
+| Frontend type contract (`types/genome.ts`) | change | Must match backend `InputReference` enum — add `"ActionQueue"` variant |
+| Inspector display utilities (`inputRefUtils.ts`) | change | Must handle unit enum variants before `in` operator — add string guards |
+| Backend `InputReference` serialization | keep | Serde's default externally-tagged representation is correct; frontend must adapt |
 
 ## Open Questions
 
