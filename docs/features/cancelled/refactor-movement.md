@@ -3,7 +3,7 @@ title: Refactor Movement to Forward/Turn Model
 tags: [simulation, core, frontend]
 size: XL
 depends-on: []
-status: needs-review
+status: cancelled
 ---
 
 ## Problem Statement
