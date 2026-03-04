@@ -3,7 +3,7 @@ title: Destructive-Only Complexity Cap
 tags: [simulation, core, genome]
 size: S
 depends-on: []
-status: needs-review
+status: ready
 ---
 
 ## Problem Statement
