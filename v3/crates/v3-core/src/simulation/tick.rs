@@ -1311,14 +1311,14 @@ mod tests {
             if let Some(log) = sim.action_logs.get(id) {
                 for entry in log.entries() {
                     // Verify action type is one of the known variants.
-                    matches!(
+                    assert!(matches!(
                         entry.action_type,
                         ActionType::NoOp
                             | ActionType::Eat
                             | ActionType::Move
                             | ActionType::Reproduce
                             | ActionType::StealEnergy
-                    );
+                    ));
                     // energy_after should differ from energy_before (action costs).
                     // (NoOp has a cost too, so they should always differ.)
                 }
