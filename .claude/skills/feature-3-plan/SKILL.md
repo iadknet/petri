@@ -9,190 +9,111 @@ description: Use when a needs_refinement feature has its problem statement, acce
 
 ## Overview
 
-Runs a mandatory recursive architectural decomposition review, then creates `docs/features/ready_to_implement/FEATURE-NAME/master_plan.md` satisfying the full plan-harness schema. The plan MUST include review gate checkmarks as explicit steps.
+Writes `master_plan.md`, runs 3 mandatory subagent-dispatched review passes until all converge to 0 findings, then commits. See `plan-templates.md` in this skill directory for all section requirements, copy-paste templates, the pre-commit checklist, and commit instructions.
 
 ## Pre-Promotion Checklist
 
-Before starting the review cycle, verify:
-1. All Open Questions in `needs_refinement/FEATURE-NAME.md` have owner + status (resolved or tracked)
+Before starting, verify in `needs_refinement/FEATURE-NAME.md`:
+1. All Open Questions have owner + status (resolved or tracked)
 2. Size is specified
 3. Problem Statement is complete
-4. At least one User Story / Acceptance Criterion is defined
+4. At least one Acceptance Criterion is defined
 
-## Architectural Decomposition Review (Mandatory, Recursive)
+## Workflow
 
-This review MUST happen during planning — not deferred to implementation.
+1. Write initial `master_plan.md` draft using templates from `plan-templates.md`
+2. Run all 3 review passes (see below)
+3. Verify pre-commit checklist in `plan-templates.md`
+4. Commit using instructions in `plan-templates.md`
+
+## Plan Review Passes (Mandatory, Sequential, Subagent-Dispatched)
+
+**Core rule:** Each review pass MUST be dispatched to a **separate subagent** (Agent tool, `subagent_type: general-purpose`). You may NOT perform these reviews inline. Subagent dispatch is the enforcement mechanism — it prevents you from shortcutting the review.
+
+A pass is "clean" only when the subagent reports **0 findings**. If findings > 0: revise the plan draft, then re-dispatch the SAME pass. Only advance to the next pass after the current one is clean.
 
 ```dot
-digraph arch_review {
+digraph review_flow {
   rankdir=TB;
   node [shape=box];
-  "Read refinement doc" -> "Review decomposition\n& boundaries";
-  "Review decomposition\n& boundaries" -> "Invoke domain skills\non plan draft";
-  "Invoke domain skills\non plan draft" -> "Re-read docs/strategy/\n& AGENTS.md files";
-  "Re-read docs/strategy/\n& AGENTS.md files" -> "New findings?";
-  "New findings?" [shape=diamond];
-  "New findings?" -> "Revise plan draft" [label="yes"];
-  "Revise plan draft" -> "Review decomposition\n& boundaries";
-  "New findings?" -> "Record cycle count\nProceed to write plan" [label="no — clean pass"];
+  "Write initial plan draft\n(master_plan.md)" -> "Dispatch Pass N\nto subagent";
+  "Dispatch Pass N\nto subagent" -> "Findings?";
+  "Findings?" [shape=diamond];
+  "Findings?" -> "Revise plan draft" [label="> 0"];
+  "Revise plan draft" -> "Re-dispatch Pass N\nto subagent";
+  "Re-dispatch Pass N\nto subagent" -> "Findings?";
+  "Findings?" -> "Last pass?" [label="0 findings"];
+  "Last pass?" [shape=diamond];
+  "Last pass?" -> "Advance to Pass N+1" [label="no"];
+  "Advance to Pass N+1" -> "Dispatch Pass N\nto subagent";
+  "Last pass?" -> "Commit plan" [label="yes — all 3 clean"];
 }
 ```
 
-### Review Checklist (all mandatory)
+### Pass 1: Domain Skills Review
 
-1. **Decomposition:** Review for separation of concerns, single-responsibility violations, and opportunities to split work into smaller units.
-2. **Boundary check:** Verify proposed changes respect existing crate/module boundaries and dependency directions.
-3. **Domain skill review:**
-   - **REQUIRED SUB-SKILL:** Rust/backend in scope → invoke `rust-skills`, review plan against it
-   - **REQUIRED SUB-SKILL:** Frontend in scope → invoke `vercel-react-best-practices` + `vercel-composition-patterns`, review
-   - Incorporate findings into plan scope or Open Questions
-4. **Architecture docs:** Re-read `docs/strategy/` architecture docs and relevant crate/module `AGENTS.md` files. Verify no conflicts with existing boundaries, dependency directions, or module responsibilities.
-5. **Goal alignment:** Re-read `docs/strategy/goals.md` and verify Goal IDs map accurately.
-6. **Repeat** from step 1 until a clean pass (no new findings).
+Dispatch subagent to:
+- Read the plan draft (provide full plan text in prompt)
+- Invoke applicable domain skills: Rust → `rust-skills`; Frontend → `vercel-react-best-practices` + `vercel-composition-patterns` + `frontend-design`
+- Review the plan against each loaded skill for performance, composition, API design, and pattern issues
 
-Record: `**Review cycles:** N` in `master_plan.md`.
+### Pass 2: Decomposition & Codebase Consistency Review
 
-## master_plan.md Creation
+Dispatch subagent to:
+- Read the plan draft
+- **Explore actual source code** in directories the plan touches (use Glob/Grep/Read — not just docs)
+- Compare proposed patterns, component structure, state management, and file organization against **existing codebase conventions**
+- Check for: separation of concerns violations, unnecessary novelty vs existing patterns, missed reuse opportunities, single-responsibility violations, type/module domain boundary correctness, data flow implications
 
-Create `docs/features/ready_to_implement/FEATURE-NAME/master_plan.md` with:
+**Why this pass matters:** Domain skills (Pass 1) give good generic advice that may conflict with this specific codebase's conventions. Pass 2 catches those conflicts.
 
-### Required Metadata Lines
-```markdown
-**Goal:** [one-line goal statement]
-**Goal IDs:** GP-XX, GO-XX (from docs/strategy/goals.md)
-**Scope:** [what's in/out]
-**Docs Impact:** [canonical docs touched]
-**Supersedes:** [prior plans this replaces, or "none"]
-**Superseded-By:** [none]
+### Pass 3: Architecture, Boundary & Goal Alignment Review
+
+Dispatch subagent to:
+- Read the plan draft
+- Re-read `docs/strategy/` architecture docs and `docs/strategy/goals.md`
+- Re-read relevant crate/module `AGENTS.md` files
+- Verify: proposed changes respect crate/module boundaries and dependency directions; no conflicts with existing architecture decisions; Goal IDs map accurately to work items; no goals are undermined
+
+### Subagent Requirements
+
+Each review pass subagent prompt MUST include:
+1. The **full plan text** (not a summary)
+2. The **specific pass instructions** from the corresponding section above
+3. The **required output format** below
+4. For Pass 2: the **directory paths** the plan touches
+
+If a subagent times out, that is a failed pass — re-dispatch it.
+
+### Required Subagent Output Format
+
+Include this in every review pass subagent prompt:
+```
+Return your review in this exact format:
+
+## Findings
+1. [HIGH/MEDIUM/LOW] Description of finding and recommended fix
+2. [HIGH/MEDIUM/LOW] ...
+
+**Total: N findings**
+
+If no issues found, return:
+
+## Findings
+(none)
+
+**Total: 0 findings**
 ```
 
-### Required Sections
-- `## Goal Alignment` — maps each Goal ID to specific work items
-- `## Boundary Impact` — what crate/module boundaries change
-- `## Existing Boundary Recheck` — table: `| Area | Decision | Rationale |` (≥2 rows, decision = keep/change)
-- `## Open Questions` — table: `| Question | Decision | Owner | Status |` (≥1 row, all resolved)
-- `## Required Skills` — domain skills to invoke (see template below)
-- `## TDD Policy` — see template below
-- `## Code Review Policy` — see template below
-- `## Commit Policy` — see template below
-- `## Implementation Steps` — `- [ ]` checkmark format with **mandatory review gate checkmarks** (see below)
+### Review Audit Trail
 
-### Required Skills Section Template
-```markdown
-## Required Skills
-- Rust/backend changes: invoke `rust-skills` BEFORE writing any Rust code and before each review
-- Frontend changes: invoke `vercel-react-best-practices` and `vercel-composition-patterns`
-  BEFORE writing any frontend code and before each review
-- Frontend UI/design: invoke `web-design-guidelines` and `frontend-design` BEFORE writing any UI
-  code; use `agent-browser` for screenshot-based design validation after each step
-```
-(Include only the lines applicable to this feature's scope.)
-
-### TDD Policy Section Template
-```markdown
-## TDD Policy
-For all behavior changes and bug fixes: write a failing test FIRST, then implement.
-A step is not complete until:
-1. The failing test exists and is committed
-2. The implementation makes it pass
-3. No existing tests regress
-
-Frontend: e2e tests using `agent-browser` MUST be written per user-facing step.
-Frontend UI changes: use `agent-browser` screenshots + `web-design-guidelines` review after each step.
-Repeat screenshot + review until clean (recursive).
-```
-
-### Code Review Policy Section Template
-```markdown
-## Code Review Policy
-After completing each implementation step:
-1. Run a thorough code review (backend: `rust-skills`; frontend: vercel skills)
-2. Fix ALL findings
-3. Run review AGAIN — repeat until no new findings (clean recursive pass)
-4. Only after clean pass: commit the step
-```
-
-### Commit Policy Section Template
-```markdown
-## Commit Policy
-- Commits happen AFTER a clean code review pass, never before
-- One commit per implementation step (focused, atomic)
-- Do NOT advance to the next step until current step is committed and reviewed clean
-```
-
-### Implementation Steps Format — WITH MANDATORY REVIEW GATES
-
-**CRITICAL:** Every plan MUST include review gate checkmarks as `- [ ]` items within `## Implementation Steps`. These are not optional. The plan harness validates their presence.
+After each pass converges, append the subagent's final output to `FEATURE-NAME/review_log.md`:
 
 ```markdown
-## Implementation Steps
-- [ ] Step 1: ...
-- [ ] Step 2: ...
-- [ ] Step N: ... (last implementation step)
-- [ ] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke domain skills (backend: `rust-skills`; frontend: `vercel-react-best-practices` + `vercel-composition-patterns`). Fix all findings. Re-review until clean pass.
-- [ ] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
-- [ ] Completion gate — run all checks from AGENTS.md Completion Gate section
+## Pass N: [Pass Name] — Dispatch M
+[paste subagent's Findings output here]
 ```
 
-**Agents follow checkmarks. If it is not a checkmark, it will be skipped.** This is why review gates MUST be checkmarks, not prose policies.
+If `review_log.md` does not exist or is missing passes, the review was not completed.
 
-For large features (6+ implementation steps), add an **interim review gate** after every 3-4 steps:
-```markdown
-- [ ] Step 1: ...
-- [ ] Step 2: ...
-- [ ] Step 3: ...
-- [ ] Review Gate: Interim code review — review Steps 1-3 changes. Fix findings, re-review until clean.
-- [ ] Step 4: ...
-- [ ] Step 5: ...
-- [ ] Step 6: ...
-- [ ] Review Gate: Code review — full branch diff review (see above)
-- [ ] Review Gate: Architecture & decomposition review (see above)
-- [ ] Completion gate — run all AGENTS.md completion checks
-```
-
-## Plan Splitting Rule
-
-If `master_plan.md` exceeds ~500 lines or covers more than one major area, split into companion files:
-- Companion naming: `FEATURE-NAME-TOPIC.md` (e.g., `storage-slots-server.md`)
-- `master_plan.md` must include `**See also:**` links to each companion
-- Each companion must include a `**Parent plan:**` back-reference to `master_plan.md`
-- Each file (main and companion) must independently satisfy required metadata and structure rules
-
-## Enforcement Checklist
-
-Before writing the file, verify the draft enforces:
-- [ ] `rust-skills` reference if any Rust/backend changes in scope
-- [ ] `vercel-react-best-practices` / `vercel-composition-patterns` if any frontend in scope
-- [ ] `frontend-design` + `web-design-guidelines` if any UI/design changes in scope
-- [ ] `agent-browser` for e2e tests per frontend step (not as afterthought)
-- [ ] `superpowers:using-git-worktrees` mentioned in implementation setup
-- [ ] `## TDD Policy` section present
-- [ ] `## Required Skills` section present
-- [ ] `## Code Review Policy` with recursive gate
-- [ ] `## Commit Policy`
-- [ ] Implementation Steps use `- [ ]` format
-- [ ] **Review Gate checkmarks present in Implementation Steps** (code review + architecture review)
-- [ ] Interim review gates added for features with 6+ steps
-- [ ] `**Review cycles:** N` at bottom
-
-## Final Action — Commit All Planning Artifacts
-
-1. **Archive the refinement doc** into the plan directory so it travels with the feature through the lifecycle:
-
-```bash
-mv docs/features/needs_refinement/FEATURE-NAME.md docs/features/ready_to_implement/FEATURE-NAME/refinement.md
-
-# Maintain .gitkeep so empty directory stays tracked
-[ -z "$(ls -A docs/features/needs_refinement/ 2>/dev/null)" ] && touch docs/features/needs_refinement/.gitkeep
-```
-
-2. **Commit ALL artifacts** created during planning on the current branch:
-
-```bash
-git add docs/features/ready_to_implement/FEATURE-NAME/
-git add docs/features/needs_refinement/
-git add docs/features/brainstorms/ideas.md  # if modified
-git commit -m "plan: FEATURE-NAME — architectural review and implementation plan"
-```
-
-**This commit is mandatory.** `feature-4-implement` creates a worktree from HEAD. If planning artifacts are uncommitted, they will not exist in the worktree and the implementation workflow will break.
+Record total subagent dispatches: `**Review cycles:** N` in `master_plan.md`.
