@@ -128,7 +128,7 @@ After completing each implementation step:
   (backward compat), filtered response with since_tick, empty result when
   since_tick is ahead of all entries.
 
-- [ ] Step 3: **`exclude` query parameter (server)** — Extend `CreatureQuery`
+- [x] Step 3: **`exclude` query parameter (server)** — Extend `CreatureQuery`
   with optional `exclude: Option<String>`. Parse comma-separated field names
   (`genome`, `action_log`, `memory`). When a field is excluded, omit it from the
   JSON response entirely (do not set to null). Use `serde_json::Map` for manual

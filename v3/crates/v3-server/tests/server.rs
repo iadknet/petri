@@ -1323,6 +1323,87 @@ async fn get_creature_since_tick_filters_action_log() {
     }
 }
 
+// ── 28d. get_creature_exclude_omits_fields ──────────────────────────────────
+
+#[tokio::test]
+async fn get_creature_exclude_omits_fields() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":42}"#))
+        .await
+        .unwrap();
+
+    // Get a creature ID.
+    let (_, snapshot_body) = do_request(
+        a.clone(),
+        get_req("/v3/simulation/snapshot?zoom_tier=detail"),
+    )
+    .await;
+    let creatures = snapshot_body["view"]["creatures"]
+        .as_array()
+        .expect("creatures array");
+    assert!(!creatures.is_empty());
+    let creature_id = creatures[0]["id"].as_u64().unwrap();
+
+    // No exclude — all fields present.
+    let uri = format!("/v3/simulation/creature/{creature_id}");
+    let (status, body) = do_request(a.clone(), get_req(&uri)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert!(body.get("genome").is_some(), "genome should be present");
+    assert!(body.get("memory").is_some(), "memory should be present");
+    assert!(
+        body.get("action_log").is_some(),
+        "action_log should be present"
+    );
+
+    // exclude=genome — genome omitted, others present.
+    let uri_excl_genome = format!("/v3/simulation/creature/{creature_id}?exclude=genome");
+    let (status, body) = do_request(a.clone(), get_req(&uri_excl_genome)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert!(body.get("genome").is_none(), "genome should be omitted");
+    assert!(body.get("memory").is_some(), "memory should be present");
+    assert!(
+        body.get("action_log").is_some(),
+        "action_log should be present"
+    );
+    // Scalar fields always present.
+    assert!(body.get("energy").is_some(), "energy should be present");
+    assert!(
+        body.get("phenotype").is_some(),
+        "phenotype should be present"
+    );
+    assert!(
+        body.get("latest_tick").is_some(),
+        "latest_tick should be present"
+    );
+
+    // exclude=genome,action_log — both omitted.
+    let uri_excl_both = format!("/v3/simulation/creature/{creature_id}?exclude=genome,action_log");
+    let (status, body) = do_request(a.clone(), get_req(&uri_excl_both)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert!(body.get("genome").is_none(), "genome should be omitted");
+    assert!(
+        body.get("action_log").is_none(),
+        "action_log should be omitted"
+    );
+    assert!(body.get("memory").is_some(), "memory should be present");
+
+    // exclude=genome,action_log,memory — all optional fields omitted.
+    let uri_excl_all =
+        format!("/v3/simulation/creature/{creature_id}?exclude=genome,action_log,memory");
+    let (status, body) = do_request(a, get_req(&uri_excl_all)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert!(body.get("genome").is_none(), "genome should be omitted");
+    assert!(
+        body.get("action_log").is_none(),
+        "action_log should be omitted"
+    );
+    assert!(body.get("memory").is_none(), "memory should be omitted");
+    // Core scalar fields still present.
+    assert!(body.get("energy").is_some(), "energy should be present");
+    assert!(body.get("id").is_some(), "id should be present");
+}
+
 // ── 29. paint_erase_barrier_clears_barrier ──────────────────────────────────
 
 #[tokio::test]
