@@ -154,22 +154,22 @@ After completing each implementation step:
   parameters (`since_tick`, `exclude`), full response schema, ActionLogEntry
   field definitions, error cases (404).
 
-- [ ] Review Gate: Interim code review — review Steps 1-5 changes. Invoke
+- [x] Review Gate: Interim code review — review Steps 1-5 changes. Invoke
   `rust-skills` for backend, `vercel-react-best-practices` for frontend. Fix
   findings, re-review until clean.
 
-- [ ] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent
+- [x] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent
   on full branch diff. Invoke domain skills (backend: `rust-skills`; frontend:
   `vercel-react-best-practices` + `vercel-composition-patterns`). Fix all
   findings. Re-review until clean pass.
 
-- [ ] Review Gate: Architecture & decomposition review — review all changes for
+- [x] Review Gate: Architecture & decomposition review — review all changes for
   boundary violations, decomposition opportunities, separation of concerns.
   Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues,
   capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until
   clean pass.
 
-- [ ] Completion gate — run all checks from AGENTS.md Completion Gate section:
+- [x] Completion gate — run all checks from AGENTS.md Completion Gate section:
   1. `scripts/check-doc-harness.sh --mode strict`
   2. `scripts/check-architecture-harness.sh --mode strict`
   3. `scripts/check-plan-harness.sh --mode strict`
