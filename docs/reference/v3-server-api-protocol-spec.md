@@ -499,6 +499,102 @@ Execution-sampler rules:
 - existing sampler behavior remains otherwise unchanged
 - detailed perception field ownership remains in `v3-sensor-spec.md`
 
+### 4.11 `GET /v3/simulation/creature/:id`
+
+Path parameters:
+- `:id` — creature FFI ID (u64).
+
+Query parameters (all optional):
+- `since_tick` (u64) — when present, only action_log entries with
+  `entry.tick > since_tick` are returned. Omit for the full log.
+- `exclude` (string) — comma-separated field names to omit from the response.
+  Valid values: `genome`, `action_log`, `memory`. Excluded fields are absent
+  from the JSON (not set to null). Unknown names are silently ignored.
+
+Response (full, no query parameters):
+
+```json
+{
+  "protocol_version": "v3alpha1",
+  "id": 7,
+  "position": { "x": 10, "y": 22 },
+  "energy": 41.0,
+  "max_energy": 20.0,
+  "age": 84,
+  "generation": 3,
+  "complexity": 12,
+  "phenotype": {
+    "channels": [128, 0, 64, 0, 0, 0],
+    "active_channel": 0,
+    "polarity": [true, false, true, false, false, false],
+    "rgb": [128, 0, 64]
+  },
+  "latest_tick": 84,
+  "genome": { "entry_node_id": 0, "nodes": ["..."] },
+  "memory": [0, 0, 0, 0, 0, 0, 0, 0],
+  "action_log": [
+    {
+      "tick": 84,
+      "action_type": "Eat",
+      "result": "Success",
+      "direction": 255,
+      "energy_before": 35.5,
+      "energy_after": 41.0,
+      "amount": 6.0,
+      "priority_bid": 0.5
+    }
+  ]
+}
+```
+
+Field definitions:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `protocol_version` | string | Always `"v3alpha1"`. |
+| `id` | u64 | Creature FFI ID. |
+| `position` | `{x, y}` | Current grid position. |
+| `energy` | f32 | Current energy level. |
+| `max_energy` | f32 | Maximum energy (from config). |
+| `age` | u64 | Ticks alive. |
+| `generation` | u64 | Reproduction generation (0 = founder). |
+| `complexity` | u32 | Genome complexity (node count). |
+| `phenotype` | object | Visual phenotype state. |
+| `latest_tick` | u64 | Tick of the most recent action_log entry (0 if empty). Always present, even when `action_log` is excluded. Used as cursor for `since_tick`. |
+| `genome` | object | Full genome (omitted when `exclude` contains `genome`). |
+| `memory` | `u8[]` | 8-byte creature memory (omitted when `exclude` contains `memory`). |
+| `action_log` | array | Action log entries (omitted when `exclude` contains `action_log`). |
+
+`ActionLogEntry` field definitions:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `tick` | u64 | Simulation tick when the action was executed. |
+| `action_type` | string | One of `NoOp`, `Eat`, `Move`, `Reproduce`, `StealEnergy`. |
+| `result` | string | One of `Success`, `NoFood`, `Blocked`, `InvalidTarget`, `EnergyConstraints`, `PopulationCap`, `TransferredAndKilled`, `NoVictim`. |
+| `direction` | u8 | Direction parameter (0-7 cardinal+diagonal, 255 = N/A). |
+| `energy_before` | f32 | Creature energy before the action. |
+| `energy_after` | f32 | Creature energy after the action (includes costs). |
+| `amount` | f32 | Action-specific amount (food consumed, energy transferred, 0 otherwise). |
+| `priority_bid` | f32 | Priority bid value for that tick. |
+
+`phenotype` sub-object:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `channels` | `u8[6]` | Per-channel phenotype values (2 per RGB component). |
+| `active_channel` | usize | Index of the currently mutating channel. |
+| `polarity` | `bool[6]` | Per-channel drift direction (true = incrementing). |
+| `rgb` | `u8[3]` | Derived RGB color. |
+
+Incremental polling pattern:
+1. First request: `GET /v3/simulation/creature/:id` (no query params) — full response.
+2. Subsequent requests: `GET /v3/simulation/creature/:id?since_tick={latest_tick}&exclude=genome` — returns only new action_log entries and omits immutable genome.
+3. Client appends returned action_log entries to its local cache, trimming to ring buffer capacity.
+
+Error cases:
+- `404 not_found` — creature ID does not exist.
+
 ---
 
 ## 5. WebSocket Stream Contract (`/v3/ws`)

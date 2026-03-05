@@ -148,7 +148,7 @@ After completing each implementation step:
   `setDetail` to handle optional fields and incremental action_log merging.
   Run `npm run build` to verify no type errors.
 
-- [ ] Step 5: **API spec documentation** — Add section 4.11 to
+- [x] Step 5: **API spec documentation** — Add section 4.11 to
   `docs/reference/v3-server-api-protocol-spec.md` documenting the
   `GET /v3/simulation/creature/:id` endpoint: path parameters, query
   parameters (`since_tick`, `exclude`), full response schema, ActionLogEntry
