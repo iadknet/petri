@@ -13,10 +13,11 @@ use crate::kernel::WorldState;
 
 /// Apply a NoOp action (deduct noop cost, scaled by genome complexity and age).
 pub fn apply_noop(creature: &mut CreatureState, config: &SimulationConfig) {
-    let mult = config
-        .energy
-        .action_cost_multiplier(creature.genome.complexity(), creature.age);
-    creature.energy -= config.energy.costs.noop_cost * mult;
+    creature.energy -= config.energy.adjusted_action_cost(
+        config.energy.costs.noop_cost,
+        creature.genome.complexity(),
+        creature.age,
+    );
 }
 
 /// Apply an Eat action: consume all food on the creature's cell, reward energy, cap at max.
@@ -31,10 +32,11 @@ pub fn apply_eat(
     let food = world.consume_food(creature.position);
     creature.energy += food * config.energy.costs.eat_reward_per_food;
     creature.energy = creature.energy.min(config.energy.lifecycle.max_energy);
-    let mult = config
-        .energy
-        .action_cost_multiplier(creature.genome.complexity(), creature.age);
-    creature.energy -= config.energy.costs.eat_cost * mult;
+    creature.energy -= config.energy.adjusted_action_cost(
+        config.energy.costs.eat_cost,
+        creature.genome.complexity(),
+        creature.age,
+    );
     food > 0.0
 }
 
@@ -63,10 +65,11 @@ pub fn apply_move(
         false
     };
 
-    let mult = config
-        .energy
-        .action_cost_multiplier(creature.genome.complexity(), creature.age);
-    creature.energy -= config.energy.costs.move_cost * mult;
+    creature.energy -= config.energy.adjusted_action_cost(
+        config.energy.costs.move_cost,
+        creature.genome.complexity(),
+        creature.age,
+    );
     succeeded
 }
 
@@ -180,11 +183,11 @@ mod tests {
     fn apply_move_updates_position_and_occupancy() {
         let start = Position::new(5, 5);
         let (mut sim, id) = make_sim_one_creature(start, 50.0);
-        let move_cost = sim.config.energy.costs.move_cost;
-        let mult = sim
-            .config
-            .energy
-            .action_cost_multiplier(sim.creatures[id].genome.complexity(), sim.creatures[id].age);
+        let adjusted_move_cost = sim.config.energy.adjusted_action_cost(
+            sim.config.energy.costs.move_cost,
+            sim.creatures[id].genome.complexity(),
+            sim.creatures[id].age,
+        );
         let energy_before = sim.creatures[id].energy;
         {
             let creature = sim.creatures.get_mut(id).unwrap();
@@ -195,7 +198,7 @@ mod tests {
         assert_eq!(sim.creatures[id].position, expected);
         assert!(sim.world.creature_at(expected).is_some());
         assert!(sim.world.creature_at(start).is_none());
-        assert!((sim.creatures[id].energy - (energy_before - move_cost * mult)).abs() < 1e-6);
+        assert!((sim.creatures[id].energy - (energy_before - adjusted_move_cost)).abs() < 1e-6);
     }
 
     #[test]
@@ -205,11 +208,11 @@ mod tests {
         // Place a barrier to the north.
         sim.world.set_barrier(Position::new(5, 4), true);
         let energy_before = sim.creatures[id].energy;
-        let move_cost = sim.config.energy.costs.move_cost;
-        let mult = sim
-            .config
-            .energy
-            .action_cost_multiplier(sim.creatures[id].genome.complexity(), sim.creatures[id].age);
+        let adjusted_move_cost = sim.config.energy.adjusted_action_cost(
+            sim.config.energy.costs.move_cost,
+            sim.creatures[id].genome.complexity(),
+            sim.creatures[id].age,
+        );
         {
             let creature = sim.creatures.get_mut(id).unwrap();
             let _ = apply_move(id, creature, &mut sim.world, Direction::N, &sim.config);
@@ -219,7 +222,7 @@ mod tests {
             "should not move into barrier"
         );
         assert!(
-            (sim.creatures[id].energy - (energy_before - move_cost * mult)).abs() < 1e-6,
+            (sim.creatures[id].energy - (energy_before - adjusted_move_cost)).abs() < 1e-6,
             "cost still deducted"
         );
     }
