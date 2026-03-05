@@ -112,7 +112,7 @@ After completing each implementation step:
 
 ## Implementation Steps
 
-- [ ] Step 1: **tower-http CompressionLayer** — Add `tower-http` as a workspace
+- [x] Step 1: **tower-http CompressionLayer** — Add `tower-http` as a workspace
   dependency in `v3/Cargo.toml` with `compression-gzip` and `compression-br`
   features. Add it to `v3-server/Cargo.toml`. Import and apply
   `CompressionLayer::new()` as a layer on the router in `v3-server/src/lib.rs`.
