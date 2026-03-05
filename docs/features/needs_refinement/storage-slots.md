@@ -37,7 +37,6 @@ Creatures currently have no way to interact with the environment beyond eating f
 - Barrier on target: remove barrier, store `Barrier` in slot
 - Food on target (density > 0.0): clear food, store `Food { density }`
 - No barrier or food: action fails
-- Barrier takes priority over food if both somehow present
 
 ### Place Semantics
 - Resolve target neighbor using existing world edge rules
