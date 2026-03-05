@@ -31,9 +31,9 @@ depends-on: []
 
 | Area | Decision | Rationale |
 |------|----------|-----------|
-| `v3/crates/v3-core/src/config/simulation.rs` (`EnergyConfig`) | keep — add method here | `EnergyConfig` already owns `action_cost_multiplier()`; the new helper composes it with a base cost. Natural home. |
-| `v3/crates/v3-core/src/simulation/actions/` | keep — update call sites only | Action functions remain responsible for orchestrating the action; they delegate cost computation to the config helper. |
-| `v3/crates/v3-core/src/simulation/tick.rs` | keep — update call sites only | Tick orchestration delegates cost computation to the config helper for failed-action penalties. |
+| `v3/crates/v3-core/src/config/simulation.rs` (`EnergyConfig`) | keep | `EnergyConfig` already owns `action_cost_multiplier()`; the new helper composes it with a base cost. Natural home. |
+| `v3/crates/v3-core/src/simulation/actions/` | keep | Action functions remain responsible for orchestrating the action; they delegate cost computation to the config helper. |
+| `v3/crates/v3-core/src/simulation/tick.rs` | keep | Tick orchestration delegates cost computation to the config helper for failed-action penalties. |
 
 ## Open Questions
 
@@ -141,8 +141,8 @@ After completing each implementation step:
 - [x] Step 5: Replace production call site in `actions/predation.rs` (1 site: `apply_steal_energy`) with the helper. Run `cargo test`.
 - [x] Step 6: Replace production call sites in `tick.rs` (4 sites: failed-action penalties) with the helper. Run `cargo test`.
 - [x] Step 7: Update test call sites in `actions/mod.rs`, `actions/predation.rs`, and `tick.rs` to use the helper where appropriate (8 sites). Run `cargo test`.
-- [ ] Review Gate: Code review — invoke `rust-skills` on full branch diff. Fix all findings. Re-review until clean pass.
-- [ ] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
-- [ ] Completion gate — run all checks from AGENTS.md Completion Gate section
+- [x] Review Gate: Code review — invoke `rust-skills` on full branch diff. Fix all findings. Re-review until clean pass.
+- [x] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
+- [x] Completion gate — run all checks from AGENTS.md Completion Gate section
 
 **Review cycles:** 3
