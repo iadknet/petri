@@ -1229,6 +1229,181 @@ async fn get_creature_includes_action_log() {
     assert!(entry["priority_bid"].is_number(), "missing priority_bid");
 }
 
+// ── 28c. get_creature_since_tick_filters_action_log ──────────────────────────
+
+#[tokio::test]
+async fn get_creature_since_tick_filters_action_log() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":42}"#))
+        .await
+        .unwrap();
+    a.clone()
+        .oneshot(post_req("/v3/simulation/start"))
+        .await
+        .unwrap();
+    a.clone()
+        .oneshot(post_req("/v3/simulation/pause"))
+        .await
+        .unwrap();
+
+    // Run 3 ticks so creatures have multiple action log entries.
+    let (status, _) = do_request(
+        a.clone(),
+        post_json("/v3/simulation/step", r#"{"steps":3}"#),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Get a creature ID.
+    let (_, snapshot_body) = do_request(
+        a.clone(),
+        get_req("/v3/simulation/snapshot?zoom_tier=detail"),
+    )
+    .await;
+    let creatures = snapshot_body["view"]["creatures"]
+        .as_array()
+        .expect("creatures array");
+    assert!(!creatures.is_empty());
+    let creature_id = creatures[0]["id"].as_u64().unwrap();
+
+    // Full fetch (no since_tick) — should include latest_tick and full action_log.
+    let uri = format!("/v3/simulation/creature/{creature_id}");
+    let (status, body) = do_request(a.clone(), get_req(&uri)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    let full_log = body["action_log"].as_array().expect("action_log array");
+    let full_count = full_log.len();
+    assert!(full_count > 0, "should have entries after 3 ticks");
+    let latest_tick = body["latest_tick"].as_u64().expect("latest_tick");
+    assert!(latest_tick > 0, "latest_tick should be > 0 after stepping");
+
+    // Fetch with since_tick = latest_tick — should return empty action_log
+    // (no entries have tick > latest_tick).
+    let uri_future = format!("/v3/simulation/creature/{creature_id}?since_tick={latest_tick}");
+    let (status, body) = do_request(a.clone(), get_req(&uri_future)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    let future_log = body["action_log"].as_array().expect("action_log array");
+    assert!(
+        future_log.is_empty(),
+        "since_tick at latest_tick should return empty log, got {} entries",
+        future_log.len()
+    );
+    // latest_tick is still the same even with since_tick filtering.
+    assert_eq!(
+        body["latest_tick"].as_u64().unwrap(),
+        latest_tick,
+        "latest_tick should be consistent"
+    );
+
+    // Fetch with since_tick = latest_tick - 1 — should return fewer entries than full.
+    if latest_tick > 1 {
+        let uri_partial = format!(
+            "/v3/simulation/creature/{creature_id}?since_tick={}",
+            latest_tick - 1
+        );
+        let (status, body) = do_request(a, get_req(&uri_partial)).await;
+        assert_eq!(status, StatusCode::OK, "body: {body}");
+        let partial_log = body["action_log"].as_array().expect("action_log array");
+        // All returned entries must have tick > (latest_tick - 1).
+        for entry in partial_log {
+            let t = entry["tick"].as_u64().unwrap();
+            assert!(
+                t > latest_tick - 1,
+                "entry tick {t} should be > {}",
+                latest_tick - 1
+            );
+        }
+        // Partial result should be a subset of the full result.
+        assert!(
+            partial_log.len() <= full_count,
+            "filtered log ({}) should not exceed full log ({})",
+            partial_log.len(),
+            full_count
+        );
+    }
+}
+
+// ── 28d. get_creature_exclude_omits_fields ──────────────────────────────────
+
+#[tokio::test]
+async fn get_creature_exclude_omits_fields() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":42}"#))
+        .await
+        .unwrap();
+
+    // Get a creature ID.
+    let (_, snapshot_body) = do_request(
+        a.clone(),
+        get_req("/v3/simulation/snapshot?zoom_tier=detail"),
+    )
+    .await;
+    let creatures = snapshot_body["view"]["creatures"]
+        .as_array()
+        .expect("creatures array");
+    assert!(!creatures.is_empty());
+    let creature_id = creatures[0]["id"].as_u64().unwrap();
+
+    // No exclude — all fields present.
+    let uri = format!("/v3/simulation/creature/{creature_id}");
+    let (status, body) = do_request(a.clone(), get_req(&uri)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert!(body.get("genome").is_some(), "genome should be present");
+    assert!(body.get("memory").is_some(), "memory should be present");
+    assert!(
+        body.get("action_log").is_some(),
+        "action_log should be present"
+    );
+
+    // exclude=genome — genome omitted, others present.
+    let uri_excl_genome = format!("/v3/simulation/creature/{creature_id}?exclude=genome");
+    let (status, body) = do_request(a.clone(), get_req(&uri_excl_genome)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert!(body.get("genome").is_none(), "genome should be omitted");
+    assert!(body.get("memory").is_some(), "memory should be present");
+    assert!(
+        body.get("action_log").is_some(),
+        "action_log should be present"
+    );
+    // Scalar fields always present.
+    assert!(body.get("energy").is_some(), "energy should be present");
+    assert!(
+        body.get("phenotype").is_some(),
+        "phenotype should be present"
+    );
+    assert!(
+        body.get("latest_tick").is_some(),
+        "latest_tick should be present"
+    );
+
+    // exclude=genome,action_log — both omitted.
+    let uri_excl_both = format!("/v3/simulation/creature/{creature_id}?exclude=genome,action_log");
+    let (status, body) = do_request(a.clone(), get_req(&uri_excl_both)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert!(body.get("genome").is_none(), "genome should be omitted");
+    assert!(
+        body.get("action_log").is_none(),
+        "action_log should be omitted"
+    );
+    assert!(body.get("memory").is_some(), "memory should be present");
+
+    // exclude=genome,action_log,memory — all optional fields omitted.
+    let uri_excl_all =
+        format!("/v3/simulation/creature/{creature_id}?exclude=genome,action_log,memory");
+    let (status, body) = do_request(a, get_req(&uri_excl_all)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert!(body.get("genome").is_none(), "genome should be omitted");
+    assert!(
+        body.get("action_log").is_none(),
+        "action_log should be omitted"
+    );
+    assert!(body.get("memory").is_none(), "memory should be omitted");
+    // Core scalar fields still present.
+    assert!(body.get("energy").is_some(), "energy should be present");
+    assert!(body.get("id").is_some(), "id should be present");
+}
+
 // ── 29. paint_erase_barrier_clears_barrier ──────────────────────────────────
 
 #[tokio::test]
@@ -1829,4 +2004,42 @@ async fn ws_non_overlapping_barrier_paint_rebroadcasts_world_static_only() {
     );
 
     server_task.abort();
+}
+
+// ── compression_returns_gzip_when_accepted ────────────────────────────────
+
+#[tokio::test]
+async fn compression_returns_gzip_when_accepted() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":42}"#))
+        .await
+        .unwrap();
+
+    // Request status with Accept-Encoding: gzip
+    let req = Request::builder()
+        .method("GET")
+        .uri("/v3/simulation/status")
+        .header("accept-encoding", "gzip")
+        .body(Body::empty())
+        .unwrap();
+
+    let resp = a.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Verify the response uses gzip content-encoding
+    let encoding = resp
+        .headers()
+        .get("content-encoding")
+        .expect("missing content-encoding header")
+        .to_str()
+        .unwrap();
+    assert_eq!(encoding, "gzip", "expected gzip content-encoding");
+
+    // Verify the body is valid gzip-compressed data that can be decompressed
+    let compressed_bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    assert!(
+        !compressed_bytes.is_empty(),
+        "compressed body should not be empty"
+    );
 }
