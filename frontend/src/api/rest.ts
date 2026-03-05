@@ -95,8 +95,20 @@ class ApiClient {
 		});
 	}
 
-	async getCreature(id: number, signal?: AbortSignal): Promise<CreatureDetail> {
-		return this.request(`/v3/simulation/creature/${id}`, { signal });
+	async getCreature(
+		id: number,
+		signal?: AbortSignal,
+		query?: { since_tick?: number; exclude?: string },
+	): Promise<CreatureDetail> {
+		const params = new URLSearchParams();
+		if (query?.since_tick !== undefined) {
+			params.set("since_tick", String(query.since_tick));
+		}
+		if (query?.exclude) {
+			params.set("exclude", query.exclude);
+		}
+		const suffix = params.size > 0 ? `?${params.toString()}` : "";
+		return this.request(`/v3/simulation/creature/${id}${suffix}`, { signal });
 	}
 
 	async paint(req: PaintRequest): Promise<PaintResponse> {

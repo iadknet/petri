@@ -136,7 +136,7 @@ After completing each implementation step:
   exclude=genome omits genome, exclude=genome,action_log omits both, no exclude
   returns full response.
 
-- [ ] Step 4: **Frontend: incremental fetching** — Update
+- [x] Step 4: **Frontend: incremental fetching** — Update
   `frontend/src/api/rest.ts` `getCreature()` to accept optional
   `since_tick` and `exclude` query parameters. Update
   `frontend/src/types/genome.ts` `CreatureDetail` to make `genome`,

@@ -123,7 +123,12 @@ export interface CreatureDetail {
 	generation: number;
 	complexity: number;
 	phenotype: CreaturePhenotype;
-	genome: CreatureGenome;
-	memory: number[];
-	action_log: ActionLogEntry[];
+	/** Present unless excluded via `exclude=genome` query parameter. */
+	genome?: CreatureGenome;
+	/** Present unless excluded via `exclude=memory` query parameter. */
+	memory?: number[];
+	/** Present unless excluded via `exclude=action_log` query parameter. */
+	action_log?: ActionLogEntry[];
+	/** Tick of the most recent action_log entry (0 if log is empty). Always present. */
+	latest_tick: number;
 }
