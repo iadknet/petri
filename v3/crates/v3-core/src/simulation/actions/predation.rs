@@ -336,11 +336,10 @@ mod tests {
         // Actual transfer = min(20, 5) = 5.0
         // Victim killed: energy goes to 0 → TransferredAndKilled
         assert_eq!(result, PredationActionResult::TransferredAndKilled);
-        // attacker: 50 - cost + 5 (actual) + bonus
-        let cost = adjusted_cost;
+        // attacker: 50 - adjusted_cost + 5 (actual) + bonus
         let bonus = sim.creatures[attacker_id].genome.complexity() as f32
             * sim.config.predation.kill_complexity_bonus_multiplier;
-        let expected = 50.0 - cost + 5.0 + bonus;
+        let expected = 50.0 - adjusted_cost + 5.0 + bonus;
         assert!(
             (sim.creatures[attacker_id].energy - expected).abs() < 1e-4,
             "attacker energy {} should be ~{}, cost on attempted not actual",
