@@ -17,6 +17,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 sha2 = { workspace = true }
 tower = { workspace = true }
+tower-http = { workspace = true }
 slotmap = { workspace = true }
 hex = "0.4"
 rmp-serde = { workspace = true }

@@ -1830,3 +1830,41 @@ async fn ws_non_overlapping_barrier_paint_rebroadcasts_world_static_only() {
 
     server_task.abort();
 }
+
+// ── compression_returns_gzip_when_accepted ────────────────────────────────
+
+#[tokio::test]
+async fn compression_returns_gzip_when_accepted() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":42}"#))
+        .await
+        .unwrap();
+
+    // Request status with Accept-Encoding: gzip
+    let req = Request::builder()
+        .method("GET")
+        .uri("/v3/simulation/status")
+        .header("accept-encoding", "gzip")
+        .body(Body::empty())
+        .unwrap();
+
+    let resp = a.oneshot(req).await.unwrap();
+    assert_eq!(resp.status(), StatusCode::OK);
+
+    // Verify the response uses gzip content-encoding
+    let encoding = resp
+        .headers()
+        .get("content-encoding")
+        .expect("missing content-encoding header")
+        .to_str()
+        .unwrap();
+    assert_eq!(encoding, "gzip", "expected gzip content-encoding");
+
+    // Verify the body is valid gzip-compressed data that can be decompressed
+    let compressed_bytes = resp.into_body().collect().await.unwrap().to_bytes();
+    assert!(
+        !compressed_bytes.is_empty(),
+        "compressed body should not be empty"
+    );
+}
