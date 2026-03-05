@@ -119,7 +119,7 @@ After completing each implementation step:
   Write a test that verifies gzip-compressed responses when `Accept-Encoding:
   gzip` is sent. Run `cargo test --workspace`, `cargo clippy`, `cargo fmt`.
 
-- [ ] Step 2: **`since_tick` query parameter (server)** — Add a `CreatureQuery`
+- [x] Step 2: **`since_tick` query parameter (server)** — Add a `CreatureQuery`
   struct with optional `since_tick: Option<u64>` to the `get_creature` handler
   in `v3-server/src/handlers/creature.rs`. When `since_tick` is present, filter
   `action_log` entries to only those with `entry.tick > since_tick`. Add a
