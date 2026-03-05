@@ -12,6 +12,7 @@ pub mod types;
 pub mod ws;
 
 use axum::routing::{get, patch, post};
+use tower_http::compression::CompressionLayer;
 
 pub fn router(state: app_state::AppState) -> axum::Router {
     axum::Router::new()
@@ -37,5 +38,6 @@ pub fn router(state: app_state::AppState) -> axum::Router {
             get(http::creature::get_sample),
         )
         .route("/v3/ws", get(ws::ws_handler))
+        .layer(CompressionLayer::new())
         .with_state(state)
 }

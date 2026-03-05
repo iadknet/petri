@@ -1,4 +1,4 @@
-use axum::extract::{Path, State};
+use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
 use slotmap::{Key, KeyData};
@@ -10,9 +10,20 @@ use crate::error::{AppError, FieldError};
 use crate::state::{AppState, SimulationStatus};
 use crate::types::PROTOCOL_VERSION;
 
+/// Query parameters for `GET /v3/simulation/creature/:id`.
+#[derive(Debug, Default, serde::Deserialize)]
+pub struct CreatureQuery {
+    /// When present, only return action_log entries with `tick > since_tick`.
+    pub since_tick: Option<u64>,
+    /// Comma-separated field names to exclude from the response
+    /// (valid values: `genome`, `action_log`, `memory`).
+    pub exclude: Option<String>,
+}
+
 pub async fn get_creature(
     State(app): State<AppState>,
     Path(id): Path<u64>,
+    Query(query): Query<CreatureQuery>,
 ) -> Result<impl IntoResponse, AppError> {
     let handle = app.sim.lock().await;
     let sim = &handle.sim;
@@ -24,32 +35,82 @@ pub async fn get_creature(
         .ok_or_else(|| AppError::NotFound(format!("creature {id} not found")))?;
 
     let rgb = channels_to_rgb(creature.phenotype_channels);
-    let memory: &[u8] = &creature.memory;
-    let action_log: Vec<_> = sim
-        .action_logs
-        .get(creature_id)
-        .map(|log| log.entries().iter().collect())
+
+    // Parse exclude set.
+    let exclude: std::collections::HashSet<&str> = query
+        .exclude
+        .as_deref()
+        .map(|s| s.split(',').map(str::trim).collect())
         .unwrap_or_default();
 
-    Ok(Json(serde_json::json!({
-        "protocol_version": PROTOCOL_VERSION,
-        "id": id,
-        "position": { "x": creature.position.x, "y": creature.position.y },
-        "energy": creature.energy,
-        "max_energy": sim.config.energy.lifecycle.initial_energy,
-        "age": creature.age,
-        "generation": creature.generation,
-        "complexity": creature.genome.complexity(),
-        "phenotype": {
+    // Build action_log with optional since_tick filtering.
+    let action_log_entries: Vec<_> = if exclude.contains("action_log") {
+        Vec::new()
+    } else {
+        sim.action_logs
+            .get(creature_id)
+            .map(|log| {
+                if let Some(since) = query.since_tick {
+                    log.entries().iter().filter(|e| e.tick > since).collect()
+                } else {
+                    log.entries().iter().collect()
+                }
+            })
+            .unwrap_or_default()
+    };
+
+    // Compute latest_tick from all entries (unfiltered) for cursor tracking.
+    let latest_tick: u64 = sim
+        .action_logs
+        .get(creature_id)
+        .and_then(|log| log.entries().back().map(|e| e.tick))
+        .unwrap_or(0);
+
+    // Build response with conditional field inclusion.
+    let mut map = serde_json::Map::new();
+    map.insert(
+        "protocol_version".into(),
+        serde_json::Value::String(PROTOCOL_VERSION.into()),
+    );
+    map.insert("id".into(), serde_json::json!(id));
+    map.insert(
+        "position".into(),
+        serde_json::json!({ "x": creature.position.x, "y": creature.position.y }),
+    );
+    map.insert("energy".into(), serde_json::json!(creature.energy));
+    map.insert(
+        "max_energy".into(),
+        serde_json::json!(sim.config.energy.lifecycle.initial_energy),
+    );
+    map.insert("age".into(), serde_json::json!(creature.age));
+    map.insert("generation".into(), serde_json::json!(creature.generation));
+    map.insert(
+        "complexity".into(),
+        serde_json::json!(creature.genome.complexity()),
+    );
+    map.insert(
+        "phenotype".into(),
+        serde_json::json!({
             "channels": creature.phenotype_channels,
             "active_channel": creature.phenotype_active_channel,
             "polarity": creature.phenotype_channel_polarity,
             "rgb": rgb,
-        },
-        "genome": creature.genome,
-        "memory": memory,
-        "action_log": action_log,
-    })))
+        }),
+    );
+    map.insert("latest_tick".into(), serde_json::json!(latest_tick));
+
+    if !exclude.contains("genome") {
+        map.insert("genome".into(), serde_json::json!(creature.genome));
+    }
+    if !exclude.contains("memory") {
+        let memory: &[u8] = &creature.memory;
+        map.insert("memory".into(), serde_json::json!(memory));
+    }
+    if !exclude.contains("action_log") {
+        map.insert("action_log".into(), serde_json::json!(action_log_entries));
+    }
+
+    Ok(Json(serde_json::Value::Object(map)))
 }
 
 // ── Execution Sampler endpoints ─────────────────────────────────────────────
