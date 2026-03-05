@@ -7,6 +7,10 @@ export function useCreatureDetail() {
 	const abortRef = useRef<AbortController | null>(null);
 	const currentIdRef = useRef<number | null>(null);
 	const lastFetchRef = useRef<number>(0);
+	/** Tracks the latest_tick from the most recent response for incremental fetching. */
+	const latestTickRef = useRef<number | null>(null);
+	/** Whether we have completed at least one full (non-incremental) fetch. */
+	const hasFullFetchRef = useRef<boolean>(false);
 	const MIN_FETCH_INTERVAL = 100; // ms — cap at ~10Hz
 
 	// Sync the ref with the store value
@@ -20,16 +24,27 @@ export function useCreatureDetail() {
 
 	// Fetch creature detail
 	useEffect(() => {
-		const fetchCreature = async (id: number) => {
+		const fetchCreature = async (id: number, incremental: boolean) => {
 			// Cancel any in-flight request
 			abortRef.current?.abort();
 			const controller = new AbortController();
 			abortRef.current = controller;
 
+			// Build query params for incremental fetch.
+			const query: { since_tick?: number; exclude?: string } = {};
+			if (incremental && hasFullFetchRef.current && latestTickRef.current !== null) {
+				query.since_tick = latestTickRef.current;
+				query.exclude = "genome";
+			}
+
 			try {
-				const detail = await api.getCreature(id, controller.signal);
+				const detail = await api.getCreature(id, controller.signal, query);
 				// Only apply if this ID is still selected
 				if (currentIdRef.current !== id) return;
+
+				// Update latest_tick cursor for next incremental fetch.
+				latestTickRef.current = detail.latest_tick;
+
 				useCreatureInspectorStore.getState().setDetail({
 					id: detail.id,
 					position: detail.position,
@@ -42,7 +57,13 @@ export function useCreatureDetail() {
 					genome: detail.genome,
 					memory: detail.memory,
 					actionLog: detail.action_log,
+					incremental: incremental && hasFullFetchRef.current,
 				});
+
+				// After first successful full fetch, enable incremental mode.
+				if (!hasFullFetchRef.current) {
+					hasFullFetchRef.current = true;
+				}
 			} catch (err) {
 				if (controller.signal.aborted) return;
 				if (currentIdRef.current !== id) return;
@@ -56,13 +77,20 @@ export function useCreatureDetail() {
 			}
 		};
 
+		// Reset incremental state when creature changes.
+		const resetIncrementalState = () => {
+			latestTickRef.current = null;
+			hasFullFetchRef.current = false;
+		};
+
 		// Fetch on selectedCreatureId change
 		const unsubInspector = useCreatureInspectorStore.subscribe((state, prev) => {
 			if (
 				state.selectedCreatureId !== prev.selectedCreatureId &&
 				state.selectedCreatureId !== null
 			) {
-				fetchCreature(state.selectedCreatureId);
+				resetIncrementalState();
+				fetchCreature(state.selectedCreatureId, false);
 			}
 		});
 
@@ -72,7 +100,7 @@ export function useCreatureDetail() {
 				const now = Date.now();
 				if (now - lastFetchRef.current >= MIN_FETCH_INTERVAL) {
 					lastFetchRef.current = now;
-					fetchCreature(currentIdRef.current);
+					fetchCreature(currentIdRef.current, true);
 				}
 			}
 		});
@@ -80,7 +108,8 @@ export function useCreatureDetail() {
 		// Initial fetch if already selected
 		const id = useCreatureInspectorStore.getState().selectedCreatureId;
 		if (id !== null) {
-			fetchCreature(id);
+			resetIncrementalState();
+			fetchCreature(id, false);
 		}
 
 		return () => {
