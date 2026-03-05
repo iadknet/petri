@@ -205,6 +205,15 @@ impl EnergyConfig {
     pub fn action_cost_multiplier(&self, complexity: u32, age: u64) -> f32 {
         self.complexity_cost.multiplier(complexity) * self.age_cost.multiplier(age)
     }
+
+    /// Returns the complexity-and-age-adjusted cost for a given base cost.
+    ///
+    /// Formula: `base_cost * action_cost_multiplier(complexity, age)`
+    #[inline]
+    #[must_use]
+    pub fn adjusted_action_cost(&self, base_cost: f32, complexity: u32, age: u64) -> f32 {
+        base_cost * self.action_cost_multiplier(complexity, age)
+    }
 }
 
 /// VM runtime config. Canonical owner: v3-runtime-config-spec.md Section 2.
@@ -1111,5 +1120,34 @@ mod tests {
         // complexity=0 (below threshold), age=0 → both return 1.0
         let mult = ec.action_cost_multiplier(0, 0);
         assert!((mult - 1.0).abs() < f32::EPSILON);
+    }
+
+    // ── EnergyConfig::adjusted_action_cost tests ───────────────────────────
+
+    #[test]
+    fn adjusted_action_cost_scales_base_cost_by_multiplier() {
+        let ec = EnergyConfig::default();
+        let base_cost = 5.0_f32;
+        // complexity=200, age=250 → multiplier = 4.225 (see test above)
+        let expected = base_cost * ec.action_cost_multiplier(200, 250);
+        let result = ec.adjusted_action_cost(base_cost, 200, 250);
+        assert!((result - expected).abs() < 1e-3);
+    }
+
+    #[test]
+    fn adjusted_action_cost_baseline_returns_base_cost() {
+        let ec = EnergyConfig::default();
+        let base_cost = 3.0_f32;
+        // complexity=0, age=0 → multiplier = 1.0
+        let result = ec.adjusted_action_cost(base_cost, 0, 0);
+        assert!((result - base_cost).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn adjusted_action_cost_zero_base_returns_zero() {
+        let ec = EnergyConfig::default();
+        // Even with high complexity/age, zero base cost stays zero.
+        let result = ec.adjusted_action_cost(0.0, 200, 400);
+        assert!((result - 0.0).abs() < f32::EPSILON);
     }
 }

@@ -134,8 +134,8 @@ After completing each implementation step:
 
 ## Implementation Steps
 
-- [ ] Step 1: Write a test for `EnergyConfig::adjusted_action_cost` that verifies `base_cost * action_cost_multiplier(complexity, age)`. Confirm it fails to compile (method doesn't exist yet).
-- [ ] Step 2: Implement `EnergyConfig::adjusted_action_cost` in `v3/crates/v3-core/src/config/simulation.rs`. Confirm the new test passes and all existing tests pass.
+- [x] Step 1: Write a test for `EnergyConfig::adjusted_action_cost` that verifies `base_cost * action_cost_multiplier(complexity, age)`. Confirm it fails to compile (method doesn't exist yet).
+- [x] Step 2: Implement `EnergyConfig::adjusted_action_cost` in `v3/crates/v3-core/src/config/simulation.rs`. Confirm the new test passes and all existing tests pass.
 - [ ] Step 3: Replace production call sites in `actions/mod.rs` (3 sites: `apply_noop`, `apply_eat`, `apply_move`) with the helper. Run `cargo test`.
 - [ ] Step 4: Replace production call site in `actions/reproduction.rs` (1 site: `apply_reproduce`) with the helper. Run `cargo test`.
 - [ ] Step 5: Replace production call site in `actions/predation.rs` (1 site: `apply_steal_energy`) with the helper. Run `cargo test`.
