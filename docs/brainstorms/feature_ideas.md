@@ -3,7 +3,6 @@
 ## Small tasks
  - Change complexity cap so it only does destructive changes. We want to create room for new addative changes to fit in the complexity cap.
 
-
 ## Deferred Architecture Follow-Ups
 
 ### Shared incremental query/projection platform
@@ -48,21 +47,6 @@ boundaries are still settling.
 
 
 ## Feature ideas
-
-### Complexity energy cost
- - companion to complexity cap that magnifies the energy cost of all actions based on complexity
-
-### Age energy cost
- - Set an "age cap"
- - Energy cost for actions increaseses when you get close to age cape
- - Gradual increase, then bigger increase closer to cap
- - Configureable age and max energy penalty multiplier.
- - Sane defaults - something like age 500, multiplier maxes out at x10
-
-### Add a action log for  creature
-
-Each creature will maintain an log of all its actions and action metadata.
-
 
 ### Ability to paint complex barriers
 
@@ -127,47 +111,6 @@ This needs further thought and refinement.  Allow food growth barrier to "drift"
 Within the creature inspector have different tabs (creatur summary, mesh viewer, sampler).
 
 Need to brainstorm more on this.
-
-
-### Storage slots
-
-- Add creature inventory with a fixed slot count, controlled by a new config option `inventory.slot_count` with default `5`.
-- Each slot stores one of:
-  - `Empty`
-  - `Barrier`
-  - `Food { density }`
-- Inventory is creature-local runtime state. Offspring spawn with empty inventory; slot count comes from config rather than inheritance.
-
-- Add two new actions:
-  - `Pickup { direction, slot }`
-  - `Place { direction, slot }`
-- Both actions use the existing 8-neighbor `Direction` model only. There is no self-cell pickup/place behavior.
-- Current-cell food remains `Eat`-only.
-
-- `Pickup(direction, slot)` semantics:
-  - Resolve the target neighbor using existing world edge rules.
-  - Fail if the target is unresolved, occupied by a creature, or the slot is invalid/full.
-  - If the target cell has a barrier, remove the barrier and store `Barrier` in the slot.
-  - Otherwise, if the target cell has food density `> 0.0`, clear that food from the cell and store `Food { density: previous_density }`.
-  - If the target has neither barrier nor food, the action fails.
-  - If a cell somehow has both barrier and food, barrier takes priority.
-
-- `Place(direction, slot)` semantics:
-  - Resolve the target neighbor using existing world edge rules.
-  - Fail if the target is unresolved or the slot is invalid/empty.
-  - If the slot contains `Barrier`, placement succeeds only if the target cell is unoccupied and barrier-free. On success, clear any food on that cell and place the barrier.
-  - If the slot contains `Food { density }`, placement succeeds only if the target cell is not a barrier and adding the stored density would not exceed `world.food.max_density`.
-  - Food placement should fail on overflow rather than clamp, so stored food density is conserved.
-
-- Add creature introspection inputs for storage slots.
-- Initial slot introspection should expose slot occupancy and item kind only, not stored food density.
-- Stored food density must still be preserved internally and should be visible in inspector/debug surfaces, just not exposed to creature cognition initially.
-
-### Refactor movement
-  - This is going to be a big change that we will have to execute carefully.  I want to refactor the movement actions. Instead of being able to move in different cardinal directions, I want there to be a sense of "Forward" for creatures and  
-  then have a two turn actions (turn left, turn right). And "move foward". The turn actions should have small default energy cost, but should still cost something.
-  - The zoomed in view of creatures can have a pointy tip for the direction they are facing.
-  - Predation should also be forward-facing.
 
 ### Communication
   - creature can modify some metadata fields about itself that are visible to other creatures that "see" it.
