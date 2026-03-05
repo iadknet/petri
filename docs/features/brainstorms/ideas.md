@@ -245,3 +245,12 @@ The Grand Unified Architecture — mapping biological intelligence to CPU-optimi
 - **Fix passive event listener warnings** → `docs/features/needs_refinement/fix-passive-event-listeners.md`
 - **Creature action log** → `docs/features/needs_refinement/creature-action-log.md`
 - **Creature action timeline** → `docs/features/needs_refinement/creature-action-timeline.md`
+- **Frontend type file domain cleanup** → `docs/features/needs_refinement/frontend-type-domain-cleanup.md`
+- **Split CreatureInspector** → `docs/features/needs_refinement/split-creature-inspector.md`
+- **Action cost helper refactor** → `docs/features/needs_refinement/action-cost-helper-refactor.md`
+- **Shared incremental query/projection platform + Event-driven projection invalidation** → `docs/features/needs_refinement/incremental-projection-platform.md`
+- **Tick phase system** → `docs/features/needs_refinement/tick-phase-system.md`
+- **Graph evaluation / plasticity decoupling** → `docs/features/needs_refinement/graph-plasticity-decoupling.md`
+- **Action timeline segment virtualization** → `docs/features/needs_refinement/action-timeline-virtualization.md`
+- **Creature endpoint sparse field selection & compression + Creature detail API spec documentation** → `docs/features/needs_refinement/creature-detail-api-optimization.md`
+- **Eventual multi-crate v3-server split** → `docs/features/needs_refinement/v3-server-crate-split.md`
