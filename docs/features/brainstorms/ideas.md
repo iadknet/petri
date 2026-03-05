@@ -4,7 +4,6 @@
 
 ## Core Simulation
 
-
 ### Communication
 - Creature can modify metadata fields about itself that are visible to other creatures that "see" it.
 - Creature can write to communication channels:
