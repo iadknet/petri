@@ -341,11 +341,11 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                             amount = food_before;
                         } else {
                             action_result = ActionResult::NoFood;
-                            let mult = sim
-                                .config
-                                .energy
-                                .action_cost_multiplier(creature.genome.complexity(), creature.age);
-                            creature.energy -= sim.config.energy.costs.failed_action_penalty * mult;
+                            creature.energy -= sim.config.energy.adjusted_action_cost(
+                                sim.config.energy.costs.failed_action_penalty,
+                                creature.genome.complexity(),
+                                creature.age,
+                            );
                         }
                     }
                     if let Some(log) = sim.action_logs.get_mut(id) {
@@ -369,11 +369,11 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                         outcome_acc.record_action_result(id, succeeded);
                         if !succeeded {
                             action_result = ActionResult::Blocked;
-                            let mult = sim
-                                .config
-                                .energy
-                                .action_cost_multiplier(creature.genome.complexity(), creature.age);
-                            creature.energy -= sim.config.energy.costs.failed_action_penalty * mult;
+                            creature.energy -= sim.config.energy.adjusted_action_cost(
+                                sim.config.energy.costs.failed_action_penalty,
+                                creature.genome.complexity(),
+                                creature.age,
+                            );
                         }
                     }
                     if let Some(log) = sim.action_logs.get_mut(id) {
@@ -414,11 +414,11 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                     };
                     if !succeeded {
                         if let Some(creature) = sim.creatures.get_mut(id) {
-                            let mult = sim
-                                .config
-                                .energy
-                                .action_cost_multiplier(creature.genome.complexity(), creature.age);
-                            creature.energy -= sim.config.energy.costs.failed_action_penalty * mult;
+                            creature.energy -= sim.config.energy.adjusted_action_cost(
+                                sim.config.energy.costs.failed_action_penalty,
+                                creature.genome.complexity(),
+                                creature.age,
+                            );
                         }
                     }
                     if let Some(log) = sim.action_logs.get_mut(id) {
@@ -465,12 +465,11 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                         }
                         PredationActionResult::RejectedNoVictim => {
                             if let Some(creature) = sim.creatures.get_mut(id) {
-                                let mult = sim.config.energy.action_cost_multiplier(
+                                creature.energy -= sim.config.energy.adjusted_action_cost(
+                                    sim.config.energy.costs.failed_action_penalty,
                                     creature.genome.complexity(),
                                     creature.age,
                                 );
-                                creature.energy -=
-                                    sim.config.energy.costs.failed_action_penalty * mult;
                             }
                             ActionResult::NoVictim
                         }
@@ -896,12 +895,18 @@ mod tests {
         sim.world.set_barrier(Position::new(5, 4), true);
 
         let energy_before = sim.creatures[id].energy;
-        let move_cost = sim.config.energy.costs.move_cost;
-        let penalty = sim.config.energy.costs.failed_action_penalty;
-        let mult = sim
-            .config
-            .energy
-            .action_cost_multiplier(sim.creatures[id].genome.complexity(), sim.creatures[id].age);
+        let complexity = sim.creatures[id].genome.complexity();
+        let age = sim.creatures[id].age;
+        let adjusted_move_cost = sim.config.energy.adjusted_action_cost(
+            sim.config.energy.costs.move_cost,
+            complexity,
+            age,
+        );
+        let adjusted_penalty = sim.config.energy.adjusted_action_cost(
+            sim.config.energy.costs.failed_action_penalty,
+            complexity,
+            age,
+        );
 
         // Simulate what the tick dispatch does: move north into barrier.
         let creature = sim.creatures.get_mut(id).unwrap();
@@ -909,30 +914,34 @@ mod tests {
         assert!(!succeeded, "move into barrier should fail");
         // Apply penalty for failed action (scaled by action cost multiplier).
         if !succeeded {
-            sim.creatures.get_mut(id).unwrap().energy -= penalty * mult;
+            sim.creatures.get_mut(id).unwrap().energy -= adjusted_penalty;
         }
 
-        let expected = energy_before - move_cost * mult - penalty * mult;
+        let expected = energy_before - adjusted_move_cost - adjusted_penalty;
         assert!(
             (sim.creatures[id].energy - expected).abs() < 1e-4,
             "energy {} should be {} (start {} - move {} - penalty {})",
             sim.creatures[id].energy,
             expected,
             energy_before,
-            move_cost * mult,
-            penalty * mult
+            adjusted_move_cost,
+            adjusted_penalty
         );
 
         // Also test failed eat.
         let energy_before_eat = sim.creatures[id].energy;
-        let eat_cost = sim.config.energy.costs.eat_cost;
+        let adjusted_eat_cost = sim.config.energy.adjusted_action_cost(
+            sim.config.energy.costs.eat_cost,
+            complexity,
+            age,
+        );
         let creature = sim.creatures.get_mut(id).unwrap();
         let eat_succeeded = apply_eat(creature, &mut sim.world, &sim.config);
         assert!(!eat_succeeded, "eat on empty cell should fail");
         if !eat_succeeded {
-            sim.creatures.get_mut(id).unwrap().energy -= penalty * mult;
+            sim.creatures.get_mut(id).unwrap().energy -= adjusted_penalty;
         }
-        let expected_eat = energy_before_eat - eat_cost * mult - penalty * mult;
+        let expected_eat = energy_before_eat - adjusted_eat_cost - adjusted_penalty;
         assert!(
             (sim.creatures[id].energy - expected_eat).abs() < 1e-4,
             "energy {} should be {} after failed eat",
@@ -969,11 +978,11 @@ mod tests {
         use crate::simulation::actions::apply_move;
         let (mut sim_young, id_young) = make_sim_with_one_creature(100.0);
         sim_young.world.set_barrier(Position::new(5, 4), true);
-        let penalty = sim_young.config.energy.costs.failed_action_penalty;
-        let mult_young = sim_young
-            .config
-            .energy
-            .action_cost_multiplier(sim_young.creatures[id_young].genome.complexity(), 0);
+        let adjusted_penalty_young = sim_young.config.energy.adjusted_action_cost(
+            sim_young.config.energy.costs.failed_action_penalty,
+            sim_young.creatures[id_young].genome.complexity(),
+            0,
+        );
         let energy_before_young = sim_young.creatures[id_young].energy;
         {
             let creature = sim_young.creatures.get_mut(id_young).unwrap();
@@ -985,16 +994,17 @@ mod tests {
                 &sim_young.config,
             );
         }
-        sim_young.creatures[id_young].energy -= penalty * mult_young;
+        sim_young.creatures[id_young].energy -= adjusted_penalty_young;
         let cost_young = energy_before_young - sim_young.creatures[id_young].energy;
 
         let (mut sim_old, id_old) = make_sim_with_one_creature(100.0);
         sim_old.world.set_barrier(Position::new(5, 4), true);
         sim_old.creatures[id_old].age = 400;
-        let mult_old = sim_old
-            .config
-            .energy
-            .action_cost_multiplier(sim_old.creatures[id_old].genome.complexity(), 400);
+        let adjusted_penalty_old = sim_old.config.energy.adjusted_action_cost(
+            sim_old.config.energy.costs.failed_action_penalty,
+            sim_old.creatures[id_old].genome.complexity(),
+            400,
+        );
         let energy_before_old = sim_old.creatures[id_old].energy;
         {
             let creature = sim_old.creatures.get_mut(id_old).unwrap();
@@ -1006,7 +1016,7 @@ mod tests {
                 &sim_old.config,
             );
         }
-        sim_old.creatures[id_old].energy -= penalty * mult_old;
+        sim_old.creatures[id_old].energy -= adjusted_penalty_old;
         let cost_old = energy_before_old - sim_old.creatures[id_old].energy;
 
         assert!(

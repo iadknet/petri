@@ -134,11 +134,11 @@ pub fn apply_reproduce(
     }
 
     // Step 4: Deduct reproduce_cost from parent (scaled by genome complexity and age).
-    let mult = sim.config.energy.action_cost_multiplier(
+    sim.creatures[parent_id].energy -= sim.config.energy.adjusted_action_cost(
+        sim.config.energy.costs.reproduce_cost,
         sim.creatures[parent_id].genome.complexity(),
         sim.creatures[parent_id].age,
     );
-    sim.creatures[parent_id].energy -= sim.config.energy.costs.reproduce_cost * mult;
 
     // Step 5: Check parent has sufficient energy after cost deduction.
     if sim.creatures[parent_id].energy < sim.config.energy.lifecycle.min_reproduce_energy {
