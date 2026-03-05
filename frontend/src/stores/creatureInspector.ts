@@ -117,8 +117,10 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 		let actionLog = state.actionLog;
 		if (detail.actionLog !== undefined) {
 			if (detail.incremental && actionLog) {
-				// Append new entries and trim to capacity (500).
+				// Append new entries and trim to capacity.
 				const merged = [...actionLog, ...detail.actionLog];
+				// Mirrors the server-side ActionLogConfig::capacity default
+				// in v3/crates/v3-core/src/config/simulation.rs.
 				const ACTION_LOG_CAPACITY = 500;
 				actionLog =
 					merged.length > ACTION_LOG_CAPACITY
