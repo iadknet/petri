@@ -82,6 +82,11 @@ Core rule:
 - `ChangeEntryNode`
 - `SwapNodeBackend`
 - `RewriteNodeId`
+- `CopyNode`
+- `CopyMeshBackwardSlice`
+- `CopyMeshForwardSlice`
+- `SpliceNode`
+- `SwapRouteTargets`
 
 ### VM domain
 
