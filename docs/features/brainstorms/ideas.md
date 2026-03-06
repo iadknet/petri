@@ -382,6 +382,43 @@ Refactor the current complexity metric into two distinct metrics:
 
 This ensures creatures aren't penalized via complexity-scaled costs for carrying inert genetic material, while still capping total genome size to prevent unbounded growth. Most systems that currently reference "complexity" actually care about functional complexity and should use the reachability-based metric. The genome size cap is the main (possibly only) consumer of the total-genome metric.
 
+### Reachability-aware mutation pathways
+
+Mutation currently appears to choose domains and operators generically, while live-vs-junk structure is only visible through separate reachability analysis. A promising direction is to make mutation more aware of whether it is acting on reachable functional mesh or unreachable exploratory reserve.
+
+Primary goal:
+- make it easier for evolution to grow and reorganize active mesh structure rather than mostly adding junk or repeatedly polishing the same tiny live core
+- preserve some neutral drift and dormant structure so search does not collapse into only mutating currently-live nodes
+
+Recommended first version:
+- keep a single mutation engine and current operator families
+- when an operator needs a structural target, bias target selection toward reachable nodes/slices/edges rather than sampling the full genome uniformly
+- keep a non-trivial probability of choosing unreachable structure so dormant material can still drift, simplify, or become useful later
+- add reachability-aware observability so mutation events can be categorized as primarily `reachable`, `unreachable`, or `cross-boundary`
+
+Candidate operator behavior to bias first:
+- topology edits like retarget, splice, route swaps, and mesh-slice copy
+- graph-internal copy/subgraph/edge mutations on reachable graph nodes
+- VM block/gene copy mutations on reachable VM nodes
+- input-ref edits on reachable nodes so active controllers can more easily acquire or shed sensors
+
+Potential new operators worth exploring after the biasing layer exists:
+- `SplitLiveEdge` — choose a reachable `A -> B` route and insert a new node or short motif between them
+- `DuplicateLiveSliceWithReconnect` — copy a reachable slice and force at least one live route through the copied structure
+- `ActivateDormantSlice` — reconnect an unreachable slice back into a reachable path
+- `PruneLiveBranch` — deliberately remove a reachable side branch to counterbalance growth and create cleaner structural alternatives
+
+Important design caution:
+- a strict two-lane system (`functional lane` vs `junk lane`) sounds simple, but may be too rigid as a first implementation
+- unreachable structure is often only one reconnection away from usefulness
+- many valuable mutations are hybrid by nature: reconnecting dormant structure, cloning live structure and then letting it drift, or routing a live path through partly inactive components
+- over-targeting the currently-live core may improve short-term hill-climbing while reducing discovery of genuinely new organization
+
+If a two-lane system is explored later, it should probably remain soft rather than absolute:
+- lane probabilities should be configurable rather than hard-coded
+- hybrid operators should explicitly exist for crossing between live and dormant structure
+- mutation telemetry should show whether the system is merely deepening the current dominant scaffold or actually increasing active-mesh diversity
+
 ## Far Future
 
 ### Massive introduction of neural nets
