@@ -2,7 +2,27 @@
 
 ## Bug Fixes
 
+### Action timeline: manual refresh button
+
+Add a refresh button/icon to the action timeline header (far right of the header row). Clicking it refreshes the timeline data on demand.
+
+### Action timeline: improve failure indicator visibility
+
+The current failure indicator (a red bar) is easy to miss and may be too bright/saturated. Consider adding a red "x" icon above the failed action segment for clearer identification, and tone down the red to a less saturated shade.
+
+### Action timeline: only first action per tick is clickable
+
+In the creature inspector's action timeline, if multiple actions happened in a single tick, only the first action's segment is clickable for inspecting metadata. Subsequent actions in the same tick cannot be selected.
+
 ## Core Simulation
+
+### Ring-based vision sensors (per-distance-ring splitting)
+
+Split vision into smaller per-ring sensors — one sensor for the ring 1 space away, another for 2 spaces away, another for 3, etc. Each existing area sensor type (food, creatures, barriers, etc.) would be decomposed this way, giving creatures the ability to evolve sensitivity to specific distance ranges rather than a single aggregate over the full radius.
+
+The goal is to lower the evolutionary barrier for creatures to start using sensors. Currently, each sensor covers the full radius, producing a large input array that is hard for random mutations to wire up usefully. Smaller per-ring sensors mean fewer inputs per sensor, making it easier for a creature to stumble into a useful connection through mutation and build on it incrementally.
+
+Key challenge: the perception radius is dynamically configurable at runtime, so the number of sensor inputs per ring must also be dynamic. This affects genome input slot allocation, sensor key enumeration, and potentially the VM input vector sizing. Needs design work on how dynamic sensor counts interact with fixed genome structure — possibly a max-ring cap with unused slots when radius is smaller, or a registry that re-maps slots when radius changes.
 
 ### Communication
 - Creature can modify metadata fields about itself that are visible to other creatures that "see" it.
@@ -254,3 +274,4 @@ The Grand Unified Architecture — mapping biological intelligence to CPU-optimi
 - **Action timeline segment virtualization** → `docs/features/needs_refinement/action-timeline-virtualization.md`
 - **Creature endpoint sparse field selection & compression + Creature detail API spec documentation** → `docs/features/needs_refinement/creature-detail-api-optimization.md`
 - **Eventual multi-crate v3-server split** → `docs/features/needs_refinement/v3-server-crate-split.md`
+- **Ring-based vision sensors** → `docs/features/needs_refinement/ring-based-sensors.md`
