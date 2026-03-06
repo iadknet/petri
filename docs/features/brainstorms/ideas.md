@@ -242,6 +242,16 @@ Discovered during creature-action-timeline architecture review.
 ### Eventual multi-crate v3-server split
 If the internal command/query/transport boundaries stabilize, a later follow-up could split `v3-server` into multiple crates. Intentionally deferred to avoid increasing migration scope while boundaries are settling.
 
+### Reachability-based complexity: separate genome_size from functional complexity
+
+Refactor the current complexity metric into two distinct metrics:
+
+1. **`genome_size`** — matches the current complexity algorithm (total node count, edge count, VM instruction count, etc. across the entire genome). Used for `max_genome_size` cap (renamed from `max_complexity`) to bound total genetic material a creature can carry.
+
+2. **`complexity`** (refactored) — only counts nodes/edges/instructions reachable from the root node. Excludes junk DNA, unreachable VM operations (dead code within VM nodes), and unused graph node internals (dormant input slots, inert sub-expressions). This becomes the metric used for complexity-scaled costs (energy upkeep, action costs, etc.).
+
+This ensures creatures aren't penalized via complexity-scaled costs for carrying inert genetic material, while still capping total genome size to prevent unbounded growth. Most systems that currently reference "complexity" actually care about functional complexity and should use the reachability-based metric. The genome size cap is the main (possibly only) consumer of the total-genome metric.
+
 ## Far Future
 
 ### Massive introduction of neural nets
