@@ -2,7 +2,8 @@ use rand::Rng;
 
 use crate::creature::genome::analysis::{vm_backward_slice_random, vm_forward_slice_random};
 use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
-use crate::mutation::types::MutationSkipReason;
+use crate::mutation::reachability::biased_select_from;
+use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
 /// VM mutation operator variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -177,13 +178,15 @@ pub struct VmMutator;
 impl VmMutator {
     /// Apply a VM operator to the genome.
     ///
-    /// Returns `Ok(())` on success, or `Err(MutationSkipReason::NoApplicableTarget)` if the
-    /// genome contains no VM-backend nodes.
+    /// Returns `Ok(TargetReachability)` on success, or `Err(MutationSkipReason::NoApplicableTarget)`
+    /// if the genome contains no VM-backend nodes.
     pub fn apply(
         genome: &mut CreatureGenome,
         op: VmOperator,
+        reachable_nodes: &[usize],
+        bias: f64,
         rng: &mut impl Rng,
-    ) -> Result<(), MutationSkipReason> {
+    ) -> Result<TargetReachability, MutationSkipReason> {
         // Pre-guard: must have at least one VM-backend node.
         let vm_indices: Vec<usize> = genome
             .nodes
@@ -196,8 +199,9 @@ impl VmMutator {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
 
-        let node_idx = vm_indices[rng.gen_range(0..vm_indices.len())];
-        match op {
+        let (node_idx, reachability) = biased_select_from(&vm_indices, reachable_nodes, bias, rng)
+            .ok_or(MutationSkipReason::NoApplicableTarget)?;
+        let result = match op {
             VmOperator::VmConstantMutation => apply_constant_mutation(genome, node_idx, rng),
             VmOperator::VmInstructionMutation => apply_instruction_mutation(genome, node_idx, rng),
             VmOperator::VmRegisterCountMutation => {
@@ -229,7 +233,8 @@ impl VmMutator {
             VmOperator::VmMutatePairedSlotAddress => {
                 apply_mutate_paired_slot_address(genome, node_idx, rng)
             }
-        }
+        };
+        result.map(|()| reachability)
     }
 }
 

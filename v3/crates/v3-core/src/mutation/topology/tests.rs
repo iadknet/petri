@@ -13,7 +13,7 @@ fn add_node_increases_node_count_by_one() {
     let mut genome = v3alpha1_founder_genome();
     let before = genome.nodes.len();
     let mut r = rng(0);
-    TopologyMutator::apply(&mut genome, TopologyOperator::AddNode, &mut r).unwrap();
+    TopologyMutator::apply(&mut genome, TopologyOperator::AddNode, &[], 0.0, &mut r).unwrap();
     assert_eq!(genome.nodes.len(), before + 1);
 }
 
@@ -23,7 +23,7 @@ fn remove_node_decreases_node_count() {
     assert!(genome.nodes.len() >= 2, "founder must have >=2 nodes");
     let before = genome.nodes.len();
     let mut r = rng(1);
-    TopologyMutator::apply(&mut genome, TopologyOperator::RemoveNode, &mut r).unwrap();
+    TopologyMutator::apply(&mut genome, TopologyOperator::RemoveNode, &[], 0.0, &mut r).unwrap();
     assert_eq!(genome.nodes.len(), before - 1);
 }
 
@@ -34,7 +34,8 @@ fn remove_node_on_single_node_genome_returns_no_applicable_target() {
     genome.nodes.truncate(1);
     genome.entry_node_id = genome.nodes[0].node_id;
     let mut r = rng(2);
-    let result = TopologyMutator::apply(&mut genome, TopologyOperator::RemoveNode, &mut r);
+    let result =
+        TopologyMutator::apply(&mut genome, TopologyOperator::RemoveNode, &[], 0.0, &mut r);
     assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
 }
 
@@ -47,7 +48,13 @@ fn retarget_node_target_changes_target() {
     for seed in 0u64..50 {
         let mut g = genome.clone();
         let mut rr = rng(seed);
-        let _ = TopologyMutator::apply(&mut g, TopologyOperator::RetargetNodeTarget, &mut rr);
+        let _ = TopologyMutator::apply(
+            &mut g,
+            TopologyOperator::RetargetNodeTarget,
+            &[],
+            0.0,
+            &mut rr,
+        );
         if g.nodes[0].targets[0] != before_target {
             genome = g;
             break;
@@ -55,7 +62,13 @@ fn retarget_node_target_changes_target() {
     }
     // At minimum, the operation doesn't fail and targets still has same length.
     let mut r2 = rng(99);
-    let result = TopologyMutator::apply(&mut genome, TopologyOperator::RetargetNodeTarget, &mut r2);
+    let result = TopologyMutator::apply(
+        &mut genome,
+        TopologyOperator::RetargetNodeTarget,
+        &[],
+        0.0,
+        &mut r2,
+    );
     assert!(result.is_ok());
 }
 
@@ -65,7 +78,14 @@ fn add_route_target_increases_target_count() {
     let before = genome.nodes[0].targets.len();
     let mut r = rng(4);
     // Force node index 0 by using a genome with known structure.
-    TopologyMutator::apply(&mut genome, TopologyOperator::AddRouteTarget, &mut r).unwrap();
+    TopologyMutator::apply(
+        &mut genome,
+        TopologyOperator::AddRouteTarget,
+        &[],
+        0.0,
+        &mut r,
+    )
+    .unwrap();
     // Total targets across all nodes must increase by 1.
     let after: usize = genome.nodes.iter().map(|n| n.targets.len()).sum();
     let before_total: usize = v3alpha1_founder_genome()
@@ -84,7 +104,14 @@ fn change_entry_node_changes_entry() {
     assert!(genome.nodes.len() >= 2);
     let original_entry = genome.entry_node_id;
     let mut r = rng(5);
-    TopologyMutator::apply(&mut genome, TopologyOperator::ChangeEntryNode, &mut r).unwrap();
+    TopologyMutator::apply(
+        &mut genome,
+        TopologyOperator::ChangeEntryNode,
+        &[],
+        0.0,
+        &mut r,
+    )
+    .unwrap();
     assert_ne!(
         genome.entry_node_id, original_entry,
         "entry node must change"
@@ -111,10 +138,10 @@ fn topology_after_each_operator_passes_parseability_gate() {
     for (i, &op) in operators.iter().enumerate() {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(i as u64 + 100);
-        let result = TopologyMutator::apply(&mut genome, op, &mut r);
+        let result = TopologyMutator::apply(&mut genome, op, &[], 0.0, &mut r);
         // Either succeeds or NoApplicableTarget — either way, genome must still be parseable.
         match result {
-            Ok(()) | Err(MutationSkipReason::NoApplicableTarget) => {
+            Ok(_) | Err(MutationSkipReason::NoApplicableTarget) => {
                 assert!(
                     ParseabilityGate::validate(&genome).is_ok(),
                     "parseability failed after {:?}: {:?}",
@@ -134,11 +161,25 @@ fn swap_node_backend_toggles_backend_on_single_node_genome() {
     genome.entry_node_id = genome.nodes[0].node_id;
 
     let mut r1 = rng(7);
-    TopologyMutator::apply(&mut genome, TopologyOperator::SwapNodeBackend, &mut r1).unwrap();
+    TopologyMutator::apply(
+        &mut genome,
+        TopologyOperator::SwapNodeBackend,
+        &[],
+        0.0,
+        &mut r1,
+    )
+    .unwrap();
     assert!(matches!(genome.nodes[0].backend_def, BackendDef::Vm(_)));
 
     let mut r2 = rng(8);
-    TopologyMutator::apply(&mut genome, TopologyOperator::SwapNodeBackend, &mut r2).unwrap();
+    TopologyMutator::apply(
+        &mut genome,
+        TopologyOperator::SwapNodeBackend,
+        &[],
+        0.0,
+        &mut r2,
+    )
+    .unwrap();
     assert!(matches!(genome.nodes[0].backend_def, BackendDef::Graph(_)));
 }
 
@@ -151,7 +192,14 @@ fn rewrite_node_id_rewrites_entry_and_target_references() {
     let old_id = genome.nodes[0].node_id;
 
     let mut r = rng(11);
-    TopologyMutator::apply(&mut genome, TopologyOperator::RewriteNodeId, &mut r).unwrap();
+    TopologyMutator::apply(
+        &mut genome,
+        TopologyOperator::RewriteNodeId,
+        &[],
+        0.0,
+        &mut r,
+    )
+    .unwrap();
     let new_id = genome.nodes[0].node_id;
 
     assert_ne!(new_id, old_id, "node id should be rewritten");
@@ -168,7 +216,7 @@ fn copy_node_increases_node_count_by_one() {
     let mut genome = v3alpha1_founder_genome();
     let before = genome.nodes.len();
     let mut r = rng(42);
-    TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &mut r).unwrap();
+    TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
     assert_eq!(genome.nodes.len(), before + 1);
 }
 
@@ -177,7 +225,7 @@ fn copy_node_assigns_different_node_id() {
     let mut genome = v3alpha1_founder_genome();
     let original_ids: Vec<NodeId> = genome.nodes.iter().map(|n| n.node_id).collect();
     let mut r = rng(42);
-    TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &mut r).unwrap();
+    TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
     let new_node = genome.nodes.last().unwrap();
     assert!(
         !original_ids.contains(&new_node.node_id),
@@ -193,7 +241,7 @@ fn copy_node_deep_copies_vm_backend() {
     for seed in 0u64..100 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &mut r).unwrap();
+        TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
         let new_node = genome.nodes.last().unwrap();
         if matches!(&new_node.backend_def, BackendDef::Vm(_)) {
             // Find which source node has matching backend.
@@ -226,7 +274,7 @@ fn copy_node_deep_copies_graph_backend() {
             internal_nodes: vec![],
         });
         let mut r = rng(seed);
-        TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &mut r).unwrap();
+        TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
         let new_node = genome.nodes.last().unwrap();
         if matches!(&new_node.backend_def, BackendDef::Graph(_)) {
             let has_match = genome
@@ -254,7 +302,7 @@ fn copy_node_sometimes_copies_targets_sometimes_not() {
     for seed in 0u64..500 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &mut r).unwrap();
+        TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
         let new_node = genome.nodes.last().unwrap();
         if new_node.targets.is_empty() {
             saw_empty = true;
@@ -279,7 +327,7 @@ fn copy_node_sometimes_copies_input_refs_sometimes_not() {
     for seed in 0u64..500 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &mut r).unwrap();
+        TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
         let new_node = genome.nodes.last().unwrap();
         if new_node.input_refs.is_empty() {
             saw_empty = true;
@@ -306,7 +354,7 @@ fn copy_node_sometimes_adds_backlink_sometimes_not() {
         let original_targets: Vec<Vec<NodeId>> =
             genome.nodes.iter().map(|n| n.targets.clone()).collect();
         let mut r = rng(seed);
-        TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &mut r).unwrap();
+        TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
         let new_id = genome.nodes.last().unwrap().node_id;
         // Check if any original node gained the new_id in its targets.
         let backlinked = genome.nodes.iter().enumerate().any(|(i, n)| {
@@ -337,7 +385,7 @@ fn copy_node_can_copy_entry_node() {
     genome.entry_node_id = genome.nodes[0].node_id;
     let before = genome.nodes.len();
     let mut r = rng(99);
-    TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &mut r).unwrap();
+    TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
     assert_eq!(genome.nodes.len(), before + 1);
 }
 
@@ -383,8 +431,13 @@ fn copy_mesh_backward_slice_duplicates_feeding_pipeline() {
     for seed in 0u64..200 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        let result =
-            TopologyMutator::apply(&mut g, TopologyOperator::CopyMeshBackwardSlice, &mut r);
+        let result = TopologyMutator::apply(
+            &mut g,
+            TopologyOperator::CopyMeshBackwardSlice,
+            &[],
+            0.0,
+            &mut r,
+        );
         if result.is_ok() && g.nodes.len() > before + 1 {
             found_multi = true;
             let ids: Vec<NodeId> = g.nodes.iter().map(|n| n.node_id).collect();
@@ -426,8 +479,13 @@ fn copy_mesh_backward_slice_remaps_internal_targets() {
     for seed in 0u64..200 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        let result =
-            TopologyMutator::apply(&mut g, TopologyOperator::CopyMeshBackwardSlice, &mut r);
+        let result = TopologyMutator::apply(
+            &mut g,
+            TopologyOperator::CopyMeshBackwardSlice,
+            &[],
+            0.0,
+            &mut r,
+        );
         if result.is_ok() && g.nodes.len() == 4 {
             let original_ids: std::collections::HashSet<NodeId> =
                 genome.nodes.iter().map(|n| n.node_id).collect();
@@ -498,7 +556,13 @@ fn copy_mesh_forward_slice_duplicates_downstream_subtree() {
     for seed in 0u64..200 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        let result = TopologyMutator::apply(&mut g, TopologyOperator::CopyMeshForwardSlice, &mut r);
+        let result = TopologyMutator::apply(
+            &mut g,
+            TopologyOperator::CopyMeshForwardSlice,
+            &[],
+            0.0,
+            &mut r,
+        );
         if result.is_ok() && g.nodes.len() > before + 1 {
             found_multi = true;
             let ids: Vec<NodeId> = g.nodes.iter().map(|n| n.node_id).collect();
@@ -529,7 +593,14 @@ fn copy_mesh_operators_single_node_genome_returns_single_copy() {
         }],
     };
     let mut r = rng(42);
-    TopologyMutator::apply(&mut genome, TopologyOperator::CopyMeshBackwardSlice, &mut r).unwrap();
+    TopologyMutator::apply(
+        &mut genome,
+        TopologyOperator::CopyMeshBackwardSlice,
+        &[],
+        0.0,
+        &mut r,
+    )
+    .unwrap();
     assert_eq!(genome.nodes.len(), 2);
     assert_ne!(genome.nodes[0].node_id, genome.nodes[1].node_id);
 }
@@ -557,7 +628,8 @@ fn swap_route_targets_changes_target_order() {
     for seed in 0u64..50 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        TopologyMutator::apply(&mut g, TopologyOperator::SwapRouteTargets, &mut r).unwrap();
+        TopologyMutator::apply(&mut g, TopologyOperator::SwapRouteTargets, &[], 0.0, &mut r)
+            .unwrap();
         if g.nodes[0].targets != original_targets {
             changed = true;
             break;
@@ -586,7 +658,8 @@ fn swap_route_targets_preserves_target_set() {
     for seed in 0u64..50 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        TopologyMutator::apply(&mut g, TopologyOperator::SwapRouteTargets, &mut r).unwrap();
+        TopologyMutator::apply(&mut g, TopologyOperator::SwapRouteTargets, &[], 0.0, &mut r)
+            .unwrap();
         let mut after_sorted = g.nodes[0].targets.clone();
         after_sorted.sort();
         assert_eq!(
@@ -612,7 +685,13 @@ fn swap_route_targets_requires_at_least_two_targets() {
         }],
     };
     let mut r = rng(0);
-    let result = TopologyMutator::apply(&mut genome, TopologyOperator::SwapRouteTargets, &mut r);
+    let result = TopologyMutator::apply(
+        &mut genome,
+        TopologyOperator::SwapRouteTargets,
+        &[],
+        0.0,
+        &mut r,
+    );
     assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
 }
 
@@ -647,7 +726,7 @@ fn splice_node_increases_node_count_by_one() {
     };
     let before = genome.nodes.len();
     let mut r = rng(0);
-    TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &mut r).unwrap();
+    TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &[], 0.0, &mut r).unwrap();
     assert_eq!(genome.nodes.len(), before + 1);
 }
 
@@ -680,7 +759,7 @@ fn splice_node_creates_a_to_c_to_b_chain() {
     };
     let b_id = NodeId::new(1);
     let mut r = rng(0);
-    TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &mut r).unwrap();
+    TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &[], 0.0, &mut r).unwrap();
     let c = genome.nodes.last().unwrap();
     let c_id = c.node_id;
     // C's target is B
@@ -712,7 +791,7 @@ fn splice_node_new_node_is_blank_vm() {
         }],
     };
     let mut r = rng(0);
-    TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &mut r).unwrap();
+    TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &[], 0.0, &mut r).unwrap();
     let c = genome.nodes.last().unwrap();
     assert!(
         c.input_refs.is_empty(),
@@ -743,7 +822,8 @@ fn splice_node_no_targets_returns_skip() {
         }],
     };
     let mut r = rng(0);
-    let result = TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &mut r);
+    let result =
+        TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &[], 0.0, &mut r);
     assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
 }
 
@@ -751,9 +831,10 @@ fn splice_node_no_targets_returns_skip() {
 fn splice_node_passes_parseability_gate() {
     let mut genome = v3alpha1_founder_genome();
     let mut r = rng(42);
-    let result = TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &mut r);
+    let result =
+        TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &[], 0.0, &mut r);
     match result {
-        Ok(()) | Err(MutationSkipReason::NoApplicableTarget) => {
+        Ok(_) | Err(MutationSkipReason::NoApplicableTarget) => {
             assert!(
                 ParseabilityGate::validate(&genome).is_ok(),
                 "parseability failed after SpliceNode"
@@ -768,7 +849,7 @@ fn splice_node_new_node_gets_fresh_node_id() {
     let mut genome = v3alpha1_founder_genome();
     let original_ids: Vec<NodeId> = genome.nodes.iter().map(|n| n.node_id).collect();
     let mut r = rng(0);
-    TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &mut r).unwrap();
+    TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &[], 0.0, &mut r).unwrap();
     let c = genome.nodes.last().unwrap();
     assert!(
         !original_ids.contains(&c.node_id),
@@ -863,9 +944,9 @@ fn copy_mesh_operators_pass_parseability_gate() {
     for (i, &op) in operators.iter().enumerate() {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(i as u64 + 200);
-        let result = TopologyMutator::apply(&mut genome, op, &mut r);
+        let result = TopologyMutator::apply(&mut genome, op, &[], 0.0, &mut r);
         match result {
-            Ok(()) | Err(MutationSkipReason::NoApplicableTarget) => {
+            Ok(_) | Err(MutationSkipReason::NoApplicableTarget) => {
                 assert!(
                     ParseabilityGate::validate(&genome).is_ok(),
                     "parseability failed after {:?}: {:?}",

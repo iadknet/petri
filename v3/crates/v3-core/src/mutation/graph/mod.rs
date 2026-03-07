@@ -5,7 +5,8 @@ use rand::Rng;
 use crate::creature::genome::{
     BackendDef, CreatureGenome, GraphInput, GraphInternalNode, GraphNodeKind,
 };
-use crate::mutation::types::MutationSkipReason;
+use crate::mutation::reachability::biased_select_from;
+use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
 /// Graph mutation operator variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -212,13 +213,15 @@ pub struct GraphMutator;
 impl GraphMutator {
     /// Apply a graph operator to the genome.
     ///
-    /// Returns `Ok(())` on success, or `Err(MutationSkipReason::NoApplicableTarget)` if the
-    /// genome has no Graph-backend nodes or no applicable internal target.
+    /// Returns `Ok(TargetReachability)` on success, or `Err(MutationSkipReason::NoApplicableTarget)`
+    /// if the genome has no Graph-backend nodes or no applicable internal target.
     pub fn apply(
         genome: &mut CreatureGenome,
         op: GraphOperator,
+        reachable_nodes: &[usize],
+        bias: f64,
         rng: &mut impl Rng,
-    ) -> Result<(), MutationSkipReason> {
+    ) -> Result<TargetReachability, MutationSkipReason> {
         // Pre-guard: must have at least one Graph-backend node.
         let graph_indices: Vec<usize> = genome
             .nodes
@@ -231,8 +234,10 @@ impl GraphMutator {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
 
-        let node_idx = graph_indices[rng.gen_range(0..graph_indices.len())];
-        match op {
+        let (node_idx, reachability) =
+            biased_select_from(&graph_indices, reachable_nodes, bias, rng)
+                .ok_or(MutationSkipReason::NoApplicableTarget)?;
+        let result = match op {
             GraphOperator::AlterGraphEdgeWeight => alter_edge_weight(genome, node_idx, rng),
             GraphOperator::SwapGraphOperator => swap_operator(genome, node_idx, rng),
             GraphOperator::MutateGraphOperatorParam => mutate_operator_param(genome, node_idx, rng),
@@ -264,7 +269,8 @@ impl GraphMutator {
                 hebbian::mutate_reward_source(genome, node_idx, rng)
             }
             GraphOperator::MutateTraceDecay => hebbian::mutate_trace_decay(genome, node_idx, rng),
-        }
+        };
+        result.map(|()| reachability)
     }
 }
 

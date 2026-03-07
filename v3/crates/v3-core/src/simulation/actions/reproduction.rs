@@ -182,10 +182,16 @@ pub fn apply_reproduce(
         .graph_runtime
         .plasticity_weights
         .clone();
+    let parent_cached_reachable = sim.creatures[parent_id].cached_reachable_nodes.clone();
 
     // Step 9: Apply genome mutations.
     let mut child_genome = child_genome;
-    let summary = MutationEngine::apply_mutations(&mut child_genome, &sim.config.mutation, rng);
+    let summary = MutationEngine::apply_mutations(
+        &mut child_genome,
+        &sim.config.mutation,
+        &parent_cached_reachable,
+        rng,
+    );
 
     // Update mutation stats.
     sim.stats.mutation_events_attempted_total += summary.attempted_events as u64;
@@ -255,7 +261,6 @@ pub fn apply_reproduce(
     // genome is identical to the parent's — copy cached_complexity to avoid
     // expensive recomputation.
     let parent_cached_complexity = sim.creatures[parent_id].cached_complexity;
-    let parent_cached_reachable = sim.creatures[parent_id].cached_reachable_nodes.clone();
     let child_id = sim.creatures.insert_with_key(|id| {
         let mut child = if summary.applied_events == 0 {
             CreatureState::new_with_cached_fields(

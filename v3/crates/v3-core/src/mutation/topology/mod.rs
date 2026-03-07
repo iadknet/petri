@@ -7,7 +7,7 @@ use crate::creature::genome::analysis::{mesh_backward_slice_random, mesh_forward
 use crate::creature::genome::{
     BackendDef, CreatureGenome, GraphBackendDef, NodeGenome, VmBackendDef, VmInstruction,
 };
-use crate::mutation::types::MutationSkipReason;
+use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
 /// Topology mutation operator variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -184,13 +184,20 @@ pub struct TopologyMutator;
 impl TopologyMutator {
     /// Apply a topology operator to the genome.
     ///
-    /// Returns `Ok(())` on success, or `Err(MutationSkipReason)` if no applicable target exists.
+    /// `_reachable_nodes` and `_bias` are accepted for signature compatibility with the
+    /// engine's biased-selection framework. Per-operator biasing for topology is wired
+    /// in a subsequent step.
+    ///
+    /// Returns `Ok(TargetReachability)` on success, or `Err(MutationSkipReason)` if no
+    /// applicable target exists.
     pub fn apply(
         genome: &mut CreatureGenome,
         op: TopologyOperator,
+        _reachable_nodes: &[usize],
+        _bias: f64,
         rng: &mut impl Rng,
-    ) -> Result<(), MutationSkipReason> {
-        match op {
+    ) -> Result<TargetReachability, MutationSkipReason> {
+        let result = match op {
             TopologyOperator::AddNode => apply_add_node(genome, rng),
             TopologyOperator::RemoveNode => apply_remove_node(genome, rng),
             TopologyOperator::RetargetNodeTarget => apply_retarget_node_target(genome, rng),
@@ -204,7 +211,8 @@ impl TopologyMutator {
             TopologyOperator::CopyMeshForwardSlice => apply_copy_mesh_forward_slice(genome, rng),
             TopologyOperator::SpliceNode => apply_splice_node(genome, rng),
             TopologyOperator::SwapRouteTargets => apply_swap_route_targets(genome, rng),
-        }
+        };
+        result.map(|()| TargetReachability::NotApplicable)
     }
 }
 

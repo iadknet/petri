@@ -23,7 +23,7 @@ fn vm_constant_mutation_changes_constant_value() {
     for seed in 0u64..50 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        VmMutator::apply(&mut g, VmOperator::VmConstantMutation, &mut r).unwrap();
+        VmMutator::apply(&mut g, VmOperator::VmConstantMutation, &[], 0.0, &mut r).unwrap();
         let after: Vec<f32> = if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
             vm.constants.clone()
         } else {
@@ -45,7 +45,14 @@ fn vm_constant_mutation_on_node_with_empty_constants_adds_constant() {
         vm.constants.clear();
     }
     let mut r = rng(0);
-    VmMutator::apply(&mut genome, VmOperator::VmConstantMutation, &mut r).unwrap();
+    VmMutator::apply(
+        &mut genome,
+        VmOperator::VmConstantMutation,
+        &[],
+        0.0,
+        &mut r,
+    )
+    .unwrap();
     if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
         assert_eq!(vm.constants.len(), 1, "one constant added");
     }
@@ -63,7 +70,7 @@ fn vm_instruction_mutation_changes_program() {
     for seed in 0u64..50 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        VmMutator::apply(&mut g, VmOperator::VmInstructionMutation, &mut r).unwrap();
+        VmMutator::apply(&mut g, VmOperator::VmInstructionMutation, &[], 0.0, &mut r).unwrap();
         let after_len = if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
             vm.program.len()
         } else {
@@ -78,7 +85,13 @@ fn vm_instruction_mutation_changes_program() {
     // At minimum, the operation must not panic.
     let _ = changed;
     let mut r = rng(99);
-    let result = VmMutator::apply(&mut genome, VmOperator::VmInstructionMutation, &mut r);
+    let result = VmMutator::apply(
+        &mut genome,
+        VmOperator::VmInstructionMutation,
+        &[],
+        0.0,
+        &mut r,
+    );
     assert!(result.is_ok());
 }
 
@@ -95,7 +108,13 @@ fn vm_mutator_on_graph_only_genome_returns_no_applicable_target() {
         targets: vec![],
     }];
     let mut r = rng(0);
-    let result = VmMutator::apply(&mut genome, VmOperator::VmConstantMutation, &mut r);
+    let result = VmMutator::apply(
+        &mut genome,
+        VmOperator::VmConstantMutation,
+        &[],
+        0.0,
+        &mut r,
+    );
     assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
 }
 
@@ -115,7 +134,7 @@ fn vm_after_mutation_passes_parseability_gate() {
     for (i, &op) in operators.iter().enumerate() {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(i as u64 + 200);
-        let _ = VmMutator::apply(&mut genome, op, &mut r);
+        let _ = VmMutator::apply(&mut genome, op, &[], 0.0, &mut r);
         assert!(
             ParseabilityGate::validate(&genome).is_ok(),
             "parseability failed after {:?}",
@@ -133,7 +152,14 @@ fn vm_insert_produces_non_noop() {
         let mut r = rng(seed);
         // Force insert path by extracting the RNG state — but simpler: just run
         // VmInstructionMutation many times and check for non-Noop in the program.
-        VmMutator::apply(&mut genome, VmOperator::VmInstructionMutation, &mut r).unwrap();
+        VmMutator::apply(
+            &mut genome,
+            VmOperator::VmInstructionMutation,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .unwrap();
         if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
             if vm.program.iter().any(|i| !matches!(i, VmInstruction::Noop)) {
                 found_non_noop = true;
@@ -158,7 +184,14 @@ fn vm_replace_produces_non_noop() {
             vm.program = vec![VmInstruction::Halt; 10];
         }
         let mut r = rng(seed);
-        VmMutator::apply(&mut genome, VmOperator::VmInstructionMutation, &mut r).unwrap();
+        VmMutator::apply(
+            &mut genome,
+            VmOperator::VmInstructionMutation,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .unwrap();
         if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
             // Check if any instruction changed to something other than Halt or Noop.
             if vm
@@ -247,7 +280,14 @@ fn raw_field_mutation_can_produce_out_of_range_action_type() {
     for seed in 0u64..512 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        VmMutator::apply(&mut g, VmOperator::VmInstructionRawFieldMutation, &mut r).unwrap();
+        VmMutator::apply(
+            &mut g,
+            VmOperator::VmInstructionRawFieldMutation,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .unwrap();
         if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
             if let VmInstruction::PushAction { action_type } = vm.program[0] {
                 if action_type > 3 {
@@ -277,7 +317,14 @@ fn raw_field_mutation_can_change_slot_idx() {
     for seed in 0u64..512 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        VmMutator::apply(&mut g, VmOperator::VmInstructionRawFieldMutation, &mut r).unwrap();
+        VmMutator::apply(
+            &mut g,
+            VmOperator::VmInstructionRawFieldMutation,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .unwrap();
         if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
             if let VmInstruction::LoadSlotImm { slot_idx, .. } = vm.program[0] {
                 if slot_idx != 0 {
@@ -304,7 +351,7 @@ fn vm_instruction_mutation_program_never_empty() {
     for seed in 0u64..100 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        VmMutator::apply(&mut g, VmOperator::VmInstructionMutation, &mut r).unwrap();
+        VmMutator::apply(&mut g, VmOperator::VmInstructionMutation, &[], 0.0, &mut r).unwrap();
         if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
             assert!(!vm.program.is_empty(), "program must not be emptied");
         }
@@ -324,7 +371,15 @@ fn vm_register_count_increments_and_decrements() {
     for seed in 0u64..100 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        if VmMutator::apply(&mut g, VmOperator::VmRegisterCountMutation, &mut r).is_ok() {
+        if VmMutator::apply(
+            &mut g,
+            VmOperator::VmRegisterCountMutation,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .is_ok()
+        {
             let new_rc = if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
                 vm.register_count
             } else {
@@ -355,7 +410,13 @@ fn vm_register_count_clamps_to_bounds() {
     for seed in 0u64..100 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        let _ = VmMutator::apply(&mut g, VmOperator::VmRegisterCountMutation, &mut r);
+        let _ = VmMutator::apply(
+            &mut g,
+            VmOperator::VmRegisterCountMutation,
+            &[],
+            0.0,
+            &mut r,
+        );
         if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
             assert!(vm.register_count >= 1, "register_count must be >= 1");
         }
@@ -367,7 +428,13 @@ fn vm_register_count_clamps_to_bounds() {
     for seed in 0u64..100 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        let _ = VmMutator::apply(&mut g, VmOperator::VmRegisterCountMutation, &mut r);
+        let _ = VmMutator::apply(
+            &mut g,
+            VmOperator::VmRegisterCountMutation,
+            &[],
+            0.0,
+            &mut r,
+        );
         if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
             assert!(vm.register_count <= 32, "register_count must be <= 32");
         }
@@ -385,7 +452,13 @@ fn copy_instruction_block_increases_program_length() {
         panic!()
     };
     let mut r = rng(42);
-    let result = VmMutator::apply(&mut genome, VmOperator::VmCopyInstructionBlock, &mut r);
+    let result = VmMutator::apply(
+        &mut genome,
+        VmOperator::VmCopyInstructionBlock,
+        &[],
+        0.0,
+        &mut r,
+    );
     assert!(result.is_ok());
     let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
         vm.program.len()
@@ -402,7 +475,13 @@ fn copy_instruction_block_on_empty_returns_no_applicable_target() {
         vm.program.clear();
     }
     let mut r = rng(0);
-    let result = VmMutator::apply(&mut genome, VmOperator::VmCopyInstructionBlock, &mut r);
+    let result = VmMutator::apply(
+        &mut genome,
+        VmOperator::VmCopyInstructionBlock,
+        &[],
+        0.0,
+        &mut r,
+    );
     assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
 }
 
@@ -416,7 +495,14 @@ fn copy_instruction_block_preserves_content() {
         panic!()
     };
     let mut r = rng(7);
-    VmMutator::apply(&mut genome, VmOperator::VmCopyInstructionBlock, &mut r).unwrap();
+    VmMutator::apply(
+        &mut genome,
+        VmOperator::VmCopyInstructionBlock,
+        &[],
+        0.0,
+        &mut r,
+    )
+    .unwrap();
     let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
         vm.program.clone()
     } else {
@@ -440,7 +526,14 @@ fn copy_instruction_block_respects_max_32() {
         vm.program = vec![VmInstruction::Noop; 3];
     }
     let mut r = rng(0);
-    VmMutator::apply(&mut genome, VmOperator::VmCopyInstructionBlock, &mut r).unwrap();
+    VmMutator::apply(
+        &mut genome,
+        VmOperator::VmCopyInstructionBlock,
+        &[],
+        0.0,
+        &mut r,
+    )
+    .unwrap();
     let after_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
         vm.program.len()
     } else {
@@ -471,6 +564,8 @@ fn copy_instruction_block_remapped_shifts_registers() {
     VmMutator::apply(
         &mut genome,
         VmOperator::VmCopyInstructionBlockRemapped,
+        &[],
+        0.0,
         &mut r,
     )
     .unwrap();
@@ -493,7 +588,13 @@ fn copy_instruction_block_remapped_wraps_registers() {
     for seed in 0u64..50 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        let _ = VmMutator::apply(&mut g, VmOperator::VmCopyInstructionBlockRemapped, &mut r);
+        let _ = VmMutator::apply(
+            &mut g,
+            VmOperator::VmCopyInstructionBlockRemapped,
+            &[],
+            0.0,
+            &mut r,
+        );
         if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
             for instr in &vm.program {
                 if let VmInstruction::Move { dst, src } = instr {
@@ -517,6 +618,8 @@ fn copy_instruction_block_remapped_preserves_non_register_fields() {
     let _ = VmMutator::apply(
         &mut genome,
         VmOperator::VmCopyInstructionBlockRemapped,
+        &[],
+        0.0,
         &mut r,
     );
     if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
@@ -541,7 +644,13 @@ fn copy_instruction_block_remapped_adjusts_jump_offsets() {
     for seed in 0u64..100 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        let _ = VmMutator::apply(&mut g, VmOperator::VmCopyInstructionBlockRemapped, &mut r);
+        let _ = VmMutator::apply(
+            &mut g,
+            VmOperator::VmCopyInstructionBlockRemapped,
+            &[],
+            0.0,
+            &mut r,
+        );
         if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
             for instr in &vm.program {
                 if let VmInstruction::Jump { offset } = instr {
@@ -572,6 +681,8 @@ fn copy_instruction_block_remapped_on_empty_returns_no_applicable_target() {
     let result = VmMutator::apply(
         &mut genome,
         VmOperator::VmCopyInstructionBlockRemapped,
+        &[],
+        0.0,
         &mut r,
     );
     assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
@@ -588,7 +699,14 @@ fn copy_constant_block_increases_length() {
         panic!()
     };
     let mut r = rng(0);
-    VmMutator::apply(&mut genome, VmOperator::VmCopyConstantBlock, &mut r).unwrap();
+    VmMutator::apply(
+        &mut genome,
+        VmOperator::VmCopyConstantBlock,
+        &[],
+        0.0,
+        &mut r,
+    )
+    .unwrap();
     let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
         vm.constants.len()
     } else {
@@ -604,7 +722,13 @@ fn copy_constant_block_on_empty_returns_no_applicable_target() {
         vm.constants.clear();
     }
     let mut r = rng(0);
-    let result = VmMutator::apply(&mut genome, VmOperator::VmCopyConstantBlock, &mut r);
+    let result = VmMutator::apply(
+        &mut genome,
+        VmOperator::VmCopyConstantBlock,
+        &[],
+        0.0,
+        &mut r,
+    );
     assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
 }
 
@@ -617,7 +741,14 @@ fn copy_constant_block_preserves_original() {
         panic!()
     };
     let mut r = rng(0);
-    VmMutator::apply(&mut genome, VmOperator::VmCopyConstantBlock, &mut r).unwrap();
+    VmMutator::apply(
+        &mut genome,
+        VmOperator::VmCopyConstantBlock,
+        &[],
+        0.0,
+        &mut r,
+    )
+    .unwrap();
     let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
         vm.constants.clone()
     } else {
@@ -634,7 +765,14 @@ fn copy_constant_block_copies_correct_values() {
         vm.constants = vec![10.0, 20.0, 30.0];
     }
     let mut r = rng(0);
-    VmMutator::apply(&mut genome, VmOperator::VmCopyConstantBlock, &mut r).unwrap();
+    VmMutator::apply(
+        &mut genome,
+        VmOperator::VmCopyConstantBlock,
+        &[],
+        0.0,
+        &mut r,
+    )
+    .unwrap();
     let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
         vm.constants.clone()
     } else {
@@ -673,7 +811,14 @@ fn copy_gene_backward_slice_increases_program_length() {
     }
     let before = 3;
     let mut r = rng(42);
-    VmMutator::apply(&mut genome, VmOperator::VmCopyGeneBackwardSlice, &mut r).unwrap();
+    VmMutator::apply(
+        &mut genome,
+        VmOperator::VmCopyGeneBackwardSlice,
+        &[],
+        0.0,
+        &mut r,
+    )
+    .unwrap();
     let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
         vm.program.len()
     } else {
@@ -696,7 +841,13 @@ fn copy_gene_backward_slice_no_output_returns_no_applicable_target() {
         ];
     }
     let mut r = rng(0);
-    let result = VmMutator::apply(&mut genome, VmOperator::VmCopyGeneBackwardSlice, &mut r);
+    let result = VmMutator::apply(
+        &mut genome,
+        VmOperator::VmCopyGeneBackwardSlice,
+        &[],
+        0.0,
+        &mut r,
+    );
     assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
 }
 
@@ -719,7 +870,14 @@ fn copy_gene_backward_slice_captures_dependency_chain() {
         vm.register_count = 4;
     }
     let mut r = rng(42);
-    VmMutator::apply(&mut genome, VmOperator::VmCopyGeneBackwardSlice, &mut r).unwrap();
+    VmMutator::apply(
+        &mut genome,
+        VmOperator::VmCopyGeneBackwardSlice,
+        &[],
+        0.0,
+        &mut r,
+    )
+    .unwrap();
     let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
         vm.program.clone()
     } else {
@@ -756,7 +914,14 @@ fn copy_gene_forward_slice_increases_program_length() {
     }
     let before = 3;
     let mut r = rng(42);
-    VmMutator::apply(&mut genome, VmOperator::VmCopyGeneForwardSlice, &mut r).unwrap();
+    VmMutator::apply(
+        &mut genome,
+        VmOperator::VmCopyGeneForwardSlice,
+        &[],
+        0.0,
+        &mut r,
+    )
+    .unwrap();
     let after = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
         vm.program.len()
     } else {
@@ -777,7 +942,13 @@ fn copy_gene_forward_slice_no_dst_returns_no_applicable_target() {
         ];
     }
     let mut r = rng(0);
-    let result = VmMutator::apply(&mut genome, VmOperator::VmCopyGeneForwardSlice, &mut r);
+    let result = VmMutator::apply(
+        &mut genome,
+        VmOperator::VmCopyGeneForwardSlice,
+        &[],
+        0.0,
+        &mut r,
+    );
     assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
 }
 
@@ -800,7 +971,14 @@ fn copy_gene_forward_slice_captures_dependency_chain() {
             vm.register_count = 4;
         }
         let mut r = rng(seed);
-        VmMutator::apply(&mut genome, VmOperator::VmCopyGeneForwardSlice, &mut r).unwrap();
+        VmMutator::apply(
+            &mut genome,
+            VmOperator::VmCopyGeneForwardSlice,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .unwrap();
         let after_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
             vm.program.len()
         } else {
@@ -924,7 +1102,7 @@ fn vm_insert_read_store_motif_inserts_read_input_and_store_slot_pair() {
     for seed in 0u64..200 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        if VmMutator::apply(&mut g, VmOperator::VmInsertReadStoreMotif, &mut r).is_ok() {
+        if VmMutator::apply(&mut g, VmOperator::VmInsertReadStoreMotif, &[], 0.0, &mut r).is_ok() {
             if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
                 // Look for consecutive ReadInput + StoreSlotImm.
                 for w in vm.program.windows(2) {
@@ -963,7 +1141,15 @@ fn vm_insert_load_compare_motif_inserts_load_slot_and_cmp_gt_pair() {
     for seed in 0u64..200 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        if VmMutator::apply(&mut g, VmOperator::VmInsertLoadCompareMotif, &mut r).is_ok() {
+        if VmMutator::apply(
+            &mut g,
+            VmOperator::VmInsertLoadCompareMotif,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .is_ok()
+        {
             if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
                 for w in vm.program.windows(2) {
                     if matches!(w[0], VmInstruction::LoadSlotImm { .. })
@@ -1011,7 +1197,7 @@ fn vm_mutate_slot_address_changes_slot_idx() {
     for seed in 0u64..200 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        if VmMutator::apply(&mut g, VmOperator::VmMutateSlotAddress, &mut r).is_ok() {
+        if VmMutator::apply(&mut g, VmOperator::VmMutateSlotAddress, &[], 0.0, &mut r).is_ok() {
             if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
                 for instr in &vm.program {
                     match instr {
@@ -1053,7 +1239,15 @@ fn vm_mutate_paired_slot_address_co_mutates_load_and_store() {
     for seed in 0u64..200 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        if VmMutator::apply(&mut g, VmOperator::VmMutatePairedSlotAddress, &mut r).is_ok() {
+        if VmMutator::apply(
+            &mut g,
+            VmOperator::VmMutatePairedSlotAddress,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .is_ok()
+        {
             if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
                 // Find the load and store that were originally slot 7.
                 let mut new_load_slot = None;
@@ -1092,7 +1286,15 @@ fn vm_mutate_paired_slot_address_skips_when_no_paired_group() {
     for seed in 0u64..50 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        if VmMutator::apply(&mut g, VmOperator::VmMutatePairedSlotAddress, &mut r).is_err() {
+        if VmMutator::apply(
+            &mut g,
+            VmOperator::VmMutatePairedSlotAddress,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .is_err()
+        {
             skipped = true;
             break;
         }

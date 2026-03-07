@@ -144,8 +144,7 @@ mod tests {
         let reachable = vec![1, 3]; // only 1, 3 reachable
         let mut rng = seeded_rng(99);
         for _ in 0..500 {
-            let (idx, class) =
-                biased_select_from(&eligible, &reachable, 1.0, &mut rng).unwrap();
+            let (idx, class) = biased_select_from(&eligible, &reachable, 1.0, &mut rng).unwrap();
             assert!(
                 idx == 1 || idx == 3,
                 "bias=1.0 must select reachable, got {idx}"
@@ -166,7 +165,10 @@ mod tests {
 
     #[test]
     fn classify_reachable_node() {
-        assert_eq!(classify_target(3, &[1, 3, 5]), TargetReachability::Reachable);
+        assert_eq!(
+            classify_target(3, &[1, 3, 5]),
+            TargetReachability::Reachable
+        );
     }
 
     #[test]
@@ -190,8 +192,7 @@ mod tests {
         let n = 5000;
         let mut reachable_count = 0u32;
         for _ in 0..n {
-            let (_, class) =
-                biased_select_from(&eligible, &reachable, 0.7, &mut rng).unwrap();
+            let (_, class) = biased_select_from(&eligible, &reachable, 0.7, &mut rng).unwrap();
             if class == TargetReachability::Reachable {
                 reachable_count += 1;
             }

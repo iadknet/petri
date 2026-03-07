@@ -9,7 +9,14 @@ fn add_internal_node_uses_varied_kinds() {
     for seed in 0u64..500 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        GraphMutator::apply(&mut genome, GraphOperator::AddInternalGraphNode, &mut r).unwrap();
+        GraphMutator::apply(
+            &mut genome,
+            GraphOperator::AddInternalGraphNode,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .unwrap();
         if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
             let last = g.internal_nodes.last().unwrap();
             discriminants.insert(std::mem::discriminant(&last.kind));
@@ -29,7 +36,14 @@ fn add_internal_node_sometimes_adds_initial_edge() {
     for seed in 0u64..200 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        GraphMutator::apply(&mut genome, GraphOperator::AddInternalGraphNode, &mut r).unwrap();
+        GraphMutator::apply(
+            &mut genome,
+            GraphOperator::AddInternalGraphNode,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .unwrap();
         if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
             let last = g.internal_nodes.last().unwrap();
             if last.inputs.is_empty() {
@@ -56,7 +70,14 @@ fn add_internal_node_edge_points_to_existing_internal() {
             continue;
         };
         let mut r = rng(seed);
-        GraphMutator::apply(&mut genome, GraphOperator::AddInternalGraphNode, &mut r).unwrap();
+        GraphMutator::apply(
+            &mut genome,
+            GraphOperator::AddInternalGraphNode,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .unwrap();
         if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
             let last = g.internal_nodes.last().unwrap();
             for edge in &last.inputs {
@@ -75,7 +96,14 @@ fn add_internal_node_edge_points_to_existing_internal() {
 fn add_internal_node_skips_edge_when_no_existing_internals() {
     let mut genome = graph_only_genome(vec![]);
     let mut r = rng(42);
-    GraphMutator::apply(&mut genome, GraphOperator::AddInternalGraphNode, &mut r).unwrap();
+    GraphMutator::apply(
+        &mut genome,
+        GraphOperator::AddInternalGraphNode,
+        &[],
+        0.0,
+        &mut r,
+    )
+    .unwrap();
     if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
         assert_eq!(g.internal_nodes.len(), 1);
         assert!(
@@ -101,7 +129,14 @@ fn alter_edge_weight_proportional_for_large_weights() {
     for seed in 0u64..50 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        GraphMutator::apply(&mut g, GraphOperator::AlterGraphEdgeWeight, &mut r).unwrap();
+        GraphMutator::apply(
+            &mut g,
+            GraphOperator::AlterGraphEdgeWeight,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .unwrap();
         if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
             let w = gd.internal_nodes[0].inputs[0].weight;
             assert!(
@@ -127,7 +162,14 @@ fn alter_edge_weight_absolute_for_near_zero_weights() {
     for seed in 0u64..50 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        GraphMutator::apply(&mut g, GraphOperator::AlterGraphEdgeWeight, &mut r).unwrap();
+        GraphMutator::apply(
+            &mut g,
+            GraphOperator::AlterGraphEdgeWeight,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .unwrap();
         if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
             let w = gd.internal_nodes[0].inputs[0].weight;
             assert!(
@@ -171,7 +213,15 @@ fn mutate_operator_param_changes_custom_output_slot() {
     for seed in 0u64..50 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        if GraphMutator::apply(&mut g, GraphOperator::MutateGraphOperatorParam, &mut r).is_ok() {
+        if GraphMutator::apply(
+            &mut g,
+            GraphOperator::MutateGraphOperatorParam,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .is_ok()
+        {
             if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
                 if let GraphNodeKind::CustomOutput(slot) = gd.internal_nodes[0].kind {
                     if slot != 5 {
@@ -199,7 +249,15 @@ fn mutate_operator_param_changes_input_ref_index() {
     for seed in 0u64..50 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        if GraphMutator::apply(&mut g, GraphOperator::MutateGraphOperatorParam, &mut r).is_ok() {
+        if GraphMutator::apply(
+            &mut g,
+            GraphOperator::MutateGraphOperatorParam,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .is_ok()
+        {
             if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
                 if let GraphNodeKind::InputRef { ref_idx, .. } = gd.internal_nodes[0].kind {
                     if ref_idx != 3 {
@@ -225,7 +283,15 @@ fn mutate_operator_param_wraps_custom_output_at_boundary() {
     for seed in 0u64..200 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        if GraphMutator::apply(&mut g, GraphOperator::MutateGraphOperatorParam, &mut r).is_ok() {
+        if GraphMutator::apply(
+            &mut g,
+            GraphOperator::MutateGraphOperatorParam,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .is_ok()
+        {
             if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
                 if let GraphNodeKind::CustomOutput(slot) = gd.internal_nodes[0].kind {
                     if slot == 255 {
@@ -254,7 +320,15 @@ fn mutate_operator_param_wraps_input_ref_at_boundary() {
     for seed in 0u64..200 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        if GraphMutator::apply(&mut g, GraphOperator::MutateGraphOperatorParam, &mut r).is_ok() {
+        if GraphMutator::apply(
+            &mut g,
+            GraphOperator::MutateGraphOperatorParam,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .is_ok()
+        {
             if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
                 if let GraphNodeKind::InputRef { ref_idx, .. } = gd.internal_nodes[0].kind {
                     if ref_idx == 0 {
@@ -291,7 +365,8 @@ fn copy_edge_bundle_preserves_source_edges() {
     for seed in 0u64..100 {
         let mut genome = graph_only_genome(nodes.clone());
         let mut r = rng(seed);
-        if GraphMutator::apply(&mut genome, GraphOperator::CopyEdgeBundle, &mut r).is_ok() {
+        if GraphMutator::apply(&mut genome, GraphOperator::CopyEdgeBundle, &[], 0.0, &mut r).is_ok()
+        {
             if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
                 // Source node (idx 0) must still have its original edge.
                 assert!(
