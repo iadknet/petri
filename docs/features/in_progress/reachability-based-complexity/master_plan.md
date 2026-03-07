@@ -190,7 +190,7 @@ Migrate every production call site per the Call Site Audit table above:
 7. Run viability tests (`cargo test -p v3-core --test viability`) to verify economic balance. Kill bonus economics are changing (functional complexity is lower than total for junk-heavy creatures), so viability tests are critical here.
 8. **Threshold check**: Verify that the complexity cost threshold (default 50) still produces reasonable pressure. Functional complexity will be lower than total complexity for creatures with junk DNA, meaning fewer creatures exceed the threshold. If viability tests pass, the economics are acceptable.
 
-- [ ] Step 3: Migrate all action cost call sites to cached functional complexity
+- [x] Step 3: Migrate all action cost call sites to cached functional complexity
 
 ### Step 4: Rename `complexity_cap` → `genome_size_cap` and update mutation pressure
 
