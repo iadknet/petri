@@ -1071,6 +1071,122 @@ fn random_decreasing_never_returns_non_decreasing() {
 }
 
 #[test]
+fn bias_1_targets_reachable_node_for_remove() {
+    // Build a 3-node genome where only node index 1 is "reachable" and removable
+    // (entry node at index 0 is not removable). With bias=1.0 the operator must
+    // pick from the reachable set.
+    let mut genome = v3alpha1_founder_genome();
+    // Add a third node so there's a non-reachable removable node too.
+    let id2 = NodeId::new(99);
+    genome.nodes.push(NodeGenome {
+        node_id: id2,
+        input_refs: vec![],
+        backend_def: BackendDef::Vm(VmBackendDef {
+            register_count: 1,
+            constants: vec![],
+            program: vec![VmInstruction::Halt],
+        }),
+        targets: vec![],
+    });
+    // Reachable = [1] (index 1 only). Index 2 is unreachable.
+    let reachable = [1usize];
+    for seed in 0u64..20 {
+        let mut g = genome.clone();
+        let mut r = rng(seed);
+        let result = TopologyMutator::apply(
+            &mut g,
+            TopologyOperator::RemoveNode,
+            &reachable,
+            1.0,
+            &mut r,
+        );
+        match result {
+            Ok(reachability) => {
+                assert_eq!(
+                    reachability,
+                    TargetReachability::Reachable,
+                    "bias=1.0 must always pick a reachable node"
+                );
+            }
+            Err(MutationSkipReason::NoApplicableTarget) => {
+                // Acceptable if the only reachable removable node is the entry node
+            }
+            Err(e) => panic!("unexpected error: {e:?}"),
+        }
+    }
+}
+
+#[test]
+fn bias_0_returns_reachable_or_unreachable() {
+    // With bias=0.0 (uniform), we should eventually see both Reachable and Unreachable.
+    let mut genome = v3alpha1_founder_genome();
+    let id2 = NodeId::new(99);
+    genome.nodes.push(NodeGenome {
+        node_id: id2,
+        input_refs: vec![],
+        backend_def: BackendDef::Vm(VmBackendDef {
+            register_count: 1,
+            constants: vec![],
+            program: vec![VmInstruction::Halt],
+        }),
+        targets: vec![],
+    });
+    // Reachable = [1]. Index 2 is unreachable. Both are removable (not entry).
+    let reachable = [1usize];
+    let mut saw_reachable = false;
+    let mut saw_unreachable = false;
+    for seed in 0u64..200 {
+        let mut g = genome.clone();
+        let mut r = rng(seed);
+        if let Ok(reachability) = TopologyMutator::apply(
+            &mut g,
+            TopologyOperator::RemoveNode,
+            &reachable,
+            0.0,
+            &mut r,
+        ) {
+            match reachability {
+                TargetReachability::Reachable => saw_reachable = true,
+                TargetReachability::Unreachable => saw_unreachable = true,
+                TargetReachability::NotApplicable => {}
+            }
+        }
+        if saw_reachable && saw_unreachable {
+            break;
+        }
+    }
+    assert!(
+        saw_reachable && saw_unreachable,
+        "bias=0.0 should eventually pick both reachable and unreachable nodes"
+    );
+}
+
+#[test]
+fn exempt_operators_return_not_applicable() {
+    let mut genome = v3alpha1_founder_genome();
+    let reachable = [0usize, 1];
+    let mut r = rng(42);
+    let result = TopologyMutator::apply(
+        &mut genome,
+        TopologyOperator::AddNode,
+        &reachable,
+        1.0,
+        &mut r,
+    );
+    assert_eq!(result, Ok(TargetReachability::NotApplicable));
+
+    let mut r2 = rng(43);
+    let result = TopologyMutator::apply(
+        &mut genome,
+        TopologyOperator::ChangeEntryNode,
+        &reachable,
+        1.0,
+        &mut r2,
+    );
+    assert_eq!(result, Ok(TargetReachability::NotApplicable));
+}
+
+#[test]
 fn random_decreasing_covers_all_decreasing_operators() {
     use std::collections::HashSet;
     let expected: HashSet<TopologyOperator> = TopologyOperator::ALL

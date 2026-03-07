@@ -259,9 +259,9 @@ After completing each implementation step:
 8. Update all engine tests: pass `&[]` as `parent_reachable_nodes` to preserve existing behavior (bias on empty reachable set is always uniform fallback)
 9. TDD: test that `apply_mutations` with `&[]` reachable set matches previous behavior; test that with `bias=1.0` and a genome with mixed reachable/unreachable VM nodes, VM mutations only target reachable nodes
 
-- [ ] Step 4: Thread reachability through engine and bias VM/Graph/InputRef
+- [x] Step 4: Thread reachability through engine and bias VM/Graph/InputRef
 
-- [ ] Review Gate: Interim code review — review Steps 1-4 changes. Fix findings, re-review until clean.
+- [x] Review Gate: Interim code review — review Steps 1-4 changes. Fix findings, re-review until clean.
 
 ### Step 5: Bias topology operators
 
@@ -285,7 +285,7 @@ After completing each implementation step:
 7. Update topology tests: pass `(&[], 0.0)` to preserve existing behavior
 8. TDD: test that with `bias=1.0` and a genome with reachable and unreachable nodes, operators like `RemoveNode` and `CopyNode` prefer reachable targets; test exempt operators return `NotApplicable`
 
-- [ ] Step 5: Bias topology operators
+- [x] Step 5: Bias topology operators
 
 ### Step 6: Wire reproduction, seeding, and stats aggregation
 
