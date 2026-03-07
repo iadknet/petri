@@ -708,10 +708,10 @@ mod tests {
             BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
         };
 
-        // Each node contributes: 1 (node) + instructions.len()
-        // A single node with (min_complexity - 1) Halt instructions reaches the target.
+        // Each PushAction is an output instruction → counts as live for functional complexity.
+        // Node itself = 1, each PushAction = 1 live instruction.
         let instruction_count = (min_complexity.saturating_sub(1)) as usize;
-        let program = vec![VmInstruction::Halt; instruction_count];
+        let program = vec![VmInstruction::PushAction { action_type: 0 }; instruction_count];
         CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![NodeGenome {

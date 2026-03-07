@@ -158,7 +158,7 @@ This step implements both metrics and wires `complexity()` to use functional com
 
 4. **Wire `complexity()` to call `functional_complexity()`**: The `complexity()` method on `CreatureGenome` now delegates to `analysis::functional_complexity()`.
 
-- [ ] Step 1: Add `genome_size()` method and reachability-aware `complexity()` with TDD
+- [x] Step 1: Add `genome_size()` method and reachability-aware `complexity()` with TDD
 
 ### Step 2: Add `cached_complexity` to `CreatureState` and wire caching
 

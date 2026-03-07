@@ -1,6 +1,10 @@
 use super::*;
-use crate::contracts::NodeId;
-use crate::creature::genome::{BackendDef, GraphInput, GraphNodeKind, NodeGenome, VmBackendDef};
+use crate::contracts::{
+    DynamicIntrospectionKey, InputReference, NodeId, StaticIntrospectionKey, WorldInputKey,
+};
+use crate::creature::genome::{
+    BackendDef, GraphBackendDef, GraphInput, GraphNodeKind, NodeGenome, VmBackendDef,
+};
 use rand::SeedableRng;
 
 // ── VM helper tests ─────────────────────────────────────────────────
@@ -691,4 +695,250 @@ fn mesh_forward_slice_handles_cycle() {
     };
     let gene = mesh_forward_slice(&genome, 0, 8).unwrap();
     assert_eq!(gene.indices, vec![0, 1]);
+}
+
+// ── Functional complexity tests ──────────────────────────────────────
+
+#[test]
+fn functional_complexity_empty_genome() {
+    let genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![],
+    };
+    assert_eq!(functional_complexity(&genome), 0);
+}
+
+#[test]
+fn functional_complexity_excludes_unreachable_nodes() {
+    // Node 0 (entry) → Node 1. Node 2 is unreachable.
+    let genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![
+            NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 4,
+                    constants: vec![],
+                    program: vec![
+                        VmInstruction::PushAction { action_type: 0 },
+                        VmInstruction::ExecuteActionQueue,
+                    ],
+                }),
+                targets: vec![NodeId::new(1)],
+            },
+            NodeGenome {
+                node_id: NodeId::new(1),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 4,
+                    constants: vec![],
+                    program: vec![
+                        VmInstruction::PushAction { action_type: 0 },
+                        VmInstruction::ExecuteActionQueue,
+                    ],
+                }),
+                targets: vec![],
+            },
+            NodeGenome {
+                node_id: NodeId::new(2),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 4,
+                    constants: vec![],
+                    program: vec![
+                        VmInstruction::PushAction { action_type: 1 },
+                        VmInstruction::ExecuteActionQueue,
+                    ],
+                }),
+                targets: vec![],
+            },
+        ],
+    };
+    let fc = functional_complexity(&genome);
+    // Node 0: 1 + 1 target + 2 live instrs = 4
+    // Node 1: 1 + 0 targets + 2 live instrs = 3
+    // Node 2: excluded
+    assert_eq!(fc, 7);
+}
+
+#[test]
+fn functional_complexity_excludes_dead_vm_instructions() {
+    // Single reachable node with dead instructions
+    let genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 4,
+                constants: vec![1.0, 2.0],
+                program: vec![
+                    VmInstruction::LoadConst {
+                        dst: 0,
+                        const_idx: 0,
+                    }, // live (feeds Add → output)
+                    VmInstruction::LoadConst {
+                        dst: 1,
+                        const_idx: 1,
+                    }, // DEAD (r1 never consumed)
+                    VmInstruction::Add { dst: 2, a: 0, b: 0 }, // live (feeds output)
+                    VmInstruction::WriteRouteTarget { src: 2 }, // output
+                ],
+            }),
+            targets: vec![],
+        }],
+    };
+    let fc = functional_complexity(&genome);
+    // 1 node + 0 targets + 3 live instrs (0,2,3) + 1 live const (const_idx=0) + 0 refs = 5
+    assert_eq!(fc, 5);
+}
+
+#[test]
+fn functional_complexity_excludes_dead_graph_nodes() {
+    // Single reachable node with Graph backend; node 2 (Sigmoid) is disconnected
+    let genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
+            backend_def: BackendDef::Graph(GraphBackendDef {
+                internal_nodes: vec![
+                    GraphInternalNode {
+                        kind: GraphNodeKind::InputRef {
+                            ref_idx: 0,
+                            sub_idx: 0,
+                        },
+                        inputs: vec![],
+                        plasticity: None,
+                    },
+                    GraphInternalNode {
+                        kind: GraphNodeKind::Add,
+                        inputs: vec![GraphInput {
+                            source_idx: 0,
+                            weight: 1.0,
+                        }],
+                        plasticity: None,
+                    },
+                    GraphInternalNode {
+                        kind: GraphNodeKind::Sigmoid,
+                        inputs: vec![],
+                        plasticity: None,
+                    }, // DEAD — disconnected from output
+                    GraphInternalNode {
+                        kind: GraphNodeKind::CustomOutput(0),
+                        inputs: vec![GraphInput {
+                            source_idx: 1,
+                            weight: 1.0,
+                        }],
+                        plasticity: None,
+                    },
+                ],
+            }),
+            targets: vec![],
+        }],
+    };
+    let fc = functional_complexity(&genome);
+    // 1 node + 0 targets
+    // Live graph nodes: 0 (InputRef), 1 (Add), 3 (CustomOutput) — node 2 (Sigmoid) excluded
+    // Node 0: 1 node + 0 inputs(edges) = 1
+    // Node 1: 1 node + 1 input = 2
+    // Node 3: 1 node + 1 input = 2
+    // Live graph subtotal: 5
+    // Consumed input_refs: ref_idx=0 from InputRef node → 1
+    // Total: 1 + 0 + 5 + 1 = 7
+    assert_eq!(fc, 7);
+}
+
+#[test]
+fn functional_complexity_counts_store_mem_as_output() {
+    // StoreMem8 should be treated as output instruction
+    let genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 4,
+                constants: vec![1.0, 2.0],
+                program: vec![
+                    VmInstruction::LoadConst {
+                        dst: 0,
+                        const_idx: 0,
+                    }, // live (feeds StoreMem8)
+                    VmInstruction::LoadConst {
+                        dst: 1,
+                        const_idx: 1,
+                    }, // DEAD
+                    VmInstruction::StoreMem8 {
+                        addr_reg: 0,
+                        src: 0,
+                    }, // output
+                ],
+            }),
+            targets: vec![],
+        }],
+    };
+    let fc = functional_complexity(&genome);
+    // 1 node + 0 targets + 2 live instrs (LoadConst@0, StoreMem8@2) + 1 const + 0 refs = 4
+    assert_eq!(fc, 4);
+}
+
+#[test]
+fn functional_complexity_counts_only_consumed_input_refs() {
+    // Node with 3 input_refs but only ref_idx=0 consumed by live code
+    let genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![
+                InputReference::World(WorldInputKey::FoodHere),
+                InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
+                InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
+            ],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 4,
+                constants: vec![],
+                program: vec![
+                    VmInstruction::ReadInput {
+                        dst: 0,
+                        ref_idx: 0,
+                        sub_idx: 0,
+                    },
+                    VmInstruction::WriteRouteTarget { src: 0 },
+                ],
+            }),
+            targets: vec![],
+        }],
+    };
+    let fc = functional_complexity(&genome);
+    // 1 node + 0 targets + 2 live instrs + 0 consts + 1 consumed ref = 4
+    // (not 6, which would include all 3 input_refs)
+    assert_eq!(fc, 4);
+}
+
+#[test]
+fn functional_complexity_equals_genome_size_fully_connected() {
+    // All nodes reachable, all instructions live, all input_refs consumed
+    let genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 4,
+                constants: vec![],
+                program: vec![
+                    VmInstruction::ReadInput {
+                        dst: 0,
+                        ref_idx: 0,
+                        sub_idx: 0,
+                    },
+                    VmInstruction::WriteRouteTarget { src: 0 },
+                ],
+            }),
+            targets: vec![],
+        }],
+    };
+    assert_eq!(functional_complexity(&genome), genome.genome_size());
 }
