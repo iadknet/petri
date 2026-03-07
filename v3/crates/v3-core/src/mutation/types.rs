@@ -392,6 +392,14 @@ impl MutationOperator {
     }
 }
 
+/// Whether a mutation target node is reachable from the mesh entry node.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TargetReachability {
+    Reachable,
+    Unreachable,
+    NotApplicable,
+}
+
 /// Semantic class for an applied mutation event.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum MutationSemanticCategory {
@@ -424,6 +432,9 @@ pub struct MutationSummary {
     pub applied_by_operator: HashMap<MutationOperator, u32>,
     pub applied_semantic_noop_events: u32,
     pub applied_semantic_change_events: u32,
+    pub reachable_target_events: u32,
+    pub unreachable_target_events: u32,
+    pub not_applicable_events: u32,
 }
 
 impl MutationSummary {
@@ -440,6 +451,9 @@ impl MutationSummary {
             applied_by_operator: HashMap::new(),
             applied_semantic_noop_events: 0,
             applied_semantic_change_events: 0,
+            reachable_target_events: 0,
+            unreachable_target_events: 0,
+            not_applicable_events: 0,
         }
     }
 
@@ -479,6 +493,14 @@ impl MutationSummary {
         self.skipped_events += 1;
         *self.skip_reasons.entry(reason).or_insert(0) += 1;
     }
+
+    pub fn record_reachability(&mut self, target: TargetReachability) {
+        match target {
+            TargetReachability::Reachable => self.reachable_target_events += 1,
+            TargetReachability::Unreachable => self.unreachable_target_events += 1,
+            TargetReachability::NotApplicable => self.not_applicable_events += 1,
+        }
+    }
 }
 
 #[cfg(test)]
@@ -498,6 +520,9 @@ mod tests {
         assert!(s.applied_by_operator.is_empty());
         assert_eq!(s.applied_semantic_noop_events, 0);
         assert_eq!(s.applied_semantic_change_events, 0);
+        assert_eq!(s.reachable_target_events, 0);
+        assert_eq!(s.unreachable_target_events, 0);
+        assert_eq!(s.not_applicable_events, 0);
     }
 
     #[test]
@@ -799,5 +824,47 @@ mod tests {
             MutationDomain::InputRef.layer(),
             MutationLayer::NodeInternal
         );
+    }
+
+    #[test]
+    fn record_reachability_increments_correct_counter() {
+        let mut s = MutationSummary::zero();
+        s.record_reachability(TargetReachability::Reachable);
+        s.record_reachability(TargetReachability::Reachable);
+        s.record_reachability(TargetReachability::Unreachable);
+        s.record_reachability(TargetReachability::NotApplicable);
+        assert_eq!(s.reachable_target_events, 2);
+        assert_eq!(s.unreachable_target_events, 1);
+        assert_eq!(s.not_applicable_events, 1);
+    }
+
+    #[test]
+    fn reachability_accounting_matches_applied_events() {
+        let mut s = MutationSummary::zero();
+        // Simulate 3 applied events with reachability tracking
+        s.record_applied(
+            MutationDomain::Topology,
+            MutationOperator::TopologyAddNode,
+            MutationSemanticCategory::SemanticChange,
+        );
+        s.record_reachability(TargetReachability::Reachable);
+
+        s.record_applied(
+            MutationDomain::Vm,
+            MutationOperator::VmConstantMutation,
+            MutationSemanticCategory::SemanticChange,
+        );
+        s.record_reachability(TargetReachability::Unreachable);
+
+        s.record_applied(
+            MutationDomain::Topology,
+            MutationOperator::TopologyAddNode,
+            MutationSemanticCategory::SemanticChange,
+        );
+        s.record_reachability(TargetReachability::NotApplicable);
+
+        let reachability_total =
+            s.reachable_target_events + s.unreachable_target_events + s.not_applicable_events;
+        assert_eq!(reachability_total, s.applied_events);
     }
 }
