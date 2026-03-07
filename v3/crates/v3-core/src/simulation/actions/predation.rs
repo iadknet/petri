@@ -205,6 +205,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         world.place_creature(pos_a, attacker_id);
@@ -220,6 +221,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         world.place_creature(pos_v, victim_id);
@@ -258,6 +260,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         world.place_creature(pos, id);

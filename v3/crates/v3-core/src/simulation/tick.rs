@@ -185,7 +185,8 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                     &creature.genome,
                     ss,
                     &mut creature.energy,
-                    &mut creature.memory,
+                    &mut creature.shared_memory,
+                    &creature.prev_shared_memory,
                     &mut creature.graph_runtime,
                     &runtime_config,
                 );
@@ -204,7 +205,8 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                     &creature.genome,
                     ss,
                     &mut creature.energy,
-                    &mut creature.memory,
+                    &mut creature.shared_memory,
+                    &creature.prev_shared_memory,
                     &mut creature.graph_runtime,
                     &runtime_config,
                 );
@@ -628,6 +630,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         world.place_creature(Position::new(5, 5), a_id);
@@ -643,6 +646,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         world.place_creature(Position::new(5, 4), b_id);
@@ -679,6 +683,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         world.place_creature(pos, id);
@@ -1096,6 +1101,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         let id_b = creatures.insert_with_key(|id| {
@@ -1109,6 +1115,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         let id_c = creatures.insert_with_key(|id| {
@@ -1122,6 +1129,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
 
@@ -1166,6 +1174,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         let id_b = creatures.insert_with_key(|id| {
@@ -1179,6 +1188,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         let id_c = creatures.insert_with_key(|id| {
@@ -1192,6 +1202,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
 

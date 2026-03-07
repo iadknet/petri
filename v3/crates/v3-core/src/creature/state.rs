@@ -1,6 +1,11 @@
+use std::mem::size_of;
+
 use crate::contracts::{CreatureId, Position};
 use crate::creature::genome::CreatureGenome;
 use crate::creature::identity::CreatureIdentityState;
+
+/// Number of f32 slots in shared memory, accessible by both VM and Graph backends.
+pub const SHARED_MEMORY_SLOTS: usize = 16;
 
 /// Per-creature runtime state for Graph backends.
 /// Groups all mutable state that graph evaluation reads/writes.
@@ -56,8 +61,11 @@ pub struct CreatureState {
     pub energy: f32,
     pub age: u64,
     pub generation: u64,
-    /// 1024-byte persistent memory, copied on reproduction.
-    pub memory: [u8; 1024],
+    /// Shared f32 memory slots, accessible by both VM and Graph backends.
+    /// Copied from parent to child on reproduction.
+    pub shared_memory: [f32; SHARED_MEMORY_SLOTS],
+    /// Snapshot of shared_memory from the previous tick (set at tick start).
+    pub prev_shared_memory: [f32; SHARED_MEMORY_SLOTS],
     /// Per-node runtime state for Graph backends (stateful operators + plasticity weights).
     pub graph_runtime: GraphRuntimeState,
     /// Lifecycle-owned identity state for kin recognition and lineage tracking.
@@ -74,7 +82,7 @@ pub struct CreatureState {
 }
 
 impl CreatureState {
-    /// Create a new creature with zeroed memory and empty graph runtime state.
+    /// Create a new creature with empty graph runtime state and zeroed prev_shared_memory.
     /// Computes `cached_complexity` from the genome.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
@@ -87,6 +95,7 @@ impl CreatureState {
         phenotype_active_channel: usize,
         phenotype_channel_polarity: [bool; 6],
         identity: CreatureIdentityState,
+        shared_memory: [f32; SHARED_MEMORY_SLOTS],
     ) -> Self {
         let cached_complexity = genome.complexity();
         Self {
@@ -96,7 +105,8 @@ impl CreatureState {
             energy,
             age: 0,
             generation,
-            memory: [0u8; 1024],
+            shared_memory,
+            prev_shared_memory: [0.0; SHARED_MEMORY_SLOTS],
             graph_runtime: GraphRuntimeState::new(),
             identity,
             phenotype_channels,
@@ -120,6 +130,7 @@ impl CreatureState {
         phenotype_active_channel: usize,
         phenotype_channel_polarity: [bool; 6],
         identity: CreatureIdentityState,
+        shared_memory: [f32; SHARED_MEMORY_SLOTS],
         cached_complexity: u32,
     ) -> Self {
         Self {
@@ -129,7 +140,8 @@ impl CreatureState {
             energy,
             age: 0,
             generation,
-            memory: [0u8; 1024],
+            shared_memory,
+            prev_shared_memory: [0.0; SHARED_MEMORY_SLOTS],
             graph_runtime: GraphRuntimeState::new(),
             identity,
             phenotype_channels,
@@ -139,6 +151,10 @@ impl CreatureState {
         }
     }
 }
+
+// Compile-time size assertion: shared_memory is 2x16x4=128 bytes vs old 1024-byte memory.
+// Lock in the size reduction and catch future bloat.
+const _: () = assert!(size_of::<[f32; SHARED_MEMORY_SLOTS]>() == 64);
 
 #[cfg(test)]
 mod tests {
@@ -166,7 +182,7 @@ mod tests {
     }
 
     #[test]
-    fn new_creature_has_zero_age_and_empty_memory() {
+    fn new_creature_has_zero_age_and_zeroed_shared_memory() {
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
         let id = sm.insert(());
         let state = CreatureState::new(
@@ -179,9 +195,11 @@ mod tests {
             0,
             [true; 6],
             CreatureIdentityState::default(),
+            [0.0; SHARED_MEMORY_SLOTS],
         );
         assert_eq!(state.age, 0);
-        assert_eq!(state.memory, [0u8; 1024]);
+        assert_eq!(state.shared_memory, [0.0; SHARED_MEMORY_SLOTS]);
+        assert_eq!(state.prev_shared_memory, [0.0; SHARED_MEMORY_SLOTS]);
         assert!(state.graph_runtime.node_state.is_empty());
         assert!(state.graph_runtime.plasticity_weights.is_empty());
         assert!(state.graph_runtime.eligibility_traces.is_empty());
@@ -190,6 +208,31 @@ mod tests {
         assert_eq!(state.phenotype_channels, [128, 64, 32, 10, 20, 30]);
         assert_eq!(state.phenotype_active_channel, 0);
         assert_eq!(state.phenotype_channel_polarity, [true; 6]);
+    }
+
+    #[test]
+    fn new_creature_preserves_passed_shared_memory() {
+        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
+        let id = sm.insert(());
+        let mut mem = [0.0f32; SHARED_MEMORY_SLOTS];
+        mem[3] = 1.5;
+        mem[7] = -2.0;
+        let state = CreatureState::new(
+            id,
+            minimal_genome(),
+            Position::new(5, 5),
+            20.0,
+            0,
+            [0; 6],
+            0,
+            [true; 6],
+            CreatureIdentityState::default(),
+            mem,
+        );
+        assert!((state.shared_memory[3] - 1.5).abs() < f32::EPSILON);
+        assert!((state.shared_memory[7] - -2.0).abs() < f32::EPSILON);
+        // prev is always zeroed for new creatures
+        assert_eq!(state.prev_shared_memory, [0.0; SHARED_MEMORY_SLOTS]);
     }
 
     #[test]
@@ -206,6 +249,7 @@ mod tests {
             0,
             [true; 6],
             CreatureIdentityState::default(),
+            [0.0; SHARED_MEMORY_SLOTS],
         );
         assert_eq!(state.position, Position::new(3, 7));
         assert_eq!(state.generation, 2);

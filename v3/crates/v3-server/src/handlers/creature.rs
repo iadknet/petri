@@ -16,7 +16,7 @@ pub struct CreatureQuery {
     /// When present, only return action_log entries with `tick > since_tick`.
     pub since_tick: Option<u64>,
     /// Comma-separated field names to exclude from the response
-    /// (valid values: `genome`, `action_log`, `memory`).
+    /// (valid values: `genome`, `action_log`, `shared_memory`).
     pub exclude: Option<String>,
 }
 
@@ -106,9 +106,11 @@ pub async fn get_creature(
     if !exclude.contains("genome") {
         map.insert("genome".into(), serde_json::json!(creature.genome));
     }
-    if !exclude.contains("memory") {
-        let memory: &[u8] = &creature.memory;
-        map.insert("memory".into(), serde_json::json!(memory));
+    if !exclude.contains("shared_memory") {
+        map.insert(
+            "shared_memory".into(),
+            serde_json::json!(&creature.shared_memory[..]),
+        );
     }
     if !exclude.contains("action_log") {
         map.insert("action_log".into(), serde_json::json!(action_log_entries));

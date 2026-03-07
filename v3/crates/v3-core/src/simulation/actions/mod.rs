@@ -111,6 +111,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         world.place_creature(pos, id);
@@ -245,6 +246,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         let id2 = creatures.insert_with_key(|id| {
@@ -258,6 +260,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         world.place_creature(pos1, id1);
@@ -332,6 +335,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         let blocker = creatures.insert_with_key(|id| {
@@ -345,6 +349,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         world.place_creature(pos, parent);
@@ -425,12 +430,12 @@ mod tests {
     }
 
     #[test]
-    fn apply_reproduce_child_inherits_memory() {
+    fn apply_reproduce_child_inherits_shared_memory() {
         let pos = Position::new(5, 5);
         let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
-        // Write a distinctive byte pattern to parent memory.
-        sim.creatures[parent_id].memory[42] = 0xAB;
-        sim.creatures[parent_id].memory[100] = 0xCD;
+        // Write distinctive values to parent shared_memory.
+        sim.creatures[parent_id].shared_memory[3] = 0.42;
+        sim.creatures[parent_id].shared_memory[7] = 0.99;
         let parent_gen = sim.creatures[parent_id].generation;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(7);
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
@@ -440,8 +445,8 @@ mod tests {
             .values()
             .find(|c| c.generation == parent_gen + 1)
             .expect("child not found");
-        assert_eq!(child.memory[42], 0xAB);
-        assert_eq!(child.memory[100], 0xCD);
+        assert!((child.shared_memory[3] - 0.42).abs() < f32::EPSILON);
+        assert!((child.shared_memory[7] - 0.99).abs() < f32::EPSILON);
     }
 
     #[test]
@@ -639,6 +644,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         let _id2 = creatures.insert_with_key(|id| {
@@ -652,6 +658,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         world.place_creature(pos1, id1);
@@ -747,6 +754,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         world.place_creature(pos, id);
@@ -912,6 +920,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         sim_low.world.place_creature(victim_pos, victim_id_low);
@@ -933,6 +942,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         sim_high.world.place_creature(victim_pos, victim_id_high);
@@ -1089,6 +1099,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         sim_young.world.place_creature(victim_pos, victim_young);
@@ -1110,6 +1121,7 @@ mod tests {
                 0,
                 [true; 6],
                 CreatureIdentityState::default(),
+                [0.0; 16],
             )
         });
         sim_old.world.place_creature(victim_pos, victim_old);
