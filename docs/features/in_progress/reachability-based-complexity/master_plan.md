@@ -244,7 +244,7 @@ Migrate every production call site per the Call Site Audit table above:
 2. `v3-mutation-spec.md`: Note that pressure gate uses `genome_size()`, not `complexity()`.
 3. `v3-evolution-observability-spec.md`: Note that `genome_complexity_*` stats reflect functional complexity.
 
-- [ ] Step 7: Update reference specification docs
+- [x] Step 7: Update reference specification docs
 
 - [ ] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke domain skills (backend: `rust-skills`; frontend: `vercel-react-best-practices` + `vercel-composition-patterns`). Fix all findings. Re-review until clean pass.
 - [ ] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.

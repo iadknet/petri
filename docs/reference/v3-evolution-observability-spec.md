@@ -73,6 +73,14 @@ Implementations must expose, at minimum:
 Counter scope (tick-level, run-level, or both) may vary by implementation, but
 the semantic meaning of each counter must remain consistent.
 
+Genome complexity stats:
+- Population-level `genome_complexity_mean`, `genome_complexity_min`, and
+  `genome_complexity_max` report functional complexity (reachability-aware), not
+  total genome size. Functional complexity excludes unreachable mesh nodes and
+  dead instructions/graph nodes within reachable nodes. This means the stats
+  reflect the actual behavioral complexity of creatures, not their total
+  structural genome size.
+
 Core accounting representation guidance:
 - Core runtime accounting should use typed keys (domain/operator/reason enums)
   on hot paths.
