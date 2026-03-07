@@ -214,7 +214,7 @@ Migrate every production call site per the Call Site Audit table above:
 4. Add doc comment to `ComplexityEnergyCostConfig` noting it operates on functional complexity (not genome size).
 5. Update server tests.
 
-- [ ] Step 5: Update server API response and population stats computation
+- [x] Step 5: Update server API response and population stats computation
 
 - [ ] Review Gate: Interim code review — review Steps 1-5 changes. Fix findings, re-review until clean.
 

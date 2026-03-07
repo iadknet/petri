@@ -108,6 +108,7 @@ impl Default for EnergyCostsConfig {
 }
 
 /// Complexity-based energy cost multiplier config.
+/// Operates on functional complexity (reachability-aware), not total genome size.
 /// Canonical owner: v3-runtime-config-spec.md Section 4.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
