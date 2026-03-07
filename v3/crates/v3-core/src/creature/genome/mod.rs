@@ -235,6 +235,15 @@ pub enum GraphNodeKind {
     PopAction,
     /// Mark mesh hop as terminal; return accumulated action queue.
     ExecuteActionQueue,
+    // ── Shared memory slot nodes ─────────────────────────────────────────────
+    /// Read `shared_memory[slot_idx % 16]` and add to weighted sum.
+    ReadSlot(u8),
+    /// Read `prev_shared_memory[slot_idx % 16]` and add to weighted sum.
+    ReadSlotPrev(u8),
+    /// Deferred: write `sanitize_f32(wsum)` to `shared_memory[slot_idx % 16]` post-convergence.
+    WriteSlot(u8),
+    /// Deferred: write `0.0` to `shared_memory[slot_idx % 16]` post-convergence.
+    ClearSlot(u8),
 }
 
 /// A single internal node in the graph backend.

@@ -103,6 +103,8 @@ pub fn execute_creature_mesh(
                 sensors,
                 config,
                 &mut side_outputs,
+                shared_memory,
+                prev_shared_memory,
             ),
         };
 

@@ -123,6 +123,8 @@ struct GraphBenchFixture {
     energy: f32,
     node_idx: usize,
     graph_runtime: GraphRuntimeState,
+    shared_memory: [f32; 16],
+    prev_shared_memory: [f32; 16],
 }
 
 fn build_graph_fixture() -> GraphBenchFixture {
@@ -152,6 +154,8 @@ fn build_graph_fixture() -> GraphBenchFixture {
         energy: creature.energy.max(1.0),
         node_idx,
         graph_runtime: GraphRuntimeState::new(),
+        shared_memory: creature.shared_memory,
+        prev_shared_memory: creature.prev_shared_memory,
     }
 }
 
@@ -313,6 +317,8 @@ fn bench_graph_execute_stress(c: &mut Criterion) {
                     &fixture.sensors,
                     &fixture.runtime_config,
                     &mut side_outputs,
+                    &mut fixture.shared_memory,
+                    &fixture.prev_shared_memory,
                 ));
             },
             BatchSize::SmallInput,
