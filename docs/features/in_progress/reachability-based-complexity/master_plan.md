@@ -234,7 +234,7 @@ Migrate every production call site per the Call Site Audit table above:
 
 **No display changes needed:** InspectorHeader and EvolutionTab read `complexity` which retains its field name. The semantic change (now functional complexity) is transparent.
 
-- [ ] Step 6: Update frontend types, config panels, and test fixtures
+- [x] Step 6: Update frontend types, config panels, and test fixtures
 
 ### Step 7: Update reference docs
 

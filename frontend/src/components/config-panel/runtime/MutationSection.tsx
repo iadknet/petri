@@ -42,14 +42,14 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		tooltip: "Probability of adding a mesh layer during genome mutation",
 	},
 	{
-		path: "mutation.complexity_cap",
-		label: "Complexity Cap",
+		path: "mutation.genome_size_cap",
+		label: "Genome Size Cap",
 		min: 1,
 		max: 5000,
 		step: 1,
-		testId: "config-field-mutation-complexity-cap",
+		testId: "config-field-mutation-genome-size-cap",
 		defaultValue: 1200,
-		tooltip: "Maximum genome complexity before complexity pressure suppresses growth mutations",
+		tooltip: "Maximum genome size before size pressure suppresses growth mutations",
 	},
 	{
 		path: "mutation.phenotype.channel_step",
@@ -95,12 +95,12 @@ export const MUTATION_FIELDS: FieldDef[] = [
 
 export const MUTATION_TOGGLES: BooleanFieldDef[] = [
 	{
-		path: "mutation.complexity_pressure_enabled",
-		label: "Complexity Pressure",
-		testId: "config-field-mutation-complexity-pressure-enabled",
+		path: "mutation.genome_size_pressure_enabled",
+		label: "Genome Size Pressure",
+		testId: "config-field-mutation-genome-size-pressure-enabled",
 		defaultValue: true,
 		tooltip:
-			"When enabled, genomes near the complexity cap are less likely to gain growth mutations",
+			"When enabled, genomes near the size cap are less likely to gain growth mutations",
 	},
 ];
 

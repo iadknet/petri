@@ -63,8 +63,8 @@ export const MOCK_CONFIG: SimulationConfig = {
 		per_birth_mutation_events_min: 1,
 		per_birth_mutation_events_max: 4,
 		mesh_layer_probability: 0.2,
-		complexity_cap: 1200,
-		complexity_pressure_enabled: true,
+		genome_size_cap: 1200,
+		genome_size_pressure_enabled: true,
 		action_queue_cap: 4,
 		phenotype: {
 			channel_step: 1,
