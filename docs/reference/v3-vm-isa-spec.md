@@ -203,7 +203,7 @@ Implementation bugs outside mutation-space (for example corrupted in-memory
 instruction representation) are still defects, but evolved operands do not
 panic the VM.
 
-Memory addressing is never invalid; all addresses wrap with `rem_euclid(1024)`.
+Slot addressing is never invalid; all slot indices wrap with `% 16`.
 
 ---
 
@@ -261,12 +261,12 @@ Defined numeric rules:
 | SetPriorityBid | 0.20 |
 | ExecuteActionQueue | 0.24 |
 | Halt | 0.05 |
-| LoadSlot | 0.14 |
-| StoreSlot | 0.16 |
-| LoadSlotImm | 0.12 |
-| StoreSlotImm | 0.14 |
-| LoadSlotPrev | 0.14 |
-| ClearSlot | 0.10 |
+| LoadSlot | 0.12 |
+| StoreSlot | 0.14 |
+| LoadSlotImm | 0.10 |
+| StoreSlotImm | 0.12 |
+| LoadSlotPrev | 0.10 |
+| ClearSlot | 0.12 |
 
 v3 energy uses continuous scalar units (`f32`).
 Opcode spend is:

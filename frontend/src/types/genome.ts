@@ -34,7 +34,15 @@ export type GraphNodeKind =
 	| { Oscillator: number }
 	| "AdaptiveGain"
 	| { CustomOutput: number }
-	| "RouterOutput";
+	| "RouterOutput"
+	| { WriteActionMeta: number }
+	| { PushAction: number }
+	| "PopAction"
+	| "ExecuteActionQueue"
+	| { ReadSlot: number }
+	| { ReadSlotPrev: number }
+	| { WriteSlot: number }
+	| { ClearSlot: number };
 
 export interface GraphInternalNode {
 	kind: GraphNodeKind;
@@ -72,13 +80,21 @@ export type VmInstruction =
 	| { ReadInput: { dst: number; input_idx: number } }
 	| { WriteInternalPayload: { slot_idx: number; src: number } }
 	| { WriteWorldActionMeta: { slot_idx: number; src: number } }
-	| { EmitWorldAction: { action_type: number } }
 	| { WriteRouteTarget: { src: number } }
+	| { PushAction: { action_type: number } }
+	| "PopAction"
+	| { ReadActionQueueLength: { dst: number } }
+	| { ReadActionQueueType: { index_src: number; dst: number } }
+	| { ReadActionQueueParam: { index_src: number; param_slot: number; dst: number } }
+	| { SetPriorityBid: { src: number } }
+	| "ExecuteActionQueue"
 	| "Halt"
-	| { LoadMem8: { dst: number; addr_reg: number } }
-	| { StoreMem8: { addr_reg: number; src: number } }
-	| { LoadMem8Imm: { dst: number; imm_addr: number } }
-	| { StoreMem8Imm: { imm_addr: number; src: number } };
+	| { LoadSlot: { dst: number; slot_reg: number } }
+	| { StoreSlot: { slot_reg: number; src: number } }
+	| { LoadSlotImm: { dst: number; slot_idx: number } }
+	| { StoreSlotImm: { slot_idx: number; src: number } }
+	| { LoadSlotPrev: { dst: number; slot_idx: number } }
+	| { ClearSlot: { slot_idx: number } };
 
 export interface VmBackendDef {
 	register_count: number;

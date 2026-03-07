@@ -460,7 +460,7 @@ mod tests {
     }
 
     #[test]
-    fn graph_node_kinds_all_26_constructible() {
+    fn graph_node_kinds_all_30_constructible() {
         let kinds: Vec<GraphNodeKind> = vec![
             GraphNodeKind::InputRef {
                 ref_idx: 0,
@@ -491,8 +491,12 @@ mod tests {
             GraphNodeKind::PushAction(1),
             GraphNodeKind::PopAction,
             GraphNodeKind::ExecuteActionQueue,
+            GraphNodeKind::ReadSlot(0),
+            GraphNodeKind::ReadSlotPrev(0),
+            GraphNodeKind::WriteSlot(0),
+            GraphNodeKind::ClearSlot(0),
         ];
-        assert_eq!(kinds.len(), 26);
+        assert_eq!(kinds.len(), 30);
     }
 
     #[test]
