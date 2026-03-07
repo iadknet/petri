@@ -6,7 +6,8 @@ use crate::contracts::{
 };
 use crate::creature::genome::{BackendDef, CreatureGenome, GraphNodeKind, VmInstruction};
 use crate::mutation::compound;
-use crate::mutation::types::MutationSkipReason;
+use crate::mutation::reachability::biased_select_from;
+use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
 /// Input reference mutation operator variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -141,17 +142,19 @@ impl InputRefMutator {
     pub fn apply(
         genome: &mut CreatureGenome,
         op: InputRefOperator,
+        reachable_nodes: &[usize],
+        bias: f64,
         rng: &mut impl Rng,
         config: &MutationConfig,
-    ) -> Result<(), MutationSkipReason> {
+    ) -> Result<TargetReachability, MutationSkipReason> {
         if genome.nodes.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
 
         match op {
-            InputRefOperator::Add => apply_add(genome, rng, config),
-            InputRefOperator::Remove => apply_remove(genome, rng),
-            InputRefOperator::Swap => apply_swap(genome, rng, config),
+            InputRefOperator::Add => apply_add(genome, reachable_nodes, bias, rng, config),
+            InputRefOperator::Remove => apply_remove(genome, reachable_nodes, bias, rng),
+            InputRefOperator::Swap => apply_swap(genome, reachable_nodes, bias, rng, config),
             InputRefOperator::RawFieldMutation => apply_raw_field_mutation(genome, rng),
         }
     }
@@ -200,10 +203,14 @@ pub(crate) fn reindex_after_removal(
 
 fn apply_add(
     genome: &mut CreatureGenome,
+    reachable_nodes: &[usize],
+    bias: f64,
     rng: &mut impl Rng,
     config: &MutationConfig,
-) -> Result<(), MutationSkipReason> {
-    let node_idx = rng.gen_range(0..genome.nodes.len());
+) -> Result<TargetReachability, MutationSkipReason> {
+    let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
+    let (node_idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let new_ref = random_input_reference(rng);
     let count = compound::sub_value_count(&new_ref, config);
     let ref_idx = genome.nodes[node_idx].input_refs.len() as u16;
@@ -211,10 +218,15 @@ fn apply_add(
     if count > 1 {
         compound::create_fan_out_nodes(&mut genome.nodes[node_idx], ref_idx, count);
     }
-    Ok(())
+    Ok(reachability)
 }
 
-fn apply_remove(genome: &mut CreatureGenome, rng: &mut impl Rng) -> Result<(), MutationSkipReason> {
+fn apply_remove(
+    genome: &mut CreatureGenome,
+    reachable_nodes: &[usize],
+    bias: f64,
+    rng: &mut impl Rng,
+) -> Result<TargetReachability, MutationSkipReason> {
     let eligible: Vec<usize> = genome
         .nodes
         .iter()
@@ -225,19 +237,22 @@ fn apply_remove(genome: &mut CreatureGenome, rng: &mut impl Rng) -> Result<(), M
     if eligible.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-    let node_idx = eligible[rng.gen_range(0..eligible.len())];
+    let (node_idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let ref_idx = rng.gen_range(0..genome.nodes[node_idx].input_refs.len());
     genome.nodes[node_idx].input_refs.remove(ref_idx);
     debug_assert!(ref_idx <= u16::MAX as usize, "input_refs index exceeds u16");
     reindex_after_removal(genome, node_idx, ref_idx as u16);
-    Ok(())
+    Ok(reachability)
 }
 
 fn apply_swap(
     genome: &mut CreatureGenome,
+    reachable_nodes: &[usize],
+    bias: f64,
     rng: &mut impl Rng,
     config: &MutationConfig,
-) -> Result<(), MutationSkipReason> {
+) -> Result<TargetReachability, MutationSkipReason> {
     let eligible: Vec<usize> = genome
         .nodes
         .iter()
@@ -248,7 +263,8 @@ fn apply_swap(
     if eligible.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-    let node_idx = eligible[rng.gen_range(0..eligible.len())];
+    let (node_idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let ref_idx = rng.gen_range(0..genome.nodes[node_idx].input_refs.len());
     let new_ref = random_input_reference(rng);
     let count = compound::sub_value_count(&new_ref, config);
@@ -256,7 +272,7 @@ fn apply_swap(
     if count > 1 {
         compound::create_fan_out_nodes(&mut genome.nodes[node_idx], ref_idx as u16, count);
     }
-    Ok(())
+    Ok(reachability)
 }
 
 /// Generate a random input reference from the full set of 44 possible values.
@@ -297,7 +313,7 @@ fn random_input_reference(rng: &mut impl Rng) -> InputReference {
 fn apply_raw_field_mutation(
     genome: &mut CreatureGenome,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<TargetReachability, MutationSkipReason> {
     // Count eligible targets: UpstreamSlot input_refs + InputRef graph nodes (for sub_idx mutation).
     let mut upstream_count: usize = 0;
     let mut graph_input_ref_count: usize = 0;
@@ -329,7 +345,7 @@ fn apply_raw_field_mutation(
                 if matches!(input_ref, InputReference::UpstreamSlot(_)) {
                     if pick == 0 {
                         *input_ref = InputReference::UpstreamSlot(rng.gen::<u16>() as usize);
-                        return Ok(());
+                        return Ok(TargetReachability::NotApplicable);
                     }
                     pick -= 1;
                 }
@@ -345,14 +361,14 @@ fn apply_raw_field_mutation(
                 if let GraphNodeKind::InputRef { sub_idx, .. } = &mut internal.kind {
                     if pick == 0 {
                         *sub_idx = rng.gen::<u16>();
-                        return Ok(());
+                        return Ok(TargetReachability::NotApplicable);
                     }
                     pick -= 1;
                 }
             }
         }
     }
-    Ok(())
+    Ok(TargetReachability::NotApplicable)
 }
 
 /// Map an index 0..8 to a Direction (canonical order).
@@ -406,6 +422,8 @@ mod tests {
         InputRefMutator::apply(
             &mut genome,
             InputRefOperator::Add,
+            &[],
+            0.0,
             &mut r,
             &default_config(),
         )
@@ -423,6 +441,8 @@ mod tests {
         InputRefMutator::apply(
             &mut genome,
             InputRefOperator::Remove,
+            &[],
+            0.0,
             &mut r,
             &default_config(),
         )
@@ -441,6 +461,8 @@ mod tests {
         let result = InputRefMutator::apply(
             &mut genome,
             InputRefOperator::Remove,
+            &[],
+            0.0,
             &mut r,
             &default_config(),
         );
@@ -459,8 +481,15 @@ mod tests {
         for seed in 0u64..100 {
             let mut g = genome.clone();
             let mut r = rng(seed);
-            if InputRefMutator::apply(&mut g, InputRefOperator::Swap, &mut r, &default_config())
-                .is_ok()
+            if InputRefMutator::apply(
+                &mut g,
+                InputRefOperator::Swap,
+                &[],
+                0.0,
+                &mut r,
+                &default_config(),
+            )
+            .is_ok()
             {
                 let new_refs: Vec<InputReference> = g
                     .nodes
@@ -555,6 +584,8 @@ mod tests {
             InputRefMutator::apply(
                 &mut genome,
                 InputRefOperator::RawFieldMutation,
+                &[],
+                0.0,
                 &mut r,
                 &default_config(),
             )
@@ -583,7 +614,7 @@ mod tests {
         for (i, &op) in operators.iter().enumerate() {
             let mut genome = v3alpha1_founder_genome();
             let mut r = rng(i as u64 + 400);
-            let _ = InputRefMutator::apply(&mut genome, op, &mut r, &default_config());
+            let _ = InputRefMutator::apply(&mut genome, op, &[], 0.0, &mut r, &default_config());
             assert!(
                 ParseabilityGate::validate(&genome).is_ok(),
                 "parseability failed after {:?}",
@@ -922,8 +953,15 @@ mod tests {
         for seed in 0u64..200 {
             let mut g = genome.clone();
             let mut r = rng(seed);
-            if InputRefMutator::apply(&mut g, InputRefOperator::Remove, &mut r, &default_config())
-                .is_ok()
+            if InputRefMutator::apply(
+                &mut g,
+                InputRefOperator::Remove,
+                &[],
+                0.0,
+                &mut r,
+                &default_config(),
+            )
+            .is_ok()
                 && g.nodes[0].input_refs.len() == 1
             {
                 // Removed one ref. Check if the remaining is UpstreamSlot(0)
@@ -1028,6 +1066,8 @@ mod tests {
             InputRefMutator::apply(
                 &mut genome,
                 InputRefOperator::Add,
+                &[],
+                0.0,
                 &mut r,
                 &default_config(),
             )
@@ -1071,6 +1111,8 @@ mod tests {
             InputRefMutator::apply(
                 &mut genome,
                 InputRefOperator::Swap,
+                &[],
+                0.0,
                 &mut r,
                 &default_config(),
             )
@@ -1111,6 +1153,8 @@ mod tests {
             let _ = InputRefMutator::apply(
                 &mut genome,
                 InputRefOperator::RawFieldMutation,
+                &[],
+                0.0,
                 &mut r,
                 &default_config(),
             );
@@ -1174,6 +1218,8 @@ mod tests {
             InputRefMutator::apply(
                 &mut genome,
                 InputRefOperator::Add,
+                &[],
+                0.0,
                 &mut r,
                 &default_config(),
             )

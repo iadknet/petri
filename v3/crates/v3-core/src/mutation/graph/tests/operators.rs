@@ -13,7 +13,13 @@ fn alter_graph_edge_weight_changes_weight() {
     for seed in 0u64..50 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        let result = GraphMutator::apply(&mut g, GraphOperator::AlterGraphEdgeWeight, &mut r);
+        let result = GraphMutator::apply(
+            &mut g,
+            GraphOperator::AlterGraphEdgeWeight,
+            &[],
+            0.0,
+            &mut r,
+        );
         if result.is_ok() {
             let new_weight = if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
                 gd.internal_nodes[2].inputs[0].weight
@@ -36,7 +42,7 @@ fn swap_graph_operator_changes_node_kind() {
     for seed in 0u64..50 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        if GraphMutator::apply(&mut g, GraphOperator::SwapGraphOperator, &mut r).is_ok() {
+        if GraphMutator::apply(&mut g, GraphOperator::SwapGraphOperator, &[], 0.0, &mut r).is_ok() {
             swapped = true;
             break;
         }
@@ -61,7 +67,15 @@ fn mutate_graph_operator_param_changes_param() {
     for seed in 0u64..50 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        if GraphMutator::apply(&mut g, GraphOperator::MutateGraphOperatorParam, &mut r).is_ok() {
+        if GraphMutator::apply(
+            &mut g,
+            GraphOperator::MutateGraphOperatorParam,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .is_ok()
+        {
             let new_param = if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
                 if let GraphNodeKind::Threshold(p) = gd.internal_nodes[2].kind {
                     p
@@ -85,7 +99,14 @@ fn add_internal_graph_node_increases_internal_node_count() {
     let mut genome = v3alpha1_founder_genome();
     let before = graph_node_internal_count(&genome);
     let mut r = rng(0);
-    GraphMutator::apply(&mut genome, GraphOperator::AddInternalGraphNode, &mut r).unwrap();
+    GraphMutator::apply(
+        &mut genome,
+        GraphOperator::AddInternalGraphNode,
+        &[],
+        0.0,
+        &mut r,
+    )
+    .unwrap();
     let after = graph_node_internal_count(&genome);
     assert_eq!(after, before + 1);
 }
@@ -96,7 +117,14 @@ fn remove_internal_graph_node_decreases_count() {
     let before = graph_node_internal_count(&genome);
     assert!(before > 0, "founder graph node must have internal nodes");
     let mut r = rng(0);
-    GraphMutator::apply(&mut genome, GraphOperator::RemoveInternalGraphNode, &mut r).unwrap();
+    GraphMutator::apply(
+        &mut genome,
+        GraphOperator::RemoveInternalGraphNode,
+        &[],
+        0.0,
+        &mut r,
+    )
+    .unwrap();
     let after = graph_node_internal_count(&genome);
     assert_eq!(after, before - 1);
 }
@@ -116,7 +144,13 @@ fn graph_mutator_on_vm_only_genome_returns_no_applicable_target() {
         targets: vec![],
     }];
     let mut r = rng(0);
-    let result = GraphMutator::apply(&mut genome, GraphOperator::AlterGraphEdgeWeight, &mut r);
+    let result = GraphMutator::apply(
+        &mut genome,
+        GraphOperator::AlterGraphEdgeWeight,
+        &[],
+        0.0,
+        &mut r,
+    );
     assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
 }
 
@@ -141,7 +175,7 @@ fn add_graph_edge_increases_input_count() {
         })
         .sum();
     let mut r = rng(0);
-    GraphMutator::apply(&mut genome, GraphOperator::AddGraphEdge, &mut r).unwrap();
+    GraphMutator::apply(&mut genome, GraphOperator::AddGraphEdge, &[], 0.0, &mut r).unwrap();
     let after: usize = genome
         .nodes
         .iter()
@@ -175,7 +209,7 @@ fn add_graph_edge_on_empty_internals_returns_no_applicable_target() {
         }
     }
     let mut r = rng(0);
-    let result = GraphMutator::apply(&mut genome, GraphOperator::AddGraphEdge, &mut r);
+    let result = GraphMutator::apply(&mut genome, GraphOperator::AddGraphEdge, &[], 0.0, &mut r);
     assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
 }
 
@@ -203,7 +237,15 @@ fn mutate_operator_param_changes_constant_value() {
     for seed in 0u64..100 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        if GraphMutator::apply(&mut g, GraphOperator::MutateGraphOperatorParam, &mut r).is_ok() {
+        if GraphMutator::apply(
+            &mut g,
+            GraphOperator::MutateGraphOperatorParam,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .is_ok()
+        {
             if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
                 // Check last internal node (the Constant we added).
                 let last = gd.internal_nodes.last().unwrap();
@@ -227,7 +269,15 @@ fn swap_operator_can_produce_parameterized_kinds() {
     for seed in 0u64..200 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        if GraphMutator::apply(&mut genome, GraphOperator::SwapGraphOperator, &mut r).is_ok() {
+        if GraphMutator::apply(
+            &mut genome,
+            GraphOperator::SwapGraphOperator,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .is_ok()
+        {
             if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
                 for node in &g.internal_nodes {
                     if is_parameterized(&node.kind) {
@@ -282,7 +332,7 @@ fn retarget_graph_edge_changes_source_idx() {
     for seed in 0u64..100 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        if GraphMutator::apply(&mut g, GraphOperator::RetargetGraphEdge, &mut r).is_ok() {
+        if GraphMutator::apply(&mut g, GraphOperator::RetargetGraphEdge, &[], 0.0, &mut r).is_ok() {
             // Check if any edge source_idx differs from original.
             if let (BackendDef::Graph(ref orig), BackendDef::Graph(ref mutated)) =
                 (&genome.nodes[0].backend_def, &g.nodes[0].backend_def)
@@ -321,7 +371,13 @@ fn retarget_graph_edge_no_edges_returns_no_applicable_target() {
         }
     }
     let mut r = rng(0);
-    let result = GraphMutator::apply(&mut genome, GraphOperator::RetargetGraphEdge, &mut r);
+    let result = GraphMutator::apply(
+        &mut genome,
+        GraphOperator::RetargetGraphEdge,
+        &[],
+        0.0,
+        &mut r,
+    );
     assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
 }
 
@@ -338,7 +394,7 @@ fn remove_graph_edge_decreases_input_count() {
     for seed in 0u64..100 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        if GraphMutator::apply(&mut g, GraphOperator::RemoveGraphEdge, &mut r).is_ok() {
+        if GraphMutator::apply(&mut g, GraphOperator::RemoveGraphEdge, &[], 0.0, &mut r).is_ok() {
             let after: usize = if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
                 gd.internal_nodes.iter().map(|n| n.inputs.len()).sum()
             } else {
@@ -361,7 +417,13 @@ fn remove_graph_edge_no_edges_returns_no_applicable_target() {
         }
     }
     let mut r = rng(0);
-    let result = GraphMutator::apply(&mut genome, GraphOperator::RemoveGraphEdge, &mut r);
+    let result = GraphMutator::apply(
+        &mut genome,
+        GraphOperator::RemoveGraphEdge,
+        &[],
+        0.0,
+        &mut r,
+    );
     assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
 }
 
@@ -378,7 +440,14 @@ fn raw_field_mutation_can_set_input_ref_out_of_range() {
             plasticity: None,
         }]);
         let mut r = rng(seed);
-        GraphMutator::apply(&mut genome, GraphOperator::GraphRawFieldMutation, &mut r).unwrap();
+        GraphMutator::apply(
+            &mut genome,
+            GraphOperator::GraphRawFieldMutation,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .unwrap();
         if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
             if let GraphNodeKind::InputRef { ref_idx, .. } = g.internal_nodes[0].kind {
                 if ref_idx > 11 {
@@ -404,7 +473,14 @@ fn raw_field_mutation_can_set_custom_output_out_of_range() {
             plasticity: None,
         }]);
         let mut r = rng(seed);
-        GraphMutator::apply(&mut genome, GraphOperator::GraphRawFieldMutation, &mut r).unwrap();
+        GraphMutator::apply(
+            &mut genome,
+            GraphOperator::GraphRawFieldMutation,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .unwrap();
         if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
             if let GraphNodeKind::CustomOutput(slot) = g.internal_nodes[0].kind {
                 if slot > 11 {
@@ -440,7 +516,14 @@ fn raw_field_mutation_can_set_edge_source_out_of_range() {
             },
         ]);
         let mut r = rng(seed);
-        GraphMutator::apply(&mut genome, GraphOperator::GraphRawFieldMutation, &mut r).unwrap();
+        GraphMutator::apply(
+            &mut genome,
+            GraphOperator::GraphRawFieldMutation,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .unwrap();
         if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
             let source_idx = g.internal_nodes[1].inputs[0].source_idx as usize;
             if source_idx >= g.internal_nodes.len() {
@@ -474,7 +557,7 @@ fn graph_after_mutation_passes_parseability_gate() {
     for (i, &op) in operators.iter().enumerate() {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(i as u64 + 300);
-        let _ = GraphMutator::apply(&mut genome, op, &mut r);
+        let _ = GraphMutator::apply(&mut genome, op, &[], 0.0, &mut r);
         assert!(
             ParseabilityGate::validate(&genome).is_ok(),
             "parseability failed after {:?}",

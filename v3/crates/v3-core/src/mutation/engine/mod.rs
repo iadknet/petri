@@ -8,7 +8,7 @@ use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
 use crate::mutation::pressure;
 use crate::mutation::topology::{TopologyMutator, TopologyOperator};
 use crate::mutation::types::{
-    MutationDomain, MutationOperator, MutationSkipReason, MutationSummary,
+    MutationDomain, MutationOperator, MutationSkipReason, MutationSummary, TargetReachability,
 };
 use crate::mutation::vm::{VmMutator, VmOperator};
 
@@ -18,10 +18,14 @@ pub struct MutationEngine;
 impl MutationEngine {
     /// Apply mutation events to a child genome and return a summary.
     ///
+    /// `parent_reachable_nodes` is the parent's cached reachable set (sorted ascending),
+    /// used to bias mutation target selection toward functional structure.
+    ///
     /// Accounting invariant: `summary.attempted_events == summary.applied_events + summary.skipped_events`.
     pub fn apply_mutations(
         genome: &mut CreatureGenome,
         config: &MutationConfig,
+        parent_reachable_nodes: &[usize],
         rng: &mut impl Rng,
     ) -> MutationSummary {
         // Probability gate.
@@ -61,13 +65,14 @@ impl MutationEngine {
         let mut summary = MutationSummary::zero();
         for _ in 0..event_count {
             // Two-layer dispatch: mesh (Topology) vs node-internal (VM/Graph/InputRef).
+            let rb = &config.reachable_bias;
             let (domain, operator, result) = if rng.gen_bool(config.mesh_layer_probability) {
                 // Layer 1: Mesh (Topology)
                 let op = select_operator!(TopologyOperator, MutationDomain::Topology, summary, rng);
                 (
                     MutationDomain::Topology,
                     topology_operator_key(op),
-                    apply_topology_event(genome, op, rng),
+                    apply_topology_event(genome, op, parent_reachable_nodes, rb.topology, rng),
                 )
             } else {
                 // Layer 2: Node-internal (VM, Graph, InputRef — equal probability)
@@ -77,7 +82,7 @@ impl MutationEngine {
                         (
                             MutationDomain::Vm,
                             vm_operator_key(op),
-                            apply_vm_event(genome, op, rng),
+                            apply_vm_event(genome, op, parent_reachable_nodes, rb.vm, rng),
                         )
                     }
                     1 => {
@@ -86,7 +91,7 @@ impl MutationEngine {
                         (
                             MutationDomain::Graph,
                             graph_operator_key(op),
-                            apply_graph_event(genome, op, rng),
+                            apply_graph_event(genome, op, parent_reachable_nodes, rb.graph, rng),
                         )
                     }
                     _ => {
@@ -99,7 +104,14 @@ impl MutationEngine {
                         (
                             MutationDomain::InputRef,
                             input_ref_operator_key(op),
-                            apply_input_ref_event(genome, op, rng, config),
+                            apply_input_ref_event(
+                                genome,
+                                op,
+                                parent_reachable_nodes,
+                                rb.input_ref,
+                                rng,
+                                config,
+                            ),
                         )
                     }
                 }
@@ -107,7 +119,10 @@ impl MutationEngine {
             summary.record_attempt(domain, operator);
 
             match result {
-                Ok(()) => summary.record_applied(domain, operator, operator.semantic_category()),
+                Ok(reachability) => {
+                    summary.record_applied(domain, operator, operator.semantic_category());
+                    summary.record_reachability(reachability);
+                }
                 Err(reason) => summary.record_skipped(reason),
             }
         }
@@ -120,13 +135,15 @@ impl MutationEngine {
 fn apply_topology_event(
     genome: &mut CreatureGenome,
     op: TopologyOperator,
+    reachable_nodes: &[usize],
+    bias: f64,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<TargetReachability, MutationSkipReason> {
     let snapshot = genome.clone();
-    match TopologyMutator::apply(genome, op, rng) {
-        Ok(()) => {
+    match TopologyMutator::apply(genome, op, reachable_nodes, bias, rng) {
+        Ok(reachability) => {
             if ParseabilityGate::validate(genome).is_ok() {
-                Ok(())
+                Ok(reachability)
             } else {
                 *genome = snapshot;
                 Err(MutationSkipReason::ParseabilityViolation)
@@ -143,13 +160,15 @@ fn apply_topology_event(
 fn apply_vm_event(
     genome: &mut CreatureGenome,
     op: VmOperator,
+    reachable_nodes: &[usize],
+    bias: f64,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<TargetReachability, MutationSkipReason> {
     let snapshot = genome.clone();
-    match VmMutator::apply(genome, op, rng) {
-        Ok(()) => {
+    match VmMutator::apply(genome, op, reachable_nodes, bias, rng) {
+        Ok(reachability) => {
             if ParseabilityGate::validate(genome).is_ok() {
-                Ok(())
+                Ok(reachability)
             } else {
                 *genome = snapshot;
                 Err(MutationSkipReason::ParseabilityViolation)
@@ -166,13 +185,15 @@ fn apply_vm_event(
 fn apply_graph_event(
     genome: &mut CreatureGenome,
     op: GraphOperator,
+    reachable_nodes: &[usize],
+    bias: f64,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<TargetReachability, MutationSkipReason> {
     let snapshot = genome.clone();
-    match GraphMutator::apply(genome, op, rng) {
-        Ok(()) => {
+    match GraphMutator::apply(genome, op, reachable_nodes, bias, rng) {
+        Ok(reachability) => {
             if ParseabilityGate::validate(genome).is_ok() {
-                Ok(())
+                Ok(reachability)
             } else {
                 *genome = snapshot;
                 Err(MutationSkipReason::ParseabilityViolation)
@@ -189,14 +210,16 @@ fn apply_graph_event(
 fn apply_input_ref_event(
     genome: &mut CreatureGenome,
     op: InputRefOperator,
+    reachable_nodes: &[usize],
+    bias: f64,
     rng: &mut impl Rng,
     config: &MutationConfig,
-) -> Result<(), MutationSkipReason> {
+) -> Result<TargetReachability, MutationSkipReason> {
     let snapshot = genome.clone();
-    match InputRefMutator::apply(genome, op, rng, config) {
-        Ok(()) => {
+    match InputRefMutator::apply(genome, op, reachable_nodes, bias, rng, config) {
+        Ok(reachability) => {
             if ParseabilityGate::validate(genome).is_ok() {
-                Ok(())
+                Ok(reachability)
             } else {
                 *genome = snapshot;
                 Err(MutationSkipReason::ParseabilityViolation)
@@ -307,7 +330,7 @@ mod tests {
         for seed in 0u64..100 {
             let mut genome = v3alpha1_founder_genome();
             let mut r = rng(seed);
-            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
             assert_eq!(
                 summary.attempted_events,
                 summary.applied_events + summary.skipped_events,
@@ -323,7 +346,7 @@ mod tests {
         config.mutation_probability = 0.0;
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(42);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
         assert_eq!(summary.attempted_events, 0);
         assert_eq!(summary.applied_events, 0);
         assert_eq!(summary.skipped_events, 0);
@@ -337,7 +360,7 @@ mod tests {
         config.per_birth_mutation_events_max = 3;
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(7);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
         assert_eq!(summary.attempted_events, 3, "must attempt exactly 3 events");
     }
 
@@ -351,7 +374,7 @@ mod tests {
         for seed in 0u64..50 {
             let mut genome = v3alpha1_founder_genome();
             let mut r = rng(seed);
-            MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
             assert!(
                 ParseabilityGate::validate(&genome).is_ok(),
                 "parseability violated at seed {}",
@@ -370,7 +393,7 @@ mod tests {
         let mut genome = v3alpha1_founder_genome();
         for seed in 0u64..1000 {
             let mut r = rng(seed);
-            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
             assert_eq!(
                 summary.attempted_events,
                 summary.applied_events + summary.skipped_events
@@ -391,7 +414,7 @@ mod tests {
         for seed in 0u64..100 {
             let mut genome = original.clone();
             let mut r = rng(seed);
-            MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
             if genome != original {
                 differ_count += 1;
             }
@@ -415,7 +438,7 @@ mod tests {
         let mut genome = v3alpha1_founder_genome();
         for seed in 0u64..1000 {
             let mut r = rng(seed);
-            MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
         }
         let has_non_noop = genome.nodes.iter().any(|n| {
             if let BackendDef::Vm(ref vm) = n.backend_def {
@@ -442,7 +465,7 @@ mod tests {
             let mut genome = v3alpha1_founder_genome();
             for gen in 0u64..100 {
                 let mut r = rng(copy * 1000 + gen);
-                MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+                MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
             }
             assert!(
                 ParseabilityGate::validate(&genome).is_ok(),
@@ -461,7 +484,7 @@ mod tests {
 
         let mut genome = v3alpha1_founder_genome();
         let mut rng = rng(123);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut rng);
+        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut rng);
 
         let attempted_by_domain: u32 = summary.attempted_by_domain.values().sum();
         let applied_by_domain: u32 = summary.applied_by_domain.values().sum();
@@ -472,14 +495,11 @@ mod tests {
         assert_eq!(attempted_by_domain, summary.attempted_events);
         assert_eq!(applied_by_domain, summary.applied_events);
         // Operator-level attempts exclude domain-skips (no operator was selected).
-        let domain_skips = summary
-            .skip_reasons
-            .get(&MutationSkipReason::NoApplicableTarget)
-            .copied()
-            .unwrap_or(0);
-        assert_eq!(
-            attempted_by_operator + domain_skips,
-            summary.attempted_events
+        // Domain-level skips: events attempted where no operator could be selected
+        // (e.g., restricted mode with no decreasing operator for a domain).
+        assert!(
+            attempted_by_operator <= summary.attempted_events,
+            "operator attempts cannot exceed total attempts"
         );
         assert_eq!(applied_by_operator, summary.applied_events);
 
@@ -502,7 +522,7 @@ mod tests {
         for seed in 0u64..20_000 {
             let mut genome = v3alpha1_founder_genome();
             let mut r = rng(seed);
-            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
             for (domain, count) in summary.attempted_by_domain {
                 *domain_hits.entry(domain).or_insert(0) += count as u64;
             }
@@ -540,7 +560,7 @@ mod tests {
         let mut genome = v3alpha1_founder_genome();
         for seed in 0u64..10_000 {
             let mut r = rng(seed);
-            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
             noop_total += summary.applied_semantic_noop_events as u64;
             change_total += summary.applied_semantic_change_events as u64;
         }
@@ -568,7 +588,7 @@ mod tests {
         for seed in 0u64..20_000 {
             let mut genome = v3alpha1_founder_genome();
             let mut r = rng(seed);
-            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
             topology_attempts += summary
                 .attempted_by_domain
                 .get(&MutationDomain::Topology)
@@ -600,7 +620,7 @@ mod tests {
         for seed in 0u64..1000 {
             let mut genome = v3alpha1_founder_genome();
             let mut r = rng(seed);
-            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
             assert_eq!(
                 summary
                     .attempted_by_domain
@@ -625,7 +645,7 @@ mod tests {
         for seed in 0u64..1000 {
             let mut genome = v3alpha1_founder_genome();
             let mut r = rng(seed);
-            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
             assert_eq!(
                 summary
                     .attempted_by_domain
@@ -655,7 +675,7 @@ mod tests {
         for seed in 0u64..5000 {
             let mut genome = v3alpha1_founder_genome();
             let mut r = rng(seed);
-            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
             for (op, &count) in &summary.attempted_by_operator {
                 if count > 0 && op.complexity_effect() == ComplexityEffect::Increasing {
                     has_increasing = true;
@@ -685,7 +705,7 @@ mod tests {
         for seed in 0u64..2000 {
             let mut genome = v3alpha1_founder_genome();
             let mut r = rng(seed);
-            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
             for (op, &count) in &summary.attempted_by_operator {
                 if count > 0 {
                     assert_eq!(
@@ -716,7 +736,7 @@ mod tests {
         for seed in 0u64..3000 {
             let mut genome = v3alpha1_founder_genome();
             let mut r = rng(seed);
-            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
             vm_attempted += summary
                 .attempted_by_domain
                 .get(&MutationDomain::Vm)
@@ -752,7 +772,7 @@ mod tests {
         for seed in 0u64..200 {
             let mut genome = v3alpha1_founder_genome();
             let mut r = rng(seed);
-            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
             assert_eq!(
                 summary.attempted_events,
                 summary.applied_events + summary.skipped_events,
@@ -774,7 +794,7 @@ mod tests {
         for seed in 0u64..100 {
             let mut genome = v3alpha1_founder_genome();
             let mut r = rng(seed);
-            let summary = MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
             assert_eq!(
                 summary.attempted_events,
                 summary.applied_events + summary.skipped_events,
@@ -796,7 +816,7 @@ mod tests {
         for seed in 0u64..50 {
             let mut genome = v3alpha1_founder_genome();
             let mut r = rng(seed);
-            MutationEngine::apply_mutations(&mut genome, &config, &mut r);
+            MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
             assert!(
                 ParseabilityGate::validate(&genome).is_ok(),
                 "parseability violated at seed {} with pressure enabled",

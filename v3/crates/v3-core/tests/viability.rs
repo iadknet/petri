@@ -463,7 +463,7 @@ fn mutation_accounting_invariant_in_viability() {
     let mut genome = v3alpha1_founder_genome();
     for seed in 0u64..1000 {
         let mut rng = SmallRng::seed_from_u64(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &cfg, &mut rng);
+        let summary = MutationEngine::apply_mutations(&mut genome, &cfg, &[], &mut rng);
         assert_eq!(
             summary.attempted_events,
             summary.applied_events + summary.skipped_events,
