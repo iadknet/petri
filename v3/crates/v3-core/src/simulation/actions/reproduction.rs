@@ -255,9 +255,10 @@ pub fn apply_reproduce(
     // genome is identical to the parent's — copy cached_complexity to avoid
     // expensive recomputation.
     let parent_cached_complexity = sim.creatures[parent_id].cached_complexity;
+    let parent_cached_reachable = sim.creatures[parent_id].cached_reachable_nodes.clone();
     let child_id = sim.creatures.insert_with_key(|id| {
         let mut child = if summary.applied_events == 0 {
-            CreatureState::new_with_cached_complexity(
+            CreatureState::new_with_cached_fields(
                 id,
                 child_genome,
                 target,
@@ -269,6 +270,7 @@ pub fn apply_reproduce(
                 child_identity,
                 child_shared_memory,
                 parent_cached_complexity,
+                parent_cached_reachable,
             )
         } else {
             CreatureState::new(

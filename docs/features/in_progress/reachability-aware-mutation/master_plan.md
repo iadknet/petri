@@ -225,7 +225,7 @@ After completing each implementation step:
 4. Update the single call site of `new_with_cached_complexity` in `reproduction.rs` to use new name and pass `parent.cached_reachable_nodes.clone()`
 5. TDD: test that `new()` populates `cached_reachable_nodes` correctly for a genome with reachable and unreachable nodes; test that `new_with_cached_fields` preserves provided values
 
-- [ ] Step 2: Add `cached_reachable_nodes` to `CreatureState`
+- [x] Step 2: Add `cached_reachable_nodes` to `CreatureState`
 
 ### Step 3: Create reachability module with biased selection helper
 
