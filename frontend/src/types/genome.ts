@@ -126,8 +126,8 @@ export interface CreatureDetail {
 	phenotype: CreaturePhenotype;
 	/** Present unless excluded via `exclude=genome` query parameter. */
 	genome?: CreatureGenome;
-	/** Present unless excluded via `exclude=memory` query parameter. */
-	memory?: number[];
+	/** Present unless excluded via `exclude=shared_memory` query parameter. */
+	shared_memory?: number[];
 	/** Present unless excluded via `exclude=action_log` query parameter. */
 	action_log?: ActionLogEntry[];
 	/** Tick of the most recent action_log entry (0 if log is empty). Always present. */

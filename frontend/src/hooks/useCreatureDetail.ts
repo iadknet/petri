@@ -55,7 +55,7 @@ export function useCreatureDetail() {
 					complexity: detail.complexity,
 					phenotype: detail.phenotype,
 					genome: detail.genome,
-					memory: detail.memory,
+					sharedMemory: detail.shared_memory,
 					actionLog: detail.action_log,
 					incremental: incremental && hasFullFetchRef.current,
 				});

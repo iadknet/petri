@@ -122,8 +122,8 @@ export const VmExecutionView = memo(function VmExecutionView({
 			{/* Outputs */}
 			<div className="text-[10px] font-mono text-slate-500">
 				<span className="text-slate-600">route:</span> {trace.final_route_target.toFixed(2)}
-				{trace.memory_writes.length > 0 && (
-					<span className="ml-2 text-amber-400/70">{trace.memory_writes.length} mem writes</span>
+				{trace.slot_writes.length > 0 && (
+					<span className="ml-2 text-amber-400/70">{trace.slot_writes.length} slot writes</span>
 				)}
 			</div>
 		</div>

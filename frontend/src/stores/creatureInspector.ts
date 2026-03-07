@@ -16,7 +16,7 @@ interface CreatureInspectorState {
 	selectedCreatureId: number | null;
 	creatureStats: CreatureStats | null;
 	creatureGenome: CreatureGenome | null;
-	creatureMemory: number[] | null;
+	creatureSharedMemory: number[] | null;
 	actionLog: ActionLogEntry[] | null;
 	isLoading: boolean;
 	error: string | null;
@@ -34,7 +34,7 @@ interface CreatureInspectorState {
 		complexity: number;
 		phenotype: CreaturePhenotype;
 		genome?: CreatureGenome;
-		memory?: number[];
+		sharedMemory?: number[];
 		actionLog?: ActionLogEntry[];
 		/** When true, actionLog entries are appended to existing log (incremental). */
 		incremental?: boolean;
@@ -56,7 +56,7 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 	selectedCreatureId: null,
 	creatureStats: null,
 	creatureGenome: null,
-	creatureMemory: null,
+	creatureSharedMemory: null,
 	actionLog: null,
 	isLoading: false,
 	error: null,
@@ -67,7 +67,7 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 			selectedCreatureId: id,
 			creatureStats: null,
 			creatureGenome: null,
-			creatureMemory: null,
+			creatureSharedMemory: null,
 			actionLog: null,
 			isLoading: true,
 			error: null,
@@ -79,7 +79,7 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 			selectedCreatureId: null,
 			creatureStats: null,
 			creatureGenome: null,
-			creatureMemory: null,
+			creatureSharedMemory: null,
 			actionLog: null,
 			isLoading: false,
 			error: null,
@@ -106,11 +106,11 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 			genome = detail.genome;
 		}
 
-		// Only update memory ref if bytes changed.
-		// When memory is omitted (excluded), keep the existing cached value.
-		let memory = state.creatureMemory;
-		if (detail.memory && (!memory || !arraysEqual(memory, detail.memory))) {
-			memory = detail.memory;
+		// Only update shared memory ref if values changed.
+		// When shared_memory is omitted (excluded), keep the existing cached value.
+		let sharedMemory = state.creatureSharedMemory;
+		if (detail.sharedMemory && (!sharedMemory || !arraysEqual(sharedMemory, detail.sharedMemory))) {
+			sharedMemory = detail.sharedMemory;
 		}
 
 		// Action log: incremental mode appends new entries, full mode replaces.
@@ -134,7 +134,7 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 		set({
 			creatureStats: stats,
 			creatureGenome: genome,
-			creatureMemory: memory,
+			creatureSharedMemory: sharedMemory,
 			actionLog,
 			isLoading: false,
 			error: null,

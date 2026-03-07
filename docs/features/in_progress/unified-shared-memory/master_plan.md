@@ -182,9 +182,9 @@ After completing each implementation step:
 
 ### Phase 5: Wire Format & Frontend
 
-- [ ] Step 11: Update v3-server creature handler. Replace `memory` byte array serialization with `shared_memory` f32 array. Update `exclude` field to accept `shared_memory` instead of `memory`. Update server tests.
+- [x] Step 11: Update v3-server creature handler. Replace `memory` byte array serialization with `shared_memory` f32 array. Update `exclude` field to accept `shared_memory` instead of `memory`. Update server tests.
 
-- [ ] Step 12: Replace `MemoryHexView` with `SharedMemoryView`. Display 16 f32 slots in a compact grid: slot index, current value (formatted to 3 decimal places), non-zero highlighting. Update `CreatureInspector.tsx`, TypeScript types (`genome.ts` or relevant type file), and `useCreatureDetail.ts` to use `shared_memory` field.
+- [x] Step 12: Replace `MemoryHexView` with `SharedMemoryView`. Display 16 f32 slots in a compact grid: slot index, current value (formatted to 3 decimal places), non-zero highlighting. Update `CreatureInspector.tsx`, TypeScript types (`genome.ts` or relevant type file), and `useCreatureDetail.ts` to use `shared_memory` field.
 
 ### Phase 6: Specs & Verification
 
