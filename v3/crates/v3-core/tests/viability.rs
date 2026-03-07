@@ -472,6 +472,58 @@ fn mutation_accounting_invariant_in_viability() {
     }
 }
 
+/// Reachability telemetry accumulates correctly during mutation.
+#[test]
+fn mutation_reachability_telemetry_accumulates() {
+    use rand::rngs::SmallRng;
+    use rand::SeedableRng;
+    use v3_core::creature::founder::v3alpha1_founder_genome;
+    use v3_core::creature::genome::analysis::mesh_reachable_nodes;
+
+    let mut cfg = SimulationConfig::default().mutation;
+    cfg.mutation_probability = 1.0;
+    cfg.per_birth_mutation_events_min = 3;
+    cfg.per_birth_mutation_events_max = 8;
+    cfg.reachable_bias.topology = 0.7;
+    cfg.reachable_bias.vm = 0.7;
+    cfg.reachable_bias.graph = 0.7;
+    cfg.reachable_bias.input_ref = 0.5;
+
+    let genome = v3alpha1_founder_genome();
+    let reachable = mesh_reachable_nodes(&genome);
+
+    let mut total_reachable = 0u32;
+    let mut total_unreachable = 0u32;
+    let mut total_na = 0u32;
+    let mut total_applied = 0u32;
+
+    for seed in 0u64..500 {
+        let mut g = genome.clone();
+        let mut rng = SmallRng::seed_from_u64(seed);
+        let summary = MutationEngine::apply_mutations(&mut g, &cfg, &reachable, &mut rng);
+        total_reachable += summary.reachable_target_events;
+        total_unreachable += summary.unreachable_target_events;
+        total_na += summary.not_applicable_events;
+        total_applied += summary.applied_events;
+    }
+
+    // With 500 seeds × 3-8 events each, we should see a mix of categories.
+    assert!(
+        total_reachable > 0,
+        "expected some reachable-target events, got 0"
+    );
+    assert!(
+        total_na > 0,
+        "expected some not-applicable events (exempt operators), got 0"
+    );
+    // Sum of all reachability categories must equal total applied events.
+    assert_eq!(
+        total_reachable + total_unreachable + total_na,
+        total_applied,
+        "reachability counts must sum to applied events"
+    );
+}
+
 /// When mutation_probability=0.0, child must inherit parent phenotype unchanged.
 #[test]
 fn phenotype_inherits_unchanged_when_no_genome_mutation() {

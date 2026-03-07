@@ -231,6 +231,9 @@ pub fn apply_reproduce(
             .entry(*reason)
             .or_insert(0) += *count as u64;
     }
+    sim.stats.mutation_reachable_target_total += summary.reachable_target_events as u64;
+    sim.stats.mutation_unreachable_target_total += summary.unreachable_target_events as u64;
+    sim.stats.mutation_not_applicable_target_total += summary.not_applicable_events as u64;
 
     // Step 10: Phenotype mutation — triggered only when at least one genome event was applied.
     let (child_channels, child_active_channel, child_polarity) = if summary.applied_events > 0 {
