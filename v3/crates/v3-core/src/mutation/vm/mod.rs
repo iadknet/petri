@@ -952,7 +952,9 @@ fn apply_mutate_paired_slot_address(
 ) -> Result<(), MutationSkipReason> {
     let node = &mut genome.nodes[node_idx];
     if let BackendDef::Vm(ref mut vm) = node.backend_def {
-        // Group slot instructions by slot_idx, tracking which have loads and stores.
+        // Group immediate-addressed slot instructions by slot_idx, tracking which have
+        // loads and stores. Register-indirect variants (LoadSlot/StoreSlot) are excluded
+        // because they have no static slot_idx field to co-mutate.
         let mut groups: std::collections::HashMap<u8, (Vec<usize>, bool, bool)> =
             std::collections::HashMap::new();
         for (i, instr) in vm.program.iter().enumerate() {
@@ -961,7 +963,7 @@ fn apply_mutate_paired_slot_address(
                 | VmInstruction::LoadSlotPrev { slot_idx, .. } => {
                     let entry = groups
                         .entry(*slot_idx)
-                        .or_insert_with(|| (Vec::new(), false, false));
+                        .or_insert((Vec::new(), false, false));
                     entry.0.push(i);
                     entry.1 = true; // has load
                 }
@@ -969,7 +971,7 @@ fn apply_mutate_paired_slot_address(
                 | VmInstruction::ClearSlot { slot_idx } => {
                     let entry = groups
                         .entry(*slot_idx)
-                        .or_insert_with(|| (Vec::new(), false, false));
+                        .or_insert((Vec::new(), false, false));
                     entry.0.push(i);
                     entry.2 = true; // has store
                 }
