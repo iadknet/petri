@@ -44,23 +44,23 @@
 |------|----------|-----------|
 | `creature/state.rs` | change | Shared memory replaces VM-only byte memory; becomes creature-level shared state accessible by both backends |
 | `runtime/` (vm, graph, mesh) | change | Execution functions gain shared memory parameters; graph uses established deferred-effect pattern for writes |
-| `mutation/` | extend | New motif operators follow existing `VmOperator` pattern with weights and complexity effects |
+| `mutation/` | change | New motif operators follow existing `VmOperator` pattern with weights and complexity effects |
 | `simulation/tick.rs` | change | Tick-start phase for snapshot + decay follows existing phase ordering convention |
 | `v3-server` wire format | change | `memory` field replaced by `shared_memory`; `exclude` filter updated |
-| Frontend inspector | replace | `MemoryHexView` replaced entirely — 16 f32 slots need different visualization than 1024 u8 bytes |
+| Frontend inspector | change | `MemoryHexView` replaced entirely — 16 f32 slots need different visualization than 1024 u8 bytes |
 
-## Resolved Open Questions
+## Open Questions
 
-| Question | Decision | Rationale |
-|----------|----------|-----------|
-| Slot count | 16 fixed (`const SHARED_MEMORY_SLOTS: usize = 16`) | Small enough for easy 4-bit addressing; large enough for non-trivial state. Fixed array for performance. |
-| Temporal primitives | Prev-tick snapshot on CreatureState + `LoadSlotPrev`/`ReadSlotPrev` opcodes/nodes; latch is inherent; `ClearSlot` explicit | Simple, no per-slot metadata. Delay via snapshot, latch for free, clear explicit, decay global. |
-| Decay model | Global `SharedMemoryConfig.decay_rate` (default 0.0, normalized to `[0.0, 1.0]` in `SimulationConfig::normalize()`) applied at tick start | Per-slot decay adds genome complexity; global is simpler and tunable. |
-| Energy costs | LoadSlot 0.12, StoreSlot 0.14, LoadSlotImm 0.10, StoreSlotImm 0.12, LoadSlotPrev 0.10, ClearSlot 0.12 | Slightly cheaper than old u8 ops to encourage use. ClearSlot matches StoreSlotImm (write-costs-more pattern). |
-| Graph WriteSlot commits | After each graph node's relaxation loop via `apply_graph_effects` extension | Consistent with existing deferred-effect pattern (CustomOutput, PushAction). |
-| Wire format | `shared_memory: number[]` on creature detail endpoint | Simple JSON array of f32 values. |
-| Motifs and reachability | Independent of reachability-aware mutation feature | Motifs operate within individual VM nodes; no cross-node targeting needed. |
-| Coordination with reachability-based-complexity | This feature and the in-progress reachability-based-complexity feature both touch `vm_is_output_instruction` and reference `StoreMem8`/`StoreMem8Imm`. Whichever lands second must update the other's references to use the new opcode names. | Both features should merge cleanly since the function signature doesn't change — only the match arms do. |
+| Question | Decision | Owner | Status |
+|----------|----------|-------|--------|
+| Slot count | 16 fixed (`const SHARED_MEMORY_SLOTS: usize = 16`) — small enough for easy 4-bit addressing; large enough for non-trivial state. Fixed array for performance. | Architect | Resolved |
+| Temporal primitives | Prev-tick snapshot on CreatureState + `LoadSlotPrev`/`ReadSlotPrev` opcodes/nodes; latch is inherent; `ClearSlot` explicit. Simple, no per-slot metadata. | Architect | Resolved |
+| Decay model | Global `SharedMemoryConfig.decay_rate` (default 0.0, normalized to `[0.0, 1.0]`) applied at tick start. Per-slot decay adds genome complexity; global is simpler and tunable. | Architect | Resolved |
+| Energy costs | LoadSlot 0.12, StoreSlot 0.14, LoadSlotImm 0.10, StoreSlotImm 0.12, LoadSlotPrev 0.10, ClearSlot 0.12. Slightly cheaper than old u8 ops to encourage use. | Architect | Resolved |
+| Graph WriteSlot commits | After each graph node's relaxation loop via `apply_graph_effects` extension. Consistent with existing deferred-effect pattern. | Architect | Resolved |
+| Wire format | `shared_memory: number[]` on creature detail endpoint. Simple JSON array of f32 values. | Architect | Resolved |
+| Motifs and reachability | Independent of reachability-aware mutation feature. Motifs operate within individual VM nodes; no cross-node targeting needed. | Architect | Resolved |
+| Coordination with reachability-based-complexity | Both features touch `vm_is_output_instruction`. Whichever lands second updates references. Merge is clean since only match arms change. | Architect | Resolved |
 
 ## Design Details
 
