@@ -327,7 +327,7 @@ After completing each implementation step:
 6. `scripts/check-architecture-harness.sh --mode strict`
 7. `scripts/check-plan-harness.sh --mode strict`
 
-- [ ] Step 8: Full verification
+- [x] Step 8: Full verification
 
 - [ ] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke domain skills (backend: `rust-skills`). Fix all findings. Re-review until clean pass.
 - [ ] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
