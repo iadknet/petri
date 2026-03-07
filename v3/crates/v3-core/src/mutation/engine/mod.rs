@@ -824,4 +824,82 @@ mod tests {
             );
         }
     }
+
+    #[test]
+    fn engine_with_bias_1_targets_only_reachable_vm_nodes() {
+        use crate::contracts::NodeId;
+        use crate::creature::genome::{
+            BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
+        };
+
+        // Build a 3-node genome: entry=0 -> 1, node 2 is unreachable.
+        // All three are VM backends so VM domain mutations can target any.
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                NodeGenome {
+                    node_id: NodeId::new(0),
+                    input_refs: vec![],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 1,
+                        constants: vec![1.0],
+                        program: vec![VmInstruction::Halt],
+                    }),
+                    targets: vec![NodeId::new(1)],
+                },
+                NodeGenome {
+                    node_id: NodeId::new(1),
+                    input_refs: vec![],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 1,
+                        constants: vec![2.0],
+                        program: vec![VmInstruction::Halt],
+                    }),
+                    targets: vec![],
+                },
+                NodeGenome {
+                    node_id: NodeId::new(2),
+                    input_refs: vec![],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 1,
+                        constants: vec![99.0],
+                        program: vec![VmInstruction::Halt],
+                    }),
+                    targets: vec![],
+                },
+            ],
+        };
+
+        // Reachable set: only nodes 0 and 1 (sorted).
+        let reachable: &[usize] = &[0, 1];
+
+        let mut config = SimulationConfig::default().mutation;
+        config.mutation_probability = 1.0;
+        config.per_birth_mutation_events_min = 1;
+        config.per_birth_mutation_events_max = 1;
+        // Force node-internal layer only (VM/Graph/InputRef).
+        config.mesh_layer_probability = 0.0;
+        // Set all biases to 1.0 — always pick reachable when available.
+        config.reachable_bias.topology = 1.0;
+        config.reachable_bias.vm = 1.0;
+        config.reachable_bias.graph = 1.0;
+        config.reachable_bias.input_ref = 1.0;
+
+        // Run many mutations, snapshot node 2 each time.
+        let node2_original = genome.nodes[2].clone();
+        let mut node2_ever_changed = false;
+        for seed in 0u64..500 {
+            let mut g = genome.clone();
+            let mut r = rng(seed);
+            let summary = MutationEngine::apply_mutations(&mut g, &config, reachable, &mut r);
+            if summary.applied_events > 0 && g.nodes[2] != node2_original {
+                node2_ever_changed = true;
+                break;
+            }
+        }
+        assert!(
+            !node2_ever_changed,
+            "with bias=1.0, unreachable node 2 must never be targeted by VM mutations"
+        );
+    }
 }
