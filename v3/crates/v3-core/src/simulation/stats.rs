@@ -35,6 +35,14 @@ pub struct SimStats {
     /// Per-reason rejection breakdown (cumulative).
     pub reproduction_actions_rejected_by_reason: HashMap<ReproductionActionResult, u64>,
 
+    // ── Reachability telemetry (cumulative) ───────────────────────────────────
+    /// Mutation events where the selected target was a reachable node.
+    pub mutation_reachable_target_total: u64,
+    /// Mutation events where the selected target was an unreachable node.
+    pub mutation_unreachable_target_total: u64,
+    /// Mutation events where target reachability was not applicable (exempt operators).
+    pub mutation_not_applicable_target_total: u64,
+
     // ── Predation cumulative ─────────────────────────────────────────────────
     pub predation_actions_attempted_total: u64,
     pub predation_actions_transferred_total: u64,

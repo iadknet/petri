@@ -302,7 +302,7 @@ After completing each implementation step:
 6. TDD: test that reproduction passes parent's reachable set; test that founder creatures have correct `cached_reachable_nodes`; test stats aggregation
 7. Run viability tests: `cargo test -p v3-core --test viability`
 
-- [ ] Step 6: Wire reproduction, seeding, and stats aggregation
+- [x] Step 6: Wire reproduction, seeding, and stats aggregation
 
 ### Step 7: Update reference specs
 

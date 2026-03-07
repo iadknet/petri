@@ -335,6 +335,9 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             .iter()
             .map(|(result, count)| (result.as_key().to_string(), *count))
             .collect(),
+        mutation_reachable_target_total: stats.mutation_reachable_target_total,
+        mutation_unreachable_target_total: stats.mutation_unreachable_target_total,
+        mutation_not_applicable_target_total: stats.mutation_not_applicable_target_total,
         genome_complexity_mean: complexity_mean,
         genome_complexity_min: complexity_min,
         genome_complexity_max: complexity_max,
