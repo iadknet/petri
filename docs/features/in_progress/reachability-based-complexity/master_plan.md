@@ -216,7 +216,7 @@ Migrate every production call site per the Call Site Audit table above:
 
 - [x] Step 5: Update server API response and population stats computation
 
-- [ ] Review Gate: Interim code review — review Steps 1-5 changes. Fix findings, re-review until clean.
+- [x] Review Gate: Interim code review — review Steps 1-5 changes. Fix findings, re-review until clean.
 
 ### Step 6: Update frontend
 
@@ -246,8 +246,8 @@ Migrate every production call site per the Call Site Audit table above:
 
 - [x] Step 7: Update reference specification docs
 
-- [ ] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke domain skills (backend: `rust-skills`; frontend: `vercel-react-best-practices` + `vercel-composition-patterns`). Fix all findings. Re-review until clean pass.
-- [ ] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
-- [ ] Completion gate — run all checks from AGENTS.md Completion Gate section
+- [x] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke domain skills (backend: `rust-skills`; frontend: `vercel-react-best-practices` + `vercel-composition-patterns`). Fix all findings. Re-review until clean pass.
+- [x] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
+- [x] Completion gate — run all checks from AGENTS.md Completion Gate section
 
 **Review cycles:** 3
