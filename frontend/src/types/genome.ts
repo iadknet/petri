@@ -122,6 +122,7 @@ export interface CreatureDetail {
 	age: number;
 	generation: number;
 	complexity: number;
+	genome_size: number;
 	phenotype: CreaturePhenotype;
 	/** Present unless excluded via `exclude=genome` query parameter. */
 	genome?: CreatureGenome;
