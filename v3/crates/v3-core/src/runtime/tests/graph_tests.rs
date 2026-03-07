@@ -1655,3 +1655,100 @@ fn read_slot_index_wraps() {
         result.output_slots[0]
     );
 }
+
+/// WriteSlot commits value to shared_memory via post-convergence effects.
+#[test]
+fn write_slot_commits_to_shared_memory() {
+    let def = GraphBackendDef {
+        internal_nodes: vec![
+            GraphInternalNode {
+                kind: GraphNodeKind::Constant(6.0),
+                inputs: vec![],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::WriteSlot(4),
+                inputs: vec![GraphInput {
+                    source_idx: 0,
+                    weight: 1.0,
+                }],
+                plasticity: None,
+            },
+        ],
+    };
+    let upstream = [0.0f32; 12];
+    let mut energy = 100.0f32;
+    let mut gr = GraphRuntimeState::new();
+    let ss = make_sensor_snapshot();
+    let mut config = default_config();
+    config.max_graph_relax_iters = 1;
+    config.graph_convergence_stable_passes = 1;
+
+    let mut shared_mem = [0.0f32; 16];
+    let prev_shared_mem = [0.0f32; 16];
+
+    let _result = execute_graph_node(
+        &def,
+        &[],
+        &upstream,
+        &mut energy,
+        0.0,
+        0,
+        &mut gr,
+        &ss,
+        &config,
+        &mut MeshSideOutputs::new(4),
+        &mut shared_mem,
+        &prev_shared_mem,
+    );
+
+    assert!(
+        (shared_mem[4] - 6.0).abs() < 1e-5,
+        "WriteSlot(4) should commit 6.0, got {}",
+        shared_mem[4]
+    );
+}
+
+/// ClearSlot zeros the slot in shared_memory via post-convergence effects.
+#[test]
+fn clear_slot_zeros_shared_memory_integration() {
+    let def = GraphBackendDef {
+        internal_nodes: vec![GraphInternalNode {
+            kind: GraphNodeKind::ClearSlot(2),
+            inputs: vec![],
+            plasticity: None,
+        }],
+    };
+    let upstream = [0.0f32; 12];
+    let mut energy = 100.0f32;
+    let mut gr = GraphRuntimeState::new();
+    let ss = make_sensor_snapshot();
+    let mut config = default_config();
+    config.max_graph_relax_iters = 1;
+    config.graph_convergence_stable_passes = 1;
+
+    let mut shared_mem = [0.0f32; 16];
+    shared_mem[2] = 42.0;
+    let prev_shared_mem = [0.0f32; 16];
+
+    let _result = execute_graph_node(
+        &def,
+        &[],
+        &upstream,
+        &mut energy,
+        0.0,
+        0,
+        &mut gr,
+        &ss,
+        &config,
+        &mut MeshSideOutputs::new(4),
+        &mut shared_mem,
+        &prev_shared_mem,
+    );
+
+    assert_eq!(
+        shared_mem[2], 0.0,
+        "ClearSlot(2) should zero slot, got {}",
+        shared_mem[2]
+    );
+}

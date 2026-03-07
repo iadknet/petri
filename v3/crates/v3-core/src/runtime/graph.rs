@@ -435,7 +435,13 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
     }
 
     // Build NodeResult via the shared 3-phase effect pass.
-    let result = apply_graph_effects(def, &curr_outputs, upstream_slots, side_outputs);
+    let result = apply_graph_effects(
+        def,
+        &curr_outputs,
+        upstream_slots,
+        side_outputs,
+        shared_memory,
+    );
 
     // Restore scratch buffers before returning.
     restore_scratch(
