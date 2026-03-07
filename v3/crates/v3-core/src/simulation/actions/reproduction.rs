@@ -172,7 +172,7 @@ pub fn apply_reproduce(
 
     // Step 8: Build offspring draft (clone parent genome + state).
     let child_genome = sim.creatures[parent_id].genome.clone();
-    let child_memory = sim.creatures[parent_id].memory;
+    let child_shared_memory = sim.creatures[parent_id].shared_memory;
     let child_generation = sim.creatures[parent_id].generation + 1;
     let child_channels = sim.creatures[parent_id].phenotype_channels;
     let child_active_channel = sim.creatures[parent_id].phenotype_active_channel;
@@ -267,6 +267,7 @@ pub fn apply_reproduce(
                 child_active_channel,
                 child_polarity,
                 child_identity,
+                child_shared_memory,
                 parent_cached_complexity,
             )
         } else {
@@ -280,9 +281,9 @@ pub fn apply_reproduce(
                 child_active_channel,
                 child_polarity,
                 child_identity,
+                child_shared_memory,
             )
         };
-        child.memory = child_memory;
         child.graph_runtime.plasticity_weights = child_plasticity;
         child
     });

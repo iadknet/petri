@@ -14,7 +14,8 @@ use crate::sensors::perception::SensorSnapshot;
 /// - `upstream_slots`: incoming output slots from the previous node (or zeroed for entry)
 /// - `energy`: creature's current energy; decremented by opcode costs; NOT restored on exhaustion
 /// - `energy_consumed`: total energy consumed this tick so far (for dynamic introspection)
-/// - `memory`: creature's persistent 1024-byte memory; NOT modified on energy exhaustion
+/// - `shared_memory`: creature's persistent shared memory (16 f32 slots); NOT modified on energy exhaustion
+/// - `prev_shared_memory`: snapshot of shared memory from previous tick (read-only)
 /// - `sensors`: pre-assembled sensor snapshot (local + extended perception)
 /// - `config`: runtime config (max_vm_steps, vm.opcode_cost_multiplier)
 /// - `side_outputs`: mesh-scoped side outputs (action queue, priority bid) that persist across hops
@@ -28,7 +29,8 @@ pub fn execute_vm_node(
     upstream_slots: &[f32; 12],
     energy: &mut f32,
     energy_consumed: f32,
-    memory: &mut [u8; 1024],
+    shared_memory: &mut [f32; 16],
+    prev_shared_memory: &[f32; 16],
     sensors: &SensorSnapshot,
     config: &RuntimeConfig,
     side_outputs: &mut MeshSideOutputs,
@@ -57,32 +59,27 @@ pub fn execute_vm_node(
     let mut pc: usize = 0;
     let mut steps: usize = 0;
 
-    // Only copy memory when the program contains memory instructions.
-    // This avoids a 1 KiB copy for the majority of genomes.
-    let uses_mem = def.has_memory_ops();
-    let mut mem_copy: [u8; 1024] = if uses_mem { *memory } else { [0u8; 1024] };
+    // Working copy of shared memory slots (64 bytes — unconditional copy).
+    let mut slot_copy: [f32; 16] = *shared_memory;
 
     use crate::creature::genome::VmInstruction;
 
-    /// Commit the working memory copy back to the creature's persistent memory,
-    /// but only when the program actually uses memory operations.
-    macro_rules! commit_memory {
+    /// Commit the working slot copy back to the creature's shared memory.
+    macro_rules! commit_slots {
         () => {
-            if uses_mem {
-                *memory = mem_copy;
-            }
+            *shared_memory = slot_copy;
         };
     }
 
     loop {
         if steps >= max_steps {
-            commit_memory!();
+            commit_slots!();
             return NodeResult::halted(payload, route_target);
         }
 
         // Soft default: if control flow lands outside the program, halt cleanly.
         if pc >= program_len {
-            commit_memory!();
+            commit_slots!();
             return NodeResult::halted(payload, route_target);
         }
 
@@ -310,7 +307,7 @@ pub fn execute_vm_node(
             }
 
             VmInstruction::ExecuteActionQueue => {
-                commit_memory!();
+                commit_slots!();
                 return NodeResult::terminal(payload, route_target);
             }
 
@@ -319,30 +316,38 @@ pub fn execute_vm_node(
             }
 
             VmInstruction::Halt => {
-                commit_memory!();
+                commit_slots!();
                 return NodeResult::halted(payload, route_target);
             }
 
-            VmInstruction::LoadMem8 { dst, addr_reg } => {
-                let addr = (regs[nr(*addr_reg, reg_count)] as i64).rem_euclid(1024) as usize;
-                regs[nr(*dst, reg_count)] = sanitize_f32(mem_copy[addr] as f32);
+            VmInstruction::LoadSlot { dst, slot_reg } => {
+                let idx = (regs[nr(*slot_reg, reg_count)] as i64).rem_euclid(16) as usize;
+                regs[nr(*dst, reg_count)] = sanitize_f32(slot_copy[idx]);
             }
 
-            VmInstruction::StoreMem8 { addr_reg, src } => {
-                let addr = (regs[nr(*addr_reg, reg_count)] as i64).rem_euclid(1024) as usize;
-                let val = regs[nr(*src, reg_count)].clamp(0.0, 255.0) as u8;
-                mem_copy[addr] = val;
+            VmInstruction::StoreSlot { slot_reg, src } => {
+                let idx = (regs[nr(*slot_reg, reg_count)] as i64).rem_euclid(16) as usize;
+                slot_copy[idx] = sanitize_f32(regs[nr(*src, reg_count)]);
             }
 
-            VmInstruction::LoadMem8Imm { dst, imm_addr } => {
-                let addr = (*imm_addr as usize).rem_euclid(1024);
-                regs[nr(*dst, reg_count)] = sanitize_f32(mem_copy[addr] as f32);
+            VmInstruction::LoadSlotImm { dst, slot_idx } => {
+                let idx = (*slot_idx as usize) % 16;
+                regs[nr(*dst, reg_count)] = sanitize_f32(slot_copy[idx]);
             }
 
-            VmInstruction::StoreMem8Imm { imm_addr, src } => {
-                let addr = (*imm_addr as usize).rem_euclid(1024);
-                let val = regs[nr(*src, reg_count)].clamp(0.0, 255.0) as u8;
-                mem_copy[addr] = val;
+            VmInstruction::StoreSlotImm { slot_idx, src } => {
+                let idx = (*slot_idx as usize) % 16;
+                slot_copy[idx] = sanitize_f32(regs[nr(*src, reg_count)]);
+            }
+
+            VmInstruction::LoadSlotPrev { dst, slot_idx } => {
+                let idx = (*slot_idx as usize) % 16;
+                regs[nr(*dst, reg_count)] = sanitize_f32(prev_shared_memory[idx]);
+            }
+
+            VmInstruction::ClearSlot { slot_idx } => {
+                let idx = (*slot_idx as usize) % 16;
+                slot_copy[idx] = 0.0;
             }
         }
 
@@ -409,10 +414,12 @@ pub(crate) fn opcode_base_cost(instr: &crate::creature::genome::VmInstruction) -
         VmInstruction::ExecuteActionQueue => 0.24,
         VmInstruction::WriteRouteTarget { .. } => 0.10,
         VmInstruction::Halt => 0.05,
-        VmInstruction::LoadMem8 { .. } => 0.16,
-        VmInstruction::StoreMem8 { .. } => 0.18,
-        VmInstruction::LoadMem8Imm { .. } => 0.14,
-        VmInstruction::StoreMem8Imm { .. } => 0.16,
+        VmInstruction::LoadSlot { .. } => 0.12,
+        VmInstruction::StoreSlot { .. } => 0.14,
+        VmInstruction::LoadSlotImm { .. } => 0.10,
+        VmInstruction::StoreSlotImm { .. } => 0.12,
+        VmInstruction::LoadSlotPrev { .. } => 0.10,
+        VmInstruction::ClearSlot { .. } => 0.12,
     }
 }
 

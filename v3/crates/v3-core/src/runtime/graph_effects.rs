@@ -4,13 +4,13 @@
 //! to their deferred effects. Processes in three phases, each scanning
 //! internal nodes in index order:
 //!
-//! 1. **Staged-value writes:** `CustomOutput`, `RouterOutput`, `WriteActionMeta`
+//! 1. **Staged-value writes:** `CustomOutput`, `RouterOutput`, `WriteActionMeta`, `WriteSlot`, `ClearSlot`
 //! 2. **Queue mutations:** `PushAction`, `PopAction`
 //! 3. **Terminal check:** `ExecuteActionQueue`
 
 use crate::creature::genome::{GraphBackendDef, GraphNodeKind};
 use crate::runtime::action_decode::decode_world_action;
-use crate::runtime::types::{MeshSideOutputs, NodeResult};
+use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult};
 
 /// Apply post-convergence effects from graph evaluation.
 ///
@@ -20,6 +20,8 @@ use crate::runtime::types::{MeshSideOutputs, NodeResult};
 /// - `CustomOutput(s)` → `output_slots[s] = curr_outputs[i]` (s < 12 guard)
 /// - `RouterOutput` → `route_target_idx = curr_outputs[i]`
 /// - `WriteActionMeta(slot)` → `action_meta[slot] = curr_outputs[i]` (slot < 8 guard)
+/// - `WriteSlot(s)` → `shared_memory[s % 16] = sanitize_f32(curr_outputs[i])`
+/// - `ClearSlot(s)` → `shared_memory[s % 16] = 0.0`
 ///
 /// **Phase 2 — Queue mutations** (node-index order):
 /// - `PushAction(action_type)` → decode action from meta buffer, push onto queue
@@ -37,6 +39,7 @@ pub(crate) fn apply_graph_effects(
     curr_outputs: &[f32],
     upstream_slots: &[f32; 12],
     side_outputs: &mut MeshSideOutputs,
+    shared_memory: &mut [f32; 16],
 ) -> NodeResult {
     let mut output_slots = *upstream_slots;
     let mut route_target_idx: f32 = 0.0;
@@ -57,6 +60,12 @@ pub(crate) fn apply_graph_effects(
                 if (*slot as usize) < 8 {
                     action_meta[*slot as usize] = curr_outputs[i];
                 }
+            }
+            GraphNodeKind::WriteSlot(slot_idx) => {
+                shared_memory[(*slot_idx as usize) % 16] = sanitize_f32(curr_outputs[i]);
+            }
+            GraphNodeKind::ClearSlot(slot_idx) => {
+                shared_memory[(*slot_idx as usize) % 16] = 0.0;
             }
             _ => {}
         }
@@ -134,7 +143,7 @@ mod tests {
         let upstream = [0.0f32; 12];
         let mut so = side_outputs();
 
-        let result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so);
+        let result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so, &mut [0.0; 16]);
 
         assert!((result.output_slots[3] - 5.0).abs() < 1e-6);
         assert_eq!(result.output_slots[0], 0.0);
@@ -152,7 +161,7 @@ mod tests {
         let upstream = [0.0f32; 12];
         let mut so = side_outputs();
 
-        let result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so);
+        let result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so, &mut [0.0; 16]);
 
         assert!((result.route_target_idx - 2.5).abs() < 1e-6);
     }
@@ -164,7 +173,7 @@ mod tests {
         let upstream = [1.0f32; 12];
         let mut so = side_outputs();
 
-        let result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so);
+        let result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so, &mut [0.0; 16]);
 
         assert_eq!(result.output_slots, upstream);
     }
@@ -178,7 +187,7 @@ mod tests {
         ];
         let mut so = side_outputs();
 
-        let result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so);
+        let result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so, &mut [0.0; 16]);
 
         assert_eq!(result.output_slots, upstream);
         assert_eq!(result.route_target_idx, 0.0);
@@ -197,7 +206,7 @@ mod tests {
         let upstream = [0.0f32; 12];
         let mut so = side_outputs();
 
-        let _result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so);
+        let _result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so, &mut [0.0; 16]);
 
         let actions = so.action_queue.into_actions_or_noop();
         assert_eq!(actions.len(), 1);
@@ -217,7 +226,7 @@ mod tests {
         let upstream = [0.0f32; 12];
         let mut so = side_outputs();
 
-        let _result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so);
+        let _result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so, &mut [0.0; 16]);
 
         let actions = so.action_queue.into_actions_or_noop();
         assert_eq!(actions, vec![WorldAction::Eat]);
@@ -233,7 +242,7 @@ mod tests {
         let upstream = [0.0f32; 12];
         let mut so = side_outputs();
 
-        let _result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so);
+        let _result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so, &mut [0.0; 16]);
 
         let actions = so.action_queue.into_actions_or_noop();
         assert_eq!(actions, vec![WorldAction::NoOp]);
@@ -248,7 +257,7 @@ mod tests {
         let upstream = [0.0f32; 12];
         let mut so = side_outputs();
 
-        let result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so);
+        let result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so, &mut [0.0; 16]);
 
         assert!(result.terminal);
     }
@@ -260,7 +269,7 @@ mod tests {
         let upstream = [0.0f32; 12];
         let mut so = side_outputs();
 
-        let result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so);
+        let result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so, &mut [0.0; 16]);
 
         assert!(!result.terminal);
     }
@@ -275,7 +284,7 @@ mod tests {
         let upstream = [0.0f32; 12];
         let mut so = side_outputs();
 
-        let _result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so);
+        let _result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so, &mut [0.0; 16]);
 
         let actions = so.action_queue.into_actions_or_noop();
         assert_eq!(
@@ -298,7 +307,7 @@ mod tests {
         let upstream = [0.0f32; 12];
         let mut so = side_outputs();
 
-        let _result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so);
+        let _result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so, &mut [0.0; 16]);
 
         let actions = so.action_queue.into_actions_or_noop();
         // meta[0]=1.0 → direction index 1 = NE
@@ -319,7 +328,7 @@ mod tests {
         let upstream = [0.0f32; 12];
         let mut so = side_outputs();
 
-        let _result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so);
+        let _result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so, &mut [0.0; 16]);
 
         let actions = so.action_queue.into_actions_or_noop();
         assert_eq!(actions, vec![WorldAction::Eat, WorldAction::NoOp]);
@@ -332,9 +341,87 @@ mod tests {
         let upstream = [0.0f32; 12];
         let mut so = side_outputs();
 
-        let result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so);
+        let result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so, &mut [0.0; 16]);
 
         // Should not panic or write anywhere
         assert!(!result.terminal);
+    }
+
+    // ── Shared memory slot effect tests ─────────────────────────────────────
+
+    #[test]
+    fn write_slot_commits_value_to_shared_memory() {
+        // WriteSlot(2): curr_outputs[node_idx] should be committed to shared_memory[2]
+        let def = make_def(vec![
+            node(GraphNodeKind::Constant(4.5)),
+            node_with_input(GraphNodeKind::WriteSlot(2), 0, 1.0),
+        ]);
+        let curr_outputs = [4.5, 4.5]; // WriteSlot returns wsum = 4.5
+        let upstream = [0.0f32; 12];
+        let mut so = side_outputs();
+        let mut shared_mem = [0.0f32; 16];
+
+        let _result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so, &mut shared_mem);
+
+        assert!(
+            (shared_mem[2] - 4.5).abs() < 1e-6,
+            "WriteSlot(2) should commit 4.5 to shared_memory[2], got {}",
+            shared_mem[2]
+        );
+    }
+
+    #[test]
+    fn clear_slot_zeros_shared_memory() {
+        let def = make_def(vec![node(GraphNodeKind::ClearSlot(5))]);
+        let curr_outputs = [0.0]; // ClearSlot returns 0.0
+        let upstream = [0.0f32; 12];
+        let mut so = side_outputs();
+        let mut shared_mem = [0.0f32; 16];
+        shared_mem[5] = 99.0;
+
+        let _result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so, &mut shared_mem);
+
+        assert_eq!(
+            shared_mem[5], 0.0,
+            "ClearSlot(5) should zero shared_memory[5], got {}",
+            shared_mem[5]
+        );
+    }
+
+    #[test]
+    fn write_slot_sanitizes_value() {
+        // If curr_outputs contains NaN, sanitize_f32 should convert to 0.0
+        let def = make_def(vec![node(GraphNodeKind::WriteSlot(0))]);
+        let curr_outputs = [f32::NAN];
+        let upstream = [0.0f32; 12];
+        let mut so = side_outputs();
+        let mut shared_mem = [0.0f32; 16];
+        shared_mem[0] = 1.0; // should become 0.0 after sanitize_f32(NaN)
+
+        let _result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so, &mut shared_mem);
+
+        assert_eq!(
+            shared_mem[0], 0.0,
+            "WriteSlot should sanitize NaN to 0.0, got {}",
+            shared_mem[0]
+        );
+    }
+
+    #[test]
+    fn write_slot_wraps_index_modulo_16() {
+        // WriteSlot(19): 19 % 16 = 3
+        let def = make_def(vec![node(GraphNodeKind::WriteSlot(19))]);
+        let curr_outputs = [2.5];
+        let upstream = [0.0f32; 12];
+        let mut so = side_outputs();
+        let mut shared_mem = [0.0f32; 16];
+
+        let _result = apply_graph_effects(&def, &curr_outputs, &upstream, &mut so, &mut shared_mem);
+
+        assert!(
+            (shared_mem[3] - 2.5).abs() < 1e-6,
+            "WriteSlot(19) should wrap to slot 3, got {}",
+            shared_mem[3]
+        );
     }
 }

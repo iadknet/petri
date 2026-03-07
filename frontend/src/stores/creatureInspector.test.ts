@@ -32,7 +32,7 @@ function makeDetail(overrides: Record<string, unknown> = {}) {
 			rgb: [255, 128, 64] as [number, number, number],
 		},
 		genome: { entry_node_id: 0, nodes: [] },
-		memory: [0, 1, 2],
+		sharedMemory: [0, 1, 2],
 		actionLog: [makeEntry(1), makeEntry(2, ActionType.Eat)],
 		...overrides,
 	};

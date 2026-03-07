@@ -127,6 +127,11 @@ pub enum GraphNodeKind {
 
     CustomOutput(u8),
     RouterOutput,
+
+    ReadSlot(u8),
+    ReadSlotPrev(u8),
+    WriteSlot(u8),
+    ClearSlot(u8),
 }
 ```
 
@@ -144,6 +149,22 @@ Missing input refs read as `0.0`. Out-of-bounds `ref_idx` reads as `0.0`.
 When `InputRef` resolves to `InputReference::UpstreamSlot(slot)`, the
 base value is routing-parent `upstream_slots[slot]` (invalid slot -> `0.0`),
 then combined with internal weighted aggregate using the same rule.
+
+### Shared Memory Slot Operators
+
+The graph backend can read and write the creature's shared memory slots
+(see `v3-vm-isa-spec.md`, Section 8):
+
+- `ReadSlot(slot_idx)`: output = `shared_memory[slot_idx % 16] + weighted_input_sum`
+- `ReadSlotPrev(slot_idx)`: output = `prev_shared_memory[slot_idx % 16] + weighted_input_sum`
+- `WriteSlot(slot_idx)`: writes `sanitize_f32(weighted_input_sum)` to
+  `shared_memory[slot_idx % 16]`; output = `weighted_input_sum`
+- `ClearSlot(slot_idx)`: writes `0.0` to `shared_memory[slot_idx % 16]`;
+  output = `0.0`
+
+Slot addressing wraps with `% 16`. All slot writes pass through
+`sanitize_f32()`. Graph slot writes operate on the same working copy as VM
+slot writes — committed on normal exit, discarded on energy exhaustion.
 
 ---
 

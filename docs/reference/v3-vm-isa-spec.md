@@ -25,7 +25,7 @@ Related references:
 
 ## 2. Instruction Set
 
-The VM defines **39 opcodes**.
+The VM defines **41 opcodes**.
 
 ### Arithmetic and Data Movement
 
@@ -96,15 +96,17 @@ The VM defines **39 opcodes**.
 | 32 | `SetPriorityBid` | src | read `regs[src]`, clamp non-negative, deduct bid from energy, set creature's turn-order priority bid (last-write-wins) |
 | 33 | `ExecuteActionQueue` | none | terminal: return accumulated action queue for execution |
 
-### Halt and Memory
+### Halt and Shared Memory Slots
 
 | # | Opcode | Operands | Semantics |
 |---|---|---|---|
 | 34 | `Halt` | none | stop VM execution |
-| 35 | `LoadMem8` | dst, addr_reg | read byte at wrapped address |
-| 36 | `StoreMem8` | addr_reg, src | write byte at wrapped address |
-| 37 | `LoadMem8Imm` | dst, imm_addr | read byte at wrapped immediate address |
-| 38 | `StoreMem8Imm` | imm_addr, src | write byte at wrapped immediate address |
+| 35 | `LoadSlot` | dst, slot_reg | `dst = shared_memory[regs[slot_reg] % 16]` |
+| 36 | `StoreSlot` | slot_reg, src | `shared_memory[regs[slot_reg] % 16] = sanitize(regs[src])` |
+| 37 | `LoadSlotImm` | dst, slot_idx | `dst = shared_memory[slot_idx % 16]` |
+| 38 | `StoreSlotImm` | slot_idx, src | `shared_memory[slot_idx % 16] = sanitize(regs[src])` |
+| 39 | `LoadSlotPrev` | dst, slot_idx | `dst = prev_shared_memory[slot_idx % 16]` |
+| 40 | `ClearSlot` | slot_idx | `shared_memory[slot_idx % 16] = 0.0` |
 
 Removed from active V3 mesh ISA:
 - `ReadSensorCell`, `ReadSensorCreature`, `ReadSensorSummary`
@@ -201,7 +203,7 @@ Implementation bugs outside mutation-space (for example corrupted in-memory
 instruction representation) are still defects, but evolved operands do not
 panic the VM.
 
-Memory addressing is never invalid; all addresses wrap with `rem_euclid(1024)`.
+Slot addressing is never invalid; all slot indices wrap with `% 16`.
 
 ---
 
@@ -259,10 +261,12 @@ Defined numeric rules:
 | SetPriorityBid | 0.20 |
 | ExecuteActionQueue | 0.24 |
 | Halt | 0.05 |
-| LoadMem8 | 0.16 |
-| StoreMem8 | 0.18 |
-| LoadMem8Imm | 0.14 |
-| StoreMem8Imm | 0.16 |
+| LoadSlot | 0.12 |
+| StoreSlot | 0.14 |
+| LoadSlotImm | 0.10 |
+| StoreSlotImm | 0.12 |
+| LoadSlotPrev | 0.10 |
+| ClearSlot | 0.12 |
 
 v3 energy uses continuous scalar units (`f32`).
 Opcode spend is:
@@ -340,12 +344,15 @@ per VM evaluation, with a configurable cap (`max_actions_per_turn`).
 
 ---
 
-## 8. Creature Memory Contract
+## 8. Shared Memory Slot Contract
 
-- Memory size: 1024 bytes per creature.
-- Persists across ticks for same creature.
-- Copied byte-for-byte on reproduction.
-- Addressing wraps with `rem_euclid(1024)`.
+- Each creature has 16 f32 shared memory slots (`shared_memory: [f32; 16]`).
+- Persists across ticks for the same creature.
+- At tick start: `prev_shared_memory` is snapshotted from `shared_memory`, then optional decay is applied.
+- On reproduction: `shared_memory` is copied from parent to child; `prev_shared_memory` is zeroed.
+- Slot addressing wraps with `% 16`.
+- All slot writes pass through `sanitize_f32()` (NaN/Infinity → 0.0).
+- VM operates on a working copy: committed on normal exit, discarded on energy exhaustion.
 
 ---
 

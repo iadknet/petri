@@ -43,7 +43,8 @@ fn run_vm(
     };
     let ss = empty_sensor_snapshot();
     let mut e = energy;
-    let mut mem = [0u8; 1024];
+    let mut mem = [0.0f32; 16];
+    let prev_mem = [0.0f32; 16];
     let cfg = config();
     let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let result = execute_vm_node(
@@ -53,6 +54,7 @@ fn run_vm(
         &mut e,
         0.0,
         &mut mem,
+        &prev_mem,
         &ss,
         &cfg,
         &mut side_outputs,

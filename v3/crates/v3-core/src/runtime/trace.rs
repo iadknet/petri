@@ -139,7 +139,7 @@ pub struct VmTrace {
     pub final_payload: [f32; 12],
     pub final_meta: [f32; 8],
     pub final_route_target: f32,
-    pub memory_writes: Vec<MemoryWrite>,
+    pub slot_writes: Vec<SlotWrite>,
 }
 
 /// Trace of a single VM instruction execution.
@@ -152,12 +152,12 @@ pub struct VmStepTrace {
     pub register_changes: Vec<(u8, f32)>,
 }
 
-/// Record of a single memory write operation.
+/// Record of a single shared-memory slot write operation.
 #[derive(Debug, Clone, Serialize)]
-pub struct MemoryWrite {
-    pub address: u16,
-    pub old_value: u8,
-    pub new_value: u8,
+pub struct SlotWrite {
+    pub slot_idx: u8,
+    pub old_value: f32,
+    pub new_value: f32,
 }
 
 // ─── Graph trace ─────────────────────────────────────────────────────────────
@@ -226,6 +226,10 @@ pub fn kind_label(kind: &GraphNodeKind) -> &'static str {
         GraphNodeKind::PushAction(_) => "PushAction",
         GraphNodeKind::PopAction => "PopAction",
         GraphNodeKind::ExecuteActionQueue => "ExecuteActionQueue",
+        GraphNodeKind::ReadSlot(_) => "ReadSlot",
+        GraphNodeKind::ReadSlotPrev(_) => "ReadSlotPrev",
+        GraphNodeKind::WriteSlot(_) => "WriteSlot",
+        GraphNodeKind::ClearSlot(_) => "ClearSlot",
     }
 }
 
@@ -395,6 +399,10 @@ mod tests {
             kind_label(&GraphNodeKind::ExecuteActionQueue),
             "ExecuteActionQueue"
         );
+        assert_eq!(kind_label(&GraphNodeKind::ReadSlot(0)), "ReadSlot");
+        assert_eq!(kind_label(&GraphNodeKind::ReadSlotPrev(0)), "ReadSlotPrev");
+        assert_eq!(kind_label(&GraphNodeKind::WriteSlot(0)), "WriteSlot");
+        assert_eq!(kind_label(&GraphNodeKind::ClearSlot(0)), "ClearSlot");
     }
 
     #[test]

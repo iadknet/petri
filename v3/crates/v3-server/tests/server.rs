@@ -1116,12 +1116,12 @@ async fn get_creature_returns_full_detail() {
     );
     assert!(body["genome"]["nodes"].is_array(), "missing genome.nodes");
 
-    // Memory
-    assert!(body["memory"].is_array(), "missing memory");
+    // Shared memory
+    assert!(body["shared_memory"].is_array(), "missing shared_memory");
     assert_eq!(
-        body["memory"].as_array().unwrap().len(),
-        1024,
-        "memory must have 1024 bytes"
+        body["shared_memory"].as_array().unwrap().len(),
+        16,
+        "shared_memory must have 16 slots"
     );
 }
 
@@ -1350,7 +1350,10 @@ async fn get_creature_exclude_omits_fields() {
     let (status, body) = do_request(a.clone(), get_req(&uri)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
     assert!(body.get("genome").is_some(), "genome should be present");
-    assert!(body.get("memory").is_some(), "memory should be present");
+    assert!(
+        body.get("shared_memory").is_some(),
+        "shared_memory should be present"
+    );
     assert!(
         body.get("action_log").is_some(),
         "action_log should be present"
@@ -1361,7 +1364,10 @@ async fn get_creature_exclude_omits_fields() {
     let (status, body) = do_request(a.clone(), get_req(&uri_excl_genome)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
     assert!(body.get("genome").is_none(), "genome should be omitted");
-    assert!(body.get("memory").is_some(), "memory should be present");
+    assert!(
+        body.get("shared_memory").is_some(),
+        "shared_memory should be present"
+    );
     assert!(
         body.get("action_log").is_some(),
         "action_log should be present"
@@ -1386,11 +1392,14 @@ async fn get_creature_exclude_omits_fields() {
         body.get("action_log").is_none(),
         "action_log should be omitted"
     );
-    assert!(body.get("memory").is_some(), "memory should be present");
+    assert!(
+        body.get("shared_memory").is_some(),
+        "shared_memory should be present"
+    );
 
-    // exclude=genome,action_log,memory — all optional fields omitted.
+    // exclude=genome,action_log,shared_memory — all optional fields omitted.
     let uri_excl_all =
-        format!("/v3/simulation/creature/{creature_id}?exclude=genome,action_log,memory");
+        format!("/v3/simulation/creature/{creature_id}?exclude=genome,action_log,shared_memory");
     let (status, body) = do_request(a, get_req(&uri_excl_all)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
     assert!(body.get("genome").is_none(), "genome should be omitted");
@@ -1398,7 +1407,10 @@ async fn get_creature_exclude_omits_fields() {
         body.get("action_log").is_none(),
         "action_log should be omitted"
     );
-    assert!(body.get("memory").is_none(), "memory should be omitted");
+    assert!(
+        body.get("shared_memory").is_none(),
+        "shared_memory should be omitted"
+    );
     // Core scalar fields still present.
     assert!(body.get("energy").is_some(), "energy should be present");
     assert!(body.get("id").is_some(), "id should be present");

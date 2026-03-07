@@ -82,7 +82,8 @@ struct VmBenchFixture {
     sensors: SensorSnapshot,
     runtime_config: RuntimeConfig,
     energy: f32,
-    memory: [u8; 1024],
+    shared_memory: [f32; 16],
+    prev_shared_memory: [f32; 16],
 }
 
 fn build_vm_fixture() -> VmBenchFixture {
@@ -109,7 +110,8 @@ fn build_vm_fixture() -> VmBenchFixture {
         sensors,
         runtime_config: sim.config.runtime.clone(),
         energy: creature.energy.max(1.0),
-        memory: creature.memory,
+        shared_memory: creature.shared_memory,
+        prev_shared_memory: creature.prev_shared_memory,
     }
 }
 
@@ -121,6 +123,8 @@ struct GraphBenchFixture {
     energy: f32,
     node_idx: usize,
     graph_runtime: GraphRuntimeState,
+    shared_memory: [f32; 16],
+    prev_shared_memory: [f32; 16],
 }
 
 fn build_graph_fixture() -> GraphBenchFixture {
@@ -150,6 +154,8 @@ fn build_graph_fixture() -> GraphBenchFixture {
         energy: creature.energy.max(1.0),
         node_idx,
         graph_runtime: GraphRuntimeState::new(),
+        shared_memory: creature.shared_memory,
+        prev_shared_memory: creature.prev_shared_memory,
     }
 }
 
@@ -199,7 +205,8 @@ fn bench_mesh_execution_only(c: &mut Criterion) {
                         &creature.genome,
                         &ss,
                         &mut creature.energy,
-                        &mut creature.memory,
+                        &mut creature.shared_memory,
+                        &creature.prev_shared_memory,
                         &mut creature.graph_runtime,
                         &config,
                     ));
@@ -280,7 +287,8 @@ fn bench_vm_execute_stress(c: &mut Criterion) {
                     &[0.0; 12],
                     &mut fixture.energy,
                     0.0,
-                    &mut fixture.memory,
+                    &mut fixture.shared_memory,
+                    &fixture.prev_shared_memory,
                     &fixture.sensors,
                     &fixture.runtime_config,
                     &mut side_outputs,
@@ -309,6 +317,8 @@ fn bench_graph_execute_stress(c: &mut Criterion) {
                     &fixture.sensors,
                     &fixture.runtime_config,
                     &mut side_outputs,
+                    &mut fixture.shared_memory,
+                    &fixture.prev_shared_memory,
                 ));
             },
             BatchSize::SmallInput,

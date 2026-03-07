@@ -118,6 +118,8 @@ pub fn execute_graph_node_traced(
     sensors: &SensorSnapshot,
     config: &RuntimeConfig,
     side_outputs: &mut MeshSideOutputs,
+    shared_memory: &mut [f32; 16],
+    prev_shared_memory: &[f32; 16],
 ) -> (NodeResult, GraphTrace) {
     let node_count = def.internal_nodes.len();
 
@@ -145,6 +147,8 @@ pub fn execute_graph_node_traced(
         sensors,
         config,
         side_outputs,
+        shared_memory,
+        prev_shared_memory,
     );
 
     (result, tracer.into_trace())
@@ -224,6 +228,8 @@ mod tests {
             &ss,
             &config,
             &mut MeshSideOutputs::new(4),
+            &mut [0.0f32; 16],
+            &[0.0f32; 16],
         );
 
         let mut energy_b = 100.0f32;
@@ -239,6 +245,8 @@ mod tests {
             &ss,
             &config,
             &mut MeshSideOutputs::new(4),
+            &mut [0.0f32; 16],
+            &[0.0f32; 16],
         );
 
         assert_eq!(result_a, result_b);
@@ -300,6 +308,8 @@ mod tests {
             &ss,
             &config,
             &mut MeshSideOutputs::new(4),
+            &mut [0.0f32; 16],
+            &[0.0f32; 16],
         );
         assert!(!r1.energy_exhausted);
         assert!((r1.output_slots[0] - 0.5).abs() < 1e-5);
@@ -322,6 +332,8 @@ mod tests {
             &ss,
             &config,
             &mut MeshSideOutputs::new(4),
+            &mut [0.0f32; 16],
+            &[0.0f32; 16],
         );
         let decay_eval2 = &trace2.passes[0].node_evaluations[1];
         assert!((decay_eval2.state_before - 0.5).abs() < 1e-6);
@@ -367,6 +379,8 @@ mod tests {
             &ss,
             &config,
             &mut MeshSideOutputs::new(4),
+            &mut [0.0f32; 16],
+            &[0.0f32; 16],
         );
 
         assert!(trace.converged);
@@ -408,6 +422,8 @@ mod tests {
             &ss,
             &config,
             &mut so_a,
+            &mut [0.0f32; 16],
+            &[0.0f32; 16],
         );
 
         let mut energy_b = 100.0f32;
@@ -424,6 +440,8 @@ mod tests {
             &ss,
             &config,
             &mut so_b,
+            &mut [0.0f32; 16],
+            &[0.0f32; 16],
         );
 
         assert_eq!(result_a, result_b);

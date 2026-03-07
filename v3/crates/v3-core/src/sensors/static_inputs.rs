@@ -164,6 +164,7 @@ mod tests {
             0,
             [true; 6],
             CreatureIdentityState::default(),
+            [0.0; 16],
         )
     }
 
@@ -270,6 +271,7 @@ mod tests {
             0,
             [true; 6],
             CreatureIdentityState::default(),
+            [0.0; 16],
         );
         creature.age = 42;
         let si = assemble_static_inputs(&world, &creature);
