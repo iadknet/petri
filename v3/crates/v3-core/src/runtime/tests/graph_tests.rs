@@ -58,6 +58,8 @@ fn empty_graph_returns_halted_and_no_energy_charged() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
 
     // No energy consumed.
@@ -94,6 +96,8 @@ fn energy_exhaustion_returns_exhausted() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
 
     assert!(result.energy_exhausted);
@@ -121,6 +125,8 @@ fn constant_node_does_not_write_output_slots() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
 
     // No CustomOutput → output_slots stays = upstream.
@@ -175,6 +181,8 @@ fn add_custom_output_writes_correct_slot() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
 
     assert!(!result.energy_exhausted);
@@ -222,6 +230,8 @@ fn router_output_sets_route_target_idx() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
 
     assert!(!result.energy_exhausted);
@@ -253,6 +263,8 @@ fn graph_never_emits_world_action() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
 
     assert!(!result.terminal);
@@ -314,6 +326,8 @@ fn decay_integrator_accumulates_state() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
     assert!(!result1.energy_exhausted);
     assert!(
@@ -333,6 +347,8 @@ fn decay_integrator_accumulates_state() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
     assert!(!result2.energy_exhausted);
     assert!(
@@ -382,6 +398,8 @@ fn state_not_mutated_on_energy_exhaustion() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
 
     assert!(result.energy_exhausted);
@@ -416,6 +434,8 @@ fn output_slots_initialized_from_upstream_passthrough() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
 
     assert!(!result.energy_exhausted);
@@ -463,6 +483,8 @@ fn energy_deducted_per_pass_on_success() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
 
     // 2 nodes * 1.0 cost = 2.0 consumed in exactly 1 pass.
@@ -524,6 +546,8 @@ fn decay_integrator_formula_correct() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
     assert!(
         (r1.output_slots[0] - 0.5).abs() < 1e-5,
@@ -542,6 +566,8 @@ fn decay_integrator_formula_correct() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
     assert!(
         (r2.output_slots[0] - 0.75).abs() < 1e-5,
@@ -603,6 +629,8 @@ fn momentum_formula_correct() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
     assert!(
         (r1.output_slots[0] - 0.2).abs() < 1e-5,
@@ -664,6 +692,8 @@ fn oscillator_nan_safe() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
 
     assert!(
@@ -726,6 +756,8 @@ fn threshold_formula_correct() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
     assert_eq!(r.output_slots[0], 1.0, "wsum=0.6 should fire");
 
@@ -742,6 +774,8 @@ fn threshold_formula_correct() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
     assert_eq!(
         r.output_slots[0], 0.0,
@@ -761,6 +795,8 @@ fn threshold_formula_correct() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
     assert_eq!(r.output_slots[0], 0.0, "wsum=0.4 should NOT fire");
 }
@@ -806,6 +842,8 @@ fn multiply_empty_inputs_is_one() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
 
     assert_eq!(
@@ -875,6 +913,8 @@ fn greater_than_formula() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
     assert_eq!(r.output_slots[0], 1.0, "2.0 > 1.0 should produce 1.0");
 
@@ -891,6 +931,8 @@ fn greater_than_formula() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
     assert_eq!(r.output_slots[0], 0.0, "1.0 == 1.0 should produce 0.0");
 
@@ -907,6 +949,8 @@ fn greater_than_formula() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
     assert_eq!(r.output_slots[0], 0.0, "0.5 < 1.0 should produce 0.0");
 }
@@ -990,6 +1034,8 @@ fn select_formula() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
     assert_eq!(
         r.output_slots[0], 10.0,
@@ -1010,6 +1056,8 @@ fn select_formula() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
     assert_eq!(
         r.output_slots[0], 20.0,
@@ -1067,6 +1115,8 @@ fn router_output_last_write_wins() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
 
     assert!(!result.energy_exhausted);
@@ -1116,6 +1166,8 @@ fn input_ref_255_soft_defaults_to_zero() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
 
     assert!(!result.energy_exhausted);
@@ -1161,6 +1213,8 @@ fn custom_output_255_does_not_write_output_slots() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
 
     assert!(!result.energy_exhausted);
@@ -1209,6 +1263,8 @@ fn edge_source_65535_soft_defaults_to_zero() {
         &ss,
         &config,
         &mut MeshSideOutputs::new(4),
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
 
     assert!(!result.energy_exhausted);
@@ -1255,6 +1311,8 @@ fn graph_push_action_and_terminate() {
         &ss,
         &config,
         &mut so,
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
 
     assert!(result.terminal);
@@ -1297,6 +1355,8 @@ fn energy_exhaustion_prevents_effects() {
         &ss,
         &config,
         &mut so,
+        &mut [0.0f32; 16],
+        &[0.0f32; 16],
     );
 
     assert!(result.energy_exhausted);
@@ -1304,5 +1364,391 @@ fn energy_exhaustion_prevents_effects() {
     assert!(
         so.action_queue.into_actions_or_noop() == vec![crate::contracts::WorldAction::NoOp],
         "exhausted graph must not push actions"
+    );
+}
+
+// ─── Shared memory slot node tests ──────────────────────────────────────
+
+/// ReadSlot reads the current shared_memory value and adds wsum.
+#[test]
+fn read_slot_returns_slot_value_plus_wsum() {
+    let def = GraphBackendDef {
+        internal_nodes: vec![
+            GraphInternalNode {
+                kind: GraphNodeKind::ReadSlot(3),
+                inputs: vec![],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::CustomOutput(0),
+                inputs: vec![GraphInput {
+                    source_idx: 0,
+                    weight: 1.0,
+                }],
+                plasticity: None,
+            },
+        ],
+    };
+    let upstream = [0.0f32; 12];
+    let mut energy = 100.0f32;
+    let mut gr = GraphRuntimeState::new();
+    let ss = make_sensor_snapshot();
+    let mut config = default_config();
+    config.max_graph_relax_iters = 1;
+    config.graph_convergence_stable_passes = 1;
+
+    let mut shared_mem = [0.0f32; 16];
+    shared_mem[3] = 7.5;
+    let prev_shared_mem = [0.0f32; 16];
+
+    let result = execute_graph_node(
+        &def,
+        &[],
+        &upstream,
+        &mut energy,
+        0.0,
+        0,
+        &mut gr,
+        &ss,
+        &config,
+        &mut MeshSideOutputs::new(4),
+        &mut shared_mem,
+        &prev_shared_mem,
+    );
+
+    assert!(
+        (result.output_slots[0] - 7.5).abs() < 1e-5,
+        "ReadSlot(3) should return 7.5, got {}",
+        result.output_slots[0]
+    );
+}
+
+/// ReadSlotPrev reads the prev_shared_memory value.
+#[test]
+fn read_slot_prev_returns_prev_value() {
+    let def = GraphBackendDef {
+        internal_nodes: vec![
+            GraphInternalNode {
+                kind: GraphNodeKind::ReadSlotPrev(5),
+                inputs: vec![],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::CustomOutput(0),
+                inputs: vec![GraphInput {
+                    source_idx: 0,
+                    weight: 1.0,
+                }],
+                plasticity: None,
+            },
+        ],
+    };
+    let upstream = [0.0f32; 12];
+    let mut energy = 100.0f32;
+    let mut gr = GraphRuntimeState::new();
+    let ss = make_sensor_snapshot();
+    let mut config = default_config();
+    config.max_graph_relax_iters = 1;
+    config.graph_convergence_stable_passes = 1;
+
+    let mut shared_mem = [0.0f32; 16];
+    let mut prev_shared_mem = [0.0f32; 16];
+    prev_shared_mem[5] = 3.25;
+
+    let result = execute_graph_node(
+        &def,
+        &[],
+        &upstream,
+        &mut energy,
+        0.0,
+        0,
+        &mut gr,
+        &ss,
+        &config,
+        &mut MeshSideOutputs::new(4),
+        &mut shared_mem,
+        &prev_shared_mem,
+    );
+
+    assert!(
+        (result.output_slots[0] - 3.25).abs() < 1e-5,
+        "ReadSlotPrev(5) should return 3.25, got {}",
+        result.output_slots[0]
+    );
+}
+
+/// WriteSlot outputs wsum during evaluation (deferred effect).
+#[test]
+fn write_slot_outputs_wsum() {
+    let def = GraphBackendDef {
+        internal_nodes: vec![
+            GraphInternalNode {
+                kind: GraphNodeKind::Constant(4.0),
+                inputs: vec![],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::WriteSlot(2),
+                inputs: vec![GraphInput {
+                    source_idx: 0,
+                    weight: 1.0,
+                }],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::CustomOutput(0),
+                inputs: vec![GraphInput {
+                    source_idx: 1,
+                    weight: 1.0,
+                }],
+                plasticity: None,
+            },
+        ],
+    };
+    let upstream = [0.0f32; 12];
+    let mut energy = 100.0f32;
+    let mut gr = GraphRuntimeState::new();
+    let ss = make_sensor_snapshot();
+    let mut config = default_config();
+    config.max_graph_relax_iters = 1;
+    config.graph_convergence_stable_passes = 1;
+
+    let mut shared_mem = [0.0f32; 16];
+    let prev_shared_mem = [0.0f32; 16];
+
+    let result = execute_graph_node(
+        &def,
+        &[],
+        &upstream,
+        &mut energy,
+        0.0,
+        0,
+        &mut gr,
+        &ss,
+        &config,
+        &mut MeshSideOutputs::new(4),
+        &mut shared_mem,
+        &prev_shared_mem,
+    );
+
+    // WriteSlot outputs wsum (4.0) during evaluation
+    assert!(
+        (result.output_slots[0] - 4.0).abs() < 1e-5,
+        "WriteSlot should output wsum=4.0, got {}",
+        result.output_slots[0]
+    );
+}
+
+/// ClearSlot outputs 0.0 during evaluation.
+#[test]
+fn clear_slot_outputs_zero() {
+    let def = GraphBackendDef {
+        internal_nodes: vec![
+            GraphInternalNode {
+                kind: GraphNodeKind::Constant(9.0),
+                inputs: vec![],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::ClearSlot(7),
+                inputs: vec![GraphInput {
+                    source_idx: 0,
+                    weight: 1.0,
+                }],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::CustomOutput(0),
+                inputs: vec![GraphInput {
+                    source_idx: 1,
+                    weight: 1.0,
+                }],
+                plasticity: None,
+            },
+        ],
+    };
+    let upstream = [0.0f32; 12];
+    let mut energy = 100.0f32;
+    let mut gr = GraphRuntimeState::new();
+    let ss = make_sensor_snapshot();
+    let mut config = default_config();
+    config.max_graph_relax_iters = 1;
+    config.graph_convergence_stable_passes = 1;
+
+    let mut shared_mem = [0.0f32; 16];
+    shared_mem[7] = 99.0;
+    let prev_shared_mem = [0.0f32; 16];
+
+    let result = execute_graph_node(
+        &def,
+        &[],
+        &upstream,
+        &mut energy,
+        0.0,
+        0,
+        &mut gr,
+        &ss,
+        &config,
+        &mut MeshSideOutputs::new(4),
+        &mut shared_mem,
+        &prev_shared_mem,
+    );
+
+    // ClearSlot always outputs 0.0
+    assert_eq!(
+        result.output_slots[0], 0.0,
+        "ClearSlot should output 0.0, got {}",
+        result.output_slots[0]
+    );
+}
+
+/// ReadSlot index wraps via modulo 16.
+#[test]
+fn read_slot_index_wraps() {
+    let def = GraphBackendDef {
+        internal_nodes: vec![
+            GraphInternalNode {
+                kind: GraphNodeKind::ReadSlot(19), // 19 % 16 = 3
+                inputs: vec![],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::CustomOutput(0),
+                inputs: vec![GraphInput {
+                    source_idx: 0,
+                    weight: 1.0,
+                }],
+                plasticity: None,
+            },
+        ],
+    };
+    let upstream = [0.0f32; 12];
+    let mut energy = 100.0f32;
+    let mut gr = GraphRuntimeState::new();
+    let ss = make_sensor_snapshot();
+    let mut config = default_config();
+    config.max_graph_relax_iters = 1;
+    config.graph_convergence_stable_passes = 1;
+
+    let mut shared_mem = [0.0f32; 16];
+    shared_mem[3] = 2.5; // slot 19 % 16 = 3
+    let prev_shared_mem = [0.0f32; 16];
+
+    let result = execute_graph_node(
+        &def,
+        &[],
+        &upstream,
+        &mut energy,
+        0.0,
+        0,
+        &mut gr,
+        &ss,
+        &config,
+        &mut MeshSideOutputs::new(4),
+        &mut shared_mem,
+        &prev_shared_mem,
+    );
+
+    assert!(
+        (result.output_slots[0] - 2.5).abs() < 1e-5,
+        "ReadSlot(19) should wrap to slot 3 = 2.5, got {}",
+        result.output_slots[0]
+    );
+}
+
+/// WriteSlot commits value to shared_memory via post-convergence effects.
+#[test]
+fn write_slot_commits_to_shared_memory() {
+    let def = GraphBackendDef {
+        internal_nodes: vec![
+            GraphInternalNode {
+                kind: GraphNodeKind::Constant(6.0),
+                inputs: vec![],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::WriteSlot(4),
+                inputs: vec![GraphInput {
+                    source_idx: 0,
+                    weight: 1.0,
+                }],
+                plasticity: None,
+            },
+        ],
+    };
+    let upstream = [0.0f32; 12];
+    let mut energy = 100.0f32;
+    let mut gr = GraphRuntimeState::new();
+    let ss = make_sensor_snapshot();
+    let mut config = default_config();
+    config.max_graph_relax_iters = 1;
+    config.graph_convergence_stable_passes = 1;
+
+    let mut shared_mem = [0.0f32; 16];
+    let prev_shared_mem = [0.0f32; 16];
+
+    let _result = execute_graph_node(
+        &def,
+        &[],
+        &upstream,
+        &mut energy,
+        0.0,
+        0,
+        &mut gr,
+        &ss,
+        &config,
+        &mut MeshSideOutputs::new(4),
+        &mut shared_mem,
+        &prev_shared_mem,
+    );
+
+    assert!(
+        (shared_mem[4] - 6.0).abs() < 1e-5,
+        "WriteSlot(4) should commit 6.0, got {}",
+        shared_mem[4]
+    );
+}
+
+/// ClearSlot zeros the slot in shared_memory via post-convergence effects.
+#[test]
+fn clear_slot_zeros_shared_memory_integration() {
+    let def = GraphBackendDef {
+        internal_nodes: vec![GraphInternalNode {
+            kind: GraphNodeKind::ClearSlot(2),
+            inputs: vec![],
+            plasticity: None,
+        }],
+    };
+    let upstream = [0.0f32; 12];
+    let mut energy = 100.0f32;
+    let mut gr = GraphRuntimeState::new();
+    let ss = make_sensor_snapshot();
+    let mut config = default_config();
+    config.max_graph_relax_iters = 1;
+    config.graph_convergence_stable_passes = 1;
+
+    let mut shared_mem = [0.0f32; 16];
+    shared_mem[2] = 42.0;
+    let prev_shared_mem = [0.0f32; 16];
+
+    let _result = execute_graph_node(
+        &def,
+        &[],
+        &upstream,
+        &mut energy,
+        0.0,
+        0,
+        &mut gr,
+        &ss,
+        &config,
+        &mut MeshSideOutputs::new(4),
+        &mut shared_mem,
+        &prev_shared_mem,
+    );
+
+    assert_eq!(
+        shared_mem[2], 0.0,
+        "ClearSlot(2) should zero slot, got {}",
+        shared_mem[2]
     );
 }

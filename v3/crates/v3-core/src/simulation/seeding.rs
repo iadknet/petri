@@ -74,6 +74,7 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
                 FOUNDER_ACTIVE_CHANNEL,
                 FOUNDER_POLARITY,
                 identity,
+                [0.0; crate::creature::state::SHARED_MEMORY_SLOTS],
             )
         });
         action_logs.insert(id, ActionLog::new(log_capacity));

@@ -396,6 +396,21 @@ impl Default for PredationConfig {
     }
 }
 
+/// Shared memory config for creature-level persistent f32 slot memory.
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct SharedMemoryConfig {
+    /// Global decay rate applied to all shared memory slots at tick start.
+    /// Clamped to [0.0, 1.0]. Default 0.0 (no decay).
+    pub decay_rate: f32,
+}
+
+impl Default for SharedMemoryConfig {
+    fn default() -> Self {
+        Self { decay_rate: 0.0 }
+    }
+}
+
 /// Population caps. Canonical owner: v3-runtime-config-spec.md Section 5.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -429,6 +444,8 @@ pub struct SimulationConfig {
     pub predation: PredationConfig,
     #[serde(default)]
     pub action_log: ActionLogConfig,
+    #[serde(default)]
+    pub shared_memory: SharedMemoryConfig,
 }
 
 impl SimulationConfig {
@@ -533,6 +550,9 @@ impl SimulationConfig {
         pred.steal_cost_rate = normalize_f32_clamp(pred.steal_cost_rate, 0.0, 1.0, 0.2);
         pred.kill_complexity_bonus_multiplier =
             normalize_f32_finite_nonneg(pred.kill_complexity_bonus_multiplier, 0.05);
+
+        self.shared_memory.decay_rate =
+            normalize_f32_clamp(self.shared_memory.decay_rate, 0.0, 1.0, 0.0);
 
         let p = &mut self.population;
         if p.initial_creatures < 1 {
@@ -649,6 +669,8 @@ mod tests {
         assert_eq!(cfg.mutation.phenotype.channel_step, 1);
         assert!((cfg.mutation.phenotype.channel_change_chance - 0.001).abs() < 1e-6);
         assert!((cfg.mutation.phenotype.polarity_flip_chance - 0.0002).abs() < 1e-6);
+        // Shared memory
+        assert!((cfg.shared_memory.decay_rate - 0.0).abs() < f32::EPSILON);
         // Predation
         assert!((cfg.predation.steal_cost_rate - 0.2).abs() < 1e-6);
         assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.05).abs() < 1e-6);
@@ -917,6 +939,38 @@ mod tests {
         cfg.predation.kill_complexity_bonus_multiplier = f32::INFINITY;
         cfg.normalize();
         assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.05).abs() < 1e-6);
+    }
+
+    // ── SharedMemoryConfig tests ──────────────────────────────────────────
+
+    #[test]
+    fn shared_memory_config_default_decay_zero() {
+        let cfg = SharedMemoryConfig::default();
+        assert!((cfg.decay_rate - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn normalize_shared_memory_decay_rate_nan_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.shared_memory.decay_rate = f32::NAN;
+        cfg.normalize();
+        assert!((cfg.shared_memory.decay_rate - 0.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn normalize_shared_memory_decay_rate_above_one_clamped() {
+        let mut cfg = SimulationConfig::default();
+        cfg.shared_memory.decay_rate = 1.5;
+        cfg.normalize();
+        assert!((cfg.shared_memory.decay_rate - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_shared_memory_decay_rate_negative_clamped() {
+        let mut cfg = SimulationConfig::default();
+        cfg.shared_memory.decay_rate = -0.5;
+        cfg.normalize();
+        assert!((cfg.shared_memory.decay_rate - 0.0).abs() < f32::EPSILON);
     }
 
     #[test]

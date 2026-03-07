@@ -96,6 +96,12 @@ Core rule:
 - `VmInstructionRawFieldMutation` (raw representable-field mutation for
   tolerant runtime decoders, including fields such as `action_type` and
   immediate memory addresses)
+- `VmInsertReadStoreMotif` (insert ReadInput + StoreSlotImm instruction pair)
+- `VmInsertLoadCompareMotif` (insert LoadSlotImm + CmpGt instruction pair)
+- `VmMutateSlotAddress` (mutate slot_idx on an existing shared-memory slot
+  opcode)
+- `VmMutatePairedSlotAddress` (co-mutate all LoadSlotImm/StoreSlotImm
+  instructions sharing the same slot_idx to a new random slot)
 
 ### Graph domain
 
@@ -108,8 +114,9 @@ Core rule:
 - `RetargetGraphEdge`
 - `RemoveGraphEdge`
 - `GraphRawFieldMutation` (raw representable-field mutation for tolerant graph
-  encodings, including `InputRef { ref_idx, sub_idx }`, `CustomOutput(u8)`, and edge source
-  indices)
+  encodings, including `InputRef { ref_idx, sub_idx }`, `CustomOutput(u8)`,
+  `ReadSlot(u8)`, `ReadSlotPrev(u8)`, `WriteSlot(u8)`, `ClearSlot(u8)`,
+  and edge source indices)
 - `CopyInternalNode`
 - `CopySubgraph`
 - `CopyEdgeBundle`

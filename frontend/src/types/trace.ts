@@ -19,8 +19,8 @@ export interface VmStepTrace {
 	register_changes: [number, number][];
 }
 
-export interface MemoryWriteTrace {
-	address: number;
+export interface SlotWriteTrace {
+	slot_idx: number;
 	old_value: number;
 	new_value: number;
 }
@@ -33,7 +33,7 @@ export interface VmTrace {
 	final_payload: number[];
 	final_meta: number[];
 	final_route_target: number;
-	memory_writes: MemoryWriteTrace[];
+	slot_writes: SlotWriteTrace[];
 }
 
 export interface GraphNodeEvalTrace {

@@ -362,6 +362,16 @@ fn mutate_operator_param(
                     *slot = slot.wrapping_sub(1);
                 }
             }
+            GraphNodeKind::ReadSlot(ref mut slot_idx)
+            | GraphNodeKind::ReadSlotPrev(ref mut slot_idx)
+            | GraphNodeKind::WriteSlot(ref mut slot_idx)
+            | GraphNodeKind::ClearSlot(ref mut slot_idx) => {
+                if rng.gen_bool(0.5) {
+                    *slot_idx = slot_idx.wrapping_add(1) % 16;
+                } else {
+                    *slot_idx = slot_idx.wrapping_sub(1) % 16;
+                }
+            }
             _ => unreachable!("is_parameterized filter should prevent reaching here"),
         }
     }
@@ -488,6 +498,10 @@ fn apply_graph_raw_field_mutation(
                     | GraphNodeKind::CustomOutput(_)
                     | GraphNodeKind::WriteActionMeta(_)
                     | GraphNodeKind::PushAction(_)
+                    | GraphNodeKind::ReadSlot(_)
+                    | GraphNodeKind::ReadSlotPrev(_)
+                    | GraphNodeKind::WriteSlot(_)
+                    | GraphNodeKind::ClearSlot(_)
             ) {
                 target_count += 1;
             }
@@ -505,6 +519,10 @@ fn apply_graph_raw_field_mutation(
                     | GraphNodeKind::CustomOutput(_)
                     | GraphNodeKind::WriteActionMeta(_)
                     | GraphNodeKind::PushAction(_)
+                    | GraphNodeKind::ReadSlot(_)
+                    | GraphNodeKind::ReadSlotPrev(_)
+                    | GraphNodeKind::WriteSlot(_)
+                    | GraphNodeKind::ClearSlot(_)
             ) {
                 if pick == 0 {
                     match &g.internal_nodes[int_idx].kind {
@@ -523,6 +541,22 @@ fn apply_graph_raw_field_mutation(
                         }
                         GraphNodeKind::PushAction(_) => {
                             g.internal_nodes[int_idx].kind = GraphNodeKind::PushAction(rng.gen());
+                        }
+                        GraphNodeKind::ReadSlot(_) => {
+                            g.internal_nodes[int_idx].kind =
+                                GraphNodeKind::ReadSlot(rng.gen_range(0u8..16));
+                        }
+                        GraphNodeKind::ReadSlotPrev(_) => {
+                            g.internal_nodes[int_idx].kind =
+                                GraphNodeKind::ReadSlotPrev(rng.gen_range(0u8..16));
+                        }
+                        GraphNodeKind::WriteSlot(_) => {
+                            g.internal_nodes[int_idx].kind =
+                                GraphNodeKind::WriteSlot(rng.gen_range(0u8..16));
+                        }
+                        GraphNodeKind::ClearSlot(_) => {
+                            g.internal_nodes[int_idx].kind =
+                                GraphNodeKind::ClearSlot(rng.gen_range(0u8..16));
                         }
                         _ => unreachable!(),
                     }
@@ -543,9 +577,9 @@ fn apply_graph_raw_field_mutation(
     Ok(())
 }
 
-/// Return a random GraphNodeKind covering all 26 variants with random initial params.
+/// Return a random GraphNodeKind covering all 30 variants with random initial params.
 fn random_graph_node_kind(rng: &mut impl Rng) -> GraphNodeKind {
-    match rng.gen_range(0u8..26) {
+    match rng.gen_range(0u8..30) {
         0 => GraphNodeKind::InputRef {
             ref_idx: rng.gen(),
             sub_idx: 0,
@@ -574,7 +608,11 @@ fn random_graph_node_kind(rng: &mut impl Rng) -> GraphNodeKind {
         22 => GraphNodeKind::WriteActionMeta(rng.gen_range(0u8..8)),
         23 => GraphNodeKind::PushAction(rng.gen_range(0u8..5)),
         24 => GraphNodeKind::PopAction,
-        _ => GraphNodeKind::ExecuteActionQueue,
+        25 => GraphNodeKind::ExecuteActionQueue,
+        26 => GraphNodeKind::ReadSlot(rng.gen_range(0u8..16)),
+        27 => GraphNodeKind::ReadSlotPrev(rng.gen_range(0u8..16)),
+        28 => GraphNodeKind::WriteSlot(rng.gen_range(0u8..16)),
+        _ => GraphNodeKind::ClearSlot(rng.gen_range(0u8..16)),
     }
 }
 
@@ -591,6 +629,10 @@ fn is_parameterized(kind: &GraphNodeKind) -> bool {
             | GraphNodeKind::InputRef { .. }
             | GraphNodeKind::WriteActionMeta(_)
             | GraphNodeKind::PushAction(_)
+            | GraphNodeKind::ReadSlot(_)
+            | GraphNodeKind::ReadSlotPrev(_)
+            | GraphNodeKind::WriteSlot(_)
+            | GraphNodeKind::ClearSlot(_)
     )
 }
 

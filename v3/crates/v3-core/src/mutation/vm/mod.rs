@@ -16,10 +16,14 @@ pub enum VmOperator {
     VmCopyConstantBlock,
     VmCopyGeneBackwardSlice,
     VmCopyGeneForwardSlice,
+    VmInsertReadStoreMotif,
+    VmInsertLoadCompareMotif,
+    VmMutateSlotAddress,
+    VmMutatePairedSlotAddress,
 }
 
 impl VmOperator {
-    pub const ALL: [Self; 9] = [
+    pub const ALL: [Self; 13] = [
         Self::VmConstantMutation,
         Self::VmInstructionMutation,
         Self::VmRegisterCountMutation,
@@ -29,6 +33,10 @@ impl VmOperator {
         Self::VmCopyConstantBlock,
         Self::VmCopyGeneBackwardSlice,
         Self::VmCopyGeneForwardSlice,
+        Self::VmInsertReadStoreMotif,
+        Self::VmInsertLoadCompareMotif,
+        Self::VmMutateSlotAddress,
+        Self::VmMutatePairedSlotAddress,
     ];
 
     /// Per-operator weight reflecting impact tier.
@@ -45,12 +53,16 @@ impl VmOperator {
             Self::VmCopyConstantBlock => 1,
             Self::VmCopyGeneBackwardSlice => 1,
             Self::VmCopyGeneForwardSlice => 1,
+            Self::VmInsertReadStoreMotif => 2,
+            Self::VmInsertLoadCompareMotif => 2,
+            Self::VmMutateSlotAddress => 4,
+            Self::VmMutatePairedSlotAddress => 4,
         }
     }
 
     const TOTAL_WEIGHT: u16 = {
         assert!(
-            Self::ALL.len() == 9,
+            Self::ALL.len() == 13,
             "ALL must cover every VmOperator variant"
         );
         let mut sum = 0u16;
@@ -71,11 +83,15 @@ impl VmOperator {
             | Self::VmCopyInstructionBlockRemapped
             | Self::VmCopyConstantBlock
             | Self::VmCopyGeneBackwardSlice
-            | Self::VmCopyGeneForwardSlice => ComplexityEffect::Increasing,
+            | Self::VmCopyGeneForwardSlice
+            | Self::VmInsertReadStoreMotif
+            | Self::VmInsertLoadCompareMotif => ComplexityEffect::Increasing,
             Self::VmConstantMutation
             | Self::VmInstructionMutation
             | Self::VmRegisterCountMutation
-            | Self::VmInstructionRawFieldMutation => ComplexityEffect::Neutral,
+            | Self::VmInstructionRawFieldMutation
+            | Self::VmMutateSlotAddress
+            | Self::VmMutatePairedSlotAddress => ComplexityEffect::Neutral,
         }
     }
 
@@ -203,6 +219,16 @@ impl VmMutator {
             VmOperator::VmCopyGeneForwardSlice => {
                 apply_copy_gene_forward_slice(genome, node_idx, rng)
             }
+            VmOperator::VmInsertReadStoreMotif => {
+                apply_insert_read_store_motif(genome, node_idx, rng)
+            }
+            VmOperator::VmInsertLoadCompareMotif => {
+                apply_insert_load_compare_motif(genome, node_idx, rng)
+            }
+            VmOperator::VmMutateSlotAddress => apply_mutate_slot_address(genome, node_idx, rng),
+            VmOperator::VmMutatePairedSlotAddress => {
+                apply_mutate_paired_slot_address(genome, node_idx, rng)
+            }
         }
     }
 }
@@ -260,7 +286,7 @@ fn random_vm_instruction(
     let cl = constants_len.clamp(1, 255) as u8;
     let il = input_refs_len.clamp(1, 255) as u8;
 
-    match rng.gen_range(0u8..39) {
+    match rng.gen_range(0u8..41) {
         0 => VmInstruction::Noop,
         1 => VmInstruction::LoadConst {
             dst: rng.gen_range(0..rc),
@@ -395,26 +421,33 @@ fn random_vm_instruction(
         },
         32 => VmInstruction::ExecuteActionQueue,
         33 => VmInstruction::Halt,
-        34 => VmInstruction::LoadMem8 {
+        34 => VmInstruction::LoadSlot {
             dst: rng.gen_range(0..rc),
-            addr_reg: rng.gen_range(0..rc),
+            slot_reg: rng.gen_range(0..rc),
         },
-        35 => VmInstruction::StoreMem8 {
-            addr_reg: rng.gen_range(0..rc),
+        35 => VmInstruction::StoreSlot {
+            slot_reg: rng.gen_range(0..rc),
             src: rng.gen_range(0..rc),
         },
-        36 => VmInstruction::LoadMem8Imm {
+        36 => VmInstruction::LoadSlotImm {
             dst: rng.gen_range(0..rc),
-            imm_addr: rng.gen(),
+            slot_idx: rng.gen_range(0..16),
         },
-        37 => VmInstruction::StoreMem8Imm {
-            imm_addr: rng.gen(),
+        37 => VmInstruction::StoreSlotImm {
+            slot_idx: rng.gen_range(0..16),
             src: rng.gen_range(0..rc),
         },
         38 => VmInstruction::SetPriorityBid {
             src: rng.gen_range(0..rc),
         },
-        _ => unreachable!("gen_range(0..39) cannot produce values >= 39"),
+        39 => VmInstruction::LoadSlotPrev {
+            dst: rng.gen_range(0..rc),
+            slot_idx: rng.gen_range(0..16),
+        },
+        40 => VmInstruction::ClearSlot {
+            slot_idx: rng.gen_range(0..16),
+        },
+        _ => unreachable!("gen_range(0..41) cannot produce values >= 41"),
     }
 }
 
@@ -484,21 +517,28 @@ fn mutate_instruction_raw_fields(instr: &mut VmInstruction, rng: &mut impl Rng) 
         VmInstruction::WriteRouteTarget { src } => {
             *src = rng.gen();
         }
-        VmInstruction::LoadMem8 { dst, addr_reg } => {
+        VmInstruction::LoadSlot { dst, slot_reg } => {
             *dst = rng.gen();
-            *addr_reg = rng.gen();
+            *slot_reg = rng.gen();
         }
-        VmInstruction::StoreMem8 { addr_reg, src } => {
-            *addr_reg = rng.gen();
+        VmInstruction::StoreSlot { slot_reg, src } => {
+            *slot_reg = rng.gen();
             *src = rng.gen();
         }
-        VmInstruction::LoadMem8Imm { dst, imm_addr } => {
+        VmInstruction::LoadSlotImm { dst, slot_idx } => {
             *dst = rng.gen();
-            *imm_addr = rng.gen();
+            *slot_idx = rng.gen_range(0..16);
         }
-        VmInstruction::StoreMem8Imm { imm_addr, src } => {
-            *imm_addr = rng.gen();
+        VmInstruction::StoreSlotImm { slot_idx, src } => {
+            *slot_idx = rng.gen_range(0..16);
             *src = rng.gen();
+        }
+        VmInstruction::LoadSlotPrev { dst, slot_idx } => {
+            *dst = rng.gen();
+            *slot_idx = rng.gen_range(0..16);
+        }
+        VmInstruction::ClearSlot { slot_idx } => {
+            *slot_idx = rng.gen_range(0..16);
         }
         VmInstruction::PushAction { action_type } => {
             *action_type = rng.gen();
@@ -677,16 +717,18 @@ fn remap_register_refs(instr: &mut VmInstruction, offset: u8, register_count: u8
             remap(index_src);
             remap(dst);
         }
-        VmInstruction::LoadMem8 { dst, addr_reg } => {
+        VmInstruction::LoadSlot { dst, slot_reg } => {
             remap(dst);
-            remap(addr_reg);
+            remap(slot_reg);
         }
-        VmInstruction::StoreMem8 { addr_reg, src } => {
-            remap(addr_reg);
+        VmInstruction::StoreSlot { slot_reg, src } => {
+            remap(slot_reg);
             remap(src);
         }
-        VmInstruction::LoadMem8Imm { dst, .. } => remap(dst),
-        VmInstruction::StoreMem8Imm { src, .. } => remap(src),
+        VmInstruction::LoadSlotImm { dst, .. } => remap(dst),
+        VmInstruction::StoreSlotImm { src, .. } => remap(src),
+        VmInstruction::LoadSlotPrev { dst, .. } => remap(dst),
+        VmInstruction::ClearSlot { .. } => {}
     }
 }
 
@@ -821,6 +863,177 @@ fn apply_copy_gene_forward_slice(
         }
     }
     Ok(())
+}
+
+// ── Slot Motif Operators ──
+
+fn apply_insert_read_store_motif(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    let input_refs_len = genome.nodes[node_idx].input_refs.len();
+    let node = &mut genome.nodes[node_idx];
+    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+        let rc = vm.register_count.max(1);
+        let il = input_refs_len.clamp(1, 255) as u16;
+        let dst = rng.gen_range(0..rc);
+        let slot_idx = rng.gen_range(0u8..16);
+        let pair = [
+            VmInstruction::ReadInput {
+                dst,
+                ref_idx: rng.gen_range(0..il),
+                sub_idx: 0,
+            },
+            VmInstruction::StoreSlotImm { slot_idx, src: dst },
+        ];
+        let pos = rng.gen_range(0..=vm.program.len());
+        vm.program.splice(pos..pos, pair);
+    }
+    Ok(())
+}
+
+fn apply_insert_load_compare_motif(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    let node = &mut genome.nodes[node_idx];
+    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+        let rc = vm.register_count.max(1);
+        let load_dst = rng.gen_range(0..rc);
+        let slot_idx = rng.gen_range(0u8..16);
+        let cmp_dst = rng.gen_range(0..rc);
+        let cmp_b = rng.gen_range(0..rc);
+        let pair = [
+            VmInstruction::LoadSlotImm {
+                dst: load_dst,
+                slot_idx,
+            },
+            VmInstruction::CmpGt {
+                dst: cmp_dst,
+                a: load_dst,
+                b: cmp_b,
+            },
+        ];
+        let pos = rng.gen_range(0..=vm.program.len());
+        vm.program.splice(pos..pos, pair);
+    }
+    Ok(())
+}
+
+fn apply_mutate_slot_address(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    let node = &mut genome.nodes[node_idx];
+    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+        let slot_indices: Vec<usize> = vm
+            .program
+            .iter()
+            .enumerate()
+            .filter(|(_, instr)| is_slot_instruction(instr))
+            .map(|(i, _)| i)
+            .collect();
+        if slot_indices.is_empty() {
+            return Err(MutationSkipReason::NoApplicableTarget);
+        }
+        let idx = slot_indices[rng.gen_range(0..slot_indices.len())];
+        mutate_slot_idx_field(&mut vm.program[idx], rng);
+    }
+    Ok(())
+}
+
+fn apply_mutate_paired_slot_address(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    let node = &mut genome.nodes[node_idx];
+    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+        // Group immediate-addressed slot instructions by slot_idx, tracking which have
+        // loads and stores. Register-indirect variants (LoadSlot/StoreSlot) are excluded
+        // because they have no static slot_idx field to co-mutate.
+        let mut groups: std::collections::HashMap<u8, (Vec<usize>, bool, bool)> =
+            std::collections::HashMap::new();
+        for (i, instr) in vm.program.iter().enumerate() {
+            match instr {
+                VmInstruction::LoadSlotImm { slot_idx, .. }
+                | VmInstruction::LoadSlotPrev { slot_idx, .. } => {
+                    let entry = groups
+                        .entry(*slot_idx)
+                        .or_insert((Vec::new(), false, false));
+                    entry.0.push(i);
+                    entry.1 = true; // has load
+                }
+                VmInstruction::StoreSlotImm { slot_idx, .. }
+                | VmInstruction::ClearSlot { slot_idx } => {
+                    let entry = groups
+                        .entry(*slot_idx)
+                        .or_insert((Vec::new(), false, false));
+                    entry.0.push(i);
+                    entry.2 = true; // has store
+                }
+                _ => {}
+            }
+        }
+        // Filter to groups with both load and store.
+        let eligible: Vec<(u8, Vec<usize>)> = groups
+            .into_iter()
+            .filter(|(_, (_, has_load, has_store))| *has_load && *has_store)
+            .map(|(slot, (indices, _, _))| (slot, indices))
+            .collect();
+        if eligible.is_empty() {
+            return Err(MutationSkipReason::NoApplicableTarget);
+        }
+        let (old_slot, indices) = &eligible[rng.gen_range(0..eligible.len())];
+        let new_slot = (*old_slot + 1 + rng.gen_range(0u8..15)) % 16;
+        for &idx in indices {
+            set_slot_idx_field(&mut vm.program[idx], new_slot);
+        }
+    }
+    Ok(())
+}
+
+fn is_slot_instruction(instr: &VmInstruction) -> bool {
+    matches!(
+        instr,
+        VmInstruction::LoadSlot { .. }
+            | VmInstruction::StoreSlot { .. }
+            | VmInstruction::LoadSlotImm { .. }
+            | VmInstruction::StoreSlotImm { .. }
+            | VmInstruction::LoadSlotPrev { .. }
+            | VmInstruction::ClearSlot { .. }
+    )
+}
+
+fn mutate_slot_idx_field(instr: &mut VmInstruction, rng: &mut impl Rng) {
+    match instr {
+        VmInstruction::LoadSlotImm { slot_idx, .. }
+        | VmInstruction::StoreSlotImm { slot_idx, .. }
+        | VmInstruction::LoadSlotPrev { slot_idx, .. }
+        | VmInstruction::ClearSlot { slot_idx } => {
+            *slot_idx = rng.gen_range(0u8..16);
+        }
+        VmInstruction::LoadSlot { slot_reg, .. } | VmInstruction::StoreSlot { slot_reg, .. } => {
+            // For register-indirect slot access, mutate the slot_reg.
+            *slot_reg = rng.gen();
+        }
+        _ => {}
+    }
+}
+
+fn set_slot_idx_field(instr: &mut VmInstruction, new_slot: u8) {
+    match instr {
+        VmInstruction::LoadSlotImm { slot_idx, .. }
+        | VmInstruction::StoreSlotImm { slot_idx, .. }
+        | VmInstruction::LoadSlotPrev { slot_idx, .. }
+        | VmInstruction::ClearSlot { slot_idx } => {
+            *slot_idx = new_slot;
+        }
+        _ => {}
+    }
 }
 
 #[cfg(test)]

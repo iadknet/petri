@@ -425,19 +425,19 @@ fn to_u8_clamps_above_255() {
 }
 
 #[test]
-fn mem8_imm_addr_65535_wraps_and_executes_without_panic() {
+fn slot_imm_idx_255_wraps_and_executes_without_panic() {
     let program = vec![
         VmInstruction::LoadConst {
             dst: 0,
             const_idx: 0,
         },
-        VmInstruction::StoreMem8Imm {
-            imm_addr: 65535,
+        VmInstruction::StoreSlotImm {
+            slot_idx: 255,
             src: 0,
         },
-        VmInstruction::LoadMem8Imm {
+        VmInstruction::LoadSlotImm {
             dst: 1,
-            imm_addr: 65535,
+            slot_idx: 255,
         },
         VmInstruction::WriteInternalPayload {
             slot_idx: 0,

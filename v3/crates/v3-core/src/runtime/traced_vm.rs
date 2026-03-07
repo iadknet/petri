@@ -10,7 +10,7 @@ use crate::contracts::InputReference;
 use crate::creature::genome::VmBackendDef;
 use crate::runtime::action_decode::decode_world_action;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
-use crate::runtime::trace::{MemoryWrite, VmStepTrace, VmTrace};
+use crate::runtime::trace::{SlotWrite, VmStepTrace, VmTrace};
 use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult};
 use crate::runtime::vm::{is_truthy, jump_target, nr, opcode_base_cost};
 use crate::sensors::perception::SensorSnapshot;
@@ -27,7 +27,8 @@ pub fn execute_vm_node_traced(
     upstream_slots: &[f32; 12],
     energy: &mut f32,
     energy_consumed: f32,
-    memory: &mut [u8; 1024],
+    shared_memory: &mut [f32; 16],
+    prev_shared_memory: &[f32; 16],
     sensors: &SensorSnapshot,
     config: &RuntimeConfig,
     side_outputs: &mut MeshSideOutputs,
@@ -42,7 +43,7 @@ pub fn execute_vm_node_traced(
         final_payload: *upstream_slots,
         final_meta: [0.0; 8],
         final_route_target: 0.0,
-        memory_writes: Vec::new(),
+        slot_writes: Vec::new(),
     };
 
     if reg_count == 0 {
@@ -65,20 +66,18 @@ pub fn execute_vm_node_traced(
     let mut pc: usize = 0;
     let mut steps_count: usize = 0;
 
-    let uses_mem = def.has_memory_ops();
-    let mut mem_copy: [u8; 1024] = if uses_mem { *memory } else { [0u8; 1024] };
+    // Working copy of shared memory slots (64 bytes — unconditional copy).
+    let mut slot_copy: [f32; 16] = *shared_memory;
 
     // Trace recording state
     let mut trace_steps: Vec<VmStepTrace> = Vec::with_capacity(program_len.min(max_steps));
-    let mut mem_writes: Vec<MemoryWrite> = Vec::new();
+    let mut slot_writes_vec: Vec<SlotWrite> = Vec::new();
 
     use crate::creature::genome::VmInstruction;
 
-    macro_rules! commit_memory {
+    macro_rules! commit_slots {
         () => {
-            if uses_mem {
-                *memory = mem_copy;
-            }
+            *shared_memory = slot_copy;
         };
     }
 
@@ -110,8 +109,9 @@ pub fn execute_vm_node_traced(
                 | VmInstruction::ReadActionQueueLength { dst, .. }
                 | VmInstruction::ReadActionQueueType { dst, .. }
                 | VmInstruction::ReadActionQueueParam { dst, .. }
-                | VmInstruction::LoadMem8 { dst, .. }
-                | VmInstruction::LoadMem8Imm { dst, .. } => Some(nr(*dst, $reg_count)),
+                | VmInstruction::LoadSlot { dst, .. }
+                | VmInstruction::LoadSlotImm { dst, .. }
+                | VmInstruction::LoadSlotPrev { dst, .. } => Some(nr(*dst, $reg_count)),
                 _ => None,
             }
         };
@@ -120,7 +120,7 @@ pub fn execute_vm_node_traced(
     // Macro to build VmTrace at exit points, avoiding repeated struct construction.
     // Only one exit point executes per call, so the single clone is the actual cost.
     macro_rules! build_trace {
-        ($steps:expr, $mem_writes:expr) => {
+        ($steps:expr, $slot_writes_vec:expr) => {
             VmTrace {
                 register_count: def.register_count,
                 constants: def.constants.clone(),
@@ -129,7 +129,7 @@ pub fn execute_vm_node_traced(
                 final_payload: payload,
                 final_meta: meta,
                 final_route_target: route_target,
-                memory_writes: $mem_writes,
+                slot_writes: $slot_writes_vec,
             }
         };
     }
@@ -137,18 +137,18 @@ pub fn execute_vm_node_traced(
     loop {
         // Match vm.rs loop structure: check max_steps and program bounds separately.
         if steps_count >= max_steps {
-            commit_memory!();
+            commit_slots!();
             return (
                 NodeResult::halted(payload, route_target),
-                build_trace!(trace_steps, mem_writes),
+                build_trace!(trace_steps, slot_writes_vec),
             );
         }
 
         if pc >= program_len {
-            commit_memory!();
+            commit_slots!();
             return (
                 NodeResult::halted(payload, route_target),
-                build_trace!(trace_steps, mem_writes),
+                build_trace!(trace_steps, slot_writes_vec),
             );
         }
 
@@ -171,7 +171,7 @@ pub fn execute_vm_node_traced(
             });
             return (
                 NodeResult::exhausted(),
-                build_trace!(trace_steps, mem_writes),
+                build_trace!(trace_steps, slot_writes_vec),
             );
         }
 
@@ -388,7 +388,7 @@ pub fn execute_vm_node_traced(
                     });
                     return (
                         NodeResult::exhausted(),
-                        build_trace!(trace_steps, mem_writes),
+                        build_trace!(trace_steps, slot_writes_vec),
                     );
                 }
                 side_outputs.priority_bid = bid;
@@ -403,7 +403,7 @@ pub fn execute_vm_node_traced(
             }
 
             VmInstruction::ExecuteActionQueue => {
-                commit_memory!();
+                commit_slots!();
                 trace_steps.push(VmStepTrace {
                     pc,
                     instruction: instr.clone(),
@@ -413,7 +413,7 @@ pub fn execute_vm_node_traced(
                 });
                 return (
                     NodeResult::terminal(payload, route_target),
-                    build_trace!(trace_steps, mem_writes),
+                    build_trace!(trace_steps, slot_writes_vec),
                 );
             }
 
@@ -422,7 +422,7 @@ pub fn execute_vm_node_traced(
             }
 
             VmInstruction::Halt => {
-                commit_memory!();
+                commit_slots!();
                 trace_steps.push(VmStepTrace {
                     pc,
                     instruction: instr.clone(),
@@ -432,44 +432,62 @@ pub fn execute_vm_node_traced(
                 });
                 return (
                     NodeResult::halted(payload, route_target),
-                    build_trace!(trace_steps, mem_writes),
+                    build_trace!(trace_steps, slot_writes_vec),
                 );
             }
 
-            VmInstruction::LoadMem8 { dst, addr_reg } => {
-                let addr = (regs[nr(*addr_reg, reg_count)] as i64).rem_euclid(1024) as usize;
-                regs[nr(*dst, reg_count)] = sanitize_f32(mem_copy[addr] as f32);
+            VmInstruction::LoadSlot { dst, slot_reg } => {
+                let idx = (regs[nr(*slot_reg, reg_count)] as i64).rem_euclid(16) as usize;
+                regs[nr(*dst, reg_count)] = sanitize_f32(slot_copy[idx]);
             }
 
-            VmInstruction::StoreMem8 { addr_reg, src } => {
-                let addr = (regs[nr(*addr_reg, reg_count)] as i64).rem_euclid(1024) as usize;
-                let old_val = mem_copy[addr];
-                let val = regs[nr(*src, reg_count)].clamp(0.0, 255.0) as u8;
-                mem_copy[addr] = val;
-                if old_val != val {
-                    mem_writes.push(MemoryWrite {
-                        address: addr as u16,
+            VmInstruction::StoreSlot { slot_reg, src } => {
+                let idx = (regs[nr(*slot_reg, reg_count)] as i64).rem_euclid(16) as usize;
+                let old_val = slot_copy[idx];
+                let new_val = sanitize_f32(regs[nr(*src, reg_count)]);
+                slot_copy[idx] = new_val;
+                if (old_val - new_val).abs() > f32::EPSILON {
+                    slot_writes_vec.push(SlotWrite {
+                        slot_idx: idx as u8,
                         old_value: old_val,
-                        new_value: val,
+                        new_value: new_val,
                     });
                 }
             }
 
-            VmInstruction::LoadMem8Imm { dst, imm_addr } => {
-                let addr = (*imm_addr as usize).rem_euclid(1024);
-                regs[nr(*dst, reg_count)] = sanitize_f32(mem_copy[addr] as f32);
+            VmInstruction::LoadSlotImm { dst, slot_idx } => {
+                let idx = (*slot_idx as usize) % 16;
+                regs[nr(*dst, reg_count)] = sanitize_f32(slot_copy[idx]);
             }
 
-            VmInstruction::StoreMem8Imm { imm_addr, src } => {
-                let addr = (*imm_addr as usize).rem_euclid(1024);
-                let old_val = mem_copy[addr];
-                let val = regs[nr(*src, reg_count)].clamp(0.0, 255.0) as u8;
-                mem_copy[addr] = val;
-                if old_val != val {
-                    mem_writes.push(MemoryWrite {
-                        address: addr as u16,
+            VmInstruction::StoreSlotImm { slot_idx, src } => {
+                let idx = (*slot_idx as usize) % 16;
+                let old_val = slot_copy[idx];
+                let new_val = sanitize_f32(regs[nr(*src, reg_count)]);
+                slot_copy[idx] = new_val;
+                if (old_val - new_val).abs() > f32::EPSILON {
+                    slot_writes_vec.push(SlotWrite {
+                        slot_idx: idx as u8,
                         old_value: old_val,
-                        new_value: val,
+                        new_value: new_val,
+                    });
+                }
+            }
+
+            VmInstruction::LoadSlotPrev { dst, slot_idx } => {
+                let idx = (*slot_idx as usize) % 16;
+                regs[nr(*dst, reg_count)] = sanitize_f32(prev_shared_memory[idx]);
+            }
+
+            VmInstruction::ClearSlot { slot_idx } => {
+                let idx = (*slot_idx as usize) % 16;
+                let old_val = slot_copy[idx];
+                slot_copy[idx] = 0.0;
+                if old_val.abs() > f32::EPSILON {
+                    slot_writes_vec.push(SlotWrite {
+                        slot_idx: idx as u8,
+                        old_value: old_val,
+                        new_value: 0.0,
                     });
                 }
             }

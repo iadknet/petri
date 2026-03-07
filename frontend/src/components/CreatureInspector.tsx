@@ -5,7 +5,7 @@ import { useCreatureInspectorStore } from "../stores/creatureInspector.ts";
 import { getDetailCount, useExecutionSamplerStore } from "../stores/executionSampler.ts";
 import { ActionTimeline } from "./inspector/ActionTimeline.tsx";
 import { InspectorHeader } from "./inspector/InspectorHeader.tsx";
-import { MemoryHexView } from "./inspector/MemoryHexView.tsx";
+import { SharedMemoryView } from "./inspector/SharedMemoryView.tsx";
 import { NodeGraph } from "./inspector/NodeGraph.tsx";
 import { PhenotypeDetail } from "./inspector/PhenotypeDetail.tsx";
 import { SamplerControls } from "./inspector/SamplerControls.tsx";
@@ -32,7 +32,7 @@ function CreatureInspector() {
 
 	const stats = useCreatureInspectorStore((s) => s.creatureStats);
 	const genome = useCreatureInspectorStore((s) => s.creatureGenome);
-	const memory = useCreatureInspectorStore((s) => s.creatureMemory);
+	const sharedMemory = useCreatureInspectorStore((s) => s.creatureSharedMemory);
 	const actionLog = useCreatureInspectorStore((s) => s.actionLog);
 	const isLoading = useCreatureInspectorStore((s) => s.isLoading);
 	const isDead = useCreatureInspectorStore((s) => s.isDead);
@@ -162,10 +162,10 @@ function CreatureInspector() {
 							</div>
 						)}
 
-						{/* Memory hex view */}
-						{memory && (
+						{/* Shared memory slots */}
+						{sharedMemory && (
 							<div className="border-t border-slate-800">
-								<MemoryHexView memory={memory} />
+								<SharedMemoryView slots={sharedMemory} />
 							</div>
 						)}
 

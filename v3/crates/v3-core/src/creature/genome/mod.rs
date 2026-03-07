@@ -2,7 +2,7 @@ pub mod analysis;
 
 use crate::contracts::{InputReference, NodeId};
 
-/// A single VM instruction. 39 opcodes per v3-vm-isa-spec.md.
+/// A single VM instruction. 41 opcodes per v3-vm-isa-spec.md.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum VmInstruction {
     // ── Arithmetic and Data Movement ─────────────────────────────────────────
@@ -93,17 +93,21 @@ pub enum VmInstruction {
     /// Terminal: return accumulated action queue for execution.
     ExecuteActionQueue,
 
-    // ── Halt and Memory ───────────────────────────────────────────────────────
+    // ── Halt and Shared Memory Slots ─────────────────────────────────────────
     /// Stop VM execution without emitting a world action.
     Halt,
-    /// `dst = memory[addr_reg % 1024]`
-    LoadMem8 { dst: u8, addr_reg: u8 },
-    /// `memory[addr_reg % 1024] = truncate(src)`
-    StoreMem8 { addr_reg: u8, src: u8 },
-    /// `dst = memory[imm_addr % 1024]`
-    LoadMem8Imm { dst: u8, imm_addr: u16 },
-    /// `memory[imm_addr % 1024] = truncate(src)`
-    StoreMem8Imm { imm_addr: u16, src: u8 },
+    /// `dst = shared_memory[regs[slot_reg] % 16]`
+    LoadSlot { dst: u8, slot_reg: u8 },
+    /// `shared_memory[regs[slot_reg] % 16] = sanitize_f32(regs[src])`
+    StoreSlot { slot_reg: u8, src: u8 },
+    /// `dst = shared_memory[slot_idx % 16]`
+    LoadSlotImm { dst: u8, slot_idx: u8 },
+    /// `shared_memory[slot_idx % 16] = sanitize_f32(regs[src])`
+    StoreSlotImm { slot_idx: u8, src: u8 },
+    /// `dst = prev_shared_memory[slot_idx % 16]`
+    LoadSlotPrev { dst: u8, slot_idx: u8 },
+    /// `shared_memory[slot_idx % 16] = 0.0`
+    ClearSlot { slot_idx: u8 },
 }
 
 /// VM backend definition for a mesh node.
@@ -115,21 +119,6 @@ pub struct VmBackendDef {
     pub constants: Vec<f32>,
     /// Instruction sequence. PC starts at 0.
     pub program: Vec<VmInstruction>,
-}
-
-impl VmBackendDef {
-    /// Returns `true` if any instruction in the program reads or writes memory.
-    pub fn has_memory_ops(&self) -> bool {
-        self.program.iter().any(|instr| {
-            matches!(
-                instr,
-                VmInstruction::LoadMem8 { .. }
-                    | VmInstruction::StoreMem8 { .. }
-                    | VmInstruction::LoadMem8Imm { .. }
-                    | VmInstruction::StoreMem8Imm { .. }
-            )
-        })
-    }
 }
 
 // ── Graph backend types ───────────────────────────────────────────────────────
@@ -246,6 +235,15 @@ pub enum GraphNodeKind {
     PopAction,
     /// Mark mesh hop as terminal; return accumulated action queue.
     ExecuteActionQueue,
+    // ── Shared memory slot nodes ─────────────────────────────────────────────
+    /// Read `shared_memory[slot_idx % 16]` and add to weighted sum.
+    ReadSlot(u8),
+    /// Read `prev_shared_memory[slot_idx % 16]` and add to weighted sum.
+    ReadSlotPrev(u8),
+    /// Deferred: write `sanitize_f32(wsum)` to `shared_memory[slot_idx % 16]` post-convergence.
+    WriteSlot(u8),
+    /// Deferred: write `0.0` to `shared_memory[slot_idx % 16]` post-convergence.
+    ClearSlot(u8),
 }
 
 /// A single internal node in the graph backend.
@@ -361,7 +359,7 @@ mod tests {
     use crate::contracts::{DynamicIntrospectionKey, StaticIntrospectionKey, WorldInputKey};
 
     #[test]
-    fn vm_instruction_all_39_variants_constructible() {
+    fn vm_instruction_all_41_variants_constructible() {
         let instructions: Vec<VmInstruction> = vec![
             VmInstruction::Noop,
             VmInstruction::LoadConst {
@@ -423,24 +421,29 @@ mod tests {
             VmInstruction::SetPriorityBid { src: 0 },
             VmInstruction::ExecuteActionQueue,
             VmInstruction::Halt,
-            VmInstruction::LoadMem8 {
+            VmInstruction::LoadSlot {
                 dst: 0,
-                addr_reg: 1,
+                slot_reg: 1,
             },
-            VmInstruction::StoreMem8 {
-                addr_reg: 0,
+            VmInstruction::StoreSlot {
+                slot_reg: 0,
                 src: 1,
             },
-            VmInstruction::LoadMem8Imm {
+            VmInstruction::LoadSlotImm {
                 dst: 0,
-                imm_addr: 100,
+                slot_idx: 3,
             },
-            VmInstruction::StoreMem8Imm {
-                imm_addr: 200,
+            VmInstruction::StoreSlotImm {
+                slot_idx: 5,
                 src: 1,
             },
+            VmInstruction::LoadSlotPrev {
+                dst: 0,
+                slot_idx: 7,
+            },
+            VmInstruction::ClearSlot { slot_idx: 2 },
         ];
-        assert_eq!(instructions.len(), 39, "must have exactly 39 opcodes");
+        assert_eq!(instructions.len(), 41, "must have exactly 41 opcodes");
     }
 
     #[test]
@@ -457,7 +460,7 @@ mod tests {
     }
 
     #[test]
-    fn graph_node_kinds_all_26_constructible() {
+    fn graph_node_kinds_all_30_constructible() {
         let kinds: Vec<GraphNodeKind> = vec![
             GraphNodeKind::InputRef {
                 ref_idx: 0,
@@ -488,8 +491,12 @@ mod tests {
             GraphNodeKind::PushAction(1),
             GraphNodeKind::PopAction,
             GraphNodeKind::ExecuteActionQueue,
+            GraphNodeKind::ReadSlot(0),
+            GraphNodeKind::ReadSlotPrev(0),
+            GraphNodeKind::WriteSlot(0),
+            GraphNodeKind::ClearSlot(0),
         ];
-        assert_eq!(kinds.len(), 26);
+        assert_eq!(kinds.len(), 30);
     }
 
     #[test]

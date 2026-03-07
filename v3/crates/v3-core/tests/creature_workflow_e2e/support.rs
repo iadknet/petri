@@ -63,6 +63,7 @@ pub(crate) fn insert_creature(
             FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
             CreatureIdentityState::default(),
+            [0.0; 16],
         )
     });
     world.place_creature(position, id);
