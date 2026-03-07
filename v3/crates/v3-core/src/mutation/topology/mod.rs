@@ -3,10 +3,11 @@ use std::collections::HashMap;
 use rand::Rng;
 
 use crate::contracts::NodeId;
-use crate::creature::genome::analysis::{mesh_backward_slice_random, mesh_forward_slice_random};
+use crate::creature::genome::analysis::{mesh_backward_slice, mesh_forward_slice};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, GraphBackendDef, NodeGenome, VmBackendDef, VmInstruction,
 };
+use crate::mutation::reachability::biased_select_from;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
 /// Topology mutation operator variants.
@@ -182,37 +183,55 @@ impl TopologyOperator {
 pub struct TopologyMutator;
 
 impl TopologyMutator {
-    /// Apply a topology operator to the genome.
-    ///
-    /// `_reachable_nodes` and `_bias` are accepted for signature compatibility with the
-    /// engine's biased-selection framework. Per-operator biasing for topology is wired
-    /// in a subsequent step.
+    /// Apply a topology operator to the genome with reachability-biased target selection.
     ///
     /// Returns `Ok(TargetReachability)` on success, or `Err(MutationSkipReason)` if no
-    /// applicable target exists.
+    /// applicable target exists. Exempt operators (AddNode, ChangeEntryNode) return
+    /// `NotApplicable` since they don't select a target node.
     pub fn apply(
         genome: &mut CreatureGenome,
         op: TopologyOperator,
-        _reachable_nodes: &[usize],
-        _bias: f64,
+        reachable_nodes: &[usize],
+        bias: f64,
         rng: &mut impl Rng,
     ) -> Result<TargetReachability, MutationSkipReason> {
-        let result = match op {
-            TopologyOperator::AddNode => apply_add_node(genome, rng),
-            TopologyOperator::RemoveNode => apply_remove_node(genome, rng),
-            TopologyOperator::RetargetNodeTarget => apply_retarget_node_target(genome, rng),
-            TopologyOperator::AddRouteTarget => apply_add_route_target(genome, rng),
-            TopologyOperator::RemoveRouteTarget => apply_remove_route_target(genome, rng),
-            TopologyOperator::ChangeEntryNode => apply_change_entry_node(genome, rng),
-            TopologyOperator::SwapNodeBackend => apply_swap_node_backend(genome, rng),
-            TopologyOperator::RewriteNodeId => apply_rewrite_node_id(genome, rng),
-            TopologyOperator::CopyNode => apply_copy_node(genome, rng),
-            TopologyOperator::CopyMeshBackwardSlice => apply_copy_mesh_backward_slice(genome, rng),
-            TopologyOperator::CopyMeshForwardSlice => apply_copy_mesh_forward_slice(genome, rng),
-            TopologyOperator::SpliceNode => apply_splice_node(genome, rng),
-            TopologyOperator::SwapRouteTargets => apply_swap_route_targets(genome, rng),
-        };
-        result.map(|()| TargetReachability::NotApplicable)
+        match op {
+            // Exempt: these don't select a target node for mutation.
+            TopologyOperator::AddNode => {
+                apply_add_node(genome, rng).map(|()| TargetReachability::NotApplicable)
+            }
+            TopologyOperator::ChangeEntryNode => {
+                apply_change_entry_node(genome, rng).map(|()| TargetReachability::NotApplicable)
+            }
+            // Biased operators:
+            TopologyOperator::RemoveNode => apply_remove_node(genome, reachable_nodes, bias, rng),
+            TopologyOperator::RetargetNodeTarget => {
+                apply_retarget_node_target(genome, reachable_nodes, bias, rng)
+            }
+            TopologyOperator::AddRouteTarget => {
+                apply_add_route_target(genome, reachable_nodes, bias, rng)
+            }
+            TopologyOperator::RemoveRouteTarget => {
+                apply_remove_route_target(genome, reachable_nodes, bias, rng)
+            }
+            TopologyOperator::SwapNodeBackend => {
+                apply_swap_node_backend(genome, reachable_nodes, bias, rng)
+            }
+            TopologyOperator::RewriteNodeId => {
+                apply_rewrite_node_id(genome, reachable_nodes, bias, rng)
+            }
+            TopologyOperator::CopyNode => apply_copy_node(genome, reachable_nodes, bias, rng),
+            TopologyOperator::CopyMeshBackwardSlice => {
+                apply_copy_mesh_backward_slice(genome, reachable_nodes, bias, rng)
+            }
+            TopologyOperator::CopyMeshForwardSlice => {
+                apply_copy_mesh_forward_slice(genome, reachable_nodes, bias, rng)
+            }
+            TopologyOperator::SpliceNode => apply_splice_node(genome, reachable_nodes, bias, rng),
+            TopologyOperator::SwapRouteTargets => {
+                apply_swap_route_targets(genome, reachable_nodes, bias, rng)
+            }
+        }
     }
 }
 
@@ -242,8 +261,10 @@ fn apply_add_node(
 
 fn apply_remove_node(
     genome: &mut CreatureGenome,
+    reachable_nodes: &[usize],
+    bias: f64,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<TargetReachability, MutationSkipReason> {
     if genome.nodes.len() <= 1 {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
@@ -256,18 +277,18 @@ fn apply_remove_node(
         .filter(|(_, n)| n.node_id != entry_id)
         .map(|(i, _)| i)
         .collect();
-    if removable.is_empty() {
-        return Err(MutationSkipReason::NoApplicableTarget);
-    }
-    let idx = removable[rng.gen_range(0..removable.len())];
+    let (idx, reachability) = biased_select_from(&removable, reachable_nodes, bias, rng)
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
     genome.nodes.remove(idx);
-    Ok(())
+    Ok(reachability)
 }
 
 fn apply_retarget_node_target(
     genome: &mut CreatureGenome,
+    reachable_nodes: &[usize],
+    bias: f64,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<TargetReachability, MutationSkipReason> {
     // Find nodes with non-empty targets.
     let eligible: Vec<usize> = genome
         .nodes
@@ -276,30 +297,34 @@ fn apply_retarget_node_target(
         .filter(|(_, n)| !n.targets.is_empty())
         .map(|(i, _)| i)
         .collect();
-    if eligible.is_empty() {
-        return Err(MutationSkipReason::NoApplicableTarget);
-    }
-    let node_idx = eligible[rng.gen_range(0..eligible.len())];
+    let (node_idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let target_slot = rng.gen_range(0..genome.nodes[node_idx].targets.len());
     let new_target = genome.nodes[rng.gen_range(0..genome.nodes.len())].node_id;
     genome.nodes[node_idx].targets[target_slot] = new_target;
-    Ok(())
+    Ok(reachability)
 }
 
 fn apply_add_route_target(
     genome: &mut CreatureGenome,
+    reachable_nodes: &[usize],
+    bias: f64,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
-    let node_idx = rng.gen_range(0..genome.nodes.len());
+) -> Result<TargetReachability, MutationSkipReason> {
+    let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
+    let (node_idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let target_id = genome.nodes[rng.gen_range(0..genome.nodes.len())].node_id;
     genome.nodes[node_idx].targets.push(target_id);
-    Ok(())
+    Ok(reachability)
 }
 
 fn apply_remove_route_target(
     genome: &mut CreatureGenome,
+    reachable_nodes: &[usize],
+    bias: f64,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<TargetReachability, MutationSkipReason> {
     let eligible: Vec<usize> = genome
         .nodes
         .iter()
@@ -307,13 +332,11 @@ fn apply_remove_route_target(
         .filter(|(_, n)| !n.targets.is_empty())
         .map(|(i, _)| i)
         .collect();
-    if eligible.is_empty() {
-        return Err(MutationSkipReason::NoApplicableTarget);
-    }
-    let node_idx = eligible[rng.gen_range(0..eligible.len())];
+    let (node_idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let target_slot = rng.gen_range(0..genome.nodes[node_idx].targets.len());
     genome.nodes[node_idx].targets.remove(target_slot);
-    Ok(())
+    Ok(reachability)
 }
 
 fn apply_change_entry_node(
@@ -339,12 +362,13 @@ fn apply_change_entry_node(
 
 fn apply_swap_node_backend(
     genome: &mut CreatureGenome,
+    reachable_nodes: &[usize],
+    bias: f64,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
-    if genome.nodes.is_empty() {
-        return Err(MutationSkipReason::NoApplicableTarget);
-    }
-    let idx = rng.gen_range(0..genome.nodes.len());
+) -> Result<TargetReachability, MutationSkipReason> {
+    let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
+    let (idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let node = &mut genome.nodes[idx];
     node.backend_def = match &node.backend_def {
         BackendDef::Vm(_) => BackendDef::Graph(GraphBackendDef {
@@ -356,18 +380,18 @@ fn apply_swap_node_backend(
             program: vec![VmInstruction::Halt],
         }),
     };
-    Ok(())
+    Ok(reachability)
 }
 
 fn apply_rewrite_node_id(
     genome: &mut CreatureGenome,
+    reachable_nodes: &[usize],
+    bias: f64,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
-    if genome.nodes.is_empty() {
-        return Err(MutationSkipReason::NoApplicableTarget);
-    }
-
-    let idx = rng.gen_range(0..genome.nodes.len());
+) -> Result<TargetReachability, MutationSkipReason> {
+    let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
+    let (idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let old_id = genome.nodes[idx].node_id;
     let new_id = next_node_id(genome);
     genome.nodes[idx].node_id = new_id;
@@ -384,17 +408,18 @@ fn apply_rewrite_node_id(
         }
     }
 
-    Ok(())
+    Ok(reachability)
 }
 
 fn apply_copy_node(
     genome: &mut CreatureGenome,
+    reachable_nodes: &[usize],
+    bias: f64,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
-    if genome.nodes.is_empty() {
-        return Err(MutationSkipReason::NoApplicableTarget);
-    }
-    let source_idx = rng.gen_range(0..genome.nodes.len());
+) -> Result<TargetReachability, MutationSkipReason> {
+    let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
+    let (source_idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let backend_def = genome.nodes[source_idx].backend_def.clone();
     let new_id = next_node_id(genome);
 
@@ -420,7 +445,7 @@ fn apply_copy_node(
     if add_backlink {
         genome.nodes[source_idx].targets.push(new_id);
     }
-    Ok(())
+    Ok(reachability)
 }
 
 /// Maximum number of nodes in a mesh slice for copy operators.
@@ -486,34 +511,46 @@ fn clone_and_remap_slice(genome: &mut CreatureGenome, gene_indices: &[usize], rn
 
 fn apply_copy_mesh_backward_slice(
     genome: &mut CreatureGenome,
+    reachable_nodes: &[usize],
+    bias: f64,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<TargetReachability, MutationSkipReason> {
     if genome.nodes.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-    let gene = mesh_backward_slice_random(genome, rng, MESH_SLICE_MAX_SIZE)
+    let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
+    let (anchor_idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
+    let gene = mesh_backward_slice(genome, anchor_idx, MESH_SLICE_MAX_SIZE)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     clone_and_remap_slice(genome, &gene.indices, rng);
-    Ok(())
+    Ok(reachability)
 }
 
 fn apply_copy_mesh_forward_slice(
     genome: &mut CreatureGenome,
+    reachable_nodes: &[usize],
+    bias: f64,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<TargetReachability, MutationSkipReason> {
     if genome.nodes.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-    let gene = mesh_forward_slice_random(genome, rng, MESH_SLICE_MAX_SIZE)
+    let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
+    let (seed_idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
+    let gene = mesh_forward_slice(genome, seed_idx, MESH_SLICE_MAX_SIZE)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     clone_and_remap_slice(genome, &gene.indices, rng);
-    Ok(())
+    Ok(reachability)
 }
 
 fn apply_splice_node(
     genome: &mut CreatureGenome,
+    reachable_nodes: &[usize],
+    bias: f64,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<TargetReachability, MutationSkipReason> {
     let eligible: Vec<usize> = genome
         .nodes
         .iter()
@@ -524,7 +561,8 @@ fn apply_splice_node(
     if eligible.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-    let a_idx = eligible[rng.gen_range(0..eligible.len())];
+    let (a_idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let target_slot = rng.gen_range(0..genome.nodes[a_idx].targets.len());
     let b_id = genome.nodes[a_idx].targets[target_slot];
     let c_id = next_node_id(genome);
@@ -539,13 +577,15 @@ fn apply_splice_node(
         targets: vec![b_id],
     });
     genome.nodes[a_idx].targets[target_slot] = c_id;
-    Ok(())
+    Ok(reachability)
 }
 
 fn apply_swap_route_targets(
     genome: &mut CreatureGenome,
+    reachable_nodes: &[usize],
+    bias: f64,
     rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
+) -> Result<TargetReachability, MutationSkipReason> {
     let eligible: Vec<usize> = genome
         .nodes
         .iter()
@@ -556,7 +596,8 @@ fn apply_swap_route_targets(
     if eligible.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-    let node_idx = eligible[rng.gen_range(0..eligible.len())];
+    let (node_idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let len = genome.nodes[node_idx].targets.len();
     let a = rng.gen_range(0..len);
     let mut b = rng.gen_range(0..len - 1);
@@ -564,7 +605,7 @@ fn apply_swap_route_targets(
         b += 1;
     }
     genome.nodes[node_idx].targets.swap(a, b);
-    Ok(())
+    Ok(reachability)
 }
 
 #[cfg(test)]
