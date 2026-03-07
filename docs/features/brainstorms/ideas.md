@@ -16,38 +16,6 @@ In the creature inspector's action timeline, if multiple actions happened in a s
 
 ## Core Simulation
 
-### Unified shared memory and VM memory evolvability
-Current behavior appears to have drifted away from the original intent: VM nodes have explicit creature-level byte memory, while graph nodes get a separate persistence path through graph-local stateful operators and plasticity state. That split likely makes "memory" feel underused, because graph already has a much easier evolutionary path to temporal behavior than VM memory does.
-
-Recommended direction:
-- introduce a single creature-level shared memory surface that both VM and graph can access
-- keep graph-local runtime state for integrators, oscillators, plasticity weights, and eligibility traces as backend-internal mechanics rather than the public memory model
-- do **not** repurpose graph internal `node_state` as shared memory, because it is indexed by graph topology and would change meaning when internal nodes are inserted, deleted, or reordered
-
-Recommended first implementation shape:
-- replace or de-emphasize the current `1024`-byte `u8` memory model in favor of a small shared bank of scalar `f32` memory slots
-- start small, likely `8`, `16`, or `32` slots, so useful addressing patterns are easy to discover through mutation
-- let VM read and write slots directly
-- let graph read a committed snapshot of the shared slots during evaluation, but stage graph-originated writes until after convergence so recurrence and memory writes do not interfere with each other inside the same relaxation loop
-- keep reproduction semantics explicit: shared creature memory is inherited, graph-local runtime state is not
-
-Evolvability improvements that should ship with the memory redesign:
-- add easier temporal primitives such as one-tick delay, latch, clear/reset, and optionally leaky/decaying memory behavior
-- reduce search friction by avoiding `f32 -> u8 -> f32` quantization for the primary memory path
-- add mutation motifs that create small useful memory circuits rather than relying only on random independent opcode/node sampling
-- examples: insert a `read input -> store slot` motif, insert a `load slot -> compare/use` motif, mutate paired load/store addresses together, or duplicate a small memory-using slice with remapped slots
-- consider separating short-term working memory from any future long-term or more persistent memory bank only if a single small shared bank proves insufficient; do not start with multiple exotic memory classes
-
-Expected benefits:
-- VM and graph creatures compete on the same memory surface instead of graph getting a separate hidden advantage
-- memory use becomes easier to evolve because address space, value representation, and write timing are all simpler
-- observability becomes clearer because "uses memory" can mean one thing across both backends
-
-Good validation targets:
-- partial observability / delayed-cue tasks where memory should matter
-- mutation telemetry showing whether memory-capable motifs are actually entering the population
-- inspector/debug views that show which shared slots are read, written, non-zero, or stable over time
-
 ### Communication
 - Creature can modify metadata fields about itself that are visible to other creatures that "see" it.
 - Creature can write to communication channels:
@@ -423,3 +391,4 @@ The Grand Unified Architecture — mapping biological intelligence to CPU-optimi
 - **Ring-based vision sensors** → `docs/features/needs_refinement/ring-based-sensors.md`
 - **Reachability-aware mutation pathways** → `docs/features/needs_refinement/reachability-aware-mutation.md`
 - **Reachability-based complexity** → `docs/features/needs_refinement/reachability-based-complexity.md`
+- **Unified shared memory and VM memory evolvability** → `docs/features/needs_refinement/unified-shared-memory.md`
