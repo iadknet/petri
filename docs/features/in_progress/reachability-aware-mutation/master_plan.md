@@ -329,8 +329,8 @@ After completing each implementation step:
 
 - [x] Step 8: Full verification
 
-- [ ] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke domain skills (backend: `rust-skills`). Fix all findings. Re-review until clean pass.
-- [ ] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
-- [ ] Completion gate — run all checks from AGENTS.md Completion Gate section
+- [x] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke domain skills (backend: `rust-skills`). Fix all findings. Re-review until clean pass.
+- [x] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
+- [x] Completion gate — run all checks from AGENTS.md Completion Gate section
 
 **Review cycles:** 5 (Pass 1: 3 dispatches, Pass 2: 1 dispatch, Pass 3: 1 dispatch)
