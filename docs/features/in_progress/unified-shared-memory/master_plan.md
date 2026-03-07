@@ -188,7 +188,7 @@ After completing each implementation step:
 
 ### Phase 6: Specs & Verification
 
-- [ ] Step 13: Update reference specs. `v3-vm-isa-spec.md`: rewrite Section 8 (Creature Memory Contract) for shared slots, update opcode table in Section 2 and cost table in Section 6, update opcode count. `v3-graph-backend-spec.md`: add slot node kinds to data model and evaluation sections. `v3-mutation-spec.md`: add motif operators to VM domain operator list.
+- [x] Step 13: Update reference specs. `v3-vm-isa-spec.md`: rewrite Section 8 (Creature Memory Contract) for shared slots, update opcode table in Section 2 and cost table in Section 6, update opcode count. `v3-graph-backend-spec.md`: add slot node kinds to data model and evaluation sections. `v3-mutation-spec.md`: add motif operators to VM domain operator list.
 
 - [ ] Step 14: Full verification. Run viability tests (`cargo test -p v3-core --test viability`). Run `cargo test --workspace`. Run `cargo clippy --workspace --all-targets -- -D warnings`. Run `cargo fmt --all -- --check`. Run `npm run build` in frontend.
 
