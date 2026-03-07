@@ -178,7 +178,7 @@ After completing each implementation step:
 
 - [x] Step 10: Add mutation motifs. Implement `VmInsertReadStoreMotif`, `VmInsertLoadCompareMotif`, `VmMutateSlotAddress`, `VmMutatePairedSlotAddress`. Add to `VmOperator::ALL` (update const array size and `TOTAL_WEIGHT`). Add corresponding entries to `MutationOperator` enum and all exhaustive match arms (`as_key`, `domain`, `semantic_category`, `complexity_effect`). Wire into engine dispatch. TDD: test each motif produces expected instruction patterns; test paired address mutation co-mutates both opcodes.
 
-- [ ] Review Gate: Interim code review — review Steps 6-10 changes. Fix findings, re-review until clean.
+- [x] Review Gate: Interim code review — review Steps 6-10 changes. Fix findings, re-review until clean.
 
 ### Phase 5: Wire Format & Frontend
 

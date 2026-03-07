@@ -248,23 +248,6 @@ fn swap_operator_can_produce_parameterized_kinds() {
 }
 
 #[test]
-fn random_graph_node_kind_covers_all_30_variants_old() {
-    use std::collections::HashSet;
-    let mut discriminants: HashSet<std::mem::Discriminant<GraphNodeKind>> = HashSet::new();
-    for seed in 0u64..5000 {
-        let mut r = rng(seed);
-        let kind = random_graph_node_kind(&mut r);
-        discriminants.insert(std::mem::discriminant(&kind));
-    }
-    assert_eq!(
-        discriminants.len(),
-        30,
-        "all 30 GraphNodeKind variants must be reachable; got {}",
-        discriminants.len()
-    );
-}
-
-#[test]
 fn random_graph_node_kind_reaches_out_of_range_input_ref_and_custom_output() {
     let mut saw_out_of_range_input_ref = false;
     let mut saw_out_of_range_custom_output = false;
