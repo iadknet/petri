@@ -173,7 +173,7 @@ This step implements both metrics and wires `complexity()` to use functional com
 5. **No-mutation fast path:** In the reproduction path, check `MutationSummary::applied_events`. If zero, the offspring's genome is identical to the parent's — copy the parent's `cached_complexity` directly instead of recomputing `functional_complexity()`. This avoids the expensive mesh BFS + backward slicing for the common case where `mutation_probability` gates most births. Use a separate constructor or setter (e.g., `CreatureState::new_with_cached_complexity(genome, complexity)`) for this path, keeping the default `new()` always-compute path for seeding and test fixtures.
 6. Update any test fixtures that explicitly assert on or construct `CreatureState` fields to account for the new `cached_complexity` field.
 
-- [ ] Step 2: Cache functional complexity on CreatureState at birth
+- [x] Step 2: Cache functional complexity on CreatureState at birth
 
 ### Step 3: Migrate ALL action cost call sites to cached complexity
 

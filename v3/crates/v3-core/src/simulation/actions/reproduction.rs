@@ -251,18 +251,37 @@ pub fn apply_reproduce(
     let child_plasticity = build_child_plasticity_weights(&child_genome, &parent_plasticity);
 
     // Step 12–13: Spawn child in slotmap + world.
+    // No-mutation fast path: if no genome mutations were applied, the offspring's
+    // genome is identical to the parent's — copy cached_complexity to avoid
+    // expensive recomputation.
+    let parent_cached_complexity = sim.creatures[parent_id].cached_complexity;
     let child_id = sim.creatures.insert_with_key(|id| {
-        let mut child = CreatureState::new(
-            id,
-            child_genome,
-            target,
-            transfer,
-            child_generation,
-            child_channels,
-            child_active_channel,
-            child_polarity,
-            child_identity,
-        );
+        let mut child = if summary.applied_events == 0 {
+            CreatureState::new_with_cached_complexity(
+                id,
+                child_genome,
+                target,
+                transfer,
+                child_generation,
+                child_channels,
+                child_active_channel,
+                child_polarity,
+                child_identity,
+                parent_cached_complexity,
+            )
+        } else {
+            CreatureState::new(
+                id,
+                child_genome,
+                target,
+                transfer,
+                child_generation,
+                child_channels,
+                child_active_channel,
+                child_polarity,
+                child_identity,
+            )
+        };
         child.memory = child_memory;
         child.graph_runtime.plasticity_weights = child_plasticity;
         child
