@@ -447,6 +447,8 @@ mod tests {
             .expect("child not found");
         assert!((child.shared_memory[3] - 0.42).abs() < f32::EPSILON);
         assert!((child.shared_memory[7] - 0.99).abs() < f32::EPSILON);
+        // Child's prev_shared_memory must be zeroed (no "previous tick" for newborn).
+        assert_eq!(child.prev_shared_memory, [0.0; 16]);
     }
 
     #[test]
