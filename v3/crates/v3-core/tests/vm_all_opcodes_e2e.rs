@@ -273,6 +273,7 @@ fn build_simulation(food_here: f32) -> (Simulation, CreatureId, Position) {
             FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
             CreatureIdentityState::default(),
+            [0.0; 16],
         )
     });
     world.place_creature(pos, id);

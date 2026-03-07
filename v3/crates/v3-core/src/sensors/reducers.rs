@@ -442,6 +442,7 @@ mod tests {
             0,
             [true; 6],
             identity,
+            [0.0; 16],
         )
     }
 

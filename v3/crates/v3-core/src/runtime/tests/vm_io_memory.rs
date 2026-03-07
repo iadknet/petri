@@ -415,6 +415,7 @@ fn vm_eats_when_food_here() {
         0,
         [true; 6],
         CreatureIdentityState::default(),
+        [0.0; 16],
     );
 
     let local = assemble_static_inputs(&world, &creature);
@@ -510,6 +511,7 @@ fn vm_noop_when_no_food() {
         0,
         [true; 6],
         CreatureIdentityState::default(),
+        [0.0; 16],
     );
     let local = assemble_static_inputs(&world, &creature);
     assert_eq!(local.food_here, 0.0);

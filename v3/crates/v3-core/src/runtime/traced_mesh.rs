@@ -24,7 +24,8 @@ pub fn execute_creature_mesh_traced(
     genome: &CreatureGenome,
     sensors: &SensorSnapshot,
     energy: &mut f32,
-    memory: &mut [u8; 1024],
+    _shared_memory: &mut [f32; 16],
+    _prev_shared_memory: &[f32; 16],
     graph_runtime: &mut GraphRuntimeState,
     config: &RuntimeConfig,
 ) -> (MeshOutput, Vec<MeshHopTrace>, TerminationReason) {
@@ -71,6 +72,9 @@ pub fn execute_creature_mesh_traced(
         let energy_consumed = (start_energy - *energy).max(0.0);
         let node_energy_before = *energy;
 
+        // Temporary: VM still uses old [u8; 1024] memory interface.
+        // Step 4 will replace VM opcodes and wire shared_memory directly.
+        let mut _legacy_mem = [0u8; 1024];
         let (result, backend_trace) = match &node.backend_def {
             BackendDef::Vm(def) => {
                 let (result, vm_trace) = execute_vm_node_traced(
@@ -79,7 +83,7 @@ pub fn execute_creature_mesh_traced(
                     &upstream_slots,
                     energy,
                     energy_consumed,
-                    memory,
+                    &mut _legacy_mem,
                     sensors,
                     config,
                     &mut side_outputs,
@@ -272,26 +276,30 @@ mod tests {
 
         // Run non-traced
         let mut energy_a = 100.0f32;
-        let mut memory_a = [0u8; 1024];
+        let mut smem_a = [0.0f32; 16];
+        let prev_a = [0.0f32; 16];
         let mut gr_a = GraphRuntimeState::new();
         let output_a = execute_creature_mesh(
             &genome,
             &ss,
             &mut energy_a,
-            &mut memory_a,
+            &mut smem_a,
+            &prev_a,
             &mut gr_a,
             &config,
         );
 
         // Run traced
         let mut energy_b = 100.0f32;
-        let mut memory_b = [0u8; 1024];
+        let mut smem_b = [0.0f32; 16];
+        let prev_b = [0.0f32; 16];
         let mut gr_b = GraphRuntimeState::new();
         let (output_b, hops, reason) = execute_creature_mesh_traced(
             &genome,
             &ss,
             &mut energy_b,
-            &mut memory_b,
+            &mut smem_b,
+            &prev_b,
             &mut gr_b,
             &config,
         );
@@ -376,11 +384,19 @@ mod tests {
         let ss = empty_ss();
         let config = default_config();
         let mut energy = 1000.0f32;
-        let mut memory = [0u8; 1024];
+        let mut smem = [0.0f32; 16];
+        let prev_smem = [0.0f32; 16];
         let mut gr = GraphRuntimeState::new();
 
-        let (output, hops, _) =
-            execute_creature_mesh_traced(&genome, &ss, &mut energy, &mut memory, &mut gr, &config);
+        let (output, hops, _) = execute_creature_mesh_traced(
+            &genome,
+            &ss,
+            &mut energy,
+            &mut smem,
+            &prev_smem,
+            &mut gr,
+            &config,
+        );
 
         assert_eq!(output.actions, vec![WorldAction::Eat]);
         // Hop 1 (VM) should have upstream_slots[5] = 9.0
@@ -409,11 +425,19 @@ mod tests {
         let mut config = default_config();
         config.vm.opcode_cost_multiplier = 1.0;
         let mut energy = 0.01f32;
-        let mut memory = [0u8; 1024];
+        let mut smem = [0.0f32; 16];
+        let prev_smem = [0.0f32; 16];
         let mut gr = GraphRuntimeState::new();
 
-        let (output, hops, reason) =
-            execute_creature_mesh_traced(&genome, &ss, &mut energy, &mut memory, &mut gr, &config);
+        let (output, hops, reason) = execute_creature_mesh_traced(
+            &genome,
+            &ss,
+            &mut energy,
+            &mut smem,
+            &prev_smem,
+            &mut gr,
+            &config,
+        );
 
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
         assert!(
@@ -458,20 +482,30 @@ mod tests {
 
         // Run non-traced path.
         let mut energy_a = 100.0f32;
-        let mut mem_a = [0u8; 1024];
+        let mut smem_a = [0.0f32; 16];
+        let prev_a = [0.0f32; 16];
         let mut gr_a = GraphRuntimeState::new();
-        let output_a =
-            execute_creature_mesh(&genome, &ss, &mut energy_a, &mut mem_a, &mut gr_a, &config);
+        let output_a = execute_creature_mesh(
+            &genome,
+            &ss,
+            &mut energy_a,
+            &mut smem_a,
+            &prev_a,
+            &mut gr_a,
+            &config,
+        );
 
         // Run traced path.
         let mut energy_b = 100.0f32;
-        let mut mem_b = [0u8; 1024];
+        let mut smem_b = [0.0f32; 16];
+        let prev_b = [0.0f32; 16];
         let mut gr_b = GraphRuntimeState::new();
         let (output_b, _, _) = execute_creature_mesh_traced(
             &genome,
             &ss,
             &mut energy_b,
-            &mut mem_b,
+            &mut smem_b,
+            &prev_b,
             &mut gr_b,
             &config,
         );

@@ -284,6 +284,7 @@ fn creatures_can_eat_food() {
             FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
             CreatureIdentityState::default(),
+            [0.0; 16],
         )
     });
     world.place_creature(pos, creature_id);
@@ -340,6 +341,7 @@ fn founder_reproduces_when_energy_allows_and_target_is_open() {
             FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
             CreatureIdentityState::default(),
+            [0.0; 16],
         )
     });
     world.place_creature(pos, parent_id);
@@ -391,6 +393,7 @@ fn founder_moves_when_no_food_and_below_reproduce_threshold() {
             FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
             CreatureIdentityState::default(),
+            [0.0; 16],
         )
     });
     world.place_creature(start, creature_id);
@@ -501,6 +504,7 @@ fn phenotype_inherits_unchanged_when_no_genome_mutation() {
             FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
             CreatureIdentityState::default(),
+            [0.0; 16],
         )
     });
     world.place_creature(pos, parent_id);
@@ -555,6 +559,7 @@ fn identity_inherits_unchanged_when_no_genome_mutation() {
             FOUNDER_ACTIVE_CHANNEL,
             FOUNDER_POLARITY,
             parent_identity,
+            [0.0; 16],
         )
     });
     world.place_creature(pos, parent_id);

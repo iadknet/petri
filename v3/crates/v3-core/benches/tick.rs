@@ -76,13 +76,15 @@ fn build_sensor_snapshot(sim: &Simulation, creature: &CreatureState) -> SensorSn
     SensorSnapshot { local, perception }
 }
 
+#[allow(dead_code)] // shared_memory/prev_shared_memory will be used once VM opcodes are wired
 struct VmBenchFixture {
     def: VmBackendDef,
     input_refs: Vec<InputReference>,
     sensors: SensorSnapshot,
     runtime_config: RuntimeConfig,
     energy: f32,
-    memory: [u8; 1024],
+    shared_memory: [f32; 16],
+    prev_shared_memory: [f32; 16],
 }
 
 fn build_vm_fixture() -> VmBenchFixture {
@@ -109,7 +111,8 @@ fn build_vm_fixture() -> VmBenchFixture {
         sensors,
         runtime_config: sim.config.runtime.clone(),
         energy: creature.energy.max(1.0),
-        memory: creature.memory,
+        shared_memory: creature.shared_memory,
+        prev_shared_memory: creature.prev_shared_memory,
     }
 }
 
@@ -199,7 +202,8 @@ fn bench_mesh_execution_only(c: &mut Criterion) {
                         &creature.genome,
                         &ss,
                         &mut creature.energy,
-                        &mut creature.memory,
+                        &mut creature.shared_memory,
+                        &creature.prev_shared_memory,
                         &mut creature.graph_runtime,
                         &config,
                     ));
@@ -274,13 +278,15 @@ fn bench_vm_execute_stress(c: &mut Criterion) {
             |mut fixture| {
                 let mut side_outputs =
                     MeshSideOutputs::new(fixture.runtime_config.max_actions_per_turn);
+                // Temporary: VM still uses legacy [u8; 1024] memory interface.
+                let mut legacy_mem = [0u8; 1024];
                 let _ = black_box(execute_vm_node(
                     &fixture.def,
                     &fixture.input_refs,
                     &[0.0; 12],
                     &mut fixture.energy,
                     0.0,
-                    &mut fixture.memory,
+                    &mut legacy_mem,
                     &fixture.sensors,
                     &fixture.runtime_config,
                     &mut side_outputs,
