@@ -452,3 +452,5 @@ The Grand Unified Architecture — mapping biological intelligence to CPU-optimi
 - **Creature endpoint sparse field selection & compression + Creature detail API spec documentation** → `docs/features/needs_refinement/creature-detail-api-optimization.md`
 - **Eventual multi-crate v3-server split** → `docs/features/needs_refinement/v3-server-crate-split.md`
 - **Ring-based vision sensors** → `docs/features/needs_refinement/ring-based-sensors.md`
+- **Reachability-aware mutation pathways** → `docs/features/needs_refinement/reachability-aware-mutation.md`
+- **Reachability-based complexity** → `docs/features/needs_refinement/reachability-based-complexity.md`
