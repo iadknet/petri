@@ -237,7 +237,7 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
     let mut complexity_min: u32 = u32::MAX;
     let mut complexity_max: u32 = 0;
     for (id, creature) in &sim.creatures {
-        let c = creature.genome.complexity();
+        let c = creature.cached_complexity;
         complexity_sum += c as u64;
         complexity_min = complexity_min.min(c);
         complexity_max = complexity_max.max(c);

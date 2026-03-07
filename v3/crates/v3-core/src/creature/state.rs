@@ -68,10 +68,14 @@ pub struct CreatureState {
     pub phenotype_active_channel: usize,
     /// Per-channel polarity flags for phenotype mutation (internal, not API-exposed).
     pub phenotype_channel_polarity: [bool; 6],
+    /// Functional complexity cached at birth. Genome is immutable after creation,
+    /// so this value is always current.
+    pub cached_complexity: u32,
 }
 
 impl CreatureState {
     /// Create a new creature with zeroed memory and empty graph runtime state.
+    /// Computes `cached_complexity` from the genome.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: CreatureId,
@@ -83,6 +87,40 @@ impl CreatureState {
         phenotype_active_channel: usize,
         phenotype_channel_polarity: [bool; 6],
         identity: CreatureIdentityState,
+    ) -> Self {
+        let cached_complexity = genome.complexity();
+        Self {
+            id,
+            genome,
+            position,
+            energy,
+            age: 0,
+            generation,
+            memory: [0u8; 1024],
+            graph_runtime: GraphRuntimeState::new(),
+            identity,
+            phenotype_channels,
+            phenotype_active_channel,
+            phenotype_channel_polarity,
+            cached_complexity,
+        }
+    }
+
+    /// Create a new creature with a pre-computed cached complexity.
+    /// Used in the no-mutation reproduction fast path where the offspring
+    /// genome is identical to the parent's.
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_with_cached_complexity(
+        id: CreatureId,
+        genome: CreatureGenome,
+        position: Position,
+        energy: f32,
+        generation: u64,
+        phenotype_channels: [u8; 6],
+        phenotype_active_channel: usize,
+        phenotype_channel_polarity: [bool; 6],
+        identity: CreatureIdentityState,
+        cached_complexity: u32,
     ) -> Self {
         Self {
             id,
@@ -97,6 +135,7 @@ impl CreatureState {
             phenotype_channels,
             phenotype_active_channel,
             phenotype_channel_polarity,
+            cached_complexity,
         }
     }
 }

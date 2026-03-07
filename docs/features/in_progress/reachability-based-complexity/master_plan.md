@@ -158,7 +158,7 @@ This step implements both metrics and wires `complexity()` to use functional com
 
 4. **Wire `complexity()` to call `functional_complexity()`**: The `complexity()` method on `CreatureGenome` now delegates to `analysis::functional_complexity()`.
 
-- [ ] Step 1: Add `genome_size()` method and reachability-aware `complexity()` with TDD
+- [x] Step 1: Add `genome_size()` method and reachability-aware `complexity()` with TDD
 
 ### Step 2: Add `cached_complexity` to `CreatureState` and wire caching
 
@@ -173,7 +173,7 @@ This step implements both metrics and wires `complexity()` to use functional com
 5. **No-mutation fast path:** In the reproduction path, check `MutationSummary::applied_events`. If zero, the offspring's genome is identical to the parent's — copy the parent's `cached_complexity` directly instead of recomputing `functional_complexity()`. This avoids the expensive mesh BFS + backward slicing for the common case where `mutation_probability` gates most births. Use a separate constructor or setter (e.g., `CreatureState::new_with_cached_complexity(genome, complexity)`) for this path, keeping the default `new()` always-compute path for seeding and test fixtures.
 6. Update any test fixtures that explicitly assert on or construct `CreatureState` fields to account for the new `cached_complexity` field.
 
-- [ ] Step 2: Cache functional complexity on CreatureState at birth
+- [x] Step 2: Cache functional complexity on CreatureState at birth
 
 ### Step 3: Migrate ALL action cost call sites to cached complexity
 
@@ -190,7 +190,7 @@ Migrate every production call site per the Call Site Audit table above:
 7. Run viability tests (`cargo test -p v3-core --test viability`) to verify economic balance. Kill bonus economics are changing (functional complexity is lower than total for junk-heavy creatures), so viability tests are critical here.
 8. **Threshold check**: Verify that the complexity cost threshold (default 50) still produces reasonable pressure. Functional complexity will be lower than total complexity for creatures with junk DNA, meaning fewer creatures exceed the threshold. If viability tests pass, the economics are acceptable.
 
-- [ ] Step 3: Migrate all action cost call sites to cached functional complexity
+- [x] Step 3: Migrate all action cost call sites to cached functional complexity
 
 ### Step 4: Rename `complexity_cap` → `genome_size_cap` and update mutation pressure
 
@@ -202,7 +202,7 @@ Migrate every production call site per the Call Site Audit table above:
 4. Update all config tests that reference these fields.
 5. Update config normalization comments.
 
-- [ ] Step 4: Rename config fields and update mutation pressure gate
+- [x] Step 4: Rename config fields and update mutation pressure gate
 
 ### Step 5: Update server API and population stats
 
@@ -214,9 +214,9 @@ Migrate every production call site per the Call Site Audit table above:
 4. Add doc comment to `ComplexityEnergyCostConfig` noting it operates on functional complexity (not genome size).
 5. Update server tests.
 
-- [ ] Step 5: Update server API response and population stats computation
+- [x] Step 5: Update server API response and population stats computation
 
-- [ ] Review Gate: Interim code review — review Steps 1-5 changes. Fix findings, re-review until clean.
+- [x] Review Gate: Interim code review — review Steps 1-5 changes. Fix findings, re-review until clean.
 
 ### Step 6: Update frontend
 
@@ -234,7 +234,7 @@ Migrate every production call site per the Call Site Audit table above:
 
 **No display changes needed:** InspectorHeader and EvolutionTab read `complexity` which retains its field name. The semantic change (now functional complexity) is transparent.
 
-- [ ] Step 6: Update frontend types, config panels, and test fixtures
+- [x] Step 6: Update frontend types, config panels, and test fixtures
 
 ### Step 7: Update reference docs
 
@@ -244,10 +244,10 @@ Migrate every production call site per the Call Site Audit table above:
 2. `v3-mutation-spec.md`: Note that pressure gate uses `genome_size()`, not `complexity()`.
 3. `v3-evolution-observability-spec.md`: Note that `genome_complexity_*` stats reflect functional complexity.
 
-- [ ] Step 7: Update reference specification docs
+- [x] Step 7: Update reference specification docs
 
-- [ ] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke domain skills (backend: `rust-skills`; frontend: `vercel-react-best-practices` + `vercel-composition-patterns`). Fix all findings. Re-review until clean pass.
-- [ ] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
-- [ ] Completion gate — run all checks from AGENTS.md Completion Gate section
+- [x] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke domain skills (backend: `rust-skills`; frontend: `vercel-react-best-practices` + `vercel-composition-patterns`). Fix all findings. Re-review until clean pass.
+- [x] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
+- [x] Completion gate — run all checks from AGENTS.md Completion Gate section
 
 **Review cycles:** 3

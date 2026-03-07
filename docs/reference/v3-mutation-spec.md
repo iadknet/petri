@@ -199,6 +199,15 @@ Selection randomization rules (internal to `MutationEngine`):
   operator's mutator implementation.
 - Canonical owner for mutation config keys/defaults: `v3-runtime-config-spec.md`.
 
+Complexity pressure gate:
+- When `genome_size_pressure_enabled` is true and the genome's total structural
+  size (`genome_size()`) exceeds `genome_size_cap`, the engine restricts mutation
+  domains to decreasing-only operators.
+- The pressure gate uses `genome_size()` (total structural size including
+  unreachable/dead code), not `complexity()` (functional reachability-aware).
+  This prevents runaway structural bloat even when junk DNA does not affect
+  action energy costs.
+
 ---
 
 ## 5. Pre-Guards vs Post-Apply Parseability

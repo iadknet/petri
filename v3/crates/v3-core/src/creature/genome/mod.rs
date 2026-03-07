@@ -316,20 +316,18 @@ impl CreatureGenome {
         self.nodes.iter().find(|n| n.node_id == id)
     }
 
-    /// Structural complexity score: sum of all discrete genome components.
+    /// Total structural size: sum of all discrete genome components.
     ///
     /// Counts every node, input ref, target, instruction, constant, and
     /// graph internal node (plus its inputs). Equal weights, includes junk DNA,
-    /// no reachability analysis.
-    pub fn complexity(&self) -> u32 {
+    /// no reachability analysis. Used for the mutation pressure gate
+    /// (`genome_size_cap`).
+    pub fn genome_size(&self) -> u32 {
         let mut score: u32 = 0;
         for node in &self.nodes {
-            // Count the node itself
             score += 1;
-            // Count input refs and targets
             score += node.input_refs.len() as u32;
             score += node.targets.len() as u32;
-            // Count backend components
             match &node.backend_def {
                 BackendDef::Vm(vm) => {
                     score += vm.program.len() as u32;
@@ -344,6 +342,16 @@ impl CreatureGenome {
             }
         }
         score
+    }
+
+    /// Functional complexity: reachability-aware score counting only
+    /// live components (reachable mesh nodes, output-connected backend
+    /// components, consumed input refs).
+    ///
+    /// Used for action energy costs. Creatures are not penalized for
+    /// junk DNA that has no functional impact.
+    pub fn complexity(&self) -> u32 {
+        analysis::functional_complexity(self)
     }
 }
 
@@ -520,16 +528,16 @@ mod tests {
     }
 
     #[test]
-    fn complexity_empty_genome() {
+    fn genome_size_empty_genome() {
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![],
         };
-        assert_eq!(genome.complexity(), 0);
+        assert_eq!(genome.genome_size(), 0);
     }
 
     #[test]
-    fn complexity_single_vm_node() {
+    fn genome_size_single_vm_node() {
         // 1 node + 2 input_refs + 1 target + 3 program + 2 constants = 9
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
@@ -554,11 +562,11 @@ mod tests {
                 targets: vec![NodeId::new(1)],
             }],
         };
-        assert_eq!(genome.complexity(), 9);
+        assert_eq!(genome.genome_size(), 9);
     }
 
     #[test]
-    fn complexity_single_graph_node() {
+    fn genome_size_single_graph_node() {
         // 1 node + 1 input_ref + 0 targets + 2 internal_nodes + (1 + 2) inputs = 7
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
@@ -597,11 +605,11 @@ mod tests {
                 targets: vec![],
             }],
         };
-        assert_eq!(genome.complexity(), 7);
+        assert_eq!(genome.genome_size(), 7);
     }
 
     #[test]
-    fn complexity_multi_node_mixed() {
+    fn genome_size_multi_node_mixed() {
         // Node 0 (VM): 1 + 0 inputs + 1 target + 1 program + 0 constants = 3
         // Node 1 (Graph): 1 + 1 input + 0 targets + 1 internal + 0 graph_inputs = 3
         // Total = 6
@@ -632,7 +640,104 @@ mod tests {
                 },
             ],
         };
-        assert_eq!(genome.complexity(), 6);
+        assert_eq!(genome.genome_size(), 6);
+    }
+
+    #[test]
+    fn complexity_excludes_unreachable_mesh_nodes() {
+        // Node 0 (entry) → Node 1. Node 2 is unreachable.
+        // Node 0: VM with output instructions (functional)
+        // Node 2: also has output instructions but is unreachable
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                NodeGenome {
+                    node_id: NodeId::new(0),
+                    input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 4,
+                        constants: vec![],
+                        program: vec![
+                            VmInstruction::ReadInput {
+                                dst: 0,
+                                ref_idx: 0,
+                                sub_idx: 0,
+                            },
+                            VmInstruction::WriteRouteTarget { src: 0 },
+                        ],
+                    }),
+                    targets: vec![NodeId::new(1)],
+                },
+                NodeGenome {
+                    node_id: NodeId::new(1),
+                    input_refs: vec![],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 4,
+                        constants: vec![],
+                        program: vec![
+                            VmInstruction::PushAction { action_type: 0 },
+                            VmInstruction::ExecuteActionQueue,
+                        ],
+                    }),
+                    targets: vec![],
+                },
+                NodeGenome {
+                    node_id: NodeId::new(2),
+                    input_refs: vec![InputReference::DynamicIntrospection(
+                        DynamicIntrospectionKey::EnergyCurrent,
+                    )],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 4,
+                        constants: vec![],
+                        program: vec![
+                            VmInstruction::ReadInput {
+                                dst: 0,
+                                ref_idx: 0,
+                                sub_idx: 0,
+                            },
+                            VmInstruction::PushAction { action_type: 1 },
+                            VmInstruction::ExecuteActionQueue,
+                        ],
+                    }),
+                    targets: vec![],
+                },
+            ],
+        };
+        // Node 0: 1 + 1 target + 2 live instrs + 0 consts + 1 consumed ref = 5
+        // Node 1: 1 + 0 targets + 2 live instrs + 0 consts + 0 refs = 3
+        // Node 2: excluded (unreachable)
+        assert_eq!(genome.complexity(), 8);
+        // genome_size counts everything including Node 2
+        assert_eq!(genome.genome_size(), 13);
+        assert!(genome.complexity() < genome.genome_size());
+    }
+
+    #[test]
+    fn complexity_equals_genome_size_when_fully_connected() {
+        // All nodes reachable, all instructions live, all input_refs consumed
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 4,
+                    constants: vec![],
+                    program: vec![
+                        VmInstruction::ReadInput {
+                            dst: 0,
+                            ref_idx: 0,
+                            sub_idx: 0,
+                        },
+                        VmInstruction::WriteRouteTarget { src: 0 },
+                    ],
+                }),
+                targets: vec![],
+            }],
+        };
+        // Node: 1 + 0 targets + 2 live instrs + 0 consts + 1 consumed ref = 4
+        // genome_size: 1 + 1 input_ref + 0 targets + 2 instrs + 0 consts = 4
+        assert_eq!(genome.complexity(), genome.genome_size());
     }
 
     // ── Gap 5: remap_output_slots tests ──

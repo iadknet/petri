@@ -108,6 +108,7 @@ impl Default for EnergyCostsConfig {
 }
 
 /// Complexity-based energy cost multiplier config.
+/// Operates on functional complexity (reachability-aware), not total genome size.
 /// Canonical owner: v3-runtime-config-spec.md Section 4.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -335,10 +336,12 @@ pub struct MutationConfig {
     /// Probability of selecting the mesh (Topology) layer per mutation event.
     /// Complement (1 - this) selects the node-internal layer (VM/Graph/InputRef).
     pub mesh_layer_probability: f64,
-    /// Genome complexity score above which pressure escalates against structural growth.
-    pub complexity_cap: u32,
-    /// Whether the complexity pressure gate is active.
-    pub complexity_pressure_enabled: bool,
+    /// Total genome size above which pressure escalates against structural growth.
+    #[serde(alias = "complexity_cap")]
+    pub genome_size_cap: u32,
+    /// Whether the genome size pressure gate is active.
+    #[serde(alias = "complexity_pressure_enabled")]
+    pub genome_size_pressure_enabled: bool,
     /// Capacity of the action queue. Compound input fan-out counts depend on this.
     #[serde(default = "default_action_queue_cap")]
     pub action_queue_cap: usize,
@@ -352,8 +355,8 @@ impl Default for MutationConfig {
             per_birth_mutation_events_min: 1,
             per_birth_mutation_events_max: 10,
             mesh_layer_probability: 0.2,
-            complexity_cap: 1200,
-            complexity_pressure_enabled: true,
+            genome_size_cap: 1200,
+            genome_size_pressure_enabled: true,
             action_queue_cap: 4,
             phenotype: PhenotypeConfig::default(),
         }
@@ -513,8 +516,8 @@ impl SimulationConfig {
         }
         // Cap must be >= 1; upper bound prevents u16 overflow in sub_value_count.
         m.action_queue_cap = m.action_queue_cap.clamp(1, 21845);
-        // complexity_cap: 0 disables pressure (handled by is_restricted), no normalization needed.
-        // complexity_pressure_enabled: bool, no normalization needed.
+        // genome_size_cap: 0 disables pressure (handled by is_restricted), no normalization needed.
+        // genome_size_pressure_enabled: bool, no normalization needed.
         let ph = &mut m.phenotype;
         if ph.channel_step == 0 {
             ph.channel_step = 1;
@@ -640,8 +643,8 @@ mod tests {
         assert!((cfg.mutation.mesh_layer_probability - 0.2).abs() < 1e-9);
         assert_eq!(cfg.mutation.action_queue_cap, 4);
         // Complexity pressure
-        assert_eq!(cfg.mutation.complexity_cap, 1200);
-        assert!(cfg.mutation.complexity_pressure_enabled);
+        assert_eq!(cfg.mutation.genome_size_cap, 1200);
+        assert!(cfg.mutation.genome_size_pressure_enabled);
         // Phenotype
         assert_eq!(cfg.mutation.phenotype.channel_step, 1);
         assert!((cfg.mutation.phenotype.channel_change_chance - 0.001).abs() < 1e-6);

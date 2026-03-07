@@ -86,7 +86,11 @@ pub async fn get_creature(
     map.insert("generation".into(), serde_json::json!(creature.generation));
     map.insert(
         "complexity".into(),
-        serde_json::json!(creature.genome.complexity()),
+        serde_json::json!(creature.cached_complexity),
+    );
+    map.insert(
+        "genome_size".into(),
+        serde_json::json!(creature.genome.genome_size()),
     );
     map.insert(
         "phenotype".into(),
