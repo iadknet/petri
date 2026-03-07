@@ -226,6 +226,10 @@ pub fn kind_label(kind: &GraphNodeKind) -> &'static str {
         GraphNodeKind::PushAction(_) => "PushAction",
         GraphNodeKind::PopAction => "PopAction",
         GraphNodeKind::ExecuteActionQueue => "ExecuteActionQueue",
+        GraphNodeKind::ReadSlot(_) => "ReadSlot",
+        GraphNodeKind::ReadSlotPrev(_) => "ReadSlotPrev",
+        GraphNodeKind::WriteSlot(_) => "WriteSlot",
+        GraphNodeKind::ClearSlot(_) => "ClearSlot",
     }
 }
 
@@ -395,6 +399,10 @@ mod tests {
             kind_label(&GraphNodeKind::ExecuteActionQueue),
             "ExecuteActionQueue"
         );
+        assert_eq!(kind_label(&GraphNodeKind::ReadSlot(0)), "ReadSlot");
+        assert_eq!(kind_label(&GraphNodeKind::ReadSlotPrev(0)), "ReadSlotPrev");
+        assert_eq!(kind_label(&GraphNodeKind::WriteSlot(0)), "WriteSlot");
+        assert_eq!(kind_label(&GraphNodeKind::ClearSlot(0)), "ClearSlot");
     }
 
     #[test]

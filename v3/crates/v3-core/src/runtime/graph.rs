@@ -80,6 +80,8 @@ impl GraphTracer for NoopTracer {
 pub(crate) struct EvalCtx<'a> {
     pub(crate) input_refs: &'a [InputReference],
     pub(crate) resolve: ResolveCtx<'a>,
+    pub(crate) shared_memory: &'a [f32; 16],
+    pub(crate) prev_shared_memory: &'a [f32; 16],
 }
 
 /// Evaluate one internal graph node's kind, returning the scalar output.
@@ -169,6 +171,15 @@ pub(crate) fn evaluate_kind(
         GraphNodeKind::PushAction(_) => wsum,
         GraphNodeKind::PopAction => wsum,
         GraphNodeKind::ExecuteActionQueue => wsum,
+        // Shared memory slot nodes.
+        GraphNodeKind::ReadSlot(slot_idx) => ctx.shared_memory[(*slot_idx as usize) % 16] + wsum,
+        GraphNodeKind::ReadSlotPrev(slot_idx) => {
+            ctx.prev_shared_memory[(*slot_idx as usize) % 16] + wsum
+        }
+        // WriteSlot/ClearSlot: deferred effect (post-convergence commit).
+        // During relaxation they behave as passthrough.
+        GraphNodeKind::WriteSlot(_) => wsum,
+        GraphNodeKind::ClearSlot(_) => 0.0,
     }
 }
 
@@ -228,6 +239,8 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
     sensors: &SensorSnapshot,
     config: &RuntimeConfig,
     side_outputs: &mut MeshSideOutputs,
+    shared_memory: &mut [f32; 16],
+    prev_shared_memory: &[f32; 16],
 ) -> NodeResult {
     let node_count = def.internal_nodes.len();
 
@@ -311,6 +324,8 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
                 energy_consumed,
                 action_queue: &side_outputs.action_queue,
             },
+            shared_memory,
+            prev_shared_memory,
         };
 
         for current_idx in 0..node_count {
@@ -461,6 +476,8 @@ pub fn execute_graph_node(
     sensors: &SensorSnapshot,
     config: &RuntimeConfig,
     side_outputs: &mut MeshSideOutputs,
+    shared_memory: &mut [f32; 16],
+    prev_shared_memory: &[f32; 16],
 ) -> NodeResult {
     execute_graph_impl(
         &mut NoopTracer,
@@ -474,6 +491,8 @@ pub fn execute_graph_node(
         sensors,
         config,
         side_outputs,
+        shared_memory,
+        prev_shared_memory,
     )
 }
 

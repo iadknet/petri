@@ -100,6 +100,8 @@ pub fn execute_creature_mesh_traced(
                     sensors,
                     config,
                     &mut side_outputs,
+                    shared_memory,
+                    prev_shared_memory,
                 );
                 (result, BackendTrace::Graph(graph_trace))
             }

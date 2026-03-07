@@ -261,6 +261,8 @@ pub fn graph_is_output_node(kind: &GraphNodeKind) -> bool {
             | GraphNodeKind::PushAction(_)
             | GraphNodeKind::PopAction
             | GraphNodeKind::ExecuteActionQueue
+            | GraphNodeKind::WriteSlot(_)
+            | GraphNodeKind::ClearSlot(_)
     )
 }
 
