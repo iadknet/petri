@@ -55,6 +55,9 @@ Implementations must expose, at minimum:
 - `mutation_events_applied_total_by_operator`
 - `mutation_events_applied_total_semantic_noop`
 - `mutation_events_applied_total_semantic_change`
+- `mutation_reachable_target_total`
+- `mutation_unreachable_target_total`
+- `mutation_not_applicable_target_total`
 
 ### Reproduction counters
 
@@ -106,6 +109,10 @@ Mutation accounting invariants:
   mutation_events_applied_total`
 - `mutation_events_applied_total_semantic_noop +
   mutation_events_applied_total_semantic_change =
+  mutation_events_applied_total`
+- `mutation_reachable_target_total +
+  mutation_unreachable_target_total +
+  mutation_not_applicable_target_total =
   mutation_events_applied_total`
 
 ---

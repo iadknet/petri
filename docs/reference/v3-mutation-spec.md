@@ -151,7 +151,7 @@ parseability or be rolled back/skipped under policy below.
 ### 4.1 Engine contract
 
 ```text
-apply_mutations(genome, mutation_config, rng_ctx) -> MutationSummary
+apply_mutations(genome, mutation_config, parent_reachable_nodes, rng_ctx) -> MutationSummary
 ```
 
 Call semantics:
@@ -159,6 +159,9 @@ Call semantics:
   it rolls `mutation_probability` to decide whether any mutation events are
   attempted. If the probability gate fails, it returns a zero-event summary
   immediately. Callers never skip the `MutationEngine` call.
+- `parent_reachable_nodes` is a sorted ascending slice of node indices that
+  were reachable in the parent's genome (computed via BFS from entry node).
+  Used for reachability-biased target selection (see Section 4.3).
 
 `MutationSummary` minimum fields:
 - `attempted_events: u32`
@@ -171,6 +174,9 @@ Call semantics:
 - `applied_by_operator: map<MutationOperator, u32>`
 - `applied_semantic_noop_events: u32`
 - `applied_semantic_change_events: u32`
+- `reachable_target_events: u32`
+- `unreachable_target_events: u32`
+- `not_applicable_events: u32`
 
 Accounting invariant:
 - `attempted_events = applied_events + skipped_events`.
@@ -182,6 +188,7 @@ for each selected event:
   1) choose mutation domain
   2) choose operator (may fail under complexity restriction if the
      domain has no eligible operators — skip with NoApplicableTarget)
+  2b) select mutation target with reachability bias (see Section 4.3)
   3) run domain pre-guards (construction constraints)
   4) snapshot local mutation target (or full genome)
   5) apply candidate mutation
@@ -190,7 +197,7 @@ for each selected event:
        rollback event
        mark skipped(ParseabilityViolation)
        continue
-  8) commit event
+  8) commit event; classify target as Reachable/Unreachable/NotApplicable
 ```
 
 Selection randomization rules (internal to `MutationEngine`):
@@ -214,6 +221,38 @@ Complexity pressure gate:
   unreachable/dead code), not `complexity()` (functional reachability-aware).
   This prevents runaway structural bloat even when junk DNA does not affect
   action energy costs.
+
+### 4.3 Reachability bias
+
+Mutation target selection is biased toward reachable (functional) mesh nodes
+using per-domain probability thresholds from `ReachableBiasConfig`.
+
+Algorithm (`biased_select_from`):
+1. Build eligible set for the operator (domain-specific filtering).
+2. Roll RNG against the domain's bias probability.
+3. On success: compute intersection of eligible and reachable sets via sorted
+   two-pointer merge. If intersection is non-empty, pick uniformly from it
+   (target is `Reachable`). If empty, fall through to uniform selection.
+4. On failure (or fallthrough): pick uniformly from eligible set. Classify
+   picked index via binary search in reachable set → `Reachable` or
+   `Unreachable`.
+
+Per-domain bias defaults: topology=0.7, vm=0.7, graph=0.7, input_ref=0.5.
+See `v3-runtime-config-spec.md` for config fields.
+
+Exempt operators:
+- Topology `AddNode` and `ChangeEntryNode` do not select a target node. They
+  return `NotApplicable` for reachability classification.
+
+`TargetReachability` classification:
+- `Reachable`: selected target was in the parent's reachable set.
+- `Unreachable`: selected target was not in the parent's reachable set.
+- `NotApplicable`: operator does not perform target selection.
+
+Design note: The parent's cached reachable set is used to bias mutations on
+the offspring. After mutations, the offspring's actual reachable set may differ.
+This is intentional — mutations are biased toward what was functional in the
+parent. The offspring receives a fresh BFS computation at birth.
 
 ---
 
