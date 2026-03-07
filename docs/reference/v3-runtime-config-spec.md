@@ -90,6 +90,10 @@ Type posture:
 | `mutation.phenotype.polarity_flip_chance` | `f32` | `0.0002` | Clamp to `[0.0, 1.0]`. |
 | `mutation.genome_size_cap` | `u32` | `1200` | Must be `>= 1`; invalid values fall back to `1200`. Maximum total genome size before size pressure suppresses growth mutations. Uses `genome_size()` (total structural size including junk DNA), not `complexity()` (functional reachability-aware). Serde alias: `complexity_cap`. |
 | `mutation.genome_size_pressure_enabled` | `bool` | `true` | When `true`, genomes near the size cap are less likely to gain growth mutations. Serde alias: `complexity_pressure_enabled`. |
+| `mutation.reachable_bias.topology` | `f64` | `0.7` | Probability that topology operators prefer reachable nodes. Clamp NaN/infinite to `0.0`, otherwise clamp to `[0.0, 1.0]`. |
+| `mutation.reachable_bias.vm` | `f64` | `0.7` | Probability that VM operators prefer reachable nodes. Same normalization. |
+| `mutation.reachable_bias.graph` | `f64` | `0.7` | Probability that graph operators prefer reachable nodes. Same normalization. |
+| `mutation.reachable_bias.input_ref` | `f64` | `0.5` | Probability that input-ref operators prefer reachable nodes. Same normalization. |
 
 Phenotype mutation is not a mutation engine domain; it is a separate pathway
 triggered by genome mutation. Phenotype algorithm and trigger semantics are

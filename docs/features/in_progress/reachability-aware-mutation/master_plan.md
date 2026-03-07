@@ -315,7 +315,7 @@ After completing each implementation step:
 2. `v3-runtime-config-spec.md`: add `ReachableBiasConfig` fields to the `MutationConfig` table
 3. `v3-evolution-observability-spec.md`: add `reachable_target_events`, `unreachable_target_events`, `not_applicable_events` to the minimum telemetry fields
 
-- [ ] Step 7: Update reference specs
+- [x] Step 7: Update reference specs
 
 ### Step 8: Full verification
 
