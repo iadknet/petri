@@ -15,7 +15,7 @@ use crate::kernel::WorldState;
 pub fn apply_noop(creature: &mut CreatureState, config: &SimulationConfig) {
     creature.energy -= config.energy.adjusted_action_cost(
         config.energy.costs.noop_cost,
-        creature.genome.complexity(),
+        creature.cached_complexity,
         creature.age,
     );
 }
@@ -34,7 +34,7 @@ pub fn apply_eat(
     creature.energy = creature.energy.min(config.energy.lifecycle.max_energy);
     creature.energy -= config.energy.adjusted_action_cost(
         config.energy.costs.eat_cost,
-        creature.genome.complexity(),
+        creature.cached_complexity,
         creature.age,
     );
     food > 0.0
@@ -67,7 +67,7 @@ pub fn apply_move(
 
     creature.energy -= config.energy.adjusted_action_cost(
         config.energy.costs.move_cost,
-        creature.genome.complexity(),
+        creature.cached_complexity,
         creature.age,
     );
     succeeded
@@ -185,7 +185,7 @@ mod tests {
         let (mut sim, id) = make_sim_one_creature(start, 50.0);
         let adjusted_move_cost = sim.config.energy.adjusted_action_cost(
             sim.config.energy.costs.move_cost,
-            sim.creatures[id].genome.complexity(),
+            sim.creatures[id].cached_complexity,
             sim.creatures[id].age,
         );
         let energy_before = sim.creatures[id].energy;
@@ -210,7 +210,7 @@ mod tests {
         let energy_before = sim.creatures[id].energy;
         let adjusted_move_cost = sim.config.energy.adjusted_action_cost(
             sim.config.energy.costs.move_cost,
-            sim.creatures[id].genome.complexity(),
+            sim.creatures[id].cached_complexity,
             sim.creatures[id].age,
         );
         {
@@ -708,10 +708,10 @@ mod tests {
             BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
         };
 
-        // Each node contributes: 1 (node) + instructions.len()
-        // A single node with (min_complexity - 1) Halt instructions reaches the target.
+        // Each PushAction is an output instruction → counts as live for functional complexity.
+        // Node itself = 1, each PushAction = 1 live instruction.
         let instruction_count = (min_complexity.saturating_sub(1)) as usize;
-        let program = vec![VmInstruction::Halt; instruction_count];
+        let program = vec![VmInstruction::PushAction { action_type: 0 }; instruction_count];
         CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![NodeGenome {

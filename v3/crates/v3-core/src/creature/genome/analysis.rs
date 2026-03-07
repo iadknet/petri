@@ -7,11 +7,12 @@
 use rand::Rng;
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::collections::VecDeque;
 
 use crate::contracts::NodeId;
 
-use super::{CreatureGenome, GraphInternalNode, GraphNodeKind, VmInstruction};
+use super::{BackendDef, CreatureGenome, GraphInternalNode, GraphNodeKind, VmInstruction};
 
 /// A detected functional gene: a set of indices within a backend array.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -575,6 +576,123 @@ pub fn mesh_forward_slice_random(
     }
     let seed_idx = rng.gen_range(0..genome.nodes.len());
     mesh_forward_slice(genome, seed_idx, max_size)
+}
+
+// ── Functional complexity ───────────────────────────────────────────────────
+
+/// Reachability-aware functional complexity: only reachable mesh nodes
+/// and live backend components contribute to the score.
+///
+/// For each reachable node, counts:
+/// - The node itself (+1)
+/// - Targets on the node
+/// - Live backend components (instructions/nodes reached by backward slicing
+///   from output instructions/nodes)
+/// - Constants referenced by live instructions (VM only)
+/// - Input refs consumed by live backend components
+#[must_use]
+pub fn functional_complexity(genome: &CreatureGenome) -> u32 {
+    let node_id_to_idx: HashMap<NodeId, usize> = genome
+        .nodes
+        .iter()
+        .enumerate()
+        .map(|(i, n)| (n.node_id, i))
+        .collect();
+
+    let entry_idx = match node_id_to_idx.get(&genome.entry_node_id) {
+        Some(&idx) => idx,
+        None => return 0,
+    };
+
+    // BFS to find reachable mesh nodes
+    let mut reachable = vec![false; genome.nodes.len()];
+    reachable[entry_idx] = true;
+    let mut queue = VecDeque::with_capacity(genome.nodes.len());
+    queue.push_back(entry_idx);
+
+    while let Some(idx) = queue.pop_front() {
+        for target_id in &genome.nodes[idx].targets {
+            if let Some(&target_idx) = node_id_to_idx.get(target_id) {
+                if !reachable[target_idx] {
+                    reachable[target_idx] = true;
+                    queue.push_back(target_idx);
+                }
+            }
+        }
+    }
+
+    // Score each reachable node
+    let mut score: u32 = 0;
+
+    for (i, node) in genome.nodes.iter().enumerate() {
+        if !reachable[i] {
+            continue;
+        }
+
+        score += 1; // node itself
+        score += node.targets.len() as u32;
+
+        match &node.backend_def {
+            BackendDef::Vm(vm) => {
+                // Union backward slices from all output instructions
+                let mut live = HashSet::new();
+                for (idx, instr) in vm.program.iter().enumerate() {
+                    if vm_is_output_instruction(instr) {
+                        if let Some(gene) = vm_backward_slice(&vm.program, idx) {
+                            live.extend(gene.indices);
+                        }
+                    }
+                }
+
+                score += live.len() as u32;
+
+                // Count unique constants and consumed input_refs from live set
+                let mut live_consts = HashSet::new();
+                let mut consumed_refs = HashSet::new();
+                for &idx in &live {
+                    match &vm.program[idx] {
+                        VmInstruction::LoadConst { const_idx, .. } => {
+                            live_consts.insert(*const_idx);
+                        }
+                        VmInstruction::ReadInput { ref_idx, .. } => {
+                            consumed_refs.insert(*ref_idx);
+                        }
+                        _ => {}
+                    }
+                }
+                score += live_consts.len() as u32;
+                score += consumed_refs.len() as u32;
+            }
+            BackendDef::Graph(graph) => {
+                // Union backward slices from all output nodes
+                let mut live = HashSet::new();
+                let max_size = graph.internal_nodes.len();
+                for (idx, inode) in graph.internal_nodes.iter().enumerate() {
+                    if graph_is_output_node(&inode.kind) {
+                        if let Some(gene) =
+                            graph_backward_slice(&graph.internal_nodes, idx, max_size)
+                        {
+                            live.extend(gene.indices);
+                        }
+                    }
+                }
+
+                // Count live nodes + their edges + consumed input_refs
+                let mut consumed_refs = HashSet::new();
+                for &idx in &live {
+                    score += 1; // the internal node
+                    score += graph.internal_nodes[idx].inputs.len() as u32;
+                    if let GraphNodeKind::InputRef { ref_idx, .. } = &graph.internal_nodes[idx].kind
+                    {
+                        consumed_refs.insert(*ref_idx);
+                    }
+                }
+                score += consumed_refs.len() as u32;
+            }
+        }
+    }
+
+    score
 }
 
 #[cfg(test)]

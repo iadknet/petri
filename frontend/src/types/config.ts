@@ -74,8 +74,8 @@ export interface MutationConfig {
 	per_birth_mutation_events_min: number;
 	per_birth_mutation_events_max: number;
 	mesh_layer_probability: number;
-	complexity_cap: number;
-	complexity_pressure_enabled: boolean;
+	genome_size_cap: number;
+	genome_size_pressure_enabled: boolean;
 	action_queue_cap: number;
 	phenotype: PhenotypeConfig;
 }
