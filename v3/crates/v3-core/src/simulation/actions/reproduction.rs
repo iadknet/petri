@@ -136,7 +136,7 @@ pub fn apply_reproduce(
     // Step 4: Deduct reproduce_cost from parent (scaled by genome complexity and age).
     sim.creatures[parent_id].energy -= sim.config.energy.adjusted_action_cost(
         sim.config.energy.costs.reproduce_cost,
-        sim.creatures[parent_id].genome.complexity(),
+        sim.creatures[parent_id].cached_complexity,
         sim.creatures[parent_id].age,
     );
 

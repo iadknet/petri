@@ -343,7 +343,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                             action_result = ActionResult::NoFood;
                             creature.energy -= sim.config.energy.adjusted_action_cost(
                                 sim.config.energy.costs.failed_action_penalty,
-                                creature.genome.complexity(),
+                                creature.cached_complexity,
                                 creature.age,
                             );
                         }
@@ -371,7 +371,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                             action_result = ActionResult::Blocked;
                             creature.energy -= sim.config.energy.adjusted_action_cost(
                                 sim.config.energy.costs.failed_action_penalty,
-                                creature.genome.complexity(),
+                                creature.cached_complexity,
                                 creature.age,
                             );
                         }
@@ -416,7 +416,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                         if let Some(creature) = sim.creatures.get_mut(id) {
                             creature.energy -= sim.config.energy.adjusted_action_cost(
                                 sim.config.energy.costs.failed_action_penalty,
-                                creature.genome.complexity(),
+                                creature.cached_complexity,
                                 creature.age,
                             );
                         }
@@ -467,7 +467,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                             if let Some(creature) = sim.creatures.get_mut(id) {
                                 creature.energy -= sim.config.energy.adjusted_action_cost(
                                     sim.config.energy.costs.failed_action_penalty,
-                                    creature.genome.complexity(),
+                                    creature.cached_complexity,
                                     creature.age,
                                 );
                             }
@@ -895,7 +895,7 @@ mod tests {
         sim.world.set_barrier(Position::new(5, 4), true);
 
         let energy_before = sim.creatures[id].energy;
-        let complexity = sim.creatures[id].genome.complexity();
+        let complexity = sim.creatures[id].cached_complexity;
         let age = sim.creatures[id].age;
         let adjusted_move_cost = sim.config.energy.adjusted_action_cost(
             sim.config.energy.costs.move_cost,
@@ -980,7 +980,7 @@ mod tests {
         sim_young.world.set_barrier(Position::new(5, 4), true);
         let adjusted_penalty_young = sim_young.config.energy.adjusted_action_cost(
             sim_young.config.energy.costs.failed_action_penalty,
-            sim_young.creatures[id_young].genome.complexity(),
+            sim_young.creatures[id_young].cached_complexity,
             0,
         );
         let energy_before_young = sim_young.creatures[id_young].energy;
@@ -1002,7 +1002,7 @@ mod tests {
         sim_old.creatures[id_old].age = 400;
         let adjusted_penalty_old = sim_old.config.energy.adjusted_action_cost(
             sim_old.config.energy.costs.failed_action_penalty,
-            sim_old.creatures[id_old].genome.complexity(),
+            sim_old.creatures[id_old].cached_complexity,
             400,
         );
         let energy_before_old = sim_old.creatures[id_old].energy;

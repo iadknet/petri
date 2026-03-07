@@ -61,7 +61,7 @@ pub fn apply_steal_energy(
     // Step 2: Deduct cost (based on attempted amount, not actual; scaled by genome complexity and age).
     let cost = sim.config.energy.adjusted_action_cost(
         sim.config.predation.steal_cost_rate * requested_amount,
-        sim.creatures[attacker_id].genome.complexity(),
+        sim.creatures[attacker_id].cached_complexity,
         sim.creatures[attacker_id].age,
     );
     sim.creatures[attacker_id].energy -= cost;
@@ -109,7 +109,7 @@ pub fn apply_steal_energy(
     // Step 8: Check kill.
     if sim.creatures[victim_id].energy <= 0.0 {
         // Snapshot victim data before removal.
-        let victim_complexity = sim.creatures[victim_id].genome.complexity();
+        let victim_complexity = sim.creatures[victim_id].cached_complexity;
         let victim_pos = sim.creatures[victim_id].position;
 
         // Compute and award complexity bonus.
@@ -301,7 +301,7 @@ mod tests {
         sim.config.predation.steal_cost_rate = 0.2;
         let adjusted_cost = sim.config.energy.adjusted_action_cost(
             0.2 * 10.0,
-            sim.creatures[attacker_id].genome.complexity(),
+            sim.creatures[attacker_id].cached_complexity,
             sim.creatures[attacker_id].age,
         );
 
@@ -326,10 +326,12 @@ mod tests {
         sim.config.predation.steal_cost_rate = 0.2;
         let adjusted_cost = sim.config.energy.adjusted_action_cost(
             0.2 * 20.0,
-            sim.creatures[attacker_id].genome.complexity(),
+            sim.creatures[attacker_id].cached_complexity,
             sim.creatures[attacker_id].age,
         );
 
+        // Capture victim complexity before kill removes it from slotmap.
+        let victim_complexity = sim.creatures[victim_id].cached_complexity;
         let result = apply_steal_energy(attacker_id, &mut sim, Direction::N, 20.0);
 
         // Cost = adjusted(0.2 * 20 (attempted)) (not 0.2 * 5)
@@ -337,8 +339,8 @@ mod tests {
         // Victim killed: energy goes to 0 → TransferredAndKilled
         assert_eq!(result, PredationActionResult::TransferredAndKilled);
         // attacker: 50 - adjusted_cost + 5 (actual) + bonus
-        let bonus = sim.creatures[attacker_id].genome.complexity() as f32
-            * sim.config.predation.kill_complexity_bonus_multiplier;
+        let bonus =
+            victim_complexity as f32 * sim.config.predation.kill_complexity_bonus_multiplier;
         let expected = 50.0 - adjusted_cost + 5.0 + bonus;
         assert!(
             (sim.creatures[attacker_id].energy - expected).abs() < 1e-4,
@@ -357,7 +359,7 @@ mod tests {
         sim.config.predation.steal_cost_rate = 0.2;
         let adjusted_cost = sim.config.energy.adjusted_action_cost(
             0.2 * 10.0,
-            sim.creatures[attacker_id].genome.complexity(),
+            sim.creatures[attacker_id].cached_complexity,
             sim.creatures[attacker_id].age,
         );
 
@@ -396,7 +398,7 @@ mod tests {
         sim.config.predation.steal_cost_rate = 0.0;
         sim.config.predation.kill_complexity_bonus_multiplier = 1.0; // large multiplier for clarity
 
-        let victim_complexity = sim.creatures[victim_id].genome.complexity();
+        let victim_complexity = sim.creatures[victim_id].cached_complexity;
         assert!(
             victim_complexity > 0,
             "founder genome should have nonzero complexity"
