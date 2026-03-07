@@ -16,14 +16,6 @@ In the creature inspector's action timeline, if multiple actions happened in a s
 
 ## Core Simulation
 
-### Ring-based vision sensors (per-distance-ring splitting)
-
-Split vision into smaller per-ring sensors — one sensor for the ring 1 space away, another for 2 spaces away, another for 3, etc. Each existing area sensor type (food, creatures, barriers, etc.) would be decomposed this way, giving creatures the ability to evolve sensitivity to specific distance ranges rather than a single aggregate over the full radius.
-
-The goal is to lower the evolutionary barrier for creatures to start using sensors. Currently, each sensor covers the full radius, producing a large input array that is hard for random mutations to wire up usefully. Smaller per-ring sensors mean fewer inputs per sensor, making it easier for a creature to stumble into a useful connection through mutation and build on it incrementally.
-
-Key challenge: the perception radius is dynamically configurable at runtime, so the number of sensor inputs per ring must also be dynamic. This affects genome input slot allocation, sensor key enumeration, and potentially the VM input vector sizing. Needs design work on how dynamic sensor counts interact with fixed genome structure — possibly a max-ring cap with unused slots when radius is smaller, or a registry that re-maps slots when radius changes.
-
 ### Unified shared memory and VM memory evolvability
 Current behavior appears to have drifted away from the original intent: VM nodes have explicit creature-level byte memory, while graph nodes get a separate persistence path through graph-local stateful operators and plasticity state. That split likely makes "memory" feel underused, because graph already has a much easier evolutionary path to temporal behavior than VM memory does.
 
@@ -354,65 +346,10 @@ The `GET /v3/simulation/creature/:id` endpoint returns the full payload (genome,
 
 Discovered during creature-action-timeline planning (data transfer analysis).
 
-### Frontend type file domain cleanup
-`CreatureDetail` (the HTTP response type for `GET /creature/:id`) lives in `src/types/genome.ts` but is not a genome type — it's an HTTP response envelope. Should be moved to `src/types/http.ts` alongside `LifecycleResponse`, `ConfigResponse`, etc. Touches many import sites so should be a standalone cleanup task.
-
-Discovered during creature-action-timeline planning (type decomposition review).
-
-### Split CreatureInspector into data display and sampler sections
-`CreatureInspector.tsx` (220+ lines) mixes two distinct concerns: data display orchestration (stats, phenotype, genome, memory, action timeline) and execution sampler controls/playback (own store, hooks, complex transport state machine). As the inspector grows, splitting into `InspectorDataSections` and `SamplerSection` sub-orchestrators would improve separation of concerns.
-
-Discovered during creature-action-timeline planning (component decomposition review).
-
-### Action cost helper refactor
-The complexity multiplier pattern `config.energy.complexity_cost.multiplier(creature.genome.complexity())` is repeated ~10 times across action cost deduction sites in `actions/mod.rs`, `actions/reproduction.rs`, `actions/predation.rs`, and `tick.rs`. A helper method on `Simulation` or a utility function could centralize the cost-deduction-with-multiplier logic and reduce duplication.
-
-### Shared incremental query/projection platform
-The viewport transport refactor will add a server-local projection layer, but a larger follow-up still exists: a shared incremental query/projection platform for server, CLI, inspector, metrics, and future replay consumers.
-
-Potential shape:
-- Shared projection types outside the current server-local module tree
-- Reusable spatial indexes
-- Common query surfaces for viewport transport and inspector reads
-- Eventual compatibility with replay/export consumers
-
-### Event-driven projection invalidation
-Replace repeated projection rescans with event-driven invalidation and incremental updates.
-
-Potential shape:
-- Topology-dirty tracking
-- Food-region dirty tracking
-- Creature-visualization dirty tracking
-- Incremental cache updates instead of whole-snapshot rebuilds
-
-### Tick phase system
-The tick loop has 5 phases (0, 1, 2, 2.5, 3). A phase-based system where phases are registered handlers would improve extensibility and make it easier to add future tick-level passes without growing the monolithic `run_tick` function.
-
-### Graph evaluation / plasticity decoupling
-Currently `graph.rs` calls directly into plasticity modules for post-convergence updates. A more extensible design would have graph evaluation produce "learning events" dispatched to registered plasticity backends, decoupling the graph relaxation loop from the specifics of any learning algorithm.
-
-### Action timeline segment virtualization
-At 500 entries × 10Hz, the ActionTimeline re-renders 500 DOM segments each cycle. If profiling shows jank, a windowed/virtualized renderer (only rendering visible segments) could reduce DOM work significantly. Currently acceptable.
-
-Discovered during creature-action-timeline code review (performance assessment).
-
 ### Creature detail API spec documentation
 The `GET /v3/simulation/creature/:id` endpoint is not documented in `docs/reference/v3-server-api-protocol-spec.md`. The `action_log` field (added by the creature-action-log feature) has no reference spec entry. Should be documented alongside the existing sample sub-endpoint docs.
 
 Discovered during creature-action-timeline architecture review.
-
-### Eventual multi-crate v3-server split
-If the internal command/query/transport boundaries stabilize, a later follow-up could split `v3-server` into multiple crates. Intentionally deferred to avoid increasing migration scope while boundaries are settling.
-
-### Reachability-based complexity: separate genome_size from functional complexity
-
-Refactor the current complexity metric into two distinct metrics:
-
-1. **`genome_size`** — matches the current complexity algorithm (total node count, edge count, VM instruction count, etc. across the entire genome). Used for `max_genome_size` cap (renamed from `max_complexity`) to bound total genetic material a creature can carry.
-
-2. **`complexity`** (refactored) — only counts nodes/edges/instructions reachable from the root node. Excludes junk DNA, unreachable VM operations (dead code within VM nodes), and unused graph node internals (dormant input slots, inert sub-expressions). This becomes the metric used for complexity-scaled costs (energy upkeep, action costs, etc.).
-
-This ensures creatures aren't penalized via complexity-scaled costs for carrying inert genetic material, while still capping total genome size to prevent unbounded growth. Most systems that currently reference "complexity" actually care about functional complexity and should use the reachability-based metric. The genome size cap is the main (possibly only) consumer of the total-genome metric.
 
 ### Reachability-aware mutation pathways
 
