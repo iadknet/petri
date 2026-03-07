@@ -76,7 +76,6 @@ fn build_sensor_snapshot(sim: &Simulation, creature: &CreatureState) -> SensorSn
     SensorSnapshot { local, perception }
 }
 
-#[allow(dead_code)] // shared_memory/prev_shared_memory will be used once VM opcodes are wired
 struct VmBenchFixture {
     def: VmBackendDef,
     input_refs: Vec<InputReference>,
@@ -278,16 +277,14 @@ fn bench_vm_execute_stress(c: &mut Criterion) {
             |mut fixture| {
                 let mut side_outputs =
                     MeshSideOutputs::new(fixture.runtime_config.max_actions_per_turn);
-                let mut shared_memory = [0.0f32; 16];
-                let prev_shared_memory = [0.0f32; 16];
                 let _ = black_box(execute_vm_node(
                     &fixture.def,
                     &fixture.input_refs,
                     &[0.0; 12],
                     &mut fixture.energy,
                     0.0,
-                    &mut shared_memory,
-                    &prev_shared_memory,
+                    &mut fixture.shared_memory,
+                    &fixture.prev_shared_memory,
                     &fixture.sensors,
                     &fixture.runtime_config,
                     &mut side_outputs,

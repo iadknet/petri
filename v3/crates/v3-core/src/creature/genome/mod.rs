@@ -2,7 +2,7 @@ pub mod analysis;
 
 use crate::contracts::{InputReference, NodeId};
 
-/// A single VM instruction. 39 opcodes per v3-vm-isa-spec.md.
+/// A single VM instruction. 41 opcodes per v3-vm-isa-spec.md.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum VmInstruction {
     // ── Arithmetic and Data Movement ─────────────────────────────────────────

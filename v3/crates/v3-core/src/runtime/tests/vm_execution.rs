@@ -235,14 +235,14 @@ fn energy_exhaustion_does_not_commit_memory_writes() {
             VmInstruction::StoreSlotImm {
                 slot_idx: 10,
                 src: 0,
-            }, // costs 0.16
+            }, // costs 0.12
             VmInstruction::Halt,
         ],
     };
     let ss = empty_sensor_snapshot();
-    // Give 0.20 energy with opcode_cost_multiplier=1.0:
-    // LoadConst(0.08) → 0.12 left; StoreSlotImm(0.16) → -0.04 → exhausted
-    let mut e = 0.20;
+    // Give 0.15 energy with opcode_cost_multiplier=1.0:
+    // LoadConst(0.08) → 0.07 left; StoreSlotImm(0.12) → -0.05 → exhausted
+    let mut e = 0.15;
     let mut mem = [0.0f32; 16];
     let prev_mem = [0.0f32; 16];
     let mut cfg = config();

@@ -14,7 +14,8 @@ use crate::sensors::perception::SensorSnapshot;
 /// - `upstream_slots`: incoming output slots from the previous node (or zeroed for entry)
 /// - `energy`: creature's current energy; decremented by opcode costs; NOT restored on exhaustion
 /// - `energy_consumed`: total energy consumed this tick so far (for dynamic introspection)
-/// - `memory`: creature's persistent 1024-byte memory; NOT modified on energy exhaustion
+/// - `shared_memory`: creature's persistent shared memory (16 f32 slots); NOT modified on energy exhaustion
+/// - `prev_shared_memory`: snapshot of shared memory from previous tick (read-only)
 /// - `sensors`: pre-assembled sensor snapshot (local + extended perception)
 /// - `config`: runtime config (max_vm_steps, vm.opcode_cost_multiplier)
 /// - `side_outputs`: mesh-scoped side outputs (action queue, priority bid) that persist across hops
@@ -413,11 +414,11 @@ pub(crate) fn opcode_base_cost(instr: &crate::creature::genome::VmInstruction) -
         VmInstruction::ExecuteActionQueue => 0.24,
         VmInstruction::WriteRouteTarget { .. } => 0.10,
         VmInstruction::Halt => 0.05,
-        VmInstruction::LoadSlot { .. } => 0.16,
-        VmInstruction::StoreSlot { .. } => 0.18,
-        VmInstruction::LoadSlotImm { .. } => 0.14,
-        VmInstruction::StoreSlotImm { .. } => 0.16,
-        VmInstruction::LoadSlotPrev { .. } => 0.14,
+        VmInstruction::LoadSlot { .. } => 0.12,
+        VmInstruction::StoreSlot { .. } => 0.14,
+        VmInstruction::LoadSlotImm { .. } => 0.10,
+        VmInstruction::StoreSlotImm { .. } => 0.12,
+        VmInstruction::LoadSlotPrev { .. } => 0.10,
         VmInstruction::ClearSlot { .. } => 0.12,
     }
 }
