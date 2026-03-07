@@ -845,7 +845,7 @@ fn vm_weighted_random_favors_refinement() {
 #[test]
 fn vm_operator_weights_are_positive() {
     let all = VmOperator::ALL;
-    assert_eq!(all.len(), 9, "ALL must cover every VmOperator variant");
+    assert_eq!(all.len(), 13, "ALL must cover every VmOperator variant");
     for &op in &all {
         assert!(op.weight() > 0, "weight must be positive for {:?}", op);
     }
@@ -915,4 +915,190 @@ fn random_decreasing_returns_none_for_vm() {
             seed
         );
     }
+}
+
+#[test]
+fn vm_insert_read_store_motif_inserts_read_input_and_store_slot_pair() {
+    let genome = v3alpha1_founder_genome();
+    let mut found_pair = false;
+    for seed in 0u64..200 {
+        let mut g = genome.clone();
+        let mut r = rng(seed);
+        if VmMutator::apply(&mut g, VmOperator::VmInsertReadStoreMotif, &mut r).is_ok() {
+            if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+                // Look for consecutive ReadInput + StoreSlotImm.
+                for w in vm.program.windows(2) {
+                    if matches!(w[0], VmInstruction::ReadInput { .. })
+                        && matches!(w[1], VmInstruction::StoreSlotImm { .. })
+                    {
+                        // Verify the dst register of ReadInput matches src of StoreSlotImm.
+                        if let (
+                            VmInstruction::ReadInput { dst, .. },
+                            VmInstruction::StoreSlotImm { src, .. },
+                        ) = (&w[0], &w[1])
+                        {
+                            if dst == src {
+                                found_pair = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if found_pair {
+            break;
+        }
+    }
+    assert!(
+        found_pair,
+        "VmInsertReadStoreMotif must insert ReadInput + StoreSlotImm pair with matching registers"
+    );
+}
+
+#[test]
+fn vm_insert_load_compare_motif_inserts_load_slot_and_cmp_gt_pair() {
+    let genome = v3alpha1_founder_genome();
+    let mut found_pair = false;
+    for seed in 0u64..200 {
+        let mut g = genome.clone();
+        let mut r = rng(seed);
+        if VmMutator::apply(&mut g, VmOperator::VmInsertLoadCompareMotif, &mut r).is_ok() {
+            if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+                for w in vm.program.windows(2) {
+                    if matches!(w[0], VmInstruction::LoadSlotImm { .. })
+                        && matches!(w[1], VmInstruction::CmpGt { .. })
+                    {
+                        if let (
+                            VmInstruction::LoadSlotImm { dst: load_dst, .. },
+                            VmInstruction::CmpGt { a, .. },
+                        ) = (&w[0], &w[1])
+                        {
+                            if load_dst == a {
+                                found_pair = true;
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if found_pair {
+            break;
+        }
+    }
+    assert!(
+        found_pair,
+        "VmInsertLoadCompareMotif must insert LoadSlotImm + CmpGt pair with matching registers"
+    );
+}
+
+#[test]
+fn vm_mutate_slot_address_changes_slot_idx() {
+    // Build a genome with slot opcodes.
+    let mut genome = v3alpha1_founder_genome();
+    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+        vm.program.push(VmInstruction::LoadSlotImm {
+            dst: 0,
+            slot_idx: 5,
+        });
+        vm.program.push(VmInstruction::StoreSlotImm {
+            slot_idx: 5,
+            src: 0,
+        });
+    }
+    let mut changed = false;
+    for seed in 0u64..200 {
+        let mut g = genome.clone();
+        let mut r = rng(seed);
+        if VmMutator::apply(&mut g, VmOperator::VmMutateSlotAddress, &mut r).is_ok() {
+            if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+                for instr in &vm.program {
+                    match instr {
+                        VmInstruction::LoadSlotImm { slot_idx, .. }
+                        | VmInstruction::StoreSlotImm { slot_idx, .. }
+                            if *slot_idx != 5 =>
+                        {
+                            changed = true;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+        if changed {
+            break;
+        }
+    }
+    assert!(
+        changed,
+        "VmMutateSlotAddress must sometimes change slot_idx"
+    );
+}
+
+#[test]
+fn vm_mutate_paired_slot_address_co_mutates_load_and_store() {
+    let mut genome = v3alpha1_founder_genome();
+    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+        vm.program.push(VmInstruction::LoadSlotImm {
+            dst: 0,
+            slot_idx: 7,
+        });
+        vm.program.push(VmInstruction::StoreSlotImm {
+            slot_idx: 7,
+            src: 0,
+        });
+    }
+    let mut co_mutated = false;
+    for seed in 0u64..200 {
+        let mut g = genome.clone();
+        let mut r = rng(seed);
+        if VmMutator::apply(&mut g, VmOperator::VmMutatePairedSlotAddress, &mut r).is_ok() {
+            if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+                // Find the load and store that were originally slot 7.
+                let mut new_load_slot = None;
+                let mut new_store_slot = None;
+                for instr in &vm.program {
+                    match instr {
+                        VmInstruction::LoadSlotImm { slot_idx, .. } => {
+                            new_load_slot = Some(*slot_idx);
+                        }
+                        VmInstruction::StoreSlotImm { slot_idx, .. } => {
+                            new_store_slot = Some(*slot_idx);
+                        }
+                        _ => {}
+                    }
+                }
+                if let (Some(ls), Some(ss)) = (new_load_slot, new_store_slot) {
+                    if ls == ss && ls != 7 {
+                        co_mutated = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        co_mutated,
+        "VmMutatePairedSlotAddress must co-mutate both load and store to same new slot"
+    );
+}
+
+#[test]
+fn vm_mutate_paired_slot_address_skips_when_no_paired_group() {
+    // Use founder genome without slot instructions — should skip.
+    let genome = v3alpha1_founder_genome();
+    let mut skipped = false;
+    for seed in 0u64..50 {
+        let mut g = genome.clone();
+        let mut r = rng(seed);
+        if VmMutator::apply(&mut g, VmOperator::VmMutatePairedSlotAddress, &mut r).is_err() {
+            skipped = true;
+            break;
+        }
+    }
+    assert!(
+        skipped,
+        "VmMutatePairedSlotAddress must skip when no load+store pair exists"
+    );
 }

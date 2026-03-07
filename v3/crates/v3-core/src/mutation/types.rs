@@ -112,6 +112,10 @@ pub enum MutationOperator {
     VmCopyConstantBlock,
     VmCopyGeneBackwardSlice,
     VmCopyGeneForwardSlice,
+    VmInsertReadStoreMotif,
+    VmInsertLoadCompareMotif,
+    VmMutateSlotAddress,
+    VmMutatePairedSlotAddress,
     // Graph
     GraphAlterGraphEdgeWeight,
     GraphSwapGraphOperator,
@@ -167,6 +171,10 @@ impl MutationOperator {
             Self::VmCopyConstantBlock => "Vm.CopyConstantBlock",
             Self::VmCopyGeneBackwardSlice => "Vm.CopyGeneBackwardSlice",
             Self::VmCopyGeneForwardSlice => "Vm.CopyGeneForwardSlice",
+            Self::VmInsertReadStoreMotif => "Vm.InsertReadStoreMotif",
+            Self::VmInsertLoadCompareMotif => "Vm.InsertLoadCompareMotif",
+            Self::VmMutateSlotAddress => "Vm.MutateSlotAddress",
+            Self::VmMutatePairedSlotAddress => "Vm.MutatePairedSlotAddress",
             Self::GraphAlterGraphEdgeWeight => "Graph.AlterGraphEdgeWeight",
             Self::GraphSwapGraphOperator => "Graph.SwapGraphOperator",
             Self::GraphMutateGraphOperatorParam => "Graph.MutateGraphOperatorParam",
@@ -219,7 +227,11 @@ impl MutationOperator {
             | Self::VmCopyInstructionBlockRemapped
             | Self::VmCopyConstantBlock
             | Self::VmCopyGeneBackwardSlice
-            | Self::VmCopyGeneForwardSlice => MutationDomain::Vm,
+            | Self::VmCopyGeneForwardSlice
+            | Self::VmInsertReadStoreMotif
+            | Self::VmInsertLoadCompareMotif
+            | Self::VmMutateSlotAddress
+            | Self::VmMutatePairedSlotAddress => MutationDomain::Vm,
             Self::GraphAlterGraphEdgeWeight
             | Self::GraphSwapGraphOperator
             | Self::GraphMutateGraphOperatorParam
@@ -276,17 +288,21 @@ impl MutationOperator {
             | Self::TopologySwapNodeBackend
             | Self::TopologyRewriteNodeId
             | Self::TopologySwapRouteTargets => ComplexityEffect::Neutral,
-            // VM: copy operators are increasing
+            // VM: copy/motif-insert operators are increasing
             Self::VmCopyInstructionBlock
             | Self::VmCopyInstructionBlockRemapped
             | Self::VmCopyConstantBlock
             | Self::VmCopyGeneBackwardSlice
-            | Self::VmCopyGeneForwardSlice => ComplexityEffect::Increasing,
+            | Self::VmCopyGeneForwardSlice
+            | Self::VmInsertReadStoreMotif
+            | Self::VmInsertLoadCompareMotif => ComplexityEffect::Increasing,
             // VM: all others neutral (mutate existing content, no structural growth)
             Self::VmConstantMutation
             | Self::VmInstructionMutation
             | Self::VmRegisterCountMutation
-            | Self::VmInstructionRawFieldMutation => ComplexityEffect::Neutral,
+            | Self::VmInstructionRawFieldMutation
+            | Self::VmMutateSlotAddress
+            | Self::VmMutatePairedSlotAddress => ComplexityEffect::Neutral,
             // Graph: structural additions
             Self::GraphAddInternalGraphNode
             | Self::GraphAddGraphEdge
@@ -319,7 +335,7 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 47] {
+    pub const fn all() -> [Self; 51] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
@@ -343,6 +359,10 @@ impl MutationOperator {
             Self::VmCopyConstantBlock,
             Self::VmCopyGeneBackwardSlice,
             Self::VmCopyGeneForwardSlice,
+            Self::VmInsertReadStoreMotif,
+            Self::VmInsertLoadCompareMotif,
+            Self::VmMutateSlotAddress,
+            Self::VmMutatePairedSlotAddress,
             Self::GraphAlterGraphEdgeWeight,
             Self::GraphSwapGraphOperator,
             Self::GraphMutateGraphOperatorParam,
@@ -605,7 +625,11 @@ mod tests {
                 | MutationOperator::VmCopyInstructionBlockRemapped
                 | MutationOperator::VmCopyConstantBlock
                 | MutationOperator::VmCopyGeneBackwardSlice
-                | MutationOperator::VmCopyGeneForwardSlice => {
+                | MutationOperator::VmCopyGeneForwardSlice
+                | MutationOperator::VmInsertReadStoreMotif
+                | MutationOperator::VmInsertLoadCompareMotif
+                | MutationOperator::VmMutateSlotAddress
+                | MutationOperator::VmMutatePairedSlotAddress => {
                     assert_eq!(operator.domain(), MutationDomain::Vm)
                 }
                 MutationOperator::GraphAlterGraphEdgeWeight
@@ -693,6 +717,12 @@ mod tests {
                 VmOperator::VmCopyConstantBlock => MutationOperator::VmCopyConstantBlock,
                 VmOperator::VmCopyGeneBackwardSlice => MutationOperator::VmCopyGeneBackwardSlice,
                 VmOperator::VmCopyGeneForwardSlice => MutationOperator::VmCopyGeneForwardSlice,
+                VmOperator::VmInsertReadStoreMotif => MutationOperator::VmInsertReadStoreMotif,
+                VmOperator::VmInsertLoadCompareMotif => MutationOperator::VmInsertLoadCompareMotif,
+                VmOperator::VmMutateSlotAddress => MutationOperator::VmMutateSlotAddress,
+                VmOperator::VmMutatePairedSlotAddress => {
+                    MutationOperator::VmMutatePairedSlotAddress
+                }
             };
             assert_eq!(
                 mo.complexity_effect(),
