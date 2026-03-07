@@ -213,7 +213,7 @@ After completing each implementation step:
 6. Add re-export for `TargetReachability` in `mutation/mod.rs`
 7. TDD: test config defaults, test serde round-trip, test normalization clamping (including NaN→0.0), test `MutationSummary::zero()` includes new fields, test `record_reachability` increments correct counters, test accounting invariant (`reachable + unreachable + not_applicable == applied_events`)
 
-- [ ] Step 1: Add `ReachableBiasConfig` and telemetry types
+- [x] Step 1: Add `ReachableBiasConfig` and telemetry types
 
 ### Step 2: Add `cached_reachable_nodes` to `CreatureState`
 

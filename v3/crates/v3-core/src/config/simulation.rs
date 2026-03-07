@@ -326,6 +326,30 @@ impl Default for PhenotypeConfig {
     }
 }
 
+/// Per-domain bias toward reachable (functional) mesh nodes during mutation target selection.
+///
+/// Each field is a probability in [0.0, 1.0]. At 0.0, selection is uniform over all eligible
+/// nodes (current behavior). At 1.0, mutations always target reachable nodes when possible.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ReachableBiasConfig {
+    pub topology: f64,
+    pub vm: f64,
+    pub graph: f64,
+    pub input_ref: f64,
+}
+
+impl Default for ReachableBiasConfig {
+    fn default() -> Self {
+        Self {
+            topology: 0.7,
+            vm: 0.7,
+            graph: 0.7,
+            input_ref: 0.5,
+        }
+    }
+}
+
 /// Mutation tuning config. Canonical owner: v3-runtime-config-spec.md Section 3.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -346,6 +370,8 @@ pub struct MutationConfig {
     #[serde(default = "default_action_queue_cap")]
     pub action_queue_cap: usize,
     pub phenotype: PhenotypeConfig,
+    #[serde(default)]
+    pub reachable_bias: ReachableBiasConfig,
 }
 
 impl Default for MutationConfig {
@@ -359,6 +385,7 @@ impl Default for MutationConfig {
             genome_size_pressure_enabled: true,
             action_queue_cap: 4,
             phenotype: PhenotypeConfig::default(),
+            reachable_bias: ReachableBiasConfig::default(),
         }
     }
 }
@@ -542,6 +569,28 @@ impl SimulationConfig {
         ph.channel_change_chance = ph.channel_change_chance.clamp(0.0, 1.0);
         ph.polarity_flip_chance = ph.polarity_flip_chance.clamp(0.0, 1.0);
 
+        let rb = &mut m.reachable_bias;
+        rb.topology = if rb.topology.is_finite() {
+            rb.topology.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        rb.vm = if rb.vm.is_finite() {
+            rb.vm.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        rb.graph = if rb.graph.is_finite() {
+            rb.graph.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        rb.input_ref = if rb.input_ref.is_finite() {
+            rb.input_ref.clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+
         if self.action_log.capacity < 1 {
             self.action_log.capacity = 500;
         }
@@ -669,6 +718,11 @@ mod tests {
         assert_eq!(cfg.mutation.phenotype.channel_step, 1);
         assert!((cfg.mutation.phenotype.channel_change_chance - 0.001).abs() < 1e-6);
         assert!((cfg.mutation.phenotype.polarity_flip_chance - 0.0002).abs() < 1e-6);
+        // Reachable bias
+        assert!((cfg.mutation.reachable_bias.topology - 0.7).abs() < 1e-9);
+        assert!((cfg.mutation.reachable_bias.vm - 0.7).abs() < 1e-9);
+        assert!((cfg.mutation.reachable_bias.graph - 0.7).abs() < 1e-9);
+        assert!((cfg.mutation.reachable_bias.input_ref - 0.5).abs() < 1e-9);
         // Shared memory
         assert!((cfg.shared_memory.decay_rate - 0.0).abs() < f32::EPSILON);
         // Predation
@@ -1206,5 +1260,81 @@ mod tests {
         // Even with high complexity/age, zero base cost stays zero.
         let result = ec.adjusted_action_cost(0.0, 200, 400);
         assert!((result - 0.0).abs() < f32::EPSILON);
+    }
+
+    // ── ReachableBiasConfig tests ─────────────────────────────────────────
+
+    #[test]
+    fn reachable_bias_config_defaults() {
+        let rb = ReachableBiasConfig::default();
+        assert!((rb.topology - 0.7).abs() < 1e-9);
+        assert!((rb.vm - 0.7).abs() < 1e-9);
+        assert!((rb.graph - 0.7).abs() < 1e-9);
+        assert!((rb.input_ref - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn reachable_bias_config_on_mutation_config_defaults() {
+        let cfg = SimulationConfig::default();
+        assert!((cfg.mutation.reachable_bias.topology - 0.7).abs() < 1e-9);
+        assert!((cfg.mutation.reachable_bias.vm - 0.7).abs() < 1e-9);
+        assert!((cfg.mutation.reachable_bias.graph - 0.7).abs() < 1e-9);
+        assert!((cfg.mutation.reachable_bias.input_ref - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn reachable_bias_serde_roundtrip() {
+        let cfg = SimulationConfig::default();
+        let json = serde_json::to_string(&cfg).unwrap();
+        let cfg2: SimulationConfig = serde_json::from_str(&json).unwrap();
+        assert!((cfg2.mutation.reachable_bias.topology - 0.7).abs() < 1e-9);
+        assert!((cfg2.mutation.reachable_bias.input_ref - 0.5).abs() < 1e-9);
+    }
+
+    #[test]
+    fn reachable_bias_serde_default_when_missing() {
+        // MutationConfig JSON without reachable_bias should get defaults
+        let json = serde_json::to_string(&MutationConfig::default()).unwrap();
+        // Remove the reachable_bias field from the JSON
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let mut obj = v.as_object().unwrap().clone();
+        obj.remove("reachable_bias");
+        let stripped = serde_json::to_string(&obj).unwrap();
+        let mc: MutationConfig = serde_json::from_str(&stripped).unwrap();
+        assert!((mc.reachable_bias.topology - 0.7).abs() < 1e-9);
+    }
+
+    #[test]
+    fn normalize_reachable_bias_clamps_above_one() {
+        let mut cfg = SimulationConfig::default();
+        cfg.mutation.reachable_bias.topology = 1.5;
+        cfg.mutation.reachable_bias.vm = 2.0;
+        cfg.normalize();
+        assert!((cfg.mutation.reachable_bias.topology - 1.0).abs() < 1e-9);
+        assert!((cfg.mutation.reachable_bias.vm - 1.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn normalize_reachable_bias_clamps_negative() {
+        let mut cfg = SimulationConfig::default();
+        cfg.mutation.reachable_bias.graph = -0.5;
+        cfg.mutation.reachable_bias.input_ref = -1.0;
+        cfg.normalize();
+        assert!((cfg.mutation.reachable_bias.graph - 0.0).abs() < 1e-9);
+        assert!((cfg.mutation.reachable_bias.input_ref - 0.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn normalize_reachable_bias_nan_falls_back_to_zero() {
+        let mut cfg = SimulationConfig::default();
+        cfg.mutation.reachable_bias.topology = f64::NAN;
+        cfg.mutation.reachable_bias.vm = f64::NAN;
+        cfg.mutation.reachable_bias.graph = f64::INFINITY;
+        cfg.mutation.reachable_bias.input_ref = f64::NEG_INFINITY;
+        cfg.normalize();
+        assert!((cfg.mutation.reachable_bias.topology - 0.0).abs() < 1e-9);
+        assert!((cfg.mutation.reachable_bias.vm - 0.0).abs() < 1e-9);
+        assert!((cfg.mutation.reachable_bias.graph - 0.0).abs() < 1e-9);
+        assert!((cfg.mutation.reachable_bias.input_ref - 0.0).abs() < 1e-9);
     }
 }
