@@ -139,7 +139,7 @@ pub struct VmTrace {
     pub final_payload: [f32; 12],
     pub final_meta: [f32; 8],
     pub final_route_target: f32,
-    pub memory_writes: Vec<MemoryWrite>,
+    pub slot_writes: Vec<SlotWrite>,
 }
 
 /// Trace of a single VM instruction execution.
@@ -152,12 +152,12 @@ pub struct VmStepTrace {
     pub register_changes: Vec<(u8, f32)>,
 }
 
-/// Record of a single memory write operation.
+/// Record of a single shared-memory slot write operation.
 #[derive(Debug, Clone, Serialize)]
-pub struct MemoryWrite {
-    pub address: u16,
-    pub old_value: u8,
-    pub new_value: u8,
+pub struct SlotWrite {
+    pub slot_idx: u8,
+    pub old_value: f32,
+    pub new_value: f32,
 }
 
 // ─── Graph trace ─────────────────────────────────────────────────────────────

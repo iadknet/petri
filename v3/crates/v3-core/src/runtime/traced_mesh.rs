@@ -72,9 +72,6 @@ pub fn execute_creature_mesh_traced(
         let energy_consumed = (start_energy - *energy).max(0.0);
         let node_energy_before = *energy;
 
-        // Temporary: VM still uses old [u8; 1024] memory interface.
-        // Step 4 will replace VM opcodes and wire shared_memory directly.
-        let mut _legacy_mem = [0u8; 1024];
         let (result, backend_trace) = match &node.backend_def {
             BackendDef::Vm(def) => {
                 let (result, vm_trace) = execute_vm_node_traced(
@@ -83,7 +80,8 @@ pub fn execute_creature_mesh_traced(
                     &upstream_slots,
                     energy,
                     energy_consumed,
-                    &mut _legacy_mem,
+                    _shared_memory,
+                    _prev_shared_memory,
                     sensors,
                     config,
                     &mut side_outputs,

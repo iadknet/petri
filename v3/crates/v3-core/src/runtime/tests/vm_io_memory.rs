@@ -108,7 +108,8 @@ fn read_input_upstream_slot() {
     };
     let ss = empty_sensor_snapshot();
     let mut e = 100.0;
-    let mut mem = [0u8; 1024];
+    let mut mem = [0.0f32; 16];
+    let prev_mem = [0.0f32; 16];
     let cfg = config();
     let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
@@ -118,6 +119,7 @@ fn read_input_upstream_slot() {
         &mut e,
         0.0,
         &mut mem,
+        &prev_mem,
         &ss,
         &cfg,
         &mut side_outputs,
@@ -207,7 +209,7 @@ fn write_route_target_sets_output() {
 // ── Memory opcodes ────────────────────────────────────────────────────────
 
 #[test]
-fn store_and_load_mem8() {
+fn store_and_load_slot() {
     let def = VmBackendDef {
         register_count: 2,
         constants: vec![42.0],
@@ -215,19 +217,19 @@ fn store_and_load_mem8() {
             VmInstruction::LoadConst {
                 dst: 0,
                 const_idx: 0,
-            }, // r0 = 42.0 (byte value)
+            }, // r0 = 42.0 (value)
             VmInstruction::LoadConst {
                 dst: 1,
                 const_idx: 0,
-            }, // r1 = 42 (address)
-            VmInstruction::StoreMem8 {
-                addr_reg: 1,
+            }, // r1 = 42.0 (slot address, wraps to 42%16=10)
+            VmInstruction::StoreSlot {
+                slot_reg: 1,
                 src: 0,
-            }, // mem[42] = 42
-            VmInstruction::LoadMem8 {
+            }, // mem[10] = 42.0
+            VmInstruction::LoadSlot {
                 dst: 0,
-                addr_reg: 1,
-            }, // r0 = mem[42]
+                slot_reg: 1,
+            }, // r0 = mem[10]
             VmInstruction::WriteInternalPayload {
                 slot_idx: 0,
                 src: 0,
@@ -237,7 +239,8 @@ fn store_and_load_mem8() {
     };
     let ss = empty_sensor_snapshot();
     let mut e = 100.0;
-    let mut mem = [0u8; 1024];
+    let mut mem = [0.0f32; 16];
+    let prev_mem = [0.0f32; 16];
     let cfg = config();
     let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
@@ -247,16 +250,17 @@ fn store_and_load_mem8() {
         &mut e,
         0.0,
         &mut mem,
+        &prev_mem,
         &ss,
         &cfg,
         &mut side_outputs,
     );
     assert!((r.output_slots[0] - 42.0).abs() < 1e-6);
-    assert_eq!(mem[42], 42); // memory committed
+    assert!((mem[10] - 42.0).abs() < f32::EPSILON); // memory committed
 }
 
 #[test]
-fn store_and_load_mem8_imm() {
+fn store_and_load_slot_imm() {
     let def = VmBackendDef {
         register_count: 1,
         constants: vec![77.0],
@@ -265,14 +269,14 @@ fn store_and_load_mem8_imm() {
                 dst: 0,
                 const_idx: 0,
             }, // r0 = 77.0
-            VmInstruction::StoreMem8Imm {
-                imm_addr: 100,
+            VmInstruction::StoreSlotImm {
+                slot_idx: 4,
                 src: 0,
-            }, // mem[100] = 77
-            VmInstruction::LoadMem8Imm {
+            }, // mem[4] = 77.0
+            VmInstruction::LoadSlotImm {
                 dst: 0,
-                imm_addr: 100,
-            }, // r0 = mem[100]
+                slot_idx: 4,
+            }, // r0 = mem[4]
             VmInstruction::WriteInternalPayload {
                 slot_idx: 0,
                 src: 0,
@@ -282,7 +286,8 @@ fn store_and_load_mem8_imm() {
     };
     let ss = empty_sensor_snapshot();
     let mut e = 100.0;
-    let mut mem = [0u8; 1024];
+    let mut mem = [0.0f32; 16];
+    let prev_mem = [0.0f32; 16];
     let cfg = config();
     let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
@@ -292,16 +297,17 @@ fn store_and_load_mem8_imm() {
         &mut e,
         0.0,
         &mut mem,
+        &prev_mem,
         &ss,
         &cfg,
         &mut side_outputs,
     );
     assert!((r.output_slots[0] - 77.0).abs() < 1e-6);
-    assert_eq!(mem[100], 77);
+    assert!((mem[4] - 77.0).abs() < f32::EPSILON);
 }
 
 #[test]
-fn memory_address_wraps_via_rem_euclid() {
+fn slot_address_wraps_via_rem_euclid() {
     let def = VmBackendDef {
         register_count: 2,
         constants: vec![1024.0, 55.0],
@@ -309,18 +315,18 @@ fn memory_address_wraps_via_rem_euclid() {
             VmInstruction::LoadConst {
                 dst: 0,
                 const_idx: 0,
-            }, // r0 = 1024 (addr)
+            }, // r0 = 1024 (addr, wraps to 1024%16=0)
             VmInstruction::LoadConst {
                 dst: 1,
                 const_idx: 1,
-            }, // r1 = 55 (val)
-            VmInstruction::StoreMem8 {
-                addr_reg: 0,
+            }, // r1 = 55.0 (val)
+            VmInstruction::StoreSlot {
+                slot_reg: 0,
                 src: 1,
-            }, // mem[1024%1024=0] = 55
-            VmInstruction::LoadMem8 {
+            }, // mem[0] = 55.0
+            VmInstruction::LoadSlot {
                 dst: 0,
-                addr_reg: 0,
+                slot_reg: 0,
             }, // r0 = mem[0]
             VmInstruction::WriteInternalPayload {
                 slot_idx: 0,
@@ -331,7 +337,8 @@ fn memory_address_wraps_via_rem_euclid() {
     };
     let ss = empty_sensor_snapshot();
     let mut e = 100.0;
-    let mut mem = [0u8; 1024];
+    let mut mem = [0.0f32; 16];
+    let prev_mem = [0.0f32; 16];
     let cfg = config();
     let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
@@ -341,6 +348,7 @@ fn memory_address_wraps_via_rem_euclid() {
         &mut e,
         0.0,
         &mut mem,
+        &prev_mem,
         &ss,
         &cfg,
         &mut side_outputs,
@@ -434,7 +442,8 @@ fn vm_eats_when_food_here() {
 
     let upstream = [0.0f32; 12];
     let mut energy = creature.energy;
-    let mut mem = [0u8; 1024];
+    let mut mem = [0.0f32; 16];
+    let prev_mem = [0.0f32; 16];
     let cfg = config();
     let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let _result = execute_vm_node(
@@ -444,6 +453,7 @@ fn vm_eats_when_food_here() {
         &mut energy,
         0.0,
         &mut mem,
+        &prev_mem,
         &ss,
         &cfg,
         &mut side_outputs,
@@ -528,7 +538,8 @@ fn vm_noop_when_no_food() {
 
     let upstream = [0.0f32; 12];
     let mut energy = 30.0;
-    let mut mem = [0u8; 1024];
+    let mut mem = [0.0f32; 16];
+    let prev_mem = [0.0f32; 16];
     let cfg = config();
     let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let _result = execute_vm_node(
@@ -538,6 +549,7 @@ fn vm_noop_when_no_food() {
         &mut energy,
         0.0,
         &mut mem,
+        &prev_mem,
         &ss,
         &cfg,
         &mut side_outputs,

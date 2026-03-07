@@ -30,10 +30,11 @@ fn assert_equivalent(
     def: VmBackendDef,
     input_refs: Vec<InputReference>,
     upstream: [f32; 12],
-    memory_seed: [u8; 1024],
+    memory_seed: [f32; 16],
 ) {
     let ss = empty_ss();
     let cfg = config();
+    let prev_mem = [0.0f32; 16];
 
     let mut energy_a = 100.0f32;
     let mut memory_a = memory_seed;
@@ -45,6 +46,7 @@ fn assert_equivalent(
         &mut energy_a,
         0.0,
         &mut memory_a,
+        &prev_mem,
         &ss,
         &cfg,
         &mut aq_a,
@@ -60,6 +62,7 @@ fn assert_equivalent(
         &mut energy_b,
         0.0,
         &mut memory_b,
+        &prev_mem,
         &ss,
         &cfg,
         &mut aq_b,
@@ -95,9 +98,11 @@ fn result_equivalence_emit_eat() {
     let ss = empty_ss();
     let cfg = config();
 
+    let prev_mem = [0.0f32; 16];
+
     // Run non-traced
     let mut energy_a = 100.0f32;
-    let mut memory_a = [0u8; 1024];
+    let mut memory_a = [0.0f32; 16];
     let mut aq_a = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let result_a = execute_vm_node(
         &def,
@@ -106,6 +111,7 @@ fn result_equivalence_emit_eat() {
         &mut energy_a,
         0.0,
         &mut memory_a,
+        &prev_mem,
         &ss,
         &cfg,
         &mut aq_a,
@@ -113,7 +119,7 @@ fn result_equivalence_emit_eat() {
 
     // Run traced
     let mut energy_b = 100.0f32;
-    let mut memory_b = [0u8; 1024];
+    let mut memory_b = [0.0f32; 16];
     let mut aq_b = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let (result_b, _trace) = execute_vm_node_traced(
         &def,
@@ -122,6 +128,7 @@ fn result_equivalence_emit_eat() {
         &mut energy_b,
         0.0,
         &mut memory_b,
+        &prev_mem,
         &ss,
         &cfg,
         &mut aq_b,
@@ -153,7 +160,8 @@ fn trace_contains_correct_instructions() {
     let ss = empty_ss();
     let cfg = config();
     let mut energy = 100.0f32;
-    let mut memory = [0u8; 1024];
+    let mut memory = [0.0f32; 16];
+    let prev_mem = [0.0f32; 16];
     let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
 
     let (_result, trace) = execute_vm_node_traced(
@@ -163,6 +171,7 @@ fn trace_contains_correct_instructions() {
         &mut energy,
         0.0,
         &mut memory,
+        &prev_mem,
         &ss,
         &cfg,
         &mut side_outputs,
@@ -200,7 +209,8 @@ fn register_changes_captured() {
     let ss = empty_ss();
     let cfg = config();
     let mut energy = 100.0f32;
-    let mut memory = [0u8; 1024];
+    let mut memory = [0.0f32; 16];
+    let prev_mem = [0.0f32; 16];
     let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
 
     let (_result, trace) = execute_vm_node_traced(
@@ -210,6 +220,7 @@ fn register_changes_captured() {
         &mut energy,
         0.0,
         &mut memory,
+        &prev_mem,
         &ss,
         &cfg,
         &mut side_outputs,
@@ -225,26 +236,26 @@ fn register_changes_captured() {
     assert!((trace.final_registers[0] - 3.5).abs() < 1e-6);
 }
 
-/// Memory writes are tracked.
+/// Slot writes are tracked.
 #[test]
-fn memory_writes_tracked() {
+fn slot_writes_tracked() {
     let def = VmBackendDef {
         register_count: 2,
         constants: vec![42.0, 7.0],
         program: vec![
-            // Load addr=7 into r0
+            // Load slot_addr=7 into r0
             VmInstruction::LoadConst {
                 dst: 0,
                 const_idx: 1,
             },
-            // Load value=42 into r1
+            // Load value=42.0 into r1
             VmInstruction::LoadConst {
                 dst: 1,
                 const_idx: 0,
             },
-            // Store r1 at addr in r0 → mem[7] = 42
-            VmInstruction::StoreMem8 {
-                addr_reg: 0,
+            // Store r1 at slot in r0 → mem[7%16=7] = 42.0
+            VmInstruction::StoreSlot {
+                slot_reg: 0,
                 src: 1,
             },
             VmInstruction::Halt,
@@ -253,7 +264,8 @@ fn memory_writes_tracked() {
     let ss = empty_ss();
     let cfg = config();
     let mut energy = 100.0f32;
-    let mut memory = [0u8; 1024];
+    let mut memory = [0.0f32; 16];
+    let prev_mem = [0.0f32; 16];
     let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
 
     let (_result, trace) = execute_vm_node_traced(
@@ -263,18 +275,19 @@ fn memory_writes_tracked() {
         &mut energy,
         0.0,
         &mut memory,
+        &prev_mem,
         &ss,
         &cfg,
         &mut side_outputs,
     );
 
-    assert_eq!(trace.memory_writes.len(), 1);
-    assert_eq!(trace.memory_writes[0].address, 7);
-    assert_eq!(trace.memory_writes[0].old_value, 0);
-    assert_eq!(trace.memory_writes[0].new_value, 42);
+    assert_eq!(trace.slot_writes.len(), 1);
+    assert_eq!(trace.slot_writes[0].slot_idx, 7);
+    assert!((trace.slot_writes[0].old_value - 0.0).abs() < f32::EPSILON);
+    assert!((trace.slot_writes[0].new_value - 42.0).abs() < f32::EPSILON);
 
     // Verify memory was committed
-    assert_eq!(memory[7], 42);
+    assert!((memory[7] - 42.0).abs() < f32::EPSILON);
 }
 
 /// Result equivalence with energy exhaustion.
@@ -292,9 +305,11 @@ fn result_equivalence_energy_exhaustion() {
     let ss = empty_ss();
     let cfg = config();
 
+    let prev_mem = [0.0f32; 16];
+
     // Energy just enough for ~1 Noop (0.05), second will exhaust
     let mut energy_a = 0.06f32;
-    let mut memory_a = [0u8; 1024];
+    let mut memory_a = [0.0f32; 16];
     let mut aq_a = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let result_a = execute_vm_node(
         &def,
@@ -303,13 +318,14 @@ fn result_equivalence_energy_exhaustion() {
         &mut energy_a,
         0.0,
         &mut memory_a,
+        &prev_mem,
         &ss,
         &cfg,
         &mut aq_a,
     );
 
     let mut energy_b = 0.06f32;
-    let mut memory_b = [0u8; 1024];
+    let mut memory_b = [0.0f32; 16];
     let mut aq_b = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let (result_b, _trace) = execute_vm_node_traced(
         &def,
@@ -318,6 +334,7 @@ fn result_equivalence_energy_exhaustion() {
         &mut energy_b,
         0.0,
         &mut memory_b,
+        &prev_mem,
         &ss,
         &cfg,
         &mut aq_b,
@@ -348,8 +365,10 @@ fn result_equivalence_routing() {
     let ss = empty_ss();
     let cfg = config();
 
+    let prev_mem = [0.0f32; 16];
+
     let mut energy_a = 100.0f32;
-    let mut memory_a = [0u8; 1024];
+    let mut memory_a = [0.0f32; 16];
     let mut aq_a = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let result_a = execute_vm_node(
         &def,
@@ -358,13 +377,14 @@ fn result_equivalence_routing() {
         &mut energy_a,
         0.0,
         &mut memory_a,
+        &prev_mem,
         &ss,
         &cfg,
         &mut aq_a,
     );
 
     let mut energy_b = 100.0f32;
-    let mut memory_b = [0u8; 1024];
+    let mut memory_b = [0.0f32; 16];
     let mut aq_b = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let (result_b, trace) = execute_vm_node_traced(
         &def,
@@ -373,6 +393,7 @@ fn result_equivalence_routing() {
         &mut energy_b,
         0.0,
         &mut memory_b,
+        &prev_mem,
         &ss,
         &cfg,
         &mut aq_b,
@@ -387,23 +408,23 @@ fn result_equivalence_routing() {
 }
 
 #[test]
-fn result_equivalence_all_38_opcodes() {
+fn result_equivalence_all_41_opcodes() {
     let zero_upstream = [0.0f32; 12];
     let mut read_input_upstream = [0.0f32; 12];
     read_input_upstream[3] = 42.0;
 
-    let zero_mem = [0u8; 1024];
-    let mut mem_for_load = [0u8; 1024];
-    mem_for_load[5] = 123;
-    let mut mem_for_load_imm = [0u8; 1024];
-    mem_for_load_imm[9] = 231;
+    let zero_mem = [0.0f32; 16];
+    let mut mem_for_load = [0.0f32; 16];
+    mem_for_load[5] = 123.0;
+    let mut mem_for_load_imm = [0.0f32; 16];
+    mem_for_load_imm[9] = 231.0;
 
     type OpcodeCase = (
         &'static str,
         VmBackendDef,
         Vec<InputReference>,
         [f32; 12],
-        [u8; 1024],
+        [f32; 16],
     );
     let cases: Vec<OpcodeCase> = vec![
         (
@@ -994,6 +1015,20 @@ fn result_equivalence_all_38_opcodes() {
             zero_mem,
         ),
         (
+            "SetPriorityBid",
+            VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![
+                    VmInstruction::SetPriorityBid { src: 0 },
+                    VmInstruction::Halt,
+                ],
+            },
+            vec![],
+            zero_upstream,
+            zero_mem,
+        ),
+        (
             "ExecuteActionQueue",
             VmBackendDef {
                 register_count: 1,
@@ -1034,7 +1069,7 @@ fn result_equivalence_all_38_opcodes() {
             zero_mem,
         ),
         (
-            "LoadMem8",
+            "LoadSlot",
             VmBackendDef {
                 register_count: 2,
                 constants: vec![5.0],
@@ -1043,9 +1078,9 @@ fn result_equivalence_all_38_opcodes() {
                         dst: 0,
                         const_idx: 0,
                     },
-                    VmInstruction::LoadMem8 {
+                    VmInstruction::LoadSlot {
                         dst: 1,
-                        addr_reg: 0,
+                        slot_reg: 0,
                     },
                     VmInstruction::Halt,
                 ],
@@ -1055,7 +1090,7 @@ fn result_equivalence_all_38_opcodes() {
             mem_for_load,
         ),
         (
-            "StoreMem8",
+            "StoreSlot",
             VmBackendDef {
                 register_count: 2,
                 constants: vec![5.0, 77.0],
@@ -1068,8 +1103,8 @@ fn result_equivalence_all_38_opcodes() {
                         dst: 1,
                         const_idx: 1,
                     },
-                    VmInstruction::StoreMem8 {
-                        addr_reg: 0,
+                    VmInstruction::StoreSlot {
+                        slot_reg: 0,
                         src: 1,
                     },
                     VmInstruction::Halt,
@@ -1080,14 +1115,14 @@ fn result_equivalence_all_38_opcodes() {
             zero_mem,
         ),
         (
-            "LoadMem8Imm",
+            "LoadSlotImm",
             VmBackendDef {
                 register_count: 1,
                 constants: vec![],
                 program: vec![
-                    VmInstruction::LoadMem8Imm {
+                    VmInstruction::LoadSlotImm {
                         dst: 0,
-                        imm_addr: 9,
+                        slot_idx: 9,
                     },
                     VmInstruction::Halt,
                 ],
@@ -1097,7 +1132,7 @@ fn result_equivalence_all_38_opcodes() {
             mem_for_load_imm,
         ),
         (
-            "StoreMem8Imm",
+            "StoreSlotImm",
             VmBackendDef {
                 register_count: 1,
                 constants: vec![88.0],
@@ -1106,10 +1141,41 @@ fn result_equivalence_all_38_opcodes() {
                         dst: 0,
                         const_idx: 0,
                     },
-                    VmInstruction::StoreMem8Imm {
-                        imm_addr: 9,
+                    VmInstruction::StoreSlotImm {
+                        slot_idx: 9,
                         src: 0,
                     },
+                    VmInstruction::Halt,
+                ],
+            },
+            vec![],
+            zero_upstream,
+            zero_mem,
+        ),
+        (
+            "LoadSlotPrev",
+            VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![
+                    VmInstruction::LoadSlotPrev {
+                        dst: 0,
+                        slot_idx: 0,
+                    },
+                    VmInstruction::Halt,
+                ],
+            },
+            vec![],
+            zero_upstream,
+            zero_mem,
+        ),
+        (
+            "ClearSlot",
+            VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![
+                    VmInstruction::ClearSlot { slot_idx: 0 },
                     VmInstruction::Halt,
                 ],
             },
@@ -1121,7 +1187,7 @@ fn result_equivalence_all_38_opcodes() {
 
     assert_eq!(
         cases.len(),
-        38,
+        41,
         "every VmInstruction opcode must be covered"
     );
 

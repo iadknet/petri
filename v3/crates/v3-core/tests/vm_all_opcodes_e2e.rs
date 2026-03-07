@@ -1,6 +1,6 @@
 //! End-to-end VM opcode coverage test.
 //!
-//! Uses one sample VM program containing all 38 opcodes. The program's final
+//! Uses one sample VM program containing all 41 opcodes. The program's final
 //! branch reads `FoodHere`: with food it executes `PushAction` + `ExecuteActionQueue`,
 //! without food it executes `Halt`. Running both scenarios yields full opcode coverage
 //! through the simulation tick path.
@@ -28,31 +28,36 @@ const FOUNDER_POLARITY: [bool; 6] = [true; 6];
 
 fn sample_vm_program() -> Vec<VmInstruction> {
     vec![
-        // ── Memory + arithmetic + logical opcodes ──────────────────────────
+        // ── Shared memory slots + arithmetic + logical opcodes ─────────────
         VmInstruction::LoadConst {
             dst: 0,
             const_idx: 0,
-        }, // r0 = 5.0 (addr)
+        }, // r0 = 5.0 (slot addr)
         VmInstruction::LoadConst {
             dst: 1,
             const_idx: 1,
         }, // r1 = 77.0 (value)
-        VmInstruction::StoreMem8 {
-            addr_reg: 0,
+        VmInstruction::StoreSlot {
+            slot_reg: 0,
             src: 1,
         },
-        VmInstruction::LoadMem8 {
+        VmInstruction::LoadSlot {
             dst: 2,
-            addr_reg: 0,
+            slot_reg: 0,
         },
-        VmInstruction::StoreMem8Imm {
-            imm_addr: 9,
+        VmInstruction::StoreSlotImm {
+            slot_idx: 9,
             src: 1,
         },
-        VmInstruction::LoadMem8Imm {
+        VmInstruction::LoadSlotImm {
             dst: 3,
-            imm_addr: 9,
+            slot_idx: 9,
         },
+        VmInstruction::LoadSlotPrev {
+            dst: 3,
+            slot_idx: 9,
+        },
+        VmInstruction::ClearSlot { slot_idx: 9 },
         VmInstruction::Move { dst: 4, src: 2 },
         VmInstruction::Add { dst: 5, a: 2, b: 3 },
         VmInstruction::Sub { dst: 6, a: 5, b: 3 },
@@ -117,6 +122,8 @@ fn sample_vm_program() -> Vec<VmInstruction> {
             src: 14,
         },
         VmInstruction::WriteRouteTarget { src: 0 },
+        // ── Priority bid ────────────────────────────────────────────────────
+        VmInstruction::SetPriorityBid { src: 13 }, // r13 = 0.0, so no energy deducted
         // ── Action queue introspection opcodes ──────────────────────────────
         VmInstruction::PushAction { action_type: 0 }, // push test NoOp action
         VmInstruction::ReadActionQueueLength { dst: 14 }, // r14 = 1.0
@@ -223,28 +230,34 @@ fn expected_all_opcode_discriminants() -> HashSet<Discriminant<VmInstruction>> {
             param_slot: 0,
             dst: 0,
         },
+        VmInstruction::SetPriorityBid { src: 0 },
         VmInstruction::ExecuteActionQueue,
         VmInstruction::Halt,
-        VmInstruction::LoadMem8 {
+        VmInstruction::LoadSlot {
             dst: 0,
-            addr_reg: 1,
+            slot_reg: 1,
         },
-        VmInstruction::StoreMem8 {
-            addr_reg: 0,
+        VmInstruction::StoreSlot {
+            slot_reg: 0,
             src: 1,
         },
-        VmInstruction::LoadMem8Imm {
+        VmInstruction::LoadSlotImm {
             dst: 0,
-            imm_addr: 0,
+            slot_idx: 0,
         },
-        VmInstruction::StoreMem8Imm {
-            imm_addr: 0,
+        VmInstruction::StoreSlotImm {
+            slot_idx: 0,
             src: 0,
         },
+        VmInstruction::LoadSlotPrev {
+            dst: 0,
+            slot_idx: 0,
+        },
+        VmInstruction::ClearSlot { slot_idx: 0 },
     ];
 
     let set: HashSet<Discriminant<VmInstruction>> = instructions.iter().map(discriminant).collect();
-    assert_eq!(set.len(), 38, "expected 38 unique VM opcode discriminants");
+    assert_eq!(set.len(), 41, "expected 41 unique VM opcode discriminants");
     set
 }
 
@@ -366,7 +379,7 @@ fn sample_program_exercises_all_vm_opcodes_e2e() {
         emit_seen.union(&halt_seen).copied().collect();
     assert_eq!(
         observed, expected,
-        "sample VM program should cover all 38 opcodes across emit/halt runs"
+        "sample VM program should cover all 41 opcodes across emit/halt runs"
     );
 
     // Verify unconditional Jump was actually taken (pc + 2 because offset=1).

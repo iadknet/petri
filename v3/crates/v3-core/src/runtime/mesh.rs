@@ -79,9 +79,6 @@ pub fn execute_creature_mesh(
 
         // Snapshot energy before node dispatch to attribute cost to the correct backend.
         let node_energy_before = *energy;
-        // Temporary: VM still uses old [u8; 1024] memory interface.
-        // Step 4 will replace VM opcodes and wire shared_memory directly.
-        let mut _legacy_mem = [0u8; 1024];
         let result = match &node.backend_def {
             BackendDef::Vm(def) => execute_vm_node(
                 def,
@@ -89,7 +86,8 @@ pub fn execute_creature_mesh(
                 &upstream_slots,
                 energy,
                 energy_consumed,
-                &mut _legacy_mem,
+                _shared_memory,
+                _prev_shared_memory,
                 sensors,
                 config,
                 &mut side_outputs,

@@ -51,8 +51,9 @@ pub fn vm_register_write(instr: &VmInstruction) -> Option<u8> {
         | VmInstruction::ReadActionQueueLength { dst, .. }
         | VmInstruction::ReadActionQueueType { dst, .. }
         | VmInstruction::ReadActionQueueParam { dst, .. }
-        | VmInstruction::LoadMem8 { dst, .. }
-        | VmInstruction::LoadMem8Imm { dst, .. } => Some(*dst),
+        | VmInstruction::LoadSlot { dst, .. }
+        | VmInstruction::LoadSlotImm { dst, .. }
+        | VmInstruction::LoadSlotPrev { dst, .. } => Some(*dst),
         VmInstruction::Noop
         | VmInstruction::Halt
         | VmInstruction::Jump { .. }
@@ -64,8 +65,9 @@ pub fn vm_register_write(instr: &VmInstruction) -> Option<u8> {
         | VmInstruction::ExecuteActionQueue
         | VmInstruction::WriteRouteTarget { .. }
         | VmInstruction::SetPriorityBid { .. }
-        | VmInstruction::StoreMem8 { .. }
-        | VmInstruction::StoreMem8Imm { .. } => None,
+        | VmInstruction::StoreSlot { .. }
+        | VmInstruction::StoreSlotImm { .. }
+        | VmInstruction::ClearSlot { .. } => None,
     }
 }
 
@@ -90,7 +92,9 @@ pub fn vm_register_read_mask(instr: &VmInstruction) -> u32 {
         | VmInstruction::PopAction
         | VmInstruction::ExecuteActionQueue => 0,
         VmInstruction::LoadConst { .. }
-        | VmInstruction::LoadMem8Imm { .. }
+        | VmInstruction::LoadSlotImm { .. }
+        | VmInstruction::LoadSlotPrev { .. }
+        | VmInstruction::ClearSlot { .. }
         | VmInstruction::ReadActionQueueLength { .. } => 0,
         VmInstruction::PushAction { .. } => 0,
         VmInstruction::Move { src, .. }
@@ -119,10 +123,10 @@ pub fn vm_register_read_mask(instr: &VmInstruction) -> u32 {
         VmInstruction::WriteInternalPayload { src, .. }
         | VmInstruction::WriteWorldActionMeta { src, .. }
         | VmInstruction::WriteRouteTarget { src }
-        | VmInstruction::SetPriorityBid { src } => vm_reg_bit(*src),
-        VmInstruction::StoreMem8Imm { src, .. } => vm_reg_bit(*src),
-        VmInstruction::LoadMem8 { addr_reg, .. } => vm_reg_bit(*addr_reg),
-        VmInstruction::StoreMem8 { addr_reg, src } => vm_reg_bit(*addr_reg) | vm_reg_bit(*src),
+        | VmInstruction::SetPriorityBid { src }
+        | VmInstruction::StoreSlotImm { src, .. } => vm_reg_bit(*src),
+        VmInstruction::LoadSlot { slot_reg, .. } => vm_reg_bit(*slot_reg),
+        VmInstruction::StoreSlot { slot_reg, src } => vm_reg_bit(*slot_reg) | vm_reg_bit(*src),
         VmInstruction::ReadActionQueueType { index_src, .. } => vm_reg_bit(*index_src),
         VmInstruction::ReadActionQueueParam { index_src, .. } => vm_reg_bit(*index_src),
     }
@@ -139,8 +143,9 @@ pub fn vm_is_output_instruction(instr: &VmInstruction) -> bool {
             | VmInstruction::ExecuteActionQueue
             | VmInstruction::WriteRouteTarget { .. }
             | VmInstruction::SetPriorityBid { .. }
-            | VmInstruction::StoreMem8 { .. }
-            | VmInstruction::StoreMem8Imm { .. }
+            | VmInstruction::StoreSlot { .. }
+            | VmInstruction::StoreSlotImm { .. }
+            | VmInstruction::ClearSlot { .. }
     )
 }
 

@@ -260,7 +260,7 @@ fn random_vm_instruction(
     let cl = constants_len.clamp(1, 255) as u8;
     let il = input_refs_len.clamp(1, 255) as u8;
 
-    match rng.gen_range(0u8..39) {
+    match rng.gen_range(0u8..41) {
         0 => VmInstruction::Noop,
         1 => VmInstruction::LoadConst {
             dst: rng.gen_range(0..rc),
@@ -395,26 +395,33 @@ fn random_vm_instruction(
         },
         32 => VmInstruction::ExecuteActionQueue,
         33 => VmInstruction::Halt,
-        34 => VmInstruction::LoadMem8 {
+        34 => VmInstruction::LoadSlot {
             dst: rng.gen_range(0..rc),
-            addr_reg: rng.gen_range(0..rc),
+            slot_reg: rng.gen_range(0..rc),
         },
-        35 => VmInstruction::StoreMem8 {
-            addr_reg: rng.gen_range(0..rc),
+        35 => VmInstruction::StoreSlot {
+            slot_reg: rng.gen_range(0..rc),
             src: rng.gen_range(0..rc),
         },
-        36 => VmInstruction::LoadMem8Imm {
+        36 => VmInstruction::LoadSlotImm {
             dst: rng.gen_range(0..rc),
-            imm_addr: rng.gen(),
+            slot_idx: rng.gen_range(0..16),
         },
-        37 => VmInstruction::StoreMem8Imm {
-            imm_addr: rng.gen(),
+        37 => VmInstruction::StoreSlotImm {
+            slot_idx: rng.gen_range(0..16),
             src: rng.gen_range(0..rc),
         },
         38 => VmInstruction::SetPriorityBid {
             src: rng.gen_range(0..rc),
         },
-        _ => unreachable!("gen_range(0..39) cannot produce values >= 39"),
+        39 => VmInstruction::LoadSlotPrev {
+            dst: rng.gen_range(0..rc),
+            slot_idx: rng.gen_range(0..16),
+        },
+        40 => VmInstruction::ClearSlot {
+            slot_idx: rng.gen_range(0..16),
+        },
+        _ => unreachable!("gen_range(0..41) cannot produce values >= 41"),
     }
 }
 
@@ -484,21 +491,28 @@ fn mutate_instruction_raw_fields(instr: &mut VmInstruction, rng: &mut impl Rng) 
         VmInstruction::WriteRouteTarget { src } => {
             *src = rng.gen();
         }
-        VmInstruction::LoadMem8 { dst, addr_reg } => {
+        VmInstruction::LoadSlot { dst, slot_reg } => {
             *dst = rng.gen();
-            *addr_reg = rng.gen();
+            *slot_reg = rng.gen();
         }
-        VmInstruction::StoreMem8 { addr_reg, src } => {
-            *addr_reg = rng.gen();
+        VmInstruction::StoreSlot { slot_reg, src } => {
+            *slot_reg = rng.gen();
             *src = rng.gen();
         }
-        VmInstruction::LoadMem8Imm { dst, imm_addr } => {
+        VmInstruction::LoadSlotImm { dst, slot_idx } => {
             *dst = rng.gen();
-            *imm_addr = rng.gen();
+            *slot_idx = rng.gen_range(0..16);
         }
-        VmInstruction::StoreMem8Imm { imm_addr, src } => {
-            *imm_addr = rng.gen();
+        VmInstruction::StoreSlotImm { slot_idx, src } => {
+            *slot_idx = rng.gen_range(0..16);
             *src = rng.gen();
+        }
+        VmInstruction::LoadSlotPrev { dst, slot_idx } => {
+            *dst = rng.gen();
+            *slot_idx = rng.gen_range(0..16);
+        }
+        VmInstruction::ClearSlot { slot_idx } => {
+            *slot_idx = rng.gen_range(0..16);
         }
         VmInstruction::PushAction { action_type } => {
             *action_type = rng.gen();
@@ -677,16 +691,18 @@ fn remap_register_refs(instr: &mut VmInstruction, offset: u8, register_count: u8
             remap(index_src);
             remap(dst);
         }
-        VmInstruction::LoadMem8 { dst, addr_reg } => {
+        VmInstruction::LoadSlot { dst, slot_reg } => {
             remap(dst);
-            remap(addr_reg);
+            remap(slot_reg);
         }
-        VmInstruction::StoreMem8 { addr_reg, src } => {
-            remap(addr_reg);
+        VmInstruction::StoreSlot { slot_reg, src } => {
+            remap(slot_reg);
             remap(src);
         }
-        VmInstruction::LoadMem8Imm { dst, .. } => remap(dst),
-        VmInstruction::StoreMem8Imm { src, .. } => remap(src),
+        VmInstruction::LoadSlotImm { dst, .. } => remap(dst),
+        VmInstruction::StoreSlotImm { src, .. } => remap(src),
+        VmInstruction::LoadSlotPrev { dst, .. } => remap(dst),
+        VmInstruction::ClearSlot { .. } => {}
     }
 }
 
