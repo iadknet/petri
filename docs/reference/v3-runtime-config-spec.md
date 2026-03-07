@@ -88,6 +88,8 @@ Type posture:
 | `mutation.phenotype.channel_step` | `u8` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
 | `mutation.phenotype.channel_change_chance` | `f32` | `0.001` | Clamp to `[0.0, 1.0]`. |
 | `mutation.phenotype.polarity_flip_chance` | `f32` | `0.0002` | Clamp to `[0.0, 1.0]`. |
+| `mutation.genome_size_cap` | `u32` | `1200` | Must be `>= 1`; invalid values fall back to `1200`. Maximum total genome size before size pressure suppresses growth mutations. Uses `genome_size()` (total structural size including junk DNA), not `complexity()` (functional reachability-aware). Serde alias: `complexity_cap`. |
+| `mutation.genome_size_pressure_enabled` | `bool` | `true` | When `true`, genomes near the size cap are less likely to gain growth mutations. Serde alias: `complexity_pressure_enabled`. |
 
 Phenotype mutation is not a mutation engine domain; it is a separate pathway
 triggered by genome mutation. Phenotype algorithm and trigger semantics are
@@ -132,7 +134,10 @@ section only owns config contract shape/defaults.
 Complexity energy cost:
 - When enabled, all action energy costs (noop, eat, move, reproduce, steal, and
   failed_action_penalty) are multiplied by
-  `1.0 + max(0, genome_complexity - threshold) * scaling_factor`.
+  `1.0 + max(0, functional_complexity - threshold) * scaling_factor`.
+- Uses functional complexity (reachability-aware), not total genome size. This
+  means creatures are not penalized for junk DNA (unreachable mesh nodes, dead
+  instructions/graph nodes within reachable nodes).
 - Creatures at or below the threshold pay standard costs (multiplier = 1.0).
 - Does NOT apply to `energy_decay_per_tick` (world-level phase 0 cost) or
   `eat_reward_per_food` (reward, not cost).
