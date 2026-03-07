@@ -188,8 +188,8 @@ fn random_vm_instruction_covers_all_families() {
     }
     assert_eq!(
         discriminants.len(),
-        39,
-        "all 39 VmInstruction variants must be reachable; got {}",
+        41,
+        "all 41 VmInstruction variants must be reachable; got {}",
         discriminants.len()
     );
 }
@@ -213,24 +213,26 @@ fn random_vm_instruction_widens_push_action_range() {
 }
 
 #[test]
-fn random_vm_instruction_widens_imm_addr_range() {
-    let mut saw_above_1023 = false;
+fn random_vm_instruction_generates_slot_opcodes() {
+    let mut saw_slot_opcode = false;
     for seed in 0u64..1024 {
         let mut r = rng(seed);
         match random_vm_instruction(&mut r, 4, 4, 4) {
-            VmInstruction::LoadMem8Imm { imm_addr, .. }
-            | VmInstruction::StoreMem8Imm { imm_addr, .. } => {
-                if imm_addr > 1023 {
-                    saw_above_1023 = true;
-                    break;
-                }
+            VmInstruction::LoadSlot { .. }
+            | VmInstruction::StoreSlot { .. }
+            | VmInstruction::LoadSlotImm { .. }
+            | VmInstruction::StoreSlotImm { .. }
+            | VmInstruction::LoadSlotPrev { .. }
+            | VmInstruction::ClearSlot { .. } => {
+                saw_slot_opcode = true;
+                break;
             }
             _ => {}
         }
     }
     assert!(
-        saw_above_1023,
-        "random instruction generation should reach imm_addr values above 1023"
+        saw_slot_opcode,
+        "random instruction generation should produce slot opcodes"
     );
 }
 
@@ -262,32 +264,32 @@ fn raw_field_mutation_can_produce_out_of_range_action_type() {
 }
 
 #[test]
-fn raw_field_mutation_can_produce_out_of_range_imm_addr() {
+fn raw_field_mutation_can_change_slot_idx() {
     let mut genome = v3alpha1_founder_genome();
     if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
-        vm.program = vec![VmInstruction::LoadMem8Imm {
+        vm.program = vec![VmInstruction::LoadSlotImm {
             dst: 0,
-            imm_addr: 0,
+            slot_idx: 0,
         }];
     }
 
-    let mut saw_out_of_range = false;
+    let mut saw_changed = false;
     for seed in 0u64..512 {
         let mut g = genome.clone();
         let mut r = rng(seed);
         VmMutator::apply(&mut g, VmOperator::VmInstructionRawFieldMutation, &mut r).unwrap();
         if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
-            if let VmInstruction::LoadMem8Imm { imm_addr, .. } = vm.program[0] {
-                if imm_addr > 1023 {
-                    saw_out_of_range = true;
+            if let VmInstruction::LoadSlotImm { slot_idx, .. } = vm.program[0] {
+                if slot_idx != 0 {
+                    saw_changed = true;
                     break;
                 }
             }
         }
     }
     assert!(
-        saw_out_of_range,
-        "raw field mutation should produce imm_addr values outside 0..=1023"
+        saw_changed,
+        "raw field mutation should change slot_idx from initial value"
     );
 }
 

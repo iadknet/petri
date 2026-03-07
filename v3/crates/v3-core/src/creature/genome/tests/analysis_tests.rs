@@ -851,8 +851,8 @@ fn functional_complexity_excludes_dead_graph_nodes() {
 }
 
 #[test]
-fn functional_complexity_counts_store_mem_as_output() {
-    // StoreMem8 should be treated as output instruction
+fn functional_complexity_counts_store_slot_as_output() {
+    // StoreSlot should be treated as output instruction
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
@@ -865,13 +865,13 @@ fn functional_complexity_counts_store_mem_as_output() {
                     VmInstruction::LoadConst {
                         dst: 0,
                         const_idx: 0,
-                    }, // live (feeds StoreMem8)
+                    }, // live (feeds StoreSlot)
                     VmInstruction::LoadConst {
                         dst: 1,
                         const_idx: 1,
                     }, // DEAD
-                    VmInstruction::StoreMem8 {
-                        addr_reg: 0,
+                    VmInstruction::StoreSlot {
+                        slot_reg: 0,
                         src: 0,
                     }, // output
                 ],
@@ -880,7 +880,7 @@ fn functional_complexity_counts_store_mem_as_output() {
         }],
     };
     let fc = functional_complexity(&genome);
-    // 1 node + 0 targets + 2 live instrs (LoadConst@0, StoreMem8@2) + 1 const + 0 refs = 4
+    // 1 node + 0 targets + 2 live instrs (LoadConst@0, StoreSlot@2) + 1 const + 0 refs = 4
     assert_eq!(fc, 4);
 }
 

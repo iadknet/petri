@@ -14,7 +14,8 @@ fn register_count_zero_halts_immediately() {
     };
     let ss = empty_sensor_snapshot();
     let mut e = 100.0;
-    let mut mem = [0u8; 1024];
+    let mut mem = [0.0f32; 16];
+    let prev_mem = [0.0f32; 16];
     let cfg = config();
     let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
@@ -24,6 +25,7 @@ fn register_count_zero_halts_immediately() {
         &mut e,
         0.0,
         &mut mem,
+        &prev_mem,
         &ss,
         &cfg,
         &mut side_outputs,
@@ -64,7 +66,8 @@ fn program_counter_past_program_len_soft_halts() {
     };
     let ss = empty_sensor_snapshot();
     let mut e = 100.0;
-    let mut mem = [0u8; 1024];
+    let mut mem = [0.0f32; 16];
+    let prev_mem = [0.0f32; 16];
     let mut cfg = config();
     cfg.vm.opcode_cost_multiplier = 1.0;
     let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
@@ -75,6 +78,7 @@ fn program_counter_past_program_len_soft_halts() {
         &mut e,
         0.0,
         &mut mem,
+        &prev_mem,
         &ss,
         &cfg,
         &mut side_outputs,
@@ -167,7 +171,8 @@ fn energy_is_deducted_per_opcode() {
     };
     let ss = empty_sensor_snapshot();
     let mut e = 100.0;
-    let mut mem = [0u8; 1024];
+    let mut mem = [0.0f32; 16];
+    let prev_mem = [0.0f32; 16];
     let mut cfg = config();
     cfg.vm.opcode_cost_multiplier = 1.0;
     let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
@@ -178,6 +183,7 @@ fn energy_is_deducted_per_opcode() {
         &mut e,
         0.0,
         &mut mem,
+        &prev_mem,
         &ss,
         &cfg,
         &mut side_outputs,
@@ -196,7 +202,8 @@ fn energy_exhaustion_returns_exhausted() {
     };
     let ss = empty_sensor_snapshot();
     let mut e = 0.01;
-    let mut mem = [0u8; 1024];
+    let mut mem = [0.0f32; 16];
+    let prev_mem = [0.0f32; 16];
     let mut cfg = config();
     cfg.vm.opcode_cost_multiplier = 1.0;
     let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
@@ -207,6 +214,7 @@ fn energy_exhaustion_returns_exhausted() {
         &mut e,
         0.0,
         &mut mem,
+        &prev_mem,
         &ss,
         &cfg,
         &mut side_outputs,
@@ -224,8 +232,8 @@ fn energy_exhaustion_does_not_commit_memory_writes() {
                 dst: 0,
                 const_idx: 0,
             }, // costs 0.08
-            VmInstruction::StoreMem8Imm {
-                imm_addr: 10,
+            VmInstruction::StoreSlotImm {
+                slot_idx: 10,
                 src: 0,
             }, // costs 0.16
             VmInstruction::Halt,
@@ -233,9 +241,10 @@ fn energy_exhaustion_does_not_commit_memory_writes() {
     };
     let ss = empty_sensor_snapshot();
     // Give 0.20 energy with opcode_cost_multiplier=1.0:
-    // LoadConst(0.08) → 0.12 left; StoreMem8Imm(0.16) → -0.04 → exhausted
+    // LoadConst(0.08) → 0.12 left; StoreSlotImm(0.16) → -0.04 → exhausted
     let mut e = 0.20;
-    let mut mem = [0u8; 1024];
+    let mut mem = [0.0f32; 16];
+    let prev_mem = [0.0f32; 16];
     let mut cfg = config();
     cfg.vm.opcode_cost_multiplier = 1.0;
     let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
@@ -246,13 +255,14 @@ fn energy_exhaustion_does_not_commit_memory_writes() {
         &mut e,
         0.0,
         &mut mem,
+        &prev_mem,
         &ss,
         &cfg,
         &mut side_outputs,
     );
     assert!(r.energy_exhausted);
-    // mem[10] should still be 0 (not written)
-    assert_eq!(mem[10], 0);
+    // mem[10] should still be 0.0 (not written)
+    assert!((mem[10]).abs() < f32::EPSILON);
 }
 
 #[test]
@@ -270,7 +280,8 @@ fn max_vm_steps_enforced() {
     };
     let ss = empty_sensor_snapshot();
     let mut e = 1000.0;
-    let mut mem = [0u8; 1024];
+    let mut mem = [0.0f32; 16];
+    let prev_mem = [0.0f32; 16];
     let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let r = execute_vm_node(
         &def,
@@ -279,6 +290,7 @@ fn max_vm_steps_enforced() {
         &mut e,
         0.0,
         &mut mem,
+        &prev_mem,
         &ss,
         &cfg,
         &mut side_outputs,
