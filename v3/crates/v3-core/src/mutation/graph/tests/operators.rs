@@ -248,18 +248,18 @@ fn swap_operator_can_produce_parameterized_kinds() {
 }
 
 #[test]
-fn random_graph_node_kind_covers_all_26_variants() {
+fn random_graph_node_kind_covers_all_30_variants_old() {
     use std::collections::HashSet;
     let mut discriminants: HashSet<std::mem::Discriminant<GraphNodeKind>> = HashSet::new();
-    for seed in 0u64..2000 {
+    for seed in 0u64..5000 {
         let mut r = rng(seed);
         let kind = random_graph_node_kind(&mut r);
         discriminants.insert(std::mem::discriminant(&kind));
     }
     assert_eq!(
         discriminants.len(),
-        26,
-        "all 26 GraphNodeKind variants must be reachable; got {}",
+        30,
+        "all 30 GraphNodeKind variants must be reachable; got {}",
         discriminants.len()
     );
 }
@@ -498,4 +498,100 @@ fn graph_after_mutation_passes_parseability_gate() {
             op
         );
     }
+}
+
+#[test]
+fn random_graph_node_kind_covers_all_30_variants() {
+    use std::collections::HashSet;
+    let mut discriminants: HashSet<std::mem::Discriminant<GraphNodeKind>> = HashSet::new();
+    for seed in 0u64..5000 {
+        let mut r = rng(seed);
+        let kind = random_graph_node_kind(&mut r);
+        discriminants.insert(std::mem::discriminant(&kind));
+    }
+    assert_eq!(
+        discriminants.len(),
+        30,
+        "all 30 GraphNodeKind variants must be reachable; got {}",
+        discriminants.len()
+    );
+}
+
+#[test]
+fn is_parameterized_returns_true_for_slot_kinds() {
+    assert!(is_parameterized(&GraphNodeKind::ReadSlot(0)));
+    assert!(is_parameterized(&GraphNodeKind::ReadSlotPrev(0)));
+    assert!(is_parameterized(&GraphNodeKind::WriteSlot(0)));
+    assert!(is_parameterized(&GraphNodeKind::ClearSlot(0)));
+}
+
+#[test]
+fn mutate_operator_param_does_not_panic_on_slot_kinds() {
+    // Build a genome with graph nodes containing slot kinds.
+    let mut genome = v3alpha1_founder_genome();
+    if let BackendDef::Graph(ref mut g) = genome.nodes[0].backend_def {
+        // Replace first 4 internal nodes with slot kinds.
+        g.internal_nodes[0].kind = GraphNodeKind::ReadSlot(5);
+        g.internal_nodes[1].kind = GraphNodeKind::ReadSlotPrev(10);
+        g.internal_nodes[2].kind = GraphNodeKind::WriteSlot(15);
+        g.internal_nodes[3].kind = GraphNodeKind::ClearSlot(0);
+    }
+    // Run mutate_operator_param many times — must not panic.
+    for seed in 0u64..200 {
+        let mut g = genome.clone();
+        let mut r = rng(seed);
+        let _ = mutate_operator_param(&mut g, 0, &mut r);
+    }
+    // Verify values actually changed.
+    let original_kinds: Vec<GraphNodeKind> =
+        if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
+            g.internal_nodes[0..4]
+                .iter()
+                .map(|n| n.kind.clone())
+                .collect()
+        } else {
+            panic!()
+        };
+    let mut any_changed = false;
+    for seed in 0u64..200 {
+        let mut g = genome.clone();
+        let mut r = rng(seed);
+        let _ = mutate_operator_param(&mut g, 0, &mut r);
+        if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
+            for (i, orig) in original_kinds.iter().enumerate() {
+                if gd.internal_nodes[i].kind != *orig {
+                    any_changed = true;
+                }
+            }
+        }
+    }
+    assert!(any_changed, "mutate_operator_param must modify slot kinds");
+}
+
+#[test]
+fn graph_raw_field_mutation_handles_slot_kinds() {
+    let mut genome = v3alpha1_founder_genome();
+    if let BackendDef::Graph(ref mut g) = genome.nodes[0].backend_def {
+        g.internal_nodes[0].kind = GraphNodeKind::ReadSlot(5);
+        g.internal_nodes[1].kind = GraphNodeKind::WriteSlot(10);
+    }
+    // Run many times — must not panic and should sometimes mutate slot fields.
+    let mut any_mutated = false;
+    for seed in 0u64..500 {
+        let mut g = genome.clone();
+        let mut r = rng(seed);
+        let _ = apply_graph_raw_field_mutation(&mut g, 0, &mut r);
+        if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
+            if gd.internal_nodes[0].kind != GraphNodeKind::ReadSlot(5)
+                || gd.internal_nodes[1].kind != GraphNodeKind::WriteSlot(10)
+            {
+                any_mutated = true;
+                break;
+            }
+        }
+    }
+    assert!(
+        any_mutated,
+        "raw field mutation must sometimes mutate slot kind fields"
+    );
 }
