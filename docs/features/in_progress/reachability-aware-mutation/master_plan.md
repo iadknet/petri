@@ -243,7 +243,7 @@ After completing each implementation step:
    - Classification: reachable index returns `Reachable`, unreachable returns `Unreachable`
    - Statistical test: `bias=0.7` with seeded RNG over N>=5000 iterations, verify reachable selection rate falls within [0.60, 0.80] when both reachable and unreachable nodes are eligible
 
-- [ ] Step 3: Create reachability module with biased selection helper
+- [x] Step 3: Create reachability module with biased selection helper
 
 ### Step 4: Thread reachability through engine and bias VM/Graph/InputRef
 
