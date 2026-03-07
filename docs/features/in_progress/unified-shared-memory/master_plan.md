@@ -190,10 +190,10 @@ After completing each implementation step:
 
 - [x] Step 13: Update reference specs. `v3-vm-isa-spec.md`: rewrite Section 8 (Creature Memory Contract) for shared slots, update opcode table in Section 2 and cost table in Section 6, update opcode count. `v3-graph-backend-spec.md`: add slot node kinds to data model and evaluation sections. `v3-mutation-spec.md`: add motif operators to VM domain operator list.
 
-- [ ] Step 14: Full verification. Run viability tests (`cargo test -p v3-core --test viability`). Run `cargo test --workspace`. Run `cargo clippy --workspace --all-targets -- -D warnings`. Run `cargo fmt --all -- --check`. Run `npm run build` in frontend.
+- [x] Step 14: Full verification. Run viability tests (`cargo test -p v3-core --test viability`). Run `cargo test --workspace`. Run `cargo clippy --workspace --all-targets -- -D warnings`. Run `cargo fmt --all -- --check`. Run `npm run build` in frontend.
 
-- [ ] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke domain skills (backend: `rust-skills`; frontend: `vercel-react-best-practices` + `vercel-composition-patterns`). Fix all findings. Re-review until clean pass.
-- [ ] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
-- [ ] Completion gate — run all checks from AGENTS.md Completion Gate section
+- [x] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on full branch diff. Invoke domain skills (backend: `rust-skills`; frontend: `vercel-react-best-practices` + `vercel-composition-patterns`). Fix all findings. Re-review until clean pass.
+- [x] Review Gate: Architecture & decomposition review — review all changes for boundary violations, decomposition opportunities, separation of concerns. Re-read `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
+- [x] Completion gate — run all checks from AGENTS.md Completion Gate section
 
 **Review cycles:** 11
