@@ -202,7 +202,7 @@ Migrate every production call site per the Call Site Audit table above:
 4. Update all config tests that reference these fields.
 5. Update config normalization comments.
 
-- [ ] Step 4: Rename config fields and update mutation pressure gate
+- [x] Step 4: Rename config fields and update mutation pressure gate
 
 ### Step 5: Update server API and population stats
 

@@ -33,9 +33,9 @@ impl MutationEngine {
         let event_count = rng
             .gen_range(config.per_birth_mutation_events_min..=config.per_birth_mutation_events_max);
 
-        // Complexity pressure: compute once before the event loop.
-        let restricted = config.complexity_pressure_enabled
-            && pressure::is_restricted(genome.complexity(), config.complexity_cap, rng);
+        // Genome size pressure: compute once before the event loop.
+        let restricted = config.genome_size_pressure_enabled
+            && pressure::is_restricted(genome.genome_size(), config.genome_size_cap, rng);
 
         // Select an operator: Decreasing-only when restricted, unrestricted otherwise.
         // Skips the event (continue) when no Decreasing operator exists for the domain.
@@ -643,8 +643,8 @@ mod tests {
         config.mutation_probability = 1.0;
         config.per_birth_mutation_events_min = 1;
         config.per_birth_mutation_events_max = 1;
-        config.complexity_pressure_enabled = false;
-        config.complexity_cap = 1; // absurdly low cap
+        config.genome_size_pressure_enabled = false;
+        config.genome_size_cap = 1; // absurdly low cap
 
         // Even with a cap of 1, if pressure is disabled, increasing operators must still appear.
         let mut has_increasing = false;
@@ -675,8 +675,8 @@ mod tests {
         config.mutation_probability = 1.0;
         config.per_birth_mutation_events_min = 1;
         config.per_birth_mutation_events_max = 1;
-        config.complexity_pressure_enabled = true;
-        config.complexity_cap = 1; // founder genome is well above 1
+        config.genome_size_pressure_enabled = true;
+        config.genome_size_cap = 1; // founder genome is well above 1
 
         for seed in 0u64..2000 {
             let mut genome = v3alpha1_founder_genome();
@@ -703,8 +703,8 @@ mod tests {
         config.mutation_probability = 1.0;
         config.per_birth_mutation_events_min = 1;
         config.per_birth_mutation_events_max = 1;
-        config.complexity_pressure_enabled = true;
-        config.complexity_cap = 1;
+        config.genome_size_pressure_enabled = true;
+        config.genome_size_cap = 1;
         config.mesh_layer_probability = 0.0; // force node-internal only
 
         let mut vm_attempted: u64 = 0;
@@ -742,8 +742,8 @@ mod tests {
         config.mutation_probability = 1.0;
         config.per_birth_mutation_events_min = 1;
         config.per_birth_mutation_events_max = 5;
-        config.complexity_pressure_enabled = true;
-        config.complexity_cap = 1;
+        config.genome_size_pressure_enabled = true;
+        config.genome_size_cap = 1;
 
         for seed in 0u64..200 {
             let mut genome = v3alpha1_founder_genome();
@@ -764,8 +764,8 @@ mod tests {
         config.mutation_probability = 1.0;
         config.per_birth_mutation_events_min = 1;
         config.per_birth_mutation_events_max = 5;
-        config.complexity_pressure_enabled = true;
-        config.complexity_cap = 1;
+        config.genome_size_pressure_enabled = true;
+        config.genome_size_cap = 1;
 
         for seed in 0u64..100 {
             let mut genome = v3alpha1_founder_genome();
@@ -786,8 +786,8 @@ mod tests {
         config.mutation_probability = 1.0;
         config.per_birth_mutation_events_min = 1;
         config.per_birth_mutation_events_max = 4;
-        config.complexity_pressure_enabled = true;
-        config.complexity_cap = 1;
+        config.genome_size_pressure_enabled = true;
+        config.genome_size_cap = 1;
 
         for seed in 0u64..50 {
             let mut genome = v3alpha1_founder_genome();
