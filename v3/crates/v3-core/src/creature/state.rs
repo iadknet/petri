@@ -1,6 +1,7 @@
 use std::mem::size_of;
 
 use crate::contracts::{CreatureId, Position};
+use crate::creature::genome::analysis::mesh_reachable_nodes;
 use crate::creature::genome::CreatureGenome;
 use crate::creature::identity::CreatureIdentityState;
 
@@ -79,6 +80,9 @@ pub struct CreatureState {
     /// Functional complexity cached at birth. Genome is immutable after creation,
     /// so this value is always current.
     pub cached_complexity: u32,
+    /// Sorted indices of mesh nodes reachable from the entry node, cached at birth.
+    /// Used by the mutation engine to bias target selection toward functional structure.
+    pub cached_reachable_nodes: Box<[usize]>,
 }
 
 impl CreatureState {
@@ -98,6 +102,7 @@ impl CreatureState {
         shared_memory: [f32; SHARED_MEMORY_SLOTS],
     ) -> Self {
         let cached_complexity = genome.complexity();
+        let cached_reachable_nodes = mesh_reachable_nodes(&genome).into_boxed_slice();
         Self {
             id,
             genome,
@@ -113,14 +118,15 @@ impl CreatureState {
             phenotype_active_channel,
             phenotype_channel_polarity,
             cached_complexity,
+            cached_reachable_nodes,
         }
     }
 
-    /// Create a new creature with a pre-computed cached complexity.
+    /// Create a new creature with pre-computed cached fields.
     /// Used in the no-mutation reproduction fast path where the offspring
     /// genome is identical to the parent's.
     #[allow(clippy::too_many_arguments)]
-    pub fn new_with_cached_complexity(
+    pub fn new_with_cached_fields(
         id: CreatureId,
         genome: CreatureGenome,
         position: Position,
@@ -132,6 +138,7 @@ impl CreatureState {
         identity: CreatureIdentityState,
         shared_memory: [f32; SHARED_MEMORY_SLOTS],
         cached_complexity: u32,
+        cached_reachable_nodes: Box<[usize]>,
     ) -> Self {
         Self {
             id,
@@ -148,6 +155,7 @@ impl CreatureState {
             phenotype_active_channel,
             phenotype_channel_polarity,
             cached_complexity,
+            cached_reachable_nodes,
         }
     }
 }
@@ -233,6 +241,95 @@ mod tests {
         assert!((state.shared_memory[7] - -2.0).abs() < f32::EPSILON);
         // prev is always zeroed for new creatures
         assert_eq!(state.prev_shared_memory, [0.0; SHARED_MEMORY_SLOTS]);
+    }
+
+    #[test]
+    fn new_creature_populates_cached_reachable_nodes() {
+        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
+        let id = sm.insert(());
+        // minimal_genome has 1 node (the entry), which is reachable
+        let state = CreatureState::new(
+            id,
+            minimal_genome(),
+            Position::new(0, 0),
+            20.0,
+            0,
+            [0; 6],
+            0,
+            [true; 6],
+            CreatureIdentityState::default(),
+            [0.0; SHARED_MEMORY_SLOTS],
+        );
+        assert_eq!(&*state.cached_reachable_nodes, &[0]);
+    }
+
+    #[test]
+    fn new_creature_reachable_excludes_disconnected_nodes() {
+        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
+        let id = sm.insert(());
+        // Genome with 2 nodes: entry at index 0, disconnected at index 1
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                NodeGenome {
+                    node_id: NodeId::new(0),
+                    input_refs: vec![],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 1,
+                        constants: vec![],
+                        program: vec![VmInstruction::Halt],
+                    }),
+                    targets: vec![], // no targets => node 1 is unreachable
+                },
+                NodeGenome {
+                    node_id: NodeId::new(1),
+                    input_refs: vec![],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 1,
+                        constants: vec![],
+                        program: vec![VmInstruction::Halt],
+                    }),
+                    targets: vec![],
+                },
+            ],
+        };
+        let state = CreatureState::new(
+            id,
+            genome,
+            Position::new(0, 0),
+            20.0,
+            0,
+            [0; 6],
+            0,
+            [true; 6],
+            CreatureIdentityState::default(),
+            [0.0; SHARED_MEMORY_SLOTS],
+        );
+        // Only node 0 should be reachable
+        assert_eq!(&*state.cached_reachable_nodes, &[0]);
+    }
+
+    #[test]
+    fn new_with_cached_fields_preserves_provided_reachable() {
+        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
+        let id = sm.insert(());
+        let reachable: Box<[usize]> = vec![0, 2, 5].into_boxed_slice();
+        let state = CreatureState::new_with_cached_fields(
+            id,
+            minimal_genome(),
+            Position::new(0, 0),
+            20.0,
+            0,
+            [0; 6],
+            0,
+            [true; 6],
+            CreatureIdentityState::default(),
+            [0.0; SHARED_MEMORY_SLOTS],
+            42,
+            reachable.clone(),
+        );
+        assert_eq!(&*state.cached_reachable_nodes, &[0, 2, 5]);
+        assert_eq!(state.cached_complexity, 42);
     }
 
     #[test]
