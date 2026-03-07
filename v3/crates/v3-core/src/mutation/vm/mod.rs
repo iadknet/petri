@@ -988,12 +988,7 @@ fn apply_mutate_paired_slot_address(
             return Err(MutationSkipReason::NoApplicableTarget);
         }
         let (old_slot, indices) = &eligible[rng.gen_range(0..eligible.len())];
-        let new_slot = loop {
-            let s = rng.gen_range(0u8..16);
-            if s != *old_slot {
-                break s;
-            }
-        };
+        let new_slot = (*old_slot + 1 + rng.gen_range(0u8..15)) % 16;
         for &idx in indices {
             set_slot_idx_field(&mut vm.program[idx], new_slot);
         }
