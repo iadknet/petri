@@ -14,10 +14,20 @@ pub fn run_phase_0(sim: &mut Simulation) {
     // Step 1: Food growth
     sim.world.grow_food(&mut sim.rng, &sim.config);
 
-    // Steps 2 & 3: Age and energy decay
+    // Steps 2 & 3: Age, energy decay, and shared memory snapshot + decay
+    let decay_rate = sim.config.shared_memory.decay_rate;
     for (_, creature) in sim.creatures.iter_mut() {
         creature.age += 1;
         creature.energy -= sim.config.energy.lifecycle.energy_decay_per_tick;
+
+        // Snapshot shared_memory → prev_shared_memory, then apply decay.
+        creature.prev_shared_memory = creature.shared_memory;
+        if decay_rate > 0.0 {
+            let factor = 1.0 - decay_rate;
+            for slot in &mut creature.shared_memory {
+                *slot *= factor;
+            }
+        }
     }
 
     // Step 4: Collect dead IDs first to avoid borrow conflict during removal.
@@ -1356,5 +1366,56 @@ mod tests {
         run_phase_0(&mut sim);
         assert!(!sim.creatures.contains_key(id));
         assert!(!sim.action_logs.contains_key(id));
+    }
+
+    #[test]
+    fn phase_0_snapshots_shared_memory_to_prev() {
+        let (mut sim, id) = make_sim_with_one_creature(100.0);
+        // Set some non-zero shared memory values.
+        let creature = sim.creatures.get_mut(id).unwrap();
+        creature.shared_memory[0] = 1.5;
+        creature.shared_memory[3] = -2.0;
+        creature.shared_memory[15] = 42.0;
+        // prev should still be zeroed before phase 0.
+        assert_eq!(creature.prev_shared_memory, [0.0; 16]);
+
+        run_phase_0(&mut sim);
+
+        let creature = sim.creatures.get(id).unwrap();
+        assert_eq!(creature.prev_shared_memory[0], 1.5);
+        assert_eq!(creature.prev_shared_memory[3], -2.0);
+        assert_eq!(creature.prev_shared_memory[15], 42.0);
+    }
+
+    #[test]
+    fn phase_0_decay_reduces_shared_memory_slots() {
+        let (mut sim, id) = make_sim_with_one_creature(100.0);
+        sim.config.shared_memory.decay_rate = 0.1;
+        let creature = sim.creatures.get_mut(id).unwrap();
+        creature.shared_memory[0] = 10.0;
+        creature.shared_memory[5] = -4.0;
+
+        run_phase_0(&mut sim);
+
+        let creature = sim.creatures.get(id).unwrap();
+        // After decay: value *= (1.0 - 0.1) = 0.9
+        assert!((creature.shared_memory[0] - 9.0).abs() < f32::EPSILON);
+        assert!((creature.shared_memory[5] - (-3.6)).abs() < f32::EPSILON);
+        // Zero slots remain zero.
+        assert_eq!(creature.shared_memory[1], 0.0);
+    }
+
+    #[test]
+    fn phase_0_no_decay_when_rate_is_zero() {
+        let (mut sim, id) = make_sim_with_one_creature(100.0);
+        // decay_rate defaults to 0.0
+        assert_eq!(sim.config.shared_memory.decay_rate, 0.0);
+        let creature = sim.creatures.get_mut(id).unwrap();
+        creature.shared_memory[7] = 5.0;
+
+        run_phase_0(&mut sim);
+
+        let creature = sim.creatures.get(id).unwrap();
+        assert_eq!(creature.shared_memory[7], 5.0);
     }
 }
