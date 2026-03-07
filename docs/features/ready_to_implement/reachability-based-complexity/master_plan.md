@@ -170,7 +170,8 @@ This step implements both metrics and wires `complexity()` to use functional com
 2. At creature creation (seeding): compute `genome.complexity()` and pass to state constructor.
 3. At offspring creation (reproduction): construct `CreatureState::new()` AFTER `MutationEngine::apply_mutations()` completes, so the genome passed to `new()` already contains mutations and `cached_complexity` reflects the offspring's actual functional complexity.
 4. Compute `cached_complexity` inside `CreatureState::new()` from the genome parameter rather than accepting it as a separate argument (prevents passing incorrect values). Since the computation is internal to `new()`, most `CreatureState::new()` call sites (including test fixtures in `sensors/`, `runtime/`, etc.) require no code changes — they recompile automatically.
-5. Update any test fixtures that explicitly assert on or construct `CreatureState` fields to account for the new `cached_complexity` field.
+5. **No-mutation fast path:** In the reproduction path, check `MutationSummary::applied_events`. If zero, the offspring's genome is identical to the parent's — copy the parent's `cached_complexity` directly instead of recomputing `functional_complexity()`. This avoids the expensive mesh BFS + backward slicing for the common case where `mutation_probability` gates most births. Use a separate constructor or setter (e.g., `CreatureState::new_with_cached_complexity(genome, complexity)`) for this path, keeping the default `new()` always-compute path for seeding and test fixtures.
+6. Update any test fixtures that explicitly assert on or construct `CreatureState` fields to account for the new `cached_complexity` field.
 
 - [ ] Step 2: Cache functional complexity on CreatureState at birth
 
