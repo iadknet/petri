@@ -10,7 +10,10 @@
 
 use crate::creature::genome::{GraphBackendDef, GraphNodeKind};
 use crate::runtime::action_decode::decode_world_action;
-use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult};
+use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
+
+/// Number of action meta slots available for `WriteActionMeta`.
+pub(crate) const ACTION_META_SLOTS: usize = 8;
 
 /// Apply post-convergence effects from graph evaluation.
 ///
@@ -43,13 +46,13 @@ pub(crate) fn apply_graph_effects(
 ) -> NodeResult {
     let mut output_slots = *upstream_slots;
     let mut route_target_idx: f32 = 0.0;
-    let mut action_meta = [0.0f32; 8];
+    let mut action_meta = [0.0f32; ACTION_META_SLOTS];
 
     // Phase 1: staged-value writes
     for (i, node) in def.internal_nodes.iter().enumerate() {
         match &node.kind {
             GraphNodeKind::CustomOutput(s) => {
-                if (*s as usize) < 12 {
+                if (*s as usize) < OUTPUT_SLOT_COUNT {
                     output_slots[*s as usize] = curr_outputs[i];
                 }
             }
@@ -57,7 +60,7 @@ pub(crate) fn apply_graph_effects(
                 route_target_idx = curr_outputs[i];
             }
             GraphNodeKind::WriteActionMeta(slot) => {
-                if (*slot as usize) < 8 {
+                if (*slot as usize) < ACTION_META_SLOTS {
                     action_meta[*slot as usize] = curr_outputs[i];
                 }
             }

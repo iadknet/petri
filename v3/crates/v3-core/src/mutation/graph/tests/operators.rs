@@ -298,30 +298,43 @@ fn swap_operator_can_produce_parameterized_kinds() {
 }
 
 #[test]
-fn random_graph_node_kind_reaches_out_of_range_input_ref_and_custom_output() {
-    let mut saw_out_of_range_input_ref = false;
-    let mut saw_out_of_range_custom_output = false;
-    for seed in 0u64..20_000 {
+fn random_graph_node_kind_bounds_custom_output_to_valid_range() {
+    for seed in 0u64..5_000 {
         let mut r = rng(seed);
-        match random_graph_node_kind(&mut r) {
-            GraphNodeKind::InputRef { ref_idx, .. } if ref_idx > 11 => {
-                saw_out_of_range_input_ref = true
-            }
-            GraphNodeKind::CustomOutput(idx) if idx > 11 => saw_out_of_range_custom_output = true,
-            _ => {}
+        let kind = random_graph_node_kind(4, &mut r);
+        if let GraphNodeKind::CustomOutput(slot) = kind {
+            assert!(
+                slot < 12,
+                "CustomOutput slot {slot} must be < OUTPUT_SLOT_COUNT (12)"
+            );
         }
-        if saw_out_of_range_input_ref && saw_out_of_range_custom_output {
-            break;
+        if let GraphNodeKind::InputRef { ref_idx, .. } = kind {
+            assert!(
+                ref_idx < 4,
+                "InputRef ref_idx {ref_idx} must be < input_ref_count (4)"
+            );
         }
     }
-    assert!(
-        saw_out_of_range_input_ref,
-        "InputRef mutation surface must include out-of-range u8 values"
-    );
-    assert!(
-        saw_out_of_range_custom_output,
-        "CustomOutput mutation surface must include out-of-range u8 values"
-    );
+}
+
+#[test]
+fn random_graph_node_kind_bounds_write_action_meta() {
+    for seed in 0u64..5_000 {
+        let mut r = rng(seed);
+        if let GraphNodeKind::WriteActionMeta(slot) = random_graph_node_kind(1, &mut r) {
+            assert!(slot < 8, "WriteActionMeta slot {slot} must be < 8");
+        }
+    }
+}
+
+#[test]
+fn random_graph_node_kind_bounds_push_action() {
+    for seed in 0u64..5_000 {
+        let mut r = rng(seed);
+        if let GraphNodeKind::PushAction(slot) = random_graph_node_kind(1, &mut r) {
+            assert!(slot < 5, "PushAction slot {slot} must be < 5");
+        }
+    }
 }
 
 #[test]
@@ -428,8 +441,7 @@ fn remove_graph_edge_no_edges_returns_no_applicable_target() {
 }
 
 #[test]
-fn raw_field_mutation_can_set_input_ref_out_of_range() {
-    let mut found_out_of_range = false;
+fn raw_field_mutation_bounds_input_ref_to_valid_range() {
     for seed in 0u64..512 {
         let mut genome = graph_only_genome(vec![GraphInternalNode {
             kind: GraphNodeKind::InputRef {
@@ -450,22 +462,18 @@ fn raw_field_mutation_can_set_input_ref_out_of_range() {
         .unwrap();
         if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
             if let GraphNodeKind::InputRef { ref_idx, .. } = g.internal_nodes[0].kind {
-                if ref_idx > 11 {
-                    found_out_of_range = true;
-                    break;
-                }
+                // Genome has 0 input_refs, so max(1) = 1 → ref_idx must be 0.
+                assert!(
+                    ref_idx < 1,
+                    "InputRef ref_idx {ref_idx} must be < max(input_ref_count, 1)"
+                );
             }
         }
     }
-    assert!(
-        found_out_of_range,
-        "raw graph mutation must reach InputRef values above output slot range"
-    );
 }
 
 #[test]
-fn raw_field_mutation_can_set_custom_output_out_of_range() {
-    let mut found_out_of_range = false;
+fn raw_field_mutation_bounds_custom_output_to_valid_range() {
     for seed in 0u64..512 {
         let mut genome = graph_only_genome(vec![GraphInternalNode {
             kind: GraphNodeKind::CustomOutput(0),
@@ -483,17 +491,13 @@ fn raw_field_mutation_can_set_custom_output_out_of_range() {
         .unwrap();
         if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
             if let GraphNodeKind::CustomOutput(slot) = g.internal_nodes[0].kind {
-                if slot > 11 {
-                    found_out_of_range = true;
-                    break;
-                }
+                assert!(
+                    slot < 12,
+                    "CustomOutput slot {slot} must be < OUTPUT_SLOT_COUNT (12)"
+                );
             }
         }
     }
-    assert!(
-        found_out_of_range,
-        "raw graph mutation must reach CustomOutput values above output slot range"
-    );
 }
 
 #[test]
@@ -572,7 +576,7 @@ fn random_graph_node_kind_covers_all_30_variants() {
     let mut discriminants: HashSet<std::mem::Discriminant<GraphNodeKind>> = HashSet::new();
     for seed in 0u64..5000 {
         let mut r = rng(seed);
-        let kind = random_graph_node_kind(&mut r);
+        let kind = random_graph_node_kind(4, &mut r);
         discriminants.insert(std::mem::discriminant(&kind));
     }
     assert_eq!(

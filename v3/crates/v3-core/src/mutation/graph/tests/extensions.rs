@@ -273,13 +273,13 @@ fn mutate_operator_param_changes_input_ref_index() {
 
 #[test]
 fn mutate_operator_param_wraps_custom_output_at_boundary() {
-    // CustomOutput(0) should eventually wrap to 255.
+    // CustomOutput(0) should eventually wrap to 11 (OUTPUT_SLOT_COUNT - 1).
     let genome = graph_only_genome(vec![GraphInternalNode {
         kind: GraphNodeKind::CustomOutput(0),
         inputs: vec![],
         plasticity: None,
     }]);
-    let mut saw_255 = false;
+    let mut saw_11 = false;
     for seed in 0u64..200 {
         let mut g = genome.clone();
         let mut r = rng(seed);
@@ -294,15 +294,90 @@ fn mutate_operator_param_wraps_custom_output_at_boundary() {
         {
             if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
                 if let GraphNodeKind::CustomOutput(slot) = gd.internal_nodes[0].kind {
-                    if slot == 255 {
-                        saw_255 = true;
+                    assert!(slot < 12, "CustomOutput slot {slot} must be < 12");
+                    if slot == 11 {
+                        saw_11 = true;
                         break;
                     }
                 }
             }
         }
     }
-    assert!(saw_255, "CustomOutput(0) must wrap to 255 via wrapping_sub");
+    assert!(
+        saw_11,
+        "CustomOutput(0) must wrap to 11 via bounded decrement"
+    );
+}
+
+#[test]
+fn mutate_operator_param_wraps_write_action_meta_at_boundary() {
+    let genome = graph_only_genome(vec![GraphInternalNode {
+        kind: GraphNodeKind::WriteActionMeta(0),
+        inputs: vec![],
+        plasticity: None,
+    }]);
+    let mut saw_7 = false;
+    for seed in 0u64..200 {
+        let mut g = genome.clone();
+        let mut r = rng(seed);
+        if GraphMutator::apply(
+            &mut g,
+            GraphOperator::MutateGraphOperatorParam,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .is_ok()
+        {
+            if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
+                if let GraphNodeKind::WriteActionMeta(slot) = gd.internal_nodes[0].kind {
+                    assert!(slot < 8, "WriteActionMeta slot {slot} must be < 8");
+                    if slot == 7 {
+                        saw_7 = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        saw_7,
+        "WriteActionMeta(0) must wrap to 7 via bounded decrement"
+    );
+}
+
+#[test]
+fn mutate_operator_param_wraps_push_action_at_boundary() {
+    let genome = graph_only_genome(vec![GraphInternalNode {
+        kind: GraphNodeKind::PushAction(0),
+        inputs: vec![],
+        plasticity: None,
+    }]);
+    let mut saw_4 = false;
+    for seed in 0u64..200 {
+        let mut g = genome.clone();
+        let mut r = rng(seed);
+        if GraphMutator::apply(
+            &mut g,
+            GraphOperator::MutateGraphOperatorParam,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .is_ok()
+        {
+            if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
+                if let GraphNodeKind::PushAction(slot) = gd.internal_nodes[0].kind {
+                    assert!(slot < 5, "PushAction slot {slot} must be < 5");
+                    if slot == 4 {
+                        saw_4 = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+    assert!(saw_4, "PushAction(0) must wrap to 4 via bounded decrement");
 }
 
 #[test]
