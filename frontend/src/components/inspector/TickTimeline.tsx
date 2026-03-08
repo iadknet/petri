@@ -1,6 +1,6 @@
 import { memo } from "react";
-import type { TickTrace } from "../../types/api.ts";
-import { formatAction } from "./inputRefUtils.ts";
+import type { TickTrace } from "../../types/trace.ts";
+import { formatActionList } from "./inputRefUtils.ts";
 
 interface TickTimelineProps {
 	ticks: TickTrace[];
@@ -35,7 +35,7 @@ export const TickTimeline = memo(function TickTimeline({
 							}`}
 						>
 							<div className="font-medium">T{tick.tick_number}</div>
-							<div className="text-[9px]">{formatAction(tick.final_action)}</div>
+							<div className="text-[9px]">{formatActionList(tick.final_actions)}</div>
 							<div className={`text-[9px] ${delta >= 0 ? "text-emerald-400" : "text-red-400"}`}>
 								{delta >= 0 ? "+" : ""}
 								{delta.toFixed(1)}e

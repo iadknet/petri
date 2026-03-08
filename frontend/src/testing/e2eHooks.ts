@@ -1,4 +1,7 @@
-import { useCreatureInspectorStore } from "../stores/creatureInspector.ts";
+import {
+	creatureInspectorSelectors,
+	useCreatureInspectorStore,
+} from "../stores/creatureInspector.ts";
 import { deriveViewRequest, useViewportStore } from "../stores/viewport.ts";
 import { useWorldViewStore } from "../stores/worldView.ts";
 
@@ -124,6 +127,7 @@ export function installE2ETestHooks(): void {
 			return getCanvasPointForWorld(creature.x, creature.y);
 		},
 		getCanvasContentSummary,
-		getSelectedCreatureId: () => useCreatureInspectorStore.getState().selectedCreatureId,
+		getSelectedCreatureId: () =>
+			creatureInspectorSelectors.selectedCreatureId(useCreatureInspectorStore.getState()),
 	};
 }

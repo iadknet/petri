@@ -1,5 +1,6 @@
 import { memo, useMemo } from "react";
-import type { InputReference, VmInstruction, VmTrace } from "../../types/api.ts";
+import type { InputReference } from "../../types/genome.ts";
+import type { VmTrace } from "../../types/trace.ts";
 import { InputsPanel } from "./InputsPanel.tsx";
 
 interface VmExecutionViewProps {
@@ -9,23 +10,6 @@ interface VmExecutionViewProps {
 	detailIndex: number;
 }
 
-function formatInstruction(instr: VmInstruction): string {
-	if (typeof instr === "string") return instr;
-	const key = Object.keys(instr)[0];
-	return key ?? "?";
-}
-
-function instructionDetail(instr: VmInstruction): string {
-	if (typeof instr === "string") return "";
-	const key = Object.keys(instr)[0] as keyof typeof instr;
-	const fields = (instr as Record<string, Record<string, number>>)[key];
-	if (!fields || typeof fields !== "object") return "";
-	return Object.entries(fields)
-		.map(([k, v]) => `${k}:${v}`)
-		.join(" ");
-}
-
-/** Compute register state at a given step by replaying register_changes from step 0. */
 function computeRegistersAtStep(trace: VmTrace, stepIndex: number): number[] {
 	const regs = new Array<number>(trace.register_count).fill(0);
 	const limit = Math.min(stepIndex + 1, trace.steps.length);
@@ -45,86 +29,81 @@ export const VmExecutionView = memo(function VmExecutionView({
 	upstreamSlots,
 	detailIndex,
 }: VmExecutionViewProps) {
-	// Compute register state at the current step (not final state).
 	const registersAtStep = useMemo(
 		() => computeRegistersAtStep(trace, detailIndex),
 		[trace, detailIndex],
 	);
 
-	// Which registers changed at the current step.
 	const changedRegs = useMemo(() => {
 		const step = trace.steps[detailIndex];
 		if (!step) return new Set<number>();
 		return new Set(step.register_changes.map(([r]) => r));
 	}, [trace, detailIndex]);
 
+	const registerEntries = useMemo(
+		() =>
+			registersAtStep.map((value, regIdx) => ({
+				id: `r${regIdx}`,
+				regIdx,
+				value,
+			})),
+		[registersAtStep],
+	);
+
 	return (
-		<div className="px-3 py-2 space-y-2">
-			{/* Inputs panel */}
+		<div className="space-y-2 px-3 py-2">
 			<InputsPanel inputRefs={inputRefs} upstreamSlots={upstreamSlots} />
 
-			{/* Registers */}
 			<div>
-				<div className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-1">
+				<div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-500">
 					Registers ({trace.register_count})
 				</div>
-				<div className="grid grid-cols-4 gap-x-2 gap-y-0.5 text-[10px] font-mono max-h-[120px] overflow-y-auto">
-					{registersAtStep.map((v, regIdx) => (
+				<div className="grid max-h-[120px] grid-cols-4 gap-x-2 gap-y-0.5 overflow-y-auto text-[10px] font-mono">
+					{registerEntries.map(({ id, regIdx, value }) => (
 						<div
-							key={regIdx}
+							key={id}
 							className={changedRegs.has(regIdx) ? "text-emerald-400" : "text-slate-400"}
 						>
-							r{regIdx}: {v.toFixed(2)}
+							r{regIdx}: {value.toFixed(2)}
 						</div>
 					))}
 				</div>
 			</div>
 
-			{/* Instruction list */}
-			<div>
-				<div className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-1">
-					Instructions ({trace.steps.length})
+			<div className="grid gap-2 md:grid-cols-2">
+				<div className="rounded border border-white/5 bg-white/[0.02] px-2 py-2 text-[10px] font-mono text-slate-400">
+					<div>
+						<span className="text-slate-600">route:</span>{" "}
+						{trace.final_route_target.toFixed(2)}
+					</div>
+					<div>
+						<span className="text-slate-600">payload:</span>{" "}
+						{trace.final_payload.length > 0
+							? trace.final_payload.map((value) => value.toFixed(2)).join(" ")
+							: "—"}
+					</div>
+					<div>
+						<span className="text-slate-600">meta:</span>{" "}
+						{trace.final_meta.length > 0
+							? trace.final_meta.map((value) => value.toFixed(2)).join(" ")
+							: "—"}
+					</div>
 				</div>
-				<div className="space-y-px max-h-[200px] overflow-y-auto">
-					{trace.steps.map((step, stepIdx) => {
-						const isCurrent = stepIdx === detailIndex;
-						const isCompleted = stepIdx < detailIndex;
-
-						return (
-							<div
-								key={`s${stepIdx}`}
-								className={`flex items-baseline gap-2 px-1.5 py-0.5 text-[10px] font-mono rounded ${
-									isCurrent
-										? "bg-sky-900/30 border-l-2 border-sky-400"
-										: isCompleted
-											? "opacity-50"
-											: ""
-								}`}
-							>
-								<span className="text-slate-600 w-4 text-right flex-shrink-0">{step.pc}</span>
-								<span className="text-slate-300 w-24 flex-shrink-0 truncate">
-									{formatInstruction(step.instruction)}
-								</span>
-								<span className="text-slate-600 text-[9px] truncate flex-1">
-									{instructionDetail(step.instruction)}
-								</span>
-								{step.register_changes.length > 0 && (
-									<span className="text-emerald-400/70 text-[9px] flex-shrink-0">
-										{step.register_changes.map(([r, v]) => `r${r}←${v.toFixed(2)}`).join(" ")}
-									</span>
-								)}
-							</div>
-						);
-					})}
+				<div className="rounded border border-white/5 bg-white/[0.02] px-2 py-2 text-[10px] font-mono text-slate-400">
+					<div className="mb-1 text-slate-600">slot writes</div>
+					{trace.slot_writes.length > 0 ? (
+						<div className="space-y-1 [content-visibility:auto]">
+							{trace.slot_writes.map((write, index) => (
+								<div key={`${write.slot_idx}-${index}`} className="text-amber-300/80">
+									s{write.slot_idx}: {write.old_value.toFixed(2)}→
+									{write.new_value.toFixed(2)}
+								</div>
+							))}
+						</div>
+					) : (
+						<div className="text-slate-600">none</div>
+					)}
 				</div>
-			</div>
-
-			{/* Outputs */}
-			<div className="text-[10px] font-mono text-slate-500">
-				<span className="text-slate-600">route:</span> {trace.final_route_target.toFixed(2)}
-				{trace.slot_writes.length > 0 && (
-					<span className="ml-2 text-amber-400/70">{trace.slot_writes.length} slot writes</span>
-				)}
 			</div>
 		</div>
 	);

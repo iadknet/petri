@@ -1,10 +1,19 @@
-import type { InputReference, WorldAction } from "../../types/api.ts";
+import type { InputReference } from "../../types/genome.ts";
+import type { WorldAction } from "../../types/trace.ts";
 
-export function formatAction(action: WorldAction): string {
+export function formatAction(action: WorldAction | null | undefined): string {
+	if (!action) return "?";
 	if (typeof action === "string") return action;
 	if ("Move" in action) return `Move(${action.Move})`;
-	if ("Reproduce" in action) return "Reproduce";
+	if ("Reproduce" in action) return `Reproduce(${action.Reproduce.direction})`;
+	if ("StealEnergy" in action) return `Steal(${action.StealEnergy.direction})`;
 	return "?";
+}
+
+export function formatActionList(actions: WorldAction[] | null | undefined): string {
+	if (!actions || actions.length === 0) return "NoOp";
+	if (actions.length === 1) return formatAction(actions[0]);
+	return `${formatAction(actions[0])} +${actions.length - 1}`;
 }
 
 export function formatInputRef(ref: InputReference): string {

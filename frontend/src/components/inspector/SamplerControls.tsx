@@ -1,13 +1,14 @@
 import { memo } from "react";
-import type { PlaybackState, SamplerPosition } from "../../stores/executionSampler.ts";
+import type { PlaybackState, SamplerPosition } from "../../stores/samplePlayback.ts";
 
 interface SamplerControlsProps {
-	playbackState: PlaybackState;
+	playbackState: PlaybackState | "sampling";
 	position: SamplerPosition;
 	totalTicks: number;
 	totalHops: number;
 	totalDetails: number;
 	playbackSpeed: number;
+	isDead: boolean;
 	onSample: () => void;
 	onResample: () => void;
 	onClear: () => void;
@@ -28,6 +29,7 @@ export const SamplerControls = memo(function SamplerControls(props: SamplerContr
 		totalHops,
 		totalDetails,
 		playbackSpeed,
+		isDead,
 		onSample,
 		onResample,
 		onClear,
@@ -122,7 +124,8 @@ export const SamplerControls = memo(function SamplerControls(props: SamplerContr
 						<button
 							type="button"
 							onClick={onResample}
-							className="px-2 py-1 text-xs font-mono bg-slate-700 hover:bg-slate-600 text-slate-300 rounded transition-colors"
+							disabled={isDead}
+							className="px-2 py-1 text-xs font-mono bg-slate-700 hover:bg-slate-600 text-slate-300 rounded transition-colors disabled:cursor-not-allowed disabled:bg-slate-800 disabled:text-slate-600"
 						>
 							Resample
 						</button>

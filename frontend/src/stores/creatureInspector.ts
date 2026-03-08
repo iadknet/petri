@@ -1,5 +1,7 @@
 import { create } from "zustand";
-import type { ActionLogEntry, CreatureGenome, CreaturePhenotype } from "../types/api.ts";
+import type { ActionLogEntry } from "../types/action-log.ts";
+import type { CreatureMeshAnnotation } from "../types/creature-detail.ts";
+import type { CreatureGenome, CreaturePhenotype } from "../types/genome.ts";
 
 export interface CreatureStats {
 	id: number;
@@ -12,15 +14,36 @@ export interface CreatureStats {
 	phenotype: CreaturePhenotype;
 }
 
-interface CreatureInspectorState {
+export interface CreatureSelectionState {
 	selectedCreatureId: number | null;
-	creatureStats: CreatureStats | null;
-	creatureGenome: CreatureGenome | null;
-	creatureSharedMemory: number[] | null;
+}
+
+export interface CreatureStaticDetailState {
+	genome: CreatureGenome | null;
+	meshAnnotations: CreatureMeshAnnotation[] | null;
+}
+
+export interface CreatureRuntimeSnapshotState {
+	sharedMemory: number[] | null;
+}
+
+export interface CreatureLiveDetailState {
+	stats: CreatureStats | null;
 	actionLog: ActionLogEntry[] | null;
+}
+
+export interface CreatureResourceMetaState {
 	isLoading: boolean;
 	error: string | null;
 	isDead: boolean;
+}
+
+interface CreatureInspectorState {
+	selection: CreatureSelectionState;
+	staticDetail: CreatureStaticDetailState;
+	runtimeSnapshot: CreatureRuntimeSnapshotState;
+	liveDetail: CreatureLiveDetailState;
+	resourceMeta: CreatureResourceMetaState;
 
 	selectCreature: (id: number) => void;
 	clearSelection: () => void;
@@ -34,9 +57,9 @@ interface CreatureInspectorState {
 		complexity: number;
 		phenotype: CreaturePhenotype;
 		genome?: CreatureGenome;
+		meshAnnotations?: CreatureMeshAnnotation[];
 		sharedMemory?: number[];
 		actionLog?: ActionLogEntry[];
-		/** When true, actionLog entries are appended to existing log (incremental). */
 		incremental?: boolean;
 	}) => void;
 	setDead: () => void;
@@ -52,96 +75,131 @@ function arraysEqual(a: number[], b: number[]): boolean {
 	return true;
 }
 
-export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, get) => ({
-	selectedCreatureId: null,
-	creatureStats: null,
-	creatureGenome: null,
-	creatureSharedMemory: null,
-	actionLog: null,
-	isLoading: false,
-	error: null,
-	isDead: false,
+const ACTION_LOG_CAPACITY = 500;
 
-	selectCreature: (id) =>
-		set({
-			selectedCreatureId: id,
-			creatureStats: null,
-			creatureGenome: null,
-			creatureSharedMemory: null,
-			actionLog: null,
-			isLoading: true,
-			error: null,
-			isDead: false,
-		}),
+function makeEmptyState(
+	selectedCreatureId: number | null,
+	isLoading: boolean,
+): Pick<
+	CreatureInspectorState,
+	"selection" | "staticDetail" | "runtimeSnapshot" | "liveDetail" | "resourceMeta"
+> {
+	return {
+		selection: { selectedCreatureId },
+		staticDetail: { genome: null, meshAnnotations: null },
+		runtimeSnapshot: { sharedMemory: null },
+		liveDetail: { stats: null, actionLog: null },
+		resourceMeta: { isLoading, error: null, isDead: false },
+	};
+}
 
-	clearSelection: () =>
-		set({
-			selectedCreatureId: null,
-			creatureStats: null,
-			creatureGenome: null,
-			creatureSharedMemory: null,
-			actionLog: null,
-			isLoading: false,
-			error: null,
-			isDead: false,
-		}),
+export const creatureInspectorSelectors = {
+	selectedCreatureId: (state: CreatureInspectorState) =>
+		state.selection.selectedCreatureId,
+	creatureStats: (state: CreatureInspectorState) => state.liveDetail.stats,
+	creatureGenome: (state: CreatureInspectorState) => state.staticDetail.genome,
+	creatureMeshAnnotations: (state: CreatureInspectorState) =>
+		state.staticDetail.meshAnnotations,
+	creatureSharedMemory: (state: CreatureInspectorState) =>
+		state.runtimeSnapshot.sharedMemory,
+	actionLog: (state: CreatureInspectorState) => state.liveDetail.actionLog,
+	isLoading: (state: CreatureInspectorState) => state.resourceMeta.isLoading,
+	error: (state: CreatureInspectorState) => state.resourceMeta.error,
+	isDead: (state: CreatureInspectorState) => state.resourceMeta.isDead,
+};
 
-	setDetail: (detail) => {
-		const state = get();
-		const stats: CreatureStats = {
-			id: detail.id,
-			position: detail.position,
-			energy: detail.energy,
-			maxEnergy: detail.maxEnergy,
-			age: detail.age,
-			generation: detail.generation,
-			complexity: detail.complexity,
-			phenotype: detail.phenotype,
-		};
+export const useCreatureInspectorStore = create<CreatureInspectorState>()(
+	(set, get) => ({
+		...makeEmptyState(null, false),
 
-		// Genome never mutates during a creature's lifetime — set once on first fetch.
-		// When genome is omitted (excluded), keep the existing cached value.
-		let genome = state.creatureGenome;
-		if (detail.genome && !genome) {
-			genome = detail.genome;
-		}
+		selectCreature: (id) =>
+			set({
+				...makeEmptyState(id, true),
+			}),
 
-		// Only update shared memory ref if values changed.
-		// When shared_memory is omitted (excluded), keep the existing cached value.
-		let sharedMemory = state.creatureSharedMemory;
-		if (detail.sharedMemory && (!sharedMemory || !arraysEqual(sharedMemory, detail.sharedMemory))) {
-			sharedMemory = detail.sharedMemory;
-		}
+		clearSelection: () =>
+			set({
+				...makeEmptyState(null, false),
+			}),
 
-		// Action log: incremental mode appends new entries, full mode replaces.
-		let actionLog = state.actionLog;
-		if (detail.actionLog !== undefined) {
-			if (detail.incremental && actionLog) {
-				// Append new entries and trim to capacity.
-				const merged = [...actionLog, ...detail.actionLog];
-				// Mirrors the server-side ActionLogConfig::capacity default
-				// in v3/crates/v3-core/src/config/simulation.rs.
-				const ACTION_LOG_CAPACITY = 500;
-				actionLog =
-					merged.length > ACTION_LOG_CAPACITY
-						? merged.slice(merged.length - ACTION_LOG_CAPACITY)
-						: merged;
-			} else {
-				actionLog = detail.actionLog;
+		setDetail: (detail) => {
+			const state = get();
+			const stats: CreatureStats = {
+				id: detail.id,
+				position: detail.position,
+				energy: detail.energy,
+				maxEnergy: detail.maxEnergy,
+				age: detail.age,
+				generation: detail.generation,
+				complexity: detail.complexity,
+				phenotype: detail.phenotype,
+			};
+
+			let genome = state.staticDetail.genome;
+			if (detail.genome && !genome) {
+				genome = detail.genome;
 			}
-		}
 
-		set({
-			creatureStats: stats,
-			creatureGenome: genome,
-			creatureSharedMemory: sharedMemory,
-			actionLog,
-			isLoading: false,
-			error: null,
-		});
-	},
+			let meshAnnotations = state.staticDetail.meshAnnotations;
+			if (detail.meshAnnotations && !meshAnnotations) {
+				meshAnnotations = detail.meshAnnotations;
+			}
 
-	setDead: () => set({ isDead: true, isLoading: false }),
-	setError: (error) => set({ error, isLoading: false }),
-	setLoading: (isLoading) => set({ isLoading }),
-}));
+			let sharedMemory = state.runtimeSnapshot.sharedMemory;
+			if (
+				detail.sharedMemory &&
+				(!sharedMemory || !arraysEqual(sharedMemory, detail.sharedMemory))
+			) {
+				sharedMemory = detail.sharedMemory;
+			}
+
+			let actionLog = state.liveDetail.actionLog;
+			if (detail.actionLog !== undefined) {
+				if (detail.incremental && actionLog) {
+					const merged = [...actionLog, ...detail.actionLog];
+					actionLog =
+						merged.length > ACTION_LOG_CAPACITY
+							? merged.slice(merged.length - ACTION_LOG_CAPACITY)
+							: merged;
+				} else {
+					actionLog = detail.actionLog;
+				}
+			}
+
+			set({
+				staticDetail: { genome, meshAnnotations },
+				runtimeSnapshot: { sharedMemory },
+				liveDetail: { stats, actionLog },
+				resourceMeta: {
+					isLoading: false,
+					error: null,
+					isDead: state.resourceMeta.isDead,
+				},
+			});
+		},
+
+		setDead: () =>
+			set((state) => ({
+				resourceMeta: {
+					...state.resourceMeta,
+					isDead: true,
+					isLoading: false,
+				},
+			})),
+		setError: (error) =>
+			set((state) => ({
+				resourceMeta: {
+					...state.resourceMeta,
+					error,
+					isLoading: false,
+				},
+			})),
+		setLoading: (isLoading) =>
+			set((state) => ({
+				resourceMeta: {
+					...state.resourceMeta,
+					isLoading,
+				},
+			})),
+	}),
+);

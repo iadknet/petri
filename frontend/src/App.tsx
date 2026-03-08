@@ -6,7 +6,11 @@ import { StatsPanel } from "./components/StatsPanel.tsx";
 import { WorldViewport } from "./components/WorldViewport.tsx";
 import { useViewSubscription } from "./hooks/useViewSubscription.ts";
 import { useConfigStore } from "./stores/config.ts";
-import { useCreatureInspectorStore } from "./stores/creatureInspector.ts";
+import {
+	creatureInspectorSelectors,
+	useCreatureInspectorStore,
+} from "./stores/creatureInspector.ts";
+import { useInspectorWorkspaceStore } from "./stores/inspectorWorkspace.ts";
 import { PanelLayoutProvider, usePanelLayout } from "./stores/layout.tsx";
 import { useStartupConfigStore } from "./stores/startupConfig.ts";
 
@@ -14,7 +18,10 @@ const LazyCreatureInspector = lazy(() => import("./components/CreatureInspector.
 
 function Dashboard() {
 	const { configOpen, statsOpen } = usePanelLayout();
-	const inspectorOpen = useCreatureInspectorStore((s) => s.selectedCreatureId !== null);
+	const inspectorOpen = useCreatureInspectorStore(
+		(s) => creatureInspectorSelectors.selectedCreatureId(s) !== null,
+	);
+	const inspectorWidth = useInspectorWorkspaceStore((state) => state.inspectorWidth);
 
 	useViewSubscription();
 
@@ -31,7 +38,7 @@ function Dashboard() {
 			});
 	}, []);
 
-	const columns = `${configOpen ? "320px " : ""}1fr${inspectorOpen ? " 420px" : ""}`;
+	const columns = `${configOpen ? "320px " : ""}1fr${inspectorOpen ? ` ${inspectorWidth}px` : ""}`;
 
 	return (
 		<div

@@ -356,18 +356,6 @@ If a two-lane system is explored later, it should probably remain soft rather th
 - hybrid operators should explicitly exist for crossing between live and dormant structure
 - mutation telemetry should show whether the system is merely deepening the current dominant scaffold or actually increasing active-mesh diversity
 
-### Decompose large mutation source files
-
-Several mutation source/test files exceed the 600-line architecture harness threshold. Notable examples:
-- `mutation/input_ref/mod.rs` (~1259 lines) — could split operators vs tests
-- `mutation/vm/mod.rs` (~1045 lines) — could split operators vs tests
-- `mutation/topology/mod.rs` (~612 lines) — just over threshold after reachability feature
-- `mutation/engine/mod.rs` (~905 lines) — engine + tests in one file
-
-Decomposition pattern: extract operator implementations into per-operator or per-group files, keep `mod.rs` as the dispatch/public API surface. Test files could be split by operator family.
-
-Discovered during reachability-aware-mutation implementation when bulk test updates required perl/sed on large files.
-
 ## Far Future
 
 ### Massive introduction of neural nets

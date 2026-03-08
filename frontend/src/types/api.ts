@@ -1,5 +1,6 @@
 export * from "./action-log.ts";
 export * from "./config.ts";
+export * from "./creature-detail.ts";
 export * from "./errors.ts";
 export * from "./genome.ts";
 export * from "./http.ts";
