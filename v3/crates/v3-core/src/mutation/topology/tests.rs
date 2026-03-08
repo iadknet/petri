@@ -346,36 +346,25 @@ fn copy_node_sometimes_copies_input_refs_sometimes_not() {
 }
 
 #[test]
-fn copy_node_sometimes_adds_backlink_sometimes_not() {
-    let mut saw_backlink = false;
-    let mut saw_no_backlink = false;
-    for seed in 0u64..500 {
+fn copy_node_always_adds_backlink() {
+    for seed in 0u64..200 {
         let mut genome = v3alpha1_founder_genome();
         let original_targets: Vec<Vec<NodeId>> =
             genome.nodes.iter().map(|n| n.targets.clone()).collect();
         let mut r = rng(seed);
         TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
         let new_id = genome.nodes.last().unwrap().node_id;
-        // Check if any original node gained the new_id in its targets.
+        // Check that some original node gained the new_id in its targets.
         let backlinked = genome.nodes.iter().enumerate().any(|(i, n)| {
             i < original_targets.len()
                 && n.targets.contains(&new_id)
                 && !original_targets[i].contains(&new_id)
         });
-        if backlinked {
-            saw_backlink = true;
-        } else {
-            saw_no_backlink = true;
-        }
-        if saw_backlink && saw_no_backlink {
-            break;
-        }
+        assert!(
+            backlinked,
+            "copy_node must always add a backlink (seed {seed})"
+        );
     }
-    assert!(saw_backlink, "must observe at least one backlink addition");
-    assert!(
-        saw_no_backlink,
-        "must observe at least one case without backlink"
-    );
 }
 
 #[test]

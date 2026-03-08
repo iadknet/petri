@@ -433,8 +433,6 @@ fn apply_copy_node(
     } else {
         vec![]
     };
-    let add_backlink = rng.gen_bool(0.5);
-
     genome.nodes.push(NodeGenome {
         node_id: new_id,
         input_refs,
@@ -442,9 +440,8 @@ fn apply_copy_node(
         targets,
     });
 
-    if add_backlink {
-        genome.nodes[source_idx].targets.push(new_id);
-    }
+    // Always add backlink to ensure the copied node is reachable.
+    genome.nodes[source_idx].targets.push(new_id);
     Ok(reachability)
 }
 
@@ -454,8 +451,8 @@ const MESH_SLICE_MAX_SIZE: usize = 8;
 /// Clone a set of nodes identified by `gene_indices`, remapping internal
 /// target references to fresh NodeIds. Appends cloned nodes to the genome.
 /// With 50% probability, offsets CustomOutput slots in cloned Graph backends
-/// to avoid clobbering the originals. With 50% probability, adds a backlink
-/// from a random pre-existing node to a random cloned node.
+/// to avoid clobbering the originals. Always adds a backlink from a random
+/// pre-existing node to a random cloned node to ensure reachability.
 fn clone_and_remap_slice(genome: &mut CreatureGenome, gene_indices: &[usize], rng: &mut impl Rng) {
     // Build old_id -> new_id mapping
     let mut id_map = HashMap::with_capacity(gene_indices.len());
@@ -500,13 +497,12 @@ fn clone_and_remap_slice(genome: &mut CreatureGenome, gene_indices: &[usize], rn
         }
     }
 
-    // 50% chance: add backlink from random pre-existing node to a random cloned node
-    if rng.gen_bool(0.5) {
-        let new_ids: Vec<NodeId> = id_map.values().copied().collect();
-        let link_target = new_ids[rng.gen_range(0..new_ids.len())];
-        let source_idx = rng.gen_range(0..pre_existing_count);
-        genome.nodes[source_idx].targets.push(link_target);
-    }
+    // Always add backlink from random pre-existing node to a random cloned node
+    // to ensure reachability.
+    let new_ids: Vec<NodeId> = id_map.values().copied().collect();
+    let link_target = new_ids[rng.gen_range(0..new_ids.len())];
+    let source_idx = rng.gen_range(0..pre_existing_count);
+    genome.nodes[source_idx].targets.push(link_target);
 }
 
 fn apply_copy_mesh_backward_slice(
