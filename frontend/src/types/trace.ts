@@ -86,7 +86,8 @@ export type WorldAction =
 	| "NoOp"
 	| "Eat"
 	| { Move: string }
-	| { Reproduce: { direction: string; offered_energy: number } };
+	| { Reproduce: { direction: string; energy_transfer: number } }
+	| { StealEnergy: { direction: string; amount: number } };
 
 export interface TickTrace {
 	tick_number: number;
@@ -94,7 +95,7 @@ export interface TickTrace {
 	energy_after: number;
 	static_inputs: StaticInputsSnapshot;
 	hops: MeshHopTrace[];
-	final_action: WorldAction;
+	final_actions: WorldAction[];
 	termination_reason: TerminationReason;
 }
 
@@ -117,4 +118,5 @@ export interface StartSampleResponse {
 	protocol_version: string;
 	status: "recording";
 	ticks_requested: number;
+	include_perception_debug: boolean;
 }

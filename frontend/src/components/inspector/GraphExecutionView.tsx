@@ -1,6 +1,8 @@
 import { memo } from "react";
-import type { GraphTrace, InputReference } from "../../types/api.ts";
+import type { InputReference } from "../../types/genome.ts";
+import type { GraphTrace } from "../../types/trace.ts";
 import { InputsPanel } from "./InputsPanel.tsx";
+import { describeGraphTraceKind } from "./mesh/meshPresentation.ts";
 
 interface GraphExecutionViewProps {
 	trace: GraphTrace;
@@ -39,6 +41,7 @@ export const GraphExecutionView = memo(function GraphExecutionView({
 				{currentPass && (
 					<div className="space-y-px max-h-[200px] overflow-y-auto">
 						{currentPass.node_evaluations.map((node) => {
+							const presentation = describeGraphTraceKind(node.kind);
 							const isStateful = STATEFUL_KINDS.has(node.kind);
 							const stateChanged = isStateful && node.state_before !== node.state_after;
 
@@ -50,10 +53,17 @@ export const GraphExecutionView = memo(function GraphExecutionView({
 									<span className="text-slate-600 w-4 text-right flex-shrink-0">
 										{node.node_index}
 									</span>
-									<span className="text-slate-300 w-20 flex-shrink-0 truncate">{node.kind}</span>
+									<span className="text-slate-300 w-20 flex-shrink-0 truncate">
+										{presentation.label}
+									</span>
 									<span className="text-slate-500 text-[9px] w-14 flex-shrink-0">
 										Σ={node.weighted_sum.toFixed(2)}
 									</span>
+									{presentation.badges.length > 0 ? (
+										<span className="text-sky-200/70 text-[9px] flex-shrink-0 uppercase">
+											{presentation.badges.join(" ")}
+										</span>
+									) : null}
 									{isStateful ? (
 										<span
 											className={`text-[9px] flex-shrink-0 ${stateChanged ? "text-amber-400" : "text-slate-600"}`}
@@ -64,6 +74,11 @@ export const GraphExecutionView = memo(function GraphExecutionView({
 									<span className="text-emerald-400/70 text-[9px] flex-shrink-0">
 										→{node.output.toFixed(3)}
 									</span>
+									{node.weighted_inputs.length > 0 ? (
+										<span className="text-slate-600 text-[9px] truncate flex-1">
+											{node.weighted_inputs.map((value) => value.toFixed(2)).join(" · ")}
+										</span>
+									) : null}
 								</div>
 							);
 						})}

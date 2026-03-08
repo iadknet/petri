@@ -1,6 +1,7 @@
 use axum::body::Body;
 use axum::http::{Request, StatusCode};
 use http_body_util::BodyExt;
+use slotmap::Key;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 use tokio::time::{timeout, Duration};
@@ -1351,6 +1352,10 @@ async fn get_creature_exclude_omits_fields() {
     assert_eq!(status, StatusCode::OK, "body: {body}");
     assert!(body.get("genome").is_some(), "genome should be present");
     assert!(
+        body.get("mesh_annotations").is_some(),
+        "mesh_annotations should be present when genome is present"
+    );
+    assert!(
         body.get("shared_memory").is_some(),
         "shared_memory should be present"
     );
@@ -1364,6 +1369,10 @@ async fn get_creature_exclude_omits_fields() {
     let (status, body) = do_request(a.clone(), get_req(&uri_excl_genome)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
     assert!(body.get("genome").is_none(), "genome should be omitted");
+    assert!(
+        body.get("mesh_annotations").is_none(),
+        "mesh_annotations should be omitted when genome is omitted"
+    );
     assert!(
         body.get("shared_memory").is_some(),
         "shared_memory should be present"
@@ -1389,6 +1398,10 @@ async fn get_creature_exclude_omits_fields() {
     assert_eq!(status, StatusCode::OK, "body: {body}");
     assert!(body.get("genome").is_none(), "genome should be omitted");
     assert!(
+        body.get("mesh_annotations").is_none(),
+        "mesh_annotations should be omitted when genome is omitted"
+    );
+    assert!(
         body.get("action_log").is_none(),
         "action_log should be omitted"
     );
@@ -1404,6 +1417,10 @@ async fn get_creature_exclude_omits_fields() {
     assert_eq!(status, StatusCode::OK, "body: {body}");
     assert!(body.get("genome").is_none(), "genome should be omitted");
     assert!(
+        body.get("mesh_annotations").is_none(),
+        "mesh_annotations should be omitted when genome is omitted"
+    );
+    assert!(
         body.get("action_log").is_none(),
         "action_log should be omitted"
     );
@@ -1414,6 +1431,41 @@ async fn get_creature_exclude_omits_fields() {
     // Core scalar fields still present.
     assert!(body.get("energy").is_some(), "energy should be present");
     assert!(body.get("id").is_some(), "id should be present");
+}
+
+#[tokio::test]
+async fn get_creature_mesh_annotations_use_cached_reachable_nodes() {
+    let state = AppState::new();
+    let creature_id = {
+        let mut handle = state.sim.lock().await;
+        let creature_id = handle
+            .sim
+            .creatures
+            .keys()
+            .next()
+            .expect("default state should have creatures");
+        handle
+            .sim
+            .creatures
+            .get_mut(creature_id)
+            .expect("creature should exist")
+            .cached_reachable_nodes = Vec::new().into_boxed_slice();
+        creature_id.data().as_ffi()
+    };
+
+    let uri = format!("/v3/simulation/creature/{creature_id}");
+    let (status, body) = do_request(router(state), get_req(&uri)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+
+    let annotations = body["mesh_annotations"]
+        .as_array()
+        .expect("mesh_annotations array");
+    assert!(
+        annotations
+            .iter()
+            .all(|annotation| annotation["reachable"].as_bool() == Some(false)),
+        "handler should trust cached reachable indices, body: {body}"
+    );
 }
 
 // ── 29. paint_erase_barrier_clears_barrier ──────────────────────────────────

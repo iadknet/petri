@@ -1,8 +1,10 @@
 import { memo } from "react";
-import type { MeshHopTrace, TerminationReason } from "../../types/api.ts";
+import type { MeshHopTrace, TerminationReason } from "../../types/trace.ts";
+import type { MeshSemantics } from "./mesh/meshSemantics.ts";
 
 interface MeshHopTimelineProps {
 	hops: MeshHopTrace[];
+	meshSemantics: MeshSemantics | null;
 	activeHopIndex: number;
 	terminationReason: TerminationReason;
 	finalAction: string;
@@ -31,6 +33,7 @@ function hopBackendType(hop: MeshHopTrace): string {
 
 export const MeshHopTimeline = memo(function MeshHopTimeline({
 	hops,
+	meshSemantics,
 	activeHopIndex,
 	terminationReason,
 	finalAction,
@@ -44,11 +47,20 @@ export const MeshHopTimeline = memo(function MeshHopTimeline({
 			<div className="flex items-center gap-1 overflow-x-auto pb-1">
 				{hops.map((hop, i) => {
 					const type = hopBackendType(hop);
-					const color = type === "Vm" ? VM_COLOR : type === "Graph" ? GRAPH_COLOR : "#94a3b8";
+					const color =
+						type === "Vm"
+							? VM_COLOR
+							: type === "Graph"
+								? GRAPH_COLOR
+								: "#94a3b8";
 					const isActive = i === activeHopIndex;
+					const semantics = meshSemantics?.nodesById.get(hop.node_id);
 
 					return (
-						<div key={hop.hop_index} className="flex items-center gap-1 flex-shrink-0">
+						<div
+							key={hop.hop_index}
+							className="flex items-center gap-1 flex-shrink-0"
+						>
 							{i > 0 && <span className="text-slate-600 text-xs">→</span>}
 							<button
 								type="button"
@@ -69,7 +81,14 @@ export const MeshHopTimeline = memo(function MeshHopTimeline({
 									</span>
 									<span className="text-slate-500">#{hop.node_id}</span>
 								</div>
-								<div className="text-[9px] text-slate-500">{hopSummary(hop)}</div>
+								{semantics ? (
+									<div className="mt-0.5 max-w-[11rem] truncate text-[9px] text-slate-300">
+										{semantics.label}
+									</div>
+								) : null}
+								<div className="text-[9px] text-slate-500">
+									{hopSummary(hop)}
+								</div>
 							</button>
 						</div>
 					);
@@ -79,7 +98,9 @@ export const MeshHopTimeline = memo(function MeshHopTimeline({
 				<div className="flex items-center gap-1 flex-shrink-0">
 					{hops.length > 0 && <span className="text-slate-600 text-xs">→</span>}
 					<span className="text-[10px] font-mono text-slate-500 px-1">
-						{terminationReason === "ActionEmitted" ? finalAction : terminationReason}
+						{terminationReason === "ActionEmitted"
+							? finalAction
+							: terminationReason}
 					</span>
 				</div>
 			</div>

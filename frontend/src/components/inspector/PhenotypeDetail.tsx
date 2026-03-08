@@ -1,5 +1,5 @@
 import { memo } from "react";
-import type { CreaturePhenotype } from "../../types/api.ts";
+import type { CreaturePhenotype } from "../../types/genome.ts";
 
 const CHANNEL_LABELS = ["H1", "H2", "S1", "S2", "L1", "L2"] as const;
 

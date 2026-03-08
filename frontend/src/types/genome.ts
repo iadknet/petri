@@ -1,5 +1,3 @@
-import type { ActionLogEntry } from "./action-log.ts";
-
 export interface CreaturePhenotype {
 	channels: [number, number, number, number, number, number];
 	active_channel: number;
@@ -13,7 +11,7 @@ export interface GraphInput {
 }
 
 export type GraphNodeKind =
-	| { InputRef: number }
+	| { InputRef: { ref_idx: number; sub_idx: number } }
 	| { Constant: number }
 	| "Add"
 	| "Multiply"
@@ -127,25 +125,4 @@ export interface NodeGenome {
 export interface CreatureGenome {
 	entry_node_id: number;
 	nodes: NodeGenome[];
-}
-
-export interface CreatureDetail {
-	protocol_version: string;
-	id: number;
-	position: { x: number; y: number };
-	energy: number;
-	max_energy: number;
-	age: number;
-	generation: number;
-	complexity: number;
-	genome_size: number;
-	phenotype: CreaturePhenotype;
-	/** Present unless excluded via `exclude=genome` query parameter. */
-	genome?: CreatureGenome;
-	/** Present unless excluded via `exclude=shared_memory` query parameter. */
-	shared_memory?: number[];
-	/** Present unless excluded via `exclude=action_log` query parameter. */
-	action_log?: ActionLogEntry[];
-	/** Tick of the most recent action_log entry (0 if log is empty). Always present. */
-	latest_tick: number;
 }

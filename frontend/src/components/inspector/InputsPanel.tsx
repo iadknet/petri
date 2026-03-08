@@ -1,5 +1,5 @@
 import { memo } from "react";
-import type { InputReference } from "../../types/api.ts";
+import type { InputReference } from "../../types/genome.ts";
 import { formatInputRef, inputRefColor } from "./inputRefUtils.ts";
 
 interface InputsPanelProps {

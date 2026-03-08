@@ -3,7 +3,10 @@ import { buildRenderModel } from "../canvas/renderModel.ts";
 import { WorldRenderer } from "../canvas/renderer.ts";
 import { useCreatureSelection } from "../hooks/useCreatureSelection.ts";
 import { usePaintInteraction } from "../hooks/usePaintInteraction.ts";
-import { useCreatureInspectorStore } from "../stores/creatureInspector.ts";
+import {
+	creatureInspectorSelectors,
+	useCreatureInspectorStore,
+} from "../stores/creatureInspector.ts";
 import { usePaintStore } from "../stores/paint.ts";
 import { useSimulationStore } from "../stores/simulation.ts";
 import { useViewportStore } from "../stores/viewport.ts";
@@ -129,7 +132,9 @@ export function WorldViewport() {
 	// Sync selected creature to renderer for highlight
 	useEffect(() => {
 		return useCreatureInspectorStore.subscribe((state) => {
-			rendererRef.current?.setSelectedCreature(state.selectedCreatureId);
+			rendererRef.current?.setSelectedCreature(
+				creatureInspectorSelectors.selectedCreatureId(state),
+			);
 		});
 	}, []);
 

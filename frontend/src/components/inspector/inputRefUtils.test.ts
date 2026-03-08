@@ -1,6 +1,26 @@
 import { describe, expect, it } from "vitest";
-import type { InputReference } from "../../types/api.ts";
-import { formatInputRef, inputRefColor } from "./inputRefUtils.ts";
+import type { InputReference } from "../../types/genome.ts";
+import type { WorldAction } from "../../types/trace.ts";
+import { formatAction, formatActionList, formatInputRef, inputRefColor } from "./inputRefUtils.ts";
+
+describe("formatAction", () => {
+	it("formats current server world action variants", () => {
+		const move: WorldAction = { Move: "E" };
+		const reproduce: WorldAction = { Reproduce: { direction: "N", energy_transfer: 12 } };
+		const steal: WorldAction = { StealEnergy: { direction: "W", amount: 3 } };
+
+		expect(formatAction(move)).toBe("Move(E)");
+		expect(formatAction(reproduce)).toBe("Reproduce(N)");
+		expect(formatAction(steal)).toBe("Steal(W)");
+	});
+
+	it("summarizes action arrays without crashing on empty entries", () => {
+		expect(formatActionList(["NoOp"])).toBe("NoOp");
+		expect(formatActionList(["Eat", { Move: "S" }])).toBe("Eat +1");
+		expect(formatActionList([])).toBe("NoOp");
+		expect(formatAction(undefined)).toBe("?");
+	});
+});
 
 describe("formatInputRef", () => {
 	it("formats World string variant", () => {
