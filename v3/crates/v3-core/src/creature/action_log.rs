@@ -13,6 +13,10 @@ pub enum ActionType {
     StealEnergy = 4,
 }
 
+/// Number of meaningful action type discriminants (NoOp..StealEnergy).
+pub const ACTION_TYPE_COUNT: u8 = 5;
+const _: () = assert!(ActionType::StealEnergy as u8 + 1 == ACTION_TYPE_COUNT);
+
 /// Outcome of an action for log entries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[non_exhaustive]

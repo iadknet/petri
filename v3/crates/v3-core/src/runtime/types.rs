@@ -1,5 +1,8 @@
 use crate::contracts::{ActionQueue, WorldAction};
 
+/// Number of output slots in a [`NodeResult`].
+pub const OUTPUT_SLOT_COUNT: usize = 12;
+
 /// Result returned by a single node evaluation.
 /// The mesh executor uses this to decide routing. Action queue lives in the
 /// mesh executor, not inside NodeResult.
@@ -8,7 +11,7 @@ use crate::contracts::{ActionQueue, WorldAction};
 pub struct NodeResult {
     /// Output slots for downstream nodes. Initialized from incoming upstream_slots;
     /// only slots written by the node are overwritten.
-    pub output_slots: [f32; 12],
+    pub output_slots: [f32; OUTPUT_SLOT_COUNT],
     /// Routing target index (f32). Mesh executor applies rem_euclid over targets.len().
     pub route_target_idx: f32,
     /// True when execution should stop (ExecuteActionQueue or Halt).
@@ -20,7 +23,7 @@ pub struct NodeResult {
 
 impl NodeResult {
     /// Create a non-terminal result (halt or step cap reached — node finished but mesh continues).
-    pub fn halted(output_slots: [f32; 12], route_target_idx: f32) -> Self {
+    pub fn halted(output_slots: [f32; OUTPUT_SLOT_COUNT], route_target_idx: f32) -> Self {
         Self {
             output_slots,
             route_target_idx,
@@ -32,7 +35,7 @@ impl NodeResult {
     /// Create a result indicating energy exhaustion.
     pub fn exhausted() -> Self {
         Self {
-            output_slots: [0.0; 12],
+            output_slots: [0.0; OUTPUT_SLOT_COUNT],
             route_target_idx: 0.0,
             terminal: true,
             energy_exhausted: true,
@@ -40,7 +43,7 @@ impl NodeResult {
     }
 
     /// Create a terminal result (action emitted or ExecuteActionQueue).
-    pub fn terminal(output_slots: [f32; 12], route_target_idx: f32) -> Self {
+    pub fn terminal(output_slots: [f32; OUTPUT_SLOT_COUNT], route_target_idx: f32) -> Self {
         Self {
             output_slots,
             route_target_idx,

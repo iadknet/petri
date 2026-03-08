@@ -101,14 +101,12 @@ fn copy_internal_node_sometimes_copies_edges_sometimes_not() {
 }
 
 #[test]
-fn copy_internal_node_sometimes_adds_backlink_sometimes_not() {
+fn copy_internal_node_always_adds_backlink() {
     let source_node = GraphInternalNode {
         kind: GraphNodeKind::Relu,
         inputs: vec![],
         plasticity: None,
     };
-    let mut saw_backlink = false;
-    let mut saw_no_backlink = false;
     for seed in 0u64..200 {
         let mut genome = graph_only_genome(vec![source_node.clone()]);
         let mut r = rng(seed);
@@ -121,25 +119,19 @@ fn copy_internal_node_sometimes_adds_backlink_sometimes_not() {
         )
         .unwrap();
         if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
-            // Check if any existing node got a new input pointing to the copy (index 1).
+            // Check that some existing node got a new input pointing to the copy (index 1).
             let has_backlink = g.internal_nodes.iter().enumerate().any(|(idx, n)| {
                 idx < g.internal_nodes.len() - 1
                     && n.inputs
                         .iter()
                         .any(|e| e.source_idx as usize == g.internal_nodes.len() - 1)
             });
-            if has_backlink {
-                saw_backlink = true;
-            } else {
-                saw_no_backlink = true;
-            }
-        }
-        if saw_backlink && saw_no_backlink {
-            break;
+            assert!(
+                has_backlink,
+                "copy_internal_node must always add a backlink (seed {seed})"
+            );
         }
     }
-    assert!(saw_backlink, "must sometimes add backlink");
-    assert!(saw_no_backlink, "must sometimes skip backlink");
 }
 
 // ── GraphCopySubgraph tests ──

@@ -1,9 +1,31 @@
 use rand::Rng;
 
+use crate::creature::action_log::ACTION_TYPE_COUNT;
 use crate::creature::genome::{
     BackendDef, CreatureGenome, GraphInput, GraphInternalNode, GraphNodeKind,
 };
+use crate::creature::state::SHARED_MEMORY_SLOTS;
 use crate::mutation::types::MutationSkipReason;
+use crate::runtime::graph_effects::ACTION_META_SLOTS;
+use crate::runtime::types::OUTPUT_SLOT_COUNT;
+
+/// Cyclic ±1 step within [0, modulus) for u8.
+fn step_bounded_u8(value: &mut u8, modulus: u8, rng: &mut impl Rng) {
+    if rng.gen_bool(0.5) {
+        *value = value.wrapping_add(1) % modulus;
+    } else {
+        *value = value.wrapping_add(modulus - 1) % modulus;
+    }
+}
+
+/// Cyclic ±1 step within [0, modulus) for u16.
+fn step_bounded_u16(value: &mut u16, modulus: u16, rng: &mut impl Rng) {
+    if rng.gen_bool(0.5) {
+        *value = value.wrapping_add(1) % modulus;
+    } else {
+        *value = value.wrapping_add(modulus - 1) % modulus;
+    }
+}
 
 pub(super) fn alter_edge_weight(
     genome: &mut CreatureGenome,
@@ -39,12 +61,13 @@ pub(super) fn swap_operator(
     node_idx: usize,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
+    let input_ref_count = genome.nodes[node_idx].input_refs.len() as u16;
     if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
         if g.internal_nodes.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
         let int_idx = rng.gen_range(0..g.internal_nodes.len());
-        g.internal_nodes[int_idx].kind = random_graph_node_kind(rng);
+        g.internal_nodes[int_idx].kind = random_graph_node_kind(input_ref_count, rng);
     }
     Ok(())
 }
@@ -54,6 +77,7 @@ pub(super) fn mutate_operator_param(
     node_idx: usize,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
+    let input_ref_count = genome.nodes[node_idx].input_refs.len() as u16;
     if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
         // Find internal nodes with parameterized kinds.
         let eligible: Vec<usize> = g
@@ -69,20 +93,13 @@ pub(super) fn mutate_operator_param(
         let int_idx = eligible[rng.gen_range(0..eligible.len())];
         match &mut g.internal_nodes[int_idx].kind {
             GraphNodeKind::CustomOutput(ref mut slot) => {
-                if rng.gen_bool(0.5) {
-                    *slot = slot.wrapping_add(1);
-                } else {
-                    *slot = slot.wrapping_sub(1);
-                }
+                step_bounded_u8(slot, OUTPUT_SLOT_COUNT as u8, rng);
             }
             GraphNodeKind::InputRef {
                 ref mut ref_idx, ..
             } => {
-                if rng.gen_bool(0.5) {
-                    *ref_idx = ref_idx.wrapping_add(1);
-                } else {
-                    *ref_idx = ref_idx.wrapping_sub(1);
-                }
+                let n = input_ref_count.max(1);
+                step_bounded_u16(ref_idx, n, rng);
             }
             GraphNodeKind::Constant(ref mut p)
             | GraphNodeKind::Threshold(ref mut p)
@@ -91,23 +108,17 @@ pub(super) fn mutate_operator_param(
             | GraphNodeKind::Oscillator(ref mut p) => {
                 *p += rng.gen_range(-0.1f32..=0.1);
             }
-            GraphNodeKind::WriteActionMeta(ref mut slot)
-            | GraphNodeKind::PushAction(ref mut slot) => {
-                if rng.gen_bool(0.5) {
-                    *slot = slot.wrapping_add(1);
-                } else {
-                    *slot = slot.wrapping_sub(1);
-                }
+            GraphNodeKind::WriteActionMeta(ref mut slot) => {
+                step_bounded_u8(slot, ACTION_META_SLOTS as u8, rng);
+            }
+            GraphNodeKind::PushAction(ref mut slot) => {
+                step_bounded_u8(slot, ACTION_TYPE_COUNT, rng);
             }
             GraphNodeKind::ReadSlot(ref mut slot_idx)
             | GraphNodeKind::ReadSlotPrev(ref mut slot_idx)
             | GraphNodeKind::WriteSlot(ref mut slot_idx)
             | GraphNodeKind::ClearSlot(ref mut slot_idx) => {
-                if rng.gen_bool(0.5) {
-                    *slot_idx = slot_idx.wrapping_add(1) % 16;
-                } else {
-                    *slot_idx = slot_idx.wrapping_sub(1) % 16;
-                }
+                step_bounded_u8(slot_idx, SHARED_MEMORY_SLOTS as u8, rng);
             }
             _ => unreachable!("is_parameterized filter should prevent reaching here"),
         }
@@ -120,9 +131,10 @@ pub(super) fn add_internal_node(
     node_idx: usize,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
+    let input_ref_count = genome.nodes[node_idx].input_refs.len() as u16;
     if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
         let existing_count = g.internal_nodes.len();
-        let kind = random_graph_node_kind(rng);
+        let kind = random_graph_node_kind(input_ref_count, rng);
         let inputs = if existing_count > 0 && rng.gen_bool(0.5) {
             vec![GraphInput {
                 source_idx: rng.gen_range(0..existing_count) as u16,
@@ -226,6 +238,7 @@ pub(super) fn apply_graph_raw_field_mutation(
     node_idx: usize,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
+    let input_ref_count = genome.nodes[node_idx].input_refs.len() as u16;
     if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
         let mut target_count: usize = 0;
         for internal in &g.internal_nodes {
@@ -265,35 +278,43 @@ pub(super) fn apply_graph_raw_field_mutation(
                     match &g.internal_nodes[int_idx].kind {
                         GraphNodeKind::InputRef { .. } => {
                             g.internal_nodes[int_idx].kind = GraphNodeKind::InputRef {
-                                ref_idx: rng.gen(),
+                                ref_idx: rng.gen_range(0..input_ref_count.max(1)),
                                 sub_idx: 0,
                             };
                         }
                         GraphNodeKind::CustomOutput(_) => {
-                            g.internal_nodes[int_idx].kind = GraphNodeKind::CustomOutput(rng.gen());
+                            g.internal_nodes[int_idx].kind = GraphNodeKind::CustomOutput(
+                                rng.gen_range(0..OUTPUT_SLOT_COUNT as u8),
+                            );
                         }
                         GraphNodeKind::WriteActionMeta(_) => {
-                            g.internal_nodes[int_idx].kind =
-                                GraphNodeKind::WriteActionMeta(rng.gen());
+                            g.internal_nodes[int_idx].kind = GraphNodeKind::WriteActionMeta(
+                                rng.gen_range(0..ACTION_META_SLOTS as u8),
+                            );
                         }
                         GraphNodeKind::PushAction(_) => {
-                            g.internal_nodes[int_idx].kind = GraphNodeKind::PushAction(rng.gen());
+                            g.internal_nodes[int_idx].kind =
+                                GraphNodeKind::PushAction(rng.gen_range(0..ACTION_TYPE_COUNT));
                         }
                         GraphNodeKind::ReadSlot(_) => {
-                            g.internal_nodes[int_idx].kind =
-                                GraphNodeKind::ReadSlot(rng.gen_range(0u8..16));
+                            g.internal_nodes[int_idx].kind = GraphNodeKind::ReadSlot(
+                                rng.gen_range(0..SHARED_MEMORY_SLOTS as u8),
+                            );
                         }
                         GraphNodeKind::ReadSlotPrev(_) => {
-                            g.internal_nodes[int_idx].kind =
-                                GraphNodeKind::ReadSlotPrev(rng.gen_range(0u8..16));
+                            g.internal_nodes[int_idx].kind = GraphNodeKind::ReadSlotPrev(
+                                rng.gen_range(0..SHARED_MEMORY_SLOTS as u8),
+                            );
                         }
                         GraphNodeKind::WriteSlot(_) => {
-                            g.internal_nodes[int_idx].kind =
-                                GraphNodeKind::WriteSlot(rng.gen_range(0u8..16));
+                            g.internal_nodes[int_idx].kind = GraphNodeKind::WriteSlot(
+                                rng.gen_range(0..SHARED_MEMORY_SLOTS as u8),
+                            );
                         }
                         GraphNodeKind::ClearSlot(_) => {
-                            g.internal_nodes[int_idx].kind =
-                                GraphNodeKind::ClearSlot(rng.gen_range(0u8..16));
+                            g.internal_nodes[int_idx].kind = GraphNodeKind::ClearSlot(
+                                rng.gen_range(0..SHARED_MEMORY_SLOTS as u8),
+                            );
                         }
                         _ => unreachable!(),
                     }
@@ -315,10 +336,10 @@ pub(super) fn apply_graph_raw_field_mutation(
 }
 
 /// Return a random GraphNodeKind covering all 30 variants with random initial params.
-pub(super) fn random_graph_node_kind(rng: &mut impl Rng) -> GraphNodeKind {
+pub(super) fn random_graph_node_kind(input_ref_count: u16, rng: &mut impl Rng) -> GraphNodeKind {
     match rng.gen_range(0u8..30) {
         0 => GraphNodeKind::InputRef {
-            ref_idx: rng.gen(),
+            ref_idx: rng.gen_range(0..input_ref_count.max(1)),
             sub_idx: 0,
         },
         1 => GraphNodeKind::Constant(rng.gen_range(-1.0f32..=1.0)),
@@ -340,16 +361,16 @@ pub(super) fn random_graph_node_kind(rng: &mut impl Rng) -> GraphNodeKind {
         17 => GraphNodeKind::Momentum(rng.gen_range(0.0f32..=1.0)),
         18 => GraphNodeKind::Oscillator(rng.gen_range(0.01f32..=10.0)),
         19 => GraphNodeKind::AdaptiveGain,
-        20 => GraphNodeKind::CustomOutput(rng.gen()),
+        20 => GraphNodeKind::CustomOutput(rng.gen_range(0..OUTPUT_SLOT_COUNT as u8)),
         21 => GraphNodeKind::RouterOutput,
-        22 => GraphNodeKind::WriteActionMeta(rng.gen_range(0u8..8)),
-        23 => GraphNodeKind::PushAction(rng.gen_range(0u8..5)),
+        22 => GraphNodeKind::WriteActionMeta(rng.gen_range(0..ACTION_META_SLOTS as u8)),
+        23 => GraphNodeKind::PushAction(rng.gen_range(0..ACTION_TYPE_COUNT)),
         24 => GraphNodeKind::PopAction,
         25 => GraphNodeKind::ExecuteActionQueue,
-        26 => GraphNodeKind::ReadSlot(rng.gen_range(0u8..16)),
-        27 => GraphNodeKind::ReadSlotPrev(rng.gen_range(0u8..16)),
-        28 => GraphNodeKind::WriteSlot(rng.gen_range(0u8..16)),
-        _ => GraphNodeKind::ClearSlot(rng.gen_range(0u8..16)),
+        26 => GraphNodeKind::ReadSlot(rng.gen_range(0..SHARED_MEMORY_SLOTS as u8)),
+        27 => GraphNodeKind::ReadSlotPrev(rng.gen_range(0..SHARED_MEMORY_SLOTS as u8)),
+        28 => GraphNodeKind::WriteSlot(rng.gen_range(0..SHARED_MEMORY_SLOTS as u8)),
+        _ => GraphNodeKind::ClearSlot(rng.gen_range(0..SHARED_MEMORY_SLOTS as u8)),
     }
 }
 
@@ -390,14 +411,12 @@ pub(super) fn apply_copy_internal_node(
         }
         let new_idx = g.internal_nodes.len();
         g.internal_nodes.push(copy);
-        // Coin flip: add backlink edge from random existing node to the copy.
-        if rng.gen_bool(0.5) {
-            let target = rng.gen_range(0..new_idx);
-            g.internal_nodes[target].inputs.push(GraphInput {
-                source_idx: new_idx as u16,
-                weight: rng.gen_range(-1.0f32..=1.0),
-            });
-        }
+        // Always add backlink edge from random existing node to the copy.
+        let target = rng.gen_range(0..new_idx);
+        g.internal_nodes[target].inputs.push(GraphInput {
+            source_idx: new_idx as u16,
+            weight: rng.gen_range(-1.0f32..=1.0),
+        });
     }
     Ok(())
 }
