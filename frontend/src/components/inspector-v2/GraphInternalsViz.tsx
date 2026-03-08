@@ -1,11 +1,9 @@
 import {
 	type Edge,
-	type EdgeProps,
 	MarkerType,
 	type Node,
 	ReactFlow,
 	ReactFlowProvider,
-	getBezierPath,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { memo, useEffect, useMemo, useState } from "react";
@@ -20,6 +18,11 @@ import {
 	type GraphInternalsNodeData,
 	GraphInternalsNode,
 } from "./GraphInternalsNode.tsx";
+import {
+	BackwardWeightEdge,
+	WeightEdge,
+	type WeightEdgeData,
+} from "./graphInternalsEdges.tsx";
 import {
 	type GraphInternalsLayoutResult,
 	layoutGraphInternals,
@@ -144,61 +147,10 @@ export function categorize(kind: GraphNodeKind): "input" | "constant" | "memory"
 
 const nodeTypes = { graphInternal: GraphInternalsNode };
 
-interface WeightEdgeData extends Record<string, unknown> {
-	weight: number;
-}
-
-function WeightEdge({
-	id,
-	sourceX,
-	sourceY,
-	targetX,
-	targetY,
-	sourcePosition,
-	targetPosition,
-	data,
-	style,
-	markerEnd,
-}: EdgeProps) {
-	const [edgePath, labelX, labelY] = getBezierPath({
-		sourceX,
-		sourceY,
-		targetX,
-		targetY,
-		sourcePosition,
-		targetPosition,
-	});
-
-	const edgeData = data as WeightEdgeData | undefined;
-	const weight = edgeData?.weight ?? 1;
-	const showWeight = Math.abs(weight - 1.0) > 0.01;
-
-	return (
-		<>
-			<path
-				id={id}
-				d={edgePath}
-				fill="none"
-				strokeWidth={1}
-				markerEnd={markerEnd as string}
-				style={style}
-			/>
-			{showWeight ? (
-				<text
-					x={labelX}
-					y={labelY - 6}
-					textAnchor="middle"
-					className="text-[8px] font-mono"
-					fill="rgba(148,163,184,0.6)"
-				>
-					{weight.toFixed(2)}
-				</text>
-			) : null}
-		</>
-	);
-}
-
-const edgeTypes = { weightEdge: memo(WeightEdge) };
+const edgeTypes = {
+	weightEdge: memo(WeightEdge),
+	backwardEdge: memo(BackwardWeightEdge),
+};
 
 /** Compute which target node ID was selected given a route value and targets array. */
 export function resolveSelectedTarget(routeTargetIdx: number, targets: number[]): number | null {
@@ -337,6 +289,27 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 
 		const flowEdges: Edge<WeightEdgeData>[] = layout.edges.map((le) => {
 			const opacity = Math.max(0.2, Math.min(Math.abs(le.weight), 1));
+			if (le.isBackward) {
+				return {
+					id: le.id,
+					source: String(le.fromIndex),
+					target: String(le.toIndex),
+					sourceHandle: "bottom-out",
+					targetHandle: "bottom-in",
+					type: "backwardEdge",
+					selectable: false,
+					focusable: false,
+					markerEnd: {
+						type: MarkerType.ArrowClosed,
+						color: `rgba(251,191,36,${opacity})`,
+						width: 10,
+						height: 10,
+					},
+					data: {
+						weight: le.weight,
+					},
+				};
+			}
 			return {
 				id: le.id,
 				source: String(le.fromIndex),

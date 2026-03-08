@@ -325,7 +325,8 @@ pub(super) fn apply_graph_raw_field_mutation(
 
             for edge_idx in 0..g.internal_nodes[int_idx].inputs.len() {
                 if pick == 0 {
-                    g.internal_nodes[int_idx].inputs[edge_idx].source_idx = rng.gen();
+                    g.internal_nodes[int_idx].inputs[edge_idx].source_idx =
+                        rng.gen_range(0..g.internal_nodes.len() as u16);
                     return Ok(());
                 }
                 pick -= 1;

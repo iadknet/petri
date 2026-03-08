@@ -124,5 +124,39 @@ describe("layoutGraphInternals", () => {
 		expect(result.edges[0]?.fromIndex).toBe(0);
 		expect(result.edges[0]?.toIndex).toBe(1);
 		expect(result.edges[0]?.weight).toBe(0.75);
+		expect(result.edges[0]?.isBackward).toBe(false);
+	});
+
+	it("marks forward edge as not backward", async () => {
+		const nodes: GraphInternalNode[] = [
+			{ kind: { InputRef: { ref_idx: 0, sub_idx: 0 } }, inputs: [] },
+			{ kind: { Threshold: 0.5 }, inputs: [{ source_idx: 0, weight: 1.0 }] },
+		];
+		const result = await layoutGraphInternals(nodes);
+		expect(result.edges).toHaveLength(1);
+		expect(result.edges[0]?.isBackward).toBe(false);
+	});
+
+	it("marks backward edge as backward", async () => {
+		const nodes: GraphInternalNode[] = [
+			{ kind: { InputRef: { ref_idx: 0, sub_idx: 0 } }, inputs: [] },
+			{ kind: { Threshold: 0.5 }, inputs: [{ source_idx: 2, weight: 0.5 }] },
+			{ kind: "RouterOutput", inputs: [{ source_idx: 1, weight: 1.0 }] },
+		];
+		const result = await layoutGraphInternals(nodes);
+		const backwardEdge = result.edges.find((e) => e.fromIndex === 2 && e.toIndex === 1);
+		expect(backwardEdge).toBeDefined();
+		expect(backwardEdge?.isBackward).toBe(true);
+	});
+
+	it("marks self-loop edge as backward", async () => {
+		const nodes: GraphInternalNode[] = [
+			{ kind: { Threshold: 0.5 }, inputs: [{ source_idx: 0, weight: 0.8 }] },
+		];
+		const result = await layoutGraphInternals(nodes);
+		expect(result.edges).toHaveLength(1);
+		expect(result.edges[0]?.fromIndex).toBe(0);
+		expect(result.edges[0]?.toIndex).toBe(0);
+		expect(result.edges[0]?.isBackward).toBe(true);
 	});
 });
