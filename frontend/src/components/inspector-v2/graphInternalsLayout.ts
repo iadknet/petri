@@ -20,6 +20,7 @@ export interface GraphInternalLayoutEdge {
 	fromIndex: number;
 	toIndex: number;
 	weight: number;
+	isBackward: boolean;
 }
 
 export interface GraphInternalsLayoutResult {
@@ -63,6 +64,7 @@ export async function layoutGraphInternals(
 				fromIndex: input.source_idx,
 				toIndex: toIdx,
 				weight: input.weight,
+				isBackward: input.source_idx >= toIdx,
 			});
 		}
 	}
@@ -102,7 +104,7 @@ export async function layoutGraphInternals(
 			"elk.algorithm": "layered",
 			"elk.direction": "RIGHT",
 			"elk.edgeRouting": "ORTHOGONAL",
-			"elk.padding": "[left=12,top=12,right=12,bottom=12]",
+			"elk.padding": "[left=12,top=12,right=12,bottom=28]",
 			"elk.spacing.nodeNode": "16",
 			"elk.layered.spacing.nodeNodeBetweenLayers": "32",
 			"elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",

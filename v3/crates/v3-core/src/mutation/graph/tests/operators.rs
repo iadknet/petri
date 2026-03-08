@@ -501,8 +501,7 @@ fn raw_field_mutation_bounds_custom_output_to_valid_range() {
 }
 
 #[test]
-fn raw_field_mutation_can_set_edge_source_out_of_range() {
-    let mut found_out_of_range = false;
+fn raw_field_mutation_bounds_edge_source_to_valid_range() {
     for seed in 0u64..512 {
         let mut genome = graph_only_genome(vec![
             GraphInternalNode {
@@ -529,17 +528,18 @@ fn raw_field_mutation_can_set_edge_source_out_of_range() {
         )
         .unwrap();
         if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
-            let source_idx = g.internal_nodes[1].inputs[0].source_idx as usize;
-            if source_idx >= g.internal_nodes.len() {
-                found_out_of_range = true;
-                break;
+            for (i, node) in g.internal_nodes.iter().enumerate() {
+                for (j, edge) in node.inputs.iter().enumerate() {
+                    assert!(
+                        (edge.source_idx as usize) < g.internal_nodes.len(),
+                        "seed {seed}: node {i} edge {j} source_idx {} >= internal_nodes.len() {}",
+                        edge.source_idx,
+                        g.internal_nodes.len()
+                    );
+                }
             }
         }
     }
-    assert!(
-        found_out_of_range,
-        "raw graph mutation must reach edge source indices outside internal node bounds"
-    );
 }
 
 #[test]

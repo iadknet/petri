@@ -67,6 +67,20 @@ export const GraphInternalsNode = memo(function GraphInternalsNode(
 				isConnectable={false}
 				className="!h-1.5 !w-1.5 !border-0 !bg-transparent !opacity-0"
 			/>
+			<Handle
+				type="source"
+				position={Position.Bottom}
+				id="bottom-out"
+				isConnectable={false}
+				className="!h-1.5 !w-1.5 !border-0 !bg-transparent !opacity-0"
+			/>
+			<Handle
+				type="target"
+				position={Position.Bottom}
+				id="bottom-in"
+				isConnectable={false}
+				className="!h-1.5 !w-1.5 !border-0 !bg-transparent !opacity-0"
+			/>
 			<div className="flex items-center gap-1 min-w-0 overflow-hidden">
 				<span className="text-slate-500 shrink-0">{data.index}</span>
 				<span
