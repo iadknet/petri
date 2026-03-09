@@ -1,12 +1,6 @@
 import type { GraphNodeKind, VmInstruction } from "../../../types/genome.ts";
 
-export type RuntimeIoBadge =
-	| "action"
-	| "input"
-	| "slot"
-	| "output"
-	| "route"
-	| "stateful";
+export type RuntimeIoBadge = "action" | "input" | "slot" | "output" | "route" | "stateful";
 
 interface RuntimeIoFlags {
 	readsInput: boolean;
@@ -26,14 +20,7 @@ export interface RuntimeIoSemantics extends RuntimeIoFlags {
 	badges: RuntimeIoBadge[];
 }
 
-const BADGE_ORDER: RuntimeIoBadge[] = [
-	"input",
-	"slot",
-	"action",
-	"route",
-	"output",
-	"stateful",
-];
+const BADGE_ORDER: RuntimeIoBadge[] = ["input", "slot", "action", "route", "output", "stateful"];
 
 const EMPTY_FLAGS: RuntimeIoFlags = {
 	readsInput: false,
@@ -47,9 +34,7 @@ const EMPTY_FLAGS: RuntimeIoFlags = {
 	stateful: false,
 };
 
-export function classifyVmInstruction(
-	instruction: VmInstruction,
-): RuntimeIoSemantics {
+export function classifyVmInstruction(instruction: VmInstruction): RuntimeIoSemantics {
 	if (typeof instruction === "string") {
 		return withBadges({ name: instruction, detail: "", ...EMPTY_FLAGS });
 	}
@@ -119,10 +104,7 @@ export function classifyGraphTraceKind(kindName: string): RuntimeIoSemantics {
 	return classifyGraphKindName(kindName, "");
 }
 
-function classifyGraphKindName(
-	name: string,
-	detail: string,
-): RuntimeIoSemantics {
+function classifyGraphKindName(name: string, detail: string): RuntimeIoSemantics {
 	const flags: RuntimeIoFlags = { ...EMPTY_FLAGS };
 
 	switch (name) {
@@ -171,18 +153,12 @@ function classifyGraphKindName(
 	});
 }
 
-function withBadges(
-	semantics: Omit<RuntimeIoSemantics, "badges">,
-): RuntimeIoSemantics {
+function withBadges(semantics: Omit<RuntimeIoSemantics, "badges">): RuntimeIoSemantics {
 	const badges = new Set<RuntimeIoBadge>();
 	if (semantics.readsInput) {
 		badges.add("input");
 	}
-	if (
-		semantics.readsSlot ||
-		semantics.readsPrevSlot ||
-		semantics.writesSlot
-	) {
+	if (semantics.readsSlot || semantics.readsPrevSlot || semantics.writesSlot) {
 		badges.add("slot");
 	}
 	if (semantics.writesAction || semantics.readsActionQueue) {

@@ -44,9 +44,7 @@ export const meshBackendTones: Record<"vm" | "graph", MeshBackendTone> = {
 	},
 };
 
-export function summarizeBackendDef(
-	backendDef: BackendDef,
-): MeshPresentationSummary {
+export function summarizeBackendDef(backendDef: BackendDef): MeshPresentationSummary {
 	if ("Vm" in backendDef) {
 		return {
 			label: "VM",
@@ -60,9 +58,7 @@ export function summarizeBackendDef(
 	};
 }
 
-export function describeVmInstruction(
-	instruction: VmInstruction,
-): MeshInstructionPresentation {
+export function describeVmInstruction(instruction: VmInstruction): MeshInstructionPresentation {
 	const semantics = classifyVmInstruction(instruction);
 	return {
 		label: semantics.name,
@@ -71,9 +67,7 @@ export function describeVmInstruction(
 	};
 }
 
-export function describeGraphInternalNode(
-	kind: GraphNodeKind,
-): MeshInstructionPresentation {
+export function describeGraphInternalNode(kind: GraphNodeKind): MeshInstructionPresentation {
 	const semantics = classifyGraphKind(kind);
 	return {
 		label: semantics.name,
@@ -82,9 +76,7 @@ export function describeGraphInternalNode(
 	};
 }
 
-export function describeGraphTraceKind(
-	kind: string,
-): MeshInstructionPresentation {
+export function describeGraphTraceKind(kind: string): MeshInstructionPresentation {
 	const semantics = classifyGraphTraceKind(kind);
 	return {
 		label: semantics.name,

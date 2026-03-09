@@ -5,7 +5,7 @@ import {
 	useCreatureInspectorStore,
 } from "../stores/creatureInspector.ts";
 import { useInspectorWorkspaceStore } from "../stores/inspectorWorkspace.ts";
-import { UnifiedInspector } from "./inspector-v2/UnifiedInspector.tsx";
+import { UnifiedInspector } from "./inspector/UnifiedInspector.tsx";
 
 function CreatureInspector() {
 	useCreatureDetail();

@@ -48,36 +48,26 @@ const graphNode: NodeGenome = {
 
 describe("meshPresentation", () => {
 	it("classifies VM instructions and node badges", () => {
-		expect(
-			describeVmInstruction({ ReadInput: { dst: 0, input_idx: 0 } }).badges,
-		).toContain("input");
-		expect(
-			describeVmInstruction({ StoreSlotImm: { slot_idx: 4, src: 0 } }).badges,
-		).toContain("slot");
-		expect(
-			describeVmInstruction({ PushAction: { action_type: 2 } }).badges,
-		).toContain("action");
-		expect(
-			describeVmInstruction({ WriteRouteTarget: { src: 0 } }).badges,
-		).toContain("route");
+		expect(describeVmInstruction({ ReadInput: { dst: 0, input_idx: 0 } }).badges).toContain(
+			"input",
+		);
+		expect(describeVmInstruction({ StoreSlotImm: { slot_idx: 4, src: 0 } }).badges).toContain(
+			"slot",
+		);
+		expect(describeVmInstruction({ PushAction: { action_type: 2 } }).badges).toContain("action");
+		expect(describeVmInstruction({ WriteRouteTarget: { src: 0 } }).badges).toContain("route");
 		expect(collectNodeBadges(vmNode)).toEqual(
 			expect.arrayContaining(["action", "input", "slot", "route"]),
 		);
 	});
 
 	it("classifies graph node roles and backend summaries", () => {
-		expect(
-			describeGraphInternalNode({ DecayIntegrator: 0.5 }).badges,
-		).toContain("stateful");
-		expect(describeGraphInternalNode({ CustomOutput: 1 }).badges).toContain(
-			"output",
-		);
+		expect(describeGraphInternalNode({ DecayIntegrator: 0.5 }).badges).toContain("stateful");
+		expect(describeGraphInternalNode({ CustomOutput: 1 }).badges).toContain("output");
 		expect(describeGraphInternalNode("RouterOutput").badges).toContain("route");
 		expect(collectNodeBadges(graphNode)).toEqual(
 			expect.arrayContaining(["output", "route", "stateful"]),
 		);
-		expect(summarizeBackendDef(graphNode.backend_def).detail).toContain(
-			"4 nodes",
-		);
+		expect(summarizeBackendDef(graphNode.backend_def).detail).toContain("4 nodes");
 	});
 });
