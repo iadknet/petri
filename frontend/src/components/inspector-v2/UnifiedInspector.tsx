@@ -26,6 +26,8 @@ interface UnifiedInspectorProps {
 		maxEnergy: number;
 		age: number;
 		generation: number;
+		complexity: number;
+		genomeSize: number;
 		position: { x: number; y: number };
 		phenotype: CreaturePhenotype;
 	};
@@ -217,6 +219,8 @@ export function UnifiedInspector({
 							focusMode={mesh.focusMode}
 							viewportCommand={mesh.meshController.viewportCommand}
 							onSelectNode={mesh.handleNodeSelect}
+							complexity={stats.complexity}
+							genomeSize={stats.genomeSize}
 						/>
 					)}
 				</div>

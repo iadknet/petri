@@ -43,6 +43,8 @@ interface MeshFlowCanvasProps {
 	focusMode: MeshFocusMode;
 	viewportCommand: MeshViewportCommand | null;
 	onSelectNode: (nodeId: number) => void;
+	complexity?: number;
+	genomeSize?: number;
 }
 
 export function MeshFlowCanvas(props: MeshFlowCanvasProps) {
@@ -61,9 +63,10 @@ const MeshFlowScene = memo(function MeshFlowScene({
 	activeNodeId,
 	activeEdgeId,
 	dimmedNodeIds,
-	focusMode,
 	viewportCommand,
 	onSelectNode,
+	complexity,
+	genomeSize,
 }: MeshFlowCanvasProps) {
 	const reactFlow = useReactFlow<MeshFlowNodeModel, MeshFlowEdgeModel>();
 	const scene = useMemo(
@@ -156,7 +159,8 @@ const MeshFlowScene = memo(function MeshFlowScene({
 					<div className="rounded-2xl border border-white/8 bg-slate-950/88 px-3 py-2 text-[10px] font-mono uppercase tracking-[0.16em] text-slate-400 shadow-[0_18px_40px_rgba(2,6,23,0.32)]">
 						<div>{scene.nodes.length} nodes</div>
 						<div>{scene.edges.length} routed edges</div>
-						<div>{focusMode === "none" ? "full view" : `${focusMode} focus`}</div>
+						{complexity != null && <div>complexity {complexity}</div>}
+						{genomeSize != null && <div>genome size {genomeSize}</div>}
 					</div>
 				</Panel>
 			</ReactFlow>

@@ -11,6 +11,7 @@ export interface CreatureStats {
 	age: number;
 	generation: number;
 	complexity: number;
+	genomeSize: number;
 	phenotype: CreaturePhenotype;
 }
 
@@ -55,6 +56,7 @@ interface CreatureInspectorState {
 		age: number;
 		generation: number;
 		complexity: number;
+		genomeSize: number;
 		phenotype: CreaturePhenotype;
 		genome?: CreatureGenome;
 		meshAnnotations?: CreatureMeshAnnotation[];
@@ -132,6 +134,7 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()(
 				age: detail.age,
 				generation: detail.generation,
 				complexity: detail.complexity,
+				genomeSize: detail.genomeSize,
 				phenotype: detail.phenotype,
 			};
 

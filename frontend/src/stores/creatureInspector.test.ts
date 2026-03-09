@@ -29,6 +29,7 @@ function makeDetail(overrides: Record<string, unknown> = {}) {
 		age: 50,
 		generation: 3,
 		complexity: 5,
+		genomeSize: 12,
 		phenotype: {
 			channels: [100, 150, 200, 50, 75, 125] as [
 				number,

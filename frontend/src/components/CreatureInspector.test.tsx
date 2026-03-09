@@ -109,6 +109,7 @@ function makeDetail(id: number) {
 		age: 12,
 		generation: 3,
 		complexity: 8,
+		genomeSize: 12,
 		phenotype: {
 			channels: [100, 150, 200, 50, 75, 125] as [number, number, number, number, number, number],
 			active_channel: 0,
