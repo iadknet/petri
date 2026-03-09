@@ -31,8 +31,8 @@ export function LinesParams({ params, onChange }: LinesParamsProps) {
 				label="Jaggedness"
 				value={params.jaggedness}
 				min={0}
-				max={1}
-				step={0.01}
+				max={3}
+				step={0.05}
 				onChange={(v) => onChange({ ...params, jaggedness: v })}
 				testId="param-jaggedness"
 			/>
