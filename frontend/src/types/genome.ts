@@ -103,13 +103,7 @@ export interface VmBackendDef {
 export type BackendDef = { Vm: VmBackendDef } | { Graph: GraphBackendDef };
 
 export type InputReference =
-	| {
-			World:
-				| string
-				| { NeighborCellFood: string }
-				| { NeighborCellBarrier: string }
-				| { NeighborCellOccupied: string };
-	  }
+	| { World: string }
 	| { StaticIntrospection: string }
 	| { DynamicIntrospection: string }
 	| { UpstreamSlot: number }

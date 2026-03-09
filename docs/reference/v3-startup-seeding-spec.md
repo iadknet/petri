@@ -146,33 +146,27 @@ NodeGenome {
   input_refs: [
     0: World(FoodHere),
     1: DynamicIntrospection(EnergyCurrent),
-    2: World(NeighborCellFood(0)),     // N
-    3: World(NeighborCellFood(2)),     // E
-    4: World(NeighborCellFood(4)),     // S
-    5: World(NeighborCellFood(6)),     // W
-    6: World(NeighborCellOccupied(0)), // N
-    7: World(NeighborCellOccupied(2)), // E
-    8: World(NeighborCellOccupied(4)), // S
-    9: World(NeighborCellOccupied(6)), // W
+    2: World(NeighborFoodRing),      // compound: 8 directions
+    3: World(NeighborOccupiedRing),   // compound: 8 directions
   ],
   backend_def: Graph(GraphBackendDef {
     internal_nodes: [
       // idx 0: food_here signal
-      { kind: InputRef(0), inputs: [] },
+      { kind: InputRef { ref_idx: 0, sub_idx: 0 }, inputs: [] },
       // idx 1: energy_current signal
-      { kind: InputRef(1), inputs: [] },
+      { kind: InputRef { ref_idx: 1, sub_idx: 0 }, inputs: [] },
       // idx 2: reproduce gate (energy >= 24.0)
       { kind: Threshold(24.0), inputs: [{ source_idx: 1, weight: 1.0 }] },
-      // idx 3-6: neighbor food N/E/S/W
-      { kind: InputRef(2), inputs: [] },
-      { kind: InputRef(3), inputs: [] },
-      { kind: InputRef(4), inputs: [] },
-      { kind: InputRef(5), inputs: [] },
-      // idx 7-10: neighbor occupied N/E/S/W
-      { kind: InputRef(6), inputs: [] },
-      { kind: InputRef(7), inputs: [] },
-      { kind: InputRef(8), inputs: [] },
-      { kind: InputRef(9), inputs: [] },
+      // idx 3-6: neighbor food N/E/S/W via ring sensor sub_idx
+      { kind: InputRef { ref_idx: 2, sub_idx: 0 }, inputs: [] },  // N
+      { kind: InputRef { ref_idx: 2, sub_idx: 2 }, inputs: [] },  // E
+      { kind: InputRef { ref_idx: 2, sub_idx: 4 }, inputs: [] },  // S
+      { kind: InputRef { ref_idx: 2, sub_idx: 6 }, inputs: [] },  // W
+      // idx 7-10: neighbor occupied N/E/S/W via ring sensor sub_idx
+      { kind: InputRef { ref_idx: 3, sub_idx: 0 }, inputs: [] },  // N
+      { kind: InputRef { ref_idx: 3, sub_idx: 2 }, inputs: [] },  // E
+      { kind: InputRef { ref_idx: 3, sub_idx: 4 }, inputs: [] },  // S
+      { kind: InputRef { ref_idx: 3, sub_idx: 6 }, inputs: [] },  // W
       // idx 11-16: output writers
       { kind: CustomOutput(0), inputs: [{ source_idx: 0, weight: 1.0 }] },
         // slot 0 = food_here

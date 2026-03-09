@@ -82,7 +82,7 @@ impl MutationEngine {
                         (
                             MutationDomain::Vm,
                             vm_operator_key(op),
-                            apply_vm_event(genome, op, parent_reachable_nodes, rb.vm, rng),
+                            apply_vm_event(genome, op, parent_reachable_nodes, rb.vm, rng, config),
                         )
                     }
                     1 => {
@@ -163,9 +163,10 @@ fn apply_vm_event(
     reachable_nodes: &[usize],
     bias: f64,
     rng: &mut impl Rng,
+    config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let snapshot = genome.clone();
-    match VmMutator::apply(genome, op, reachable_nodes, bias, rng) {
+    match VmMutator::apply(genome, op, reachable_nodes, bias, rng, config) {
         Ok(reachability) => {
             if ParseabilityGate::validate(genome).is_ok() {
                 Ok(reachability)

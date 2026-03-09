@@ -6,7 +6,7 @@ import type { GraphTrace } from "../../types/trace.ts";
 import { GraphInternalsNode, type GraphInternalsNodeData } from "./GraphInternalsNode.tsx";
 import { BackwardWeightEdge, WeightEdge, type WeightEdgeData } from "./graphInternalsEdges.tsx";
 import { type GraphInternalsLayoutResult, layoutGraphInternals } from "./graphInternalsLayout.ts";
-import { formatInputRef } from "./inputRefUtils.ts";
+import { directionName, formatInputRef, isRingSensor } from "./inputRefUtils.ts";
 
 interface GraphInternalsVizProps {
 	internalNodes: GraphInternalNode[];
@@ -74,6 +74,10 @@ export function getKindLabel(kind: GraphNodeKind, inputRefs: InputReference[]): 
 			}
 			const ref = inputRefs[ref_idx];
 			const label = ref ? formatInputRef(ref) : `In(${ref_idx})`;
+			// Ring sensors: show direction name instead of raw sub_idx
+			if (ref && typeof ref !== "string" && "World" in ref && isRingSensor(ref.World)) {
+				return `${label}[${directionName(sub_idx)}]`;
+			}
 			return sub_idx > 0 ? `${label}[${sub_idx}]` : label;
 		}
 		case "Constant":

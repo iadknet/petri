@@ -106,6 +106,11 @@ impl PerceptionSnapshot {
     /// Resolve an extended perception compound key at the given sub_idx.
     ///
     /// Returns 0.0 for out-of-range sub_idx or non-compound keys.
+    ///
+    /// NOTE: No longer used in the production resolution path. All compound
+    /// resolution goes through `SensorSnapshot::resolve_compound()`, which
+    /// wraps out-of-range sub_idx via modular arithmetic. This method is
+    /// retained for direct-access use cases.
     #[inline]
     pub fn resolve(&self, key: &WorldInputKey, sub_idx: u16) -> f32 {
         let idx = sub_idx as usize;
@@ -146,6 +151,36 @@ pub struct SensorSnapshot {
     pub local: StaticInputs,
     /// Extended perception summaries and nearby-creature banks.
     pub perception: PerceptionSnapshot,
+}
+
+impl SensorSnapshot {
+    /// Resolve a compound WorldInputKey at the given sub_idx.
+    ///
+    /// Sub_idx is wrapped via `compound_width()` — out-of-range values wrap to
+    /// valid indices. The `compound_width_matches_array_sizes` test ensures
+    /// width constants stay in sync with actual array lengths.
+    ///
+    /// [`opt-inline-small`] Hot path — called per compound input per tick.
+    #[inline]
+    pub fn resolve_compound(&self, key: &WorldInputKey, sub_idx: u16) -> f32 {
+        debug_assert!(
+            key.compound_width() > 1,
+            "scalar key routed to resolve_compound"
+        );
+        let idx = (sub_idx % key.compound_width()) as usize;
+        match key {
+            WorldInputKey::AreaFoodSummary => self.perception.area_food[idx],
+            WorldInputKey::AreaBarrierSummary => self.perception.area_barrier[idx],
+            WorldInputKey::AreaOccupancySummary => self.perception.area_occupancy[idx],
+            WorldInputKey::NearbyCreatureCore => self.perception.nearby_core[idx],
+            WorldInputKey::NearbyCreatureVitals => self.perception.nearby_vitals[idx],
+            WorldInputKey::NearbyCreatureIdentity => self.perception.nearby_identity[idx],
+            WorldInputKey::NeighborFoodRing => self.local.neighbor_food[idx],
+            WorldInputKey::NeighborBarrierRing => self.local.neighbor_barrier[idx],
+            WorldInputKey::NeighborOccupiedRing => self.local.neighbor_occupied[idx],
+            _ => 0.0,
+        }
+    }
 }
 
 /// Narrow config view consumed by perception reducers.
@@ -204,6 +239,7 @@ pub fn genome_uses_extended_perception(genome: &crate::creature::genome::Creatur
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::sensors::static_inputs::StaticInputs;
 
     #[test]
     fn perception_snapshot_size_within_budget() {
@@ -283,8 +319,60 @@ mod tests {
             &WorldInputKey::FoodHere
         ));
         assert!(!PerceptionSnapshot::is_extended_key(
-            &WorldInputKey::NeighborCellFood(crate::contracts::Direction::N)
+            &WorldInputKey::NeighborFoodRing
         ));
+    }
+
+    #[test]
+    fn compound_width_matches_array_sizes() {
+        // Extended perception arrays
+        let p = PerceptionSnapshot::zero();
+        assert_eq!(
+            WorldInputKey::AreaFoodSummary.compound_width() as usize,
+            p.area_food.len()
+        );
+        assert_eq!(
+            WorldInputKey::AreaBarrierSummary.compound_width() as usize,
+            p.area_barrier.len()
+        );
+        assert_eq!(
+            WorldInputKey::AreaOccupancySummary.compound_width() as usize,
+            p.area_occupancy.len()
+        );
+        assert_eq!(
+            WorldInputKey::NearbyCreatureCore.compound_width() as usize,
+            p.nearby_core.len()
+        );
+        assert_eq!(
+            WorldInputKey::NearbyCreatureVitals.compound_width() as usize,
+            p.nearby_vitals.len()
+        );
+        assert_eq!(
+            WorldInputKey::NearbyCreatureIdentity.compound_width() as usize,
+            p.nearby_identity.len()
+        );
+
+        // Ring sensor arrays on StaticInputs
+        let local = StaticInputs {
+            food_here: 0.0,
+            neighbor_food: [0.0; 8],
+            neighbor_barrier: [0.0; 8],
+            neighbor_occupied: [0.0; 8],
+            generation: 0.0,
+            age_ticks: 0.0,
+        };
+        assert_eq!(
+            WorldInputKey::NeighborFoodRing.compound_width() as usize,
+            local.neighbor_food.len()
+        );
+        assert_eq!(
+            WorldInputKey::NeighborBarrierRing.compound_width() as usize,
+            local.neighbor_barrier.len()
+        );
+        assert_eq!(
+            WorldInputKey::NeighborOccupiedRing.compound_width() as usize,
+            local.neighbor_occupied.len()
+        );
     }
 
     #[test]

@@ -214,45 +214,51 @@ fn vm_reads_all_inputs_e2e() {
         targets: vec![id_vm],
     };
 
-    let mut input_refs = vec![InputReference::World(WorldInputKey::FoodHere)];
-    for dir in Direction::ALL {
-        input_refs.push(InputReference::World(WorldInputKey::NeighborCellFood(dir)));
-    }
-    for dir in Direction::ALL {
-        input_refs.push(InputReference::World(WorldInputKey::NeighborCellBarrier(
-            dir,
-        )));
-    }
-    for dir in Direction::ALL {
-        input_refs.push(InputReference::World(WorldInputKey::NeighborCellOccupied(
-            dir,
-        )));
-    }
-    input_refs.push(InputReference::StaticIntrospection(
-        StaticIntrospectionKey::Generation,
-    ));
-    input_refs.push(InputReference::StaticIntrospection(
-        StaticIntrospectionKey::AgeTicks,
-    ));
-    input_refs.push(InputReference::DynamicIntrospection(
-        DynamicIntrospectionKey::EnergyCurrent,
-    ));
-    input_refs.push(InputReference::DynamicIntrospection(
-        DynamicIntrospectionKey::EnergyConsumedThisTick,
-    ));
-    input_refs.push(InputReference::UpstreamSlot(11));
+    // Ring sensors are compound (8 sub-values each, indexed by Direction::to_index()).
+    // ref 0: FoodHere
+    // ref 1: NeighborFoodRing (compound, 8 sub-values)
+    // ref 2: NeighborBarrierRing (compound, 8 sub-values)
+    // ref 3: NeighborOccupiedRing (compound, 8 sub-values)
+    // ref 4: Generation
+    // ref 5: AgeTicks
+    // ref 6: EnergyCurrent
+    // ref 7: EnergyConsumedThisTick
+    // ref 8: UpstreamSlot(11)
+    let input_refs = vec![
+        InputReference::World(WorldInputKey::FoodHere),
+        InputReference::World(WorldInputKey::NeighborFoodRing),
+        InputReference::World(WorldInputKey::NeighborBarrierRing),
+        InputReference::World(WorldInputKey::NeighborOccupiedRing),
+        InputReference::StaticIntrospection(StaticIntrospectionKey::Generation),
+        InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
+        InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
+        InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),
+        InputReference::UpstreamSlot(11),
+    ];
 
+    // Build a program that reads every sub-value of every input ref.
+    // For compound ring sensors (refs 1-3), read sub_idx 0..7.
+    // For scalar refs (0, 4-8), read sub_idx 0.
     let mut program = Vec::new();
-    for idx in 0..input_refs.len() {
-        program.push(VmInstruction::LoadConst {
-            dst: 0,
-            const_idx: 0,
-        });
-        program.push(VmInstruction::ReadInput {
-            dst: 0,
-            ref_idx: idx as u16,
-            sub_idx: 0,
-        });
+    // Track (ref_idx, sub_idx) order so we can match observed values later.
+    let mut read_schedule: Vec<(u16, u16)> = Vec::new();
+    for (ref_idx, iref) in input_refs.iter().enumerate() {
+        let width = match iref {
+            InputReference::World(k) => k.compound_width(),
+            _ => 1,
+        };
+        for sub in 0..width {
+            program.push(VmInstruction::LoadConst {
+                dst: 0,
+                const_idx: 0,
+            });
+            program.push(VmInstruction::ReadInput {
+                dst: 0,
+                ref_idx: ref_idx as u16,
+                sub_idx: sub,
+            });
+            read_schedule.push((ref_idx as u16, sub));
+        }
     }
     program.push(VmInstruction::PushAction { action_type: 0 });
     program.push(VmInstruction::ExecuteActionQueue);
@@ -286,70 +292,81 @@ fn vm_reads_all_inputs_e2e() {
     assert!((tick.hops[1].upstream_slots[11] - 0.73).abs() < 1e-6);
 
     let trace = vm_hop(&tick, 1);
-    let mut observed = vec![f32::NAN; input_refs.len()];
+    // Collect all ReadInput results keyed by (ref_idx, sub_idx).
+    let mut observed: std::collections::HashMap<(u16, u16), f32> = std::collections::HashMap::new();
     let mut seen_reads = 0usize;
 
     for step in &trace.steps {
-        if let VmInstruction::ReadInput { ref_idx, .. } = &step.instruction {
+        if let VmInstruction::ReadInput {
+            ref_idx, sub_idx, ..
+        } = &step.instruction
+        {
             let (_, value) = step
                 .register_changes
                 .iter()
                 .find(|(reg, _)| *reg == 0)
                 .copied()
                 .expect("ReadInput should update register 0");
-            observed[*ref_idx as usize] = value;
+            observed.insert((*ref_idx, *sub_idx), value);
             seen_reads += 1;
         }
     }
 
-    assert_eq!(seen_reads, input_refs.len());
+    assert_eq!(seen_reads, read_schedule.len());
 
-    assert!((observed[0] - 0.91).abs() < 1e-6, "FoodHere");
+    // ref 0: FoodHere (scalar)
+    assert!((observed[&(0, 0)] - 0.91).abs() < 1e-6, "FoodHere");
 
+    // ref 1: NeighborFoodRing (compound, 8 sub-values)
     for dir in Direction::ALL {
         let idx = dir.to_index();
         let expected_food = 0.11 + (idx as f32 * 0.07);
         assert!(
-            (observed[1 + idx] - expected_food).abs() < 1e-6,
-            "NeighborCellFood({dir:?})"
+            (observed[&(1, idx as u16)] - expected_food).abs() < 1e-6,
+            "NeighborFoodRing[{dir:?}]"
         );
     }
 
+    // ref 2: NeighborBarrierRing (compound, 8 sub-values)
     for dir in Direction::ALL {
         let idx = dir.to_index();
         let expected = if idx % 2 == 0 { 1.0 } else { 0.0 };
         assert!(
-            (observed[9 + idx] - expected).abs() < 1e-6,
-            "NeighborCellBarrier({dir:?})"
+            (observed[&(2, idx as u16)] - expected).abs() < 1e-6,
+            "NeighborBarrierRing[{dir:?}]"
         );
     }
 
+    // ref 3: NeighborOccupiedRing (compound, 8 sub-values)
     for dir in Direction::ALL {
         let idx = dir.to_index();
         let expected = if idx % 2 == 1 { 1.0 } else { 0.0 };
         assert!(
-            (observed[17 + idx] - expected).abs() < 1e-6,
-            "NeighborCellOccupied({dir:?})"
+            (observed[&(3, idx as u16)] - expected).abs() < 1e-6,
+            "NeighborOccupiedRing[{dir:?}]"
         );
     }
 
-    assert!((observed[25] - 9.0).abs() < 1e-6, "Generation");
-    assert!((observed[26] - 3.0).abs() < 1e-6, "AgeTicks");
+    // ref 4: Generation, ref 5: AgeTicks
+    assert!((observed[&(4, 0)] - 9.0).abs() < 1e-6, "Generation");
+    assert!((observed[&(5, 0)] - 3.0).abs() < 1e-6, "AgeTicks");
 
-    let energy_current = observed[27];
+    let energy_current = observed[&(6, 0)];
     assert!(energy_current > 0.0, "EnergyCurrent should stay positive");
     assert!(
         energy_current < 150.0,
         "EnergyCurrent should stay below starting energy"
     );
 
-    let energy_consumed = observed[28];
+    // ref 7: EnergyConsumedThisTick
+    let energy_consumed = observed[&(7, 0)];
     assert!(
         energy_consumed > 0.0,
         "EnergyConsumedThisTick should include graph hop costs"
     );
 
-    assert!((observed[29] - 0.73).abs() < 1e-6, "UpstreamSlot(11)");
+    // ref 8: UpstreamSlot(11)
+    assert!((observed[&(8, 0)] - 0.73).abs() < 1e-6, "UpstreamSlot(11)");
 }
 
 #[test]
@@ -369,9 +386,7 @@ fn vm_uses_neighbor_barrier_sensor_to_choose_action_e2e() {
 
         let vm_node = NodeGenome {
             node_id: NodeId::new(0),
-            input_refs: vec![InputReference::World(WorldInputKey::NeighborCellBarrier(
-                Direction::N,
-            ))],
+            input_refs: vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
             backend_def: BackendDef::Vm(VmBackendDef {
                 register_count: 3,
                 constants: vec![99.0, 0.5],
@@ -436,7 +451,7 @@ fn vm_uses_neighbor_barrier_sensor_to_choose_action_e2e() {
             .expect("ReadInput should update register 0");
         assert!(
             (read_value - expected_barrier_value).abs() < 1e-6,
-            "VM should read NeighborCellBarrier(N) accurately"
+            "VM should read NeighborBarrierRing[N] accurately"
         );
     }
 }

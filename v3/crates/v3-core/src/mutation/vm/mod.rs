@@ -1,5 +1,6 @@
 use rand::Rng;
 
+use crate::config::MutationConfig;
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::mutation::reachability::biased_select_from;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
@@ -188,6 +189,7 @@ impl VmMutator {
         reachable_nodes: &[usize],
         bias: f64,
         rng: &mut impl Rng,
+        config: &MutationConfig,
     ) -> Result<TargetReachability, MutationSkipReason> {
         // Pre-guard: must have at least one VM-backend node.
         let vm_indices: Vec<usize> = genome
@@ -210,7 +212,7 @@ impl VmMutator {
                 apply_register_count_mutation(genome, node_idx, rng)
             }
             VmOperator::VmInstructionRawFieldMutation => {
-                apply_instruction_raw_field_mutation(genome, node_idx, rng)
+                apply_instruction_raw_field_mutation(genome, node_idx, rng, config)
             }
             VmOperator::VmCopyInstructionBlock => {
                 apply_copy_instruction_block(genome, node_idx, rng)

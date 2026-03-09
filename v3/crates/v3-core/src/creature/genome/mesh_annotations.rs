@@ -225,12 +225,12 @@ fn classify_input_ref(input_ref: &InputReference) -> MeshReadClass {
 fn classify_world_input(key: &WorldInputKey) -> MeshReadClass {
     match key {
         WorldInputKey::FoodHere
-        | WorldInputKey::NeighborCellFood(_)
+        | WorldInputKey::NeighborFoodRing
         | WorldInputKey::AreaFoodSummary => MeshReadClass::Food,
-        WorldInputKey::NeighborCellBarrier(_) | WorldInputKey::AreaBarrierSummary => {
+        WorldInputKey::NeighborBarrierRing | WorldInputKey::AreaBarrierSummary => {
             MeshReadClass::Barrier
         }
-        WorldInputKey::NeighborCellOccupied(_) | WorldInputKey::AreaOccupancySummary => {
+        WorldInputKey::NeighborOccupiedRing | WorldInputKey::AreaOccupancySummary => {
             MeshReadClass::Occupancy
         }
         WorldInputKey::NearbyCreatureCore

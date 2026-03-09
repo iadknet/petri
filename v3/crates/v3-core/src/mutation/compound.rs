@@ -4,18 +4,13 @@ use crate::creature::genome::{BackendDef, GraphInternalNode, GraphNodeKind, Node
 
 /// Number of sub-values for a compound input. Returns 1 for scalar inputs.
 ///
-/// Extended perception compound widths per v3-sensor-spec.md Section 5.
+/// World key widths delegate to `WorldInputKey::compound_width()`.
+/// ActionQueue width is config-dependent (`action_queue_cap * 3`).
 #[must_use]
 pub fn sub_value_count(reference: &InputReference, config: &MutationConfig) -> u16 {
-    use crate::contracts::WorldInputKey;
     match reference {
         InputReference::ActionQueue => (config.action_queue_cap as u16) * 3,
-        InputReference::World(WorldInputKey::AreaFoodSummary) => 7,
-        InputReference::World(WorldInputKey::AreaBarrierSummary) => 7,
-        InputReference::World(WorldInputKey::AreaOccupancySummary) => 7,
-        InputReference::World(WorldInputKey::NearbyCreatureCore) => 16,
-        InputReference::World(WorldInputKey::NearbyCreatureVitals) => 8,
-        InputReference::World(WorldInputKey::NearbyCreatureIdentity) => 12,
+        InputReference::World(key) => key.compound_width(),
         _ => 1,
     }
 }
