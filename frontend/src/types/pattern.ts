@@ -84,14 +84,14 @@ export const DEFAULT_PATTERN_PARAMS: Record<PatternType, PatternParams> = {
 	Maze: {
 		pattern_type: "Maze",
 		corridor_width: 2,
-		wall_thickness: 1,
+		wall_thickness: 2,
 		open_center_radius: 0,
 	},
 	Spiral: {
 		pattern_type: "Spiral",
 		arm_count: 3,
 		arm_thickness: 2,
-		gap_width: 4,
+		gap_width: 10,
 		clockwise: true,
 		open_center_radius: 0,
 	},
@@ -102,8 +102,8 @@ export const DEFAULT_PATTERN_PARAMS: Record<PatternType, PatternParams> = {
 	},
 	ParallelLines: {
 		pattern_type: "ParallelLines",
-		spacing: 8,
-		thickness: 1,
+		spacing: 10,
+		thickness: 2,
 		jaggedness: 0.5,
 		angle_degrees: 0.0,
 	},
@@ -112,6 +112,6 @@ export const DEFAULT_PATTERN_PARAMS: Record<PatternType, PatternParams> = {
 		point_count: 1,
 		ray_count: 8,
 		ray_length: 20,
-		ray_thickness: 1,
+		ray_thickness: 2,
 	},
 };

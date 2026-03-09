@@ -32,7 +32,7 @@ export function SpiralParams({ params, onChange }: SpiralParamsProps) {
 				label="Gap width"
 				value={params.gap_width}
 				min={1}
-				max={16}
+				max={40}
 				step={1}
 				onChange={(v) => onChange({ ...params, gap_width: v })}
 				testId="param-gap-width"
@@ -41,7 +41,7 @@ export function SpiralParams({ params, onChange }: SpiralParamsProps) {
 				label="Open center"
 				value={params.open_center_radius}
 				min={0}
-				max={20}
+				max={200}
 				step={1}
 				onChange={(v) => onChange({ ...params, open_center_radius: v })}
 				testId="param-open-center"
