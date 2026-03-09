@@ -1,4 +1,4 @@
-use crate::contracts::{Direction, DynamicIntrospectionKey, InputReference, NodeId, WorldInputKey};
+use crate::contracts::{DynamicIntrospectionKey, InputReference, NodeId, WorldInputKey};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind,
     NodeGenome, VmBackendDef, VmInstruction,
@@ -21,14 +21,8 @@ fn node0_graph_sensor() -> NodeGenome {
         input_refs: vec![
             InputReference::World(WorldInputKey::FoodHere),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
-            InputReference::World(WorldInputKey::NeighborCellFood(Direction::N)),
-            InputReference::World(WorldInputKey::NeighborCellFood(Direction::E)),
-            InputReference::World(WorldInputKey::NeighborCellFood(Direction::S)),
-            InputReference::World(WorldInputKey::NeighborCellFood(Direction::W)),
-            InputReference::World(WorldInputKey::NeighborCellOccupied(Direction::N)),
-            InputReference::World(WorldInputKey::NeighborCellOccupied(Direction::E)),
-            InputReference::World(WorldInputKey::NeighborCellOccupied(Direction::S)),
-            InputReference::World(WorldInputKey::NeighborCellOccupied(Direction::W)),
+            InputReference::World(WorldInputKey::NeighborFoodRing),
+            InputReference::World(WorldInputKey::NeighborOccupiedRing),
         ],
         backend_def: BackendDef::Graph(GraphBackendDef {
             internal_nodes: vec![
@@ -59,11 +53,45 @@ fn node0_graph_sensor() -> NodeGenome {
                     }],
                     plasticity: None,
                 },
-                // idx 3-6: neighbor food N/E/S/W
+                // idx 3-6: neighbor food N/E/S/W via ring sub_idx
+                // Direction::to_index(): N=0, E=2, S=4, W=6
                 GraphInternalNode {
                     kind: GraphNodeKind::InputRef {
                         ref_idx: 2,
-                        sub_idx: 0,
+                        sub_idx: 0, // N
+                    },
+                    inputs: vec![],
+                    plasticity: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 2,
+                        sub_idx: 2, // E
+                    },
+                    inputs: vec![],
+                    plasticity: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 2,
+                        sub_idx: 4, // S
+                    },
+                    inputs: vec![],
+                    plasticity: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 2,
+                        sub_idx: 6, // W
+                    },
+                    inputs: vec![],
+                    plasticity: None,
+                },
+                // idx 7-10: neighbor occupied N/E/S/W via ring sub_idx
+                GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 3,
+                        sub_idx: 0, // N
                     },
                     inputs: vec![],
                     plasticity: None,
@@ -71,56 +99,23 @@ fn node0_graph_sensor() -> NodeGenome {
                 GraphInternalNode {
                     kind: GraphNodeKind::InputRef {
                         ref_idx: 3,
-                        sub_idx: 0,
+                        sub_idx: 2, // E
                     },
                     inputs: vec![],
                     plasticity: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::InputRef {
-                        ref_idx: 4,
-                        sub_idx: 0,
+                        ref_idx: 3,
+                        sub_idx: 4, // S
                     },
                     inputs: vec![],
                     plasticity: None,
                 },
                 GraphInternalNode {
                     kind: GraphNodeKind::InputRef {
-                        ref_idx: 5,
-                        sub_idx: 0,
-                    },
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                // idx 7-10: neighbor occupied N/E/S/W
-                GraphInternalNode {
-                    kind: GraphNodeKind::InputRef {
-                        ref_idx: 6,
-                        sub_idx: 0,
-                    },
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::InputRef {
-                        ref_idx: 7,
-                        sub_idx: 0,
-                    },
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::InputRef {
-                        ref_idx: 8,
-                        sub_idx: 0,
-                    },
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::InputRef {
-                        ref_idx: 9,
-                        sub_idx: 0,
+                        ref_idx: 3,
+                        sub_idx: 6, // W
                     },
                     inputs: vec![],
                     plasticity: None,
@@ -334,7 +329,7 @@ mod tests {
         // Node 0: Graph backend
         let node0 = &g.nodes[0];
         assert_eq!(node0.node_id, NodeId::new(0));
-        assert_eq!(node0.input_refs.len(), 10);
+        assert_eq!(node0.input_refs.len(), 4);
         assert_eq!(node0.targets, vec![NodeId::new(1)]);
 
         if let BackendDef::Graph(ref gdef) = node0.backend_def {

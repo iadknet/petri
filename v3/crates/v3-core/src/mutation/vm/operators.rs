@@ -1,5 +1,7 @@
 use rand::Rng;
 
+use crate::config::MutationConfig;
+use crate::contracts::InputReference;
 use crate::creature::genome::analysis::{vm_backward_slice_random, vm_forward_slice_random};
 use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
 use crate::mutation::types::MutationSkipReason;
@@ -222,7 +224,12 @@ pub(super) fn random_vm_instruction(
     }
 }
 
-fn mutate_instruction_raw_fields(instr: &mut VmInstruction, rng: &mut impl Rng) {
+fn mutate_instruction_raw_fields(
+    instr: &mut VmInstruction,
+    rng: &mut impl Rng,
+    input_refs: &[InputReference],
+    config: &MutationConfig,
+) {
     match instr {
         VmInstruction::Noop | VmInstruction::Halt => {
             *instr = VmInstruction::PushAction {
@@ -277,8 +284,12 @@ fn mutate_instruction_raw_fields(instr: &mut VmInstruction, rng: &mut impl Rng) 
             sub_idx,
         } => {
             *dst = rng.gen();
-            *ref_idx = rng.gen();
-            *sub_idx = rng.gen();
+            *ref_idx = rng.gen_range(0..input_refs.len().max(1) as u16);
+            let width = input_refs
+                .get(*ref_idx as usize)
+                .map(|r| crate::mutation::compound::sub_value_count(r, config))
+                .unwrap_or(1);
+            *sub_idx = rng.gen_range(0..width);
         }
         VmInstruction::WriteInternalPayload { slot_idx, src }
         | VmInstruction::WriteWorldActionMeta { slot_idx, src } => {
@@ -414,18 +425,20 @@ pub(super) fn apply_instruction_raw_field_mutation(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
+    config: &MutationConfig,
 ) -> Result<(), MutationSkipReason> {
     let node = &mut genome.nodes[node_idx];
-    if let BackendDef::Vm(ref mut vm) = node.backend_def {
-        if vm.program.is_empty() {
-            vm.program.push(VmInstruction::PushAction {
-                action_type: rng.gen(),
-            });
-            return Ok(());
-        }
-        let idx = rng.gen_range(0..vm.program.len());
-        mutate_instruction_raw_fields(&mut vm.program[idx], rng);
+    let BackendDef::Vm(ref mut vm) = node.backend_def else {
+        return Ok(());
+    };
+    if vm.program.is_empty() {
+        vm.program.push(VmInstruction::PushAction {
+            action_type: rng.gen(),
+        });
+        return Ok(());
     }
+    let idx = rng.gen_range(0..vm.program.len());
+    mutate_instruction_raw_fields(&mut vm.program[idx], rng, &node.input_refs, config);
     Ok(())
 }
 

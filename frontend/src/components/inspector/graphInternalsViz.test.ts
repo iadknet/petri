@@ -22,20 +22,24 @@ describe("getKindName", () => {
 
 describe("getKindLabel", () => {
 	const inputRefs: InputReference[] = [
-		{ World: { NeighborCellFood: "N" } },
-		{ World: "Energy" },
+		{ World: "NeighborFoodRing" },
+		{ World: "FoodHere" },
 		{ UpstreamSlot: 0 },
 	];
 
 	it("resolves InputRef ref_idx to sensor name via inputRefs", () => {
-		expect(getKindLabel({ InputRef: { ref_idx: 0, sub_idx: 0 } }, inputRefs)).toBe("Food.N");
-		expect(getKindLabel({ InputRef: { ref_idx: 1, sub_idx: 0 } }, inputRefs)).toBe("Energy");
+		expect(getKindLabel({ InputRef: { ref_idx: 0, sub_idx: 0 } }, inputRefs)).toBe("FoodRing[N]");
+		expect(getKindLabel({ InputRef: { ref_idx: 1, sub_idx: 0 } }, inputRefs)).toBe("FoodHere");
 		expect(getKindLabel({ InputRef: { ref_idx: 2, sub_idx: 0 } }, inputRefs)).toBe("slot[0]");
 	});
 
-	it("appends sub_idx when non-zero", () => {
-		expect(getKindLabel({ InputRef: { ref_idx: 0, sub_idx: 2 } }, inputRefs)).toBe("Food.N[2]");
-		expect(getKindLabel({ InputRef: { ref_idx: 1, sub_idx: 1 } }, inputRefs)).toBe("Energy[1]");
+	it("shows direction names for ring sensor sub_idx", () => {
+		expect(getKindLabel({ InputRef: { ref_idx: 0, sub_idx: 2 } }, inputRefs)).toBe("FoodRing[E]");
+		expect(getKindLabel({ InputRef: { ref_idx: 0, sub_idx: 4 } }, inputRefs)).toBe("FoodRing[S]");
+	});
+
+	it("appends sub_idx when non-zero for non-ring refs", () => {
+		expect(getKindLabel({ InputRef: { ref_idx: 1, sub_idx: 1 } }, inputRefs)).toBe("FoodHere[1]");
 	});
 
 	it("falls back for out-of-bounds ref_idx", () => {
@@ -54,19 +58,17 @@ describe("getKindLabel", () => {
 		expect(getKindLabel({ InputRef: { ref_idx: 0xffff, sub_idx: 6 } }, inputRefs)).toBe("Dead[6]");
 	});
 
-	it("resolves NeighborCellFood sensor", () => {
-		const refs: InputReference[] = [{ World: { NeighborCellFood: "NE" } }];
-		expect(getKindLabel({ InputRef: { ref_idx: 0, sub_idx: 0 } }, refs)).toBe("Food.NE");
-	});
+	it("resolves ring sensor variants with direction names", () => {
+		const foodRefs: InputReference[] = [{ World: "NeighborFoodRing" }];
+		expect(getKindLabel({ InputRef: { ref_idx: 0, sub_idx: 1 } }, foodRefs)).toBe("FoodRing[NE]");
 
-	it("resolves NeighborCellBarrier sensor", () => {
-		const refs: InputReference[] = [{ World: { NeighborCellBarrier: "S" } }];
-		expect(getKindLabel({ InputRef: { ref_idx: 0, sub_idx: 0 } }, refs)).toBe("Barrier.S");
-	});
+		const barrierRefs: InputReference[] = [{ World: "NeighborBarrierRing" }];
+		expect(getKindLabel({ InputRef: { ref_idx: 0, sub_idx: 4 } }, barrierRefs)).toBe(
+			"BarrierRing[S]",
+		);
 
-	it("resolves NeighborCellOccupied sensor", () => {
-		const refs: InputReference[] = [{ World: { NeighborCellOccupied: "E" } }];
-		expect(getKindLabel({ InputRef: { ref_idx: 0, sub_idx: 0 } }, refs)).toBe("Occ.E");
+		const occRefs: InputReference[] = [{ World: "NeighborOccupiedRing" }];
+		expect(getKindLabel({ InputRef: { ref_idx: 0, sub_idx: 2 } }, occRefs)).toBe("OccRing[E]");
 	});
 
 	it("resolves StaticIntrospection sensor", () => {

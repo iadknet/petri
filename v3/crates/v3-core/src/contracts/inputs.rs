@@ -1,16 +1,14 @@
-use crate::contracts::Direction;
-
 /// Identifies a world-state spatial sensor input.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub enum WorldInputKey {
     /// Food density on current cell, normalized to [0.0, 1.0].
     FoodHere,
-    /// Food density on neighbor cell in given direction, normalized to [0.0, 1.0].
-    NeighborCellFood(Direction),
-    /// Whether neighbor cell has a barrier: 1.0 = barrier, 0.0 = clear.
-    NeighborCellBarrier(Direction),
-    /// Whether neighbor cell is occupied by another creature: 1.0 = occupied, 0.0 = empty.
-    NeighborCellOccupied(Direction),
+    /// Compound: neighbor food ring (8 sub-values, indexed by Direction::to_index()).
+    NeighborFoodRing,
+    /// Compound: neighbor barrier ring (8 sub-values, indexed by Direction::to_index()).
+    NeighborBarrierRing,
+    /// Compound: neighbor occupied ring (8 sub-values, indexed by Direction::to_index()).
+    NeighborOccupiedRing,
     /// Compound: area food summary (7 sub-values). See v3-sensor-spec.md Section 5.1.
     AreaFoodSummary,
     /// Compound: area barrier summary (7 sub-values). See v3-sensor-spec.md Section 5.2.
@@ -23,6 +21,25 @@ pub enum WorldInputKey {
     NearbyCreatureVitals,
     /// Compound: nearby creature identity (4 slots × 3 fields = 12 sub-values). See v3-sensor-spec.md Section 5.6.
     NearbyCreatureIdentity,
+}
+
+impl WorldInputKey {
+    /// Number of sub-values for compound access. Returns 1 for scalar keys.
+    ///
+    /// [`opt-inline-small`] Hot path — called per instruction per tick.
+    /// [`api-must-use`] Pure getter.
+    #[inline]
+    #[must_use]
+    pub fn compound_width(&self) -> u16 {
+        match self {
+            Self::AreaFoodSummary | Self::AreaBarrierSummary | Self::AreaOccupancySummary => 7,
+            Self::NeighborFoodRing | Self::NeighborBarrierRing | Self::NeighborOccupiedRing => 8,
+            Self::NearbyCreatureCore => 16,
+            Self::NearbyCreatureVitals => 8,
+            Self::NearbyCreatureIdentity => 12,
+            _ => 1,
+        }
+    }
 }
 
 /// Static introspection values assembled at tick start (snapshot).
@@ -66,9 +83,9 @@ mod tests {
     #[test]
     fn world_input_keys_constructible() {
         let _food = WorldInputKey::FoodHere;
-        let _nfood = WorldInputKey::NeighborCellFood(Direction::N);
-        let _barrier = WorldInputKey::NeighborCellBarrier(Direction::SE);
-        let _occ = WorldInputKey::NeighborCellOccupied(Direction::W);
+        let _nfood = WorldInputKey::NeighborFoodRing;
+        let _barrier = WorldInputKey::NeighborBarrierRing;
+        let _occ = WorldInputKey::NeighborOccupiedRing;
     }
 
     #[test]
@@ -91,6 +108,9 @@ mod tests {
             InputReference::World(WorldInputKey::NearbyCreatureCore),
             InputReference::World(WorldInputKey::NearbyCreatureVitals),
             InputReference::World(WorldInputKey::NearbyCreatureIdentity),
+            InputReference::World(WorldInputKey::NeighborFoodRing),
+            InputReference::World(WorldInputKey::NeighborBarrierRing),
+            InputReference::World(WorldInputKey::NeighborOccupiedRing),
             InputReference::StaticIntrospection(StaticIntrospectionKey::Generation),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
             InputReference::UpstreamSlot(0),
@@ -104,11 +124,10 @@ mod tests {
     }
 
     #[test]
-    fn all_eight_directions_covered_for_neighbor_inputs() {
-        for dir in Direction::ALL {
-            let _food = InputReference::World(WorldInputKey::NeighborCellFood(dir));
-            let _barrier = InputReference::World(WorldInputKey::NeighborCellBarrier(dir));
-            let _occ = InputReference::World(WorldInputKey::NeighborCellOccupied(dir));
-        }
+    fn ring_sensor_compound_widths() {
+        assert_eq!(WorldInputKey::NeighborFoodRing.compound_width(), 8);
+        assert_eq!(WorldInputKey::NeighborBarrierRing.compound_width(), 8);
+        assert_eq!(WorldInputKey::NeighborOccupiedRing.compound_width(), 8);
+        assert_eq!(WorldInputKey::FoodHere.compound_width(), 1);
     }
 }

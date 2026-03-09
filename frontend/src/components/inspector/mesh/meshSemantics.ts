@@ -188,24 +188,18 @@ function inferReadClasses(inputRefs: InputReference[]): MeshReadClass[] {
 		}
 
 		if ("World" in inputRef) {
-			const worldRef = inputRef.World;
-			if (typeof worldRef === "string") {
-				if (worldRef.toLowerCase().includes("food")) {
-					classes.add("food");
-				}
-				continue;
-			}
-			if ("NeighborCellFood" in worldRef) {
+			const w = inputRef.World;
+			if (w === "NeighborFoodRing") {
 				classes.add("neighbor");
 				classes.add("food");
-			}
-			if ("NeighborCellBarrier" in worldRef) {
+			} else if (w === "NeighborBarrierRing") {
 				classes.add("neighbor");
 				classes.add("barrier");
-			}
-			if ("NeighborCellOccupied" in worldRef) {
+			} else if (w === "NeighborOccupiedRing") {
 				classes.add("neighbor");
 				classes.add("occupancy");
+			} else if (w.toLowerCase().includes("food")) {
+				classes.add("food");
 			}
 			continue;
 		}

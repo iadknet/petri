@@ -2,7 +2,7 @@ use rand::Rng;
 
 use crate::config::MutationConfig;
 use crate::contracts::{
-    Direction, DynamicIntrospectionKey, InputReference, StaticIntrospectionKey, WorldInputKey,
+    DynamicIntrospectionKey, InputReference, StaticIntrospectionKey, WorldInputKey,
 };
 use crate::creature::genome::{BackendDef, CreatureGenome, GraphNodeKind, VmInstruction};
 use crate::mutation::compound;
@@ -155,7 +155,7 @@ impl InputRefMutator {
             InputRefOperator::Add => apply_add(genome, reachable_nodes, bias, rng, config),
             InputRefOperator::Remove => apply_remove(genome, reachable_nodes, bias, rng),
             InputRefOperator::Swap => apply_swap(genome, reachable_nodes, bias, rng, config),
-            InputRefOperator::RawFieldMutation => apply_raw_field_mutation(genome, rng),
+            InputRefOperator::RawFieldMutation => apply_raw_field_mutation(genome, rng, config),
         }
     }
 }
@@ -275,44 +275,37 @@ fn apply_swap(
     Ok(reachability)
 }
 
-/// Generate a random input reference from the full set of 44 possible values.
+/// Generate a random input reference from the full set of 23 possible values.
 ///
-/// Distribution: FoodHere (1) + NeighborCellFood (8) + NeighborCellBarrier (8) +
-/// NeighborCellOccupied (8) + StaticIntrospection (2) + DynamicIntrospection (2) +
-/// ActionQueue (1) + AreaFoodSummary (1) + AreaBarrierSummary (1) +
-/// AreaOccupancySummary (1) + NearbyCreatureCore (1) + NearbyCreatureVitals (1) +
-/// NearbyCreatureIdentity (1) + UpstreamSlot(usize) raw values (8 weighted slots) = 44 total.
+/// Distribution: FoodHere (1) + Ring sensors (3) + StaticIntrospection (2) +
+/// DynamicIntrospection (2) + ActionQueue (1) + Area summaries (3) +
+/// Nearby creature (3) + UpstreamSlot (8 weighted slots) = 23 total.
 fn random_input_reference(rng: &mut impl Rng) -> InputReference {
-    let idx = rng.gen_range(0u8..44);
+    let idx = rng.gen_range(0u8..23);
     match idx {
         0 => InputReference::World(WorldInputKey::FoodHere),
-        1..=8 => {
-            InputReference::World(WorldInputKey::NeighborCellFood(direction_from_idx(idx - 1)))
-        }
-        9..=16 => InputReference::World(WorldInputKey::NeighborCellBarrier(direction_from_idx(
-            idx - 9,
-        ))),
-        17..=24 => InputReference::World(WorldInputKey::NeighborCellOccupied(direction_from_idx(
-            idx - 17,
-        ))),
-        25 => InputReference::StaticIntrospection(StaticIntrospectionKey::Generation),
-        26 => InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
-        27 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
-        28 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),
-        29 => InputReference::ActionQueue,
-        30 => InputReference::World(WorldInputKey::AreaFoodSummary),
-        31 => InputReference::World(WorldInputKey::AreaBarrierSummary),
-        32 => InputReference::World(WorldInputKey::AreaOccupancySummary),
-        33 => InputReference::World(WorldInputKey::NearbyCreatureCore),
-        34 => InputReference::World(WorldInputKey::NearbyCreatureVitals),
-        35 => InputReference::World(WorldInputKey::NearbyCreatureIdentity),
-        _ => InputReference::UpstreamSlot(rng.gen::<u8>() as usize),
+        1 => InputReference::World(WorldInputKey::NeighborFoodRing),
+        2 => InputReference::World(WorldInputKey::NeighborBarrierRing),
+        3 => InputReference::World(WorldInputKey::NeighborOccupiedRing),
+        4 => InputReference::StaticIntrospection(StaticIntrospectionKey::Generation),
+        5 => InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
+        6 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
+        7 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),
+        8 => InputReference::ActionQueue,
+        9 => InputReference::World(WorldInputKey::AreaFoodSummary),
+        10 => InputReference::World(WorldInputKey::AreaBarrierSummary),
+        11 => InputReference::World(WorldInputKey::AreaOccupancySummary),
+        12 => InputReference::World(WorldInputKey::NearbyCreatureCore),
+        13 => InputReference::World(WorldInputKey::NearbyCreatureVitals),
+        14 => InputReference::World(WorldInputKey::NearbyCreatureIdentity),
+        _ => InputReference::UpstreamSlot(rng.gen_range(0..12_usize)),
     }
 }
 
 fn apply_raw_field_mutation(
     genome: &mut CreatureGenome,
     rng: &mut impl Rng,
+    config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
     // Count eligible targets: UpstreamSlot input_refs + InputRef graph nodes (for sub_idx mutation).
     let mut upstream_count: usize = 0;
@@ -344,7 +337,7 @@ fn apply_raw_field_mutation(
             for input_ref in &mut node.input_refs {
                 if matches!(input_ref, InputReference::UpstreamSlot(_)) {
                     if pick == 0 {
-                        *input_ref = InputReference::UpstreamSlot(rng.gen::<u16>() as usize);
+                        *input_ref = InputReference::UpstreamSlot(rng.gen_range(0..12_usize));
                         return Ok(TargetReachability::NotApplicable);
                     }
                     pick -= 1;
@@ -358,9 +351,14 @@ fn apply_raw_field_mutation(
     for node in &mut genome.nodes {
         if let BackendDef::Graph(ref mut gd) = node.backend_def {
             for internal in &mut gd.internal_nodes {
-                if let GraphNodeKind::InputRef { sub_idx, .. } = &mut internal.kind {
+                if let GraphNodeKind::InputRef { ref_idx, sub_idx } = &mut internal.kind {
                     if pick == 0 {
-                        *sub_idx = rng.gen::<u16>();
+                        let width = node
+                            .input_refs
+                            .get(*ref_idx as usize)
+                            .map(|r| compound::sub_value_count(r, config))
+                            .unwrap_or(1);
+                        *sub_idx = rng.gen_range(0..width);
                         return Ok(TargetReachability::NotApplicable);
                     }
                     pick -= 1;
@@ -369,11 +367,6 @@ fn apply_raw_field_mutation(
         }
     }
     Ok(TargetReachability::NotApplicable)
-}
-
-/// Map an index 0..8 to a Direction (canonical order).
-fn direction_from_idx(idx: u8) -> Direction {
-    Direction::ALL[idx as usize]
 }
 
 #[cfg(test)]

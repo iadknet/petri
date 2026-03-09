@@ -52,31 +52,57 @@ fn graph_reads_all_neighbor_sensor_directions_e2e() {
         }
     }
 
-    let mut input_refs = vec![InputReference::World(WorldInputKey::FoodHere)];
-    for dir in Direction::ALL {
-        input_refs.push(InputReference::World(WorldInputKey::NeighborCellFood(dir)));
-    }
-    for dir in Direction::ALL {
-        input_refs.push(InputReference::World(WorldInputKey::NeighborCellBarrier(
-            dir,
-        )));
-    }
-    for dir in Direction::ALL {
-        input_refs.push(InputReference::World(WorldInputKey::NeighborCellOccupied(
-            dir,
-        )));
-    }
+    let input_refs = vec![
+        InputReference::World(WorldInputKey::FoodHere), // ref 0: scalar
+        InputReference::World(WorldInputKey::NeighborFoodRing), // ref 1: compound(8)
+        InputReference::World(WorldInputKey::NeighborBarrierRing), // ref 2: compound(8)
+        InputReference::World(WorldInputKey::NeighborOccupiedRing), // ref 3: compound(8)
+    ];
 
-    let internal_nodes: Vec<GraphInternalNode> = (0..input_refs.len())
-        .map(|i| GraphInternalNode {
+    // Build 25 internal nodes: 1 scalar FoodHere + 8×3 compound ring sub-indices.
+    let mut internal_nodes: Vec<GraphInternalNode> = Vec::with_capacity(25);
+    // Node 0: FoodHere (scalar, sub_idx ignored)
+    internal_nodes.push(GraphInternalNode {
+        kind: GraphNodeKind::InputRef {
+            ref_idx: 0,
+            sub_idx: 0,
+        },
+        inputs: vec![],
+        plasticity: None,
+    });
+    // Nodes 1..=8: NeighborFoodRing, sub_idx = direction index 0..7
+    for dir_idx in 0u16..8 {
+        internal_nodes.push(GraphInternalNode {
             kind: GraphNodeKind::InputRef {
-                ref_idx: i as u16,
-                sub_idx: 0,
+                ref_idx: 1,
+                sub_idx: dir_idx,
             },
             inputs: vec![],
             plasticity: None,
-        })
-        .collect();
+        });
+    }
+    // Nodes 9..=16: NeighborBarrierRing, sub_idx = direction index 0..7
+    for dir_idx in 0u16..8 {
+        internal_nodes.push(GraphInternalNode {
+            kind: GraphNodeKind::InputRef {
+                ref_idx: 2,
+                sub_idx: dir_idx,
+            },
+            inputs: vec![],
+            plasticity: None,
+        });
+    }
+    // Nodes 17..=24: NeighborOccupiedRing, sub_idx = direction index 0..7
+    for dir_idx in 0u16..8 {
+        internal_nodes.push(GraphInternalNode {
+            kind: GraphNodeKind::InputRef {
+                ref_idx: 3,
+                sub_idx: dir_idx,
+            },
+            inputs: vec![],
+            plasticity: None,
+        });
+    }
 
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -106,33 +132,33 @@ fn graph_reads_all_neighbor_sensor_directions_e2e() {
     // slot 0: FoodHere
     assert!((evals[0].output - 0.9).abs() < 1e-6, "FoodHere");
 
-    // slots 1..=8: NeighborCellFood per direction index
+    // slots 1..=8: NeighborFoodRing per direction index
     for dir in Direction::ALL {
         let idx = dir.to_index();
         let expected_food = (idx as f32 + 1.0) / 10.0;
         assert!(
             (evals[1 + idx].output - expected_food).abs() < 1e-6,
-            "NeighborCellFood({dir:?})"
+            "NeighborFoodRing[{dir:?}]"
         );
     }
 
-    // slots 9..=16: NeighborCellBarrier per direction index
+    // slots 9..=16: NeighborBarrierRing per direction index
     for dir in Direction::ALL {
         let idx = dir.to_index();
         let expected = if idx % 2 == 0 { 1.0 } else { 0.0 };
         assert!(
             (evals[9 + idx].output - expected).abs() < 1e-6,
-            "NeighborCellBarrier({dir:?})"
+            "NeighborBarrierRing[{dir:?}]"
         );
     }
 
-    // slots 17..=24: NeighborCellOccupied per direction index
+    // slots 17..=24: NeighborOccupiedRing per direction index
     for dir in Direction::ALL {
         let idx = dir.to_index();
         let expected = if idx % 2 == 1 { 1.0 } else { 0.0 };
         assert!(
             (evals[17 + idx].output - expected).abs() < 1e-6,
-            "NeighborCellOccupied({dir:?})"
+            "NeighborOccupiedRing[{dir:?}]"
         );
     }
 }
@@ -151,24 +177,38 @@ fn graph_reads_inputs_and_writes_outputs_e2e() {
     world.set_barrier(east, true);
 
     let input_refs = vec![
-        InputReference::World(WorldInputKey::FoodHere), // slot 0
-        InputReference::World(WorldInputKey::NeighborCellFood(Direction::N)), // slot 1
-        InputReference::World(WorldInputKey::NeighborCellBarrier(Direction::E)), // slot 2
-        InputReference::World(WorldInputKey::NeighborCellOccupied(Direction::W)), // slot 3
-        InputReference::StaticIntrospection(StaticIntrospectionKey::Generation), // slot 4
-        InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks), // slot 5
-        InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent), // slot 6
-        InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick), // slot 7
-        InputReference::UpstreamSlot(3), // slot 8
+        InputReference::World(WorldInputKey::FoodHere), // ref 0 (scalar)
+        InputReference::World(WorldInputKey::NeighborFoodRing), // ref 1 (compound, sub_idx=N=0)
+        InputReference::World(WorldInputKey::NeighborBarrierRing), // ref 2 (compound, sub_idx=E=2)
+        InputReference::World(WorldInputKey::NeighborOccupiedRing), // ref 3 (compound, sub_idx=W=6)
+        InputReference::StaticIntrospection(StaticIntrospectionKey::Generation), // ref 4
+        InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks), // ref 5
+        InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent), // ref 6
+        InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick), // ref 7
+        InputReference::UpstreamSlot(3), // ref 8
+    ];
+
+    // sub_idx per input ref: compound ring inputs use the direction index,
+    // scalar inputs use 0.
+    let sub_indices: [u16; 9] = [
+        0,                              // FoodHere: scalar
+        Direction::N.to_index() as u16, // NeighborFoodRing → N=0
+        Direction::E.to_index() as u16, // NeighborBarrierRing → E=2
+        Direction::W.to_index() as u16, // NeighborOccupiedRing → W=6
+        0,                              // Generation: scalar
+        0,                              // AgeTicks: scalar
+        0,                              // EnergyCurrent: scalar
+        0,                              // EnergyConsumedThisTick: scalar
+        0,                              // UpstreamSlot: scalar
     ];
 
     let mut internal_nodes: Vec<GraphInternalNode> = Vec::new();
-    for i in 0..input_refs.len() {
+    for (i, &sub_idx) in sub_indices.iter().enumerate().take(input_refs.len()) {
         let input_node_idx = (i * 2) as u16;
         internal_nodes.push(GraphInternalNode {
             kind: GraphNodeKind::InputRef {
                 ref_idx: i as u16,
-                sub_idx: 0,
+                sub_idx,
             },
             inputs: vec![],
             plasticity: None,
@@ -222,9 +262,9 @@ fn graph_reads_inputs_and_writes_outputs_e2e() {
 
     let out = tick.hops[0].output_slots;
     assert!((out[0] - 0.6).abs() < 1e-6, "FoodHere");
-    assert!((out[1] - 0.25).abs() < 1e-6, "NeighborFood(N)");
-    assert!((out[2] - 1.0).abs() < 1e-6, "NeighborBarrier(E)");
-    assert!((out[3] - 1.0).abs() < 1e-6, "NeighborOccupied(W)");
+    assert!((out[1] - 0.25).abs() < 1e-6, "NeighborFoodRing[N]");
+    assert!((out[2] - 1.0).abs() < 1e-6, "NeighborBarrierRing[E]");
+    assert!((out[3] - 1.0).abs() < 1e-6, "NeighborOccupiedRing[W]");
     assert!((out[4] - 7.0).abs() < 1e-6, "Generation");
     assert!(
         (out[5] - 4.0).abs() < 1e-6,

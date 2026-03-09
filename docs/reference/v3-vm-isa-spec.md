@@ -110,7 +110,7 @@ The VM defines **41 opcodes**.
 
 Removed from active V3 mesh ISA:
 - `ReadSensorCell`, `ReadSensorCreature`, `ReadSensorSummary`
-- `ReadNeighborCell`, `ReadNeighborCreature`
+- `ReadNeighborCreature`
 - `EmitInternal`
 - `EmitWorldAction` (replaced by `PushAction` + `ExecuteActionQueue`)
 

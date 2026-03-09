@@ -40,14 +40,18 @@ Compound variants resolve to multiple sub-values addressed via `sub_idx`.
 
 Compound inputs in v3alpha1:
 - `ActionQueue`
-- `World(AreaFoodSummary)`
-- `World(AreaBarrierSummary)`
-- `World(AreaOccupancySummary)`
-- `World(NearbyCreatureCore)`
-- `World(NearbyCreatureVitals)`
-- `World(NearbyCreatureIdentity)`
+- `World(NeighborFoodRing)` — 8 sub-values (N, NE, E, SE, S, SW, W, NW)
+- `World(NeighborBarrierRing)` — 8 sub-values
+- `World(NeighborOccupiedRing)` — 8 sub-values
+- `World(AreaFoodSummary)` — 7 sub-values
+- `World(AreaBarrierSummary)` — 7 sub-values
+- `World(AreaOccupancySummary)` — 7 sub-values
+- `World(NearbyCreatureCore)` — 16 sub-values
+- `World(NearbyCreatureVitals)` — 8 sub-values
+- `World(NearbyCreatureIdentity)` — 12 sub-values
 
-For scalar inputs, `sub_idx > 0` returns `0.0`.
+For scalar inputs, `sub_idx` is ignored (the scalar value is returned regardless).
+For compound inputs, `sub_idx` wraps via modular arithmetic (`sub_idx % width`).
 
 ---
 
@@ -82,9 +86,9 @@ Canonical conceptual world keys:
 ```rust
 pub enum WorldInputKey {
     FoodHere,
-    NeighborCellFood(Direction),
-    NeighborCellBarrier(Direction),
-    NeighborCellOccupied(Direction),
+    NeighborFoodRing,
+    NeighborBarrierRing,
+    NeighborOccupiedRing,
     AreaFoodSummary,
     AreaBarrierSummary,
     AreaOccupancySummary,
@@ -98,9 +102,16 @@ pub enum WorldInputKey {
 
 Resolved once per acting-creature turn from the frozen local snapshot:
 - `FoodHere`: `clamp(food_density[self_cell], 0.0, 1.0)` → `[0.0, 1.0]`
-- `NeighborCellFood(dir)`: `clamp(food_density[neighbor], 0.0, 1.0)` → `[0.0, 1.0]`
-- `NeighborCellBarrier(dir)`: `1.0` if barrier, else `0.0`
-- `NeighborCellOccupied(dir)`: `1.0` if occupied by any creature, else `0.0`
+
+#### Ring sensors (compound, 8 sub-values)
+
+Ring sensors provide neighbor cell data as compound inputs with 8 sub-values,
+one per direction indexed by `Direction::to_index()`:
+N=0, NE=1, E=2, SE=3, S=4, SW=5, W=6, NW=7.
+
+- `NeighborFoodRing[dir]`: `clamp(food_density[neighbor], 0.0, 1.0)` → `[0.0, 1.0]`
+- `NeighborBarrierRing[dir]`: `1.0` if barrier, else `0.0`
+- `NeighborOccupiedRing[dir]`: `1.0` if occupied by any creature, else `0.0`
 
 World neighbor semantics (coordinate system, direction mapping, and edge-mode
 resolution) are canonical in `v3-world-grid-spec.md`.
@@ -362,8 +373,8 @@ Canonical phase order remains in `v3-tick-orchestration-spec.md`.
 
 - Missing `input_refs` index: `0.0`
 - Invalid upstream slot: `0.0`
-- Compound input out-of-bounds `sub_idx`: `0.0`
-- Scalar input with `sub_idx > 0`: `0.0`
+- Compound input out-of-bounds `sub_idx`: wraps via `sub_idx % compound_width()`
+- Scalar input with any `sub_idx`: returns the scalar value (sub_idx is ignored)
 - Unknown/unsupported key variant at runtime boundary: `0.0`
 
 Soft defaults are deliberate to support junk-DNA evolution without crashes.

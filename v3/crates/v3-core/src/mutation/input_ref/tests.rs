@@ -134,14 +134,14 @@ fn random_input_reference_covers_all_categories() {
         let ir = random_input_reference(&mut r);
         let cat = match ir {
             InputReference::World(WorldInputKey::FoodHere) => "FoodHere".to_string(),
-            InputReference::World(WorldInputKey::NeighborCellFood(_)) => {
-                "NeighborCellFood".to_string()
+            InputReference::World(WorldInputKey::NeighborFoodRing) => {
+                "NeighborFoodRing".to_string()
             }
-            InputReference::World(WorldInputKey::NeighborCellBarrier(_)) => {
-                "NeighborCellBarrier".to_string()
+            InputReference::World(WorldInputKey::NeighborBarrierRing) => {
+                "NeighborBarrierRing".to_string()
             }
-            InputReference::World(WorldInputKey::NeighborCellOccupied(_)) => {
-                "NeighborCellOccupied".to_string()
+            InputReference::World(WorldInputKey::NeighborOccupiedRing) => {
+                "NeighborOccupiedRing".to_string()
             }
             InputReference::World(WorldInputKey::AreaFoodSummary) => "AreaFoodSummary".to_string(),
             InputReference::World(WorldInputKey::AreaBarrierSummary) => {
@@ -176,26 +176,17 @@ fn random_input_reference_covers_all_categories() {
 }
 
 #[test]
-fn random_input_reference_reaches_out_of_range_upstream_slot() {
-    let mut saw_out_of_range_upstream_slot = false;
+fn random_input_reference_upstream_slot_bounded() {
     for seed in 0u64..20_000 {
         let mut r = rng(seed);
         if let InputReference::UpstreamSlot(slot) = random_input_reference(&mut r) {
-            if slot > 11 {
-                saw_out_of_range_upstream_slot = true;
-                break;
-            }
+            assert!(slot < 12, "upstream slot must be bounded < 12, got {slot}");
         }
     }
-    assert!(
-        saw_out_of_range_upstream_slot,
-        "input ref mutation surface must include out-of-range upstream slots"
-    );
 }
 
 #[test]
-fn raw_field_mutation_can_set_out_of_range_upstream_slot() {
-    let mut found_out_of_range = false;
+fn raw_field_mutation_upstream_slot_bounded() {
     for seed in 0u64..512 {
         let mut genome = single_node_genome_with_input_ref(InputReference::UpstreamSlot(0));
         let mut r = rng(seed);
@@ -209,16 +200,12 @@ fn raw_field_mutation_can_set_out_of_range_upstream_slot() {
         )
         .unwrap();
         if let InputReference::UpstreamSlot(slot) = genome.nodes[0].input_refs[0] {
-            if slot > 11 {
-                found_out_of_range = true;
-                break;
-            }
+            assert!(
+                slot < 12,
+                "mutated upstream slot must be bounded < 12, got {slot}"
+            );
         }
     }
-    assert!(
-        found_out_of_range,
-        "raw input-ref mutation must reach out-of-range upstream slots"
-    );
 }
 
 #[test]

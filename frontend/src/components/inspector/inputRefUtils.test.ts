@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { InputReference } from "../../types/genome.ts";
 import type { WorldAction } from "../../types/trace.ts";
-import { formatAction, formatActionList, formatInputRef, inputRefColor } from "./inputRefUtils.ts";
+import {
+	directionName,
+	formatAction,
+	formatActionList,
+	formatInputRef,
+	inputRefColor,
+	isRingSensor,
+} from "./inputRefUtils.ts";
 
 describe("formatAction", () => {
 	it("formats current server world action variants", () => {
@@ -28,9 +35,10 @@ describe("formatInputRef", () => {
 		expect(formatInputRef(ref)).toBe("FoodHere");
 	});
 
-	it("formats NeighborCellFood variant", () => {
-		const ref: InputReference = { World: { NeighborCellFood: "North" } };
-		expect(formatInputRef(ref)).toBe("Food.North");
+	it("formats ring sensor variants", () => {
+		expect(formatInputRef({ World: "NeighborFoodRing" })).toBe("FoodRing");
+		expect(formatInputRef({ World: "NeighborBarrierRing" })).toBe("BarrierRing");
+		expect(formatInputRef({ World: "NeighborOccupiedRing" })).toBe("OccRing");
 	});
 
 	it("formats StaticIntrospection variant", () => {
@@ -78,5 +86,36 @@ describe("inputRefColor", () => {
 	it("returns gray for unknown string variant", () => {
 		const ref = "UnknownFuture" as unknown as InputReference;
 		expect(inputRefColor(ref)).toBe("#94a3b8");
+	});
+});
+
+describe("directionName", () => {
+	it("maps sub_idx 0..7 to direction names", () => {
+		expect(directionName(0)).toBe("N");
+		expect(directionName(1)).toBe("NE");
+		expect(directionName(2)).toBe("E");
+		expect(directionName(3)).toBe("SE");
+		expect(directionName(4)).toBe("S");
+		expect(directionName(5)).toBe("SW");
+		expect(directionName(6)).toBe("W");
+		expect(directionName(7)).toBe("NW");
+	});
+
+	it("wraps values >= 8", () => {
+		expect(directionName(8)).toBe("N");
+		expect(directionName(10)).toBe("E");
+	});
+});
+
+describe("isRingSensor", () => {
+	it("returns true for ring sensor keys", () => {
+		expect(isRingSensor("NeighborFoodRing")).toBe(true);
+		expect(isRingSensor("NeighborBarrierRing")).toBe(true);
+		expect(isRingSensor("NeighborOccupiedRing")).toBe(true);
+	});
+
+	it("returns false for non-ring keys", () => {
+		expect(isRingSensor("FoodHere")).toBe(false);
+		expect(isRingSensor("AreaFoodSummary")).toBe(false);
 	});
 });

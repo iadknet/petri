@@ -1,5 +1,5 @@
 use crate::contracts::{ActionQueue, DynamicIntrospectionKey, InputReference};
-use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
+use crate::sensors::perception::SensorSnapshot;
 
 /// Shared resolution context for input references.
 ///
@@ -17,8 +17,9 @@ pub struct ResolveCtx<'a> {
 
 /// Resolve an `InputReference` to its current f32 value.
 ///
-/// - `sub_idx`: sub-value index for compound inputs (ActionQueue, extended
-///   perception world keys). For scalar inputs, `sub_idx > 0` returns `0.0`.
+/// - `sub_idx`: sub-value index for compound inputs (ActionQueue, compound
+///   world keys). Scalar inputs ignore sub_idx. Compound inputs wrap via
+///   `compound_width()`.
 /// - World and static introspection keys are read from the pre-assembled snapshot.
 /// - Dynamic introspection is resolved live from `ctx.energy` and `ctx.energy_consumed`.
 /// - UpstreamSlot: reads `upstream_slots[idx]`; idx >= 12 yields 0.0.
@@ -36,12 +37,11 @@ pub fn resolve_input(reference: &InputReference, sub_idx: u16, ctx: &ResolveCtx<
                 _ => ctx.action_queue.param_at(slot, 1),
             }
         }
-        // Extended perception compound keys: use sub_idx for multi-field addressing.
-        InputReference::World(key) if PerceptionSnapshot::is_extended_key(key) => {
-            ctx.sensors.perception.resolve(key, sub_idx)
+        // Compound world keys: use sub_idx for multi-field addressing.
+        InputReference::World(key) if key.compound_width() > 1 => {
+            ctx.sensors.resolve_compound(key, sub_idx)
         }
-        // All other input types are scalar: sub_idx > 0 returns 0.0.
-        _ if sub_idx > 0 => 0.0,
+        // Scalar world keys: sub_idx is ignored.
         InputReference::World(key) => ctx.sensors.local.resolve_world(key),
         InputReference::StaticIntrospection(key) => ctx.sensors.local.resolve_static(key),
         InputReference::DynamicIntrospection(key) => match key {
@@ -111,12 +111,13 @@ mod tests {
     }
 
     #[test]
-    fn world_neighbor_food() {
+    fn world_neighbor_food_ring() {
         let ss = make_sensor_snapshot(0.0);
         let upstream = [0.0f32; 12];
         let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
+        // NeighborFoodRing is compound, sub_idx=0 → Direction::N
         let v = resolve_input(
-            &InputReference::World(WorldInputKey::NeighborCellFood(Direction::N)),
+            &InputReference::World(WorldInputKey::NeighborFoodRing),
             0,
             &ctx,
         );
@@ -301,7 +302,7 @@ mod tests {
     }
 
     #[test]
-    fn sub_idx_nonzero_on_scalar_returns_zero() {
+    fn sub_idx_ignored_on_scalar() {
         let ss = make_sensor_snapshot(0.75);
         let mut upstream = [0.0f32; 12];
         upstream[0] = 5.0;
@@ -315,14 +316,17 @@ mod tests {
         ];
 
         for r in &refs {
-            // sub_idx=0 should return non-zero for these inputs
             let v0 = resolve_input(r, 0, &ctx);
             assert!(v0 != 0.0, "sub_idx=0 should return non-zero for {:?}", r);
 
-            // sub_idx > 0 should always return 0.0 for scalar inputs
+            // sub_idx > 0 returns the SAME value as sub_idx == 0 for scalar inputs
             for sub in [1u16, 2, 100, u16::MAX] {
                 let v = resolve_input(r, sub, &ctx);
-                assert_eq!(v, 0.0, "sub_idx={sub} should return 0.0 for scalar {:?}", r);
+                assert_eq!(
+                    v, v0,
+                    "sub_idx={sub} should return same value as sub_idx=0 for scalar {:?}",
+                    r
+                );
             }
         }
     }
@@ -353,18 +357,33 @@ mod tests {
     }
 
     #[test]
-    fn extended_key_oob_sub_idx_returns_zero() {
-        let ss = make_sensor_snapshot(0.0);
+    fn compound_oob_sub_idx_wraps() {
+        let mut ss = make_sensor_snapshot(0.0);
+        ss.perception.area_food[0] = 0.42;
         let upstream = [0.0f32; 12];
         let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
 
-        // area_food has 7 sub-values; sub_idx=7 is out of range
+        // area_food has 7 sub-values; sub_idx=7 wraps to index 0
         let v = resolve_input(
             &InputReference::World(WorldInputKey::AreaFoodSummary),
             7,
             &ctx,
         );
-        assert_eq!(v, 0.0);
+        assert!(
+            (v - 0.42).abs() < f32::EPSILON,
+            "sub_idx=7 should wrap to index 0 (0.42), got {v}"
+        );
+
+        // Large sub_idx also wraps
+        let v_large = resolve_input(
+            &InputReference::World(WorldInputKey::AreaFoodSummary),
+            14,
+            &ctx,
+        );
+        assert!(
+            (v_large - 0.42).abs() < f32::EPSILON,
+            "sub_idx=14 should wrap to index 0 (0.42), got {v_large}"
+        );
     }
 
     #[test]

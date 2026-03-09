@@ -16,16 +16,27 @@ export function formatActionList(actions: WorldAction[] | null | undefined): str
 	return `${formatAction(actions[0])} +${actions.length - 1}`;
 }
 
+const RING_LABELS: Record<string, string> = {
+	NeighborFoodRing: "FoodRing",
+	NeighborBarrierRing: "BarrierRing",
+	NeighborOccupiedRing: "OccRing",
+};
+
+const DIRECTION_NAMES = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const;
+
+/** Map a ring sensor sub_idx to a direction name (N=0, NE=1, ..., NW=7). */
+export function directionName(subIdx: number): string {
+	return DIRECTION_NAMES[subIdx % 8] ?? `?${subIdx}`;
+}
+
+/** True if the given World key is a ring sensor (compound with 8 directional sub-values). */
+export function isRingSensor(worldKey: string): boolean {
+	return worldKey in RING_LABELS;
+}
+
 export function formatInputRef(ref: InputReference): string {
 	if (typeof ref === "string") return ref;
-	if ("World" in ref) {
-		const w = ref.World;
-		if (typeof w === "string") return w;
-		if ("NeighborCellFood" in w) return `Food.${w.NeighborCellFood}`;
-		if ("NeighborCellBarrier" in w) return `Barrier.${w.NeighborCellBarrier}`;
-		if ("NeighborCellOccupied" in w) return `Occ.${w.NeighborCellOccupied}`;
-		return "World:?";
-	}
+	if ("World" in ref) return RING_LABELS[ref.World] ?? ref.World;
 	if ("StaticIntrospection" in ref) return ref.StaticIntrospection;
 	if ("DynamicIntrospection" in ref) return ref.DynamicIntrospection;
 	if ("UpstreamSlot" in ref) return `slot[${ref.UpstreamSlot}]`;

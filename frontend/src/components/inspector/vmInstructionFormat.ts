@@ -1,5 +1,5 @@
 import type { InputReference, VmInstruction } from "../../types/genome.ts";
-import { formatInputRef } from "./inputRefUtils.ts";
+import { directionName, formatInputRef, isRingSensor } from "./inputRefUtils.ts";
 import type { RuntimeIoBadge } from "./mesh/runtimeIoSemantics.ts";
 import { classifyVmInstruction } from "./mesh/runtimeIoSemantics.ts";
 
@@ -45,6 +45,10 @@ function resolveInputRef(refIdx: number, subIdx: number, inputRefs: InputReferen
 	const ref = inputRefs[refIdx];
 	if (!ref) return `input[${refIdx}]`;
 	const label = formatInputRef(ref);
+	// Ring sensors: show direction name instead of raw sub_idx
+	if (typeof ref !== "string" && "World" in ref && isRingSensor(ref.World)) {
+		return `${label}[${directionName(subIdx)}]`;
+	}
 	if (subIdx > 0) return `${label}[${subIdx}]`;
 	return label;
 }
