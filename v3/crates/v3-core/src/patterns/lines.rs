@@ -39,7 +39,8 @@ pub(super) fn generate(
     let step_size = amplitude * 0.15;
     let half_t = thickness / 2;
 
-    let mut cells = HashSet::new();
+    let estimated = line_count * trace_steps as usize * thickness as usize;
+    let mut cells = HashSet::with_capacity(estimated);
 
     for i in 0..line_count {
         let line_offset = (i as f64 + 0.5) * spacing;

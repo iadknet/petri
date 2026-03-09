@@ -1,6 +1,5 @@
 use std::collections::HashSet;
 
-use rand::seq::SliceRandom;
 use rand::Rng;
 
 use crate::kernel::paint::PaintPoint;
@@ -34,28 +33,35 @@ pub(super) fn generate(
     visited[start_row][start_col] = true;
 
     while let Some(&(row, col)) = stack.last() {
-        let mut neighbors = Vec::new();
+        // Fixed-size buffer avoids heap allocation per iteration (max 4 neighbors).
+        let mut neighbors = [(0usize, 0usize, 0usize, 0usize); 4];
+        let mut count = 0;
         // N
         if row > 0 && !visited[row - 1][col] {
-            neighbors.push((row - 1, col, 0, 2)); // dir=N, opposite=S
+            neighbors[count] = (row - 1, col, 0, 2); // dir=N, opposite=S
+            count += 1;
         }
         // E
         if col + 1 < cols && !visited[row][col + 1] {
-            neighbors.push((row, col + 1, 1, 3));
+            neighbors[count] = (row, col + 1, 1, 3);
+            count += 1;
         }
         // S
         if row + 1 < rows && !visited[row + 1][col] {
-            neighbors.push((row + 1, col, 2, 0));
+            neighbors[count] = (row + 1, col, 2, 0);
+            count += 1;
         }
         // W
         if col > 0 && !visited[row][col - 1] {
-            neighbors.push((row, col - 1, 3, 1));
+            neighbors[count] = (row, col - 1, 3, 1);
+            count += 1;
         }
 
-        if neighbors.is_empty() {
+        if count == 0 {
             stack.pop();
         } else {
-            let &(nr, nc, dir, opp) = neighbors.choose(rng).unwrap();
+            let idx = rng.gen_range(0..count);
+            let (nr, nc, dir, opp) = neighbors[idx];
             walls[row][col][dir] = false;
             walls[nr][nc][opp] = false;
             visited[nr][nc] = true;
@@ -64,27 +70,28 @@ pub(super) fn generate(
     }
 
     // Render walls into cell positions.
-    let mut cells = HashSet::new();
-
-    // Fill the entire bounds with walls first, then carve corridors.
-    // More efficient: only add wall cells, skip corridor cells.
     let total_grid_w = cols as u16 * cell_size + wt;
     let total_grid_h = rows as u16 * cell_size + wt;
+    // Estimate: roughly half the grid area will be walls.
+    let estimated_walls =
+        (total_grid_w.min(bounds.width) as usize * total_grid_h.min(bounds.height) as usize) / 2;
+    let mut cells = HashSet::with_capacity(estimated_walls);
 
     // Add all wall cells within the grid area.
     for gy in 0..total_grid_h.min(bounds.height) {
         for gx in 0..total_grid_w.min(bounds.width) {
-            let in_col = (gx.wrapping_sub(wt)) / cell_size;
-            let in_row = (gy.wrapping_sub(wt)) / cell_size;
-            let local_x = if gx >= wt {
-                (gx - wt) % cell_size
+            // Compute grid cell indices and local offsets.
+            // When gx < wt or gy < wt, we're in the border wall region;
+            // local_x/y are set to cell_size to force the wall case.
+            let (in_col, local_x) = if gx >= wt {
+                ((gx - wt) / cell_size, (gx - wt) % cell_size)
             } else {
-                cell_size // force wall
+                (0, cell_size) // border wall: force wall, col index unused
             };
-            let local_y = if gy >= wt {
-                (gy - wt) % cell_size
+            let (in_row, local_y) = if gy >= wt {
+                ((gy - wt) / cell_size, (gy - wt) % cell_size)
             } else {
-                cell_size // force wall
+                (0, cell_size) // border wall: force wall, row index unused
             };
 
             let is_corridor_x = local_x < cw;
