@@ -5,6 +5,7 @@ pub mod contracts;
 pub mod creature;
 pub mod kernel;
 pub mod mutation;
+pub mod patterns;
 pub mod runtime;
 pub mod sensors;
 pub mod simulation;
