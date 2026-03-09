@@ -398,12 +398,12 @@ algorithm specifications.
   area. Handle loading state (spinner on preview requests) and error state (toast
   or inline error).
 
-- [ ] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on
+- [x] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on
   full branch diff. Invoke domain skills (backend: `rust-skills`; frontend:
   `vercel-react-best-practices` + `vercel-composition-patterns`). Fix all findings.
   Re-review until clean pass.
 
-- [ ] Review Gate: Architecture & decomposition review — review all changes for
+- [x] Review Gate: Architecture & decomposition review — review all changes for
   boundary violations, decomposition opportunities, separation of concerns. Re-read
   `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger
   items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
