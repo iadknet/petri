@@ -408,6 +408,6 @@ algorithm specifications.
   `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger
   items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
 
-- [ ] Completion gate — run all checks from AGENTS.md Completion Gate section
+- [x] Completion gate — run all checks from AGENTS.md Completion Gate section
 
 **Review cycles:** 8 (Pass 1: 3 dispatches, Pass 2: 3 dispatches, Pass 3: 2 dispatches)
