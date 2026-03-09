@@ -34,22 +34,22 @@ export function usePatternInteraction(
 
 		const camera = useViewportStore.getState().camera;
 
-		// Convert world coordinates to canvas pixel coordinates
+		// Convert world coordinates to canvas pixel coordinates.
+		// Camera coords are in CSS pixel space (main canvas buffer = CSS pixels),
+		// and the overlay canvas buffer also uses CSS pixels (no DPR scaling).
 		const startCanvasX = camera.x + start.x * camera.zoom;
 		const startCanvasY = camera.y + start.y * camera.zoom;
 		const endCanvasX = camera.x + (current.x + 1) * camera.zoom;
 		const endCanvasY = camera.y + (current.y + 1) * camera.zoom;
 
-		// Account for device pixel ratio
-		const dpr = window.devicePixelRatio || 1;
-		const x = Math.min(startCanvasX, endCanvasX) * dpr;
-		const y = Math.min(startCanvasY, endCanvasY) * dpr;
-		const w = Math.abs(endCanvasX - startCanvasX) * dpr;
-		const h = Math.abs(endCanvasY - startCanvasY) * dpr;
+		const x = Math.min(startCanvasX, endCanvasX);
+		const y = Math.min(startCanvasY, endCanvasY);
+		const w = Math.abs(endCanvasX - startCanvasX);
+		const h = Math.abs(endCanvasY - startCanvasY);
 
-		ctx.setLineDash([6 * dpr, 4 * dpr]);
+		ctx.setLineDash([6, 4]);
 		ctx.strokeStyle = "rgba(16, 185, 129, 0.8)";
-		ctx.lineWidth = 2 * dpr;
+		ctx.lineWidth = 2;
 		ctx.strokeRect(x, y, w, h);
 
 		// Fill with very low opacity
@@ -57,21 +57,20 @@ export function usePatternInteraction(
 		ctx.fillRect(x, y, w, h);
 	}, [rendererRef]);
 
-	// Initialize overlay canvas size and keep it synced to viewport
+	// Initialize overlay canvas size and keep it synced to viewport.
+	// Use CSS pixel dimensions (no DPR scaling) to match the main canvas buffer.
 	useEffect(() => {
 		const canvas = selectionOverlayRef.current;
 		if (canvas) {
 			const state = useViewportStore.getState();
-			const dpr = window.devicePixelRatio || 1;
-			canvas.width = Math.floor(state.canvasSize.width * dpr);
-			canvas.height = Math.floor(state.canvasSize.height * dpr);
+			canvas.width = Math.floor(state.canvasSize.width);
+			canvas.height = Math.floor(state.canvasSize.height);
 		}
 		return useViewportStore.subscribe((state) => {
 			const canvas = selectionOverlayRef.current;
 			if (!canvas) return;
-			const dpr = window.devicePixelRatio || 1;
-			const w = Math.floor(state.canvasSize.width * dpr);
-			const h = Math.floor(state.canvasSize.height * dpr);
+			const w = Math.floor(state.canvasSize.width);
+			const h = Math.floor(state.canvasSize.height);
 			if (canvas.width !== w || canvas.height !== h) {
 				canvas.width = w;
 				canvas.height = h;

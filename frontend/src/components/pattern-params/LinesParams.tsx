@@ -13,7 +13,7 @@ export function LinesParams({ params, onChange }: LinesParamsProps) {
 				label="Spacing"
 				value={params.spacing}
 				min={2}
-				max={32}
+				max={40}
 				step={1}
 				onChange={(v) => onChange({ ...params, spacing: v })}
 				testId="param-spacing"

@@ -13,7 +13,7 @@ export function MazeParams({ params, onChange }: MazeParamsProps) {
 				label="Corridor width"
 				value={params.corridor_width}
 				min={1}
-				max={10}
+				max={40}
 				step={1}
 				onChange={(v) => onChange({ ...params, corridor_width: v })}
 				testId="param-corridor-width"
@@ -22,7 +22,7 @@ export function MazeParams({ params, onChange }: MazeParamsProps) {
 				label="Wall thickness"
 				value={params.wall_thickness}
 				min={1}
-				max={5}
+				max={10}
 				step={1}
 				onChange={(v) => onChange({ ...params, wall_thickness: v })}
 				testId="param-wall-thickness"
@@ -31,7 +31,7 @@ export function MazeParams({ params, onChange }: MazeParamsProps) {
 				label="Open center"
 				value={params.open_center_radius}
 				min={0}
-				max={20}
+				max={200}
 				step={1}
 				onChange={(v) => onChange({ ...params, open_center_radius: v })}
 				testId="param-open-center"

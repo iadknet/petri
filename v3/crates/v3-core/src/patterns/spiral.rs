@@ -26,7 +26,11 @@ pub(super) fn generate(
     let max_r = (bounds.width.min(bounds.height) as f64) / 2.0;
     let thickness_r = arm_thickness as f64 / 2.0;
     let dir: f64 = if clockwise { 1.0 } else { -1.0 };
-    let cycle = (gap_width as f64 + arm_thickness as f64).max(1.0);
+    // cycle = total radial distance per full spiral revolution.
+    // With N arms equally spaced, each arm occupies cycle/N radially.
+    // gap_width is the visible space between adjacent arm edges, so:
+    //   cycle/N = gap_width + arm_thickness  =>  cycle = N * (gap_width + arm_thickness)
+    let cycle = (arm_count as f64 * (gap_width as f64 + arm_thickness as f64)).max(1.0);
 
     // Estimate: each arm traces ~max_r steps, placing ~arm_thickness cells each.
     let estimated = arm_count as usize * max_r as usize * arm_thickness as usize;
