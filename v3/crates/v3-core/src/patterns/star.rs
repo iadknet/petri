@@ -26,7 +26,8 @@ pub(super) fn generate(
     let angular_spacing = 2.0 * PI / ray_count as f64;
     let jitter_range = angular_spacing * 0.05;
 
-    let mut cells = HashSet::new();
+    let estimated = point_count * ray_count as usize * ray_length as usize * ray_thickness as usize;
+    let mut cells = HashSet::with_capacity(estimated);
 
     for (cx, cy) in &centers {
         let cx = *cx as f64 + 0.5;

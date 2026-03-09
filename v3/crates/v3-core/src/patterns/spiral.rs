@@ -28,7 +28,9 @@ pub(super) fn generate(
     let dir: f64 = if clockwise { 1.0 } else { -1.0 };
     let cycle = (gap_width as f64 + arm_thickness as f64).max(1.0);
 
-    let mut cells = HashSet::new();
+    // Estimate: each arm traces ~max_r steps, placing ~arm_thickness cells each.
+    let estimated = arm_count as usize * max_r as usize * arm_thickness as usize;
+    let mut cells = HashSet::with_capacity(estimated);
 
     for i in 0..arm_count {
         let theta_0 = i as f64 * (2.0 * PI / arm_count as f64);

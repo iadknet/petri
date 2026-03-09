@@ -9,9 +9,11 @@ use v3_core::patterns::{generate_pattern_seeded, PatternBounds, PatternParams};
 
 use crate::error::{AppError, FieldError};
 use crate::handlers::lifecycle::build_ws_frame;
-use crate::query::cache::DirtyRect;
+use crate::query::cache::{world_static_changed, DirtyRect};
 use crate::state::{AppState, SimulationStatus};
 use crate::types::PROTOCOL_VERSION;
+
+const MAX_PATTERN_AREA: u32 = 1_000_000;
 
 #[derive(Debug, Deserialize)]
 pub struct PatternRequest {
@@ -56,6 +58,17 @@ fn validate_request(
     let y = req.bounds.y.min(world_height.saturating_sub(1));
     let width = req.bounds.width.min(world_width.saturating_sub(x));
     let height = req.bounds.height.min(world_height.saturating_sub(y));
+
+    let area = width as u32 * height as u32;
+    if area > MAX_PATTERN_AREA {
+        return Err(AppError::ValidationRejected {
+            field_errors: vec![FieldError {
+                field: "bounds".into(),
+                reason: format!("area ({area}) exceeds maximum ({MAX_PATTERN_AREA})"),
+            }],
+            endpoint: "pattern",
+        });
+    }
 
     Ok(PatternBounds {
         x,
@@ -138,7 +151,7 @@ pub async fn apply(
     // Apply pattern as barriers via Simulation::apply_paint.
     // brush_half_extent=0 since pattern cells are already at final positions.
     let stats = handle.sim.apply_paint(PaintTool::Barrier, 0, &points);
-    let static_changed = stats.barrier_set_cells > 0;
+    let static_changed = world_static_changed(PaintTool::Barrier, &stats);
 
     // Construct dirty rect directly from the bounds (no need to iterate points).
     let dirty_rect = DirtyRect {

@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use rand::seq::SliceRandom;
 use rand::Rng;
 
 use crate::kernel::paint::PaintPoint;
@@ -78,11 +79,7 @@ pub(super) fn generate(
 
         if cells.len() > target {
             let mut vec: Vec<(u16, u16)> = cells.into_iter().collect();
-            // Shuffle and truncate to target.
-            for i in (1..vec.len()).rev() {
-                let j = rng.gen_range(0..=i);
-                vec.swap(i, j);
-            }
+            vec.shuffle(rng);
             vec.truncate(target);
             cells = vec.into_iter().collect();
         }
