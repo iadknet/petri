@@ -43,6 +43,7 @@ Likely shape:
 - neutral default means normal food growth
 - positive values create fertile zones; negative values create sparse or stressed zones
 - UI tools could paint local modifiers directly, blur them, or stamp procedural patterns
+- paint tools or auto-generation should have congigurable guassian/grandient transions
 
 Main value:
 - creates macro-scale ecological structure without requiring creature behavior to generate it
