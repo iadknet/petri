@@ -2107,3 +2107,81 @@ async fn compression_returns_gzip_when_accepted() {
         "compressed body should not be empty"
     );
 }
+
+// ── Pattern endpoint tests ──────────────────────────────────────────────────
+
+#[tokio::test]
+async fn pattern_preview_returns_bitmap() {
+    let a = app();
+    // First startup to have a world.
+    let (status, _) = do_request(a.clone(), startup_req(r#"{"seed":42}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let req = post_json(
+        "/v3/simulation/pattern/preview",
+        r#"{"params":{"pattern_type":"Noise","density":0.15,"cluster_size":3},"bounds":{"x":0,"y":0,"width":20,"height":20},"seed":42}"#,
+    );
+    let (status, body) = do_request(a, req).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert!(body["protocol_version"].is_string());
+    assert!(body["bitmap"].is_string());
+    assert!(body["cell_count"].is_number());
+    assert!(body["cell_count"].as_u64().unwrap() > 0);
+    assert_eq!(body["bounds"]["width"].as_u64().unwrap(), 20);
+    assert_eq!(body["bounds"]["height"].as_u64().unwrap(), 20);
+}
+
+#[tokio::test]
+async fn pattern_apply_creates_barriers() {
+    let a = app();
+    let (status, _) = do_request(a.clone(), startup_req(r#"{"seed":42}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let req = post_json(
+        "/v3/simulation/pattern/apply",
+        r#"{"params":{"pattern_type":"Star","point_count":1,"ray_count":4,"ray_length":5,"ray_thickness":1},"bounds":{"x":10,"y":10,"width":20,"height":20},"seed":42}"#,
+    );
+    let (status, body) = do_request(a, req).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert!(body["protocol_version"].is_string());
+    assert!(body["stats"]["barrier_set_cells"].as_u64().unwrap() > 0);
+    assert!(body["world_static_changed"].as_bool().unwrap());
+    assert_eq!(body["dirty_rect"]["x"].as_u64().unwrap(), 10);
+    assert_eq!(body["dirty_rect"]["y"].as_u64().unwrap(), 10);
+}
+
+#[tokio::test]
+async fn pattern_apply_while_running_returns_error() {
+    let a = app();
+    let (status, _) = do_request(a.clone(), startup_req(r#"{"seed":42}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+
+    // Start the simulation.
+    let (status, _) = do_request(a.clone(), post_req("/v3/simulation/start")).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let req = post_json(
+        "/v3/simulation/pattern/apply",
+        r#"{"params":{"pattern_type":"Maze","corridor_width":2,"wall_thickness":1,"open_center_radius":0},"bounds":{"x":0,"y":0,"width":10,"height":10},"seed":42}"#,
+    );
+    let (status, body) = do_request(a, req).await;
+    assert_eq!(status, StatusCode::CONFLICT, "body: {body}");
+}
+
+#[tokio::test]
+async fn pattern_preview_deterministic_same_seed() {
+    let a = app();
+    let (status, _) = do_request(a.clone(), startup_req(r#"{"seed":42}"#)).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let json = r#"{"params":{"pattern_type":"Noise","density":0.15,"cluster_size":3},"bounds":{"x":0,"y":0,"width":30,"height":30},"seed":12345}"#;
+
+    let req1 = post_json("/v3/simulation/pattern/preview", json);
+    let (_, body1) = do_request(a.clone(), req1).await;
+
+    let req2 = post_json("/v3/simulation/pattern/preview", json);
+    let (_, body2) = do_request(a, req2).await;
+
+    assert_eq!(body1["bitmap"], body2["bitmap"]);
+    assert_eq!(body1["cell_count"], body2["cell_count"]);
+}
