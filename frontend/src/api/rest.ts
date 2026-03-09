@@ -5,6 +5,9 @@ import type {
 	LifecycleResponse,
 	PaintRequest,
 	PaintResponse,
+	PatternApplyResponse,
+	PatternPreviewResponse,
+	PatternRequest,
 	SampleResponse,
 	SimulationConfig,
 	SnapshotResponse,
@@ -113,6 +116,24 @@ class ApiClient {
 
 	async paint(req: PaintRequest): Promise<PaintResponse> {
 		return this.request("/v3/simulation/paint", {
+			method: "POST",
+			body: JSON.stringify(req),
+		});
+	}
+
+	async patternPreview(
+		req: PatternRequest,
+		signal?: AbortSignal,
+	): Promise<PatternPreviewResponse> {
+		return this.request("/v3/simulation/pattern/preview", {
+			method: "POST",
+			body: JSON.stringify(req),
+			signal,
+		});
+	}
+
+	async patternApply(req: PatternRequest): Promise<PatternApplyResponse> {
+		return this.request("/v3/simulation/pattern/apply", {
 			method: "POST",
 			body: JSON.stringify(req),
 		});
