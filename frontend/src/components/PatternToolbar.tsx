@@ -50,7 +50,12 @@ function PatternParamsPanel({
 	}
 }
 
-export function PatternToolbar() {
+interface PatternToolbarProps {
+	onApply: () => void;
+	onCancel: () => void;
+}
+
+export function PatternToolbar({ onApply, onCancel }: PatternToolbarProps) {
 	const setMode = usePaintStore((s) => s.setMode);
 	const selectedPattern = usePatternStore((s) => s.selectedPattern);
 	const patternParams = usePatternStore((s) => s.patternParams);
@@ -59,7 +64,6 @@ export function PatternToolbar() {
 	const selectPattern = usePatternStore((s) => s.selectPattern);
 	const setPatternParams = usePatternStore((s) => s.setPatternParams);
 	const randomizeSeed = usePatternStore((s) => s.randomizeSeed);
-	const clearPattern = usePatternStore((s) => s.clearPattern);
 
 	const hasArea = areaBounds !== null;
 
@@ -142,6 +146,7 @@ export function PatternToolbar() {
 				<button
 					type="button"
 					data-testid="pattern-apply"
+					onClick={onApply}
 					disabled={!hasArea}
 					className="flex-1 px-2 py-1.5 text-xs font-medium rounded transition-colors bg-emerald-600 text-white hover:bg-emerald-500 disabled:opacity-40 disabled:cursor-not-allowed"
 				>
@@ -150,7 +155,7 @@ export function PatternToolbar() {
 				<button
 					type="button"
 					data-testid="pattern-cancel"
-					onClick={clearPattern}
+					onClick={onCancel}
 					disabled={!hasArea}
 					className="flex-1 px-2 py-1.5 text-xs rounded transition-colors bg-slate-700 text-slate-200 hover:bg-slate-600 disabled:opacity-40 disabled:cursor-not-allowed"
 				>
