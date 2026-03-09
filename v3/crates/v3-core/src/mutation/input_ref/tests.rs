@@ -861,3 +861,138 @@ fn action_queue_appears_in_random_input_reference_pool() {
         "ActionQueue must be reachable from random_input_reference"
     );
 }
+
+// -- apply_add auto-connect integration tests --
+
+#[test]
+fn add_scalar_input_to_graph_creates_internal_node() {
+    // With chance=0.0, adding any scalar input should create exactly one
+    // InputRef internal node (previously only compound inputs created leaves).
+    let config = MutationConfig {
+        input_auto_connect_chance: 0.0,
+        ..MutationConfig::default()
+    };
+    let mut found = false;
+    for seed in 0u64..500 {
+        let mut genome = graph_genome_with_input_refs(vec![], vec![]);
+        let mut r = rng(seed);
+        InputRefMutator::apply(
+            &mut genome,
+            InputRefOperator::Add,
+            &[],
+            0.0,
+            &mut r,
+            &config,
+        )
+        .unwrap();
+        let ref_added = &genome.nodes[0].input_refs[0];
+        let count = compound::sub_value_count(ref_added, &config);
+        if count == 1 {
+            // Scalar input was added — should now have exactly 1 internal node
+            if let BackendDef::Graph(ref gd) = genome.nodes[0].backend_def {
+                assert_eq!(
+                    gd.internal_nodes.len(),
+                    1,
+                    "scalar Add must create 1 InputRef internal node"
+                );
+                assert!(matches!(
+                    gd.internal_nodes[0].kind,
+                    GraphNodeKind::InputRef {
+                        ref_idx: 0,
+                        sub_idx: 0,
+                    }
+                ));
+                found = true;
+                break;
+            }
+        }
+    }
+    assert!(found, "must find a seed producing a scalar input ref");
+}
+
+#[test]
+fn add_input_auto_connects_with_chance_one() {
+    // With chance=1.0 and pre-existing internal nodes, every new leaf should
+    // get a bootstrap edge.
+    let config = MutationConfig {
+        input_auto_connect_chance: 1.0,
+        ..MutationConfig::default()
+    };
+    let preexisting = vec![GraphInternalNode {
+        kind: GraphNodeKind::Add,
+        inputs: vec![],
+        plasticity: None,
+    }];
+    let mut found = false;
+    for seed in 0u64..500 {
+        let mut genome = graph_genome_with_input_refs(
+            vec![InputReference::World(WorldInputKey::FoodHere)],
+            preexisting.clone(),
+        );
+        let mut r = rng(seed);
+        InputRefMutator::apply(
+            &mut genome,
+            InputRefOperator::Add,
+            &[],
+            0.0,
+            &mut r,
+            &config,
+        )
+        .unwrap();
+        if let BackendDef::Graph(ref gd) = genome.nodes[0].backend_def {
+            let new_leaves = gd.internal_nodes.len() - 1; // subtract pre-existing
+            if new_leaves > 0 {
+                // Check that each new leaf has a bootstrap edge from preexisting[0]
+                let edges_from_new: usize = gd.internal_nodes[0]
+                    .inputs
+                    .iter()
+                    .filter(|inp| inp.source_idx as usize >= 1)
+                    .count();
+                assert_eq!(
+                    edges_from_new, new_leaves,
+                    "every new leaf should have a bootstrap edge (chance=1.0)"
+                );
+                found = true;
+                break;
+            }
+        }
+    }
+    assert!(found, "must find a seed that adds input and connects");
+}
+
+#[test]
+fn add_scalar_input_increases_genome_size() {
+    let config = MutationConfig {
+        input_auto_connect_chance: 0.0,
+        ..MutationConfig::default()
+    };
+    let mut found = false;
+    for seed in 0u64..500 {
+        let mut genome = graph_genome_with_input_refs(vec![], vec![]);
+        let size_before = genome.genome_size();
+        let mut r = rng(seed);
+        InputRefMutator::apply(
+            &mut genome,
+            InputRefOperator::Add,
+            &[],
+            0.0,
+            &mut r,
+            &config,
+        )
+        .unwrap();
+        let ref_added = &genome.nodes[0].input_refs[0];
+        let count = compound::sub_value_count(ref_added, &config);
+        if count == 1 {
+            let size_after = genome.genome_size();
+            assert!(
+                size_after > size_before,
+                "genome_size must increase after scalar Add: before={}, after={}",
+                size_before,
+                size_after
+            );
+            found = true;
+            break;
+        }
+    }
+    assert!(found, "must find a seed producing a scalar input ref");
+}

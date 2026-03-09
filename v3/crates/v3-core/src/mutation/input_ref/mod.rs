@@ -215,9 +215,13 @@ fn apply_add(
     let count = compound::sub_value_count(&new_ref, config);
     let ref_idx = genome.nodes[node_idx].input_refs.len() as u16;
     genome.nodes[node_idx].input_refs.push(new_ref);
-    if count > 1 {
-        compound::create_fan_out_nodes(&mut genome.nodes[node_idx], ref_idx, count);
-    }
+    compound::create_and_connect_input_leaves(
+        &mut genome.nodes[node_idx],
+        ref_idx,
+        count,
+        config.input_auto_connect_chance,
+        rng,
+    );
     Ok(reachability)
 }
 
@@ -269,6 +273,12 @@ fn apply_swap(
     let new_ref = random_input_reference(rng);
     let count = compound::sub_value_count(&new_ref, config);
     genome.nodes[node_idx].input_refs[ref_idx] = new_ref;
+    // Swap intentionally uses create_fan_out_nodes (not create_and_connect_input_leaves):
+    // - Swap is a neutral mutation; adding bootstrap edges would make it structural.
+    // - For scalar→scalar swaps, existing InputRef internal nodes already read
+    //   the new input via resolve_input at the same ref_idx.
+    // - Compound-widening swaps leave new sub-value leaves disconnected;
+    //   a follow-up can address this if it proves problematic.
     if count > 1 {
         compound::create_fan_out_nodes(&mut genome.nodes[node_idx], ref_idx as u16, count);
     }

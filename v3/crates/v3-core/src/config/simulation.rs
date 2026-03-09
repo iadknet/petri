@@ -282,6 +282,10 @@ fn default_max_actions_per_turn() -> usize {
     10
 }
 
+fn default_input_auto_connect_chance() -> f32 {
+    0.3
+}
+
 fn default_action_queue_cap() -> usize {
     4
 }
@@ -372,6 +376,10 @@ pub struct MutationConfig {
     pub phenotype: PhenotypeConfig,
     #[serde(default)]
     pub reachable_bias: ReachableBiasConfig,
+    /// Per-leaf probability that a newly created InputRef leaf node gets a
+    /// bootstrap edge to a random pre-existing internal node. Default 0.3.
+    #[serde(default = "default_input_auto_connect_chance")]
+    pub input_auto_connect_chance: f32,
 }
 
 impl Default for MutationConfig {
@@ -386,6 +394,7 @@ impl Default for MutationConfig {
             action_queue_cap: 4,
             phenotype: PhenotypeConfig::default(),
             reachable_bias: ReachableBiasConfig::default(),
+            input_auto_connect_chance: default_input_auto_connect_chance(),
         }
     }
 }
@@ -591,6 +600,12 @@ impl SimulationConfig {
             0.0
         };
 
+        m.input_auto_connect_chance = if m.input_auto_connect_chance.is_finite() {
+            m.input_auto_connect_chance.clamp(0.0, 1.0)
+        } else {
+            0.3
+        };
+
         if self.action_log.capacity < 1 {
             self.action_log.capacity = 500;
         }
@@ -718,6 +733,8 @@ mod tests {
         assert_eq!(cfg.mutation.phenotype.channel_step, 1);
         assert!((cfg.mutation.phenotype.channel_change_chance - 0.001).abs() < 1e-6);
         assert!((cfg.mutation.phenotype.polarity_flip_chance - 0.0002).abs() < 1e-6);
+        // Input auto-connect
+        assert!((cfg.mutation.input_auto_connect_chance - 0.3).abs() < 1e-6);
         // Reachable bias
         assert!((cfg.mutation.reachable_bias.topology - 0.7).abs() < 1e-9);
         assert!((cfg.mutation.reachable_bias.vm - 0.7).abs() < 1e-9);
@@ -888,6 +905,30 @@ mod tests {
         cfg.mutation.phenotype.channel_change_chance = -0.5;
         cfg.normalize();
         assert!((cfg.mutation.phenotype.channel_change_chance - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_input_auto_connect_chance_above_one_clamped() {
+        let mut cfg = SimulationConfig::default();
+        cfg.mutation.input_auto_connect_chance = 1.5;
+        cfg.normalize();
+        assert!((cfg.mutation.input_auto_connect_chance - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_input_auto_connect_chance_negative_clamped() {
+        let mut cfg = SimulationConfig::default();
+        cfg.mutation.input_auto_connect_chance = -0.5;
+        cfg.normalize();
+        assert!((cfg.mutation.input_auto_connect_chance - 0.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_input_auto_connect_chance_nan_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.mutation.input_auto_connect_chance = f32::NAN;
+        cfg.normalize();
+        assert!((cfg.mutation.input_auto_connect_chance - 0.3).abs() < 1e-6);
     }
 
     #[test]
