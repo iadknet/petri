@@ -25,15 +25,8 @@
 
 ## World & Environment
 
-### Complex barrier painting tools
-Set of new barrier painting tools that create sections of the map with interesting unique environments:
-- Paint a maze
-- Paint a spiral
-- Paint random noise
-- Paint parallel squiggly/jagged lines
-- Paint random star patterns
-
-Each needs sub-configuration (spacing, density, etc.). Tool allows drawing a box on the map and filling it with the selected pattern. UI organization needed.
+### ~~Complex barrier painting tools~~ (promoted)
+See Promoted section below.
 
 ### Configurable barrier topology generation
 In the startup config, add a section for configuring initial barrier topology. Way to "add" features (mazes, open spaces, noise) with size/configuration. Algorithm needs to handle competing spatial requirements proportionally.
