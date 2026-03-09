@@ -12,6 +12,7 @@ import { useSimulationStore } from "../stores/simulation.ts";
 import { useViewportStore } from "../stores/viewport.ts";
 import { useWorldViewStore } from "../stores/worldView.ts";
 import { PaintToolbar } from "./PaintToolbar.tsx";
+import { PatternToolbar } from "./PatternToolbar.tsx";
 import { ZoomControls } from "./ZoomControls.tsx";
 
 export function WorldViewport() {
@@ -307,6 +308,7 @@ export function WorldViewport() {
 
 	const canTogglePaint = simState === "idle" || simState === "paused";
 	const togglePaintMode = usePaintStore((s) => s.togglePaintMode);
+	const paintSubMode = usePaintStore((s) => s.mode);
 
 	return (
 		<div ref={containerRef} className="relative w-full h-full overflow-hidden bg-petri-bg">
@@ -323,14 +325,15 @@ export function WorldViewport() {
 				onContextMenu={handleContextMenu}
 			/>
 			{/* Brush overlay — positioned via direct DOM manipulation in the hook */}
-			{paintMode && (
+			{paintMode && paintSubMode === "brush" && (
 				<div
 					ref={brushOverlayRef}
 					className="fixed top-0 left-0 pointer-events-none border-2 bg-white/5"
 					style={{ display: "none" }}
 				/>
 			)}
-			{paintMode && <PaintToolbar />}
+			{paintMode && paintSubMode === "brush" && <PaintToolbar />}
+			{paintMode && paintSubMode === "pattern" && <PatternToolbar />}
 			<ZoomControls
 				onZoomIn={handleZoomIn}
 				onZoomOut={handleZoomOut}
