@@ -21,13 +21,14 @@ pub enum VmOperator {
     VmCopyGeneBackwardSlice,
     VmCopyGeneForwardSlice,
     VmInsertReadStoreMotif,
+    VmInsertReadBidMotif,
     VmInsertLoadCompareMotif,
     VmMutateSlotAddress,
     VmMutatePairedSlotAddress,
 }
 
 impl VmOperator {
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 14] = [
         Self::VmConstantMutation,
         Self::VmInstructionMutation,
         Self::VmRegisterCountMutation,
@@ -38,6 +39,7 @@ impl VmOperator {
         Self::VmCopyGeneBackwardSlice,
         Self::VmCopyGeneForwardSlice,
         Self::VmInsertReadStoreMotif,
+        Self::VmInsertReadBidMotif,
         Self::VmInsertLoadCompareMotif,
         Self::VmMutateSlotAddress,
         Self::VmMutatePairedSlotAddress,
@@ -58,6 +60,7 @@ impl VmOperator {
             Self::VmCopyGeneBackwardSlice => 1,
             Self::VmCopyGeneForwardSlice => 1,
             Self::VmInsertReadStoreMotif => 2,
+            Self::VmInsertReadBidMotif => 2,
             Self::VmInsertLoadCompareMotif => 2,
             Self::VmMutateSlotAddress => 4,
             Self::VmMutatePairedSlotAddress => 4,
@@ -66,7 +69,7 @@ impl VmOperator {
 
     const TOTAL_WEIGHT: u16 = {
         assert!(
-            Self::ALL.len() == 13,
+            Self::ALL.len() == 14,
             "ALL must cover every VmOperator variant"
         );
         let mut sum = 0u16;
@@ -89,6 +92,7 @@ impl VmOperator {
             | Self::VmCopyGeneBackwardSlice
             | Self::VmCopyGeneForwardSlice
             | Self::VmInsertReadStoreMotif
+            | Self::VmInsertReadBidMotif
             | Self::VmInsertLoadCompareMotif => ComplexityEffect::Increasing,
             Self::VmConstantMutation
             | Self::VmInstructionMutation
@@ -230,6 +234,7 @@ impl VmMutator {
             VmOperator::VmInsertReadStoreMotif => {
                 apply_insert_read_store_motif(genome, node_idx, rng)
             }
+            VmOperator::VmInsertReadBidMotif => apply_insert_read_bid_motif(genome, node_idx, rng),
             VmOperator::VmInsertLoadCompareMotif => {
                 apply_insert_load_compare_motif(genome, node_idx, rng)
             }

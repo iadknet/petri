@@ -677,6 +677,54 @@ pub(super) fn apply_insert_read_store_motif(
     Ok(())
 }
 
+pub(super) fn apply_insert_read_bid_motif(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    let input_refs_len = genome.nodes[node_idx].input_refs.len();
+    if input_refs_len == 0 {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
+
+    let node = &mut genome.nodes[node_idx];
+    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+        let rc = vm.register_count.max(1);
+        let il = input_refs_len.clamp(1, 255) as u16;
+        let dst = rng.gen_range(0..rc);
+        let pair = [
+            VmInstruction::ReadInput {
+                dst,
+                ref_idx: rng.gen_range(0..il),
+                sub_idx: 0,
+            },
+            VmInstruction::SetPriorityBid { src: dst },
+        ];
+
+        let terminal_positions: Vec<usize> = vm
+            .program
+            .iter()
+            .enumerate()
+            .filter(|(_, instr)| {
+                matches!(
+                    instr,
+                    VmInstruction::ExecuteActionQueue | VmInstruction::Halt
+                )
+            })
+            .map(|(idx, _)| idx)
+            .collect();
+
+        let pos = if terminal_positions.is_empty() {
+            rng.gen_range(0..=vm.program.len())
+        } else {
+            terminal_positions[rng.gen_range(0..terminal_positions.len())]
+        };
+
+        vm.program.splice(pos..pos, pair);
+    }
+    Ok(())
+}
+
 pub(super) fn apply_insert_load_compare_motif(
     genome: &mut CreatureGenome,
     node_idx: usize,

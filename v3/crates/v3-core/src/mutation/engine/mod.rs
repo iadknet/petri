@@ -267,6 +267,7 @@ fn vm_operator_key(op: VmOperator) -> MutationOperator {
         VmOperator::VmCopyGeneBackwardSlice => MutationOperator::VmCopyGeneBackwardSlice,
         VmOperator::VmCopyGeneForwardSlice => MutationOperator::VmCopyGeneForwardSlice,
         VmOperator::VmInsertReadStoreMotif => MutationOperator::VmInsertReadStoreMotif,
+        VmOperator::VmInsertReadBidMotif => MutationOperator::VmInsertReadBidMotif,
         VmOperator::VmInsertLoadCompareMotif => MutationOperator::VmInsertLoadCompareMotif,
         VmOperator::VmMutateSlotAddress => MutationOperator::VmMutateSlotAddress,
         VmOperator::VmMutatePairedSlotAddress => MutationOperator::VmMutatePairedSlotAddress,

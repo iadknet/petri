@@ -1083,7 +1083,7 @@ fn vm_weighted_random_favors_refinement() {
 #[test]
 fn vm_operator_weights_are_positive() {
     let all = VmOperator::ALL;
-    assert_eq!(all.len(), 13, "ALL must cover every VmOperator variant");
+    assert_eq!(all.len(), 14, "ALL must cover every VmOperator variant");
     for &op in &all {
         assert!(op.weight() > 0, "weight must be positive for {:?}", op);
     }
@@ -1200,6 +1200,46 @@ fn vm_insert_read_store_motif_inserts_read_input_and_store_slot_pair() {
     assert!(
         found_pair,
         "VmInsertReadStoreMotif must insert ReadInput + StoreSlotImm pair with matching registers"
+    );
+}
+
+#[test]
+fn vm_insert_read_bid_motif_inserts_read_input_and_priority_bid_pair() {
+    let genome = v3alpha1_founder_genome();
+    let mut found_pair = false;
+    for seed in 0u64..200 {
+        let mut g = genome.clone();
+        let mut r = rng(seed);
+        if VmMutator::apply(
+            &mut g,
+            VmOperator::VmInsertReadBidMotif,
+            &[],
+            0.0,
+            &mut r,
+            &MutationConfig::default(),
+        )
+        .is_ok()
+        {
+            if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+                for w in vm.program.windows(3) {
+                    if let [VmInstruction::ReadInput { dst, .. }, VmInstruction::SetPriorityBid { src }, VmInstruction::ExecuteActionQueue] =
+                        w
+                    {
+                        if dst == src {
+                            found_pair = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+        if found_pair {
+            break;
+        }
+    }
+    assert!(
+        found_pair,
+        "VmInsertReadBidMotif must insert ReadInput + SetPriorityBid before ExecuteActionQueue with matching registers"
     );
 }
 
