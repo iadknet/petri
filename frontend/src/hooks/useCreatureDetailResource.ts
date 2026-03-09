@@ -49,6 +49,7 @@ export function useCreatureDetailResource() {
 					age: detail.age,
 					generation: detail.generation,
 					complexity: detail.complexity,
+					genomeSize: detail.genome_size,
 					phenotype: detail.phenotype,
 					genome: detail.genome,
 					meshAnnotations: detail.mesh_annotations,

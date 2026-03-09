@@ -81,6 +81,8 @@ const defaultProps = {
 		maxEnergy: 100,
 		age: 47,
 		generation: 3,
+		complexity: 5,
+		genomeSize: 12,
 		position: { x: 128, y: 64 },
 		phenotype: makePhenotype(),
 	},

@@ -21,6 +21,8 @@ interface MeshCanvasProps {
 	focusMode: MeshFocusMode;
 	viewportCommand: MeshViewportCommand | null;
 	onSelectNode: (nodeId: number) => void;
+	complexity?: number;
+	genomeSize?: number;
 }
 
 export function MeshCanvas({
@@ -34,6 +36,8 @@ export function MeshCanvas({
 	focusMode,
 	viewportCommand,
 	onSelectNode,
+	complexity,
+	genomeSize,
 }: MeshCanvasProps) {
 	if (!layout) {
 		return (
@@ -64,6 +68,8 @@ export function MeshCanvas({
 						focusMode={focusMode}
 						viewportCommand={viewportCommand}
 						onSelectNode={onSelectNode}
+						complexity={complexity}
+						genomeSize={genomeSize}
 					/>
 				</Suspense>
 			</div>
