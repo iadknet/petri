@@ -1,19 +1,5 @@
 # Feature Ideas
 
-## Bug Fixes
-
-### Action timeline: manual refresh button
-
-Add a refresh button/icon to the action timeline header (far right of the header row). Clicking it refreshes the timeline data on demand.
-
-### Action timeline: improve failure indicator visibility
-
-The current failure indicator (a red bar) is easy to miss and may be too bright/saturated. Consider adding a red "x" icon above the failed action segment for clearer identification, and tone down the red to a less saturated shade.
-
-### Action timeline: only first action per tick is clickable
-
-In the creature inspector's action timeline, if multiple actions happened in a single tick, only the first action's segment is clickable for inspecting metadata. Subsequent actions in the same tick cannot be selected.
-
 ## Core Simulation
 
 ### Communication
@@ -210,9 +196,6 @@ Uncovered during reconcile-config-panel: the `edge_mode` select was implemented 
 ### FieldLabel primitive extraction
 Uncovered during reconcile-config-panel: the label+tooltip+lock-icon layout is duplicated across `FieldRow.tsx`, `ToggleRow.tsx`, and the inline edge_mode select in `WorldTopologySection.tsx`. Extract a `FieldLabel` subcomponent to eliminate the three-site JSX duplication.
 
-### Refactor creature inspector
-Within the creature inspector have different tabs (creature summary, mesh viewer, sampler). Needs more brainstorming on tab organization and content.
-
 ### Lineage ancestry tracking
 Each creature stores its parent_id (some of this exists via CreatureIdentityState). The server maintains a compressed ancestry graph — not every individual, but enough to answer "trace this creature back to its founder" and "find the common ancestor of creatures A and B." Pruned over time: drop branches where all descendants are dead. Pure data infrastructure — no UI, but everything in the species/phylogeny features builds on it.
 
@@ -289,12 +272,6 @@ Find creatures by genome characteristics and highlight results on the map:
 
 Needs a query UI and efficient filtering over potentially 100K creatures. Powerful for finding interesting specimens.
 
-### Reconcile config panel with all backend options
-Audit the frontend config panel against all backend configuration options. Ensure every config option has a corresponding frontend control, verify all existing controls are functional, and reassess the logical groupings of config elements in the UI. This subsumes the "Expose predation config in UI" idea below — predation config is one example of a missing control, but the full reconciliation should catch all gaps.
-
-### Expose predation config in UI
-PredationConfig (steal_cost_rate, kill_complexity_bonus_multiplier) exists in the backend but has no controls in the runtime config panel. Add it.
-
 ### Replay / time travel
 Record simulation history to allow rewinding, replaying from checkpoints, or exporting timelapse. Could range from simple periodic snapshots to full tick-level recording. Large design space — needs significant refinement.
 
@@ -303,58 +280,6 @@ UI ability to save the current simulation config state to a file and load a prev
 
 ### Save / load world state
 Save and load complete world state (all creatures, map, world state) to/from a compact binary file. Must handle the full simulation snapshot — potentially large data. On load, best-effort restoration: apply what can be mapped to the current schema and gracefully skip or default anything that has changed. Strict backward compatibility is explicitly not a goal given the rapid pace of changes. Lower priority than save/load config.
-
-## Architecture
-
-### Creature endpoint sparse field selection and compression
-The `GET /v3/simulation/creature/:id` endpoint returns the full payload (genome, memory, action_log) on every poll at up to 10Hz. With a full 500-entry action_log (~75KB JSON) and no server-side compression, this is ~750KB/s per inspected creature. Three improvements:
-1. **`since_tick` query parameter** — return only action_log entries newer than the specified tick. Reduces action_log transfer by ~98% in steady-state (only ~0-10 new entries per poll vs 500).
-2. **`tower-http` CompressionLayer** — add gzip/brotli middleware to the Axum server. JSON action logs are highly compressible (repeated field names, similar float patterns). Would reduce payload 80-90%.
-3. **Sparse field selection** — query parameter to include/exclude heavy fields (action_log, genome, memory). The frontend already caches genome (set-once) so it doesn't need it after first fetch.
-
-Discovered during creature-action-timeline planning (data transfer analysis).
-
-### Creature detail API spec documentation
-The `GET /v3/simulation/creature/:id` endpoint is not documented in `docs/reference/v3-server-api-protocol-spec.md`. The `action_log` field (added by the creature-action-log feature) has no reference spec entry. Should be documented alongside the existing sample sub-endpoint docs.
-
-Discovered during creature-action-timeline architecture review.
-
-### Reachability-aware mutation pathways
-
-Mutation currently appears to choose domains and operators generically, while live-vs-junk structure is only visible through separate reachability analysis. A promising direction is to make mutation more aware of whether it is acting on reachable functional mesh or unreachable exploratory reserve.
-
-Primary goal:
-- make it easier for evolution to grow and reorganize active mesh structure rather than mostly adding junk or repeatedly polishing the same tiny live core
-- preserve some neutral drift and dormant structure so search does not collapse into only mutating currently-live nodes
-
-Recommended first version:
-- keep a single mutation engine and current operator families
-- when an operator needs a structural target, bias target selection toward reachable nodes/slices/edges rather than sampling the full genome uniformly
-- keep a non-trivial probability of choosing unreachable structure so dormant material can still drift, simplify, or become useful later
-- add reachability-aware observability so mutation events can be categorized as primarily `reachable`, `unreachable`, or `cross-boundary`
-
-Candidate operator behavior to bias first:
-- topology edits like retarget, splice, route swaps, and mesh-slice copy
-- graph-internal copy/subgraph/edge mutations on reachable graph nodes
-- VM block/gene copy mutations on reachable VM nodes
-- input-ref edits on reachable nodes so active controllers can more easily acquire or shed sensors
-
-Potential new operators worth exploring after the biasing layer exists:
-- `SplitLiveEdge` — choose a reachable `A -> B` route and insert a new node or short motif between them
-- `DuplicateLiveSliceWithReconnect` — copy a reachable slice and force at least one live route through the copied structure
-- `ActivateDormantSlice` — reconnect an unreachable slice back into a reachable path
-- `PruneLiveBranch` — deliberately remove a reachable side branch to counterbalance growth and create cleaner structural alternatives
-
-Important design caution:
-- a strict two-lane system (`functional lane` vs `junk lane`) sounds simple, but may be too rigid as a first implementation
-- unreachable structure is often only one reconnection away from usefulness
-- many valuable mutations are hybrid by nature: reconnecting dormant structure, cloning live structure and then letting it drift, or routing a live path through partly inactive components
-- over-targeting the currently-live core may improve short-term hill-climbing while reducing discovery of genuinely new organization
-
-If a two-lane system is explored later, it should probably remain soft rather than absolute:
-- lane probabilities should be configurable rather than hard-coded
-- hybrid operators should explicitly exist for crossing between live and dormant structure
-- mutation telemetry should show whether the system is merely deepening the current dominant scaffold or actually increasing active-mesh diversity
 
 ## Far Future
 
@@ -374,21 +299,11 @@ The Grand Unified Architecture — mapping biological intelligence to CPU-optimi
 
 ## Promoted
 
-- **Fix creature inspector** → `docs/features/needs_refinement/fix-creature-inspector.md`
-- **Reconcile config panel** → `docs/features/needs_refinement/reconcile-config-panel.md`
-- **Fix passive event listener warnings** → `docs/features/needs_refinement/fix-passive-event-listeners.md`
-- **Creature action log** → `docs/features/needs_refinement/creature-action-log.md`
-- **Creature action timeline** → `docs/features/needs_refinement/creature-action-timeline.md`
-- **Frontend type file domain cleanup** → `docs/features/needs_refinement/frontend-type-domain-cleanup.md`
-- **Split CreatureInspector** → `docs/features/needs_refinement/split-creature-inspector.md`
-- **Action cost helper refactor** → `docs/features/needs_refinement/action-cost-helper-refactor.md`
-- **Shared incremental query/projection platform + Event-driven projection invalidation** → `docs/features/needs_refinement/incremental-projection-platform.md`
-- **Tick phase system** → `docs/features/needs_refinement/tick-phase-system.md`
-- **Graph evaluation / plasticity decoupling** → `docs/features/needs_refinement/graph-plasticity-decoupling.md`
-- **Action timeline segment virtualization** → `docs/features/needs_refinement/action-timeline-virtualization.md`
-- **Creature endpoint sparse field selection & compression + Creature detail API spec documentation** → `docs/features/needs_refinement/creature-detail-api-optimization.md`
-- **Eventual multi-crate v3-server split** → `docs/features/needs_refinement/v3-server-crate-split.md`
-- **Ring-based vision sensors** → `docs/features/needs_refinement/ring-based-sensors.md`
-- **Reachability-aware mutation pathways** → `docs/features/needs_refinement/reachability-aware-mutation.md`
-- **Reachability-based complexity** → `docs/features/needs_refinement/reachability-based-complexity.md`
-- **Unified shared memory and VM memory evolvability** → `docs/features/needs_refinement/unified-shared-memory.md`
+- **Frontend type file domain cleanup** → `docs/features/needs_refinement/refactors/frontend-type-domain-cleanup.md`
+- **Split CreatureInspector** → `docs/features/needs_refinement/refactors/split-creature-inspector.md`
+- **Shared incremental query/projection platform + Event-driven projection invalidation** → `docs/features/needs_refinement/refactors/incremental-projection-platform.md`
+- **Tick phase system** → `docs/features/needs_refinement/refactors/tick-phase-system.md`
+- **Graph evaluation / plasticity decoupling** → `docs/features/needs_refinement/refactors/graph-plasticity-decoupling.md`
+- **Action timeline segment virtualization** → `docs/features/needs_refinement/refactors/action-timeline-virtualization.md`
+- **Eventual multi-crate v3-server split** → `docs/features/needs_refinement/maybe-do/v3-server-crate-split.md`
+- **Ring-based vision sensors** → `docs/features/needs_refinement/maybe-do/ring-based-sensors.md`
