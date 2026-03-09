@@ -145,6 +145,7 @@ fn operator_domain_mapping_is_consistent() {
             | MutationOperator::VmCopyGeneBackwardSlice
             | MutationOperator::VmCopyGeneForwardSlice
             | MutationOperator::VmInsertReadStoreMotif
+            | MutationOperator::VmInsertReadBidMotif
             | MutationOperator::VmInsertLoadCompareMotif
             | MutationOperator::VmMutateSlotAddress
             | MutationOperator::VmMutatePairedSlotAddress => {
@@ -234,6 +235,7 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
             VmOperator::VmCopyGeneBackwardSlice => MutationOperator::VmCopyGeneBackwardSlice,
             VmOperator::VmCopyGeneForwardSlice => MutationOperator::VmCopyGeneForwardSlice,
             VmOperator::VmInsertReadStoreMotif => MutationOperator::VmInsertReadStoreMotif,
+            VmOperator::VmInsertReadBidMotif => MutationOperator::VmInsertReadBidMotif,
             VmOperator::VmInsertLoadCompareMotif => MutationOperator::VmInsertLoadCompareMotif,
             VmOperator::VmMutateSlotAddress => MutationOperator::VmMutateSlotAddress,
             VmOperator::VmMutatePairedSlotAddress => MutationOperator::VmMutatePairedSlotAddress,

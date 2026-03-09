@@ -113,6 +113,7 @@ pub enum MutationOperator {
     VmCopyGeneBackwardSlice,
     VmCopyGeneForwardSlice,
     VmInsertReadStoreMotif,
+    VmInsertReadBidMotif,
     VmInsertLoadCompareMotif,
     VmMutateSlotAddress,
     VmMutatePairedSlotAddress,
@@ -172,6 +173,7 @@ impl MutationOperator {
             Self::VmCopyGeneBackwardSlice => "Vm.CopyGeneBackwardSlice",
             Self::VmCopyGeneForwardSlice => "Vm.CopyGeneForwardSlice",
             Self::VmInsertReadStoreMotif => "Vm.InsertReadStoreMotif",
+            Self::VmInsertReadBidMotif => "Vm.InsertReadBidMotif",
             Self::VmInsertLoadCompareMotif => "Vm.InsertLoadCompareMotif",
             Self::VmMutateSlotAddress => "Vm.MutateSlotAddress",
             Self::VmMutatePairedSlotAddress => "Vm.MutatePairedSlotAddress",
@@ -229,6 +231,7 @@ impl MutationOperator {
             | Self::VmCopyGeneBackwardSlice
             | Self::VmCopyGeneForwardSlice
             | Self::VmInsertReadStoreMotif
+            | Self::VmInsertReadBidMotif
             | Self::VmInsertLoadCompareMotif
             | Self::VmMutateSlotAddress
             | Self::VmMutatePairedSlotAddress => MutationDomain::Vm,
@@ -295,6 +298,7 @@ impl MutationOperator {
             | Self::VmCopyGeneBackwardSlice
             | Self::VmCopyGeneForwardSlice
             | Self::VmInsertReadStoreMotif
+            | Self::VmInsertReadBidMotif
             | Self::VmInsertLoadCompareMotif => ComplexityEffect::Increasing,
             // VM: all others neutral (mutate existing content, no structural growth)
             Self::VmConstantMutation
@@ -335,7 +339,7 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 51] {
+    pub const fn all() -> [Self; 52] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
@@ -360,6 +364,7 @@ impl MutationOperator {
             Self::VmCopyGeneBackwardSlice,
             Self::VmCopyGeneForwardSlice,
             Self::VmInsertReadStoreMotif,
+            Self::VmInsertReadBidMotif,
             Self::VmInsertLoadCompareMotif,
             Self::VmMutateSlotAddress,
             Self::VmMutatePairedSlotAddress,
