@@ -367,7 +367,7 @@ algorithm specifications.
   display with randomize button. Integrate into WorldViewport layout alongside
   existing PaintToolbar.
 
-- [ ] Step 6: **Frontend area selection interaction** — Create
+- [x] Step 6: **Frontend area selection interaction** — Create
   `usePatternInteraction` hook for click-drag rectangle selection on canvas.
   Renders dashed rectangle outline during drag via canvas overlay. Converts canvas
   coordinates to world bounds using `renderer.canvasToWorld()`. Floor the
