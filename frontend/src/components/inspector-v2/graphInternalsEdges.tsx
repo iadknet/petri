@@ -1,11 +1,8 @@
-import {
-	type EdgeProps,
-	Position,
-	getBezierPath,
-} from "@xyflow/react";
+import { type EdgeProps, getBezierPath } from "@xyflow/react";
 
 export interface WeightEdgeData extends Record<string, unknown> {
 	weight: number;
+	opacity: number;
 }
 
 export function WeightEdge({
@@ -69,7 +66,7 @@ export function BackwardWeightEdge({
 }: EdgeProps) {
 	const edgeData = data as WeightEdgeData | undefined;
 	const weight = edgeData?.weight ?? 1;
-	const opacity = Math.max(0.2, Math.min(Math.abs(weight), 1));
+	const opacity = edgeData?.opacity ?? Math.max(0.2, Math.min(Math.abs(weight), 1));
 	const showWeight = Math.abs(weight - 1.0) > 0.01;
 
 	const isSelfLoop =
@@ -86,14 +83,15 @@ export function BackwardWeightEdge({
 		labelX = sourceX;
 		labelY = sourceY + r * 2 + 6;
 	} else {
-		[edgePath, labelX, labelY] = getBezierPath({
-			sourceX,
-			sourceY,
-			targetX,
-			targetY,
-			sourcePosition: Position.Bottom,
-			targetPosition: Position.Bottom,
-		});
+		// Scale the drop with node distance so nearby nodes get a subtle
+		// curve instead of the dramatic U-loop from Position.Bottom bezier
+		const dx = Math.abs(targetX - sourceX);
+		const dy = Math.abs(targetY - sourceY);
+		const drop = Math.max(20, Math.min(50, dx * 0.15 + dy * 0.2));
+		const bottomY = Math.max(sourceY, targetY) + drop;
+		edgePath = `M ${sourceX} ${sourceY} C ${sourceX} ${bottomY}, ${targetX} ${bottomY}, ${targetX} ${targetY}`;
+		labelX = (sourceX + targetX) / 2;
+		labelY = bottomY;
 	}
 
 	return (

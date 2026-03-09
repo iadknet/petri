@@ -288,12 +288,14 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 		);
 
 		const flowEdges: Edge<WeightEdgeData>[] = layout.edges.map((le) => {
-			const opacity = Math.max(0.2, Math.min(Math.abs(le.weight), 1));
+			const endpointsLive = liveSet.has(le.fromIndex) && liveSet.has(le.toIndex);
+			const weightOpacity = Math.max(0.2, Math.min(Math.abs(le.weight), 1));
+			const opacity = endpointsLive ? weightOpacity : weightOpacity * 0.35;
 			if (le.isBackward) {
 				return {
 					id: le.id,
-					source: String(le.fromIndex),
-					target: String(le.toIndex),
+					source: String(le.toIndex),
+					target: String(le.fromIndex),
 					sourceHandle: "bottom-out",
 					targetHandle: "bottom-in",
 					type: "backwardEdge",
@@ -307,6 +309,7 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 					},
 					data: {
 						weight: le.weight,
+						opacity,
 					},
 				};
 			}
@@ -328,6 +331,7 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 				},
 				data: {
 					weight: le.weight,
+					opacity,
 				},
 			};
 		});
