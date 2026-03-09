@@ -65,14 +65,14 @@ configuration, and live server-side preview.
 
 | Area | Decision | Rationale |
 |------|----------|-----------|
-| `v3-core` top-level modules | add `patterns` module | Pattern generation is a construction/algorithm concern, not world state management. Top-level module (peer to `kernel`, `simulation`, `sensors`) enables clean reuse from both server handlers (paint UI) and `simulation::seeding` (future world-init). Depends on `kernel::paint::PaintPoint` for output type. |
-| `v3-core::kernel` | keep unchanged | `kernel` continues to own world state and spatial primitives. Pattern algorithms live outside kernel. |
-| `v3-core::kernel::paint` | keep unchanged | Paint stroke application unchanged. Pattern apply reuses `Simulation::apply_paint(Barrier, 0, generated_points)` to ensure creature eviction is handled. |
-| `v3-server` | extend with `handlers/pattern.rs` + `http/pattern.rs` | Follow existing two-layer convention: logic in `handlers/`, re-exports in `http/`. Request/response DTOs inline in handler (matching `handlers/paint.rs`). Routes added to `lib.rs`. |
-| `PatternBounds` vs `DirtyRect` | keep separate | `PatternBounds` is a v3-core input type (generation bounds); `DirtyRect` is a v3-server transport type (update region). Same fields but different semantic domains and crate ownership. |
-| `frontend/src/stores/paint.ts` | extend minimally | Add `mode: 'brush' \| 'pattern'` discriminator only. Pattern-specific state lives in separate `usePatternStore` to avoid re-renders of brush subscribers. |
-| `frontend/src/stores/pattern.ts` | new | Dedicated store for reactive pattern state only (selectedPattern, params, areaBounds, seed). Preview cells are NOT in this store — they live in a `useRef` in `usePatternInteraction` hook (matching existing brush preview pattern). |
-| `frontend/src/hooks/usePaintInteraction.ts` | keep unchanged | Existing brush interaction stays untouched. New `usePatternInteraction` handles area selection separately. |
+| `v3-core` top-level modules | change | Add `patterns` module. Pattern generation is a construction/algorithm concern, not world state management. Top-level module (peer to `kernel`, `simulation`, `sensors`) enables clean reuse from both server handlers (paint UI) and `simulation::seeding` (future world-init). Depends on `kernel::paint::PaintPoint` for output type. |
+| `v3-core::kernel` | keep | `kernel` continues to own world state and spatial primitives. Pattern algorithms live outside kernel. |
+| `v3-core::kernel::paint` | keep | Paint stroke application unchanged. Pattern apply reuses `Simulation::apply_paint(Barrier, 0, generated_points)` to ensure creature eviction is handled. |
+| `v3-server` | change | Extend with `handlers/pattern.rs` + `http/pattern.rs`. Follow existing two-layer convention: logic in `handlers/`, re-exports in `http/`. Request/response DTOs inline in handler (matching `handlers/paint.rs`). Routes added to `lib.rs`. |
+| `PatternBounds` vs `DirtyRect` | keep | `PatternBounds` is a v3-core input type (generation bounds); `DirtyRect` is a v3-server transport type (update region). Same fields but different semantic domains and crate ownership. |
+| `frontend/src/stores/paint.ts` | change | Add `mode: 'brush' \| 'pattern'` discriminator only. Pattern-specific state lives in separate `usePatternStore` to avoid re-renders of brush subscribers. |
+| `frontend/src/stores/pattern.ts` | change | New dedicated store for reactive pattern state only (selectedPattern, params, areaBounds, seed). Preview cells are NOT in this store — they live in a `useRef` in `usePatternInteraction` hook (matching existing brush preview pattern). |
+| `frontend/src/hooks/usePaintInteraction.ts` | keep | Existing brush interaction stays untouched. New `usePatternInteraction` handles area selection separately. |
 
 ## Open Questions
 
