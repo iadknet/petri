@@ -3,6 +3,25 @@ use crate::creature::action_log::{ActionLogEntry, ActionResult, ActionType};
 use crate::runtime::types::MeshOutput;
 use crate::simulation::simulation::Simulation;
 
+fn remove_creature_from_sim(sim: &mut Simulation, id: CreatureId) {
+    if let Some(creature) = sim.creatures.remove(id) {
+        sim.world.remove_creature(creature.position);
+    }
+    sim.action_logs.remove(id);
+}
+
+fn remove_creature_if_dead(sim: &mut Simulation, id: CreatureId) -> bool {
+    if sim
+        .creatures
+        .get(id)
+        .is_some_and(|creature| creature.energy <= 0.0)
+    {
+        remove_creature_from_sim(sim, id);
+        return true;
+    }
+    false
+}
+
 /// Run Phase 0 of a tick: food growth, creature aging, energy decay, dead-creature removal.
 ///
 /// Sub-step canonical order (v3-tick-orchestration-spec.md Section 3):
@@ -39,10 +58,7 @@ pub fn run_phase_0(sim: &mut Simulation) {
         .collect();
 
     for id in dead_ids {
-        if let Some(creature) = sim.creatures.remove(id) {
-            sim.world.remove_creature(creature.position);
-        }
-        sim.action_logs.remove(id);
+        remove_creature_from_sim(sim, id);
     }
 }
 
@@ -500,6 +516,10 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                     }
                 }
             }
+
+            if remove_creature_if_dead(sim, id) {
+                break;
+            }
         }
     }
 
@@ -599,8 +619,11 @@ fn sort_by_priority_bid(decisions: &mut [(CreatureId, MeshOutput)]) {
 mod tests {
     use super::*;
     use crate::config::SimulationConfig;
-    use crate::contracts::{CreatureId, Direction, Position};
+    use crate::contracts::{CreatureId, Direction, NodeId, Position};
     use crate::creature::founder::v3alpha1_founder_genome;
+    use crate::creature::genome::{
+        BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
+    };
     use crate::creature::identity::CreatureIdentityState;
     use crate::creature::state::CreatureState;
     use crate::kernel::WorldState;
@@ -614,6 +637,22 @@ mod tests {
         cfg.world.height = 20;
         cfg.population.initial_creatures = 5;
         cfg
+    }
+
+    fn vm_program_genome(program: Vec<VmInstruction>) -> CreatureGenome {
+        CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program,
+                }),
+                targets: vec![],
+            }],
+        }
     }
 
     /// Build a minimal simulation with two creatures and no food/food-growth.
@@ -710,6 +749,45 @@ mod tests {
         (sim, id)
     }
 
+    fn make_sim_with_custom_genome(
+        energy: f32,
+        genome: CreatureGenome,
+    ) -> (Simulation, CreatureId) {
+        let mut cfg = small_config();
+        cfg.world.food.growth_rate = 0.0;
+        cfg.world.food.initial_coverage = 0.0;
+
+        let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
+        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let pos = Position::new(5, 5);
+        let id = creatures.insert_with_key(|id| {
+            CreatureState::new(
+                id,
+                genome,
+                pos,
+                energy,
+                0,
+                [0, 0, 92, 92, 138, 138],
+                0,
+                [true; 6],
+                CreatureIdentityState::default(),
+                [0.0; 16],
+            )
+        });
+        world.place_creature(pos, id);
+
+        let sim = Simulation {
+            world,
+            creatures,
+            action_logs: slotmap::SecondaryMap::new(),
+            tick: 0,
+            config: cfg,
+            stats: crate::simulation::stats::SimStats::default(),
+            rng: rand::rngs::SmallRng::seed_from_u64(42),
+        };
+        (sim, id)
+    }
+
     #[test]
     fn phase_0_increments_creature_age() {
         let (mut sim, id) = make_sim_with_one_creature(50.0);
@@ -767,6 +845,45 @@ mod tests {
         assert!(sim.world.creature_at(pos).is_some());
         run_phase_0(&mut sim);
         assert!(sim.world.creature_at(pos).is_none());
+    }
+
+    #[test]
+    fn queued_actions_stop_once_action_exhausts_creature_energy() {
+        let genome = vm_program_genome(vec![
+            VmInstruction::PushAction { action_type: 1 }, // Eat
+            VmInstruction::PushAction { action_type: 0 }, // NoOp
+            VmInstruction::ExecuteActionQueue,
+        ]);
+        let (mut sim, id) = make_sim_with_custom_genome(1.0, genome);
+        sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
+
+        let creature = &sim.creatures[id];
+        let fatal_eat_cost = sim.config.energy.adjusted_action_cost(
+            sim.config.energy.costs.eat_cost,
+            creature.cached_complexity,
+            creature.age,
+        ) + sim.config.energy.adjusted_action_cost(
+            sim.config.energy.costs.failed_action_penalty,
+            creature.cached_complexity,
+            creature.age,
+        );
+        sim.creatures[id].energy = fatal_eat_cost - 0.01;
+
+        run_tick(&mut sim, &mut None);
+
+        assert_eq!(sim.stats.last_tick_eat, 1, "first queued Eat should run");
+        assert_eq!(
+            sim.stats.last_tick_noop, 0,
+            "remaining queued actions should stop after fatal exhaustion"
+        );
+        assert!(
+            !sim.creatures.contains_key(id),
+            "creature should die immediately after exhausting its energy"
+        );
+        assert!(
+            sim.world.creature_at(Position::new(5, 5)).is_none(),
+            "dead creature should be removed from occupancy immediately"
+        );
     }
 
     #[test]
