@@ -4,6 +4,7 @@ import { WorldRenderer } from "../canvas/renderer.ts";
 import { useCreatureSelection } from "../hooks/useCreatureSelection.ts";
 import { usePaintInteraction } from "../hooks/usePaintInteraction.ts";
 import { usePatternInteraction } from "../hooks/usePatternInteraction.ts";
+import { usePatternPreview } from "../hooks/usePatternPreview.ts";
 import {
 	creatureInspectorSelectors,
 	useCreatureInspectorStore,
@@ -41,6 +42,8 @@ export function WorldViewport() {
 		handleMouseUp: patternMouseUp,
 		selectionOverlayRef,
 	} = usePatternInteraction(rendererRef);
+
+	const { applyPattern, cancelPattern } = usePatternPreview(rendererRef);
 
 	const { handleMouseDown: selectionMouseDown, handleMouseUp: selectionMouseUp } =
 		useCreatureSelection(rendererRef);
@@ -368,7 +371,9 @@ export function WorldViewport() {
 				/>
 			)}
 			{paintMode && paintSubMode === "brush" && <PaintToolbar />}
-			{paintMode && paintSubMode === "pattern" && <PatternToolbar />}
+			{paintMode && paintSubMode === "pattern" && (
+				<PatternToolbar onApply={applyPattern} onCancel={cancelPattern} />
+			)}
 			<ZoomControls
 				onZoomIn={handleZoomIn}
 				onZoomOut={handleZoomOut}

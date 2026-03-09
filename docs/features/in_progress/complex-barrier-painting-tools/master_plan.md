@@ -378,7 +378,7 @@ algorithm specifications.
   pattern area selection takes priority when paint mode is `'pattern'`. Keyboard:
   Escape cancels selection.
 
-- [ ] Step 7: **Frontend preview and apply flow** — Wire debounced (300ms) server
+- [x] Step 7: **Frontend preview and apply flow** — Wire debounced (300ms) server
   preview requests triggered by parameter or area changes. Store preview cells in a
   `useRef` (not reactive state) and pass to renderer via `setPreview(cells, "barrier")`
   at 40% opacity — using `tool: "barrier"` since patterns generate barriers.
