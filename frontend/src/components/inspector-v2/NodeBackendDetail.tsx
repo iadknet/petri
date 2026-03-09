@@ -1,13 +1,14 @@
 import { useMemo } from "react";
-import type { BackendDef } from "../../types/genome.ts";
+import type { BackendDef, InputReference } from "../../types/genome.ts";
 import type { VmTrace } from "../../types/trace.ts";
 import {
 	describeGraphInternalNode,
-	describeVmInstruction,
 } from "../inspector/mesh/meshPresentation.ts";
+import { formatReadableInstruction } from "./vmInstructionFormat.ts";
 
 interface NodeBackendDetailProps {
 	backendDef: BackendDef;
+	inputRefs: InputReference[];
 	liveInstructionIndices: number[];
 	liveInternalNodeIndices: number[];
 	vmTrace?: VmTrace | null;
@@ -16,6 +17,7 @@ interface NodeBackendDetailProps {
 
 export function NodeBackendDetail({
 	backendDef,
+	inputRefs,
 	liveInstructionIndices,
 	liveInternalNodeIndices,
 	vmTrace,
@@ -45,19 +47,12 @@ export function NodeBackendDetail({
 
 		return (
 			<div className="px-3 py-2">
-				<div className="mb-1 flex items-baseline gap-2">
-					<span className="text-[10px] font-medium uppercase tracking-wider text-slate-500">
-						VM Program ({vm.program.length})
-					</span>
-					{vm.constants.length > 0 ? (
-						<span className="text-[10px] font-mono text-slate-500">
-							const {vm.constants.map((v, i) => `${i}:${v}`).join(" ")}
-						</span>
-					) : null}
+				<div className="mb-1.5 text-[10px] font-medium uppercase tracking-wider text-slate-500">
+					VM Program ({vm.program.length}) · {vm.register_count} regs
 				</div>
-				<div className="max-h-[200px] space-y-px overflow-y-auto">
+				<div className="space-y-px overflow-y-auto">
 					{vm.program.map((instruction, index) => {
-						const presentation = describeVmInstruction(instruction);
+						const readable = formatReadableInstruction(instruction, inputRefs, vm.constants);
 						const isLive = liveSet.has(index);
 
 						// Execution state overlay
@@ -85,20 +80,18 @@ export function NodeBackendDetail({
 								key={index}
 								data-testid={`vm-instruction-${index}`}
 								data-junk={isLive ? "false" : "true"}
-								className={`flex items-baseline gap-2 rounded px-1.5 py-0.5 text-[10px] font-mono ${rowClass}`}
+								className={`flex items-baseline gap-2 rounded px-1.5 py-0.5 text-[11px] font-mono leading-relaxed ${rowClass}`}
 							>
-								<span className="w-4 shrink-0 text-right text-slate-600">{index}</span>
-								<span className="w-24 shrink-0 truncate text-slate-300">
-									{presentation.label}
+								<span className="w-5 shrink-0 text-right text-slate-600">{index}</span>
+								<span className="w-[5.5rem] shrink-0 truncate text-slate-400">
+									{readable.label}
 								</span>
-								{presentation.detail ? (
-									<span className="flex-1 truncate text-[9px] text-slate-600">
-										{presentation.detail}
-									</span>
-								) : null}
-								{presentation.badges.length > 0 ? (
+								<span className="flex-1 truncate text-slate-200">
+									{readable.operands}
+								</span>
+								{readable.badges.length > 0 ? (
 									<span className="shrink-0 text-[9px] uppercase text-cyan-400/70">
-										{presentation.badges.join(" ")}
+										{readable.badges.join(" ")}
 									</span>
 								) : null}
 								{regChanges && regChanges.length > 0 ? (

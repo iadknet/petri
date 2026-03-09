@@ -2,7 +2,6 @@ import "@xyflow/react/dist/style.css";
 
 import {
 	type EdgeTypes,
-	MiniMap,
 	type NodeTypes,
 	Panel,
 	ReactFlow,
@@ -18,7 +17,6 @@ import type { MeshAnalysis } from "./mesh/meshAnalysis.ts";
 import { buildMeshFlowScene } from "./mesh/meshFlowAdapter.ts";
 import type {
 	MeshFlowEdge as MeshFlowEdgeModel,
-	MeshFlowNodeData,
 	MeshFlowNode as MeshFlowNodeModel,
 } from "./mesh/meshFlowAdapter.ts";
 import type { MeshLayout } from "./mesh/meshLayout.ts";
@@ -146,15 +144,6 @@ const MeshFlowScene = memo(function MeshFlowScene({
 				defaultViewport={{ x: 0, y: 0, zoom: 1 }}
 				className="rounded-b-[1.5rem] bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.1),transparent_32%),linear-gradient(180deg,rgba(15,23,42,0.94),rgba(2,6,23,0.92))]"
 			>
-				<MiniMap<MeshFlowNodeModel>
-					pannable
-					zoomable
-					maskColor="rgba(2,6,23,0.42)"
-					nodeColor={(node) => getMiniMapNodeColor(node.data)}
-					nodeStrokeColor={(node) => getMiniMapNodeStroke(node.data)}
-					nodeBorderRadius={10}
-					className="!bottom-4 !right-4 !border !border-white/10 !bg-slate-950/90"
-				/>
 				<Panel position="top-right">
 					<div className="rounded-2xl border border-white/8 bg-slate-950/88 px-3 py-2 text-[10px] font-mono uppercase tracking-[0.16em] text-slate-400 shadow-[0_18px_40px_rgba(2,6,23,0.32)]">
 						<div>{scene.nodes.length} nodes</div>
@@ -168,10 +157,3 @@ const MeshFlowScene = memo(function MeshFlowScene({
 	);
 });
 
-function getMiniMapNodeColor(data: MeshFlowNodeData): string {
-	return data.minimapColor;
-}
-
-function getMiniMapNodeStroke(data: MeshFlowNodeData): string {
-	return data.active ? "#facc15" : data.backendAccent;
-}
