@@ -300,3 +300,4 @@ The Grand Unified Architecture — mapping biological intelligence to CPU-optimi
 - **Action timeline segment virtualization** → `docs/features/needs_refinement/refactors/action-timeline-virtualization.md`
 - **Eventual multi-crate v3-server split** → `docs/features/needs_refinement/maybe-do/v3-server-crate-split.md`
 - **Ring-based vision sensors** → `docs/features/needs_refinement/maybe-do/ring-based-sensors.md`
+- **Complex barrier painting tools** → `docs/features/needs_refinement/complex-barrier-painting-tools.md`
