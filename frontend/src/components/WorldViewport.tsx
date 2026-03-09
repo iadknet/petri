@@ -3,6 +3,8 @@ import { buildRenderModel } from "../canvas/renderModel.ts";
 import { WorldRenderer } from "../canvas/renderer.ts";
 import { useCreatureSelection } from "../hooks/useCreatureSelection.ts";
 import { usePaintInteraction } from "../hooks/usePaintInteraction.ts";
+import { usePatternInteraction } from "../hooks/usePatternInteraction.ts";
+import { usePatternPreview } from "../hooks/usePatternPreview.ts";
 import {
 	creatureInspectorSelectors,
 	useCreatureInspectorStore,
@@ -12,6 +14,7 @@ import { useSimulationStore } from "../stores/simulation.ts";
 import { useViewportStore } from "../stores/viewport.ts";
 import { useWorldViewStore } from "../stores/worldView.ts";
 import { PaintToolbar } from "./PaintToolbar.tsx";
+import { PatternToolbar } from "./PatternToolbar.tsx";
 import { ZoomControls } from "./ZoomControls.tsx";
 
 export function WorldViewport() {
@@ -32,6 +35,15 @@ export function WorldViewport() {
 		brushOverlayRef,
 		clearPreview,
 	} = usePaintInteraction(rendererRef);
+
+	const {
+		handleMouseDown: patternMouseDown,
+		handleMouseMove: patternMouseMove,
+		handleMouseUp: patternMouseUp,
+		selectionOverlayRef,
+	} = usePatternInteraction(rendererRef);
+
+	const { applyPattern, cancelPattern } = usePatternPreview(rendererRef, selectionOverlayRef);
 
 	const { handleMouseDown: selectionMouseDown, handleMouseUp: selectionMouseUp } =
 		useCreatureSelection(rendererRef);
@@ -181,7 +193,12 @@ export function WorldViewport() {
 	const handleMouseDown = useCallback(
 		(e: React.MouseEvent) => {
 			if (paintMode && e.button === 0) {
-				paintMouseDown(e);
+				const mode = usePaintStore.getState().mode;
+				if (mode === "pattern") {
+					patternMouseDown(e);
+				} else {
+					paintMouseDown(e);
+				}
 				return;
 			}
 			if (e.button === 0) {
@@ -189,14 +206,19 @@ export function WorldViewport() {
 				dragRef.current = { startX: e.clientX, startY: e.clientY };
 			}
 		},
-		[paintMode, paintMouseDown, selectionMouseDown],
+		[paintMode, paintMouseDown, patternMouseDown, selectionMouseDown],
 	);
 
 	// Pan: mouse move
 	const handleMouseMove = useCallback(
 		(e: React.MouseEvent) => {
 			if (paintMode) {
-				paintMouseMove(e);
+				const mode = usePaintStore.getState().mode;
+				if (mode === "pattern") {
+					patternMouseMove(e);
+				} else {
+					paintMouseMove(e);
+				}
 				// Still allow pan with right-click drag
 				if (dragRef.current) {
 					const dx = e.clientX - dragRef.current.startX;
@@ -221,7 +243,7 @@ export function WorldViewport() {
 				}
 			}
 		},
-		[paintMode, paintMouseMove, setCamera],
+		[paintMode, paintMouseMove, patternMouseMove, setCamera],
 	);
 
 	// Pan: mouse up
@@ -229,12 +251,17 @@ export function WorldViewport() {
 		(e: React.MouseEvent) => {
 			dragRef.current = null;
 			if (paintMode) {
-				paintMouseUp();
+				const mode = usePaintStore.getState().mode;
+				if (mode === "pattern") {
+					patternMouseUp();
+				} else {
+					paintMouseUp();
+				}
 			} else {
 				selectionMouseUp(e);
 			}
 		},
-		[paintMode, paintMouseUp, selectionMouseUp],
+		[paintMode, paintMouseUp, patternMouseUp, selectionMouseUp],
 	);
 
 	// Right-click drag for pan in paint mode
@@ -264,7 +291,7 @@ export function WorldViewport() {
 
 	const handleMouseEnter = useCallback(
 		(e: React.MouseEvent) => {
-			if (paintMode) {
+			if (paintMode && usePaintStore.getState().mode === "brush") {
 				paintMouseMove(e);
 			}
 		},
@@ -274,14 +301,18 @@ export function WorldViewport() {
 	const handleMouseLeave = useCallback(() => {
 		dragRef.current = null;
 		if (paintMode) {
-			paintMouseUp();
-			clearPreview();
-			// Hide brush overlay
-			if (brushOverlayRef.current) {
-				brushOverlayRef.current.style.display = "none";
+			const mode = usePaintStore.getState().mode;
+			if (mode === "pattern") {
+				patternMouseUp();
+			} else {
+				paintMouseUp();
+				clearPreview();
+				if (brushOverlayRef.current) {
+					brushOverlayRef.current.style.display = "none";
+				}
 			}
 		}
-	}, [paintMode, paintMouseUp, clearPreview, brushOverlayRef]);
+	}, [paintMode, paintMouseUp, patternMouseUp, clearPreview, brushOverlayRef]);
 
 	const handleZoomIn = useCallback(() => {
 		const renderer = rendererRef.current;
@@ -307,13 +338,14 @@ export function WorldViewport() {
 
 	const canTogglePaint = simState === "idle" || simState === "paused";
 	const togglePaintMode = usePaintStore((s) => s.togglePaintMode);
+	const paintSubMode = usePaintStore((s) => s.mode);
 
 	return (
 		<div ref={containerRef} className="relative w-full h-full overflow-hidden bg-petri-bg">
 			<canvas
 				ref={canvasRef}
 				data-testid="world-canvas"
-				className={`absolute inset-0 ${paintMode ? "cursor-none" : "cursor-crosshair"}`}
+				className={`absolute inset-0 ${paintMode && paintSubMode === "brush" ? "cursor-none" : "cursor-crosshair"}`}
 				onMouseDown={handleMouseDown}
 				onMouseMove={handleMouseMove}
 				onMouseUp={handleMouseUp}
@@ -323,14 +355,25 @@ export function WorldViewport() {
 				onContextMenu={handleContextMenu}
 			/>
 			{/* Brush overlay — positioned via direct DOM manipulation in the hook */}
-			{paintMode && (
+			{paintMode && paintSubMode === "brush" && (
 				<div
 					ref={brushOverlayRef}
 					className="fixed top-0 left-0 pointer-events-none border-2 bg-white/5"
 					style={{ display: "none" }}
 				/>
 			)}
-			{paintMode && <PaintToolbar />}
+			{/* Pattern selection overlay — transparent canvas for dashed rectangle */}
+			{paintMode && paintSubMode === "pattern" && (
+				<canvas
+					ref={selectionOverlayRef}
+					data-testid="pattern-selection-overlay"
+					className="absolute inset-0 pointer-events-none"
+				/>
+			)}
+			{paintMode && paintSubMode === "brush" && <PaintToolbar />}
+			{paintMode && paintSubMode === "pattern" && (
+				<PatternToolbar onApply={applyPattern} onCancel={cancelPattern} />
+			)}
 			<ZoomControls
 				onZoomIn={handleZoomIn}
 				onZoomOut={handleZoomOut}

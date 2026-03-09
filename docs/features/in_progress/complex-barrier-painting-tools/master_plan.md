@@ -296,7 +296,7 @@ algorithm specifications.
 
 ## Implementation Steps
 
-- [ ] Step 1: **Backend types and generate stub** — Create top-level
+- [x] Step 1: **Backend types and generate stub** — Create top-level
   `v3-core::patterns` module (`v3/crates/v3-core/src/patterns.rs` or
   `v3/crates/v3-core/src/patterns/mod.rs`) with `PatternBounds` (deriving Debug,
   Clone, Copy, PartialEq, Eq, Serialize, Deserialize), `PatternParams` (tagged enum
@@ -307,7 +307,7 @@ algorithm specifications.
   validation (zero-area returns empty), serde round-trip, and the generate function
   contract.
 
-- [ ] Step 2: **Pattern algorithms** — Implement all 5 pattern generators within
+- [x] Step 2: **Pattern algorithms** — Implement all 5 pattern generators within
   `generate_pattern()` match on `PatternParams`. Each algorithm takes bounds,
   params, and rng, returns `Vec<PaintPoint>`. Use `Vec::with_capacity()` with
   estimated output size per pattern. Validate float params (clamp density to
@@ -316,7 +316,7 @@ algorithm specifications.
   positions within bounds, and pattern-specific invariants. See companion file for
   algorithm specifications.
 
-- [ ] Step 3: **Server endpoints** — Add `handlers/pattern.rs` with handler logic
+- [x] Step 3: **Server endpoints** — Add `handlers/pattern.rs` with handler logic
   and `http/pattern.rs` re-exporting (following existing `handlers/paint.rs` +
   `http/paint.rs` two-layer convention). Define request/response DTOs inline in the
   handler module (matching paint handler convention). All responses include
@@ -339,10 +339,10 @@ algorithm specifications.
   to workspace `Cargo.toml` and v3-server `Cargo.toml` for bitmap encoding. TDD:
   write handler tests for both endpoints.
 
-- [ ] Review Gate: Interim code review — review Steps 1-3 backend changes. Invoke
+- [x] Review Gate: Interim code review — review Steps 1-3 backend changes. Invoke
   `rust-skills`. Fix findings, re-review until clean.
 
-- [ ] Step 4: **Frontend types and stores** — Add TypeScript types for pattern
+- [x] Step 4: **Frontend types and stores** — Add TypeScript types for pattern
   requests/responses in `types/pattern.ts` (dedicated file, re-exported from
   `types/api.ts`). Create new `usePatternStore` in
   `stores/pattern.ts` with: `selectedPattern`, `patternParams` (per-pattern
@@ -356,7 +356,7 @@ algorithm specifications.
   paint mode. When `paintMode` is false, `mode` is irrelevant. Add REST client
   methods for preview and apply endpoints.
 
-- [ ] Step 5: **Frontend pattern toolbar and parameter panels** — Create
+- [x] Step 5: **Frontend pattern toolbar and parameter panels** — Create
   `PatternToolbar.tsx` with 5 pattern buttons and "Apply"/"Cancel" action buttons
   (disabled until area is selected). Create explicit per-pattern parameter
   components in `components/pattern-params/`: `MazeParams.tsx`, `SpiralParams.tsx`,
@@ -367,7 +367,7 @@ algorithm specifications.
   display with randomize button. Integrate into WorldViewport layout alongside
   existing PaintToolbar.
 
-- [ ] Step 6: **Frontend area selection interaction** — Create
+- [x] Step 6: **Frontend area selection interaction** — Create
   `usePatternInteraction` hook for click-drag rectangle selection on canvas.
   Renders dashed rectangle outline during drag via canvas overlay. Converts canvas
   coordinates to world bounds using `renderer.canvasToWorld()`. Floor the
@@ -378,7 +378,7 @@ algorithm specifications.
   pattern area selection takes priority when paint mode is `'pattern'`. Keyboard:
   Escape cancels selection.
 
-- [ ] Step 7: **Frontend preview and apply flow** — Wire debounced (300ms) server
+- [x] Step 7: **Frontend preview and apply flow** — Wire debounced (300ms) server
   preview requests triggered by parameter or area changes. Store preview cells in a
   `useRef` (not reactive state) and pass to renderer via `setPreview(cells, "barrier")`
   at 40% opacity — using `tool: "barrier"` since patterns generate barriers.
@@ -398,16 +398,16 @@ algorithm specifications.
   area. Handle loading state (spinner on preview requests) and error state (toast
   or inline error).
 
-- [ ] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on
+- [x] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent on
   full branch diff. Invoke domain skills (backend: `rust-skills`; frontend:
   `vercel-react-best-practices` + `vercel-composition-patterns`). Fix all findings.
   Re-review until clean pass.
 
-- [ ] Review Gate: Architecture & decomposition review — review all changes for
+- [x] Review Gate: Architecture & decomposition review — review all changes for
   boundary violations, decomposition opportunities, separation of concerns. Re-read
   `docs/strategy/` and relevant `AGENTS.md` files. Fix easy issues, capture larger
   items in `docs/features/brainstorms/ideas.md`. Repeat until clean pass.
 
-- [ ] Completion gate — run all checks from AGENTS.md Completion Gate section
+- [x] Completion gate — run all checks from AGENTS.md Completion Gate section
 
 **Review cycles:** 8 (Pass 1: 3 dispatches, Pass 2: 3 dispatches, Pass 3: 2 dispatches)

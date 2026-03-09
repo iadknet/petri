@@ -26,6 +26,11 @@ pub fn router(state: app_state::AppState) -> axum::Router {
         .route("/v3/simulation/config", patch(http::status::patch_config))
         .route("/v3/simulation/paint", post(http::paint::paint))
         .route(
+            "/v3/simulation/pattern/preview",
+            post(http::pattern::preview),
+        )
+        .route("/v3/simulation/pattern/apply", post(http::pattern::apply))
+        .route(
             "/v3/simulation/creature/:id",
             get(http::creature::get_creature),
         )

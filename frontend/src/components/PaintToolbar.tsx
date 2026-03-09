@@ -19,9 +19,30 @@ export function PaintToolbar() {
 	const brushHalfExtent = usePaintStore((s) => s.brushHalfExtent);
 	const setTool = usePaintStore((s) => s.setTool);
 	const setBrushHalfExtent = usePaintStore((s) => s.setBrushHalfExtent);
+	const setMode = usePaintStore((s) => s.setMode);
 
 	return (
 		<div data-testid="paint-toolbar" className="absolute top-3 left-3 flex flex-col gap-2 z-10 bg-slate-800/60 backdrop-blur-sm rounded-lg p-2">
+			{/* Mode switcher */}
+			<div className="flex gap-0.5">
+				<button
+					type="button"
+					data-testid="mode-brush"
+					aria-pressed={true}
+					className="flex-1 px-2 py-1 text-[10px] uppercase tracking-wider rounded transition-colors bg-emerald-600 text-white"
+				>
+					Brush
+				</button>
+				<button
+					type="button"
+					data-testid="mode-pattern"
+					onClick={() => setMode("pattern")}
+					className="flex-1 px-2 py-1 text-[10px] uppercase tracking-wider rounded transition-colors bg-slate-700 text-slate-200 hover:bg-slate-600"
+				>
+					Pattern
+				</button>
+			</div>
+
 			<div className="text-[10px] uppercase tracking-wider text-slate-400 px-1">Tool</div>
 			<div className="flex flex-col gap-0.5">
 				{TOOLS.map((t) => (
