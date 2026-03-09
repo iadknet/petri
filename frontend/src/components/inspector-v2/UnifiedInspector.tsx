@@ -186,8 +186,8 @@ export function UnifiedInspector({
 				onClose={onClose}
 			/>
 
-			{/* Canvas area (full width) + node inspector slide-up */}
-			<div className="relative flex flex-1 min-h-0 flex-col overflow-hidden">
+			{/* Canvas area (full width) + node inspector */}
+			<div className="flex flex-1 min-h-0 flex-col overflow-hidden">
 				{/* Controls header */}
 				<MeshControls
 					backendFilter={mesh.backendFilter}
@@ -200,8 +200,8 @@ export function UnifiedInspector({
 					onResetView={mesh.meshController.requestResetView}
 				/>
 
-				{/* Canvas */}
-				<div className="flex-1 min-h-0">
+				{/* Canvas — shrinks to fit, minimum 120px so nodes stay visible */}
+				<div className="flex-1 min-h-[120px]">
 					{mesh.layoutError ? (
 						<InspectorEmptyState
 							title="Layout failed"
@@ -225,9 +225,9 @@ export function UnifiedInspector({
 					)}
 				</div>
 
-				{/* Node inspector: slide-up panel from bottom of canvas */}
+				{/* Node inspector */}
 				{mesh.detailNode && (
-					<div className="absolute inset-x-0 bottom-0 max-h-[50%] overflow-y-auto border-t border-slate-800 bg-slate-950/95 backdrop-blur-sm">
+					<div className="max-h-[65%] shrink-0 overflow-y-auto border-t border-slate-800 bg-slate-950">
 						<NodeInspector
 							node={mesh.detailNode}
 							semantics={mesh.detailSemantics}

@@ -20,6 +20,7 @@ describe("NodeBackendDetail", () => {
 		render(
 			<NodeBackendDetail
 				backendDef={backendDef}
+				inputRefs={[{ World: "FoodHere" }]}
 				liveInstructionIndices={[0, 2]}
 				liveInternalNodeIndices={[]}
 			/>,
@@ -48,6 +49,7 @@ describe("NodeBackendDetail", () => {
 		render(
 			<NodeBackendDetail
 				backendDef={backendDef}
+				inputRefs={[]}
 				liveInstructionIndices={[]}
 				liveInternalNodeIndices={[0, 1, 2]}
 			/>,
@@ -72,6 +74,7 @@ describe("NodeBackendDetail", () => {
 		render(
 			<NodeBackendDetail
 				backendDef={backendDef}
+				inputRefs={[]}
 				liveInstructionIndices={[]}
 				liveInternalNodeIndices={[0, 2]}
 			/>,

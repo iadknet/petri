@@ -67,7 +67,6 @@ export function NodeInspector({ node, semantics, sharedMemory, executionHop }: N
 			<NodeConnections
 				inputRefs={node.node.input_refs}
 				targets={node.node.targets}
-				incomingCount={node.incomingIds.length}
 			/>
 			{isGraph && "Graph" in node.node.backend_def ? (
 				<Suspense
@@ -91,6 +90,7 @@ export function NodeInspector({ node, semantics, sharedMemory, executionHop }: N
 				<>
 					<NodeBackendDetail
 						backendDef={node.node.backend_def}
+						inputRefs={node.node.input_refs}
 						liveInstructionIndices={semantics?.liveInstructionIndices ?? []}
 						liveInternalNodeIndices={semantics?.liveInternalNodeIndices ?? []}
 						vmTrace={vmTrace}
