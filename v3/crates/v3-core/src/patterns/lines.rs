@@ -18,7 +18,7 @@ pub(super) fn generate(
 ) -> Vec<PaintPoint> {
     let spacing = spacing.max(2) as f64;
     let thickness = thickness.max(1) as i32;
-    let jaggedness = jaggedness.clamp(0.0, 1.0) as f64;
+    let jaggedness = jaggedness.max(0.0) as f64;
     let angle = (angle_degrees.clamp(0.0, 360.0) as f64) * PI / 180.0;
 
     // Direction along the line and perpendicular (normal).
@@ -35,7 +35,7 @@ pub(super) fn generate(
     let max_trace = (bounds.width as f64 * dx.abs()) + (bounds.height as f64 * dy.abs());
     let trace_steps = max_trace.ceil() as i32;
 
-    let amplitude = jaggedness * spacing * 0.3;
+    let amplitude = jaggedness * spacing * 0.8;
     let step_size = amplitude * 0.15;
     let half_t = thickness / 2;
 
