@@ -13,16 +13,15 @@ const DEBOUNCE_MS = 300;
 export interface PatternPreviewHandlers {
 	applyPattern: () => void;
 	cancelPattern: () => void;
-	isPreviewLoading: boolean;
 }
 
 export function usePatternPreview(
 	rendererRef: RefObject<WorldRenderer | null>,
+	selectionOverlayRef?: RefObject<HTMLCanvasElement | null>,
 ): PatternPreviewHandlers {
 	const abortRef = useRef<AbortController | null>(null);
 	const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 	const previewCellsRef = useRef<Set<string> | null>(null);
-	const isLoadingRef = useRef(false);
 
 	const clearDebounce = useCallback(() => {
 		if (debounceRef.current !== null) {
@@ -38,13 +37,20 @@ export function usePatternPreview(
 		}
 	}, []);
 
+	const clearSelectionOverlay = useCallback(() => {
+		const canvas = selectionOverlayRef?.current;
+		if (canvas) {
+			const ctx = canvas.getContext("2d");
+			ctx?.clearRect(0, 0, canvas.width, canvas.height);
+		}
+	}, [selectionOverlayRef]);
+
 	const clearPreview = useCallback(() => {
 		clearDebounce();
 		abortInFlight();
 		previewCellsRef.current = null;
 		rendererRef.current?.setPreview(null, null);
 		rendererRef.current?.invalidate();
-		isLoadingRef.current = false;
 	}, [rendererRef, clearDebounce, abortInFlight]);
 
 	const requestPreview = useCallback(() => {
@@ -59,7 +65,6 @@ export function usePatternPreview(
 
 		const controller = new AbortController();
 		abortRef.current = controller;
-		isLoadingRef.current = true;
 
 		api.patternPreview(
 			{
@@ -75,12 +80,10 @@ export function usePatternPreview(
 				previewCellsRef.current = cells;
 				rendererRef.current?.setPreview(cells, "barrier");
 				rendererRef.current?.invalidate();
-				isLoadingRef.current = false;
 			})
 			.catch((err) => {
 				if (err instanceof DOMException && err.name === "AbortError") return;
 				console.error("[PatternPreview] Preview error:", err);
-				isLoadingRef.current = false;
 			});
 	}, [rendererRef, clearPreview, abortInFlight]);
 
@@ -164,34 +167,17 @@ export function usePatternPreview(
 		previewCellsRef.current = null;
 		rendererRef.current?.setPreview(null, null);
 		usePatternStore.getState().clearPattern();
-
-		// Clear the selection overlay
-		const canvas = document.querySelector<HTMLCanvasElement>(
-			'[data-testid="pattern-selection-overlay"]',
-		);
-		if (canvas) {
-			const ctx = canvas.getContext("2d");
-			ctx?.clearRect(0, 0, canvas.width, canvas.height);
-		}
-	}, [rendererRef, clearDebounce, abortInFlight]);
+		clearSelectionOverlay();
+	}, [rendererRef, clearDebounce, abortInFlight, clearSelectionOverlay]);
 
 	const cancelPattern = useCallback(() => {
 		clearPreview();
 		usePatternStore.getState().clearPattern();
-
-		// Clear the selection overlay
-		const canvas = document.querySelector<HTMLCanvasElement>(
-			'[data-testid="pattern-selection-overlay"]',
-		);
-		if (canvas) {
-			const ctx = canvas.getContext("2d");
-			ctx?.clearRect(0, 0, canvas.width, canvas.height);
-		}
-	}, [clearPreview]);
+		clearSelectionOverlay();
+	}, [clearPreview, clearSelectionOverlay]);
 
 	return {
 		applyPattern,
 		cancelPattern,
-		isPreviewLoading: isLoadingRef.current,
 	};
 }

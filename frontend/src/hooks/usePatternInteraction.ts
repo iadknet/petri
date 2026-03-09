@@ -57,8 +57,15 @@ export function usePatternInteraction(
 		ctx.fillRect(x, y, w, h);
 	}, [rendererRef]);
 
-	// Sync overlay canvas buffer size to viewport
+	// Initialize overlay canvas size and keep it synced to viewport
 	useEffect(() => {
+		const canvas = selectionOverlayRef.current;
+		if (canvas) {
+			const state = useViewportStore.getState();
+			const dpr = window.devicePixelRatio || 1;
+			canvas.width = Math.floor(state.canvasSize.width * dpr);
+			canvas.height = Math.floor(state.canvasSize.height * dpr);
+		}
 		return useViewportStore.subscribe((state) => {
 			const canvas = selectionOverlayRef.current;
 			if (!canvas) return;
@@ -145,11 +152,11 @@ export function usePatternInteraction(
 		const end = dragCurrentRef.current;
 		if (!start || !end) return;
 
-		// Compute min/max to handle drags in any direction
-		const minX = Math.min(start.x, end.x);
-		const minY = Math.min(start.y, end.y);
-		const maxX = Math.max(start.x, end.x);
-		const maxY = Math.max(start.y, end.y);
+		// Compute min/max to handle drags in any direction, clamped to >= 0
+		const minX = Math.max(0, Math.min(start.x, end.x));
+		const minY = Math.max(0, Math.min(start.y, end.y));
+		const maxX = Math.max(0, Math.max(start.x, end.x));
+		const maxY = Math.max(0, Math.max(start.y, end.y));
 
 		const width = maxX - minX + 1;
 		const height = maxY - minY + 1;
