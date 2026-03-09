@@ -43,7 +43,7 @@ export function WorldViewport() {
 		selectionOverlayRef,
 	} = usePatternInteraction(rendererRef);
 
-	const { applyPattern, cancelPattern } = usePatternPreview(rendererRef);
+	const { applyPattern, cancelPattern } = usePatternPreview(rendererRef, selectionOverlayRef);
 
 	const { handleMouseDown: selectionMouseDown, handleMouseUp: selectionMouseUp } =
 		useCreatureSelection(rendererRef);
