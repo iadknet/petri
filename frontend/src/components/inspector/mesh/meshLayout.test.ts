@@ -55,9 +55,7 @@ describe("layoutMesh", () => {
 		expect(node1).toBeDefined();
 		expect(node2).toBeDefined();
 		expect(node9).toBeDefined();
-		expect(node9?.x ?? 0).toBeGreaterThan(
-			Math.max(node1?.x ?? 0, node2?.x ?? 0),
-		);
+		expect(node9?.x ?? 0).toBeGreaterThan(Math.max(node1?.x ?? 0, node2?.x ?? 0));
 		expect(layout.width).toBeGreaterThan(0);
 		expect(layout.height).toBeGreaterThan(0);
 	});
@@ -66,8 +64,6 @@ describe("layoutMesh", () => {
 		const layout = await layoutMesh(analyzeMesh(makeCyclicGenome()));
 
 		expect(layout.edges.some((edge) => edge.toId === 42)).toBe(false);
-		expect(
-			layout.edges.some((edge) => edge.fromId === 1 && edge.toId === 2),
-		).toBe(true);
+		expect(layout.edges.some((edge) => edge.fromId === 1 && edge.toId === 2)).toBe(true);
 	});
 });

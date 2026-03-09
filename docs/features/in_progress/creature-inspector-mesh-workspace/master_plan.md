@@ -30,18 +30,18 @@
 
 ## Boundary Impact
 
-- `frontend/src/hooks/`
-  - `useCreatureDetailResource.ts` owns creature-detail fetch lifecycle
-  - `useSampleSessionResource.ts` owns sampling lifecycle
 - `frontend/src/stores/`
   - `creatureInspector.ts` split into structured detail/resource slices
   - `samplePlayback.ts` owns playback cursor and transport controls
   - `sampleSession.ts` owns sampling session state
   - `inspectorWorkspace.ts` owns inspector-local UI state
+- `frontend/src/components/inspector/hooks/`
+  - `useMeshDerivation.ts` owns mesh workspace derivation and selection/focus filtering
+  - `useInspectorSampler.ts` owns inspector-local sampler orchestration
 - `frontend/src/components/inspector/mesh/`
-  - pure mesh-domain helpers for topology analysis, ELK layout, shared presentation, and trace focus
+  - mesh UI primitives (`MeshCanvas`, `MeshControls`, React Flow wrappers, viewport controller) plus pure mesh-domain helpers for topology analysis, ELK layout, shared presentation, and trace focus
 - `frontend/src/components/inspector/`
-  - presentation workspaces and mesh UI components only
+  - unified inspector shell, node detail surfaces, sampler bar, and shared presentation helpers
 
 No backend dependency direction changes and no wire-format changes.
 
@@ -52,9 +52,10 @@ No backend dependency direction changes and no wire-format changes.
 | Area | Decision | Rationale |
 |------|----------|-----------|
 | `frontend/src/api/` | keep | No transport contract changes were required for milestone 1 |
-| `frontend/src/hooks/` | change | Resource hooks now own fetch/poll lifecycles instead of pushing that logic into the inspector component |
 | `frontend/src/stores/` | change | Inspector data state, playback state, and workspace UI state are now separated by concern |
-| `frontend/src/components/inspector/` | change | Explicit `Mesh`, `Summary`, `Execution`, and `Memory` workspaces replace a single stacked inspector surface |
+| `frontend/src/components/inspector/hooks/` | change | Inspector-local derivation and sampler orchestration moved under the inspector boundary instead of the shared hooks layer |
+| `frontend/src/components/inspector/mesh/` | change | Mesh UI primitives and mesh-domain helpers now live together under a single canonical subtree |
+| `frontend/src/components/inspector/` | change | The unified inspector shell owns presentation surfaces and composes the canonical mesh subtree |
 | `frontend/src/types/` | change | `CreatureDetail` transport types moved out of `genome.ts` so genome types stay structural |
 
 ---

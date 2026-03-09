@@ -73,8 +73,7 @@ export const VmExecutionView = memo(function VmExecutionView({
 			<div className="grid gap-2 md:grid-cols-2">
 				<div className="rounded border border-white/5 bg-white/[0.02] px-2 py-2 text-[10px] font-mono text-slate-400">
 					<div>
-						<span className="text-slate-600">route:</span>{" "}
-						{trace.final_route_target.toFixed(2)}
+						<span className="text-slate-600">route:</span> {trace.final_route_target.toFixed(2)}
 					</div>
 					<div>
 						<span className="text-slate-600">payload:</span>{" "}
@@ -95,8 +94,7 @@ export const VmExecutionView = memo(function VmExecutionView({
 						<div className="space-y-1 [content-visibility:auto]">
 							{trace.slot_writes.map((write, index) => (
 								<div key={`${write.slot_idx}-${index}`} className="text-amber-300/80">
-									s{write.slot_idx}: {write.old_value.toFixed(2)}→
-									{write.new_value.toFixed(2)}
+									s{write.slot_idx}: {write.old_value.toFixed(2)}→{write.new_value.toFixed(2)}
 								</div>
 							))}
 						</div>

@@ -4,18 +4,11 @@ import type {
 	MeshReadClass,
 	MeshWriteClass,
 } from "../../../types/creature-detail.ts";
-import type {
-	CreatureGenome,
-	InputReference,
-	NodeGenome,
-} from "../../../types/genome.ts";
+import type { CreatureGenome, InputReference, NodeGenome } from "../../../types/genome.ts";
 import { formatInputRef } from "../inputRefUtils.ts";
 import { type MeshAnalysis, type MeshBackendKind, analyzeMesh } from "./meshAnalysis.ts";
 import type { RuntimeIoBadge } from "./runtimeIoSemantics.ts";
-import {
-	classifyGraphKind,
-	classifyVmInstruction,
-} from "./runtimeIoSemantics.ts";
+import { classifyGraphKind, classifyVmInstruction } from "./runtimeIoSemantics.ts";
 
 export type MeshNodeBadge = RuntimeIoBadge;
 export type MeshSemanticRole =
@@ -73,19 +66,9 @@ const SOURCE_PRIORITY: MeshReadClass[] = [
 	"upstream",
 ];
 
-const BADGE_ORDER: MeshNodeBadge[] = [
-	"input",
-	"slot",
-	"action",
-	"route",
-	"output",
-	"stateful",
-];
+const BADGE_ORDER: MeshNodeBadge[] = ["input", "slot", "action", "route", "output", "stateful"];
 
-type CreatureMeshAnnotations =
-	| CreatureDetail["mesh_annotations"]
-	| null
-	| undefined;
+type CreatureMeshAnnotations = CreatureDetail["mesh_annotations"] | null | undefined;
 
 export function deriveMeshSemantics(
 	genome: CreatureGenome,
@@ -121,12 +104,8 @@ function deriveNodeSemantics(
 		...(annotation?.read_classes ?? []),
 		...inferReadClasses(node.input_refs),
 	]);
-	const writeClasses = unique([
-		...(annotation?.write_classes ?? []),
-		...inferWriteClasses(node),
-	]);
-	const hasStatefulBehavior =
-		annotation?.has_stateful_behavior ?? inferStatefulBehavior(node);
+	const writeClasses = unique([...(annotation?.write_classes ?? []), ...inferWriteClasses(node)]);
+	const hasStatefulBehavior = annotation?.has_stateful_behavior ?? inferStatefulBehavior(node);
 	const slotReads = hasSlotRead(node);
 	const sourceClass = deriveSourceClass(readClasses);
 	const role = deriveRole({
@@ -144,9 +123,7 @@ function deriveNodeSemantics(
 		slotReads,
 	});
 	const shortLabel = formatRoleLabel(role, backendKind);
-	const label = sourceClass
-		? `${shortLabel} · ${formatSourceClass(sourceClass)}`
-		: shortLabel;
+	const label = sourceClass ? `${shortLabel} · ${formatSourceClass(sourceClass)}` : shortLabel;
 	const inputTexts = node.input_refs.map((ref) => formatInputRef(ref));
 	const badges = deriveBadges({
 		readClasses,
@@ -156,9 +133,7 @@ function deriveNodeSemantics(
 	});
 	const liveInstructionIndices =
 		annotation?.live_instruction_indices ??
-		("Vm" in node.backend_def
-			? node.backend_def.Vm.program.map((_, index) => index)
-			: []);
+		("Vm" in node.backend_def ? node.backend_def.Vm.program.map((_, index) => index) : []);
 	const liveInternalNodeIndices =
 		annotation?.live_internal_node_indices ??
 		("Graph" in node.backend_def
@@ -186,9 +161,7 @@ function deriveNodeSemantics(
 		label,
 		rationale: {
 			role: describeRoleReason(role),
-			source: sourceClass
-				? `Primary source class: ${formatSourceClass(sourceClass)}.`
-				: null,
+			source: sourceClass ? `Primary source class: ${formatSourceClass(sourceClass)}.` : null,
 			confidence: describeConfidenceReason(confidence),
 		},
 		badges,
@@ -237,10 +210,7 @@ function inferReadClasses(inputRefs: InputReference[]): MeshReadClass[] {
 			continue;
 		}
 
-		if (
-			"StaticIntrospection" in inputRef ||
-			"DynamicIntrospection" in inputRef
-		) {
+		if ("StaticIntrospection" in inputRef || "DynamicIntrospection" in inputRef) {
 			classes.add("introspection");
 			continue;
 		}
@@ -300,10 +270,7 @@ function inferStatefulBehavior(node: NodeGenome): boolean {
 		return node.backend_def.Vm.program.some((instruction) => {
 			const semantics = classifyVmInstruction(instruction);
 			return (
-				semantics.stateful ||
-				semantics.readsSlot ||
-				semantics.readsPrevSlot ||
-				semantics.writesSlot
+				semantics.stateful || semantics.readsSlot || semantics.readsPrevSlot || semantics.writesSlot
 			);
 		});
 	}
@@ -315,10 +282,7 @@ function inferStatefulBehavior(node: NodeGenome): boolean {
 	return node.backend_def.Graph.internal_nodes.some((internalNode) => {
 		const semantics = classifyGraphKind(internalNode.kind);
 		return (
-			semantics.stateful ||
-			semantics.readsSlot ||
-			semantics.readsPrevSlot ||
-			semantics.writesSlot
+			semantics.stateful || semantics.readsSlot || semantics.readsPrevSlot || semantics.writesSlot
 		);
 	});
 }
@@ -459,10 +423,7 @@ function deriveBadges({
 	return BADGE_ORDER.filter((badge) => badges.has(badge));
 }
 
-function formatRoleLabel(
-	role: MeshSemanticRole,
-	backendKind: MeshBackendKind,
-): string {
+function formatRoleLabel(role: MeshSemanticRole, backendKind: MeshBackendKind): string {
 	switch (role) {
 		case "route_selector":
 			return "Route Selector";

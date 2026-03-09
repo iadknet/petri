@@ -1,7 +1,10 @@
 import { act, fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useCreatureInspectorStore } from "../stores/creatureInspector.ts";
-import { DEFAULT_INSPECTOR_WIDTH, useInspectorWorkspaceStore } from "../stores/inspectorWorkspace.ts";
+import {
+	DEFAULT_INSPECTOR_WIDTH,
+	useInspectorWorkspaceStore,
+} from "../stores/inspectorWorkspace.ts";
 import { useSamplePlaybackStore } from "../stores/samplePlayback.ts";
 import { useSampleSessionStore } from "../stores/sampleSession.ts";
 import { ActionResult, ActionType } from "../types/action-log.ts";
@@ -25,7 +28,7 @@ vi.mock("../hooks/useExecutionSampler.ts", () => ({
 }));
 
 // Mock heavy components that aren't relevant to CreatureInspector integration
-vi.mock("./inspector/MeshCanvas.tsx", () => ({
+vi.mock("./inspector/mesh/MeshCanvas.tsx", () => ({
 	MeshCanvas: () => <div data-testid="mesh-canvas">MeshCanvas</div>,
 }));
 
@@ -190,9 +193,7 @@ describe("CreatureInspector", () => {
 		fireEvent.mouseMove(window, { clientX: 520 });
 		fireEvent.mouseUp(window);
 
-		expect(useInspectorWorkspaceStore.getState().inspectorWidth).toBe(
-			DEFAULT_INSPECTOR_WIDTH + 80,
-		);
+		expect(useInspectorWorkspaceStore.getState().inspectorWidth).toBe(DEFAULT_INSPECTOR_WIDTH + 80);
 	});
 
 	it("uses separator semantics for keyboard resizing", () => {
@@ -208,9 +209,7 @@ describe("CreatureInspector", () => {
 		expect(handle).toHaveAttribute("aria-orientation", "vertical");
 
 		fireEvent.keyDown(handle, { key: "ArrowRight" });
-		expect(useInspectorWorkspaceStore.getState().inspectorWidth).toBe(
-			DEFAULT_INSPECTOR_WIDTH + 24,
-		);
+		expect(useInspectorWorkspaceStore.getState().inspectorWidth).toBe(DEFAULT_INSPECTOR_WIDTH + 24);
 
 		fireEvent.keyDown(handle, { key: "ArrowLeft" });
 		expect(useInspectorWorkspaceStore.getState().inspectorWidth).toBe(DEFAULT_INSPECTOR_WIDTH);
