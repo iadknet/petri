@@ -127,7 +127,8 @@ Founder identity state semantics remain owned by
 
 ### 5.1 Canonical v3alpha1 Founder Genome
 
-The founder genome is a 2-node mesh with both backend types.
+The founder genome is a 2-node mesh with both backend types. The graph backend
+uses the CGP-style layered model (see `v3-graph-backend-spec.md`).
 
 **Structural layout:**
 
@@ -150,39 +151,55 @@ NodeGenome {
     3: World(NeighborOccupiedRing),   // compound: 8 directions
   ],
   backend_def: Graph(GraphBackendDef {
-    internal_nodes: [
-      // idx 0: food_here signal
-      { kind: InputRef { ref_idx: 0, sub_idx: 0 }, inputs: [] },
-      // idx 1: energy_current signal
-      { kind: InputRef { ref_idx: 1, sub_idx: 0 }, inputs: [] },
-      // idx 2: reproduce gate (energy >= 24.0)
-      { kind: Threshold(24.0), inputs: [{ source_idx: 1, weight: 1.0 }] },
-      // idx 3-6: neighbor food N/E/S/W via ring sensor sub_idx
-      { kind: InputRef { ref_idx: 2, sub_idx: 0 }, inputs: [] },  // N
-      { kind: InputRef { ref_idx: 2, sub_idx: 2 }, inputs: [] },  // E
-      { kind: InputRef { ref_idx: 2, sub_idx: 4 }, inputs: [] },  // S
-      { kind: InputRef { ref_idx: 2, sub_idx: 6 }, inputs: [] },  // W
-      // idx 7-10: neighbor occupied N/E/S/W via ring sensor sub_idx
-      { kind: InputRef { ref_idx: 3, sub_idx: 0 }, inputs: [] },  // N
-      { kind: InputRef { ref_idx: 3, sub_idx: 2 }, inputs: [] },  // E
-      { kind: InputRef { ref_idx: 3, sub_idx: 4 }, inputs: [] },  // S
-      { kind: InputRef { ref_idx: 3, sub_idx: 6 }, inputs: [] },  // W
-      // idx 11-16: output writers
-      { kind: CustomOutput(0), inputs: [{ source_idx: 0, weight: 1.0 }] },
-        // slot 0 = food_here
-      { kind: CustomOutput(1), inputs: [{ source_idx: 2, weight: 1.0 }] },
-        // slot 1 = can_reproduce (0 or 1)
-      { kind: CustomOutput(2), inputs: [{ source_idx: 3, weight: 1.0 }] },
-        // slot 2 = food_N
-      { kind: CustomOutput(3), inputs: [{ source_idx: 4, weight: 1.0 }] },
-        // slot 3 = food_E
-      { kind: CustomOutput(4), inputs: [{ source_idx: 5, weight: 1.0 }] },
-        // slot 4 = food_S
-      { kind: CustomOutput(5), inputs: [{ source_idx: 6, weight: 1.0 }] },
-        // slot 5 = food_W
-      // idx 17: route to node 1
-      { kind: RouterOutput, inputs: [] },
+    compute_nodes: [
+      // idx 0: reproduce gate (energy >= 24.0)
+      { kind: Threshold(24.0),
+        inputs: [{ source: InputLeaf { ref_idx: 1, sub_idx: 0 },
+                   weight: 1.0 }] },
     ],
+
+    output_sinks: [
+      // Full fixed catalog (45 sinks). Only 7 are wired at founder time.
+      // CustomOutput(0): food_here → slot 0
+      { kind: CustomOutput(0),
+        inputs: [{ source: InputLeaf { ref_idx: 0, sub_idx: 0 },
+                   weight: 1.0 }] },
+      // CustomOutput(1): can_reproduce → slot 1
+      { kind: CustomOutput(1),
+        inputs: [{ source: ComputeNode(0), weight: 1.0 }] },
+      // CustomOutput(2): food_N → slot 2
+      { kind: CustomOutput(2),
+        inputs: [{ source: InputLeaf { ref_idx: 2, sub_idx: 0 },
+                   weight: 1.0 }] },
+      // CustomOutput(3): food_E → slot 3
+      { kind: CustomOutput(3),
+        inputs: [{ source: InputLeaf { ref_idx: 2, sub_idx: 2 },
+                   weight: 1.0 }] },
+      // CustomOutput(4): food_S → slot 4
+      { kind: CustomOutput(4),
+        inputs: [{ source: InputLeaf { ref_idx: 2, sub_idx: 4 },
+                   weight: 1.0 }] },
+      // CustomOutput(5): food_W → slot 5
+      { kind: CustomOutput(5),
+        inputs: [{ source: InputLeaf { ref_idx: 2, sub_idx: 6 },
+                   weight: 1.0 }] },
+      // CustomOutput(6..11): empty (inert)
+      // RouterOutput: empty (default routing)
+      { kind: RouterOutput, inputs: [] },
+      // WriteSlot(0..15): empty (inert)
+      // ClearSlot(0..15): empty (inert)
+    ],
+
+    action_bank: [
+      // action_queue_cap (default 4) empty ActionSlots
+      // All start disconnected — no graph-based action emission at founder.
+      { behavior: Emit(NoOp), gate_inputs: [], param_inputs: [] },
+      { behavior: Emit(NoOp), gate_inputs: [], param_inputs: [] },
+      { behavior: Emit(NoOp), gate_inputs: [], param_inputs: [] },
+      { behavior: Emit(NoOp), gate_inputs: [], param_inputs: [] },
+    ],
+
+    execute_gate: { inputs: [] },  // empty — no graph-based termination
   }),
   targets: [1],
 }
@@ -247,7 +264,14 @@ NodeGenome {
 ```
 
 **Behavioral intent:**
-- Founders build a multi-action queue each tick using `PushAction` + `ExecuteActionQueue`.
+- The graph node aggregates sensor data into output slots using the CGP
+  three-layer model: implicit InputLeaf sources feed through one compute node
+  (Threshold gate for reproduction readiness) into fixed output sinks.
+- Most output sinks, all action bank slots, and the execute gate start unwired
+  (evolutionary blank slate). Evolution can wire them to add graph-based
+  action emission as an alternative to VM-based action emission.
+- The VM node handles decision-making and action emission using `PushAction` +
+  `ExecuteActionQueue`.
 - Founders reproduce when energy is sufficient (highest priority).
 - Founders eat when standing on food (second priority).
 - Founders move toward the cardinal direction with highest visible food.
@@ -258,9 +282,9 @@ find food and reproduce efficiently will out-compete those that do not.
 
 **Determinism note:** The founder genome structure above is canonical for
 v3alpha1 seeding. The exact bytewise encoding is an implementation detail, but
-the structural layout (node count, node IDs, input_refs, graph internal
-topology, VM instruction sequence, and constants) must be identical across
-implementations for deterministic seeding with the same seed.
+the structural layout (node count, node IDs, input_refs, compute nodes,
+output sink wiring, VM instruction sequence, and constants) must be identical
+across implementations for deterministic seeding with the same seed.
 
 ---
 

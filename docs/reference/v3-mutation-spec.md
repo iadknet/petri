@@ -105,23 +105,32 @@ Core rule:
 
 ### Graph domain
 
-- `AlterGraphEdgeWeight`
-- `SwapGraphOperator`
-- `MutateGraphOperatorParam`
-- `AddInternalGraphNode(kind)`
-- `RemoveInternalGraphNode`
-- `AddGraphEdge`
-- `RetargetGraphEdge`
-- `RemoveGraphEdge`
-- `GraphRawFieldMutation` (raw representable-field mutation for tolerant graph
-  encodings, including `InputRef { ref_idx, sub_idx }`, `CustomOutput(u8)`,
-  `ReadSlot(u8)`, `ReadSlotPrev(u8)`, `WriteSlot(u8)`, `ClearSlot(u8)`,
-  and edge source indices)
-- `CopyInternalNode`
-- `CopySubgraph`
-- `CopyEdgeBundle`
-- `EnableHebbian` (add `PlasticityConfig` to a non-plasticity node)
-- `DisableHebbian` (remove `PlasticityConfig` from a plasticity node)
+Topology mutations operate on `compute_nodes` only. Fixed structural outputs
+(output sinks, action bank, execute gate) are never added/removed/retyped —
+only their edges are evolvable.
+
+- `AlterGraphEdgeWeight` (all 5 edge-bearing surfaces: compute inputs, sink
+  inputs, action gate, action param, execute gate)
+- `SwapGraphOperator` (compute nodes only, 17 `ComputeNodeKind` variants)
+- `MutateGraphOperatorParam` (compute params: Constant, Threshold,
+  DecayIntegrator, Momentum, Oscillator)
+- `AddComputeNode(kind)` (appends to `compute_nodes`)
+- `RemoveComputeNode` (removes from `compute_nodes`, remaps
+  `GraphSource::ComputeNode` indices across all edge containers)
+- `AddGraphEdge` (all 5 edge-bearing surfaces)
+- `RetargetGraphEdge` (all 5 edge-bearing surfaces)
+- `RemoveGraphEdge` (all 5 edge-bearing surfaces)
+- `GraphRawFieldMutation` (raw representable-field mutation for compute node
+  params and `GraphSource` fields in edges — `ComputeNode(idx)`,
+  `InputLeaf { ref_idx, sub_idx }`, `SharedMemory { slot, previous }`)
+- `CopyComputeNode` (copies a single compute node)
+- `CopySubgraph` (copies compute node cluster; internal edges remapped,
+  external edges preserved; copied nodes start as dead genes)
+- `CopyEdgeBundle` (copies edge set between surfaces)
+- `MutateActionSlotBehavior` (raw field mutation on `action_bank[i].behavior`,
+  picks uniformly from `Pop` or `Emit(random WorldActionKind)`)
+- `EnableHebbian` (add `PlasticityConfig` to a non-plasticity compute node)
+- `DisableHebbian` (remove `PlasticityConfig` from a plasticity compute node)
 - `MutateHebbianRule` (change the `HebbianRule` variant)
 - `MutateHebbianRate` (perturb the `learning_rate`)
 - `ToggleHebbianLamarckian` (flip the `lamarckian` inheritance flag)
@@ -132,9 +141,13 @@ Core rule:
 
 ### InputRef domain
 
-- `Add`
-- `Remove`
-- `Swap`
+- `Add` (pushes to `input_refs` — new `GraphSource::InputLeaf` sources become
+  available; no physical leaf nodes created)
+- `Remove` (removes from `input_refs`; walks all edge containers to remove
+  edges where `ref_idx == removed` and decrements `ref_idx` for edges where
+  `ref_idx > removed`)
+- `Swap` (replaces an input_ref variant; updates edges where `sub_idx` exceeds
+  new width across all edge containers)
 - `RawFieldMutation` (raw representable-field mutation for tolerant
   `UpstreamSlot(usize)` values)
 
