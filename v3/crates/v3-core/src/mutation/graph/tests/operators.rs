@@ -773,7 +773,12 @@ fn remove_internal_node_only_removes_non_input_ref() {
                     seed
                 );
                 // Total should be 3 (one computation node removed)
-                assert_eq!(g.internal_nodes.len(), 3, "one node removed (seed {})", seed);
+                assert_eq!(
+                    g.internal_nodes.len(),
+                    3,
+                    "one node removed (seed {})",
+                    seed
+                );
             }
         }
     }
