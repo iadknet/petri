@@ -384,10 +384,12 @@ Soft defaults are deliberate to support junk-DNA evolution without crashes.
 ## 9. Backend Access Paths and Energy Cost
 
 - VM: `ReadInput { dst, ref_idx, sub_idx }`
-- Graph: `InputRef { ref_idx, sub_idx }`
+- Graph: `GraphSource::InputLeaf { ref_idx, sub_idx }` (implicit edge source)
 
 Backend posture:
 - backends address the same compound layout using `(ref_idx, sub_idx)`
+- Graph backend uses `GraphSource::InputLeaf { ref_idx, sub_idx }` as edge
+  sources (implicit inputs, not physical nodes)
 - no backend reads world state directly
 
 Energy-cost decision for v1:

@@ -1,6 +1,7 @@
 # V3 Graph Backend Spec
 
-Reference specification for `BackendDef::Graph` execution.
+Reference specification for `BackendDef::Graph` execution using CGP-style
+layered architecture.
 
 Status: Active
 
@@ -14,39 +15,229 @@ Related references:
 
 ---
 
-## 1. Graph Backend Data Model
+## 1. Architecture Overview
+
+The graph backend uses a three-layer CGP (Cartesian Genetic Programming) model:
+
+1. **Implicit inputs** — sensor data and shared memory reads are addressable
+   sources (`GraphSource`), not physical nodes.
+2. **Compute nodes** — mutable computation layer with free topology mutations.
+   Supports recurrence via Gauss-Seidel relaxation.
+3. **Fixed structural outputs** — value sinks, action bank, and execute gate.
+   Structurally immutable (always present); only edges TO them are evolvable.
+
+This separation eliminates the class of bugs where topology mutations corrupt
+structural invariants (sensor nodes, output nodes). Every topology mutation
+produces a structurally valid genome.
+
+---
+
+## 2. Graph Backend Data Model
 
 ```rust
 pub struct GraphBackendDef {
-    pub internal_nodes: Vec<GraphInternalNode>,
+    pub compute_nodes: Vec<ComputeNode>,
+    pub output_sinks: Vec<OutputSink>,
+    pub action_bank: Vec<ActionSlot>,
+    pub execute_gate: ExecuteGate,
 }
 
-pub struct GraphInternalNode {
-    pub kind: GraphNodeKind,
-    pub inputs: Vec<GraphInput>,
+pub struct ComputeNode {
+    pub kind: ComputeNodeKind,
+    pub inputs: Vec<GraphEdge>,
     pub plasticity: Option<PlasticityConfig>,
 }
 
-pub struct GraphInput {
-    pub source_idx: u16,
+pub struct OutputSink {
+    pub kind: OutputSinkKind,
+    pub inputs: Vec<GraphEdge>,
+}
+
+pub struct ActionSlot {
+    pub behavior: ActionSlotBehavior,
+    pub gate_inputs: Vec<GraphEdge>,
+    pub param_inputs: Vec<GraphEdge>,
+}
+
+pub struct ExecuteGate {
+    pub inputs: Vec<GraphEdge>,
+}
+
+pub struct GraphEdge {
+    pub source: GraphSource,
     pub weight: f32,
 }
 ```
 
-Design choice: edges are co-located with each internal node for linear,
-cache-friendly evaluation.
+Design choice: edges are co-located with each node/sink for linear,
+cache-friendly evaluation. Fixed structural outputs are stored in separate
+Vecs to prevent topology mutations from affecting them.
 
 ---
 
-## 2. Evaluation Order, Recurrence, and Convergence
+## 3. GraphSource (Edge Addressing)
 
-Graph evaluation uses bounded relaxation passes to support internal recurrence
-(including backward and self edges) without unbounded runtime.
+```rust
+pub enum GraphSource {
+    InputLeaf { ref_idx: u16, sub_idx: u16 },
+    SharedMemory { slot: u8, previous: bool },
+    ComputeNode(u16),
+}
+```
 
-Per node evaluation:
+- `InputLeaf { ref_idx, sub_idx }` — reads `input_refs[ref_idx]` with
+  sub-value index `sub_idx`. Replaces the old `InputRef` node kind.
+- `SharedMemory { slot, previous }` — reads `shared_memory[slot]` (current)
+  or `prev_shared_memory[slot]` (previous tick). Replaces `ReadSlot`/
+  `ReadSlotPrev` node kinds.
+- `ComputeNode(idx)` — reads the output of `compute_nodes[idx]`.
+
+---
+
+## 4. ComputeNodeKind
+
+```rust
+pub enum ComputeNodeKind {
+    // Arithmetic
+    Add,
+    Multiply,
+    Negate,
+    Abs,
+    Min,
+    Max,
+    WeightedSum,
+
+    // Activation
+    Sigmoid,
+    Tanh,
+    Relu,
+    Clamp01,
+    Threshold(f32),
+
+    // Logic
+    GreaterThan,
+    Select,
+
+    // Stateful
+    DecayIntegrator(f32),
+    Momentum(f32),
+    Oscillator(f32),
+    AdaptiveGain,
+
+    // Constant
+    Constant(f32),
+}
+```
+
+17 variants (down from 30 in the mixed-node model). Only computation-relevant
+kinds — no input/output/shared-memory kinds.
+
+### Node class taxonomy
+
+| Class | Kinds | Visual role |
+|-------|-------|-------------|
+| Arithmetic | Add, Multiply, Negate, Abs, Min, Max, WeightedSum | Pure math |
+| Activation | Sigmoid, Tanh, Relu, Clamp01, Threshold | Nonlinear transforms |
+| Logic | GreaterThan, Select | Decision/gating |
+| Stateful | DecayIntegrator, Momentum, Oscillator, AdaptiveGain | Per-tick memory |
+| Constant | Constant(f32) | Fixed value source |
+
+---
+
+## 5. OutputSinkKind
+
+```rust
+pub enum OutputSinkKind {
+    CustomOutput(u8),   // 12 slots, indices 0-11
+    RouterOutput,       // single normalized routing scalar
+    WriteSlot(u8),      // 16 slots, indices 0-15: shared memory write
+    ClearSlot(u8),      // 16 slots, indices 0-15: shared memory clear
+}
+```
+
+The full sink catalog is fixed at genome construction: 12 CustomOutput + 1
+RouterOutput + 16 WriteSlot + 16 ClearSlot = 45 sinks. Mutations can only
+modify edges TO sinks, not add/remove/change sink kinds.
+
+### Inert-when-unwired rule
+
+A sink with empty `inputs` does NOT write its target. It preserves the
+upstream/default value:
+- CustomOutput with no edges: `output_slots[slot]` retains incoming
+  `upstream_slots[slot]`.
+- WriteSlot/ClearSlot with no edges: `shared_memory[slot]` is unchanged.
+- RouterOutput with no edges: default `route_target_idx` applies.
+
+Only sinks with at least one edge compute their weighted-sum and write
+the result.
+
+---
+
+## 6. ActionSlotBehavior and WorldActionKind
+
+```rust
+pub enum ActionSlotBehavior {
+    Pop,
+    Emit(WorldActionKind),
+}
+
+pub enum WorldActionKind {
+    Eat,
+    Move,
+    Reproduce,
+    StealEnergy,
+    NoOp,
+}
+```
+
+- `Pop` — queue-program-control: removes the last queued action.
+- `Emit(kind)` — world-action-payload: decodes a world action from `kind` +
+  the slot's `param_inputs` and pushes to the queue.
+
+Behavior is evolvable via raw field mutation (not edge-computed).
+
+### Action parameter decoding
+
+When an `Emit(kind)` slot fires, parameters are decoded from `param_inputs`
+weighted sums:
+
+| `WorldActionKind` | `param[0]` | `param[1]` | Notes |
+|---|---|---|---|
+| `Eat` | — | — | No params |
+| `Move` | direction index (0-7) | — | `round().clamp(0, 7)` |
+| `Reproduce` | direction index (0-7) | offspring energy | Non-negative |
+| `StealEnergy` | direction index (0-7) | steal amount | Non-negative |
+| `NoOp` | — | — | Real action with costs |
+
+Direction decoding matches the VM `PushAction` convention:
+`meta[0].round().clamp(0.0, 7.0)` maps to `Direction::ALL`.
+
+---
+
+## 7. ExecuteGate
+
+```rust
+pub struct ExecuteGate {
+    pub inputs: Vec<GraphEdge>,
+}
+```
+
+Separate gated output controlling mesh termination. The gate fires when
+`wsum(inputs) > 0.0` AND the action queue is non-empty. When fired, the mesh
+hop terminates and returns the accumulated action queue for execution.
+
+If inputs are empty, `wsum = 0.0` — gate doesn't fire. Terminal behavior is
+evolvable only through edge mutations on the execute gate.
+
+---
+
+## 8. Evaluation Order, Recurrence, and Convergence
+
+Graph evaluation uses bounded relaxation passes over `compute_nodes` only.
+Fixed structural outputs are evaluated in a separate post-convergence pass.
 
 ```text
-node_count = internal_nodes.len()
+node_count = compute_nodes.len()
 prev_outputs = [0.0; node_count]
 curr_outputs = [0.0; node_count]
 
@@ -63,20 +254,13 @@ passes_executed = 0
 for pass in 0..max_graph_relax_iters:
   for current_idx in 0..node_count:
     weighted_input_sum = 0.0
-    for input in internal_nodes[current_idx].inputs:
-      source_idx = input.source_idx as usize
-      source_value =
-        if source_idx >= node_count:
-          0.0
-        else if source_idx < current_idx:
-          curr_outputs[source_idx]   // already updated this pass
-        else:
-          prev_outputs[source_idx]   // self/backward/not-yet-updated
-
-      weighted_input_sum += source_value * input.weight
+    for edge in compute_nodes[current_idx].inputs:
+      source_value = resolve_source(edge.source, ctx)
+      weighted_input_sum += source_value * edge.weight
 
     curr_outputs[current_idx] =
-      evaluate_kind(internal_nodes[current_idx].kind, weighted_input_sum)
+      evaluate_compute_kind(compute_nodes[current_idx].kind,
+                            weighted_input_sum)
 
   passes_executed += 1
   delta = max_abs(curr_outputs[i] - prev_outputs[i]) over i in 0..node_count
@@ -91,84 +275,83 @@ for pass in 0..max_graph_relax_iters:
     break
 ```
 
-This is "iterate until convergence or budget exhaustion." It is intentionally
-bounded by `max_graph_relax_iters` to prevent infinite internal loops.
+### Source resolution
+
+```text
+resolve_source(source, ctx):
+  match source:
+    InputLeaf { ref_idx, sub_idx } =>
+      resolve_input(input_refs[ref_idx], sub_idx, ctx)
+    SharedMemory { slot, previous: false } =>
+      shared_memory[slot % 16]
+    SharedMemory { slot, previous: true } =>
+      prev_shared_memory[slot % 16]
+    ComputeNode(idx) =>
+      if idx >= node_count: 0.0
+      else if idx < current_idx: curr_outputs[idx]
+      else: prev_outputs[idx]
+```
+
+This is Gauss-Seidel iteration — forward references see current-pass values,
+backward/self references see previous-pass values.
+
 Canonical owner for graph convergence budget/config defaults:
 `v3-runtime-config-spec.md`.
 
 ---
 
-## 3. GraphNodeKind
+## 9. Post-Convergence Effects
 
-```rust
-pub enum GraphNodeKind {
-    InputRef { ref_idx: u16, sub_idx: u16 },
+After compute node relaxation converges (or budget exhausts), a three-phase
+effects pass processes all fixed structural outputs.
 
-    Constant(f32),
-    Add,
-    Multiply,
-    Negate,
-    Abs,
-    Min,
-    Max,
-    Threshold(f32),
-    GreaterThan,
-    Sigmoid,
-    Tanh,
-    Relu,
-    Select,
-    Clamp01,
-    WeightedSum,
+### Phase 1: Value outputs
 
-    DecayIntegrator(f32),
-    Momentum(f32),
-    Oscillator(f32),
-    AdaptiveGain,
+Iterate `output_sinks`. For each sink with non-empty `inputs`:
+- Gather `wsum = sum(resolve_source(edge.source) * edge.weight)` using
+  converged `curr_outputs` for `ComputeNode` sources.
+- Write to target:
+  - `CustomOutput(slot)`: `output_slots[slot] = wsum` (slot < 12).
+  - `RouterOutput`: `route_target_idx = min(floor(clamp01(wsum) * target_count), target_count - 1)`.
+  - `WriteSlot(slot)`: `shared_memory[slot % 16] = sanitize_f32(wsum)`.
+  - `ClearSlot(slot)`: `shared_memory[slot % 16] = 0.0` (wsum is ignored;
+    the act of having edges and firing is what clears).
 
-    CustomOutput(u8),
-    RouterOutput,
+Sinks with empty `inputs` are inert — no write occurs.
 
-    ReadSlot(u8),
-    ReadSlotPrev(u8),
-    WriteSlot(u8),
-    ClearSlot(u8),
-}
-```
+### Phase 2: Action bank scan
 
-`InputRef { ref_idx, sub_idx }` reads `input_refs[ref_idx]` with sub-value
-index `sub_idx` and combines it with the node's internal weighted aggregate:
+Iterate `action_bank` in order (index 0 to N-1). For each slot:
+1. Gather `gate_wsum = sum(resolve_source(e.source) * e.weight)` from
+   `gate_inputs`.
+2. If `gate_wsum > 0.0` (slot fires):
+   - If `behavior` is `Pop`: remove last queued item. No-op if queue empty.
+   - If `behavior` is `Emit(kind)`: gather `param_wsum[i]` from
+     `param_inputs`, decode world action from `kind` + params, push to queue.
+3. If `gate_inputs` is empty: `gate_wsum = 0.0`, slot doesn't fire.
 
-`output = resolve_input(input_refs[ref_idx], sub_idx, ctx) + weighted_input_sum`
+### Phase 3: Execute gate
 
-For scalar inputs (all variants except `ActionQueue`), `sub_idx > 0` returns
-`0.0`. For compound inputs (e.g. `ActionQueue`), `sub_idx` addresses
-individual sub-values within the compound (see `v3-sensor-spec.md`).
+Gather `gate_wsum` from `execute_gate.inputs`. If `gate_wsum > 0.0` AND
+queue is non-empty: mark hop as terminal.
 
-Missing input refs read as `0.0`. Out-of-bounds `ref_idx` reads as `0.0`.
-
-When `InputRef` resolves to `InputReference::UpstreamSlot(slot)`, the
-base value is routing-parent `upstream_slots[slot]` (invalid slot -> `0.0`),
-then combined with internal weighted aggregate using the same rule.
-
-### Shared Memory Slot Operators
-
-The graph backend can read and write the creature's shared memory slots
-(see `v3-vm-isa-spec.md`, Section 8):
-
-- `ReadSlot(slot_idx)`: output = `shared_memory[slot_idx % 16] + weighted_input_sum`
-- `ReadSlotPrev(slot_idx)`: output = `prev_shared_memory[slot_idx % 16] + weighted_input_sum`
-- `WriteSlot(slot_idx)`: writes `sanitize_f32(weighted_input_sum)` to
-  `shared_memory[slot_idx % 16]`; output = `weighted_input_sum`
-- `ClearSlot(slot_idx)`: writes `0.0` to `shared_memory[slot_idx % 16]`;
-  output = `0.0`
-
-Slot addressing wraps with `% 16`. All slot writes pass through
-`sanitize_f32()`. Graph slot writes operate on the same working copy as VM
-slot writes — committed on normal exit, discarded on energy exhaustion.
+If `execute_gate.inputs` is empty: `gate_wsum = 0.0`, hop doesn't terminate.
 
 ---
 
-## 4. Stateful Operators and `graph_state`
+## 10. Router Normalization
+
+Single router output, value normalized to target index:
+```text
+idx = min(floor(clamp01(route_value) * target_count), target_count - 1)
+```
+
+The final `min` clamp prevents OOB when `route_value == 1.0`. Replaces
+`rem_euclid` wrapping with bounded binning.
+
+---
+
+## 11. Stateful Operators and `graph_state`
 
 Graph state is keyed by mesh `NodeId`:
 
@@ -176,8 +359,8 @@ Graph state is keyed by mesh `NodeId`:
 HashMap<NodeId, Vec<f32>>
 ```
 
-Stateful operators use fixed slot mapping by internal node index.
-Example: internal node `i` uses state slot `i` in the owning mesh node state
+Stateful operators use fixed slot mapping by compute node index.
+Example: compute node `i` uses state slot `i` in the owning mesh node state
 vector.
 
 Rules:
@@ -188,22 +371,9 @@ Rules:
 
 ---
 
-## 5. Outputs and Routing
+## 12. Energy Cost
 
-During graph evaluation:
-- Graph `output_slots` buffer is initialized from incoming `upstream_slots`.
-- `CustomOutput(slot)` writes into `output_slots[slot]` when `slot < 12`.
-- Invalid custom output slot writes are ignored (slot value is unchanged).
-- `RouterOutput` writes candidate route value to `route_target_idx`.
-- If multiple `RouterOutput` nodes execute, last-write-wins.
-
-Graph backend never emits `WorldAction` directly.
-
----
-
-## 6. Energy Cost
-
-Graph node cost is charged per internal-node-per-pass evaluation
+Graph node cost is charged per compute-node-per-pass evaluation
 (`graph_node_base_cost` or equivalent config-driven scalar).
 Canonical owner for graph runtime cost config:
 `v3-runtime-config-spec.md`.
@@ -212,19 +382,22 @@ Equivalent requested energy:
 
 ```text
 graph_energy_requested =
-  graph_node_base_cost * internal_nodes.len() * passes_executed
+  graph_node_base_cost * compute_nodes.len() * passes_executed
 ```
 
 If energy is exhausted during graph evaluation, node evaluation halts and mesh
 execution returns `WorldAction::NoOp`.
 
+Note: fixed structural outputs (sinks, action bank, execute gate) are not
+counted in the per-pass energy cost. They are evaluated once post-convergence.
+
 ---
 
-## 7. Plasticity
+## 13. Plasticity
 
 ### PlasticityConfig
 
-Per-node learning configuration:
+Per-node learning configuration (applies to compute nodes only):
 
 ```rust
 pub struct PlasticityConfig {
@@ -252,7 +425,7 @@ traces updated during Phase 1; weight updates deferred to Phase 2.5).
 Plasticity weights (`plasticity_weights`) and eligibility traces
 (`eligibility_traces`) are stored parallel to `node_state` in
 `GraphRuntimeState`. Both use `Vec<Vec<Box<[f32]>>>` layout — one `Box<[f32]>`
-per node, one `f32` per input edge.
+per compute node, one `f32` per input edge.
 
 - Plasticity weights are lazy-initialized to `1.0` on first use.
 - Eligibility traces are lazy-initialized to `0.0` on first use.
@@ -261,7 +434,7 @@ per node, one `f32` per input edge.
 
 ### Eligibility trace update (Phase 1, post-convergence)
 
-After graph convergence, for each reward-modulated node:
+After graph convergence, for each reward-modulated compute node:
 
 ```text
 trace[edge] = decay * old_trace + hebbian_delta(pre, post, weight)
@@ -278,17 +451,75 @@ new_weight = clamp(weight + dw, -weight_clamp, weight_clamp)
 
 ---
 
-## 8. Backend-Local Soft Defaults
+## 14. Three-Tier Liveness Model
 
-Determinism scope is canonical in `AGENTS.md`; V3 harness reproducibility
-controls are specified in `v3-mesh-execution-spec.md`
-(`Test-Mode Reproducibility Notes`).
+Clear terminology to avoid conflating structural presence with functional
+contribution:
+
+- **Structurally present**: exists in the genome by construction. All fixed
+  sinks, all action slots, and the execute gate are always structurally present.
+- **Wired**: has at least one edge. Only wired items write values / fire
+  actions. Only wired items count toward `genome_size()` and
+  `functional_complexity()`.
+- **Functionally reachable** ("live"): compute nodes backward-reachable from
+  any wired sink, wired action slot gate/param, or wired execute gate inputs.
+  "Live" is reserved for behaviorally contributing items only — unwired sinks
+  are structurally present but NOT live.
+
+Dormant (unwired) sinks and action slots are NOT counted toward
+`genome_size()` or `functional_complexity()`. This prevents the fixed catalog
+from imposing a constant complexity tax.
+
+---
+
+## 15. Fixed Output Catalog Construction
+
+`GraphBackendDef::new_with_fixed_outputs(config)` constructs:
+- 12 `CustomOutput(0..11)` sinks
+- 1 `RouterOutput` sink
+- 16 `WriteSlot(0..15)` sinks
+- 16 `ClearSlot(0..15)` sinks
+- `action_bank` of `config.action_queue_cap` empty `ActionSlot`s
+- Empty `ExecuteGate`
+
+All sinks and action slots start with empty edge Vecs (inert until evolution
+wires them).
+
+### Queue-size contract
+
+`action_bank.len()` is derived from `MutationConfig::action_queue_cap`
+(default 4). This gives a single source of truth for queue shape:
+- `action_bank.len() == config.action_queue_cap` at genome creation time.
+- `InputReference::ActionQueue` width = `action_queue_cap * 3`.
+- Invariant: `action_queue_cap <= max_actions_per_turn`.
+
+Config-change policy: frozen at creation. `action_bank.len()` is set when the
+genome is created and never changes. If `action_queue_cap` changes
+mid-simulation, existing creatures keep their original bank size.
+
+---
+
+## 16. Soft-Default Matrix
+
+Two-layer validation: mutation-time (bound values at creation) and runtime
+(silent 0.0 fallback).
+
+| Situation | Behavior |
+|-----------|----------|
+| `ComputeNode(idx)` where `idx >= compute_nodes.len()` | Resolve to 0.0 |
+| `InputLeaf { ref_idx }` where `ref_idx >= input_refs.len()` | Resolve to 0.0 |
+| `InputLeaf { sub_idx }` where `sub_idx >= sub_value_count` | Resolve to 0.0 |
+| `SharedMemory { slot }` where `slot >= 16` | Bound at mutation time to 0-15; defensive fallback: 0.0 |
+| `CustomOutput(s)` where `s >= 12` | Constructor invariant; defensive fallback: 0.0 |
+| `Pop` on empty queue | Silent no-op |
+| ActionSlot with empty `gate_inputs` | gate wsum = 0.0, slot doesn't fire |
+| ActionSlot with empty `param_inputs` | all params = 0.0 |
+| ExecuteGate with empty `inputs` | wsum = 0.0, hop doesn't terminate |
+| Edge with NaN/Inf weight | `sanitize_f32()` to 0.0 |
+| Sink with empty `inputs` | Inert — does not write |
+| `Emit(NoOp)` that fires | Enqueues `WorldAction::NoOp` (real action with costs) |
+| Non-converged graph at iteration cap | Uses last computed pass output |
+| Missing graph state | Lazily initialized to zeros |
 
 Cross-runtime fallback outcomes are canonical in
 `v3-mesh-execution-spec.md` (Section 4, authoritative soft-default matrix).
-
-Backend-local soft defaults:
-- Invalid edges read as `0.0`.
-- Missing input refs read as `0.0`.
-- Missing state lazily initialized to zeros.
-- Non-converged graphs at iteration cap use the last computed pass output.

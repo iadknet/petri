@@ -55,7 +55,9 @@ pub enum BackendDef {
 ```
 
 `VmBackendDef` is defined in `v3-vm-isa-spec.md`.
-`GraphBackendDef` is defined in `v3-graph-backend-spec.md`.
+`GraphBackendDef` is defined in `v3-graph-backend-spec.md`. The graph backend
+uses a CGP-style layered model with implicit inputs, mutable compute nodes,
+and fixed structural outputs (value sinks, action bank, execute gate).
 Topology examples are documented in `v3-genome-topology-examples.md`.
 
 ---
@@ -71,6 +73,8 @@ Required invariants:
 - `nodes` is non-empty.
 - `node_id` values are unique.
 - backend payloads remain decodable.
+- Graph backend fixed output catalog is structurally intact (correct sink
+  count and sink kinds match the canonical catalog).
 
 Deliberately not required at validation time:
 - `entry_node_id` must resolve.
@@ -96,6 +100,11 @@ pub struct CreatureState {
 
 The key is mesh `NodeId` (not global flat offsets). This avoids state/index
 misalignment across topology mutations.
+
+Within each mesh node, graph runtime state (node_state, plasticity_weights,
+eligibility_traces, scratch buffers) is indexed by compute node index — only
+compute nodes have state. Fixed structural outputs (sinks, action bank,
+execute gate) do not participate in relaxation and have no runtime state.
 
 ---
 
