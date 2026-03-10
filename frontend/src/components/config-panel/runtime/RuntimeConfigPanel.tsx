@@ -1,5 +1,6 @@
 import { Section } from "../shared/Section.tsx";
 import type { BooleanFieldDef, FieldDef, RuntimePanelProps } from "../shared/types.ts";
+import { ACTION_LOG_FIELDS } from "./ActionLogSection.tsx";
 import {
 	AGE_COST_ALL_FIELDS,
 	AGE_COST_FIELDS,
@@ -22,6 +23,7 @@ import { POPULATION_FIELDS } from "./PopulationSection.tsx";
 import { PREDATION_FIELDS } from "./PredationSection.tsx";
 import { RuntimeFieldGroup } from "./RuntimeFieldGroup.tsx";
 import { RUNTIME_FIELDS } from "./RuntimeSection.tsx";
+import { SHARED_MEMORY_FIELDS } from "./SharedMemorySection.tsx";
 
 export const RUNTIME_PATCH_FIELDS: (FieldDef | BooleanFieldDef)[] = [
 	...FOOD_PARAMETERS_FIELDS,
@@ -33,6 +35,8 @@ export const RUNTIME_PATCH_FIELDS: (FieldDef | BooleanFieldDef)[] = [
 	...RUNTIME_FIELDS,
 	...MUTATION_ALL_FIELDS,
 	...PREDATION_FIELDS,
+	...ACTION_LOG_FIELDS,
+	...SHARED_MEMORY_FIELDS,
 ];
 
 interface RuntimeConfigPanelProps {
@@ -131,6 +135,22 @@ export function RuntimeConfigPanel({
 					<RuntimeFieldGroup
 						title="Predation"
 						fields={PREDATION_FIELDS}
+						localDraft={localDraft}
+						serverConfig={serverConfig}
+						simState={simState}
+						updateDraft={updateDraft}
+					/>
+					<RuntimeFieldGroup
+						title="Action Log"
+						fields={ACTION_LOG_FIELDS}
+						localDraft={localDraft}
+						serverConfig={serverConfig}
+						simState={simState}
+						updateDraft={updateDraft}
+					/>
+					<RuntimeFieldGroup
+						title="Shared Memory"
+						fields={SHARED_MEMORY_FIELDS}
 						localDraft={localDraft}
 						serverConfig={serverConfig}
 						simState={simState}

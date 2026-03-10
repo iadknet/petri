@@ -89,10 +89,23 @@ const MOCK_CONFIG: SimulationConfig = {
 			channel_change_chance: 0.001,
 			polarity_flip_chance: 0.0002,
 		},
+		reachable_bias: {
+			topology: 0.7,
+			vm: 0.7,
+			graph: 0.7,
+			input_ref: 0.5,
+		},
+		input_auto_connect_chance: 0.3,
 	},
 	predation: {
 		steal_cost_rate: 0.2,
 		kill_complexity_bonus_multiplier: 0.05,
+	},
+	action_log: {
+		capacity: 500,
+	},
+	shared_memory: {
+		decay_rate: 0.0,
 	},
 };
 
