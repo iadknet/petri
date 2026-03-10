@@ -1,7 +1,8 @@
 use criterion::{black_box, criterion_group, criterion_main, BatchSize, Criterion};
 use v3_core::config::{RuntimeConfig, SimulationConfig};
 use v3_core::contracts::InputReference;
-use v3_core::creature::genome::{BackendDef, GraphBackendDef, VmBackendDef};
+use v3_core::creature::genome::cgp::CgpGraphBackendDef;
+use v3_core::creature::genome::{BackendDef, VmBackendDef};
 use v3_core::creature::state::{CreatureState, GraphRuntimeState};
 use v3_core::runtime::graph::execute_graph_node;
 use v3_core::runtime::types::MeshSideOutputs;
@@ -116,7 +117,7 @@ fn build_vm_fixture() -> VmBenchFixture {
 }
 
 struct GraphBenchFixture {
-    def: GraphBackendDef,
+    def: CgpGraphBackendDef,
     input_refs: Vec<InputReference>,
     sensors: SensorSnapshot,
     runtime_config: RuntimeConfig,

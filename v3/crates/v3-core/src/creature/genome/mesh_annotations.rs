@@ -2,11 +2,8 @@ use std::collections::BTreeSet;
 
 use crate::contracts::{InputReference, NodeId, WorldInputKey};
 
-use super::analysis::{
-    graph_backward_slice, graph_is_output_node, mesh_reachable_nodes, vm_backward_slice,
-    vm_is_output_instruction,
-};
-use super::{BackendDef, CreatureGenome, GraphBackendDef, GraphNodeKind, NodeGenome, VmBackendDef};
+use super::analysis::{mesh_reachable_nodes, vm_backward_slice, vm_is_output_instruction};
+use super::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef};
 
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
@@ -123,54 +120,12 @@ fn derive_node_annotation(node: &NodeGenome, reachable: bool) -> MeshNodeAnnotat
             }
         }
         BackendDef::Graph(graph) => {
-            live_internal_node_indices = collect_live_graph_node_indices(graph);
-            for index in &live_internal_node_indices {
-                let Some(internal_node) = graph.internal_nodes.get(*index) else {
-                    continue;
-                };
-                if internal_node.plasticity.is_some() {
-                    has_stateful_behavior = true;
-                }
-
-                match &internal_node.kind {
-                    GraphNodeKind::InputRef { ref_idx, .. } => {
-                        if let Some(input_ref) = node.input_refs.get(*ref_idx as usize) {
-                            read_classes.insert(classify_input_ref(input_ref));
-                        }
-                    }
-                    GraphNodeKind::RouterOutput => {
-                        write_classes.insert(MeshWriteClass::Route);
-                    }
-                    GraphNodeKind::CustomOutput(_) => {
-                        write_classes.insert(MeshWriteClass::Payload);
-                    }
-                    GraphNodeKind::WriteActionMeta(_)
-                    | GraphNodeKind::PushAction(_)
-                    | GraphNodeKind::PopAction
-                    | GraphNodeKind::ExecuteActionQueue => {
-                        write_classes.insert(MeshWriteClass::Action);
-                    }
-                    GraphNodeKind::ReadSlot(_)
-                    | GraphNodeKind::ReadSlotPrev(_)
-                    | GraphNodeKind::WriteSlot(_)
-                    | GraphNodeKind::ClearSlot(_) => {
-                        has_stateful_behavior = true;
-                        if matches!(
-                            &internal_node.kind,
-                            GraphNodeKind::WriteSlot(_) | GraphNodeKind::ClearSlot(_)
-                        ) {
-                            write_classes.insert(MeshWriteClass::Memory);
-                        }
-                    }
-                    GraphNodeKind::DecayIntegrator(_)
-                    | GraphNodeKind::Momentum(_)
-                    | GraphNodeKind::Oscillator(_)
-                    | GraphNodeKind::AdaptiveGain => {
-                        has_stateful_behavior = true;
-                    }
-                    _ => {}
-                }
-            }
+            let (cgp_reads, cgp_writes, cgp_stateful, cgp_live) =
+                super::cgp_mesh_annotations::derive_cgp_annotations(graph, &node.input_refs);
+            read_classes.extend(cgp_reads);
+            write_classes.extend(cgp_writes);
+            has_stateful_behavior = cgp_stateful;
+            live_internal_node_indices = cgp_live;
         }
     }
 
@@ -190,20 +145,6 @@ fn collect_live_vm_instruction_indices(vm: &VmBackendDef) -> Vec<usize> {
     for (index, instruction) in vm.program.iter().enumerate() {
         if vm_is_output_instruction(instruction) {
             if let Some(gene) = vm_backward_slice(&vm.program, index) {
-                live.extend(gene.indices);
-            }
-        }
-    }
-    live.into_iter().collect()
-}
-
-fn collect_live_graph_node_indices(graph: &GraphBackendDef) -> Vec<usize> {
-    let mut live = BTreeSet::new();
-    for (index, internal_node) in graph.internal_nodes.iter().enumerate() {
-        if graph_is_output_node(&internal_node.kind) {
-            if let Some(gene) =
-                graph_backward_slice(&graph.internal_nodes, index, graph.internal_nodes.len())
-            {
                 live.extend(gene.indices);
             }
         }
@@ -244,10 +185,11 @@ mod tests {
     use super::*;
     use crate::contracts::{DynamicIntrospectionKey, InputReference};
     use crate::creature::genome::analysis::mesh_reachable_nodes;
-    use crate::creature::genome::{
-        CreatureGenome, GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind, NodeGenome,
-        VmBackendDef, VmInstruction,
+    use crate::creature::genome::cgp::{
+        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
+        OutputSink, OutputSinkKind,
     };
+    use crate::creature::genome::{CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
 
     #[test]
     fn derives_factual_vm_annotations_from_live_instructions() {
@@ -304,42 +246,40 @@ mod tests {
 
     #[test]
     fn derives_graph_annotations_and_marks_unreachable_nodes() {
+        // CGP graph: CN0 (AdaptiveGain) with InputLeaf(0,0) → RouterOutput sink
+        // CN1 (Constant) disconnected (dead)
         let reachable_graph = NodeGenome {
             node_id: NodeId::new(1),
             input_refs: vec![InputReference::World(WorldInputKey::NearbyCreatureCore)],
             targets: vec![],
-            backend_def: BackendDef::Graph(GraphBackendDef {
-                internal_nodes: vec![
-                    GraphInternalNode {
-                        kind: GraphNodeKind::InputRef {
-                            ref_idx: 0,
-                            sub_idx: 0,
-                        },
-                        inputs: vec![],
-                        plasticity: None,
-                    },
-                    GraphInternalNode {
-                        kind: GraphNodeKind::AdaptiveGain,
-                        inputs: vec![GraphInput {
-                            source_idx: 0,
+            backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                compute_nodes: vec![
+                    ComputeNode {
+                        kind: ComputeNodeKind::AdaptiveGain,
+                        inputs: vec![GraphEdge {
+                            source: GraphSource::InputLeaf {
+                                ref_idx: 0,
+                                sub_idx: 0,
+                            },
                             weight: 1.0,
                         }],
                         plasticity: None,
                     },
-                    GraphInternalNode {
-                        kind: GraphNodeKind::RouterOutput,
-                        inputs: vec![GraphInput {
-                            source_idx: 1,
-                            weight: 1.0,
-                        }],
-                        plasticity: None,
-                    },
-                    GraphInternalNode {
-                        kind: GraphNodeKind::Constant(1.0),
-                        inputs: vec![],
+                    ComputeNode {
+                        kind: ComputeNodeKind::Constant(1.0),
+                        inputs: vec![], // DEAD — disconnected
                         plasticity: None,
                     },
                 ],
+                output_sinks: vec![OutputSink {
+                    kind: OutputSinkKind::RouterOutput,
+                    inputs: vec![GraphEdge {
+                        source: GraphSource::ComputeNode(0),
+                        weight: 1.0,
+                    }],
+                }],
+                action_bank: vec![],
+                execute_gate: ExecuteGate { inputs: vec![] },
             }),
         };
 
@@ -375,8 +315,9 @@ mod tests {
         assert!(graph_annotation.reachable);
         assert_eq!(graph_annotation.read_classes, vec![MeshReadClass::Neighbor]);
         assert_eq!(graph_annotation.write_classes, vec![MeshWriteClass::Route]);
-        assert!(graph_annotation.has_stateful_behavior);
-        assert_eq!(graph_annotation.live_internal_node_indices, vec![0, 1, 2]);
+        assert!(graph_annotation.has_stateful_behavior); // AdaptiveGain is stateful
+                                                         // Only CN0 is live (CN1 is dead)
+        assert_eq!(graph_annotation.live_internal_node_indices, vec![0]);
 
         assert!(!unreachable_annotation.reachable);
         assert_eq!(

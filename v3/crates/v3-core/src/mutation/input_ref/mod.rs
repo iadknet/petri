@@ -7,7 +7,7 @@ use crate::config::MutationConfig;
 use crate::contracts::{
     DynamicIntrospectionKey, InputReference, StaticIntrospectionKey, WorldInputKey,
 };
-use crate::creature::genome::{BackendDef, CreatureGenome, GraphNodeKind};
+use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::mutation::compound;
 use crate::mutation::reachability::biased_select_from;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
@@ -164,23 +164,23 @@ impl InputRefMutator {
 }
 
 /// Remove InputRef leaf nodes with `ref_idx == u16::MAX` (invalidated by reindexing).
-/// Returns count removed. No-op for VM backends.
+/// Returns count removed. No-op for VM and CGP Graph backends.
 fn gc_orphaned_input_ref_nodes(backend: &mut BackendDef) -> usize {
     match backend {
-        BackendDef::Graph(gd) => gd.remove_nodes_where(
-            |n| matches!(n.kind, GraphNodeKind::InputRef { ref_idx, .. } if ref_idx == u16::MAX),
-        ),
+        // CGP graph backend has no InputRef leaf nodes — edges use GraphSource::InputLeaf
+        // and orphaned edges are cleaned up by reindex_input_refs_after_removal.
+        BackendDef::Graph(_) => 0,
         BackendDef::Vm(_) => 0,
     }
 }
 
 /// Remove all InputRef leaf nodes matching `target_ref_idx`.
-/// Returns count removed. No-op for VM backends.
-fn remove_input_ref_leaves_for(backend: &mut BackendDef, target_ref_idx: u16) -> usize {
+/// Returns count removed. No-op for VM and CGP Graph backends.
+fn remove_input_ref_leaves_for(backend: &mut BackendDef, _target_ref_idx: u16) -> usize {
     match backend {
-        BackendDef::Graph(gd) => gd.remove_nodes_where(|n| {
-            matches!(n.kind, GraphNodeKind::InputRef { ref_idx, .. } if ref_idx == target_ref_idx)
-        }),
+        // CGP graph backend has no InputRef leaf nodes — edges reference inputs
+        // via GraphSource::InputLeaf and are managed by edge-level operations.
+        BackendDef::Graph(_) => 0,
         BackendDef::Vm(_) => 0,
     }
 }
@@ -303,64 +303,34 @@ fn random_input_reference(rng: &mut impl Rng) -> InputReference {
 fn apply_raw_field_mutation(
     genome: &mut CreatureGenome,
     rng: &mut impl Rng,
-    config: &MutationConfig,
+    _config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
-    // Count eligible targets: UpstreamSlot input_refs + InputRef graph nodes (for sub_idx mutation).
+    // Count eligible targets: UpstreamSlot input_refs only.
+    // (The old second pool — InputRef graph nodes for sub_idx mutation — no longer
+    // exists in the CGP graph backend. CGP edges use GraphSource::InputLeaf and
+    // sub_idx is mutated via cgp_operators.)
     let mut upstream_count: usize = 0;
-    let mut graph_input_ref_count: usize = 0;
     for node in &genome.nodes {
         upstream_count += node
             .input_refs
             .iter()
             .filter(|r| matches!(r, InputReference::UpstreamSlot(_)))
             .count();
-        if let BackendDef::Graph(ref gd) = node.backend_def {
-            graph_input_ref_count += gd
-                .internal_nodes
-                .iter()
-                .filter(|n| matches!(n.kind, GraphNodeKind::InputRef { .. }))
-                .count();
-        }
     }
-    let total = upstream_count + graph_input_ref_count;
-    if total == 0 {
+    if upstream_count == 0 {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
 
-    let mut pick = rng.gen_range(0..total);
+    let mut pick = rng.gen_range(0..upstream_count);
 
-    // First pool: UpstreamSlot input_refs.
-    if pick < upstream_count {
-        for node in &mut genome.nodes {
-            for input_ref in &mut node.input_refs {
-                if matches!(input_ref, InputReference::UpstreamSlot(_)) {
-                    if pick == 0 {
-                        *input_ref = InputReference::UpstreamSlot(rng.gen_range(0..12_usize));
-                        return Ok(TargetReachability::NotApplicable);
-                    }
-                    pick -= 1;
-                }
-            }
-        }
-    }
-
-    // Second pool: InputRef graph node sub_idx mutation.
-    pick -= upstream_count;
     for node in &mut genome.nodes {
-        if let BackendDef::Graph(ref mut gd) = node.backend_def {
-            for internal in &mut gd.internal_nodes {
-                if let GraphNodeKind::InputRef { ref_idx, sub_idx } = &mut internal.kind {
-                    if pick == 0 {
-                        let width = node
-                            .input_refs
-                            .get(*ref_idx as usize)
-                            .map(|r| compound::sub_value_count(r, config))
-                            .unwrap_or(1);
-                        *sub_idx = rng.gen_range(0..width);
-                        return Ok(TargetReachability::NotApplicable);
-                    }
-                    pick -= 1;
+        for input_ref in &mut node.input_refs {
+            if matches!(input_ref, InputReference::UpstreamSlot(_)) {
+                if pick == 0 {
+                    *input_ref = InputReference::UpstreamSlot(rng.gen_range(0..12_usize));
+                    return Ok(TargetReachability::NotApplicable);
                 }
+                pick -= 1;
             }
         }
     }

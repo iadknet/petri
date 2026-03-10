@@ -6,7 +6,7 @@
 
 use crate::config::RuntimeConfig;
 use crate::contracts::InputReference;
-use crate::creature::genome::{GraphBackendDef, GraphNodeKind};
+use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::graph::{execute_graph_impl, GraphTracer};
 use crate::runtime::trace::{kind_label, GraphNodeEvalTrace, GraphPassTrace, GraphTrace};
@@ -64,7 +64,7 @@ impl GraphTracer for RecordingTracer {
     fn on_node_eval(
         &mut self,
         node_index: usize,
-        kind: &GraphNodeKind,
+        kind: &ComputeNodeKind,
         weighted_inputs: &[f32],
         weighted_sum: f32,
         state_before: f32,
@@ -108,7 +108,7 @@ impl GraphTracer for RecordingTracer {
 /// status, and final outputs.
 #[allow(clippy::too_many_arguments)]
 pub fn execute_graph_node_traced(
-    def: &GraphBackendDef,
+    def: &CgpGraphBackendDef,
     input_refs: &[InputReference],
     upstream_slots: &[f32; 12],
     energy: &mut f32,
@@ -121,7 +121,7 @@ pub fn execute_graph_node_traced(
     shared_memory: &mut [f32; 16],
     prev_shared_memory: &[f32; 16],
 ) -> (NodeResult, GraphTrace) {
-    let node_count = def.internal_nodes.len();
+    let node_count = def.compute_nodes.len();
 
     if node_count == 0 {
         let trace = GraphTrace {
@@ -154,312 +154,4 @@ pub fn execute_graph_node_traced(
     (result, tracer.into_trace())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::config::RuntimeConfig;
-    use crate::creature::genome::{GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind};
-    use crate::creature::state::GraphRuntimeState;
-    use crate::runtime::graph::execute_graph_node;
-    use crate::runtime::types::MeshSideOutputs;
-    use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
-    use crate::sensors::static_inputs::StaticInputs;
-
-    fn default_config() -> RuntimeConfig {
-        RuntimeConfig::default()
-    }
-
-    fn make_ss() -> SensorSnapshot {
-        SensorSnapshot {
-            local: StaticInputs {
-                food_here: 0.0,
-                neighbor_food: [0.0; 8],
-                neighbor_barrier: [0.0; 8],
-                neighbor_occupied: [0.0; 8],
-                generation: 0.0,
-                age_ticks: 0.0,
-            },
-            perception: PerceptionSnapshot::zero(),
-        }
-    }
-
-    /// Result equivalence: Constant + CustomOutput + RouterOutput.
-    #[test]
-    fn result_equivalence_constant_custom_router() {
-        let def = GraphBackendDef {
-            internal_nodes: vec![
-                GraphInternalNode {
-                    kind: GraphNodeKind::Constant(2.0),
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::CustomOutput(0),
-                    inputs: vec![GraphInput {
-                        source_idx: 0,
-                        weight: 3.0,
-                    }],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::RouterOutput,
-                    inputs: vec![GraphInput {
-                        source_idx: 0,
-                        weight: 1.5,
-                    }],
-                    plasticity: None,
-                },
-            ],
-        };
-        let upstream = [0.0f32; 12];
-        let ss = make_ss();
-        let config = default_config();
-
-        let mut energy_a = 100.0f32;
-        let mut gr_a = GraphRuntimeState::new();
-        let result_a = execute_graph_node(
-            &def,
-            &[],
-            &upstream,
-            &mut energy_a,
-            0.0,
-            0,
-            &mut gr_a,
-            &ss,
-            &config,
-            &mut MeshSideOutputs::new(4),
-            &mut [0.0f32; 16],
-            &[0.0f32; 16],
-        );
-
-        let mut energy_b = 100.0f32;
-        let mut gr_b = GraphRuntimeState::new();
-        let (result_b, trace) = execute_graph_node_traced(
-            &def,
-            &[],
-            &upstream,
-            &mut energy_b,
-            0.0,
-            0,
-            &mut gr_b,
-            &ss,
-            &config,
-            &mut MeshSideOutputs::new(4),
-            &mut [0.0f32; 16],
-            &[0.0f32; 16],
-        );
-
-        assert_eq!(result_a, result_b);
-        assert!(
-            (energy_a - energy_b).abs() < 1e-6,
-            "energy: {energy_a} vs {energy_b}"
-        );
-        assert_eq!(gr_a.node_state, gr_b.node_state);
-        assert!(trace.converged);
-        assert!(!trace.passes.is_empty());
-    }
-
-    /// DecayIntegrator state transitions captured across 2 calls.
-    #[test]
-    fn decay_integrator_state_captured() {
-        let def = GraphBackendDef {
-            internal_nodes: vec![
-                GraphInternalNode {
-                    kind: GraphNodeKind::Constant(1.0),
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::DecayIntegrator(0.5),
-                    inputs: vec![GraphInput {
-                        source_idx: 0,
-                        weight: 1.0,
-                    }],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::CustomOutput(0),
-                    inputs: vec![GraphInput {
-                        source_idx: 1,
-                        weight: 1.0,
-                    }],
-                    plasticity: None,
-                },
-            ],
-        };
-        let upstream = [0.0f32; 12];
-        let ss = make_ss();
-        let mut config = default_config();
-        config.max_graph_relax_iters = 1;
-        config.graph_convergence_stable_passes = 1;
-
-        let mut energy = 1000.0f32;
-        let mut gr = GraphRuntimeState::new();
-
-        // Call 1: state 0.0 → 0.5
-        let (r1, trace1) = execute_graph_node_traced(
-            &def,
-            &[],
-            &upstream,
-            &mut energy,
-            0.0,
-            0,
-            &mut gr,
-            &ss,
-            &config,
-            &mut MeshSideOutputs::new(4),
-            &mut [0.0f32; 16],
-            &[0.0f32; 16],
-        );
-        assert!(!r1.energy_exhausted);
-        assert!((r1.output_slots[0] - 0.5).abs() < 1e-5);
-
-        // Check trace captured state transition
-        let decay_eval = &trace1.passes[0].node_evaluations[1]; // node 1 = DecayIntegrator
-        assert_eq!(decay_eval.kind, "DecayIntegrator");
-        assert!((decay_eval.state_before - 0.0).abs() < 1e-6);
-        assert!((decay_eval.state_after - 0.5).abs() < 1e-6);
-
-        // Call 2: state 0.5 → 0.75
-        let (_r2, trace2) = execute_graph_node_traced(
-            &def,
-            &[],
-            &upstream,
-            &mut energy,
-            0.0,
-            0,
-            &mut gr,
-            &ss,
-            &config,
-            &mut MeshSideOutputs::new(4),
-            &mut [0.0f32; 16],
-            &[0.0f32; 16],
-        );
-        let decay_eval2 = &trace2.passes[0].node_evaluations[1];
-        assert!((decay_eval2.state_before - 0.5).abs() < 1e-6);
-        assert!((decay_eval2.state_after - 0.75).abs() < 1e-6);
-    }
-
-    /// Convergence status captured correctly.
-    #[test]
-    fn convergence_status_captured() {
-        // A graph with only Constant nodes converges immediately
-        let def = GraphBackendDef {
-            internal_nodes: vec![
-                GraphInternalNode {
-                    kind: GraphNodeKind::Constant(1.0),
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::CustomOutput(0),
-                    inputs: vec![GraphInput {
-                        source_idx: 0,
-                        weight: 1.0,
-                    }],
-                    plasticity: None,
-                },
-            ],
-        };
-        let upstream = [0.0f32; 12];
-        let ss = make_ss();
-        let config = default_config();
-
-        let mut energy = 1000.0f32;
-        let mut gr = GraphRuntimeState::new();
-
-        let (_result, trace) = execute_graph_node_traced(
-            &def,
-            &[],
-            &upstream,
-            &mut energy,
-            0.0,
-            0,
-            &mut gr,
-            &ss,
-            &config,
-            &mut MeshSideOutputs::new(4),
-            &mut [0.0f32; 16],
-            &[0.0f32; 16],
-        );
-
-        assert!(trace.converged);
-        assert!(trace.stable_passes_count >= config.graph_convergence_stable_passes);
-    }
-
-    /// Result equivalence with action-queue variants (PushAction + ExecuteActionQueue).
-    #[test]
-    fn result_equivalence_with_action_variants() {
-        let def = GraphBackendDef {
-            internal_nodes: vec![
-                GraphInternalNode {
-                    kind: GraphNodeKind::PushAction(1), // Eat
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::ExecuteActionQueue,
-                    inputs: vec![],
-                    plasticity: None,
-                },
-            ],
-        };
-        let upstream = [0.0f32; 12];
-        let ss = make_ss();
-        let config = default_config();
-
-        let mut energy_a = 100.0f32;
-        let mut gr_a = GraphRuntimeState::new();
-        let mut so_a = MeshSideOutputs::new(4);
-        let result_a = execute_graph_node(
-            &def,
-            &[],
-            &upstream,
-            &mut energy_a,
-            0.0,
-            0,
-            &mut gr_a,
-            &ss,
-            &config,
-            &mut so_a,
-            &mut [0.0f32; 16],
-            &[0.0f32; 16],
-        );
-
-        let mut energy_b = 100.0f32;
-        let mut gr_b = GraphRuntimeState::new();
-        let mut so_b = MeshSideOutputs::new(4);
-        let (result_b, trace) = execute_graph_node_traced(
-            &def,
-            &[],
-            &upstream,
-            &mut energy_b,
-            0.0,
-            0,
-            &mut gr_b,
-            &ss,
-            &config,
-            &mut so_b,
-            &mut [0.0f32; 16],
-            &[0.0f32; 16],
-        );
-
-        assert_eq!(result_a, result_b);
-        assert!(result_a.terminal, "should be terminal");
-        assert!(
-            (energy_a - energy_b).abs() < 1e-6,
-            "energy: {energy_a} vs {energy_b}"
-        );
-        assert!(trace.converged);
-
-        // Both should have Eat queued
-        let actions_a = so_a.action_queue.into_actions_or_noop();
-        let actions_b = so_b.action_queue.into_actions_or_noop();
-        assert_eq!(actions_a, actions_b);
-        assert_eq!(
-            actions_a,
-            vec![crate::contracts::WorldAction::Eat],
-            "both paths should queue Eat"
-        );
-    }
-}
+// Old traced_graph tests removed — CGP graph tests live in runtime/cgp_graph.rs.

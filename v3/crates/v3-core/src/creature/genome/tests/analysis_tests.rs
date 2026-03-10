@@ -2,9 +2,11 @@ use super::*;
 use crate::contracts::{
     DynamicIntrospectionKey, InputReference, NodeId, StaticIntrospectionKey, WorldInputKey,
 };
-use crate::creature::genome::{
-    BackendDef, GraphBackendDef, GraphInput, GraphNodeKind, NodeGenome, VmBackendDef,
+use crate::creature::genome::cgp::{
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
+    OutputSink, OutputSinkKind,
 };
+use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef};
 use rand::SeedableRng;
 
 // ── VM helper tests ─────────────────────────────────────────────────
@@ -257,187 +259,6 @@ fn forward_slice_random_returns_some_for_valid_program() {
     let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
     let gene = vm_forward_slice_random(&program, &mut rng).unwrap();
     assert_eq!(gene.indices, vec![0, 1]);
-}
-
-// ── Graph analysis tests ────────────────────────────────────────────
-
-fn make_graph_nodes() -> Vec<GraphInternalNode> {
-    // Node 0: InputRef(0) — no inputs (reads from external input_refs)
-    // Node 1: Add — inputs from node 0
-    // Node 2: CustomOutput(0) — inputs from node 1 (output node)
-    vec![
-        GraphInternalNode {
-            kind: GraphNodeKind::InputRef {
-                ref_idx: 0,
-                sub_idx: 0,
-            },
-            inputs: vec![],
-            plasticity: None,
-        },
-        GraphInternalNode {
-            kind: GraphNodeKind::Add,
-            inputs: vec![GraphInput {
-                source_idx: 0,
-                weight: 1.0,
-            }],
-            plasticity: None,
-        },
-        GraphInternalNode {
-            kind: GraphNodeKind::CustomOutput(0),
-            inputs: vec![GraphInput {
-                source_idx: 1,
-                weight: 1.0,
-            }],
-            plasticity: None,
-        },
-    ]
-}
-
-#[test]
-fn graph_is_output_node_matches_outputs() {
-    assert!(graph_is_output_node(&GraphNodeKind::CustomOutput(0)));
-    assert!(graph_is_output_node(&GraphNodeKind::RouterOutput));
-    assert!(!graph_is_output_node(&GraphNodeKind::Add));
-    assert!(!graph_is_output_node(&GraphNodeKind::InputRef {
-        ref_idx: 0,
-        sub_idx: 0
-    }));
-}
-
-#[test]
-fn graph_backward_slice_traces_deps() {
-    let nodes = make_graph_nodes();
-    // Anchor at node 2 (CustomOutput) -> node 1 (Add) -> node 0 (InputRef)
-    let gene = graph_backward_slice(&nodes, 2, 32).unwrap();
-    assert_eq!(gene.indices, vec![0, 1, 2]);
-}
-
-#[test]
-fn graph_backward_slice_returns_none_for_non_output() {
-    let nodes = make_graph_nodes();
-    assert_eq!(graph_backward_slice(&nodes, 0, 32), None);
-}
-
-#[test]
-fn graph_backward_slice_excludes_disconnected() {
-    // Node 0: InputRef — no inputs
-    // Node 1: InputRef — no inputs (disconnected from output)
-    // Node 2: CustomOutput — inputs from node 0 only
-    let nodes = vec![
-        GraphInternalNode {
-            kind: GraphNodeKind::InputRef {
-                ref_idx: 0,
-                sub_idx: 0,
-            },
-            inputs: vec![],
-            plasticity: None,
-        },
-        GraphInternalNode {
-            kind: GraphNodeKind::InputRef {
-                ref_idx: 1,
-                sub_idx: 0,
-            },
-            inputs: vec![],
-            plasticity: None,
-        },
-        GraphInternalNode {
-            kind: GraphNodeKind::CustomOutput(0),
-            inputs: vec![GraphInput {
-                source_idx: 0,
-                weight: 1.0,
-            }],
-            plasticity: None,
-        },
-    ];
-    let gene = graph_backward_slice(&nodes, 2, 32).unwrap();
-    assert_eq!(gene.indices, vec![0, 2]); // node 1 excluded
-}
-
-#[test]
-fn graph_backward_slice_respects_max_size() {
-    let nodes = make_graph_nodes();
-    let gene = graph_backward_slice(&nodes, 2, 2).unwrap();
-    assert_eq!(gene.indices.len(), 2);
-}
-
-#[test]
-fn graph_backward_slice_empty_returns_none() {
-    let nodes: Vec<GraphInternalNode> = vec![];
-    assert_eq!(graph_backward_slice(&nodes, 0, 32), None);
-}
-
-#[test]
-fn graph_forward_slice_traces_downstream() {
-    let nodes = make_graph_nodes();
-    // Seed at node 0: node 1 reads from 0, node 2 reads from 1
-    let gene = graph_forward_slice(&nodes, 0, 32).unwrap();
-    assert_eq!(gene.indices, vec![0, 1, 2]);
-}
-
-#[test]
-fn graph_forward_slice_excludes_disconnected() {
-    // Node 0: InputRef — seed
-    // Node 1: InputRef — disconnected
-    // Node 2: Add — reads from node 0
-    let nodes = vec![
-        GraphInternalNode {
-            kind: GraphNodeKind::InputRef {
-                ref_idx: 0,
-                sub_idx: 0,
-            },
-            inputs: vec![],
-            plasticity: None,
-        },
-        GraphInternalNode {
-            kind: GraphNodeKind::InputRef {
-                ref_idx: 1,
-                sub_idx: 0,
-            },
-            inputs: vec![],
-            plasticity: None,
-        },
-        GraphInternalNode {
-            kind: GraphNodeKind::Add,
-            inputs: vec![GraphInput {
-                source_idx: 0,
-                weight: 1.0,
-            }],
-            plasticity: None,
-        },
-    ];
-    let gene = graph_forward_slice(&nodes, 0, 32).unwrap();
-    assert_eq!(gene.indices, vec![0, 2]); // node 1 excluded
-}
-
-#[test]
-fn graph_forward_slice_respects_max_size() {
-    let nodes = make_graph_nodes();
-    let gene = graph_forward_slice(&nodes, 0, 2).unwrap();
-    assert_eq!(gene.indices.len(), 2);
-}
-
-#[test]
-fn graph_forward_slice_out_of_bounds_returns_none() {
-    let nodes = make_graph_nodes();
-    assert_eq!(graph_forward_slice(&nodes, 10, 32), None);
-}
-
-#[test]
-fn graph_backward_slice_random_returns_none_for_no_outputs() {
-    let nodes = vec![GraphInternalNode {
-        kind: GraphNodeKind::Add,
-        inputs: vec![],
-        plasticity: None,
-    }];
-    let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
-    assert_eq!(graph_backward_slice_random(&nodes, &mut rng, 32), None);
-}
-
-#[test]
-fn graph_forward_slice_random_returns_none_for_empty() {
-    let nodes: Vec<GraphInternalNode> = vec![];
-    let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
-    assert_eq!(graph_forward_slice_random(&nodes, &mut rng, 32), None);
 }
 
 // ── Mesh reachability tests ─────────────────────────────────────────
@@ -796,58 +617,49 @@ fn functional_complexity_excludes_dead_vm_instructions() {
 
 #[test]
 fn functional_complexity_excludes_dead_graph_nodes() {
-    // Single reachable node with Graph backend; node 2 (Sigmoid) is disconnected
+    // CGP graph: CN0 (Add) wired to sink, CN1 (Sigmoid) disconnected (dead)
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
             input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
-            backend_def: BackendDef::Graph(GraphBackendDef {
-                internal_nodes: vec![
-                    GraphInternalNode {
-                        kind: GraphNodeKind::InputRef {
-                            ref_idx: 0,
-                            sub_idx: 0,
-                        },
-                        inputs: vec![],
-                        plasticity: None,
-                    },
-                    GraphInternalNode {
-                        kind: GraphNodeKind::Add,
-                        inputs: vec![GraphInput {
-                            source_idx: 0,
+            backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                compute_nodes: vec![
+                    ComputeNode {
+                        kind: ComputeNodeKind::Add,
+                        inputs: vec![GraphEdge {
+                            source: GraphSource::InputLeaf {
+                                ref_idx: 0,
+                                sub_idx: 0,
+                            },
                             weight: 1.0,
                         }],
                         plasticity: None,
                     },
-                    GraphInternalNode {
-                        kind: GraphNodeKind::Sigmoid,
-                        inputs: vec![],
-                        plasticity: None,
-                    }, // DEAD — disconnected from output
-                    GraphInternalNode {
-                        kind: GraphNodeKind::CustomOutput(0),
-                        inputs: vec![GraphInput {
-                            source_idx: 1,
-                            weight: 1.0,
-                        }],
+                    ComputeNode {
+                        kind: ComputeNodeKind::Sigmoid,
+                        inputs: vec![], // DEAD — disconnected from output
                         plasticity: None,
                     },
                 ],
+                output_sinks: vec![OutputSink {
+                    kind: OutputSinkKind::CustomOutput(0),
+                    inputs: vec![GraphEdge {
+                        source: GraphSource::ComputeNode(0),
+                        weight: 1.0,
+                    }],
+                }],
+                action_bank: vec![],
+                execute_gate: ExecuteGate { inputs: vec![] },
             }),
             targets: vec![],
         }],
     };
     let fc = functional_complexity(&genome);
-    // 1 node + 0 targets
-    // Live graph nodes: 0 (InputRef), 1 (Add), 3 (CustomOutput) — node 2 (Sigmoid) excluded
-    // Node 0: 1 node + 0 inputs(edges) = 1
-    // Node 1: 1 node + 1 input = 2
-    // Node 3: 1 node + 1 input = 2
-    // Live graph subtotal: 5
-    // Consumed input_refs: ref_idx=0 from InputRef node → 1
-    // Total: 1 + 0 + 5 + 1 = 7
-    assert_eq!(fc, 7);
+    // 1 mesh node + 0 targets
+    // CGP: 1 wired sink + 1 live compute node (CN0) + 1 edge (CN0's InputLeaf) + 1 consumed ref
+    // Total: 1 + 0 + 1 + 1 + 1 + 1 = 5
+    assert_eq!(fc, 5);
 }
 
 #[test]

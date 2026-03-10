@@ -12,7 +12,8 @@ use std::collections::VecDeque;
 
 use crate::contracts::NodeId;
 
-use super::{BackendDef, CreatureGenome, GraphInternalNode, GraphNodeKind, VmInstruction};
+use super::cgp_analysis;
+use super::{BackendDef, CreatureGenome, VmInstruction};
 
 /// A detected functional gene: a set of indices within a backend array.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -247,156 +248,6 @@ pub fn vm_forward_slice_random(
     }
     let seed_idx = writers[rng.gen_range(0..writers.len())];
     vm_forward_slice(program, seed_idx)
-}
-
-// ── Graph analysis functions ────────────────────────────────────────────────
-
-/// Returns true if the graph node kind is an output writer.
-pub fn graph_is_output_node(kind: &GraphNodeKind) -> bool {
-    matches!(
-        kind,
-        GraphNodeKind::CustomOutput(_)
-            | GraphNodeKind::RouterOutput
-            | GraphNodeKind::WriteActionMeta(_)
-            | GraphNodeKind::PushAction(_)
-            | GraphNodeKind::PopAction
-            | GraphNodeKind::ExecuteActionQueue
-            | GraphNodeKind::WriteSlot(_)
-            | GraphNodeKind::ClearSlot(_)
-    )
-}
-
-/// Backward-slice from an anchor node (must be an output node).
-///
-/// BFS backward from the anchor following `source_idx` edges. Returns
-/// sorted indices capped at `max_size` nodes.
-#[must_use]
-pub fn graph_backward_slice(
-    nodes: &[GraphInternalNode],
-    anchor_idx: usize,
-    max_size: usize,
-) -> Option<DetectedGene> {
-    if anchor_idx >= nodes.len() || !graph_is_output_node(&nodes[anchor_idx].kind) {
-        return None;
-    }
-    let mut visited = vec![false; nodes.len()];
-    visited[anchor_idx] = true;
-    let mut queue = VecDeque::new();
-    let mut gene_indices = Vec::with_capacity(max_size.min(nodes.len()));
-    gene_indices.push(anchor_idx);
-
-    // Enqueue sources of the anchor
-    for input in &nodes[anchor_idx].inputs {
-        let src = input.source_idx as usize;
-        if src < nodes.len() && !visited[src] {
-            visited[src] = true;
-            queue.push_back(src);
-        }
-    }
-
-    while let Some(idx) = queue.pop_front() {
-        gene_indices.push(idx);
-        if gene_indices.len() >= max_size {
-            break;
-        }
-        for input in &nodes[idx].inputs {
-            let src = input.source_idx as usize;
-            if src < nodes.len() && !visited[src] {
-                visited[src] = true;
-                queue.push_back(src);
-            }
-        }
-    }
-
-    gene_indices.sort_unstable();
-    Some(DetectedGene {
-        indices: gene_indices,
-    })
-}
-
-/// Backward-slice from a randomly chosen output node.
-#[must_use]
-pub fn graph_backward_slice_random(
-    nodes: &[GraphInternalNode],
-    rng: &mut impl Rng,
-    max_size: usize,
-) -> Option<DetectedGene> {
-    let outputs: Vec<usize> = nodes
-        .iter()
-        .enumerate()
-        .filter(|(_, n)| graph_is_output_node(&n.kind))
-        .map(|(i, _)| i)
-        .collect();
-    if outputs.is_empty() {
-        return None;
-    }
-    let anchor = outputs[rng.gen_range(0..outputs.len())];
-    graph_backward_slice(nodes, anchor, max_size)
-}
-
-/// Forward-slice from a seed node.
-///
-/// Fixpoint expansion: starts from seed, iteratively includes any node
-/// whose inputs reference an already-included node. Returns sorted indices
-/// capped at `max_size`.
-#[must_use]
-pub fn graph_forward_slice(
-    nodes: &[GraphInternalNode],
-    seed_idx: usize,
-    max_size: usize,
-) -> Option<DetectedGene> {
-    if seed_idx >= nodes.len() {
-        return None;
-    }
-    let mut included = vec![false; nodes.len()];
-    included[seed_idx] = true;
-    let mut count = 1usize;
-
-    // Fixpoint iteration
-    loop {
-        let mut changed = false;
-        for i in 0..nodes.len() {
-            if included[i] || count >= max_size {
-                continue;
-            }
-            let refs_included = nodes[i].inputs.iter().any(|inp| {
-                (inp.source_idx as usize) < nodes.len() && included[inp.source_idx as usize]
-            });
-            if refs_included {
-                included[i] = true;
-                count += 1;
-                changed = true;
-                if count >= max_size {
-                    break;
-                }
-            }
-        }
-        if !changed {
-            break;
-        }
-    }
-
-    let indices: Vec<usize> = included
-        .iter()
-        .enumerate()
-        .filter(|(_, &inc)| inc)
-        .map(|(i, _)| i)
-        .collect();
-    Some(DetectedGene { indices })
-}
-
-/// Forward-slice from a randomly chosen node.
-#[must_use]
-pub fn graph_forward_slice_random(
-    nodes: &[GraphInternalNode],
-    rng: &mut impl Rng,
-    max_size: usize,
-) -> Option<DetectedGene> {
-    if nodes.is_empty() {
-        return None;
-    }
-    let seed_idx = rng.gen_range(0..nodes.len());
-    graph_forward_slice(nodes, seed_idx, max_size)
 }
 
 // ── Mesh reachability analysis ──────────────────────────────────────────────
@@ -671,30 +522,7 @@ pub fn functional_complexity(genome: &CreatureGenome) -> u32 {
                 score += consumed_refs.len() as u32;
             }
             BackendDef::Graph(graph) => {
-                // Union backward slices from all output nodes
-                let mut live = HashSet::new();
-                let max_size = graph.internal_nodes.len();
-                for (idx, inode) in graph.internal_nodes.iter().enumerate() {
-                    if graph_is_output_node(&inode.kind) {
-                        if let Some(gene) =
-                            graph_backward_slice(&graph.internal_nodes, idx, max_size)
-                        {
-                            live.extend(gene.indices);
-                        }
-                    }
-                }
-
-                // Count live nodes + their edges + consumed input_refs
-                let mut consumed_refs = HashSet::new();
-                for &idx in &live {
-                    score += 1; // the internal node
-                    score += graph.internal_nodes[idx].inputs.len() as u32;
-                    if let GraphNodeKind::InputRef { ref_idx, .. } = &graph.internal_nodes[idx].kind
-                    {
-                        consumed_refs.insert(*ref_idx);
-                    }
-                }
-                score += consumed_refs.len() as u32;
+                score += cgp_analysis::cgp_functional_complexity(graph);
             }
         }
     }

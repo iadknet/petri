@@ -1,11 +1,14 @@
 use slotmap::SlotMap;
+use v3_core::config::MutationConfig;
 use v3_core::contracts::{
     CreatureId, Direction, DynamicIntrospectionKey, InputReference, NodeId, Position,
     StaticIntrospectionKey, WorldAction, WorldInputKey,
 };
+use v3_core::creature::genome::cgp::{
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
+};
 use v3_core::creature::genome::{
-    BackendDef, CreatureGenome, GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind,
-    NodeGenome, VmBackendDef, VmInstruction,
+    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
 use v3_core::creature::state::CreatureState;
 use v3_core::kernel::WorldState;
@@ -15,6 +18,62 @@ use v3_core::simulation::Simulation;
 use crate::support::{
     insert_creature, run_one_traced_tick, test_config, vm_emit_noop_genome, vm_hop,
 };
+
+/// Build a CGP graph backend with a single Constant compute node whose output
+/// is wired to the specified CustomOutput sink and optionally to RouterOutput.
+fn cgp_constant_to_custom_output(value: f32, custom_slot: u8) -> CgpGraphBackendDef {
+    let config = MutationConfig::default();
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+    def.compute_nodes.push(ComputeNode {
+        kind: ComputeNodeKind::Constant(value),
+        inputs: Vec::new(),
+        plasticity: None,
+    });
+    // Wire the CustomOutput(custom_slot) sink to CN0
+    if let Some(sink) = def
+        .output_sinks
+        .iter_mut()
+        .find(|s| s.kind == OutputSinkKind::CustomOutput(custom_slot))
+    {
+        sink.inputs.push(GraphEdge {
+            source: GraphSource::ComputeNode(0),
+            weight: 1.0,
+        });
+    }
+    def
+}
+
+/// Build a CGP graph backend with a compute node that reads an InputLeaf and
+/// writes the result to a CustomOutput sink.
+fn cgp_passthrough_input_to_custom_output(
+    ref_idx: u16,
+    sub_idx: u16,
+    custom_slot: u8,
+) -> CgpGraphBackendDef {
+    let config = MutationConfig::default();
+    let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+    // CN0: Add with single InputLeaf edge (acts as passthrough)
+    def.compute_nodes.push(ComputeNode {
+        kind: ComputeNodeKind::Add,
+        inputs: vec![GraphEdge {
+            source: GraphSource::InputLeaf { ref_idx, sub_idx },
+            weight: 1.0,
+        }],
+        plasticity: None,
+    });
+    // Wire CustomOutput(custom_slot) to CN0
+    if let Some(sink) = def
+        .output_sinks
+        .iter_mut()
+        .find(|s| s.kind == OutputSinkKind::CustomOutput(custom_slot))
+    {
+        sink.inputs.push(GraphEdge {
+            source: GraphSource::ComputeNode(0),
+            weight: 1.0,
+        });
+    }
+    def
+}
 
 #[test]
 fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
@@ -27,64 +86,19 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
     let id_b = NodeId::new(1);
     let id_c = NodeId::new(2);
 
-    // Node A: writes 0.8 into slot 2, routes to B.
+    // Node A: writes 0.8 into slot 2, routes to B (RouterOutput unwired → 0.0 → targets[0]).
     let node_a = NodeGenome {
         node_id: id_a,
         input_refs: vec![],
-        backend_def: BackendDef::Graph(GraphBackendDef {
-            internal_nodes: vec![
-                GraphInternalNode {
-                    kind: GraphNodeKind::Constant(0.8),
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::CustomOutput(2),
-                    inputs: vec![GraphInput {
-                        source_idx: 0,
-                        weight: 1.0,
-                    }],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::RouterOutput,
-                    inputs: vec![],
-                    plasticity: None,
-                },
-            ],
-        }),
+        backend_def: BackendDef::Graph(cgp_constant_to_custom_output(0.8, 2)),
         targets: vec![id_b],
     };
 
-    // Node B: reads upstream slot 2 and writes it into slot 4, routes to C.
+    // Node B: reads upstream slot 2 via InputLeaf and writes it into slot 4, routes to C.
     let node_b = NodeGenome {
         node_id: id_b,
         input_refs: vec![InputReference::UpstreamSlot(2)],
-        backend_def: BackendDef::Graph(GraphBackendDef {
-            internal_nodes: vec![
-                GraphInternalNode {
-                    kind: GraphNodeKind::InputRef {
-                        ref_idx: 0,
-                        sub_idx: 0,
-                    },
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::CustomOutput(4),
-                    inputs: vec![GraphInput {
-                        source_idx: 0,
-                        weight: 1.0,
-                    }],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::RouterOutput,
-                    inputs: vec![],
-                    plasticity: None,
-                },
-            ],
-        }),
+        backend_def: BackendDef::Graph(cgp_passthrough_input_to_custom_output(0, 0, 4)),
         targets: vec![id_c],
     };
 
@@ -189,28 +203,7 @@ fn vm_reads_all_inputs_e2e() {
     let graph_node = NodeGenome {
         node_id: id_graph,
         input_refs: vec![],
-        backend_def: BackendDef::Graph(GraphBackendDef {
-            internal_nodes: vec![
-                GraphInternalNode {
-                    kind: GraphNodeKind::Constant(0.73),
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::CustomOutput(11),
-                    inputs: vec![GraphInput {
-                        source_idx: 0,
-                        weight: 1.0,
-                    }],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::RouterOutput,
-                    inputs: vec![],
-                    plasticity: None,
-                },
-            ],
-        }),
+        backend_def: BackendDef::Graph(cgp_constant_to_custom_output(0.73, 11)),
         targets: vec![id_vm],
     };
 

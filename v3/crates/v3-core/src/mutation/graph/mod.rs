@@ -12,14 +12,6 @@ use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::mutation::reachability::biased_select_from;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
-// Re-export types and operator functions that tests call directly via `use super::*`.
-#[cfg(test)]
-use crate::creature::genome::GraphNodeKind;
-#[cfg(test)]
-use operators::{
-    apply_graph_raw_field_mutation, is_parameterized, mutate_operator_param, random_graph_node_kind,
-};
-
 /// Graph mutation operator variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GraphOperator {

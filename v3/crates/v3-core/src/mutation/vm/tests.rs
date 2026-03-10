@@ -1,7 +1,7 @@
 use super::*;
 use crate::contracts::NodeId;
 use crate::creature::founder::v3alpha1_founder_genome;
-use crate::creature::genome::{BackendDef, GraphBackendDef, NodeGenome, VmInstruction};
+use crate::creature::genome::{BackendDef, NodeGenome, VmInstruction};
 use crate::creature::parseability::ParseabilityGate;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -120,9 +120,11 @@ fn vm_mutator_on_graph_only_genome_returns_no_applicable_target() {
     genome.nodes = vec![NodeGenome {
         node_id: NodeId::new(0),
         input_refs: vec![],
-        backend_def: BackendDef::Graph(GraphBackendDef {
-            internal_nodes: vec![],
-        }),
+        backend_def: BackendDef::Graph(
+            crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs(
+                &MutationConfig::default(),
+            ),
+        ),
         targets: vec![],
     }];
     let mut r = rng(0);
