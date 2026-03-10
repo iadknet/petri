@@ -88,6 +88,7 @@ pub(crate) fn cgp_live_compute_indices(def: &CgpGraphBackendDef) -> Vec<usize> {
 /// BFS backward through `GraphSource::ComputeNode` edges. Returns sorted
 /// indices capped at `max_size`.
 #[must_use]
+#[allow(dead_code)] // wired into mutation gene detection in a future phase
 pub(crate) fn cgp_backward_slice(
     def: &CgpGraphBackendDef,
     anchor_idx: usize,
@@ -138,6 +139,7 @@ pub(crate) fn cgp_backward_slice(
 
 /// Backward-slice from a randomly chosen compute node.
 #[must_use]
+#[allow(dead_code)] // wired into mutation gene detection in a future phase
 pub(crate) fn cgp_backward_slice_random(
     def: &CgpGraphBackendDef,
     rng: &mut impl Rng,
@@ -158,6 +160,7 @@ pub(crate) fn cgp_backward_slice_random(
 /// whose inputs reference an already-included node via `GraphSource::ComputeNode`.
 /// Returns sorted indices capped at `max_size`.
 #[must_use]
+#[allow(dead_code)] // wired into mutation gene detection in a future phase
 pub(crate) fn cgp_forward_slice(
     def: &CgpGraphBackendDef,
     seed_idx: usize,
@@ -210,6 +213,7 @@ pub(crate) fn cgp_forward_slice(
 
 /// Forward-slice from a randomly chosen compute node.
 #[must_use]
+#[allow(dead_code)] // wired into mutation gene detection in a future phase
 pub(crate) fn cgp_forward_slice_random(
     def: &CgpGraphBackendDef,
     rng: &mut impl Rng,

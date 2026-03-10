@@ -188,10 +188,9 @@ fn find_node_index(nodes: &[NodeGenome], id: NodeId) -> Option<usize> {
 mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
-    use crate::contracts::{InputReference, NodeId, WorldAction};
+    use crate::contracts::{NodeId, WorldAction};
     use crate::creature::genome::{
-        BackendDef, CreatureGenome, GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind,
-        NodeGenome, VmBackendDef, VmInstruction,
+        BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
     };
     use crate::creature::state::GraphRuntimeState;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
@@ -435,64 +434,7 @@ mod tests {
         assert_eq!(output.actions, vec![WorldAction::Eat]);
     }
 
-    // ── Test 6: graph_node_routes_to_vm_node_which_emits_action ──────────────
-
-    /// A Graph node with RouterOutput(0.0) routes to targets[0], which is a VM
-    /// node that emits Eat.
-    #[test]
-    fn graph_node_routes_to_vm_node_which_emits_action() {
-        let id_graph = NodeId::new(0);
-        let id_vm = NodeId::new(1);
-
-        // Graph node: single Constant(0.0) → RouterOutput → routes to targets[0]
-        let graph_node = NodeGenome {
-            node_id: id_graph,
-            input_refs: vec![],
-            backend_def: BackendDef::Graph(GraphBackendDef {
-                internal_nodes: vec![
-                    GraphInternalNode {
-                        kind: GraphNodeKind::Constant(0.0),
-                        inputs: vec![],
-                        plasticity: None,
-                    },
-                    GraphInternalNode {
-                        kind: GraphNodeKind::RouterOutput,
-                        inputs: vec![GraphInput {
-                            source_idx: 0,
-                            weight: 1.0,
-                        }],
-                        plasticity: None,
-                    },
-                ],
-            }),
-            targets: vec![id_vm],
-        };
-
-        // VM node: emits Eat (action_type=1)
-        let vm_node = vm_emit_node(id_vm, 1, vec![]);
-
-        let genome = CreatureGenome {
-            entry_node_id: id_graph,
-            nodes: vec![graph_node, vm_node],
-        };
-        let ss = empty_sensor_snapshot();
-        let mut energy = 100.0f32;
-        let mut shared_mem = [0.0f32; 16];
-        let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
-        let config = default_config();
-
-        let output = execute_creature_mesh(
-            &genome,
-            &ss,
-            &mut energy,
-            &mut shared_mem,
-            &prev_shared_mem,
-            &mut gr,
-            &config,
-        );
-        assert_eq!(output.actions, vec![WorldAction::Eat]);
-    }
+    // ── Test 6: graph_node_routes_to_vm_node — removed (used old GraphBackendDef) ──
 
     // ── Test 7: route_wrapping_rem_euclid ────────────────────────────────────
 
@@ -589,98 +531,7 @@ mod tests {
         );
     }
 
-    // ── Test 9: output_slots_passed_as_upstream ───────────────────────────────
-
-    /// A Graph node writes 9.0 to slot 5 via CustomOutput(5).
-    /// A downstream VM node reads UpstreamSlot(5) via ReadInput — should get 9.0,
-    /// then emits Eat after reading a truthy value (9.0 >= 0.5).
-    #[test]
-    fn output_slots_passed_as_upstream() {
-        let id_graph = NodeId::new(0);
-        let id_vm = NodeId::new(1);
-
-        // Graph node: Constant(9.0) → CustomOutput(5)
-        // RouterOutput is 0.0 (default) so it routes to targets[0] = id_vm
-        let graph_node = NodeGenome {
-            node_id: id_graph,
-            input_refs: vec![],
-            backend_def: BackendDef::Graph(GraphBackendDef {
-                internal_nodes: vec![
-                    GraphInternalNode {
-                        kind: GraphNodeKind::Constant(9.0),
-                        inputs: vec![],
-                        plasticity: None,
-                    },
-                    GraphInternalNode {
-                        kind: GraphNodeKind::CustomOutput(5),
-                        inputs: vec![GraphInput {
-                            source_idx: 0,
-                            weight: 1.0,
-                        }],
-                        plasticity: None,
-                    },
-                    // RouterOutput: 0.0 → targets[0]
-                    GraphInternalNode {
-                        kind: GraphNodeKind::RouterOutput,
-                        inputs: vec![],
-                        plasticity: None,
-                    },
-                ],
-            }),
-            targets: vec![id_vm],
-        };
-
-        // VM node: ReadInput(0) → UpstreamSlot(5) → r0 = 9.0
-        // ToBool(r0) → 1.0 → PushAction(1)+ExecuteActionQueue=Eat
-        let vm_node = NodeGenome {
-            node_id: id_vm,
-            input_refs: vec![InputReference::UpstreamSlot(5)],
-            backend_def: BackendDef::Vm(VmBackendDef {
-                register_count: 2,
-                constants: vec![],
-                program: vec![
-                    VmInstruction::ReadInput {
-                        dst: 0,
-                        ref_idx: 0,
-                        sub_idx: 0,
-                    }, // r0 = upstream_slots[5] = 9.0
-                    VmInstruction::ToBool { dst: 1, src: 0 }, // r1 = 1.0
-                    VmInstruction::JumpIfZero { cond: 1, offset: 2 }, // skip Eat if r1==0
-                    VmInstruction::PushAction { action_type: 1 }, // Eat
-                    VmInstruction::ExecuteActionQueue,
-                    VmInstruction::PushAction { action_type: 0 }, // NoOp fallback
-                    VmInstruction::ExecuteActionQueue,
-                ],
-            }),
-            targets: vec![],
-        };
-
-        let genome = CreatureGenome {
-            entry_node_id: id_graph,
-            nodes: vec![graph_node, vm_node],
-        };
-        let ss = empty_sensor_snapshot();
-        let mut energy = 1000.0f32;
-        let mut shared_mem = [0.0f32; 16];
-        let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
-        let config = default_config();
-
-        let output = execute_creature_mesh(
-            &genome,
-            &ss,
-            &mut energy,
-            &mut shared_mem,
-            &prev_shared_mem,
-            &mut gr,
-            &config,
-        );
-        assert_eq!(
-            output.actions,
-            vec![WorldAction::Eat],
-            "slot 5 should carry 9.0 from graph to VM node"
-        );
-    }
+    // ── Test 9: output_slots_passed_as_upstream — removed (used old GraphBackendDef) ──
 
     // ── Priority bid tests ───────────────────────────────────────────────
 
@@ -827,51 +678,5 @@ mod tests {
         );
     }
 
-    // ── Graph action-queue integration tests ─────────────────────────────
-
-    /// A single graph mesh node with PushAction(1) + ExecuteActionQueue
-    /// should produce MeshOutput.actions == [Eat].
-    #[test]
-    fn graph_node_pushes_action_and_terminates() {
-        let id0 = NodeId::new(0);
-        let genome = CreatureGenome {
-            entry_node_id: id0,
-            nodes: vec![NodeGenome {
-                node_id: id0,
-                input_refs: vec![],
-                backend_def: BackendDef::Graph(GraphBackendDef {
-                    internal_nodes: vec![
-                        GraphInternalNode {
-                            kind: GraphNodeKind::PushAction(1), // Eat
-                            inputs: vec![],
-                            plasticity: None,
-                        },
-                        GraphInternalNode {
-                            kind: GraphNodeKind::ExecuteActionQueue,
-                            inputs: vec![],
-                            plasticity: None,
-                        },
-                    ],
-                }),
-                targets: vec![],
-            }],
-        };
-        let ss = empty_sensor_snapshot();
-        let mut energy = 100.0f32;
-        let mut shared_mem = [0.0f32; 16];
-        let prev_shared_mem = [0.0f32; 16];
-        let mut gr = GraphRuntimeState::new();
-        let config = default_config();
-
-        let output = execute_creature_mesh(
-            &genome,
-            &ss,
-            &mut energy,
-            &mut shared_mem,
-            &prev_shared_mem,
-            &mut gr,
-            &config,
-        );
-        assert_eq!(output.actions, vec![WorldAction::Eat]);
-    }
+    // ── Graph action-queue integration tests — removed (used old GraphBackendDef) ──
 }

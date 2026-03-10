@@ -1,8 +1,11 @@
 use slotmap::SlotMap;
+use v3_core::config::MutationConfig;
 use v3_core::contracts::{CreatureId, NodeId, Position, WorldAction};
+use v3_core::creature::genome::cgp::{
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
+};
 use v3_core::creature::genome::{
-    BackendDef, CreatureGenome, GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind,
-    NodeGenome, VmBackendDef, VmInstruction,
+    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
 use v3_core::creature::state::CreatureState;
 use v3_core::kernel::WorldState;
@@ -21,26 +24,32 @@ fn routing_wraps_negative_index_to_reachable_downstream_node_e2e() {
     let id_noop = NodeId::new(1);
     let id_eat = NodeId::new(2);
 
+    // CGP graph: Constant(-1.0) → RouterOutput sink
+    let entry_def = {
+        let config = MutationConfig::default();
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        def.compute_nodes.push(ComputeNode {
+            kind: ComputeNodeKind::Constant(-1.0),
+            inputs: Vec::new(),
+            plasticity: None,
+        });
+        // Wire RouterOutput sink to CN0
+        if let Some(sink) = def
+            .output_sinks
+            .iter_mut()
+            .find(|s| s.kind == OutputSinkKind::RouterOutput)
+        {
+            sink.inputs.push(GraphEdge {
+                source: GraphSource::ComputeNode(0),
+                weight: 1.0,
+            });
+        }
+        def
+    };
     let entry = NodeGenome {
         node_id: id_entry,
         input_refs: vec![],
-        backend_def: BackendDef::Graph(GraphBackendDef {
-            internal_nodes: vec![
-                GraphInternalNode {
-                    kind: GraphNodeKind::Constant(-1.0),
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::RouterOutput,
-                    inputs: vec![GraphInput {
-                        source_idx: 0,
-                        weight: 1.0,
-                    }],
-                    plasticity: None,
-                },
-            ],
-        }),
+        backend_def: BackendDef::Graph(entry_def),
         targets: vec![id_noop, id_eat],
     };
     let noop = NodeGenome {
@@ -98,36 +107,44 @@ fn graph_state_persists_across_ticks_e2e() {
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
     let pos = Position::new(7, 7);
 
+    // CGP graph: Constant(1.0) → DecayIntegrator(0.5) → CustomOutput(0)
+    let state_def = {
+        let config = MutationConfig::default();
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        // CN0: Constant(1.0)
+        def.compute_nodes.push(ComputeNode {
+            kind: ComputeNodeKind::Constant(1.0),
+            inputs: Vec::new(),
+            plasticity: None,
+        });
+        // CN1: DecayIntegrator(0.5) with input from CN0
+        def.compute_nodes.push(ComputeNode {
+            kind: ComputeNodeKind::DecayIntegrator(0.5),
+            inputs: vec![GraphEdge {
+                source: GraphSource::ComputeNode(0),
+                weight: 1.0,
+            }],
+            plasticity: None,
+        });
+        // Wire CustomOutput(0) sink to CN1
+        if let Some(sink) = def
+            .output_sinks
+            .iter_mut()
+            .find(|s| s.kind == OutputSinkKind::CustomOutput(0))
+        {
+            sink.inputs.push(GraphEdge {
+                source: GraphSource::ComputeNode(1),
+                weight: 1.0,
+            });
+        }
+        def
+    };
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
             input_refs: vec![],
-            backend_def: BackendDef::Graph(GraphBackendDef {
-                internal_nodes: vec![
-                    GraphInternalNode {
-                        kind: GraphNodeKind::Constant(1.0),
-                        inputs: vec![],
-                        plasticity: None,
-                    },
-                    GraphInternalNode {
-                        kind: GraphNodeKind::DecayIntegrator(0.5),
-                        inputs: vec![GraphInput {
-                            source_idx: 0,
-                            weight: 1.0,
-                        }],
-                        plasticity: None,
-                    },
-                    GraphInternalNode {
-                        kind: GraphNodeKind::CustomOutput(0),
-                        inputs: vec![GraphInput {
-                            source_idx: 1,
-                            weight: 1.0,
-                        }],
-                        plasticity: None,
-                    },
-                ],
-            }),
+            backend_def: BackendDef::Graph(state_def),
             targets: vec![],
         }],
     };

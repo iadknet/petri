@@ -2,10 +2,12 @@ use std::collections::HashMap;
 
 use rand::Rng;
 
+use crate::config::MutationConfig;
 use crate::contracts::NodeId;
 use crate::creature::genome::analysis::{mesh_backward_slice, mesh_forward_slice};
+use crate::creature::genome::cgp::CgpGraphBackendDef;
 use crate::creature::genome::{
-    BackendDef, CreatureGenome, GraphBackendDef, NodeGenome, VmBackendDef, VmInstruction,
+    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
 use crate::mutation::reachability::biased_select_from;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
@@ -371,9 +373,9 @@ fn apply_swap_node_backend(
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let node = &mut genome.nodes[idx];
     node.backend_def = match &node.backend_def {
-        BackendDef::Vm(_) => BackendDef::Graph(GraphBackendDef {
-            internal_nodes: vec![],
-        }),
+        BackendDef::Vm(_) => BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs(
+            &MutationConfig::default(),
+        )),
         BackendDef::Graph(_) => BackendDef::Vm(VmBackendDef {
             register_count: 1,
             constants: vec![],
@@ -489,13 +491,10 @@ fn clone_and_remap_slice(genome: &mut CreatureGenome, gene_indices: &[usize], rn
     let pre_existing_count = genome.nodes.len();
     genome.nodes.extend(cloned);
 
-    // 50% chance: remap CustomOutput slots in cloned nodes to avoid clobbering
-    if rng.gen_bool(0.5) {
-        let offset = rng.gen_range(1u8..12); // 1-11, never 0 (no-op)
-        for idx in pre_existing_count..genome.nodes.len() {
-            genome.nodes[idx].backend_def.remap_output_slots(offset);
-        }
-    }
+    // Note: previously remapped CustomOutput slots in cloned Graph backends
+    // to avoid clobbering. CGP Graph backends have fixed output sinks (not
+    // remappable), and VM backends don't have CustomOutput node kinds, so
+    // this remapping step is now a no-op and has been removed.
 
     // Always add backlink from random pre-existing node to a random cloned node
     // to ensure reachability.

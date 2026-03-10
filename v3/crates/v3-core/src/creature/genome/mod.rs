@@ -1,8 +1,6 @@
 pub mod analysis;
 pub mod cgp;
-#[allow(dead_code)]
 pub(crate) mod cgp_analysis;
-#[allow(dead_code)]
 pub(crate) mod cgp_mesh_annotations;
 pub mod mesh_annotations;
 
@@ -341,29 +339,23 @@ impl GraphBackendDef {
 
 // ── Top-level genome types ────────────────────────────────────────────────────
 
-/// Backend definition: either VM or Graph.
+/// Backend definition: either VM or Graph (CGP three-layer model).
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub enum BackendDef {
     Vm(VmBackendDef),
-    Graph(GraphBackendDef),
+    Graph(cgp::CgpGraphBackendDef),
 }
 
 impl BackendDef {
     /// After an input_ref is removed at `removed_ref_idx`, update all internal
-    /// references. Graph: walks InputRef nodes. VM: walks ReadInput instructions.
-    /// Matching `ref_idx` → `u16::MAX` (invalidated). Above → decremented.
+    /// references. Graph: walks all edge containers (InputLeaf ref_idx).
+    /// VM: walks ReadInput instructions.
+    /// Matching ref_idx edges removed (Graph) or set to u16::MAX (VM).
+    /// Above → decremented.
     pub fn reindex_input_refs_after_removal(&mut self, removed_ref_idx: u16) {
         match self {
             BackendDef::Graph(gd) => {
-                for internal in &mut gd.internal_nodes {
-                    if let GraphNodeKind::InputRef { ref_idx, .. } = &mut internal.kind {
-                        if *ref_idx == removed_ref_idx {
-                            *ref_idx = u16::MAX;
-                        } else if *ref_idx > removed_ref_idx {
-                            *ref_idx -= 1;
-                        }
-                    }
-                }
+                gd.reindex_input_refs_after_removal(removed_ref_idx);
             }
             BackendDef::Vm(vm) => {
                 for instr in &mut vm.program {
@@ -373,22 +365,6 @@ impl BackendDef {
                         } else if *ref_idx > removed_ref_idx {
                             *ref_idx -= 1;
                         }
-                    }
-                }
-            }
-        }
-    }
-
-    /// Offset CustomOutput slot indices in Graph backends. No-op for VM.
-    /// Only remaps in-range slots (0..12). Out-of-range slots are junk
-    /// (runtime ignores writes to slot >= 12) and left untouched to
-    /// avoid u8 overflow.
-    pub fn remap_output_slots(&mut self, offset: u8) {
-        if let BackendDef::Graph(ref mut g) = self {
-            for node in &mut g.internal_nodes {
-                if let GraphNodeKind::CustomOutput(ref mut slot) = node.kind {
-                    if *slot < 12 {
-                        *slot = (*slot + offset) % 12;
                     }
                 }
             }
@@ -439,9 +415,27 @@ impl CreatureGenome {
                     score += vm.constants.len() as u32;
                 }
                 BackendDef::Graph(graph) => {
-                    score += graph.internal_nodes.len() as u32;
-                    for inode in &graph.internal_nodes {
-                        score += inode.inputs.len() as u32;
+                    // Count compute nodes + their edges
+                    score += graph.compute_nodes.len() as u32;
+                    for cn in &graph.compute_nodes {
+                        score += cn.inputs.len() as u32;
+                    }
+                    // Count wired output sinks (unwired are structural scaffolding)
+                    for sink in &graph.output_sinks {
+                        if !sink.inputs.is_empty() {
+                            score += 1 + sink.inputs.len() as u32;
+                        }
+                    }
+                    // Count wired action slots
+                    for slot in &graph.action_bank {
+                        let edges = slot.gate_inputs.len() + slot.param_inputs.len();
+                        if edges > 0 {
+                            score += 1 + edges as u32;
+                        }
+                    }
+                    // Count wired execute gate
+                    if !graph.execute_gate.inputs.is_empty() {
+                        score += 1 + graph.execute_gate.inputs.len() as u32;
                     }
                 }
             }
@@ -681,41 +675,49 @@ mod tests {
 
     #[test]
     fn genome_size_single_graph_node() {
-        // 1 node + 1 input_ref + 0 targets + 2 internal_nodes + (1 + 2) inputs = 7
+        use crate::config::MutationConfig;
+        use crate::creature::genome::cgp::{
+            CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
+        };
+        // 1 node + 1 input_ref + 0 targets + 2 compute_nodes + (1 + 2) compute edges = 7
+        // (unwired sinks, action bank, and execute gate add 0)
+        let mut cgp = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
+        cgp.compute_nodes = vec![
+            ComputeNode {
+                kind: ComputeNodeKind::Add,
+                inputs: vec![GraphEdge {
+                    source: GraphSource::InputLeaf {
+                        ref_idx: 0,
+                        sub_idx: 0,
+                    },
+                    weight: 1.0,
+                }],
+                plasticity: None,
+            },
+            ComputeNode {
+                kind: ComputeNodeKind::Sigmoid,
+                inputs: vec![
+                    GraphEdge {
+                        source: GraphSource::ComputeNode(0),
+                        weight: 0.5,
+                    },
+                    GraphEdge {
+                        source: GraphSource::InputLeaf {
+                            ref_idx: 0,
+                            sub_idx: 0,
+                        },
+                        weight: -0.3,
+                    },
+                ],
+                plasticity: None,
+            },
+        ];
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![NodeGenome {
                 node_id: NodeId::new(0),
                 input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
-                backend_def: BackendDef::Graph(GraphBackendDef {
-                    internal_nodes: vec![
-                        GraphInternalNode {
-                            kind: GraphNodeKind::InputRef {
-                                ref_idx: 0,
-                                sub_idx: 0,
-                            },
-                            inputs: vec![GraphInput {
-                                source_idx: 0,
-                                weight: 1.0,
-                            }],
-                            plasticity: None,
-                        },
-                        GraphInternalNode {
-                            kind: GraphNodeKind::Sigmoid,
-                            inputs: vec![
-                                GraphInput {
-                                    source_idx: 0,
-                                    weight: 0.5,
-                                },
-                                GraphInput {
-                                    source_idx: 1,
-                                    weight: -0.3,
-                                },
-                            ],
-                            plasticity: None,
-                        },
-                    ],
-                }),
+                backend_def: BackendDef::Graph(cgp),
                 targets: vec![],
             }],
         };
@@ -724,9 +726,17 @@ mod tests {
 
     #[test]
     fn genome_size_multi_node_mixed() {
+        use crate::config::MutationConfig;
+        use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNode, ComputeNodeKind};
         // Node 0 (VM): 1 + 0 inputs + 1 target + 1 program + 0 constants = 3
-        // Node 1 (Graph): 1 + 1 input + 0 targets + 1 internal + 0 graph_inputs = 3
+        // Node 1 (Graph): 1 + 1 input + 0 targets + 1 compute_node + 0 edges = 3
         // Total = 6
+        let mut cgp = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
+        cgp.compute_nodes = vec![ComputeNode {
+            kind: ComputeNodeKind::Constant(1.0),
+            inputs: vec![],
+            plasticity: None,
+        }];
         let genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![
@@ -743,13 +753,7 @@ mod tests {
                 NodeGenome {
                     node_id: NodeId::new(1),
                     input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
-                    backend_def: BackendDef::Graph(GraphBackendDef {
-                        internal_nodes: vec![GraphInternalNode {
-                            kind: GraphNodeKind::Constant(1.0),
-                            inputs: vec![],
-                            plasticity: None,
-                        }],
-                    }),
+                    backend_def: BackendDef::Graph(cgp),
                     targets: vec![],
                 },
             ],
@@ -854,76 +858,8 @@ mod tests {
         assert_eq!(genome.complexity(), genome.genome_size());
     }
 
-    // ── Gap 5: remap_output_slots tests ──
-
-    #[test]
-    fn remap_output_slots_offsets_graph_custom_outputs() {
-        let mut backend = BackendDef::Graph(GraphBackendDef {
-            internal_nodes: vec![GraphInternalNode {
-                kind: GraphNodeKind::CustomOutput(2),
-                inputs: vec![],
-                plasticity: None,
-            }],
-        });
-        backend.remap_output_slots(3);
-        if let BackendDef::Graph(ref g) = backend {
-            assert_eq!(
-                g.internal_nodes[0].kind,
-                GraphNodeKind::CustomOutput(5),
-                "2 + 3 = 5"
-            );
-        }
-    }
-
-    #[test]
-    fn remap_output_slots_wraps_within_12() {
-        let mut backend = BackendDef::Graph(GraphBackendDef {
-            internal_nodes: vec![GraphInternalNode {
-                kind: GraphNodeKind::CustomOutput(10),
-                inputs: vec![],
-                plasticity: None,
-            }],
-        });
-        backend.remap_output_slots(5);
-        if let BackendDef::Graph(ref g) = backend {
-            assert_eq!(
-                g.internal_nodes[0].kind,
-                GraphNodeKind::CustomOutput(3),
-                "10 + 5 = 15, 15 % 12 = 3"
-            );
-        }
-    }
-
-    #[test]
-    fn remap_output_slots_skips_out_of_range_slots() {
-        let mut backend = BackendDef::Graph(GraphBackendDef {
-            internal_nodes: vec![GraphInternalNode {
-                kind: GraphNodeKind::CustomOutput(200),
-                inputs: vec![],
-                plasticity: None,
-            }],
-        });
-        backend.remap_output_slots(5);
-        if let BackendDef::Graph(ref g) = backend {
-            assert_eq!(
-                g.internal_nodes[0].kind,
-                GraphNodeKind::CustomOutput(200),
-                "out-of-range slots must be left untouched"
-            );
-        }
-    }
-
-    #[test]
-    fn remap_output_slots_noop_for_vm() {
-        let mut backend = BackendDef::Vm(VmBackendDef {
-            register_count: 1,
-            constants: vec![],
-            program: vec![VmInstruction::Halt],
-        });
-        let before = backend.clone();
-        backend.remap_output_slots(5);
-        assert_eq!(backend, before, "VM backend must be unchanged");
-    }
+    // Old remap_output_slots tests deleted. The method tested old GraphNodeKind::CustomOutput
+    // remapping which does not exist in the CGP model (output sinks are structurally fixed).
 
     #[test]
     fn creature_genome_serde_roundtrip() {
@@ -1200,69 +1136,71 @@ mod tests {
 
     #[test]
     fn reindex_input_refs_after_removal_graph() {
-        // Graph backend with InputRef nodes at ref_idx 0, 1, 2.
+        // CGP Graph backend with InputLeaf edges at ref_idx 0, 1, 2.
         // Remove input_ref at index 1:
         // - ref_idx 0 → unchanged
-        // - ref_idx 1 → u16::MAX (invalidated)
+        // - ref_idx 1 → removed (edge dropped)
         // - ref_idx 2 → 1 (decremented)
-        let mut backend = BackendDef::Graph(GraphBackendDef {
-            internal_nodes: vec![
-                GraphInternalNode {
-                    kind: GraphNodeKind::InputRef {
+        use crate::config::MutationConfig;
+        use crate::creature::genome::cgp::{
+            CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
+        };
+        let mut cgp = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
+        cgp.compute_nodes = vec![ComputeNode {
+            kind: ComputeNodeKind::Add,
+            inputs: vec![
+                GraphEdge {
+                    source: GraphSource::InputLeaf {
                         ref_idx: 0,
                         sub_idx: 0,
                     },
-                    inputs: vec![],
-                    plasticity: None,
+                    weight: 1.0,
                 },
-                GraphInternalNode {
-                    kind: GraphNodeKind::InputRef {
+                GraphEdge {
+                    source: GraphSource::InputLeaf {
                         ref_idx: 1,
                         sub_idx: 3,
                     },
-                    inputs: vec![],
-                    plasticity: None,
+                    weight: 1.0,
                 },
-                GraphInternalNode {
-                    kind: GraphNodeKind::InputRef {
+                GraphEdge {
+                    source: GraphSource::InputLeaf {
                         ref_idx: 2,
                         sub_idx: 0,
                     },
-                    inputs: vec![],
-                    plasticity: None,
+                    weight: 1.0,
                 },
-                GraphInternalNode {
-                    kind: GraphNodeKind::Add,
-                    inputs: vec![],
-                    plasticity: None,
+                GraphEdge {
+                    source: GraphSource::ComputeNode(0),
+                    weight: 0.5,
                 },
             ],
-        });
+            plasticity: None,
+        }];
+        let mut backend = BackendDef::Graph(cgp);
         backend.reindex_input_refs_after_removal(1);
         if let BackendDef::Graph(ref g) = backend {
+            let edges = &g.compute_nodes[0].inputs;
+            // ref_idx 1 edge removed, 3 edges remain (0, 2→1, ComputeNode)
+            assert_eq!(edges.len(), 3, "edge at ref_idx 1 must be removed");
+            // ref_idx 0 → unchanged
             assert_eq!(
-                g.internal_nodes[0].kind,
-                GraphNodeKind::InputRef {
+                edges[0].source,
+                GraphSource::InputLeaf {
                     ref_idx: 0,
-                    sub_idx: 0
+                    sub_idx: 0,
                 }
             );
+            // ref_idx 2 → decremented to 1
             assert_eq!(
-                g.internal_nodes[1].kind,
-                GraphNodeKind::InputRef {
-                    ref_idx: u16::MAX,
-                    sub_idx: 3
-                }
-            );
-            assert_eq!(
-                g.internal_nodes[2].kind,
-                GraphNodeKind::InputRef {
+                edges[1].source,
+                GraphSource::InputLeaf {
                     ref_idx: 1,
-                    sub_idx: 0
+                    sub_idx: 0,
                 }
             );
-            // Non-InputRef node unchanged
-            assert_eq!(g.internal_nodes[3].kind, GraphNodeKind::Add);
+            // Non-InputLeaf edge unchanged
+            assert_eq!(edges[2].source, GraphSource::ComputeNode(0));
         } else {
             panic!("expected Graph");
         }

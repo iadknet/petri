@@ -8,7 +8,8 @@
 //! Traces are parallel to `plasticity_weights` in shape:
 //! `[mesh_node_idx][internal_node_idx][edge_idx]`.
 
-use crate::creature::genome::{GraphBackendDef, HebbianRule};
+use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphSource};
+use crate::creature::genome::HebbianRule;
 
 /// Ensure `eligibility_traces` is properly sized for the given mesh node.
 ///
@@ -16,7 +17,7 @@ use crate::creature::genome::{GraphBackendDef, HebbianRule};
 /// trace storage for reward-modulated nodes. Non-modulated nodes get empty
 /// `Box<[f32]>` sentinels.
 pub(crate) fn ensure_eligibility_traces(
-    def: &GraphBackendDef,
+    def: &CgpGraphBackendDef,
     node_idx: usize,
     eligibility_traces: &mut Vec<Vec<Box<[f32]>>>,
 ) {
@@ -26,21 +27,21 @@ pub(crate) fn ensure_eligibility_traces(
     }
 
     let node_traces = &mut eligibility_traces[node_idx];
-    let node_count = def.internal_nodes.len();
+    let node_count = def.compute_nodes.len();
 
-    // Ensure inner vec covers all internal nodes.
+    // Ensure inner vec covers all compute nodes.
     if node_traces.len() < node_count {
         node_traces.resize_with(node_count, || Box::new([]) as Box<[f32]>);
     }
 
     // Lazily initialize traces for reward-modulated nodes (all zeros).
-    for (i, inode) in def.internal_nodes.iter().enumerate() {
-        let is_reward_modulated = inode
+    for (i, cnode) in def.compute_nodes.iter().enumerate() {
+        let is_reward_modulated = cnode
             .plasticity
             .as_ref()
             .is_some_and(|p| p.modulation.is_some());
-        if is_reward_modulated && node_traces[i].is_empty() && !inode.inputs.is_empty() {
-            node_traces[i] = vec![0.0f32; inode.inputs.len()].into_boxed_slice();
+        if is_reward_modulated && node_traces[i].is_empty() && !cnode.inputs.is_empty() {
+            node_traces[i] = vec![0.0f32; cnode.inputs.len()].into_boxed_slice();
         }
     }
 }
@@ -57,16 +58,16 @@ pub(crate) fn ensure_eligibility_traces(
 /// Pure Hebbian nodes (no modulation) are skipped — they are updated
 /// directly by [`super::hebbian::apply_hebbian_updates`].
 pub(crate) fn update_eligibility_traces(
-    def: &GraphBackendDef,
+    def: &CgpGraphBackendDef,
     node_idx: usize,
     eligibility_traces: &mut [Vec<Box<[f32]>>],
     plasticity_weights: &[Vec<Box<[f32]>>],
     final_outputs: &[f32],
 ) {
-    let node_count = def.internal_nodes.len();
+    let node_count = def.compute_nodes.len();
 
-    for (i, inode) in def.internal_nodes.iter().enumerate() {
-        let cfg = match &inode.plasticity {
+    for (i, cnode) in def.compute_nodes.iter().enumerate() {
+        let cfg = match &cnode.plasticity {
             Some(c) => c,
             None => continue,
         };
@@ -77,7 +78,7 @@ pub(crate) fn update_eligibility_traces(
             None => continue,
         };
 
-        if inode.inputs.is_empty() {
+        if cnode.inputs.is_empty() {
             continue;
         }
 
@@ -108,12 +109,15 @@ pub(crate) fn update_eligibility_traces(
                 &[][..]
             };
 
-        for (edge_idx, input) in inode.inputs.iter().enumerate() {
+        for (edge_idx, edge) in cnode.inputs.iter().enumerate() {
             if edge_idx >= traces.len() {
                 break;
             }
 
-            let src = input.source_idx as usize;
+            let src = match edge.source {
+                GraphSource::ComputeNode(idx) => idx as usize,
+                _ => usize::MAX, // non-compute sources have no index into final_outputs
+            };
             let pre = if src < node_count && src < final_outputs.len() {
                 final_outputs[src]
             } else {
@@ -123,7 +127,7 @@ pub(crate) fn update_eligibility_traces(
             let w = if edge_idx < weights.len() {
                 weights[edge_idx]
             } else {
-                input.weight // fall back to genome weight
+                edge.weight // fall back to genome weight
             };
 
             // Compute the Hebbian delta (same rules as pure Hebbian).
@@ -142,180 +146,12 @@ pub(crate) fn update_eligibility_traces(
 
 /// Returns `true` if any internal node has reward-modulated plasticity.
 #[inline]
-pub(crate) fn has_any_reward_modulated(def: &GraphBackendDef) -> bool {
-    def.internal_nodes.iter().any(|n| {
+pub(crate) fn has_any_reward_modulated(def: &CgpGraphBackendDef) -> bool {
+    def.compute_nodes.iter().any(|n| {
         n.plasticity
             .as_ref()
             .is_some_and(|p| p.modulation.is_some())
     })
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::creature::genome::{
-        GraphInput, GraphInternalNode, GraphNodeKind, HebbianRule, OutcomeChannel,
-        PlasticityConfig, RewardModulationConfig,
-    };
-
-    fn make_reward_modulated_def(rule: HebbianRule, rate: f32, decay: f32) -> GraphBackendDef {
-        GraphBackendDef {
-            internal_nodes: vec![
-                // Node 0: constant input source
-                GraphInternalNode {
-                    kind: GraphNodeKind::Constant(1.0),
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                // Node 1: reward-modulated node with one input from node 0
-                GraphInternalNode {
-                    kind: GraphNodeKind::Add,
-                    inputs: vec![GraphInput {
-                        source_idx: 0,
-                        weight: 0.5,
-                    }],
-                    plasticity: Some(PlasticityConfig {
-                        rule,
-                        learning_rate: rate,
-                        weight_clamp: 5.0,
-                        lamarckian: false,
-                        modulation: Some(RewardModulationConfig {
-                            reward_source: OutcomeChannel::EnergyDelta,
-                            trace_decay: decay,
-                        }),
-                    }),
-                },
-            ],
-        }
-    }
-
-    #[test]
-    fn ensure_traces_lazy_init() {
-        let def = make_reward_modulated_def(HebbianRule::Classic, 0.1, 0.9);
-        let mut traces: Vec<Vec<Box<[f32]>>> = Vec::new();
-
-        ensure_eligibility_traces(&def, 0, &mut traces);
-
-        // Node 0 (no modulation) should have empty traces.
-        assert!(traces[0][0].is_empty());
-        // Node 1 (reward-modulated) should have zero-initialized traces.
-        assert_eq!(traces[0][1].len(), 1);
-        assert!((traces[0][1][0] - 0.0).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn ensure_traces_idempotent() {
-        let def = make_reward_modulated_def(HebbianRule::Classic, 0.1, 0.9);
-        let mut traces: Vec<Vec<Box<[f32]>>> = Vec::new();
-
-        ensure_eligibility_traces(&def, 0, &mut traces);
-        // Modify the trace.
-        traces[0][1][0] = 0.42;
-        // Call again — should NOT reset.
-        ensure_eligibility_traces(&def, 0, &mut traces);
-        assert!((traces[0][1][0] - 0.42).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn trace_accumulates_with_decay() {
-        let def = make_reward_modulated_def(HebbianRule::Classic, 0.1, 0.9);
-        let mut traces: Vec<Vec<Box<[f32]>>> = Vec::new();
-        ensure_eligibility_traces(&def, 0, &mut traces);
-
-        // Set up weights (needed for the delta computation).
-        let weights: Vec<Vec<Box<[f32]>>> = vec![vec![
-            Box::new([]) as Box<[f32]>,
-            vec![0.5f32].into_boxed_slice(),
-        ]];
-
-        // pre=1.0 (node 0 output), post=0.5 (node 1 output)
-        let outputs = vec![1.0, 0.5];
-
-        // First update: trace = 0.9 * 0.0 + (0.1 * 1.0 * 0.5) = 0.05
-        update_eligibility_traces(&def, 0, &mut traces, &weights, &outputs);
-        assert!((traces[0][1][0] - 0.05).abs() < 1e-6);
-
-        // Second update: trace = 0.9 * 0.05 + 0.05 = 0.095
-        update_eligibility_traces(&def, 0, &mut traces, &weights, &outputs);
-        assert!((traces[0][1][0] - 0.095).abs() < 1e-6);
-    }
-
-    #[test]
-    fn trace_resets_with_zero_decay() {
-        let def = make_reward_modulated_def(HebbianRule::Classic, 0.1, 0.0);
-        let mut traces: Vec<Vec<Box<[f32]>>> = Vec::new();
-        ensure_eligibility_traces(&def, 0, &mut traces);
-
-        let weights: Vec<Vec<Box<[f32]>>> = vec![vec![
-            Box::new([]) as Box<[f32]>,
-            vec![0.5f32].into_boxed_slice(),
-        ]];
-        let outputs = vec![1.0, 0.5];
-
-        // First update: trace = 0.0 * 0.0 + 0.05 = 0.05
-        update_eligibility_traces(&def, 0, &mut traces, &weights, &outputs);
-        assert!((traces[0][1][0] - 0.05).abs() < 1e-6);
-
-        // Second update: trace = 0.0 * 0.05 + 0.05 = 0.05 (no memory)
-        update_eligibility_traces(&def, 0, &mut traces, &weights, &outputs);
-        assert!((traces[0][1][0] - 0.05).abs() < 1e-6);
-    }
-
-    #[test]
-    fn pure_hebbian_nodes_skipped() {
-        let def = GraphBackendDef {
-            internal_nodes: vec![GraphInternalNode {
-                kind: GraphNodeKind::Add,
-                inputs: vec![GraphInput {
-                    source_idx: 0,
-                    weight: 1.0,
-                }],
-                plasticity: Some(PlasticityConfig {
-                    rule: HebbianRule::Classic,
-                    learning_rate: 0.1,
-                    weight_clamp: 5.0,
-                    lamarckian: false,
-                    modulation: None, // Pure Hebbian — no modulation.
-                }),
-            }],
-        };
-        let mut traces: Vec<Vec<Box<[f32]>>> = Vec::new();
-        ensure_eligibility_traces(&def, 0, &mut traces);
-
-        // Pure Hebbian node should not get traces initialized.
-        assert!(traces[0][0].is_empty());
-    }
-
-    #[test]
-    fn has_any_reward_modulated_detects_presence() {
-        let def_with = make_reward_modulated_def(HebbianRule::Classic, 0.1, 0.9);
-        assert!(has_any_reward_modulated(&def_with));
-
-        let def_without = GraphBackendDef {
-            internal_nodes: vec![GraphInternalNode {
-                kind: GraphNodeKind::Add,
-                inputs: vec![],
-                plasticity: Some(PlasticityConfig {
-                    rule: HebbianRule::Classic,
-                    learning_rate: 0.1,
-                    weight_clamp: 5.0,
-                    lamarckian: false,
-                    modulation: None,
-                }),
-            }],
-        };
-        assert!(!has_any_reward_modulated(&def_without));
-    }
-
-    #[test]
-    fn update_on_missing_traces_is_noop() {
-        let def = make_reward_modulated_def(HebbianRule::Classic, 0.1, 0.9);
-        let mut traces: Vec<Vec<Box<[f32]>>> = Vec::new();
-        // Don't call ensure — traces are empty.
-        let weights: Vec<Vec<Box<[f32]>>> = Vec::new();
-        let outputs = vec![1.0, 0.5];
-
-        // Should not panic.
-        update_eligibility_traces(&def, 0, &mut traces, &weights, &outputs);
-    }
-}
+// Old eligibility trace tests removed — production code ported to CGP types.

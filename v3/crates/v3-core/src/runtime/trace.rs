@@ -5,7 +5,8 @@
 //! pass-by-pass detail for graph nodes.
 
 use crate::contracts::{InputReference, NodeId, WorldAction};
-use crate::creature::genome::{GraphNodeKind, VmInstruction};
+use crate::creature::genome::cgp::ComputeNodeKind;
+use crate::creature::genome::VmInstruction;
 use crate::sensors::perception::PerceptionSnapshot;
 use crate::sensors::static_inputs::StaticInputs;
 use serde::Serialize;
@@ -193,43 +194,32 @@ pub struct GraphNodeEvalTrace {
     pub output: f32,
 }
 
-/// Map a [`GraphNodeKind`] variant to a static string label.
+/// Map a [`ComputeNodeKind`] variant to a static string label.
 ///
 /// Uses `&'static str` to avoid heap allocation per node evaluation
 /// in traced passes (`anti-format-hot-path`).
 #[inline]
-pub fn kind_label(kind: &GraphNodeKind) -> &'static str {
+pub fn kind_label(kind: &ComputeNodeKind) -> &'static str {
     match kind {
-        GraphNodeKind::InputRef { .. } => "InputRef",
-        GraphNodeKind::Constant(_) => "Constant",
-        GraphNodeKind::Add => "Add",
-        GraphNodeKind::Multiply => "Multiply",
-        GraphNodeKind::Negate => "Negate",
-        GraphNodeKind::Abs => "Abs",
-        GraphNodeKind::Min => "Min",
-        GraphNodeKind::Max => "Max",
-        GraphNodeKind::Threshold(_) => "Threshold",
-        GraphNodeKind::GreaterThan => "GreaterThan",
-        GraphNodeKind::Sigmoid => "Sigmoid",
-        GraphNodeKind::Tanh => "Tanh",
-        GraphNodeKind::Relu => "Relu",
-        GraphNodeKind::Select => "Select",
-        GraphNodeKind::Clamp01 => "Clamp01",
-        GraphNodeKind::WeightedSum => "WeightedSum",
-        GraphNodeKind::DecayIntegrator(_) => "DecayIntegrator",
-        GraphNodeKind::Momentum(_) => "Momentum",
-        GraphNodeKind::Oscillator(_) => "Oscillator",
-        GraphNodeKind::AdaptiveGain => "AdaptiveGain",
-        GraphNodeKind::CustomOutput(_) => "CustomOutput",
-        GraphNodeKind::RouterOutput => "RouterOutput",
-        GraphNodeKind::WriteActionMeta(_) => "WriteActionMeta",
-        GraphNodeKind::PushAction(_) => "PushAction",
-        GraphNodeKind::PopAction => "PopAction",
-        GraphNodeKind::ExecuteActionQueue => "ExecuteActionQueue",
-        GraphNodeKind::ReadSlot(_) => "ReadSlot",
-        GraphNodeKind::ReadSlotPrev(_) => "ReadSlotPrev",
-        GraphNodeKind::WriteSlot(_) => "WriteSlot",
-        GraphNodeKind::ClearSlot(_) => "ClearSlot",
+        ComputeNodeKind::Constant(_) => "Constant",
+        ComputeNodeKind::Add => "Add",
+        ComputeNodeKind::Multiply => "Multiply",
+        ComputeNodeKind::Negate => "Negate",
+        ComputeNodeKind::Abs => "Abs",
+        ComputeNodeKind::Min => "Min",
+        ComputeNodeKind::Max => "Max",
+        ComputeNodeKind::Threshold(_) => "Threshold",
+        ComputeNodeKind::GreaterThan => "GreaterThan",
+        ComputeNodeKind::Sigmoid => "Sigmoid",
+        ComputeNodeKind::Tanh => "Tanh",
+        ComputeNodeKind::Relu => "Relu",
+        ComputeNodeKind::Select => "Select",
+        ComputeNodeKind::Clamp01 => "Clamp01",
+        ComputeNodeKind::WeightedSum => "WeightedSum",
+        ComputeNodeKind::DecayIntegrator(_) => "DecayIntegrator",
+        ComputeNodeKind::Momentum(_) => "Momentum",
+        ComputeNodeKind::Oscillator(_) => "Oscillator",
+        ComputeNodeKind::AdaptiveGain => "AdaptiveGain",
     }
 }
 
@@ -358,51 +348,30 @@ mod tests {
 
     #[test]
     fn kind_label_covers_all_variants() {
+        use crate::creature::genome::cgp::ComputeNodeKind;
+
+        assert_eq!(kind_label(&ComputeNodeKind::Constant(1.0)), "Constant");
+        assert_eq!(kind_label(&ComputeNodeKind::Add), "Add");
+        assert_eq!(kind_label(&ComputeNodeKind::Multiply), "Multiply");
+        assert_eq!(kind_label(&ComputeNodeKind::Negate), "Negate");
+        assert_eq!(kind_label(&ComputeNodeKind::Abs), "Abs");
+        assert_eq!(kind_label(&ComputeNodeKind::Min), "Min");
+        assert_eq!(kind_label(&ComputeNodeKind::Max), "Max");
+        assert_eq!(kind_label(&ComputeNodeKind::Threshold(0.5)), "Threshold");
+        assert_eq!(kind_label(&ComputeNodeKind::GreaterThan), "GreaterThan");
+        assert_eq!(kind_label(&ComputeNodeKind::Sigmoid), "Sigmoid");
+        assert_eq!(kind_label(&ComputeNodeKind::Tanh), "Tanh");
+        assert_eq!(kind_label(&ComputeNodeKind::Relu), "Relu");
+        assert_eq!(kind_label(&ComputeNodeKind::Select), "Select");
+        assert_eq!(kind_label(&ComputeNodeKind::Clamp01), "Clamp01");
+        assert_eq!(kind_label(&ComputeNodeKind::WeightedSum), "WeightedSum");
         assert_eq!(
-            kind_label(&GraphNodeKind::InputRef {
-                ref_idx: 0,
-                sub_idx: 0
-            }),
-            "InputRef"
-        );
-        assert_eq!(kind_label(&GraphNodeKind::Constant(1.0)), "Constant");
-        assert_eq!(kind_label(&GraphNodeKind::Add), "Add");
-        assert_eq!(kind_label(&GraphNodeKind::Multiply), "Multiply");
-        assert_eq!(kind_label(&GraphNodeKind::Negate), "Negate");
-        assert_eq!(kind_label(&GraphNodeKind::Abs), "Abs");
-        assert_eq!(kind_label(&GraphNodeKind::Min), "Min");
-        assert_eq!(kind_label(&GraphNodeKind::Max), "Max");
-        assert_eq!(kind_label(&GraphNodeKind::Threshold(0.5)), "Threshold");
-        assert_eq!(kind_label(&GraphNodeKind::GreaterThan), "GreaterThan");
-        assert_eq!(kind_label(&GraphNodeKind::Sigmoid), "Sigmoid");
-        assert_eq!(kind_label(&GraphNodeKind::Tanh), "Tanh");
-        assert_eq!(kind_label(&GraphNodeKind::Relu), "Relu");
-        assert_eq!(kind_label(&GraphNodeKind::Select), "Select");
-        assert_eq!(kind_label(&GraphNodeKind::Clamp01), "Clamp01");
-        assert_eq!(kind_label(&GraphNodeKind::WeightedSum), "WeightedSum");
-        assert_eq!(
-            kind_label(&GraphNodeKind::DecayIntegrator(0.5)),
+            kind_label(&ComputeNodeKind::DecayIntegrator(0.5)),
             "DecayIntegrator"
         );
-        assert_eq!(kind_label(&GraphNodeKind::Momentum(0.5)), "Momentum");
-        assert_eq!(kind_label(&GraphNodeKind::Oscillator(1.0)), "Oscillator");
-        assert_eq!(kind_label(&GraphNodeKind::AdaptiveGain), "AdaptiveGain");
-        assert_eq!(kind_label(&GraphNodeKind::CustomOutput(0)), "CustomOutput");
-        assert_eq!(kind_label(&GraphNodeKind::RouterOutput), "RouterOutput");
-        assert_eq!(
-            kind_label(&GraphNodeKind::WriteActionMeta(0)),
-            "WriteActionMeta"
-        );
-        assert_eq!(kind_label(&GraphNodeKind::PushAction(1)), "PushAction");
-        assert_eq!(kind_label(&GraphNodeKind::PopAction), "PopAction");
-        assert_eq!(
-            kind_label(&GraphNodeKind::ExecuteActionQueue),
-            "ExecuteActionQueue"
-        );
-        assert_eq!(kind_label(&GraphNodeKind::ReadSlot(0)), "ReadSlot");
-        assert_eq!(kind_label(&GraphNodeKind::ReadSlotPrev(0)), "ReadSlotPrev");
-        assert_eq!(kind_label(&GraphNodeKind::WriteSlot(0)), "WriteSlot");
-        assert_eq!(kind_label(&GraphNodeKind::ClearSlot(0)), "ClearSlot");
+        assert_eq!(kind_label(&ComputeNodeKind::Momentum(0.5)), "Momentum");
+        assert_eq!(kind_label(&ComputeNodeKind::Oscillator(1.0)), "Oscillator");
+        assert_eq!(kind_label(&ComputeNodeKind::AdaptiveGain), "AdaptiveGain");
     }
 
     #[test]

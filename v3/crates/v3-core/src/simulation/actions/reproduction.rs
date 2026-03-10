@@ -1,5 +1,6 @@
 use rand::Rng;
 
+use super::cgp_reproduction;
 use crate::contracts::{CreatureId, Direction};
 use crate::creature::action_log::ActionLog;
 use crate::creature::genome::{BackendDef, CreatureGenome};
@@ -21,7 +22,7 @@ fn build_child_plasticity_weights(
     let mut result: Vec<Vec<Box<[f32]>>> = Vec::new();
 
     for (mesh_idx, mesh_node) in child_genome.nodes.iter().enumerate() {
-        let graph_def = match &mesh_node.backend_def {
+        let cgp_def = match &mesh_node.backend_def {
             BackendDef::Graph(g) => g,
             _ => continue, // VM nodes have no plasticity weights
         };
@@ -31,29 +32,11 @@ fn build_child_plasticity_weights(
             result.resize_with(mesh_idx + 1, Vec::new);
         }
 
-        let node_count = graph_def.internal_nodes.len();
-        let mut inner: Vec<Box<[f32]>> = Vec::with_capacity(node_count);
-
-        for (inode_idx, inode) in graph_def.internal_nodes.iter().enumerate() {
-            let should_copy = inode.plasticity.as_ref().is_some_and(|cfg| cfg.lamarckian);
-
-            if should_copy {
-                // Try to copy parent's learned weights for this mesh+internal node.
-                let parent_weights = parent_plasticity
-                    .get(mesh_idx)
-                    .and_then(|v| v.get(inode_idx))
-                    .filter(|w| !w.is_empty());
-
-                if let Some(pw) = parent_weights {
-                    inner.push(pw.clone());
-                } else {
-                    // Parent had no learned weights yet — child will lazy-init from genome.
-                    inner.push(Box::new([]));
-                }
-            } else {
-                inner.push(Box::new([]));
-            }
-        }
+        let parent_weights_for_node = parent_plasticity
+            .get(mesh_idx)
+            .map_or(&[] as &[_], |v| v.as_slice());
+        let inner =
+            cgp_reproduction::build_cgp_child_plasticity_weights(cgp_def, parent_weights_for_node);
 
         result[mesh_idx] = inner;
     }
@@ -308,24 +291,26 @@ pub fn apply_reproduce(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::creature::genome::{
-        GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind, HebbianRule,
-        PlasticityConfig,
-    };
+    use crate::config::MutationConfig;
+    use crate::creature::genome::cgp::{ComputeNode, ComputeNodeKind, GraphEdge, GraphSource};
+    use crate::creature::genome::{HebbianRule, PlasticityConfig};
 
-    /// Helper: builds a genome with a single Graph mesh node containing the given internal nodes.
-    fn genome_with_graph_nodes(nodes: Vec<GraphInternalNode>) -> CreatureGenome {
+    /// Helper: builds a genome with a single Graph mesh node containing the given compute nodes.
+    fn genome_with_cgp_compute_nodes(compute_nodes: Vec<ComputeNode>) -> CreatureGenome {
         use crate::contracts::NodeId;
         use crate::creature::genome::NodeGenome;
+
+        let config = MutationConfig::default();
+        let mut def =
+            crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        def.compute_nodes = compute_nodes;
 
         CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![NodeGenome {
                 node_id: NodeId::new(0),
                 input_refs: vec![],
-                backend_def: BackendDef::Graph(GraphBackendDef {
-                    internal_nodes: nodes,
-                }),
+                backend_def: BackendDef::Graph(def),
                 targets: vec![],
             }],
         }
@@ -333,16 +318,16 @@ mod tests {
 
     #[test]
     fn lamarckian_copies_parent_learned_weights() {
-        let genome = genome_with_graph_nodes(vec![
-            GraphInternalNode {
-                kind: GraphNodeKind::Constant(1.0),
+        let genome = genome_with_cgp_compute_nodes(vec![
+            ComputeNode {
+                kind: ComputeNodeKind::Constant(1.0),
                 inputs: vec![],
                 plasticity: None,
             },
-            GraphInternalNode {
-                kind: GraphNodeKind::Add,
-                inputs: vec![GraphInput {
-                    source_idx: 0,
+            ComputeNode {
+                kind: ComputeNodeKind::Add,
+                inputs: vec![GraphEdge {
+                    source: GraphSource::ComputeNode(0),
                     weight: 0.5,
                 }],
                 plasticity: Some(PlasticityConfig {
@@ -357,33 +342,33 @@ mod tests {
 
         // Parent has learned weight 0.9 (drifted from genome 0.5).
         let parent_plasticity: Vec<Vec<Box<[f32]>>> = vec![vec![
-            Box::new([]) as Box<[f32]>, // node 0: no Hebbian
-            Box::new([0.9]),            // node 1: learned weight
+            Box::new([]) as Box<[f32]>, // CN0: no Hebbian
+            Box::new([0.9]),            // CN1: learned weight
         ]];
 
         let child_hw = build_child_plasticity_weights(&genome, &parent_plasticity);
 
         assert_eq!(child_hw.len(), 1);
         assert_eq!(child_hw[0].len(), 2);
-        // Node 0 (no Hebbian): empty
+        // CN0 (no Hebbian): empty
         assert!(child_hw[0][0].is_empty());
-        // Node 1 (Lamarckian): copied from parent
+        // CN1 (Lamarckian): copied from parent
         assert_eq!(child_hw[0][1].len(), 1);
         assert!((child_hw[0][1][0] - 0.9).abs() < 1e-6);
     }
 
     #[test]
     fn darwinian_resets_to_empty() {
-        let genome = genome_with_graph_nodes(vec![
-            GraphInternalNode {
-                kind: GraphNodeKind::Constant(1.0),
+        let genome = genome_with_cgp_compute_nodes(vec![
+            ComputeNode {
+                kind: ComputeNodeKind::Constant(1.0),
                 inputs: vec![],
                 plasticity: None,
             },
-            GraphInternalNode {
-                kind: GraphNodeKind::Add,
-                inputs: vec![GraphInput {
-                    source_idx: 0,
+            ComputeNode {
+                kind: ComputeNodeKind::Add,
+                inputs: vec![GraphEdge {
+                    source: GraphSource::ComputeNode(0),
                     weight: 0.5,
                 }],
                 plasticity: Some(PlasticityConfig {
@@ -404,18 +389,18 @@ mod tests {
 
         assert_eq!(child_hw.len(), 1);
         assert_eq!(child_hw[0].len(), 2);
-        // Node 0 (no Hebbian): empty
+        // CN0 (no Hebbian): empty
         assert!(child_hw[0][0].is_empty());
-        // Node 1 (Darwinian): empty — will lazy-init from genome weights on first tick
+        // CN1 (Darwinian): empty — will lazy-init from genome weights on first tick
         assert!(child_hw[0][1].is_empty());
     }
 
     #[test]
     fn lamarckian_with_no_parent_weights_returns_empty() {
-        let genome = genome_with_graph_nodes(vec![GraphInternalNode {
-            kind: GraphNodeKind::Add,
-            inputs: vec![GraphInput {
-                source_idx: 0,
+        let genome = genome_with_cgp_compute_nodes(vec![ComputeNode {
+            kind: ComputeNodeKind::Add,
+            inputs: vec![GraphEdge {
+                source: GraphSource::ComputeNode(0),
                 weight: 0.5,
             }],
             plasticity: Some(PlasticityConfig {

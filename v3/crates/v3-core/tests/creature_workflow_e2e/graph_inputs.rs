@@ -1,12 +1,13 @@
 use slotmap::SlotMap;
+use v3_core::config::MutationConfig;
 use v3_core::contracts::{
     CreatureId, Direction, DynamicIntrospectionKey, InputReference, NodeId, Position,
     StaticIntrospectionKey, WorldAction, WorldInputKey,
 };
-use v3_core::creature::genome::{
-    BackendDef, CreatureGenome, GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind,
-    NodeGenome,
+use v3_core::creature::genome::cgp::{
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
+use v3_core::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use v3_core::creature::state::CreatureState;
 use v3_core::kernel::WorldState;
 use v3_core::simulation::Simulation;
@@ -59,57 +60,78 @@ fn graph_reads_all_neighbor_sensor_directions_e2e() {
         InputReference::World(WorldInputKey::NeighborOccupiedRing), // ref 3: compound(8)
     ];
 
-    // Build 25 internal nodes: 1 scalar FoodHere + 8×3 compound ring sub-indices.
-    let mut internal_nodes: Vec<GraphInternalNode> = Vec::with_capacity(25);
-    // Node 0: FoodHere (scalar, sub_idx ignored)
-    internal_nodes.push(GraphInternalNode {
-        kind: GraphNodeKind::InputRef {
-            ref_idx: 0,
-            sub_idx: 0,
-        },
-        inputs: vec![],
-        plasticity: None,
-    });
-    // Nodes 1..=8: NeighborFoodRing, sub_idx = direction index 0..7
-    for dir_idx in 0u16..8 {
-        internal_nodes.push(GraphInternalNode {
-            kind: GraphNodeKind::InputRef {
-                ref_idx: 1,
-                sub_idx: dir_idx,
-            },
-            inputs: vec![],
+    // Build 25 compute nodes: each reads an InputLeaf via a single edge on an Add node.
+    // CN0: FoodHere (scalar)
+    // CN1..=8: NeighborFoodRing, sub_idx = direction index 0..7
+    // CN9..=16: NeighborBarrierRing, sub_idx = direction index 0..7
+    // CN17..=24: NeighborOccupiedRing, sub_idx = direction index 0..7
+    let graph_def = {
+        let config = MutationConfig::default();
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+
+        // CN0: FoodHere
+        def.compute_nodes.push(ComputeNode {
+            kind: ComputeNodeKind::Add,
+            inputs: vec![GraphEdge {
+                source: GraphSource::InputLeaf {
+                    ref_idx: 0,
+                    sub_idx: 0,
+                },
+                weight: 1.0,
+            }],
             plasticity: None,
         });
-    }
-    // Nodes 9..=16: NeighborBarrierRing, sub_idx = direction index 0..7
-    for dir_idx in 0u16..8 {
-        internal_nodes.push(GraphInternalNode {
-            kind: GraphNodeKind::InputRef {
-                ref_idx: 2,
-                sub_idx: dir_idx,
-            },
-            inputs: vec![],
-            plasticity: None,
-        });
-    }
-    // Nodes 17..=24: NeighborOccupiedRing, sub_idx = direction index 0..7
-    for dir_idx in 0u16..8 {
-        internal_nodes.push(GraphInternalNode {
-            kind: GraphNodeKind::InputRef {
-                ref_idx: 3,
-                sub_idx: dir_idx,
-            },
-            inputs: vec![],
-            plasticity: None,
-        });
-    }
+        // CN1..=8: NeighborFoodRing per direction
+        for dir_idx in 0u16..8 {
+            def.compute_nodes.push(ComputeNode {
+                kind: ComputeNodeKind::Add,
+                inputs: vec![GraphEdge {
+                    source: GraphSource::InputLeaf {
+                        ref_idx: 1,
+                        sub_idx: dir_idx,
+                    },
+                    weight: 1.0,
+                }],
+                plasticity: None,
+            });
+        }
+        // CN9..=16: NeighborBarrierRing per direction
+        for dir_idx in 0u16..8 {
+            def.compute_nodes.push(ComputeNode {
+                kind: ComputeNodeKind::Add,
+                inputs: vec![GraphEdge {
+                    source: GraphSource::InputLeaf {
+                        ref_idx: 2,
+                        sub_idx: dir_idx,
+                    },
+                    weight: 1.0,
+                }],
+                plasticity: None,
+            });
+        }
+        // CN17..=24: NeighborOccupiedRing per direction
+        for dir_idx in 0u16..8 {
+            def.compute_nodes.push(ComputeNode {
+                kind: ComputeNodeKind::Add,
+                inputs: vec![GraphEdge {
+                    source: GraphSource::InputLeaf {
+                        ref_idx: 3,
+                        sub_idx: dir_idx,
+                    },
+                    weight: 1.0,
+                }],
+                plasticity: None,
+            });
+        }
+        def
+    };
 
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
             input_refs,
-            backend_def: BackendDef::Graph(GraphBackendDef { internal_nodes }),
+            backend_def: BackendDef::Graph(graph_def),
             targets: vec![],
         }],
     };
@@ -202,33 +224,47 @@ fn graph_reads_inputs_and_writes_outputs_e2e() {
         0,                              // UpstreamSlot: scalar
     ];
 
-    let mut internal_nodes: Vec<GraphInternalNode> = Vec::new();
-    for (i, &sub_idx) in sub_indices.iter().enumerate().take(input_refs.len()) {
-        let input_node_idx = (i * 2) as u16;
-        internal_nodes.push(GraphInternalNode {
-            kind: GraphNodeKind::InputRef {
-                ref_idx: i as u16,
-                sub_idx,
-            },
-            inputs: vec![],
-            plasticity: None,
-        });
-        internal_nodes.push(GraphInternalNode {
-            kind: GraphNodeKind::CustomOutput(i as u8),
-            inputs: vec![GraphInput {
-                source_idx: input_node_idx,
-                weight: 1.0,
-            }],
-            plasticity: None,
-        });
-    }
+    // Build CGP graph: one compute node per input ref (Add with InputLeaf edge),
+    // each wired to the corresponding CustomOutput sink.
+    let graph_def = {
+        let config = MutationConfig::default();
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+
+        for (i, &sub_idx) in sub_indices.iter().enumerate().take(input_refs.len()) {
+            // Add compute node reading InputLeaf(ref_idx=i, sub_idx)
+            def.compute_nodes.push(ComputeNode {
+                kind: ComputeNodeKind::Add,
+                inputs: vec![GraphEdge {
+                    source: GraphSource::InputLeaf {
+                        ref_idx: i as u16,
+                        sub_idx,
+                    },
+                    weight: 1.0,
+                }],
+                plasticity: None,
+            });
+            // Wire CustomOutput(i) sink to the compute node we just added
+            let cn_idx = def.compute_nodes.len() - 1;
+            if let Some(sink) = def
+                .output_sinks
+                .iter_mut()
+                .find(|s| s.kind == OutputSinkKind::CustomOutput(i as u8))
+            {
+                sink.inputs.push(GraphEdge {
+                    source: GraphSource::ComputeNode(cn_idx as u16),
+                    weight: 1.0,
+                });
+            }
+        }
+        def
+    };
 
     let target_genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
             input_refs,
-            backend_def: BackendDef::Graph(GraphBackendDef { internal_nodes }),
+            backend_def: BackendDef::Graph(graph_def),
             targets: vec![],
         }],
     };

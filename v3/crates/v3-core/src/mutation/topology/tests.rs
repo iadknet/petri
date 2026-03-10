@@ -266,13 +266,15 @@ fn copy_node_deep_copies_vm_backend() {
 #[test]
 fn copy_node_deep_copies_graph_backend() {
     // Swap one founder node to Graph first, then copy.
+    use crate::config::MutationConfig;
+    use crate::creature::genome::cgp::CgpGraphBackendDef;
     let mut found = false;
     for seed in 0u64..100 {
         let mut genome = v3alpha1_founder_genome();
-        // Swap node 1 to Graph backend.
-        genome.nodes[1].backend_def = BackendDef::Graph(GraphBackendDef {
-            internal_nodes: vec![],
-        });
+        // Swap node 1 to CGP Graph backend.
+        genome.nodes[1].backend_def = BackendDef::Graph(
+            CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default()),
+        );
         let mut r = rng(seed);
         TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
         let new_node = genome.nodes.last().unwrap();
@@ -846,83 +848,8 @@ fn splice_node_new_node_gets_fresh_node_id() {
     );
 }
 
-// ── Gap 5: Output slot remapping in clones tests ──
-
-#[test]
-fn clone_remap_slice_sometimes_offsets_custom_outputs() {
-    use crate::creature::genome::{GraphBackendDef, GraphInternalNode, GraphNodeKind};
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Graph(GraphBackendDef {
-                internal_nodes: vec![GraphInternalNode {
-                    kind: GraphNodeKind::CustomOutput(2),
-                    inputs: vec![],
-                    plasticity: None,
-                }],
-            }),
-            targets: vec![],
-        }],
-    };
-    let mut saw_different = false;
-    for seed in 0u64..200 {
-        let mut g = genome.clone();
-        let mut r = rng(seed);
-        clone_and_remap_slice(&mut g, &[0], &mut r);
-        if let BackendDef::Graph(ref gd) = g.nodes.last().unwrap().backend_def {
-            if let GraphNodeKind::CustomOutput(slot) = gd.internal_nodes[0].kind {
-                if slot != 2 {
-                    saw_different = true;
-                    break;
-                }
-            }
-        }
-    }
-    assert!(
-        saw_different,
-        "cloned nodes must sometimes have different CustomOutput slot"
-    );
-}
-
-#[test]
-fn clone_remap_slice_sometimes_preserves_custom_outputs() {
-    use crate::creature::genome::{GraphBackendDef, GraphInternalNode, GraphNodeKind};
-    let genome = CreatureGenome {
-        entry_node_id: NodeId::new(0),
-        nodes: vec![NodeGenome {
-            node_id: NodeId::new(0),
-            input_refs: vec![],
-            backend_def: BackendDef::Graph(GraphBackendDef {
-                internal_nodes: vec![GraphInternalNode {
-                    kind: GraphNodeKind::CustomOutput(2),
-                    inputs: vec![],
-                    plasticity: None,
-                }],
-            }),
-            targets: vec![],
-        }],
-    };
-    let mut saw_same = false;
-    for seed in 0u64..200 {
-        let mut g = genome.clone();
-        let mut r = rng(seed);
-        clone_and_remap_slice(&mut g, &[0], &mut r);
-        if let BackendDef::Graph(ref gd) = g.nodes.last().unwrap().backend_def {
-            if let GraphNodeKind::CustomOutput(slot) = gd.internal_nodes[0].kind {
-                if slot == 2 {
-                    saw_same = true;
-                    break;
-                }
-            }
-        }
-    }
-    assert!(
-        saw_same,
-        "cloned nodes must sometimes keep original CustomOutput slot"
-    );
-}
+// Old output slot remapping tests deleted. CGP Graph backends have fixed output sinks
+// (not remappable CustomOutput node kinds), so the remap_output_slots behavior no longer exists.
 
 #[test]
 fn copy_mesh_operators_pass_parseability_gate() {

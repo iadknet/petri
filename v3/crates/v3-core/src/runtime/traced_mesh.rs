@@ -193,9 +193,12 @@ mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
     use crate::contracts::{InputReference, NodeId, WorldAction};
+    use crate::creature::genome::cgp::{
+        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
+        OutputSink, OutputSinkKind,
+    };
     use crate::creature::genome::{
-        BackendDef, CreatureGenome, GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind,
-        NodeGenome, VmBackendDef, VmInstruction,
+        BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
     };
     use crate::creature::state::GraphRuntimeState;
     use crate::runtime::mesh::execute_creature_mesh;
@@ -242,25 +245,25 @@ mod tests {
         let id_graph = NodeId::new(0);
         let id_vm = NodeId::new(1);
 
+        // CGP graph: Constant(0.0) → RouterOutput sink (routes to target 0)
         let graph_node = NodeGenome {
             node_id: id_graph,
             input_refs: vec![],
-            backend_def: BackendDef::Graph(GraphBackendDef {
-                internal_nodes: vec![
-                    GraphInternalNode {
-                        kind: GraphNodeKind::Constant(0.0),
-                        inputs: vec![],
-                        plasticity: None,
-                    },
-                    GraphInternalNode {
-                        kind: GraphNodeKind::RouterOutput,
-                        inputs: vec![GraphInput {
-                            source_idx: 0,
-                            weight: 1.0,
-                        }],
-                        plasticity: None,
-                    },
-                ],
+            backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                compute_nodes: vec![ComputeNode {
+                    kind: ComputeNodeKind::Constant(0.0),
+                    inputs: vec![],
+                    plasticity: None,
+                }],
+                output_sinks: vec![OutputSink {
+                    kind: OutputSinkKind::RouterOutput,
+                    inputs: vec![GraphEdge {
+                        source: GraphSource::ComputeNode(0),
+                        weight: 1.0,
+                    }],
+                }],
+                action_bank: vec![],
+                execute_gate: ExecuteGate { inputs: vec![] },
             }),
             targets: vec![id_vm],
         };
@@ -328,31 +331,31 @@ mod tests {
         let id_graph = NodeId::new(0);
         let id_vm = NodeId::new(1);
 
-        // Graph writes 9.0 to slot 5
+        // CGP graph writes 9.0 to CustomOutput(5), RouterOutput unwired (default route)
         let graph_node = NodeGenome {
             node_id: id_graph,
             input_refs: vec![],
-            backend_def: BackendDef::Graph(GraphBackendDef {
-                internal_nodes: vec![
-                    GraphInternalNode {
-                        kind: GraphNodeKind::Constant(9.0),
-                        inputs: vec![],
-                        plasticity: None,
-                    },
-                    GraphInternalNode {
-                        kind: GraphNodeKind::CustomOutput(5),
-                        inputs: vec![GraphInput {
-                            source_idx: 0,
+            backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                compute_nodes: vec![ComputeNode {
+                    kind: ComputeNodeKind::Constant(9.0),
+                    inputs: vec![],
+                    plasticity: None,
+                }],
+                output_sinks: vec![
+                    OutputSink {
+                        kind: OutputSinkKind::CustomOutput(5),
+                        inputs: vec![GraphEdge {
+                            source: GraphSource::ComputeNode(0),
                             weight: 1.0,
                         }],
-                        plasticity: None,
                     },
-                    GraphInternalNode {
-                        kind: GraphNodeKind::RouterOutput,
-                        inputs: vec![],
-                        plasticity: None,
+                    OutputSink {
+                        kind: OutputSinkKind::RouterOutput,
+                        inputs: vec![], // unwired = default route
                     },
                 ],
+                action_bank: vec![],
+                execute_gate: ExecuteGate { inputs: vec![] },
             }),
             targets: vec![id_vm],
         };

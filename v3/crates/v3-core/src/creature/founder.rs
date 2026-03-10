@@ -1,8 +1,10 @@
+use crate::config::MutationConfig;
 use crate::contracts::{DynamicIntrospectionKey, InputReference, NodeId, WorldInputKey};
 use crate::creature::genome::{
-    BackendDef, CreatureGenome, GraphBackendDef, GraphInput, GraphInternalNode, GraphNodeKind,
-    NodeGenome, VmBackendDef, VmInstruction,
+    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
+
+use super::cgp_founder::build_cgp_founder_graph;
 
 /// Return the canonical v3alpha1 founder genome.
 ///
@@ -24,165 +26,7 @@ fn node0_graph_sensor() -> NodeGenome {
             InputReference::World(WorldInputKey::NeighborFoodRing),
             InputReference::World(WorldInputKey::NeighborOccupiedRing),
         ],
-        backend_def: BackendDef::Graph(GraphBackendDef {
-            internal_nodes: vec![
-                // idx 0: food_here signal
-                GraphInternalNode {
-                    kind: GraphNodeKind::InputRef {
-                        ref_idx: 0,
-                        sub_idx: 0,
-                    },
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                // idx 1: energy_current signal
-                GraphInternalNode {
-                    kind: GraphNodeKind::InputRef {
-                        ref_idx: 1,
-                        sub_idx: 0,
-                    },
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                // idx 2: reproduce gate (energy >= 24.0)
-                GraphInternalNode {
-                    kind: GraphNodeKind::Threshold(24.0),
-                    inputs: vec![GraphInput {
-                        source_idx: 1,
-                        weight: 1.0,
-                    }],
-                    plasticity: None,
-                },
-                // idx 3-6: neighbor food N/E/S/W via ring sub_idx
-                // Direction::to_index(): N=0, E=2, S=4, W=6
-                GraphInternalNode {
-                    kind: GraphNodeKind::InputRef {
-                        ref_idx: 2,
-                        sub_idx: 0, // N
-                    },
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::InputRef {
-                        ref_idx: 2,
-                        sub_idx: 2, // E
-                    },
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::InputRef {
-                        ref_idx: 2,
-                        sub_idx: 4, // S
-                    },
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::InputRef {
-                        ref_idx: 2,
-                        sub_idx: 6, // W
-                    },
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                // idx 7-10: neighbor occupied N/E/S/W via ring sub_idx
-                GraphInternalNode {
-                    kind: GraphNodeKind::InputRef {
-                        ref_idx: 3,
-                        sub_idx: 0, // N
-                    },
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::InputRef {
-                        ref_idx: 3,
-                        sub_idx: 2, // E
-                    },
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::InputRef {
-                        ref_idx: 3,
-                        sub_idx: 4, // S
-                    },
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                GraphInternalNode {
-                    kind: GraphNodeKind::InputRef {
-                        ref_idx: 3,
-                        sub_idx: 6, // W
-                    },
-                    inputs: vec![],
-                    plasticity: None,
-                },
-                // idx 11-16: output writers
-                // slot 0 = food_here
-                GraphInternalNode {
-                    kind: GraphNodeKind::CustomOutput(0),
-                    inputs: vec![GraphInput {
-                        source_idx: 0,
-                        weight: 1.0,
-                    }],
-                    plasticity: None,
-                },
-                // slot 1 = can_reproduce (0 or 1)
-                GraphInternalNode {
-                    kind: GraphNodeKind::CustomOutput(1),
-                    inputs: vec![GraphInput {
-                        source_idx: 2,
-                        weight: 1.0,
-                    }],
-                    plasticity: None,
-                },
-                // slot 2 = food_N
-                GraphInternalNode {
-                    kind: GraphNodeKind::CustomOutput(2),
-                    inputs: vec![GraphInput {
-                        source_idx: 3,
-                        weight: 1.0,
-                    }],
-                    plasticity: None,
-                },
-                // slot 3 = food_E
-                GraphInternalNode {
-                    kind: GraphNodeKind::CustomOutput(3),
-                    inputs: vec![GraphInput {
-                        source_idx: 4,
-                        weight: 1.0,
-                    }],
-                    plasticity: None,
-                },
-                // slot 4 = food_S
-                GraphInternalNode {
-                    kind: GraphNodeKind::CustomOutput(4),
-                    inputs: vec![GraphInput {
-                        source_idx: 5,
-                        weight: 1.0,
-                    }],
-                    plasticity: None,
-                },
-                // slot 5 = food_W
-                GraphInternalNode {
-                    kind: GraphNodeKind::CustomOutput(5),
-                    inputs: vec![GraphInput {
-                        source_idx: 6,
-                        weight: 1.0,
-                    }],
-                    plasticity: None,
-                },
-                // idx 17: route to node 1
-                GraphInternalNode {
-                    kind: GraphNodeKind::RouterOutput,
-                    inputs: vec![],
-                    plasticity: None,
-                },
-            ],
-        }),
+        backend_def: BackendDef::Graph(build_cgp_founder_graph(&MutationConfig::default())),
         targets: vec![NodeId::new(1)],
     }
 }
@@ -333,7 +177,8 @@ mod tests {
         assert_eq!(node0.targets, vec![NodeId::new(1)]);
 
         if let BackendDef::Graph(ref gdef) = node0.backend_def {
-            assert_eq!(gdef.internal_nodes.len(), 18);
+            // CGP founder: 1 compute node (Threshold)
+            assert_eq!(gdef.compute_nodes.len(), 1);
         } else {
             panic!("Node 0 must be Graph backend");
         }
