@@ -429,8 +429,10 @@ mod tests {
 
     #[test]
     fn new_with_custom_queue_cap() {
-        let mut config = MutationConfig::default();
-        config.action_queue_cap = 8;
+        let config = MutationConfig {
+            action_queue_cap: 8,
+            ..MutationConfig::default()
+        };
         let def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
         assert_eq!(def.action_bank.len(), 8);
     }
@@ -461,7 +463,7 @@ mod tests {
             ComputeNodeKind::Add,
             ComputeNodeKind::Threshold(0.5),
             ComputeNodeKind::DecayIntegrator(0.9),
-            ComputeNodeKind::Constant(3.14),
+            ComputeNodeKind::Constant(3.25),
         ];
         let json = serde_json::to_string(&kinds).unwrap();
         let decoded: Vec<ComputeNodeKind> = serde_json::from_str(&json).unwrap();

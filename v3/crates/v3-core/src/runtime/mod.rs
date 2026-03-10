@@ -1,4 +1,8 @@
 pub mod action_decode;
+#[allow(dead_code)]
+pub(crate) mod cgp_graph;
+#[allow(dead_code)]
+pub(crate) mod cgp_graph_effects;
 pub mod graph;
 pub(crate) mod graph_effects;
 pub mod inputs;
