@@ -1,3 +1,6 @@
+#[allow(dead_code)]
+pub(crate) mod cgp;
+
 use rand::Rng;
 
 use crate::config::MutationConfig;

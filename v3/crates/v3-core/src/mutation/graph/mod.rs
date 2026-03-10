@@ -1,6 +1,11 @@
 pub mod hebbian;
 mod operators;
 
+#[allow(dead_code)]
+pub(crate) mod cgp_hebbian;
+#[allow(dead_code)]
+pub(crate) mod cgp_operators;
+
 use rand::Rng;
 
 use crate::creature::genome::{BackendDef, CreatureGenome};
