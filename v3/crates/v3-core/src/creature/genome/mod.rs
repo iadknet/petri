@@ -263,6 +263,69 @@ pub struct GraphBackendDef {
     pub internal_nodes: Vec<GraphInternalNode>,
 }
 
+impl GraphBackendDef {
+    /// Remove the node at `idx`. Remaps edge `source_idx` on surviving nodes:
+    /// edges to the removed node become `u16::MAX`, edges above the removed
+    /// index are decremented by 1.
+    pub fn remove_node_at(&mut self, idx: usize) {
+        self.internal_nodes.remove(idx);
+        let removed = idx as u16;
+        for node in &mut self.internal_nodes {
+            for edge in &mut node.inputs {
+                if edge.source_idx == removed {
+                    edge.source_idx = u16::MAX;
+                } else if edge.source_idx > removed {
+                    edge.source_idx -= 1;
+                }
+            }
+        }
+    }
+
+    /// Remove all nodes matching `should_remove`. Builds a full remap table,
+    /// adjusts all edge `source_idx` on survivors. Returns count removed.
+    pub fn remove_nodes_where(
+        &mut self,
+        should_remove: impl Fn(&GraphInternalNode) -> bool,
+    ) -> usize {
+        let len = self.internal_nodes.len();
+        // Build removal mask and remap table in one pass.
+        let mut remove_mask = vec![false; len];
+        let mut remap = vec![0u16; len];
+        let mut offset: u16 = 0;
+        for i in 0..len {
+            if should_remove(&self.internal_nodes[i]) {
+                remove_mask[i] = true;
+                remap[i] = u16::MAX; // removed → dangling sentinel
+                offset += 1;
+            } else {
+                remap[i] = (i as u16) - offset;
+            }
+        }
+        let removed = offset as usize;
+        if removed == 0 {
+            return 0;
+        }
+        // Single-pass compaction using retain (O(n) vs O(k*n) reverse removal).
+        let mut i = 0;
+        self.internal_nodes.retain(|_| {
+            let keep = !remove_mask[i];
+            i += 1;
+            keep
+        });
+        // Remap edges on survivors.
+        for node in &mut self.internal_nodes {
+            for edge in &mut node.inputs {
+                let old = edge.source_idx as usize;
+                if old < len {
+                    edge.source_idx = remap[old];
+                }
+                // Edges already at u16::MAX or beyond `len` are left as-is.
+            }
+        }
+        removed
+    }
+}
+
 // ── Top-level genome types ────────────────────────────────────────────────────
 
 /// Backend definition: either VM or Graph.
@@ -904,5 +967,189 @@ mod tests {
             let ch2: OutcomeChannel = serde_json::from_str(&json).unwrap();
             assert_eq!(ch, ch2);
         }
+    }
+
+    // ── remove_node_at / remove_nodes_where tests ──
+
+    #[test]
+    fn remove_node_at_reindexes_edges() {
+        // Nodes: [Add, Sigmoid, Relu] with edges pointing at various indices.
+        // Remove node 1 (Sigmoid). Edges above idx 1 should decrement.
+        let mut g = GraphBackendDef {
+            internal_nodes: vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::Add,
+                    inputs: vec![GraphInput {
+                        source_idx: 1,
+                        weight: 1.0,
+                    }],
+                    plasticity: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::Sigmoid,
+                    inputs: vec![],
+                    plasticity: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::Relu,
+                    inputs: vec![GraphInput {
+                        source_idx: 0,
+                        weight: 0.5,
+                    }],
+                    plasticity: None,
+                },
+            ],
+        };
+        g.remove_node_at(1);
+        assert_eq!(g.internal_nodes.len(), 2);
+        // Node 0 (Add) had edge to idx 1 (removed) → dangled to u16::MAX
+        assert_eq!(g.internal_nodes[0].inputs[0].source_idx, u16::MAX);
+        // Node 1 (was Relu at idx 2) had edge to idx 0 → unchanged
+        assert_eq!(g.internal_nodes[1].inputs[0].source_idx, 0);
+        assert_eq!(g.internal_nodes[1].kind, GraphNodeKind::Relu);
+    }
+
+    #[test]
+    fn remove_node_at_dangles_edges_to_removed() {
+        // Edge pointing at the removed node should become u16::MAX.
+        let mut g = GraphBackendDef {
+            internal_nodes: vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::Add,
+                    inputs: vec![],
+                    plasticity: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::Sigmoid,
+                    inputs: vec![GraphInput {
+                        source_idx: 0,
+                        weight: 1.0,
+                    }],
+                    plasticity: None,
+                },
+            ],
+        };
+        g.remove_node_at(0);
+        assert_eq!(g.internal_nodes.len(), 1);
+        // Edge was pointing at removed idx 0 → dangled
+        assert_eq!(g.internal_nodes[0].inputs[0].source_idx, u16::MAX);
+    }
+
+    #[test]
+    fn remove_nodes_where_removes_matching() {
+        // 3 nodes: InputRef, Add, InputRef. Remove all InputRef nodes.
+        let mut g = GraphBackendDef {
+            internal_nodes: vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 0,
+                        sub_idx: 0,
+                    },
+                    inputs: vec![],
+                    plasticity: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::Add,
+                    inputs: vec![GraphInput {
+                        source_idx: 0,
+                        weight: 1.0,
+                    }],
+                    plasticity: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 1,
+                        sub_idx: 0,
+                    },
+                    inputs: vec![],
+                    plasticity: None,
+                },
+            ],
+        };
+        let removed = g.remove_nodes_where(|n| matches!(n.kind, GraphNodeKind::InputRef { .. }));
+        assert_eq!(removed, 2);
+        assert_eq!(g.internal_nodes.len(), 1);
+        assert_eq!(g.internal_nodes[0].kind, GraphNodeKind::Add);
+    }
+
+    #[test]
+    fn remove_nodes_where_reindexes_surviving_edges() {
+        // Nodes: [InputRef(0), Add, InputRef(1), Relu]
+        // Add has edge → InputRef(1) at idx 2. Relu has edge → Add at idx 1.
+        // Remove both InputRef nodes. After removal:
+        // - Add is at idx 0, Relu at idx 1
+        // - Add's edge to old idx 2 (InputRef(1), removed) → u16::MAX
+        // - Relu's edge to old idx 1 (Add) → new idx 0
+        let mut g = GraphBackendDef {
+            internal_nodes: vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 0,
+                        sub_idx: 0,
+                    },
+                    inputs: vec![],
+                    plasticity: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::Add,
+                    inputs: vec![GraphInput {
+                        source_idx: 2,
+                        weight: 1.0,
+                    }],
+                    plasticity: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 1,
+                        sub_idx: 0,
+                    },
+                    inputs: vec![],
+                    plasticity: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::Relu,
+                    inputs: vec![GraphInput {
+                        source_idx: 1,
+                        weight: 0.5,
+                    }],
+                    plasticity: None,
+                },
+            ],
+        };
+        let removed = g.remove_nodes_where(|n| matches!(n.kind, GraphNodeKind::InputRef { .. }));
+        assert_eq!(removed, 2);
+        assert_eq!(g.internal_nodes.len(), 2);
+        assert_eq!(g.internal_nodes[0].kind, GraphNodeKind::Add);
+        assert_eq!(g.internal_nodes[1].kind, GraphNodeKind::Relu);
+        // Add's edge to removed node → u16::MAX
+        assert_eq!(g.internal_nodes[0].inputs[0].source_idx, u16::MAX);
+        // Relu's edge to old idx 1 (Add) → new idx 0
+        assert_eq!(g.internal_nodes[1].inputs[0].source_idx, 0);
+    }
+
+    #[test]
+    fn remove_nodes_where_noop_when_no_match() {
+        let mut g = GraphBackendDef {
+            internal_nodes: vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::Add,
+                    inputs: vec![],
+                    plasticity: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::Sigmoid,
+                    inputs: vec![GraphInput {
+                        source_idx: 0,
+                        weight: 1.0,
+                    }],
+                    plasticity: None,
+                },
+            ],
+        };
+        let removed = g.remove_nodes_where(|_| false);
+        assert_eq!(removed, 0);
+        assert_eq!(g.internal_nodes.len(), 2);
+        // Edges unchanged
+        assert_eq!(g.internal_nodes[1].inputs[0].source_idx, 0);
     }
 }
