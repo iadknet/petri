@@ -4,7 +4,7 @@ use crate::config::MutationConfig;
 use crate::contracts::{
     DynamicIntrospectionKey, InputReference, StaticIntrospectionKey, WorldInputKey,
 };
-use crate::creature::genome::{BackendDef, CreatureGenome, GraphNodeKind, VmInstruction};
+use crate::creature::genome::{BackendDef, CreatureGenome, GraphNodeKind};
 use crate::mutation::compound;
 use crate::mutation::reachability::biased_select_from;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
@@ -160,44 +160,25 @@ impl InputRefMutator {
     }
 }
 
-/// After removing `input_refs[removed_ref_idx]` from `genome.nodes[node_idx]`,
-/// update all internal references (graph InputRef nodes and VM ReadInput instructions)
-/// so they stay consistent:
-/// - `ref_idx == removed_ref_idx` → set to `u16::MAX` (invalidated → resolves to 0.0)
-/// - `ref_idx > removed_ref_idx` → decrement by 1
-/// - `ref_idx < removed_ref_idx` → unchanged
-///
-/// `sub_idx` is unaffected — it indexes within a compound input, not across `input_refs`.
-pub(crate) fn reindex_after_removal(
-    genome: &mut CreatureGenome,
-    node_idx: usize,
-    removed_ref_idx: u16,
-) {
-    debug_assert!(node_idx < genome.nodes.len(), "node_idx out of bounds");
-    let node = &mut genome.nodes[node_idx];
-    match &mut node.backend_def {
-        BackendDef::Graph(gd) => {
-            for internal in &mut gd.internal_nodes {
-                if let GraphNodeKind::InputRef { ref_idx, .. } = &mut internal.kind {
-                    if *ref_idx == removed_ref_idx {
-                        *ref_idx = u16::MAX;
-                    } else if *ref_idx > removed_ref_idx {
-                        *ref_idx -= 1;
-                    }
-                }
-            }
-        }
-        BackendDef::Vm(vm) => {
-            for instr in &mut vm.program {
-                if let VmInstruction::ReadInput { ref_idx, .. } = instr {
-                    if *ref_idx == removed_ref_idx {
-                        *ref_idx = u16::MAX;
-                    } else if *ref_idx > removed_ref_idx {
-                        *ref_idx -= 1;
-                    }
-                }
-            }
-        }
+/// Remove InputRef leaf nodes with `ref_idx == u16::MAX` (invalidated by reindexing).
+/// Returns count removed. No-op for VM backends.
+fn gc_orphaned_input_ref_nodes(backend: &mut BackendDef) -> usize {
+    match backend {
+        BackendDef::Graph(gd) => gd.remove_nodes_where(
+            |n| matches!(n.kind, GraphNodeKind::InputRef { ref_idx, .. } if ref_idx == u16::MAX),
+        ),
+        BackendDef::Vm(_) => 0,
+    }
+}
+
+/// Remove all InputRef leaf nodes matching `target_ref_idx`.
+/// Returns count removed. No-op for VM backends.
+fn remove_input_ref_leaves_for(backend: &mut BackendDef, target_ref_idx: u16) -> usize {
+    match backend {
+        BackendDef::Graph(gd) => gd.remove_nodes_where(|n| {
+            matches!(n.kind, GraphNodeKind::InputRef { ref_idx, .. } if ref_idx == target_ref_idx)
+        }),
+        BackendDef::Vm(_) => 0,
     }
 }
 
@@ -246,7 +227,10 @@ fn apply_remove(
     let ref_idx = rng.gen_range(0..genome.nodes[node_idx].input_refs.len());
     genome.nodes[node_idx].input_refs.remove(ref_idx);
     debug_assert!(ref_idx <= u16::MAX as usize, "input_refs index exceeds u16");
-    reindex_after_removal(genome, node_idx, ref_idx as u16);
+    genome.nodes[node_idx]
+        .backend_def
+        .reindex_input_refs_after_removal(ref_idx as u16);
+    gc_orphaned_input_ref_nodes(&mut genome.nodes[node_idx].backend_def);
     Ok(reachability)
 }
 
@@ -273,15 +257,16 @@ fn apply_swap(
     let new_ref = random_input_reference(rng);
     let count = compound::sub_value_count(&new_ref, config);
     genome.nodes[node_idx].input_refs[ref_idx] = new_ref;
-    // Swap intentionally uses create_fan_out_nodes (not create_and_connect_input_leaves):
-    // - Swap is a neutral mutation; adding bootstrap edges would make it structural.
-    // - For scalar→scalar swaps, existing InputRef internal nodes already read
-    //   the new input via resolve_input at the same ref_idx.
-    // - Compound-widening swaps leave new sub-value leaves disconnected;
-    //   a follow-up can address this if it proves problematic.
-    if count > 1 {
-        compound::create_fan_out_nodes(&mut genome.nodes[node_idx], ref_idx as u16, count);
-    }
+    // Remove old InputRef leaves for this ref_idx, then create fresh leaves
+    // with probabilistic bootstrap edge connection (same as apply_add).
+    remove_input_ref_leaves_for(&mut genome.nodes[node_idx].backend_def, ref_idx as u16);
+    compound::create_and_connect_input_leaves(
+        &mut genome.nodes[node_idx],
+        ref_idx as u16,
+        count,
+        config.input_auto_connect_chance,
+        rng,
+    );
     Ok(reachability)
 }
 
