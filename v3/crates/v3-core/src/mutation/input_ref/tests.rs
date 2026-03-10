@@ -360,7 +360,7 @@ fn random_decreasing_covers_all_decreasing_operators() {
     );
 }
 
-// -- reindex_after_removal tests ------------------------------------------
+// -- reindex_input_refs_after_removal tests --------------------------------
 
 fn graph_genome_with_input_refs(
     input_refs: Vec<InputReference>,
@@ -408,7 +408,7 @@ fn reindex_graph_decrements_refs_above_removed() {
     );
     let mut g = genome;
     // Remove input ref at index 1 -> ref_idx 0 stays, ref_idx 2 -> 1
-    reindex_after_removal(&mut g, 0, 1);
+    g.nodes[0].backend_def.reindex_input_refs_after_removal(1);
     if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
         // ref_idx 0 < removed(1) -> unchanged
         assert_eq!(
@@ -449,7 +449,7 @@ fn reindex_graph_invalidates_removed_ref() {
     );
     let mut g = genome;
     // Remove the ref at index 1 -> ref_idx 1 == removed -> invalidate
-    reindex_after_removal(&mut g, 0, 1);
+    g.nodes[0].backend_def.reindex_input_refs_after_removal(1);
     if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
         assert_eq!(
             gd.internal_nodes[0].kind,
@@ -500,7 +500,9 @@ fn reindex_vm_decrements_and_invalidates() {
         }],
     };
     // Remove input ref at index 1
-    reindex_after_removal(&mut genome, 0, 1);
+    genome.nodes[0]
+        .backend_def
+        .reindex_input_refs_after_removal(1);
     if let BackendDef::Vm(ref vm) = genome.nodes[0].backend_def {
         // ref_idx 0 < 1 -> unchanged
         assert!(matches!(
@@ -597,7 +599,9 @@ fn reindex_noop_on_empty_graph_backend() {
         vec![InputReference::World(WorldInputKey::FoodHere)],
         vec![], // no internal nodes
     );
-    reindex_after_removal(&mut genome, 0, 0); // should not panic
+    genome.nodes[0]
+        .backend_def
+        .reindex_input_refs_after_removal(0); // should not panic
 }
 
 #[test]
@@ -615,7 +619,9 @@ fn reindex_noop_on_empty_vm_program() {
             targets: vec![],
         }],
     };
-    reindex_after_removal(&mut genome, 0, 0); // should not panic
+    genome.nodes[0]
+        .backend_def
+        .reindex_input_refs_after_removal(0); // should not panic
 }
 
 #[test]
@@ -641,7 +647,9 @@ fn reindex_graph_invalidates_all_matching_refs() {
             },
         ],
     );
-    reindex_after_removal(&mut genome, 0, 0);
+    genome.nodes[0]
+        .backend_def
+        .reindex_input_refs_after_removal(0);
     if let BackendDef::Graph(ref gd) = genome.nodes[0].backend_def {
         for (i, node) in gd.internal_nodes.iter().enumerate() {
             if let GraphNodeKind::InputRef { ref_idx, .. } = node.kind {
@@ -995,4 +1003,413 @@ fn add_scalar_input_increases_genome_size() {
         }
     }
     assert!(found, "must find a seed producing a scalar input ref");
+}
+
+// -- Lifecycle cleanup tests ------------------------------------------------
+
+#[test]
+fn gc_orphaned_removes_u16max_nodes() {
+    // Graph with 2 valid InputRef nodes + 1 orphaned (ref_idx = u16::MAX).
+    // gc_orphaned_input_ref_nodes should remove only the orphaned one.
+    let mut backend = BackendDef::Graph(GraphBackendDef {
+        internal_nodes: vec![
+            GraphInternalNode {
+                kind: GraphNodeKind::InputRef {
+                    ref_idx: 0,
+                    sub_idx: 0,
+                },
+                inputs: vec![],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::InputRef {
+                    ref_idx: u16::MAX,
+                    sub_idx: 0,
+                },
+                inputs: vec![],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::Add,
+                inputs: vec![],
+                plasticity: None,
+            },
+        ],
+    });
+    let removed = gc_orphaned_input_ref_nodes(&mut backend);
+    assert_eq!(removed, 1);
+    if let BackendDef::Graph(ref g) = backend {
+        assert_eq!(g.internal_nodes.len(), 2);
+        // Valid InputRef still there
+        assert!(matches!(
+            g.internal_nodes[0].kind,
+            GraphNodeKind::InputRef {
+                ref_idx: 0,
+                sub_idx: 0,
+            }
+        ));
+        // Add node still there
+        assert_eq!(g.internal_nodes[1].kind, GraphNodeKind::Add);
+    }
+}
+
+#[test]
+fn remove_input_ref_leaves_for_removes_matching_ref_idx() {
+    // Graph with InputRef nodes for ref_idx 0 and ref_idx 1.
+    // remove_input_ref_leaves_for(1) should only remove ref_idx=1 leaves.
+    let mut backend = BackendDef::Graph(GraphBackendDef {
+        internal_nodes: vec![
+            GraphInternalNode {
+                kind: GraphNodeKind::InputRef {
+                    ref_idx: 0,
+                    sub_idx: 0,
+                },
+                inputs: vec![],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::InputRef {
+                    ref_idx: 1,
+                    sub_idx: 0,
+                },
+                inputs: vec![],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::InputRef {
+                    ref_idx: 1,
+                    sub_idx: 1,
+                },
+                inputs: vec![],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::Add,
+                inputs: vec![],
+                plasticity: None,
+            },
+        ],
+    });
+    let removed = remove_input_ref_leaves_for(&mut backend, 1);
+    assert_eq!(removed, 2);
+    if let BackendDef::Graph(ref g) = backend {
+        assert_eq!(g.internal_nodes.len(), 2);
+        assert!(matches!(
+            g.internal_nodes[0].kind,
+            GraphNodeKind::InputRef {
+                ref_idx: 0,
+                sub_idx: 0,
+            }
+        ));
+        assert_eq!(g.internal_nodes[1].kind, GraphNodeKind::Add);
+    }
+}
+
+#[test]
+fn remove_input_ref_deletes_orphaned_leaves() {
+    // After apply_remove, no InputRef nodes with ref_idx == u16::MAX should remain.
+    let genome = graph_genome_with_input_refs(
+        vec![
+            InputReference::World(WorldInputKey::FoodHere),
+            InputReference::UpstreamSlot(0),
+        ],
+        vec![
+            GraphInternalNode {
+                kind: GraphNodeKind::InputRef {
+                    ref_idx: 0,
+                    sub_idx: 0,
+                },
+                inputs: vec![],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::InputRef {
+                    ref_idx: 1,
+                    sub_idx: 0,
+                },
+                inputs: vec![],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::Add,
+                inputs: vec![],
+                plasticity: None,
+            },
+        ],
+    );
+    // Run Remove over many seeds until we find one that removes an input_ref
+    for seed in 0u64..200 {
+        let mut g = genome.clone();
+        let mut r = rng(seed);
+        if InputRefMutator::apply(
+            &mut g,
+            InputRefOperator::Remove,
+            &[],
+            0.0,
+            &mut r,
+            &default_config(),
+        )
+        .is_ok()
+        {
+            // Check: no orphaned InputRef nodes remain
+            if let BackendDef::Graph(ref gd) = g.nodes[0].backend_def {
+                for node in &gd.internal_nodes {
+                    if let GraphNodeKind::InputRef { ref_idx, .. } = node.kind {
+                        assert_ne!(
+                            ref_idx,
+                            u16::MAX,
+                            "orphaned InputRef node found after Remove (seed {})",
+                            seed
+                        );
+                    }
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn swap_cleans_up_old_compound_leaves() {
+    // Start with an 8-wide compound input, swap to scalar.
+    // Old 8 leaves should be removed, 1 new leaf created.
+    let config = MutationConfig {
+        input_auto_connect_chance: 0.0,
+        ..MutationConfig::default()
+    };
+    let mut found = false;
+    for seed in 0u64..5000 {
+        let mut genome = graph_genome_with_input_refs(
+            vec![InputReference::World(WorldInputKey::NearbyCreatureVitals)], // 8-wide
+            // Create 8 InputRef leaves for ref_idx 0
+            (0..8)
+                .map(|sub| GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 0,
+                        sub_idx: sub,
+                    },
+                    inputs: vec![],
+                    plasticity: None,
+                })
+                .collect(),
+        );
+        let mut r = rng(seed);
+        if InputRefMutator::apply(
+            &mut genome,
+            InputRefOperator::Swap,
+            &[],
+            0.0,
+            &mut r,
+            &config,
+        )
+        .is_ok()
+        {
+            let new_ref = &genome.nodes[0].input_refs[0];
+            let new_count = compound::sub_value_count(new_ref, &config);
+            if new_count == 1 {
+                // Swapped to a scalar: old 8 leaves removed, 1 new created
+                if let BackendDef::Graph(ref gd) = genome.nodes[0].backend_def {
+                    let input_ref_count = gd
+                        .internal_nodes
+                        .iter()
+                        .filter(|n| matches!(n.kind, GraphNodeKind::InputRef { .. }))
+                        .count();
+                    assert_eq!(
+                        input_ref_count, 1,
+                        "swap 8-wide→scalar: expected 1 leaf, got {} (seed {})",
+                        input_ref_count, seed
+                    );
+                    found = true;
+                    break;
+                }
+            }
+        }
+    }
+    assert!(found, "must find a seed swapping compound to scalar");
+}
+
+#[test]
+fn swap_compound_to_narrower_removes_excess() {
+    // Start with 8-wide, swap to 7-wide. Should have exactly 7 leaves.
+    let config = MutationConfig {
+        input_auto_connect_chance: 0.0,
+        ..MutationConfig::default()
+    };
+    let mut found = false;
+    for seed in 0u64..5000 {
+        let mut genome = graph_genome_with_input_refs(
+            vec![InputReference::World(WorldInputKey::NearbyCreatureVitals)], // 8-wide
+            (0..8)
+                .map(|sub| GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 0,
+                        sub_idx: sub,
+                    },
+                    inputs: vec![],
+                    plasticity: None,
+                })
+                .collect(),
+        );
+        let mut r = rng(seed);
+        if InputRefMutator::apply(
+            &mut genome,
+            InputRefOperator::Swap,
+            &[],
+            0.0,
+            &mut r,
+            &config,
+        )
+        .is_ok()
+        {
+            let new_ref = &genome.nodes[0].input_refs[0];
+            let new_count = compound::sub_value_count(new_ref, &config);
+            if new_count == 7 {
+                // Swapped to 7-wide (e.g., AreaFoodSummary)
+                if let BackendDef::Graph(ref gd) = genome.nodes[0].backend_def {
+                    let input_ref_count = gd
+                        .internal_nodes
+                        .iter()
+                        .filter(|n| matches!(n.kind, GraphNodeKind::InputRef { .. }))
+                        .count();
+                    assert_eq!(
+                        input_ref_count, 7,
+                        "swap 8-wide→7-wide: expected 7 leaves, got {} (seed {})",
+                        input_ref_count, seed
+                    );
+                    found = true;
+                    break;
+                }
+            }
+        }
+    }
+    assert!(found, "must find a seed swapping 8-wide to 7-wide");
+}
+
+#[test]
+fn swap_creates_bootstrap_edges_with_chance_one() {
+    // With input_auto_connect_chance = 1.0 and pre-existing nodes,
+    // new leaves from swap should have bootstrap edges.
+    let config = MutationConfig {
+        input_auto_connect_chance: 1.0,
+        ..MutationConfig::default()
+    };
+    let mut found = false;
+    for seed in 0u64..5000 {
+        let mut genome = graph_genome_with_input_refs(
+            vec![InputReference::World(WorldInputKey::FoodHere)], // scalar
+            vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 0,
+                        sub_idx: 0,
+                    },
+                    inputs: vec![],
+                    plasticity: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::Add,
+                    inputs: vec![],
+                    plasticity: None,
+                },
+            ],
+        );
+        let mut r = rng(seed);
+        if InputRefMutator::apply(
+            &mut genome,
+            InputRefOperator::Swap,
+            &[],
+            0.0,
+            &mut r,
+            &config,
+        )
+        .is_ok()
+        {
+            let new_ref = &genome.nodes[0].input_refs[0];
+            let new_count = compound::sub_value_count(new_ref, &config);
+            if new_count == 1 {
+                // Scalar swap: old leaf removed, 1 new leaf created.
+                // With chance=1.0, the new leaf should have a bootstrap edge
+                // from a pre-existing node (the Add node).
+                if let BackendDef::Graph(ref gd) = genome.nodes[0].backend_def {
+                    let new_leaves: Vec<usize> = gd
+                        .internal_nodes
+                        .iter()
+                        .enumerate()
+                        .filter(|(_, n)| matches!(n.kind, GraphNodeKind::InputRef { .. }))
+                        .map(|(i, _)| i)
+                        .collect();
+                    if new_leaves.len() == 1 {
+                        let leaf_idx = new_leaves[0] as u16;
+                        // Check if any pre-existing node has an edge pointing to the new leaf
+                        let has_bootstrap = gd
+                            .internal_nodes
+                            .iter()
+                            .any(|n| n.inputs.iter().any(|e| e.source_idx == leaf_idx));
+                        if has_bootstrap {
+                            found = true;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        found,
+        "swap with chance=1.0 must create bootstrap edges to new leaves"
+    );
+}
+
+#[test]
+fn swap_no_bootstrap_edges_with_chance_zero() {
+    // With input_auto_connect_chance = 0.0, new leaves from swap should
+    // NOT have bootstrap edges from pre-existing nodes.
+    let config = MutationConfig {
+        input_auto_connect_chance: 0.0,
+        ..MutationConfig::default()
+    };
+    for seed in 0u64..500 {
+        let mut genome = graph_genome_with_input_refs(
+            vec![InputReference::World(WorldInputKey::FoodHere)], // scalar
+            vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 0,
+                        sub_idx: 0,
+                    },
+                    inputs: vec![],
+                    plasticity: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::Add,
+                    inputs: vec![],
+                    plasticity: None,
+                },
+            ],
+        );
+        let mut r = rng(seed);
+        if InputRefMutator::apply(
+            &mut genome,
+            InputRefOperator::Swap,
+            &[],
+            0.0,
+            &mut r,
+            &config,
+        )
+        .is_ok()
+        {
+            // With chance=0.0, no pre-existing node should gain new edges
+            if let BackendDef::Graph(ref gd) = genome.nodes[0].backend_def {
+                // Add node (which is non-InputRef) should still have 0 inputs
+                for n in &gd.internal_nodes {
+                    if n.kind == GraphNodeKind::Add {
+                        assert!(
+                            n.inputs.is_empty(),
+                            "Add node should have no edges with chance=0.0 (seed {})",
+                            seed
+                        );
+                    }
+                }
+            }
+        }
+    }
 }

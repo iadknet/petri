@@ -177,11 +177,20 @@ pub(super) fn remove_internal_node(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     if let BackendDef::Graph(ref mut g) = genome.nodes[node_idx].backend_def {
-        if g.internal_nodes.is_empty() {
+        // Filter candidates to exclude InputRef leaf nodes — they are owned
+        // by their input_ref and must not be removed by topology mutations.
+        let eligible: Vec<usize> = g
+            .internal_nodes
+            .iter()
+            .enumerate()
+            .filter(|(_, n)| !matches!(n.kind, GraphNodeKind::InputRef { .. }))
+            .map(|(i, _)| i)
+            .collect();
+        if eligible.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
-        let int_idx = rng.gen_range(0..g.internal_nodes.len());
-        g.internal_nodes.remove(int_idx);
+        let target_idx = eligible[rng.gen_range(0..eligible.len())];
+        g.remove_node_at(target_idx);
     }
     Ok(())
 }

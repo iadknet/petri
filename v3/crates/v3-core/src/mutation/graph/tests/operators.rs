@@ -665,3 +665,190 @@ fn graph_raw_field_mutation_handles_slot_kinds() {
         "raw field mutation must sometimes mutate slot kind fields"
     );
 }
+
+// ── InputRef leaf protection + edge reindexing tests ──
+
+#[test]
+fn remove_internal_node_never_removes_input_ref() {
+    // Graph with ONLY InputRef nodes → should return NoApplicableTarget.
+    let mut genome = graph_only_genome(vec![
+        GraphInternalNode {
+            kind: GraphNodeKind::InputRef {
+                ref_idx: 0,
+                sub_idx: 0,
+            },
+            inputs: vec![],
+            plasticity: None,
+        },
+        GraphInternalNode {
+            kind: GraphNodeKind::InputRef {
+                ref_idx: 0,
+                sub_idx: 1,
+            },
+            inputs: vec![],
+            plasticity: None,
+        },
+    ]);
+    let mut r = rng(42);
+    let result = GraphMutator::apply(
+        &mut genome,
+        GraphOperator::RemoveInternalGraphNode,
+        &[],
+        0.0,
+        &mut r,
+    );
+    assert_eq!(
+        result,
+        Err(MutationSkipReason::NoApplicableTarget),
+        "remove must not target InputRef nodes"
+    );
+    // Nodes unchanged
+    if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
+        assert_eq!(g.internal_nodes.len(), 2);
+    }
+}
+
+#[test]
+fn remove_internal_node_only_removes_non_input_ref() {
+    // Mixed graph: InputRef nodes + computation nodes. After many removals,
+    // InputRef count must never decrease.
+
+    let make_genome = || {
+        graph_only_genome(vec![
+            GraphInternalNode {
+                kind: GraphNodeKind::InputRef {
+                    ref_idx: 0,
+                    sub_idx: 0,
+                },
+                inputs: vec![],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::Add,
+                inputs: vec![GraphInput {
+                    source_idx: 0,
+                    weight: 1.0,
+                }],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::InputRef {
+                    ref_idx: 0,
+                    sub_idx: 1,
+                },
+                inputs: vec![],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::Sigmoid,
+                inputs: vec![GraphInput {
+                    source_idx: 1,
+                    weight: 0.5,
+                }],
+                plasticity: None,
+            },
+        ])
+    };
+    for seed in 0u64..100 {
+        let mut genome = make_genome();
+        let mut r = rng(seed);
+        if GraphMutator::apply(
+            &mut genome,
+            GraphOperator::RemoveInternalGraphNode,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .is_ok()
+        {
+            if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
+                let input_ref_count = g
+                    .internal_nodes
+                    .iter()
+                    .filter(|n| matches!(n.kind, GraphNodeKind::InputRef { .. }))
+                    .count();
+                assert_eq!(
+                    input_ref_count, 2,
+                    "InputRef nodes must never be removed (seed {})",
+                    seed
+                );
+                // Total should be 3 (one computation node removed)
+                assert_eq!(
+                    g.internal_nodes.len(),
+                    3,
+                    "one node removed (seed {})",
+                    seed
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn remove_internal_node_reindexes_edges() {
+    // After removing a computation node, edges on surviving nodes should be
+    // reindexed correctly.
+
+    let make_genome = || {
+        graph_only_genome(vec![
+            GraphInternalNode {
+                kind: GraphNodeKind::InputRef {
+                    ref_idx: 0,
+                    sub_idx: 0,
+                },
+                inputs: vec![],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::Add,
+                inputs: vec![GraphInput {
+                    source_idx: 0,
+                    weight: 1.0,
+                }],
+                plasticity: None,
+            },
+            GraphInternalNode {
+                kind: GraphNodeKind::Sigmoid,
+                inputs: vec![GraphInput {
+                    source_idx: 1,
+                    weight: 0.5,
+                }],
+                plasticity: None,
+            },
+        ])
+    };
+    let mut found_valid_reindex = false;
+    for seed in 0u64..200 {
+        let mut genome = make_genome();
+        let mut r = rng(seed);
+        if GraphMutator::apply(
+            &mut genome,
+            GraphOperator::RemoveInternalGraphNode,
+            &[],
+            0.0,
+            &mut r,
+        )
+        .is_ok()
+        {
+            if let BackendDef::Graph(ref g) = genome.nodes[0].backend_def {
+                // All surviving edges should point within valid range or u16::MAX
+                for node in &g.internal_nodes {
+                    for edge in &node.inputs {
+                        assert!(
+                            (edge.source_idx as usize) < g.internal_nodes.len()
+                                || edge.source_idx == u16::MAX,
+                            "edge source_idx {} out of range (len={})",
+                            edge.source_idx,
+                            g.internal_nodes.len()
+                        );
+                    }
+                }
+                found_valid_reindex = true;
+            }
+        }
+    }
+    assert!(
+        found_valid_reindex,
+        "must successfully remove a node and reindex"
+    );
+}
