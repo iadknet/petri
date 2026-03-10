@@ -1,3 +1,5 @@
+#[allow(dead_code)]
+pub(crate) mod cgp_reproduction;
 mod predation;
 mod reproduction;
 

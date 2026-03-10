@@ -1,5 +1,9 @@
 pub mod analysis;
 pub mod cgp;
+#[allow(dead_code)]
+pub(crate) mod cgp_analysis;
+#[allow(dead_code)]
+pub(crate) mod cgp_mesh_annotations;
 pub mod mesh_annotations;
 
 use crate::contracts::{InputReference, NodeId};
