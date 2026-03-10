@@ -268,7 +268,10 @@ impl GraphBackendDef {
     /// edges to the removed node become `u16::MAX`, edges above the removed
     /// index are decremented by 1.
     pub fn remove_node_at(&mut self, idx: usize) {
-        debug_assert!(idx <= u16::MAX as usize, "node index exceeds u16");
+        debug_assert!(
+            idx < self.internal_nodes.len(),
+            "remove_node_at: idx out of bounds"
+        );
         self.internal_nodes.remove(idx);
         let removed = idx as u16;
         for node in &mut self.internal_nodes {
@@ -289,6 +292,10 @@ impl GraphBackendDef {
         should_remove: impl Fn(&GraphInternalNode) -> bool,
     ) -> usize {
         let len = self.internal_nodes.len();
+        debug_assert!(
+            len <= u16::MAX as usize,
+            "internal_nodes count exceeds u16 index space"
+        );
         // Build removal mask and remap table in one pass.
         let mut remove_mask = vec![false; len];
         let mut remap = vec![0u16; len];
