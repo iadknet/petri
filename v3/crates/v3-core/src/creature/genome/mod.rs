@@ -268,6 +268,7 @@ impl GraphBackendDef {
     /// edges to the removed node become `u16::MAX`, edges above the removed
     /// index are decremented by 1.
     pub fn remove_node_at(&mut self, idx: usize) {
+        debug_assert!(idx <= u16::MAX as usize, "node index exceeds u16");
         self.internal_nodes.remove(idx);
         let removed = idx as u16;
         for node in &mut self.internal_nodes {
@@ -336,6 +337,36 @@ pub enum BackendDef {
 }
 
 impl BackendDef {
+    /// After an input_ref is removed at `removed_ref_idx`, update all internal
+    /// references. Graph: walks InputRef nodes. VM: walks ReadInput instructions.
+    /// Matching `ref_idx` → `u16::MAX` (invalidated). Above → decremented.
+    pub fn reindex_input_refs_after_removal(&mut self, removed_ref_idx: u16) {
+        match self {
+            BackendDef::Graph(gd) => {
+                for internal in &mut gd.internal_nodes {
+                    if let GraphNodeKind::InputRef { ref_idx, .. } = &mut internal.kind {
+                        if *ref_idx == removed_ref_idx {
+                            *ref_idx = u16::MAX;
+                        } else if *ref_idx > removed_ref_idx {
+                            *ref_idx -= 1;
+                        }
+                    }
+                }
+            }
+            BackendDef::Vm(vm) => {
+                for instr in &mut vm.program {
+                    if let VmInstruction::ReadInput { ref_idx, .. } = instr {
+                        if *ref_idx == removed_ref_idx {
+                            *ref_idx = u16::MAX;
+                        } else if *ref_idx > removed_ref_idx {
+                            *ref_idx -= 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     /// Offset CustomOutput slot indices in Graph backends. No-op for VM.
     /// Only remaps in-range slots (0..12). Out-of-range slots are junk
     /// (runtime ignores writes to slot >= 12) and left untouched to
@@ -1151,5 +1182,135 @@ mod tests {
         assert_eq!(g.internal_nodes.len(), 2);
         // Edges unchanged
         assert_eq!(g.internal_nodes[1].inputs[0].source_idx, 0);
+    }
+
+    // ── reindex_input_refs_after_removal tests ──
+
+    #[test]
+    fn reindex_input_refs_after_removal_graph() {
+        // Graph backend with InputRef nodes at ref_idx 0, 1, 2.
+        // Remove input_ref at index 1:
+        // - ref_idx 0 → unchanged
+        // - ref_idx 1 → u16::MAX (invalidated)
+        // - ref_idx 2 → 1 (decremented)
+        let mut backend = BackendDef::Graph(GraphBackendDef {
+            internal_nodes: vec![
+                GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 0,
+                        sub_idx: 0,
+                    },
+                    inputs: vec![],
+                    plasticity: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 1,
+                        sub_idx: 3,
+                    },
+                    inputs: vec![],
+                    plasticity: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::InputRef {
+                        ref_idx: 2,
+                        sub_idx: 0,
+                    },
+                    inputs: vec![],
+                    plasticity: None,
+                },
+                GraphInternalNode {
+                    kind: GraphNodeKind::Add,
+                    inputs: vec![],
+                    plasticity: None,
+                },
+            ],
+        });
+        backend.reindex_input_refs_after_removal(1);
+        if let BackendDef::Graph(ref g) = backend {
+            assert_eq!(
+                g.internal_nodes[0].kind,
+                GraphNodeKind::InputRef {
+                    ref_idx: 0,
+                    sub_idx: 0
+                }
+            );
+            assert_eq!(
+                g.internal_nodes[1].kind,
+                GraphNodeKind::InputRef {
+                    ref_idx: u16::MAX,
+                    sub_idx: 3
+                }
+            );
+            assert_eq!(
+                g.internal_nodes[2].kind,
+                GraphNodeKind::InputRef {
+                    ref_idx: 1,
+                    sub_idx: 0
+                }
+            );
+            // Non-InputRef node unchanged
+            assert_eq!(g.internal_nodes[3].kind, GraphNodeKind::Add);
+        } else {
+            panic!("expected Graph");
+        }
+    }
+
+    #[test]
+    fn reindex_input_refs_after_removal_vm() {
+        // VM backend with ReadInput instructions at ref_idx 0, 1, 2.
+        // Remove input_ref at index 1.
+        let mut backend = BackendDef::Vm(VmBackendDef {
+            register_count: 4,
+            constants: vec![],
+            program: vec![
+                VmInstruction::ReadInput {
+                    dst: 0,
+                    ref_idx: 0,
+                    sub_idx: 0,
+                },
+                VmInstruction::ReadInput {
+                    dst: 1,
+                    ref_idx: 1,
+                    sub_idx: 0,
+                },
+                VmInstruction::ReadInput {
+                    dst: 2,
+                    ref_idx: 2,
+                    sub_idx: 5,
+                },
+                VmInstruction::Halt,
+            ],
+        });
+        backend.reindex_input_refs_after_removal(1);
+        if let BackendDef::Vm(ref vm) = backend {
+            assert!(matches!(
+                vm.program[0],
+                VmInstruction::ReadInput {
+                    ref_idx: 0,
+                    sub_idx: 0,
+                    ..
+                }
+            ));
+            assert!(matches!(
+                vm.program[1],
+                VmInstruction::ReadInput {
+                    ref_idx: u16::MAX,
+                    sub_idx: 0,
+                    ..
+                }
+            ));
+            assert!(matches!(
+                vm.program[2],
+                VmInstruction::ReadInput {
+                    ref_idx: 1,
+                    sub_idx: 5,
+                    ..
+                }
+            ));
+            assert!(matches!(vm.program[3], VmInstruction::Halt));
+        } else {
+            panic!("expected VM");
+        }
     }
 }
