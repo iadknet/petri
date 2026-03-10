@@ -69,6 +69,13 @@ export interface PhenotypeConfig {
 	polarity_flip_chance: number;
 }
 
+export interface ReachableBiasConfig {
+	topology: number;
+	vm: number;
+	graph: number;
+	input_ref: number;
+}
+
 export interface MutationConfig {
 	mutation_probability: number;
 	per_birth_mutation_events_min: number;
@@ -78,6 +85,8 @@ export interface MutationConfig {
 	genome_size_pressure_enabled: boolean;
 	action_queue_cap: number;
 	phenotype: PhenotypeConfig;
+	reachable_bias: ReachableBiasConfig;
+	input_auto_connect_chance: number;
 }
 
 export interface PerceptionRuntimeConfig {
@@ -103,6 +112,14 @@ export interface PredationConfig {
 	kill_complexity_bonus_multiplier: number;
 }
 
+export interface ActionLogConfig {
+	capacity: number;
+}
+
+export interface SharedMemoryConfig {
+	decay_rate: number;
+}
+
 export interface SimulationConfig {
 	population: PopulationConfig;
 	world: WorldConfig;
@@ -110,4 +127,6 @@ export interface SimulationConfig {
 	runtime: RuntimeConfig;
 	mutation: MutationConfig;
 	predation: PredationConfig;
+	action_log: ActionLogConfig;
+	shared_memory: SharedMemoryConfig;
 }
