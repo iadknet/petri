@@ -75,6 +75,95 @@ describe("useCreatureDetailResource", () => {
 		vi.useRealTimers();
 	});
 
+	it("updates store with new data when tick changes via setStatus", async () => {
+		const detail1 = buildCreatureDetail();
+		const detail2 = {
+			...buildCreatureDetail(),
+			energy: 35,
+			age: 9,
+			position: { x: 11, y: 13 },
+			latest_tick: 2733,
+			action_log: [
+				{
+					tick: 2733,
+					action_type: "Move" as const,
+					result: "Success" as const,
+					direction: 2,
+					energy_before: 42,
+					energy_after: 35,
+					amount: 0,
+					priority_bid: 0.5,
+				},
+			],
+		};
+		vi.mocked(api.getCreature)
+			.mockResolvedValueOnce(detail1)
+			.mockResolvedValueOnce(detail2);
+
+		useCreatureInspectorStore.getState().selectCreature(7);
+		await act(async () => {
+			render(<Harness />);
+			await Promise.resolve();
+		});
+
+		expect(api.getCreature).toHaveBeenCalledTimes(1);
+		expect(useCreatureInspectorStore.getState().liveDetail.stats?.energy).toBe(42);
+		expect(useCreatureInspectorStore.getState().liveDetail.stats?.age).toBe(8);
+
+		// Simulate tick change via setStatus (production path)
+		act(() => {
+			vi.advanceTimersByTime(200);
+			useSimulationStore.getState().setStatus(1, 2733, {
+				state: "running",
+				population: 50,
+				mean_energy: 40,
+				last_tick_actions: {
+					move: 10,
+					eat: 5,
+					reproduce: 2,
+					noop: 30,
+					steal: 0,
+					predation_kills: 0,
+				},
+				reproduction_actions_attempted_total: 0,
+				reproduction_actions_spawned_total: 0,
+				reproduction_actions_rejected_total: 0,
+				predation_actions_attempted_total: 0,
+				predation_actions_transferred_total: 0,
+				predation_actions_rejected_total: 0,
+				predation_kills_total: 0,
+				predation_actions_by_result: {},
+				mutation_events_attempted_total: 0,
+				mutation_events_applied_total: 0,
+				mutation_events_skipped_total: 0,
+				mutation_events_attempted_total_by_domain: {},
+				mutation_events_applied_total_by_domain: {},
+				mutation_events_attempted_total_by_operator: {},
+				mutation_events_applied_total_by_operator: {},
+				mutation_events_applied_total_semantic_noop: 0,
+				mutation_events_applied_total_semantic_change: 0,
+				last_tick_compute_energy_total_mean: 0,
+				last_tick_compute_energy_total_min: 0,
+				last_tick_compute_energy_total_max: 0,
+				last_tick_compute_energy_vm_mean: 0,
+				last_tick_compute_energy_graph_mean: 0,
+				perf: {
+					projection_publish_ms: 0,
+					ws_frame_publish_ms: 0,
+					subscriber_count: 1,
+				},
+			});
+		});
+
+		await act(async () => {
+			await Promise.resolve();
+		});
+
+		expect(api.getCreature).toHaveBeenCalledTimes(2);
+		expect(useCreatureInspectorStore.getState().liveDetail.stats?.energy).toBe(35);
+		expect(useCreatureInspectorStore.getState().liveDetail.stats?.age).toBe(9);
+	});
+
 	it("stops incremental polling after the selected creature is marked dead", async () => {
 		vi.mocked(api.getCreature)
 			.mockResolvedValueOnce(buildCreatureDetail())
