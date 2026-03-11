@@ -30,7 +30,7 @@ export function buildGraphFlowScene(input: {
 		if (!pos) continue;
 
 		const trace = traceOverlay?.get(mn.id) ?? null;
-		const isLive = mn.nodeType === "compute" ? liveSet.has(mn.arrayIndex) : mn.nodeType !== "input";
+		const isLive = mn.nodeType === "compute" ? liveSet.has(mn.arrayIndex) : true;
 
 		flowNodes.push({
 			id: mn.id,
