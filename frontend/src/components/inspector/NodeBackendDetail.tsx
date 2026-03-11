@@ -1,7 +1,7 @@
 import { useMemo } from "react";
 import type { BackendDef, InputReference } from "../../types/genome.ts";
 import type { VmTrace } from "../../types/trace.ts";
-import { formatGraphSource } from "./GraphInternalsViz.tsx";
+import { formatGraphSource } from "./graphNodeFormatters.ts";
 import { describeComputeNodeKind } from "./mesh/meshPresentation.ts";
 import { formatReadableInstruction } from "./vmInstructionFormat.ts";
 
