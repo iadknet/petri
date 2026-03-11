@@ -63,11 +63,38 @@ export interface GraphPassTrace {
 	max_delta: number;
 }
 
+export interface GraphOutputSinkTrace {
+	wired: boolean;
+	weighted_sum: number;
+	applied: boolean;
+	applied_value: number;
+}
+
+export interface GraphActionSlotTrace {
+	wired: boolean;
+	gate_weighted_sum: number;
+	fired: boolean;
+	param_values: [number, number];
+	queue_len_before: number;
+	queue_len_after: number;
+	emitted_action: WorldAction | null;
+}
+
+export interface GraphExecuteGateTrace {
+	wired: boolean;
+	weighted_sum: number;
+	queue_non_empty: boolean;
+	fired: boolean;
+}
+
 export interface GraphTrace {
 	passes: GraphPassTrace[];
 	converged: boolean;
 	stable_passes_count: number;
 	final_outputs: number[];
+	output_sinks: GraphOutputSinkTrace[];
+	action_slots: GraphActionSlotTrace[];
+	execute_gate: GraphExecuteGateTrace;
 }
 
 export type BackendTrace = { Vm: VmTrace } | { Graph: GraphTrace };

@@ -1,11 +1,8 @@
 import { describe, expect, it } from "vitest";
 import type { InputReference } from "../../types/genome.ts";
-import {
-	categorize,
-	getKindLabel,
-	getKindName,
-	resolveSelectedTarget,
-} from "./GraphInternalsViz.tsx";
+import { resolveSelectedTarget } from "./GraphInternalsViz.tsx";
+import { categorizeComputeNode } from "./graphNodeCategories.ts";
+import { getKindLabel, getKindName } from "./graphNodeFormatters.ts";
 
 describe("getKindName", () => {
 	it("returns string kinds directly", () => {
@@ -70,35 +67,41 @@ describe("getKindLabel", () => {
 	});
 });
 
-describe("categorize", () => {
+describe("categorizeComputeNode", () => {
 	it("classifies Constant as constant", () => {
-		expect(categorize({ Constant: 1 })).toBe("constant");
-		expect(categorize({ Constant: 0 })).toBe("constant");
-		expect(categorize({ Constant: -3.14 })).toBe("constant");
+		expect(categorizeComputeNode({ Constant: 1 })).toBe("constant");
+		expect(categorizeComputeNode({ Constant: 0 })).toBe("constant");
+		expect(categorizeComputeNode({ Constant: -3.14 })).toBe("constant");
 	});
 
-	it("classifies all string kinds as processing", () => {
-		expect(categorize("Add")).toBe("processing");
-		expect(categorize("Multiply")).toBe("processing");
-		expect(categorize("Negate")).toBe("processing");
-		expect(categorize("Abs")).toBe("processing");
-		expect(categorize("Min")).toBe("processing");
-		expect(categorize("Max")).toBe("processing");
-		expect(categorize("WeightedSum")).toBe("processing");
-		expect(categorize("Sigmoid")).toBe("processing");
-		expect(categorize("Tanh")).toBe("processing");
-		expect(categorize("Relu")).toBe("processing");
-		expect(categorize("Clamp01")).toBe("processing");
-		expect(categorize("GreaterThan")).toBe("processing");
-		expect(categorize("Select")).toBe("processing");
-		expect(categorize("AdaptiveGain")).toBe("processing");
+	it("classifies arithmetic kinds", () => {
+		expect(categorizeComputeNode("Add")).toBe("arithmetic");
+		expect(categorizeComputeNode("Multiply")).toBe("arithmetic");
+		expect(categorizeComputeNode("Negate")).toBe("arithmetic");
+		expect(categorizeComputeNode("Abs")).toBe("arithmetic");
+		expect(categorizeComputeNode("Min")).toBe("arithmetic");
+		expect(categorizeComputeNode("Max")).toBe("arithmetic");
+		expect(categorizeComputeNode("WeightedSum")).toBe("arithmetic");
 	});
 
-	it("classifies parameterized non-Constant kinds as processing", () => {
-		expect(categorize({ Threshold: 0.5 })).toBe("processing");
-		expect(categorize({ DecayIntegrator: 0.9 })).toBe("processing");
-		expect(categorize({ Momentum: 0.8 })).toBe("processing");
-		expect(categorize({ Oscillator: 0.5 })).toBe("processing");
+	it("classifies activation kinds", () => {
+		expect(categorizeComputeNode("Sigmoid")).toBe("activation");
+		expect(categorizeComputeNode("Tanh")).toBe("activation");
+		expect(categorizeComputeNode("Relu")).toBe("activation");
+		expect(categorizeComputeNode("Clamp01")).toBe("activation");
+		expect(categorizeComputeNode({ Threshold: 0.5 })).toBe("activation");
+	});
+
+	it("classifies logic kinds", () => {
+		expect(categorizeComputeNode("GreaterThan")).toBe("logic");
+		expect(categorizeComputeNode("Select")).toBe("logic");
+	});
+
+	it("classifies stateful kinds", () => {
+		expect(categorizeComputeNode({ DecayIntegrator: 0.9 })).toBe("stateful");
+		expect(categorizeComputeNode({ Momentum: 0.8 })).toBe("stateful");
+		expect(categorizeComputeNode({ Oscillator: 0.5 })).toBe("stateful");
+		expect(categorizeComputeNode("AdaptiveGain")).toBe("stateful");
 	});
 });
 
