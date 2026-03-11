@@ -72,7 +72,14 @@ impl MutationEngine {
                 (
                     MutationDomain::Topology,
                     topology_operator_key(op),
-                    apply_topology_event(genome, op, parent_reachable_nodes, rb.topology, rng),
+                    apply_topology_event(
+                        genome,
+                        op,
+                        parent_reachable_nodes,
+                        rb.topology,
+                        rng,
+                        config,
+                    ),
                 )
             } else {
                 // Layer 2: Node-internal (VM, Graph, InputRef — equal probability)
@@ -138,9 +145,10 @@ fn apply_topology_event(
     reachable_nodes: &[usize],
     bias: f64,
     rng: &mut impl Rng,
+    config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let snapshot = genome.clone();
-    match TopologyMutator::apply(genome, op, reachable_nodes, bias, rng) {
+    match TopologyMutator::apply(genome, op, reachable_nodes, bias, rng, config) {
         Ok(reachability) => {
             if ParseabilityGate::validate(genome).is_ok() {
                 Ok(reachability)

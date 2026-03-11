@@ -349,6 +349,41 @@ fn engine_mesh_layer_probability_one_always_selects_topology() {
 }
 
 #[test]
+fn apply_topology_event_threads_config_into_add_node_birth_policy() {
+    use crate::creature::genome::BackendDef;
+    use crate::mutation::topology::TopologyOperator;
+    use crate::mutation::types::TargetReachability;
+
+    let mut config = SimulationConfig::default().mutation;
+    config.topology_new_node_birth.graph_backend_chance = 1.0;
+    config.topology_new_node_birth.graph_initialized_chance = 0.0;
+    config.topology_new_node_birth.graph_compute_gate_chance = 0.0;
+
+    let mut genome = v3alpha1_founder_genome();
+    let before_nodes = genome.nodes.len();
+    let mut r = rng(10_001);
+    let reachability = apply_topology_event(
+        &mut genome,
+        TopologyOperator::AddNode,
+        &[],
+        0.0,
+        &mut r,
+        &config,
+    )
+    .expect("AddNode should apply");
+
+    assert_eq!(reachability, TargetReachability::NotApplicable);
+    assert_eq!(genome.nodes.len(), before_nodes + 1);
+
+    let newborn = genome.nodes.last().expect("newborn node must exist");
+    let BackendDef::Graph(graph) = &newborn.backend_def else {
+        panic!("newborn backend must follow config and be Graph");
+    };
+    assert!(newborn.input_refs.is_empty());
+    assert!(graph.compute_nodes.is_empty());
+}
+
+#[test]
 fn engine_pressure_disabled_does_not_restrict() {
     use crate::mutation::types::ComplexityEffect;
 

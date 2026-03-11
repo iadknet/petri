@@ -1,6 +1,6 @@
 use super::*;
 use crate::config::MutationConfig;
-use crate::contracts::NodeId;
+use crate::contracts::{NodeId, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::cgp::{
     ActionSlot, ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate,
@@ -11,6 +11,7 @@ use crate::creature::genome::{
 };
 use crate::creature::parseability::ParseabilityGate;
 use crate::mutation::compound::sub_value_count;
+use crate::mutation::sampling::random_input_reference;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
