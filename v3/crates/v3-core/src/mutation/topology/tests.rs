@@ -1,5 +1,8 @@
 use super::*;
+use crate::config::MutationConfig;
 use crate::creature::founder::v3alpha1_founder_genome;
+use crate::creature::genome::cgp::{GraphSource, OutputSinkKind};
+use crate::creature::genome::{VmBackendDef, VmInstruction};
 use crate::creature::parseability::ParseabilityGate;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -8,12 +11,52 @@ fn rng(seed: u64) -> SmallRng {
     SmallRng::seed_from_u64(seed)
 }
 
+fn apply(
+    genome: &mut CreatureGenome,
+    op: TopologyOperator,
+    reachable_nodes: &[usize],
+    bias: f64,
+    rng: &mut impl rand::Rng,
+) -> Result<TargetReachability, MutationSkipReason> {
+    apply_with_config(
+        genome,
+        op,
+        reachable_nodes,
+        bias,
+        rng,
+        &MutationConfig::default(),
+    )
+}
+
+fn apply_with_config(
+    genome: &mut CreatureGenome,
+    op: TopologyOperator,
+    reachable_nodes: &[usize],
+    bias: f64,
+    rng: &mut impl rand::Rng,
+    config: &MutationConfig,
+) -> Result<TargetReachability, MutationSkipReason> {
+    TopologyMutator::apply(genome, op, reachable_nodes, bias, rng, config)
+}
+
+fn forced_birth_config(
+    graph_backend_chance: f32,
+    graph_initialized_chance: f32,
+    graph_compute_gate_chance: f32,
+) -> MutationConfig {
+    let mut config = MutationConfig::default();
+    config.topology_new_node_birth.graph_backend_chance = graph_backend_chance;
+    config.topology_new_node_birth.graph_initialized_chance = graph_initialized_chance;
+    config.topology_new_node_birth.graph_compute_gate_chance = graph_compute_gate_chance;
+    config
+}
+
 #[test]
 fn add_node_increases_node_count_by_one() {
     let mut genome = v3alpha1_founder_genome();
     let before = genome.nodes.len();
     let mut r = rng(0);
-    TopologyMutator::apply(&mut genome, TopologyOperator::AddNode, &[], 0.0, &mut r).unwrap();
+    apply(&mut genome, TopologyOperator::AddNode, &[], 0.0, &mut r).unwrap();
     assert_eq!(genome.nodes.len(), before + 1);
 }
 
@@ -23,7 +66,7 @@ fn remove_node_decreases_node_count() {
     assert!(genome.nodes.len() >= 2, "founder must have >=2 nodes");
     let before = genome.nodes.len();
     let mut r = rng(1);
-    TopologyMutator::apply(&mut genome, TopologyOperator::RemoveNode, &[], 0.0, &mut r).unwrap();
+    apply(&mut genome, TopologyOperator::RemoveNode, &[], 0.0, &mut r).unwrap();
     assert_eq!(genome.nodes.len(), before - 1);
 }
 
@@ -34,8 +77,7 @@ fn remove_node_on_single_node_genome_returns_no_applicable_target() {
     genome.nodes.truncate(1);
     genome.entry_node_id = genome.nodes[0].node_id;
     let mut r = rng(2);
-    let result =
-        TopologyMutator::apply(&mut genome, TopologyOperator::RemoveNode, &[], 0.0, &mut r);
+    let result = apply(&mut genome, TopologyOperator::RemoveNode, &[], 0.0, &mut r);
     assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
 }
 
@@ -48,7 +90,7 @@ fn retarget_node_target_changes_target() {
     for seed in 0u64..50 {
         let mut g = genome.clone();
         let mut rr = rng(seed);
-        let _ = TopologyMutator::apply(
+        let _ = apply(
             &mut g,
             TopologyOperator::RetargetNodeTarget,
             &[],
@@ -62,7 +104,7 @@ fn retarget_node_target_changes_target() {
     }
     // At minimum, the operation doesn't fail and targets still has same length.
     let mut r2 = rng(99);
-    let result = TopologyMutator::apply(
+    let result = apply(
         &mut genome,
         TopologyOperator::RetargetNodeTarget,
         &[],
@@ -78,7 +120,7 @@ fn add_route_target_increases_target_count() {
     let before = genome.nodes[0].targets.len();
     let mut r = rng(4);
     // Force node index 0 by using a genome with known structure.
-    TopologyMutator::apply(
+    apply(
         &mut genome,
         TopologyOperator::AddRouteTarget,
         &[],
@@ -104,7 +146,7 @@ fn change_entry_node_changes_entry() {
     assert!(genome.nodes.len() >= 2);
     let original_entry = genome.entry_node_id;
     let mut r = rng(5);
-    TopologyMutator::apply(
+    apply(
         &mut genome,
         TopologyOperator::ChangeEntryNode,
         &[],
@@ -138,7 +180,7 @@ fn topology_after_each_operator_passes_parseability_gate() {
     for (i, &op) in operators.iter().enumerate() {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(i as u64 + 100);
-        let result = TopologyMutator::apply(&mut genome, op, &[], 0.0, &mut r);
+        let result = apply(&mut genome, op, &[], 0.0, &mut r);
         // Either succeeds or NoApplicableTarget — either way, genome must still be parseable.
         match result {
             Ok(_) | Err(MutationSkipReason::NoApplicableTarget) => {
@@ -161,7 +203,7 @@ fn swap_node_backend_toggles_backend_on_single_node_genome() {
     genome.entry_node_id = genome.nodes[0].node_id;
 
     let mut r1 = rng(7);
-    TopologyMutator::apply(
+    apply(
         &mut genome,
         TopologyOperator::SwapNodeBackend,
         &[],
@@ -172,7 +214,7 @@ fn swap_node_backend_toggles_backend_on_single_node_genome() {
     assert!(matches!(genome.nodes[0].backend_def, BackendDef::Vm(_)));
 
     let mut r2 = rng(8);
-    TopologyMutator::apply(
+    apply(
         &mut genome,
         TopologyOperator::SwapNodeBackend,
         &[],
@@ -192,7 +234,7 @@ fn rewrite_node_id_rewrites_entry_and_target_references() {
     let old_id = genome.nodes[0].node_id;
 
     let mut r = rng(11);
-    TopologyMutator::apply(
+    apply(
         &mut genome,
         TopologyOperator::RewriteNodeId,
         &[],
@@ -216,7 +258,7 @@ fn copy_node_increases_node_count_by_one() {
     let mut genome = v3alpha1_founder_genome();
     let before = genome.nodes.len();
     let mut r = rng(42);
-    TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
+    apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
     assert_eq!(genome.nodes.len(), before + 1);
 }
 
@@ -225,7 +267,7 @@ fn copy_node_assigns_different_node_id() {
     let mut genome = v3alpha1_founder_genome();
     let original_ids: Vec<NodeId> = genome.nodes.iter().map(|n| n.node_id).collect();
     let mut r = rng(42);
-    TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
+    apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
     let new_node = genome.nodes.last().unwrap();
     assert!(
         !original_ids.contains(&new_node.node_id),
@@ -241,7 +283,7 @@ fn copy_node_deep_copies_vm_backend() {
     for seed in 0u64..100 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
+        apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
         let new_node = genome.nodes.last().unwrap();
         if matches!(&new_node.backend_def, BackendDef::Vm(_)) {
             // Find which source node has matching backend.
@@ -276,7 +318,7 @@ fn copy_node_deep_copies_graph_backend() {
             CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default()),
         );
         let mut r = rng(seed);
-        TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
+        apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
         let new_node = genome.nodes.last().unwrap();
         if matches!(&new_node.backend_def, BackendDef::Graph(_)) {
             let has_match = genome
@@ -304,7 +346,7 @@ fn copy_node_sometimes_copies_targets_sometimes_not() {
     for seed in 0u64..500 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
+        apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
         let new_node = genome.nodes.last().unwrap();
         if new_node.targets.is_empty() {
             saw_empty = true;
@@ -329,7 +371,7 @@ fn copy_node_sometimes_copies_input_refs_sometimes_not() {
     for seed in 0u64..500 {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(seed);
-        TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
+        apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
         let new_node = genome.nodes.last().unwrap();
         if new_node.input_refs.is_empty() {
             saw_empty = true;
@@ -354,7 +396,7 @@ fn copy_node_always_adds_backlink() {
         let original_targets: Vec<Vec<NodeId>> =
             genome.nodes.iter().map(|n| n.targets.clone()).collect();
         let mut r = rng(seed);
-        TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
+        apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
         let new_id = genome.nodes.last().unwrap().node_id;
         // Check that some original node gained the new_id in its targets.
         let backlinked = genome.nodes.iter().enumerate().any(|(i, n)| {
@@ -376,7 +418,7 @@ fn copy_node_can_copy_entry_node() {
     genome.entry_node_id = genome.nodes[0].node_id;
     let before = genome.nodes.len();
     let mut r = rng(99);
-    TopologyMutator::apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
+    apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
     assert_eq!(genome.nodes.len(), before + 1);
 }
 
@@ -422,7 +464,7 @@ fn copy_mesh_backward_slice_duplicates_feeding_pipeline() {
     for seed in 0u64..200 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        let result = TopologyMutator::apply(
+        let result = apply(
             &mut g,
             TopologyOperator::CopyMeshBackwardSlice,
             &[],
@@ -470,7 +512,7 @@ fn copy_mesh_backward_slice_remaps_internal_targets() {
     for seed in 0u64..200 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        let result = TopologyMutator::apply(
+        let result = apply(
             &mut g,
             TopologyOperator::CopyMeshBackwardSlice,
             &[],
@@ -547,7 +589,7 @@ fn copy_mesh_forward_slice_duplicates_downstream_subtree() {
     for seed in 0u64..200 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        let result = TopologyMutator::apply(
+        let result = apply(
             &mut g,
             TopologyOperator::CopyMeshForwardSlice,
             &[],
@@ -584,7 +626,7 @@ fn copy_mesh_operators_single_node_genome_returns_single_copy() {
         }],
     };
     let mut r = rng(42);
-    TopologyMutator::apply(
+    apply(
         &mut genome,
         TopologyOperator::CopyMeshBackwardSlice,
         &[],
@@ -619,8 +661,7 @@ fn swap_route_targets_changes_target_order() {
     for seed in 0u64..50 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        TopologyMutator::apply(&mut g, TopologyOperator::SwapRouteTargets, &[], 0.0, &mut r)
-            .unwrap();
+        apply(&mut g, TopologyOperator::SwapRouteTargets, &[], 0.0, &mut r).unwrap();
         if g.nodes[0].targets != original_targets {
             changed = true;
             break;
@@ -649,8 +690,7 @@ fn swap_route_targets_preserves_target_set() {
     for seed in 0u64..50 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        TopologyMutator::apply(&mut g, TopologyOperator::SwapRouteTargets, &[], 0.0, &mut r)
-            .unwrap();
+        apply(&mut g, TopologyOperator::SwapRouteTargets, &[], 0.0, &mut r).unwrap();
         let mut after_sorted = g.nodes[0].targets.clone();
         after_sorted.sort();
         assert_eq!(
@@ -676,7 +716,7 @@ fn swap_route_targets_requires_at_least_two_targets() {
         }],
     };
     let mut r = rng(0);
-    let result = TopologyMutator::apply(
+    let result = apply(
         &mut genome,
         TopologyOperator::SwapRouteTargets,
         &[],
@@ -717,7 +757,7 @@ fn splice_node_increases_node_count_by_one() {
     };
     let before = genome.nodes.len();
     let mut r = rng(0);
-    TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &[], 0.0, &mut r).unwrap();
+    apply(&mut genome, TopologyOperator::SpliceNode, &[], 0.0, &mut r).unwrap();
     assert_eq!(genome.nodes.len(), before + 1);
 }
 
@@ -750,7 +790,7 @@ fn splice_node_creates_a_to_c_to_b_chain() {
     };
     let b_id = NodeId::new(1);
     let mut r = rng(0);
-    TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &[], 0.0, &mut r).unwrap();
+    apply(&mut genome, TopologyOperator::SpliceNode, &[], 0.0, &mut r).unwrap();
     let c = genome.nodes.last().unwrap();
     let c_id = c.node_id;
     // C's target is B
@@ -781,8 +821,17 @@ fn splice_node_new_node_is_blank_vm() {
             targets: vec![NodeId::new(1)],
         }],
     };
+    let config = forced_birth_config(0.0, 1.0, 1.0);
     let mut r = rng(0);
-    TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &[], 0.0, &mut r).unwrap();
+    apply_with_config(
+        &mut genome,
+        TopologyOperator::SpliceNode,
+        &[],
+        0.0,
+        &mut r,
+        &config,
+    )
+    .unwrap();
     let c = genome.nodes.last().unwrap();
     assert!(
         c.input_refs.is_empty(),
@@ -795,6 +844,214 @@ fn splice_node_new_node_is_blank_vm() {
     } else {
         panic!("spliced node must be VM backend");
     }
+}
+
+#[test]
+fn add_node_can_force_blank_graph_birth() {
+    let mut genome = v3alpha1_founder_genome();
+    let config = forced_birth_config(1.0, 0.0, 0.0);
+    let mut r = rng(5);
+    apply_with_config(
+        &mut genome,
+        TopologyOperator::AddNode,
+        &[],
+        0.0,
+        &mut r,
+        &config,
+    )
+    .unwrap();
+    let newborn = genome.nodes.last().unwrap();
+    let BackendDef::Graph(graph) = &newborn.backend_def else {
+        panic!("expected Graph newborn");
+    };
+    assert!(newborn.input_refs.is_empty());
+    assert!(graph.compute_nodes.is_empty());
+    let wired_sink_count = graph
+        .output_sinks
+        .iter()
+        .filter(|sink| !sink.inputs.is_empty())
+        .count();
+    assert_eq!(wired_sink_count, 0);
+}
+
+#[test]
+fn add_node_can_force_vm_birth() {
+    let mut genome = v3alpha1_founder_genome();
+    let config = forced_birth_config(0.0, 1.0, 1.0);
+    let mut r = rng(6);
+    apply_with_config(
+        &mut genome,
+        TopologyOperator::AddNode,
+        &[],
+        0.0,
+        &mut r,
+        &config,
+    )
+    .unwrap();
+    let newborn = genome.nodes.last().unwrap();
+    assert!(newborn.input_refs.is_empty());
+    let BackendDef::Vm(vm) = &newborn.backend_def else {
+        panic!("expected VM newborn");
+    };
+    assert_eq!(vm.register_count, 1);
+    assert!(vm.constants.is_empty());
+    assert_eq!(vm.program, vec![VmInstruction::Halt]);
+}
+
+#[test]
+fn add_node_can_force_initialized_direct_graph_birth() {
+    let mut genome = v3alpha1_founder_genome();
+    let config = forced_birth_config(1.0, 1.0, 0.0);
+    let mut r = rng(7);
+    apply_with_config(
+        &mut genome,
+        TopologyOperator::AddNode,
+        &[],
+        0.0,
+        &mut r,
+        &config,
+    )
+    .unwrap();
+    let newborn = genome.nodes.last().unwrap();
+    let BackendDef::Graph(graph) = &newborn.backend_def else {
+        panic!("expected Graph newborn");
+    };
+    assert_eq!(newborn.input_refs.len(), 1);
+    assert!(graph.compute_nodes.is_empty());
+    let wired_custom_sinks: Vec<_> = graph
+        .output_sinks
+        .iter()
+        .filter(|sink| {
+            matches!(sink.kind, OutputSinkKind::CustomOutput(_)) && !sink.inputs.is_empty()
+        })
+        .collect();
+    assert_eq!(wired_custom_sinks.len(), 1);
+    assert_eq!(wired_custom_sinks[0].inputs.len(), 1);
+    assert!(matches!(
+        wired_custom_sinks[0].inputs[0].source,
+        GraphSource::InputLeaf { ref_idx: 0, .. }
+    ));
+    let wired_non_custom = graph
+        .output_sinks
+        .iter()
+        .filter(|sink| !matches!(sink.kind, OutputSinkKind::CustomOutput(_)))
+        .filter(|sink| !sink.inputs.is_empty())
+        .count();
+    assert_eq!(wired_non_custom, 0);
+}
+
+#[test]
+fn splice_node_can_force_initialized_compute_graph_birth() {
+    let mut genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![
+            NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![VmInstruction::Halt],
+                }),
+                targets: vec![NodeId::new(1)],
+            },
+            NodeGenome {
+                node_id: NodeId::new(1),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![VmInstruction::Halt],
+                }),
+                targets: vec![],
+            },
+        ],
+    };
+    let config = forced_birth_config(1.0, 1.0, 1.0);
+    let mut r = rng(11);
+    apply_with_config(
+        &mut genome,
+        TopologyOperator::SpliceNode,
+        &[],
+        0.0,
+        &mut r,
+        &config,
+    )
+    .unwrap();
+    let newborn = genome.nodes.last().unwrap();
+    let BackendDef::Graph(graph) = &newborn.backend_def else {
+        panic!("expected Graph newborn");
+    };
+    assert_eq!(newborn.input_refs.len(), 1);
+    assert_eq!(graph.compute_nodes.len(), 1);
+    let wired_custom_sinks: Vec<_> = graph
+        .output_sinks
+        .iter()
+        .filter(|sink| {
+            matches!(sink.kind, OutputSinkKind::CustomOutput(_)) && !sink.inputs.is_empty()
+        })
+        .collect();
+    assert_eq!(wired_custom_sinks.len(), 1);
+    assert_eq!(wired_custom_sinks[0].inputs.len(), 1);
+    assert!(matches!(
+        wired_custom_sinks[0].inputs[0].source,
+        GraphSource::ComputeNode(0)
+    ));
+    let wired_non_custom = graph
+        .output_sinks
+        .iter()
+        .filter(|sink| !matches!(sink.kind, OutputSinkKind::CustomOutput(_)))
+        .filter(|sink| !sink.inputs.is_empty())
+        .count();
+    assert_eq!(wired_non_custom, 0);
+}
+
+#[test]
+fn splice_node_can_force_vm_birth() {
+    let mut genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![
+            NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![VmInstruction::Halt],
+                }),
+                targets: vec![NodeId::new(1)],
+            },
+            NodeGenome {
+                node_id: NodeId::new(1),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![VmInstruction::Halt],
+                }),
+                targets: vec![],
+            },
+        ],
+    };
+    let config = forced_birth_config(0.0, 1.0, 1.0);
+    let mut r = rng(12);
+    apply_with_config(
+        &mut genome,
+        TopologyOperator::SpliceNode,
+        &[],
+        0.0,
+        &mut r,
+        &config,
+    )
+    .unwrap();
+    let newborn = genome.nodes.last().unwrap();
+    assert!(newborn.input_refs.is_empty());
+    let BackendDef::Vm(vm) = &newborn.backend_def else {
+        panic!("expected VM newborn");
+    };
+    assert_eq!(vm.register_count, 1);
+    assert!(vm.constants.is_empty());
+    assert_eq!(vm.program, vec![VmInstruction::Halt]);
 }
 
 #[test]
@@ -813,8 +1070,7 @@ fn splice_node_no_targets_returns_skip() {
         }],
     };
     let mut r = rng(0);
-    let result =
-        TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &[], 0.0, &mut r);
+    let result = apply(&mut genome, TopologyOperator::SpliceNode, &[], 0.0, &mut r);
     assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
 }
 
@@ -822,8 +1078,7 @@ fn splice_node_no_targets_returns_skip() {
 fn splice_node_passes_parseability_gate() {
     let mut genome = v3alpha1_founder_genome();
     let mut r = rng(42);
-    let result =
-        TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &[], 0.0, &mut r);
+    let result = apply(&mut genome, TopologyOperator::SpliceNode, &[], 0.0, &mut r);
     match result {
         Ok(_) | Err(MutationSkipReason::NoApplicableTarget) => {
             assert!(
@@ -840,7 +1095,7 @@ fn splice_node_new_node_gets_fresh_node_id() {
     let mut genome = v3alpha1_founder_genome();
     let original_ids: Vec<NodeId> = genome.nodes.iter().map(|n| n.node_id).collect();
     let mut r = rng(0);
-    TopologyMutator::apply(&mut genome, TopologyOperator::SpliceNode, &[], 0.0, &mut r).unwrap();
+    apply(&mut genome, TopologyOperator::SpliceNode, &[], 0.0, &mut r).unwrap();
     let c = genome.nodes.last().unwrap();
     assert!(
         !original_ids.contains(&c.node_id),
@@ -860,7 +1115,7 @@ fn copy_mesh_operators_pass_parseability_gate() {
     for (i, &op) in operators.iter().enumerate() {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(i as u64 + 200);
-        let result = TopologyMutator::apply(&mut genome, op, &[], 0.0, &mut r);
+        let result = apply(&mut genome, op, &[], 0.0, &mut r);
         match result {
             Ok(_) | Err(MutationSkipReason::NoApplicableTarget) => {
                 assert!(
@@ -1009,7 +1264,7 @@ fn bias_1_targets_reachable_node_for_remove() {
     for seed in 0u64..20 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        let result = TopologyMutator::apply(
+        let result = apply(
             &mut g,
             TopologyOperator::RemoveNode,
             &reachable,
@@ -1054,7 +1309,7 @@ fn bias_0_returns_reachable_or_unreachable() {
     for seed in 0u64..200 {
         let mut g = genome.clone();
         let mut r = rng(seed);
-        if let Ok(reachability) = TopologyMutator::apply(
+        if let Ok(reachability) = apply(
             &mut g,
             TopologyOperator::RemoveNode,
             &reachable,
@@ -1082,7 +1337,7 @@ fn exempt_operators_return_not_applicable() {
     let mut genome = v3alpha1_founder_genome();
     let reachable = [0usize, 1];
     let mut r = rng(42);
-    let result = TopologyMutator::apply(
+    let result = apply(
         &mut genome,
         TopologyOperator::AddNode,
         &reachable,
@@ -1092,7 +1347,7 @@ fn exempt_operators_return_not_applicable() {
     assert_eq!(result, Ok(TargetReachability::NotApplicable));
 
     let mut r2 = rng(43);
-    let result = TopologyMutator::apply(
+    let result = apply(
         &mut genome,
         TopologyOperator::ChangeEntryNode,
         &reachable,

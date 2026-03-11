@@ -539,6 +539,61 @@ async fn patch_config_world_field_while_running_returns_409() {
     );
 }
 
+// ── 11b. get_config_includes_topology_new_node_birth_defaults ──────────────
+
+#[tokio::test]
+async fn get_config_includes_topology_new_node_birth_defaults() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let (status, body) = do_request(a, get_req("/v3/simulation/config")).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    let birth = &body["config"]["mutation"]["topology_new_node_birth"];
+    assert!(birth.is_object(), "missing topology_new_node_birth: {body}");
+    assert_eq!(birth["graph_backend_chance"].as_f64(), Some(0.5));
+    assert_eq!(birth["graph_initialized_chance"].as_f64(), Some(0.5));
+    assert_eq!(birth["graph_compute_gate_chance"].as_f64(), Some(0.5));
+}
+
+// ── 11c. patch_config_roundtrips_topology_new_node_birth_fields ────────────
+
+#[tokio::test]
+async fn patch_config_roundtrips_topology_new_node_birth_fields() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let patch = r#"{
+        "mutation": {
+            "topology_new_node_birth": {
+                "graph_backend_chance": 1.0,
+                "graph_initialized_chance": 0.0,
+                "graph_compute_gate_chance": 1.0
+            }
+        }
+    }"#;
+
+    let (patch_status, patch_body) =
+        do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
+    assert_eq!(patch_status, StatusCode::OK, "body: {patch_body}");
+    let patched = &patch_body["config"]["mutation"]["topology_new_node_birth"];
+    assert_eq!(patched["graph_backend_chance"].as_f64(), Some(1.0));
+    assert_eq!(patched["graph_initialized_chance"].as_f64(), Some(0.0));
+    assert_eq!(patched["graph_compute_gate_chance"].as_f64(), Some(1.0));
+
+    let (get_status, get_body) = do_request(a, get_req("/v3/simulation/config")).await;
+    assert_eq!(get_status, StatusCode::OK, "body: {get_body}");
+    let fetched = &get_body["config"]["mutation"]["topology_new_node_birth"];
+    assert_eq!(fetched["graph_backend_chance"].as_f64(), Some(1.0));
+    assert_eq!(fetched["graph_initialized_chance"].as_f64(), Some(0.0));
+    assert_eq!(fetched["graph_compute_gate_chance"].as_f64(), Some(1.0));
+}
+
 // ── 12. error_envelope_has_protocol_version ─────────────────────────────────
 
 #[tokio::test]

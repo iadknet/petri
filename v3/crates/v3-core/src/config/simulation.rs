@@ -354,6 +354,25 @@ impl Default for ReachableBiasConfig {
     }
 }
 
+/// Birth policy for newly created topology nodes (AddNode, SpliceNode).
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TopologyNewNodeBirthConfig {
+    pub graph_backend_chance: f32,
+    pub graph_initialized_chance: f32,
+    pub graph_compute_gate_chance: f32,
+}
+
+impl Default for TopologyNewNodeBirthConfig {
+    fn default() -> Self {
+        Self {
+            graph_backend_chance: 0.5,
+            graph_initialized_chance: 0.5,
+            graph_compute_gate_chance: 0.5,
+        }
+    }
+}
+
 /// Mutation tuning config. Canonical owner: v3-runtime-config-spec.md Section 3.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -380,6 +399,8 @@ pub struct MutationConfig {
     /// bootstrap edge to a random pre-existing internal node. Default 0.3.
     #[serde(default = "default_input_auto_connect_chance")]
     pub input_auto_connect_chance: f32,
+    #[serde(default)]
+    pub topology_new_node_birth: TopologyNewNodeBirthConfig,
 }
 
 impl Default for MutationConfig {
@@ -395,6 +416,7 @@ impl Default for MutationConfig {
             phenotype: PhenotypeConfig::default(),
             reachable_bias: ReachableBiasConfig::default(),
             input_auto_connect_chance: default_input_auto_connect_chance(),
+            topology_new_node_birth: TopologyNewNodeBirthConfig::default(),
         }
     }
 }
@@ -606,6 +628,23 @@ impl SimulationConfig {
             m.input_auto_connect_chance.clamp(0.0, 1.0)
         } else {
             0.3
+        };
+
+        let nb = &mut m.topology_new_node_birth;
+        nb.graph_backend_chance = if nb.graph_backend_chance.is_finite() {
+            nb.graph_backend_chance.clamp(0.0, 1.0)
+        } else {
+            0.5
+        };
+        nb.graph_initialized_chance = if nb.graph_initialized_chance.is_finite() {
+            nb.graph_initialized_chance.clamp(0.0, 1.0)
+        } else {
+            0.5
+        };
+        nb.graph_compute_gate_chance = if nb.graph_compute_gate_chance.is_finite() {
+            nb.graph_compute_gate_chance.clamp(0.0, 1.0)
+        } else {
+            0.5
         };
 
         if self.action_log.capacity < 1 {
@@ -1365,6 +1404,46 @@ mod tests {
         let stripped = serde_json::to_string(&obj).unwrap();
         let mc: MutationConfig = serde_json::from_str(&stripped).unwrap();
         assert!((mc.reachable_bias.topology - 0.7).abs() < 1e-9);
+    }
+
+    #[test]
+    fn topology_new_node_birth_defaults() {
+        let cfg = SimulationConfig::default();
+        let birth = &cfg.mutation.topology_new_node_birth;
+        assert!((birth.graph_backend_chance - 0.5).abs() < f32::EPSILON);
+        assert!((birth.graph_initialized_chance - 0.5).abs() < f32::EPSILON);
+        assert!((birth.graph_compute_gate_chance - 0.5).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn topology_new_node_birth_serde_default_when_missing() {
+        let json = serde_json::to_string(&MutationConfig::default()).unwrap();
+        let v: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let mut obj = v.as_object().unwrap().clone();
+        obj.remove("topology_new_node_birth");
+        let stripped = serde_json::to_string(&obj).unwrap();
+        let mc: MutationConfig = serde_json::from_str(&stripped).unwrap();
+        let birth = &mc.topology_new_node_birth;
+        assert!((birth.graph_backend_chance - 0.5).abs() < f32::EPSILON);
+        assert!((birth.graph_initialized_chance - 0.5).abs() < f32::EPSILON);
+        assert!((birth.graph_compute_gate_chance - 0.5).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn normalize_topology_new_node_birth_clamps_and_fallbacks() {
+        let mut cfg = SimulationConfig::default();
+        cfg.mutation.topology_new_node_birth.graph_backend_chance = 2.0;
+        cfg.mutation
+            .topology_new_node_birth
+            .graph_initialized_chance = -1.0;
+        cfg.mutation
+            .topology_new_node_birth
+            .graph_compute_gate_chance = f32::NAN;
+        cfg.normalize();
+        let birth = &cfg.mutation.topology_new_node_birth;
+        assert!((birth.graph_backend_chance - 1.0).abs() < f32::EPSILON);
+        assert!((birth.graph_initialized_chance - 0.0).abs() < f32::EPSILON);
+        assert!((birth.graph_compute_gate_chance - 0.5).abs() < f32::EPSILON);
     }
 
     #[test]

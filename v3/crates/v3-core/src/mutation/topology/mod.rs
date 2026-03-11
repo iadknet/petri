@@ -5,12 +5,11 @@ use rand::Rng;
 use crate::config::MutationConfig;
 use crate::contracts::NodeId;
 use crate::creature::genome::analysis::{mesh_backward_slice, mesh_forward_slice};
-use crate::creature::genome::cgp::CgpGraphBackendDef;
-use crate::creature::genome::{
-    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
-};
+use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::reachability::biased_select_from;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
+
+mod birth;
 
 /// Topology mutation operator variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -196,11 +195,12 @@ impl TopologyMutator {
         reachable_nodes: &[usize],
         bias: f64,
         rng: &mut impl Rng,
+        config: &MutationConfig,
     ) -> Result<TargetReachability, MutationSkipReason> {
         match op {
             // Exempt: these don't select a target node for mutation.
             TopologyOperator::AddNode => {
-                apply_add_node(genome, rng).map(|()| TargetReachability::NotApplicable)
+                apply_add_node(genome, config, rng).map(|()| TargetReachability::NotApplicable)
             }
             TopologyOperator::ChangeEntryNode => {
                 apply_change_entry_node(genome, rng).map(|()| TargetReachability::NotApplicable)
@@ -217,7 +217,7 @@ impl TopologyMutator {
                 apply_remove_route_target(genome, reachable_nodes, bias, rng)
             }
             TopologyOperator::SwapNodeBackend => {
-                apply_swap_node_backend(genome, reachable_nodes, bias, rng)
+                apply_swap_node_backend(genome, reachable_nodes, bias, rng, config)
             }
             TopologyOperator::RewriteNodeId => {
                 apply_rewrite_node_id(genome, reachable_nodes, bias, rng)
@@ -229,7 +229,9 @@ impl TopologyMutator {
             TopologyOperator::CopyMeshForwardSlice => {
                 apply_copy_mesh_forward_slice(genome, reachable_nodes, bias, rng)
             }
-            TopologyOperator::SpliceNode => apply_splice_node(genome, reachable_nodes, bias, rng),
+            TopologyOperator::SpliceNode => {
+                apply_splice_node(genome, reachable_nodes, bias, rng, config)
+            }
             TopologyOperator::SwapRouteTargets => {
                 apply_swap_route_targets(genome, reachable_nodes, bias, rng)
             }
@@ -245,19 +247,16 @@ fn next_node_id(genome: &CreatureGenome) -> NodeId {
 
 fn apply_add_node(
     genome: &mut CreatureGenome,
-    _rng: &mut impl Rng,
+    config: &MutationConfig,
+    rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let new_id = next_node_id(genome);
-    genome.nodes.push(NodeGenome {
-        node_id: new_id,
-        input_refs: vec![],
-        backend_def: BackendDef::Vm(VmBackendDef {
-            register_count: 1,
-            constants: vec![],
-            program: vec![VmInstruction::Halt],
-        }),
-        targets: vec![],
-    });
+    genome.nodes.push(birth::new_topology_birth_node(
+        new_id,
+        Vec::new(),
+        config,
+        rng,
+    ));
     Ok(())
 }
 
@@ -367,20 +366,15 @@ fn apply_swap_node_backend(
     reachable_nodes: &[usize],
     bias: f64,
     rng: &mut impl Rng,
+    config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
     let (idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let node = &mut genome.nodes[idx];
     node.backend_def = match &node.backend_def {
-        BackendDef::Vm(_) => BackendDef::Graph(CgpGraphBackendDef::new_with_fixed_outputs(
-            &MutationConfig::default(),
-        )),
-        BackendDef::Graph(_) => BackendDef::Vm(VmBackendDef {
-            register_count: 1,
-            constants: vec![],
-            program: vec![VmInstruction::Halt],
-        }),
+        BackendDef::Vm(_) => birth::blank_graph_backend(config),
+        BackendDef::Graph(_) => birth::minimal_vm_backend(),
     };
     Ok(reachability)
 }
@@ -545,6 +539,7 @@ fn apply_splice_node(
     reachable_nodes: &[usize],
     bias: f64,
     rng: &mut impl Rng,
+    config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let eligible: Vec<usize> = genome
         .nodes
@@ -561,16 +556,12 @@ fn apply_splice_node(
     let target_slot = rng.gen_range(0..genome.nodes[a_idx].targets.len());
     let b_id = genome.nodes[a_idx].targets[target_slot];
     let c_id = next_node_id(genome);
-    genome.nodes.push(NodeGenome {
-        node_id: c_id,
-        input_refs: vec![],
-        backend_def: BackendDef::Vm(VmBackendDef {
-            register_count: 1,
-            constants: vec![],
-            program: vec![VmInstruction::Halt],
-        }),
-        targets: vec![b_id],
-    });
+    genome.nodes.push(birth::new_topology_birth_node(
+        c_id,
+        vec![b_id],
+        config,
+        rng,
+    ));
     genome.nodes[a_idx].targets[target_slot] = c_id;
     Ok(reachability)
 }

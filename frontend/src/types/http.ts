@@ -7,6 +7,7 @@ import type {
 	PopulationConfig,
 	RuntimeConfig,
 	SimulationConfig,
+	TopologyNewNodeBirthConfig,
 	VmConfig,
 	WorldConfig,
 } from "./config.ts";
@@ -63,8 +64,9 @@ export interface StartupRequest {
 	runtime?: Partial<Omit<RuntimeConfig, "vm">> & {
 		vm?: Partial<VmConfig>;
 	};
-	mutation?: Partial<Omit<MutationConfig, "phenotype">> & {
+	mutation?: Partial<Omit<MutationConfig, "phenotype" | "topology_new_node_birth">> & {
 		phenotype?: Partial<PhenotypeConfig>;
+		topology_new_node_birth?: Partial<TopologyNewNodeBirthConfig>;
 	};
 }
 

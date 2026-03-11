@@ -76,6 +76,12 @@ export interface ReachableBiasConfig {
 	input_ref: number;
 }
 
+export interface TopologyNewNodeBirthConfig {
+	graph_backend_chance: number;
+	graph_initialized_chance: number;
+	graph_compute_gate_chance: number;
+}
+
 export interface MutationConfig {
 	mutation_probability: number;
 	per_birth_mutation_events_min: number;
@@ -87,6 +93,7 @@ export interface MutationConfig {
 	phenotype: PhenotypeConfig;
 	reachable_bias: ReachableBiasConfig;
 	input_auto_connect_chance: number;
+	topology_new_node_birth: TopologyNewNodeBirthConfig;
 }
 
 export interface PerceptionRuntimeConfig {

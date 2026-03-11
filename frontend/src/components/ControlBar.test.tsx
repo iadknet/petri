@@ -96,6 +96,11 @@ const MOCK_CONFIG: SimulationConfig = {
 			input_ref: 0.5,
 		},
 		input_auto_connect_chance: 0.3,
+		topology_new_node_birth: {
+			graph_backend_chance: 0.5,
+			graph_initialized_chance: 0.5,
+			graph_compute_gate_chance: 0.5,
+		},
 	},
 	predation: {
 		steal_cost_rate: 0.2,

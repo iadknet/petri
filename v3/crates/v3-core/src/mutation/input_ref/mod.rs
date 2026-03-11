@@ -1,12 +1,11 @@
 use rand::Rng;
 
 use crate::config::MutationConfig;
-use crate::contracts::{
-    DynamicIntrospectionKey, InputReference, StaticIntrospectionKey, WorldInputKey,
-};
+use crate::contracts::InputReference;
 use crate::creature::genome::CreatureGenome;
 use crate::mutation::compound::sub_value_count;
 use crate::mutation::reachability::biased_select_from;
+use crate::mutation::sampling;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
 /// Input reference mutation operator variants.
@@ -170,7 +169,7 @@ fn apply_add(
     let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
     let (node_idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let new_ref = random_input_reference(rng);
+    let new_ref = sampling::random_input_reference(rng);
     genome.nodes[node_idx].input_refs.push(new_ref);
     Ok(reachability)
 }
@@ -222,7 +221,7 @@ fn apply_swap(
     let (node_idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let ref_idx = rng.gen_range(0..genome.nodes[node_idx].input_refs.len());
-    let new_ref = random_input_reference(rng);
+    let new_ref = sampling::random_input_reference(rng);
     genome.nodes[node_idx].input_refs[ref_idx] = new_ref;
     let new_width = sub_value_count(&genome.nodes[node_idx].input_refs[ref_idx], config);
     debug_assert!(ref_idx <= u16::MAX as usize, "input_refs index exceeds u16");
@@ -230,33 +229,6 @@ fn apply_swap(
         .backend_def
         .clamp_sub_idx_after_swap(ref_idx as u16, new_width);
     Ok(reachability)
-}
-
-/// Generate a random input reference from the full set of 23 possible values.
-///
-/// Distribution: FoodHere (1) + Ring sensors (3) + StaticIntrospection (2) +
-/// DynamicIntrospection (2) + ActionQueue (1) + Area summaries (3) +
-/// Nearby creature (3) + UpstreamSlot (8 weighted slots) = 23 total.
-fn random_input_reference(rng: &mut impl Rng) -> InputReference {
-    let idx = rng.gen_range(0u8..23);
-    match idx {
-        0 => InputReference::World(WorldInputKey::FoodHere),
-        1 => InputReference::World(WorldInputKey::NeighborFoodRing),
-        2 => InputReference::World(WorldInputKey::NeighborBarrierRing),
-        3 => InputReference::World(WorldInputKey::NeighborOccupiedRing),
-        4 => InputReference::StaticIntrospection(StaticIntrospectionKey::Generation),
-        5 => InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
-        6 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
-        7 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),
-        8 => InputReference::ActionQueue,
-        9 => InputReference::World(WorldInputKey::AreaFoodSummary),
-        10 => InputReference::World(WorldInputKey::AreaBarrierSummary),
-        11 => InputReference::World(WorldInputKey::AreaOccupancySummary),
-        12 => InputReference::World(WorldInputKey::NearbyCreatureCore),
-        13 => InputReference::World(WorldInputKey::NearbyCreatureVitals),
-        14 => InputReference::World(WorldInputKey::NearbyCreatureIdentity),
-        _ => InputReference::UpstreamSlot(rng.gen_range(0..12_usize)),
-    }
 }
 
 fn apply_raw_field_mutation(
