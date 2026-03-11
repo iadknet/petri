@@ -1,12 +1,13 @@
 import type {
 	BackendDef,
-	GraphNodeKind,
+	ComputeNodeKind,
 	NodeGenome,
+	OutputSinkKind,
 	VmInstruction,
 } from "../../../types/genome.ts";
 import type { RuntimeIoBadge } from "./runtimeIoSemantics.ts";
 import {
-	classifyGraphKind,
+	classifyComputeNodeKind,
 	classifyGraphTraceKind,
 	classifyVmInstruction,
 } from "./runtimeIoSemantics.ts";
@@ -48,13 +49,18 @@ export function summarizeBackendDef(backendDef: BackendDef): MeshPresentationSum
 	if ("Vm" in backendDef) {
 		return {
 			label: "VM",
-			detail: `${backendDef.Vm.program.length} ops · ${backendDef.Vm.register_count} regs`,
+			detail: `${backendDef.Vm.program.length} ops \u00b7 ${backendDef.Vm.register_count} regs`,
 		};
 	}
 
+	const graph = backendDef.Graph;
+	const wiredSinks = graph.output_sinks.filter((s) => s.inputs.length > 0).length;
+	const wiredActions = graph.action_bank.filter(
+		(s) => s.gate_inputs.length > 0 || s.param_inputs.length > 0,
+	).length;
 	return {
 		label: "Graph",
-		detail: `${backendDef.Graph.internal_nodes.length} nodes`,
+		detail: `${graph.compute_nodes.length} compute \u00b7 ${wiredSinks} sinks \u00b7 ${wiredActions} actions`,
 	};
 }
 
@@ -67,8 +73,8 @@ export function describeVmInstruction(instruction: VmInstruction): MeshInstructi
 	};
 }
 
-export function describeGraphInternalNode(kind: GraphNodeKind): MeshInstructionPresentation {
-	const semantics = classifyGraphKind(kind);
+export function describeComputeNodeKind(kind: ComputeNodeKind): MeshInstructionPresentation {
+	const semantics = classifyComputeNodeKind(kind);
 	return {
 		label: semantics.name,
 		detail: semantics.detail,
@@ -85,6 +91,13 @@ export function describeGraphTraceKind(kind: string): MeshInstructionPresentatio
 	};
 }
 
+/** Get the kind name from an OutputSinkKind. */
+function getOutputSinkKindName(kind: OutputSinkKind): string {
+	if (typeof kind === "string") return kind;
+	const [name] = Object.entries(kind)[0] ?? ["?"];
+	return name;
+}
+
 export function collectNodeBadges(node: NodeGenome): MeshNodeBadge[] {
 	const badgeSet = new Set<MeshNodeBadge>();
 
@@ -97,9 +110,28 @@ export function collectNodeBadges(node: NodeGenome): MeshNodeBadge[] {
 	}
 
 	if ("Graph" in node.backend_def) {
-		for (const internalNode of node.backend_def.Graph.internal_nodes) {
-			for (const badge of describeGraphInternalNode(internalNode.kind).badges) {
+		const graph = node.backend_def.Graph;
+
+		// Compute node badges (stateful)
+		for (const computeNode of graph.compute_nodes) {
+			for (const badge of describeComputeNodeKind(computeNode.kind).badges) {
 				badgeSet.add(badge);
+			}
+		}
+
+		// Output sink badges
+		for (const sink of graph.output_sinks) {
+			if (sink.inputs.length === 0) continue; // unwired sinks don't contribute
+			const sinkName = getOutputSinkKindName(sink.kind);
+			if (sinkName === "RouterOutput") badgeSet.add("route");
+			else if (sinkName === "CustomOutput") badgeSet.add("output");
+			else if (sinkName === "WriteSlot" || sinkName === "ClearSlot") badgeSet.add("slot");
+		}
+
+		// Action bank badges
+		for (const slot of graph.action_bank) {
+			if (slot.gate_inputs.length > 0 || slot.param_inputs.length > 0) {
+				badgeSet.add("action");
 			}
 		}
 	}

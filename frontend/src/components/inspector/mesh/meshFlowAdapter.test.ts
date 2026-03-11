@@ -31,10 +31,25 @@ const genome: CreatureGenome = {
 			targets: [],
 			backend_def: {
 				Graph: {
-					internal_nodes: [
-						{ kind: { InputRef: { ref_idx: 0, sub_idx: 0 } }, inputs: [] },
-						{ kind: "RouterOutput", inputs: [{ source_idx: 0, weight: 1 }] },
+					compute_nodes: [
+						{
+							kind: "Add",
+							inputs: [
+								{
+									source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } },
+									weight: 1,
+								},
+							],
+						},
 					],
+					output_sinks: [
+						{
+							kind: "RouterOutput",
+							inputs: [{ source: { ComputeNode: 0 }, weight: 1 }],
+						},
+					],
+					action_bank: [],
+					execute_gate: { inputs: [] },
 				},
 			},
 		},
@@ -56,7 +71,7 @@ const annotations: CreatureMeshAnnotation[] = [
 		read_classes: ["upstream"],
 		write_classes: ["route"],
 		has_stateful_behavior: false,
-		live_internal_node_indices: [0, 1],
+		live_internal_node_indices: [0],
 	},
 ];
 
@@ -129,7 +144,7 @@ describe("meshFlowAdapter", () => {
 				read_classes: ["upstream"],
 				write_classes: ["route"],
 				has_stateful_behavior: false,
-				live_internal_node_indices: [0, 1],
+				live_internal_node_indices: [0],
 			},
 		];
 		const semantics = deriveMeshSemantics(genome, memoryAnnotations);

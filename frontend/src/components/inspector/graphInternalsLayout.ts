@@ -1,6 +1,6 @@
 import type { ElkExtendedEdge, ElkNode } from "elkjs/lib/elk-api";
 import ELK from "elkjs/lib/elk.bundled.js";
-import type { GraphInternalNode } from "../../types/genome.ts";
+import type { ComputeNode, GraphSource } from "../../types/genome.ts";
 
 const elk = new ELK();
 
@@ -30,72 +30,49 @@ export interface GraphInternalsLayoutResult {
 	height: number;
 }
 
-export type NodeCategory = "input" | "constant" | "memory" | "processing" | "output";
+export type NodeCategory = "constant" | "processing";
+
+/** Extract the source compute node index from a GraphSource, or null if not a ComputeNode source. */
+function computeNodeSourceIndex(source: GraphSource): number | null {
+	if ("ComputeNode" in source) return source.ComputeNode;
+	return null;
+}
 
 export async function layoutGraphInternals(
-	internalNodes: GraphInternalNode[],
+	computeNodes: ComputeNode[],
 	nodeWidths?: number[],
 	nodeCategories?: NodeCategory[],
 	nodeHeights?: number[],
 ): Promise<GraphInternalsLayoutResult> {
-	if (internalNodes.length === 0) {
+	if (computeNodes.length === 0) {
 		return { nodes: [], edges: [], width: 0, height: 0 };
 	}
 
 	const elkEdges: ElkExtendedEdge[] = [];
 	const resultEdges: GraphInternalLayoutEdge[] = [];
 
-	for (let toIdx = 0; toIdx < internalNodes.length; toIdx++) {
-		const node = internalNodes[toIdx];
+	for (let toIdx = 0; toIdx < computeNodes.length; toIdx++) {
+		const node = computeNodes[toIdx];
 		if (!node) continue;
 		for (let inputIdx = 0; inputIdx < node.inputs.length; inputIdx++) {
-			const input = node.inputs[inputIdx];
-			if (!input) continue;
-			// Skip edges referencing out-of-bounds nodes (junk from mutation)
-			if (input.source_idx < 0 || input.source_idx >= internalNodes.length) continue;
-			const edgeId = `${input.source_idx}->${toIdx}:${inputIdx}`;
+			const edge = node.inputs[inputIdx];
+			if (!edge) continue;
+			const fromIdx = computeNodeSourceIndex(edge.source);
+			// Only layout edges between compute nodes (InputLeaf/SharedMemory are implicit)
+			if (fromIdx === null || fromIdx < 0 || fromIdx >= computeNodes.length) continue;
+			const edgeId = `CN${fromIdx}->${toIdx}:${inputIdx}`;
 			elkEdges.push({
 				id: edgeId,
-				sources: [String(input.source_idx)],
+				sources: [String(fromIdx)],
 				targets: [String(toIdx)],
 			});
 			resultEdges.push({
 				id: edgeId,
-				fromIndex: input.source_idx,
+				fromIndex: fromIdx,
 				toIndex: toIdx,
-				weight: input.weight,
-				isBackward: input.source_idx >= toIdx,
+				weight: edge.weight,
+				isBackward: fromIdx >= toIdx,
 			});
-		}
-	}
-
-	// Add invisible anchor edges for disconnected nodes so FIRST/LAST constraints work
-	if (nodeCategories) {
-		const connectedNodes = new Set<number>();
-		for (const edge of elkEdges) {
-			connectedNodes.add(Number(edge.sources[0]));
-			connectedNodes.add(Number(edge.targets[0]));
-		}
-		const isSourceCategory = (c: NodeCategory) =>
-			c === "input" || c === "constant" || c === "memory";
-		const firstSource = nodeCategories.findIndex(isSourceCategory);
-		const firstOutput = nodeCategories.findIndex((c) => c === "output");
-		for (let i = 0; i < internalNodes.length; i++) {
-			if (connectedNodes.has(i)) continue;
-			const cat = nodeCategories[i];
-			if (cat === "output" && firstSource >= 0) {
-				elkEdges.push({
-					id: `_anchor-${firstSource}->${i}`,
-					sources: [String(firstSource)],
-					targets: [String(i)],
-				});
-			} else if (cat && isSourceCategory(cat) && firstOutput >= 0) {
-				elkEdges.push({
-					id: `_anchor-${i}->${firstOutput}`,
-					sources: [String(i)],
-					targets: [String(firstOutput)],
-				});
-			}
 		}
 	}
 
@@ -111,13 +88,11 @@ export async function layoutGraphInternals(
 			"elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
 			"elk.separateConnectedComponents": "false",
 		},
-		children: internalNodes.map((_, index) => {
+		children: computeNodes.map((_, index) => {
 			const category = nodeCategories?.[index];
 			const layoutOptions: Record<string, string> = {};
-			if (category === "input" || category === "constant" || category === "memory") {
+			if (category === "constant") {
 				layoutOptions["elk.layered.layerConstraint"] = "FIRST";
-			} else if (category === "output") {
-				layoutOptions["elk.layered.layerConstraint"] = "LAST";
 			}
 			return {
 				id: String(index),

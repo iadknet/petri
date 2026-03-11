@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { NodeGenome } from "../../../types/genome.ts";
 import {
 	collectNodeBadges,
-	describeGraphInternalNode,
+	describeComputeNodeKind,
 	describeVmInstruction,
 	summarizeBackendDef,
 } from "./meshPresentation.ts";
@@ -33,15 +33,26 @@ const graphNode: NodeGenome = {
 	targets: [],
 	backend_def: {
 		Graph: {
-			internal_nodes: [
-				{ kind: { InputRef: { ref_idx: 0, sub_idx: 0 } }, inputs: [] },
+			compute_nodes: [
 				{
 					kind: { DecayIntegrator: 0.5 },
-					inputs: [{ source_idx: 0, weight: 1 }],
+					inputs: [
+						{ source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } }, weight: 1 },
+					],
 				},
-				{ kind: { CustomOutput: 1 }, inputs: [{ source_idx: 1, weight: 1 }] },
-				{ kind: "RouterOutput", inputs: [{ source_idx: 1, weight: 0.5 }] },
 			],
+			output_sinks: [
+				{
+					kind: { CustomOutput: 1 },
+					inputs: [{ source: { ComputeNode: 0 }, weight: 1 }],
+				},
+				{
+					kind: "RouterOutput",
+					inputs: [{ source: { ComputeNode: 0 }, weight: 0.5 }],
+				},
+			],
+			action_bank: [],
+			execute_gate: { inputs: [] },
 		},
 	},
 };
@@ -61,13 +72,12 @@ describe("meshPresentation", () => {
 		);
 	});
 
-	it("classifies graph node roles and backend summaries", () => {
-		expect(describeGraphInternalNode({ DecayIntegrator: 0.5 }).badges).toContain("stateful");
-		expect(describeGraphInternalNode({ CustomOutput: 1 }).badges).toContain("output");
-		expect(describeGraphInternalNode("RouterOutput").badges).toContain("route");
+	it("classifies graph compute node roles and backend summaries", () => {
+		expect(describeComputeNodeKind({ DecayIntegrator: 0.5 }).badges).toContain("stateful");
 		expect(collectNodeBadges(graphNode)).toEqual(
 			expect.arrayContaining(["output", "route", "stateful"]),
 		);
-		expect(summarizeBackendDef(graphNode.backend_def).detail).toContain("4 nodes");
+		expect(summarizeBackendDef(graphNode.backend_def).detail).toContain("1 compute");
+		expect(summarizeBackendDef(graphNode.backend_def).detail).toContain("2 sinks");
 	});
 });

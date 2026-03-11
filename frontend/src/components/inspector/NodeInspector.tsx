@@ -74,7 +74,7 @@ export function NodeInspector({ node, semantics, sharedMemory, executionHop }: N
 					}
 				>
 					<GraphInternalsViz
-						internalNodes={node.node.backend_def.Graph.internal_nodes}
+						computeNodes={node.node.backend_def.Graph.compute_nodes}
 						liveIndices={semantics?.liveInternalNodeIndices ?? []}
 						inputRefs={node.node.input_refs}
 						targets={node.node.targets}

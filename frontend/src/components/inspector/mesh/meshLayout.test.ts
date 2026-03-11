@@ -25,7 +25,10 @@ function makeCyclicGenome(): CreatureGenome {
 				targets: [1],
 				backend_def: {
 					Graph: {
-						internal_nodes: [{ kind: { Constant: 1 }, inputs: [] }],
+						compute_nodes: [{ kind: { Constant: 1 }, inputs: [] }],
+						output_sinks: [],
+						action_bank: [],
+						execute_gate: { inputs: [] },
 					},
 				},
 			},

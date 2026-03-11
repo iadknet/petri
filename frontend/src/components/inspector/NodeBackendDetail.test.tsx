@@ -35,14 +35,28 @@ describe("NodeBackendDetail", () => {
 		expect(instr2).toHaveAttribute("data-junk", "false");
 	});
 
-	it("renders Graph internal nodes", () => {
+	it("renders Graph compute nodes", () => {
 		const backendDef: BackendDef = {
 			Graph: {
-				internal_nodes: [
-					{ kind: { InputRef: { ref_idx: 0, sub_idx: 0 } }, inputs: [] },
-					{ kind: { DecayIntegrator: 0.2 }, inputs: [{ source_idx: 0, weight: 1 }] },
-					{ kind: "RouterOutput", inputs: [{ source_idx: 1, weight: 1 }] },
+				compute_nodes: [
+					{
+						kind: "Add",
+						inputs: [
+							{ source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } }, weight: 1 },
+						],
+					},
+					{
+						kind: { DecayIntegrator: 0.2 },
+						inputs: [{ source: { ComputeNode: 0 }, weight: 1 }],
+					},
+					{
+						kind: "Sigmoid",
+						inputs: [{ source: { ComputeNode: 1 }, weight: 1 }],
+					},
 				],
+				output_sinks: [],
+				action_bank: [],
+				execute_gate: { inputs: [] },
 			},
 		};
 
@@ -60,14 +74,28 @@ describe("NodeBackendDetail", () => {
 		expect(screen.getByTestId("graph-internal-2")).toBeInTheDocument();
 	});
 
-	it("marks non-live instructions as junk", () => {
+	it("marks non-live compute nodes as junk", () => {
 		const backendDef: BackendDef = {
 			Graph: {
-				internal_nodes: [
-					{ kind: { InputRef: { ref_idx: 0, sub_idx: 0 } }, inputs: [] },
-					{ kind: { DecayIntegrator: 0.2 }, inputs: [{ source_idx: 0, weight: 1 }] },
-					{ kind: "RouterOutput", inputs: [{ source_idx: 1, weight: 1 }] },
+				compute_nodes: [
+					{
+						kind: "Add",
+						inputs: [
+							{ source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } }, weight: 1 },
+						],
+					},
+					{
+						kind: { DecayIntegrator: 0.2 },
+						inputs: [{ source: { ComputeNode: 0 }, weight: 1 }],
+					},
+					{
+						kind: "Sigmoid",
+						inputs: [{ source: { ComputeNode: 1 }, weight: 1 }],
+					},
 				],
+				output_sinks: [],
+				action_bank: [],
+				execute_gate: { inputs: [] },
 			},
 		};
 
