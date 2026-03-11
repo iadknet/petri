@@ -177,9 +177,9 @@ Invalid `ref_idx` is a soft default and yields `0.0`.
 
 ### Routing Write Semantics
 
-`WriteRouteTarget(src_reg)` sets VM node's `route_target_idx` output.
+`WriteRouteTarget(src_reg)` sets VM node's raw route value.
 - Multiple writes in one VM run use last-write-wins.
-- If never written, default `route_target_idx` is `0.0`.
+- If never written, default raw route value is `0.0`.
 - Mesh executor applies routing conversion rules from
   `v3-mesh-execution-spec.md`.
 
@@ -331,7 +331,8 @@ At node end:
 - if `ExecuteActionQueue` was called: `NodeResult.terminal` is true, mesh
   returns accumulated action queue
 - otherwise internal payload buffer is emitted as `NodeResult.output_slots`
-- route target is returned in `NodeResult.route_target_idx`
+- route value is returned in `NodeResult.route` as
+  `RouteDecision::VmWrap { raw_value }`
 - payload/meta buffers are discarded after node dispatch
 
 This makes `WriteInternalPayload` the VM path for producing routed output slots.

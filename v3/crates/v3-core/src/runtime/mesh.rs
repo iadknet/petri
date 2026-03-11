@@ -2,14 +2,15 @@
 //!
 //! The mesh executor walks a chain of [`NodeGenome`] nodes starting from
 //! `genome.entry_node_id`, dispatching each node to its backend (VM or Graph),
-//! and routing to the next node via the returned `route_target_idx` until a
-//! [`WorldAction`] is emitted or a soft-default termination condition fires.
+//! and routing to the next node via the returned internal routing decision until
+//! a terminal condition or soft-default termination condition fires.
 
 use crate::config::RuntimeConfig;
 use crate::contracts::{NodeId, WorldAction};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
-use crate::runtime::graph::execute_graph_node;
+use crate::runtime::cgp::execute_graph_node;
+use crate::runtime::routing::resolve_route_index;
 use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs};
 use crate::runtime::vm::execute_vm_node;
 use crate::sensors::perception::SensorSnapshot;
@@ -19,7 +20,7 @@ use crate::sensors::perception::SensorSnapshot;
 ///
 /// The function walks the genome's node chain starting at `entry_node_id`,
 /// dispatching each node to its VM or Graph backend, routing to subsequent
-/// nodes via the `route_target_idx` field of [`NodeResult`], and terminating
+/// nodes via the `route` field of [`NodeResult`], and terminating
 /// when a terminal instruction is reached or a soft-default condition fires.
 ///
 /// All soft-default termination conditions return `vec![WorldAction::NoOp]`.
@@ -141,23 +142,7 @@ pub fn execute_creature_mesh(
             };
         }
 
-        // Convert route_target_idx (f32) to i64 with special-case handling for
-        // NaN and infinities to avoid undefined behaviour from out-of-range casts.
-        let route_target_idx = result.route_target_idx;
-        let route_idx_i64: i64 = if route_target_idx.is_nan() {
-            -1
-        } else if route_target_idx == f32::INFINITY {
-            i64::MAX
-        } else if route_target_idx == f32::NEG_INFINITY {
-            i64::MIN
-        } else {
-            // Clamp to the representable i64 range before casting to prevent UB.
-            route_target_idx
-                .clamp(i64::MIN as f32, i64::MAX as f32)
-                .floor() as i64
-        };
-
-        let target_pos = route_idx_i64.rem_euclid(node.targets.len() as i64) as usize;
+        let target_pos = resolve_route_index(node.targets.len(), result.route);
         let target_id = node.targets[target_pos];
 
         // Soft default: routed target id missing from node set.

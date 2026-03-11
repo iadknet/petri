@@ -64,7 +64,10 @@ pub fn run_phase_0(sim: &mut Simulation) {
 /// When `Some`, the target creature is extracted from the parallel batch and run
 /// sequentially with [`execute_creature_mesh_traced`], recording detailed trace data.
 /// When `None`, behavior is identical to the untraced path.
-pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::ActiveTrace>) {
+pub fn run_tick(
+    sim: &mut Simulation,
+    trace: &mut Option<crate::runtime::trace::recording::ActiveTrace>,
+) {
     use rand::seq::SliceRandom;
     use rand::RngCore;
     use rand::SeedableRng;
@@ -75,7 +78,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
 
     use crate::contracts::{CreatureId, WorldAction};
     use crate::runtime::mesh::execute_creature_mesh;
-    use crate::runtime::trace::{StaticInputsSnapshot, TickTrace};
+    use crate::runtime::trace::domain::{PerceptionDebugSnapshot, StaticInputsSnapshot, TickTrace};
     use crate::runtime::traced_mesh::execute_creature_mesh_traced;
     use crate::runtime::types::MeshOutput;
     use crate::sensors::perception::{
@@ -229,9 +232,7 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<crate::runtime::trace::
                 // Record tick trace.
                 if let Some(ref mut active) = trace {
                     let debug_perception = if active.include_perception_debug {
-                        Some(crate::runtime::trace::PerceptionDebugSnapshot::from(
-                            &ss.perception,
-                        ))
+                        Some(PerceptionDebugSnapshot::from(&ss.perception))
                     } else {
                         None
                     };

@@ -1,30 +1,17 @@
-//! Traced graph execution — records per-pass trace data for the Execution Sampler.
-//!
-//! Uses [`RecordingTracer`] with the shared [`super::graph::execute_graph_impl`]
-//! to avoid duplicating the relaxation loop. The tracer callbacks record
-//! [`GraphNodeEvalTrace`] per node and [`GraphPassTrace`] per pass.
-
 use crate::config::RuntimeConfig;
 use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind};
 use crate::creature::state::GraphRuntimeState;
-use crate::runtime::graph::{execute_graph_impl, GraphTracer};
-use crate::runtime::trace::{kind_label, GraphNodeEvalTrace, GraphPassTrace, GraphTrace};
+use crate::runtime::cgp::execute::{execute_graph_impl, GraphTracer};
+use crate::runtime::trace::domain::{kind_label, GraphNodeEvalTrace, GraphPassTrace, GraphTrace};
 use crate::runtime::types::{MeshSideOutputs, NodeResult};
 use crate::sensors::perception::SensorSnapshot;
 
-// ─── RecordingTracer ─────────────────────────────────────────────────────────
-
-/// Tracer that records per-pass trace data for the Execution Sampler.
-///
-/// Captures [`GraphNodeEvalTrace`] per node and [`GraphPassTrace`] per pass,
-/// assembled into a [`GraphTrace`] via [`into_trace`](RecordingTracer::into_trace).
 pub(crate) struct RecordingTracer {
     passes: Vec<GraphPassTrace>,
     current_pass_evals: Vec<GraphNodeEvalTrace>,
     current_pass_cost: f32,
     current_pass_energy: f32,
-    // Captured by on_finish — avoids fragile reconstruction from trace data.
     final_outputs: Vec<f32>,
     final_stable_passes: u32,
     final_converged: bool,
@@ -43,7 +30,6 @@ impl RecordingTracer {
         }
     }
 
-    /// Consume the tracer and build the final [`GraphTrace`].
     pub(crate) fn into_trace(self) -> GraphTrace {
         GraphTrace {
             passes: self.passes,
@@ -99,15 +85,8 @@ impl GraphTracer for RecordingTracer {
     }
 }
 
-// ─── Public entry point ──────────────────────────────────────────────────────
-
-/// Execute a graph-backend mesh node with trace recording.
-///
-/// Identical behavior to [`super::graph::execute_graph_node`] but additionally
-/// returns a [`GraphTrace`] capturing per-pass node evaluations, convergence
-/// status, and final outputs.
 #[allow(clippy::too_many_arguments)]
-pub fn execute_graph_node_traced(
+pub(crate) fn execute_graph_node_traced(
     def: &CgpGraphBackendDef,
     input_refs: &[InputReference],
     upstream_slots: &[f32; 12],
@@ -130,7 +109,13 @@ pub fn execute_graph_node_traced(
             stable_passes_count: 0,
             final_outputs: Vec::new(),
         };
-        return (NodeResult::halted(*upstream_slots, 0.0), trace);
+        return (
+            NodeResult::halted(
+                *upstream_slots,
+                crate::runtime::routing::RouteDecision::CgpNormalized { raw_value: 0.0 },
+            ),
+            trace,
+        );
     }
 
     let mut tracer = RecordingTracer::new(config.max_graph_relax_iters, node_count);
@@ -153,5 +138,3 @@ pub fn execute_graph_node_traced(
 
     (result, tracer.into_trace())
 }
-
-// Old traced_graph tests removed — CGP graph tests live in runtime/cgp_graph.rs.

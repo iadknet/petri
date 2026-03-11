@@ -404,7 +404,7 @@ fn result_equivalence_routing() {
         (energy_a - energy_b).abs() < 1e-6,
         "energy: {energy_a} vs {energy_b}"
     );
-    assert!((trace.final_route_target - 2.5).abs() < 1e-6);
+    assert!((trace.final_route_value - 2.5).abs() < 1e-6);
 }
 
 #[test]

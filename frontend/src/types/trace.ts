@@ -11,6 +11,15 @@ export interface StaticInputsSnapshot {
 	age_ticks: number;
 }
 
+export interface PerceptionDebugSnapshot {
+	area_food: number[];
+	area_barrier: number[];
+	area_occupancy: number[];
+	nearby_core: number[];
+	nearby_vitals: number[];
+	nearby_identity: number[];
+}
+
 export interface VmStepTrace {
 	pc: number;
 	instruction: VmInstruction;
@@ -32,7 +41,7 @@ export interface VmTrace {
 	final_registers: number[];
 	final_payload: number[];
 	final_meta: number[];
-	final_route_target: number;
+	final_route_value: number;
 	slot_writes: SlotWriteTrace[];
 }
 
@@ -63,6 +72,14 @@ export interface GraphTrace {
 
 export type BackendTrace = { Vm: VmTrace } | { Graph: GraphTrace };
 
+export type TraceRouteKind = "vm_wrap" | "cgp_normalized";
+
+export interface TraceRouteDecision {
+	kind: TraceRouteKind;
+	raw_value: number;
+	resolved_target_index: number;
+}
+
 export interface MeshHopTrace {
 	hop_index: number;
 	node_id: number;
@@ -71,7 +88,7 @@ export interface MeshHopTrace {
 	energy_before: number;
 	energy_after: number;
 	output_slots: number[];
-	route_target_idx: number;
+	route: TraceRouteDecision;
 	backend_trace: BackendTrace;
 }
 
@@ -94,9 +111,11 @@ export interface TickTrace {
 	energy_before: number;
 	energy_after: number;
 	static_inputs: StaticInputsSnapshot;
+	debug_perception: PerceptionDebugSnapshot | null;
 	hops: MeshHopTrace[];
 	final_actions: WorldAction[];
 	termination_reason: TerminationReason;
+	priority_bid: number;
 }
 
 export interface ExecutionSample {

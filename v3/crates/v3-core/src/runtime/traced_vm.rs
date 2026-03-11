@@ -10,7 +10,8 @@ use crate::contracts::InputReference;
 use crate::creature::genome::VmBackendDef;
 use crate::runtime::action_decode::decode_world_action;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
-use crate::runtime::trace::{SlotWrite, VmStepTrace, VmTrace};
+use crate::runtime::routing::RouteDecision;
+use crate::runtime::trace::domain::{SlotWrite, VmStepTrace, VmTrace};
 use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult};
 use crate::runtime::vm::{is_truthy, jump_target, nr, opcode_base_cost};
 use crate::sensors::perception::SensorSnapshot;
@@ -21,7 +22,7 @@ use crate::sensors::perception::SensorSnapshot;
 /// returns a [`VmTrace`] capturing per-instruction register changes,
 /// memory writes, and final state.
 #[allow(clippy::too_many_arguments)]
-pub fn execute_vm_node_traced(
+pub(crate) fn execute_vm_node_traced(
     def: &VmBackendDef,
     input_refs: &[InputReference],
     upstream_slots: &[f32; 12],
@@ -42,17 +43,23 @@ pub fn execute_vm_node_traced(
         final_registers: Vec::new(),
         final_payload: *upstream_slots,
         final_meta: [0.0; 8],
-        final_route_target: 0.0,
+        final_route_value: 0.0,
         slot_writes: Vec::new(),
     };
 
     if reg_count == 0 {
-        return (NodeResult::halted(*upstream_slots, 0.0), empty_trace());
+        return (
+            NodeResult::halted(*upstream_slots, RouteDecision::VmWrap { raw_value: 0.0 }),
+            empty_trace(),
+        );
     }
 
     let program_len = def.program.len();
     if program_len == 0 {
-        return (NodeResult::halted(*upstream_slots, 0.0), empty_trace());
+        return (
+            NodeResult::halted(*upstream_slots, RouteDecision::VmWrap { raw_value: 0.0 }),
+            empty_trace(),
+        );
     }
 
     let max_steps = config.max_vm_steps.max(1) as usize;
@@ -128,7 +135,7 @@ pub fn execute_vm_node_traced(
                 final_registers: regs[..reg_count].to_vec(),
                 final_payload: payload,
                 final_meta: meta,
-                final_route_target: route_target,
+                final_route_value: route_target,
                 slot_writes: $slot_writes_vec,
             }
         };
@@ -139,7 +146,12 @@ pub fn execute_vm_node_traced(
         if steps_count >= max_steps {
             commit_slots!();
             return (
-                NodeResult::halted(payload, route_target),
+                NodeResult::halted(
+                    payload,
+                    RouteDecision::VmWrap {
+                        raw_value: route_target,
+                    },
+                ),
                 build_trace!(trace_steps, slot_writes_vec),
             );
         }
@@ -147,7 +159,12 @@ pub fn execute_vm_node_traced(
         if pc >= program_len {
             commit_slots!();
             return (
-                NodeResult::halted(payload, route_target),
+                NodeResult::halted(
+                    payload,
+                    RouteDecision::VmWrap {
+                        raw_value: route_target,
+                    },
+                ),
                 build_trace!(trace_steps, slot_writes_vec),
             );
         }
@@ -412,7 +429,12 @@ pub fn execute_vm_node_traced(
                     register_changes: Vec::new(),
                 });
                 return (
-                    NodeResult::terminal(payload, route_target),
+                    NodeResult::terminal(
+                        payload,
+                        RouteDecision::VmWrap {
+                            raw_value: route_target,
+                        },
+                    ),
                     build_trace!(trace_steps, slot_writes_vec),
                 );
             }
@@ -431,7 +453,12 @@ pub fn execute_vm_node_traced(
                     register_changes: Vec::new(),
                 });
                 return (
-                    NodeResult::halted(payload, route_target),
+                    NodeResult::halted(
+                        payload,
+                        RouteDecision::VmWrap {
+                            raw_value: route_target,
+                        },
+                    ),
                     build_trace!(trace_steps, slot_writes_vec),
                 );
             }

@@ -20,6 +20,7 @@ impl ResolveCtx<'_> {
     /// `GraphSource::ComputeNode` or `GraphSource::SharedMemory` resolution
     /// (i.e. the resolve_ctx is never actually read).
     #[cfg(test)]
+    #[allow(dead_code)]
     pub(crate) fn dummy() -> ResolveCtx<'static> {
         use std::sync::LazyLock;
         static SNAPSHOT: LazyLock<SensorSnapshot> = LazyLock::new(|| SensorSnapshot {

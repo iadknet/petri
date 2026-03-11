@@ -166,7 +166,8 @@ upstream/default value:
 - CustomOutput with no edges: `output_slots[slot]` retains incoming
   `upstream_slots[slot]`.
 - WriteSlot/ClearSlot with no edges: `shared_memory[slot]` is unchanged.
-- RouterOutput with no edges: default `route_target_idx` applies.
+- RouterOutput with no edges: default route decision applies
+  (`RouteDecision::CgpNormalized { raw_value: 0.0 }`).
 
 Only sinks with at least one edge compute their weighted-sum and write
 the result.
@@ -312,7 +313,9 @@ Iterate `output_sinks`. For each sink with non-empty `inputs`:
   converged `curr_outputs` for `ComputeNode` sources.
 - Write to target:
   - `CustomOutput(slot)`: `output_slots[slot] = wsum` (slot < 12).
-  - `RouterOutput`: `route_target_idx = min(floor(clamp01(wsum) * target_count), target_count - 1)`.
+  - `RouterOutput`: emit `RouteDecision::CgpNormalized { raw_value: wsum }`.
+    Mesh routing resolves that decision with
+    `idx = min(floor(clamp01(raw_value) * target_count), target_count - 1)`.
   - `WriteSlot(slot)`: `shared_memory[slot % 16] = sanitize_f32(wsum)`.
   - `ClearSlot(slot)`: `shared_memory[slot % 16] = 0.0` (wsum is ignored;
     the act of having edges and firing is what clears).

@@ -19,7 +19,8 @@ use v3_core::creature::genome::{
 use v3_core::creature::identity::CreatureIdentityState;
 use v3_core::creature::state::CreatureState;
 use v3_core::kernel::WorldState;
-use v3_core::runtime::trace::{ActiveTrace, BackendTrace, TickTrace, VmTrace};
+use v3_core::runtime::trace::domain::{BackendTrace, TickTrace, TraceRouteKind, VmTrace};
+use v3_core::runtime::trace::recording::ActiveTrace;
 use v3_core::simulation::{run_tick, Simulation};
 
 const FOUNDER_CHANNELS: [u8; 6] = [0, 0, 92, 92, 138, 138];
@@ -350,9 +351,13 @@ fn sample_program_exercises_all_vm_opcodes_e2e() {
         "Eat path should consume food"
     );
     assert!(
-        (emit_trace.ticks[0].hops[0].route_target_idx - 5.0).abs() < 1e-6,
+        (emit_trace.ticks[0].hops[0].route.raw_value - 5.0).abs() < 1e-6,
         "Jump should skip LoadConst that would overwrite route target source register"
     );
+    assert!(matches!(
+        emit_trace.ticks[0].hops[0].route.kind,
+        TraceRouteKind::VmWrap
+    ));
     let emit_seen = collect_vm_discriminants(&emit_trace.ticks[0]);
     let emit_vm_trace = vm_trace(&emit_trace.ticks[0]);
 
@@ -369,9 +374,13 @@ fn sample_program_exercises_all_vm_opcodes_e2e() {
         "Halt path should leave no food on an empty cell"
     );
     assert!(
-        (halt_trace.ticks[0].hops[0].route_target_idx - 5.0).abs() < 1e-6,
+        (halt_trace.ticks[0].hops[0].route.raw_value - 5.0).abs() < 1e-6,
         "Jump should skip LoadConst that would overwrite route target source register"
     );
+    assert!(matches!(
+        halt_trace.ticks[0].hops[0].route.kind,
+        TraceRouteKind::VmWrap
+    ));
     let halt_seen = collect_vm_discriminants(&halt_trace.ticks[0]);
     let halt_vm_trace = vm_trace(&halt_trace.ticks[0]);
 

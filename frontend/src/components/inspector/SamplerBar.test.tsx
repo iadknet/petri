@@ -33,7 +33,7 @@ function buildSample(tickCount = 2): ExecutionSample {
 				energy_before: 10,
 				energy_after: 9.5,
 				output_slots: [],
-				route_target_idx: 0,
+				route: { kind: "vm_wrap", raw_value: 0, resolved_target_index: 0 },
 				backend_trace: {
 					Vm: {
 						register_count: 4,
@@ -50,7 +50,7 @@ function buildSample(tickCount = 2): ExecutionSample {
 						final_registers: [0, 0, 0, 0],
 						final_payload: [],
 						final_meta: [],
-						final_route_target: 0,
+						final_route_value: 0,
 						slot_writes: [],
 					},
 				},
@@ -63,7 +63,7 @@ function buildSample(tickCount = 2): ExecutionSample {
 				energy_before: 9.5,
 				energy_after: 9,
 				output_slots: [],
-				route_target_idx: 0,
+				route: { kind: "cgp_normalized", raw_value: 0, resolved_target_index: 0 },
 				backend_trace: {
 					Graph: {
 						passes: [
@@ -84,6 +84,8 @@ function buildSample(tickCount = 2): ExecutionSample {
 		],
 		final_actions: ["NoOp" as const],
 		termination_reason: "NoTargets" as const,
+		debug_perception: null,
+		priority_bid: 0,
 	}));
 
 	return { creature_id: 1, ticks };

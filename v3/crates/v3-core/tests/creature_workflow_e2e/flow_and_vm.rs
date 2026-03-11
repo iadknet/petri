@@ -12,7 +12,7 @@ use v3_core::creature::genome::{
 };
 use v3_core::creature::state::CreatureState;
 use v3_core::kernel::WorldState;
-use v3_core::runtime::trace::BackendTrace;
+use v3_core::runtime::trace::domain::BackendTrace;
 use v3_core::simulation::Simulation;
 
 use crate::support::{

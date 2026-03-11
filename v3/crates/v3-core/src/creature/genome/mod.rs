@@ -228,7 +228,7 @@ pub enum GraphNodeKind {
     // ── Output writers ────────────────────────────────────────────────────────
     /// Write computed value to `output_slots[u8]`.
     CustomOutput(u8),
-    /// Write computed value to `route_target_idx`.
+    /// Write computed value to the routing scalar consumed by mesh routing.
     RouterOutput,
     // ── Action-queue outputs (deferred effect, post-convergence) ──────────────
     /// Write computed value to staged action meta buffer slot (0..7).

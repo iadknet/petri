@@ -23,7 +23,7 @@ pub enum SimulationStatus {
 pub struct SimHandle {
     pub sim: Simulation,
     pub status: SimulationStatus,
-    pub active_trace: Option<v3_core::runtime::trace::ActiveTrace>,
+    pub active_trace: Option<v3_core::runtime::trace::recording::ActiveTrace>,
 }
 
 impl SimHandle {

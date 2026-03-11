@@ -203,7 +203,12 @@ fn write_route_target_sets_output() {
         VmInstruction::Halt,
     ];
     let (r, _, _aq) = run_vm(program, 1, vec![2.0], &[], zeroed_upstream(), 100.0);
-    assert!((r.route_target_idx - 2.0).abs() < 1e-6);
+    match r.route {
+        crate::runtime::routing::RouteDecision::VmWrap { raw_value } => {
+            assert!((raw_value - 2.0).abs() < 1e-6);
+        }
+        other => panic!("unexpected route decision: {other:?}"),
+    }
 }
 
 // ── Memory opcodes ────────────────────────────────────────────────────────

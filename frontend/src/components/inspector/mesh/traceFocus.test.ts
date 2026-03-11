@@ -71,7 +71,7 @@ const sample: ExecutionSample = {
 					energy_before: 10,
 					energy_after: 9.5,
 					output_slots: [0.7],
-					route_target_idx: 1,
+					route: { kind: "vm_wrap", raw_value: 1, resolved_target_index: 1 },
 					backend_trace: {
 						Vm: {
 							register_count: 1,
@@ -88,7 +88,7 @@ const sample: ExecutionSample = {
 							final_registers: [0.7],
 							final_payload: [],
 							final_meta: [],
-							final_route_target: 1,
+							final_route_value: 1,
 							slot_writes: [],
 						},
 					},
@@ -96,6 +96,8 @@ const sample: ExecutionSample = {
 			],
 			final_actions: ["NoOp"],
 			termination_reason: "ActionEmitted",
+			debug_perception: null,
+			priority_bid: 0,
 		},
 	],
 };
@@ -156,7 +158,10 @@ describe("deriveTraceFocus", () => {
 					hops: [
 						{
 							...sourceHop,
-							route_target_idx: 1,
+							route: {
+								...sourceHop.route,
+								resolved_target_index: 1,
+							},
 						},
 					],
 				},
