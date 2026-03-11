@@ -4,10 +4,7 @@ import type { ActionLogEntry } from "../types/action-log.ts";
 import type { CreatureMeshAnnotation } from "../types/creature-detail.ts";
 import { useCreatureInspectorStore } from "./creatureInspector.ts";
 
-function makeEntry(
-	tick: number,
-	actionType: ActionType = ActionType.Move,
-): ActionLogEntry {
+function makeEntry(tick: number, actionType: ActionType = ActionType.Move): ActionLogEntry {
 	return {
 		tick,
 		action_type: actionType,
@@ -31,14 +28,7 @@ function makeDetail(overrides: Record<string, unknown> = {}) {
 		complexity: 5,
 		genomeSize: 12,
 		phenotype: {
-			channels: [100, 150, 200, 50, 75, 125] as [
-				number,
-				number,
-				number,
-				number,
-				number,
-				number,
-			],
+			channels: [100, 150, 200, 50, 75, 125] as [number, number, number, number, number, number],
 			active_channel: 0,
 			polarity: [true, false, true, false, true, false] as [
 				boolean,
@@ -88,9 +78,7 @@ describe("creatureInspectorStore actionLog", () => {
 	});
 
 	it("initializes actionLog as null", () => {
-		expect(
-			useCreatureInspectorStore.getState().liveDetail.actionLog,
-		).toBeNull();
+		expect(useCreatureInspectorStore.getState().liveDetail.actionLog).toBeNull();
 	});
 
 	it("stores actionLog when setDetail is called", () => {
@@ -120,9 +108,7 @@ describe("creatureInspectorStore actionLog", () => {
 
 	it("resets actionLog to null on selectCreature", () => {
 		useCreatureInspectorStore.getState().setDetail(makeDetail());
-		expect(
-			useCreatureInspectorStore.getState().liveDetail.actionLog,
-		).not.toBeNull();
+		expect(useCreatureInspectorStore.getState().liveDetail.actionLog).not.toBeNull();
 
 		useCreatureInspectorStore.getState().selectCreature(99);
 		const state = useCreatureInspectorStore.getState();
@@ -134,9 +120,7 @@ describe("creatureInspectorStore actionLog", () => {
 
 	it("resets actionLog to null on clearSelection", () => {
 		useCreatureInspectorStore.getState().setDetail(makeDetail());
-		expect(
-			useCreatureInspectorStore.getState().liveDetail.actionLog,
-		).not.toBeNull();
+		expect(useCreatureInspectorStore.getState().liveDetail.actionLog).not.toBeNull();
 
 		useCreatureInspectorStore.getState().clearSelection();
 		const state = useCreatureInspectorStore.getState();
@@ -149,9 +133,7 @@ describe("creatureInspectorStore actionLog", () => {
 	it("incremental setDetail appends new actionLog entries to existing ones", () => {
 		// Seed initial log with ticks 1 and 2.
 		useCreatureInspectorStore.getState().setDetail(makeDetail());
-		expect(
-			useCreatureInspectorStore.getState().liveDetail.actionLog,
-		).toHaveLength(2);
+		expect(useCreatureInspectorStore.getState().liveDetail.actionLog).toHaveLength(2);
 
 		// Incrementally append entries with ticks 3 and 4.
 		useCreatureInspectorStore.getState().setDetail(
@@ -168,12 +150,8 @@ describe("creatureInspectorStore actionLog", () => {
 	it("incremental setDetail trims to capacity (500) when exceeding it", () => {
 		// Seed with 499 entries (ticks 1..499).
 		const initial = Array.from({ length: 499 }, (_, i) => makeEntry(i + 1));
-		useCreatureInspectorStore
-			.getState()
-			.setDetail(makeDetail({ actionLog: initial }));
-		expect(
-			useCreatureInspectorStore.getState().liveDetail.actionLog,
-		).toHaveLength(499);
+		useCreatureInspectorStore.getState().setDetail(makeDetail({ actionLog: initial }));
+		expect(useCreatureInspectorStore.getState().liveDetail.actionLog).toHaveLength(499);
 
 		// Incrementally add 3 more entries (ticks 500, 501, 502) -> total 502 > 500.
 		useCreatureInspectorStore.getState().setDetail(
@@ -191,28 +169,22 @@ describe("creatureInspectorStore actionLog", () => {
 
 	it("setDetail with actionLog: undefined preserves existing action log", () => {
 		useCreatureInspectorStore.getState().setDetail(makeDetail());
-		const originalLog =
-			useCreatureInspectorStore.getState().liveDetail.actionLog;
+		const originalLog = useCreatureInspectorStore.getState().liveDetail.actionLog;
 		expect(originalLog).toHaveLength(2);
 
 		// Call setDetail without actionLog field.
-		useCreatureInspectorStore
-			.getState()
-			.setDetail(makeDetail({ actionLog: undefined }));
+		useCreatureInspectorStore.getState().setDetail(makeDetail({ actionLog: undefined }));
 		const log = useCreatureInspectorStore.getState().liveDetail.actionLog;
 		expect(log).toBe(originalLog);
 	});
 
 	it("setDetail with genome: undefined preserves existing genome", () => {
 		useCreatureInspectorStore.getState().setDetail(makeDetail());
-		const originalGenome =
-			useCreatureInspectorStore.getState().staticDetail.genome;
+		const originalGenome = useCreatureInspectorStore.getState().staticDetail.genome;
 		expect(originalGenome).not.toBeNull();
 
 		// Call setDetail without genome field.
-		useCreatureInspectorStore
-			.getState()
-			.setDetail(makeDetail({ genome: undefined }));
+		useCreatureInspectorStore.getState().setDetail(makeDetail({ genome: undefined }));
 		const genome = useCreatureInspectorStore.getState().staticDetail.genome;
 		expect(genome).toBe(originalGenome);
 	});

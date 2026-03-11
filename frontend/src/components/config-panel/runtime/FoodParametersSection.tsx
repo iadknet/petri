@@ -26,8 +26,7 @@ export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 		max: 1,
 		step: 0.01,
 		defaultValue: 0.25,
-		tooltip:
-			"Fraction of growth delta deposited to neighbor during spread",
+		tooltip: "Fraction of growth delta deposited to neighbor during spread",
 	},
 	{
 		path: "world.food.recovery_spawn_rate",

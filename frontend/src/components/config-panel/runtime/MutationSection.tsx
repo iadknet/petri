@@ -150,8 +150,7 @@ export const MUTATION_TOGGLES: BooleanFieldDef[] = [
 		label: "Genome Size Pressure",
 		testId: "config-field-mutation-genome-size-pressure-enabled",
 		defaultValue: true,
-		tooltip:
-			"When enabled, genomes near the size cap are less likely to gain growth mutations",
+		tooltip: "When enabled, genomes near the size cap are less likely to gain growth mutations",
 	},
 ];
 

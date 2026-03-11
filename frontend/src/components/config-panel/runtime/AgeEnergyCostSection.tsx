@@ -19,8 +19,7 @@ export const AGE_COST_FIELDS: FieldDef[] = [
 		step: 0.5,
 		testId: "config-field-age-cost-max-multiplier",
 		defaultValue: 10,
-		tooltip:
-			"Maximum energy cost multiplier applied to creatures at or beyond age cap",
+		tooltip: "Maximum energy cost multiplier applied to creatures at or beyond age cap",
 	},
 ];
 
@@ -30,8 +29,7 @@ export const AGE_COST_TOGGLES: BooleanFieldDef[] = [
 		label: "Age Cost",
 		testId: "config-field-age-cost-enabled",
 		defaultValue: true,
-		tooltip:
-			"When enabled, older creatures pay higher energy costs for all actions",
+		tooltip: "When enabled, older creatures pay higher energy costs for all actions",
 	},
 ];
 

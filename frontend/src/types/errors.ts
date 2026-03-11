@@ -15,11 +15,7 @@ export interface ErrorDetails {
 export interface ApiError {
 	protocol_version: string;
 	error: {
-		code:
-			| "invalid_request"
-			| "invalid_state_transition"
-			| "validation_rejected"
-			| "internal_error";
+		code: "invalid_request" | "invalid_state_transition" | "validation_rejected" | "internal_error";
 		message: string;
 		details?: ErrorDetails;
 	};

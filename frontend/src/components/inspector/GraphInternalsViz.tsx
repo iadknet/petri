@@ -1,7 +1,12 @@
 import { type Edge, MarkerType, type Node, ReactFlow, ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { memo, useEffect, useMemo, useState } from "react";
-import type { ComputeNode, ComputeNodeKind, GraphSource, InputReference } from "../../types/genome.ts";
+import type {
+	ComputeNode,
+	ComputeNodeKind,
+	GraphSource,
+	InputReference,
+} from "../../types/genome.ts";
 import type { GraphTrace } from "../../types/trace.ts";
 import { GraphInternalsNode, type GraphInternalsNodeData } from "./GraphInternalsNode.tsx";
 import { BackwardWeightEdge, WeightEdge, type WeightEdgeData } from "./graphInternalsEdges.tsx";
@@ -80,9 +85,7 @@ export function formatGraphSource(source: GraphSource, inputRefs: InputReference
 	return "?";
 }
 
-export function categorize(
-	kind: ComputeNodeKind,
-): "constant" | "processing" {
+export function categorize(kind: ComputeNodeKind): "constant" | "processing" {
 	const name = getKindName(kind);
 	if (name === "Constant") return "constant";
 	return "processing";
@@ -256,15 +259,7 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 		});
 
 		return { nodes: flowNodes, edges: flowEdges };
-	}, [
-		layout,
-		computeNodes,
-		liveSet,
-		evalByIndex,
-		initialByIndex,
-		nodeLabels,
-		inputRefs,
-	]);
+	}, [layout, computeNodes, liveSet, evalByIndex, initialByIndex, nodeLabels, inputRefs]);
 
 	if (!layout) {
 		return (

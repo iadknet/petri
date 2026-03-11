@@ -121,10 +121,7 @@ class ApiClient {
 		});
 	}
 
-	async patternPreview(
-		req: PatternRequest,
-		signal?: AbortSignal,
-	): Promise<PatternPreviewResponse> {
+	async patternPreview(req: PatternRequest, signal?: AbortSignal): Promise<PatternPreviewResponse> {
 		return this.request("/v3/simulation/pattern/preview", {
 			method: "POST",
 			body: JSON.stringify(req),

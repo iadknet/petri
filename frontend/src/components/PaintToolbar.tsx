@@ -22,7 +22,10 @@ export function PaintToolbar() {
 	const setMode = usePaintStore((s) => s.setMode);
 
 	return (
-		<div data-testid="paint-toolbar" className="absolute top-3 left-3 flex flex-col gap-2 z-10 bg-slate-800/60 backdrop-blur-sm rounded-lg p-2">
+		<div
+			data-testid="paint-toolbar"
+			className="absolute top-3 left-3 flex flex-col gap-2 z-10 bg-slate-800/60 backdrop-blur-sm rounded-lg p-2"
+		>
 			{/* Mode switcher */}
 			<div className="flex gap-0.5">
 				<button

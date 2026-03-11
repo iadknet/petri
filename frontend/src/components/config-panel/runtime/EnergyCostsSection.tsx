@@ -55,7 +55,6 @@ export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 		step: 0.1,
 		defaultValue: 5.0,
 		testId: "config-field-energy-costs-failed-action-penalty",
-		tooltip:
-			"Additional energy penalty when an action fails (move blocked, eat empty cell, etc.)",
+		tooltip: "Additional energy penalty when an action fails (move blocked, eat empty cell, etc.)",
 	},
 ];
