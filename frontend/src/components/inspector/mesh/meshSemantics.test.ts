@@ -29,14 +29,25 @@ function makeGenome(): CreatureGenome {
 				targets: [3],
 				backend_def: {
 					Graph: {
-						internal_nodes: [
-							{ kind: { InputRef: { ref_idx: 0, sub_idx: 0 } }, inputs: [] },
+						compute_nodes: [
 							{
 								kind: { DecayIntegrator: 0.25 },
-								inputs: [{ source_idx: 0, weight: 1 }],
+								inputs: [
+									{
+										source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } },
+										weight: 1,
+									},
+								],
 							},
-							{ kind: "RouterOutput", inputs: [{ source_idx: 1, weight: 1 }] },
 						],
+						output_sinks: [
+							{
+								kind: "RouterOutput",
+								inputs: [{ source: { ComputeNode: 0 }, weight: 1 }],
+							},
+						],
+						action_bank: [],
+						execute_gate: { inputs: [] },
 					},
 				},
 			},
@@ -71,7 +82,7 @@ const annotations: CreatureMeshAnnotation[] = [
 		read_classes: ["upstream"],
 		write_classes: ["route"],
 		has_stateful_behavior: true,
-		live_internal_node_indices: [0, 1, 2],
+		live_internal_node_indices: [0],
 	},
 	{
 		node_id: 3,

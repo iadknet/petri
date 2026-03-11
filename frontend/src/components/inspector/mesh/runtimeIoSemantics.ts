@@ -1,4 +1,4 @@
-import type { GraphNodeKind, VmInstruction } from "../../../types/genome.ts";
+import type { ComputeNodeKind, VmInstruction } from "../../../types/genome.ts";
 
 export type RuntimeIoBadge = "action" | "input" | "slot" | "output" | "route" | "stateful";
 
@@ -90,52 +90,24 @@ export function classifyVmInstruction(instruction: VmInstruction): RuntimeIoSema
 	});
 }
 
-export function classifyGraphKind(kind: GraphNodeKind): RuntimeIoSemantics {
+export function classifyComputeNodeKind(kind: ComputeNodeKind): RuntimeIoSemantics {
 	if (typeof kind === "string") {
-		return classifyGraphKindName(kind, "");
+		return classifyComputeKindName(kind, "");
 	}
 
 	const [name, rawValue] = Object.entries(kind)[0] ?? ["?", 0];
 	const detail = typeof rawValue === "number" ? rawValue.toString() : "";
-	return classifyGraphKindName(name, detail);
+	return classifyComputeKindName(name, detail);
 }
 
 export function classifyGraphTraceKind(kindName: string): RuntimeIoSemantics {
-	return classifyGraphKindName(kindName, "");
+	return classifyComputeKindName(kindName, "");
 }
 
-function classifyGraphKindName(name: string, detail: string): RuntimeIoSemantics {
+function classifyComputeKindName(name: string, detail: string): RuntimeIoSemantics {
 	const flags: RuntimeIoFlags = { ...EMPTY_FLAGS };
 
 	switch (name) {
-		case "InputRef":
-			flags.readsInput = true;
-			break;
-		case "RouterOutput":
-			flags.writesRoute = true;
-			break;
-		case "CustomOutput":
-			flags.writesPayload = true;
-			break;
-		case "WriteActionMeta":
-		case "PushAction":
-		case "PopAction":
-		case "ExecuteActionQueue":
-			flags.writesAction = true;
-			break;
-		case "ReadSlot":
-			flags.readsSlot = true;
-			flags.stateful = true;
-			break;
-		case "ReadSlotPrev":
-			flags.readsPrevSlot = true;
-			flags.stateful = true;
-			break;
-		case "WriteSlot":
-		case "ClearSlot":
-			flags.writesSlot = true;
-			flags.stateful = true;
-			break;
 		case "AdaptiveGain":
 		case "DecayIntegrator":
 		case "Momentum":

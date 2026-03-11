@@ -8,7 +8,7 @@ import type { CreatureGenome, InputReference, NodeGenome } from "../../../types/
 import { formatInputRef } from "../inputRefUtils.ts";
 import { type MeshAnalysis, type MeshBackendKind, analyzeMesh } from "./meshAnalysis.ts";
 import type { RuntimeIoBadge } from "./runtimeIoSemantics.ts";
-import { classifyGraphKind, classifyVmInstruction } from "./runtimeIoSemantics.ts";
+import { classifyComputeNodeKind, classifyVmInstruction } from "./runtimeIoSemantics.ts";
 
 export type MeshNodeBadge = RuntimeIoBadge;
 export type MeshSemanticRole =
@@ -137,7 +137,7 @@ function deriveNodeSemantics(
 	const liveInternalNodeIndices =
 		annotation?.live_internal_node_indices ??
 		("Graph" in node.backend_def
-			? node.backend_def.Graph.internal_nodes.map((_, index) => index)
+			? node.backend_def.Graph.compute_nodes.map((_, index) => index)
 			: []);
 	const searchTokens = buildSearchTokens({
 		nodeId: node.node_id,
@@ -239,19 +239,25 @@ function inferWriteClasses(node: NodeGenome): MeshWriteClass[] {
 	}
 
 	if ("Graph" in node.backend_def) {
-		for (const internalNode of node.backend_def.Graph.internal_nodes) {
-			const semantics = classifyGraphKind(internalNode.kind);
-			if (semantics.writesRoute) {
-				classes.add("route");
-			}
-			if (semantics.writesPayload) {
+		const graph = node.backend_def.Graph;
+
+		// Derive write classes from fixed structural outputs (wired sinks only)
+		for (const sink of graph.output_sinks) {
+			if (sink.inputs.length === 0) continue;
+			const kind = sink.kind;
+			if (typeof kind === "string") {
+				if (kind === "RouterOutput") classes.add("route");
+			} else if ("CustomOutput" in kind) {
 				classes.add("payload");
-			}
-			if (semantics.writesAction) {
-				classes.add("action");
-			}
-			if (semantics.writesSlot) {
+			} else if ("WriteSlot" in kind || "ClearSlot" in kind) {
 				classes.add("memory");
+			}
+		}
+
+		// Action bank contributes action writes
+		for (const slot of graph.action_bank) {
+			if (slot.gate_inputs.length > 0 || slot.param_inputs.length > 0) {
+				classes.add("action");
 			}
 		}
 	}
@@ -273,12 +279,24 @@ function inferStatefulBehavior(node: NodeGenome): boolean {
 		return false;
 	}
 
-	return node.backend_def.Graph.internal_nodes.some((internalNode) => {
-		const semantics = classifyGraphKind(internalNode.kind);
-		return (
-			semantics.stateful || semantics.readsSlot || semantics.readsPrevSlot || semantics.writesSlot
-		);
+	const graph = node.backend_def.Graph;
+	// Compute nodes may be stateful (DecayIntegrator, Momentum, etc.)
+	const hasStatefulCompute = graph.compute_nodes.some((cn) => {
+		const semantics = classifyComputeNodeKind(cn.kind);
+		return semantics.stateful;
 	});
+	// SharedMemory sources in edges indicate slot reads
+	const hasSharedMemoryRead = graph.compute_nodes.some((cn) =>
+		cn.inputs.some((edge) => "SharedMemory" in edge.source),
+	);
+	// WriteSlot/ClearSlot sinks indicate slot writes
+	const hasSlotWrite = graph.output_sinks.some(
+		(sink) =>
+			sink.inputs.length > 0 &&
+			typeof sink.kind !== "string" &&
+			("WriteSlot" in sink.kind || "ClearSlot" in sink.kind),
+	);
+	return hasStatefulCompute || hasSharedMemoryRead || hasSlotWrite;
 }
 
 function hasSlotRead(node: NodeGenome): boolean {
@@ -290,10 +308,11 @@ function hasSlotRead(node: NodeGenome): boolean {
 	}
 
 	if ("Graph" in node.backend_def) {
-		return node.backend_def.Graph.internal_nodes.some((internalNode) => {
-			const semantics = classifyGraphKind(internalNode.kind);
-			return semantics.readsSlot || semantics.readsPrevSlot;
-		});
+		// SharedMemory sources in any edge indicate slot reads
+		const graph = node.backend_def.Graph;
+		return graph.compute_nodes.some((cn) =>
+			cn.inputs.some((edge) => "SharedMemory" in edge.source),
+		);
 	}
 
 	return false;

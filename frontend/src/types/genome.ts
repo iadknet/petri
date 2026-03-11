@@ -5,50 +5,91 @@ export interface CreaturePhenotype {
 	rgb: [number, number, number];
 }
 
-export interface GraphInput {
-	source_idx: number;
+// ── CGP Graph Backend Types ─────────────────────────────────────────────────
+
+export type GraphSource =
+	| { InputLeaf: { ref_idx: number; sub_idx: number } }
+	| { SharedMemory: { slot: number; previous: boolean } }
+	| { ComputeNode: number };
+
+export interface GraphEdge {
+	source: GraphSource;
 	weight: number;
 }
 
-export type GraphNodeKind =
-	| { InputRef: { ref_idx: number; sub_idx: number } }
-	| { Constant: number }
+export type ComputeNodeKind =
 	| "Add"
 	| "Multiply"
 	| "Negate"
 	| "Abs"
 	| "Min"
 	| "Max"
-	| { Threshold: number }
-	| "GreaterThan"
+	| "WeightedSum"
 	| "Sigmoid"
 	| "Tanh"
 	| "Relu"
-	| "Select"
 	| "Clamp01"
-	| "WeightedSum"
+	| { Threshold: number }
+	| "GreaterThan"
+	| "Select"
 	| { DecayIntegrator: number }
 	| { Momentum: number }
 	| { Oscillator: number }
 	| "AdaptiveGain"
+	| { Constant: number };
+
+export type HebbianRule = "Classic" | "Oja" | "AntiHebb" | "Covariance";
+export type OutcomeChannel = "EnergyDelta" | "ActionSuccess" | "DamageDelta" | "OffspringSuccess";
+
+export interface RewardModulationConfig {
+	reward_source: OutcomeChannel;
+	trace_decay: number;
+}
+
+export interface PlasticityConfig {
+	rule: HebbianRule;
+	learning_rate: number;
+	weight_clamp: number;
+	lamarckian: boolean;
+	modulation?: RewardModulationConfig | null;
+}
+
+export interface ComputeNode {
+	kind: ComputeNodeKind;
+	inputs: GraphEdge[];
+	plasticity?: PlasticityConfig | null;
+}
+
+export type OutputSinkKind =
 	| { CustomOutput: number }
 	| "RouterOutput"
-	| { WriteActionMeta: number }
-	| { PushAction: number }
-	| "PopAction"
-	| "ExecuteActionQueue"
-	| { ReadSlot: number }
-	| { ReadSlotPrev: number }
 	| { WriteSlot: number }
 	| { ClearSlot: number };
 
-export interface GraphInternalNode {
-	kind: GraphNodeKind;
-	inputs: GraphInput[];
+export interface OutputSink {
+	kind: OutputSinkKind;
+	inputs: GraphEdge[];
+}
+
+export type WorldActionKind = "Eat" | "Move" | "Reproduce" | "StealEnergy" | "NoOp";
+
+export type ActionSlotBehavior = "Pop" | { Emit: WorldActionKind };
+
+export interface ActionSlot {
+	behavior: ActionSlotBehavior;
+	gate_inputs: GraphEdge[];
+	param_inputs: GraphEdge[];
+}
+
+export interface ExecuteGate {
+	inputs: GraphEdge[];
 }
 
 export interface GraphBackendDef {
-	internal_nodes: GraphInternalNode[];
+	compute_nodes: ComputeNode[];
+	output_sinks: OutputSink[];
+	action_bank: ActionSlot[];
+	execute_gate: ExecuteGate;
 }
 
 export type VmInstruction =

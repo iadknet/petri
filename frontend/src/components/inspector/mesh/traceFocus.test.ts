@@ -25,7 +25,10 @@ const genome: CreatureGenome = {
 			targets: [],
 			backend_def: {
 				Graph: {
-					internal_nodes: [{ kind: "RouterOutput", inputs: [] }],
+					compute_nodes: [],
+					output_sinks: [{ kind: "RouterOutput", inputs: [] }],
+					action_bank: [],
+					execute_gate: { inputs: [] },
 				},
 			},
 		},

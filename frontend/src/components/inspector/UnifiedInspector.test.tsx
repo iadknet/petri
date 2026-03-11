@@ -48,10 +48,14 @@ function makeGenome(): CreatureGenome {
 				targets: [],
 				backend_def: {
 					Graph: {
-						internal_nodes: [
-							{ kind: { InputRef: { ref_idx: 0, sub_idx: 0 } }, inputs: [] },
-							{ kind: "RouterOutput", inputs: [{ source_idx: 0, weight: 1 }] },
+						compute_nodes: [
+							{ kind: "Add", inputs: [{ source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } }, weight: 1 }] },
 						],
+						output_sinks: [
+							{ kind: "RouterOutput", inputs: [{ source: { ComputeNode: 0 }, weight: 1 }] },
+						],
+						action_bank: [],
+						execute_gate: { inputs: [] },
 					},
 				},
 			},

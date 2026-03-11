@@ -1,7 +1,8 @@
 import { useMemo } from "react";
 import type { BackendDef, InputReference } from "../../types/genome.ts";
 import type { VmTrace } from "../../types/trace.ts";
-import { describeGraphInternalNode } from "./mesh/meshPresentation.ts";
+import { formatGraphSource } from "./GraphInternalsViz.tsx";
+import { describeComputeNodeKind } from "./mesh/meshPresentation.ts";
 import { formatReadableInstruction } from "./vmInstructionFormat.ts";
 
 interface NodeBackendDetailProps {
@@ -92,7 +93,7 @@ export function NodeBackendDetail({
 								) : null}
 								{regChanges && regChanges.length > 0 ? (
 									<span className="shrink-0 text-[9px] text-emerald-400/70">
-										{regChanges.map(([r, v]) => `r${r}←${v.toFixed(2)}`).join(" ")}
+										{regChanges.map(([r, v]) => `r${r}\u2190${v.toFixed(2)}`).join(" ")}
 									</span>
 								) : null}
 							</div>
@@ -110,16 +111,16 @@ export function NodeBackendDetail({
 		return (
 			<div className="px-3 py-2">
 				<div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-500">
-					Graph Internals ({graph.internal_nodes.length})
+					Compute Nodes ({graph.compute_nodes.length})
 				</div>
 				<div className="max-h-[200px] space-y-px overflow-y-auto">
-					{graph.internal_nodes.map((internalNode, index) => {
-						const presentation = describeGraphInternalNode(internalNode.kind);
+					{graph.compute_nodes.map((computeNode, index) => {
+						const presentation = describeComputeNodeKind(computeNode.kind);
 						const isLive = liveSet.has(index);
 
 						return (
 							<div
-								// biome-ignore lint/suspicious/noArrayIndexKey: internal nodes are indexed by position
+								// biome-ignore lint/suspicious/noArrayIndexKey: compute nodes are indexed by position
 								key={index}
 								data-testid={`graph-internal-${index}`}
 								data-junk={isLive ? "false" : "true"}
@@ -132,10 +133,13 @@ export function NodeBackendDetail({
 								{presentation.detail ? (
 									<span className="text-[9px] text-slate-600">{presentation.detail}</span>
 								) : null}
-								{internalNode.inputs.length > 0 ? (
+								{computeNode.inputs.length > 0 ? (
 									<span className="text-[9px] text-slate-500">
-										{internalNode.inputs
-											.map((input) => `src:${input.source_idx} \u00d7 ${input.weight.toFixed(2)}`)
+										{computeNode.inputs
+											.map(
+												(edge) =>
+													`${formatGraphSource(edge.source, inputRefs)} \u00d7 ${edge.weight.toFixed(2)}`,
+											)
 											.join(" \u00b7 ")}
 									</span>
 								) : null}
