@@ -419,8 +419,6 @@ mod tests {
         assert_eq!(output.actions, vec![WorldAction::Eat]);
     }
 
-    // ── Test 6: graph_node_routes_to_vm_node — removed (used old GraphBackendDef) ──
-
     // ── Test 7: route_wrapping_rem_euclid ────────────────────────────────────
 
     /// VM sets route=3.7; floor(3.7)=3; 3.rem_euclid(3 targets)=0.
@@ -515,8 +513,6 @@ mod tests {
             "route=-1.0 should wrap via rem_euclid and select targets[1]"
         );
     }
-
-    // ── Test 9: output_slots_passed_as_upstream — removed (used old GraphBackendDef) ──
 
     // ── Priority bid tests ───────────────────────────────────────────────
 
@@ -662,6 +658,4 @@ mod tests {
             "last-write-wins: second node's bid should be returned"
         );
     }
-
-    // ── Graph action-queue integration tests — removed (used old GraphBackendDef) ──
 }

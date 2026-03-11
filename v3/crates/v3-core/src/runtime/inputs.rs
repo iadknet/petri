@@ -15,37 +15,6 @@ pub struct ResolveCtx<'a> {
     pub action_queue: &'a ActionQueue,
 }
 
-impl ResolveCtx<'_> {
-    /// Create a dummy `ResolveCtx` for tests that only need to exercise
-    /// `GraphSource::ComputeNode` or `GraphSource::SharedMemory` resolution
-    /// (i.e. the resolve_ctx is never actually read).
-    #[cfg(test)]
-    #[allow(dead_code)]
-    pub(crate) fn dummy() -> ResolveCtx<'static> {
-        use std::sync::LazyLock;
-        static SNAPSHOT: LazyLock<SensorSnapshot> = LazyLock::new(|| SensorSnapshot {
-            local: crate::sensors::static_inputs::StaticInputs {
-                food_here: 0.0,
-                neighbor_food: [0.0; 8],
-                neighbor_barrier: [0.0; 8],
-                neighbor_occupied: [0.0; 8],
-                generation: 0.0,
-                age_ticks: 0.0,
-            },
-            perception: crate::sensors::perception::PerceptionSnapshot::zero(),
-        });
-        static UPSTREAM: [f32; 12] = [0.0; 12];
-        static AQ: LazyLock<ActionQueue> = LazyLock::new(|| ActionQueue::new(4));
-        ResolveCtx {
-            sensors: &SNAPSHOT,
-            upstream_slots: &UPSTREAM,
-            energy: 0.0,
-            energy_consumed: 0.0,
-            action_queue: &AQ,
-        }
-    }
-}
-
 /// Resolve an `InputReference` to its current f32 value.
 ///
 /// - `sub_idx`: sub-value index for compound inputs (ActionQueue, compound
