@@ -7,7 +7,16 @@ use crate::creature::genome::cgp::{
 use crate::runtime::cgp::sources::{resolve_source, resolve_source_post_convergence};
 use crate::runtime::inputs::ResolveCtx;
 use crate::runtime::routing::RouteDecision;
+use crate::runtime::trace::domain::{
+    GraphActionSlotTrace, GraphExecuteGateTrace, GraphOutputSinkTrace,
+};
 use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
+
+pub(crate) struct CgpEffectsTrace {
+    pub(crate) output_sinks: Vec<GraphOutputSinkTrace>,
+    pub(crate) action_slots: Vec<GraphActionSlotTrace>,
+    pub(crate) execute_gate: GraphExecuteGateTrace,
+}
 
 #[inline]
 #[allow(clippy::too_many_arguments)]
@@ -87,15 +96,23 @@ pub(crate) fn apply_cgp_graph_effects(
     side_outputs: &mut MeshSideOutputs,
     shared_memory: &mut [f32; 16],
     prev_shared_memory: &[f32; 16],
-) -> NodeResult {
+) -> (NodeResult, CgpEffectsTrace) {
     let mut output_slots = *upstream_slots;
     let mut route_raw_value = 0.0f32;
     let compute_count = def.compute_nodes.len();
     let mut buf = Vec::with_capacity(8);
+    let mut output_sink_traces = Vec::with_capacity(def.output_sinks.len());
+    let mut action_slot_traces = Vec::with_capacity(def.action_bank.len());
 
     // Phase 1: value outputs
     for sink in &def.output_sinks {
         if sink.inputs.is_empty() {
+            output_sink_traces.push(GraphOutputSinkTrace {
+                wired: false,
+                weighted_sum: 0.0,
+                applied: false,
+                applied_value: 0.0,
+            });
             continue;
         }
 
@@ -109,53 +126,74 @@ pub(crate) fn apply_cgp_graph_effects(
             prev_shared_memory,
             &mut buf,
         );
+        let mut applied = false;
+        let mut applied_value = 0.0;
 
         match sink.kind {
             OutputSinkKind::CustomOutput(s) => {
                 if (s as usize) < OUTPUT_SLOT_COUNT {
-                    output_slots[s as usize] = sanitize_f32(wsum);
+                    applied_value = sanitize_f32(wsum);
+                    output_slots[s as usize] = applied_value;
+                    applied = true;
                 }
             }
             OutputSinkKind::RouterOutput => {
-                route_raw_value = sanitize_f32(wsum);
+                applied_value = sanitize_f32(wsum);
+                route_raw_value = applied_value;
+                applied = true;
             }
             OutputSinkKind::WriteSlot(s) => {
                 if (s as usize) < 16 {
-                    shared_memory[s as usize] = sanitize_f32(wsum);
+                    applied_value = sanitize_f32(wsum);
+                    shared_memory[s as usize] = applied_value;
+                    applied = true;
                 }
             }
             OutputSinkKind::ClearSlot(s) => {
                 if (s as usize) < 16 {
                     shared_memory[s as usize] = 0.0;
+                    applied_value = 0.0;
+                    applied = true;
                 }
             }
         }
+
+        output_sink_traces.push(GraphOutputSinkTrace {
+            wired: true,
+            weighted_sum: sanitize_f32(wsum),
+            applied,
+            applied_value,
+        });
     }
 
     // Phase 2: action bank scan
     for slot in &def.action_bank {
-        if slot.gate_inputs.is_empty() {
-            continue;
-        }
+        let wired = !slot.gate_inputs.is_empty() || !slot.param_inputs.is_empty();
+        let queue_len_before = side_outputs.action_queue.len();
+        let gate_wsum = if !slot.gate_inputs.is_empty() {
+            edges_wsum(
+                &slot.gate_inputs,
+                compute_count,
+                curr_outputs,
+                input_refs,
+                resolve_ctx,
+                shared_memory,
+                prev_shared_memory,
+                &mut buf,
+            )
+        } else {
+            0.0
+        };
+        let fired = !slot.gate_inputs.is_empty() && gate_wsum > 0.0;
+        let mut param_values = [0.0f32; 2];
+        let mut emitted_action = None;
 
-        let gate_wsum = edges_wsum(
-            &slot.gate_inputs,
-            compute_count,
-            curr_outputs,
-            input_refs,
-            resolve_ctx,
-            shared_memory,
-            prev_shared_memory,
-            &mut buf,
-        );
-
-        if gate_wsum > 0.0 {
+        if fired {
             match slot.behavior {
                 ActionSlotBehavior::Pop => {
                     side_outputs.action_queue.pop();
                 }
                 ActionSlotBehavior::Emit(kind) => {
-                    let mut param_values = [0.0f32; 2];
                     for (i, edge) in slot.param_inputs.iter().enumerate() {
                         if i >= 2 {
                             break;
@@ -175,17 +213,29 @@ pub(crate) fn apply_cgp_graph_effects(
                     }
 
                     let action = decode_action_from_kind(kind, &param_values);
+                    emitted_action = Some(action);
                     side_outputs.action_queue.push(action);
                 }
             }
         }
+
+        let param_values_trace = [sanitize_f32(param_values[0]), sanitize_f32(param_values[1])];
+
+        action_slot_traces.push(GraphActionSlotTrace {
+            wired,
+            gate_weighted_sum: sanitize_f32(gate_wsum),
+            fired,
+            param_values: param_values_trace,
+            queue_len_before,
+            queue_len_after: side_outputs.action_queue.len(),
+            emitted_action,
+        });
     }
 
     // Phase 3: execute gate
-    let terminal = if def.execute_gate.inputs.is_empty() {
-        false
-    } else {
-        let gate_wsum = edges_wsum(
+    let execute_wired = !def.execute_gate.inputs.is_empty();
+    let execute_wsum = if execute_wired {
+        edges_wsum(
             &def.execute_gate.inputs,
             compute_count,
             curr_outputs,
@@ -194,16 +244,31 @@ pub(crate) fn apply_cgp_graph_effects(
             shared_memory,
             prev_shared_memory,
             &mut buf,
-        );
-        gate_wsum > 0.0 && !side_outputs.action_queue.is_empty()
+        )
+    } else {
+        0.0
     };
+    let queue_non_empty = !side_outputs.action_queue.is_empty();
+    let terminal = execute_wired && execute_wsum > 0.0 && queue_non_empty;
 
-    NodeResult {
-        output_slots,
-        route: RouteDecision::CgpNormalized {
-            raw_value: route_raw_value,
+    (
+        NodeResult {
+            output_slots,
+            route: RouteDecision::CgpNormalized {
+                raw_value: route_raw_value,
+            },
+            terminal,
+            energy_exhausted: false,
         },
-        terminal,
-        energy_exhausted: false,
-    }
+        CgpEffectsTrace {
+            output_sinks: output_sink_traces,
+            action_slots: action_slot_traces,
+            execute_gate: GraphExecuteGateTrace {
+                wired: execute_wired,
+                weighted_sum: sanitize_f32(execute_wsum),
+                queue_non_empty,
+                fired: terminal,
+            },
+        },
+    )
 }

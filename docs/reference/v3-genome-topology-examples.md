@@ -63,7 +63,7 @@ Topology:
 | 1 | VM | `[]` | Reads slots + sensors, emits action |
 
 Tick trace:
-1. Node 0 reads `InputRef { ref_idx, sub_idx }` values and writes derived signals (for example, slots 0 and 1).
+1. Node 0 reads `GraphSource::InputLeaf { ref_idx, sub_idx }` values through sink/compute edges and writes derived signals (for example, slots 0 and 1).
 2. Routing picks `targets[0]`, so Node 1 executes next.
 3. Node 1 reads `UpstreamSlot(slot)`, combines with direct inputs, and emits `Move/Eat/Reproduce/NoOp`.
 

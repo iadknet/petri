@@ -13,6 +13,7 @@ pub enum GraphOperator {
     AlterGraphEdgeWeight,
     SwapGraphOperator,
     MutateGraphOperatorParam,
+    MutateActionSlotBehavior,
     AddInternalGraphNode,
     RemoveInternalGraphNode,
     AddGraphEdge,
@@ -34,10 +35,11 @@ pub enum GraphOperator {
 }
 
 impl GraphOperator {
-    pub const ALL: [Self; 21] = [
+    pub const ALL: [Self; 22] = [
         Self::AlterGraphEdgeWeight,
         Self::SwapGraphOperator,
         Self::MutateGraphOperatorParam,
+        Self::MutateActionSlotBehavior,
         Self::AddInternalGraphNode,
         Self::RemoveInternalGraphNode,
         Self::AddGraphEdge,
@@ -66,6 +68,7 @@ impl GraphOperator {
             Self::AlterGraphEdgeWeight => 4,
             Self::SwapGraphOperator => 2,
             Self::MutateGraphOperatorParam => 4,
+            Self::MutateActionSlotBehavior => 2,
             Self::AddInternalGraphNode => 1,
             Self::RemoveInternalGraphNode => 1,
             Self::AddGraphEdge => 2,
@@ -89,7 +92,7 @@ impl GraphOperator {
 
     const TOTAL_WEIGHT: u16 = {
         assert!(
-            Self::ALL.len() == 21,
+            Self::ALL.len() == 22,
             "ALL must cover every GraphOperator variant"
         );
         let mut sum = 0u16;
@@ -120,6 +123,7 @@ impl GraphOperator {
             Self::AlterGraphEdgeWeight
             | Self::SwapGraphOperator
             | Self::MutateGraphOperatorParam
+            | Self::MutateActionSlotBehavior
             | Self::RetargetGraphEdge
             | Self::GraphRawFieldMutation
             | Self::MutateHebbianRule
@@ -243,6 +247,9 @@ impl GraphMutator {
             GraphOperator::SwapGraphOperator => operators::swap_operator(genome, node_idx, rng),
             GraphOperator::MutateGraphOperatorParam => {
                 operators::mutate_operator_param(genome, node_idx, rng)
+            }
+            GraphOperator::MutateActionSlotBehavior => {
+                operators::mutate_action_slot_behavior(genome, node_idx, rng)
             }
             GraphOperator::AddInternalGraphNode => {
                 operators::add_internal_node(genome, node_idx, rng)

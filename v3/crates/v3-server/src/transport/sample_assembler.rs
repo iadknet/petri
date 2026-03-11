@@ -3,10 +3,11 @@
 use v3_core::runtime::trace::domain as core_trace;
 
 use crate::transport::sample_protocol::{
-    BackendTracePayload, ExecutionSamplePayload, GraphNodeEvalTracePayload, GraphPassTracePayload,
-    GraphTracePayload, MeshHopTracePayload, PerceptionDebugSnapshotPayload, RouteDecisionPayload,
-    RouteKindPayload, SlotWritePayload, StaticInputsSnapshotPayload, TerminationReasonPayload,
-    TickTracePayload, VmStepTracePayload, VmTracePayload,
+    BackendTracePayload, ExecutionSamplePayload, GraphActionSlotTracePayload,
+    GraphExecuteGateTracePayload, GraphNodeEvalTracePayload, GraphOutputSinkTracePayload,
+    GraphPassTracePayload, GraphTracePayload, MeshHopTracePayload, PerceptionDebugSnapshotPayload,
+    RouteDecisionPayload, RouteKindPayload, SlotWritePayload, StaticInputsSnapshotPayload,
+    TerminationReasonPayload, TickTracePayload, VmStepTracePayload, VmTracePayload,
 };
 
 #[inline]
@@ -159,6 +160,40 @@ fn assemble_hop(hop: core_trace::MeshHopTrace) -> Result<MeshHopTracePayload, se
                     converged: graph.converged,
                     stable_passes_count: graph.stable_passes_count,
                     final_outputs: graph.final_outputs,
+                    output_sinks: graph
+                        .output_sinks
+                        .into_iter()
+                        .map(|s| GraphOutputSinkTracePayload {
+                            wired: s.wired,
+                            weighted_sum: s.weighted_sum,
+                            applied: s.applied,
+                            applied_value: s.applied_value,
+                        })
+                        .collect(),
+                    action_slots: graph
+                        .action_slots
+                        .into_iter()
+                        .map(|slot| {
+                            Ok(GraphActionSlotTracePayload {
+                                wired: slot.wired,
+                                gate_weighted_sum: slot.gate_weighted_sum,
+                                fired: slot.fired,
+                                param_values: slot.param_values,
+                                queue_len_before: slot.queue_len_before,
+                                queue_len_after: slot.queue_len_after,
+                                emitted_action: slot
+                                    .emitted_action
+                                    .map(serialize_core_shape)
+                                    .transpose()?,
+                            })
+                        })
+                        .collect::<Result<Vec<_>, _>>()?,
+                    execute_gate: GraphExecuteGateTracePayload {
+                        wired: graph.execute_gate.wired,
+                        weighted_sum: graph.execute_gate.weighted_sum,
+                        queue_non_empty: graph.execute_gate.queue_non_empty,
+                        fired: graph.execute_gate.fired,
+                    },
                 })
             }
         },
@@ -169,8 +204,9 @@ fn assemble_hop(hop: core_trace::MeshHopTrace) -> Result<MeshHopTracePayload, se
 mod tests {
     use super::*;
     use v3_core::runtime::trace::domain::{
-        BackendTrace, ExecutionSample, MeshHopTrace, TickTrace, TraceRouteDecision, TraceRouteKind,
-        VmTrace,
+        BackendTrace, ExecutionSample, GraphActionSlotTrace, GraphExecuteGateTrace,
+        GraphOutputSinkTrace, GraphTrace, MeshHopTrace, TickTrace, TraceRouteDecision,
+        TraceRouteKind, VmTrace,
     };
 
     #[test]
@@ -226,5 +262,86 @@ mod tests {
         assert!(matches!(route.kind, RouteKindPayload::VmWrap));
         assert!((route.raw_value - 3.0).abs() < 1e-6);
         assert_eq!(route.resolved_target_index, 1);
+    }
+
+    #[test]
+    fn assembler_maps_graph_effect_phase_trace_fields() {
+        let sample = ExecutionSample {
+            creature_id: 7,
+            ticks: vec![TickTrace {
+                tick_number: 1,
+                energy_before: 5.0,
+                energy_after: 4.5,
+                static_inputs: core_trace::StaticInputsSnapshot {
+                    food_here: 0.0,
+                    neighbor_food: [0.0; 8],
+                    neighbor_barrier: [0.0; 8],
+                    neighbor_occupied: [0.0; 8],
+                    generation: 1.0,
+                    age_ticks: 1.0,
+                },
+                debug_perception: None,
+                hops: vec![MeshHopTrace {
+                    hop_index: 0,
+                    node_id: v3_core::contracts::NodeId::new(2),
+                    input_refs: vec![],
+                    upstream_slots: [0.0; 12],
+                    energy_before: 5.0,
+                    energy_after: 4.5,
+                    output_slots: [1.0; 12],
+                    route: TraceRouteDecision {
+                        kind: TraceRouteKind::CgpNormalized,
+                        raw_value: 0.25,
+                    },
+                    resolved_target_index: 0,
+                    backend_trace: BackendTrace::Graph(GraphTrace {
+                        passes: vec![],
+                        converged: true,
+                        stable_passes_count: 2,
+                        final_outputs: vec![1.0],
+                        output_sinks: vec![GraphOutputSinkTrace {
+                            wired: true,
+                            weighted_sum: 1.0,
+                            applied: true,
+                            applied_value: 1.0,
+                        }],
+                        action_slots: vec![GraphActionSlotTrace {
+                            wired: true,
+                            gate_weighted_sum: 1.0,
+                            fired: true,
+                            param_values: [0.0, 0.0],
+                            queue_len_before: 0,
+                            queue_len_after: 1,
+                            emitted_action: Some(v3_core::contracts::WorldAction::Eat),
+                        }],
+                        execute_gate: GraphExecuteGateTrace {
+                            wired: true,
+                            weighted_sum: 1.0,
+                            queue_non_empty: true,
+                            fired: true,
+                        },
+                    }),
+                }],
+                final_actions: vec![v3_core::contracts::WorldAction::Eat],
+                termination_reason: core_trace::TerminationReason::ActionEmitted,
+                priority_bid: 0.0,
+            }],
+        };
+
+        let assembled =
+            assemble_execution_sample(sample).expect("valid core trace sample should assemble");
+
+        let graph = match &assembled.ticks[0].hops[0].backend_trace {
+            BackendTracePayload::Graph(graph) => graph,
+            BackendTracePayload::Vm(_) => panic!("expected graph payload"),
+        };
+        assert_eq!(graph.output_sinks.len(), 1);
+        assert!(graph.output_sinks[0].wired);
+        assert!(graph.output_sinks[0].applied);
+        assert_eq!(graph.action_slots.len(), 1);
+        assert!(graph.action_slots[0].fired);
+        assert!(graph.action_slots[0].emitted_action.is_some());
+        assert!(graph.execute_gate.fired);
+        assert!(graph.execute_gate.queue_non_empty);
     }
 }

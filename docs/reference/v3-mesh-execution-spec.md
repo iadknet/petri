@@ -57,7 +57,7 @@ current_node_id = genome.entry_node_id
 upstream_slots = [0.0; 12]
 action_queue = []
 hops = 0
-max_mesh_hops = validated(config.max_mesh_hops, default=128, min=1)
+max_mesh_hops = validated(config.max_mesh_hops, default=1024, min=1)
 
 loop:
   if hops >= max_mesh_hops:
@@ -116,7 +116,7 @@ A single chain evaluation terminates on the first matching condition:
 
 Safety rules:
 - value must be `>= 1`
-- invalid values (for example `0`) fall back to default (`128`)
+- invalid values (for example `0`) fall back to default (`1024`)
 - the cap cannot be disabled
 
 Graph internal recurrence rule:
@@ -138,7 +138,8 @@ behavior.
 | Condition | Runtime behavior |
 |---|---|
 | `entry_node_id` missing from node set | Return `WorldAction::NoOp` |
-| Routed index (negative, out-of-range, or non-finite) | Map to signed route index and wrap with `rem_euclid(targets.len())` |
+| VM route decision (`RouteDecision::VmWrap`) with negative/out-of-range/non-finite raw value | Map to signed route index and wrap with `rem_euclid(targets.len())` |
+| Graph route decision (`RouteDecision::CgpNormalized`) with out-of-range/non-finite raw value | Sanitize + clamp to `[0.0, 1.0]`, then bin via `idx = min(floor(clamp01(raw) * targets.len()), targets.len()-1)` |
 | Routed target id missing | Return `WorldAction::NoOp` |
 | Routing requested but `targets` is empty | Return `WorldAction::NoOp` |
 | `ReadInput` `ref_idx` out of range | Yield `0.0` |
@@ -177,7 +178,9 @@ This section defines V3-local harness controls for deterministic tests.
 
 For deterministic tests, use a fixed mode that pins:
 - Routing conversion (`NaN -> -1`, `+inf -> i64::MAX`, `-inf -> i64::MIN`) and
-  `rem_euclid` wrapping.
+  `rem_euclid` wrapping for VM route decisions.
+- CGP routing conversion (`sanitize_f32(raw)`, clamp to `[0.0, 1.0]`, bounded
+  binning to `0..targets.len()-1`) for graph route decisions.
 - Float sanitation rules from VM/graph specs before routing decisions.
 - Node iteration order (`nodes` order and internal graph order).
 - Graph convergence loop order and stop criteria
