@@ -86,11 +86,7 @@ export function usePatternInteraction(
 	useEffect(() => {
 		const handleKeyDown = (e: KeyboardEvent) => {
 			const paintStore = usePaintStore.getState();
-			if (
-				e.key === "Escape" &&
-				paintStore.paintMode &&
-				paintStore.mode === "pattern"
-			) {
+			if (e.key === "Escape" && paintStore.paintMode && paintStore.mode === "pattern") {
 				isDraggingRef.current = false;
 				dragStartRef.current = null;
 				dragCurrentRef.current = null;

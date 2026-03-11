@@ -66,14 +66,15 @@ export function usePatternPreview(
 		const controller = new AbortController();
 		abortRef.current = controller;
 
-		api.patternPreview(
-			{
-				params: patternParams,
-				bounds: areaBounds,
-				seed: patternSeed,
-			},
-			controller.signal,
-		)
+		api
+			.patternPreview(
+				{
+					params: patternParams,
+					bounds: areaBounds,
+					seed: patternSeed,
+				},
+				controller.signal,
+			)
 			.then((response) => {
 				if (controller.signal.aborted) return;
 				const cells = decodeBitmap(response.bitmap, response.bounds);

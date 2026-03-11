@@ -1,9 +1,5 @@
 import { create } from "zustand";
-import type {
-	PatternBounds,
-	PatternParams,
-	PatternType,
-} from "../types/api.ts";
+import type { PatternBounds, PatternParams, PatternType } from "../types/api.ts";
 import { DEFAULT_PATTERN_PARAMS } from "../types/api.ts";
 
 export interface PatternState {

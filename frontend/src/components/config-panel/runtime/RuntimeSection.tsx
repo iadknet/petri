@@ -80,8 +80,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		max: 10,
 		step: 0.001,
 		defaultValue: 0.0,
-		tooltip:
-			"Energy cost per reward-modulated weight update during learning",
+		tooltip: "Energy cost per reward-modulated weight update during learning",
 	},
 	{
 		path: "runtime.max_actions_per_turn",
@@ -99,7 +98,6 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		max: 8,
 		step: 1,
 		defaultValue: 5,
-		tooltip:
-			"Vision radius for extended perception area summaries",
+		tooltip: "Vision radius for extended perception area summaries",
 	},
 ];

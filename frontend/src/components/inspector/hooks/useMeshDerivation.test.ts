@@ -35,8 +35,14 @@ function makeGenome(): CreatureGenome {
 				backend_def: {
 					Graph: {
 						compute_nodes: [
-							{ kind: "Add", inputs: [{ source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } }, weight: 1 }] },
-							{ kind: { DecayIntegrator: 0.2 }, inputs: [{ source: { ComputeNode: 0 }, weight: 1 }] },
+							{
+								kind: "Add",
+								inputs: [{ source: { InputLeaf: { ref_idx: 0, sub_idx: 0 } }, weight: 1 }],
+							},
+							{
+								kind: { DecayIntegrator: 0.2 },
+								inputs: [{ source: { ComputeNode: 0 }, weight: 1 }],
+							},
 						],
 						output_sinks: [
 							{ kind: "RouterOutput", inputs: [{ source: { ComputeNode: 1 }, weight: 1 }] },
@@ -64,9 +70,7 @@ function makeGenome(): CreatureGenome {
 				targets: [],
 				backend_def: {
 					Graph: {
-						compute_nodes: [
-							{ kind: { Constant: 1 }, inputs: [] },
-						],
+						compute_nodes: [{ kind: { Constant: 1 }, inputs: [] }],
 						output_sinks: [
 							{ kind: { CustomOutput: 1 }, inputs: [{ source: { ComputeNode: 0 }, weight: 1 }] },
 						],

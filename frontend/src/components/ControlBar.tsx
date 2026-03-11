@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { api, type DeepPartial } from "../api/rest.ts";
+import { type DeepPartial, api } from "../api/rest.ts";
 import { useConfigStore } from "../stores/config.ts";
 import { usePanelLayout } from "../stores/layout.tsx";
 import { useSimulationStore } from "../stores/simulation.ts";

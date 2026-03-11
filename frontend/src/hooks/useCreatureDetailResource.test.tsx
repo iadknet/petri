@@ -96,9 +96,7 @@ describe("useCreatureDetailResource", () => {
 				},
 			],
 		};
-		vi.mocked(api.getCreature)
-			.mockResolvedValueOnce(detail1)
-			.mockResolvedValueOnce(detail2);
+		vi.mocked(api.getCreature).mockResolvedValueOnce(detail1).mockResolvedValueOnce(detail2);
 
 		useCreatureInspectorStore.getState().selectCreature(7);
 		await act(async () => {

@@ -1,4 +1,8 @@
-export function deepSet<T extends Record<string, unknown>>(obj: T, path: string, value: unknown): T {
+export function deepSet<T extends Record<string, unknown>>(
+	obj: T,
+	path: string,
+	value: unknown,
+): T {
 	const clone = structuredClone(obj);
 	const keys = path.split(".");
 	let current: Record<string, unknown> = clone;

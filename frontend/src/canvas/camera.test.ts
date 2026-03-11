@@ -27,11 +27,7 @@ describe("camera helpers", () => {
 		const panned = panCamera({ x: 10, y: 20, zoom: 2 }, 5, -3);
 		expect(panned).toEqual({ x: 15, y: 17, zoom: 2 });
 
-		const zoomed = zoomCameraFromCenter(
-			{ x: 0, y: 0, zoom: 2 },
-			{ width: 200, height: 100 },
-			-1,
-		);
+		const zoomed = zoomCameraFromCenter({ x: 0, y: 0, zoom: 2 }, { width: 200, height: 100 }, -1);
 		expect(zoomed.x).toBeCloseTo(-10);
 		expect(zoomed.y).toBeCloseTo(-5);
 		expect(zoomed.zoom).toBeCloseTo(2.2);

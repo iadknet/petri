@@ -19,8 +19,7 @@ export const COMPLEXITY_COST_FIELDS: FieldDef[] = [
 		step: 0.001,
 		testId: "config-field-complexity-cost-scaling-factor",
 		defaultValue: 0.002,
-		tooltip:
-			"Energy cost multiplier increase per unit of complexity above threshold",
+		tooltip: "Energy cost multiplier increase per unit of complexity above threshold",
 	},
 ];
 
@@ -30,8 +29,7 @@ export const COMPLEXITY_COST_TOGGLES: BooleanFieldDef[] = [
 		label: "Complexity Cost",
 		testId: "config-field-complexity-cost-enabled",
 		defaultValue: true,
-		tooltip:
-			"When enabled, creatures with complex genomes pay higher energy costs for all actions",
+		tooltip: "When enabled, creatures with complex genomes pay higher energy costs for all actions",
 	},
 ];
 

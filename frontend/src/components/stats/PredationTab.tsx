@@ -9,9 +9,7 @@ export function PredationTab() {
 	const predationKills = useStatsHistoryStore((s) => s.predationKills);
 
 	const successRate =
-		predationAttempted > 0
-			? ((predationTransferred / predationAttempted) * 100).toFixed(1)
-			: "0.0";
+		predationAttempted > 0 ? ((predationTransferred / predationAttempted) * 100).toFixed(1) : "0.0";
 
 	return (
 		<div className="flex flex-col gap-3 p-3">
@@ -36,11 +34,7 @@ export function PredationTab() {
 				<Gauge label="Attempted" value={predationAttempted} />
 				<Gauge label="Transferred" value={predationTransferred} />
 				<Gauge label="Kills" value={predationKills} />
-				<Gauge
-					label="Success Rate"
-					value={Number(successRate)}
-					format={(v) => `${v}%`}
-				/>
+				<Gauge label="Success Rate" value={Number(successRate)} format={(v) => `${v}%`} />
 			</div>
 		</div>
 	);

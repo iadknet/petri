@@ -1,11 +1,7 @@
 import { Section } from "../shared/Section.tsx";
 import type { BooleanFieldDef, FieldDef, RuntimePanelProps } from "../shared/types.ts";
 import { ACTION_LOG_FIELDS } from "./ActionLogSection.tsx";
-import {
-	AGE_COST_ALL_FIELDS,
-	AGE_COST_FIELDS,
-	AGE_COST_TOGGLES,
-} from "./AgeEnergyCostSection.tsx";
+import { AGE_COST_ALL_FIELDS, AGE_COST_FIELDS, AGE_COST_TOGGLES } from "./AgeEnergyCostSection.tsx";
 import {
 	COMPLEXITY_COST_ALL_FIELDS,
 	COMPLEXITY_COST_FIELDS,
@@ -14,11 +10,7 @@ import {
 import { ENERGY_COSTS_FIELDS } from "./EnergyCostsSection.tsx";
 import { ENERGY_LIFECYCLE_FIELDS } from "./EnergyLifecycleSection.tsx";
 import { FOOD_PARAMETERS_FIELDS } from "./FoodParametersSection.tsx";
-import {
-	MUTATION_ALL_FIELDS,
-	MUTATION_FIELDS,
-	MUTATION_TOGGLES,
-} from "./MutationSection.tsx";
+import { MUTATION_ALL_FIELDS, MUTATION_FIELDS, MUTATION_TOGGLES } from "./MutationSection.tsx";
 import { POPULATION_FIELDS } from "./PopulationSection.tsx";
 import { PREDATION_FIELDS } from "./PredationSection.tsx";
 import { RuntimeFieldGroup } from "./RuntimeFieldGroup.tsx";
