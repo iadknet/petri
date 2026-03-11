@@ -8,8 +8,11 @@
 //! Traces are parallel to `plasticity_weights` in shape:
 //! `[mesh_node_idx][internal_node_idx][edge_idx]`.
 
-use crate::creature::genome::cgp::{CgpGraphBackendDef, GraphSource};
+use crate::contracts::InputReference;
+use crate::creature::genome::cgp::CgpGraphBackendDef;
 use crate::creature::genome::HebbianRule;
+use crate::runtime::cgp::sources::resolve_source_post_convergence;
+use crate::runtime::inputs::ResolveCtx;
 
 /// Ensure `eligibility_traces` is properly sized for the given mesh node.
 ///
@@ -57,14 +60,19 @@ pub(crate) fn ensure_eligibility_traces(
 ///
 /// Pure Hebbian nodes (no modulation) are skipped — they are updated
 /// directly by [`super::hebbian::apply_hebbian_updates`].
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn update_eligibility_traces(
     def: &CgpGraphBackendDef,
     node_idx: usize,
     eligibility_traces: &mut [Vec<Box<[f32]>>],
     plasticity_weights: &[Vec<Box<[f32]>>],
     final_outputs: &[f32],
+    input_refs: &[InputReference],
+    resolve_ctx: &ResolveCtx<'_>,
+    shared_memory: &[f32; 16],
+    prev_shared_memory: &[f32; 16],
 ) {
-    let node_count = def.compute_nodes.len();
+    let compute_count = def.compute_nodes.len();
 
     for (i, cnode) in def.compute_nodes.iter().enumerate() {
         let cfg = match &cnode.plasticity {
@@ -114,15 +122,15 @@ pub(crate) fn update_eligibility_traces(
                 break;
             }
 
-            let src = match edge.source {
-                GraphSource::ComputeNode(idx) => idx as usize,
-                _ => usize::MAX, // non-compute sources have no index into final_outputs
-            };
-            let pre = if src < node_count && src < final_outputs.len() {
-                final_outputs[src]
-            } else {
-                0.0
-            };
+            let pre = resolve_source_post_convergence(
+                &edge.source,
+                compute_count,
+                final_outputs,
+                input_refs,
+                resolve_ctx,
+                shared_memory,
+                prev_shared_memory,
+            );
 
             let w = if edge_idx < weights.len() {
                 weights[edge_idx]

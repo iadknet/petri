@@ -1,7 +1,7 @@
 use super::super::run_tick;
 use super::support::*;
 use crate::config::SimulationConfig;
-use crate::runtime::trace::ActiveTrace;
+use crate::runtime::trace::recording::ActiveTrace;
 use crate::simulation::seeding::seed_simulation;
 
 #[test]

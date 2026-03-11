@@ -37,9 +37,10 @@ export function deriveTraceFocus(
 	}
 
 	const node = genome.nodes.find((candidate) => candidate.node_id === currentHop.node_id);
+	const routeTargetIdx = currentHop.route.resolved_target_index;
 	const routeTargetId =
-		node && currentHop.route_target_idx >= 0 && currentHop.route_target_idx < node.targets.length
-			? (node.targets[currentHop.route_target_idx] ?? null)
+		node && routeTargetIdx >= 0 && routeTargetIdx < node.targets.length
+			? (node.targets[routeTargetIdx] ?? null)
 			: null;
 
 	return {
@@ -49,7 +50,7 @@ export function deriveTraceFocus(
 				? formatMeshEdgeId(
 						currentHop.node_id,
 						routeTargetId,
-						getMeshEdgeOccurrenceIndex(node?.targets ?? [], currentHop.route_target_idx),
+						getMeshEdgeOccurrenceIndex(node?.targets ?? [], routeTargetIdx),
 					)
 				: null,
 		routeTargetId,

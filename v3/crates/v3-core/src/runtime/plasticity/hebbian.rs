@@ -1,14 +1,17 @@
 //! Hebbian learning — weight adaptation for graph nodes at runtime.
 //!
-//! Called by [`super::graph::execute_graph_node`] and
-//! [`super::traced_graph::execute_graph_node_traced`] after the relaxation loop
+//! Called by [`crate::runtime::cgp::execute::execute_graph_node`] and
+//! [`crate::runtime::cgp::traced::execute_graph_node_traced`] after the relaxation loop
 //! converges.
 //!
 //! **Module boundary:** This module owns the learning math (weight init,
-//! update rules, clamping). Graph relaxation lives in `graph.rs`.
+//! update rules, clamping). Graph relaxation lives in `runtime/cgp/execute.rs`.
 
-use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNode, GraphSource};
+use crate::contracts::InputReference;
+use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNode};
 use crate::creature::genome::HebbianRule;
+use crate::runtime::cgp::sources::{resolve_source, resolve_source_post_convergence};
+use crate::runtime::inputs::ResolveCtx;
 
 /// Ensure `hebbian_weights` is properly sized and initialized for the given mesh node.
 ///
@@ -64,14 +67,19 @@ pub(crate) fn effective_weight(
 /// is the "pre" activation.
 ///
 /// Returns total energy cost of the updates.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn apply_hebbian_updates(
     def: &CgpGraphBackendDef,
     node_idx: usize,
     hebbian_weights: &mut [Vec<Box<[f32]>>],
     final_outputs: &[f32],
+    input_refs: &[InputReference],
+    resolve_ctx: &ResolveCtx<'_>,
+    shared_memory: &[f32; 16],
+    prev_shared_memory: &[f32; 16],
     cost_per_update: f32,
 ) -> f32 {
-    let node_count = def.compute_nodes.len();
+    let compute_count = def.compute_nodes.len();
     let mut total_cost: f32 = 0.0;
 
     for (i, cnode) in def.compute_nodes.iter().enumerate() {
@@ -114,15 +122,15 @@ pub(crate) fn apply_hebbian_updates(
                 break;
             }
 
-            let src = match edge.source {
-                GraphSource::ComputeNode(idx) => idx as usize,
-                _ => usize::MAX,
-            };
-            let pre = if src < node_count && src < final_outputs.len() {
-                final_outputs[src]
-            } else {
-                0.0
-            };
+            let pre = resolve_source_post_convergence(
+                &edge.source,
+                compute_count,
+                final_outputs,
+                input_refs,
+                resolve_ctx,
+                shared_memory,
+                prev_shared_memory,
+            );
 
             let w = weights[edge_idx];
 
@@ -146,35 +154,36 @@ pub(crate) fn apply_hebbian_updates(
 /// Like [`super::graph::collect_weighted_inputs`] but substitutes learned
 /// Hebbian weights for genome weights when available.
 ///
-/// Only resolves `GraphSource::ComputeNode` sources using Gauss-Seidel order.
-/// Other source types (InputLeaf, SharedMemory) are not resolved here — they
-/// require a full `ResolveCtx` which is not available in this context. Non-compute
-/// sources evaluate to 0.0.
+/// Resolves all `GraphSource` variants through the shared CGP source resolver,
+/// preserving the same Gauss-Seidel semantics used by the non-plastic path.
 #[inline]
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn collect_weighted_inputs_hebbian(
     node: &ComputeNode,
     current_idx: usize,
     node_count: usize,
     prev_outputs: &[f32],
     curr_outputs: &[f32],
+    input_refs: &[InputReference],
+    resolve_ctx: &ResolveCtx<'_>,
+    shared_memory: &[f32; 16],
+    prev_shared_memory: &[f32; 16],
     learned_weights: &[f32],
     buf: &mut Vec<f32>,
 ) {
     buf.clear();
     buf.extend(node.inputs.iter().enumerate().map(|(edge_idx, edge)| {
-        let source_value = match edge.source {
-            GraphSource::ComputeNode(idx) => {
-                let src = idx as usize;
-                if src >= node_count {
-                    0.0
-                } else if src < current_idx {
-                    curr_outputs[src]
-                } else {
-                    prev_outputs[src]
-                }
-            }
-            _ => 0.0, // non-compute sources not resolved in Hebbian context
-        };
+        let source_value = resolve_source(
+            &edge.source,
+            current_idx,
+            node_count,
+            prev_outputs,
+            curr_outputs,
+            input_refs,
+            resolve_ctx,
+            shared_memory,
+            prev_shared_memory,
+        );
         source_value * effective_weight(edge.weight, learned_weights, edge_idx)
     }));
 }
@@ -185,4 +194,4 @@ pub(crate) fn has_any_hebbian(def: &CgpGraphBackendDef) -> bool {
     def.compute_nodes.iter().any(|n| n.plasticity.is_some())
 }
 
-// Old Hebbian tests removed — CGP Hebbian tests live in mutation/graph/cgp_hebbian.rs.
+// Old Hebbian tests removed — CGP Hebbian tests live in mutation/graph/hebbian.rs.

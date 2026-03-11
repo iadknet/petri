@@ -1,17 +1,11 @@
-//! Trace data structures for the Execution Sampler.
-//!
-//! These types record a creature's brain execution over multiple ticks,
-//! capturing instruction-by-instruction detail for VM nodes and
-//! pass-by-pass detail for graph nodes.
+//! Passive trace-domain data structures for the Execution Sampler.
 
 use crate::contracts::{InputReference, NodeId, WorldAction};
 use crate::creature::genome::cgp::ComputeNodeKind;
-use crate::creature::genome::VmInstruction;
+use crate::runtime::routing::RouteDecision;
 use crate::sensors::perception::PerceptionSnapshot;
 use crate::sensors::static_inputs::StaticInputs;
 use serde::Serialize;
-
-// ─── Top-level sample ────────────────────────────────────────────────────────
 
 /// A completed execution sample containing traces for multiple ticks.
 #[derive(Debug, Clone, Serialize)]
@@ -47,12 +41,7 @@ pub enum TerminationReason {
     MissingNode,
 }
 
-// ─── Static inputs snapshot ──────────────────────────────────────────────────
-
 /// Serializable mirror of [`StaticInputs`].
-///
-/// `StaticInputs` derives `Debug, Clone, PartialEq` but NOT `Serialize`,
-/// so we use this snapshot type for trace serialization.
 #[derive(Debug, Clone, Serialize)]
 pub struct StaticInputsSnapshot {
     pub food_here: f32,
@@ -76,12 +65,7 @@ impl From<&StaticInputs> for StaticInputsSnapshot {
     }
 }
 
-// ─── Perception debug snapshot ───────────────────────────────────────────────
-
 /// Serializable mirror of [`PerceptionSnapshot`] for trace debug output.
-///
-/// Per v3-server-api-protocol-spec.md Section 4.9: only included when
-/// `include_perception_debug = true` in the sample request.
 #[derive(Debug, Clone, Serialize)]
 pub struct PerceptionDebugSnapshot {
     pub area_food: [f32; 7],
@@ -105,7 +89,36 @@ impl From<&PerceptionSnapshot> for PerceptionDebugSnapshot {
     }
 }
 
-// ─── Mesh hop trace ──────────────────────────────────────────────────────────
+/// Public route decision kind captured in traces.
+#[derive(Debug, Clone, Copy, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TraceRouteKind {
+    VmWrap,
+    CgpNormalized,
+}
+
+/// Public route decision captured per hop.
+#[derive(Debug, Clone, Copy, Serialize)]
+pub struct TraceRouteDecision {
+    pub kind: TraceRouteKind,
+    pub raw_value: f32,
+}
+
+impl TraceRouteDecision {
+    #[must_use]
+    pub(crate) fn from_internal(route: RouteDecision) -> Self {
+        match route {
+            RouteDecision::VmWrap { raw_value } => Self {
+                kind: TraceRouteKind::VmWrap,
+                raw_value,
+            },
+            RouteDecision::CgpNormalized { raw_value } => Self {
+                kind: TraceRouteKind::CgpNormalized,
+                raw_value,
+            },
+        }
+    }
+}
 
 /// Trace data for a single hop in the mesh chain.
 #[derive(Debug, Clone, Serialize)]
@@ -117,7 +130,8 @@ pub struct MeshHopTrace {
     pub energy_before: f32,
     pub energy_after: f32,
     pub output_slots: [f32; 12],
-    pub route_target_idx: f32,
+    pub route: TraceRouteDecision,
+    pub resolved_target_index: usize,
     pub backend_trace: BackendTrace,
 }
 
@@ -128,8 +142,6 @@ pub enum BackendTrace {
     Graph(GraphTrace),
 }
 
-// ─── VM trace ────────────────────────────────────────────────────────────────
-
 /// Trace of a VM node's execution.
 #[derive(Debug, Clone, Serialize)]
 pub struct VmTrace {
@@ -139,7 +151,7 @@ pub struct VmTrace {
     pub final_registers: Vec<f32>,
     pub final_payload: [f32; 12],
     pub final_meta: [f32; 8],
-    pub final_route_target: f32,
+    pub final_route_value: f32,
     pub slot_writes: Vec<SlotWrite>,
 }
 
@@ -147,7 +159,7 @@ pub struct VmTrace {
 #[derive(Debug, Clone, Serialize)]
 pub struct VmStepTrace {
     pub pc: usize,
-    pub instruction: VmInstruction,
+    pub instruction: crate::creature::genome::VmInstruction,
     pub energy_cost: f32,
     pub energy_after: f32,
     pub register_changes: Vec<(u8, f32)>,
@@ -160,8 +172,6 @@ pub struct SlotWrite {
     pub old_value: f32,
     pub new_value: f32,
 }
-
-// ─── Graph trace ─────────────────────────────────────────────────────────────
 
 /// Trace of a graph node's relaxation loop.
 #[derive(Debug, Clone, Serialize)]
@@ -195,9 +205,6 @@ pub struct GraphNodeEvalTrace {
 }
 
 /// Map a [`ComputeNodeKind`] variant to a static string label.
-///
-/// Uses `&'static str` to avoid heap allocation per node evaluation
-/// in traced passes (`anti-format-hot-path`).
 #[inline]
 pub fn kind_label(kind: &ComputeNodeKind) -> &'static str {
     match kind {
@@ -223,110 +230,9 @@ pub fn kind_label(kind: &ComputeNodeKind) -> &'static str {
     }
 }
 
-// ─── Sample error ────────────────────────────────────────────────────────────
-
-/// Errors that can occur during execution sampling.
-///
-/// Manual `Display` + `Error` impls used instead of `thiserror` because
-/// `thiserror` is not a direct dependency of v3-core, and adding a crate
-/// dependency for 2 variants is not warranted.
-#[derive(Debug, Clone, Serialize)]
-pub enum SampleError {
-    CreatureNotFound,
-    CreatureDied { ticks_completed: u32 },
-}
-
-impl std::fmt::Display for SampleError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SampleError::CreatureNotFound => write!(f, "creature not found"),
-            SampleError::CreatureDied { ticks_completed } => {
-                write!(f, "creature died after {ticks_completed} ticks")
-            }
-        }
-    }
-}
-
-impl std::error::Error for SampleError {}
-
-// ─── Active trace (recording state) ─────────────────────────────────────────
-
-use crate::contracts::CreatureId;
-
-/// In-progress trace recording state.
-///
-/// Lives on `SimHandle` (v3-server), not `Simulation` — it's an
-/// instrumentation concern, not a domain concept.
-#[derive(Debug)]
-pub struct ActiveTrace {
-    pub creature_id: CreatureId,
-    pub ticks_remaining: u32,
-    pub ticks: Vec<TickTrace>,
-    /// Whether to capture extended perception debug snapshots per tick.
-    pub include_perception_debug: bool,
-}
-
-impl ActiveTrace {
-    /// Create a new trace recording request.
-    pub fn new(creature_id: CreatureId, num_ticks: u32) -> Self {
-        Self {
-            creature_id,
-            ticks_remaining: num_ticks,
-            ticks: Vec::with_capacity(num_ticks as usize),
-            include_perception_debug: false,
-        }
-    }
-
-    /// Whether recording is complete (all requested ticks captured).
-    #[must_use]
-    pub fn is_complete(&self) -> bool {
-        self.ticks_remaining == 0
-    }
-
-    /// Convert the completed recording into a serializable sample.
-    #[must_use]
-    pub fn into_sample(self, creature_ffi_id: u64) -> ExecutionSample {
-        ExecutionSample {
-            creature_id: creature_ffi_id,
-            ticks: self.ticks,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use slotmap::SlotMap;
-
-    #[test]
-    fn active_trace_new_preallocates() {
-        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
-        let id = sm.insert(());
-        let trace = ActiveTrace::new(id, 5);
-        assert_eq!(trace.ticks.capacity(), 5);
-        assert_eq!(trace.ticks_remaining, 5);
-        assert!(!trace.is_complete());
-    }
-
-    #[test]
-    fn active_trace_is_complete_when_zero_remaining() {
-        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
-        let id = sm.insert(());
-        let mut trace = ActiveTrace::new(id, 1);
-        assert!(!trace.is_complete());
-        trace.ticks_remaining = 0;
-        assert!(trace.is_complete());
-    }
-
-    #[test]
-    fn into_sample_sets_creature_id() {
-        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
-        let id = sm.insert(());
-        let trace = ActiveTrace::new(id, 0);
-        let sample = trace.into_sample(42);
-        assert_eq!(sample.creature_id, 42);
-        assert!(sample.ticks.is_empty());
-    }
 
     #[test]
     fn static_inputs_snapshot_from_static_inputs() {
@@ -390,19 +296,14 @@ mod tests {
     }
 
     #[test]
-    fn active_trace_defaults_perception_debug_off() {
-        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
-        let id = sm.insert(());
-        let trace = ActiveTrace::new(id, 3);
-        assert!(!trace.include_perception_debug);
-    }
+    fn trace_route_decision_maps_internal_route() {
+        let vm = TraceRouteDecision::from_internal(RouteDecision::VmWrap { raw_value: 2.5 });
+        assert!(matches!(vm.kind, TraceRouteKind::VmWrap));
+        assert!((vm.raw_value - 2.5).abs() < 1e-6);
 
-    #[test]
-    fn sample_error_display() {
-        let e1 = SampleError::CreatureNotFound;
-        assert_eq!(e1.to_string(), "creature not found");
-
-        let e2 = SampleError::CreatureDied { ticks_completed: 3 };
-        assert_eq!(e2.to_string(), "creature died after 3 ticks");
+        let cgp =
+            TraceRouteDecision::from_internal(RouteDecision::CgpNormalized { raw_value: 0.4 });
+        assert!(matches!(cgp.kind, TraceRouteKind::CgpNormalized));
+        assert!((cgp.raw_value - 0.4).abs() < 1e-6);
     }
 }

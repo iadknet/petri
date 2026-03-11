@@ -9,12 +9,13 @@ use v3_core::creature::genome::{
 };
 use v3_core::creature::state::CreatureState;
 use v3_core::kernel::WorldState;
+use v3_core::runtime::trace::domain::TraceRouteKind;
 use v3_core::simulation::Simulation;
 
 use crate::support::{insert_creature, run_one_traced_tick, test_config};
 
 #[test]
-fn routing_wraps_negative_index_to_reachable_downstream_node_e2e() {
+fn cgp_routing_normalizes_negative_to_first_target_e2e() {
     let cfg = test_config();
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
     let pos = Position::new(2, 2);
@@ -90,11 +91,16 @@ fn routing_wraps_negative_index_to_reachable_downstream_node_e2e() {
     let tick = run_one_traced_tick(&mut sim, target);
 
     assert_eq!(tick.hops.len(), 2);
-    assert_eq!(tick.final_actions[0], WorldAction::Eat);
-    assert!((tick.hops[0].route_target_idx - (-1.0)).abs() < 1e-6);
+    assert_eq!(tick.final_actions[0], WorldAction::NoOp);
+    assert!((tick.hops[0].route.raw_value - (-1.0)).abs() < 1e-6);
+    assert!(matches!(
+        tick.hops[0].route.kind,
+        TraceRouteKind::CgpNormalized
+    ));
+    assert_eq!(tick.hops[0].resolved_target_index, 0);
     assert_eq!(
-        tick.hops[1].node_id, id_eat,
-        "route=-1 with 2 targets should rem_euclid to index 1"
+        tick.hops[1].node_id, id_noop,
+        "route=-1 should clamp to 0 under normalized CGP routing"
     );
 }
 

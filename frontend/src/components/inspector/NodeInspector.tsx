@@ -78,7 +78,7 @@ export function NodeInspector({ node, semantics, sharedMemory, executionHop }: N
 						liveIndices={semantics?.liveInternalNodeIndices ?? []}
 						inputRefs={node.node.input_refs}
 						targets={node.node.targets}
-						routeTargetIdx={executionHop?.hop.route_target_idx ?? null}
+						routeTargetIdx={executionHop?.hop.route.resolved_target_index ?? null}
 						trace={graphTrace}
 						detailIndex={executionHop?.detailIndex ?? 0}
 					/>

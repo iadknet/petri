@@ -39,6 +39,8 @@ function buildSample(creatureId: number): ExecutionSample {
 				hops: [],
 				final_actions: ["NoOp"],
 				termination_reason: "NoTargets",
+				debug_perception: null,
+				priority_bid: 0,
 			},
 		],
 	};
@@ -72,7 +74,7 @@ describe("useSampleSessionResource", () => {
 		const getSampleRequest = deferred<SampleResponse>();
 
 		vi.mocked(api.startSample).mockResolvedValue({
-			protocol_version: "v3alpha1",
+			protocol_version: "v3alpha2",
 			status: "recording",
 			ticks_requested: 5,
 			include_perception_debug: false,
@@ -107,7 +109,7 @@ describe("useSampleSessionResource", () => {
 
 		await act(async () => {
 			getSampleRequest.resolve({
-				protocol_version: "v3alpha1",
+				protocol_version: "v3alpha2",
 				status: "complete",
 				sample: buildSample(7),
 			});

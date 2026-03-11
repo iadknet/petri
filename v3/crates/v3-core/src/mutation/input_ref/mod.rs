@@ -308,7 +308,7 @@ fn apply_raw_field_mutation(
     // Count eligible targets: UpstreamSlot input_refs only.
     // (The old second pool — InputRef graph nodes for sub_idx mutation — no longer
     // exists in the CGP graph backend. CGP edges use GraphSource::InputLeaf and
-    // sub_idx is mutated via cgp_operators.)
+    // sub_idx is mutated via mutation/graph/operators.rs.)
     let mut upstream_count: usize = 0;
     for node in &genome.nodes {
         upstream_count += node

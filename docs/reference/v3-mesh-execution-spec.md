@@ -31,17 +31,19 @@ eligibility are owned by `v3-tick-orchestration-spec.md`.
 pub fn execute_creature_mesh(
     genome: &CreatureGenome,
     sensors: &SensorSnapshot,
-    energy: &mut Energy,
-    memory: &mut [u8; 1024],
-    graph_state: &mut HashMap<NodeId, Vec<f32>>,
-    config: &MeshConfig,
-) -> WorldAction
+    energy: &mut f32,
+    shared_memory: &mut [f32; 16],
+    prev_shared_memory: &[f32; 16],
+    graph_runtime: &mut GraphRuntimeState,
+    config: &RuntimeConfig,
+) -> MeshOutput
 ```
 
 Boundary intent:
 - `sensors/` owns local and extended perception snapshot assembly.
 - `runtime/` owns node evaluation, routing, and soft-default behavior.
-- `contracts/` boundary remains `WorldAction` only.
+- `runtime` returns `MeshOutput` (`actions`, cost report, `priority_bid`) to
+  tick orchestration.
 - `tick/orchestrator` owns turn ordering and immediate action application.
 
 ---
@@ -53,40 +55,35 @@ Each tick evaluates a routing chain from `entry_node_id`.
 ```text
 current_node_id = genome.entry_node_id
 upstream_slots = [0.0; 12]
+action_queue = []
 hops = 0
 max_mesh_hops = validated(config.max_mesh_hops, default=128, min=1)
 
 loop:
   if hops >= max_mesh_hops:
-    return WorldAction::NoOp
+    return action_queue_or_noop()
 
   evaluate current node with upstream_slots -> NodeResult {
     output_slots: [f32; 12],
-    route_target_idx: f32,
-    world_action: Option<WorldAction>,
+    route: RouteDecision,
+    terminal: bool,
+    energy_exhausted: bool,
   }
 
-  if world_action is Some(action):
-    return action
+  if energy_exhausted:
+    return [WorldAction::NoOp]
+
+  if terminal:
+    return action_queue_or_noop()
 
   if node.targets is empty:
-    return WorldAction::NoOp
+    return action_queue_or_noop()
 
-  route_idx_i64 =
-    if route_target_idx is NaN:
-      -1
-    else if route_target_idx is +infinite:
-      i64::MAX
-    else if route_target_idx is -infinite:
-      i64::MIN
-    else:
-      floor(route_target_idx).clamp(i64::MIN as f32, i64::MAX as f32) as i64
-
-  target_idx = route_idx_i64.rem_euclid(node.targets.len() as i64) as usize
+  target_idx = resolve_route_index(node.targets.len(), route)
 
   target_id = node.targets[target_idx]
   if target_id is missing from genome node set:
-    return WorldAction::NoOp
+    return action_queue_or_noop()
 
   upstream_slots = output_slots
   current_node_id = target_id
@@ -109,10 +106,11 @@ Notes:
 
 A single chain evaluation terminates on the first matching condition:
 
-1. VM emits `WorldAction`.
-2. Energy reaches zero during node evaluation.
+1. Node execution returns `terminal = true`.
+2. Energy reaches zero during node evaluation (`energy_exhausted = true`).
 3. `max_mesh_hops` failsafe triggers.
-4. Runtime hits a broken routing state handled by soft default (`NoOp`).
+4. Runtime hits a broken routing state handled by soft default (preserve queue;
+   return `NoOp` when queue is empty).
 
 `max_mesh_hops` is configuration-controlled.
 

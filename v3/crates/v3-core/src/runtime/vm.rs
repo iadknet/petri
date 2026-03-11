@@ -3,6 +3,7 @@ use crate::contracts::InputReference;
 use crate::creature::genome::VmBackendDef;
 use crate::runtime::action_decode::decode_world_action;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
+use crate::runtime::routing::RouteDecision;
 use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult};
 use crate::sensors::perception::SensorSnapshot;
 
@@ -23,7 +24,7 @@ use crate::sensors::perception::SensorSnapshot;
 /// # Returns
 /// `NodeResult` — the mesh executor checks `terminal` and `energy_exhausted` to decide routing.
 #[allow(clippy::too_many_arguments)]
-pub fn execute_vm_node(
+pub(crate) fn execute_vm_node(
     def: &VmBackendDef,
     input_refs: &[InputReference],
     upstream_slots: &[f32; 12],
@@ -38,13 +39,13 @@ pub fn execute_vm_node(
     // Safety: register_count == 0 → immediate halt.
     let reg_count = def.register_count as usize;
     if reg_count == 0 {
-        return NodeResult::halted(*upstream_slots, 0.0);
+        return NodeResult::halted(*upstream_slots, RouteDecision::VmWrap { raw_value: 0.0 });
     }
 
     // Safety: empty program → immediate halt.
     let program_len = def.program.len();
     if program_len == 0 {
-        return NodeResult::halted(*upstream_slots, 0.0);
+        return NodeResult::halted(*upstream_slots, RouteDecision::VmWrap { raw_value: 0.0 });
     }
 
     let max_steps = config.max_vm_steps.max(1) as usize;
@@ -74,13 +75,23 @@ pub fn execute_vm_node(
     loop {
         if steps >= max_steps {
             commit_slots!();
-            return NodeResult::halted(payload, route_target);
+            return NodeResult::halted(
+                payload,
+                RouteDecision::VmWrap {
+                    raw_value: route_target,
+                },
+            );
         }
 
         // Soft default: if control flow lands outside the program, halt cleanly.
         if pc >= program_len {
             commit_slots!();
-            return NodeResult::halted(payload, route_target);
+            return NodeResult::halted(
+                payload,
+                RouteDecision::VmWrap {
+                    raw_value: route_target,
+                },
+            );
         }
 
         let instr = &def.program[pc];
@@ -308,7 +319,12 @@ pub fn execute_vm_node(
 
             VmInstruction::ExecuteActionQueue => {
                 commit_slots!();
-                return NodeResult::terminal(payload, route_target);
+                return NodeResult::terminal(
+                    payload,
+                    RouteDecision::VmWrap {
+                        raw_value: route_target,
+                    },
+                );
             }
 
             VmInstruction::WriteRouteTarget { src } => {
@@ -317,7 +333,12 @@ pub fn execute_vm_node(
 
             VmInstruction::Halt => {
                 commit_slots!();
-                return NodeResult::halted(payload, route_target);
+                return NodeResult::halted(
+                    payload,
+                    RouteDecision::VmWrap {
+                        raw_value: route_target,
+                    },
+                );
             }
 
             VmInstruction::LoadSlot { dst, slot_reg } => {

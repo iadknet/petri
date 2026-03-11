@@ -98,8 +98,9 @@ Topology:
 | 3 | VM | `[]` | Exploration action logic |
 
 Tick trace (example route):
-1. Node 0 computes `route_target_idx = 1.8`.
-2. Runtime maps to `target_idx = floor(1.8) = 1`, then wraps: `1 % 3 = 1`.
+1. Node 0 computes routing `raw_value = 0.62`.
+2. Graph routing uses normalized binning:
+   `target_idx = min(floor(clamp01(0.62) * 3), 2) = 1`.
 3. Node 2 executes and emits `Reproduce`.
 
 ---

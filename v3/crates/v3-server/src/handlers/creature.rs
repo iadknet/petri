@@ -8,10 +8,12 @@ use v3_core::creature::genome::mesh_annotations::{
     derive_mesh_annotations_with_reachable_indices, MeshNodeAnnotation,
 };
 use v3_core::mutation::phenotype::channels_to_rgb;
-use v3_core::runtime::trace::{ActiveTrace, ExecutionSample};
+use v3_core::runtime::trace::recording::ActiveTrace;
 
 use crate::error::{AppError, FieldError};
 use crate::state::{AppState, SimulationStatus};
+use crate::transport::sample_assembler::assemble_execution_sample;
+use crate::transport::sample_protocol::ExecutionSamplePayload;
 use crate::types::PROTOCOL_VERSION;
 
 #[derive(Debug, Default, serde::Deserialize)]
@@ -83,7 +85,7 @@ struct SampleRecordingResponse {
 struct SampleCompleteResponse {
     protocol_version: &'static str,
     status: &'static str,
-    sample: ExecutionSample,
+    sample: ExecutionSamplePayload,
 }
 
 fn to_json_value<T: serde::Serialize>(value: T) -> Result<Json<serde_json::Value>, AppError> {
@@ -257,7 +259,8 @@ pub async fn get_sample(
             .active_trace
             .take()
             .expect("active_trace confirmed Some above");
-        let sample = trace.into_sample(ffi_id);
+        let sample = assemble_execution_sample(trace.into_sample(ffi_id))
+            .map_err(|error| AppError::Internal(format!("failed to assemble sample: {error}")))?;
 
         return to_json_value(SampleCompleteResponse {
             protocol_version: PROTOCOL_VERSION,

@@ -1,6 +1,6 @@
 # V3 Server API and Protocol Spec
 
-Reference specification for canonical v3alpha1 server HTTP/WebSocket contracts,
+Reference specification for canonical v3alpha2 server HTTP/WebSocket contracts,
 lifecycle transitions, and error semantics.
 
 Status: Active
@@ -21,7 +21,7 @@ Related references:
 ## 1. Purpose and Scope
 
 This document defines:
-- v3alpha1 protocol-version posture;
+- v3alpha2 protocol-version posture;
 - canonical HTTP endpoint contracts for simulation lifecycle, status/frame, and
   config read/patch surfaces;
 - canonical WebSocket event envelope and payload mapping;
@@ -50,11 +50,11 @@ Current viewport-transport addenda:
 Version contract:
 - `protocol_version` is required in all top-level HTTP responses and WebSocket
   event envelopes.
-- Canonical value: `"v3alpha1"`.
+- Canonical value: `"v3alpha2"`.
 - Breaking payload changes require protocol-version bump.
 - Server transport versioning is independent from the CLI NDJSON contract; a
   server bump does not automatically change the CLI protocol version.
-- Documented v3alpha1 exception: food-density payloads and food config shape
+- Documented v3alpha2 exception: food-density payloads and food config shape
   are migrated in-place to normalized `f32` semantics (`density: f32`,
   world food recovery/spread/max fields) without a version bump, to keep core,
   server, and frontend aligned in one compatibility window.
@@ -87,7 +87,7 @@ Base path: `/v3`.
 
 ### 4.1 `POST /v3/simulation/startup`
 
-Request (conceptual v3alpha1 shape):
+Request (conceptual v3alpha2 shape):
 
 ```json
 {
@@ -160,7 +160,7 @@ Request rules:
   `v3-runtime-config-spec.md`.
 - Mutation tuning lives at top-level `mutation.*` in the startup/config keyspace
   (not under `runtime.*`).
-- No `founder_profile` request field is supported in v3alpha1.
+- No `founder_profile` request field is supported in v3alpha2.
 - Unknown request fields are rejected.
 - Invalid/non-viable startup requests are rejected with
   `422 validation_rejected`; no auto-normalization behavior is canonical.
@@ -169,7 +169,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha1",
+  "protocol_version": "v3alpha2",
   "state": "idle",
   "tick": 0,
   "config_digest": "sha256:<hex>",
@@ -190,7 +190,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha1",
+  "protocol_version": "v3alpha2",
   "state": "running",
   "tick": 123
 }
@@ -205,7 +205,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha1",
+  "protocol_version": "v3alpha2",
   "state": "paused",
   "tick": 123
 }
@@ -234,7 +234,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha1",
+  "protocol_version": "v3alpha2",
   "state": "paused",
   "tick": 124,
   "steps_applied": 1
@@ -247,7 +247,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha1",
+  "protocol_version": "v3alpha2",
   "state": "running",
   "tick": 124,
   "population": 48,
@@ -300,7 +300,7 @@ Response (full sparse frame):
 
 ```json
 {
-  "protocol_version": "v3alpha1",
+  "protocol_version": "v3alpha2",
   "state": "running",
   "tick": 124,
   "width": 400,
@@ -335,7 +335,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha1",
+  "protocol_version": "v3alpha2",
   "state": "paused",
   "config": {
     "population": {
@@ -421,7 +421,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha1",
+  "protocol_version": "v3alpha2",
   "state": "paused",
   "config": { "...": "effective config" }
 }
@@ -452,7 +452,7 @@ Response:
 
 ```json
 {
-  "protocol_version": "v3alpha1",
+  "protocol_version": "v3alpha2",
   "status": "recording",
   "ticks_requested": 5,
   "include_perception_debug": false
@@ -465,7 +465,7 @@ Recording response:
 
 ```json
 {
-  "protocol_version": "v3alpha1",
+  "protocol_version": "v3alpha2",
   "status": "recording",
   "ticks_completed": 2,
   "ticks_remaining": 3
@@ -476,13 +476,28 @@ Complete response:
 
 ```json
 {
-  "protocol_version": "v3alpha1",
+  "protocol_version": "v3alpha2",
   "status": "complete",
   "sample": {
     "creature_id": 7,
     "ticks": [
       {
         "tick_number": 124,
+        "hops": [
+          {
+            "hop_index": 0,
+            "route": {
+              "kind": "vm_wrap",
+              "raw_value": 2.5,
+              "resolved_target_index": 2
+            },
+            "backend_trace": {
+              "Vm": {
+                "final_route_value": 2.5
+              }
+            }
+          }
+        ],
         "static_inputs": { "...": "existing local snapshot" },
         "debug_perception": null
       }
@@ -496,7 +511,10 @@ Execution-sampler rules:
   `debug_perception` is `null`
 - when the request asked for perception debugging, `debug_perception` contains
   the extended-perception snapshot for that tick
-- existing sampler behavior remains otherwise unchanged
+- sampler route payload is `route { kind, raw_value, resolved_target_index }`
+- VM trace route scalar field is `final_route_value`
+- sampler wire DTO ownership and mapping live in `v3-server/src/transport/`
+  (`sample_protocol.rs`, `sample_assembler.rs`)
 - detailed perception field ownership remains in `v3-sensor-spec.md`
 
 ### 4.11 `GET /v3/simulation/creature/:id`
@@ -508,14 +526,14 @@ Query parameters (all optional):
 - `since_tick` (u64) — when present, only action_log entries with
   `entry.tick > since_tick` are returned. Omit for the full log.
 - `exclude` (string) — comma-separated field names to omit from the response.
-  Valid values: `genome`, `action_log`, `memory`. Excluded fields are absent
+  Valid values: `genome`, `action_log`, `shared_memory`. Excluded fields are absent
   from the JSON (not set to null). Unknown names are silently ignored.
 
 Response (full, no query parameters):
 
 ```json
 {
-  "protocol_version": "v3alpha1",
+  "protocol_version": "v3alpha2",
   "id": 7,
   "position": { "x": 10, "y": 22 },
   "energy": 41.0,
@@ -531,7 +549,7 @@ Response (full, no query parameters):
   },
   "latest_tick": 84,
   "genome": { "entry_node_id": 0, "nodes": ["..."] },
-  "memory": [0, 0, 0, 0, 0, 0, 0, 0],
+  "shared_memory": [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0],
   "action_log": [
     {
       "tick": 84,
@@ -551,7 +569,7 @@ Field definitions:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `protocol_version` | string | Always `"v3alpha1"`. |
+| `protocol_version` | string | Always `"v3alpha2"`. |
 | `id` | u64 | Creature FFI ID. |
 | `position` | `{x, y}` | Current grid position. |
 | `energy` | f32 | Current energy level. |
@@ -562,7 +580,7 @@ Field definitions:
 | `phenotype` | object | Visual phenotype state. |
 | `latest_tick` | u64 | Tick of the most recent action_log entry (0 if empty). Always present, even when `action_log` is excluded. Used as cursor for `since_tick`. |
 | `genome` | object | Full genome (omitted when `exclude` contains `genome`). |
-| `memory` | `u8[]` | 8-byte creature memory (omitted when `exclude` contains `memory`). |
+| `shared_memory` | `f32[]` | 16-slot creature shared memory (omitted when `exclude` contains `shared_memory`). |
 | `action_log` | array | Action log entries (omitted when `exclude` contains `action_log`). |
 
 `ActionLogEntry` field definitions:
@@ -603,7 +621,7 @@ Event envelope:
 
 ```json
 {
-  "protocol_version": "v3alpha1",
+  "protocol_version": "v3alpha2",
   "event": "status",
   "tick": 124,
   "payload": {}
@@ -684,7 +702,7 @@ Envelope/payload consistency rules:
 Emission frequency:
 - Events are emitted once per completed tick while the simulation is `running`.
 - Implementations may throttle emission (for example emit every Nth tick) for
-  performance, but must document the throttle policy. The default v3alpha1
+  performance, but must document the throttle policy. The default v3alpha2
   behavior is per-tick emission.
 
 Ordering rules:
@@ -701,7 +719,7 @@ All non-2xx HTTP responses use:
 
 ```json
 {
-  "protocol_version": "v3alpha1",
+  "protocol_version": "v3alpha2",
   "error": {
     "code": "validation_rejected",
     "message": "startup request failed validation",
@@ -727,7 +745,7 @@ Required error codes:
 
 ---
 
-## 7. Out-of-Scope API Surfaces (v3alpha1)
+## 7. Out-of-Scope API Surfaces (v3alpha2)
 
 Not part of this version:
 - `GET /v3/simulation/snapshot`
@@ -749,7 +767,7 @@ Snapshot import/export contracts require a follow-up spec.
 - Required observability semantics: `v3-evolution-observability-spec.md`
 - Local runner NDJSON output contract: `v3-cli-contract-spec.md`
 
-This file remains canonical for v3alpha1 server transport/API semantics.
+This file remains canonical for v3alpha2 server transport/API semantics.
 
 ---
 

@@ -9,8 +9,11 @@ use crate::config::RuntimeConfig;
 use crate::contracts::{NodeId, WorldAction};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
-use crate::runtime::trace::{BackendTrace, MeshHopTrace, TerminationReason};
-use crate::runtime::traced_graph::execute_graph_node_traced;
+use crate::runtime::cgp::execute_graph_node_traced;
+use crate::runtime::routing::resolve_route_index;
+use crate::runtime::trace::domain::{
+    BackendTrace, MeshHopTrace, TerminationReason, TraceRouteDecision,
+};
 use crate::runtime::traced_vm::execute_vm_node_traced;
 use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs};
 use crate::sensors::perception::SensorSnapshot;
@@ -113,6 +116,12 @@ pub fn execute_creature_mesh_traced(
             BackendDef::Graph(_) => report.graph_cost += node_cost,
         }
 
+        let resolved_target_index = if node.targets.is_empty() {
+            0
+        } else {
+            resolve_route_index(node.targets.len(), result.route)
+        };
+
         hop_traces.push(MeshHopTrace {
             hop_index: hops,
             node_id: current_node_id,
@@ -121,7 +130,8 @@ pub fn execute_creature_mesh_traced(
             energy_before: node_energy_before,
             energy_after: *energy,
             output_slots: result.output_slots,
-            route_target_idx: result.route_target_idx,
+            route: TraceRouteDecision::from_internal(result.route),
+            resolved_target_index,
             backend_trace,
         });
 
@@ -149,20 +159,7 @@ pub fn execute_creature_mesh_traced(
             );
         }
 
-        let route_target_idx = result.route_target_idx;
-        let route_idx_i64: i64 = if route_target_idx.is_nan() {
-            -1
-        } else if route_target_idx == f32::INFINITY {
-            i64::MAX
-        } else if route_target_idx == f32::NEG_INFINITY {
-            i64::MIN
-        } else {
-            route_target_idx
-                .clamp(i64::MIN as f32, i64::MAX as f32)
-                .floor() as i64
-        };
-
-        let target_pos = route_idx_i64.rem_euclid(node.targets.len() as i64) as usize;
+        let target_pos = resolved_target_index;
         let target_id = node.targets[target_pos];
 
         if find_node_index(&genome.nodes, target_id).is_none() {
@@ -198,10 +195,12 @@ mod tests {
         OutputSink, OutputSinkKind,
     };
     use crate::creature::genome::{
-        BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
+        BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig, VmBackendDef,
+        VmInstruction,
     };
     use crate::creature::state::GraphRuntimeState;
     use crate::runtime::mesh::execute_creature_mesh;
+    use crate::runtime::trace::domain::TraceRouteKind;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
 
@@ -449,6 +448,125 @@ mod tests {
             reason
         );
         assert_eq!(hops.len(), 1);
+    }
+
+    #[test]
+    fn graph_energy_exhaustion_traces_cgp_route_kind() {
+        let id0 = NodeId::new(0);
+        let genome = CreatureGenome {
+            entry_node_id: id0,
+            nodes: vec![NodeGenome {
+                node_id: id0,
+                input_refs: vec![],
+                backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    compute_nodes: vec![ComputeNode {
+                        kind: ComputeNodeKind::Constant(1.0),
+                        inputs: vec![],
+                        plasticity: None,
+                    }],
+                    output_sinks: vec![],
+                    action_bank: vec![],
+                    execute_gate: ExecuteGate { inputs: vec![] },
+                }),
+                targets: vec![],
+            }],
+        };
+
+        let ss = empty_ss();
+        let mut config = default_config();
+        config.graph_node_base_cost = 1.0;
+        let mut energy = 0.1f32;
+        let mut smem = [0.0f32; 16];
+        let prev_smem = [0.0f32; 16];
+        let mut gr = GraphRuntimeState::new();
+
+        let (output, hops, reason) = execute_creature_mesh_traced(
+            &genome,
+            &ss,
+            &mut energy,
+            &mut smem,
+            &prev_smem,
+            &mut gr,
+            &config,
+        );
+
+        assert_eq!(output.actions, vec![WorldAction::NoOp]);
+        assert!(matches!(reason, TerminationReason::EnergyExhausted));
+        assert_eq!(hops.len(), 1);
+        assert!(matches!(hops[0].route.kind, TraceRouteKind::CgpNormalized));
+    }
+
+    #[test]
+    fn graph_plasticity_cost_exhaustion_stops_effects() {
+        let id0 = NodeId::new(0);
+        let genome = CreatureGenome {
+            entry_node_id: id0,
+            nodes: vec![NodeGenome {
+                node_id: id0,
+                input_refs: vec![],
+                backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    compute_nodes: vec![ComputeNode {
+                        kind: ComputeNodeKind::Constant(1.0),
+                        inputs: vec![GraphEdge {
+                            source: GraphSource::SharedMemory {
+                                slot: 0,
+                                previous: false,
+                            },
+                            weight: 1.0,
+                        }],
+                        plasticity: Some(PlasticityConfig {
+                            rule: HebbianRule::Classic,
+                            learning_rate: 0.5,
+                            weight_clamp: 1.0,
+                            lamarckian: false,
+                            modulation: None,
+                        }),
+                    }],
+                    output_sinks: vec![],
+                    action_bank: vec![crate::creature::genome::cgp::ActionSlot {
+                        behavior: crate::creature::genome::cgp::ActionSlotBehavior::Emit(
+                            crate::creature::genome::cgp::WorldActionKind::Eat,
+                        ),
+                        gate_inputs: vec![GraphEdge {
+                            source: GraphSource::ComputeNode(0),
+                            weight: 1.0,
+                        }],
+                        param_inputs: vec![],
+                    }],
+                    execute_gate: ExecuteGate {
+                        inputs: vec![GraphEdge {
+                            source: GraphSource::ComputeNode(0),
+                            weight: 1.0,
+                        }],
+                    },
+                }),
+                targets: vec![],
+            }],
+        };
+
+        let ss = empty_ss();
+        let mut config = default_config();
+        config.graph_node_base_cost = 0.1;
+        config.plasticity_update_cost = 2.0;
+        let mut energy = 1.0f32;
+        let mut smem = [0.0f32; 16];
+        let prev_smem = [0.0f32; 16];
+        let mut gr = GraphRuntimeState::new();
+
+        let (output, hops, reason) = execute_creature_mesh_traced(
+            &genome,
+            &ss,
+            &mut energy,
+            &mut smem,
+            &prev_smem,
+            &mut gr,
+            &config,
+        );
+
+        assert_eq!(output.actions, vec![WorldAction::NoOp]);
+        assert!(matches!(reason, TerminationReason::EnergyExhausted));
+        assert_eq!(hops.len(), 1);
+        assert!(matches!(hops[0].route.kind, TraceRouteKind::CgpNormalized));
     }
 
     /// Traced and non-traced paths produce identical MeshOutput when priority bid is used.

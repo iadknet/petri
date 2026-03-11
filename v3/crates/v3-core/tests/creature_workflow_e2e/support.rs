@@ -7,7 +7,8 @@ use v3_core::creature::genome::{
 use v3_core::creature::identity::CreatureIdentityState;
 use v3_core::creature::state::CreatureState;
 use v3_core::kernel::WorldState;
-use v3_core::runtime::trace::{ActiveTrace, BackendTrace, TickTrace};
+use v3_core::runtime::trace::domain::{BackendTrace, GraphTrace, TickTrace, VmTrace};
+use v3_core::runtime::trace::recording::ActiveTrace;
 use v3_core::simulation::{run_tick, Simulation};
 
 pub(crate) const FOUNDER_CHANNELS: [u8; 6] = [0, 0, 92, 92, 138, 138];
@@ -79,14 +80,14 @@ pub(crate) fn run_one_traced_tick(sim: &mut Simulation, target: CreatureId) -> T
     trace.ticks.into_iter().next().expect("missing traced tick")
 }
 
-pub(crate) fn graph_hop(tick: &TickTrace, hop_idx: usize) -> &v3_core::runtime::trace::GraphTrace {
+pub(crate) fn graph_hop(tick: &TickTrace, hop_idx: usize) -> &GraphTrace {
     match &tick.hops[hop_idx].backend_trace {
         BackendTrace::Graph(g) => g,
         BackendTrace::Vm(_) => panic!("expected graph hop"),
     }
 }
 
-pub(crate) fn vm_hop(tick: &TickTrace, hop_idx: usize) -> &v3_core::runtime::trace::VmTrace {
+pub(crate) fn vm_hop(tick: &TickTrace, hop_idx: usize) -> &VmTrace {
     match &tick.hops[hop_idx].backend_trace {
         BackendTrace::Vm(v) => v,
         BackendTrace::Graph(_) => panic!("expected vm hop"),
