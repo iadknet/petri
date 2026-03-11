@@ -1,14 +1,10 @@
-#[allow(dead_code)]
-pub(crate) mod cgp;
-
 use rand::Rng;
 
 use crate::config::MutationConfig;
 use crate::contracts::{
     DynamicIntrospectionKey, InputReference, StaticIntrospectionKey, WorldInputKey,
 };
-use crate::creature::genome::{BackendDef, CreatureGenome};
-use crate::mutation::compound;
+use crate::creature::genome::CreatureGenome;
 use crate::mutation::reachability::biased_select_from;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
@@ -163,49 +159,18 @@ impl InputRefMutator {
     }
 }
 
-/// Remove InputRef leaf nodes with `ref_idx == u16::MAX` (invalidated by reindexing).
-/// Returns count removed. No-op for VM and CGP Graph backends.
-fn gc_orphaned_input_ref_nodes(backend: &mut BackendDef) -> usize {
-    match backend {
-        // CGP graph backend has no InputRef leaf nodes — edges use GraphSource::InputLeaf
-        // and orphaned edges are cleaned up by reindex_input_refs_after_removal.
-        BackendDef::Graph(_) => 0,
-        BackendDef::Vm(_) => 0,
-    }
-}
-
-/// Remove all InputRef leaf nodes matching `target_ref_idx`.
-/// Returns count removed. No-op for VM and CGP Graph backends.
-fn remove_input_ref_leaves_for(backend: &mut BackendDef, _target_ref_idx: u16) -> usize {
-    match backend {
-        // CGP graph backend has no InputRef leaf nodes — edges reference inputs
-        // via GraphSource::InputLeaf and are managed by edge-level operations.
-        BackendDef::Graph(_) => 0,
-        BackendDef::Vm(_) => 0,
-    }
-}
-
 fn apply_add(
     genome: &mut CreatureGenome,
     reachable_nodes: &[usize],
     bias: f64,
     rng: &mut impl Rng,
-    config: &MutationConfig,
+    _config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
     let (node_idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let new_ref = random_input_reference(rng);
-    let count = compound::sub_value_count(&new_ref, config);
-    let ref_idx = genome.nodes[node_idx].input_refs.len() as u16;
     genome.nodes[node_idx].input_refs.push(new_ref);
-    compound::create_and_connect_input_leaves(
-        &mut genome.nodes[node_idx],
-        ref_idx,
-        count,
-        config.input_auto_connect_chance,
-        rng,
-    );
     Ok(reachability)
 }
 
@@ -233,7 +198,6 @@ fn apply_remove(
     genome.nodes[node_idx]
         .backend_def
         .reindex_input_refs_after_removal(ref_idx as u16);
-    gc_orphaned_input_ref_nodes(&mut genome.nodes[node_idx].backend_def);
     Ok(reachability)
 }
 
@@ -242,7 +206,7 @@ fn apply_swap(
     reachable_nodes: &[usize],
     bias: f64,
     rng: &mut impl Rng,
-    config: &MutationConfig,
+    _config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let eligible: Vec<usize> = genome
         .nodes
@@ -258,18 +222,7 @@ fn apply_swap(
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let ref_idx = rng.gen_range(0..genome.nodes[node_idx].input_refs.len());
     let new_ref = random_input_reference(rng);
-    let count = compound::sub_value_count(&new_ref, config);
     genome.nodes[node_idx].input_refs[ref_idx] = new_ref;
-    // Remove old InputRef leaves for this ref_idx, then create fresh leaves
-    // with probabilistic bootstrap edge connection (same as apply_add).
-    remove_input_ref_leaves_for(&mut genome.nodes[node_idx].backend_def, ref_idx as u16);
-    compound::create_and_connect_input_leaves(
-        &mut genome.nodes[node_idx],
-        ref_idx as u16,
-        count,
-        config.input_auto_connect_chance,
-        rng,
-    );
     Ok(reachability)
 }
 

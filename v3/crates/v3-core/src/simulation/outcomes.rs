@@ -31,21 +31,13 @@ pub(crate) struct OutcomeRecord {
 
 /// Tick-level outcome accumulator for all creatures.
 ///
-/// Currently created fresh per tick. If moved into `Simulation` for
-/// cross-tick reuse, call [`clear`](OutcomeAccumulator::clear) to avoid
-/// reallocation (`mem-reuse-collections`).
+/// Currently created fresh per tick during simulation execution.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct OutcomeAccumulator {
     records: SecondaryMap<CreatureId, OutcomeRecord>,
 }
 
 impl OutcomeAccumulator {
-    /// Reset for a new tick without deallocating.
-    #[allow(dead_code)] // Used when accumulator is stored in Simulation for reuse.
-    pub(crate) fn clear(&mut self) {
-        self.records.clear();
-    }
-
     /// Snapshot a creature's energy at the start of the tick.
     pub(crate) fn snapshot_energy(&mut self, id: CreatureId, energy: f32) {
         self.records.insert(
@@ -184,15 +176,6 @@ mod tests {
         assert!(
             (bank.signals[OutcomeChannel::OffspringSuccess as usize] - 2.0).abs() < f32::EPSILON
         );
-    }
-
-    #[test]
-    fn clear_resets_accumulator() {
-        let mut acc = OutcomeAccumulator::default();
-        let id = make_id();
-        acc.snapshot_energy(id, 100.0);
-        acc.clear();
-        assert!(acc.compute_signal_bank(id, 100.0).is_none());
     }
 
     #[test]

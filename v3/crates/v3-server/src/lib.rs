@@ -1,7 +1,6 @@
 //! v3-server: HTTP/WS transport over v3-core.
 
 pub mod app_state;
-pub mod command;
 pub mod error;
 pub mod handlers;
 pub mod http;

@@ -1,13 +1,10 @@
 //! CGP-style founder graph backend construction.
 //!
-//! Builds the `CgpGraphBackendDef` that replaces the flat `GraphBackendDef`
-//! in Node 0 of the founder genome. The full genome wiring (wrapping in
-//! `BackendDef` + constructing `CreatureGenome`) happens in Phase 5 when
-//! `BackendDef::Graph` is swapped to use `CgpGraphBackendDef`.
+//! Builds the `CgpGraphBackendDef` used by Node 0 of the founder genome.
 //!
 //! The CGP founder graph has:
 //! - 1 ComputeNode: Threshold(24.0) — energy gate for reproduction
-//! - Full fixed output catalog (45 sinks), with 6 CustomOutput wired
+//! - Full fixed output catalog (45 sinks), with 6 CustomOutput sinks wired
 //! - RouterOutput unwired (default routing to single target)
 //! - Action bank + ExecuteGate start unwired (blank slate for evolution)
 

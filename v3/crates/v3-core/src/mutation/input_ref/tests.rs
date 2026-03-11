@@ -359,9 +359,8 @@ fn random_decreasing_covers_all_decreasing_operators() {
     );
 }
 
-// Old graph-dependent tests (reindex_input_refs_after_removal, compound fan-out,
-// lifecycle cleanup, etc.) deleted. These tested the old GraphBackendDef model.
-// CGP equivalent tests exist in the cgp module and genome/mod.rs tests.
+// Legacy flat-graph lifecycle tests were removed during the CGP migration.
+// The remaining Graph coverage lives in genome/mod.rs tests.
 
 #[test]
 fn reindex_vm_decrements_and_invalidates() {

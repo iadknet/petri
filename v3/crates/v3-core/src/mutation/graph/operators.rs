@@ -7,8 +7,7 @@
 use rand::Rng;
 
 use crate::creature::genome::cgp::{
-    ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
-    WorldActionKind,
+    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
 };
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::mutation::types::MutationSkipReason;
@@ -205,23 +204,6 @@ pub(crate) fn random_compute_node_kind(rng: &mut impl Rng) -> ComputeNodeKind {
         16 => ComputeNodeKind::Oscillator(rng.gen_range(0.01f32..=8.0)),
         17 => ComputeNodeKind::AdaptiveGain,
         _ => ComputeNodeKind::Constant(rng.gen_range(-1.0f32..=1.0)),
-    }
-}
-
-/// Generate a random `ActionSlotBehavior`.
-#[cfg_attr(not(test), allow(dead_code))] // Wired once GraphOperator exposes action-slot behavior mutation.
-fn random_action_slot_behavior(rng: &mut impl Rng) -> ActionSlotBehavior {
-    if rng.gen_bool(0.15) {
-        ActionSlotBehavior::Pop
-    } else {
-        let kind = match rng.gen_range(0u8..5) {
-            0 => WorldActionKind::Eat,
-            1 => WorldActionKind::Move,
-            2 => WorldActionKind::Reproduce,
-            3 => WorldActionKind::StealEnergy,
-            _ => WorldActionKind::NoOp,
-        };
-        ActionSlotBehavior::Emit(kind)
     }
 }
 
@@ -621,22 +603,6 @@ pub(crate) fn mutate_compute_param(
     Ok(())
 }
 
-// ─── Action slot behavior mutation ──────────────────────────────────────────
-
-/// Mutate the behavior of a random action slot.
-#[cfg_attr(not(test), allow(dead_code))] // Covered by local tests until GraphOperator exposes this path.
-pub(crate) fn mutate_action_slot_behavior(
-    def: &mut CgpGraphBackendDef,
-    rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
-    if def.action_bank.is_empty() {
-        return Err(MutationSkipReason::NoApplicableTarget);
-    }
-    let idx = rng.gen_range(0..def.action_bank.len());
-    def.action_bank[idx].behavior = random_action_slot_behavior(rng);
-    Ok(())
-}
-
 // ─── Raw field mutation ─────────────────────────────────────────────────────
 
 /// Raw field mutation: randomly retarget an edge source or mutate a compute param.
@@ -931,37 +897,6 @@ mod tests {
         };
         let mut rng = test_rng();
         assert!(mutate_compute_param(&mut def, &mut rng).is_err());
-    }
-
-    // ── Action slot behavior tests ──────────────────────────────────────────
-
-    #[test]
-    fn mutate_action_slot_behavior_changes_slot() {
-        let mut def = minimal_def();
-        let mut rng = test_rng();
-        let original = def.action_bank[0].behavior;
-        // 20 mutations across 6 possible behaviors — near-certain to change
-        let mut changed = false;
-        for _ in 0..20 {
-            mutate_action_slot_behavior(&mut def, &mut rng).unwrap();
-            if def.action_bank[0].behavior != original {
-                changed = true;
-                break;
-            }
-        }
-        assert!(changed, "behavior should change after 20 mutations");
-    }
-
-    #[test]
-    fn mutate_action_slot_behavior_empty_bank_is_skip() {
-        let mut def = CgpGraphBackendDef {
-            compute_nodes: Vec::new(),
-            output_sinks: Vec::new(),
-            action_bank: Vec::new(),
-            execute_gate: ExecuteGate { inputs: Vec::new() },
-        };
-        let mut rng = test_rng();
-        assert!(mutate_action_slot_behavior(&mut def, &mut rng).is_err());
     }
 
     // ── Random generation tests ─────────────────────────────────────────────

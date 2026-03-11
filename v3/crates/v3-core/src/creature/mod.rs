@@ -1,5 +1,4 @@
 pub mod action_log;
-#[allow(dead_code)]
 pub(crate) mod cgp_founder;
 pub mod founder;
 pub mod genome;
