@@ -1,94 +1,28 @@
-import { type Edge, MarkerType, type Node, ReactFlow, ReactFlowProvider } from "@xyflow/react";
+import { ReactFlow, ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { memo, useEffect, useMemo, useState } from "react";
-import type {
-	ComputeNode,
-	ComputeNodeKind,
-	GraphSource,
-	InputReference,
-} from "../../types/genome.ts";
+import type { GraphBackendDef, InputReference } from "../../types/genome.ts";
 import type { GraphTrace } from "../../types/trace.ts";
-import { GraphInternalsNode, type GraphInternalsNodeData } from "./GraphInternalsNode.tsx";
-import { BackwardWeightEdge, WeightEdge, type WeightEdgeData } from "./graphInternalsEdges.tsx";
-import { type GraphInternalsLayoutResult, layoutGraphInternals } from "./graphInternalsLayout.ts";
-import { directionName, formatInputRef, isRingSensor } from "./inputRefUtils.ts";
+import { GraphInternalsNode } from "./GraphInternalsNode.tsx";
+import { buildGraphFlowScene } from "./graphFlowAdapter.ts";
+import { buildFullGraphModel } from "./graphFullModel.ts";
+import { BackwardWeightEdge, WeightEdge } from "./graphInternalsEdges.tsx";
+import {
+	type LayoutInputEdge,
+	type LayoutInputNode,
+	type LayoutOutput,
+	layoutGraphInternals,
+} from "./graphInternalsLayout.ts";
+import { buildComputeTraceOverlay, buildOutputTraceOverlay } from "./graphTraceOverlay.ts";
 
 interface GraphInternalsVizProps {
-	computeNodes: ComputeNode[];
+	graphDef: GraphBackendDef;
 	liveIndices: number[];
 	inputRefs: InputReference[];
 	targets: number[];
 	routeTargetIdx: number | null;
 	trace: GraphTrace | null;
 	detailIndex: number;
-}
-
-const STATEFUL_KINDS = new Set(["DecayIntegrator", "Momentum", "Oscillator", "AdaptiveGain"]);
-
-export function getKindName(kind: ComputeNodeKind): string {
-	if (typeof kind === "string") return kind;
-	const [name] = Object.entries(kind)[0] ?? ["?"];
-	return name;
-}
-
-/** Produce a human-readable label for a compute node kind. */
-export function getKindLabel(kind: ComputeNodeKind, _inputRefs: InputReference[]): string {
-	if (typeof kind === "string") {
-		switch (kind) {
-			case "WeightedSum":
-				return "\u03A3 Weight";
-			case "Clamp01":
-				return "Clamp";
-			case "GreaterThan":
-				return "GT";
-			default:
-				return kind;
-		}
-	}
-	const [name, value] = Object.entries(kind)[0] ?? ["?", ""];
-	switch (name) {
-		case "Constant":
-			return `Const(${(value as number).toFixed(2)})`;
-		case "Threshold":
-			return `Thresh(${(value as number).toFixed(2)})`;
-		case "DecayIntegrator":
-			return `Decay(${(value as number).toFixed(2)})`;
-		case "Momentum":
-			return `Momentum(${(value as number).toFixed(2)})`;
-		case "Oscillator":
-			return `Osc(${(value as number).toFixed(2)})`;
-		default:
-			if (typeof value === "number") {
-				return `${name}(${Number.isInteger(value) ? value : (value as number).toFixed(2)})`;
-			}
-			return name;
-	}
-}
-
-/** Format a GraphSource as a human-readable label. */
-export function formatGraphSource(source: GraphSource, inputRefs: InputReference[]): string {
-	if ("ComputeNode" in source) return `CN${source.ComputeNode}`;
-	if ("SharedMemory" in source) {
-		const { slot, previous } = source.SharedMemory;
-		return previous ? `Prev s[${slot}]` : `Read s[${slot}]`;
-	}
-	if ("InputLeaf" in source) {
-		const { ref_idx, sub_idx } = source.InputLeaf;
-		if (ref_idx === 0xffff) return sub_idx > 0 ? `Dead[${sub_idx}]` : "Dead";
-		const ref = inputRefs[ref_idx];
-		const label = ref ? formatInputRef(ref) : `In(${ref_idx})`;
-		if (ref && typeof ref !== "string" && "World" in ref && isRingSensor(ref.World)) {
-			return `${label}[${directionName(sub_idx)}]`;
-		}
-		return sub_idx > 0 ? `${label}[${sub_idx}]` : label;
-	}
-	return "?";
-}
-
-export function categorize(kind: ComputeNodeKind): "constant" | "processing" {
-	const name = getKindName(kind);
-	if (name === "Constant") return "constant";
-	return "processing";
 }
 
 const nodeTypes = { graphInternal: GraphInternalsNode };
@@ -107,169 +41,98 @@ export function resolveSelectedTarget(routeTargetIdx: number, targets: number[])
 }
 
 export const GraphInternalsViz = memo(function GraphInternalsViz({
-	computeNodes,
+	graphDef,
 	liveIndices,
 	inputRefs,
-	targets: _targets,
-	routeTargetIdx: _routeTargetIdx,
+	targets: _targets, // TODO: wire up resolveSelectedTarget for RouterOutput nodes
+	routeTargetIdx: _routeTargetIdx, // TODO: wire up resolveSelectedTarget for RouterOutput nodes
 	trace,
 	detailIndex,
 }: GraphInternalsVizProps) {
-	const [layout, setLayout] = useState<GraphInternalsLayoutResult | null>(null);
+	const [layout, setLayout] = useState<LayoutOutput | null>(null);
 
 	const liveSet = useMemo(() => new Set(liveIndices), [liveIndices]);
-
-	// Pre-compute labels and categories for layout
-	const nodeLabels = useMemo(
-		() => computeNodes.map((node) => getKindLabel(node.kind, inputRefs)),
-		[computeNodes, inputRefs],
-	);
-
-	const nodeCategories = useMemo(
-		() => computeNodes.map((node) => categorize(node.kind)),
-		[computeNodes],
-	);
-
-	// Compute first-pass values for showing deltas
-	const firstPass = trace?.passes[0] ?? null;
-	const initialByIndex = useMemo(() => {
-		if (!firstPass) return null;
-		const map = new Map<number, number>();
-		for (const evalNode of firstPass.node_evaluations) {
-			map.set(evalNode.node_index, evalNode.output);
-		}
-		return map;
-	}, [firstPass]);
-
-	// Compute current pass data from trace
-	const currentPass = trace?.passes[detailIndex] ?? null;
-	const evalByIndex = useMemo(() => {
-		if (!currentPass) return null;
-		const map = new Map<number, { output: number; stateChange: string | null }>();
-		for (const evalNode of currentPass.node_evaluations) {
-			const isStateful = STATEFUL_KINDS.has(evalNode.kind);
-			const stateChanged = isStateful && evalNode.state_before !== evalNode.state_after;
-			map.set(evalNode.node_index, {
-				output: evalNode.output,
-				stateChange: stateChanged
-					? `${evalNode.state_before.toFixed(2)}\u2192${evalNode.state_after.toFixed(2)}`
-					: null,
-			});
-		}
-		return map;
-	}, [currentPass]);
-
-	// Re-layout when trace presence changes (not on every pass change)
 	const hasTrace = trace !== null;
 
-	// Run ELK layout with dynamic widths/heights based on label length and content
+	// 1. Build domain model
+	const model = useMemo(() => buildFullGraphModel(graphDef, inputRefs), [graphDef, inputRefs]);
+
+	// 2. Compute layout input (nodes with layer constraints + edges)
+	const layoutInput = useMemo(() => {
+		const traceValueExtraWidth = hasTrace ? 80 : 0;
+		const layoutNodes: LayoutInputNode[] = model.nodes.map((mn) => {
+			let layerConstraint: "FIRST" | "LAST" | undefined;
+			if (mn.nodeType === "input" || mn.category === "constant") {
+				layerConstraint = "FIRST";
+			} else if (
+				mn.nodeType === "output_sink" ||
+				mn.nodeType === "action_slot" ||
+				mn.nodeType === "execute_gate"
+			) {
+				layerConstraint = "LAST";
+			}
+			return {
+				id: mn.id,
+				width: mn.baseWidth + traceValueExtraWidth,
+				height: mn.height,
+				layerConstraint,
+			};
+		});
+		const layoutEdges: LayoutInputEdge[] = model.edges.map((me) => ({
+			id: me.id,
+			sourceId: me.sourceId,
+			targetId: me.targetId,
+		}));
+		return { nodes: layoutNodes, edges: layoutEdges, traceValueExtraWidth };
+	}, [model, hasTrace]);
+
+	// 3. Run async ELK layout
 	useEffect(() => {
 		let cancelled = false;
-		// Extra width for value display during execution ("= X.XX" or "X.XX → X.XX")
-		const traceValueWidth = hasTrace ? 80 : 0;
-		const widths = nodeLabels.map((label) => {
-			return Math.max(72, Math.min(label.length * 7 + 24, 140)) + traceValueWidth;
-		});
-		const heights = computeNodes.map(() => 24);
-		layoutGraphInternals(computeNodes, widths, nodeCategories, heights).then((result) => {
+		layoutGraphInternals(layoutInput.nodes, layoutInput.edges).then((result) => {
 			if (!cancelled) setLayout(result);
 		});
 		return () => {
 			cancelled = true;
 		};
-	}, [computeNodes, nodeLabels, nodeCategories, hasTrace]);
+	}, [layoutInput]);
 
-	const { nodes, edges } = useMemo(() => {
-		if (!layout) return { nodes: [], edges: [] };
+	// 4. Build trace overlay
+	const traceOverlay = useMemo(() => {
+		if (!trace) return null;
+		const overlay = buildComputeTraceOverlay(trace, detailIndex);
+		for (const [k, v] of buildOutputTraceOverlay(trace)) overlay.set(k, v);
+		return overlay;
+	}, [trace, detailIndex]);
 
-		const flowNodes: Node<GraphInternalsNodeData>[] = layout.nodes.map((ln) => {
-			const computeNode = computeNodes[ln.index];
-			const kind = computeNode?.kind;
-			const evalData = evalByIndex?.get(ln.index) ?? null;
-
-			return {
-				id: String(ln.index),
-				type: "graphInternal",
-				position: { x: ln.x, y: ln.y },
-				draggable: false,
-				connectable: false,
-				selectable: false,
-				style: { width: ln.width, height: ln.height },
-				data: {
-					index: ln.index,
-					kindLabel: nodeLabels[ln.index] ?? (kind ? getKindLabel(kind, inputRefs) : "?"),
-					category: kind ? categorize(kind) : "processing",
-					isLive: liveSet.has(ln.index),
-					initialValue: initialByIndex?.get(ln.index) ?? null,
-					outputValue: evalData?.output ?? null,
-					stateChange: evalData?.stateChange ?? null,
-					routeTargets: null,
-					selectedTarget: null,
-				},
-			};
+	// 5. Build ReactFlow scene
+	const scene = useMemo(() => {
+		if (!layout) return null;
+		return buildGraphFlowScene({
+			model,
+			layout,
+			traceOverlay,
+			liveSet,
 		});
+	}, [model, layout, traceOverlay, liveSet]);
 
-		const flowEdges: Edge<WeightEdgeData>[] = layout.edges.map((le) => {
-			const endpointsLive = liveSet.has(le.fromIndex) && liveSet.has(le.toIndex);
-			const weightOpacity = Math.max(0.2, Math.min(Math.abs(le.weight), 1));
-			const opacity = endpointsLive ? weightOpacity : weightOpacity * 0.35;
-			if (le.isBackward) {
-				return {
-					id: le.id,
-					source: String(le.toIndex),
-					target: String(le.fromIndex),
-					sourceHandle: "bottom-out",
-					targetHandle: "bottom-in",
-					type: "backwardEdge",
-					selectable: false,
-					focusable: false,
-					markerEnd: {
-						type: MarkerType.ArrowClosed,
-						color: `rgba(251,191,36,${opacity})`,
-						width: 10,
-						height: 10,
-					},
-					data: {
-						weight: le.weight,
-						opacity,
-					},
-				};
-			}
-			return {
-				id: le.id,
-				source: String(le.fromIndex),
-				target: String(le.toIndex),
-				type: "weightEdge",
-				selectable: false,
-				focusable: false,
-				markerEnd: {
-					type: MarkerType.ArrowClosed,
-					color: `rgba(148,163,184,${opacity})`,
-					width: 10,
-					height: 10,
-				},
-				style: {
-					stroke: `rgba(148,163,184,${opacity})`,
-				},
-				data: {
-					weight: le.weight,
-					opacity,
-				},
-			};
-		});
-
-		return { nodes: flowNodes, edges: flowEdges };
-	}, [layout, computeNodes, liveSet, evalByIndex, initialByIndex, nodeLabels, inputRefs]);
-
-	if (!layout) {
+	if (!layout || !scene) {
 		return (
 			<div className="flex items-center justify-center py-4">
-				<p className="text-[10px] font-mono text-slate-500">Computing layout\u2026</p>
+				<p className="text-[10px] font-mono text-slate-500">Computing layout{"\u2026"}</p>
 			</div>
 		);
 	}
 
-	const height = Math.max(Math.min(layout.height + 24, 300), 120);
+	const inputCount = model.nodes.filter((n) => n.nodeType === "input").length;
+	const computeCount = graphDef.compute_nodes.length;
+	const outputCount = model.nodes.filter(
+		(n) =>
+			n.nodeType === "output_sink" || n.nodeType === "action_slot" || n.nodeType === "execute_gate",
+	).length;
+
+	const currentPass = trace?.passes[detailIndex] ?? null;
+	const height = Math.max(Math.min(layout.totalHeight + 24, 450), 120);
 
 	return (
 		<div className="px-3 py-2">
@@ -279,7 +142,9 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 						Pass {detailIndex + 1}/{trace.passes.length}
 					</span>
 					{currentPass ? (
-						<span className="text-slate-600">\u0394={currentPass.max_delta.toFixed(4)}</span>
+						<span className="text-slate-600">
+							{"\u0394"}={currentPass.max_delta.toFixed(4)}
+						</span>
 					) : null}
 					<span className={trace.converged ? "text-emerald-400" : "text-amber-400"}>
 						{trace.converged ? "converged" : "not converged"}
@@ -287,7 +152,7 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 				</div>
 			) : (
 				<div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-500">
-					Compute Nodes ({computeNodes.length})
+					Graph ({inputCount} in {"\u00b7"} {computeCount} compute {"\u00b7"} {outputCount} out)
 				</div>
 			)}
 			<div
@@ -296,8 +161,8 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 			>
 				<ReactFlowProvider>
 					<ReactFlow
-						nodes={nodes}
-						edges={edges}
+						nodes={scene.nodes}
+						edges={scene.edges}
 						nodeTypes={nodeTypes}
 						edgeTypes={edgeTypes}
 						fitView

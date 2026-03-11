@@ -3,6 +3,7 @@ import { type EdgeProps, getBezierPath } from "@xyflow/react";
 export interface WeightEdgeData extends Record<string, unknown> {
 	weight: number;
 	opacity: number;
+	tint?: { r: number; g: number; b: number };
 }
 
 export function WeightEdge({
@@ -28,7 +29,10 @@ export function WeightEdge({
 
 	const edgeData = data as WeightEdgeData | undefined;
 	const weight = edgeData?.weight ?? 1;
+	const tint = edgeData?.tint;
 	const showWeight = Math.abs(weight - 1.0) > 0.01;
+
+	const labelFill = tint ? `rgba(${tint.r},${tint.g},${tint.b},0.6)` : "rgba(148,163,184,0.6)";
 
 	return (
 		<>
@@ -46,7 +50,7 @@ export function WeightEdge({
 					y={labelY - 6}
 					textAnchor="middle"
 					className="text-[8px] font-mono"
-					fill="rgba(148,163,184,0.6)"
+					fill={labelFill}
 				>
 					{weight.toFixed(2)}
 				</text>
@@ -67,7 +71,13 @@ export function BackwardWeightEdge({
 	const edgeData = data as WeightEdgeData | undefined;
 	const weight = edgeData?.weight ?? 1;
 	const opacity = edgeData?.opacity ?? Math.max(0.2, Math.min(Math.abs(weight), 1));
+	const tint = edgeData?.tint;
 	const showWeight = Math.abs(weight - 1.0) > 0.01;
+
+	const strokeColor = tint
+		? `rgba(${tint.r},${tint.g},${tint.b},${opacity})`
+		: `rgba(251,191,36,${opacity})`;
+	const labelFill = tint ? `rgba(${tint.r},${tint.g},${tint.b},0.6)` : "rgba(251,191,36,0.6)";
 
 	const isSelfLoop = Math.abs(sourceX - targetX) < 5 && Math.abs(sourceY - targetY) < 5;
 
@@ -102,7 +112,7 @@ export function BackwardWeightEdge({
 				strokeWidth={1}
 				strokeDasharray="4 3"
 				markerEnd={markerEnd as string}
-				style={{ stroke: `rgba(251,191,36,${opacity})` }}
+				style={{ stroke: strokeColor }}
 			/>
 			{showWeight ? (
 				<text
@@ -110,7 +120,7 @@ export function BackwardWeightEdge({
 					y={labelY - 6}
 					textAnchor="middle"
 					className="text-[8px] font-mono"
-					fill="rgba(251,191,36,0.6)"
+					fill={labelFill}
 				>
 					{weight.toFixed(2)}
 				</text>
