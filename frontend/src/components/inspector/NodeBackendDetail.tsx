@@ -1,8 +1,6 @@
 import { useMemo } from "react";
 import type { BackendDef, InputReference } from "../../types/genome.ts";
 import type { VmTrace } from "../../types/trace.ts";
-import { formatGraphSource } from "./graphNodeFormatters.ts";
-import { describeComputeNodeKind } from "./mesh/meshPresentation.ts";
 import { formatReadableInstruction } from "./vmInstructionFormat.ts";
 
 interface NodeBackendDetailProps {
@@ -18,7 +16,6 @@ export function NodeBackendDetail({
 	backendDef,
 	inputRefs,
 	liveInstructionIndices,
-	liveInternalNodeIndices,
 	vmTrace,
 	detailIndex = 0,
 }: NodeBackendDetailProps) {
@@ -94,58 +91,6 @@ export function NodeBackendDetail({
 								{regChanges && regChanges.length > 0 ? (
 									<span className="shrink-0 text-[9px] text-emerald-400/70">
 										{regChanges.map(([r, v]) => `r${r}\u2190${v.toFixed(2)}`).join(" ")}
-									</span>
-								) : null}
-							</div>
-						);
-					})}
-				</div>
-			</div>
-		);
-	}
-
-	if ("Graph" in backendDef) {
-		const graph = backendDef.Graph;
-		const liveSet = new Set(liveInternalNodeIndices);
-
-		return (
-			<div className="px-3 py-2">
-				<div className="mb-1 text-[10px] font-medium uppercase tracking-wider text-slate-500">
-					Compute Nodes ({graph.compute_nodes.length})
-				</div>
-				<div className="max-h-[200px] space-y-px overflow-y-auto">
-					{graph.compute_nodes.map((computeNode, index) => {
-						const presentation = describeComputeNodeKind(computeNode.kind);
-						const isLive = liveSet.has(index);
-
-						return (
-							<div
-								// biome-ignore lint/suspicious/noArrayIndexKey: compute nodes are indexed by position
-								key={index}
-								data-testid={`graph-internal-${index}`}
-								data-junk={isLive ? "false" : "true"}
-								className={`flex items-baseline gap-2 rounded px-1.5 py-0.5 text-[10px] font-mono ${
-									isLive ? "" : "opacity-40"
-								}`}
-							>
-								<span className="w-4 shrink-0 text-right text-slate-600">{index}</span>
-								<span className="shrink-0 truncate text-slate-300">{presentation.label}</span>
-								{presentation.detail ? (
-									<span className="text-[9px] text-slate-600">{presentation.detail}</span>
-								) : null}
-								{computeNode.inputs.length > 0 ? (
-									<span className="text-[9px] text-slate-500">
-										{computeNode.inputs
-											.map(
-												(edge) =>
-													`${formatGraphSource(edge.source, inputRefs)} \u00d7 ${edge.weight.toFixed(2)}`,
-											)
-											.join(" \u00b7 ")}
-									</span>
-								) : null}
-								{presentation.badges.length > 0 ? (
-									<span className="shrink-0 text-[9px] uppercase text-cyan-400/70">
-										{presentation.badges.join(" ")}
 									</span>
 								) : null}
 							</div>
