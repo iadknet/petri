@@ -1,80 +1,40 @@
 import type { ElkExtendedEdge, ElkNode } from "elkjs/lib/elk-api";
 import ELK from "elkjs/lib/elk.bundled.js";
-import type { ComputeNode, GraphSource } from "../../types/genome.ts";
 
 const elk = new ELK();
 
-const DEFAULT_NODE_WIDTH = 72;
-const NODE_HEIGHT = 24;
-
-export interface GraphInternalLayoutNode {
-	index: number;
-	x: number;
-	y: number;
-	width: number;
-	height: number;
-}
-
-export interface GraphInternalLayoutEdge {
+export interface LayoutInputNode {
 	id: string;
-	fromIndex: number;
-	toIndex: number;
-	weight: number;
-	isBackward: boolean;
-}
-
-export interface GraphInternalsLayoutResult {
-	nodes: GraphInternalLayoutNode[];
-	edges: GraphInternalLayoutEdge[];
 	width: number;
 	height: number;
+	layerConstraint?: "FIRST" | "LAST";
 }
 
-export type NodeCategory = "constant" | "processing";
+export interface LayoutInputEdge {
+	id: string;
+	sourceId: string;
+	targetId: string;
+}
 
-/** Extract the source compute node index from a GraphSource, or null if not a ComputeNode source. */
-function computeNodeSourceIndex(source: GraphSource): number | null {
-	if ("ComputeNode" in source) return source.ComputeNode;
-	return null;
+export interface LayoutOutput {
+	positions: Map<string, { x: number; y: number; width: number; height: number }>;
+	totalWidth: number;
+	totalHeight: number;
 }
 
 export async function layoutGraphInternals(
-	computeNodes: ComputeNode[],
-	nodeWidths?: number[],
-	nodeCategories?: NodeCategory[],
-	nodeHeights?: number[],
-): Promise<GraphInternalsLayoutResult> {
-	if (computeNodes.length === 0) {
-		return { nodes: [], edges: [], width: 0, height: 0 };
+	nodes: LayoutInputNode[],
+	edges: LayoutInputEdge[],
+): Promise<LayoutOutput> {
+	if (nodes.length === 0) {
+		return { positions: new Map(), totalWidth: 0, totalHeight: 0 };
 	}
 
-	const elkEdges: ElkExtendedEdge[] = [];
-	const resultEdges: GraphInternalLayoutEdge[] = [];
-
-	for (let toIdx = 0; toIdx < computeNodes.length; toIdx++) {
-		const node = computeNodes[toIdx];
-		if (!node) continue;
-		for (let inputIdx = 0; inputIdx < node.inputs.length; inputIdx++) {
-			const edge = node.inputs[inputIdx];
-			if (!edge) continue;
-			const fromIdx = computeNodeSourceIndex(edge.source);
-			// Only layout edges between compute nodes (InputLeaf/SharedMemory are implicit)
-			if (fromIdx === null || fromIdx < 0 || fromIdx >= computeNodes.length) continue;
-			const edgeId = `CN${fromIdx}->${toIdx}:${inputIdx}`;
-			elkEdges.push({
-				id: edgeId,
-				sources: [String(fromIdx)],
-				targets: [String(toIdx)],
-			});
-			resultEdges.push({
-				id: edgeId,
-				fromIndex: fromIdx,
-				toIndex: toIdx,
-				weight: edge.weight,
-				isBackward: fromIdx >= toIdx,
-			});
-		}
-	}
+	const elkEdges: ElkExtendedEdge[] = edges.map((e) => ({
+		id: e.id,
+		sources: [e.sourceId],
+		targets: [e.targetId],
+	}));
 
 	const elkGraph: ElkNode = {
 		id: "graph-internals",
@@ -88,16 +48,15 @@ export async function layoutGraphInternals(
 			"elk.layered.considerModelOrder.strategy": "NODES_AND_EDGES",
 			"elk.separateConnectedComponents": "false",
 		},
-		children: computeNodes.map((_, index) => {
-			const category = nodeCategories?.[index];
+		children: nodes.map((n) => {
 			const layoutOptions: Record<string, string> = {};
-			if (category === "constant") {
-				layoutOptions["elk.layered.layerConstraint"] = "FIRST";
+			if (n.layerConstraint) {
+				layoutOptions["elk.layered.layerConstraint"] = n.layerConstraint;
 			}
 			return {
-				id: String(index),
-				width: nodeWidths?.[index] ?? DEFAULT_NODE_WIDTH,
-				height: nodeHeights?.[index] ?? NODE_HEIGHT,
+				id: n.id,
+				width: n.width,
+				height: n.height,
 				layoutOptions,
 			};
 		}),
@@ -106,18 +65,19 @@ export async function layoutGraphInternals(
 
 	const layoutResult = await elk.layout(elkGraph);
 
-	const nodes: GraphInternalLayoutNode[] = (layoutResult.children ?? []).map((child) => ({
-		index: Number(child.id),
-		x: child.x ?? 0,
-		y: child.y ?? 0,
-		width: child.width ?? DEFAULT_NODE_WIDTH,
-		height: child.height ?? NODE_HEIGHT,
-	}));
+	const positions = new Map<string, { x: number; y: number; width: number; height: number }>();
+	for (const child of layoutResult.children ?? []) {
+		positions.set(child.id, {
+			x: child.x ?? 0,
+			y: child.y ?? 0,
+			width: child.width ?? 0,
+			height: child.height ?? 0,
+		});
+	}
 
 	return {
-		nodes,
-		edges: resultEdges,
-		width: layoutResult.width ?? 0,
-		height: layoutResult.height ?? 0,
+		positions,
+		totalWidth: layoutResult.width ?? 0,
+		totalHeight: layoutResult.height ?? 0,
 	};
 }
