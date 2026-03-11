@@ -567,8 +567,10 @@ impl SimulationConfig {
         if m.per_birth_mutation_events_max < m.per_birth_mutation_events_min {
             m.per_birth_mutation_events_max = m.per_birth_mutation_events_min;
         }
-        // Cap must be >= 1; upper bound prevents u16 overflow in sub_value_count.
-        m.action_queue_cap = m.action_queue_cap.clamp(1, 21845);
+        // Cap must be >= 1, <= runtime queue capacity, and <= u16/3 to keep
+        // ActionQueue compound width (`cap * 3`) representable in u16.
+        let max_action_queue_cap = rt.max_actions_per_turn.min(21845);
+        m.action_queue_cap = m.action_queue_cap.clamp(1, max_action_queue_cap);
         // genome_size_cap: 0 disables pressure (handled by is_restricted), no normalization needed.
         // genome_size_pressure_enabled: bool, no normalization needed.
         let ph = &mut m.phenotype;
@@ -854,9 +856,29 @@ mod tests {
     #[test]
     fn normalize_huge_action_queue_cap_clamped() {
         let mut cfg = SimulationConfig::default();
+        cfg.runtime.max_actions_per_turn = 100_000;
         cfg.mutation.action_queue_cap = 100_000;
         cfg.normalize();
         assert_eq!(cfg.mutation.action_queue_cap, 21845);
+    }
+
+    #[test]
+    fn normalize_action_queue_cap_clamped_to_max_actions_per_turn() {
+        let mut cfg = SimulationConfig::default();
+        cfg.runtime.max_actions_per_turn = 3;
+        cfg.mutation.action_queue_cap = 10;
+        cfg.normalize();
+        assert_eq!(cfg.mutation.action_queue_cap, 3);
+    }
+
+    #[test]
+    fn normalize_zero_max_actions_per_turn_caps_action_queue_after_fallback() {
+        let mut cfg = SimulationConfig::default();
+        cfg.runtime.max_actions_per_turn = 0;
+        cfg.mutation.action_queue_cap = 100_000;
+        cfg.normalize();
+        assert_eq!(cfg.runtime.max_actions_per_turn, 10);
+        assert_eq!(cfg.mutation.action_queue_cap, 10);
     }
 
     #[test]

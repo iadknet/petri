@@ -180,6 +180,39 @@ pub struct GraphTrace {
     pub converged: bool,
     pub stable_passes_count: u32,
     pub final_outputs: Vec<f32>,
+    pub output_sinks: Vec<GraphOutputSinkTrace>,
+    pub action_slots: Vec<GraphActionSlotTrace>,
+    pub execute_gate: GraphExecuteGateTrace,
+}
+
+/// Effect-phase trace for a single output sink (indexed 1:1 with `output_sinks`).
+#[derive(Debug, Clone, Serialize)]
+pub struct GraphOutputSinkTrace {
+    pub wired: bool,
+    pub weighted_sum: f32,
+    pub applied: bool,
+    pub applied_value: f32,
+}
+
+/// Effect-phase trace for a single action slot (indexed 1:1 with `action_bank`).
+#[derive(Debug, Clone, Serialize)]
+pub struct GraphActionSlotTrace {
+    pub wired: bool,
+    pub gate_weighted_sum: f32,
+    pub fired: bool,
+    pub param_values: [f32; 2],
+    pub queue_len_before: usize,
+    pub queue_len_after: usize,
+    pub emitted_action: Option<WorldAction>,
+}
+
+/// Effect-phase trace for the execute gate.
+#[derive(Debug, Clone, Serialize)]
+pub struct GraphExecuteGateTrace {
+    pub wired: bool,
+    pub weighted_sum: f32,
+    pub queue_non_empty: bool,
+    pub fired: bool,
 }
 
 /// Trace of a single relaxation pass.

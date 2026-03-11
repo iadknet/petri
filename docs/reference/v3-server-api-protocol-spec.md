@@ -513,6 +513,12 @@ Execution-sampler rules:
   the extended-perception snapshot for that tick
 - sampler route payload is `route { kind, raw_value, resolved_target_index }`
 - VM trace route scalar field is `final_route_value`
+- Graph trace payload includes effect-phase structural records:
+  - `output_sinks[]` entries with `wired`, `weighted_sum`, `applied`,
+    `applied_value`
+  - `action_slots[]` entries with `wired`, `gate_weighted_sum`, `fired`,
+    `param_values`, `queue_len_before`, `queue_len_after`, `emitted_action`
+  - `execute_gate` with `wired`, `weighted_sum`, `queue_non_empty`, `fired`
 - sampler wire DTO ownership and mapping live in `v3-server/src/transport/`
   (`sample_protocol.rs`, `sample_assembler.rs`)
 - detailed perception field ownership remains in `v3-sensor-spec.md`

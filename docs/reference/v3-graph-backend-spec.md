@@ -340,6 +340,22 @@ queue is non-empty: mark hop as terminal.
 
 If `execute_gate.inputs` is empty: `gate_wsum = 0.0`, hop doesn't terminate.
 
+### Effect-phase trace visibility (Execution Sampler)
+
+Graph sampler traces include post-convergence structural-layer records in
+addition to compute relaxation passes:
+- `output_sinks: Vec<GraphOutputSinkTrace>` (1:1 with `output_sinks`)
+  - fields: `wired`, `weighted_sum`, `applied`, `applied_value`
+- `action_slots: Vec<GraphActionSlotTrace>` (1:1 with `action_bank`)
+  - fields: `wired`, `gate_weighted_sum`, `fired`, `param_values`,
+    `queue_len_before`, `queue_len_after`, `emitted_action`
+- `execute_gate: GraphExecuteGateTrace`
+  - fields: `wired`, `weighted_sum`, `queue_non_empty`, `fired`
+
+These records are always index-aligned with structural catalogs (not sparse
+"only fired" lists), so UI/debug tooling can compare wired-but-inert vs active
+behavior directly.
+
 ---
 
 ## 10. Router Normalization
@@ -495,6 +511,9 @@ wires them).
 - `action_bank.len() == config.action_queue_cap` at genome creation time.
 - `InputReference::ActionQueue` width = `action_queue_cap * 3`.
 - Invariant: `action_queue_cap <= max_actions_per_turn`.
+- Normalization order: `max_actions_per_turn` is normalized first, then
+  `action_queue_cap` is clamped to
+  `1..=min(21845, max_actions_per_turn)`.
 
 Config-change policy: frozen at creation. `action_bank.len()` is set when the
 genome is created and never changes. If `action_queue_cap` changes

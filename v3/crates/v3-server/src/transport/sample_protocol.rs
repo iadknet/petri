@@ -124,6 +124,36 @@ pub struct GraphTracePayload {
     pub converged: bool,
     pub stable_passes_count: u32,
     pub final_outputs: Vec<f32>,
+    pub output_sinks: Vec<GraphOutputSinkTracePayload>,
+    pub action_slots: Vec<GraphActionSlotTracePayload>,
+    pub execute_gate: GraphExecuteGateTracePayload,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GraphOutputSinkTracePayload {
+    pub wired: bool,
+    pub weighted_sum: f32,
+    pub applied: bool,
+    pub applied_value: f32,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GraphActionSlotTracePayload {
+    pub wired: bool,
+    pub gate_weighted_sum: f32,
+    pub fired: bool,
+    pub param_values: [f32; 2],
+    pub queue_len_before: usize,
+    pub queue_len_after: usize,
+    pub emitted_action: Option<WorldActionPayload>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct GraphExecuteGateTracePayload {
+    pub wired: bool,
+    pub weighted_sum: f32,
+    pub queue_non_empty: bool,
+    pub fired: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]

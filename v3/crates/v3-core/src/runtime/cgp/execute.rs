@@ -2,7 +2,7 @@ use crate::config::RuntimeConfig;
 use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind};
 use crate::creature::state::GraphRuntimeState;
-use crate::runtime::cgp::effects::apply_cgp_graph_effects;
+use crate::runtime::cgp::effects::{apply_cgp_graph_effects, CgpEffectsTrace};
 use crate::runtime::cgp::eval::{evaluate_compute_kind, sanitize_output};
 use crate::runtime::cgp::sources::collect_cgp_weighted_inputs;
 use crate::runtime::inputs::ResolveCtx;
@@ -28,6 +28,7 @@ pub(crate) trait GraphTracer {
     );
     fn on_pass_end(&mut self, delta: f32);
     fn on_finish(&mut self, curr_outputs: &[f32], stable_passes: u32, converged: bool);
+    fn on_effects(&mut self, effects: CgpEffectsTrace);
 }
 
 /// Zero-cost tracer used by the production path.
@@ -52,6 +53,8 @@ impl GraphTracer for NoopTracer {
     fn on_pass_end(&mut self, _: f32) {}
     #[inline]
     fn on_finish(&mut self, _: &[f32], _: u32, _: bool) {}
+    #[inline]
+    fn on_effects(&mut self, _: CgpEffectsTrace) {}
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -291,7 +294,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
         energy_consumed,
         action_queue: &queue_snapshot,
     };
-    let result = apply_cgp_graph_effects(
+    let (result, effects_trace) = apply_cgp_graph_effects(
         def,
         &curr_outputs,
         input_refs,
@@ -301,6 +304,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
         shared_memory,
         prev_shared_memory,
     );
+    tracer.on_effects(effects_trace);
 
     restore_scratch(
         graph_runtime,

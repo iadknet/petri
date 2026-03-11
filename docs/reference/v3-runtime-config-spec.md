@@ -58,6 +58,7 @@ Transport posture note:
 | Key | Type | Default | Constraint / normalization | Used by |
 | --- | --- | --- | --- | --- |
 | `runtime.max_mesh_hops` | `u32` | `1024` | Must be `>= 1`; invalid values fall back to `1024`. | `v3-mesh-execution-spec.md` |
+| `runtime.max_actions_per_turn` | `usize` | `10` | Must be `>= 1`; invalid values fall back to `10`. Upper bound on queued actions returned from one mesh evaluation. | `v3-mesh-execution-spec.md`, `v3-graph-backend-spec.md`, `v3-vm-isa-spec.md` |
 | `runtime.max_vm_steps` | `u32` | `10000` | Must be `>= 1`; invalid values fall back to `10000`. | `v3-vm-isa-spec.md` |
 | `runtime.max_graph_relax_iters` | `u32` | `15` | Must be `>= 1`; invalid values fall back to `15`. | `v3-graph-backend-spec.md` |
 | `runtime.graph_convergence_epsilon` | `f32` | `1e-3` | Must be `>= 0.0`; invalid values fall back to `1e-3`. | `v3-graph-backend-spec.md` |
@@ -85,6 +86,7 @@ Type posture:
 | `mutation.mutation_probability` | `f64` | `0.303` | Clamp to `[0.0, 1.0]`. Uses `f64` (not `f32`) to preserve precision for very small probability values used in low-mutation-rate experiments. |
 | `mutation.per_birth_mutation_events_min` | `u32` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
 | `mutation.per_birth_mutation_events_max` | `u32` | `10` | Must be `>= per_birth_mutation_events_min`; lower values normalize to min. |
+| `mutation.action_queue_cap` | `usize` | `4` | Must be clamped to `1..=min(21845, runtime.max_actions_per_turn)`. `21845` preserves `InputReference::ActionQueue` width (`cap * 3`) within `u16`. |
 | `mutation.phenotype.channel_step` | `u8` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
 | `mutation.phenotype.channel_change_chance` | `f32` | `0.001` | Clamp to `[0.0, 1.0]`. |
 | `mutation.phenotype.polarity_flip_chance` | `f32` | `0.0002` | Clamp to `[0.0, 1.0]`. |
@@ -111,6 +113,13 @@ Mutation randomization semantics:
 
 Mutation behavior semantics remain canonical in `v3-mutation-spec.md`; this
 section only owns config contract shape/defaults.
+
+Queue-shape coupling invariant:
+- `mutation.action_queue_cap <= runtime.max_actions_per_turn`.
+- Runtime normalization order must normalize `runtime.max_actions_per_turn`
+  first, then clamp `mutation.action_queue_cap` against it.
+- This keeps genome action-slot count, `ActionQueue` input width, and runtime
+  queue execution cap in lockstep.
 
 ---
 

@@ -2,8 +2,12 @@ use crate::config::RuntimeConfig;
 use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNodeKind};
 use crate::creature::state::GraphRuntimeState;
+use crate::runtime::cgp::effects::CgpEffectsTrace;
 use crate::runtime::cgp::execute::{execute_graph_impl, GraphTracer};
-use crate::runtime::trace::domain::{kind_label, GraphNodeEvalTrace, GraphPassTrace, GraphTrace};
+use crate::runtime::trace::domain::{
+    kind_label, GraphActionSlotTrace, GraphExecuteGateTrace, GraphNodeEvalTrace,
+    GraphOutputSinkTrace, GraphPassTrace, GraphTrace,
+};
 use crate::runtime::types::{MeshSideOutputs, NodeResult};
 use crate::sensors::perception::SensorSnapshot;
 
@@ -15,6 +19,9 @@ pub(crate) struct RecordingTracer {
     final_outputs: Vec<f32>,
     final_stable_passes: u32,
     final_converged: bool,
+    output_sinks: Vec<GraphOutputSinkTrace>,
+    action_slots: Vec<GraphActionSlotTrace>,
+    execute_gate: GraphExecuteGateTrace,
 }
 
 impl RecordingTracer {
@@ -27,6 +34,14 @@ impl RecordingTracer {
             final_outputs: Vec::new(),
             final_stable_passes: 0,
             final_converged: false,
+            output_sinks: Vec::new(),
+            action_slots: Vec::new(),
+            execute_gate: GraphExecuteGateTrace {
+                wired: false,
+                weighted_sum: 0.0,
+                queue_non_empty: false,
+                fired: false,
+            },
         }
     }
 
@@ -36,6 +51,9 @@ impl RecordingTracer {
             converged: self.final_converged,
             stable_passes_count: self.final_stable_passes,
             final_outputs: self.final_outputs,
+            output_sinks: self.output_sinks,
+            action_slots: self.action_slots,
+            execute_gate: self.execute_gate,
         }
     }
 }
@@ -83,6 +101,12 @@ impl GraphTracer for RecordingTracer {
         self.final_stable_passes = stable_passes;
         self.final_converged = converged;
     }
+
+    fn on_effects(&mut self, effects: CgpEffectsTrace) {
+        self.output_sinks = effects.output_sinks;
+        self.action_slots = effects.action_slots;
+        self.execute_gate = effects.execute_gate;
+    }
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -108,6 +132,14 @@ pub(crate) fn execute_graph_node_traced(
             converged: false,
             stable_passes_count: 0,
             final_outputs: Vec::new(),
+            output_sinks: Vec::new(),
+            action_slots: Vec::new(),
+            execute_gate: GraphExecuteGateTrace {
+                wired: false,
+                weighted_sum: 0.0,
+                queue_non_empty: false,
+                fired: false,
+            },
         };
         return (
             NodeResult::halted(

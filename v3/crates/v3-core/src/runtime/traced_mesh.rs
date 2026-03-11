@@ -405,6 +405,262 @@ mod tests {
         assert!((hops[1].upstream_slots[5] - 9.0).abs() < 1e-5);
     }
 
+    #[test]
+    fn graph_effect_trace_captures_sinks_action_bank_and_execute_gate() {
+        let id0 = NodeId::new(0);
+        let genome = CreatureGenome {
+            entry_node_id: id0,
+            nodes: vec![NodeGenome {
+                node_id: id0,
+                input_refs: vec![],
+                backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    compute_nodes: vec![ComputeNode {
+                        kind: ComputeNodeKind::Constant(1.0),
+                        inputs: vec![],
+                        plasticity: None,
+                    }],
+                    output_sinks: vec![
+                        OutputSink {
+                            kind: OutputSinkKind::CustomOutput(0),
+                            inputs: vec![GraphEdge {
+                                source: GraphSource::ComputeNode(0),
+                                weight: 1.0,
+                            }],
+                        },
+                        OutputSink {
+                            kind: OutputSinkKind::RouterOutput,
+                            inputs: vec![],
+                        },
+                    ],
+                    action_bank: vec![
+                        crate::creature::genome::cgp::ActionSlot {
+                            behavior: crate::creature::genome::cgp::ActionSlotBehavior::Emit(
+                                crate::creature::genome::cgp::WorldActionKind::Eat,
+                            ),
+                            gate_inputs: vec![GraphEdge {
+                                source: GraphSource::ComputeNode(0),
+                                weight: 1.0,
+                            }],
+                            param_inputs: vec![],
+                        },
+                        crate::creature::genome::cgp::ActionSlot {
+                            behavior: crate::creature::genome::cgp::ActionSlotBehavior::Pop,
+                            gate_inputs: vec![GraphEdge {
+                                source: GraphSource::ComputeNode(0),
+                                weight: 1.0,
+                            }],
+                            param_inputs: vec![],
+                        },
+                    ],
+                    execute_gate: ExecuteGate {
+                        inputs: vec![GraphEdge {
+                            source: GraphSource::ComputeNode(0),
+                            weight: 1.0,
+                        }],
+                    },
+                }),
+                targets: vec![],
+            }],
+        };
+
+        let ss = empty_ss();
+        let mut energy = 100.0f32;
+        let mut smem = [0.0f32; 16];
+        let prev_smem = [0.0f32; 16];
+        let mut gr = GraphRuntimeState::new();
+        let config = default_config();
+
+        let (output, hops, reason) = execute_creature_mesh_traced(
+            &genome,
+            &ss,
+            &mut energy,
+            &mut smem,
+            &prev_smem,
+            &mut gr,
+            &config,
+        );
+
+        assert_eq!(hops.len(), 1);
+        assert!(matches!(reason, TerminationReason::NoTargets));
+        assert_eq!(output.actions, vec![WorldAction::NoOp]);
+
+        let BackendTrace::Graph(graph) = &hops[0].backend_trace else {
+            panic!("expected graph backend trace");
+        };
+
+        assert_eq!(graph.output_sinks.len(), 2);
+        assert!(graph.output_sinks[0].wired);
+        assert!(graph.output_sinks[0].applied);
+        assert!((graph.output_sinks[0].applied_value - 1.0).abs() < 1e-6);
+        assert!(!graph.output_sinks[1].wired);
+        assert!(!graph.output_sinks[1].applied);
+
+        assert_eq!(graph.action_slots.len(), 2);
+        assert!(graph.action_slots[0].wired);
+        assert!(graph.action_slots[0].fired);
+        assert_eq!(graph.action_slots[0].queue_len_before, 0);
+        assert_eq!(graph.action_slots[0].queue_len_after, 1);
+        assert_eq!(graph.action_slots[0].emitted_action, Some(WorldAction::Eat));
+        assert!(graph.action_slots[1].wired);
+        assert!(graph.action_slots[1].fired);
+        assert_eq!(graph.action_slots[1].queue_len_before, 1);
+        assert_eq!(graph.action_slots[1].queue_len_after, 0);
+        assert!(graph.action_slots[1].emitted_action.is_none());
+
+        assert!(graph.execute_gate.wired);
+        assert!(!graph.execute_gate.queue_non_empty);
+        assert!(!graph.execute_gate.fired);
+    }
+
+    #[test]
+    fn graph_effect_trace_execute_gate_fires_only_with_non_empty_queue() {
+        let id0 = NodeId::new(0);
+        let genome = CreatureGenome {
+            entry_node_id: id0,
+            nodes: vec![NodeGenome {
+                node_id: id0,
+                input_refs: vec![],
+                backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    compute_nodes: vec![ComputeNode {
+                        kind: ComputeNodeKind::Constant(1.0),
+                        inputs: vec![],
+                        plasticity: None,
+                    }],
+                    output_sinks: vec![],
+                    action_bank: vec![crate::creature::genome::cgp::ActionSlot {
+                        behavior: crate::creature::genome::cgp::ActionSlotBehavior::Emit(
+                            crate::creature::genome::cgp::WorldActionKind::Eat,
+                        ),
+                        gate_inputs: vec![GraphEdge {
+                            source: GraphSource::ComputeNode(0),
+                            weight: 1.0,
+                        }],
+                        param_inputs: vec![],
+                    }],
+                    execute_gate: ExecuteGate {
+                        inputs: vec![GraphEdge {
+                            source: GraphSource::ComputeNode(0),
+                            weight: 1.0,
+                        }],
+                    },
+                }),
+                targets: vec![],
+            }],
+        };
+
+        let ss = empty_ss();
+        let mut energy = 100.0f32;
+        let mut smem = [0.0f32; 16];
+        let prev_smem = [0.0f32; 16];
+        let mut gr = GraphRuntimeState::new();
+        let config = default_config();
+
+        let (output, hops, reason) = execute_creature_mesh_traced(
+            &genome,
+            &ss,
+            &mut energy,
+            &mut smem,
+            &prev_smem,
+            &mut gr,
+            &config,
+        );
+
+        assert_eq!(hops.len(), 1);
+        assert!(matches!(reason, TerminationReason::ActionEmitted));
+        assert_eq!(output.actions, vec![WorldAction::Eat]);
+
+        let BackendTrace::Graph(graph) = &hops[0].backend_trace else {
+            panic!("expected graph backend trace");
+        };
+
+        assert_eq!(graph.output_sinks.len(), 0);
+        assert_eq!(graph.action_slots.len(), 1);
+        assert!(graph.action_slots[0].fired);
+        assert_eq!(graph.action_slots[0].queue_len_before, 0);
+        assert_eq!(graph.action_slots[0].queue_len_after, 1);
+        assert_eq!(graph.action_slots[0].emitted_action, Some(WorldAction::Eat));
+        assert!(graph.execute_gate.wired);
+        assert!(graph.execute_gate.queue_non_empty);
+        assert!(graph.execute_gate.fired);
+    }
+
+    #[test]
+    fn graph_effect_trace_sanitizes_non_finite_values() {
+        let id0 = NodeId::new(0);
+        let genome = CreatureGenome {
+            entry_node_id: id0,
+            nodes: vec![NodeGenome {
+                node_id: id0,
+                input_refs: vec![],
+                backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    compute_nodes: vec![ComputeNode {
+                        kind: ComputeNodeKind::Constant(1.0),
+                        inputs: vec![],
+                        plasticity: None,
+                    }],
+                    output_sinks: vec![OutputSink {
+                        kind: OutputSinkKind::CustomOutput(0),
+                        inputs: vec![GraphEdge {
+                            source: GraphSource::ComputeNode(0),
+                            weight: f32::NAN,
+                        }],
+                    }],
+                    action_bank: vec![crate::creature::genome::cgp::ActionSlot {
+                        behavior: crate::creature::genome::cgp::ActionSlotBehavior::Emit(
+                            crate::creature::genome::cgp::WorldActionKind::Move,
+                        ),
+                        gate_inputs: vec![GraphEdge {
+                            source: GraphSource::ComputeNode(0),
+                            weight: 1.0,
+                        }],
+                        param_inputs: vec![GraphEdge {
+                            source: GraphSource::ComputeNode(0),
+                            weight: f32::INFINITY,
+                        }],
+                    }],
+                    execute_gate: ExecuteGate {
+                        inputs: vec![GraphEdge {
+                            source: GraphSource::ComputeNode(0),
+                            weight: f32::NAN,
+                        }],
+                    },
+                }),
+                targets: vec![],
+            }],
+        };
+
+        let ss = empty_ss();
+        let mut energy = 100.0f32;
+        let mut smem = [0.0f32; 16];
+        let prev_smem = [0.0f32; 16];
+        let mut gr = GraphRuntimeState::new();
+        let config = default_config();
+
+        let (_output, hops, _reason) = execute_creature_mesh_traced(
+            &genome,
+            &ss,
+            &mut energy,
+            &mut smem,
+            &prev_smem,
+            &mut gr,
+            &config,
+        );
+
+        let BackendTrace::Graph(graph) = &hops[0].backend_trace else {
+            panic!("expected graph backend trace");
+        };
+
+        assert_eq!(graph.output_sinks.len(), 1);
+        assert_eq!(graph.output_sinks[0].weighted_sum, 0.0);
+        assert_eq!(graph.output_sinks[0].applied_value, 0.0);
+
+        assert_eq!(graph.action_slots.len(), 1);
+        assert_eq!(graph.action_slots[0].param_values[0], 1_000_000_000.0);
+        assert!(graph.action_slots[0].gate_weighted_sum.is_finite());
+
+        assert!(graph.execute_gate.weighted_sum.is_finite());
+    }
+
     /// Energy exhaustion captured with correct termination reason.
     #[test]
     fn energy_exhaustion_termination() {

@@ -114,6 +114,8 @@ only their edges are evolvable.
 - `SwapGraphOperator` (compute nodes only, 17 `ComputeNodeKind` variants)
 - `MutateGraphOperatorParam` (compute params: Constant, Threshold,
   DecayIntegrator, Momentum, Oscillator)
+- `MutateActionSlotBehavior` (mutates `action_bank[i].behavior` between `Pop`
+  and `Emit(WorldActionKind)` variants)
 - `AddComputeNode(kind)` (appends to `compute_nodes`)
 - `RemoveComputeNode` (removes from `compute_nodes`, remaps
   `GraphSource::ComputeNode` indices across all edge containers)
@@ -127,8 +129,6 @@ only their edges are evolvable.
 - `CopySubgraph` (copies compute node cluster; internal edges remapped,
   external edges preserved; copied nodes start as dead genes)
 - `CopyEdgeBundle` (copies edge set between surfaces)
-- `MutateActionSlotBehavior` (raw field mutation on `action_bank[i].behavior`,
-  picks uniformly from `Pop` or `Emit(random WorldActionKind)`)
 - `EnableHebbian` (add `PlasticityConfig` to a non-plasticity compute node)
 - `DisableHebbian` (remove `PlasticityConfig` from a plasticity compute node)
 - `MutateHebbianRule` (change the `HebbianRule` variant)

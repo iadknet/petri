@@ -2,10 +2,15 @@ use super::*;
 use crate::config::MutationConfig;
 use crate::contracts::NodeId;
 use crate::creature::founder::v3alpha1_founder_genome;
+use crate::creature::genome::cgp::{
+    ActionSlot, ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate,
+    GraphEdge, GraphSource, OutputSink, OutputSinkKind, WorldActionKind,
+};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
 use crate::creature::parseability::ParseabilityGate;
+use crate::mutation::compound::sub_value_count;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
@@ -122,6 +127,129 @@ fn swap_input_ref_changes_value() {
         }
     }
     assert!(changed, "swap must change at least one input ref");
+}
+
+#[test]
+fn swap_graph_input_ref_clamps_out_of_range_sub_indices() {
+    let config = default_config();
+    let def = CgpGraphBackendDef {
+        compute_nodes: vec![ComputeNode {
+            kind: ComputeNodeKind::Add,
+            inputs: vec![
+                GraphEdge {
+                    source: GraphSource::InputLeaf {
+                        ref_idx: 0,
+                        sub_idx: 3,
+                    },
+                    weight: 1.0,
+                },
+                GraphEdge {
+                    source: GraphSource::InputLeaf {
+                        ref_idx: 0,
+                        sub_idx: 0,
+                    },
+                    weight: 1.0,
+                },
+            ],
+            plasticity: None,
+        }],
+        output_sinks: vec![OutputSink {
+            kind: OutputSinkKind::CustomOutput(0),
+            inputs: vec![GraphEdge {
+                source: GraphSource::InputLeaf {
+                    ref_idx: 0,
+                    sub_idx: 2,
+                },
+                weight: 1.0,
+            }],
+        }],
+        action_bank: vec![ActionSlot {
+            behavior: ActionSlotBehavior::Emit(WorldActionKind::Eat),
+            gate_inputs: vec![GraphEdge {
+                source: GraphSource::InputLeaf {
+                    ref_idx: 0,
+                    sub_idx: 4,
+                },
+                weight: 1.0,
+            }],
+            param_inputs: vec![GraphEdge {
+                source: GraphSource::InputLeaf {
+                    ref_idx: 0,
+                    sub_idx: 0,
+                },
+                weight: 1.0,
+            }],
+        }],
+        execute_gate: ExecuteGate {
+            inputs: vec![GraphEdge {
+                source: GraphSource::InputLeaf {
+                    ref_idx: 0,
+                    sub_idx: 5,
+                },
+                weight: 1.0,
+            }],
+        },
+    };
+    let base_genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![InputReference::ActionQueue],
+            backend_def: BackendDef::Graph(def),
+            targets: vec![],
+        }],
+    };
+
+    for seed in 0u64..5_000 {
+        let mut genome = base_genome.clone();
+        let mut r = rng(seed);
+        InputRefMutator::apply(
+            &mut genome,
+            InputRefOperator::Swap,
+            &[],
+            0.0,
+            &mut r,
+            &config,
+        )
+        .unwrap();
+
+        let new_ref = genome.nodes[0].input_refs[0].clone();
+        if sub_value_count(&new_ref, &config) != 1 {
+            continue;
+        }
+
+        let BackendDef::Graph(graph) = &genome.nodes[0].backend_def else {
+            panic!("expected graph backend");
+        };
+
+        // Compute input with sub_idx 3 should be removed, sub_idx 0 should remain.
+        assert_eq!(graph.compute_nodes[0].inputs.len(), 1);
+        assert!(matches!(
+            graph.compute_nodes[0].inputs[0].source,
+            GraphSource::InputLeaf {
+                ref_idx: 0,
+                sub_idx: 0
+            }
+        ));
+
+        // Wired surface edges with out-of-range sub_idx should be removed.
+        assert!(graph.output_sinks[0].inputs.is_empty());
+        assert!(graph.action_bank[0].gate_inputs.is_empty());
+        assert!(graph.execute_gate.inputs.is_empty());
+
+        // Valid sub_idx 0 action param edge should remain.
+        assert_eq!(graph.action_bank[0].param_inputs.len(), 1);
+        assert!(matches!(
+            graph.action_bank[0].param_inputs[0].source,
+            GraphSource::InputLeaf {
+                ref_idx: 0,
+                sub_idx: 0
+            }
+        ));
+        return;
+    }
+
+    panic!("did not hit scalar swap target in tested seeds");
 }
 
 #[test]

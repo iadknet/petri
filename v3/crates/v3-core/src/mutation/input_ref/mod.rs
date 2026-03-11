@@ -5,6 +5,7 @@ use crate::contracts::{
     DynamicIntrospectionKey, InputReference, StaticIntrospectionKey, WorldInputKey,
 };
 use crate::creature::genome::CreatureGenome;
+use crate::mutation::compound::sub_value_count;
 use crate::mutation::reachability::biased_select_from;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
@@ -206,7 +207,7 @@ fn apply_swap(
     reachable_nodes: &[usize],
     bias: f64,
     rng: &mut impl Rng,
-    _config: &MutationConfig,
+    config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let eligible: Vec<usize> = genome
         .nodes
@@ -223,6 +224,11 @@ fn apply_swap(
     let ref_idx = rng.gen_range(0..genome.nodes[node_idx].input_refs.len());
     let new_ref = random_input_reference(rng);
     genome.nodes[node_idx].input_refs[ref_idx] = new_ref;
+    let new_width = sub_value_count(&genome.nodes[node_idx].input_refs[ref_idx], config);
+    debug_assert!(ref_idx <= u16::MAX as usize, "input_refs index exceeds u16");
+    genome.nodes[node_idx]
+        .backend_def
+        .clamp_sub_idx_after_swap(ref_idx as u16, new_width);
     Ok(reachability)
 }
 

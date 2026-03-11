@@ -7,7 +7,8 @@
 use rand::Rng;
 
 use crate::creature::genome::cgp::{
-    CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
+    ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
+    WorldActionKind,
 };
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::mutation::types::MutationSkipReason;
@@ -52,6 +53,15 @@ pub(super) fn mutate_operator_param(
 ) -> Result<(), MutationSkipReason> {
     let def = graph_def_mut(genome, node_idx)?;
     mutate_compute_param(def, rng)
+}
+
+pub(super) fn mutate_action_slot_behavior(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    let def = graph_def_mut(genome, node_idx)?;
+    mutate_action_slot_behavior_in_def(def, rng)
 }
 
 pub(super) fn add_internal_node(
@@ -204,6 +214,36 @@ pub(crate) fn random_compute_node_kind(rng: &mut impl Rng) -> ComputeNodeKind {
         16 => ComputeNodeKind::Oscillator(rng.gen_range(0.01f32..=8.0)),
         17 => ComputeNodeKind::AdaptiveGain,
         _ => ComputeNodeKind::Constant(rng.gen_range(-1.0f32..=1.0)),
+    }
+}
+
+fn random_action_slot_behavior_excluding(
+    current: ActionSlotBehavior,
+    rng: &mut impl Rng,
+) -> ActionSlotBehavior {
+    match current {
+        ActionSlotBehavior::Pop => ActionSlotBehavior::Emit(random_world_action_kind(rng)),
+        ActionSlotBehavior::Emit(current_kind) => {
+            if rng.gen_bool(0.5) {
+                ActionSlotBehavior::Pop
+            } else {
+                let mut next_kind = random_world_action_kind(rng);
+                while next_kind == current_kind {
+                    next_kind = random_world_action_kind(rng);
+                }
+                ActionSlotBehavior::Emit(next_kind)
+            }
+        }
+    }
+}
+
+fn random_world_action_kind(rng: &mut impl Rng) -> WorldActionKind {
+    match rng.gen_range(0u8..5) {
+        0 => WorldActionKind::Eat,
+        1 => WorldActionKind::Move,
+        2 => WorldActionKind::Reproduce,
+        3 => WorldActionKind::StealEnergy,
+        _ => WorldActionKind::NoOp,
     }
 }
 
@@ -600,6 +640,20 @@ pub(crate) fn mutate_compute_param(
         }
         _ => unreachable!("is_compute_parameterized filter"),
     }
+    Ok(())
+}
+
+/// Mutate one action slot's behavior (Pop vs Emit(kind)).
+pub(crate) fn mutate_action_slot_behavior_in_def(
+    def: &mut CgpGraphBackendDef,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    if def.action_bank.is_empty() {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
+    let slot_idx = rng.gen_range(0..def.action_bank.len());
+    let current = def.action_bank[slot_idx].behavior;
+    def.action_bank[slot_idx].behavior = random_action_slot_behavior_excluding(current, rng);
     Ok(())
 }
 
