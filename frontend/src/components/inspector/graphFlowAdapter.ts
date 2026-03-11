@@ -64,18 +64,17 @@ export function buildGraphFlowScene(input: {
 		});
 	}
 
+	const nodeById = new Map(model.nodes.map((n) => [n.id, n]));
+
 	const flowEdges: Edge<WeightEdgeData>[] = [];
 	for (const me of model.edges) {
-		const sourceNode = model.nodes.find((n) => n.id === me.sourceId);
-		const targetNode = model.nodes.find((n) => n.id === me.targetId);
+		const sourceNode = nodeById.get(me.sourceId);
+		const targetNode = nodeById.get(me.targetId);
+		// Input and output nodes are always "live"; only compute nodes use liveSet
 		const sourceLive =
-			sourceNode?.nodeType === "compute"
-				? liveSet.has(sourceNode.arrayIndex)
-				: sourceNode?.nodeType !== "input" || true;
+			sourceNode?.nodeType === "compute" ? liveSet.has(sourceNode.arrayIndex) : true;
 		const targetLive =
-			targetNode?.nodeType === "compute"
-				? liveSet.has(targetNode.arrayIndex)
-				: targetNode?.nodeType !== "input" || true;
+			targetNode?.nodeType === "compute" ? liveSet.has(targetNode.arrayIndex) : true;
 		const endpointsLive = sourceLive && targetLive;
 
 		const weightOpacity = Math.max(0.2, Math.min(Math.abs(me.weight), 1));

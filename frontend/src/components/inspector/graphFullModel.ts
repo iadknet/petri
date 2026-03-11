@@ -76,8 +76,9 @@ function computeBaseWidth(label: string): number {
 function collectEdgesFromSources(
 	edges: GraphEdge[],
 	targetId: string,
+	targetArrayIndex: number,
 	targetType: "compute" | "output",
-	inputNodeIds: Map<string, true>,
+	inputNodeIds: Set<string>,
 	edgePrefix: string,
 ): GraphModelEdge[] {
 	const result: GraphModelEdge[] = [];
@@ -88,9 +89,7 @@ function collectEdgesFromSources(
 		if ("ComputeNode" in source) {
 			const sourceId = `cn:${source.ComputeNode}`;
 			const edgeType = targetType === "compute" ? "compute_to_compute" : "compute_to_output";
-			const isBackward =
-				targetType === "compute" &&
-				source.ComputeNode >= Number.parseInt(targetId.replace("cn:", ""), 10);
+			const isBackward = targetType === "compute" && source.ComputeNode >= targetArrayIndex;
 			result.push({
 				id: `${edgePrefix}:${i}`,
 				sourceId,
@@ -123,7 +122,7 @@ export function buildFullGraphModel(
 ): FullGraphModel {
 	const nodes: GraphModelNode[] = [];
 	const allEdges: GraphModelEdge[] = [];
-	const inputNodeIds = new Map<string, true>();
+	const inputNodeIds = new Set<string>();
 
 	// Phase 1: Discover all unique input sources across the entire graph
 	const allGraphEdges: GraphEdge[] = [];
@@ -139,12 +138,10 @@ export function buildFullGraphModel(
 	}
 	for (const edge of graphDef.execute_gate.inputs) allGraphEdges.push(edge);
 
-	const seenInputIds = new Set<string>();
 	for (const edge of allGraphEdges) {
 		const inId = inputNodeId(edge.source);
-		if (inId && !seenInputIds.has(inId)) {
-			seenInputIds.add(inId);
-			inputNodeIds.set(inId, true);
+		if (inId && !inputNodeIds.has(inId)) {
+			inputNodeIds.add(inId);
 			const label = inputLabel(edge.source, inputRefs);
 			nodes.push({
 				id: inId,
@@ -224,7 +221,7 @@ export function buildFullGraphModel(
 		const cn = graphDef.compute_nodes[i];
 		if (!cn) continue;
 		allEdges.push(
-			...collectEdgesFromSources(cn.inputs, `cn:${i}`, "compute", inputNodeIds, `cn:${i}`),
+			...collectEdgesFromSources(cn.inputs, `cn:${i}`, i, "compute", inputNodeIds, `cn:${i}`),
 		);
 	}
 
@@ -232,7 +229,7 @@ export function buildFullGraphModel(
 		const sink = graphDef.output_sinks[i];
 		if (!sink || sink.inputs.length === 0) continue;
 		allEdges.push(
-			...collectEdgesFromSources(sink.inputs, `sink:${i}`, "output", inputNodeIds, `sink:${i}`),
+			...collectEdgesFromSources(sink.inputs, `sink:${i}`, i, "output", inputNodeIds, `sink:${i}`),
 		);
 	}
 
@@ -243,6 +240,7 @@ export function buildFullGraphModel(
 			...collectEdgesFromSources(
 				slot.gate_inputs,
 				`act:${i}`,
+				i,
 				"output",
 				inputNodeIds,
 				`act:${i}:gate`,
@@ -252,6 +250,7 @@ export function buildFullGraphModel(
 			...collectEdgesFromSources(
 				slot.param_inputs,
 				`act:${i}`,
+				i,
 				"output",
 				inputNodeIds,
 				`act:${i}:param`,
@@ -264,6 +263,7 @@ export function buildFullGraphModel(
 			...collectEdgesFromSources(
 				graphDef.execute_gate.inputs,
 				"gate",
+				0,
 				"output",
 				inputNodeIds,
 				"gate",

@@ -44,8 +44,8 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 	graphDef,
 	liveIndices,
 	inputRefs,
-	targets: _targets,
-	routeTargetIdx: _routeTargetIdx,
+	targets: _targets, // TODO: wire up resolveSelectedTarget for RouterOutput nodes
+	routeTargetIdx: _routeTargetIdx, // TODO: wire up resolveSelectedTarget for RouterOutput nodes
 	trace,
 	detailIndex,
 }: GraphInternalsVizProps) {
@@ -100,10 +100,9 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 	// 4. Build trace overlay
 	const traceOverlay = useMemo(() => {
 		if (!trace) return null;
-		return new Map([
-			...buildComputeTraceOverlay(trace, detailIndex),
-			...buildOutputTraceOverlay(trace),
-		]);
+		const overlay = buildComputeTraceOverlay(trace, detailIndex);
+		for (const [k, v] of buildOutputTraceOverlay(trace)) overlay.set(k, v);
+		return overlay;
 	}, [trace, detailIndex]);
 
 	// 5. Build ReactFlow scene
