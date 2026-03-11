@@ -80,6 +80,7 @@ function collectEdgesFromSources(
 	targetType: "compute" | "output",
 	inputNodeIds: Set<string>,
 	edgePrefix: string,
+	computeNodeCount: number,
 ): GraphModelEdge[] {
 	const result: GraphModelEdge[] = [];
 	for (let i = 0; i < edges.length; i++) {
@@ -87,9 +88,11 @@ function collectEdgesFromSources(
 		if (!edge) continue;
 		const source = edge.source;
 		if ("ComputeNode" in source) {
-			const sourceId = `cn:${source.ComputeNode}`;
+			const idx = source.ComputeNode;
+			if (idx < 0 || idx >= computeNodeCount) continue;
+			const sourceId = `cn:${idx}`;
 			const edgeType = targetType === "compute" ? "compute_to_compute" : "compute_to_output";
-			const isBackward = targetType === "compute" && source.ComputeNode >= targetArrayIndex;
+			const isBackward = targetType === "compute" && idx >= targetArrayIndex;
 			result.push({
 				id: `${edgePrefix}:${i}`,
 				sourceId,
@@ -190,7 +193,7 @@ export function buildFullGraphModel(
 
 	for (let i = 0; i < graphDef.action_bank.length; i++) {
 		const slot = graphDef.action_bank[i];
-		if (!slot) continue;
+		if (!slot || (slot.gate_inputs.length === 0 && slot.param_inputs.length === 0)) continue;
 		const behaviorLabel = formatActionSlotBehavior(slot.behavior);
 		nodes.push({
 			id: `act:${i}`,
@@ -217,11 +220,20 @@ export function buildFullGraphModel(
 	}
 
 	// Phase 4: Collect all edges
-	for (let i = 0; i < graphDef.compute_nodes.length; i++) {
+	const cnCount = graphDef.compute_nodes.length;
+	for (let i = 0; i < cnCount; i++) {
 		const cn = graphDef.compute_nodes[i];
 		if (!cn) continue;
 		allEdges.push(
-			...collectEdgesFromSources(cn.inputs, `cn:${i}`, i, "compute", inputNodeIds, `cn:${i}`),
+			...collectEdgesFromSources(
+				cn.inputs,
+				`cn:${i}`,
+				i,
+				"compute",
+				inputNodeIds,
+				`cn:${i}`,
+				cnCount,
+			),
 		);
 	}
 
@@ -229,13 +241,21 @@ export function buildFullGraphModel(
 		const sink = graphDef.output_sinks[i];
 		if (!sink || sink.inputs.length === 0) continue;
 		allEdges.push(
-			...collectEdgesFromSources(sink.inputs, `sink:${i}`, i, "output", inputNodeIds, `sink:${i}`),
+			...collectEdgesFromSources(
+				sink.inputs,
+				`sink:${i}`,
+				i,
+				"output",
+				inputNodeIds,
+				`sink:${i}`,
+				cnCount,
+			),
 		);
 	}
 
 	for (let i = 0; i < graphDef.action_bank.length; i++) {
 		const slot = graphDef.action_bank[i];
-		if (!slot) continue;
+		if (!slot || (slot.gate_inputs.length === 0 && slot.param_inputs.length === 0)) continue;
 		allEdges.push(
 			...collectEdgesFromSources(
 				slot.gate_inputs,
@@ -244,6 +264,7 @@ export function buildFullGraphModel(
 				"output",
 				inputNodeIds,
 				`act:${i}:gate`,
+				cnCount,
 			),
 		);
 		allEdges.push(
@@ -254,6 +275,7 @@ export function buildFullGraphModel(
 				"output",
 				inputNodeIds,
 				`act:${i}:param`,
+				cnCount,
 			),
 		);
 	}
@@ -267,6 +289,7 @@ export function buildFullGraphModel(
 				"output",
 				inputNodeIds,
 				"gate",
+				cnCount,
 			),
 		);
 	}
