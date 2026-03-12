@@ -373,3 +373,98 @@ fn nan_in_add_becomes_zero() {
     let (r, _, _) = run_vm(program, 2, vec![2e9_f32], &[], zeroed_upstream(), 100.0);
     assert!((r.output_slots[0] - 1_000_000_000.0).abs() < 1.0);
 }
+
+// ── SetPriorityBid overconsumption ──────────────────────────────────────
+
+#[test]
+fn priority_bid_capped_at_available_energy() {
+    // A bid of 500.0 with only 100.0 energy should never drive energy negative.
+    // Uses opcode_cost_multiplier=1.0 for deterministic cost accounting.
+    let def = VmBackendDef {
+        register_count: 1,
+        constants: vec![500.0],
+        program: vec![
+            VmInstruction::LoadConst {
+                dst: 0,
+                const_idx: 0,
+            },
+            VmInstruction::SetPriorityBid { src: 0 },
+            VmInstruction::Halt,
+        ],
+    };
+    let ss = empty_sensor_snapshot();
+    let mut e = 100.0;
+    let mut mem = [0.0f32; 16];
+    let prev_mem = [0.0f32; 16];
+    let mut cfg = config();
+    cfg.vm.opcode_cost_multiplier = 1.0;
+    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
+    let _r = execute_vm_node(
+        &def,
+        &[],
+        &zeroed_upstream(),
+        &mut e,
+        0.0,
+        &mut mem,
+        &prev_mem,
+        &ss,
+        &cfg,
+        &mut side_outputs,
+    );
+    assert!(
+        e >= 0.0,
+        "energy must never go negative from a priority bid; got {}",
+        e,
+    );
+}
+
+#[test]
+fn oversized_bid_produces_exact_all_in_exhaustion() {
+    // When the requested bid (500.0) exceeds available energy, the bid is capped
+    // to available energy, producing an exact all-in: energy lands at 0.0 and the
+    // creature exhausts. Verify the energy is exactly zero (not negative) and the
+    // creature is correctly marked exhausted.
+    // Uses opcode_cost_multiplier=1.0 for deterministic cost accounting.
+    let starting_energy = 100.0_f32;
+    let def = VmBackendDef {
+        register_count: 1,
+        constants: vec![500.0],
+        program: vec![
+            VmInstruction::LoadConst {
+                dst: 0,
+                const_idx: 0,
+            },
+            VmInstruction::SetPriorityBid { src: 0 },
+            VmInstruction::Halt,
+        ],
+    };
+    let ss = empty_sensor_snapshot();
+    let mut e = starting_energy;
+    let mut mem = [0.0f32; 16];
+    let prev_mem = [0.0f32; 16];
+    let mut cfg = config();
+    cfg.vm.opcode_cost_multiplier = 1.0;
+    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
+    let r = execute_vm_node(
+        &def,
+        &[],
+        &zeroed_upstream(),
+        &mut e,
+        0.0,
+        &mut mem,
+        &prev_mem,
+        &ss,
+        &cfg,
+        &mut side_outputs,
+    );
+    // Capped bid drains all remaining energy → exact zero, not negative.
+    assert_eq!(
+        e, 0.0,
+        "capped bid should drain energy to exactly 0.0; got {e}"
+    );
+    // All-in bid correctly triggers exhaustion.
+    assert!(
+        r.energy_exhausted,
+        "creature should be exhausted after all-in capped bid",
+    );
+}

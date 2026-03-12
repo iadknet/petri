@@ -393,7 +393,7 @@ pub(crate) fn execute_vm_node_traced(
 
             VmInstruction::SetPriorityBid { src } => {
                 let raw = regs[nr(*src, reg_count)];
-                let bid = if raw > 0.0 { raw } else { 0.0 };
+                let bid = if raw > 0.0 { raw.min(*energy) } else { 0.0 };
                 *energy -= bid;
                 if *energy <= 0.0 {
                     trace_steps.push(VmStepTrace {

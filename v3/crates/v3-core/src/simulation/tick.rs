@@ -507,6 +507,11 @@ pub fn run_tick(
                 }
             }
 
+            // Floor energy at 0.0 — creatures cannot spend more than they have.
+            if let Some(creature) = sim.creatures.get_mut(id) {
+                creature.energy = creature.energy.max(0.0);
+            }
+
             if remove_creature_if_dead(sim, id) {
                 break;
             }
@@ -589,6 +594,8 @@ pub fn run_tick(
                     }
                 }
             }
+            // Floor energy at 0.0 — same invariant as Phase 2 action costs.
+            creature.energy = creature.energy.max(0.0);
         }
     }
 

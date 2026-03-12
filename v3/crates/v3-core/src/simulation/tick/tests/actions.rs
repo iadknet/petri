@@ -247,3 +247,55 @@ fn priority_bid_stats_tracked_after_tick() {
     assert_eq!(sim.stats.last_tick_priority_bid_mean, 0.0);
     assert_eq!(sim.stats.last_tick_priority_bidders_count, 0);
 }
+
+#[test]
+fn energy_floor_at_zero_after_action_execution() {
+    // Bug: the tick loop's Phase 2 action costs (move_cost + failed_action_penalty)
+    // can drive energy deeply negative before the death check fires. With a high
+    // age multiplier (10x at age 500), a creature with 3.0 energy paying 60.0 in
+    // costs ends up at -57.0.
+    //
+    // The tick loop must floor energy at 0.0 after each action so that stored
+    // energy never goes negative. We test this by queuing TWO failed moves.
+    // Without the floor, the first failure drives energy to -57.0 and the second
+    // failure subtracts another 60.0 from that. With the floor, the first action
+    // clamps energy to 0.0 and the creature is removed before the second action
+    // runs — confirming the floor + death check works correctly.
+    let genome = vm_program_genome(vec![
+        // Queue two Move(N) actions. Both will fail against the barrier.
+        crate::creature::genome::VmInstruction::PushAction { action_type: 2 },
+        crate::creature::genome::VmInstruction::PushAction { action_type: 2 },
+        crate::creature::genome::VmInstruction::ExecuteActionQueue,
+    ]);
+    let (mut sim, id) = make_sim_with_custom_genome(3.0, genome);
+
+    // High age → maximum age-cost multiplier (10x).
+    sim.creatures[id].age = 500;
+    // Disable energy decay so it doesn't confound the test.
+    sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
+
+    // Place barrier directly north of creature at (5,5) so moves fail.
+    sim.world.set_barrier(Position::new(5, 4), true);
+
+    run_tick(&mut sim, &mut None);
+
+    // Creature should be dead after the first failed move exhausted its energy.
+    assert!(
+        !sim.creatures.contains_key(id),
+        "creature should die after action costs exhaust energy",
+    );
+    // Only ONE move should have been attempted — the floor clamp ensures the
+    // creature is removed before processing the second action.
+    assert_eq!(
+        sim.stats.last_tick_move, 1,
+        "only one move should execute before creature dies; second should be prevented",
+    );
+    // Verify no surviving creature has negative energy (global invariant).
+    for (cid, creature) in &sim.creatures {
+        assert!(
+            creature.energy >= 0.0,
+            "creature {cid:?} has negative energy {}",
+            creature.energy,
+        );
+    }
+}
