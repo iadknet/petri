@@ -108,4 +108,11 @@ describe("ConfigPanel", () => {
 			});
 		});
 	});
+
+	it("does not render legacy input auto-connect runtime field", () => {
+		render(<ConfigPanel />);
+		expect(
+			screen.queryByTestId("config-field-mutation-input-auto-connect"),
+		).not.toBeInTheDocument();
+	});
 });

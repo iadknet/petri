@@ -395,9 +395,11 @@ pub struct MutationConfig {
     pub phenotype: PhenotypeConfig,
     #[serde(default)]
     pub reachable_bias: ReachableBiasConfig,
-    /// Per-leaf probability that a newly created InputRef leaf node gets a
-    /// bootstrap edge to a random pre-existing internal node. Default 0.3.
-    #[serde(default = "default_input_auto_connect_chance")]
+    /// Legacy ingress-only field.
+    ///
+    /// This key is accepted in startup/PATCH payloads for backward compatibility,
+    /// but is omitted from emitted runtime config payloads.
+    #[serde(default = "default_input_auto_connect_chance", skip_serializing)]
     pub input_auto_connect_chance: f32,
     #[serde(default)]
     pub topology_new_node_birth: TopologyNewNodeBirthConfig,
@@ -1404,6 +1406,20 @@ mod tests {
         let stripped = serde_json::to_string(&obj).unwrap();
         let mc: MutationConfig = serde_json::from_str(&stripped).unwrap();
         assert!((mc.reachable_bias.topology - 0.7).abs() < 1e-9);
+    }
+
+    #[test]
+    fn mutation_config_serialization_omits_legacy_input_auto_connect_field() {
+        let cfg = SimulationConfig::default();
+        let json = serde_json::to_value(&cfg).unwrap();
+        let mutation = json
+            .get("mutation")
+            .and_then(serde_json::Value::as_object)
+            .expect("mutation object");
+        assert!(
+            !mutation.contains_key("input_auto_connect_chance"),
+            "legacy field must be omitted from emitted runtime config"
+        );
     }
 
     #[test]
