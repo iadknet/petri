@@ -96,6 +96,9 @@ Type posture:
 | `mutation.reachable_bias.vm` | `f64` | `0.7` | Probability that VM operators prefer reachable nodes. Same normalization. |
 | `mutation.reachable_bias.graph` | `f64` | `0.7` | Probability that graph operators prefer reachable nodes. Same normalization. |
 | `mutation.reachable_bias.input_ref` | `f64` | `0.5` | Probability that input-ref operators prefer reachable nodes. Same normalization. |
+| `mutation.topology_new_node_birth.graph_backend_chance` | `f32` | `0.5` | Probability that topology newborns (`AddNode`, `SpliceNode`) are graph-backed instead of minimal VM. Clamp to `[0.0, 1.0]`; NaN/infinite falls back to `0.5`. |
+| `mutation.topology_new_node_birth.graph_initialized_chance` | `f32` | `0.5` | Given graph-backed newborn, probability that it starts with one `input_ref` and one custom-output wire. Clamp to `[0.0, 1.0]`; NaN/infinite falls back to `0.5`. |
+| `mutation.topology_new_node_birth.graph_compute_gate_chance` | `f32` | `0.5` | Given initialized graph newborn, probability that initial sink wiring routes through one newborn compute node instead of direct `InputLeaf` -> sink wiring. Clamp to `[0.0, 1.0]`; NaN/infinite falls back to `0.5`. |
 
 Phenotype mutation is not a mutation engine domain; it is a separate pathway
 triggered by genome mutation. Phenotype algorithm and trigger semantics are
@@ -113,6 +116,12 @@ Mutation randomization semantics:
 
 Mutation behavior semantics remain canonical in `v3-mutation-spec.md`; this
 section only owns config contract shape/defaults.
+
+Legacy compatibility note:
+- `mutation.input_auto_connect_chance` is a deprecated ingress-only key.
+- Runtime config responses must omit it.
+- Implementations may accept it in startup/PATCH payloads for backward
+  compatibility, but it has no effect on current mutation behavior.
 
 Queue-shape coupling invariant:
 - `mutation.action_queue_cap <= runtime.max_actions_per_turn`.

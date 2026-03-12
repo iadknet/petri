@@ -88,6 +88,12 @@ Core rule:
 - `SpliceNode`
 - `SwapRouteTargets`
 
+Topology newborn policy note:
+- `AddNode` and `SpliceNode` newborn backend/initialization behavior is
+  configured by `mutation.topology_new_node_birth.*` fields.
+- Canonical defaults/normalization for those fields are owned by
+  `v3-runtime-config-spec.md`.
+
 ### VM domain
 
 - `VmInstructionMutation` (insert/delete/replace opcode, mutate operands)

@@ -594,6 +594,38 @@ async fn patch_config_roundtrips_topology_new_node_birth_fields() {
     assert_eq!(fetched["graph_compute_gate_chance"].as_f64(), Some(1.0));
 }
 
+// ── 11d. patch_config_accepts_legacy_input_auto_connect_without_echo ────────
+
+#[tokio::test]
+async fn patch_config_accepts_legacy_input_auto_connect_without_echo() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let patch = r#"{
+        "mutation": {
+            "input_auto_connect_chance": 0.9
+        }
+    }"#;
+
+    let (patch_status, patch_body) =
+        do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
+    assert_eq!(patch_status, StatusCode::OK, "body: {patch_body}");
+    assert!(
+        patch_body["config"]["mutation"]["input_auto_connect_chance"].is_null(),
+        "legacy field must not be echoed in PATCH response: {patch_body}"
+    );
+
+    let (get_status, get_body) = do_request(a, get_req("/v3/simulation/config")).await;
+    assert_eq!(get_status, StatusCode::OK, "body: {get_body}");
+    assert!(
+        get_body["config"]["mutation"]["input_auto_connect_chance"].is_null(),
+        "legacy field must not appear in GET response: {get_body}"
+    );
+}
+
 // ── 12. error_envelope_has_protocol_version ─────────────────────────────────
 
 #[tokio::test]

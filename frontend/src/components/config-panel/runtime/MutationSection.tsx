@@ -125,17 +125,6 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		defaultValue: 4,
 		tooltip: "Maximum number of actions in the creature action queue",
 	},
-	{
-		path: "mutation.input_auto_connect_chance",
-		label: "Input Auto-Connect",
-		min: 0,
-		max: 1,
-		step: 0.01,
-		testId: "config-field-mutation-input-auto-connect",
-		defaultValue: 0.3,
-		tooltip:
-			"Probability that new InputRef leaf nodes are automatically connected to reachable inputs",
-	},
 	...MUTATION_NEWBORN_FIELDS,
 	{
 		path: "mutation.reachable_bias.topology",

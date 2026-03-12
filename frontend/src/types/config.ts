@@ -92,7 +92,6 @@ export interface MutationConfig {
 	action_queue_cap: number;
 	phenotype: PhenotypeConfig;
 	reachable_bias: ReachableBiasConfig;
-	input_auto_connect_chance: number;
 	topology_new_node_birth: TopologyNewNodeBirthConfig;
 }
 
