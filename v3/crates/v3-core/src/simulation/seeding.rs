@@ -6,7 +6,7 @@ use slotmap::{SecondaryMap, SlotMap};
 use crate::config::SimulationConfig;
 use crate::contracts::{CreatureId, InputReference, Position, WorldInputKey};
 use crate::creature::action_log::ActionLog;
-use crate::creature::founder::v3alpha1_founder_genome;
+use crate::creature::founder::founder_genome;
 use crate::creature::genome::CreatureGenome;
 use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::CreatureState;
@@ -59,7 +59,7 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
     let log_capacity = config.action_log.capacity;
 
     for (founder_index, &pos) in positions.iter().take(spawn_count).enumerate() {
-        let genome = v3alpha1_founder_genome();
+        let genome = founder_genome(config.population.founder_profile);
         let energy = config.energy.lifecycle.initial_energy;
         let identity = CreatureIdentityState::founder(founder_index, seed);
         // Insert into slotmap to get an id, then fill with actual state.
@@ -132,7 +132,8 @@ pub fn seed_simulation_with_perception_mix(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::SimulationConfig;
+    use crate::config::{FounderProfile, SimulationConfig};
+    use crate::creature::genome::{BackendDef, VmInstruction};
     use crate::sensors::perception::genome_uses_extended_perception;
     use std::collections::HashSet;
 
@@ -310,6 +311,33 @@ mod tests {
                 .filter(|creature| genome_uses_extended_perception(&creature.genome))
                 .count(),
             200
+        );
+    }
+
+    #[test]
+    fn seeding_uses_configured_founder_profile() {
+        let mut cfg = small_config();
+        cfg.population.founder_profile = FounderProfile::ForageFirstSparse;
+        let sim = seed_simulation(cfg, 42);
+        let founder = sim.creatures.values().next().expect("seeded founder");
+        let BackendDef::Vm(vm) = &founder.genome.nodes[1].backend_def else {
+            panic!("node 1 should be VM backend");
+        };
+
+        let first_eat = vm
+            .program
+            .iter()
+            .position(|instr| matches!(instr, VmInstruction::PushAction { action_type: 1 }))
+            .expect("eat action should exist");
+        let first_reproduce = vm
+            .program
+            .iter()
+            .position(|instr| matches!(instr, VmInstruction::PushAction { action_type: 3 }))
+            .expect("reproduce action should exist");
+
+        assert!(
+            first_eat < first_reproduce,
+            "forage-first founder should prioritize eat before reproduce"
         );
     }
 }

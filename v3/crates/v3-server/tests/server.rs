@@ -680,6 +680,28 @@ async fn patch_config_accepts_legacy_input_auto_connect_without_echo() {
     );
 }
 
+// ── 11e. startup_accepts_founder_profile_and_get_config_roundtrips ─────────
+
+#[tokio::test]
+async fn startup_accepts_founder_profile_and_get_config_roundtrips() {
+    let a = app();
+    let startup_body = r#"{
+        "seed": 7,
+        "population": {
+            "founder_profile": "forage_first_sparse_rich_offspring"
+        }
+    }"#;
+    let (startup_status, startup_resp) = do_request(a.clone(), startup_req(startup_body)).await;
+    assert_eq!(startup_status, StatusCode::OK, "body: {startup_resp}");
+
+    let (get_status, get_body) = do_request(a, get_req("/v3/simulation/config")).await;
+    assert_eq!(get_status, StatusCode::OK, "body: {get_body}");
+    assert_eq!(
+        get_body["config"]["population"]["founder_profile"].as_str(),
+        Some("forage_first_sparse_rich_offspring")
+    );
+}
+
 // ── 12. error_envelope_has_protocol_version ─────────────────────────────────
 
 #[tokio::test]
