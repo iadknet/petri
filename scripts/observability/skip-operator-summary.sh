@@ -18,8 +18,13 @@ fetch_json "/v3/simulation/status" | "${JQ_BIN}" --argjson threshold "${threshol
 		skip_total: .mutation_events_skipped_total,
 		applied_total: .mutation_events_applied_total,
 		skip_ratio: (
-			.mutation_events_skipped_total
-			/ (.mutation_events_skipped_total + .mutation_events_applied_total)
+			if ((.mutation_events_skipped_total + .mutation_events_applied_total) == 0)
+			then 0
+			else (
+				.mutation_events_skipped_total
+				/ (.mutation_events_skipped_total + .mutation_events_applied_total)
+			)
+			end
 		),
 		top_skipped_operators: (
 			[

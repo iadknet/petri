@@ -25,7 +25,7 @@ pub struct WorldFoodConfig {
 impl Default for WorldFoodConfig {
     fn default() -> Self {
         Self {
-            growth_rate: 0.096,
+            growth_rate: 0.05,
             initial_density: 1.0,
             initial_coverage: 0.15,
             spread_threshold_ratio: 0.8,
@@ -58,6 +58,23 @@ impl Default for WorldConfig {
     }
 }
 
+/// Founder genome profile used when seeding startup creatures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FounderProfile {
+    /// Canonical v3alpha1 founder genome.
+    #[default]
+    V3Alpha1,
+    /// Founder variant that prioritizes foraging before reproduction.
+    ForageFirstSparse,
+    /// Forage-first founder with a higher reproduction gate to delay early branching.
+    ForageFirstSparseConservative,
+    /// Forage-first founder that transfers more energy to offspring.
+    ForageFirstSparseRichOffspring,
+    /// Forage-first founder with a mid-threshold, mid-transfer reproduction policy.
+    ForageFirstSparseBalanced,
+}
+
 /// Energy lifecycle config. Canonical owner: v3-runtime-config-spec.md Section 4.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -75,7 +92,7 @@ impl Default for EnergyLifecycleConfig {
             initial_energy: 20.0,
             max_energy: 200.0,
             energy_decay_per_tick: 0.5,
-            min_reproduce_energy: 1.0,
+            min_reproduce_energy: 30.0,
             default_offspring_energy: 100.0,
         }
     }
@@ -97,11 +114,11 @@ pub struct EnergyCostsConfig {
 impl Default for EnergyCostsConfig {
     fn default() -> Self {
         Self {
-            move_cost: 1.0,
+            move_cost: 0.2,
             eat_cost: 0.0,
             noop_cost: 0.05,
             reproduce_cost: 0.1,
-            eat_reward_per_food: 12.0,
+            eat_reward_per_food: 5.0,
             failed_action_penalty: 5.0,
         }
     }
@@ -477,6 +494,8 @@ impl Default for SharedMemoryConfig {
 pub struct PopulationConfig {
     pub initial_creatures: u32,
     pub max_creatures: u32,
+    #[serde(default)]
+    pub founder_profile: FounderProfile,
 }
 
 impl Default for PopulationConfig {
@@ -484,6 +503,7 @@ impl Default for PopulationConfig {
         Self {
             initial_creatures: 2000,
             max_creatures: 100000,
+            founder_profile: FounderProfile::default(),
         }
     }
 }
@@ -519,7 +539,7 @@ impl SimulationConfig {
             w.height = 400;
         }
         w.food.max_density = normalize_f32_finite_positive(w.food.max_density, 1.0);
-        w.food.growth_rate = normalize_f32_clamp(w.food.growth_rate, 0.0, 1.0, 0.096);
+        w.food.growth_rate = normalize_f32_clamp(w.food.growth_rate, 0.0, 1.0, 0.05);
         w.food.initial_coverage = normalize_f32_clamp(w.food.initial_coverage, 0.0, 1.0, 0.15);
         w.food.spread_threshold_ratio =
             normalize_f32_clamp(w.food.spread_threshold_ratio, 0.0, 1.0, 0.8);
@@ -540,16 +560,16 @@ impl SimulationConfig {
         el.initial_energy = normalize_f32_finite_nonneg(el.initial_energy, 20.0);
         el.max_energy = normalize_f32_finite_min(el.max_energy, 1.0, 200.0);
         el.energy_decay_per_tick = normalize_f32_finite_nonneg(el.energy_decay_per_tick, 0.5);
-        el.min_reproduce_energy = normalize_f32_finite_nonneg(el.min_reproduce_energy, 1.0);
+        el.min_reproduce_energy = normalize_f32_finite_nonneg(el.min_reproduce_energy, 30.0);
         el.default_offspring_energy =
             normalize_f32_finite_nonneg(el.default_offspring_energy, 100.0);
 
         let ec = &mut self.energy.costs;
-        ec.move_cost = normalize_f32_finite_nonneg(ec.move_cost, 1.0);
+        ec.move_cost = normalize_f32_finite_nonneg(ec.move_cost, 0.2);
         ec.eat_cost = normalize_f32_finite_nonneg(ec.eat_cost, 0.0);
         ec.noop_cost = normalize_f32_finite_nonneg(ec.noop_cost, 0.05);
         ec.reproduce_cost = normalize_f32_finite_nonneg(ec.reproduce_cost, 0.1);
-        ec.eat_reward_per_food = normalize_f32_finite_nonneg(ec.eat_reward_per_food, 12.0);
+        ec.eat_reward_per_food = normalize_f32_finite_nonneg(ec.eat_reward_per_food, 5.0);
         ec.failed_action_penalty = normalize_f32_finite_nonneg(ec.failed_action_penalty, 5.0);
 
         let cc = &mut self.energy.complexity_cost;
@@ -722,7 +742,7 @@ mod tests {
         assert_eq!(cfg.world.width, 400);
         assert_eq!(cfg.world.height, 400);
         assert!(matches!(cfg.world.edge_mode, WorldEdgeMode::Wrap));
-        assert!((cfg.world.food.growth_rate - 0.096).abs() < 1e-6);
+        assert!((cfg.world.food.growth_rate - 0.05).abs() < 1e-6);
         assert!((cfg.world.food.initial_density - 1.0).abs() < 1e-6);
         assert!((cfg.world.food.initial_coverage - 0.15).abs() < 1e-6);
         assert!((cfg.world.food.spread_threshold_ratio - 0.8).abs() < 1e-6);
@@ -734,7 +754,7 @@ mod tests {
         assert!((cfg.energy.lifecycle.initial_energy - 20.0).abs() < 1e-6);
         assert!((cfg.energy.lifecycle.max_energy - 200.0).abs() < 1e-6);
         assert!((cfg.energy.lifecycle.energy_decay_per_tick - 0.5).abs() < 1e-6);
-        assert!((cfg.energy.lifecycle.min_reproduce_energy - 1.0).abs() < 1e-6);
+        assert!((cfg.energy.lifecycle.min_reproduce_energy - 30.0).abs() < 1e-6);
         assert!((cfg.energy.lifecycle.default_offspring_energy - 100.0).abs() < 1e-6);
         // Complexity energy cost
         assert!(cfg.energy.complexity_cost.enabled);
@@ -745,11 +765,11 @@ mod tests {
         assert_eq!(cfg.energy.age_cost.age_cap, 500);
         assert!((cfg.energy.age_cost.max_multiplier - 10.0).abs() < 1e-6);
         // Energy costs
-        assert!((cfg.energy.costs.move_cost - 1.0).abs() < 1e-6);
+        assert!((cfg.energy.costs.move_cost - 0.2).abs() < 1e-6);
         assert!((cfg.energy.costs.eat_cost - 0.0).abs() < 1e-6);
         assert!((cfg.energy.costs.noop_cost - 0.05).abs() < 1e-6);
         assert!((cfg.energy.costs.reproduce_cost - 0.1).abs() < 1e-6);
-        assert!((cfg.energy.costs.eat_reward_per_food - 12.0).abs() < 1e-6);
+        assert!((cfg.energy.costs.eat_reward_per_food - 5.0).abs() < 1e-6);
         assert!((cfg.energy.costs.failed_action_penalty - 5.0).abs() < 1e-6);
         // Runtime
         assert_eq!(cfg.runtime.max_mesh_hops, 1024);
@@ -791,6 +811,41 @@ mod tests {
         // Population
         assert_eq!(cfg.population.initial_creatures, 2000);
         assert_eq!(cfg.population.max_creatures, 100000);
+        assert_eq!(cfg.population.founder_profile, FounderProfile::V3Alpha1);
+    }
+
+    #[test]
+    fn founder_profile_serde_default_when_missing() {
+        let json = r#"{"initial_creatures":2000,"max_creatures":100000}"#;
+        let pop: PopulationConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(pop.founder_profile, FounderProfile::V3Alpha1);
+    }
+
+    #[test]
+    fn founder_profile_serde_supports_tuned_variants() {
+        let profiles = [
+            ("forage_first_sparse", FounderProfile::ForageFirstSparse),
+            (
+                "forage_first_sparse_conservative",
+                FounderProfile::ForageFirstSparseConservative,
+            ),
+            (
+                "forage_first_sparse_rich_offspring",
+                FounderProfile::ForageFirstSparseRichOffspring,
+            ),
+            (
+                "forage_first_sparse_balanced",
+                FounderProfile::ForageFirstSparseBalanced,
+            ),
+        ];
+
+        for (wire, expected) in profiles {
+            let json = format!(
+                r#"{{"initial_creatures":2000,"max_creatures":100000,"founder_profile":"{wire}"}}"#
+            );
+            let pop: PopulationConfig = serde_json::from_str(&json).unwrap();
+            assert_eq!(pop.founder_profile, expected);
+        }
     }
 
     #[test]
@@ -798,7 +853,7 @@ mod tests {
         let mut cfg = SimulationConfig::default();
         cfg.world.food.growth_rate = f32::NAN;
         cfg.normalize();
-        assert!((cfg.world.food.growth_rate - 0.096).abs() < 1e-6);
+        assert!((cfg.world.food.growth_rate - 0.05).abs() < 1e-6);
     }
 
     #[test]

@@ -3,7 +3,7 @@
 //! Builds the `CgpGraphBackendDef` used by Node 0 of the founder genome.
 //!
 //! The CGP founder graph has:
-//! - 1 ComputeNode: Threshold(24.0) — energy gate for reproduction
+//! - 1 ComputeNode: Threshold(30.0) — energy gate for reproduction
 //! - Full fixed output catalog (45 sinks), with 6 CustomOutput sinks wired
 //! - RouterOutput unwired (default routing to single target)
 //! - Action bank + ExecuteGate start unwired (blank slate for evolution)
@@ -22,7 +22,7 @@ use crate::creature::genome::cgp::{
 ///   3: NeighborOccupiedRing
 ///
 /// Compute nodes:
-///   CN0: Threshold(24.0) — gated by EnergyCurrent (input_ref 1)
+///   CN0: Threshold(30.0) — gated by EnergyCurrent (input_ref 1)
 ///
 /// Wired output sinks:
 ///   CustomOutput(0) ← InputLeaf(0,0) — food_here passthrough
@@ -33,11 +33,21 @@ use crate::creature::genome::cgp::{
 ///   CustomOutput(5) ← InputLeaf(2,6) — food_W
 #[must_use]
 pub(crate) fn build_cgp_founder_graph(config: &MutationConfig) -> CgpGraphBackendDef {
+    build_cgp_founder_graph_with_threshold(config, 30.0)
+}
+
+/// Build the CGP graph backend for the founder's sensor aggregator node
+/// with a configurable reproduction energy threshold.
+#[must_use]
+pub(crate) fn build_cgp_founder_graph_with_threshold(
+    config: &MutationConfig,
+    reproduce_energy_threshold: f32,
+) -> CgpGraphBackendDef {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs(config);
 
     // Single compute node: energy threshold gate
     def.compute_nodes.push(ComputeNode {
-        kind: ComputeNodeKind::Threshold(24.0),
+        kind: ComputeNodeKind::Threshold(reproduce_energy_threshold),
         inputs: vec![GraphEdge {
             source: GraphSource::InputLeaf {
                 ref_idx: 1, // EnergyCurrent
@@ -89,7 +99,7 @@ mod tests {
         let def = build_cgp_founder_graph(&config);
 
         assert_eq!(def.compute_nodes.len(), 1);
-        assert_eq!(def.compute_nodes[0].kind, ComputeNodeKind::Threshold(24.0));
+        assert_eq!(def.compute_nodes[0].kind, ComputeNodeKind::Threshold(30.0));
         assert_eq!(def.compute_nodes[0].inputs.len(), 1);
         assert_eq!(
             def.compute_nodes[0].inputs[0].source,
@@ -98,6 +108,14 @@ mod tests {
                 sub_idx: 0,
             }
         );
+    }
+
+    #[test]
+    fn cgp_founder_custom_threshold() {
+        let config = MutationConfig::default();
+        let def = build_cgp_founder_graph_with_threshold(&config, 40.0);
+        assert_eq!(def.compute_nodes.len(), 1);
+        assert_eq!(def.compute_nodes[0].kind, ComputeNodeKind::Threshold(40.0));
     }
 
     #[test]
