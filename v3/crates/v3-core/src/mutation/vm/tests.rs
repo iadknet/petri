@@ -114,6 +114,60 @@ fn vm_instruction_mutation_changes_program() {
 }
 
 #[test]
+fn vm_delete_instruction_removes_one_instruction() {
+    let mut genome = v3alpha1_founder_genome();
+    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+        vm.program = vec![
+            VmInstruction::Noop,
+            VmInstruction::Halt,
+            VmInstruction::PushAction { action_type: 1 },
+        ];
+    }
+
+    let before_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+        vm.program.len()
+    } else {
+        panic!()
+    };
+    let mut r = rng(7);
+    let result = VmMutator::apply(
+        &mut genome,
+        VmOperator::VmDeleteInstruction,
+        &[],
+        0.0,
+        &mut r,
+        &MutationConfig::default(),
+    );
+    assert!(result.is_ok());
+
+    let after_len = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
+        vm.program.len()
+    } else {
+        panic!()
+    };
+    assert_eq!(after_len + 1, before_len);
+}
+
+#[test]
+fn vm_delete_instruction_skips_single_instruction_program() {
+    let mut genome = v3alpha1_founder_genome();
+    if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
+        vm.program = vec![VmInstruction::Noop];
+    }
+
+    let mut r = rng(11);
+    let result = VmMutator::apply(
+        &mut genome,
+        VmOperator::VmDeleteInstruction,
+        &[],
+        0.0,
+        &mut r,
+        &MutationConfig::default(),
+    );
+    assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+}
+
+#[test]
 fn vm_mutator_on_graph_only_genome_returns_no_applicable_target() {
     let mut genome = v3alpha1_founder_genome();
     // Replace all nodes with Graph-backend nodes.
@@ -144,6 +198,7 @@ fn vm_after_mutation_passes_parseability_gate() {
     let operators = [
         VmOperator::VmConstantMutation,
         VmOperator::VmInstructionMutation,
+        VmOperator::VmDeleteInstruction,
         VmOperator::VmRegisterCountMutation,
         VmOperator::VmInstructionRawFieldMutation,
         VmOperator::VmCopyInstructionBlock,
@@ -1085,7 +1140,7 @@ fn vm_weighted_random_favors_refinement() {
 #[test]
 fn vm_operator_weights_are_positive() {
     let all = VmOperator::ALL;
-    assert_eq!(all.len(), 14, "ALL must cover every VmOperator variant");
+    assert_eq!(all.len(), 15, "ALL must cover every VmOperator variant");
     for &op in &all {
         assert!(op.weight() > 0, "weight must be positive for {:?}", op);
     }
@@ -1127,31 +1182,26 @@ fn random_non_increasing_never_returns_increasing() {
 }
 
 #[test]
-fn random_non_increasing_only_returns_neutral_for_vm() {
-    // VM has no Decreasing operators, so all non-increasing should be Neutral.
+fn vm_has_at_least_one_decreasing_operator() {
     use crate::mutation::types::ComplexityEffect;
-    for seed in 0u64..200 {
-        let mut r = rng(seed);
-        if let Some(op) = VmOperator::random_non_increasing(&mut r) {
-            assert_eq!(
-                op.complexity_effect(),
-                ComplexityEffect::Neutral,
-                "VM non-increasing must be neutral, got {:?} at seed {}",
-                op,
-                seed
-            );
-        }
-    }
+    let saw_decreasing = VmOperator::ALL
+        .iter()
+        .any(|op| op.complexity_effect() == ComplexityEffect::Decreasing);
+    assert!(
+        saw_decreasing,
+        "VM operator set should include at least one Decreasing operator"
+    );
 }
 
 #[test]
-fn random_decreasing_returns_none_for_vm() {
-    // VM has 0 Decreasing operators, so random_decreasing() must always return None.
+fn random_decreasing_returns_some_for_vm() {
+    // VM must expose at least one Decreasing operator for restricted-mode selection.
     for seed in 0u64..200 {
         let mut r = rng(seed);
-        assert!(
-            VmOperator::random_decreasing(&mut r).is_none(),
-            "VM random_decreasing must return None (0 Decreasing operators), seed {}",
+        assert_eq!(
+            VmOperator::random_decreasing(&mut r),
+            Some(VmOperator::VmDeleteInstruction),
+            "VM random_decreasing should select VmDeleteInstruction, seed {}",
             seed
         );
     }

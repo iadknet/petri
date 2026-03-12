@@ -1,9 +1,66 @@
 use super::super::run_tick;
 use super::support::*;
-use crate::contracts::{Direction, Position};
-use crate::simulation::actions::{apply_eat, apply_move, apply_reproduce, apply_steal_energy};
+use crate::contracts::{Direction, InputReference, NodeId, Position, WorldInputKey};
+use crate::creature::genome::{
+    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
+};
+use crate::simulation::actions::{
+    apply_eat, apply_move, apply_reproduce, apply_steal_energy, BarrierReaderState,
+    MoveBlockedCause, ReproductionInvalidTargetCause,
+};
 use crate::simulation::seeding::seed_simulation;
 use rand::SeedableRng;
+use std::collections::HashSet;
+
+fn move_north_with_barrier_reader_genome() -> CreatureGenome {
+    CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![
+                    VmInstruction::ReadInput {
+                        dst: 0,
+                        ref_idx: 0,
+                        sub_idx: 0,
+                    },
+                    VmInstruction::WriteRouteTarget { src: 0 },
+                    VmInstruction::PushAction { action_type: 2 },
+                    VmInstruction::ExecuteActionQueue,
+                ],
+            }),
+            targets: vec![],
+        }],
+    }
+}
+
+fn reproduce_north_with_barrier_reader_genome() -> CreatureGenome {
+    CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![InputReference::World(WorldInputKey::NeighborBarrierRing)],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![
+                    VmInstruction::ReadInput {
+                        dst: 0,
+                        ref_idx: 0,
+                        sub_idx: 0,
+                    },
+                    VmInstruction::WriteRouteTarget { src: 0 },
+                    VmInstruction::PushAction { action_type: 3 },
+                    VmInstruction::ExecuteActionQueue,
+                ],
+            }),
+            targets: vec![],
+        }],
+    }
+}
 
 #[test]
 fn queued_actions_stop_once_action_exhausts_creature_energy() {
@@ -166,6 +223,300 @@ fn failed_action_penalty_increases_with_age() {
     assert!(
         cost_old > cost_young,
         "old creature should pay more for failed action: young={cost_young}, old={cost_old}"
+    );
+}
+
+#[test]
+fn failed_move_records_blocked_barrier_cause_in_tick() {
+    let genome = vm_program_genome(vec![
+        crate::creature::genome::VmInstruction::PushAction { action_type: 2 },
+        crate::creature::genome::VmInstruction::ExecuteActionQueue,
+    ]);
+    let (mut sim, _id) = make_sim_with_custom_genome(100.0, genome);
+    sim.world.set_barrier(Position::new(5, 4), true);
+
+    run_tick(&mut sim, &mut None);
+
+    assert_eq!(
+        sim.stats
+            .move_actions_blocked_total_by_cause
+            .get(&MoveBlockedCause::Barrier)
+            .copied()
+            .unwrap_or(0),
+        1
+    );
+}
+
+#[test]
+fn reproduce_invalid_target_records_barrier_cause_in_tick() {
+    let genome = vm_program_genome(vec![
+        crate::creature::genome::VmInstruction::PushAction { action_type: 3 },
+        crate::creature::genome::VmInstruction::ExecuteActionQueue,
+    ]);
+    let (mut sim, _id) = make_sim_with_custom_genome(100.0, genome);
+    sim.world.set_barrier(Position::new(5, 4), true);
+
+    run_tick(&mut sim, &mut None);
+
+    assert_eq!(
+        sim.stats
+            .reproduction_actions_rejected_invalid_target_total_by_cause
+            .get(&ReproductionInvalidTargetCause::Barrier)
+            .copied()
+            .unwrap_or(0),
+        1
+    );
+}
+
+#[test]
+fn move_barrier_neighbor_counters_split_by_barrier_reader_state() {
+    let no_reader_genome = vm_program_genome(vec![
+        VmInstruction::PushAction { action_type: 2 },
+        VmInstruction::ExecuteActionQueue,
+    ]);
+    let (mut no_reader_sim, _) = make_sim_with_custom_genome(100.0, no_reader_genome);
+    no_reader_sim.world.set_barrier(Position::new(5, 4), true);
+    run_tick(&mut no_reader_sim, &mut None);
+    assert_eq!(
+        no_reader_sim
+            .stats
+            .move_attempts_with_barrier_neighbor_total_by_reader_state
+            .get(&BarrierReaderState::NoBarrierReader)
+            .copied()
+            .unwrap_or(0),
+        1
+    );
+    assert_eq!(
+        no_reader_sim
+            .stats
+            .move_blocked_barrier_with_barrier_neighbor_total_by_reader_state
+            .get(&BarrierReaderState::NoBarrierReader)
+            .copied()
+            .unwrap_or(0),
+        1
+    );
+
+    let (mut reader_sim, _) =
+        make_sim_with_custom_genome(100.0, move_north_with_barrier_reader_genome());
+    reader_sim.world.set_barrier(Position::new(5, 4), true);
+    run_tick(&mut reader_sim, &mut None);
+    assert_eq!(
+        reader_sim
+            .stats
+            .move_attempts_with_barrier_neighbor_total_by_reader_state
+            .get(&BarrierReaderState::HasBarrierReader)
+            .copied()
+            .unwrap_or(0),
+        1
+    );
+    assert_eq!(
+        reader_sim
+            .stats
+            .move_blocked_barrier_with_barrier_neighbor_total_by_reader_state
+            .get(&BarrierReaderState::HasBarrierReader)
+            .copied()
+            .unwrap_or(0),
+        1
+    );
+}
+
+#[test]
+fn reproduction_barrier_neighbor_counters_split_by_barrier_reader_state() {
+    let no_reader_genome = vm_program_genome(vec![
+        VmInstruction::PushAction { action_type: 3 },
+        VmInstruction::ExecuteActionQueue,
+    ]);
+    let (mut no_reader_sim, _) = make_sim_with_custom_genome(100.0, no_reader_genome);
+    no_reader_sim.world.set_barrier(Position::new(5, 4), true);
+    run_tick(&mut no_reader_sim, &mut None);
+    assert_eq!(
+        no_reader_sim
+            .stats
+            .reproduction_attempts_with_barrier_neighbor_total_by_reader_state
+            .get(&BarrierReaderState::NoBarrierReader)
+            .copied()
+            .unwrap_or(0),
+        1
+    );
+    assert_eq!(
+        no_reader_sim
+            .stats
+            .reproduction_invalid_target_barrier_with_barrier_neighbor_total_by_reader_state
+            .get(&BarrierReaderState::NoBarrierReader)
+            .copied()
+            .unwrap_or(0),
+        1
+    );
+
+    let (mut reader_sim, _) =
+        make_sim_with_custom_genome(100.0, reproduce_north_with_barrier_reader_genome());
+    reader_sim.world.set_barrier(Position::new(5, 4), true);
+    run_tick(&mut reader_sim, &mut None);
+    assert_eq!(
+        reader_sim
+            .stats
+            .reproduction_attempts_with_barrier_neighbor_total_by_reader_state
+            .get(&BarrierReaderState::HasBarrierReader)
+            .copied()
+            .unwrap_or(0),
+        1
+    );
+    assert_eq!(
+        reader_sim
+            .stats
+            .reproduction_invalid_target_barrier_with_barrier_neighbor_total_by_reader_state
+            .get(&BarrierReaderState::HasBarrierReader)
+            .copied()
+            .unwrap_or(0),
+        1
+    );
+}
+
+#[test]
+fn move_blocked_avoidable_counters_track_alternative_targets_by_reader_state() {
+    let no_reader_genome = vm_program_genome(vec![
+        VmInstruction::PushAction { action_type: 2 },
+        VmInstruction::ExecuteActionQueue,
+    ]);
+    let (mut no_reader_sim, _) = make_sim_with_custom_genome(100.0, no_reader_genome);
+    no_reader_sim.world.set_barrier(Position::new(5, 4), true);
+    run_tick(&mut no_reader_sim, &mut None);
+    assert_eq!(
+        no_reader_sim
+            .stats
+            .move_actions_blocked_avoidable_total_by_reader_state
+            .get(&BarrierReaderState::NoBarrierReader)
+            .copied()
+            .unwrap_or(0),
+        1
+    );
+
+    let (mut no_reader_unavoidable_sim, _) = make_sim_with_custom_genome(
+        100.0,
+        vm_program_genome(vec![
+            VmInstruction::PushAction { action_type: 2 },
+            VmInstruction::ExecuteActionQueue,
+        ]),
+    );
+    let center = Position::new(5, 5);
+    for dir in Direction::ALL {
+        if let Some(neighbor) = no_reader_unavoidable_sim
+            .world
+            .resolve_neighbor(center, dir)
+        {
+            no_reader_unavoidable_sim.world.set_barrier(neighbor, true);
+        }
+    }
+    run_tick(&mut no_reader_unavoidable_sim, &mut None);
+    assert_eq!(
+        no_reader_unavoidable_sim
+            .stats
+            .move_actions_blocked_avoidable_total_by_reader_state
+            .get(&BarrierReaderState::NoBarrierReader)
+            .copied()
+            .unwrap_or(0),
+        0
+    );
+
+    let (mut reader_sim, _) =
+        make_sim_with_custom_genome(100.0, move_north_with_barrier_reader_genome());
+    reader_sim.world.set_barrier(Position::new(5, 4), true);
+    run_tick(&mut reader_sim, &mut None);
+    assert_eq!(
+        reader_sim
+            .stats
+            .move_actions_blocked_avoidable_total_by_reader_state
+            .get(&BarrierReaderState::HasBarrierReader)
+            .copied()
+            .unwrap_or(0),
+        1
+    );
+}
+
+#[test]
+fn reproduction_invalid_target_avoidable_counters_track_alternative_targets_by_reader_state() {
+    let no_reader_genome = vm_program_genome(vec![
+        VmInstruction::PushAction { action_type: 3 },
+        VmInstruction::ExecuteActionQueue,
+    ]);
+    let (mut no_reader_sim, _) = make_sim_with_custom_genome(100.0, no_reader_genome);
+    no_reader_sim.world.set_barrier(Position::new(5, 4), true);
+    run_tick(&mut no_reader_sim, &mut None);
+    assert_eq!(
+        no_reader_sim
+            .stats
+            .reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state
+            .get(&BarrierReaderState::NoBarrierReader)
+            .copied()
+            .unwrap_or(0),
+        1
+    );
+
+    let (mut no_reader_unavoidable_sim, _) = make_sim_with_custom_genome(
+        100.0,
+        vm_program_genome(vec![
+            VmInstruction::PushAction { action_type: 3 },
+            VmInstruction::ExecuteActionQueue,
+        ]),
+    );
+    let center = Position::new(5, 5);
+    for dir in Direction::ALL {
+        if let Some(neighbor) = no_reader_unavoidable_sim
+            .world
+            .resolve_neighbor(center, dir)
+        {
+            no_reader_unavoidable_sim.world.set_barrier(neighbor, true);
+        }
+    }
+    run_tick(&mut no_reader_unavoidable_sim, &mut None);
+    assert_eq!(
+        no_reader_unavoidable_sim
+            .stats
+            .reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state
+            .get(&BarrierReaderState::NoBarrierReader)
+            .copied()
+            .unwrap_or(0),
+        0
+    );
+
+    let (mut reader_sim, _) =
+        make_sim_with_custom_genome(100.0, reproduce_north_with_barrier_reader_genome());
+    reader_sim.world.set_barrier(Position::new(5, 4), true);
+    run_tick(&mut reader_sim, &mut None);
+    assert_eq!(
+        reader_sim
+            .stats
+            .reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state
+            .get(&BarrierReaderState::HasBarrierReader)
+            .copied()
+            .unwrap_or(0),
+        1
+    );
+}
+
+#[test]
+fn reproduction_invalid_target_helper_classifies_out_of_bounds_and_contention() {
+    let world = crate::kernel::WorldState::new(5, 5, crate::config::WorldEdgeMode::Bounded);
+    let successful_spawn_targets = HashSet::new();
+
+    assert_eq!(
+        super::super::classify_reproduction_invalid_target_cause(
+            &world,
+            None,
+            &successful_spawn_targets
+        ),
+        ReproductionInvalidTargetCause::OutOfBounds
+    );
+
+    let mut successful_spawn_targets = HashSet::new();
+    successful_spawn_targets.insert(Position::new(1, 1));
+    assert_eq!(
+        super::super::classify_reproduction_invalid_target_cause(
+            &world,
+            Some(Position::new(1, 1)),
+            &successful_spawn_targets
+        ),
+        ReproductionInvalidTargetCause::Contention
     );
 }
 

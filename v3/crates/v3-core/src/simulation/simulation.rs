@@ -72,10 +72,28 @@ impl Simulation {
             self.world
                 .apply_paint_stroke(tool, brush_half_extent, points, max_density);
         for id in evicted {
-            self.creatures.remove(id);
-            self.action_logs.remove(id);
+            self.remove_creature(id);
         }
         stats
+    }
+
+    /// Remove one creature and record exit-time mutation value aggregates.
+    pub fn remove_creature(&mut self, id: CreatureId) {
+        if let Some(creature) = self.creatures.remove(id) {
+            for operator in creature.birth_mutation_operators.iter().copied() {
+                let totals = self
+                    .stats
+                    .mutation_value_totals_by_operator
+                    .entry(operator)
+                    .or_default();
+                totals.carriers_observed_total += 1;
+                totals.survival_ticks_sum += creature.age;
+                totals.offspring_spawned_sum += creature.offspring_spawned_count;
+                totals.final_energy_sum += f64::from(creature.energy.max(0.0));
+            }
+            self.world.remove_creature(creature.position);
+        }
+        self.action_logs.remove(id);
     }
 
     /// Mean energy across all living creatures. Returns `0.0` for an empty population.

@@ -43,6 +43,30 @@ function makeDetail(overrides: Record<string, unknown> = {}) {
 		genome: { entry_node_id: 0, nodes: [] },
 		sharedMemory: [0, 1, 2],
 		actionLog: [makeEntry(1), makeEntry(2, ActionType.Eat)],
+		diagnostics: {
+			current_inputs: {
+				food_here: 0.4,
+				neighbor_food: [0, 0, 0, 0, 0, 0, 0, 0],
+				neighbor_barrier: [1, 0, 1, 0, 0, 0, 0, 0],
+				neighbor_occupied: [0, 0, 0, 1, 0, 0, 0, 0],
+			},
+			live_circuit: {
+				reachable_node_count: 3,
+				stateful_reachable_node_count: 1,
+				barrier_reader_reachable_node_count: 1,
+				distinct_upstream_slots_read: [0],
+				distinct_payload_slots_written: [1],
+				distinct_custom_output_slots_written: [2],
+				reachable_read_class_counts: { barrier: 1, food: 2 },
+				reachable_write_class_counts: { action: 1, route: 2 },
+			},
+			recent_actions: {
+				sampled_entries: 2,
+				blocked_move_count: 1,
+				invalid_target_reproduce_count: 0,
+				by_action_result: { "Move:Blocked": 1 },
+			},
+		},
 		...overrides,
 	};
 }
@@ -72,6 +96,7 @@ describe("creatureInspectorStore actionLog", () => {
 		expect(state.runtimeSnapshot.sharedMemory).toEqual([0, 1, 2]);
 		expect(state.liveDetail.stats?.id).toBe(1);
 		expect(state.liveDetail.actionLog).toHaveLength(2);
+		expect(state.liveDetail.diagnostics?.live_circuit.reachable_node_count).toBe(3);
 		expect(state.resourceMeta.isLoading).toBe(false);
 		expect(state.resourceMeta.error).toBeNull();
 		expect(state.resourceMeta.isDead).toBe(false);
@@ -176,6 +201,16 @@ describe("creatureInspectorStore actionLog", () => {
 		useCreatureInspectorStore.getState().setDetail(makeDetail({ actionLog: undefined }));
 		const log = useCreatureInspectorStore.getState().liveDetail.actionLog;
 		expect(log).toBe(originalLog);
+	});
+
+	it("setDetail with diagnostics: undefined preserves existing diagnostics", () => {
+		useCreatureInspectorStore.getState().setDetail(makeDetail());
+		const originalDiagnostics = useCreatureInspectorStore.getState().liveDetail.diagnostics;
+		expect(originalDiagnostics).not.toBeNull();
+
+		useCreatureInspectorStore.getState().setDetail(makeDetail({ diagnostics: undefined }));
+		const diagnostics = useCreatureInspectorStore.getState().liveDetail.diagnostics;
+		expect(diagnostics).toBe(originalDiagnostics);
 	});
 
 	it("setDetail with genome: undefined preserves existing genome", () => {

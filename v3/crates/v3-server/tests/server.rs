@@ -304,12 +304,66 @@ async fn get_status_has_all_required_fields() {
         "missing mutation_events_applied_total_by_operator"
     );
     assert!(
+        body["mutation_events_skipped_total_by_operator"].is_object(),
+        "missing mutation_events_skipped_total_by_operator"
+    );
+    assert!(
         body["mutation_events_applied_total_semantic_noop"].is_number(),
         "missing mutation_events_applied_total_semantic_noop"
     );
     assert!(
         body["mutation_events_applied_total_semantic_change"].is_number(),
         "missing mutation_events_applied_total_semantic_change"
+    );
+    assert!(
+        body["mutation_target_reachability_total"].is_object(),
+        "missing mutation_target_reachability_total"
+    );
+    assert!(
+        body["move_actions_blocked_total_by_cause"].is_object(),
+        "missing move_actions_blocked_total_by_cause"
+    );
+    assert!(
+        body["move_actions_blocked_avoidable_total_by_reader_state"].is_object(),
+        "missing move_actions_blocked_avoidable_total_by_reader_state"
+    );
+    assert!(
+        body["reproduction_actions_rejected_invalid_target_total_by_cause"].is_object(),
+        "missing reproduction_actions_rejected_invalid_target_total_by_cause"
+    );
+    assert!(
+        body["reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state"]
+            .is_object(),
+        "missing reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state"
+    );
+    assert!(
+        body["mutation_operator_funnel_total_by_operator"].is_object(),
+        "missing mutation_operator_funnel_total_by_operator"
+    );
+    assert!(
+        body["mutation_skip_reasons_total_by_operator"].is_object(),
+        "missing mutation_skip_reasons_total_by_operator"
+    );
+    assert!(
+        body["move_attempts_with_barrier_neighbor_total_by_reader_state"].is_object(),
+        "missing move_attempts_with_barrier_neighbor_total_by_reader_state"
+    );
+    assert!(
+        body["move_blocked_barrier_with_barrier_neighbor_total_by_reader_state"].is_object(),
+        "missing move_blocked_barrier_with_barrier_neighbor_total_by_reader_state"
+    );
+    assert!(
+        body["reproduction_attempts_with_barrier_neighbor_total_by_reader_state"].is_object(),
+        "missing reproduction_attempts_with_barrier_neighbor_total_by_reader_state"
+    );
+    assert!(
+        body["reproduction_invalid_target_barrier_with_barrier_neighbor_total_by_reader_state"]
+            .is_object(),
+        "missing reproduction_invalid_target_barrier_with_barrier_neighbor_total_by_reader_state"
+    );
+    assert!(
+        body["mutation_value_totals_by_operator"].is_object(),
+        "missing mutation_value_totals_by_operator"
     );
 }
 
@@ -702,6 +756,11 @@ async fn health_payload_contains_mutation_skip_by_reason() {
         .mutation_events_attempted_total_by_operator
         .values()
         .sum();
+    let skipped_by_operator: u64 = frame
+        .health
+        .mutation_events_skipped_total_by_operator
+        .values()
+        .sum();
     let applied_by_operator: u64 = frame
         .health
         .mutation_events_applied_total_by_operator
@@ -725,6 +784,21 @@ async fn health_payload_contains_mutation_skip_by_reason() {
     assert_eq!(
         applied_by_operator, frame.health.mutation_events_applied_total,
         "applied_by_operator must reconcile to mutation_events_applied_total"
+    );
+    assert!(
+        skipped_by_operator <= frame.health.mutation_events_skipped_total,
+        "skipped_by_operator ({skipped_by_operator}) must not exceed mutation_events_skipped_total ({})",
+        frame.health.mutation_events_skipped_total
+    );
+    assert_eq!(
+        frame.health.mutation_target_reachability_total.reachable
+            + frame.health.mutation_target_reachability_total.unreachable
+            + frame
+                .health
+                .mutation_target_reachability_total
+                .not_applicable,
+        frame.health.mutation_events_applied_total,
+        "reachability totals must reconcile to mutation_events_applied_total"
     );
     assert_eq!(
         frame.health.mutation_events_applied_total_semantic_noop
@@ -1450,6 +1524,33 @@ async fn get_creature_exclude_omits_fields() {
         body.get("action_log").is_some(),
         "action_log should be present"
     );
+    assert!(
+        body.get("diagnostics").is_some(),
+        "diagnostics should be present"
+    );
+    assert!(
+        body["diagnostics"]["current_inputs"]["neighbor_barrier"].is_array(),
+        "diagnostics.current_inputs.neighbor_barrier should be an array"
+    );
+    assert!(
+        body["diagnostics"]["live_circuit"]["reachable_node_count"].is_number(),
+        "diagnostics.live_circuit.reachable_node_count should be numeric"
+    );
+    assert!(
+        body["diagnostics"]["live_circuit"]["barrier_decision_writer_reachable_node_count"]
+            .is_number(),
+        "diagnostics.live_circuit.barrier_decision_writer_reachable_node_count should be numeric"
+    );
+    assert!(
+        body["diagnostics"]["live_circuit"]
+            ["barrier_reader_without_decision_writer_reachable_node_count"]
+            .is_number(),
+        "diagnostics.live_circuit.barrier_reader_without_decision_writer_reachable_node_count should be numeric"
+    );
+    assert!(
+        body["diagnostics"]["recent_actions"]["by_action_result"].is_object(),
+        "diagnostics.recent_actions.by_action_result should be an object"
+    );
 
     // exclude=genome — genome omitted, others present.
     let uri_excl_genome = format!("/v3/simulation/creature/{creature_id}?exclude=genome");
@@ -1500,7 +1601,7 @@ async fn get_creature_exclude_omits_fields() {
     // exclude=genome,action_log,shared_memory — all optional fields omitted.
     let uri_excl_all =
         format!("/v3/simulation/creature/{creature_id}?exclude=genome,action_log,shared_memory");
-    let (status, body) = do_request(a, get_req(&uri_excl_all)).await;
+    let (status, body) = do_request(a.clone(), get_req(&uri_excl_all)).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
     assert!(body.get("genome").is_none(), "genome should be omitted");
     assert!(
@@ -1515,9 +1616,23 @@ async fn get_creature_exclude_omits_fields() {
         body.get("shared_memory").is_none(),
         "shared_memory should be omitted"
     );
+    assert!(
+        body.get("diagnostics").is_some(),
+        "diagnostics should still be present unless explicitly excluded"
+    );
     // Core scalar fields still present.
     assert!(body.get("energy").is_some(), "energy should be present");
     assert!(body.get("id").is_some(), "id should be present");
+
+    let uri_excl_diagnostics = format!(
+        "/v3/simulation/creature/{creature_id}?exclude=genome,action_log,shared_memory,diagnostics"
+    );
+    let (status, body) = do_request(a.clone(), get_req(&uri_excl_diagnostics)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert!(
+        body.get("diagnostics").is_none(),
+        "diagnostics should be omitted when requested"
+    );
 }
 
 #[tokio::test]

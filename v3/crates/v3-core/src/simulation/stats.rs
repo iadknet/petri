@@ -1,9 +1,20 @@
 use std::collections::HashMap;
 
-use crate::mutation::{MutationDomain, MutationOperator, MutationSkipReason};
-use crate::simulation::actions::{
-    PredationActionResult, PredationEventRecord, ReproductionActionResult,
+use crate::mutation::{
+    MutationDomain, MutationOperator, MutationOperatorFunnel, MutationSkipReason,
 };
+use crate::simulation::actions::{
+    BarrierReaderState, MoveBlockedCause, PredationActionResult, PredationEventRecord,
+    ReproductionActionResult, ReproductionInvalidTargetCause,
+};
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct MutationValueTotals {
+    pub carriers_observed_total: u64,
+    pub survival_ticks_sum: u64,
+    pub offspring_spawned_sum: u64,
+    pub final_energy_sum: f64,
+}
 
 /// Observability counters for the simulation.
 ///
@@ -32,8 +43,39 @@ pub struct SimStats {
     pub mutation_events_applied_total_semantic_change: u64,
     /// Per-reason mutation skip breakdown (cumulative).
     pub mutation_events_skipped_by_reason: HashMap<MutationSkipReason, u64>,
+    /// Per-operator mutation skip breakdown (cumulative).
+    pub mutation_events_skipped_total_by_operator: HashMap<MutationOperator, u64>,
+    /// Per-operator mutation event funnel counters (cumulative).
+    pub mutation_operator_funnel_total_by_operator:
+        HashMap<MutationOperator, MutationOperatorFunnel>,
+    /// Per-operator skip reason breakdown (cumulative).
+    pub mutation_skip_reasons_total_by_operator:
+        HashMap<MutationOperator, HashMap<MutationSkipReason, u64>>,
     /// Per-reason rejection breakdown (cumulative).
     pub reproduction_actions_rejected_by_reason: HashMap<ReproductionActionResult, u64>,
+    /// Fine-grained invalid-target rejection breakdown (cumulative).
+    pub reproduction_actions_rejected_invalid_target_total_by_cause:
+        HashMap<ReproductionInvalidTargetCause, u64>,
+    /// Invalid-target reproduction outcomes where at least one adjacent alternative target was
+    /// valid.
+    pub reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state:
+        HashMap<BarrierReaderState, u64>,
+    /// Fine-grained move blocked breakdown (cumulative).
+    pub move_actions_blocked_total_by_cause: HashMap<MoveBlockedCause, u64>,
+    /// Move blocked outcomes where at least one adjacent alternative target was valid.
+    pub move_actions_blocked_avoidable_total_by_reader_state: HashMap<BarrierReaderState, u64>,
+    /// Move attempts made while at least one neighboring barrier was present.
+    pub move_attempts_with_barrier_neighbor_total_by_reader_state: HashMap<BarrierReaderState, u64>,
+    /// Move actions blocked by barriers while at least one neighboring barrier was present.
+    pub move_blocked_barrier_with_barrier_neighbor_total_by_reader_state:
+        HashMap<BarrierReaderState, u64>,
+    /// Reproduction attempts made while at least one neighboring barrier was present.
+    pub reproduction_attempts_with_barrier_neighbor_total_by_reader_state:
+        HashMap<BarrierReaderState, u64>,
+    /// Reproduction invalid-target(barrier) outcomes while at least one neighboring barrier
+    /// was present.
+    pub reproduction_invalid_target_barrier_with_barrier_neighbor_total_by_reader_state:
+        HashMap<BarrierReaderState, u64>,
 
     // ── Reachability telemetry (cumulative) ───────────────────────────────────
     /// Mutation events where the selected target was a reachable node.
@@ -42,6 +84,8 @@ pub struct SimStats {
     pub mutation_unreachable_target_total: u64,
     /// Mutation events where target reachability was not applicable (exempt operators).
     pub mutation_not_applicable_target_total: u64,
+    /// Lifecycle value aggregates keyed by mutation operator on carrier creatures.
+    pub mutation_value_totals_by_operator: HashMap<MutationOperator, MutationValueTotals>,
 
     // ── Predation cumulative ─────────────────────────────────────────────────
     pub predation_actions_attempted_total: u64,

@@ -81,6 +81,30 @@ const defaultProps = {
 	meshAnnotations: null,
 	sharedMemory: null,
 	actionLog: null,
+	diagnostics: {
+		current_inputs: {
+			food_here: 0.2,
+			neighbor_food: [0, 0, 0, 0.1, 0, 0, 0, 0],
+			neighbor_barrier: [1, 0, 1, 0, 0, 0, 1, 0],
+			neighbor_occupied: [0, 1, 0, 0, 0, 0, 0, 1],
+		},
+		live_circuit: {
+			reachable_node_count: 2,
+			stateful_reachable_node_count: 1,
+			barrier_reader_reachable_node_count: 1,
+			distinct_upstream_slots_read: [0, 1],
+			distinct_payload_slots_written: [0],
+			distinct_custom_output_slots_written: [2],
+			reachable_read_class_counts: { barrier: 1, food: 2 },
+			reachable_write_class_counts: { action: 1, route: 2 },
+		},
+		recent_actions: {
+			sampled_entries: 4,
+			blocked_move_count: 2,
+			invalid_target_reproduce_count: 1,
+			by_action_result: { "Move:Blocked": 2, "Reproduce:InvalidTarget": 1 },
+		},
+	},
 	isDead: false,
 	stats: {
 		id: 12345,
@@ -114,6 +138,9 @@ describe("UnifiedInspector", () => {
 
 		// Node inspector (defaults to entry node)
 		expect(screen.getByText("#1")).toBeInTheDocument();
+		expect(screen.getByText("Diagnostics")).toBeInTheDocument();
+		expect(screen.getByText("Barrier Perception")).toBeInTheDocument();
+		expect(screen.getByText("Live Circuit Structure")).toBeInTheDocument();
 
 		// Sampler bar (idle state)
 		expect(screen.getByRole("button", { name: /sample/i })).toBeInTheDocument();
@@ -134,5 +161,13 @@ describe("UnifiedInspector", () => {
 		render(<UnifiedInspector {...defaultProps} isDead={true} />);
 
 		expect(screen.getByText("DEAD")).toBeInTheDocument();
+	});
+
+	it("renders diagnostics empty state when diagnostics are missing", () => {
+		render(<UnifiedInspector {...defaultProps} diagnostics={null} />);
+		expect(screen.getByTestId("inspector-diagnostics-empty")).toBeInTheDocument();
+		expect(
+			screen.getByText("Diagnostics unavailable for this creature response."),
+		).toBeInTheDocument();
 	});
 });

@@ -2,8 +2,12 @@ use std::mem::size_of;
 
 use crate::contracts::{CreatureId, Position};
 use crate::creature::genome::analysis::mesh_reachable_nodes;
+use crate::creature::genome::mesh_annotations::{
+    derive_mesh_annotations_with_reachable_indices, MeshReadClass,
+};
 use crate::creature::genome::CreatureGenome;
 use crate::creature::identity::CreatureIdentityState;
+use crate::mutation::MutationOperator;
 
 /// Number of f32 slots in shared memory, accessible by both VM and Graph backends.
 pub const SHARED_MEMORY_SLOTS: usize = 16;
@@ -83,6 +87,12 @@ pub struct CreatureState {
     /// Sorted indices of mesh nodes reachable from the entry node, cached at birth.
     /// Used by the mutation engine to bias target selection toward functional structure.
     pub cached_reachable_nodes: Box<[usize]>,
+    /// Whether any reachable node has a live barrier read path.
+    pub cached_has_barrier_reader: bool,
+    /// Mutation operators applied when this creature was born.
+    pub birth_mutation_operators: Box<[MutationOperator]>,
+    /// Number of offspring this creature has spawned.
+    pub offspring_spawned_count: u64,
 }
 
 impl CreatureState {
@@ -103,6 +113,8 @@ impl CreatureState {
     ) -> Self {
         let cached_complexity = genome.complexity();
         let cached_reachable_nodes = mesh_reachable_nodes(&genome).into_boxed_slice();
+        let cached_has_barrier_reader =
+            compute_has_barrier_reader(&genome, cached_reachable_nodes.as_ref());
         Self {
             id,
             genome,
@@ -119,6 +131,9 @@ impl CreatureState {
             phenotype_channel_polarity,
             cached_complexity,
             cached_reachable_nodes,
+            cached_has_barrier_reader,
+            birth_mutation_operators: Vec::new().into_boxed_slice(),
+            offspring_spawned_count: 0,
         }
     }
 
@@ -140,6 +155,8 @@ impl CreatureState {
         cached_complexity: u32,
         cached_reachable_nodes: Box<[usize]>,
     ) -> Self {
+        let cached_has_barrier_reader =
+            compute_has_barrier_reader(&genome, cached_reachable_nodes.as_ref());
         Self {
             id,
             genome,
@@ -156,8 +173,23 @@ impl CreatureState {
             phenotype_channel_polarity,
             cached_complexity,
             cached_reachable_nodes,
+            cached_has_barrier_reader,
+            birth_mutation_operators: Vec::new().into_boxed_slice(),
+            offspring_spawned_count: 0,
         }
     }
+}
+
+fn compute_has_barrier_reader(genome: &CreatureGenome, reachable_indices: &[usize]) -> bool {
+    derive_mesh_annotations_with_reachable_indices(genome, reachable_indices)
+        .iter()
+        .any(|node| {
+            node.reachable
+                && node
+                    .read_classes
+                    .iter()
+                    .any(|class| matches!(class, MeshReadClass::Barrier))
+        })
 }
 
 // Compile-time size assertion: shared_memory is 2x16x4=128 bytes vs old 1024-byte memory.

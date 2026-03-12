@@ -58,6 +58,30 @@ function buildCreatureDetail() {
 		mesh_annotations: [],
 		shared_memory: [0, 1],
 		action_log: [],
+		diagnostics: {
+			current_inputs: {
+				food_here: 0.1,
+				neighbor_food: [0, 0, 0, 0, 0, 0, 0, 0],
+				neighbor_barrier: [0, 1, 0, 0, 0, 0, 0, 0],
+				neighbor_occupied: [0, 0, 0, 1, 0, 0, 0, 0],
+			},
+			live_circuit: {
+				reachable_node_count: 2,
+				stateful_reachable_node_count: 1,
+				barrier_reader_reachable_node_count: 1,
+				distinct_upstream_slots_read: [0],
+				distinct_payload_slots_written: [0],
+				distinct_custom_output_slots_written: [],
+				reachable_read_class_counts: { barrier: 1 },
+				reachable_write_class_counts: { action: 1 },
+			},
+			recent_actions: {
+				sampled_entries: 3,
+				blocked_move_count: 1,
+				invalid_target_reproduce_count: 0,
+				by_action_result: { "Move:Blocked": 1 },
+			},
+		},
 		latest_tick: 2732,
 	};
 }
@@ -107,6 +131,10 @@ describe("useCreatureDetailResource", () => {
 		expect(api.getCreature).toHaveBeenCalledTimes(1);
 		expect(useCreatureInspectorStore.getState().liveDetail.stats?.energy).toBe(42);
 		expect(useCreatureInspectorStore.getState().liveDetail.stats?.age).toBe(8);
+		expect(
+			useCreatureInspectorStore.getState().liveDetail.diagnostics?.live_circuit
+				.reachable_node_count,
+		).toBe(2);
 
 		// Simulate tick change via setStatus (production path)
 		act(() => {

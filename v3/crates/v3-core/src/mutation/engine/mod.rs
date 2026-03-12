@@ -41,85 +41,154 @@ impl MutationEngine {
         let restricted = config.genome_size_pressure_enabled
             && pressure::is_restricted(genome.genome_size(), config.genome_size_cap, rng);
 
-        // Select an operator: Decreasing-only when restricted, unrestricted otherwise.
-        // Skips the event (continue) when no Decreasing operator exists for the domain.
-        macro_rules! select_operator {
-            ($Op:ty, $domain:expr, $summary:expr, $rng:expr) => {
-                if restricted {
-                    match <$Op>::random_decreasing($rng) {
-                        Some(op) => op,
-                        None => {
-                            $summary.record_domain_skip(
-                                $domain,
-                                MutationSkipReason::NoApplicableTarget,
-                            );
-                            continue;
-                        }
-                    }
-                } else {
-                    <$Op>::random($rng)
-                }
-            };
-        }
-
         let mut summary = MutationSummary::zero();
         for _ in 0..event_count {
             // Two-layer dispatch: mesh (Topology) vs node-internal (VM/Graph/InputRef).
             let rb = &config.reachable_bias;
             let (domain, operator, result) = if rng.gen_bool(config.mesh_layer_probability) {
                 // Layer 1: Mesh (Topology)
-                let op = select_operator!(TopologyOperator, MutationDomain::Topology, summary, rng);
-                (
-                    MutationDomain::Topology,
-                    topology_operator_key(op),
-                    apply_topology_event(
+                let mut available: Vec<TopologyOperator> = TopologyOperator::ALL
+                    .iter()
+                    .copied()
+                    .filter(|op| !restricted || op.complexity_effect().is_decreasing())
+                    .collect();
+                let selected = loop {
+                    if available.is_empty() {
+                        break None;
+                    }
+                    let idx = select_weighted_index(&available, |op| op.weight() as u16, rng);
+                    let op = available[idx];
+                    let result = apply_topology_event(
                         genome,
                         op,
                         parent_reachable_nodes,
                         rb.topology,
                         rng,
                         config,
-                    ),
-                )
+                    );
+                    if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
+                        available.swap_remove(idx);
+                        continue;
+                    }
+                    break Some((op, result));
+                };
+                let Some((op, result)) = selected else {
+                    summary.record_domain_skip(
+                        MutationDomain::Topology,
+                        MutationSkipReason::NoApplicableTarget,
+                    );
+                    continue;
+                };
+                (MutationDomain::Topology, topology_operator_key(op), result)
             } else {
                 // Layer 2: Node-internal (VM, Graph, InputRef — equal probability)
                 match rng.gen_range(0u8..3) {
                     0 => {
-                        let op = select_operator!(VmOperator, MutationDomain::Vm, summary, rng);
-                        (
-                            MutationDomain::Vm,
-                            vm_operator_key(op),
-                            apply_vm_event(genome, op, parent_reachable_nodes, rb.vm, rng, config),
-                        )
+                        let mut available: Vec<VmOperator> = VmOperator::ALL
+                            .iter()
+                            .copied()
+                            .filter(|op| !restricted || op.complexity_effect().is_decreasing())
+                            .collect();
+                        let selected = loop {
+                            if available.is_empty() {
+                                break None;
+                            }
+                            let idx =
+                                select_weighted_index(&available, |op| op.weight() as u16, rng);
+                            let op = available[idx];
+                            let result = apply_vm_event(
+                                genome,
+                                op,
+                                parent_reachable_nodes,
+                                rb.vm,
+                                rng,
+                                config,
+                            );
+                            if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
+                                available.swap_remove(idx);
+                                continue;
+                            }
+                            break Some((op, result));
+                        };
+                        let Some((op, result)) = selected else {
+                            summary.record_domain_skip(
+                                MutationDomain::Vm,
+                                MutationSkipReason::NoApplicableTarget,
+                            );
+                            continue;
+                        };
+                        (MutationDomain::Vm, vm_operator_key(op), result)
                     }
                     1 => {
-                        let op =
-                            select_operator!(GraphOperator, MutationDomain::Graph, summary, rng);
-                        (
-                            MutationDomain::Graph,
-                            graph_operator_key(op),
-                            apply_graph_event(genome, op, parent_reachable_nodes, rb.graph, rng),
-                        )
+                        let mut available: Vec<GraphOperator> = GraphOperator::ALL
+                            .iter()
+                            .copied()
+                            .filter(|op| !restricted || op.complexity_effect().is_decreasing())
+                            .collect();
+                        let selected = loop {
+                            if available.is_empty() {
+                                break None;
+                            }
+                            let idx =
+                                select_weighted_index(&available, |op| op.weight() as u16, rng);
+                            let op = available[idx];
+                            let result = apply_graph_event(
+                                genome,
+                                op,
+                                parent_reachable_nodes,
+                                rb.graph,
+                                rng,
+                            );
+                            if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
+                                available.swap_remove(idx);
+                                continue;
+                            }
+                            break Some((op, result));
+                        };
+                        let Some((op, result)) = selected else {
+                            summary.record_domain_skip(
+                                MutationDomain::Graph,
+                                MutationSkipReason::NoApplicableTarget,
+                            );
+                            continue;
+                        };
+                        (MutationDomain::Graph, graph_operator_key(op), result)
                     }
                     _ => {
-                        let op = select_operator!(
-                            InputRefOperator,
-                            MutationDomain::InputRef,
-                            summary,
-                            rng
-                        );
-                        (
-                            MutationDomain::InputRef,
-                            input_ref_operator_key(op),
-                            apply_input_ref_event(
+                        let mut available: Vec<InputRefOperator> = InputRefOperator::ALL
+                            .iter()
+                            .copied()
+                            .filter(|op| !restricted || op.complexity_effect().is_decreasing())
+                            .collect();
+                        let selected = loop {
+                            if available.is_empty() {
+                                break None;
+                            }
+                            let idx =
+                                select_weighted_index(&available, |op| op.weight() as u16, rng);
+                            let op = available[idx];
+                            let result = apply_input_ref_event(
                                 genome,
                                 op,
                                 parent_reachable_nodes,
                                 rb.input_ref,
                                 rng,
                                 config,
-                            ),
-                        )
+                            );
+                            if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
+                                available.swap_remove(idx);
+                                continue;
+                            }
+                            break Some((op, result));
+                        };
+                        let Some((op, result)) = selected else {
+                            summary.record_domain_skip(
+                                MutationDomain::InputRef,
+                                MutationSkipReason::NoApplicableTarget,
+                            );
+                            continue;
+                        };
+                        (MutationDomain::InputRef, input_ref_operator_key(op), result)
                     }
                 }
             };
@@ -130,12 +199,34 @@ impl MutationEngine {
                     summary.record_applied(domain, operator, operator.semantic_category());
                     summary.record_reachability(reachability);
                 }
-                Err(reason) => summary.record_skipped(reason),
+                Err(reason) => summary.record_skipped(operator, reason),
             }
         }
 
         summary
     }
+}
+
+fn select_weighted_index<T: Copy>(
+    options: &[T],
+    mut weight_of: impl FnMut(T) -> u16,
+    rng: &mut impl Rng,
+) -> usize {
+    debug_assert!(!options.is_empty(), "weighted selection requires options");
+    let total_weight: u16 = options.iter().copied().map(&mut weight_of).sum();
+    debug_assert!(
+        total_weight > 0,
+        "weighted selection requires positive total weight"
+    );
+    let mut draw = rng.gen_range(0..total_weight);
+    for (idx, op) in options.iter().copied().enumerate() {
+        let weight = weight_of(op);
+        if draw < weight {
+            return idx;
+        }
+        draw -= weight;
+    }
+    unreachable!("weight draw must return an index");
 }
 
 /// Apply one topology mutation event with parseability gate.
@@ -263,6 +354,7 @@ fn vm_operator_key(op: VmOperator) -> MutationOperator {
     match op {
         VmOperator::VmConstantMutation => MutationOperator::VmConstantMutation,
         VmOperator::VmInstructionMutation => MutationOperator::VmInstructionMutation,
+        VmOperator::VmDeleteInstruction => MutationOperator::VmDeleteInstruction,
         VmOperator::VmRegisterCountMutation => MutationOperator::VmRegisterCountMutation,
         VmOperator::VmInstructionRawFieldMutation => {
             MutationOperator::VmInstructionRawFieldMutation

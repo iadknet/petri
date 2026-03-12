@@ -13,6 +13,7 @@ use operators::*;
 pub enum VmOperator {
     VmConstantMutation,
     VmInstructionMutation,
+    VmDeleteInstruction,
     VmRegisterCountMutation,
     VmInstructionRawFieldMutation,
     VmCopyInstructionBlock,
@@ -28,9 +29,10 @@ pub enum VmOperator {
 }
 
 impl VmOperator {
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 15] = [
         Self::VmConstantMutation,
         Self::VmInstructionMutation,
+        Self::VmDeleteInstruction,
         Self::VmRegisterCountMutation,
         Self::VmInstructionRawFieldMutation,
         Self::VmCopyInstructionBlock,
@@ -52,6 +54,7 @@ impl VmOperator {
         match self {
             Self::VmConstantMutation => 4,
             Self::VmInstructionMutation => 2,
+            Self::VmDeleteInstruction => 1,
             Self::VmRegisterCountMutation => 2,
             Self::VmInstructionRawFieldMutation => 4,
             Self::VmCopyInstructionBlock => 1,
@@ -69,7 +72,7 @@ impl VmOperator {
 
     const TOTAL_WEIGHT: u16 = {
         assert!(
-            Self::ALL.len() == 14,
+            Self::ALL.len() == 15,
             "ALL must cover every VmOperator variant"
         );
         let mut sum = 0u16;
@@ -94,6 +97,7 @@ impl VmOperator {
             | Self::VmInsertReadStoreMotif
             | Self::VmInsertReadBidMotif
             | Self::VmInsertLoadCompareMotif => ComplexityEffect::Increasing,
+            Self::VmDeleteInstruction => ComplexityEffect::Decreasing,
             Self::VmConstantMutation
             | Self::VmInstructionMutation
             | Self::VmRegisterCountMutation
@@ -212,6 +216,7 @@ impl VmMutator {
         let result = match op {
             VmOperator::VmConstantMutation => apply_constant_mutation(genome, node_idx, rng),
             VmOperator::VmInstructionMutation => apply_instruction_mutation(genome, node_idx, rng),
+            VmOperator::VmDeleteInstruction => apply_delete_instruction(genome, node_idx, rng),
             VmOperator::VmRegisterCountMutation => {
                 apply_register_count_mutation(genome, node_idx, rng)
             }

@@ -47,6 +47,12 @@ export interface PerfPayload {
 	subscriber_count: number;
 }
 
+export interface MutationTargetReachabilityTotalPayload {
+	reachable: number;
+	unreachable: number;
+	not_applicable: number;
+}
+
 export interface StatusPayload {
 	state: SimState;
 	population: number;
@@ -67,6 +73,10 @@ export interface StatusPayload {
 	mutation_events_applied_total_by_domain: Record<string, number>;
 	mutation_events_attempted_total_by_operator: Record<string, number>;
 	mutation_events_applied_total_by_operator: Record<string, number>;
+	mutation_events_skipped_total_by_operator?: Record<string, number>;
+	mutation_target_reachability_total?: MutationTargetReachabilityTotalPayload;
+	move_actions_blocked_total_by_cause?: Record<string, number>;
+	reproduction_actions_rejected_invalid_target_total_by_cause?: Record<string, number>;
 	mutation_events_applied_total_semantic_noop: number;
 	mutation_events_applied_total_semantic_change: number;
 	last_tick_compute_energy_total_mean: number;
@@ -87,6 +97,10 @@ export interface HealthPayload {
 	mutation_events_applied_total_by_domain: Record<string, number>;
 	mutation_events_attempted_total_by_operator: Record<string, number>;
 	mutation_events_applied_total_by_operator: Record<string, number>;
+	mutation_events_skipped_total_by_operator?: Record<string, number>;
+	mutation_target_reachability_total?: MutationTargetReachabilityTotalPayload;
+	move_actions_blocked_total_by_cause?: Record<string, number>;
+	reproduction_actions_rejected_invalid_target_total_by_cause?: Record<string, number>;
 	mutation_events_applied_total_semantic_noop: number;
 	mutation_events_applied_total_semantic_change: number;
 	reproduction_actions_attempted_total: number;

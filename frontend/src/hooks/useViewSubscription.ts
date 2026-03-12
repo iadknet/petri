@@ -15,6 +15,12 @@ import type {
 	StatusPayload,
 } from "../types/api.ts";
 
+const EMPTY_MUTATION_TARGET_REACHABILITY = {
+	reachable: 0,
+	unreachable: 0,
+	notApplicable: 0,
+};
+
 function applyStatusToStores(
 	projectionRevision: number,
 	tick: number,
@@ -70,6 +76,16 @@ function applyHealthToStores(
 		health.mutation_events_attempted_total,
 		health.mutation_events_applied_total,
 		health.mutation_events_skipped_total,
+		health.mutation_events_skipped_total_by_operator ?? {},
+		health.mutation_target_reachability_total
+			? {
+					reachable: health.mutation_target_reachability_total.reachable,
+					unreachable: health.mutation_target_reachability_total.unreachable,
+					notApplicable: health.mutation_target_reachability_total.not_applicable,
+				}
+			: EMPTY_MUTATION_TARGET_REACHABILITY,
+		health.move_actions_blocked_total_by_cause ?? {},
+		health.reproduction_actions_rejected_invalid_target_total_by_cause ?? {},
 	);
 	stats.setPredationStats(
 		health.predation_actions_attempted_total,

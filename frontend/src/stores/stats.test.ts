@@ -48,11 +48,25 @@ describe("StatsHistoryStore", () => {
 	});
 
 	it("tracks mutation stats", () => {
-		useStatsHistoryStore.getState().setMutationStats(500, 300, 200);
+		useStatsHistoryStore
+			.getState()
+			.setMutationStats(
+				500,
+				300,
+				200,
+				{ insert_node: 120, rewired_input: 80 },
+				{ reachable: 260, unreachable: 30, notApplicable: 10 },
+				{ barrier: 5, occupied: 2 },
+				{ barrier: 9, contention: 3 },
+			);
 		const state = useStatsHistoryStore.getState();
 		expect(state.mutationAttempted).toBe(500);
 		expect(state.mutationApplied).toBe(300);
 		expect(state.mutationSkipped).toBe(200);
+		expect(state.mutationSkippedByOperator.insert_node).toBe(120);
+		expect(state.mutationTargetReachabilityTotal.reachable).toBe(260);
+		expect(state.moveActionsBlockedByCause.barrier).toBe(5);
+		expect(state.reproductionInvalidTargetRejectedByCause.contention).toBe(3);
 	});
 
 	it("resets all state", () => {
@@ -62,5 +76,7 @@ describe("StatsHistoryStore", () => {
 		const state = useStatsHistoryStore.getState();
 		expect(state.statsHistory).toHaveLength(0);
 		expect(state.mutationAttempted).toBe(0);
+		expect(state.mutationTargetReachabilityTotal.reachable).toBe(0);
+		expect(Object.keys(state.mutationSkippedByOperator)).toHaveLength(0);
 	});
 });

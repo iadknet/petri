@@ -30,6 +30,12 @@ export interface ComplexityPoint {
 	max: number;
 }
 
+export interface MutationTargetReachabilityTotal {
+	reachable: number;
+	unreachable: number;
+	notApplicable: number;
+}
+
 /** Fixed-size ring buffer that overwrites oldest entries */
 function pushRing<T>(buf: T[], item: T, maxSize: number): T[] {
 	if (buf.length >= maxSize) {
@@ -56,6 +62,10 @@ export interface StatsHistoryState {
 	mutationAttempted: number;
 	mutationApplied: number;
 	mutationSkipped: number;
+	mutationSkippedByOperator: Record<string, number>;
+	mutationTargetReachabilityTotal: MutationTargetReachabilityTotal;
+	moveActionsBlockedByCause: Record<string, number>;
+	reproductionInvalidTargetRejectedByCause: Record<string, number>;
 
 	// Cumulative predation stats (from health events)
 	predationAttempted: number;
@@ -82,7 +92,15 @@ export interface StatsHistoryState {
 		rejected: number,
 		byReason: Record<string, number>,
 	) => void;
-	setMutationStats: (attempted: number, applied: number, skipped: number) => void;
+	setMutationStats: (
+		attempted: number,
+		applied: number,
+		skipped: number,
+		skippedByOperator?: Record<string, number>,
+		targetReachabilityTotal?: MutationTargetReachabilityTotal,
+		moveBlockedByCause?: Record<string, number>,
+		reproductionInvalidTargetByCause?: Record<string, number>,
+	) => void;
 	setPredationStats: (
 		attempted: number,
 		transferred: number,
@@ -105,6 +123,10 @@ export const useStatsHistoryStore = create<StatsHistoryState>()((set) => ({
 	mutationAttempted: 0,
 	mutationApplied: 0,
 	mutationSkipped: 0,
+	mutationSkippedByOperator: {},
+	mutationTargetReachabilityTotal: { reachable: 0, unreachable: 0, notApplicable: 0 },
+	moveActionsBlockedByCause: {},
+	reproductionInvalidTargetRejectedByCause: {},
 	predationAttempted: 0,
 	predationTransferred: 0,
 	predationRejected: 0,
@@ -143,11 +165,23 @@ export const useStatsHistoryStore = create<StatsHistoryState>()((set) => ({
 			reproRejectedByReason: byReason,
 		}),
 
-	setMutationStats: (attempted, applied, skipped) =>
+	setMutationStats: (
+		attempted,
+		applied,
+		skipped,
+		skippedByOperator = {},
+		targetReachabilityTotal = { reachable: 0, unreachable: 0, notApplicable: 0 },
+		moveBlockedByCause = {},
+		reproductionInvalidTargetByCause = {},
+	) =>
 		set({
 			mutationAttempted: attempted,
 			mutationApplied: applied,
 			mutationSkipped: skipped,
+			mutationSkippedByOperator: skippedByOperator,
+			mutationTargetReachabilityTotal: targetReachabilityTotal,
+			moveActionsBlockedByCause: moveBlockedByCause,
+			reproductionInvalidTargetRejectedByCause: reproductionInvalidTargetByCause,
 		}),
 
 	setPredationStats: (attempted, transferred, rejected, kills, byResult) =>
@@ -172,6 +206,10 @@ export const useStatsHistoryStore = create<StatsHistoryState>()((set) => ({
 			mutationAttempted: 0,
 			mutationApplied: 0,
 			mutationSkipped: 0,
+			mutationSkippedByOperator: {},
+			mutationTargetReachabilityTotal: { reachable: 0, unreachable: 0, notApplicable: 0 },
+			moveActionsBlockedByCause: {},
+			reproductionInvalidTargetRejectedByCause: {},
 			predationAttempted: 0,
 			predationTransferred: 0,
 			predationRejected: 0,

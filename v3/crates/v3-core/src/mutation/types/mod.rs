@@ -105,6 +105,7 @@ pub enum MutationOperator {
     // VM
     VmConstantMutation,
     VmInstructionMutation,
+    VmDeleteInstruction,
     VmRegisterCountMutation,
     VmInstructionRawFieldMutation,
     VmCopyInstructionBlock,
@@ -166,6 +167,7 @@ impl MutationOperator {
             Self::TopologySwapRouteTargets => "Topology.SwapRouteTargets",
             Self::VmConstantMutation => "Vm.VmConstantMutation",
             Self::VmInstructionMutation => "Vm.VmInstructionMutation",
+            Self::VmDeleteInstruction => "Vm.VmDeleteInstruction",
             Self::VmRegisterCountMutation => "Vm.VmRegisterCountMutation",
             Self::VmInstructionRawFieldMutation => "Vm.VmInstructionRawFieldMutation",
             Self::VmCopyInstructionBlock => "Vm.CopyInstructionBlock",
@@ -225,6 +227,7 @@ impl MutationOperator {
             | Self::TopologySwapRouteTargets => MutationDomain::Topology,
             Self::VmConstantMutation
             | Self::VmInstructionMutation
+            | Self::VmDeleteInstruction
             | Self::VmRegisterCountMutation
             | Self::VmInstructionRawFieldMutation
             | Self::VmCopyInstructionBlock
@@ -303,6 +306,7 @@ impl MutationOperator {
             | Self::VmInsertReadStoreMotif
             | Self::VmInsertReadBidMotif
             | Self::VmInsertLoadCompareMotif => ComplexityEffect::Increasing,
+            Self::VmDeleteInstruction => ComplexityEffect::Decreasing,
             // VM: all others neutral (mutate existing content, no structural growth)
             Self::VmConstantMutation
             | Self::VmInstructionMutation
@@ -343,7 +347,7 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 53] {
+    pub const fn all() -> [Self; 54] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
@@ -360,6 +364,7 @@ impl MutationOperator {
             Self::TopologySwapRouteTargets,
             Self::VmConstantMutation,
             Self::VmInstructionMutation,
+            Self::VmDeleteInstruction,
             Self::VmRegisterCountMutation,
             Self::VmInstructionRawFieldMutation,
             Self::VmCopyInstructionBlock,
@@ -427,6 +432,17 @@ impl MutationSemanticCategory {
     }
 }
 
+/// Per-operator funnel counters for mutation-event staging.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct MutationOperatorFunnel {
+    pub attempted: u64,
+    pub applicable: u64,
+    pub structurally_valid: u64,
+    pub applied: u64,
+    pub semantic_change: u64,
+    pub skipped: u64,
+}
+
 /// Summary returned by `MutationEngine` for every offspring.
 ///
 /// Accounting invariant: `attempted_events == applied_events + skipped_events`.
@@ -436,12 +452,15 @@ pub struct MutationSummary {
     pub applied_events: u32,
     pub skipped_events: u32,
     pub skip_reasons: HashMap<MutationSkipReason, u32>,
+    pub skipped_by_operator: HashMap<MutationOperator, u32>,
     pub attempted_by_domain: HashMap<MutationDomain, u32>,
     pub applied_by_domain: HashMap<MutationDomain, u32>,
     pub attempted_by_operator: HashMap<MutationOperator, u32>,
     pub applied_by_operator: HashMap<MutationOperator, u32>,
     pub applied_semantic_noop_events: u32,
     pub applied_semantic_change_events: u32,
+    pub operator_funnel_by_operator: HashMap<MutationOperator, MutationOperatorFunnel>,
+    pub skip_reasons_by_operator: HashMap<MutationOperator, HashMap<MutationSkipReason, u32>>,
     pub reachable_target_events: u32,
     pub unreachable_target_events: u32,
     pub not_applicable_events: u32,
@@ -455,12 +474,15 @@ impl MutationSummary {
             applied_events: 0,
             skipped_events: 0,
             skip_reasons: HashMap::new(),
+            skipped_by_operator: HashMap::new(),
             attempted_by_domain: HashMap::new(),
             applied_by_domain: HashMap::new(),
             attempted_by_operator: HashMap::new(),
             applied_by_operator: HashMap::new(),
             applied_semantic_noop_events: 0,
             applied_semantic_change_events: 0,
+            operator_funnel_by_operator: HashMap::new(),
+            skip_reasons_by_operator: HashMap::new(),
             reachable_target_events: 0,
             unreachable_target_events: 0,
             not_applicable_events: 0,
@@ -471,6 +493,10 @@ impl MutationSummary {
         self.attempted_events += 1;
         *self.attempted_by_domain.entry(domain).or_insert(0) += 1;
         *self.attempted_by_operator.entry(operator).or_insert(0) += 1;
+        self.operator_funnel_by_operator
+            .entry(operator)
+            .or_default()
+            .attempted += 1;
     }
 
     pub fn record_applied(
@@ -482,15 +508,40 @@ impl MutationSummary {
         self.applied_events += 1;
         *self.applied_by_domain.entry(domain).or_insert(0) += 1;
         *self.applied_by_operator.entry(operator).or_insert(0) += 1;
+        let funnel = self
+            .operator_funnel_by_operator
+            .entry(operator)
+            .or_default();
+        funnel.applicable += 1;
+        funnel.structurally_valid += 1;
+        funnel.applied += 1;
         match semantic {
             MutationSemanticCategory::SemanticNoop => self.applied_semantic_noop_events += 1,
-            MutationSemanticCategory::SemanticChange => self.applied_semantic_change_events += 1,
+            MutationSemanticCategory::SemanticChange => {
+                self.applied_semantic_change_events += 1;
+                funnel.semantic_change += 1;
+            }
         }
     }
 
-    pub fn record_skipped(&mut self, reason: MutationSkipReason) {
+    pub fn record_skipped(&mut self, operator: MutationOperator, reason: MutationSkipReason) {
         self.skipped_events += 1;
         *self.skip_reasons.entry(reason).or_insert(0) += 1;
+        *self.skipped_by_operator.entry(operator).or_insert(0) += 1;
+        *self
+            .skip_reasons_by_operator
+            .entry(operator)
+            .or_default()
+            .entry(reason)
+            .or_insert(0) += 1;
+        let funnel = self
+            .operator_funnel_by_operator
+            .entry(operator)
+            .or_default();
+        if !matches!(reason, MutationSkipReason::NoApplicableTarget) {
+            funnel.applicable += 1;
+        }
+        funnel.skipped += 1;
     }
 
     /// Record a skip where no operator could be selected for a domain.

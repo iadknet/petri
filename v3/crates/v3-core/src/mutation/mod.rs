@@ -25,6 +25,6 @@ pub mod vm_mutator {
 
 pub use engine::MutationEngine;
 pub use types::{
-    MutationDomain, MutationLayer, MutationOperator, MutationSemanticCategory, MutationSkipReason,
-    MutationSummary, TargetReachability,
+    MutationDomain, MutationLayer, MutationOperator, MutationOperatorFunnel,
+    MutationSemanticCategory, MutationSkipReason, MutationSummary, TargetReachability,
 };

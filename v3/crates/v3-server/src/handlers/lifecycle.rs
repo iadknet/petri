@@ -11,7 +11,9 @@ use v3_core::simulation::{run_tick, seed_simulation};
 use crate::error::{AppError, FieldError};
 use crate::state::{
     AppState, BarrierCell, CreatureSnapshot, FoodCell, FramePayload, HealthPayload,
-    LastTickActions, PredationEventSnapshot, SimHandle, SimulationStatus, StatusPayload, WsFrame,
+    LastTickActions, MutationOperatorFunnelPayload, MutationOperatorValueTotalsPayload,
+    MutationTargetReachabilityTotalPayload, PredationEventSnapshot, SimHandle, SimulationStatus,
+    StatusPayload, WsFrame,
 };
 use crate::types::{config_digest, deep_merge, StepRequest, PROTOCOL_VERSION};
 
@@ -309,10 +311,65 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             .iter()
             .map(|(operator, count)| (operator.as_key().to_string(), *count))
             .collect(),
+        mutation_events_skipped_total_by_operator: stats
+            .mutation_events_skipped_total_by_operator
+            .iter()
+            .map(|(operator, count)| (operator.as_key().to_string(), *count))
+            .collect(),
+        mutation_operator_funnel_total_by_operator: stats
+            .mutation_operator_funnel_total_by_operator
+            .iter()
+            .map(|(operator, funnel)| {
+                (
+                    operator.as_key().to_string(),
+                    MutationOperatorFunnelPayload {
+                        attempted: funnel.attempted,
+                        applicable: funnel.applicable,
+                        structurally_valid: funnel.structurally_valid,
+                        applied: funnel.applied,
+                        semantic_change: funnel.semantic_change,
+                        skipped: funnel.skipped,
+                    },
+                )
+            })
+            .collect(),
+        mutation_skip_reasons_total_by_operator: stats
+            .mutation_skip_reasons_total_by_operator
+            .iter()
+            .map(|(operator, by_reason)| {
+                (
+                    operator.as_key().to_string(),
+                    by_reason
+                        .iter()
+                        .map(|(reason, count)| (reason.as_key().to_string(), *count))
+                        .collect(),
+                )
+            })
+            .collect(),
         mutation_events_applied_total_semantic_noop: stats
             .mutation_events_applied_total_semantic_noop,
         mutation_events_applied_total_semantic_change: stats
             .mutation_events_applied_total_semantic_change,
+        mutation_target_reachability_total: MutationTargetReachabilityTotalPayload {
+            reachable: stats.mutation_reachable_target_total,
+            unreachable: stats.mutation_unreachable_target_total,
+            not_applicable: stats.mutation_not_applicable_target_total,
+        },
+        mutation_value_totals_by_operator: stats
+            .mutation_value_totals_by_operator
+            .iter()
+            .map(|(operator, totals)| {
+                (
+                    operator.as_key().to_string(),
+                    MutationOperatorValueTotalsPayload {
+                        carriers_observed_total: totals.carriers_observed_total,
+                        survival_ticks_sum: totals.survival_ticks_sum,
+                        offspring_spawned_sum: totals.offspring_spawned_sum,
+                        final_energy_sum: totals.final_energy_sum,
+                    },
+                )
+            })
+            .collect(),
         reproduction_actions_attempted_total: stats.reproduction_actions_attempted_total,
         reproduction_actions_spawned_total: stats.reproduction_actions_spawned_total,
         reproduction_actions_rejected_total: stats.reproduction_actions_rejected_total,
@@ -321,10 +378,50 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             .iter()
             .map(|(reason, count)| (reason.as_key().to_string(), *count))
             .collect(),
+        reproduction_actions_rejected_invalid_target_total_by_cause: stats
+            .reproduction_actions_rejected_invalid_target_total_by_cause
+            .iter()
+            .map(|(cause, count)| (cause.as_key().to_string(), *count))
+            .collect(),
+        reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state: stats
+            .reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state
+            .iter()
+            .map(|(state, count)| (state.as_key().to_string(), *count))
+            .collect(),
         mutation_events_skipped_total_by_reason: stats
             .mutation_events_skipped_by_reason
             .iter()
             .map(|(reason, count)| (reason.as_key().to_string(), *count))
+            .collect(),
+        move_actions_blocked_total_by_cause: stats
+            .move_actions_blocked_total_by_cause
+            .iter()
+            .map(|(cause, count)| (cause.as_key().to_string(), *count))
+            .collect(),
+        move_actions_blocked_avoidable_total_by_reader_state: stats
+            .move_actions_blocked_avoidable_total_by_reader_state
+            .iter()
+            .map(|(state, count)| (state.as_key().to_string(), *count))
+            .collect(),
+        move_attempts_with_barrier_neighbor_total_by_reader_state: stats
+            .move_attempts_with_barrier_neighbor_total_by_reader_state
+            .iter()
+            .map(|(state, count)| (state.as_key().to_string(), *count))
+            .collect(),
+        move_blocked_barrier_with_barrier_neighbor_total_by_reader_state: stats
+            .move_blocked_barrier_with_barrier_neighbor_total_by_reader_state
+            .iter()
+            .map(|(state, count)| (state.as_key().to_string(), *count))
+            .collect(),
+        reproduction_attempts_with_barrier_neighbor_total_by_reader_state: stats
+            .reproduction_attempts_with_barrier_neighbor_total_by_reader_state
+            .iter()
+            .map(|(state, count)| (state.as_key().to_string(), *count))
+            .collect(),
+        reproduction_invalid_target_barrier_with_barrier_neighbor_total_by_reader_state: stats
+            .reproduction_invalid_target_barrier_with_barrier_neighbor_total_by_reader_state
+            .iter()
+            .map(|(state, count)| (state.as_key().to_string(), *count))
             .collect(),
         predation_actions_attempted_total: stats.predation_actions_attempted_total,
         predation_actions_transferred_total: stats.predation_actions_transferred_total,

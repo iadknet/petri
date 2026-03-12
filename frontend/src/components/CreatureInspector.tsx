@@ -17,6 +17,7 @@ function CreatureInspector() {
 	);
 	const sharedMemory = useCreatureInspectorStore(creatureInspectorSelectors.creatureSharedMemory);
 	const actionLog = useCreatureInspectorStore(creatureInspectorSelectors.actionLog);
+	const diagnostics = useCreatureInspectorStore(creatureInspectorSelectors.creatureDiagnostics);
 	const isLoading = useCreatureInspectorStore(creatureInspectorSelectors.isLoading);
 	const isDead = useCreatureInspectorStore(creatureInspectorSelectors.isDead);
 	const error = useCreatureInspectorStore(creatureInspectorSelectors.error);
@@ -75,6 +76,7 @@ function CreatureInspector() {
 			meshAnnotations={meshAnnotations}
 			sharedMemory={sharedMemory}
 			actionLog={actionLog}
+			diagnostics={diagnostics}
 			isDead={isDead}
 			stats={stats}
 			onClose={handleClose}

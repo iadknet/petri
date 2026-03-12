@@ -3,7 +3,7 @@ mod predation;
 mod reproduction;
 
 pub use predation::{apply_steal_energy, PredationActionResult, PredationEventRecord};
-pub use reproduction::{apply_reproduce, ReproductionActionResult};
+pub use reproduction::{apply_reproduce, ReproductionActionResult, ReproductionInvalidTargetCause};
 
 use crate::config::SimulationConfig;
 use crate::contracts::{CreatureId, Direction};
@@ -11,6 +11,44 @@ use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
 
 // ─── Action application functions ─────────────────────────────────────────────
+
+/// Classification for rejected move actions.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum MoveBlockedCause {
+    Barrier,
+    Occupied,
+    OutOfBounds,
+}
+
+impl MoveBlockedCause {
+    /// Stable string key used by transport/API boundaries.
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::Barrier => "barrier",
+            Self::Occupied => "occupied",
+            Self::OutOfBounds => "out_of_bounds",
+        }
+    }
+}
+
+/// Whether the acting creature has any live barrier sensor read in reachable mesh nodes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum BarrierReaderState {
+    HasBarrierReader,
+    NoBarrierReader,
+}
+
+impl BarrierReaderState {
+    /// Stable string key used by transport/API boundaries.
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::HasBarrierReader => "has_barrier_reader",
+            Self::NoBarrierReader => "no_barrier_reader",
+        }
+    }
+}
 
 /// Apply a NoOp action (deduct noop cost, scaled by genome complexity and age).
 pub fn apply_noop(creature: &mut CreatureState, config: &SimulationConfig) {

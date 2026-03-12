@@ -7,15 +7,37 @@ fn mutation_summary_zero_has_zero_counts() {
     assert_eq!(s.applied_events, 0);
     assert_eq!(s.skipped_events, 0);
     assert!(s.skip_reasons.is_empty());
+    assert!(s.skipped_by_operator.is_empty());
     assert!(s.attempted_by_domain.is_empty());
     assert!(s.applied_by_domain.is_empty());
     assert!(s.attempted_by_operator.is_empty());
     assert!(s.applied_by_operator.is_empty());
+    assert!(s.operator_funnel_by_operator.is_empty());
+    assert!(s.skip_reasons_by_operator.is_empty());
     assert_eq!(s.applied_semantic_noop_events, 0);
     assert_eq!(s.applied_semantic_change_events, 0);
     assert_eq!(s.reachable_target_events, 0);
     assert_eq!(s.unreachable_target_events, 0);
     assert_eq!(s.not_applicable_events, 0);
+}
+
+#[test]
+fn record_skipped_tracks_skip_reason_and_operator() {
+    let mut s = MutationSummary::zero();
+    s.record_skipped(
+        MutationOperator::VmInstructionMutation,
+        MutationSkipReason::NoApplicableTarget,
+    );
+    assert_eq!(s.skipped_events, 1);
+    assert_eq!(
+        s.skip_reasons.get(&MutationSkipReason::NoApplicableTarget),
+        Some(&1)
+    );
+    assert_eq!(
+        s.skipped_by_operator
+            .get(&MutationOperator::VmInstructionMutation),
+        Some(&1)
+    );
 }
 
 #[test]
@@ -98,6 +120,10 @@ fn complexity_effect_known_classifications() {
         ComplexityEffect::Increasing
     );
     assert_eq!(
+        MutationOperator::VmDeleteInstruction.complexity_effect(),
+        ComplexityEffect::Decreasing
+    );
+    assert_eq!(
         MutationOperator::GraphCopySubgraph.complexity_effect(),
         ComplexityEffect::Increasing
     );
@@ -137,6 +163,7 @@ fn operator_domain_mapping_is_consistent() {
             }
             MutationOperator::VmConstantMutation
             | MutationOperator::VmInstructionMutation
+            | MutationOperator::VmDeleteInstruction
             | MutationOperator::VmRegisterCountMutation
             | MutationOperator::VmInstructionRawFieldMutation
             | MutationOperator::VmCopyInstructionBlock
@@ -224,6 +251,7 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
         let mo = match vm {
             VmOperator::VmConstantMutation => MutationOperator::VmConstantMutation,
             VmOperator::VmInstructionMutation => MutationOperator::VmInstructionMutation,
+            VmOperator::VmDeleteInstruction => MutationOperator::VmDeleteInstruction,
             VmOperator::VmRegisterCountMutation => MutationOperator::VmRegisterCountMutation,
             VmOperator::VmInstructionRawFieldMutation => {
                 MutationOperator::VmInstructionRawFieldMutation
@@ -359,4 +387,44 @@ fn reachability_accounting_matches_applied_events() {
     let reachability_total =
         s.reachable_target_events + s.unreachable_target_events + s.not_applicable_events;
     assert_eq!(reachability_total, s.applied_events);
+}
+
+#[test]
+fn operator_funnel_tracks_stage_counts_and_skip_reason_breakdown() {
+    let mut s = MutationSummary::zero();
+    let operator = MutationOperator::VmInstructionMutation;
+    let domain = MutationDomain::Vm;
+
+    s.record_attempt(domain, operator);
+    s.record_applied(domain, operator, MutationSemanticCategory::SemanticChange);
+
+    s.record_attempt(domain, operator);
+    s.record_skipped(operator, MutationSkipReason::NoApplicableTarget);
+
+    s.record_attempt(domain, operator);
+    s.record_skipped(operator, MutationSkipReason::ParseabilityViolation);
+
+    let funnel = s
+        .operator_funnel_by_operator
+        .get(&operator)
+        .expect("operator funnel should exist");
+    assert_eq!(funnel.attempted, 3);
+    assert_eq!(funnel.applicable, 2);
+    assert_eq!(funnel.structurally_valid, 1);
+    assert_eq!(funnel.applied, 1);
+    assert_eq!(funnel.semantic_change, 1);
+    assert_eq!(funnel.skipped, 2);
+
+    let by_reason = s
+        .skip_reasons_by_operator
+        .get(&operator)
+        .expect("operator skip reasons should exist");
+    assert_eq!(
+        by_reason.get(&MutationSkipReason::NoApplicableTarget),
+        Some(&1)
+    );
+    assert_eq!(
+        by_reason.get(&MutationSkipReason::ParseabilityViolation),
+        Some(&1)
+    );
 }

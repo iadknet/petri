@@ -2,6 +2,7 @@ use super::super::run_phase_0;
 use super::support::*;
 use crate::config::SimulationConfig;
 use crate::contracts::Position;
+use crate::mutation::MutationOperator;
 use crate::simulation::seeding::seed_simulation;
 
 #[test]
@@ -123,4 +124,37 @@ fn phase_0_no_decay_when_rate_is_zero() {
 
     let creature = sim.creatures.get(id).unwrap();
     assert_eq!(creature.shared_memory[7], 5.0);
+}
+
+#[test]
+fn phase_0_records_mutation_value_totals_on_creature_death() {
+    let decay = SimulationConfig::default()
+        .energy
+        .lifecycle
+        .energy_decay_per_tick;
+    let (mut sim, id) = make_sim_with_one_creature(decay * 0.5);
+    let creature = sim.creatures.get_mut(id).expect("creature should exist");
+    creature.age = 9;
+    creature.offspring_spawned_count = 3;
+    creature.birth_mutation_operators = vec![
+        MutationOperator::VmInstructionMutation,
+        MutationOperator::GraphMutateHebbianRule,
+    ]
+    .into_boxed_slice();
+
+    run_phase_0(&mut sim);
+
+    for operator in [
+        MutationOperator::VmInstructionMutation,
+        MutationOperator::GraphMutateHebbianRule,
+    ] {
+        let totals = sim
+            .stats
+            .mutation_value_totals_by_operator
+            .get(&operator)
+            .expect("totals should be recorded");
+        assert_eq!(totals.carriers_observed_total, 1);
+        assert_eq!(totals.survival_ticks_sum, 10);
+        assert_eq!(totals.offspring_spawned_sum, 3);
+    }
 }

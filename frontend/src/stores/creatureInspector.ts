@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import type { ActionLogEntry } from "../types/action-log.ts";
-import type { CreatureMeshAnnotation } from "../types/creature-detail.ts";
+import type { CreatureDiagnostics, CreatureMeshAnnotation } from "../types/creature-detail.ts";
 import type { CreatureGenome, CreaturePhenotype } from "../types/genome.ts";
 
 export interface CreatureStats {
@@ -31,6 +31,7 @@ export interface CreatureRuntimeSnapshotState {
 export interface CreatureLiveDetailState {
 	stats: CreatureStats | null;
 	actionLog: ActionLogEntry[] | null;
+	diagnostics: CreatureDiagnostics | null;
 }
 
 export interface CreatureResourceMetaState {
@@ -62,6 +63,7 @@ interface CreatureInspectorState {
 		meshAnnotations?: CreatureMeshAnnotation[];
 		sharedMemory?: number[];
 		actionLog?: ActionLogEntry[];
+		diagnostics?: CreatureDiagnostics;
 		incremental?: boolean;
 	}) => void;
 	setDead: () => void;
@@ -90,7 +92,7 @@ function makeEmptyState(
 		selection: { selectedCreatureId },
 		staticDetail: { genome: null, meshAnnotations: null },
 		runtimeSnapshot: { sharedMemory: null },
-		liveDetail: { stats: null, actionLog: null },
+		liveDetail: { stats: null, actionLog: null, diagnostics: null },
 		resourceMeta: { isLoading, error: null, isDead: false },
 	};
 }
@@ -102,6 +104,7 @@ export const creatureInspectorSelectors = {
 	creatureMeshAnnotations: (state: CreatureInspectorState) => state.staticDetail.meshAnnotations,
 	creatureSharedMemory: (state: CreatureInspectorState) => state.runtimeSnapshot.sharedMemory,
 	actionLog: (state: CreatureInspectorState) => state.liveDetail.actionLog,
+	creatureDiagnostics: (state: CreatureInspectorState) => state.liveDetail.diagnostics,
 	isLoading: (state: CreatureInspectorState) => state.resourceMeta.isLoading,
 	error: (state: CreatureInspectorState) => state.resourceMeta.error,
 	isDead: (state: CreatureInspectorState) => state.resourceMeta.isDead,
@@ -162,10 +165,12 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 			}
 		}
 
+		const diagnostics = detail.diagnostics ?? state.liveDetail.diagnostics;
+
 		set({
 			staticDetail: { genome, meshAnnotations },
 			runtimeSnapshot: { sharedMemory },
-			liveDetail: { stats, actionLog },
+			liveDetail: { stats, actionLog, diagnostics },
 			resourceMeta: {
 				isLoading: false,
 				error: null,

@@ -39,6 +39,10 @@ function buildStatusPayload(): StatusPayload {
 		mutation_events_applied_total_by_domain: {},
 		mutation_events_attempted_total_by_operator: {},
 		mutation_events_applied_total_by_operator: {},
+		mutation_events_skipped_total_by_operator: {},
+		mutation_target_reachability_total: { reachable: 2, unreachable: 0, not_applicable: 0 },
+		move_actions_blocked_total_by_cause: {},
+		reproduction_actions_rejected_invalid_target_total_by_cause: {},
 		mutation_events_applied_total_semantic_noop: 0,
 		mutation_events_applied_total_semantic_change: 2,
 		last_tick_compute_energy_total_mean: 2,
@@ -61,6 +65,10 @@ function buildHealthPayload(): HealthPayload {
 		mutation_events_applied_total_by_domain: {},
 		mutation_events_attempted_total_by_operator: {},
 		mutation_events_applied_total_by_operator: {},
+		mutation_events_skipped_total_by_operator: { duplicate_mutation: 1 },
+		mutation_target_reachability_total: { reachable: 1, unreachable: 1, not_applicable: 0 },
+		move_actions_blocked_total_by_cause: { barrier: 2 },
+		reproduction_actions_rejected_invalid_target_total_by_cause: { occupied: 1 },
 		mutation_events_applied_total_semantic_noop: 0,
 		mutation_events_applied_total_semantic_change: 2,
 		reproduction_actions_attempted_total: 4,
@@ -142,6 +150,8 @@ describe("useViewSubscription store helpers", () => {
 		expect(useViewportStore.getState().worldSize).toEqual({ width: 12, height: 10 });
 		expect(useStatsHistoryStore.getState().statsHistory).toEqual([]);
 		expect(useStatsHistoryStore.getState().reproAttempted).toBe(4);
+		expect(useStatsHistoryStore.getState().mutationSkippedByOperator.duplicate_mutation).toBe(1);
+		expect(useStatsHistoryStore.getState().mutationTargetReachabilityTotal.unreachable).toBe(1);
 	});
 
 	it("uses measured canvas size for the bootstrap fallback request when available", () => {

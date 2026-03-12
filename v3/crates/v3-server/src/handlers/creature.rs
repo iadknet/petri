@@ -2,13 +2,19 @@ use axum::extract::{Path, Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
 use slotmap::{Key, KeyData};
-use v3_core::contracts::CreatureId;
-use v3_core::creature::action_log::ActionLogEntry;
+use std::collections::{BTreeMap, BTreeSet};
+use v3_core::contracts::{CreatureId, InputReference};
+use v3_core::creature::action_log::{ActionLogEntry, ActionResult, ActionType};
+use v3_core::creature::genome::cgp::OutputSinkKind;
 use v3_core::creature::genome::mesh_annotations::{
-    derive_mesh_annotations_with_reachable_indices, MeshNodeAnnotation,
+    derive_mesh_annotations_with_reachable_indices, MeshNodeAnnotation, MeshReadClass,
+    MeshWriteClass,
 };
+use v3_core::creature::genome::{BackendDef, VmInstruction};
 use v3_core::mutation::phenotype::channels_to_rgb;
 use v3_core::runtime::trace::recording::ActiveTrace;
+use v3_core::runtime::OUTPUT_SLOT_COUNT;
+use v3_core::sensors::static_inputs::assemble_static_inputs;
 
 use crate::error::{AppError, FieldError};
 use crate::state::{AppState, SimulationStatus};
@@ -57,6 +63,45 @@ struct CreatureDetailResponse<'a> {
     shared_memory: Option<&'a [f32]>,
     #[serde(skip_serializing_if = "Option::is_none")]
     action_log: Option<Vec<&'a ActionLogEntry>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    diagnostics: Option<CreatureDiagnosticsResponse>,
+}
+
+#[derive(serde::Serialize)]
+struct CreatureDiagnosticsResponse {
+    current_inputs: CreatureCurrentInputsDiagnostics,
+    live_circuit: CreatureLiveCircuitDiagnostics,
+    recent_actions: CreatureRecentActionsDiagnostics,
+}
+
+#[derive(serde::Serialize)]
+struct CreatureCurrentInputsDiagnostics {
+    food_here: f32,
+    neighbor_food: [f32; 8],
+    neighbor_barrier: [f32; 8],
+    neighbor_occupied: [f32; 8],
+}
+
+#[derive(serde::Serialize)]
+struct CreatureLiveCircuitDiagnostics {
+    reachable_node_count: usize,
+    stateful_reachable_node_count: usize,
+    barrier_reader_reachable_node_count: usize,
+    barrier_decision_writer_reachable_node_count: usize,
+    barrier_reader_without_decision_writer_reachable_node_count: usize,
+    distinct_upstream_slots_read: Vec<usize>,
+    distinct_payload_slots_written: Vec<usize>,
+    distinct_custom_output_slots_written: Vec<usize>,
+    reachable_read_class_counts: BTreeMap<String, u32>,
+    reachable_write_class_counts: BTreeMap<String, u32>,
+}
+
+#[derive(serde::Serialize)]
+struct CreatureRecentActionsDiagnostics {
+    sampled_entries: usize,
+    blocked_move_count: u32,
+    invalid_target_reproduce_count: u32,
+    by_action_result: BTreeMap<String, u32>,
 }
 
 #[derive(serde::Serialize)]
@@ -94,6 +139,191 @@ fn to_json_value<T: serde::Serialize>(value: T) -> Result<Json<serde_json::Value
     Ok(Json(body))
 }
 
+fn mesh_read_class_key(class: MeshReadClass) -> &'static str {
+    match class {
+        MeshReadClass::Food => "food",
+        MeshReadClass::Neighbor => "neighbor",
+        MeshReadClass::Barrier => "barrier",
+        MeshReadClass::Occupancy => "occupancy",
+        MeshReadClass::Introspection => "introspection",
+        MeshReadClass::Upstream => "upstream",
+        MeshReadClass::ActionQueue => "action_queue",
+    }
+}
+
+fn mesh_write_class_key(class: MeshWriteClass) -> &'static str {
+    match class {
+        MeshWriteClass::Route => "route",
+        MeshWriteClass::Action => "action",
+        MeshWriteClass::Memory => "memory",
+        MeshWriteClass::Payload => "payload",
+    }
+}
+
+fn action_type_key(kind: ActionType) -> &'static str {
+    match kind {
+        ActionType::NoOp => "NoOp",
+        ActionType::Eat => "Eat",
+        ActionType::Move => "Move",
+        ActionType::Reproduce => "Reproduce",
+        ActionType::StealEnergy => "StealEnergy",
+        _ => "Unknown",
+    }
+}
+
+fn action_result_key(result: ActionResult) -> &'static str {
+    match result {
+        ActionResult::Success => "Success",
+        ActionResult::NoFood => "NoFood",
+        ActionResult::Blocked => "Blocked",
+        ActionResult::InvalidTarget => "InvalidTarget",
+        ActionResult::EnergyConstraints => "EnergyConstraints",
+        ActionResult::PopulationCap => "PopulationCap",
+        ActionResult::TransferredAndKilled => "TransferredAndKilled",
+        ActionResult::NoVictim => "NoVictim",
+        _ => "Unknown",
+    }
+}
+
+fn build_creature_diagnostics(
+    sim: &v3_core::simulation::Simulation,
+    creature: &v3_core::creature::state::CreatureState,
+    mesh_annotations: &[MeshNodeAnnotation],
+    action_log_entries: &[&ActionLogEntry],
+) -> CreatureDiagnosticsResponse {
+    let static_inputs = assemble_static_inputs(&sim.world, creature);
+    let current_inputs = CreatureCurrentInputsDiagnostics {
+        food_here: static_inputs.food_here,
+        neighbor_food: static_inputs.neighbor_food,
+        neighbor_barrier: static_inputs.neighbor_barrier,
+        neighbor_occupied: static_inputs.neighbor_occupied,
+    };
+
+    let mut reachable_read_class_counts: BTreeMap<String, u32> = BTreeMap::new();
+    let mut reachable_write_class_counts: BTreeMap<String, u32> = BTreeMap::new();
+    let mut stateful_reachable_node_count = 0usize;
+    let mut barrier_reader_reachable_node_count = 0usize;
+    let mut barrier_decision_writer_reachable_node_count = 0usize;
+    let mut barrier_reader_without_decision_writer_reachable_node_count = 0usize;
+
+    for annotation in mesh_annotations
+        .iter()
+        .filter(|annotation| annotation.reachable)
+    {
+        if annotation.has_stateful_behavior {
+            stateful_reachable_node_count += 1;
+        }
+        let reads_barrier = annotation.read_classes.contains(&MeshReadClass::Barrier);
+        if reads_barrier {
+            barrier_reader_reachable_node_count += 1;
+            let writes_decision = annotation
+                .write_classes
+                .iter()
+                .any(|class| matches!(class, MeshWriteClass::Action | MeshWriteClass::Route));
+            if writes_decision {
+                barrier_decision_writer_reachable_node_count += 1;
+            } else {
+                barrier_reader_without_decision_writer_reachable_node_count += 1;
+            }
+        }
+        for class in &annotation.read_classes {
+            *reachable_read_class_counts
+                .entry(mesh_read_class_key(*class).to_string())
+                .or_insert(0) += 1;
+        }
+        for class in &annotation.write_classes {
+            *reachable_write_class_counts
+                .entry(mesh_write_class_key(*class).to_string())
+                .or_insert(0) += 1;
+        }
+    }
+
+    let reachable_node_ids: BTreeSet<_> = mesh_annotations
+        .iter()
+        .filter(|annotation| annotation.reachable)
+        .map(|annotation| annotation.node_id)
+        .collect();
+    let mut upstream_slots: BTreeSet<usize> = BTreeSet::new();
+    let mut payload_slots: BTreeSet<usize> = BTreeSet::new();
+    let mut custom_output_slots: BTreeSet<usize> = BTreeSet::new();
+    for node in &creature.genome.nodes {
+        if !reachable_node_ids.contains(&node.node_id) {
+            continue;
+        }
+        for input_ref in &node.input_refs {
+            if let InputReference::UpstreamSlot(slot) = input_ref {
+                if *slot < OUTPUT_SLOT_COUNT {
+                    upstream_slots.insert(*slot);
+                }
+            }
+        }
+        match &node.backend_def {
+            BackendDef::Vm(vm) => {
+                for instruction in &vm.program {
+                    if let VmInstruction::WriteInternalPayload { slot_idx, .. } = instruction {
+                        let slot_idx = *slot_idx as usize;
+                        if slot_idx < OUTPUT_SLOT_COUNT {
+                            payload_slots.insert(slot_idx);
+                        }
+                    }
+                }
+            }
+            BackendDef::Graph(graph) => {
+                for sink in &graph.output_sinks {
+                    if sink.inputs.is_empty() {
+                        continue;
+                    }
+                    if let OutputSinkKind::CustomOutput(slot) = sink.kind {
+                        custom_output_slots.insert(slot as usize);
+                    }
+                }
+            }
+        }
+    }
+
+    let recent_window: Vec<_> = action_log_entries.iter().rev().take(32).copied().collect();
+    let mut by_action_result = BTreeMap::new();
+    let mut blocked_move_count = 0u32;
+    let mut invalid_target_reproduce_count = 0u32;
+    for entry in &recent_window {
+        let key = format!(
+            "{}:{}",
+            action_type_key(entry.action_type),
+            action_result_key(entry.result)
+        );
+        *by_action_result.entry(key).or_insert(0) += 1;
+        if entry.action_type == ActionType::Move && entry.result == ActionResult::Blocked {
+            blocked_move_count += 1;
+        }
+        if entry.action_type == ActionType::Reproduce && entry.result == ActionResult::InvalidTarget
+        {
+            invalid_target_reproduce_count += 1;
+        }
+    }
+
+    CreatureDiagnosticsResponse {
+        current_inputs,
+        live_circuit: CreatureLiveCircuitDiagnostics {
+            reachable_node_count: reachable_node_ids.len(),
+            stateful_reachable_node_count,
+            barrier_reader_reachable_node_count,
+            barrier_decision_writer_reachable_node_count,
+            barrier_reader_without_decision_writer_reachable_node_count,
+            distinct_upstream_slots_read: upstream_slots.into_iter().collect(),
+            distinct_payload_slots_written: payload_slots.into_iter().collect(),
+            distinct_custom_output_slots_written: custom_output_slots.into_iter().collect(),
+            reachable_read_class_counts,
+            reachable_write_class_counts,
+        },
+        recent_actions: CreatureRecentActionsDiagnostics {
+            sampled_entries: recent_window.len(),
+            blocked_move_count,
+            invalid_target_reproduce_count,
+            by_action_result,
+        },
+    }
+}
+
 pub async fn get_creature(
     State(app): State<AppState>,
     Path(id): Path<u64>,
@@ -115,22 +345,22 @@ pub async fn get_creature(
         .map(|s| s.split(',').map(str::trim).collect())
         .unwrap_or_default();
 
-    let action_log_entries: Vec<_> = if exclude.contains("action_log") {
+    let all_action_log_entries: Vec<&ActionLogEntry> = sim
+        .action_logs
+        .get(creature_id)
+        .map(|log| log.entries().iter().collect())
+        .unwrap_or_default();
+
+    let action_log_entries: Vec<&ActionLogEntry> = if exclude.contains("action_log") {
         Vec::new()
+    } else if let Some(since) = query.since_tick {
+        all_action_log_entries
+            .iter()
+            .copied()
+            .filter(|entry| entry.tick > since)
+            .collect()
     } else {
-        sim.action_logs
-            .get(creature_id)
-            .map(|log| {
-                if let Some(since) = query.since_tick {
-                    log.entries()
-                        .iter()
-                        .filter(|entry| entry.tick > since)
-                        .collect()
-                } else {
-                    log.entries().iter().collect()
-                }
-            })
-            .unwrap_or_default()
+        all_action_log_entries.clone()
     };
 
     let latest_tick = sim
@@ -138,6 +368,21 @@ pub async fn get_creature(
         .get(creature_id)
         .and_then(|log| log.entries().back().map(|entry| entry.tick))
         .unwrap_or(0);
+
+    let include_genome = !exclude.contains("genome");
+    let include_diagnostics = !exclude.contains("diagnostics");
+    let mesh_annotations = if include_genome || include_diagnostics {
+        derive_mesh_annotations_with_reachable_indices(
+            &creature.genome,
+            &creature.cached_reachable_nodes,
+        )
+    } else {
+        Vec::new()
+    };
+
+    let diagnostics = include_diagnostics.then(|| {
+        build_creature_diagnostics(sim, creature, &mesh_annotations, &all_action_log_entries)
+    });
 
     let response = CreatureDetailResponse {
         protocol_version: PROTOCOL_VERSION,
@@ -159,15 +404,11 @@ pub async fn get_creature(
             rgb,
         },
         latest_tick,
-        genome: (!exclude.contains("genome")).then_some(&creature.genome),
-        mesh_annotations: (!exclude.contains("genome")).then(|| {
-            derive_mesh_annotations_with_reachable_indices(
-                &creature.genome,
-                &creature.cached_reachable_nodes,
-            )
-        }),
+        genome: include_genome.then_some(&creature.genome),
+        mesh_annotations: include_genome.then_some(mesh_annotations),
         shared_memory: (!exclude.contains("shared_memory")).then(|| &creature.shared_memory[..]),
         action_log: (!exclude.contains("action_log")).then_some(action_log_entries),
+        diagnostics,
     };
 
     to_json_value(response)
