@@ -3,10 +3,7 @@ use crate::runtime::types::MeshOutput;
 use crate::simulation::simulation::Simulation;
 
 pub(super) fn remove_creature_from_sim(sim: &mut Simulation, id: CreatureId) {
-    if let Some(creature) = sim.creatures.remove(id) {
-        sim.world.remove_creature(creature.position);
-    }
-    sim.action_logs.remove(id);
+    sim.remove_creature(id);
 }
 
 pub(super) fn remove_creature_if_dead(sim: &mut Simulation, id: CreatureId) -> bool {

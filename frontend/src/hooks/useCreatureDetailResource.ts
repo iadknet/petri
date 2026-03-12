@@ -55,6 +55,7 @@ export function useCreatureDetailResource() {
 					meshAnnotations: detail.mesh_annotations,
 					sharedMemory: detail.shared_memory,
 					actionLog: detail.action_log,
+					diagnostics: detail.diagnostics,
 					incremental: incremental && hasFullFetchRef.current,
 				});
 

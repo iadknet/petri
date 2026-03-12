@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useInspectorWorkspaceStore } from "../../stores/inspectorWorkspace.ts";
 import type { ActionLogEntry } from "../../types/action-log.ts";
-import type { CreatureMeshAnnotation } from "../../types/creature-detail.ts";
+import type { CreatureDiagnostics, CreatureMeshAnnotation } from "../../types/creature-detail.ts";
 import type { CreatureGenome, CreaturePhenotype } from "../../types/genome.ts";
+import { InspectorDiagnosticsCards } from "./InspectorDiagnosticsCards.tsx";
 import { InspectorEmptyState } from "./InspectorEmptyState.tsx";
 import { NodeInspector } from "./NodeInspector.tsx";
 import { SamplerBar } from "./SamplerBar.tsx";
@@ -19,6 +20,7 @@ interface UnifiedInspectorProps {
 	meshAnnotations: CreatureMeshAnnotation[] | null;
 	sharedMemory: number[] | null;
 	actionLog: ActionLogEntry[] | null;
+	diagnostics: CreatureDiagnostics | null;
 	isDead: boolean;
 	stats: {
 		id: number;
@@ -40,6 +42,7 @@ export function UnifiedInspector({
 	meshAnnotations,
 	sharedMemory,
 	actionLog,
+	diagnostics,
 	isDead,
 	stats,
 	onClose,
@@ -188,6 +191,8 @@ export function UnifiedInspector({
 
 			{/* Canvas area (full width) + node inspector */}
 			<div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+				<InspectorDiagnosticsCards diagnostics={diagnostics} />
+
 				{/* Controls header */}
 				<MeshControls
 					backendFilter={mesh.backendFilter}

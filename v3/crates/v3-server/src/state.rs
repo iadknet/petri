@@ -122,13 +122,28 @@ pub struct HealthPayload {
     pub mutation_events_applied_total_by_domain: HashMap<String, u64>,
     pub mutation_events_attempted_total_by_operator: HashMap<String, u64>,
     pub mutation_events_applied_total_by_operator: HashMap<String, u64>,
+    pub mutation_events_skipped_total_by_operator: HashMap<String, u64>,
+    pub mutation_operator_funnel_total_by_operator: HashMap<String, MutationOperatorFunnelPayload>,
+    pub mutation_skip_reasons_total_by_operator: HashMap<String, HashMap<String, u64>>,
     pub mutation_events_applied_total_semantic_noop: u64,
     pub mutation_events_applied_total_semantic_change: u64,
+    pub mutation_target_reachability_total: MutationTargetReachabilityTotalPayload,
+    pub mutation_value_totals_by_operator: HashMap<String, MutationOperatorValueTotalsPayload>,
     pub reproduction_actions_attempted_total: u64,
     pub reproduction_actions_spawned_total: u64,
     pub reproduction_actions_rejected_total: u64,
     pub reproduction_actions_rejected_total_by_reason: HashMap<String, u64>,
+    pub reproduction_actions_rejected_invalid_target_total_by_cause: HashMap<String, u64>,
+    pub reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state:
+        HashMap<String, u64>,
     pub mutation_events_skipped_total_by_reason: HashMap<String, u64>,
+    pub move_actions_blocked_total_by_cause: HashMap<String, u64>,
+    pub move_actions_blocked_avoidable_total_by_reader_state: HashMap<String, u64>,
+    pub move_attempts_with_barrier_neighbor_total_by_reader_state: HashMap<String, u64>,
+    pub move_blocked_barrier_with_barrier_neighbor_total_by_reader_state: HashMap<String, u64>,
+    pub reproduction_attempts_with_barrier_neighbor_total_by_reader_state: HashMap<String, u64>,
+    pub reproduction_invalid_target_barrier_with_barrier_neighbor_total_by_reader_state:
+        HashMap<String, u64>,
     pub predation_actions_attempted_total: u64,
     pub predation_actions_transferred_total: u64,
     pub predation_actions_rejected_total: u64,
@@ -137,6 +152,31 @@ pub struct HealthPayload {
     pub genome_complexity_mean: f32,
     pub genome_complexity_min: u32,
     pub genome_complexity_max: u32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct MutationTargetReachabilityTotalPayload {
+    pub reachable: u64,
+    pub unreachable: u64,
+    pub not_applicable: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct MutationOperatorFunnelPayload {
+    pub attempted: u64,
+    pub applicable: u64,
+    pub structurally_valid: u64,
+    pub applied: u64,
+    pub semantic_change: u64,
+    pub skipped: u64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+pub struct MutationOperatorValueTotalsPayload {
+    pub carriers_observed_total: u64,
+    pub survival_ticks_sum: u64,
+    pub offspring_spawned_sum: u64,
+    pub final_energy_sum: f64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

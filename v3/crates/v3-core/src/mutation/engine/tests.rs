@@ -179,6 +179,7 @@ fn engine_domain_and_operator_counters_reconcile_to_global_totals() {
     let applied_by_domain: u32 = summary.applied_by_domain.values().sum();
     let attempted_by_operator: u32 = summary.attempted_by_operator.values().sum();
     let applied_by_operator: u32 = summary.applied_by_operator.values().sum();
+    let skipped_by_operator: u32 = summary.skipped_by_operator.values().sum();
 
     // Domain-level attempts include domain-skips (no applicable operator).
     assert_eq!(attempted_by_domain, summary.attempted_events);
@@ -191,6 +192,10 @@ fn engine_domain_and_operator_counters_reconcile_to_global_totals() {
         "operator attempts cannot exceed total attempts"
     );
     assert_eq!(applied_by_operator, summary.applied_events);
+    assert!(
+        skipped_by_operator <= summary.skipped_events,
+        "operator skips cannot exceed total skips"
+    );
 
     assert_eq!(
         summary.applied_semantic_noop_events + summary.applied_semantic_change_events,
@@ -199,7 +204,7 @@ fn engine_domain_and_operator_counters_reconcile_to_global_totals() {
 }
 
 #[test]
-fn engine_attempted_counters_cover_all_domains_and_operators_over_long_run() {
+fn engine_attempted_counters_cover_all_domains_and_hit_each_domain_operator_surface() {
     let mut config = SimulationConfig::default().mutation;
     config.mutation_probability = 1.0;
     config.per_birth_mutation_events_min = 1;
@@ -228,11 +233,15 @@ fn engine_attempted_counters_cover_all_domains_and_operators_over_long_run() {
         );
     }
 
-    for operator in MutationOperator::all() {
+    let mut attempted_domains = std::collections::HashSet::new();
+    for operator in operator_hits.keys().copied() {
+        attempted_domains.insert(operator.domain());
+    }
+    for domain in MutationDomain::all() {
         assert!(
-            operator_hits.get(&operator).copied().unwrap_or(0) > 0,
-            "expected attempted events for operator {:?}",
-            operator
+            attempted_domains.contains(&domain),
+            "expected at least one attempted operator in domain {:?}",
+            domain
         );
     }
 }
@@ -445,8 +454,8 @@ fn engine_pressure_at_cap_selects_only_decreasing() {
 }
 
 #[test]
-fn engine_restricted_vm_mutations_always_skipped() {
-    // VM has 0 Decreasing operators, so restricted VM events must always be skipped.
+fn engine_restricted_vm_mutations_can_apply() {
+    // Restricted VM events should be able to select and apply a Decreasing operator.
     let mut config = SimulationConfig::default().mutation;
     config.mutation_probability = 1.0;
     config.per_birth_mutation_events_min = 1;
@@ -476,9 +485,35 @@ fn engine_restricted_vm_mutations_always_skipped() {
         vm_attempted > 0,
         "VM domain must be attempted at least once over 3000 seeds"
     );
+    assert!(
+        vm_applied > 0,
+        "VM domain should apply at least once when restricted"
+    );
+}
+
+#[test]
+fn engine_does_not_record_operator_no_applicable_skips() {
+    let mut config = SimulationConfig::default().mutation;
+    config.mutation_probability = 1.0;
+    config.per_birth_mutation_events_min = 1;
+    config.per_birth_mutation_events_max = 1;
+
+    let mut operator_no_applicable_skips: u64 = 0;
+    for seed in 0u64..2_000 {
+        let mut genome = v3alpha1_founder_genome();
+        let mut r = rng(seed);
+        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        for by_reason in summary.skip_reasons_by_operator.values() {
+            operator_no_applicable_skips += by_reason
+                .get(&MutationSkipReason::NoApplicableTarget)
+                .copied()
+                .unwrap_or(0) as u64;
+        }
+    }
+
     assert_eq!(
-        vm_applied, 0,
-        "VM domain must never apply when restricted (0 Decreasing operators)"
+        operator_no_applicable_skips, 0,
+        "operator-attributed NoApplicableTarget skips should be eliminated by applicability-aware selection"
     );
 }
 

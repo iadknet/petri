@@ -421,6 +421,22 @@ pub(super) fn apply_instruction_mutation(
     Ok(())
 }
 
+pub(super) fn apply_delete_instruction(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    let node = &mut genome.nodes[node_idx];
+    if let BackendDef::Vm(ref mut vm) = node.backend_def {
+        if vm.program.len() <= 1 {
+            return Err(MutationSkipReason::NoApplicableTarget);
+        }
+        let idx = rng.gen_range(0..vm.program.len());
+        vm.program.remove(idx);
+    }
+    Ok(())
+}
+
 pub(super) fn apply_instruction_raw_field_mutation(
     genome: &mut CreatureGenome,
     node_idx: usize,

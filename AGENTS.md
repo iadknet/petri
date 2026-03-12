@@ -71,6 +71,9 @@ as items in `## Implementation Steps`:
    the changed code MUST be re-run. A verification step checked off before the
    change does not count as verification of the post-change code. This includes
    build checks, test suites, and type checking.
+7. **Gemini is prohibited for code review workflows in this repository.** Use
+   other available review paths (e.g., `superpowers:code-reviewer`,
+   Codex review, local/manual review).
 
 ## Determinism Scope (Canonical)
 

@@ -4,8 +4,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::query::projection::ProjectionSnapshot;
 use crate::state::{
-    CreatureSnapshot, HealthPayload, LastTickActions, PredationEventSnapshot, SimulationStatus,
-    TransportPerfSnapshot,
+    CreatureSnapshot, HealthPayload, LastTickActions, MutationOperatorFunnelPayload,
+    MutationOperatorValueTotalsPayload, MutationTargetReachabilityTotalPayload,
+    PredationEventSnapshot, SimulationStatus, TransportPerfSnapshot,
 };
 pub use crate::types::PROTOCOL_VERSION;
 
@@ -61,8 +62,31 @@ pub struct StatusEventPayload {
     pub mutation_events_applied_total_by_domain: std::collections::HashMap<String, u64>,
     pub mutation_events_attempted_total_by_operator: std::collections::HashMap<String, u64>,
     pub mutation_events_applied_total_by_operator: std::collections::HashMap<String, u64>,
+    pub mutation_events_skipped_total_by_operator: std::collections::HashMap<String, u64>,
+    pub mutation_operator_funnel_total_by_operator:
+        std::collections::HashMap<String, MutationOperatorFunnelPayload>,
+    pub mutation_skip_reasons_total_by_operator:
+        std::collections::HashMap<String, std::collections::HashMap<String, u64>>,
     pub mutation_events_applied_total_semantic_noop: u64,
     pub mutation_events_applied_total_semantic_change: u64,
+    pub mutation_target_reachability_total: MutationTargetReachabilityTotalPayload,
+    pub mutation_value_totals_by_operator:
+        std::collections::HashMap<String, MutationOperatorValueTotalsPayload>,
+    pub move_actions_blocked_total_by_cause: std::collections::HashMap<String, u64>,
+    pub move_actions_blocked_avoidable_total_by_reader_state:
+        std::collections::HashMap<String, u64>,
+    pub move_attempts_with_barrier_neighbor_total_by_reader_state:
+        std::collections::HashMap<String, u64>,
+    pub move_blocked_barrier_with_barrier_neighbor_total_by_reader_state:
+        std::collections::HashMap<String, u64>,
+    pub reproduction_attempts_with_barrier_neighbor_total_by_reader_state:
+        std::collections::HashMap<String, u64>,
+    pub reproduction_invalid_target_barrier_with_barrier_neighbor_total_by_reader_state:
+        std::collections::HashMap<String, u64>,
+    pub reproduction_actions_rejected_invalid_target_total_by_cause:
+        std::collections::HashMap<String, u64>,
+    pub reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state:
+        std::collections::HashMap<String, u64>,
     pub last_tick_compute_energy_total_mean: f32,
     pub last_tick_compute_energy_total_min: f32,
     pub last_tick_compute_energy_total_max: f32,
@@ -186,10 +210,43 @@ pub fn build_status_event_payload(
         mutation_events_applied_total_by_operator: health
             .mutation_events_applied_total_by_operator
             .clone(),
+        mutation_events_skipped_total_by_operator: health
+            .mutation_events_skipped_total_by_operator
+            .clone(),
+        mutation_operator_funnel_total_by_operator: health
+            .mutation_operator_funnel_total_by_operator
+            .clone(),
+        mutation_skip_reasons_total_by_operator: health
+            .mutation_skip_reasons_total_by_operator
+            .clone(),
         mutation_events_applied_total_semantic_noop: health
             .mutation_events_applied_total_semantic_noop,
         mutation_events_applied_total_semantic_change: health
             .mutation_events_applied_total_semantic_change,
+        mutation_target_reachability_total: health.mutation_target_reachability_total.clone(),
+        mutation_value_totals_by_operator: health.mutation_value_totals_by_operator.clone(),
+        move_actions_blocked_total_by_cause: health.move_actions_blocked_total_by_cause.clone(),
+        move_actions_blocked_avoidable_total_by_reader_state: health
+            .move_actions_blocked_avoidable_total_by_reader_state
+            .clone(),
+        move_attempts_with_barrier_neighbor_total_by_reader_state: health
+            .move_attempts_with_barrier_neighbor_total_by_reader_state
+            .clone(),
+        move_blocked_barrier_with_barrier_neighbor_total_by_reader_state: health
+            .move_blocked_barrier_with_barrier_neighbor_total_by_reader_state
+            .clone(),
+        reproduction_attempts_with_barrier_neighbor_total_by_reader_state: health
+            .reproduction_attempts_with_barrier_neighbor_total_by_reader_state
+            .clone(),
+        reproduction_invalid_target_barrier_with_barrier_neighbor_total_by_reader_state: health
+            .reproduction_invalid_target_barrier_with_barrier_neighbor_total_by_reader_state
+            .clone(),
+        reproduction_actions_rejected_invalid_target_total_by_cause: health
+            .reproduction_actions_rejected_invalid_target_total_by_cause
+            .clone(),
+        reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state: health
+            .reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state
+            .clone(),
         last_tick_compute_energy_total_mean: status.last_tick_compute_total_mean,
         last_tick_compute_energy_total_min: status.last_tick_compute_total_min,
         last_tick_compute_energy_total_max: status.last_tick_compute_total_max,
@@ -362,8 +419,24 @@ mod tests {
             mutation_events_applied_total_by_domain: Default::default(),
             mutation_events_attempted_total_by_operator: Default::default(),
             mutation_events_applied_total_by_operator: Default::default(),
+            mutation_events_skipped_total_by_operator: Default::default(),
+            mutation_operator_funnel_total_by_operator: Default::default(),
+            mutation_skip_reasons_total_by_operator: Default::default(),
             mutation_events_applied_total_semantic_noop: 0,
             mutation_events_applied_total_semantic_change: 0,
+            mutation_target_reachability_total:
+                super::MutationTargetReachabilityTotalPayload::default(),
+            mutation_value_totals_by_operator: Default::default(),
+            move_actions_blocked_total_by_cause: Default::default(),
+            move_actions_blocked_avoidable_total_by_reader_state: Default::default(),
+            move_attempts_with_barrier_neighbor_total_by_reader_state: Default::default(),
+            move_blocked_barrier_with_barrier_neighbor_total_by_reader_state: Default::default(),
+            reproduction_attempts_with_barrier_neighbor_total_by_reader_state: Default::default(),
+            reproduction_invalid_target_barrier_with_barrier_neighbor_total_by_reader_state:
+                Default::default(),
+            reproduction_actions_rejected_invalid_target_total_by_cause: Default::default(),
+            reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state:
+                Default::default(),
             last_tick_compute_energy_total_mean: 0.0,
             last_tick_compute_energy_total_min: 0.0,
             last_tick_compute_energy_total_max: 0.0,

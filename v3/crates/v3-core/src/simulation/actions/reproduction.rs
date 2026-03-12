@@ -66,6 +66,28 @@ impl ReproductionActionResult {
     }
 }
 
+/// Fine-grained cause for invalid reproduction targets.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum ReproductionInvalidTargetCause {
+    Barrier,
+    Occupied,
+    OutOfBounds,
+    Contention,
+}
+
+impl ReproductionInvalidTargetCause {
+    /// Stable string key used by transport/API boundaries.
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::Barrier => "barrier",
+            Self::Occupied => "occupied",
+            Self::OutOfBounds => "out_of_bounds",
+            Self::Contention => "contention",
+        }
+    }
+}
+
 /// Apply a Reproduce action per v3-reproduction-spec.md Section 6 unified sequence.
 ///
 /// Returns the outcome indicating whether offspring was spawned or why it was rejected.
@@ -214,9 +236,42 @@ pub fn apply_reproduce(
             .entry(*reason)
             .or_insert(0) += *count as u64;
     }
+    for (operator, count) in &summary.skipped_by_operator {
+        *sim.stats
+            .mutation_events_skipped_total_by_operator
+            .entry(*operator)
+            .or_insert(0) += *count as u64;
+    }
+    for (operator, funnel) in &summary.operator_funnel_by_operator {
+        let entry = sim
+            .stats
+            .mutation_operator_funnel_total_by_operator
+            .entry(*operator)
+            .or_default();
+        entry.attempted += funnel.attempted;
+        entry.applicable += funnel.applicable;
+        entry.structurally_valid += funnel.structurally_valid;
+        entry.applied += funnel.applied;
+        entry.semantic_change += funnel.semantic_change;
+        entry.skipped += funnel.skipped;
+    }
+    for (operator, by_reason) in &summary.skip_reasons_by_operator {
+        let entry = sim
+            .stats
+            .mutation_skip_reasons_total_by_operator
+            .entry(*operator)
+            .or_default();
+        for (reason, count) in by_reason {
+            *entry.entry(*reason).or_insert(0) += *count as u64;
+        }
+    }
     sim.stats.mutation_reachable_target_total += summary.reachable_target_events as u64;
     sim.stats.mutation_unreachable_target_total += summary.unreachable_target_events as u64;
     sim.stats.mutation_not_applicable_target_total += summary.not_applicable_events as u64;
+    let mut child_birth_mutation_operators: Vec<_> =
+        summary.applied_by_operator.keys().copied().collect();
+    child_birth_mutation_operators.sort_by_key(|operator| operator.as_key());
+    let child_birth_mutation_operators = child_birth_mutation_operators.into_boxed_slice();
 
     // Step 10: Phenotype mutation — triggered only when at least one genome event was applied.
     let (child_channels, child_active_channel, child_polarity) = if summary.applied_events > 0 {
@@ -247,7 +302,7 @@ pub fn apply_reproduce(
     // genome is identical to the parent's — copy cached_complexity to avoid
     // expensive recomputation.
     let parent_cached_complexity = sim.creatures[parent_id].cached_complexity;
-    let child_id = sim.creatures.insert_with_key(|id| {
+    let child_id = sim.creatures.insert_with_key(move |id| {
         let mut child = if summary.applied_events == 0 {
             CreatureState::new_with_cached_fields(
                 id,
@@ -278,11 +333,15 @@ pub fn apply_reproduce(
             )
         };
         child.graph_runtime.plasticity_weights = child_plasticity;
+        child.birth_mutation_operators = child_birth_mutation_operators;
         child
     });
     sim.action_logs
         .insert(child_id, ActionLog::new(sim.config.action_log.capacity));
     sim.world.place_creature(target, child_id);
+    if let Some(parent) = sim.creatures.get_mut(parent_id) {
+        parent.offspring_spawned_count += 1;
+    }
 
     sim.stats.reproduction_actions_spawned_total += 1;
     ReproductionActionResult::Spawned

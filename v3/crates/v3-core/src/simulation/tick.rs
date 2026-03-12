@@ -11,6 +11,79 @@ use self::helpers::{remove_creature_from_sim, remove_creature_if_dead};
 #[path = "tick/tests/mod.rs"]
 mod tests;
 
+fn classify_move_blocked_cause(
+    world: &crate::kernel::WorldState,
+    from: crate::contracts::Position,
+    dir: crate::contracts::Direction,
+) -> crate::simulation::actions::MoveBlockedCause {
+    use crate::simulation::actions::MoveBlockedCause;
+
+    let Some(target) = world.resolve_neighbor(from, dir) else {
+        return MoveBlockedCause::OutOfBounds;
+    };
+    if world.is_barrier(target) {
+        return MoveBlockedCause::Barrier;
+    }
+    if world.creature_at(target).is_some() {
+        return MoveBlockedCause::Occupied;
+    }
+    MoveBlockedCause::OutOfBounds
+}
+
+fn classify_reproduction_invalid_target_cause(
+    world: &crate::kernel::WorldState,
+    target: Option<crate::contracts::Position>,
+    successful_spawn_targets: &std::collections::HashSet<crate::contracts::Position>,
+) -> crate::simulation::actions::ReproductionInvalidTargetCause {
+    use crate::simulation::actions::ReproductionInvalidTargetCause;
+
+    let Some(target) = target else {
+        return ReproductionInvalidTargetCause::OutOfBounds;
+    };
+    if successful_spawn_targets.contains(&target) {
+        return ReproductionInvalidTargetCause::Contention;
+    }
+    if world.is_barrier(target) {
+        return ReproductionInvalidTargetCause::Barrier;
+    }
+    if world.creature_at(target).is_some() {
+        return ReproductionInvalidTargetCause::Occupied;
+    }
+    ReproductionInvalidTargetCause::OutOfBounds
+}
+
+fn has_neighbor_barrier(
+    world: &crate::kernel::WorldState,
+    position: crate::contracts::Position,
+) -> bool {
+    crate::contracts::Direction::ALL.iter().any(|dir| {
+        world
+            .resolve_neighbor(position, *dir)
+            .is_some_and(|neighbor| world.is_barrier(neighbor))
+    })
+}
+
+fn has_any_valid_adjacent_target(
+    world: &crate::kernel::WorldState,
+    position: crate::contracts::Position,
+) -> bool {
+    crate::contracts::Direction::ALL.iter().any(|dir| {
+        world
+            .resolve_neighbor(position, *dir)
+            .is_some_and(|target| !world.is_barrier(target) && world.creature_at(target).is_none())
+    })
+}
+
+fn barrier_reader_state_for_creature(
+    creature: &crate::creature::state::CreatureState,
+) -> crate::simulation::actions::BarrierReaderState {
+    if creature.cached_has_barrier_reader {
+        crate::simulation::actions::BarrierReaderState::HasBarrierReader
+    } else {
+        crate::simulation::actions::BarrierReaderState::NoBarrierReader
+    }
+}
+
 /// Run Phase 0 of a tick: food growth, creature aging, energy decay, dead-creature removal.
 ///
 /// Sub-step canonical order (v3-tick-orchestration-spec.md Section 3):
@@ -72,7 +145,7 @@ pub fn run_tick(
     use rand::RngCore;
     use rand::SeedableRng;
 
-    use std::collections::HashMap;
+    use std::collections::{HashMap, HashSet};
 
     use rayon::prelude::*;
 
@@ -283,6 +356,7 @@ pub fn run_tick(
     let mut compute_creature_count = 0u32;
     let mut priority_bid_sum = 0.0f32;
     let mut priority_bid_count = 0u32;
+    let mut successful_spawn_targets: HashSet<crate::contracts::Position> = HashSet::new();
 
     for (id, output) in decisions {
         let compute_cost = &output.cost_report;
@@ -381,17 +455,66 @@ pub fn run_tick(
                 }
                 WorldAction::Move(dir) => {
                     let mut action_result = ActionResult::Success;
+                    let mut blocked_cause = None;
+                    let (has_barrier_neighbor, barrier_reader_state, has_alternative_target) = sim
+                        .creatures
+                        .get(id)
+                        .map(|creature| {
+                            let position = creature.position;
+                            (
+                                has_neighbor_barrier(&sim.world, position),
+                                barrier_reader_state_for_creature(creature),
+                                has_any_valid_adjacent_target(&sim.world, position),
+                            )
+                        })
+                        .unwrap_or((
+                            false,
+                            crate::simulation::actions::BarrierReaderState::NoBarrierReader,
+                            false,
+                        ));
+                    if has_barrier_neighbor {
+                        *sim.stats
+                            .move_attempts_with_barrier_neighbor_total_by_reader_state
+                            .entry(barrier_reader_state)
+                            .or_insert(0) += 1;
+                    }
                     if let Some(creature) = sim.creatures.get_mut(id) {
+                        let from = creature.position;
                         let succeeded = apply_move(id, creature, &mut sim.world, dir, &sim.config);
                         sim.stats.last_tick_move += 1;
                         outcome_acc.record_action_result(id, succeeded);
                         if !succeeded {
+                            blocked_cause =
+                                Some(classify_move_blocked_cause(&sim.world, from, dir));
                             action_result = ActionResult::Blocked;
                             creature.energy -= sim.config.energy.adjusted_action_cost(
                                 sim.config.energy.costs.failed_action_penalty,
                                 creature.cached_complexity,
                                 creature.age,
                             );
+                        }
+                    }
+                    if let Some(cause) = blocked_cause {
+                        *sim.stats
+                            .move_actions_blocked_total_by_cause
+                            .entry(cause)
+                            .or_insert(0) += 1;
+                        if has_alternative_target {
+                            *sim.stats
+                                .move_actions_blocked_avoidable_total_by_reader_state
+                                .entry(barrier_reader_state)
+                                .or_insert(0) += 1;
+                        }
+                        if has_barrier_neighbor
+                            && matches!(
+                                cause,
+                                crate::simulation::actions::MoveBlockedCause::Barrier
+                            )
+                        {
+                            *sim.stats
+                                .move_blocked_barrier_with_barrier_neighbor_total_by_reader_state
+                                .entry(barrier_reader_state)
+                                .or_insert(0) += 1;
                         }
                     }
                     if let Some(log) = sim.action_logs.get_mut(id) {
@@ -411,12 +534,72 @@ pub fn run_tick(
                     direction,
                     energy_transfer,
                 } => {
+                    let (
+                        has_barrier_neighbor,
+                        barrier_reader_state,
+                        has_alternative_target,
+                        reproduction_target,
+                    ) = sim
+                        .creatures
+                        .get(id)
+                        .map(|creature| {
+                            let position = creature.position;
+                            (
+                                has_neighbor_barrier(&sim.world, position),
+                                barrier_reader_state_for_creature(creature),
+                                has_any_valid_adjacent_target(&sim.world, position),
+                                sim.world.resolve_neighbor(position, direction),
+                            )
+                        })
+                        .unwrap_or((
+                            false,
+                            crate::simulation::actions::BarrierReaderState::NoBarrierReader,
+                            false,
+                            None,
+                        ));
+                    if has_barrier_neighbor {
+                        *sim.stats
+                            .reproduction_attempts_with_barrier_neighbor_total_by_reader_state
+                            .entry(barrier_reader_state)
+                            .or_insert(0) += 1;
+                    }
                     let result =
                         apply_reproduce(id, sim, direction, energy_transfer, &mut reproduce_rng);
                     let succeeded = result == ReproductionActionResult::Spawned;
                     outcome_acc.record_action_result(id, succeeded);
                     if succeeded {
+                        if let Some(target) = reproduction_target {
+                            successful_spawn_targets.insert(target);
+                        }
                         outcome_acc.record_offspring(id);
+                    }
+                    if result == ReproductionActionResult::RejectedInvalidTarget {
+                        let cause = classify_reproduction_invalid_target_cause(
+                            &sim.world,
+                            reproduction_target,
+                            &successful_spawn_targets,
+                        );
+                        *sim.stats
+                            .reproduction_actions_rejected_invalid_target_total_by_cause
+                            .entry(cause)
+                            .or_insert(0) += 1;
+                        if has_alternative_target {
+                            *sim.stats
+                                .reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state
+                                .entry(barrier_reader_state)
+                                .or_insert(0) += 1;
+                        }
+                        if has_barrier_neighbor
+                            && matches!(
+                                cause,
+                                crate::simulation::actions::ReproductionInvalidTargetCause::Barrier
+                            )
+                        {
+                            *sim.stats
+                                .reproduction_invalid_target_barrier_with_barrier_neighbor_total_by_reader_state
+                                .entry(barrier_reader_state)
+                                .or_insert(0) += 1;
+                        }
                     }
                     let action_result = match result {
                         ReproductionActionResult::Spawned => ActionResult::Success,
