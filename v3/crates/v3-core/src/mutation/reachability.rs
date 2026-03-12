@@ -18,6 +18,7 @@ use super::types::TargetReachability;
 ///
 /// - `bias = 0.0`: uniform selection from `eligible` (no reachability preference).
 /// - `bias = 1.0`: always select from reachable nodes when any are eligible.
+/// - `bias = -1.0`: always select from unreachable nodes when any are eligible.
 ///
 /// Returns `(selected_index, classification)` or `None` if `eligible` is empty.
 #[must_use]
@@ -31,21 +32,36 @@ pub fn biased_select_from(
         return None;
     }
 
+    let prefer_reachable = bias >= 0.0;
     let bias_clamped = if bias.is_finite() {
-        bias.clamp(0.0, 1.0)
+        bias.abs().clamp(0.0, 1.0)
     } else {
         0.0
     };
 
-    // Attempt biased selection toward reachable nodes
+    // Attempt biased selection toward the preferred class
     if bias_clamped > 0.0 && rng.gen_bool(bias_clamped) {
-        let count = intersection_count(eligible, reachable);
+        let reachable_count = intersection_count(eligible, reachable);
+        let count = if prefer_reachable {
+            reachable_count
+        } else {
+            eligible.len() - reachable_count
+        };
         if count > 0 {
             let pick = rng.gen_range(0..count);
-            let idx = nth_intersection(eligible, reachable, pick);
-            return Some((idx, TargetReachability::Reachable));
+            let idx = if prefer_reachable {
+                nth_intersection(eligible, reachable, pick)
+            } else {
+                nth_difference(eligible, reachable, pick)
+            };
+            let class = if prefer_reachable {
+                TargetReachability::Reachable
+            } else {
+                TargetReachability::Unreachable
+            };
+            return Some((idx, class));
         }
-        // No reachable nodes in eligible set — fall through to uniform
+        // No preferred-class nodes in eligible set — fall through to uniform
     }
 
     // Uniform selection from all eligible nodes
@@ -101,6 +117,27 @@ fn nth_intersection(a: &[usize], b: &[usize], k: usize) -> usize {
         }
     }
     panic!("k={k} out of range for intersection");
+}
+
+/// Find the k-th element (0-based) in `a \ b` for sorted slices.
+///
+/// Panics if `k` is out of range for the difference.
+fn nth_difference(a: &[usize], b: &[usize], k: usize) -> usize {
+    let (mut i, mut j, mut found) = (0usize, 0usize, 0usize);
+    while i < a.len() {
+        while j < b.len() && b[j] < a[i] {
+            j += 1;
+        }
+        let in_b = j < b.len() && b[j] == a[i];
+        if !in_b {
+            if found == k {
+                return a[i];
+            }
+            found += 1;
+        }
+        i += 1;
+    }
+    panic!("k={k} out of range for difference");
 }
 
 #[cfg(test)]
@@ -164,6 +201,31 @@ mod tests {
     }
 
     #[test]
+    fn negative_bias_one_always_selects_unreachable_when_available() {
+        let eligible = vec![0, 1, 2, 3, 4];
+        let reachable = vec![1, 3]; // 0, 2, 4 are unreachable
+        let mut rng = seeded_rng(123);
+        for _ in 0..500 {
+            let (idx, class) = biased_select_from(&eligible, &reachable, -1.0, &mut rng).unwrap();
+            assert!(
+                idx == 0 || idx == 2 || idx == 4,
+                "bias=-1.0 must select unreachable, got {idx}"
+            );
+            assert_eq!(class, TargetReachability::Unreachable);
+        }
+    }
+
+    #[test]
+    fn negative_bias_one_falls_back_when_no_unreachable_eligible() {
+        let eligible = vec![1, 3, 5];
+        let reachable = vec![1, 3, 5]; // all reachable
+        let mut rng = seeded_rng(77);
+        let (idx, class) = biased_select_from(&eligible, &reachable, -1.0, &mut rng).unwrap();
+        assert!(eligible.contains(&idx));
+        assert_eq!(class, TargetReachability::Reachable);
+    }
+
+    #[test]
     fn classify_reachable_node() {
         assert_eq!(
             classify_target(3, &[1, 3, 5]),
@@ -217,5 +279,11 @@ mod tests {
     fn nth_intersection_basic() {
         assert_eq!(nth_intersection(&[1, 3, 5, 7], &[3, 5, 9], 0), 3);
         assert_eq!(nth_intersection(&[1, 3, 5, 7], &[3, 5, 9], 1), 5);
+    }
+
+    #[test]
+    fn nth_difference_basic() {
+        assert_eq!(nth_difference(&[1, 3, 5, 7], &[3, 5, 9], 0), 1);
+        assert_eq!(nth_difference(&[1, 3, 5, 7], &[3, 5, 9], 1), 7);
     }
 }
