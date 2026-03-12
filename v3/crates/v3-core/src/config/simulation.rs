@@ -141,7 +141,7 @@ pub struct ComplexityEnergyCostConfig {
 impl Default for ComplexityEnergyCostConfig {
     fn default() -> Self {
         Self {
-            enabled: true,
+            enabled: false,
             threshold: 50,
             scaling_factor: 0.002,
         }
@@ -757,7 +757,7 @@ mod tests {
         assert!((cfg.energy.lifecycle.min_reproduce_energy - 30.0).abs() < 1e-6);
         assert!((cfg.energy.lifecycle.default_offspring_energy - 100.0).abs() < 1e-6);
         // Complexity energy cost
-        assert!(cfg.energy.complexity_cost.enabled);
+        assert!(!cfg.energy.complexity_cost.enabled);
         assert_eq!(cfg.energy.complexity_cost.threshold, 50);
         assert!((cfg.energy.complexity_cost.scaling_factor - 0.002).abs() < 1e-6);
         // Age energy cost
@@ -1211,7 +1211,10 @@ mod tests {
 
     #[test]
     fn complexity_multiplier_above_threshold_scales_linearly() {
-        let cc = ComplexityEnergyCostConfig::default();
+        let cc = ComplexityEnergyCostConfig {
+            enabled: true,
+            ..ComplexityEnergyCostConfig::default()
+        };
         // threshold=50, scaling=0.002
         // complexity 200: 1.0 + (200-50) * 0.002 = 1.3
         assert!((cc.multiplier(200) - 1.3).abs() < 1e-6);
@@ -1375,7 +1378,8 @@ mod tests {
 
     #[test]
     fn action_cost_multiplier_composes_complexity_and_age() {
-        let ec = EnergyConfig::default();
+        let mut ec = EnergyConfig::default();
+        ec.complexity_cost.enabled = true;
         // complexity=200, age=250
         // complexity_mult = 1.0 + (200-50)*0.002 = 1.3
         // age_mult = 1.0 + 9.0 * 0.25 = 3.25

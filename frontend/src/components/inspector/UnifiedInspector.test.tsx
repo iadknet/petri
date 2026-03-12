@@ -1,4 +1,4 @@
-import { render, screen } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { useInspectorWorkspaceStore } from "../../stores/inspectorWorkspace.ts";
 import type { CreatureGenome, CreaturePhenotype } from "../../types/genome.ts";
@@ -139,6 +139,13 @@ describe("UnifiedInspector", () => {
 		// Node inspector (defaults to entry node)
 		expect(screen.getByText("#1")).toBeInTheDocument();
 		expect(screen.getByText("Diagnostics")).toBeInTheDocument();
+		expect(screen.queryByText("Barrier Perception")).not.toBeInTheDocument();
+		expect(screen.queryByText("Live Circuit Structure")).not.toBeInTheDocument();
+
+		const diagnosticsToggle = screen.getByTestId("inspector-diagnostics-toggle");
+		expect(diagnosticsToggle).toHaveAttribute("aria-expanded", "false");
+		fireEvent.click(diagnosticsToggle);
+		expect(diagnosticsToggle).toHaveAttribute("aria-expanded", "true");
 		expect(screen.getByText("Barrier Perception")).toBeInTheDocument();
 		expect(screen.getByText("Live Circuit Structure")).toBeInTheDocument();
 
@@ -166,6 +173,9 @@ describe("UnifiedInspector", () => {
 	it("renders diagnostics empty state when diagnostics are missing", () => {
 		render(<UnifiedInspector {...defaultProps} diagnostics={null} />);
 		expect(screen.getByTestId("inspector-diagnostics-empty")).toBeInTheDocument();
+		expect(screen.queryByText("Diagnostics unavailable for this creature response.")).toBeNull();
+
+		fireEvent.click(screen.getByTestId("inspector-diagnostics-toggle"));
 		expect(
 			screen.getByText("Diagnostics unavailable for this creature response."),
 		).toBeInTheDocument();

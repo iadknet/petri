@@ -781,7 +781,8 @@ mod tests {
         energy: f32,
         genome: crate::creature::genome::CreatureGenome,
     ) -> (Simulation, CreatureId) {
-        let cfg = small_config();
+        let mut cfg = small_config();
+        cfg.energy.complexity_cost.enabled = true;
         let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
         let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
         let id = creatures.insert_with_key(|id| {

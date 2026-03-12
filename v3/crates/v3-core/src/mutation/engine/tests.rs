@@ -661,3 +661,81 @@ fn engine_with_bias_1_targets_only_reachable_vm_nodes() {
         "with bias=1.0, unreachable node 2 must never be targeted by VM mutations"
     );
 }
+
+#[test]
+fn engine_pressure_restricted_deletions_bias_toward_unreachable_nodes() {
+    use crate::contracts::NodeId;
+    use crate::creature::genome::{
+        BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
+    };
+
+    // Build a 3-node VM genome: entry=0 -> 1, node 2 is unreachable.
+    // Each node has 2 instructions so VmDeleteInstruction is always applicable.
+    let genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![
+            NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![1.0],
+                    program: vec![VmInstruction::Noop, VmInstruction::Halt],
+                }),
+                targets: vec![NodeId::new(1)],
+            },
+            NodeGenome {
+                node_id: NodeId::new(1),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![2.0],
+                    program: vec![VmInstruction::Noop, VmInstruction::Halt],
+                }),
+                targets: vec![],
+            },
+            NodeGenome {
+                node_id: NodeId::new(2),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![99.0],
+                    program: vec![VmInstruction::Noop, VmInstruction::Halt],
+                }),
+                targets: vec![],
+            },
+        ],
+    };
+
+    let reachable: &[usize] = &[0, 1];
+
+    let mut config = SimulationConfig::default().mutation;
+    config.mutation_probability = 1.0;
+    config.per_birth_mutation_events_min = 1;
+    config.per_birth_mutation_events_max = 1;
+    config.mesh_layer_probability = 0.0;
+    config.genome_size_pressure_enabled = true;
+    config.genome_size_cap = 1;
+    config.reachable_bias.vm = 1.0;
+
+    let mut reachable_targets = 0u64;
+    let mut unreachable_targets = 0u64;
+    for seed in 0u64..3000 {
+        let mut g = genome.clone();
+        let mut r = rng(seed);
+        let summary = MutationEngine::apply_mutations(&mut g, &config, reachable, &mut r);
+        reachable_targets += summary.reachable_target_events as u64;
+        unreachable_targets += summary.unreachable_target_events as u64;
+    }
+
+    assert!(
+        reachable_targets + unreachable_targets > 0,
+        "expected at least one reachability-classified mutation event"
+    );
+    assert!(
+        unreachable_targets > reachable_targets,
+        "restricted deletions should favor unreachable targets under inverted pressure bias; reachable={}, unreachable={}",
+        reachable_targets,
+        unreachable_targets
+    );
+}

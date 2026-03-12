@@ -62,7 +62,7 @@ impl MutationEngine {
                         genome,
                         op,
                         parent_reachable_nodes,
-                        rb.topology,
+                        pressure_adjusted_bias(rb.topology, restricted),
                         rng,
                         config,
                     );
@@ -100,7 +100,7 @@ impl MutationEngine {
                                 genome,
                                 op,
                                 parent_reachable_nodes,
-                                rb.vm,
+                                pressure_adjusted_bias(rb.vm, restricted),
                                 rng,
                                 config,
                             );
@@ -136,7 +136,7 @@ impl MutationEngine {
                                 genome,
                                 op,
                                 parent_reachable_nodes,
-                                rb.graph,
+                                pressure_adjusted_bias(rb.graph, restricted),
                                 rng,
                             );
                             if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
@@ -171,7 +171,7 @@ impl MutationEngine {
                                 genome,
                                 op,
                                 parent_reachable_nodes,
-                                rb.input_ref,
+                                pressure_adjusted_bias(rb.input_ref, restricted),
                                 rng,
                                 config,
                             );
@@ -204,6 +204,16 @@ impl MutationEngine {
         }
 
         summary
+    }
+}
+
+/// Under active genome-size pressure restriction, invert reachability targeting so
+/// decreasing operators preferentially prune unreachable structure first.
+fn pressure_adjusted_bias(base_bias: f64, restricted: bool) -> f64 {
+    if restricted {
+        -base_bias
+    } else {
+        base_bias
     }
 }
 
