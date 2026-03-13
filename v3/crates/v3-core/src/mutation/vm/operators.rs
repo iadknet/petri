@@ -673,10 +673,13 @@ pub(super) fn apply_insert_read_store_motif(
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let input_refs_len = genome.nodes[node_idx].input_refs.len();
+    if input_refs_len == 0 {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
     let node = &mut genome.nodes[node_idx];
     if let BackendDef::Vm(ref mut vm) = node.backend_def {
         let rc = vm.register_count.max(1);
-        let il = input_refs_len.clamp(1, 255) as u16;
+        let il = input_refs_len.min(255) as u16;
         let dst = rng.gen_range(0..rc);
         let slot_idx = rng.gen_range(0u8..16);
         let pair = [
@@ -706,7 +709,7 @@ pub(super) fn apply_insert_read_bid_motif(
     let node = &mut genome.nodes[node_idx];
     if let BackendDef::Vm(ref mut vm) = node.backend_def {
         let rc = vm.register_count.max(1);
-        let il = input_refs_len.clamp(1, 255) as u16;
+        let il = input_refs_len.min(255) as u16;
         let dst = rng.gen_range(0..rc);
         let pair = [
             VmInstruction::ReadInput {

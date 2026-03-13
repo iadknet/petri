@@ -2,7 +2,7 @@ use rand::Rng;
 
 use crate::config::MutationConfig;
 use crate::contracts::InputReference;
-use crate::creature::genome::CreatureGenome;
+use crate::creature::genome::{CreatureGenome, VmInstruction};
 use crate::mutation::compound::sub_value_count;
 use crate::mutation::reachability::biased_select_from;
 use crate::mutation::sampling;
@@ -122,19 +122,41 @@ fn apply_add(
         config,
     );
 
-    // Auto-wire all sub-indices into random graph surfaces
-    if let BackendDef::Graph(ref mut def) = genome.nodes[node_idx].backend_def {
-        for sub_idx in 0..width {
-            if let Some(surface) = pick_random_surface(def, rng) {
-                let edges = get_edge_vec_mut(def, surface);
-                edges.push(GraphEdge {
-                    source: GraphSource::InputLeaf {
-                        ref_idx: new_ref_idx,
-                        sub_idx,
-                    },
-                    weight: rng.gen_range(-1.0f32..=1.0),
-                });
+    // Auto-wire into the backend so the new input is immediately connected.
+    match genome.nodes[node_idx].backend_def {
+        BackendDef::Graph(ref mut def) => {
+            // Wire all sub-indices into random graph surfaces.
+            for sub_idx in 0..width {
+                if let Some(surface) = pick_random_surface(def, rng) {
+                    let edges = get_edge_vec_mut(def, surface);
+                    edges.push(GraphEdge {
+                        source: GraphSource::InputLeaf {
+                            ref_idx: new_ref_idx,
+                            sub_idx,
+                        },
+                        weight: rng.gen_range(-1.0f32..=1.0),
+                    });
+                }
             }
+        }
+        BackendDef::Vm(ref mut vm) => {
+            // Insert a ReadInput instruction so the new ref is actually read.
+            // Without this, the ref sits disconnected — no VM instruction
+            // references it — creating junk DNA that wastes complexity budget.
+            let rc = vm.register_count.max(1);
+            let dst = rng.gen_range(0..rc);
+            let sub_idx = if width > 1 {
+                rng.gen_range(0..width)
+            } else {
+                0
+            };
+            let read = VmInstruction::ReadInput {
+                dst,
+                ref_idx: new_ref_idx,
+                sub_idx,
+            };
+            let pos = rng.gen_range(0..=vm.program.len());
+            vm.program.insert(pos, read);
         }
     }
 
