@@ -35,6 +35,7 @@ interface RuntimeConfigPanelProps {
 	localDraft: RuntimePanelProps["localDraft"] | null;
 	serverConfig: RuntimePanelProps["serverConfig"] | null;
 	simState: RuntimePanelProps["simState"];
+	tick: RuntimePanelProps["tick"];
 	updateDraft: RuntimePanelProps["updateDraft"];
 }
 
@@ -42,6 +43,7 @@ export function RuntimeConfigPanel({
 	localDraft,
 	serverConfig,
 	simState,
+	tick,
 	updateDraft,
 }: RuntimeConfigPanelProps) {
 	return (
@@ -63,6 +65,7 @@ export function RuntimeConfigPanel({
 						localDraft={localDraft}
 						serverConfig={serverConfig}
 						simState={simState}
+						tick={tick}
 						updateDraft={updateDraft}
 					/>
 					<RuntimeFieldGroup
@@ -71,6 +74,7 @@ export function RuntimeConfigPanel({
 						localDraft={localDraft}
 						serverConfig={serverConfig}
 						simState={simState}
+						tick={tick}
 						updateDraft={updateDraft}
 					/>
 					<RuntimeFieldGroup
@@ -79,6 +83,7 @@ export function RuntimeConfigPanel({
 						localDraft={localDraft}
 						serverConfig={serverConfig}
 						simState={simState}
+						tick={tick}
 						updateDraft={updateDraft}
 					/>
 					<RuntimeFieldGroup
@@ -87,6 +92,7 @@ export function RuntimeConfigPanel({
 						localDraft={localDraft}
 						serverConfig={serverConfig}
 						simState={simState}
+						tick={tick}
 						updateDraft={updateDraft}
 					/>
 					<RuntimeFieldGroup
@@ -96,6 +102,7 @@ export function RuntimeConfigPanel({
 						localDraft={localDraft}
 						serverConfig={serverConfig}
 						simState={simState}
+						tick={tick}
 						updateDraft={updateDraft}
 					/>
 					<RuntimeFieldGroup
@@ -105,6 +112,7 @@ export function RuntimeConfigPanel({
 						localDraft={localDraft}
 						serverConfig={serverConfig}
 						simState={simState}
+						tick={tick}
 						updateDraft={updateDraft}
 					/>
 					<RuntimeFieldGroup
@@ -113,6 +121,7 @@ export function RuntimeConfigPanel({
 						localDraft={localDraft}
 						serverConfig={serverConfig}
 						simState={simState}
+						tick={tick}
 						updateDraft={updateDraft}
 					/>
 					<RuntimeFieldGroup
@@ -122,6 +131,7 @@ export function RuntimeConfigPanel({
 						localDraft={localDraft}
 						serverConfig={serverConfig}
 						simState={simState}
+						tick={tick}
 						updateDraft={updateDraft}
 					/>
 					<RuntimeFieldGroup
@@ -130,6 +140,7 @@ export function RuntimeConfigPanel({
 						localDraft={localDraft}
 						serverConfig={serverConfig}
 						simState={simState}
+						tick={tick}
 						updateDraft={updateDraft}
 					/>
 					<RuntimeFieldGroup
@@ -138,6 +149,7 @@ export function RuntimeConfigPanel({
 						localDraft={localDraft}
 						serverConfig={serverConfig}
 						simState={simState}
+						tick={tick}
 						updateDraft={updateDraft}
 					/>
 					<RuntimeFieldGroup
@@ -146,6 +158,7 @@ export function RuntimeConfigPanel({
 						localDraft={localDraft}
 						serverConfig={serverConfig}
 						simState={simState}
+						tick={tick}
 						updateDraft={updateDraft}
 					/>
 				</>

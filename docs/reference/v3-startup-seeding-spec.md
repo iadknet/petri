@@ -65,7 +65,8 @@ Conceptual override domains:
   `v3-runtime-config-spec.md` Section 5),
 - `world` (`width`, `height`, `edge_mode`, food parameters),
 - `energy` (lifecycle and action-cost controls),
-- `runtime` (mesh/vm/graph/mutation controls).
+- `runtime` (mesh/vm/graph/mutation controls),
+- `startup` (startup-only controls such as early-run ramps).
 
 v3alpha1 policy:
 - No `founder_profile` request field is part of the canonical startup contract.

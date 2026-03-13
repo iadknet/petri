@@ -17,6 +17,7 @@ export function ConfigPanel() {
 	const serverConfig = useConfigStore((s) => s.serverConfig);
 	const isDirty = useConfigStore((s) => s.isDirty);
 	const simState = useSimulationStore((s) => s.simState);
+	const tick = useSimulationStore((s) => s.tick);
 	const updateDraft = useConfigStore((s) => s.updateDraft);
 	const resetDraft = useConfigStore((s) => s.resetDraft);
 	const commitServerConfig = useConfigStore((s) => s.commitServerConfig);
@@ -67,6 +68,7 @@ export function ConfigPanel() {
 					localDraft={localDraft}
 					serverConfig={serverConfig}
 					simState={simState}
+					tick={tick}
 					updateDraft={updateDraft}
 				/>
 			</div>

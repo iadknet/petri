@@ -19,6 +19,38 @@ use crate::types::{config_digest, deep_merge, StepRequest, PROTOCOL_VERSION};
 
 const FRAME_INTERVAL: Duration = Duration::from_millis(100);
 
+fn validate_startup_ramps(config: &SimulationConfig) -> Result<(), AppError> {
+    let ramp = &config.startup.ramps.failed_action_penalty;
+    if ramp.target_tick < 1 {
+        return Err(AppError::ValidationRejected {
+            field_errors: vec![FieldError {
+                field: "startup.ramps.failed_action_penalty.target_tick".into(),
+                reason: "must be >= 1".into(),
+            }],
+            endpoint: "startup",
+        });
+    }
+    if !ramp.start.is_finite() || ramp.start < 0.0 {
+        return Err(AppError::ValidationRejected {
+            field_errors: vec![FieldError {
+                field: "startup.ramps.failed_action_penalty.start".into(),
+                reason: "must be finite and >= 0.0".into(),
+            }],
+            endpoint: "startup",
+        });
+    }
+    if !ramp.end.is_finite() || ramp.end < 0.0 {
+        return Err(AppError::ValidationRejected {
+            field_errors: vec![FieldError {
+                field: "startup.ramps.failed_action_penalty.end".into(),
+                reason: "must be finite and >= 0.0".into(),
+            }],
+            endpoint: "startup",
+        });
+    }
+    Ok(())
+}
+
 pub async fn startup(
     State(app): State<AppState>,
     body: axum::body::Bytes,
@@ -54,7 +86,9 @@ pub async fn startup(
             }],
             endpoint: "startup",
         })?;
+    validate_startup_ramps(&config)?;
     config.normalize();
+    config.apply_startup_overrides();
 
     // Re-seed the simulation.
     let new_sim = seed_simulation(config.clone(), seed);

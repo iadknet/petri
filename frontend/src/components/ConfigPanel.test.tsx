@@ -115,4 +115,27 @@ describe("ConfigPanel", () => {
 			screen.queryByTestId("config-field-mutation-input-auto-connect"),
 		).not.toBeInTheDocument();
 	});
+
+	it("locks runtime failed action penalty while startup ramp is active", () => {
+		useConfigStore.getState().setServerConfig(
+			{
+				...MOCK_CONFIG,
+				startup: {
+					ramps: {
+						failed_action_penalty: {
+							enabled: true,
+							start: 5,
+							end: 30,
+							target_tick: 1000,
+						},
+					},
+				},
+			},
+			"paused",
+		);
+		useSimulationStore.getState().setTick(10);
+
+		render(<ConfigPanel />);
+		expect(screen.getByTestId("config-field-energy-costs-failed-action-penalty")).toBeDisabled();
+	});
 });

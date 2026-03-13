@@ -7,6 +7,7 @@ interface FieldRowProps {
 	value: number;
 	serverValue?: number;
 	disabled: boolean;
+	disabledReason?: string;
 	onChange: (path: string, value: number) => void;
 	testId?: string;
 }
@@ -17,6 +18,7 @@ export function FieldRow({
 	value,
 	serverValue,
 	disabled,
+	disabledReason,
 	onChange,
 	testId,
 }: FieldRowProps) {
@@ -32,7 +34,7 @@ export function FieldRow({
 			<div className="flex items-center justify-between gap-2">
 				<label htmlFor={inputId} className="flex items-center gap-1 text-xs text-slate-300">
 					{disabled && (
-						<span className="text-slate-500" title="Locked in current state">
+						<span className="text-slate-500" title={disabledReason ?? "Locked in current state"}>
 							&#x1f512;
 						</span>
 					)}

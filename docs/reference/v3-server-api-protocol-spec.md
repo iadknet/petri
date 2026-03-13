@@ -127,6 +127,16 @@ Request (conceptual v3alpha2 shape):
       "eat_reward_per_food": 12.0
     }
   },
+  "startup": {
+    "ramps": {
+      "failed_action_penalty": {
+        "enabled": true,
+        "start": 5.0,
+        "end": 30.0,
+        "target_tick": 1000
+      }
+    }
+  },
   "runtime": {
     "max_mesh_hops": 1024,
     "max_vm_steps": 10000,
@@ -160,6 +170,7 @@ Request rules:
   `v3-runtime-config-spec.md`.
 - Mutation tuning lives at top-level `mutation.*` in the startup/config keyspace
   (not under `runtime.*`).
+- Startup-only controls live under `startup.*` and are restart-only.
 - No `founder_profile` request field is supported in v3alpha2.
 - Unknown request fields are rejected.
 - Invalid/non-viable startup requests are rejected with
@@ -414,6 +425,9 @@ Rules:
 - World topology fields (`world.width`, `world.height`, `world.edge_mode`) are
   editable only in `idle`.
 - Runtime and energy fields are editable in `idle` and `paused`.
+- `startup.*` fields are restart-only and rejected from PATCH.
+- `energy.costs.failed_action_penalty` is rejected while an active startup
+  failed-action-penalty ramp is still in progress (`tick < target_tick`).
 - Editing configuration in disallowed states returns
   `409 invalid_state_transition`.
 

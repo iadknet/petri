@@ -227,6 +227,48 @@ fn failed_action_penalty_increases_with_age() {
 }
 
 #[test]
+fn failed_action_penalty_ramp_uses_effective_tick_value() {
+    let genome = vm_program_genome(vec![
+        crate::creature::genome::VmInstruction::PushAction { action_type: 2 },
+        crate::creature::genome::VmInstruction::ExecuteActionQueue,
+    ]);
+    let (mut sim, id) = make_sim_with_custom_genome(100.0, genome);
+    sim.world.set_barrier(Position::new(5, 4), true);
+    sim.config.energy.costs.move_cost = 0.0;
+    sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
+    sim.config.energy.age_cost.enabled = false;
+    sim.config.energy.complexity_cost.enabled = false;
+
+    sim.config.startup.ramps.failed_action_penalty.enabled = true;
+    sim.config.startup.ramps.failed_action_penalty.start = 5.0;
+    sim.config.startup.ramps.failed_action_penalty.end = 30.0;
+    sim.config.startup.ramps.failed_action_penalty.target_tick = 2;
+    sim.config.apply_startup_overrides();
+
+    let e0 = sim.creatures[id].energy;
+    run_tick(&mut sim, &mut None);
+    let e1 = sim.creatures[id].energy;
+    assert!(
+        (e0 - e1 - 5.0).abs() < 1e-4,
+        "tick 0 penalty should be ramp start"
+    );
+
+    run_tick(&mut sim, &mut None);
+    let e2 = sim.creatures[id].energy;
+    assert!(
+        (e1 - e2 - 17.5).abs() < 1e-4,
+        "tick 1 penalty should be midpoint interpolation"
+    );
+
+    run_tick(&mut sim, &mut None);
+    let e3 = sim.creatures[id].energy;
+    assert!(
+        (e2 - e3 - 30.0).abs() < 1e-4,
+        "tick 2 penalty should match ramp end/runtime"
+    );
+}
+
+#[test]
 fn failed_move_records_blocked_barrier_cause_in_tick() {
     let genome = vm_program_genome(vec![
         crate::creature::genome::VmInstruction::PushAction { action_type: 2 },
