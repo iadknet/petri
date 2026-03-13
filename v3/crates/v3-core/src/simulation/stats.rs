@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
+use crate::contracts::WorldInputKey;
 use crate::mutation::{
-    MutationDomain, MutationOperator, MutationOperatorFunnel, MutationSkipReason,
+    MutationAddedNodeInputClass, MutationDomain, MutationOperator, MutationOperatorFunnel,
+    MutationSkipReason,
 };
 use crate::simulation::actions::{
     BarrierReaderState, MoveBlockedCause, PredationActionResult, PredationEventRecord,
@@ -192,6 +194,12 @@ pub struct SimStats {
     /// Per-operator skip reason breakdown (cumulative).
     pub mutation_skip_reasons_total_by_operator:
         HashMap<MutationOperator, HashMap<MutationSkipReason, u64>>,
+    /// Input classes attached or wired when a mutation added a new node, grouped by operator.
+    pub mutation_added_node_input_classes_total_by_operator:
+        HashMap<MutationOperator, HashMap<MutationAddedNodeInputClass, u64>>,
+    /// Exact world inputs attached or wired when a mutation added a new node, grouped by operator.
+    pub mutation_added_node_world_inputs_total_by_operator:
+        HashMap<MutationOperator, HashMap<WorldInputKey, u64>>,
     /// Per-reason rejection breakdown (cumulative).
     pub reproduction_actions_rejected_by_reason: HashMap<ReproductionActionResult, u64>,
     /// Fine-grained invalid-target rejection breakdown (cumulative).

@@ -265,6 +265,26 @@ pub fn apply_reproduce(
             *entry.entry(*reason).or_insert(0) += *count as u64;
         }
     }
+    for (operator, by_class) in &summary.added_node_input_classes_by_operator {
+        let entry = sim
+            .stats
+            .mutation_added_node_input_classes_total_by_operator
+            .entry(*operator)
+            .or_default();
+        for (class, count) in by_class {
+            *entry.entry(*class).or_insert(0) += *count as u64;
+        }
+    }
+    for (operator, by_key) in &summary.added_node_world_inputs_by_operator {
+        let entry = sim
+            .stats
+            .mutation_added_node_world_inputs_total_by_operator
+            .entry(*operator)
+            .or_default();
+        for (key, count) in by_key {
+            *entry.entry(*key).or_insert(0) += *count as u64;
+        }
+    }
     sim.stats.mutation_reachable_target_total += summary.reachable_target_events as u64;
     sim.stats.mutation_unreachable_target_total += summary.unreachable_target_events as u64;
     sim.stats.mutation_not_applicable_target_total += summary.not_applicable_events as u64;

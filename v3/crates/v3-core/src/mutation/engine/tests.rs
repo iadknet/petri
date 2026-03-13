@@ -1,12 +1,71 @@
 use super::*;
 use crate::config::SimulationConfig;
+use crate::contracts::{InputReference, NodeId, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
-use crate::mutation::{MutationDomain, MutationOperator};
+use crate::creature::genome::cgp::{CgpGraphBackendDef, ExecuteGate, OutputSink, OutputSinkKind};
+use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
+use crate::mutation::{MutationAddedNodeInputClass, MutationDomain, MutationOperator};
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
 fn rng(seed: u64) -> SmallRng {
     SmallRng::seed_from_u64(seed)
+}
+
+fn forced_initialized_graph_birth_config() -> crate::config::MutationConfig {
+    let mut config = SimulationConfig::default().mutation;
+    config.mutation_probability = 1.0;
+    config.per_birth_mutation_events_min = 1;
+    config.per_birth_mutation_events_max = 1;
+    config.mesh_layer_probability = 1.0;
+    config.topology_new_node_birth.graph_backend_chance = 1.0;
+    config.topology_new_node_birth.graph_initialized_chance = 1.0;
+    config.topology_new_node_birth.graph_compute_gate_chance = 0.0;
+    config
+}
+
+fn classify_expected_added_input_classes(
+    input_refs: &[InputReference],
+) -> Vec<MutationAddedNodeInputClass> {
+    let mut classes = std::collections::BTreeSet::new();
+    for input_ref in input_refs {
+        classes.insert(MutationAddedNodeInputClass::from(input_ref));
+    }
+    if classes.is_empty() {
+        vec![MutationAddedNodeInputClass::None]
+    } else {
+        classes.into_iter().collect()
+    }
+}
+
+fn single_graph_genome_with_inputs(input_refs: Vec<InputReference>) -> CreatureGenome {
+    CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs,
+            backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                compute_nodes: Vec::new(),
+                output_sinks: vec![OutputSink {
+                    kind: OutputSinkKind::CustomOutput(0),
+                    inputs: Vec::new(),
+                }],
+                action_bank: Vec::new(),
+                execute_gate: ExecuteGate { inputs: Vec::new() },
+            }),
+            targets: Vec::new(),
+        }],
+    }
+}
+
+fn collect_expected_world_inputs(input_refs: &[InputReference]) -> Vec<WorldInputKey> {
+    let mut keys = std::collections::BTreeSet::new();
+    for input_ref in input_refs {
+        if let InputReference::World(key) = input_ref {
+            keys.insert(*key);
+        }
+    }
+    keys.into_iter().collect()
 }
 
 #[test]
@@ -39,6 +98,199 @@ fn engine_with_probability_zero_returns_zero_summary() {
     assert_eq!(summary.attempted_events, 0);
     assert_eq!(summary.applied_events, 0);
     assert_eq!(summary.skipped_events, 0);
+}
+
+#[test]
+fn engine_records_added_input_classes_for_topology_add_node() {
+    let config = forced_initialized_graph_birth_config();
+
+    for seed in 0u64..2_000 {
+        let mut genome = v3alpha1_founder_genome();
+        let mut r = rng(seed);
+        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        if summary
+            .applied_by_operator
+            .contains_key(&MutationOperator::TopologyAddNode)
+        {
+            let newborn = genome.nodes.last().expect("newborn node should exist");
+            let expected = classify_expected_added_input_classes(&newborn.input_refs);
+            let recorded = summary
+                .added_node_input_classes_by_operator
+                .get(&MutationOperator::TopologyAddNode)
+                .expect("input classes should be recorded");
+            for class in expected {
+                assert_eq!(recorded.get(&class), Some(&1));
+            }
+            return;
+        }
+    }
+
+    panic!("failed to observe Topology.AddNode within search budget");
+}
+
+#[test]
+fn engine_records_added_input_classes_for_topology_splice_node() {
+    let config = forced_initialized_graph_birth_config();
+    let base_genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![
+            NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    compute_nodes: Vec::new(),
+                    output_sinks: vec![OutputSink {
+                        kind: OutputSinkKind::CustomOutput(0),
+                        inputs: Vec::new(),
+                    }],
+                    action_bank: Vec::new(),
+                    execute_gate: ExecuteGate { inputs: Vec::new() },
+                }),
+                targets: vec![NodeId::new(1)],
+            },
+            NodeGenome {
+                node_id: NodeId::new(1),
+                input_refs: vec![],
+                backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    compute_nodes: Vec::new(),
+                    output_sinks: vec![OutputSink {
+                        kind: OutputSinkKind::CustomOutput(0),
+                        inputs: Vec::new(),
+                    }],
+                    action_bank: Vec::new(),
+                    execute_gate: ExecuteGate { inputs: Vec::new() },
+                }),
+                targets: vec![],
+            },
+        ],
+    };
+
+    for seed in 0u64..2_000 {
+        let mut genome = base_genome.clone();
+        let mut r = rng(seed);
+        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        if summary
+            .applied_by_operator
+            .contains_key(&MutationOperator::TopologySpliceNode)
+        {
+            let newborn = genome.nodes.last().expect("spliced node should exist");
+            let expected = classify_expected_added_input_classes(&newborn.input_refs);
+            let recorded = summary
+                .added_node_input_classes_by_operator
+                .get(&MutationOperator::TopologySpliceNode)
+                .expect("input classes should be recorded");
+            for class in expected {
+                assert_eq!(recorded.get(&class), Some(&1));
+            }
+            return;
+        }
+    }
+
+    panic!("failed to observe Topology.SpliceNode within search budget");
+}
+
+#[test]
+fn engine_records_added_input_classes_for_graph_add_internal_graph_node() {
+    let mut config = SimulationConfig::default().mutation;
+    config.mutation_probability = 1.0;
+    config.per_birth_mutation_events_min = 1;
+    config.per_birth_mutation_events_max = 1;
+    config.mesh_layer_probability = 0.0;
+
+    let expected = vec![
+        MutationAddedNodeInputClass::Food,
+        MutationAddedNodeInputClass::Barrier,
+    ];
+    let base_genome = single_graph_genome_with_inputs(vec![
+        InputReference::World(WorldInputKey::FoodHere),
+        InputReference::World(WorldInputKey::NeighborBarrierRing),
+    ]);
+
+    for seed in 0u64..5_000 {
+        let mut genome = base_genome.clone();
+        let mut r = rng(seed);
+        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        if summary
+            .applied_by_operator
+            .contains_key(&MutationOperator::GraphAddInternalGraphNode)
+        {
+            let recorded = summary
+                .added_node_input_classes_by_operator
+                .get(&MutationOperator::GraphAddInternalGraphNode)
+                .expect("input classes should be recorded");
+            for class in expected {
+                assert_eq!(recorded.get(&class), Some(&1));
+            }
+            return;
+        }
+    }
+
+    panic!("failed to observe Graph.AddInternalGraphNode within search budget");
+}
+
+#[test]
+fn engine_records_added_world_inputs_for_topology_add_node() {
+    let config = forced_initialized_graph_birth_config();
+
+    for seed in 0u64..10_000 {
+        let mut genome = v3alpha1_founder_genome();
+        let mut r = rng(seed);
+        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        if summary
+            .applied_by_operator
+            .contains_key(&MutationOperator::TopologyAddNode)
+        {
+            let newborn = genome.nodes.last().expect("newborn node should exist");
+            let expected = collect_expected_world_inputs(&newborn.input_refs);
+            if expected.is_empty() {
+                continue;
+            }
+            let recorded = summary
+                .added_node_world_inputs_by_operator
+                .get(&MutationOperator::TopologyAddNode)
+                .expect("world inputs should be recorded");
+            for key in expected {
+                assert_eq!(recorded.get(&key), Some(&1));
+            }
+            return;
+        }
+    }
+
+    panic!("failed to observe Topology.AddNode with world inputs within search budget");
+}
+
+#[test]
+fn engine_records_added_world_inputs_for_graph_add_internal_graph_node() {
+    let mut config = SimulationConfig::default().mutation;
+    config.mutation_probability = 1.0;
+    config.per_birth_mutation_events_min = 1;
+    config.per_birth_mutation_events_max = 1;
+    config.mesh_layer_probability = 0.0;
+
+    let base_genome = single_graph_genome_with_inputs(vec![
+        InputReference::World(WorldInputKey::AreaFoodSummary),
+        InputReference::World(WorldInputKey::NeighborBarrierRing),
+    ]);
+
+    for seed in 0u64..5_000 {
+        let mut genome = base_genome.clone();
+        let mut r = rng(seed);
+        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
+        if summary
+            .applied_by_operator
+            .contains_key(&MutationOperator::GraphAddInternalGraphNode)
+        {
+            let recorded = summary
+                .added_node_world_inputs_by_operator
+                .get(&MutationOperator::GraphAddInternalGraphNode)
+                .expect("world inputs should be recorded");
+            assert_eq!(recorded.get(&WorldInputKey::AreaFoodSummary), Some(&1));
+            assert_eq!(recorded.get(&WorldInputKey::NeighborBarrierRing), Some(&1));
+            return;
+        }
+    }
+
+    panic!("failed to observe Graph.AddInternalGraphNode within search budget");
 }
 
 #[test]

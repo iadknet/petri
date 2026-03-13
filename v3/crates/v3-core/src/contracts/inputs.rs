@@ -1,5 +1,7 @@
 /// Identifies a world-state spatial sensor input.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
 pub enum WorldInputKey {
     /// Food density on current cell, normalized to [0.0, 1.0].
     FoodHere,
@@ -24,6 +26,23 @@ pub enum WorldInputKey {
 }
 
 impl WorldInputKey {
+    /// Stable string key used by transport/API boundaries.
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::FoodHere => "FoodHere",
+            Self::NeighborFoodRing => "NeighborFoodRing",
+            Self::NeighborBarrierRing => "NeighborBarrierRing",
+            Self::NeighborOccupiedRing => "NeighborOccupiedRing",
+            Self::AreaFoodSummary => "AreaFoodSummary",
+            Self::AreaBarrierSummary => "AreaBarrierSummary",
+            Self::AreaOccupancySummary => "AreaOccupancySummary",
+            Self::NearbyCreatureCore => "NearbyCreatureCore",
+            Self::NearbyCreatureVitals => "NearbyCreatureVitals",
+            Self::NearbyCreatureIdentity => "NearbyCreatureIdentity",
+        }
+    }
+
     /// Number of sub-values for compound access. Returns 1 for scalar keys.
     ///
     /// [`opt-inline-small`] Hot path — called per instruction per tick.

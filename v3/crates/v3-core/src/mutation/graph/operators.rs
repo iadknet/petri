@@ -6,6 +6,7 @@
 
 use rand::Rng;
 
+use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{
     ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
     WorldActionKind,
@@ -69,13 +70,13 @@ pub(super) fn add_internal_node(
     node_idx: usize,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    let input_ref_count = genome
+    let input_refs = genome
         .nodes
         .get(node_idx)
-        .map(|n| n.input_refs.len() as u16)
+        .map(|n| n.input_refs.clone())
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let def = graph_def_mut(genome, node_idx)?;
-    add_compute_node(def, input_ref_count, rng)
+    add_compute_node(def, &input_refs, rng)
 }
 
 pub(super) fn add_graph_edge(
@@ -364,9 +365,10 @@ pub(crate) fn get_edge_vec_mut(
 /// Add a new compute node with a random kind and optional bootstrap edge.
 pub(crate) fn add_compute_node(
     def: &mut CgpGraphBackendDef,
-    input_ref_count: u16,
+    input_refs: &[InputReference],
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
+    let input_ref_count = input_refs.len() as u16;
     let compute_count = def.compute_nodes.len() as u16;
     let kind = random_compute_node_kind(rng);
     let inputs = if compute_count > 0 && rng.gen_bool(0.5) {
@@ -383,22 +385,32 @@ pub(crate) fn add_compute_node(
         plasticity: None,
     });
 
-    // Wire each attached input-ref into a random destination surface so freshly
-    // added compute nodes start from an already-connected graph context.
-    for ref_idx in 0..input_ref_count {
-        if let Some(surface) = pick_random_surface(def, rng) {
-            let edges = get_edge_vec_mut(def, surface);
-            edges.push(GraphEdge {
-                source: GraphSource::InputLeaf {
-                    ref_idx,
-                    sub_idx: 0,
-                },
-                weight: rng.gen_range(-1.0f32..=1.0),
-            });
+    let action_queue_cap = def.action_bank.len();
+    for (ref_idx, reference) in input_refs.iter().enumerate() {
+        let width = input_ref_width(reference, action_queue_cap);
+        for sub_idx in 0..width {
+            if let Some(surface) = pick_random_surface(def, rng) {
+                get_edge_vec_mut(def, surface).push(GraphEdge {
+                    source: GraphSource::InputLeaf {
+                        ref_idx: ref_idx as u16,
+                        sub_idx,
+                    },
+                    weight: rng.gen_range(-1.0f32..=1.0),
+                });
+            }
         }
     }
-
     Ok(())
+}
+
+fn input_ref_width(reference: &InputReference, action_queue_cap: usize) -> u16 {
+    match reference {
+        InputReference::World(key) => key.compound_width(),
+        InputReference::ActionQueue => (action_queue_cap.max(1) * 3).min(u16::MAX as usize) as u16,
+        InputReference::StaticIntrospection(_)
+        | InputReference::DynamicIntrospection(_)
+        | InputReference::UpstreamSlot(_) => 1,
+    }
 }
 
 /// Remove a random compute node and remap all edges.
@@ -714,6 +726,7 @@ pub(crate) fn raw_field_mutation(
 mod tests {
     use super::*;
     use crate::config::MutationConfig;
+    use crate::contracts::{InputReference, WorldInputKey};
     use crate::creature::genome::cgp::{
         ActionSlot, ActionSlotBehavior, ExecuteGate, OutputSink, OutputSinkKind, WorldActionKind,
     };
@@ -806,19 +819,134 @@ mod tests {
         let mut def = minimal_def();
         let mut rng = test_rng();
         let before = def.compute_nodes.len();
-        add_compute_node(&mut def, 2, &mut rng).unwrap();
+        let input_refs = vec![
+            InputReference::World(WorldInputKey::FoodHere),
+            InputReference::World(WorldInputKey::NeighborBarrierRing),
+        ];
+        add_compute_node(&mut def, &input_refs, &mut rng).unwrap();
         assert_eq!(def.compute_nodes.len(), before + 1);
+    }
+
+    fn count_edges_from_input_leaf(
+        def: &CgpGraphBackendDef,
+        expected_ref_idx: u16,
+        expected_sub_idx: u16,
+    ) -> usize {
+        let mut total = 0usize;
+        for node in &def.compute_nodes {
+            total += node
+                .inputs
+                .iter()
+                .filter(|edge| {
+                    matches!(
+                        edge.source,
+                        GraphSource::InputLeaf { ref_idx, sub_idx }
+                            if ref_idx == expected_ref_idx && sub_idx == expected_sub_idx
+                    )
+                })
+                .count();
+        }
+        for sink in &def.output_sinks {
+            total += sink
+                .inputs
+                .iter()
+                .filter(|edge| {
+                    matches!(
+                        edge.source,
+                        GraphSource::InputLeaf { ref_idx, sub_idx }
+                            if ref_idx == expected_ref_idx && sub_idx == expected_sub_idx
+                    )
+                })
+                .count();
+        }
+        for slot in &def.action_bank {
+            total += slot
+                .gate_inputs
+                .iter()
+                .filter(|edge| {
+                    matches!(
+                        edge.source,
+                        GraphSource::InputLeaf { ref_idx, sub_idx }
+                            if ref_idx == expected_ref_idx && sub_idx == expected_sub_idx
+                    )
+                })
+                .count();
+            total += slot
+                .param_inputs
+                .iter()
+                .filter(|edge| {
+                    matches!(
+                        edge.source,
+                        GraphSource::InputLeaf { ref_idx, sub_idx }
+                            if ref_idx == expected_ref_idx && sub_idx == expected_sub_idx
+                    )
+                })
+                .count();
+        }
+        total
+            + def
+                .execute_gate
+                .inputs
+                .iter()
+                .filter(|edge| {
+                    matches!(
+                        edge.source,
+                        GraphSource::InputLeaf { ref_idx, sub_idx }
+                            if ref_idx == expected_ref_idx && sub_idx == expected_sub_idx
+                    )
+                })
+                .count()
+    }
+
+    #[test]
+    fn add_compute_node_wires_every_sub_input_for_attached_refs() {
+        let mut def = minimal_def();
+        // Ensure action queue width is >3 to validate per-sub-index wiring.
+        def.action_bank.push(ActionSlot {
+            behavior: ActionSlotBehavior::Emit(WorldActionKind::Move),
+            gate_inputs: Vec::new(),
+            param_inputs: Vec::new(),
+        });
+        let input_refs = vec![
+            InputReference::World(WorldInputKey::FoodHere), // width 1
+            InputReference::World(WorldInputKey::NeighborBarrierRing), // width 8
+            InputReference::ActionQueue,                    // width action_bank.len()*3 == 6
+        ];
+        let mut rng = test_rng();
+        add_compute_node(&mut def, &input_refs, &mut rng).unwrap();
+
+        assert!(
+            count_edges_from_input_leaf(&def, 0, 0) > 0,
+            "scalar input_ref should be wired"
+        );
+        for sub_idx in 0..8u16 {
+            assert!(
+                count_edges_from_input_leaf(&def, 1, sub_idx) > 0,
+                "compound world input_ref sub_idx={sub_idx} should be wired"
+            );
+        }
+        for sub_idx in 0..6u16 {
+            assert!(
+                count_edges_from_input_leaf(&def, 2, sub_idx) > 0,
+                "action queue input_ref sub_idx={sub_idx} should be wired"
+            );
+        }
     }
 
     #[test]
     fn add_compute_node_wires_each_attached_input_ref() {
         let mut def = minimal_def();
         let mut rng = test_rng();
-        let input_ref_count = 4u16;
+        let input_refs = [
+            InputReference::World(WorldInputKey::FoodHere),
+            InputReference::World(WorldInputKey::NeighborFoodRing),
+            InputReference::World(WorldInputKey::NeighborBarrierRing),
+            InputReference::World(WorldInputKey::AreaFoodSummary),
+        ];
 
-        add_compute_node(&mut def, input_ref_count, &mut rng).unwrap();
+        add_compute_node(&mut def, &input_refs, &mut rng).unwrap();
 
-        for ref_idx in 0..input_ref_count {
+        for ref_idx in 0..input_refs.len() as u16 {
             assert!(
                 count_edges_from_input_ref(&def, ref_idx) > 0,
                 "input_ref {ref_idx} should be wired at least once when adding a compute node"

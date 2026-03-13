@@ -67,6 +67,11 @@ pub struct StatusEventPayload {
         std::collections::HashMap<String, MutationOperatorFunnelPayload>,
     pub mutation_skip_reasons_total_by_operator:
         std::collections::HashMap<String, std::collections::HashMap<String, u64>>,
+    pub mutation_added_node_input_classes_total_by_operator:
+        std::collections::HashMap<String, std::collections::HashMap<String, u64>>,
+    pub mutation_added_node_world_inputs_total_by_operator:
+        std::collections::HashMap<String, std::collections::HashMap<String, u64>>,
+    pub vm_live_read_world_inputs_current: std::collections::HashMap<String, u64>,
     pub mutation_events_applied_total_semantic_noop: u64,
     pub mutation_events_applied_total_semantic_change: u64,
     pub mutation_target_reachability_total: MutationTargetReachabilityTotalPayload,
@@ -220,6 +225,13 @@ pub fn build_status_event_payload(
         mutation_skip_reasons_total_by_operator: health
             .mutation_skip_reasons_total_by_operator
             .clone(),
+        mutation_added_node_input_classes_total_by_operator: health
+            .mutation_added_node_input_classes_total_by_operator
+            .clone(),
+        mutation_added_node_world_inputs_total_by_operator: health
+            .mutation_added_node_world_inputs_total_by_operator
+            .clone(),
+        vm_live_read_world_inputs_current: health.vm_live_read_world_inputs_current.clone(),
         mutation_events_applied_total_semantic_noop: health
             .mutation_events_applied_total_semantic_noop,
         mutation_events_applied_total_semantic_change: health
@@ -424,6 +436,9 @@ mod tests {
             mutation_events_skipped_total_by_operator: Default::default(),
             mutation_operator_funnel_total_by_operator: Default::default(),
             mutation_skip_reasons_total_by_operator: Default::default(),
+            mutation_added_node_input_classes_total_by_operator: Default::default(),
+            mutation_added_node_world_inputs_total_by_operator: Default::default(),
+            vm_live_read_world_inputs_current: Default::default(),
             mutation_events_applied_total_semantic_noop: 0,
             mutation_events_applied_total_semantic_change: 0,
             mutation_target_reachability_total:

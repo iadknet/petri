@@ -23,5 +23,14 @@ fetch_json "/v3/simulation/status" | "${JQ_BIN}" '{
 	mutation_events_skipped_total,
 	mutation_events_applied_total,
 	mutation_outcome_summary: (.mutation_outcome_summary // {}),
+	mutation_added_node_input_classes_total_by_operator: (
+		.mutation_added_node_input_classes_total_by_operator // {}
+	),
+	mutation_added_node_world_inputs_total_by_operator: (
+		.mutation_added_node_world_inputs_total_by_operator // {}
+	),
+	vm_live_read_world_inputs_current: (
+		.vm_live_read_world_inputs_current // {}
+	),
 	mutation_value_totals_by_operator: (.mutation_value_totals_by_operator // {})
 }'

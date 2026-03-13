@@ -14,11 +14,40 @@ fn mutation_summary_zero_has_zero_counts() {
     assert!(s.applied_by_operator.is_empty());
     assert!(s.operator_funnel_by_operator.is_empty());
     assert!(s.skip_reasons_by_operator.is_empty());
+    assert!(s.added_node_input_classes_by_operator.is_empty());
+    assert!(s.added_node_world_inputs_by_operator.is_empty());
     assert_eq!(s.applied_semantic_noop_events, 0);
     assert_eq!(s.applied_semantic_change_events, 0);
     assert_eq!(s.reachable_target_events, 0);
     assert_eq!(s.unreachable_target_events, 0);
     assert_eq!(s.not_applicable_events, 0);
+}
+
+#[test]
+fn added_node_input_class_keys_are_stable() {
+    assert_eq!(MutationAddedNodeInputClass::None.as_key(), "none");
+    assert_eq!(MutationAddedNodeInputClass::Food.as_key(), "food");
+    assert_eq!(MutationAddedNodeInputClass::Barrier.as_key(), "barrier");
+    assert_eq!(
+        MutationAddedNodeInputClass::ActionQueue.as_key(),
+        "action_queue"
+    );
+}
+
+#[test]
+fn world_input_key_keys_are_stable() {
+    assert_eq!(
+        crate::contracts::WorldInputKey::FoodHere.as_key(),
+        "FoodHere"
+    );
+    assert_eq!(
+        crate::contracts::WorldInputKey::AreaFoodSummary.as_key(),
+        "AreaFoodSummary"
+    );
+    assert_eq!(
+        crate::contracts::WorldInputKey::NearbyCreatureIdentity.as_key(),
+        "NearbyCreatureIdentity"
+    );
 }
 
 #[test]

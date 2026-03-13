@@ -12,6 +12,6 @@ pub mod vm;
 
 pub use engine::MutationEngine;
 pub use types::{
-    MutationDomain, MutationOperator, MutationOperatorFunnel, MutationSemanticCategory,
-    MutationSkipReason, MutationSummary, TargetReachability,
+    MutationAddedNodeInputClass, MutationDomain, MutationOperator, MutationOperatorFunnel,
+    MutationSemanticCategory, MutationSkipReason, MutationSummary, TargetReachability,
 };

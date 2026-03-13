@@ -1,14 +1,17 @@
+use std::collections::BTreeSet;
+
 use rand::Rng;
 
 use crate::config::MutationConfig;
-use crate::creature::genome::CreatureGenome;
+use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::creature::parseability::ParseabilityGate;
 use crate::mutation::graph::{GraphMutator, GraphOperator};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
 use crate::mutation::pressure;
 use crate::mutation::topology::{TopologyMutator, TopologyOperator};
 use crate::mutation::types::{
-    MutationDomain, MutationOperator, MutationSkipReason, MutationSummary, TargetReachability,
+    MutationAddedNodeInputClass, MutationDomain, MutationOperator, MutationSkipReason,
+    MutationSummary, TargetReachability,
 };
 use crate::mutation::vm::{VmMutator, VmOperator};
 
@@ -45,7 +48,9 @@ impl MutationEngine {
         for _ in 0..event_count {
             // Two-layer dispatch: mesh (Topology) vs node-internal (VM/Graph/InputRef).
             let rb = &config.reachable_bias;
-            let (domain, operator, result) = if rng.gen_bool(config.mesh_layer_probability) {
+            let (domain, operator, tracked_before, result) = if rng
+                .gen_bool(config.mesh_layer_probability)
+            {
                 // Layer 1: Mesh (Topology)
                 let mut available: Vec<TopologyOperator> = TopologyOperator::ALL
                     .iter()
@@ -58,6 +63,12 @@ impl MutationEngine {
                     }
                     let idx = select_weighted_index(&available, |op| op.weight() as u16, rng);
                     let op = available[idx];
+                    let operator = topology_operator_key(op);
+                    let tracked_before = if operator_requires_added_node_input_tracking(operator) {
+                        Some(genome.clone())
+                    } else {
+                        None
+                    };
                     let result = apply_topology_event(
                         genome,
                         op,
@@ -70,16 +81,16 @@ impl MutationEngine {
                         available.swap_remove(idx);
                         continue;
                     }
-                    break Some((op, result));
+                    break Some((operator, tracked_before, result));
                 };
-                let Some((op, result)) = selected else {
+                let Some((operator, tracked_before, result)) = selected else {
                     summary.record_domain_skip(
                         MutationDomain::Topology,
                         MutationSkipReason::NoApplicableTarget,
                     );
                     continue;
                 };
-                (MutationDomain::Topology, topology_operator_key(op), result)
+                (MutationDomain::Topology, operator, tracked_before, result)
             } else {
                 // Layer 2: Node-internal (VM, Graph, InputRef — equal probability)
                 match rng.gen_range(0u8..3) {
@@ -96,6 +107,13 @@ impl MutationEngine {
                             let idx =
                                 select_weighted_index(&available, |op| op.weight() as u16, rng);
                             let op = available[idx];
+                            let operator = vm_operator_key(op);
+                            let tracked_before =
+                                if operator_requires_added_node_input_tracking(operator) {
+                                    Some(genome.clone())
+                                } else {
+                                    None
+                                };
                             let result = apply_vm_event(
                                 genome,
                                 op,
@@ -108,16 +126,16 @@ impl MutationEngine {
                                 available.swap_remove(idx);
                                 continue;
                             }
-                            break Some((op, result));
+                            break Some((operator, tracked_before, result));
                         };
-                        let Some((op, result)) = selected else {
+                        let Some((operator, tracked_before, result)) = selected else {
                             summary.record_domain_skip(
                                 MutationDomain::Vm,
                                 MutationSkipReason::NoApplicableTarget,
                             );
                             continue;
                         };
-                        (MutationDomain::Vm, vm_operator_key(op), result)
+                        (MutationDomain::Vm, operator, tracked_before, result)
                     }
                     1 => {
                         let mut available: Vec<GraphOperator> = GraphOperator::ALL
@@ -132,6 +150,13 @@ impl MutationEngine {
                             let idx =
                                 select_weighted_index(&available, |op| op.weight() as u16, rng);
                             let op = available[idx];
+                            let operator = graph_operator_key(op);
+                            let tracked_before =
+                                if operator_requires_added_node_input_tracking(operator) {
+                                    Some(genome.clone())
+                                } else {
+                                    None
+                                };
                             let result = apply_graph_event(
                                 genome,
                                 op,
@@ -143,16 +168,16 @@ impl MutationEngine {
                                 available.swap_remove(idx);
                                 continue;
                             }
-                            break Some((op, result));
+                            break Some((operator, tracked_before, result));
                         };
-                        let Some((op, result)) = selected else {
+                        let Some((operator, tracked_before, result)) = selected else {
                             summary.record_domain_skip(
                                 MutationDomain::Graph,
                                 MutationSkipReason::NoApplicableTarget,
                             );
                             continue;
                         };
-                        (MutationDomain::Graph, graph_operator_key(op), result)
+                        (MutationDomain::Graph, operator, tracked_before, result)
                     }
                     _ => {
                         let mut available: Vec<InputRefOperator> = InputRefOperator::ALL
@@ -167,6 +192,13 @@ impl MutationEngine {
                             let idx =
                                 select_weighted_index(&available, |op| op.weight() as u16, rng);
                             let op = available[idx];
+                            let operator = input_ref_operator_key(op);
+                            let tracked_before =
+                                if operator_requires_added_node_input_tracking(operator) {
+                                    Some(genome.clone())
+                                } else {
+                                    None
+                                };
                             let result = apply_input_ref_event(
                                 genome,
                                 op,
@@ -179,16 +211,16 @@ impl MutationEngine {
                                 available.swap_remove(idx);
                                 continue;
                             }
-                            break Some((op, result));
+                            break Some((operator, tracked_before, result));
                         };
-                        let Some((op, result)) = selected else {
+                        let Some((operator, tracked_before, result)) = selected else {
                             summary.record_domain_skip(
                                 MutationDomain::InputRef,
                                 MutationSkipReason::NoApplicableTarget,
                             );
                             continue;
                         };
-                        (MutationDomain::InputRef, input_ref_operator_key(op), result)
+                        (MutationDomain::InputRef, operator, tracked_before, result)
                     }
                 }
             };
@@ -197,6 +229,18 @@ impl MutationEngine {
             match result {
                 Ok(reachability) => {
                     summary.record_applied(domain, operator, operator.semantic_category());
+                    if let Some(before) = tracked_before.as_ref() {
+                        if let Some(classes) =
+                            collect_added_node_input_classes(before, genome, operator)
+                        {
+                            summary.record_added_node_input_classes(operator, &classes);
+                        }
+                        if let Some(keys) =
+                            collect_added_node_world_inputs_for_operator(before, genome, operator)
+                        {
+                            summary.record_added_node_world_inputs(operator, &keys);
+                        }
+                    }
                     summary.record_reachability(reachability);
                 }
                 Err(reason) => summary.record_skipped(operator, reason),
@@ -214,6 +258,113 @@ fn pressure_adjusted_bias(base_bias: f64, restricted: bool) -> f64 {
         -base_bias
     } else {
         base_bias
+    }
+}
+
+fn operator_requires_added_node_input_tracking(operator: MutationOperator) -> bool {
+    matches!(
+        operator,
+        MutationOperator::TopologyAddNode
+            | MutationOperator::TopologySpliceNode
+            | MutationOperator::GraphAddInternalGraphNode
+    )
+}
+
+fn classify_added_node_input_classes(
+    input_refs: &[crate::contracts::InputReference],
+) -> Vec<MutationAddedNodeInputClass> {
+    let classes: BTreeSet<_> = input_refs
+        .iter()
+        .map(MutationAddedNodeInputClass::from)
+        .collect();
+    if classes.is_empty() {
+        vec![MutationAddedNodeInputClass::None]
+    } else {
+        classes.into_iter().collect()
+    }
+}
+
+fn collect_added_node_world_inputs(
+    input_refs: &[crate::contracts::InputReference],
+) -> Vec<crate::contracts::WorldInputKey> {
+    input_refs
+        .iter()
+        .filter_map(|input_ref| match input_ref {
+            crate::contracts::InputReference::World(key) => Some(*key),
+            _ => None,
+        })
+        .collect::<BTreeSet<_>>()
+        .into_iter()
+        .collect()
+}
+
+fn collect_added_node_input_classes(
+    before: &CreatureGenome,
+    after: &CreatureGenome,
+    operator: MutationOperator,
+) -> Option<Vec<MutationAddedNodeInputClass>> {
+    match operator {
+        MutationOperator::TopologyAddNode | MutationOperator::TopologySpliceNode => {
+            let before_ids: BTreeSet<_> = before.nodes.iter().map(|node| node.node_id).collect();
+            let newborn = after
+                .nodes
+                .iter()
+                .find(|node| !before_ids.contains(&node.node_id))?;
+            Some(classify_added_node_input_classes(&newborn.input_refs))
+        }
+        MutationOperator::GraphAddInternalGraphNode => {
+            let target = before.nodes.iter().zip(after.nodes.iter()).find_map(
+                |(before_node, after_node)| match (
+                    &before_node.backend_def,
+                    &after_node.backend_def,
+                ) {
+                    (BackendDef::Graph(before_graph), BackendDef::Graph(after_graph))
+                        if after_graph.compute_nodes.len()
+                            == before_graph.compute_nodes.len() + 1 =>
+                    {
+                        Some(after_node)
+                    }
+                    _ => None,
+                },
+            )?;
+            Some(classify_added_node_input_classes(&target.input_refs))
+        }
+        _ => None,
+    }
+}
+
+fn collect_added_node_world_inputs_for_operator(
+    before: &CreatureGenome,
+    after: &CreatureGenome,
+    operator: MutationOperator,
+) -> Option<Vec<crate::contracts::WorldInputKey>> {
+    match operator {
+        MutationOperator::TopologyAddNode | MutationOperator::TopologySpliceNode => {
+            let before_ids: BTreeSet<_> = before.nodes.iter().map(|node| node.node_id).collect();
+            let newborn = after
+                .nodes
+                .iter()
+                .find(|node| !before_ids.contains(&node.node_id))?;
+            Some(collect_added_node_world_inputs(&newborn.input_refs))
+        }
+        MutationOperator::GraphAddInternalGraphNode => {
+            let target = before.nodes.iter().zip(after.nodes.iter()).find_map(
+                |(before_node, after_node)| match (
+                    &before_node.backend_def,
+                    &after_node.backend_def,
+                ) {
+                    (BackendDef::Graph(before_graph), BackendDef::Graph(after_graph))
+                        if after_graph.compute_nodes.len()
+                            == before_graph.compute_nodes.len() + 1 =>
+                    {
+                        Some(after_node)
+                    }
+                    _ => None,
+                },
+            )?;
+            Some(collect_added_node_world_inputs(&target.input_refs))
+        }
+        _ => None,
     }
 }
 

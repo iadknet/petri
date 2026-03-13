@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use crate::contracts::{InputReference, WorldInputKey};
+
 /// Whether a mutation operator increases, decreases, or preserves genome complexity.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum ComplexityEffect {
@@ -51,6 +53,64 @@ pub enum MutationDomain {
     InputRef,
 }
 
+/// Input class attached or wired when a mutation adds a new node.
+#[derive(
+    Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum MutationAddedNodeInputClass {
+    None,
+    Food,
+    Neighbor,
+    Barrier,
+    Occupancy,
+    Introspection,
+    Upstream,
+    ActionQueue,
+}
+
+impl MutationAddedNodeInputClass {
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::None => "none",
+            Self::Food => "food",
+            Self::Neighbor => "neighbor",
+            Self::Barrier => "barrier",
+            Self::Occupancy => "occupancy",
+            Self::Introspection => "introspection",
+            Self::Upstream => "upstream",
+            Self::ActionQueue => "action_queue",
+        }
+    }
+}
+
+impl From<&InputReference> for MutationAddedNodeInputClass {
+    fn from(input_ref: &InputReference) -> Self {
+        match input_ref {
+            InputReference::World(key) => match key {
+                WorldInputKey::FoodHere
+                | WorldInputKey::NeighborFoodRing
+                | WorldInputKey::AreaFoodSummary => Self::Food,
+                WorldInputKey::NeighborBarrierRing | WorldInputKey::AreaBarrierSummary => {
+                    Self::Barrier
+                }
+                WorldInputKey::NeighborOccupiedRing | WorldInputKey::AreaOccupancySummary => {
+                    Self::Occupancy
+                }
+                WorldInputKey::NearbyCreatureCore
+                | WorldInputKey::NearbyCreatureVitals
+                | WorldInputKey::NearbyCreatureIdentity => Self::Neighbor,
+            },
+            InputReference::StaticIntrospection(_) | InputReference::DynamicIntrospection(_) => {
+                Self::Introspection
+            }
+            InputReference::UpstreamSlot(_) => Self::Upstream,
+            InputReference::ActionQueue => Self::ActionQueue,
+        }
+    }
+}
+
 impl MutationDomain {
     #[must_use]
     pub const fn as_key(self) -> &'static str {
@@ -66,7 +126,6 @@ impl MutationDomain {
     pub const fn all() -> [Self; 4] {
         [Self::Topology, Self::Vm, Self::Graph, Self::InputRef]
     }
-
 }
 
 /// Mutation operator selected for one attempted mutation event.
@@ -445,6 +504,9 @@ pub struct MutationSummary {
     pub applied_semantic_change_events: u32,
     pub operator_funnel_by_operator: HashMap<MutationOperator, MutationOperatorFunnel>,
     pub skip_reasons_by_operator: HashMap<MutationOperator, HashMap<MutationSkipReason, u32>>,
+    pub added_node_input_classes_by_operator:
+        HashMap<MutationOperator, HashMap<MutationAddedNodeInputClass, u32>>,
+    pub added_node_world_inputs_by_operator: HashMap<MutationOperator, HashMap<WorldInputKey, u32>>,
     pub reachable_target_events: u32,
     pub unreachable_target_events: u32,
     pub not_applicable_events: u32,
@@ -467,6 +529,8 @@ impl MutationSummary {
             applied_semantic_change_events: 0,
             operator_funnel_by_operator: HashMap::new(),
             skip_reasons_by_operator: HashMap::new(),
+            added_node_input_classes_by_operator: HashMap::new(),
+            added_node_world_inputs_by_operator: HashMap::new(),
             reachable_target_events: 0,
             unreachable_target_events: 0,
             not_applicable_events: 0,
@@ -526,6 +590,34 @@ impl MutationSummary {
             funnel.applicable += 1;
         }
         funnel.skipped += 1;
+    }
+
+    pub fn record_added_node_input_classes(
+        &mut self,
+        operator: MutationOperator,
+        classes: &[MutationAddedNodeInputClass],
+    ) {
+        let entry = self
+            .added_node_input_classes_by_operator
+            .entry(operator)
+            .or_default();
+        for class in classes {
+            *entry.entry(*class).or_insert(0) += 1;
+        }
+    }
+
+    pub fn record_added_node_world_inputs(
+        &mut self,
+        operator: MutationOperator,
+        keys: &[WorldInputKey],
+    ) {
+        let entry = self
+            .added_node_world_inputs_by_operator
+            .entry(operator)
+            .or_default();
+        for key in keys {
+            *entry.entry(*key).or_insert(0) += 1;
+        }
     }
 
     /// Record a skip where no operator could be selected for a domain.

@@ -258,5 +258,4 @@ mod tests {
         let result = si.resolve_world(&WorldInputKey::FoodHere);
         assert_eq!(result, 0.0);
     }
-
 }
