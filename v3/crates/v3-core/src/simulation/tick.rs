@@ -357,6 +357,7 @@ pub fn run_tick(
     let mut priority_bid_sum = 0.0f32;
     let mut priority_bid_count = 0u32;
     let mut successful_spawn_targets: HashSet<crate::contracts::Position> = HashSet::new();
+    let failed_action_penalty = sim.config.failed_action_penalty_for_tick(sim.tick);
 
     for (id, output) in decisions {
         let compute_cost = &output.cost_report;
@@ -434,7 +435,7 @@ pub fn run_tick(
                         } else {
                             action_result = ActionResult::NoFood;
                             creature.energy -= sim.config.energy.adjusted_action_cost(
-                                sim.config.energy.costs.failed_action_penalty,
+                                failed_action_penalty,
                                 creature.cached_complexity,
                                 creature.age,
                             );
@@ -488,7 +489,7 @@ pub fn run_tick(
                                 Some(classify_move_blocked_cause(&sim.world, from, dir));
                             action_result = ActionResult::Blocked;
                             creature.energy -= sim.config.energy.adjusted_action_cost(
-                                sim.config.energy.costs.failed_action_penalty,
+                                failed_action_penalty,
                                 creature.cached_complexity,
                                 creature.age,
                             );
@@ -616,7 +617,7 @@ pub fn run_tick(
                     if !succeeded {
                         if let Some(creature) = sim.creatures.get_mut(id) {
                             creature.energy -= sim.config.energy.adjusted_action_cost(
-                                sim.config.energy.costs.failed_action_penalty,
+                                failed_action_penalty,
                                 creature.cached_complexity,
                                 creature.age,
                             );
@@ -667,7 +668,7 @@ pub fn run_tick(
                         PredationActionResult::RejectedNoVictim => {
                             if let Some(creature) = sim.creatures.get_mut(id) {
                                 creature.energy -= sim.config.energy.adjusted_action_cost(
-                                    sim.config.energy.costs.failed_action_penalty,
+                                    failed_action_penalty,
                                     creature.cached_complexity,
                                     creature.age,
                                 );

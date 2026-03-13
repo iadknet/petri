@@ -15,6 +15,7 @@ vi.mock("../api/rest.ts", () => ({
 		start: vi.fn(),
 		pause: vi.fn(),
 		step: vi.fn(),
+		patchConfig: vi.fn(),
 		getConfig: vi.fn(),
 	},
 }));
@@ -111,6 +112,16 @@ const MOCK_CONFIG: SimulationConfig = {
 	shared_memory: {
 		decay_rate: 0.0,
 	},
+	startup: {
+		ramps: {
+			failed_action_penalty: {
+				enabled: false,
+				start: 5,
+				end: 5,
+				target_tick: 1000,
+			},
+		},
+	},
 };
 
 describe("ControlBar", () => {
@@ -160,6 +171,16 @@ describe("ControlBar", () => {
 				},
 			},
 			energy: { initial_energy: 20 },
+			startup: {
+				ramps: {
+					failed_action_penalty: {
+						enabled: false,
+						start: 5,
+						end: 5,
+						target_tick: 1000,
+					},
+				},
+			},
 		});
 		useStatsHistoryStore.getState().pushStats(3, 10, 25);
 
@@ -200,12 +221,83 @@ describe("ControlBar", () => {
 				energy: {
 					lifecycle: { initial_energy: 20 },
 				},
+				startup: {
+					ramps: {
+						failed_action_penalty: {
+							enabled: false,
+							start: 5,
+							end: 5,
+							target_tick: 1000,
+						},
+					},
+				},
 			});
 			expect(useSimulationStore.getState().simState).toBe("idle");
 			expect(useSimulationStore.getState().tick).toBe(0);
 			expect(useStatsHistoryStore.getState().statsHistory).toHaveLength(0);
 			expect(useConfigStore.getState().serverConfig).toEqual(MOCK_CONFIG);
 		});
+	});
+
+	it("restart skips runtime failed_action_penalty re-patch when startup ramp is enabled", async () => {
+		useConfigStore.getState().setServerConfig(MOCK_CONFIG, "paused");
+		useStartupConfigStore.getState().setPreset({
+			seed: 123,
+			population: { initial_creatures: 64 },
+			world: {
+				width: 512,
+				height: 384,
+				edge_mode: "Wrap",
+				food: {
+					initial_density: 1.0,
+					initial_coverage: 0.4,
+				},
+			},
+			energy: { initial_energy: 20 },
+			startup: {
+				ramps: {
+					failed_action_penalty: {
+						enabled: true,
+						start: 5,
+						end: 30,
+						target_tick: 1000,
+					},
+				},
+			},
+		});
+		vi.mocked(api.startup).mockResolvedValue({
+			protocol_version: "v3alpha1",
+			state: "idle",
+			tick: 0,
+			config_digest: "sha256:deadbeef",
+			seeded_creatures: 64,
+		});
+		vi.mocked(api.patchConfig).mockResolvedValue({
+			protocol_version: "v3alpha1",
+			state: "idle",
+			config: MOCK_CONFIG,
+		});
+		vi.mocked(api.getConfig).mockResolvedValue({
+			protocol_version: "v3alpha1",
+			state: "idle",
+			config: MOCK_CONFIG,
+		});
+
+		render(
+			<PanelLayoutProvider>
+				<ControlBar />
+			</PanelLayoutProvider>,
+		);
+
+		fireEvent.click(screen.getByTestId("control-restart"));
+
+		await waitFor(() => {
+			expect(api.patchConfig).toHaveBeenCalledTimes(1);
+		});
+		const patch = vi.mocked(api.patchConfig).mock.calls[0]?.[0] as {
+			energy?: { costs?: { failed_action_penalty?: number } };
+		};
+		expect(patch.energy?.costs?.failed_action_penalty).toBeUndefined();
 	});
 
 	it("displays TPS value when ticksPerSecond is non-zero", () => {
