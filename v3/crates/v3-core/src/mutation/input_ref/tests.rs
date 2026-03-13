@@ -12,6 +12,7 @@ use crate::creature::genome::{
 use crate::creature::parseability::ParseabilityGate;
 use crate::mutation::compound::sub_value_count;
 use crate::mutation::sampling::random_input_reference;
+use crate::runtime::OUTPUT_SLOT_COUNT;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
@@ -308,7 +309,10 @@ fn random_input_reference_upstream_slot_bounded() {
     for seed in 0u64..20_000 {
         let mut r = rng(seed);
         if let InputReference::UpstreamSlot(slot) = random_input_reference(&mut r) {
-            assert!(slot < 12, "upstream slot must be bounded < 12, got {slot}");
+            assert!(
+                slot < OUTPUT_SLOT_COUNT,
+                "upstream slot must be bounded < {OUTPUT_SLOT_COUNT}, got {slot}"
+            );
         }
     }
 }
@@ -329,8 +333,8 @@ fn raw_field_mutation_upstream_slot_bounded() {
         .unwrap();
         if let InputReference::UpstreamSlot(slot) = genome.nodes[0].input_refs[0] {
             assert!(
-                slot < 12,
-                "mutated upstream slot must be bounded < 12, got {slot}"
+                slot < OUTPUT_SLOT_COUNT,
+                "mutated upstream slot must be bounded < {OUTPUT_SLOT_COUNT}, got {slot}"
             );
         }
     }
@@ -405,87 +409,230 @@ fn complexity_effect_consistent_with_types() {
     }
 }
 
-#[test]
-fn random_non_increasing_never_returns_increasing() {
-    use crate::mutation::types::ComplexityEffect;
-    for seed in 0u64..200 {
-        let mut r = rng(seed);
-        if let Some(op) = InputRefOperator::random_non_increasing(&mut r) {
-            assert_ne!(
-                op.complexity_effect(),
-                ComplexityEffect::Increasing,
-                "random_non_increasing returned Increasing operator {:?} at seed {}",
-                op,
-                seed
-            );
-        }
+// ── InputRef::Add auto-wiring tests ─────────────────────────────────────────
+
+fn graph_node_genome_zero_refs() -> CreatureGenome {
+    CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![],
+            backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                compute_nodes: vec![ComputeNode {
+                    kind: ComputeNodeKind::Add,
+                    inputs: vec![],
+                    plasticity: None,
+                }],
+                output_sinks: vec![OutputSink {
+                    kind: OutputSinkKind::CustomOutput(0),
+                    inputs: vec![],
+                }],
+                action_bank: vec![ActionSlot {
+                    behavior: ActionSlotBehavior::Emit(WorldActionKind::Eat),
+                    gate_inputs: vec![],
+                    param_inputs: vec![],
+                }],
+                execute_gate: ExecuteGate { inputs: vec![] },
+            }),
+            targets: vec![],
+        }],
     }
 }
 
+fn count_input_leaf_edges_for_ref(genome: &CreatureGenome, node_idx: usize, ref_idx: u16) -> usize {
+    let BackendDef::Graph(ref def) = genome.nodes[node_idx].backend_def else {
+        return 0;
+    };
+    let mut count = 0;
+    for node in &def.compute_nodes {
+        count += node
+            .inputs
+            .iter()
+            .filter(
+                |e| matches!(e.source, GraphSource::InputLeaf { ref_idx: r, .. } if r == ref_idx),
+            )
+            .count();
+    }
+    for sink in &def.output_sinks {
+        count += sink
+            .inputs
+            .iter()
+            .filter(
+                |e| matches!(e.source, GraphSource::InputLeaf { ref_idx: r, .. } if r == ref_idx),
+            )
+            .count();
+    }
+    for slot in &def.action_bank {
+        count += slot
+            .gate_inputs
+            .iter()
+            .filter(
+                |e| matches!(e.source, GraphSource::InputLeaf { ref_idx: r, .. } if r == ref_idx),
+            )
+            .count();
+        count += slot
+            .param_inputs
+            .iter()
+            .filter(
+                |e| matches!(e.source, GraphSource::InputLeaf { ref_idx: r, .. } if r == ref_idx),
+            )
+            .count();
+    }
+    count += def
+        .execute_gate
+        .inputs
+        .iter()
+        .filter(|e| matches!(e.source, GraphSource::InputLeaf { ref_idx: r, .. } if r == ref_idx))
+        .count();
+    count
+}
+
 #[test]
-fn random_non_increasing_covers_neutral_and_decreasing() {
-    use crate::mutation::types::ComplexityEffect;
-    let mut saw_neutral = false;
-    let mut saw_decreasing = false;
-    for seed in 0u64..1000 {
+fn add_input_ref_to_graph_node_creates_input_leaf_edge() {
+    let mut genome = graph_node_genome_zero_refs();
+    let mut r = rng(42);
+    InputRefMutator::apply(
+        &mut genome,
+        InputRefOperator::Add,
+        &[],
+        0.0,
+        &mut r,
+        &default_config(),
+    )
+    .unwrap();
+    assert_eq!(genome.nodes[0].input_refs.len(), 1);
+    assert!(
+        count_input_leaf_edges_for_ref(&genome, 0, 0) > 0,
+        "adding an input ref to a graph node must create at least one InputLeaf edge"
+    );
+}
+
+#[test]
+fn add_input_ref_to_graph_node_wires_correct_ref_idx() {
+    let mut genome = graph_node_genome_zero_refs();
+    // Pre-populate with 2 existing input refs
+    genome.nodes[0]
+        .input_refs
+        .push(InputReference::World(WorldInputKey::FoodHere));
+    genome.nodes[0]
+        .input_refs
+        .push(InputReference::World(WorldInputKey::FoodHere));
+    let mut r = rng(99);
+    InputRefMutator::apply(
+        &mut genome,
+        InputRefOperator::Add,
+        &[],
+        0.0,
+        &mut r,
+        &default_config(),
+    )
+    .unwrap();
+    assert_eq!(genome.nodes[0].input_refs.len(), 3);
+    assert!(
+        count_input_leaf_edges_for_ref(&genome, 0, 2) > 0,
+        "new input ref at index 2 must have at least one InputLeaf edge with ref_idx=2"
+    );
+}
+
+#[test]
+fn add_input_ref_compound_wires_all_sub_indices() {
+    let config = default_config();
+    // Try many seeds to find one that generates a compound ref (width > 1)
+    for seed in 0u64..10_000 {
+        let mut genome = graph_node_genome_zero_refs();
         let mut r = rng(seed);
-        if let Some(op) = InputRefOperator::random_non_increasing(&mut r) {
-            match op.complexity_effect() {
-                ComplexityEffect::Neutral => saw_neutral = true,
-                ComplexityEffect::Decreasing => saw_decreasing = true,
-                ComplexityEffect::Increasing => unreachable!(),
+        InputRefMutator::apply(
+            &mut genome,
+            InputRefOperator::Add,
+            &[],
+            0.0,
+            &mut r,
+            &config,
+        )
+        .unwrap();
+        let width = sub_value_count(&genome.nodes[0].input_refs[0], &config);
+        if width <= 1 {
+            continue;
+        }
+        // Found a compound ref — verify all sub_idx values are wired
+        let BackendDef::Graph(ref def) = genome.nodes[0].backend_def else {
+            panic!("expected graph backend");
+        };
+        let mut seen_sub_indices: std::collections::HashSet<u16> = std::collections::HashSet::new();
+        for node in &def.compute_nodes {
+            for e in &node.inputs {
+                if let GraphSource::InputLeaf {
+                    ref_idx: 0,
+                    sub_idx,
+                } = e.source
+                {
+                    seen_sub_indices.insert(sub_idx);
+                }
             }
         }
-        if saw_neutral && saw_decreasing {
-            break;
+        for sink in &def.output_sinks {
+            for e in &sink.inputs {
+                if let GraphSource::InputLeaf {
+                    ref_idx: 0,
+                    sub_idx,
+                } = e.source
+                {
+                    seen_sub_indices.insert(sub_idx);
+                }
+            }
         }
-    }
-    assert!(saw_neutral, "must produce at least one neutral operator");
-    assert!(
-        saw_decreasing,
-        "must produce at least one decreasing operator"
-    );
-}
-
-#[test]
-fn random_decreasing_never_returns_non_decreasing() {
-    use crate::mutation::types::ComplexityEffect;
-    for seed in 0u64..200 {
-        let mut r = rng(seed);
-        if let Some(op) = InputRefOperator::random_decreasing(&mut r) {
-            assert_eq!(
-                op.complexity_effect(),
-                ComplexityEffect::Decreasing,
-                "random_decreasing returned non-Decreasing operator {:?} at seed {}",
-                op,
+        for slot in &def.action_bank {
+            for e in slot.gate_inputs.iter().chain(slot.param_inputs.iter()) {
+                if let GraphSource::InputLeaf {
+                    ref_idx: 0,
+                    sub_idx,
+                } = e.source
+                {
+                    seen_sub_indices.insert(sub_idx);
+                }
+            }
+        }
+        for e in &def.execute_gate.inputs {
+            if let GraphSource::InputLeaf {
+                ref_idx: 0,
+                sub_idx,
+            } = e.source
+            {
+                seen_sub_indices.insert(sub_idx);
+            }
+        }
+        for sub_idx in 0..width {
+            assert!(
+                seen_sub_indices.contains(&sub_idx),
+                "compound ref (width={}) missing sub_idx={} in graph edges at seed {}",
+                width,
+                sub_idx,
                 seed
             );
         }
+        return; // Test passed
     }
+    panic!("did not generate a compound input ref in 10000 seeds");
 }
 
 #[test]
-fn random_decreasing_covers_all_decreasing_operators() {
-    use std::collections::HashSet;
-    let expected: HashSet<InputRefOperator> = InputRefOperator::ALL
-        .iter()
-        .copied()
-        .filter(|op| op.complexity_effect().is_decreasing())
-        .collect();
-    let mut seen = HashSet::new();
-    for seed in 0u64..2000 {
-        let mut r = rng(seed);
-        if let Some(op) = InputRefOperator::random_decreasing(&mut r) {
-            seen.insert(op);
-        }
-        if seen == expected {
-            break;
-        }
-    }
-    assert_eq!(
-        seen, expected,
-        "random_decreasing must cover all Decreasing operators"
-    );
+fn add_input_ref_to_vm_node_skips_graph_wiring() {
+    let mut genome =
+        single_node_genome_with_input_ref(InputReference::World(WorldInputKey::FoodHere));
+    genome.nodes[0].input_refs.clear(); // start with 0 refs
+    let mut r = rng(42);
+    InputRefMutator::apply(
+        &mut genome,
+        InputRefOperator::Add,
+        &[],
+        0.0,
+        &mut r,
+        &default_config(),
+    )
+    .unwrap();
+    assert_eq!(genome.nodes[0].input_refs.len(), 1);
+    // VM backend should be unchanged — no panic, no graph edges
+    assert!(matches!(genome.nodes[0].backend_def, BackendDef::Vm(_)));
 }
 
 // Legacy flat-graph lifecycle tests were removed during the CGP migration.

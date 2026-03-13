@@ -11,7 +11,7 @@ use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute_graph_node;
 use crate::runtime::routing::resolve_route_index;
-use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs};
+use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
 use crate::runtime::vm::execute_vm_node;
 use crate::sensors::perception::SensorSnapshot;
 
@@ -46,7 +46,7 @@ pub fn execute_creature_mesh(
     config: &RuntimeConfig,
 ) -> MeshOutput {
     let mut current_node_id = genome.entry_node_id;
-    let mut upstream_slots = [0.0f32; 12];
+    let mut upstream_slots = [0.0f32; OUTPUT_SLOT_COUNT];
     let mut hops: usize = 0;
     let max_hops = config.max_mesh_hops.max(1) as usize;
     let start_energy = *energy;

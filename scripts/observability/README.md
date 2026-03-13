@@ -25,6 +25,7 @@ Available probes:
 ./scripts/observability/barrier-causal-funnel.sh 200
 ./scripts/observability/mutation-value-leaderboard.sh 1000 20
 ./scripts/observability/health-invariants.sh
+./scripts/observability/system-triage.sh 200
 ```
 
 What each probe returns:
@@ -55,6 +56,10 @@ What each probe returns:
 - `health-invariants.sh`
   Reconciliation checks for core telemetry invariants. Exits non-zero when any
   invariant fails so it can be used as a CI/smoke gate.
+- `system-triage.sh`
+  Cross-layer triage with explicit pass/fail gates for execution integrity,
+  mutation signal quality, and cognition utilization, plus a likely primary
+  failure layer (`execution`, `mutation`, `cognition`, or `none_detected`).
 
 Notes:
 

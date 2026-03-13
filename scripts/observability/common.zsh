@@ -56,9 +56,20 @@ sample_creature_ids() {
 	local snapshot_json="${2:?snapshot json is required}"
 
 	echo "${snapshot_json}" \
-		| "${JQ_BIN}" -r '.view.creatures[].id' \
+		| "${AWK_BIN}" '
+			{
+				line = $0
+				while (match(line, /"id"[[:space:]]*:[[:space:]]*[0-9]+/)) {
+					token = substr(line, RSTART, RLENGTH)
+					gsub(/[^0-9]/, "", token)
+					if (length(token) > 0) {
+						print token
+					}
+					line = substr(line, RSTART + RLENGTH)
+				}
+			}
+		' \
 		| "${AWK_BIN}" 'BEGIN { srand(); } { print rand(), $0; }' \
 		| "${SORT_BIN}" -k1,1n \
-		| "${HEAD_BIN}" -n "${sample_size}" \
-		| "${AWK_BIN}" '{ print $2; }'
+		| "${AWK_BIN}" -v max="${sample_size}" 'NR <= max { print $2; }'
 }

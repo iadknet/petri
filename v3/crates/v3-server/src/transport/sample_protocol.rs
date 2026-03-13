@@ -1,6 +1,7 @@
 //! HTTP sampler response DTOs owned by the transport layer.
 
 use serde::Serialize;
+use v3_core::runtime::OUTPUT_SLOT_COUNT;
 
 /// Serialized input-reference shape owned by transport wire DTOs.
 pub type InputReferencePayload = serde_json::Value;
@@ -62,10 +63,10 @@ pub struct MeshHopTracePayload {
     pub hop_index: usize,
     pub node_id: u64,
     pub input_refs: Vec<InputReferencePayload>,
-    pub upstream_slots: [f32; 12],
+    pub upstream_slots: [f32; OUTPUT_SLOT_COUNT],
     pub energy_before: f32,
     pub energy_after: f32,
-    pub output_slots: [f32; 12],
+    pub output_slots: [f32; OUTPUT_SLOT_COUNT],
     pub route: RouteDecisionPayload,
     pub backend_trace: BackendTracePayload,
 }
@@ -96,7 +97,7 @@ pub struct VmTracePayload {
     pub constants: Vec<f32>,
     pub steps: Vec<VmStepTracePayload>,
     pub final_registers: Vec<f32>,
-    pub final_payload: [f32; 12],
+    pub final_payload: [f32; OUTPUT_SLOT_COUNT],
     pub final_meta: [f32; 8],
     pub final_route_value: f32,
     pub slot_writes: Vec<SlotWritePayload>,

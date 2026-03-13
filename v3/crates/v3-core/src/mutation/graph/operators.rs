@@ -251,7 +251,7 @@ fn random_world_action_kind(rng: &mut impl Rng) -> WorldActionKind {
 
 /// Identifies which edge-bearing surface an edge belongs to.
 #[derive(Debug, Clone, Copy)]
-enum EdgeSurface {
+pub(crate) enum EdgeSurface {
     ComputeInput(usize),
     SinkInput(usize),
     ActionGate(usize),
@@ -317,7 +317,10 @@ fn pick_random_edge(def: &CgpGraphBackendDef, rng: &mut impl Rng) -> Option<(Edg
 
 /// Pick a random edge container (surface) to add an edge to.
 /// Uniform across all surfaces (compute inputs, sink inputs, action gate/param, execute gate).
-fn pick_random_surface(def: &CgpGraphBackendDef, rng: &mut impl Rng) -> Option<EdgeSurface> {
+pub(crate) fn pick_random_surface(
+    def: &CgpGraphBackendDef,
+    rng: &mut impl Rng,
+) -> Option<EdgeSurface> {
     // Build list of all available surfaces
     let mut surfaces = Vec::with_capacity(
         def.compute_nodes.len() + def.output_sinks.len() + def.action_bank.len() * 2 + 1,
@@ -343,7 +346,10 @@ fn pick_random_surface(def: &CgpGraphBackendDef, rng: &mut impl Rng) -> Option<E
 }
 
 /// Get mutable reference to the edge vec for a given surface.
-fn get_edge_vec_mut(def: &mut CgpGraphBackendDef, surface: EdgeSurface) -> &mut Vec<GraphEdge> {
+pub(crate) fn get_edge_vec_mut(
+    def: &mut CgpGraphBackendDef,
+    surface: EdgeSurface,
+) -> &mut Vec<GraphEdge> {
     match surface {
         EdgeSurface::ComputeInput(i) => &mut def.compute_nodes[i].inputs,
         EdgeSurface::SinkInput(i) => &mut def.output_sinks[i].inputs,
@@ -376,6 +382,22 @@ pub(crate) fn add_compute_node(
         inputs,
         plasticity: None,
     });
+
+    // Wire each attached input-ref into a random destination surface so freshly
+    // added compute nodes start from an already-connected graph context.
+    for ref_idx in 0..input_ref_count {
+        if let Some(surface) = pick_random_surface(def, rng) {
+            let edges = get_edge_vec_mut(def, surface);
+            edges.push(GraphEdge {
+                source: GraphSource::InputLeaf {
+                    ref_idx,
+                    sub_idx: 0,
+                },
+                weight: rng.gen_range(-1.0f32..=1.0),
+            });
+        }
+    }
+
     Ok(())
 }
 
@@ -737,6 +759,46 @@ mod tests {
         }
     }
 
+    fn count_edges_from_input_ref(def: &CgpGraphBackendDef, ref_idx: u16) -> usize {
+        let from_compute = def
+            .compute_nodes
+            .iter()
+            .flat_map(|n| n.inputs.iter())
+            .filter(
+                |e| matches!(e.source, GraphSource::InputLeaf { ref_idx: r, sub_idx: 0 } if r == ref_idx),
+            )
+            .count();
+
+        let from_sinks = def
+            .output_sinks
+            .iter()
+            .flat_map(|s| s.inputs.iter())
+            .filter(
+                |e| matches!(e.source, GraphSource::InputLeaf { ref_idx: r, sub_idx: 0 } if r == ref_idx),
+            )
+            .count();
+
+        let from_actions = def
+            .action_bank
+            .iter()
+            .flat_map(|slot| slot.gate_inputs.iter().chain(slot.param_inputs.iter()))
+            .filter(
+                |e| matches!(e.source, GraphSource::InputLeaf { ref_idx: r, sub_idx: 0 } if r == ref_idx),
+            )
+            .count();
+
+        let from_execute = def
+            .execute_gate
+            .inputs
+            .iter()
+            .filter(
+                |e| matches!(e.source, GraphSource::InputLeaf { ref_idx: r, sub_idx: 0 } if r == ref_idx),
+            )
+            .count();
+
+        from_compute + from_sinks + from_actions + from_execute
+    }
+
     // ── Topology tests ──────────────────────────────────────────────────────
 
     #[test]
@@ -746,6 +808,22 @@ mod tests {
         let before = def.compute_nodes.len();
         add_compute_node(&mut def, 2, &mut rng).unwrap();
         assert_eq!(def.compute_nodes.len(), before + 1);
+    }
+
+    #[test]
+    fn add_compute_node_wires_each_attached_input_ref() {
+        let mut def = minimal_def();
+        let mut rng = test_rng();
+        let input_ref_count = 4u16;
+
+        add_compute_node(&mut def, input_ref_count, &mut rng).unwrap();
+
+        for ref_idx in 0..input_ref_count {
+            assert!(
+                count_edges_from_input_ref(&def, ref_idx) > 0,
+                "input_ref {ref_idx} should be wired at least once when adding a compute node"
+            );
+        }
     }
 
     #[test]

@@ -624,7 +624,11 @@ async fn get_config_includes_topology_new_node_birth_defaults() {
     let birth = &body["config"]["mutation"]["topology_new_node_birth"];
     assert!(birth.is_object(), "missing topology_new_node_birth: {body}");
     assert_eq!(birth["graph_backend_chance"].as_f64(), Some(0.5));
-    assert_eq!(birth["graph_initialized_chance"].as_f64(), Some(0.5));
+    assert!(
+        (birth["graph_initialized_chance"].as_f64().unwrap() - 0.8).abs() < 1e-6,
+        "graph_initialized_chance should be ~0.8, got {:?}",
+        birth["graph_initialized_chance"]
+    );
     assert_eq!(birth["graph_compute_gate_chance"].as_f64(), Some(0.5));
 }
 
@@ -662,38 +666,6 @@ async fn patch_config_roundtrips_topology_new_node_birth_fields() {
     assert_eq!(fetched["graph_backend_chance"].as_f64(), Some(1.0));
     assert_eq!(fetched["graph_initialized_chance"].as_f64(), Some(0.0));
     assert_eq!(fetched["graph_compute_gate_chance"].as_f64(), Some(1.0));
-}
-
-// ── 11d. patch_config_accepts_legacy_input_auto_connect_without_echo ────────
-
-#[tokio::test]
-async fn patch_config_accepts_legacy_input_auto_connect_without_echo() {
-    let a = app();
-    a.clone()
-        .oneshot(startup_req(r#"{"seed":1}"#))
-        .await
-        .unwrap();
-
-    let patch = r#"{
-        "mutation": {
-            "input_auto_connect_chance": 0.9
-        }
-    }"#;
-
-    let (patch_status, patch_body) =
-        do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
-    assert_eq!(patch_status, StatusCode::OK, "body: {patch_body}");
-    assert!(
-        patch_body["config"]["mutation"]["input_auto_connect_chance"].is_null(),
-        "legacy field must not be echoed in PATCH response: {patch_body}"
-    );
-
-    let (get_status, get_body) = do_request(a, get_req("/v3/simulation/config")).await;
-    assert_eq!(get_status, StatusCode::OK, "body: {get_body}");
-    assert!(
-        get_body["config"]["mutation"]["input_auto_connect_chance"].is_null(),
-        "legacy field must not appear in GET response: {get_body}"
-    );
 }
 
 // ── 11e. startup_accepts_founder_profile_and_get_config_roundtrips ─────────

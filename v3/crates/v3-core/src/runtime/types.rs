@@ -1,8 +1,9 @@
 use crate::contracts::{ActionQueue, WorldAction};
+use crate::creature::genome::cgp::CUSTOM_OUTPUT_COUNT;
 use crate::runtime::routing::RouteDecision;
 
 /// Number of output slots in a [`NodeResult`].
-pub const OUTPUT_SLOT_COUNT: usize = 12;
+pub const OUTPUT_SLOT_COUNT: usize = CUSTOM_OUTPUT_COUNT as usize;
 
 /// Result returned by a single node evaluation.
 /// The mesh executor uses this to decide routing. Action queue lives in the
@@ -162,7 +163,10 @@ mod tests {
 
     #[test]
     fn node_result_halted_is_not_terminal() {
-        let r = NodeResult::halted([0.0; 12], RouteDecision::VmWrap { raw_value: 0.0 });
+        let r = NodeResult::halted(
+            [0.0; OUTPUT_SLOT_COUNT],
+            RouteDecision::VmWrap { raw_value: 0.0 },
+        );
         assert!(!r.terminal);
         assert!(!r.energy_exhausted);
     }
@@ -188,8 +192,16 @@ mod tests {
 
     #[test]
     fn node_result_terminal_is_terminal() {
-        let r = NodeResult::terminal([0.0; 12], RouteDecision::VmWrap { raw_value: 0.0 });
+        let r = NodeResult::terminal(
+            [0.0; OUTPUT_SLOT_COUNT],
+            RouteDecision::VmWrap { raw_value: 0.0 },
+        );
         assert!(r.terminal);
         assert!(!r.energy_exhausted);
+    }
+
+    #[test]
+    fn output_slot_count_matches_bus_experiment_target() {
+        assert_eq!(OUTPUT_SLOT_COUNT, 24);
     }
 }

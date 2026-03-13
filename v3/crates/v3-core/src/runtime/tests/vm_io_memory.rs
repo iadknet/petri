@@ -181,7 +181,7 @@ fn write_internal_payload_invalid_slot_ignored() {
             const_idx: 0,
         },
         VmInstruction::WriteInternalPayload {
-            slot_idx: 12,
+            slot_idx: OUTPUT_SLOT_COUNT as u8,
             src: 0,
         }, // ignored
         VmInstruction::Halt,
@@ -445,7 +445,7 @@ fn vm_eats_when_food_here() {
         panic!("expected VM backend");
     };
 
-    let upstream = [0.0f32; 12];
+    let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
     let mut energy = creature.energy;
     let mut mem = [0.0f32; 16];
     let prev_mem = [0.0f32; 16];
@@ -541,7 +541,7 @@ fn vm_noop_when_no_food() {
         panic!()
     };
 
-    let upstream = [0.0f32; 12];
+    let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
     let mut energy = 30.0;
     let mut mem = [0.0f32; 16];
     let prev_mem = [0.0f32; 16];

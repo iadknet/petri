@@ -4,7 +4,7 @@ use crate::creature::genome::VmBackendDef;
 use crate::runtime::action_decode::decode_world_action;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::routing::RouteDecision;
-use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult};
+use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::SensorSnapshot;
 
 /// Execute a VM backend node.
@@ -27,7 +27,7 @@ use crate::sensors::perception::SensorSnapshot;
 pub(crate) fn execute_vm_node(
     def: &VmBackendDef,
     input_refs: &[InputReference],
-    upstream_slots: &[f32; 12],
+    upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
     energy: &mut f32,
     energy_consumed: f32,
     shared_memory: &mut [f32; 16],
@@ -54,7 +54,7 @@ pub(crate) fn execute_vm_node(
     // Stack-allocated registers covering the full u8 range (256 * 4 = 1KB).
     const MAX_REGS: usize = 256;
     let mut regs = [0.0f32; MAX_REGS];
-    let mut payload: [f32; 12] = *upstream_slots;
+    let mut payload: [f32; OUTPUT_SLOT_COUNT] = *upstream_slots;
     let mut meta: [f32; 8] = [0.0; 8];
     let mut route_target: f32 = 0.0;
     let mut pc: usize = 0;
@@ -265,7 +265,7 @@ pub(crate) fn execute_vm_node(
             }
 
             VmInstruction::WriteInternalPayload { slot_idx, src } => {
-                if (*slot_idx as usize) < 12 {
+                if (*slot_idx as usize) < OUTPUT_SLOT_COUNT {
                     payload[*slot_idx as usize] = regs[nr(*src, reg_count)];
                 }
                 // invalid slot: write ignored

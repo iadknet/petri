@@ -1,4 +1,4 @@
-use crate::contracts::{Direction, InputReference, StaticIntrospectionKey, WorldInputKey};
+use crate::contracts::{Direction, StaticIntrospectionKey, WorldInputKey};
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
 
@@ -93,33 +93,11 @@ pub fn assemble_static_inputs(world: &WorldState, creature: &CreatureState) -> S
     }
 }
 
-/// Resolve an InputReference using only static and upstream data.
-/// Dynamic introspection keys return 0.0 (resolved live by runtime).
-pub fn resolve_static_ref(
-    reference: &InputReference,
-    static_inputs: &StaticInputs,
-    upstream_slots: &[f32; 12],
-) -> f32 {
-    match reference {
-        InputReference::World(key) => static_inputs.resolve_world(key),
-        InputReference::StaticIntrospection(key) => static_inputs.resolve_static(key),
-        InputReference::DynamicIntrospection(_) => 0.0,
-        InputReference::UpstreamSlot(idx) => {
-            if *idx < 12 {
-                upstream_slots[*idx]
-            } else {
-                0.0
-            }
-        }
-        InputReference::ActionQueue => 0.0,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::config::{SimulationConfig, WorldEdgeMode};
-    use crate::contracts::{CreatureId, DynamicIntrospectionKey, NodeId, Position};
+    use crate::contracts::{CreatureId, NodeId, Position};
     use crate::creature::genome::{
         BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
     };
@@ -281,41 +259,4 @@ mod tests {
         assert_eq!(result, 0.0);
     }
 
-    #[test]
-    fn resolve_static_ref_upstream_slot_in_range() {
-        let world = make_world(4, 4);
-        let id = get_id();
-        let creature = make_creature(id, Position::new(0, 0));
-        let si = assemble_static_inputs(&world, &creature);
-        let mut upstream = [0.0f32; 12];
-        upstream[3] = 7.5;
-        let val = resolve_static_ref(&InputReference::UpstreamSlot(3), &si, &upstream);
-        assert!((val - 7.5).abs() < 1e-6);
-    }
-
-    #[test]
-    fn resolve_static_ref_upstream_slot_out_of_range_zero() {
-        let world = make_world(4, 4);
-        let id = get_id();
-        let creature = make_creature(id, Position::new(0, 0));
-        let si = assemble_static_inputs(&world, &creature);
-        let upstream = [0.0f32; 12];
-        let val = resolve_static_ref(&InputReference::UpstreamSlot(12), &si, &upstream);
-        assert_eq!(val, 0.0);
-    }
-
-    #[test]
-    fn resolve_static_ref_dynamic_introspection_yields_zero() {
-        let world = make_world(4, 4);
-        let id = get_id();
-        let creature = make_creature(id, Position::new(0, 0));
-        let si = assemble_static_inputs(&world, &creature);
-        let upstream = [0.0f32; 12];
-        let val = resolve_static_ref(
-            &InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
-            &si,
-            &upstream,
-        );
-        assert_eq!(val, 0.0);
-    }
 }
