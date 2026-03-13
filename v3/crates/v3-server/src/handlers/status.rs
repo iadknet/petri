@@ -9,6 +9,18 @@ use crate::transport::protocol::build_status_event_payload;
 use crate::types::{deep_merge, PROTOCOL_VERSION};
 use crate::{app_state::AppState, query::projection::ProjectionSnapshot};
 
+fn patch_touches_startup(patch: &serde_json::Value) -> bool {
+    patch.get("startup").is_some()
+}
+
+fn patch_touches_failed_action_penalty(patch: &serde_json::Value) -> bool {
+    patch
+        .get("energy")
+        .and_then(|e| e.get("costs"))
+        .and_then(|c| c.get("failed_action_penalty"))
+        .is_some()
+}
+
 pub async fn get_status(State(app): State<AppState>) -> impl IntoResponse {
     let snapshot = {
         app.projection
@@ -37,7 +49,32 @@ pub async fn patch_config(
     let patch: serde_json::Value = serde_json::from_slice(&body)
         .map_err(|e| AppError::InvalidRequest(format!("invalid JSON: {e}")))?;
 
+    if patch_touches_startup(&patch) {
+        return Err(AppError::ValidationRejected {
+            field_errors: vec![FieldError {
+                field: "startup".into(),
+                reason: "startup config is restart-only and cannot be patched".into(),
+            }],
+            endpoint: "patch_config",
+        });
+    }
+
     let mut handle = app.sim.lock().await;
+
+    if patch_touches_failed_action_penalty(&patch)
+        && handle
+            .sim
+            .config
+            .failed_action_penalty_ramp_active(handle.sim.tick)
+    {
+        return Err(AppError::ValidationRejected {
+            field_errors: vec![FieldError {
+                field: "energy.costs.failed_action_penalty".into(),
+                reason: "startup failed-action-penalty ramp is still active".into(),
+            }],
+            endpoint: "patch_config",
+        });
+    }
 
     // Check if patch touches world-topology fields (require Idle state).
     let topology_touched = patch.get("world").is_some_and(|w| {
