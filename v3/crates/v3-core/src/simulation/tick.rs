@@ -100,6 +100,8 @@ pub fn run_phase_0(sim: &mut Simulation) {
     for (_, creature) in sim.creatures.iter_mut() {
         creature.age += 1;
         creature.energy -= sim.config.energy.lifecycle.energy_decay_per_tick;
+        creature.lifetime_energy_sum += f64::from(creature.energy.max(0.0));
+        creature.lifetime_energy_sample_count += 1;
 
         // Snapshot shared_memory → prev_shared_memory, then apply decay.
         creature.prev_shared_memory = creature.shared_memory;
@@ -404,6 +406,7 @@ pub fn run_tick(
                 WorldAction::NoOp => {
                     // NoOp cannot fail; no failed_action_penalty possible.
                     if let Some(creature) = sim.creatures.get_mut(id) {
+                        creature.lifetime_action_attempted_count += 1;
                         apply_noop(creature, &sim.config);
                         sim.stats.last_tick_noop += 1;
                         outcome_acc.record_action_result(id, true);
@@ -425,6 +428,7 @@ pub fn run_tick(
                     let mut action_result = ActionResult::Success;
                     let mut amount = 0.0;
                     if let Some(creature) = sim.creatures.get_mut(id) {
+                        creature.lifetime_action_attempted_count += 1;
                         let food_before = sim.world.food_at(creature.position);
                         let succeeded = apply_eat(creature, &mut sim.world, &sim.config);
                         sim.stats.last_tick_eat += 1;
@@ -479,11 +483,13 @@ pub fn run_tick(
                             .or_insert(0) += 1;
                     }
                     if let Some(creature) = sim.creatures.get_mut(id) {
+                        creature.lifetime_action_attempted_count += 1;
                         let from = creature.position;
                         let succeeded = apply_move(id, creature, &mut sim.world, dir, &sim.config);
                         sim.stats.last_tick_move += 1;
                         outcome_acc.record_action_result(id, succeeded);
                         if !succeeded {
+                            creature.lifetime_blocked_move_count += 1;
                             blocked_cause =
                                 Some(classify_move_blocked_cause(&sim.world, from, dir));
                             action_result = ActionResult::Blocked;
@@ -565,6 +571,9 @@ pub fn run_tick(
                     }
                     let result =
                         apply_reproduce(id, sim, direction, energy_transfer, &mut reproduce_rng);
+                    if let Some(creature) = sim.creatures.get_mut(id) {
+                        creature.lifetime_action_attempted_count += 1;
+                    }
                     let succeeded = result == ReproductionActionResult::Spawned;
                     outcome_acc.record_action_result(id, succeeded);
                     if succeeded {
@@ -574,6 +583,9 @@ pub fn run_tick(
                         outcome_acc.record_offspring(id);
                     }
                     if result == ReproductionActionResult::RejectedInvalidTarget {
+                        if let Some(creature) = sim.creatures.get_mut(id) {
+                            creature.lifetime_invalid_reproduce_count += 1;
+                        }
                         let cause = classify_reproduction_invalid_target_cause(
                             &sim.world,
                             reproduction_target,
@@ -638,6 +650,9 @@ pub fn run_tick(
                 WorldAction::StealEnergy { direction, amount } => {
                     // Snapshot predation events length to extract damage info.
                     let pred_events_before = sim.stats.last_tick_predation_events.len();
+                    if let Some(creature) = sim.creatures.get_mut(id) {
+                        creature.lifetime_action_attempted_count += 1;
+                    }
                     let result = apply_steal_energy(id, sim, direction, amount);
                     let succeeded = result != PredationActionResult::RejectedNoVictim;
                     outcome_acc.record_action_result(id, succeeded);

@@ -285,6 +285,31 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
         barriers,
     };
 
+    let map_mutation_value_totals = |totals: &v3_core::simulation::stats::MutationValueTotals| {
+        MutationOperatorValueTotalsPayload {
+            carriers_observed_total: totals.carriers_observed_total,
+            survival_ticks_sum: totals.survival_ticks_sum,
+            offspring_spawned_sum: totals.offspring_spawned_sum,
+            final_energy_sum: totals.final_energy_sum,
+            helpful_total: totals.helpful_total,
+            neutral_total: totals.neutral_total,
+            detrimental_total: totals.detrimental_total,
+            confidence_low_total: totals.confidence_low_total,
+            confidence_medium_total: totals.confidence_medium_total,
+            confidence_high_total: totals.confidence_high_total,
+            viability_score_sum: totals.viability_score_sum,
+            viability_score_delta_sum: totals.viability_score_delta_sum,
+            survived_short_horizon_total: totals.survived_short_horizon_total,
+            survived_long_horizon_total: totals.survived_long_horizon_total,
+            reproduced_once_total: totals.reproduced_once_total,
+            mean_lifetime_energy_sum: totals.mean_lifetime_energy_sum,
+            action_attempted_total: totals.action_attempted_total,
+            blocked_move_total: totals.blocked_move_total,
+            invalid_reproduce_total: totals.invalid_reproduce_total,
+            invalid_action_total: totals.invalid_action_total,
+        }
+    };
+
     let health = HealthPayload {
         population: sim.creatures.len(),
         mean_energy: sim.mean_energy(),
@@ -361,15 +386,11 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             .map(|(operator, totals)| {
                 (
                     operator.as_key().to_string(),
-                    MutationOperatorValueTotalsPayload {
-                        carriers_observed_total: totals.carriers_observed_total,
-                        survival_ticks_sum: totals.survival_ticks_sum,
-                        offspring_spawned_sum: totals.offspring_spawned_sum,
-                        final_energy_sum: totals.final_energy_sum,
-                    },
+                    map_mutation_value_totals(totals),
                 )
             })
             .collect(),
+        mutation_outcome_summary: map_mutation_value_totals(&stats.mutation_outcome_summary),
         reproduction_actions_attempted_total: stats.reproduction_actions_attempted_total,
         reproduction_actions_spawned_total: stats.reproduction_actions_spawned_total,
         reproduction_actions_rejected_total: stats.reproduction_actions_rejected_total,

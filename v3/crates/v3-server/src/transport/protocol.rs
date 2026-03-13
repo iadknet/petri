@@ -72,6 +72,7 @@ pub struct StatusEventPayload {
     pub mutation_target_reachability_total: MutationTargetReachabilityTotalPayload,
     pub mutation_value_totals_by_operator:
         std::collections::HashMap<String, MutationOperatorValueTotalsPayload>,
+    pub mutation_outcome_summary: MutationOperatorValueTotalsPayload,
     pub move_actions_blocked_total_by_cause: std::collections::HashMap<String, u64>,
     pub move_actions_blocked_avoidable_total_by_reader_state:
         std::collections::HashMap<String, u64>,
@@ -225,6 +226,7 @@ pub fn build_status_event_payload(
             .mutation_events_applied_total_semantic_change,
         mutation_target_reachability_total: health.mutation_target_reachability_total.clone(),
         mutation_value_totals_by_operator: health.mutation_value_totals_by_operator.clone(),
+        mutation_outcome_summary: health.mutation_outcome_summary.clone(),
         move_actions_blocked_total_by_cause: health.move_actions_blocked_total_by_cause.clone(),
         move_actions_blocked_avoidable_total_by_reader_state: health
             .move_actions_blocked_avoidable_total_by_reader_state
@@ -427,6 +429,7 @@ mod tests {
             mutation_target_reachability_total:
                 super::MutationTargetReachabilityTotalPayload::default(),
             mutation_value_totals_by_operator: Default::default(),
+            mutation_outcome_summary: Default::default(),
             move_actions_blocked_total_by_cause: Default::default(),
             move_actions_blocked_avoidable_total_by_reader_state: Default::default(),
             move_attempts_with_barrier_neighbor_total_by_reader_state: Default::default(),

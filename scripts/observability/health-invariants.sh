@@ -43,6 +43,17 @@ result_json="$(
 		| (sum_values($h.move_blocked_barrier_with_barrier_neighbor_total_by_reader_state)) as $move_neighbor_blocked_barrier
 		| (sum_values($h.reproduction_attempts_with_barrier_neighbor_total_by_reader_state)) as $repro_neighbor_attempts
 		| (sum_values($h.reproduction_invalid_target_barrier_with_barrier_neighbor_total_by_reader_state)) as $repro_neighbor_invalid_barrier
+		| ($h.mutation_outcome_summary.carriers_observed_total // 0) as $outcome_carriers
+		| (
+			($h.mutation_outcome_summary.helpful_total // 0)
+			+ ($h.mutation_outcome_summary.neutral_total // 0)
+			+ ($h.mutation_outcome_summary.detrimental_total // 0)
+		) as $outcome_class_total
+		| (
+			($h.mutation_outcome_summary.confidence_low_total // 0)
+			+ ($h.mutation_outcome_summary.confidence_medium_total // 0)
+			+ ($h.mutation_outcome_summary.confidence_high_total // 0)
+		) as $outcome_conf_total
 		| [
 			{
 				name: "mutation_attempted = applied + skipped",
@@ -133,6 +144,18 @@ result_json="$(
 				ok: ($repro_neighbor_invalid_barrier <= $repro_neighbor_attempts),
 				actual: $repro_neighbor_invalid_barrier,
 				expected_max: $repro_neighbor_attempts
+			},
+			{
+				name: "mutation_outcome_summary class totals = carriers_observed_total",
+				ok: ($outcome_class_total == $outcome_carriers),
+				actual: $outcome_class_total,
+				expected: $outcome_carriers
+			},
+			{
+				name: "mutation_outcome_summary confidence totals = carriers_observed_total",
+				ok: ($outcome_conf_total == $outcome_carriers),
+				actual: $outcome_conf_total,
+				expected: $outcome_carriers
 			}
 		] as $checks
 		| {

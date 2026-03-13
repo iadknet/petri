@@ -14,6 +14,147 @@ pub struct MutationValueTotals {
     pub survival_ticks_sum: u64,
     pub offspring_spawned_sum: u64,
     pub final_energy_sum: f64,
+    pub helpful_total: u64,
+    pub neutral_total: u64,
+    pub detrimental_total: u64,
+    pub confidence_low_total: u64,
+    pub confidence_medium_total: u64,
+    pub confidence_high_total: u64,
+    pub viability_score_sum: f64,
+    pub viability_score_delta_sum: f64,
+    pub survived_short_horizon_total: u64,
+    pub survived_long_horizon_total: u64,
+    pub reproduced_once_total: u64,
+    pub mean_lifetime_energy_sum: f64,
+    pub action_attempted_total: u64,
+    pub blocked_move_total: u64,
+    pub invalid_reproduce_total: u64,
+    pub invalid_action_total: u64,
+}
+
+impl MutationValueTotals {
+    pub fn record_outcome(
+        &mut self,
+        observation: MutationOutcomeObservation,
+        evaluation: MutationOutcomeEvaluation,
+    ) {
+        self.carriers_observed_total += 1;
+        self.survival_ticks_sum += observation.survival_ticks;
+        self.offspring_spawned_sum += observation.offspring_spawned_total;
+        self.final_energy_sum += observation.final_energy;
+        self.viability_score_sum += observation.viability_score;
+        self.viability_score_delta_sum += evaluation.score_delta;
+        self.mean_lifetime_energy_sum += observation.mean_lifetime_energy;
+        self.action_attempted_total += observation.action_attempted_total;
+        self.blocked_move_total += observation.blocked_move_total;
+        self.invalid_reproduce_total += observation.invalid_reproduce_total;
+        self.invalid_action_total += observation.invalid_action_total;
+
+        if observation.survived_short_horizon {
+            self.survived_short_horizon_total += 1;
+        }
+        if observation.survived_long_horizon {
+            self.survived_long_horizon_total += 1;
+        }
+        if observation.reproduced_once {
+            self.reproduced_once_total += 1;
+        }
+
+        match evaluation.class {
+            MutationOutcomeClass::Helpful => self.helpful_total += 1,
+            MutationOutcomeClass::Neutral => self.neutral_total += 1,
+            MutationOutcomeClass::Detrimental => self.detrimental_total += 1,
+        }
+        match evaluation.confidence {
+            MutationOutcomeConfidence::Low => self.confidence_low_total += 1,
+            MutationOutcomeConfidence::Medium => self.confidence_medium_total += 1,
+            MutationOutcomeConfidence::High => self.confidence_high_total += 1,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MutationOutcomeClass {
+    Helpful,
+    Neutral,
+    Detrimental,
+}
+
+impl MutationOutcomeClass {
+    #[must_use]
+    pub fn as_key(self) -> &'static str {
+        match self {
+            Self::Helpful => "helpful",
+            Self::Neutral => "neutral",
+            Self::Detrimental => "detrimental",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MutationOutcomeConfidence {
+    Low,
+    Medium,
+    High,
+}
+
+impl MutationOutcomeConfidence {
+    #[must_use]
+    pub fn as_key(self) -> &'static str {
+        match self {
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct MutationOutcomeEvaluation {
+    pub class: MutationOutcomeClass,
+    pub confidence: MutationOutcomeConfidence,
+    pub score_delta: f64,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct MutationOutcomeObservation {
+    pub survival_ticks: u64,
+    pub offspring_spawned_total: u64,
+    pub final_energy: f64,
+    pub viability_score: f64,
+    pub mean_lifetime_energy: f64,
+    pub action_attempted_total: u64,
+    pub blocked_move_total: u64,
+    pub invalid_reproduce_total: u64,
+    pub invalid_action_total: u64,
+    pub survived_short_horizon: bool,
+    pub survived_long_horizon: bool,
+    pub reproduced_once: bool,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub struct RunningStats {
+    pub count: u64,
+    pub mean: f64,
+    pub m2: f64,
+}
+
+impl RunningStats {
+    pub fn push(&mut self, value: f64) {
+        self.count += 1;
+        let delta = value - self.mean;
+        self.mean += delta / self.count as f64;
+        let delta2 = value - self.mean;
+        self.m2 += delta * delta2;
+    }
+
+    #[must_use]
+    pub fn std_dev(self) -> f64 {
+        if self.count < 2 {
+            return 0.0;
+        }
+        (self.m2 / (self.count as f64 - 1.0)).sqrt()
+    }
 }
 
 /// Observability counters for the simulation.
@@ -86,6 +227,13 @@ pub struct SimStats {
     pub mutation_not_applicable_target_total: u64,
     /// Lifecycle value aggregates keyed by mutation operator on carrier creatures.
     pub mutation_value_totals_by_operator: HashMap<MutationOperator, MutationValueTotals>,
+    /// Mutation lifecycle outcome summary across all creatures with at least one
+    /// applied birth mutation operator.
+    pub mutation_outcome_summary: MutationValueTotals,
+    /// Running cohort baselines keyed by generation bucket.
+    pub mutation_outcome_baseline_by_generation_bucket: HashMap<u64, RunningStats>,
+    /// Global fallback baseline used when cohort-local sample sizes are small.
+    pub mutation_outcome_baseline_global: RunningStats,
 
     // ── Predation cumulative ─────────────────────────────────────────────────
     pub predation_actions_attempted_total: u64,
@@ -123,4 +271,132 @@ pub struct SimStats {
     pub last_tick_priority_bid_mean: f32,
     /// Number of creatures that bid > 0 this tick.
     pub last_tick_priority_bidders_count: u32,
+}
+
+const OUTCOME_GENERATION_BUCKET_WIDTH: u64 = 128;
+const OUTCOME_BASELINE_MIN_MEDIUM_CONFIDENCE: u64 = 20;
+const OUTCOME_BASELINE_MIN_HIGH_CONFIDENCE: u64 = 100;
+const OUTCOME_BASELINE_MIN_CLASSIFICATION: u64 = 5;
+const OUTCOME_SCORE_STD_DEV_FLOOR: f64 = 0.05;
+const OUTCOME_SCORE_Z_THRESHOLD: f64 = 0.25;
+
+impl SimStats {
+    #[must_use]
+    pub fn classify_mutation_outcome(
+        &mut self,
+        generation: u64,
+        viability_score: f64,
+    ) -> MutationOutcomeEvaluation {
+        let generation_bucket = generation / OUTCOME_GENERATION_BUCKET_WIDTH;
+        let bucket_baseline = self
+            .mutation_outcome_baseline_by_generation_bucket
+            .get(&generation_bucket)
+            .copied()
+            .unwrap_or_default();
+        let global_baseline = self.mutation_outcome_baseline_global;
+
+        let baseline = if bucket_baseline.count >= OUTCOME_BASELINE_MIN_MEDIUM_CONFIDENCE {
+            bucket_baseline
+        } else {
+            global_baseline
+        };
+
+        let confidence = if baseline.count >= OUTCOME_BASELINE_MIN_HIGH_CONFIDENCE {
+            MutationOutcomeConfidence::High
+        } else if baseline.count >= OUTCOME_BASELINE_MIN_MEDIUM_CONFIDENCE {
+            MutationOutcomeConfidence::Medium
+        } else {
+            MutationOutcomeConfidence::Low
+        };
+
+        let score_delta = if baseline.count == 0 {
+            0.0
+        } else {
+            viability_score - baseline.mean
+        };
+
+        let class = if baseline.count < OUTCOME_BASELINE_MIN_CLASSIFICATION {
+            MutationOutcomeClass::Neutral
+        } else {
+            let std_dev = baseline.std_dev().max(OUTCOME_SCORE_STD_DEV_FLOOR);
+            let z = score_delta / std_dev;
+            if z >= OUTCOME_SCORE_Z_THRESHOLD {
+                MutationOutcomeClass::Helpful
+            } else if z <= -OUTCOME_SCORE_Z_THRESHOLD {
+                MutationOutcomeClass::Detrimental
+            } else {
+                MutationOutcomeClass::Neutral
+            }
+        };
+
+        self.mutation_outcome_baseline_global.push(viability_score);
+        self.mutation_outcome_baseline_by_generation_bucket
+            .entry(generation_bucket)
+            .or_default()
+            .push(viability_score);
+
+        MutationOutcomeEvaluation {
+            class,
+            confidence,
+            score_delta,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn mutation_value_totals_record_outcome_updates_classification_and_confidence_counters() {
+        let mut totals = MutationValueTotals::default();
+        totals.record_outcome(
+            MutationOutcomeObservation {
+                survival_ticks: 64,
+                offspring_spawned_total: 2,
+                final_energy: 12.0,
+                viability_score: 0.75,
+                mean_lifetime_energy: 10.0,
+                action_attempted_total: 20,
+                blocked_move_total: 3,
+                invalid_reproduce_total: 2,
+                invalid_action_total: 5,
+                survived_short_horizon: true,
+                survived_long_horizon: false,
+                reproduced_once: true,
+            },
+            MutationOutcomeEvaluation {
+                class: MutationOutcomeClass::Helpful,
+                confidence: MutationOutcomeConfidence::Medium,
+                score_delta: 0.15,
+            },
+        );
+
+        assert_eq!(totals.carriers_observed_total, 1);
+        assert_eq!(totals.helpful_total, 1);
+        assert_eq!(totals.neutral_total, 0);
+        assert_eq!(totals.detrimental_total, 0);
+        assert_eq!(totals.confidence_low_total, 0);
+        assert_eq!(totals.confidence_medium_total, 1);
+        assert_eq!(totals.confidence_high_total, 0);
+        assert_eq!(totals.invalid_action_total, 5);
+        assert_eq!(totals.action_attempted_total, 20);
+    }
+
+    #[test]
+    fn classify_mutation_outcome_uses_global_baseline_before_bucket_is_populated() {
+        let mut stats = SimStats::default();
+        for _ in 0..30 {
+            stats.mutation_outcome_baseline_global.push(0.20);
+        }
+
+        let eval = stats.classify_mutation_outcome(999, 0.40);
+        assert_eq!(eval.confidence, MutationOutcomeConfidence::Medium);
+        assert_eq!(eval.class, MutationOutcomeClass::Helpful);
+        assert!(
+            eval.score_delta > 0.0,
+            "expected positive score delta, got {}",
+            eval.score_delta
+        );
+    }
 }

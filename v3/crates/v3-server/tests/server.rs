@@ -365,6 +365,22 @@ async fn get_status_has_all_required_fields() {
         body["mutation_value_totals_by_operator"].is_object(),
         "missing mutation_value_totals_by_operator"
     );
+    assert!(
+        body["mutation_outcome_summary"].is_object(),
+        "missing mutation_outcome_summary"
+    );
+    assert!(
+        body["mutation_outcome_summary"]["helpful_total"].is_number(),
+        "missing mutation_outcome_summary.helpful_total"
+    );
+    assert!(
+        body["mutation_outcome_summary"]["neutral_total"].is_number(),
+        "missing mutation_outcome_summary.neutral_total"
+    );
+    assert!(
+        body["mutation_outcome_summary"]["detrimental_total"].is_number(),
+        "missing mutation_outcome_summary.detrimental_total"
+    );
 }
 
 // ── 9b. get_status_uses_energy_names_and_perf_block ────────────────────────

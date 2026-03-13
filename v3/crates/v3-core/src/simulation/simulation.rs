@@ -7,7 +7,10 @@ use crate::creature::action_log::ActionLog;
 use crate::creature::state::CreatureState;
 use crate::kernel::paint::{PaintPoint, PaintStats, PaintTool};
 use crate::kernel::WorldState;
-use crate::simulation::stats::SimStats;
+use crate::simulation::stats::{MutationOutcomeObservation, SimStats};
+
+const SHORT_SURVIVAL_HORIZON_TICKS: u64 = 32;
+const LONG_SURVIVAL_HORIZON_TICKS: u64 = 128;
 
 /// Central simulation container.
 ///
@@ -80,16 +83,23 @@ impl Simulation {
     /// Remove one creature and record exit-time mutation value aggregates.
     pub fn remove_creature(&mut self, id: CreatureId) {
         if let Some(creature) = self.creatures.remove(id) {
+            let observation = build_mutation_outcome_observation(&creature, &self.config);
+            let evaluation = self
+                .stats
+                .classify_mutation_outcome(creature.generation, observation.viability_score);
+
+            if !creature.birth_mutation_operators.is_empty() {
+                self.stats
+                    .mutation_outcome_summary
+                    .record_outcome(observation, evaluation);
+            }
+
             for operator in creature.birth_mutation_operators.iter().copied() {
-                let totals = self
-                    .stats
+                self.stats
                     .mutation_value_totals_by_operator
                     .entry(operator)
-                    .or_default();
-                totals.carriers_observed_total += 1;
-                totals.survival_ticks_sum += creature.age;
-                totals.offspring_spawned_sum += creature.offspring_spawned_count;
-                totals.final_energy_sum += f64::from(creature.energy.max(0.0));
+                    .or_default()
+                    .record_outcome(observation, evaluation);
             }
             self.world.remove_creature(creature.position);
         }
@@ -103,6 +113,50 @@ impl Simulation {
         } else {
             self.creatures.values().map(|c| c.energy).sum::<f32>() / self.creatures.len() as f32
         }
+    }
+}
+
+fn build_mutation_outcome_observation(
+    creature: &CreatureState,
+    config: &SimulationConfig,
+) -> MutationOutcomeObservation {
+    let survived_short_horizon = creature.age >= SHORT_SURVIVAL_HORIZON_TICKS;
+    let survived_long_horizon = creature.age >= LONG_SURVIVAL_HORIZON_TICKS;
+    let reproduced_once = creature.offspring_spawned_count > 0;
+    let mean_lifetime_energy = if creature.lifetime_energy_sample_count > 0 {
+        creature.lifetime_energy_sum / creature.lifetime_energy_sample_count as f64
+    } else {
+        f64::from(creature.energy.max(0.0))
+    };
+    let blocked_move_total = creature.lifetime_blocked_move_count;
+    let invalid_reproduce_total = creature.lifetime_invalid_reproduce_count;
+    let invalid_action_total = blocked_move_total + invalid_reproduce_total;
+    let action_attempted_total = creature.lifetime_action_attempted_count.max(1);
+    let invalid_action_rate = invalid_action_total as f64 / action_attempted_total as f64;
+
+    // Composite score tuned for observability: survival + reproduction + energy stability,
+    // with a penalty for recurrent invalid/blocked actions.
+    let min_reproduce_energy = f64::from(config.energy.lifecycle.min_reproduce_energy.max(0.001));
+    let energy_term = (mean_lifetime_energy / min_reproduce_energy).clamp(0.0, 1.0);
+    let viability_score = 0.30 * survived_short_horizon as u8 as f64
+        + 0.35 * survived_long_horizon as u8 as f64
+        + 0.25 * reproduced_once as u8 as f64
+        + 0.10 * energy_term
+        - 0.20 * invalid_action_rate;
+
+    MutationOutcomeObservation {
+        survival_ticks: creature.age,
+        offspring_spawned_total: creature.offspring_spawned_count,
+        final_energy: f64::from(creature.energy.max(0.0)),
+        viability_score,
+        mean_lifetime_energy,
+        action_attempted_total: creature.lifetime_action_attempted_count,
+        blocked_move_total,
+        invalid_reproduce_total,
+        invalid_action_total,
+        survived_short_horizon,
+        survived_long_horizon,
+        reproduced_once,
     }
 }
 
