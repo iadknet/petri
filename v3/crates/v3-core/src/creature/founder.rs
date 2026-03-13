@@ -382,7 +382,7 @@ mod tests {
     use crate::contracts::Direction;
     use crate::contracts::WorldAction;
     use crate::creature::genome::cgp::ComputeNodeKind;
-    use crate::runtime::types::MeshSideOutputs;
+    use crate::runtime::types::{MeshSideOutputs, OUTPUT_SLOT_COUNT};
     use crate::runtime::vm::execute_vm_node;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
@@ -406,7 +406,7 @@ mod tests {
             panic!("node 1 must be VM backend");
         };
 
-        let mut upstream = [0.0f32; 12];
+        let mut upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         upstream[0] = food_here;
         upstream[1] = can_reproduce;
         upstream[2] = food_n;

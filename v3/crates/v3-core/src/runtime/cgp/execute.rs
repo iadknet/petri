@@ -9,7 +9,7 @@ use crate::runtime::inputs::ResolveCtx;
 use crate::runtime::plasticity::hebbian;
 use crate::runtime::plasticity::traces;
 use crate::runtime::routing::RouteDecision;
-use crate::runtime::types::{MeshSideOutputs, NodeResult};
+use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::SensorSnapshot;
 
 /// Callback trait for instrumenting the graph relaxation loop.
@@ -62,7 +62,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
     tracer: &mut T,
     def: &CgpGraphBackendDef,
     input_refs: &[InputReference],
-    upstream_slots: &[f32; 12],
+    upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
     energy: &mut f32,
     energy_consumed: f32,
     node_idx: usize,
@@ -321,7 +321,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
 pub(crate) fn execute_graph_node(
     def: &CgpGraphBackendDef,
     input_refs: &[InputReference],
-    upstream_slots: &[f32; 12],
+    upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
     energy: &mut f32,
     energy_consumed: f32,
     node_idx: usize,

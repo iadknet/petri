@@ -1165,23 +1165,6 @@ fn complexity_effect_consistent_with_types() {
 }
 
 #[test]
-fn random_non_increasing_never_returns_increasing() {
-    use crate::mutation::types::ComplexityEffect;
-    for seed in 0u64..200 {
-        let mut r = rng(seed);
-        if let Some(op) = VmOperator::random_non_increasing(&mut r) {
-            assert_ne!(
-                op.complexity_effect(),
-                ComplexityEffect::Increasing,
-                "random_non_increasing returned Increasing operator {:?} at seed {}",
-                op,
-                seed
-            );
-        }
-    }
-}
-
-#[test]
 fn vm_has_at_least_one_decreasing_operator() {
     use crate::mutation::types::ComplexityEffect;
     let saw_decreasing = VmOperator::ALL
@@ -1191,20 +1174,6 @@ fn vm_has_at_least_one_decreasing_operator() {
         saw_decreasing,
         "VM operator set should include at least one Decreasing operator"
     );
-}
-
-#[test]
-fn random_decreasing_returns_some_for_vm() {
-    // VM must expose at least one Decreasing operator for restricted-mode selection.
-    for seed in 0u64..200 {
-        let mut r = rng(seed);
-        assert_eq!(
-            VmOperator::random_decreasing(&mut r),
-            Some(VmOperator::VmDeleteInstruction),
-            "VM random_decreasing should select VmDeleteInstruction, seed {}",
-            seed
-        );
-    }
 }
 
 #[test]

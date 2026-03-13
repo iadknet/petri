@@ -353,10 +353,6 @@ fn default_max_actions_per_turn() -> usize {
     10
 }
 
-fn default_input_auto_connect_chance() -> f32 {
-    0.3
-}
-
 fn default_action_queue_cap() -> usize {
     4
 }
@@ -438,7 +434,7 @@ impl Default for TopologyNewNodeBirthConfig {
     fn default() -> Self {
         Self {
             graph_backend_chance: 0.5,
-            graph_initialized_chance: 0.5,
+            graph_initialized_chance: 0.8,
             graph_compute_gate_chance: 0.5,
         }
     }
@@ -466,12 +462,6 @@ pub struct MutationConfig {
     pub phenotype: PhenotypeConfig,
     #[serde(default)]
     pub reachable_bias: ReachableBiasConfig,
-    /// Legacy ingress-only field.
-    ///
-    /// This key is accepted in startup/PATCH payloads for backward compatibility,
-    /// but is omitted from emitted runtime config payloads.
-    #[serde(default = "default_input_auto_connect_chance", skip_serializing)]
-    pub input_auto_connect_chance: f32,
     #[serde(default)]
     pub topology_new_node_birth: TopologyNewNodeBirthConfig,
 }
@@ -488,7 +478,6 @@ impl Default for MutationConfig {
             action_queue_cap: 4,
             phenotype: PhenotypeConfig::default(),
             reachable_bias: ReachableBiasConfig::default(),
-            input_auto_connect_chance: default_input_auto_connect_chance(),
             topology_new_node_birth: TopologyNewNodeBirthConfig::default(),
         }
     }
@@ -738,12 +727,6 @@ impl SimulationConfig {
             0.0
         };
 
-        m.input_auto_connect_chance = if m.input_auto_connect_chance.is_finite() {
-            m.input_auto_connect_chance.clamp(0.0, 1.0)
-        } else {
-            0.3
-        };
-
         let nb = &mut m.topology_new_node_birth;
         nb.graph_backend_chance = if nb.graph_backend_chance.is_finite() {
             nb.graph_backend_chance.clamp(0.0, 1.0)
@@ -753,7 +736,7 @@ impl SimulationConfig {
         nb.graph_initialized_chance = if nb.graph_initialized_chance.is_finite() {
             nb.graph_initialized_chance.clamp(0.0, 1.0)
         } else {
-            0.5
+            0.8
         };
         nb.graph_compute_gate_chance = if nb.graph_compute_gate_chance.is_finite() {
             nb.graph_compute_gate_chance.clamp(0.0, 1.0)
@@ -893,8 +876,6 @@ mod tests {
         assert_eq!(cfg.mutation.phenotype.channel_step, 1);
         assert!((cfg.mutation.phenotype.channel_change_chance - 0.001).abs() < 1e-6);
         assert!((cfg.mutation.phenotype.polarity_flip_chance - 0.0002).abs() < 1e-6);
-        // Input auto-connect
-        assert!((cfg.mutation.input_auto_connect_chance - 0.3).abs() < 1e-6);
         // Reachable bias
         assert!((cfg.mutation.reachable_bias.topology - 0.7).abs() < 1e-9);
         assert!((cfg.mutation.reachable_bias.vm - 0.7).abs() < 1e-9);
@@ -1120,30 +1101,6 @@ mod tests {
         cfg.mutation.phenotype.channel_change_chance = -0.5;
         cfg.normalize();
         assert!((cfg.mutation.phenotype.channel_change_chance - 0.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn normalize_input_auto_connect_chance_above_one_clamped() {
-        let mut cfg = SimulationConfig::default();
-        cfg.mutation.input_auto_connect_chance = 1.5;
-        cfg.normalize();
-        assert!((cfg.mutation.input_auto_connect_chance - 1.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn normalize_input_auto_connect_chance_negative_clamped() {
-        let mut cfg = SimulationConfig::default();
-        cfg.mutation.input_auto_connect_chance = -0.5;
-        cfg.normalize();
-        assert!((cfg.mutation.input_auto_connect_chance - 0.0).abs() < 1e-6);
-    }
-
-    #[test]
-    fn normalize_input_auto_connect_chance_nan_falls_back() {
-        let mut cfg = SimulationConfig::default();
-        cfg.mutation.input_auto_connect_chance = f32::NAN;
-        cfg.normalize();
-        assert!((cfg.mutation.input_auto_connect_chance - 0.3).abs() < 1e-6);
     }
 
     #[test]
@@ -1565,25 +1522,11 @@ mod tests {
     }
 
     #[test]
-    fn mutation_config_serialization_omits_legacy_input_auto_connect_field() {
-        let cfg = SimulationConfig::default();
-        let json = serde_json::to_value(&cfg).unwrap();
-        let mutation = json
-            .get("mutation")
-            .and_then(serde_json::Value::as_object)
-            .expect("mutation object");
-        assert!(
-            !mutation.contains_key("input_auto_connect_chance"),
-            "legacy field must be omitted from emitted runtime config"
-        );
-    }
-
-    #[test]
     fn topology_new_node_birth_defaults() {
         let cfg = SimulationConfig::default();
         let birth = &cfg.mutation.topology_new_node_birth;
         assert!((birth.graph_backend_chance - 0.5).abs() < f32::EPSILON);
-        assert!((birth.graph_initialized_chance - 0.5).abs() < f32::EPSILON);
+        assert!((birth.graph_initialized_chance - 0.8).abs() < f32::EPSILON);
         assert!((birth.graph_compute_gate_chance - 0.5).abs() < f32::EPSILON);
     }
 
@@ -1597,7 +1540,7 @@ mod tests {
         let mc: MutationConfig = serde_json::from_str(&stripped).unwrap();
         let birth = &mc.topology_new_node_birth;
         assert!((birth.graph_backend_chance - 0.5).abs() < f32::EPSILON);
-        assert!((birth.graph_initialized_chance - 0.5).abs() < f32::EPSILON);
+        assert!((birth.graph_initialized_chance - 0.8).abs() < f32::EPSILON);
         assert!((birth.graph_compute_gate_chance - 0.5).abs() < f32::EPSILON);
     }
 

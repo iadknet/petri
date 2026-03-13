@@ -15,7 +15,7 @@ use crate::runtime::trace::domain::{
     BackendTrace, MeshHopTrace, TerminationReason, TraceRouteDecision,
 };
 use crate::runtime::traced_vm::execute_vm_node_traced;
-use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs};
+use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::SensorSnapshot;
 
 /// Execute the creature's mesh chain with trace recording.
@@ -33,7 +33,7 @@ pub fn execute_creature_mesh_traced(
     config: &RuntimeConfig,
 ) -> (MeshOutput, Vec<MeshHopTrace>, TerminationReason) {
     let mut current_node_id = genome.entry_node_id;
-    let mut upstream_slots = [0.0f32; 12];
+    let mut upstream_slots = [0.0f32; OUTPUT_SLOT_COUNT];
     let mut hops: usize = 0;
     let max_hops = config.max_mesh_hops.max(1) as usize;
     let start_energy = *energy;

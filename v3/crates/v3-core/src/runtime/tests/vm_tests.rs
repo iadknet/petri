@@ -2,7 +2,7 @@ use super::*;
 use crate::config::RuntimeConfig;
 use crate::contracts::Direction;
 use crate::creature::genome::{VmBackendDef, VmInstruction};
-use crate::runtime::types::MeshSideOutputs;
+use crate::runtime::types::{MeshSideOutputs, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;
 
@@ -24,8 +24,8 @@ fn empty_sensor_snapshot() -> SensorSnapshot {
     }
 }
 
-fn zeroed_upstream() -> [f32; 12] {
-    [0.0; 12]
+fn zeroed_upstream() -> [f32; OUTPUT_SLOT_COUNT] {
+    [0.0; OUTPUT_SLOT_COUNT]
 }
 
 fn run_vm(
@@ -33,7 +33,7 @@ fn run_vm(
     register_count: u8,
     constants: Vec<f32>,
     input_refs: &[InputReference],
-    upstream: [f32; 12],
+    upstream: [f32; OUTPUT_SLOT_COUNT],
     energy: f32,
 ) -> (NodeResult, f32, MeshSideOutputs) {
     let def = VmBackendDef {

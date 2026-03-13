@@ -184,10 +184,10 @@ pub struct CgpGraphBackendDef {
 }
 
 /// Number of CustomOutput sinks in the fixed catalog.
-pub const CUSTOM_OUTPUT_COUNT: u8 = 12;
+pub const CUSTOM_OUTPUT_COUNT: u8 = 24;
 /// Number of shared memory slots (WriteSlot + ClearSlot each).
 pub const SHARED_MEMORY_SLOTS: u8 = 16;
-/// Total fixed sink count: 12 CustomOutput + 1 Router + 16 WriteSlot + 16 ClearSlot.
+/// Total fixed sink count: N CustomOutput + 1 Router + 16 WriteSlot + 16 ClearSlot.
 pub const FIXED_SINK_COUNT: usize =
     CUSTOM_OUTPUT_COUNT as usize + 1 + SHARED_MEMORY_SLOTS as usize * 2;
 
@@ -197,7 +197,7 @@ impl CgpGraphBackendDef {
     pub fn new_with_fixed_outputs(config: &MutationConfig) -> Self {
         let mut output_sinks = Vec::with_capacity(FIXED_SINK_COUNT);
 
-        // 12 CustomOutput sinks
+        // CustomOutput sinks
         for slot in 0..CUSTOM_OUTPUT_COUNT {
             output_sinks.push(OutputSink {
                 kind: OutputSinkKind::CustomOutput(slot),
@@ -391,22 +391,27 @@ mod tests {
         assert!(def.execute_gate.inputs.is_empty());
 
         // Verify sink ordering
-        for i in 0..12u8 {
+        for i in 0..CUSTOM_OUTPUT_COUNT {
             assert_eq!(
                 def.output_sinks[i as usize].kind,
                 OutputSinkKind::CustomOutput(i)
             );
         }
-        assert_eq!(def.output_sinks[12].kind, OutputSinkKind::RouterOutput);
-        for i in 0..16u8 {
+        assert_eq!(
+            def.output_sinks[CUSTOM_OUTPUT_COUNT as usize].kind,
+            OutputSinkKind::RouterOutput
+        );
+        for i in 0..SHARED_MEMORY_SLOTS {
             assert_eq!(
-                def.output_sinks[13 + i as usize].kind,
+                def.output_sinks[CUSTOM_OUTPUT_COUNT as usize + 1 + i as usize].kind,
                 OutputSinkKind::WriteSlot(i)
             );
         }
-        for i in 0..16u8 {
+        for i in 0..SHARED_MEMORY_SLOTS {
             assert_eq!(
-                def.output_sinks[29 + i as usize].kind,
+                def.output_sinks
+                    [CUSTOM_OUTPUT_COUNT as usize + 1 + SHARED_MEMORY_SLOTS as usize + i as usize]
+                    .kind,
                 OutputSinkKind::ClearSlot(i)
             );
         }

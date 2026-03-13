@@ -120,14 +120,6 @@ pub fn build_barrier_mask(frame: &FramePayload) -> Box<[u8]> {
     mask.into_boxed_slice()
 }
 
-#[must_use]
-pub fn barrier_at(mask: &[u8], world_width: u16, x: u16, y: u16) -> bool {
-    let index = y as usize * world_width as usize + x as usize;
-    let byte = index / 8;
-    let bit = index % 8;
-    mask.get(byte).is_some_and(|value| value & (1 << bit) != 0)
-}
-
 fn quantize_food_density(density: f32) -> u8 {
     (density.clamp(0.0, 1.0) * 255.0).round() as u8
 }

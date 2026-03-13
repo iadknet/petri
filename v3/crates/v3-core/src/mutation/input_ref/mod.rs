@@ -7,6 +7,7 @@ use crate::mutation::compound::sub_value_count;
 use crate::mutation::reachability::biased_select_from;
 use crate::mutation::sampling;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
+use crate::runtime::OUTPUT_SLOT_COUNT;
 
 /// Input reference mutation operator variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -57,68 +58,6 @@ impl InputRefOperator {
         }
     }
 
-    const NON_INCREASING_WEIGHT: u16 = {
-        let mut sum = 0u16;
-        let mut i = 0;
-        while i < Self::ALL.len() {
-            if !Self::ALL[i].complexity_effect().is_increasing() {
-                sum += Self::ALL[i].weight() as u16;
-            }
-            i += 1;
-        }
-        sum
-    };
-
-    const DECREASING_WEIGHT: u16 = {
-        let mut sum = 0u16;
-        let mut i = 0;
-        while i < Self::ALL.len() {
-            if Self::ALL[i].complexity_effect().is_decreasing() {
-                sum += Self::ALL[i].weight() as u16;
-            }
-            i += 1;
-        }
-        sum
-    };
-
-    /// Pick a random Decreasing-only operator weighted by impact tier.
-    pub fn random_decreasing(rng: &mut impl Rng) -> Option<Self> {
-        if Self::DECREASING_WEIGHT == 0 {
-            return None;
-        }
-        let mut r = rng.gen_range(0..Self::DECREASING_WEIGHT);
-        for &op in &Self::ALL {
-            if !op.complexity_effect().is_decreasing() {
-                continue;
-            }
-            let w = op.weight() as u16;
-            if r < w {
-                return Some(op);
-            }
-            r -= w;
-        }
-        unreachable!()
-    }
-
-    /// Pick a random non-increasing operator (Neutral or Decreasing) weighted by impact tier.
-    pub fn random_non_increasing(rng: &mut impl Rng) -> Option<Self> {
-        if Self::NON_INCREASING_WEIGHT == 0 {
-            return None;
-        }
-        let mut r = rng.gen_range(0..Self::NON_INCREASING_WEIGHT);
-        for &op in &Self::ALL {
-            if op.complexity_effect().is_increasing() {
-                continue;
-            }
-            let w = op.weight() as u16;
-            if r < w {
-                return Some(op);
-            }
-            r -= w;
-        }
-        unreachable!()
-    }
-
     /// Pick a random input ref operator weighted by impact tier.
     pub fn random(rng: &mut impl Rng) -> Self {
         let mut r = rng.gen_range(0..Self::TOTAL_WEIGHT);
@@ -164,13 +103,41 @@ fn apply_add(
     reachable_nodes: &[usize],
     bias: f64,
     rng: &mut impl Rng,
-    _config: &MutationConfig,
+    config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
+    use crate::creature::genome::cgp::{GraphEdge, GraphSource};
+    use crate::creature::genome::BackendDef;
+    use crate::mutation::graph::operators::{get_edge_vec_mut, pick_random_surface};
+
     let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
     let (node_idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let new_ref = sampling::random_input_reference(rng);
     genome.nodes[node_idx].input_refs.push(new_ref);
+
+    // Compute width before mutable borrow of backend_def (own-borrow-over-clone)
+    let new_ref_idx = (genome.nodes[node_idx].input_refs.len() - 1) as u16;
+    let width = sub_value_count(
+        &genome.nodes[node_idx].input_refs[new_ref_idx as usize],
+        config,
+    );
+
+    // Auto-wire all sub-indices into random graph surfaces
+    if let BackendDef::Graph(ref mut def) = genome.nodes[node_idx].backend_def {
+        for sub_idx in 0..width {
+            if let Some(surface) = pick_random_surface(def, rng) {
+                let edges = get_edge_vec_mut(def, surface);
+                edges.push(GraphEdge {
+                    source: GraphSource::InputLeaf {
+                        ref_idx: new_ref_idx,
+                        sub_idx,
+                    },
+                    weight: rng.gen_range(-1.0f32..=1.0),
+                });
+            }
+        }
+    }
+
     Ok(reachability)
 }
 
@@ -258,7 +225,7 @@ fn apply_raw_field_mutation(
         for input_ref in &mut node.input_refs {
             if matches!(input_ref, InputReference::UpstreamSlot(_)) {
                 if pick == 0 {
-                    *input_ref = InputReference::UpstreamSlot(rng.gen_range(0..12_usize));
+                    *input_ref = InputReference::UpstreamSlot(rng.gen_range(0..OUTPUT_SLOT_COUNT));
                     return Ok(TargetReachability::NotApplicable);
                 }
                 pick -= 1;

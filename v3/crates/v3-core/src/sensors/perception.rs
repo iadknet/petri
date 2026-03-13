@@ -103,29 +103,6 @@ impl PerceptionSnapshot {
         }
     }
 
-    /// Resolve an extended perception compound key at the given sub_idx.
-    ///
-    /// Returns 0.0 for out-of-range sub_idx or non-compound keys.
-    ///
-    /// NOTE: No longer used in the production resolution path. All compound
-    /// resolution goes through `SensorSnapshot::resolve_compound()`, which
-    /// wraps out-of-range sub_idx via modular arithmetic. This method is
-    /// retained for direct-access use cases.
-    #[inline]
-    pub fn resolve(&self, key: &WorldInputKey, sub_idx: u16) -> f32 {
-        let idx = sub_idx as usize;
-        match key {
-            WorldInputKey::AreaFoodSummary => *self.area_food.get(idx).unwrap_or(&0.0),
-            WorldInputKey::AreaBarrierSummary => *self.area_barrier.get(idx).unwrap_or(&0.0),
-            WorldInputKey::AreaOccupancySummary => *self.area_occupancy.get(idx).unwrap_or(&0.0),
-            WorldInputKey::NearbyCreatureCore => *self.nearby_core.get(idx).unwrap_or(&0.0),
-            WorldInputKey::NearbyCreatureVitals => *self.nearby_vitals.get(idx).unwrap_or(&0.0),
-            WorldInputKey::NearbyCreatureIdentity => *self.nearby_identity.get(idx).unwrap_or(&0.0),
-            // Local scalar keys are not resolved here.
-            _ => 0.0,
-        }
-    }
-
     /// Returns true if this key is an extended perception compound key.
     #[inline]
     pub fn is_extended_key(key: &WorldInputKey) -> bool {
@@ -259,52 +236,6 @@ mod tests {
         assert_eq!(snap.nearby_core, [0.0; 16]);
         assert_eq!(snap.nearby_vitals, [0.0; 8]);
         assert_eq!(snap.nearby_identity, [0.0; 12]);
-    }
-
-    #[test]
-    fn resolve_area_food_in_range() {
-        let mut snap = PerceptionSnapshot::zero();
-        snap.area_food[0] = 0.5;
-        snap.area_food[6] = 0.9;
-        assert!((snap.resolve(&WorldInputKey::AreaFoodSummary, 0) - 0.5).abs() < f32::EPSILON);
-        assert!((snap.resolve(&WorldInputKey::AreaFoodSummary, 6) - 0.9).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn resolve_area_food_out_of_range_returns_zero() {
-        let snap = PerceptionSnapshot::zero();
-        assert_eq!(snap.resolve(&WorldInputKey::AreaFoodSummary, 7), 0.0);
-        assert_eq!(snap.resolve(&WorldInputKey::AreaFoodSummary, 100), 0.0);
-    }
-
-    #[test]
-    fn resolve_nearby_core_in_range() {
-        let mut snap = PerceptionSnapshot::zero();
-        snap.nearby_core[0] = 1.0; // present
-        snap.nearby_core[1] = 0.3; // rel_x
-        assert!((snap.resolve(&WorldInputKey::NearbyCreatureCore, 0) - 1.0).abs() < f32::EPSILON);
-        assert!((snap.resolve(&WorldInputKey::NearbyCreatureCore, 1) - 0.3).abs() < f32::EPSILON);
-    }
-
-    #[test]
-    fn resolve_nearby_core_out_of_range_returns_zero() {
-        let snap = PerceptionSnapshot::zero();
-        assert_eq!(snap.resolve(&WorldInputKey::NearbyCreatureCore, 16), 0.0);
-    }
-
-    #[test]
-    fn resolve_nearby_identity_in_range() {
-        let mut snap = PerceptionSnapshot::zero();
-        snap.nearby_identity[0] = 0.75;
-        assert!(
-            (snap.resolve(&WorldInputKey::NearbyCreatureIdentity, 0) - 0.75).abs() < f32::EPSILON
-        );
-    }
-
-    #[test]
-    fn resolve_local_key_returns_zero() {
-        let snap = PerceptionSnapshot::zero();
-        assert_eq!(snap.resolve(&WorldInputKey::FoodHere, 0), 0.0);
     }
 
     #[test]

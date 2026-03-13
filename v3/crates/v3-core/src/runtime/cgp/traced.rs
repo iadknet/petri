@@ -8,7 +8,7 @@ use crate::runtime::trace::domain::{
     kind_label, GraphActionSlotTrace, GraphExecuteGateTrace, GraphNodeEvalTrace,
     GraphOutputSinkTrace, GraphPassTrace, GraphTrace,
 };
-use crate::runtime::types::{MeshSideOutputs, NodeResult};
+use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::SensorSnapshot;
 
 pub(crate) struct RecordingTracer {
@@ -113,7 +113,7 @@ impl GraphTracer for RecordingTracer {
 pub(crate) fn execute_graph_node_traced(
     def: &CgpGraphBackendDef,
     input_refs: &[InputReference],
-    upstream_slots: &[f32; 12],
+    upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
     energy: &mut f32,
     energy_consumed: f32,
     node_idx: usize,

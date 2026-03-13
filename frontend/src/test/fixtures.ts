@@ -79,7 +79,7 @@ export const MOCK_CONFIG: SimulationConfig = {
 		},
 		topology_new_node_birth: {
 			graph_backend_chance: 0.5,
-			graph_initialized_chance: 0.5,
+			graph_initialized_chance: 0.8,
 			graph_compute_gate_chance: 0.5,
 		},
 	},

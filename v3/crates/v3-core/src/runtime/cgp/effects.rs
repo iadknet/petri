@@ -92,7 +92,7 @@ pub(crate) fn apply_cgp_graph_effects(
     curr_outputs: &[f32],
     input_refs: &[InputReference],
     resolve_ctx: &ResolveCtx<'_>,
-    upstream_slots: &[f32; 12],
+    upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
     side_outputs: &mut MeshSideOutputs,
     shared_memory: &mut [f32; 16],
     prev_shared_memory: &[f32; 16],

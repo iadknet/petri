@@ -3,6 +3,7 @@
 use crate::contracts::{InputReference, NodeId, WorldAction};
 use crate::creature::genome::cgp::ComputeNodeKind;
 use crate::runtime::routing::RouteDecision;
+use crate::runtime::OUTPUT_SLOT_COUNT;
 use crate::sensors::perception::PerceptionSnapshot;
 use crate::sensors::static_inputs::StaticInputs;
 use serde::Serialize;
@@ -126,10 +127,10 @@ pub struct MeshHopTrace {
     pub hop_index: usize,
     pub node_id: NodeId,
     pub input_refs: Vec<InputReference>,
-    pub upstream_slots: [f32; 12],
+    pub upstream_slots: [f32; OUTPUT_SLOT_COUNT],
     pub energy_before: f32,
     pub energy_after: f32,
-    pub output_slots: [f32; 12],
+    pub output_slots: [f32; OUTPUT_SLOT_COUNT],
     pub route: TraceRouteDecision,
     pub resolved_target_index: usize,
     pub backend_trace: BackendTrace,
@@ -149,7 +150,7 @@ pub struct VmTrace {
     pub constants: Vec<f32>,
     pub steps: Vec<VmStepTrace>,
     pub final_registers: Vec<f32>,
-    pub final_payload: [f32; 12],
+    pub final_payload: [f32; OUTPUT_SLOT_COUNT],
     pub final_meta: [f32; 8],
     pub final_route_value: f32,
     pub slot_writes: Vec<SlotWrite>,

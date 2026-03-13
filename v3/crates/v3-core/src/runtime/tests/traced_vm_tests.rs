@@ -2,7 +2,7 @@ use super::*;
 use crate::config::RuntimeConfig;
 use crate::contracts::InputReference;
 use crate::creature::genome::{VmBackendDef, VmInstruction};
-use crate::runtime::types::MeshSideOutputs;
+use crate::runtime::types::{MeshSideOutputs, OUTPUT_SLOT_COUNT};
 use crate::runtime::vm::execute_vm_node;
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;
@@ -29,7 +29,7 @@ fn assert_equivalent(
     label: &str,
     def: VmBackendDef,
     input_refs: Vec<InputReference>,
-    upstream: [f32; 12],
+    upstream: [f32; OUTPUT_SLOT_COUNT],
     memory_seed: [f32; 16],
 ) {
     let ss = empty_ss();
@@ -94,7 +94,7 @@ fn result_equivalence_emit_eat() {
         ],
     };
     let input_refs: Vec<InputReference> = vec![];
-    let upstream = [0.0f32; 12];
+    let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
     let ss = empty_ss();
     let cfg = config();
 
@@ -167,7 +167,7 @@ fn trace_contains_correct_instructions() {
     let (_result, trace) = execute_vm_node_traced(
         &def,
         &[],
-        &[0.0; 12],
+        &[0.0; OUTPUT_SLOT_COUNT],
         &mut energy,
         0.0,
         &mut memory,
@@ -216,7 +216,7 @@ fn register_changes_captured() {
     let (_result, trace) = execute_vm_node_traced(
         &def,
         &[],
-        &[0.0; 12],
+        &[0.0; OUTPUT_SLOT_COUNT],
         &mut energy,
         0.0,
         &mut memory,
@@ -271,7 +271,7 @@ fn slot_writes_tracked() {
     let (_result, trace) = execute_vm_node_traced(
         &def,
         &[],
-        &[0.0; 12],
+        &[0.0; OUTPUT_SLOT_COUNT],
         &mut energy,
         0.0,
         &mut memory,
@@ -314,7 +314,7 @@ fn result_equivalence_energy_exhaustion() {
     let result_a = execute_vm_node(
         &def,
         &[],
-        &[0.0; 12],
+        &[0.0; OUTPUT_SLOT_COUNT],
         &mut energy_a,
         0.0,
         &mut memory_a,
@@ -330,7 +330,7 @@ fn result_equivalence_energy_exhaustion() {
     let (result_b, _trace) = execute_vm_node_traced(
         &def,
         &[],
-        &[0.0; 12],
+        &[0.0; OUTPUT_SLOT_COUNT],
         &mut energy_b,
         0.0,
         &mut memory_b,
@@ -373,7 +373,7 @@ fn result_equivalence_routing() {
     let result_a = execute_vm_node(
         &def,
         &[],
-        &[0.0; 12],
+        &[0.0; OUTPUT_SLOT_COUNT],
         &mut energy_a,
         0.0,
         &mut memory_a,
@@ -389,7 +389,7 @@ fn result_equivalence_routing() {
     let (result_b, trace) = execute_vm_node_traced(
         &def,
         &[],
-        &[0.0; 12],
+        &[0.0; OUTPUT_SLOT_COUNT],
         &mut energy_b,
         0.0,
         &mut memory_b,
@@ -409,8 +409,8 @@ fn result_equivalence_routing() {
 
 #[test]
 fn result_equivalence_all_41_opcodes() {
-    let zero_upstream = [0.0f32; 12];
-    let mut read_input_upstream = [0.0f32; 12];
+    let zero_upstream = [0.0f32; OUTPUT_SLOT_COUNT];
+    let mut read_input_upstream = [0.0f32; OUTPUT_SLOT_COUNT];
     read_input_upstream[3] = 42.0;
 
     let zero_mem = [0.0f32; 16];
@@ -423,7 +423,7 @@ fn result_equivalence_all_41_opcodes() {
         &'static str,
         VmBackendDef,
         Vec<InputReference>,
-        [f32; 12],
+        [f32; OUTPUT_SLOT_COUNT],
         [f32; 16],
     );
     let cases: Vec<OpcodeCase> = vec![

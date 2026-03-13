@@ -1,4 +1,5 @@
 use crate::contracts::{ActionQueue, DynamicIntrospectionKey, InputReference};
+use crate::runtime::OUTPUT_SLOT_COUNT;
 use crate::sensors::perception::SensorSnapshot;
 
 /// Shared resolution context for input references.
@@ -9,7 +10,7 @@ use crate::sensors::perception::SensorSnapshot;
 #[derive(Debug, Clone)]
 pub struct ResolveCtx<'a> {
     pub sensors: &'a SensorSnapshot,
-    pub upstream_slots: &'a [f32; 12],
+    pub upstream_slots: &'a [f32; OUTPUT_SLOT_COUNT],
     pub energy: f32,
     pub energy_consumed: f32,
     pub action_queue: &'a ActionQueue,
@@ -22,7 +23,7 @@ pub struct ResolveCtx<'a> {
 ///   `compound_width()`.
 /// - World and static introspection keys are read from the pre-assembled snapshot.
 /// - Dynamic introspection is resolved live from `ctx.energy` and `ctx.energy_consumed`.
-/// - UpstreamSlot: reads `upstream_slots[idx]`; idx >= 12 yields 0.0.
+/// - UpstreamSlot: reads `upstream_slots[idx]`; idx >= `OUTPUT_SLOT_COUNT` yields 0.0.
 /// - Missing or out-of-range index: 0.0 (soft default).
 #[inline]
 #[must_use]
@@ -49,7 +50,7 @@ pub fn resolve_input(reference: &InputReference, sub_idx: u16, ctx: &ResolveCtx<
             DynamicIntrospectionKey::EnergyConsumedThisTick => ctx.energy_consumed,
         },
         InputReference::UpstreamSlot(idx) => {
-            if *idx < 12 {
+            if *idx < OUTPUT_SLOT_COUNT {
                 ctx.upstream_slots[*idx]
             } else {
                 0.0
@@ -84,7 +85,7 @@ mod tests {
 
     fn make_ctx<'a>(
         ss: &'a SensorSnapshot,
-        upstream: &'a [f32; 12],
+        upstream: &'a [f32; OUTPUT_SLOT_COUNT],
         energy: f32,
         energy_consumed: f32,
     ) -> ResolveCtx<'a> {
@@ -104,7 +105,7 @@ mod tests {
     #[test]
     fn world_food_here() {
         let ss = make_sensor_snapshot(0.75);
-        let upstream = [0.0f32; 12];
+        let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
         let v = resolve_input(&InputReference::World(WorldInputKey::FoodHere), 0, &ctx);
         assert!((v - 0.75).abs() < 1e-6);
@@ -113,7 +114,7 @@ mod tests {
     #[test]
     fn world_neighbor_food_ring() {
         let ss = make_sensor_snapshot(0.0);
-        let upstream = [0.0f32; 12];
+        let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
         // NeighborFoodRing is compound, sub_idx=0 → Direction::N
         let v = resolve_input(
@@ -127,7 +128,7 @@ mod tests {
     #[test]
     fn static_introspection_generation() {
         let ss = make_sensor_snapshot(0.0);
-        let upstream = [0.0f32; 12];
+        let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let ctx = make_ctx(&ss, &upstream, 20.0, 0.0);
         let v = resolve_input(
             &InputReference::StaticIntrospection(StaticIntrospectionKey::Generation),
@@ -140,7 +141,7 @@ mod tests {
     #[test]
     fn static_introspection_age_ticks() {
         let ss = make_sensor_snapshot(0.0);
-        let upstream = [0.0f32; 12];
+        let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let ctx = make_ctx(&ss, &upstream, 20.0, 0.0);
         let v = resolve_input(
             &InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
@@ -153,7 +154,7 @@ mod tests {
     #[test]
     fn dynamic_energy_current_live() {
         let ss = make_sensor_snapshot(0.0);
-        let upstream = [0.0f32; 12];
+        let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let ctx = make_ctx(&ss, &upstream, 42.5, 0.0);
         let v = resolve_input(
             &InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
@@ -166,7 +167,7 @@ mod tests {
     #[test]
     fn dynamic_energy_consumed_this_tick() {
         let ss = make_sensor_snapshot(0.0);
-        let upstream = [0.0f32; 12];
+        let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let ctx = make_ctx(&ss, &upstream, 20.0, 5.5);
         let v = resolve_input(
             &InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),
@@ -179,7 +180,7 @@ mod tests {
     #[test]
     fn upstream_slot_in_range() {
         let ss = make_sensor_snapshot(0.0);
-        let mut upstream = [0.0f32; 12];
+        let mut upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         upstream[7] = 99.0;
         let ctx = make_ctx(&ss, &upstream, 20.0, 0.0);
         let v = resolve_input(&InputReference::UpstreamSlot(7), 0, &ctx);
@@ -187,28 +188,29 @@ mod tests {
     }
 
     #[test]
-    fn upstream_slot_at_boundary_11() {
+    fn upstream_slot_at_last_valid_boundary() {
         let ss = make_sensor_snapshot(0.0);
-        let mut upstream = [0.0f32; 12];
-        upstream[11] = 3.0;
+        let mut upstream = [0.0f32; OUTPUT_SLOT_COUNT];
+        let last_slot = OUTPUT_SLOT_COUNT - 1;
+        upstream[last_slot] = 3.0;
         let ctx = make_ctx(&ss, &upstream, 20.0, 0.0);
-        let v = resolve_input(&InputReference::UpstreamSlot(11), 0, &ctx);
+        let v = resolve_input(&InputReference::UpstreamSlot(last_slot), 0, &ctx);
         assert!((v - 3.0).abs() < 1e-6);
     }
 
     #[test]
     fn upstream_slot_out_of_range_yields_zero() {
         let ss = make_sensor_snapshot(0.0);
-        let upstream = [1.0f32; 12];
+        let upstream = [1.0f32; OUTPUT_SLOT_COUNT];
         let ctx = make_ctx(&ss, &upstream, 20.0, 0.0);
-        let v = resolve_input(&InputReference::UpstreamSlot(12), 0, &ctx);
+        let v = resolve_input(&InputReference::UpstreamSlot(OUTPUT_SLOT_COUNT), 0, &ctx);
         assert_eq!(v, 0.0);
     }
 
     #[test]
     fn upstream_slot_large_index_yields_zero() {
         let ss = make_sensor_snapshot(0.0);
-        let upstream = [1.0f32; 12];
+        let upstream = [1.0f32; OUTPUT_SLOT_COUNT];
         let ctx = make_ctx(&ss, &upstream, 20.0, 0.0);
         let v = resolve_input(&InputReference::UpstreamSlot(999), 0, &ctx);
         assert_eq!(v, 0.0);
@@ -219,7 +221,7 @@ mod tests {
     #[test]
     fn action_queue_sub_idx_0_returns_action_type() {
         let ss = make_sensor_snapshot(0.0);
-        let upstream = [0.0f32; 12];
+        let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let mut aq = ActionQueue::new(4);
         aq.push(WorldAction::Eat); // type 1
         let ctx = ResolveCtx {
@@ -237,7 +239,7 @@ mod tests {
     #[test]
     fn action_queue_sub_idx_maps_slot_and_field() {
         let ss = make_sensor_snapshot(0.0);
-        let upstream = [0.0f32; 12];
+        let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let mut aq = ActionQueue::new(4);
         aq.push(WorldAction::NoOp); // slot 0: type=0
         aq.push(WorldAction::Move(Direction::E)); // slot 1: type=2, param0=2.0 (E direction index)
@@ -262,7 +264,7 @@ mod tests {
     #[test]
     fn action_queue_param1_field_coverage() {
         let ss = make_sensor_snapshot(0.0);
-        let upstream = [0.0f32; 12];
+        let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let mut aq = ActionQueue::new(4);
         aq.push(WorldAction::Reproduce {
             direction: Direction::N,
@@ -286,7 +288,7 @@ mod tests {
     #[test]
     fn action_queue_oob_returns_zero() {
         let ss = make_sensor_snapshot(0.0);
-        let upstream = [0.0f32; 12];
+        let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let aq = ActionQueue::new(4); // empty queue
         let ctx = ResolveCtx {
             sensors: &ss,
@@ -304,7 +306,7 @@ mod tests {
     #[test]
     fn sub_idx_ignored_on_scalar() {
         let ss = make_sensor_snapshot(0.75);
-        let mut upstream = [0.0f32; 12];
+        let mut upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         upstream[0] = 5.0;
         let ctx = make_ctx(&ss, &upstream, 50.0, 3.0);
 
@@ -338,7 +340,7 @@ mod tests {
         let mut ss = make_sensor_snapshot(0.0);
         ss.perception.area_food[0] = 0.42;
         ss.perception.area_food[6] = 0.88;
-        let upstream = [0.0f32; 12];
+        let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
 
         let v0 = resolve_input(
@@ -360,7 +362,7 @@ mod tests {
     fn compound_oob_sub_idx_wraps() {
         let mut ss = make_sensor_snapshot(0.0);
         ss.perception.area_food[0] = 0.42;
-        let upstream = [0.0f32; 12];
+        let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
 
         // area_food has 7 sub-values; sub_idx=7 wraps to index 0
@@ -391,7 +393,7 @@ mod tests {
         let mut ss = make_sensor_snapshot(0.0);
         ss.perception.nearby_core[0] = 1.0; // present
         ss.perception.nearby_core[3] = 0.75; // dist
-        let upstream = [0.0f32; 12];
+        let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
 
         let present = resolve_input(
@@ -413,7 +415,7 @@ mod tests {
     fn extended_key_identity_routes_correctly() {
         let mut ss = make_sensor_snapshot(0.0);
         ss.perception.nearby_identity[0] = 0.9; // kin_affinity slot 0
-        let upstream = [0.0f32; 12];
+        let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
 
         let v = resolve_input(
@@ -427,7 +429,7 @@ mod tests {
     #[test]
     fn zero_perception_returns_zeros_for_all_extended_keys() {
         let ss = make_sensor_snapshot(0.0);
-        let upstream = [0.0f32; 12];
+        let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
 
         let keys = [

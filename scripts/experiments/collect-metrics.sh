@@ -29,7 +29,7 @@ export API_RETRY_DELAY_SECONDS
 
 mkdir -p "${OUTPUT_DIR}"
 
-PROBE_TOTAL=7
+PROBE_TOTAL=8
 PROBE_INDEX=0
 
 run_probe() {
@@ -49,6 +49,7 @@ run_probe "status_summary" "status_summary.json" "${OBS_DIR}/status-summary.sh"
 run_probe "health_invariants" "health_invariants.json" "${OBS_DIR}/health-invariants.sh"
 run_probe "skip_operator_summary" "skip_operator_summary.json" "${OBS_DIR}/skip-operator-summary.sh"
 run_probe "mutation_value_leaderboard" "mutation_value_leaderboard.json" "${OBS_DIR}/mutation-value-leaderboard.sh"
+run_probe "system_triage" "system_triage.json" "${OBS_DIR}/system-triage.sh" "${SAMPLE_SIZE}"
 run_probe "barrier_awareness_sample" "barrier_awareness_sample.json" "${OBS_DIR}/barrier-awareness-sample.sh" "${SAMPLE_SIZE}"
 run_probe "barrier_causal_funnel" "barrier_causal_funnel.json" "${OBS_DIR}/barrier-causal-funnel.sh" "${SAMPLE_SIZE}"
 

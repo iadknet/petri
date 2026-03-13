@@ -351,21 +351,6 @@ pub fn mesh_backward_slice(
     Some(DetectedGene { indices })
 }
 
-/// Backward-slice from a randomly chosen mesh node.
-#[inline]
-#[must_use]
-pub fn mesh_backward_slice_random(
-    genome: &CreatureGenome,
-    rng: &mut impl Rng,
-    max_size: usize,
-) -> Option<DetectedGene> {
-    if genome.nodes.is_empty() {
-        return None;
-    }
-    let anchor_idx = rng.gen_range(0..genome.nodes.len());
-    mesh_backward_slice(genome, anchor_idx, max_size)
-}
-
 /// Forward-slice from a seed node at the mesh level.
 ///
 /// BFS forward from the seed through `targets` edges, collecting the
@@ -419,21 +404,6 @@ pub fn mesh_forward_slice(
         .map(|(i, _)| i)
         .collect();
     Some(DetectedGene { indices })
-}
-
-/// Forward-slice from a randomly chosen mesh node.
-#[inline]
-#[must_use]
-pub fn mesh_forward_slice_random(
-    genome: &CreatureGenome,
-    rng: &mut impl Rng,
-    max_size: usize,
-) -> Option<DetectedGene> {
-    if genome.nodes.is_empty() {
-        return None;
-    }
-    let seed_idx = rng.gen_range(0..genome.nodes.len());
-    mesh_forward_slice(genome, seed_idx, max_size)
 }
 
 // ── Functional complexity ───────────────────────────────────────────────────

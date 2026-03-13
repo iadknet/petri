@@ -337,17 +337,6 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
 }
 
 #[test]
-fn mutation_domain_layer_mapping() {
-    assert_eq!(MutationDomain::Topology.layer(), MutationLayer::Mesh);
-    assert_eq!(MutationDomain::Vm.layer(), MutationLayer::NodeInternal);
-    assert_eq!(MutationDomain::Graph.layer(), MutationLayer::NodeInternal);
-    assert_eq!(
-        MutationDomain::InputRef.layer(),
-        MutationLayer::NodeInternal
-    );
-}
-
-#[test]
 fn record_reachability_increments_correct_counter() {
     let mut s = MutationSummary::zero();
     s.record_reachability(TargetReachability::Reachable);

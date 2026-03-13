@@ -5,6 +5,7 @@ use crate::contracts::{
     DynamicIntrospectionKey, InputReference, StaticIntrospectionKey, WorldInputKey,
 };
 use crate::mutation::compound::sub_value_count;
+use crate::runtime::OUTPUT_SLOT_COUNT;
 
 /// Generate a random input reference from the full set of 23 possible values.
 ///
@@ -29,7 +30,7 @@ pub(crate) fn random_input_reference(rng: &mut impl Rng) -> InputReference {
         12 => InputReference::World(WorldInputKey::NearbyCreatureCore),
         13 => InputReference::World(WorldInputKey::NearbyCreatureVitals),
         14 => InputReference::World(WorldInputKey::NearbyCreatureIdentity),
-        _ => InputReference::UpstreamSlot(rng.gen_range(0..12_usize)),
+        _ => InputReference::UpstreamSlot(rng.gen_range(0..OUTPUT_SLOT_COUNT)),
     }
 }
 

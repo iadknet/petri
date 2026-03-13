@@ -208,6 +208,7 @@ mod tests {
         GraphOutputSinkTrace, GraphTrace, MeshHopTrace, TickTrace, TraceRouteDecision,
         TraceRouteKind, VmTrace,
     };
+    use v3_core::runtime::OUTPUT_SLOT_COUNT;
 
     #[test]
     fn assembler_preserves_route_shape() {
@@ -230,10 +231,10 @@ mod tests {
                     hop_index: 0,
                     node_id: v3_core::contracts::NodeId::new(1),
                     input_refs: vec![],
-                    upstream_slots: [0.0; 12],
+                    upstream_slots: [0.0; OUTPUT_SLOT_COUNT],
                     energy_before: 10.0,
                     energy_after: 9.5,
-                    output_slots: [0.0; 12],
+                    output_slots: [0.0; OUTPUT_SLOT_COUNT],
                     route: TraceRouteDecision {
                         kind: TraceRouteKind::VmWrap,
                         raw_value: 3.0,
@@ -244,7 +245,7 @@ mod tests {
                         constants: vec![],
                         steps: vec![],
                         final_registers: vec![0.0],
-                        final_payload: [0.0; 12],
+                        final_payload: [0.0; OUTPUT_SLOT_COUNT],
                         final_meta: [0.0; 8],
                         final_route_value: 3.0,
                         slot_writes: vec![],
@@ -285,10 +286,10 @@ mod tests {
                     hop_index: 0,
                     node_id: v3_core::contracts::NodeId::new(2),
                     input_refs: vec![],
-                    upstream_slots: [0.0; 12],
+                    upstream_slots: [0.0; OUTPUT_SLOT_COUNT],
                     energy_before: 5.0,
                     energy_after: 4.5,
-                    output_slots: [1.0; 12],
+                    output_slots: [1.0; OUTPUT_SLOT_COUNT],
                     route: TraceRouteDecision {
                         kind: TraceRouteKind::CgpNormalized,
                         raw_value: 0.25,

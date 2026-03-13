@@ -3,6 +3,7 @@
 .claude/*
 !.claude/skills/
 target/
+artifacts/
 
 # Profiling output
 dhat-heap.json
