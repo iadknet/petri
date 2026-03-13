@@ -718,6 +718,145 @@ async fn startup_accepts_founder_profile_and_get_config_roundtrips() {
     );
 }
 
+// ── 11f. startup_failed_action_penalty_ramp_pins_runtime_penalty_to_end ───
+
+#[tokio::test]
+async fn startup_failed_action_penalty_ramp_pins_runtime_penalty_to_end() {
+    let a = app();
+    let startup_body = r#"{
+        "seed": 123,
+        "startup": {
+            "ramps": {
+                "failed_action_penalty": {
+                    "enabled": true,
+                    "start": 5.0,
+                    "end": 30.0,
+                    "target_tick": 1000
+                }
+            }
+        }
+    }"#;
+
+    let (startup_status, startup_resp) = do_request(a.clone(), startup_req(startup_body)).await;
+    assert_eq!(startup_status, StatusCode::OK, "body: {startup_resp}");
+
+    let (get_status, get_body) = do_request(a, get_req("/v3/simulation/config")).await;
+    assert_eq!(get_status, StatusCode::OK, "body: {get_body}");
+    assert_eq!(
+        get_body["config"]["energy"]["costs"]["failed_action_penalty"].as_f64(),
+        Some(30.0)
+    );
+    assert_eq!(
+        get_body["config"]["startup"]["ramps"]["failed_action_penalty"]["enabled"].as_bool(),
+        Some(true)
+    );
+}
+
+// ── 11g. patch_config_rejects_startup_fields ───────────────────────────────
+
+#[tokio::test]
+async fn patch_config_rejects_startup_fields() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let patch = r#"{
+        "startup": {
+            "ramps": {
+                "failed_action_penalty": {
+                    "enabled": true,
+                    "start": 5.0,
+                    "end": 30.0,
+                    "target_tick": 1000
+                }
+            }
+        }
+    }"#;
+
+    let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
+    assert_eq!(
+        body["error"].as_str(),
+        Some("validation_rejected"),
+        "body: {body}"
+    );
+}
+
+// ── 11h. patch_config_blocks_failed_penalty_while_ramp_active ─────────────
+
+#[tokio::test]
+async fn patch_config_blocks_failed_penalty_while_ramp_active() {
+    let a = app();
+    let startup_body = r#"{
+        "seed": 321,
+        "startup": {
+            "ramps": {
+                "failed_action_penalty": {
+                    "enabled": true,
+                    "start": 5.0,
+                    "end": 30.0,
+                    "target_tick": 10
+                }
+            }
+        }
+    }"#;
+    let (startup_status, startup_resp) = do_request(a.clone(), startup_req(startup_body)).await;
+    assert_eq!(startup_status, StatusCode::OK, "body: {startup_resp}");
+
+    let patch = r#"{"energy":{"costs":{"failed_action_penalty":7.0}}}"#;
+    let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
+    assert_eq!(
+        body["error"].as_str(),
+        Some("validation_rejected"),
+        "body: {body}"
+    );
+}
+
+// ── 11i. patch_config_allows_failed_penalty_after_ramp_target_tick ─────────
+
+#[tokio::test]
+async fn patch_config_allows_failed_penalty_after_ramp_target_tick() {
+    let a = app();
+    let startup_body = r#"{
+        "seed": 777,
+        "startup": {
+            "ramps": {
+                "failed_action_penalty": {
+                    "enabled": true,
+                    "start": 5.0,
+                    "end": 30.0,
+                    "target_tick": 1
+                }
+            }
+        }
+    }"#;
+    let (startup_status, startup_resp) = do_request(a.clone(), startup_req(startup_body)).await;
+    assert_eq!(startup_status, StatusCode::OK, "body: {startup_resp}");
+
+    let (start_status, start_body) = do_request(a.clone(), post_req("/v3/simulation/start")).await;
+    assert_eq!(start_status, StatusCode::OK, "body: {start_body}");
+    let (pause_status, pause_body) = do_request(a.clone(), post_req("/v3/simulation/pause")).await;
+    assert_eq!(pause_status, StatusCode::OK, "body: {pause_body}");
+    let (step_status, step_body) = do_request(
+        a.clone(),
+        post_json("/v3/simulation/step", r#"{"steps":1}"#),
+    )
+    .await;
+    assert_eq!(step_status, StatusCode::OK, "body: {step_body}");
+
+    let patch = r#"{"energy":{"costs":{"failed_action_penalty":9.0}}}"#;
+    let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert_eq!(
+        body["config"]["energy"]["costs"]["failed_action_penalty"].as_f64(),
+        Some(9.0),
+        "body: {body}"
+    );
+}
+
 // ── 12. error_envelope_has_protocol_version ─────────────────────────────────
 
 #[tokio::test]

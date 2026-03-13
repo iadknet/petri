@@ -93,4 +93,14 @@ export const MOCK_CONFIG: SimulationConfig = {
 	shared_memory: {
 		decay_rate: 0.0,
 	},
+	startup: {
+		ramps: {
+			failed_action_penalty: {
+				enabled: false,
+				start: 5,
+				end: 5,
+				target_tick: 1000,
+			},
+		},
+	},
 };

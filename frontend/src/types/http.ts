@@ -1,5 +1,6 @@
 import type {
 	CostsConfig,
+	FailedActionPenaltyRampConfig,
 	FoodConfig,
 	LifecycleEnergyConfig,
 	MutationConfig,
@@ -67,6 +68,11 @@ export interface StartupRequest {
 	mutation?: Partial<Omit<MutationConfig, "phenotype" | "topology_new_node_birth">> & {
 		phenotype?: Partial<PhenotypeConfig>;
 		topology_new_node_birth?: Partial<TopologyNewNodeBirthConfig>;
+	};
+	startup?: {
+		ramps?: {
+			failed_action_penalty?: Partial<FailedActionPenaltyRampConfig>;
+		};
 	};
 }
 

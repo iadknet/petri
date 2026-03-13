@@ -234,6 +234,60 @@ impl EnergyConfig {
     }
 }
 
+/// Startup ramp for failed action penalty.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FailedActionPenaltyRampConfig {
+    pub enabled: bool,
+    pub start: f32,
+    pub end: f32,
+    pub target_tick: u64,
+}
+
+impl Default for FailedActionPenaltyRampConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            start: 5.0,
+            end: 5.0,
+            target_tick: 1000,
+        }
+    }
+}
+
+impl FailedActionPenaltyRampConfig {
+    /// Returns true while interpolation should still be applied.
+    #[must_use]
+    pub fn is_active(&self, tick: u64) -> bool {
+        let target_tick = self.target_tick.max(1);
+        self.enabled && tick < target_tick
+    }
+
+    /// Returns linearly interpolated ramp value for a tick.
+    #[must_use]
+    pub fn value_for_tick(&self, tick: u64) -> f32 {
+        let target_tick = self.target_tick.max(1);
+        let progress = (tick as f32 / target_tick as f32).clamp(0.0, 1.0);
+        self.start + (self.end - self.start) * progress
+    }
+}
+
+/// Startup-time ramp controls for values that should vary early in a run.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StartupRampsConfig {
+    #[serde(default)]
+    pub failed_action_penalty: FailedActionPenaltyRampConfig,
+}
+
+/// Startup-only controls persisted in config and applied on restart/startup.
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct StartupConfig {
+    #[serde(default)]
+    pub ramps: StartupRampsConfig,
+}
+
 /// VM runtime config. Canonical owner: v3-runtime-config-spec.md Section 2.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -517,6 +571,8 @@ impl Default for PopulationConfig {
 pub struct SimulationConfig {
     pub world: WorldConfig,
     pub energy: EnergyConfig,
+    #[serde(default)]
+    pub startup: StartupConfig,
     pub runtime: RuntimeConfig,
     pub mutation: MutationConfig,
     pub population: PopulationConfig,
@@ -529,6 +585,34 @@ pub struct SimulationConfig {
 }
 
 impl SimulationConfig {
+    /// Apply startup-time config overrides that should pin runtime-visible values.
+    pub fn apply_startup_overrides(&mut self) {
+        let ramp = &self.startup.ramps.failed_action_penalty;
+        if ramp.enabled {
+            self.energy.costs.failed_action_penalty = ramp.end;
+        }
+    }
+
+    /// Whether the startup failed action penalty ramp is currently active.
+    #[must_use]
+    pub fn failed_action_penalty_ramp_active(&self, tick: u64) -> bool {
+        self.startup.ramps.failed_action_penalty.is_active(tick)
+    }
+
+    /// Effective failed action penalty for a given tick.
+    ///
+    /// During an active startup ramp, this interpolates from `start` to `end`.
+    /// Otherwise it returns the runtime config value.
+    #[must_use]
+    pub fn failed_action_penalty_for_tick(&self, tick: u64) -> f32 {
+        let ramp = &self.startup.ramps.failed_action_penalty;
+        if ramp.is_active(tick) {
+            ramp.value_for_tick(tick)
+        } else {
+            self.energy.costs.failed_action_penalty
+        }
+    }
+
     /// Apply normalization/fallback for out-of-range values per spec constraints.
     pub fn normalize(&mut self) {
         let w = &mut self.world;
@@ -571,6 +655,14 @@ impl SimulationConfig {
         ec.reproduce_cost = normalize_f32_finite_nonneg(ec.reproduce_cost, 0.1);
         ec.eat_reward_per_food = normalize_f32_finite_nonneg(ec.eat_reward_per_food, 5.0);
         ec.failed_action_penalty = normalize_f32_finite_nonneg(ec.failed_action_penalty, 5.0);
+        let failed_penalty_fallback = ec.failed_action_penalty;
+
+        let ramp = &mut self.startup.ramps.failed_action_penalty;
+        ramp.start = normalize_f32_finite_nonneg(ramp.start, failed_penalty_fallback);
+        ramp.end = normalize_f32_finite_nonneg(ramp.end, failed_penalty_fallback);
+        if ramp.target_tick < 1 {
+            ramp.target_tick = 1;
+        }
 
         let cc = &mut self.energy.complexity_cost;
         cc.scaling_factor = normalize_f32_finite_nonneg(cc.scaling_factor, 0.002);
@@ -771,6 +863,11 @@ mod tests {
         assert!((cfg.energy.costs.reproduce_cost - 0.1).abs() < 1e-6);
         assert!((cfg.energy.costs.eat_reward_per_food - 5.0).abs() < 1e-6);
         assert!((cfg.energy.costs.failed_action_penalty - 5.0).abs() < 1e-6);
+        // Startup ramps
+        assert!(!cfg.startup.ramps.failed_action_penalty.enabled);
+        assert!((cfg.startup.ramps.failed_action_penalty.start - 5.0).abs() < 1e-6);
+        assert!((cfg.startup.ramps.failed_action_penalty.end - 5.0).abs() < 1e-6);
+        assert_eq!(cfg.startup.ramps.failed_action_penalty.target_tick, 1000);
         // Runtime
         assert_eq!(cfg.runtime.max_mesh_hops, 1024);
         assert_eq!(cfg.runtime.max_vm_steps, 10000);
@@ -1553,5 +1650,42 @@ mod tests {
         assert!((cfg.mutation.reachable_bias.vm - 0.0).abs() < 1e-9);
         assert!((cfg.mutation.reachable_bias.graph - 0.0).abs() < 1e-9);
         assert!((cfg.mutation.reachable_bias.input_ref - 0.0).abs() < 1e-9);
+    }
+
+    #[test]
+    fn startup_failed_action_penalty_ramp_defaults_to_disabled() {
+        let cfg = SimulationConfig::default();
+        assert!(!cfg.startup.ramps.failed_action_penalty.enabled);
+        assert!(
+            (cfg.failed_action_penalty_for_tick(0) - cfg.energy.costs.failed_action_penalty).abs()
+                < 1e-6
+        );
+    }
+
+    #[test]
+    fn startup_failed_action_penalty_ramp_interpolates_until_target_tick() {
+        let mut cfg = SimulationConfig::default();
+        cfg.startup.ramps.failed_action_penalty.enabled = true;
+        cfg.startup.ramps.failed_action_penalty.start = 5.0;
+        cfg.startup.ramps.failed_action_penalty.end = 30.0;
+        cfg.startup.ramps.failed_action_penalty.target_tick = 1000;
+        cfg.apply_startup_overrides();
+
+        assert!((cfg.energy.costs.failed_action_penalty - 30.0).abs() < 1e-6);
+        assert!((cfg.failed_action_penalty_for_tick(0) - 5.0).abs() < 1e-6);
+        assert!((cfg.failed_action_penalty_for_tick(500) - 17.5).abs() < 1e-5);
+        assert!((cfg.failed_action_penalty_for_tick(1000) - 30.0).abs() < 1e-6);
+        assert!((cfg.failed_action_penalty_for_tick(2000) - 30.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn startup_failed_action_penalty_ramp_active_only_before_target_tick() {
+        let mut cfg = SimulationConfig::default();
+        cfg.startup.ramps.failed_action_penalty.enabled = true;
+        cfg.startup.ramps.failed_action_penalty.target_tick = 3;
+
+        assert!(cfg.failed_action_penalty_ramp_active(0));
+        assert!(cfg.failed_action_penalty_ramp_active(2));
+        assert!(!cfg.failed_action_penalty_ramp_active(3));
     }
 }

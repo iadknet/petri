@@ -151,7 +151,11 @@ export function ControlBar() {
 			// Re-apply current runtime config values so they survive restart
 			if (prevConfig) {
 				const patch: Record<string, unknown> = {};
+				const failedPenaltyRampEnabled = startup.startup.ramps.failed_action_penalty.enabled;
 				for (const field of RUNTIME_PATCH_FIELDS) {
+					if (failedPenaltyRampEnabled && field.path === "energy.costs.failed_action_penalty") {
+						continue;
+					}
 					mergePatch(patch, buildPatch(field.path, getByPath(prevConfig, field.path) as number));
 				}
 				await api.patchConfig(patch as DeepPartial<SimulationConfig>);

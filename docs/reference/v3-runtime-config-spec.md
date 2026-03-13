@@ -146,6 +146,7 @@ Queue-shape coupling invariant:
 | `energy.costs.noop_cost` | `f32` | `0.05` | Must be finite and `>= 0.0`; invalid values fall back to `0.05`. |
 | `energy.costs.reproduce_cost` | `f32` | `0.1` | Must be finite and `>= 0.0`; invalid values fall back to `0.1`. |
 | `energy.costs.eat_reward_per_food` | `f32` | `12.0` | Must be finite and `>= 0.0`; invalid values fall back to `12.0`. |
+| `energy.costs.failed_action_penalty` | `f32` | `5.0` | Must be finite and `>= 0.0`; invalid values fall back to `5.0`. |
 | `energy.complexity_cost.enabled` | `bool` | `true` | When `true`, genome complexity scales action energy costs via a linear multiplier. |
 | `energy.complexity_cost.threshold` | `u32` | `50` | Complexity at or below this value incurs no extra cost (multiplier = 1.0). |
 | `energy.complexity_cost.scaling_factor` | `f32` | `0.002` | Must be finite and `>= 0.0`; invalid values fall back to `0.002`. Linear scaling: multiplier = `1.0 + max(0, complexity - threshold) * scaling_factor`. |
@@ -183,6 +184,12 @@ Action cost multiplier composition:
   naturally.
 - Applied to: noop, eat, move, reproduce, steal, and failed_action_penalty costs.
 - Centralized via `EnergyConfig::action_cost_multiplier(complexity, age)`.
+
+Startup ramp note:
+- Implementations may support startup-only ramps (for example
+  `startup.ramps.failed_action_penalty`) that transiently override the effective
+  failed-action penalty during early ticks while preserving
+  `energy.costs.failed_action_penalty` as the steady-state runtime value.
 
 Energy posture:
 - Energy lifecycle and action-cost config values are continuous scalar units

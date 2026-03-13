@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { MOCK_CONFIG } from "../test/fixtures.ts";
-import { useStartupConfigStore } from "./startupConfig.ts";
+import { buildStartupRequest, useStartupConfigStore } from "./startupConfig.ts";
 
 describe("StartupConfigStore", () => {
 	beforeEach(() => {
@@ -36,5 +36,24 @@ describe("StartupConfigStore", () => {
 		const after = useStartupConfigStore.getState().preset.seed;
 		expect(after).not.toBe(before);
 		expect(after).toBe(Math.floor(0.123456 * 2 ** 32));
+	});
+
+	it("buildStartupRequest includes startup failed action penalty ramp settings", () => {
+		useStartupConfigStore
+			.getState()
+			.updatePreset("startup.ramps.failed_action_penalty.enabled", true);
+		useStartupConfigStore.getState().updatePreset("startup.ramps.failed_action_penalty.start", 5);
+		useStartupConfigStore.getState().updatePreset("startup.ramps.failed_action_penalty.end", 30);
+		useStartupConfigStore
+			.getState()
+			.updatePreset("startup.ramps.failed_action_penalty.target_tick", 1000);
+
+		const req = buildStartupRequest(useStartupConfigStore.getState().preset);
+		expect(req.startup?.ramps?.failed_action_penalty).toEqual({
+			enabled: true,
+			start: 5,
+			end: 30,
+			target_tick: 1000,
+		});
 	});
 });

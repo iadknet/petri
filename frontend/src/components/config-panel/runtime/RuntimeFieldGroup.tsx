@@ -17,8 +17,12 @@ export function RuntimeFieldGroup({
 	localDraft,
 	serverConfig,
 	simState,
+	tick,
 	updateDraft,
 }: RuntimeFieldGroupProps) {
+	const failedPenaltyRamp = serverConfig.startup.ramps.failed_action_penalty;
+	const failedPenaltyRampActive = failedPenaltyRamp.enabled && tick < failedPenaltyRamp.target_tick;
+
 	return (
 		<FieldGroup title={title}>
 			{toggles?.map((field) => (
@@ -33,18 +37,30 @@ export function RuntimeFieldGroup({
 					testId={field.testId}
 				/>
 			))}
-			{fields.map((field) => (
-				<FieldRow
-					key={`runtime-${field.path}`}
-					field={field}
-					id={`runtime-${field.path.replaceAll(".", "-")}`}
-					value={getByPath(localDraft, field.path) as number}
-					serverValue={getByPath(serverConfig, field.path) as number}
-					disabled={simState === "running"}
-					onChange={updateDraft}
-					testId={field.testId}
-				/>
-			))}
+			{fields.map((field) =>
+				// Failed action penalty is startup-ramped until target tick, so runtime edits are locked.
+				(() => {
+					const rampLocked =
+						failedPenaltyRampActive && field.path === "energy.costs.failed_action_penalty";
+					return (
+						<FieldRow
+							key={`runtime-${field.path}`}
+							field={field}
+							id={`runtime-${field.path.replaceAll(".", "-")}`}
+							value={getByPath(localDraft, field.path) as number}
+							serverValue={getByPath(serverConfig, field.path) as number}
+							disabled={simState === "running" || rampLocked}
+							disabledReason={
+								rampLocked
+									? `Locked by startup failed-action penalty ramp until tick ${failedPenaltyRamp.target_tick}`
+									: "Locked in current state"
+							}
+							onChange={updateDraft}
+							testId={field.testId}
+						/>
+					);
+				})(),
+			)}
 		</FieldGroup>
 	);
 }
