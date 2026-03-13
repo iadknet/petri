@@ -381,6 +381,18 @@ async fn get_status_has_all_required_fields() {
         body["mutation_outcome_summary"]["detrimental_total"].is_number(),
         "missing mutation_outcome_summary.detrimental_total"
     );
+    assert!(
+        body["mutation_added_node_input_classes_total_by_operator"].is_object(),
+        "missing mutation_added_node_input_classes_total_by_operator"
+    );
+    assert!(
+        body["mutation_added_node_world_inputs_total_by_operator"].is_object(),
+        "missing mutation_added_node_world_inputs_total_by_operator"
+    );
+    assert!(
+        body["vm_live_read_world_inputs_current"].is_object(),
+        "missing vm_live_read_world_inputs_current"
+    );
 }
 
 // ── 9b. get_status_uses_energy_names_and_perf_block ────────────────────────

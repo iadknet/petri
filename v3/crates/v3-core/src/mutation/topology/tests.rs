@@ -1297,4 +1297,3 @@ fn exempt_operators_return_not_applicable() {
     );
     assert_eq!(result, Ok(TargetReachability::NotApplicable));
 }
-

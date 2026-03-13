@@ -272,11 +272,15 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
     let mut complexity_sum: u64 = 0;
     let mut complexity_min: u32 = u32::MAX;
     let mut complexity_max: u32 = 0;
+    let mut vm_live_read_world_inputs_current = std::collections::HashMap::new();
     for (id, creature) in &sim.creatures {
         let c = creature.cached_complexity;
         complexity_sum += c as u64;
         complexity_min = complexity_min.min(c);
         complexity_max = complexity_max.max(c);
+        for (key, count) in creature.cached_live_vm_world_inputs.iter().copied() {
+            *vm_live_read_world_inputs_current.entry(key).or_insert(0u64) += u64::from(count);
+        }
         creatures.push(CreatureSnapshot {
             id: id.data().as_ffi(),
             x: creature.position.x,
@@ -404,6 +408,36 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
                         .collect(),
                 )
             })
+            .collect(),
+        mutation_added_node_input_classes_total_by_operator: stats
+            .mutation_added_node_input_classes_total_by_operator
+            .iter()
+            .map(|(operator, by_class)| {
+                (
+                    operator.as_key().to_string(),
+                    by_class
+                        .iter()
+                        .map(|(class, count)| (class.as_key().to_string(), *count))
+                        .collect(),
+                )
+            })
+            .collect(),
+        mutation_added_node_world_inputs_total_by_operator: stats
+            .mutation_added_node_world_inputs_total_by_operator
+            .iter()
+            .map(|(operator, by_key)| {
+                (
+                    operator.as_key().to_string(),
+                    by_key
+                        .iter()
+                        .map(|(key, count)| (key.as_key().to_string(), *count))
+                        .collect(),
+                )
+            })
+            .collect(),
+        vm_live_read_world_inputs_current: vm_live_read_world_inputs_current
+            .into_iter()
+            .map(|(key, count)| (key.as_key().to_string(), count))
             .collect(),
         mutation_events_applied_total_semantic_noop: stats
             .mutation_events_applied_total_semantic_noop,

@@ -140,7 +140,7 @@ fn derive_node_annotation(node: &NodeGenome, reachable: bool) -> MeshNodeAnnotat
     }
 }
 
-fn collect_live_vm_instruction_indices(vm: &VmBackendDef) -> Vec<usize> {
+pub(crate) fn collect_live_vm_instruction_indices(vm: &VmBackendDef) -> Vec<usize> {
     let mut live = BTreeSet::new();
     for (index, instruction) in vm.program.iter().enumerate() {
         if vm_is_output_instruction(instruction) {

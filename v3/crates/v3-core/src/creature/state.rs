@@ -1,11 +1,13 @@
+use std::collections::BTreeMap;
 use std::mem::size_of;
 
-use crate::contracts::{CreatureId, Position};
+use crate::contracts::{CreatureId, Position, WorldInputKey};
 use crate::creature::genome::analysis::mesh_reachable_nodes;
 use crate::creature::genome::mesh_annotations::{
-    derive_mesh_annotations_with_reachable_indices, MeshReadClass,
+    collect_live_vm_instruction_indices, derive_mesh_annotations_with_reachable_indices,
+    MeshReadClass,
 };
-use crate::creature::genome::CreatureGenome;
+use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
 use crate::creature::identity::CreatureIdentityState;
 use crate::mutation::MutationOperator;
 
@@ -89,6 +91,8 @@ pub struct CreatureState {
     pub cached_reachable_nodes: Box<[usize]>,
     /// Whether any reachable node has a live barrier read path.
     pub cached_has_barrier_reader: bool,
+    /// Exact world-input keys read by live VM `ReadInput` instructions on reachable nodes.
+    pub cached_live_vm_world_inputs: Box<[(WorldInputKey, u16)]>,
     /// Mutation operators applied when this creature was born.
     pub birth_mutation_operators: Box<[MutationOperator]>,
     /// Number of offspring this creature has spawned.
@@ -125,6 +129,8 @@ impl CreatureState {
         let cached_reachable_nodes = mesh_reachable_nodes(&genome).into_boxed_slice();
         let cached_has_barrier_reader =
             compute_has_barrier_reader(&genome, cached_reachable_nodes.as_ref());
+        let cached_live_vm_world_inputs =
+            compute_live_vm_world_inputs(&genome, cached_reachable_nodes.as_ref());
         Self {
             id,
             genome,
@@ -142,6 +148,7 @@ impl CreatureState {
             cached_complexity,
             cached_reachable_nodes,
             cached_has_barrier_reader,
+            cached_live_vm_world_inputs,
             birth_mutation_operators: Vec::new().into_boxed_slice(),
             offspring_spawned_count: 0,
             lifetime_action_attempted_count: 0,
@@ -172,6 +179,8 @@ impl CreatureState {
     ) -> Self {
         let cached_has_barrier_reader =
             compute_has_barrier_reader(&genome, cached_reachable_nodes.as_ref());
+        let cached_live_vm_world_inputs =
+            compute_live_vm_world_inputs(&genome, cached_reachable_nodes.as_ref());
         Self {
             id,
             genome,
@@ -189,6 +198,7 @@ impl CreatureState {
             cached_complexity,
             cached_reachable_nodes,
             cached_has_barrier_reader,
+            cached_live_vm_world_inputs,
             birth_mutation_operators: Vec::new().into_boxed_slice(),
             offspring_spawned_count: 0,
             lifetime_action_attempted_count: 0,
@@ -212,6 +222,34 @@ fn compute_has_barrier_reader(genome: &CreatureGenome, reachable_indices: &[usiz
         })
 }
 
+fn compute_live_vm_world_inputs(
+    genome: &CreatureGenome,
+    reachable_indices: &[usize],
+) -> Box<[(WorldInputKey, u16)]> {
+    let mut counts = BTreeMap::<WorldInputKey, u16>::new();
+    for &node_idx in reachable_indices {
+        let Some(node) = genome.nodes.get(node_idx) else {
+            continue;
+        };
+        let BackendDef::Vm(vm) = &node.backend_def else {
+            continue;
+        };
+        for instruction_idx in collect_live_vm_instruction_indices(vm) {
+            let Some(VmInstruction::ReadInput { ref_idx, .. }) = vm.program.get(instruction_idx)
+            else {
+                continue;
+            };
+            let Some(crate::contracts::InputReference::World(key)) =
+                node.input_refs.get(*ref_idx as usize)
+            else {
+                continue;
+            };
+            *counts.entry(*key).or_insert(0) += 1;
+        }
+    }
+    counts.into_iter().collect::<Vec<_>>().into_boxed_slice()
+}
+
 // Compile-time size assertion: shared_memory is 2x16x4=128 bytes vs old 1024-byte memory.
 // Lock in the size reduction and catch future bloat.
 const _: () = assert!(size_of::<[f32; SHARED_MEMORY_SLOTS]>() == 64);
@@ -219,7 +257,7 @@ const _: () = assert!(size_of::<[f32; SHARED_MEMORY_SLOTS]>() == 64);
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::contracts::NodeId;
+    use crate::contracts::{DynamicIntrospectionKey, InputReference, NodeId, WorldInputKey};
     use crate::creature::genome::{
         BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
     };
@@ -402,5 +440,99 @@ mod tests {
         );
         assert_eq!(state.position, Position::new(3, 7));
         assert_eq!(state.generation, 2);
+    }
+
+    #[test]
+    fn new_creature_caches_live_vm_world_inputs() {
+        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
+        let id = sm.insert(());
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                NodeGenome {
+                    node_id: NodeId::new(0),
+                    input_refs: vec![
+                        InputReference::World(WorldInputKey::AreaFoodSummary),
+                        InputReference::World(WorldInputKey::NeighborBarrierRing),
+                        InputReference::DynamicIntrospection(
+                            DynamicIntrospectionKey::EnergyCurrent,
+                        ),
+                    ],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 4,
+                        constants: vec![],
+                        program: vec![
+                            VmInstruction::ReadInput {
+                                dst: 0,
+                                ref_idx: 0,
+                                sub_idx: 0,
+                            },
+                            VmInstruction::ReadInput {
+                                dst: 1,
+                                ref_idx: 1,
+                                sub_idx: 0,
+                            },
+                            VmInstruction::ReadInput {
+                                dst: 2,
+                                ref_idx: 0,
+                                sub_idx: 3,
+                            },
+                            VmInstruction::WriteInternalPayload {
+                                slot_idx: 0,
+                                src: 0,
+                            },
+                            VmInstruction::WriteInternalPayload {
+                                slot_idx: 1,
+                                src: 1,
+                            },
+                            VmInstruction::WriteInternalPayload {
+                                slot_idx: 2,
+                                src: 2,
+                            },
+                        ],
+                    }),
+                    targets: vec![],
+                },
+                NodeGenome {
+                    node_id: NodeId::new(1),
+                    input_refs: vec![InputReference::World(WorldInputKey::AreaOccupancySummary)],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 2,
+                        constants: vec![],
+                        program: vec![
+                            VmInstruction::ReadInput {
+                                dst: 0,
+                                ref_idx: 0,
+                                sub_idx: 0,
+                            },
+                            VmInstruction::WriteInternalPayload {
+                                slot_idx: 0,
+                                src: 0,
+                            },
+                        ],
+                    }),
+                    targets: vec![],
+                },
+            ],
+        };
+
+        let state = CreatureState::new(
+            id,
+            genome,
+            Position::new(0, 0),
+            10.0,
+            0,
+            [0; 6],
+            0,
+            [true; 6],
+            CreatureIdentityState::default(),
+            [0.0; SHARED_MEMORY_SLOTS],
+        );
+
+        let counts: std::collections::HashMap<_, _> =
+            state.cached_live_vm_world_inputs.iter().cloned().collect();
+        assert_eq!(counts.get(&WorldInputKey::AreaFoodSummary), Some(&2));
+        assert_eq!(counts.get(&WorldInputKey::NeighborBarrierRing), Some(&1));
+        assert!(!counts.contains_key(&WorldInputKey::AreaOccupancySummary));
     }
 }
