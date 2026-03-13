@@ -443,7 +443,7 @@ mod tests {
 
         for key in &keys {
             for sub in 0..20u16 {
-                let v = resolve_input(&InputReference::World(key.clone()), sub, &ctx);
+                let v = resolve_input(&InputReference::World(*key), sub, &ctx);
                 assert_eq!(
                     v, 0.0,
                     "zero perception should return 0.0 for {:?} sub_idx={sub}",

@@ -1,8 +1,11 @@
 use super::*;
 use crate::contracts::NodeId;
 use crate::creature::founder::v3alpha1_founder_genome;
-use crate::creature::genome::{BackendDef, NodeGenome, VmInstruction};
+use crate::creature::genome::{
+    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
+};
 use crate::creature::parseability::ParseabilityGate;
+use crate::mutation::types::MutationSkipReason;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
@@ -1261,6 +1264,37 @@ fn vm_insert_read_bid_motif_inserts_read_input_and_priority_bid_pair() {
     assert!(
         found_pair,
         "VmInsertReadBidMotif must insert ReadInput + SetPriorityBid before ExecuteActionQueue with matching registers"
+    );
+}
+
+#[test]
+fn vm_insert_read_store_motif_skips_on_empty_input_refs() {
+    let mut genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![], // empty — no valid ref_idx targets
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 2,
+                constants: vec![],
+                program: vec![VmInstruction::Halt],
+            }),
+            targets: vec![],
+        }],
+    };
+    let mut r = rng(42);
+    let result = VmMutator::apply(
+        &mut genome,
+        VmOperator::VmInsertReadStoreMotif,
+        &[0],
+        0.5,
+        &mut r,
+        &MutationConfig::default(),
+    );
+    assert_eq!(
+        result,
+        Err(MutationSkipReason::NoApplicableTarget),
+        "ReadStoreMotif must skip when node has no input refs"
     );
 }
 

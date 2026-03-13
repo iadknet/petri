@@ -616,10 +616,14 @@ fn add_input_ref_compound_wires_all_sub_indices() {
 }
 
 #[test]
-fn add_input_ref_to_vm_node_skips_graph_wiring() {
+fn add_input_ref_to_vm_node_inserts_read_input_instruction() {
     let mut genome =
         single_node_genome_with_input_ref(InputReference::World(WorldInputKey::FoodHere));
     genome.nodes[0].input_refs.clear(); // start with 0 refs
+    let program_len_before = match &genome.nodes[0].backend_def {
+        BackendDef::Vm(vm) => vm.program.len(),
+        _ => panic!("expected VM backend"),
+    };
     let mut r = rng(42);
     InputRefMutator::apply(
         &mut genome,
@@ -631,15 +635,63 @@ fn add_input_ref_to_vm_node_skips_graph_wiring() {
     )
     .unwrap();
     assert_eq!(genome.nodes[0].input_refs.len(), 1);
-    // VM backend should be unchanged — no panic, no graph edges
-    assert!(matches!(genome.nodes[0].backend_def, BackendDef::Vm(_)));
+    let BackendDef::Vm(ref vm) = genome.nodes[0].backend_def else {
+        panic!("expected VM backend");
+    };
+    // A ReadInput instruction referencing the new ref_idx=0 must have been inserted
+    let has_read = vm
+        .program
+        .iter()
+        .any(|instr| matches!(instr, VmInstruction::ReadInput { ref_idx: 0, .. }));
+    assert!(
+        has_read,
+        "InputRef.Add on VM node must insert a ReadInput for the new ref; program: {:?}",
+        vm.program
+    );
+    assert!(
+        vm.program.len() > program_len_before,
+        "VM program must grow after InputRef.Add"
+    );
+}
+
+#[test]
+fn add_input_ref_to_vm_node_with_existing_refs_uses_correct_ref_idx() {
+    let mut genome =
+        single_node_genome_with_input_ref(InputReference::World(WorldInputKey::FoodHere));
+    // Add a second ref so the new one will be at index 2
+    genome.nodes[0]
+        .input_refs
+        .push(InputReference::UpstreamSlot(0));
+    let mut r = rng(99);
+    InputRefMutator::apply(
+        &mut genome,
+        InputRefOperator::Add,
+        &[],
+        0.0,
+        &mut r,
+        &default_config(),
+    )
+    .unwrap();
+    assert_eq!(genome.nodes[0].input_refs.len(), 3);
+    let BackendDef::Vm(ref vm) = genome.nodes[0].backend_def else {
+        panic!("expected VM backend");
+    };
+    let has_read_2 = vm
+        .program
+        .iter()
+        .any(|instr| matches!(instr, VmInstruction::ReadInput { ref_idx: 2, .. }));
+    assert!(
+        has_read_2,
+        "new ref at index 2 must have a ReadInput with ref_idx=2; program: {:?}",
+        vm.program
+    );
 }
 
 // Legacy flat-graph lifecycle tests were removed during the CGP migration.
 // The remaining Graph coverage lives in genome/mod.rs tests.
 
 #[test]
-fn reindex_vm_decrements_and_invalidates() {
+fn reindex_vm_decrements_and_noops_orphans() {
     let mut genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
@@ -688,15 +740,12 @@ fn reindex_vm_decrements_and_invalidates() {
                 ..
             }
         ));
-        // ref_idx 1 == removed -> invalidated to u16::MAX
-        assert!(matches!(
-            vm.program[1],
-            VmInstruction::ReadInput {
-                ref_idx: u16::MAX,
-                sub_idx: 0,
-                ..
-            }
-        ));
+        // ref_idx 1 == removed -> converted to Noop (not u16::MAX zombie)
+        assert!(
+            matches!(vm.program[1], VmInstruction::Noop),
+            "orphaned ReadInput must become Noop, got {:?}",
+            vm.program[1]
+        );
         // ref_idx 2 > 1 -> decremented to 1
         assert!(matches!(
             vm.program[2],

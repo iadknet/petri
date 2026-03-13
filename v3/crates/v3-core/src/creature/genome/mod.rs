@@ -197,7 +197,7 @@ impl BackendDef {
     /// After an input_ref is removed at `removed_ref_idx`, update all internal
     /// references. Graph: walks all edge containers (InputLeaf ref_idx).
     /// VM: walks ReadInput instructions.
-    /// Matching ref_idx edges removed (Graph) or set to u16::MAX (VM).
+    /// Matching ref_idx edges removed (Graph) or converted to Noop (VM).
     /// Above → decremented.
     pub fn reindex_input_refs_after_removal(&mut self, removed_ref_idx: u16) {
         match self {
@@ -208,7 +208,10 @@ impl BackendDef {
                 for instr in &mut vm.program {
                     if let VmInstruction::ReadInput { ref_idx, .. } = instr {
                         if *ref_idx == removed_ref_idx {
-                            *ref_idx = u16::MAX;
+                            // Convert orphaned read to Noop instead of leaving a
+                            // permanent u16::MAX zombie that silently reads 0.0.
+                            // This parallels the Graph backend which removes the edge.
+                            *instr = VmInstruction::Noop;
                         } else if *ref_idx > removed_ref_idx {
                             *ref_idx -= 1;
                         }
@@ -853,14 +856,11 @@ mod tests {
                     ..
                 }
             ));
-            assert!(matches!(
-                vm.program[1],
-                VmInstruction::ReadInput {
-                    ref_idx: u16::MAX,
-                    sub_idx: 0,
-                    ..
-                }
-            ));
+            assert!(
+                matches!(vm.program[1], VmInstruction::Noop),
+                "orphaned ReadInput must become Noop, got {:?}",
+                vm.program[1]
+            );
             assert!(matches!(
                 vm.program[2],
                 VmInstruction::ReadInput {
