@@ -156,5 +156,25 @@ fn phase_0_records_mutation_value_totals_on_creature_death() {
         assert_eq!(totals.carriers_observed_total, 1);
         assert_eq!(totals.survival_ticks_sum, 10);
         assert_eq!(totals.offspring_spawned_sum, 3);
+        assert_eq!(
+            totals.helpful_total + totals.neutral_total + totals.detrimental_total,
+            totals.carriers_observed_total
+        );
+        assert_eq!(
+            totals.confidence_low_total
+                + totals.confidence_medium_total
+                + totals.confidence_high_total,
+            totals.carriers_observed_total
+        );
     }
+    assert_eq!(
+        sim.stats.mutation_outcome_summary.carriers_observed_total,
+        1
+    );
+    assert_eq!(
+        sim.stats.mutation_outcome_summary.helpful_total
+            + sim.stats.mutation_outcome_summary.neutral_total
+            + sim.stats.mutation_outcome_summary.detrimental_total,
+        sim.stats.mutation_outcome_summary.carriers_observed_total
+    );
 }

@@ -22,5 +22,6 @@ fetch_json "/v3/simulation/status" | "${JQ_BIN}" '{
 	mutation_target_reachability_total,
 	mutation_events_skipped_total,
 	mutation_events_applied_total,
+	mutation_outcome_summary: (.mutation_outcome_summary // {}),
 	mutation_value_totals_by_operator: (.mutation_value_totals_by_operator // {})
 }'

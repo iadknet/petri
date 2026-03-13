@@ -228,6 +228,7 @@ mod tests {
                     mutation_events_applied_total_semantic_change: 0,
                     mutation_target_reachability_total: Default::default(),
                     mutation_value_totals_by_operator: Default::default(),
+                    mutation_outcome_summary: Default::default(),
                     reproduction_actions_attempted_total: 0,
                     reproduction_actions_spawned_total: 0,
                     reproduction_actions_rejected_total: 0,

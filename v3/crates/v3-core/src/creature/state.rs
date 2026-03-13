@@ -93,6 +93,16 @@ pub struct CreatureState {
     pub birth_mutation_operators: Box<[MutationOperator]>,
     /// Number of offspring this creature has spawned.
     pub offspring_spawned_count: u64,
+    /// Lifetime action attempts executed by this creature.
+    pub lifetime_action_attempted_count: u64,
+    /// Lifetime move actions rejected as blocked.
+    pub lifetime_blocked_move_count: u64,
+    /// Lifetime reproduction actions rejected as invalid target.
+    pub lifetime_invalid_reproduce_count: u64,
+    /// Lifetime running sum of energy samples (for mean-lifetime-energy telemetry).
+    pub lifetime_energy_sum: f64,
+    /// Number of lifetime energy samples accumulated.
+    pub lifetime_energy_sample_count: u64,
 }
 
 impl CreatureState {
@@ -134,6 +144,11 @@ impl CreatureState {
             cached_has_barrier_reader,
             birth_mutation_operators: Vec::new().into_boxed_slice(),
             offspring_spawned_count: 0,
+            lifetime_action_attempted_count: 0,
+            lifetime_blocked_move_count: 0,
+            lifetime_invalid_reproduce_count: 0,
+            lifetime_energy_sum: 0.0,
+            lifetime_energy_sample_count: 0,
         }
     }
 
@@ -176,6 +191,11 @@ impl CreatureState {
             cached_has_barrier_reader,
             birth_mutation_operators: Vec::new().into_boxed_slice(),
             offspring_spawned_count: 0,
+            lifetime_action_attempted_count: 0,
+            lifetime_blocked_move_count: 0,
+            lifetime_invalid_reproduce_count: 0,
+            lifetime_energy_sum: 0.0,
+            lifetime_energy_sample_count: 0,
         }
     }
 }
