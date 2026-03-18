@@ -33,6 +33,25 @@ In the startup config, add a section for configuring initial barrier topology. W
 
 ## Ecology & Diversity
 
+### Ecology layering and rollout strategy
+The resource/ecology work probably needs to land as a staged stack rather than one giant feature. Each layer adds a different kind of selection pressure, and shipping them incrementally should make it easier to tell which pressures actually preserve or increase behavioral complexity.
+
+Current preferred order:
+- food growth-rate layer first, to create long-lived habitat topology
+- optional friendly-start ramp second, so founders see the same habitat shape but under less severe food pressure early in the run
+- occupancy depletion next, to create local turnover and anti-camping pressure
+- barrier-attached food after that, to create a distinct edge niche
+- only then multiple ordinary food types, once the single-food ecology is already producing useful structure
+- time-varying fertility later, once static heterogeneity and local depletion are understood
+
+Reasoning:
+- growth-rate topology adds macro-scale search pressure
+- depletion adds local negative feedback
+- barrier food adds geometry-linked specialization
+- multiple food types add resource choice and sensor/action branching, which is likely powerful but also much more confounding
+
+This is mainly about keeping the ecology interpretable while still building toward richer niche structure.
+
 ### Food growth-rate layer
 Add a world overlay that modifies base food growth rate per cell. New brush for painting positive and negative growth-rate modifiers with configurable size and blur.
 
@@ -68,6 +87,29 @@ Important property:
 - fertility topology should be visible in debugging/overlay tools so ecology can be interpreted after long runs
 
 This entry is mainly about giving experiments a controllable initial ecology rather than forcing every run to use hand-painted maps.
+
+### Friendly-start ecological ramp
+Add startup/runtime controls that make the ecology more forgiving early in a run, then gradually tighten toward the real target conditions. The goal is to keep the founder genome relatively simple while still letting early lineages survive long enough to discover richer strategies.
+
+Important constraint:
+- the early and late worlds should usually keep the same broad topology
+- a good default is "patchy from tick 0, but denser / easier / faster-regrowing early"
+- this should operate on ecological severity more than on founder intelligence
+
+Possible controls:
+- global multiplier on food regrowth or spread that decays toward `1.0`
+- higher early recovery floor that anneals downward
+- larger or denser fertile regions during startup generation
+- lower early failed-action penalty if experiments show harsh exploration costs are suppressing adaptation
+
+Potential value:
+- improves founder survival without baking strategy into the founder genome
+- keeps the eventual search problem present from the start
+- gives a clean place to experiment with regime-shift versus same-shape curricula
+
+Main caveat:
+- a hard switch from one food ecology to a very different one may just cause extinction or train reflexes that do not matter later
+- if environment change is used as a complexity driver, it should probably be gradual and interpretable rather than a single abrupt regime swap
 
 ### Time variation for food growth-rate layer
 Allow the growth-rate layer to drift or evolve over time. Options could include slow drift, seasonal oscillation, or moving fertility fronts.
@@ -109,6 +151,37 @@ Open questions:
 - whether only the current occupied cell is affected or whether occupancy should leave a short trail
 - whether all creatures deposit the same depletion or whether larger/older/more numerous creatures should deplete more strongly
 - whether this should affect only ordinary food or other renewable resources too
+
+### Multiple food types with exclusive occupancy
+Add several ordinary food types, each with its own sensor family, growth parameters, and long-lived fertility topology. Different food types should create different but overlapping ecological opportunities without requiring separate biomes for every niche.
+
+Current inclination:
+- default to exclusive occupancy between ordinary food types
+- if one food type occupies a passable cell, other ordinary food types cannot occupy that same cell at the same time
+- treat overlap as a later experiment, not the initial model
+
+Why exclusivity seems attractive:
+- keeps the world legible
+- makes resource competition spatially meaningful
+- prevents cells from becoming stacked jackpots
+- makes each food type's habitat footprint easier to interpret in telemetry and overlays
+
+Important design boundary:
+- per-type fertility should remain a resource-level growth modifier
+- cross-type occupancy exclusion should be enforced by a higher-level ecology/world rule rather than embedded inside the fertility generator itself
+- shared pressures like occupancy depletion may also belong at the world/ecology layer first, even if later experiments justify per-resource variants
+
+Good differentiation axes:
+- distinct startup fertility patterns
+- different regrowth or spread dynamics
+- different energy yield
+- different sensitivity to depletion
+- different association with barriers, open space, or corridors
+
+Important caveat:
+- jumping directly to 3-6 additional food types may multiply the search space and runtime cost too quickly
+- likely better to prove the pattern with one extra type before scaling upward
+- if exclusive occupancy remains a hard invariant, future implementation should probably avoid paying for a fully independent dense occupancy plane for every food type unless measurement shows it is acceptable
 
 ### Carrion resource and scavenging action
 When creatures die, leave behind a separate temporary food resource with different dynamics from base food. Carrion should be high-value, decay over time, and likely require separate sensors and a dedicated action to harvest.
@@ -155,6 +228,7 @@ Why this feels promising:
 - barriers already structure movement and visibility, so adding a barrier-linked resource creates meaningfully different microhabitats
 - edge specialists can coexist spatially with open-field grazers and scavengers
 - a dedicated harvest action makes the niche behaviorally distinct instead of just being "normal food with a different texture," even though the creature still harvests it from its own occupied cell
+- even if this is built on top of a shared food/resource abstraction, it likely still deserves its own action/economy semantics rather than being treated as only a fertility preset
 
 Good follow-on questions:
 - whether some barrier topologies create especially valuable edge patterns
