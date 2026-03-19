@@ -1,3 +1,4 @@
+pub mod fertility;
 pub mod food_resource;
 mod grid;
 pub mod paint;
