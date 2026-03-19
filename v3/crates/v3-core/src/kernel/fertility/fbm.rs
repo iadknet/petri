@@ -14,6 +14,8 @@ pub fn generate_fbm(
     persistence: f32,
     seed: u64,
 ) -> Grid<f32> {
+    // The noise crate's Perlin builder takes a u32 seed; the upper 32 bits of
+    // the u64 world_seed are intentionally discarded here.
     let fbm = Fbm::<Perlin>::new(seed as u32)
         .set_octaves(octaves as usize)
         .set_frequency(frequency as f64)

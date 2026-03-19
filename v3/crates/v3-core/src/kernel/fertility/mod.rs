@@ -17,18 +17,19 @@ pub use uniform::generate_uniform;
 
 use crate::config::{FertilityAlgorithm, FertilityConfig};
 use crate::kernel::Grid;
-use rand::Rng;
 
 /// Generate a raw fertility grid from the configured layers.
 ///
 /// If fertility is disabled, returns a grid filled with 0.0.
 /// If no layers are configured, uses a default PoissonBlobs layer.
 /// Values are in [-1, 1] (pre-annealing/mapping).
+///
+/// Each algorithm that requires randomness creates its own RNG seeded from
+/// `world_seed` plus a per-layer index for isolation.
 pub fn generate_fertility(
     width: u16,
     height: u16,
     config: &FertilityConfig,
-    rng: &mut impl Rng,
     world_seed: u64,
 ) -> Grid<f32> {
     if !config.enabled {
@@ -50,7 +51,7 @@ pub fn generate_fertility(
         .iter()
         .enumerate()
         .map(|(i, layer)| {
-            let grid = generate_layer(width, height, &layer.algorithm, rng, world_seed, i as u64);
+            let grid = generate_layer(width, height, &layer.algorithm, world_seed, i as u64);
             (grid, layer.weight)
         })
         .collect();
@@ -63,7 +64,6 @@ fn generate_layer(
     width: u16,
     height: u16,
     algorithm: &FertilityAlgorithm,
-    _rng: &mut impl Rng,
     world_seed: u64,
     layer_index: u64,
 ) -> Grid<f32> {
@@ -134,8 +134,7 @@ mod tests {
 
     #[test]
     fn disabled_returns_all_zeros() {
-        let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
-        let grid = generate_fertility(32, 32, &disabled_config(), &mut rng, 1);
+        let grid = generate_fertility(32, 32, &disabled_config(), 1);
         for (_, _, v) in grid.iter() {
             assert!(v.abs() < f32::EPSILON, "expected 0.0, got {v}");
         }
@@ -143,8 +142,7 @@ mod tests {
 
     #[test]
     fn enabled_with_default_config_produces_variation() {
-        let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
-        let grid = generate_fertility(64, 64, &enabled_config(), &mut rng, 1);
+        let grid = generate_fertility(64, 64, &enabled_config(), 1);
         let mut has_positive = false;
         let mut has_negative = false;
         for (_, _, v) in grid.iter() {
@@ -166,8 +164,7 @@ mod tests {
             layers: vec![],
             ..FertilityConfig::default()
         };
-        let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
-        let grid = generate_fertility(32, 32, &config, &mut rng, 1);
+        let grid = generate_fertility(32, 32, &config, 1);
         // Should produce a non-trivial grid (not all zeros) because it falls
         // back to PoissonBlobs.
         let any_nonzero = grid.iter().any(|(_, _, v)| v.abs() > 0.01);

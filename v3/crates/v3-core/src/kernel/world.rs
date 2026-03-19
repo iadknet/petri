@@ -26,7 +26,7 @@ impl WorldState {
             width,
             height,
             edge_mode,
-            food: FoodResource::new(width, height, FoodResourceConfig::default()),
+            food: FoodResource::new(width, height, FoodResourceConfig::default(), edge_mode),
             barriers: Grid::new(width, height, false),
             creature_at: Grid::new(width, height, None),
         }
@@ -43,8 +43,8 @@ impl WorldState {
     ///
     /// Must be called before `seed_food` during world startup so that the
     /// fertility grid is ready before food growth begins.
-    pub fn seed_fertility(&mut self, rng: &mut impl Rng, world_seed: u64) {
-        self.food.seed_fertility(rng, world_seed);
+    pub fn seed_fertility(&mut self, world_seed: u64) {
+        self.food.seed_fertility(world_seed);
     }
 
     /// Seed initial food distribution (transitional delegate).
@@ -57,14 +57,7 @@ impl WorldState {
     ///
     /// Reads barriers internally so callers do not need to pass them.
     pub fn grow_food(&mut self, tick: u64, rng: &mut impl Rng) {
-        self.food.grow(
-            &self.barriers,
-            tick,
-            rng,
-            self.width,
-            self.height,
-            self.edge_mode,
-        );
+        self.food.grow(&self.barriers, tick, rng);
     }
 
     /// Consume all food on a cell. Returns the amount consumed (0 if empty).
