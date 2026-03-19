@@ -103,6 +103,10 @@ pub async fn patch_config(
     merged_config.normalize();
 
     handle.sim.config = merged_config.clone();
+    handle
+        .sim
+        .world
+        .apply_food_config(merged_config.world.food.clone());
     let state = handle.status;
     let frame = crate::handlers::lifecycle::build_ws_frame(&handle);
     drop(handle);
