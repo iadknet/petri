@@ -36,15 +36,15 @@ pub fn generate_fertility(
         return Grid::new(width, height, 0.0);
     }
 
-    let layers = if config.layers.is_empty() {
-        // Use the default PoissonBlobs algorithm.
-        let default_algo = FertilityAlgorithm::default();
-        vec![crate::config::FertilityLayer {
-            algorithm: default_algo,
-            weight: 1.0,
-        }]
+    let default_layer = crate::config::FertilityLayer {
+        algorithm: FertilityAlgorithm::default(),
+        weight: 1.0,
+    };
+    let layers: &[crate::config::FertilityLayer] = if config.layers.is_empty() {
+        // Use the default PoissonBlobs algorithm when no layers are configured.
+        std::slice::from_ref(&default_layer)
     } else {
-        config.layers.clone()
+        &config.layers
     };
 
     let generated: Vec<(Grid<f32>, f32)> = layers

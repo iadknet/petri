@@ -173,13 +173,14 @@ mod tests {
         let pos = Position::new(3, 3);
         let (mut sim, id) = make_sim_one_creature(pos, 10.0);
         // Place food on the creature's cell.
+        {
+            let mut food_cfg = small_config().world.food;
+            food_cfg.initial_coverage = 1.0;
+            food_cfg.initial_density = 0.5;
+            sim.world.apply_food_config(food_cfg);
+        }
         sim.world
-            .seed_food(&mut rand::rngs::SmallRng::seed_from_u64(0), &{
-                let mut cfg = small_config();
-                cfg.world.food.initial_coverage = 1.0;
-                cfg.world.food.initial_density = 0.5;
-                cfg
-            });
+            .seed_food(&mut rand::rngs::SmallRng::seed_from_u64(0));
         let energy_before = sim.creatures[id].energy;
         let creature = sim.creatures.get_mut(id).unwrap();
         let _ = apply_eat(creature, &mut sim.world, &sim.config);
@@ -200,11 +201,12 @@ mod tests {
         sim.config.energy.costs.eat_reward_per_food = 20.0;
         // Place max food to ensure energy would exceed max without cap.
         {
-            let mut cfg = small_config();
-            cfg.world.food.initial_coverage = 1.0;
-            cfg.world.food.initial_density = 1.0;
+            let mut food_cfg = small_config().world.food;
+            food_cfg.initial_coverage = 1.0;
+            food_cfg.initial_density = 1.0;
+            sim.world.apply_food_config(food_cfg);
             sim.world
-                .seed_food(&mut rand::rngs::SmallRng::seed_from_u64(0), &cfg);
+                .seed_food(&mut rand::rngs::SmallRng::seed_from_u64(0));
         }
         let max = sim.config.energy.lifecycle.max_energy;
         let creature = sim.creatures.get_mut(id).unwrap();
@@ -724,13 +726,14 @@ mod tests {
     fn apply_eat_returns_true_with_food() {
         let pos = Position::new(3, 3);
         let (mut sim, id) = make_sim_one_creature(pos, 10.0);
+        {
+            let mut food_cfg = small_config().world.food;
+            food_cfg.initial_coverage = 1.0;
+            food_cfg.initial_density = 0.5;
+            sim.world.apply_food_config(food_cfg);
+        }
         sim.world
-            .seed_food(&mut rand::rngs::SmallRng::seed_from_u64(0), &{
-                let mut cfg = small_config();
-                cfg.world.food.initial_coverage = 1.0;
-                cfg.world.food.initial_density = 0.5;
-                cfg
-            });
+            .seed_food(&mut rand::rngs::SmallRng::seed_from_u64(0));
         let creature = sim.creatures.get_mut(id).unwrap();
         let result = apply_eat(creature, &mut sim.world, &sim.config);
         assert!(result, "eating food should return true");
