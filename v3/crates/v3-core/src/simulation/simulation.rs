@@ -35,13 +35,15 @@ impl Simulation {
     /// Prefer [`crate::simulation::seed_simulation`] for normal simulation startup.
     /// This constructor exists for tests that need fine-grained control over world state.
     pub fn new(
-        world: WorldState,
+        mut world: WorldState,
         creatures: SlotMap<CreatureId, CreatureState>,
         tick: u64,
         config: SimulationConfig,
         seed: u64,
     ) -> Self {
         use rand::SeedableRng;
+        // Ensure the world's FoodResource uses the simulation's food config.
+        world.apply_food_config(config.world.food.clone());
         Self {
             world,
             creatures,

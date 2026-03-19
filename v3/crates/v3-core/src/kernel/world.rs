@@ -1,8 +1,8 @@
-use rand::seq::SliceRandom;
 use rand::Rng;
 
-use crate::config::{SimulationConfig, WorldEdgeMode};
+use crate::config::{FoodResourceConfig, SimulationConfig, WorldEdgeMode};
 use crate::contracts::{CreatureId, Direction, Position};
+use crate::kernel::food_resource::FoodResource;
 use crate::kernel::Grid;
 
 /// Central world state: food density, barriers, and creature occupancy.
@@ -14,11 +14,9 @@ pub struct WorldState {
     pub width: u16,
     pub height: u16,
     pub edge_mode: WorldEdgeMode,
-    food_density: Grid<f32>,
+    food: FoodResource,
     barriers: Grid<bool>,
     creature_at: Grid<Option<CreatureId>>,
-    /// Reusable scratch buffer for `grow_food` to avoid per-tick allocation.
-    food_snapshot: Vec<f32>,
 }
 
 impl WorldState {
@@ -28,168 +26,60 @@ impl WorldState {
             width,
             height,
             edge_mode,
-            food_density: Grid::new(width, height, 0.0),
+            food: FoodResource::new(width, height, FoodResourceConfig::default()),
             barriers: Grid::new(width, height, false),
             creature_at: Grid::new(width, height, None),
-            food_snapshot: Vec::new(),
         }
     }
 
-    // ── Food ─────────────────────────────────────────────────────────────────
+    // ── Food (delegates to FoodResource) ──────────────────────────────────────
 
-    /// Seed initial food distribution.
-    /// Clears prior food and samples exact target coverage over non-barrier cells.
+    /// Read-only access to the `FoodResource`.
+    pub fn food(&self) -> &FoodResource {
+        &self.food
+    }
+
+    /// Seed initial food distribution (transitional delegate).
     pub fn seed_food(&mut self, rng: &mut impl Rng, config: &SimulationConfig) {
-        for y in 0..self.height {
-            for x in 0..self.width {
-                self.food_density.set(x, y, 0.0);
-            }
-        }
-
-        let mut candidates = Vec::new();
-        for y in 0..self.height {
-            for x in 0..self.width {
-                if *self.barriers.get(x, y) {
-                    continue;
-                }
-                candidates.push(Position::new(x, y));
-            }
-        }
-        if candidates.is_empty() {
-            return;
-        }
-
-        let coverage = config.world.food.initial_coverage.clamp(0.0, 1.0);
-        let target = ((coverage * candidates.len() as f32).round() as usize).min(candidates.len());
-        if target == 0 {
-            return;
-        }
-
-        let density = config
-            .world
-            .food
-            .initial_density
-            .clamp(0.0, config.world.food.max_density);
-
-        candidates.shuffle(rng);
-        for pos in candidates.into_iter().take(target) {
-            self.food_density.set(pos.x, pos.y, density);
-        }
+        self.food
+            .seed_density(&self.barriers, rng, &config.world.food);
     }
 
-    fn add_food_clamped(&mut self, pos: Position, delta: f32, max_density: f32) {
-        if delta <= 0.0 {
-            return;
-        }
-        let current = *self.food_density.get(pos.x, pos.y);
-        self.food_density
-            .set(pos.x, pos.y, (current + delta).min(max_density));
-    }
-
-    /// Grow food phase using v1-aligned mechanics:
-    /// proportional growth, threshold spread, and low-density recovery spawn.
-    pub fn grow_food(&mut self, rng: &mut impl Rng, config: &SimulationConfig) {
-        let total_cells = self.width as usize * self.height as usize;
-        if total_cells == 0 {
-            return;
-        }
-
-        let growth_rate = config.world.food.growth_rate.max(0.0);
-        let max_density = config.world.food.max_density.max(0.0);
-        if max_density <= 0.0 {
-            return;
-        }
-
-        let spread_threshold =
-            max_density * config.world.food.spread_threshold_ratio.clamp(0.0, 1.0);
-        let spread_density_ratio = config.world.food.spread_density_ratio.clamp(0.0, 1.0);
-        let recovery_floor = config.world.food.recovery_floor_ratio.clamp(0.0, 1.0);
-        let recovery_spawn_rate = config.world.food.recovery_spawn_rate.clamp(0.0, 1.0);
-        // Snapshot food densities into a reusable buffer (avoids per-tick allocation).
-        self.food_snapshot.clear();
-        self.food_snapshot.extend(
-            self.food_density
-                .as_slice()
-                .iter()
-                .map(|v| v.clamp(0.0, max_density)),
+    /// Grow food phase (transitional delegate).
+    ///
+    /// Reads barriers internally so callers do not need to pass them.
+    pub fn grow_food(&mut self, tick: u64, rng: &mut impl Rng) {
+        self.food.grow(
+            &self.barriers,
+            tick,
+            rng,
+            self.width,
+            self.height,
+            self.edge_mode,
         );
-        let total_food: f32 = self.food_snapshot.iter().sum();
-        let average_density_ratio =
-            (total_food / (total_cells as f32 * max_density)).clamp(0.0, 1.0);
-
-        for idx in 0..total_cells {
-            let source = self.food_snapshot[idx];
-            let x = (idx % self.width as usize) as u16;
-            let y = (idx / self.width as usize) as u16;
-            let pos = Position::new(x, y);
-
-            if self.is_barrier(pos) {
-                continue;
-            }
-
-            let delta = source * growth_rate;
-            self.add_food_clamped(pos, delta, max_density);
-
-            if source < spread_threshold || delta <= 0.0 {
-                continue;
-            }
-
-            let mut neighbors = [Position::new(0, 0); 4];
-            let mut ncount = 0;
-            for dir in [Direction::N, Direction::E, Direction::S, Direction::W] {
-                let Some(npos) = self.resolve_neighbor(pos, dir) else {
-                    continue;
-                };
-                if self.is_barrier(npos) {
-                    continue;
-                }
-                neighbors[ncount] = npos;
-                ncount += 1;
-            }
-            if ncount == 0 {
-                continue;
-            }
-            let target = neighbors[rng.gen_range(0..ncount)];
-            self.add_food_clamped(target, delta * spread_density_ratio, max_density);
-        }
-
-        if average_density_ratio >= recovery_floor {
-            return;
-        }
-
-        let spawn_attempts = (total_cells as f32 * recovery_spawn_rate).round() as usize;
-        let spawn_delta = max_density * growth_rate;
-        if spawn_attempts == 0 || spawn_delta <= 0.0 {
-            return;
-        }
-
-        for _ in 0..spawn_attempts {
-            let idx = rng.gen_range(0..total_cells);
-            let x = (idx % self.width as usize) as u16;
-            let y = (idx / self.width as usize) as u16;
-            let pos = Position::new(x, y);
-            if self.is_barrier(pos) {
-                continue;
-            }
-            self.add_food_clamped(pos, spawn_delta, max_density);
-        }
     }
 
     /// Consume all food on a cell. Returns the amount consumed (0 if empty).
+    /// Transitional delegate to `FoodResource::consume`.
     pub fn consume_food(&mut self, pos: Position) -> f32 {
-        let amount = *self.food_density.get(pos.x, pos.y);
-        self.food_density.set(pos.x, pos.y, 0.0);
-        amount
+        self.food.consume(pos)
     }
 
     /// Get food density at a position.
+    /// Transitional delegate to `FoodResource::food_at`.
     pub fn food_at(&self, pos: Position) -> f32 {
-        *self.food_density.get(pos.x, pos.y)
+        self.food.food_at(pos)
     }
 
     /// Set food density at a position directly.
+    /// Transitional delegate to `FoodResource::set_food`.
     pub fn set_food(&mut self, pos: Position, value: f32) {
-        self.food_density.set(pos.x, pos.y, value);
+        self.food.set_food(pos, value);
+    }
+
+    /// Replace the active food config.
+    pub fn apply_food_config(&mut self, config: FoodResourceConfig) {
+        self.food.update_config(config);
     }
 
     // ── Barriers ─────────────────────────────────────────────────────────────
@@ -251,20 +141,16 @@ impl WorldState {
     // ── Diagnostics ──────────────────────────────────────────────────────────
 
     /// Total food across all cells (for testing and diagnostics).
+    /// Transitional delegate to `FoodResource::total_food`.
     pub fn total_food(&self) -> f32 {
-        let mut sum = 0.0f32;
-        for y in 0..self.height {
-            for x in 0..self.width {
-                sum += *self.food_density.get(x, y);
-            }
-        }
-        sum
+        self.food.total_food()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::FoodResourceConfig;
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
     use slotmap::SlotMap;
@@ -275,6 +161,18 @@ mod tests {
 
     fn small_wrap_world() -> WorldState {
         WorldState::new(10, 10, WorldEdgeMode::Wrap)
+    }
+
+    /// Helper: create a WorldState with a custom food config applied.
+    fn world_with_food_config(
+        width: u16,
+        height: u16,
+        edge_mode: WorldEdgeMode,
+        food_cfg: FoodResourceConfig,
+    ) -> WorldState {
+        let mut w = WorldState::new(width, height, edge_mode);
+        w.apply_food_config(food_cfg);
+        w
     }
 
     #[test]
@@ -329,31 +227,35 @@ mod tests {
 
     #[test]
     fn grow_food_increases_total_with_rate_one() {
-        let mut w = WorldState::new(4, 4, WorldEdgeMode::Wrap);
+        let food_cfg = FoodResourceConfig {
+            growth_rate: 0.5,
+            recovery_floor_ratio: 0.0,
+            ..FoodResourceConfig::default()
+        };
+        let mut w = world_with_food_config(4, 4, WorldEdgeMode::Wrap, food_cfg);
         for y in 0..4u16 {
             for x in 0..4u16 {
-                w.food_density.set(x, y, 0.5);
+                w.set_food(Position::new(x, y), 0.5);
             }
         }
         let before = w.total_food();
         let mut rng = SmallRng::seed_from_u64(42);
-        let mut cfg = default_config();
-        cfg.world.food.growth_rate = 0.5;
-        cfg.world.food.recovery_floor_ratio = 0.0;
-        w.grow_food(&mut rng, &cfg);
+        w.grow_food(0, &mut rng);
         assert!(w.total_food() > before);
     }
 
     #[test]
     fn grow_food_clamps_at_max_density() {
-        let mut w = WorldState::new(1, 1, WorldEdgeMode::Wrap);
-        w.food_density.set(0, 0, 0.9);
+        let food_cfg = FoodResourceConfig {
+            growth_rate: 1.0,
+            max_density: 1.0,
+            recovery_floor_ratio: 0.0,
+            ..FoodResourceConfig::default()
+        };
+        let mut w = world_with_food_config(1, 1, WorldEdgeMode::Wrap, food_cfg);
+        w.set_food(Position::new(0, 0), 0.9);
         let mut rng = SmallRng::seed_from_u64(0);
-        let mut cfg = default_config();
-        cfg.world.food.growth_rate = 1.0;
-        cfg.world.food.max_density = 1.0;
-        cfg.world.food.recovery_floor_ratio = 0.0;
-        w.grow_food(&mut rng, &cfg);
+        w.grow_food(0, &mut rng);
         assert!((w.food_at(Position::new(0, 0)) - 1.0).abs() < 1e-6);
     }
 
@@ -361,16 +263,18 @@ mod tests {
     fn grow_food_includes_occupied_cells_for_local_growth() {
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
         let id = sm.insert(());
-        let mut w = WorldState::new(1, 1, WorldEdgeMode::Wrap);
+        let food_cfg = FoodResourceConfig {
+            growth_rate: 0.5,
+            recovery_floor_ratio: 0.0,
+            ..FoodResourceConfig::default()
+        };
+        let mut w = world_with_food_config(1, 1, WorldEdgeMode::Wrap, food_cfg);
         let pos = Position::new(0, 0);
-        w.food_density.set(0, 0, 0.8);
+        w.set_food(pos, 0.8);
         w.place_creature(pos, id);
 
-        let mut cfg = default_config();
-        cfg.world.food.growth_rate = 0.5;
-        cfg.world.food.recovery_floor_ratio = 0.0;
         let mut rng = SmallRng::seed_from_u64(0);
-        w.grow_food(&mut rng, &cfg);
+        w.grow_food(0, &mut rng);
 
         assert!((w.food_at(pos) - 1.0).abs() < 1e-6);
     }
@@ -379,7 +283,7 @@ mod tests {
     fn consume_food_returns_amount_and_clears_cell() {
         let mut w = small_wrap_world();
         let pos = Position::new(3, 3);
-        w.food_density.set(3, 3, 0.42);
+        w.set_food(pos, 0.42);
         let consumed = w.consume_food(pos);
         assert!((consumed - 0.42).abs() < 1e-6);
         assert!((w.food_at(pos) - 0.0).abs() < 1e-6);
@@ -401,30 +305,34 @@ mod tests {
 
     #[test]
     fn growth_is_density_proportional() {
-        let mut w = WorldState::new(2, 1, WorldEdgeMode::Bounded);
-        w.food_density.set(0, 0, 0.2);
-        w.food_density.set(1, 0, 0.4);
-        let mut cfg = default_config();
-        cfg.world.food.growth_rate = 0.5;
-        cfg.world.food.spread_threshold_ratio = 1.0;
-        cfg.world.food.recovery_floor_ratio = 0.0;
+        let food_cfg = FoodResourceConfig {
+            growth_rate: 0.5,
+            spread_threshold_ratio: 1.0,
+            recovery_floor_ratio: 0.0,
+            ..FoodResourceConfig::default()
+        };
+        let mut w = world_with_food_config(2, 1, WorldEdgeMode::Bounded, food_cfg);
+        w.set_food(Position::new(0, 0), 0.2);
+        w.set_food(Position::new(1, 0), 0.4);
         let mut rng = SmallRng::seed_from_u64(0);
-        w.grow_food(&mut rng, &cfg);
+        w.grow_food(0, &mut rng);
         assert!((w.food_at(Position::new(0, 0)) - 0.3).abs() < 1e-6);
         assert!((w.food_at(Position::new(1, 0)) - 0.6).abs() < 1e-6);
     }
 
     #[test]
     fn spread_activates_at_threshold() {
-        let mut w = WorldState::new(2, 1, WorldEdgeMode::Bounded);
-        w.food_density.set(0, 0, 0.75);
-        let mut cfg = default_config();
-        cfg.world.food.growth_rate = 0.2;
-        cfg.world.food.spread_threshold_ratio = 0.75;
-        cfg.world.food.spread_density_ratio = 1.0;
-        cfg.world.food.recovery_floor_ratio = 0.0;
+        let food_cfg = FoodResourceConfig {
+            growth_rate: 0.2,
+            spread_threshold_ratio: 0.75,
+            spread_density_ratio: 1.0,
+            recovery_floor_ratio: 0.0,
+            ..FoodResourceConfig::default()
+        };
+        let mut w = world_with_food_config(2, 1, WorldEdgeMode::Bounded, food_cfg);
+        w.set_food(Position::new(0, 0), 0.75);
         let mut rng = SmallRng::seed_from_u64(1);
-        w.grow_food(&mut rng, &cfg);
+        w.grow_food(0, &mut rng);
         assert!((w.food_at(Position::new(0, 0)) - 0.9).abs() < 1e-6);
         assert!((w.food_at(Position::new(1, 0)) - 0.15).abs() < 1e-6);
     }
@@ -433,18 +341,20 @@ mod tests {
     fn spread_can_target_occupied_neighbors() {
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
         let id = sm.insert(());
-        let mut w = WorldState::new(2, 1, WorldEdgeMode::Bounded);
+        let food_cfg = FoodResourceConfig {
+            growth_rate: 0.2,
+            spread_threshold_ratio: 0.75,
+            spread_density_ratio: 1.0,
+            recovery_floor_ratio: 0.0,
+            ..FoodResourceConfig::default()
+        };
+        let mut w = world_with_food_config(2, 1, WorldEdgeMode::Bounded, food_cfg);
         let occupied = Position::new(1, 0);
-        w.food_density.set(0, 0, 0.9);
+        w.set_food(Position::new(0, 0), 0.9);
         w.place_creature(occupied, id);
 
-        let mut cfg = default_config();
-        cfg.world.food.growth_rate = 0.2;
-        cfg.world.food.spread_threshold_ratio = 0.75;
-        cfg.world.food.spread_density_ratio = 1.0;
-        cfg.world.food.recovery_floor_ratio = 0.0;
         let mut rng = SmallRng::seed_from_u64(3);
-        w.grow_food(&mut rng, &cfg);
+        w.grow_food(0, &mut rng);
 
         assert!(w.food_at(occupied) > 0.0);
     }
@@ -454,15 +364,17 @@ mod tests {
         // source=0.75, growth_rate=0.2, spread_density_ratio=0.25
         // delta = 0.75 * 0.2 = 0.15
         // spread deposit = 0.15 * 0.25 = 0.0375
-        let mut w = WorldState::new(2, 1, WorldEdgeMode::Bounded);
-        w.food_density.set(0, 0, 0.75);
-        let mut cfg = default_config();
-        cfg.world.food.growth_rate = 0.2;
-        cfg.world.food.spread_threshold_ratio = 0.75;
-        cfg.world.food.spread_density_ratio = 0.25;
-        cfg.world.food.recovery_floor_ratio = 0.0;
+        let food_cfg = FoodResourceConfig {
+            growth_rate: 0.2,
+            spread_threshold_ratio: 0.75,
+            spread_density_ratio: 0.25,
+            recovery_floor_ratio: 0.0,
+            ..FoodResourceConfig::default()
+        };
+        let mut w = world_with_food_config(2, 1, WorldEdgeMode::Bounded, food_cfg);
+        w.set_food(Position::new(0, 0), 0.75);
         let mut rng = SmallRng::seed_from_u64(1);
-        w.grow_food(&mut rng, &cfg);
+        w.grow_food(0, &mut rng);
         // Source gets local growth: 0.75 + 0.15 = 0.9
         assert!((w.food_at(Position::new(0, 0)) - 0.9).abs() < 1e-6);
         // Neighbor gets spread deposit: 0.15 * 0.25 = 0.0375
@@ -471,15 +383,17 @@ mod tests {
 
     #[test]
     fn spread_density_ratio_zero_deposits_nothing() {
-        let mut w = WorldState::new(2, 1, WorldEdgeMode::Bounded);
-        w.food_density.set(0, 0, 0.9);
-        let mut cfg = default_config();
-        cfg.world.food.growth_rate = 0.2;
-        cfg.world.food.spread_threshold_ratio = 0.75;
-        cfg.world.food.spread_density_ratio = 0.0;
-        cfg.world.food.recovery_floor_ratio = 0.0;
+        let food_cfg = FoodResourceConfig {
+            growth_rate: 0.2,
+            spread_threshold_ratio: 0.75,
+            spread_density_ratio: 0.0,
+            recovery_floor_ratio: 0.0,
+            ..FoodResourceConfig::default()
+        };
+        let mut w = world_with_food_config(2, 1, WorldEdgeMode::Bounded, food_cfg);
+        w.set_food(Position::new(0, 0), 0.9);
         let mut rng = SmallRng::seed_from_u64(1);
-        w.grow_food(&mut rng, &cfg);
+        w.grow_food(0, &mut rng);
         // Source gets local growth
         assert!(w.food_at(Position::new(0, 0)) > 0.9);
         // Neighbor gets nothing because ratio is 0
@@ -488,16 +402,18 @@ mod tests {
 
     #[test]
     fn recovery_spawn_runs_when_density_below_floor() {
-        let mut w = WorldState::new(4, 1, WorldEdgeMode::Wrap);
-        w.food_density.set(0, 0, 0.01);
-        let mut cfg = default_config();
-        cfg.world.food.growth_rate = 0.2;
-        cfg.world.food.recovery_spawn_rate = 1.0;
-        cfg.world.food.recovery_floor_ratio = 0.5;
-        cfg.world.food.spread_threshold_ratio = 1.1;
+        let food_cfg = FoodResourceConfig {
+            growth_rate: 0.2,
+            recovery_spawn_rate: 1.0,
+            recovery_floor_ratio: 0.5,
+            spread_threshold_ratio: 1.1,
+            ..FoodResourceConfig::default()
+        };
+        let mut w = world_with_food_config(4, 1, WorldEdgeMode::Wrap, food_cfg);
+        w.set_food(Position::new(0, 0), 0.01);
         let before = w.total_food();
         let mut rng = SmallRng::seed_from_u64(2);
-        w.grow_food(&mut rng, &cfg);
+        w.grow_food(0, &mut rng);
         assert!(w.total_food() > before);
     }
 
@@ -505,17 +421,19 @@ mod tests {
     fn recovery_spawn_can_fill_occupied_cells() {
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
         let id = sm.insert(());
-        let mut w = WorldState::new(1, 1, WorldEdgeMode::Wrap);
+        let food_cfg = FoodResourceConfig {
+            growth_rate: 0.5,
+            recovery_spawn_rate: 1.0,
+            recovery_floor_ratio: 1.0,
+            spread_threshold_ratio: 1.1,
+            ..FoodResourceConfig::default()
+        };
+        let mut w = world_with_food_config(1, 1, WorldEdgeMode::Wrap, food_cfg);
         let pos = Position::new(0, 0);
         w.place_creature(pos, id);
 
-        let mut cfg = default_config();
-        cfg.world.food.growth_rate = 0.5;
-        cfg.world.food.recovery_spawn_rate = 1.0;
-        cfg.world.food.recovery_floor_ratio = 1.0;
-        cfg.world.food.spread_threshold_ratio = 1.1;
         let mut rng = SmallRng::seed_from_u64(4);
-        w.grow_food(&mut rng, &cfg);
+        w.grow_food(0, &mut rng);
 
         assert!(w.food_at(pos) > 0.0);
     }
@@ -632,5 +550,16 @@ mod tests {
                 assert_eq!(w1.food_at(pos), w2.food_at(pos));
             }
         }
+    }
+
+    #[test]
+    fn apply_food_config_updates_config() {
+        let mut w = small_wrap_world();
+        let food_cfg = FoodResourceConfig {
+            growth_rate: 0.99,
+            ..FoodResourceConfig::default()
+        };
+        w.apply_food_config(food_cfg);
+        assert!((w.food().config().growth_rate - 0.99).abs() < f32::EPSILON);
     }
 }
