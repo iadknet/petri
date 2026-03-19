@@ -1,7 +1,8 @@
 mod simulation;
 
 pub use simulation::{
-    EnergyConfig, EnergyCostsConfig, EnergyLifecycleConfig, FounderProfile, MutationConfig,
+    AnnealingConfig, EnergyConfig, EnergyCostsConfig, EnergyLifecycleConfig, FertilityAlgorithm,
+    FertilityConfig, FertilityLayer, FoodResourceConfig, FounderProfile, MutationConfig,
     PhenotypeConfig, PopulationConfig, PredationConfig, RuntimeConfig, SimulationConfig,
     VmRuntimeConfig, WorldConfig, WorldEdgeMode, WorldFoodConfig,
 };
