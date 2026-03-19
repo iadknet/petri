@@ -1,6 +1,6 @@
 use rand::Rng;
 
-use crate::config::FoodResourceConfig;
+use crate::config::{FoodResourceConfig, WorldEdgeMode};
 use crate::contracts::{Direction, Position};
 use crate::kernel::fertility;
 use crate::kernel::Grid;
@@ -14,18 +14,26 @@ pub struct FoodResource {
     density: Grid<f32>,
     fertility: Grid<f32>,
     config: FoodResourceConfig,
+    edge_mode: WorldEdgeMode,
     /// Reusable scratch buffer for `grow` to avoid per-tick allocation.
     growth_scratch: Vec<f32>,
 }
 
 impl FoodResource {
     /// Create a new food resource with zero density and zero fertility everywhere.
-    pub fn new(width: u16, height: u16, config: FoodResourceConfig) -> Self {
+    pub fn new(
+        width: u16,
+        height: u16,
+        config: FoodResourceConfig,
+        edge_mode: WorldEdgeMode,
+    ) -> Self {
+        let total_cells = width as usize * height as usize;
         Self {
             density: Grid::new(width, height, 0.0),
             fertility: Grid::new(width, height, 0.0),
             config,
-            growth_scratch: Vec::new(),
+            edge_mode,
+            growth_scratch: Vec::with_capacity(total_cells),
         }
     }
 
@@ -87,12 +95,11 @@ impl FoodResource {
     ///
     /// Must be called before `seed_density` during world startup so that the
     /// fertility grid is ready before food growth begins.
-    pub fn seed_fertility(&mut self, rng: &mut impl Rng, world_seed: u64) {
+    pub fn seed_fertility(&mut self, world_seed: u64) {
         self.fertility = fertility::generate_fertility(
             self.width(),
             self.height(),
             &self.config.fertility,
-            rng,
             world_seed,
         );
     }
@@ -114,19 +121,14 @@ impl FoodResource {
     ///
     /// `barriers` is provided by the owning `WorldState`.
     /// `tick` drives fertility annealing (ramping effective fertility over time).
-    /// `edge_mode` and world dimensions are read from the density grid itself.
+    /// World dimensions and edge mode are read from `self` (set during construction).
     ///
     /// When `self.config.fertility.enabled` is false, all fertility multipliers
     /// are 1.0 (identity — no behavior change from pre-fertility code).
-    pub fn grow(
-        &mut self,
-        barriers: &Grid<bool>,
-        tick: u64,
-        rng: &mut impl Rng,
-        width: u16,
-        height: u16,
-        edge_mode: crate::config::WorldEdgeMode,
-    ) {
+    pub fn grow(&mut self, barriers: &Grid<bool>, tick: u64, rng: &mut impl Rng) {
+        let width = self.width();
+        let height = self.height();
+        let edge_mode = self.edge_mode;
         let total_cells = width as usize * height as usize;
         if total_cells == 0 {
             return;
@@ -305,12 +307,12 @@ fn resolve_neighbor_static(
     dir: Direction,
     width: u16,
     height: u16,
-    edge_mode: crate::config::WorldEdgeMode,
+    edge_mode: WorldEdgeMode,
 ) -> Option<Position> {
     let (dx, dy) = dir.delta();
     match edge_mode {
-        crate::config::WorldEdgeMode::Wrap => pos.neighbor_wrap(dx, dy, width, height),
-        crate::config::WorldEdgeMode::Bounded => pos.neighbor_bounded(dx, dy, width, height),
+        WorldEdgeMode::Wrap => pos.neighbor_wrap(dx, dy, width, height),
+        WorldEdgeMode::Bounded => pos.neighbor_bounded(dx, dy, width, height),
     }
 }
 
@@ -322,7 +324,7 @@ mod tests {
     use rand::SeedableRng;
 
     fn default_food() -> FoodResource {
-        FoodResource::new(4, 4, FoodResourceConfig::default())
+        FoodResource::new(4, 4, FoodResourceConfig::default(), WorldEdgeMode::Wrap)
     }
 
     #[test]
@@ -378,7 +380,7 @@ mod tests {
 
     #[test]
     fn width_and_height_match_construction() {
-        let food = FoodResource::new(10, 20, FoodResourceConfig::default());
+        let food = FoodResource::new(10, 20, FoodResourceConfig::default(), WorldEdgeMode::Wrap);
         assert_eq!(food.width(), 10);
         assert_eq!(food.height(), 20);
     }
@@ -430,9 +432,8 @@ mod tests {
         };
         // Uniform { value: 1.0 } fills fertility grid with 1.0 (raw).
         // map_fertility(1.0, min, max) = max (since (1+1)/2 = 1.0, so min + 1.0*(max-min) = max).
-        let mut food = FoodResource::new(width, height, config);
-        let mut rng = SmallRng::seed_from_u64(42);
-        food.seed_fertility(&mut rng, 42);
+        let mut food = FoodResource::new(width, height, config, WorldEdgeMode::Wrap);
+        food.seed_fertility(42);
         food
     }
 
@@ -444,7 +445,7 @@ mod tests {
         food.set_food(Position::new(1, 1), 0.5);
         let before = food.food_at(Position::new(1, 1));
         let mut rng = SmallRng::seed_from_u64(1);
-        food.grow(&barriers, 0, &mut rng, 4, 4, WorldEdgeMode::Wrap);
+        food.grow(&barriers, 0, &mut rng);
         let after = food.food_at(Position::new(1, 1));
         assert!(
             (after - before).abs() < f32::EPSILON,
@@ -459,7 +460,7 @@ mod tests {
         let barriers = Grid::new(4, 4, false);
         food.set_food(Position::new(1, 1), 0.5);
         let mut rng = SmallRng::seed_from_u64(1);
-        food.grow(&barriers, 0, &mut rng, 4, 4, WorldEdgeMode::Wrap);
+        food.grow(&barriers, 0, &mut rng);
         // Expected: 0.5 + 0.5 * 0.05 * 2.0 = 0.55
         let after = food.food_at(Position::new(1, 1));
         assert!(
@@ -486,7 +487,7 @@ mod tests {
         };
         // Uniform raw=1.0, min=1, max=1 → effective fertility = 1.0 for all cells.
         // This is identity — should match disabled behavior.
-        let mut food_disabled = FoodResource::new(4, 4, disabled_config);
+        let mut food_disabled = FoodResource::new(4, 4, disabled_config, WorldEdgeMode::Wrap);
         let mut food_enabled = food_with_uniform_fertility(4, 4, 1.0, 1.0);
 
         let barriers = Grid::new(4, 4, false);
@@ -502,8 +503,8 @@ mod tests {
 
         let mut rng_d = SmallRng::seed_from_u64(99);
         let mut rng_e = SmallRng::seed_from_u64(99);
-        food_disabled.grow(&barriers, 0, &mut rng_d, 4, 4, WorldEdgeMode::Wrap);
-        food_enabled.grow(&barriers, 0, &mut rng_e, 4, 4, WorldEdgeMode::Wrap);
+        food_disabled.grow(&barriers, 0, &mut rng_d);
+        food_enabled.grow(&barriers, 0, &mut rng_e);
 
         for y in 0..4u16 {
             for x in 0..4u16 {
@@ -537,7 +538,7 @@ mod tests {
             },
             ..FoodResourceConfig::default()
         };
-        let mut food = FoodResource::new(4, 4, config);
+        let mut food = FoodResource::new(4, 4, config, WorldEdgeMode::Wrap);
         // Manually set fertility grid: left half = -1.0 (barren), right half = 1.0 (fertile).
         for y in 0..4u16 {
             for x in 0..4u16 {
@@ -553,7 +554,7 @@ mod tests {
         // Run many ticks to get recovery spawns.
         let mut rng = SmallRng::seed_from_u64(42);
         for tick in 0..50 {
-            food.grow(&barriers, tick, &mut rng, 4, 4, WorldEdgeMode::Wrap);
+            food.grow(&barriers, tick, &mut rng);
         }
 
         // Barren cells (left half) should have no food.
@@ -586,14 +587,80 @@ mod tests {
             },
             ..FoodResourceConfig::default()
         };
-        let mut food = FoodResource::new(32, 32, config);
-        let mut rng = SmallRng::seed_from_u64(42);
-        food.seed_fertility(&mut rng, 42);
+        let mut food = FoodResource::new(32, 32, config, WorldEdgeMode::Wrap);
+        food.seed_fertility(42);
         // Verify the grid has variation (not all zeros).
         let has_nonzero = food.fertility().iter().any(|(_, _, v)| v.abs() > 0.01);
         assert!(
             has_nonzero,
             "expected fertility grid to have non-zero values after seeding"
+        );
+    }
+
+    #[test]
+    fn spread_deposit_scales_by_neighbor_fertility() {
+        // Set up a 3-cell row (bounded so only one neighbor per edge cell):
+        //   cell (0,0): fertility = 0.0 (barren neighbor)
+        //   cell (1,0): high food (source, above spread threshold)
+        //   cell (2,0): fertility = 2.0 (fertile neighbor)
+        //
+        // With fertility enabled (min=0, max=2):
+        //   map_fertility(-1.0, 0, 2) = 0.0 → barren
+        //   map_fertility( 1.0, 0, 2) = 2.0 → fertile
+        //
+        // After grow, we run two identical simulations — one where spread is
+        // forced to the barren neighbor (2,0 as source → (0,0) blocked in
+        // bounded) and one forced to the fertile neighbor. We verify that the
+        // fertile neighbor receives strictly more spread food.
+        //
+        // Implementation approach: use a 1D world of 2 cells (Bounded) where
+        // the source has only one possible spread target, and compare the
+        // deposit received when that target has fertility=0 vs fertility=2.
+
+        let make_config = |target_fert_raw: f32| -> FoodResource {
+            let config = FoodResourceConfig {
+                growth_rate: 0.1,
+                max_density: 1.0,
+                // Set threshold below source so spread always triggers.
+                spread_threshold_ratio: 0.0,
+                spread_density_ratio: 1.0,
+                recovery_floor_ratio: 0.0,
+                recovery_spawn_rate: 0.0,
+                fertility: FertilityConfig {
+                    enabled: true,
+                    min_fertility: 0.0,
+                    max_fertility: 2.0,
+                    layers: vec![],
+                },
+                ..FoodResourceConfig::default()
+            };
+            // 2 cells: (0,0) is the source, (1,0) is the spread target.
+            // Source fertility = 1.0 (fertile), target fertility = target_fert_raw.
+            let mut food = FoodResource::new(2, 1, config, WorldEdgeMode::Bounded);
+            food.fertility.set(0, 0, 1.0); // source is fertile
+            food.fertility.set(1, 0, target_fert_raw); // target varies
+            food.set_food(Position::new(0, 0), 0.8); // source has plenty of food
+            food
+        };
+
+        let barriers = Grid::new(2, 1, false);
+
+        // Barren target: raw fertility = -1.0 → map_fertility = 0.0
+        let mut food_barren = make_config(-1.0);
+        let mut rng = SmallRng::seed_from_u64(1);
+        food_barren.grow(&barriers, 0, &mut rng);
+        let deposit_barren = food_barren.food_at(Position::new(1, 0));
+
+        // Fertile target: raw fertility = 1.0 → map_fertility = 2.0
+        let mut food_fertile = make_config(1.0);
+        let mut rng = SmallRng::seed_from_u64(1);
+        food_fertile.grow(&barriers, 0, &mut rng);
+        let deposit_fertile = food_fertile.food_at(Position::new(1, 0));
+
+        assert!(
+            deposit_fertile > deposit_barren,
+            "fertile neighbor (deposit={deposit_fertile}) should receive more spread food \
+             than barren neighbor (deposit={deposit_barren})"
         );
     }
 }

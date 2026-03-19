@@ -70,10 +70,10 @@ pub enum FertilityAlgorithm {
 impl Default for FertilityAlgorithm {
     fn default() -> Self {
         FertilityAlgorithm::PoissonBlobs {
-            blob_count: 20,
-            min_radius: 10.0,
-            max_radius: 40.0,
-            falloff: 2.0,
+            blob_count: 8,
+            min_radius: 5.0,
+            max_radius: 15.0,
+            falloff: 0.5,
             seed: None,
         }
     }
@@ -146,10 +146,6 @@ impl Default for AnnealingConfig {
         }
     }
 }
-
-/// Type alias for backwards compatibility.
-#[allow(dead_code)]
-pub type WorldFoodConfig = FoodResourceConfig;
 
 /// World/grid config. Canonical owner: v3-world-grid-spec.md Section 4.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
