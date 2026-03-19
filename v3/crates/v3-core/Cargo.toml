@@ -10,6 +10,7 @@ serde = { workspace = true }
 rand = { workspace = true }
 rayon = { workspace = true }
 slotmap = { workspace = true }
+noise = "0.9"
 
 [features]
 dhat-heap = ["dep:dhat"]
