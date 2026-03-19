@@ -9,6 +9,7 @@ use v3_core::mutation::phenotype::channels_to_rgb;
 use v3_core::simulation::{run_tick, seed_simulation};
 
 use crate::error::{AppError, FieldError};
+use crate::query::cache::build_food_fertility_u8;
 use crate::state::{
     AppState, BarrierCell, CreatureSnapshot, FoodCell, FramePayload, HealthPayload,
     LastTickActions, MutationOperatorFunnelPayload, MutationOperatorValueTotalsPayload,
@@ -315,12 +316,15 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
         }
     }
 
+    let food_fertility_u8 = build_food_fertility_u8(sim.world.food());
+
     let frame = FramePayload {
         width: sim.world.width,
         height: sim.world.height,
         creatures,
         food,
         barriers,
+        food_fertility_u8,
     };
 
     let map_mutation_value_totals = |totals: &v3_core::simulation::stats::MutationValueTotals| {

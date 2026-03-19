@@ -12,6 +12,7 @@ pub struct ProjectionSnapshot {
     pub world_static_revision: u64,
     pub ws_frame: WsFrame,
     pub food_density_u8: Box<[u8]>,
+    pub food_fertility_u8: Box<[u8]>,
     pub barrier_mask: Box<[u8]>,
     pub creature_tile_index: CreatureTileIndex,
 }
@@ -80,6 +81,7 @@ impl ProjectionSnapshot {
         ws_frame: WsFrame,
     ) -> Self {
         let food_density_u8 = build_food_density_u8(&ws_frame.frame);
+        let food_fertility_u8 = ws_frame.frame.food_fertility_u8.clone();
         let barrier_mask = build_barrier_mask(&ws_frame.frame);
         let creature_tile_index =
             CreatureTileIndex::build(DEFAULT_TILE_SIZE, &ws_frame.frame.creatures);
@@ -88,6 +90,7 @@ impl ProjectionSnapshot {
             projection_revision,
             world_static_revision,
             food_density_u8,
+            food_fertility_u8,
             barrier_mask,
             creature_tile_index,
             ws_frame,
@@ -99,4 +102,5 @@ fn same_world_static(current: &ProjectionSnapshot, next: &ProjectionSnapshot) ->
     current.ws_frame.frame.width == next.ws_frame.frame.width
         && current.ws_frame.frame.height == next.ws_frame.frame.height
         && current.barrier_mask == next.barrier_mask
+        && current.food_fertility_u8 == next.food_fertility_u8
 }
