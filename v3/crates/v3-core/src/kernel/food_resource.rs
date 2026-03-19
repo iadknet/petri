@@ -2,6 +2,7 @@ use rand::Rng;
 
 use crate::config::FoodResourceConfig;
 use crate::contracts::{Direction, Position};
+use crate::kernel::fertility;
 use crate::kernel::Grid;
 
 /// Self-contained food substrate: density grid, fertility map, and growth logic.
@@ -80,6 +81,22 @@ impl FoodResource {
         self.density.height()
     }
 
+    // ── Fertility ─────────────────────────────────────────────────────────────
+
+    /// Generate and store a fertility map from the configured layers and world seed.
+    ///
+    /// Must be called before `seed_density` during world startup so that the
+    /// fertility grid is ready before food growth begins.
+    pub fn seed_fertility(&mut self, rng: &mut impl Rng, world_seed: u64) {
+        self.fertility = fertility::generate_fertility(
+            self.width(),
+            self.height(),
+            &self.config.fertility,
+            rng,
+            world_seed,
+        );
+    }
+
     // ── Growth ────────────────────────────────────────────────────────────────
 
     /// Add food clamped to max density.
@@ -96,7 +113,7 @@ impl FoodResource {
     /// and low-density recovery spawn.
     ///
     /// `barriers` is provided by the owning `WorldState`.
-    /// `tick` is accepted for future annealing support (currently unused).
+    /// `tick` drives fertility annealing (ramping effective fertility over time).
     /// `edge_mode` and world dimensions are read from the density grid itself.
     ///
     /// When `self.config.fertility.enabled` is false, all fertility multipliers
@@ -104,7 +121,7 @@ impl FoodResource {
     pub fn grow(
         &mut self,
         barriers: &Grid<bool>,
-        _tick: u64,
+        tick: u64,
         rng: &mut impl Rng,
         width: u16,
         height: u16,
@@ -125,6 +142,19 @@ impl FoodResource {
         let spread_density_ratio = self.config.spread_density_ratio.clamp(0.0, 1.0);
         let recovery_floor = self.config.recovery_floor_ratio.clamp(0.0, 1.0);
         let recovery_spawn_rate = self.config.recovery_spawn_rate.clamp(0.0, 1.0);
+
+        // Compute effective fertility range once per tick.
+        let fertility_enabled = self.config.fertility.enabled;
+        let (eff_min, eff_max) = if fertility_enabled {
+            fertility::effective_fertility_range(
+                &self.config.annealing,
+                self.config.fertility.min_fertility,
+                self.config.fertility.max_fertility,
+                tick,
+            )
+        } else {
+            (1.0, 1.0)
+        };
 
         // Snapshot food densities into a reusable buffer (avoids per-tick allocation).
         self.growth_scratch.clear();
@@ -148,7 +178,13 @@ impl FoodResource {
                 continue;
             }
 
-            let delta = source * growth_rate;
+            // Proportional growth with fertility multiplier.
+            let cell_fertility = if fertility_enabled {
+                fertility::map_fertility(*self.fertility.get(x, y), eff_min, eff_max)
+            } else {
+                1.0
+            };
+            let delta = source * growth_rate * cell_fertility;
             self.add_food_clamped(pos, delta, max_density);
 
             if source < spread_threshold || delta <= 0.0 {
@@ -172,7 +208,17 @@ impl FoodResource {
                 continue;
             }
             let target = neighbors[rng.gen_range(0..ncount)];
-            self.add_food_clamped(target, delta * spread_density_ratio, max_density);
+            // Spread deposit with neighbor's fertility multiplier.
+            let neighbor_fertility = if fertility_enabled {
+                fertility::map_fertility(*self.fertility.get(target.x, target.y), eff_min, eff_max)
+            } else {
+                1.0
+            };
+            self.add_food_clamped(
+                target,
+                delta * spread_density_ratio * neighbor_fertility,
+                max_density,
+            );
         }
 
         if average_density_ratio >= recovery_floor {
@@ -193,7 +239,13 @@ impl FoodResource {
             if *barriers.get(x, y) {
                 continue;
             }
-            self.add_food_clamped(pos, spawn_delta, max_density);
+            // Recovery spawn with fertility multiplier.
+            let cell_fertility = if fertility_enabled {
+                fertility::map_fertility(*self.fertility.get(x, y), eff_min, eff_max)
+            } else {
+                1.0
+            };
+            self.add_food_clamped(pos, spawn_delta * cell_fertility, max_density);
         }
     }
 
@@ -265,7 +317,9 @@ fn resolve_neighbor_static(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::FoodResourceConfig;
+    use crate::config::{FertilityConfig, FoodResourceConfig, WorldEdgeMode};
+    use rand::rngs::SmallRng;
+    use rand::SeedableRng;
 
     fn default_food() -> FoodResource {
         FoodResource::new(4, 4, FoodResourceConfig::default())
@@ -344,6 +398,202 @@ mod tests {
         assert!(
             (food.density_grid().get(2, 3) - food.food_at(Position::new(2, 3))).abs()
                 < f32::EPSILON
+        );
+    }
+
+    // ── Fertility integration tests ─────────────────────────────────────────
+
+    /// Helper: create a FoodResource with uniform fertility (all cells get the
+    /// same raw value mapped to the given min/max range).
+    fn food_with_uniform_fertility(
+        width: u16,
+        height: u16,
+        min_fert: f32,
+        max_fert: f32,
+    ) -> FoodResource {
+        let config = FoodResourceConfig {
+            growth_rate: 0.05,
+            max_density: 1.0,
+            spread_threshold_ratio: 1.1, // disable spread
+            recovery_floor_ratio: 0.0,   // disable recovery
+            recovery_spawn_rate: 0.0,
+            fertility: FertilityConfig {
+                enabled: true,
+                min_fertility: min_fert,
+                max_fertility: max_fert,
+                layers: vec![crate::config::FertilityLayer {
+                    algorithm: crate::config::FertilityAlgorithm::Uniform { value: 1.0 },
+                    weight: 1.0,
+                }],
+            },
+            ..FoodResourceConfig::default()
+        };
+        // Uniform { value: 1.0 } fills fertility grid with 1.0 (raw).
+        // map_fertility(1.0, min, max) = max (since (1+1)/2 = 1.0, so min + 1.0*(max-min) = max).
+        let mut food = FoodResource::new(width, height, config);
+        let mut rng = SmallRng::seed_from_u64(42);
+        food.seed_fertility(&mut rng, 42);
+        food
+    }
+
+    #[test]
+    fn fertility_zero_stops_proportional_growth() {
+        // Uniform raw=1.0, min=0, max=0 → effective fertility = 0.0 for all cells.
+        let mut food = food_with_uniform_fertility(4, 4, 0.0, 0.0);
+        let barriers = Grid::new(4, 4, false);
+        food.set_food(Position::new(1, 1), 0.5);
+        let before = food.food_at(Position::new(1, 1));
+        let mut rng = SmallRng::seed_from_u64(1);
+        food.grow(&barriers, 0, &mut rng, 4, 4, WorldEdgeMode::Wrap);
+        let after = food.food_at(Position::new(1, 1));
+        assert!(
+            (after - before).abs() < f32::EPSILON,
+            "expected no growth with zero fertility, before={before}, after={after}"
+        );
+    }
+
+    #[test]
+    fn fertility_doubles_growth() {
+        // Uniform raw=1.0, min=2, max=2 → effective fertility = 2.0 for all cells.
+        let mut food = food_with_uniform_fertility(4, 4, 2.0, 2.0);
+        let barriers = Grid::new(4, 4, false);
+        food.set_food(Position::new(1, 1), 0.5);
+        let mut rng = SmallRng::seed_from_u64(1);
+        food.grow(&barriers, 0, &mut rng, 4, 4, WorldEdgeMode::Wrap);
+        // Expected: 0.5 + 0.5 * 0.05 * 2.0 = 0.55
+        let after = food.food_at(Position::new(1, 1));
+        assert!(
+            (after - 0.55).abs() < 1e-6,
+            "expected 0.55 with 2x fertility, got {after}"
+        );
+    }
+
+    #[test]
+    fn fertility_disabled_matches_baseline() {
+        // Two FoodResources: one with fertility disabled, one enabled at 1.0/1.0.
+        // Both should produce identical results after grow.
+        let disabled_config = FoodResourceConfig {
+            growth_rate: 0.05,
+            max_density: 1.0,
+            spread_threshold_ratio: 1.1, // disable spread
+            recovery_floor_ratio: 0.0,
+            recovery_spawn_rate: 0.0,
+            fertility: FertilityConfig {
+                enabled: false,
+                ..FertilityConfig::default()
+            },
+            ..FoodResourceConfig::default()
+        };
+        // Uniform raw=1.0, min=1, max=1 → effective fertility = 1.0 for all cells.
+        // This is identity — should match disabled behavior.
+        let mut food_disabled = FoodResource::new(4, 4, disabled_config);
+        let mut food_enabled = food_with_uniform_fertility(4, 4, 1.0, 1.0);
+
+        let barriers = Grid::new(4, 4, false);
+
+        // Set same food pattern on both.
+        for y in 0..4u16 {
+            for x in 0..4u16 {
+                let val = (x as f32 + y as f32 * 4.0) / 16.0;
+                food_disabled.set_food(Position::new(x, y), val);
+                food_enabled.set_food(Position::new(x, y), val);
+            }
+        }
+
+        let mut rng_d = SmallRng::seed_from_u64(99);
+        let mut rng_e = SmallRng::seed_from_u64(99);
+        food_disabled.grow(&barriers, 0, &mut rng_d, 4, 4, WorldEdgeMode::Wrap);
+        food_enabled.grow(&barriers, 0, &mut rng_e, 4, 4, WorldEdgeMode::Wrap);
+
+        for y in 0..4u16 {
+            for x in 0..4u16 {
+                let d = food_disabled.food_at(Position::new(x, y));
+                let e = food_enabled.food_at(Position::new(x, y));
+                assert!(
+                    (d - e).abs() < 1e-6,
+                    "mismatch at ({x},{y}): disabled={d}, enabled-at-1.0={e}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn recovery_spawn_respects_fertility() {
+        // Left half (x < 2): raw = -1.0 (barren), Right half (x >= 2): raw = 1.0 (fertile).
+        // With min=0.0, max=2.0:
+        //   map_fertility(-1.0, 0, 2) = 0.0 (barren)
+        //   map_fertility(1.0, 0, 2) = 2.0 (fertile)
+        let config = FoodResourceConfig {
+            growth_rate: 0.05,
+            max_density: 1.0,
+            spread_threshold_ratio: 1.1, // disable spread
+            recovery_floor_ratio: 1.0,   // always trigger recovery
+            recovery_spawn_rate: 1.0,    // max spawn attempts
+            fertility: FertilityConfig {
+                enabled: true,
+                min_fertility: 0.0,
+                max_fertility: 2.0,
+                layers: vec![], // won't matter, we'll set fertility grid manually
+            },
+            ..FoodResourceConfig::default()
+        };
+        let mut food = FoodResource::new(4, 4, config);
+        // Manually set fertility grid: left half = -1.0 (barren), right half = 1.0 (fertile).
+        for y in 0..4u16 {
+            for x in 0..4u16 {
+                if x < 2 {
+                    food.fertility.set(x, y, -1.0);
+                } else {
+                    food.fertility.set(x, y, 1.0);
+                }
+            }
+        }
+
+        let barriers = Grid::new(4, 4, false);
+        // Run many ticks to get recovery spawns.
+        let mut rng = SmallRng::seed_from_u64(42);
+        for tick in 0..50 {
+            food.grow(&barriers, tick, &mut rng, 4, 4, WorldEdgeMode::Wrap);
+        }
+
+        // Barren cells (left half) should have no food.
+        for y in 0..4u16 {
+            for x in 0..2u16 {
+                assert!(
+                    food.food_at(Position::new(x, y)) < f32::EPSILON,
+                    "barren cell ({x},{y}) has food: {}",
+                    food.food_at(Position::new(x, y))
+                );
+            }
+        }
+        // Fertile cells should have some food after 50 recovery ticks.
+        let fertile_food: f32 = (0..4u16)
+            .flat_map(|y| (2..4u16).map(move |x| Position::new(x, y)))
+            .map(|p| food.food_at(p))
+            .sum();
+        assert!(
+            fertile_food > 0.0,
+            "expected some food in fertile cells after recovery"
+        );
+    }
+
+    #[test]
+    fn seed_fertility_populates_grid() {
+        let config = FoodResourceConfig {
+            fertility: FertilityConfig {
+                enabled: true,
+                ..FertilityConfig::default()
+            },
+            ..FoodResourceConfig::default()
+        };
+        let mut food = FoodResource::new(32, 32, config);
+        let mut rng = SmallRng::seed_from_u64(42);
+        food.seed_fertility(&mut rng, 42);
+        // Verify the grid has variation (not all zeros).
+        let has_nonzero = food.fertility().iter().any(|(_, _, v)| v.abs() > 0.01);
+        assert!(
+            has_nonzero,
+            "expected fertility grid to have non-zero values after seeding"
         );
     }
 }

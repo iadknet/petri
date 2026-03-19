@@ -39,6 +39,14 @@ impl WorldState {
         &self.food
     }
 
+    /// Seed the fertility map from the configured layers and world seed.
+    ///
+    /// Must be called before `seed_food` during world startup so that the
+    /// fertility grid is ready before food growth begins.
+    pub fn seed_fertility(&mut self, rng: &mut impl Rng, world_seed: u64) {
+        self.food.seed_fertility(rng, world_seed);
+    }
+
     /// Seed initial food distribution (transitional delegate).
     pub fn seed_food(&mut self, rng: &mut impl Rng, config: &SimulationConfig) {
         self.food
