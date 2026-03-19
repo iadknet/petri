@@ -40,11 +40,13 @@ impl FoodResource {
     // ── Accessors ─────────────────────────────────────────────────────────────
 
     /// Get food density at a position.
+    #[must_use]
     pub fn food_at(&self, pos: Position) -> f32 {
         *self.density.get(pos.x, pos.y)
     }
 
     /// Consume all food on a cell. Returns the amount consumed (0 if empty).
+    #[must_use]
     pub fn consume(&mut self, pos: Position) -> f32 {
         let amount = *self.density.get(pos.x, pos.y);
         self.density.set(pos.x, pos.y, 0.0);
@@ -57,21 +59,25 @@ impl FoodResource {
     }
 
     /// Total food across all cells (for testing and diagnostics).
+    #[must_use]
     pub fn total_food(&self) -> f32 {
         self.density.as_slice().iter().sum()
     }
 
     /// Read-only access to the fertility grid.
+    #[must_use]
     pub fn fertility(&self) -> &Grid<f32> {
         &self.fertility
     }
 
     /// Read-only access to the active food config.
+    #[must_use]
     pub fn config(&self) -> &FoodResourceConfig {
         &self.config
     }
 
     /// Read-only access to the density grid.
+    #[must_use]
     pub fn density_grid(&self) -> &Grid<f32> {
         &self.density
     }
@@ -81,10 +87,12 @@ impl FoodResource {
         self.config = config;
     }
 
+    #[must_use]
     pub fn width(&self) -> u16 {
         self.density.width()
     }
 
+    #[must_use]
     pub fn height(&self) -> u16 {
         self.density.height()
     }
@@ -255,12 +263,7 @@ impl FoodResource {
 
     /// Seed initial food distribution.
     /// Clears prior food and samples exact target coverage over non-barrier cells.
-    pub fn seed_density(
-        &mut self,
-        barriers: &Grid<bool>,
-        rng: &mut impl Rng,
-        config: &FoodResourceConfig,
-    ) {
+    pub fn seed_density(&mut self, barriers: &Grid<bool>, rng: &mut impl Rng) {
         use rand::seq::SliceRandom;
 
         let width = self.density.width();
@@ -285,13 +288,16 @@ impl FoodResource {
             return;
         }
 
-        let coverage = config.initial_coverage.clamp(0.0, 1.0);
+        let coverage = self.config.initial_coverage.clamp(0.0, 1.0);
         let target = ((coverage * candidates.len() as f32).round() as usize).min(candidates.len());
         if target == 0 {
             return;
         }
 
-        let density = config.initial_density.clamp(0.0, config.max_density);
+        let density = self
+            .config
+            .initial_density
+            .clamp(0.0, self.config.max_density);
 
         candidates.shuffle(rng);
         for pos in candidates.into_iter().take(target) {

@@ -37,7 +37,7 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
     );
     world.apply_food_config(config.world.food.clone());
     world.seed_fertility(seed);
-    world.seed_food(&mut rng, &config);
+    world.seed_food(&mut rng);
 
     // Collect all non-barrier, in-bounds positions.
     let mut positions: Vec<Position> =

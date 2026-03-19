@@ -1,6 +1,6 @@
 use rand::Rng;
 
-use crate::config::{FoodResourceConfig, SimulationConfig, WorldEdgeMode};
+use crate::config::{FoodResourceConfig, WorldEdgeMode};
 use crate::contracts::{CreatureId, Direction, Position};
 use crate::kernel::food_resource::FoodResource;
 use crate::kernel::Grid;
@@ -26,6 +26,7 @@ impl WorldState {
             width,
             height,
             edge_mode,
+            // Config is replaced by apply_food_config() before seeding.
             food: FoodResource::new(width, height, FoodResourceConfig::default(), edge_mode),
             barriers: Grid::new(width, height, false),
             creature_at: Grid::new(width, height, None),
@@ -48,9 +49,8 @@ impl WorldState {
     }
 
     /// Seed initial food distribution (transitional delegate).
-    pub fn seed_food(&mut self, rng: &mut impl Rng, config: &SimulationConfig) {
-        self.food
-            .seed_density(&self.barriers, rng, &config.world.food);
+    pub fn seed_food(&mut self, rng: &mut impl Rng) {
+        self.food.seed_density(&self.barriers, rng);
     }
 
     /// Grow food phase (transitional delegate).
@@ -151,7 +151,7 @@ impl WorldState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::FoodResourceConfig;
+    use crate::config::{FoodResourceConfig, SimulationConfig};
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
     use slotmap::SlotMap;
@@ -192,18 +192,19 @@ mod tests {
     #[test]
     fn seed_food_places_some_food() {
         let mut w = small_wrap_world();
+        w.apply_food_config(default_config().world.food);
         let mut rng = SmallRng::seed_from_u64(42);
-        let cfg = default_config();
-        w.seed_food(&mut rng, &cfg);
+        w.seed_food(&mut rng);
         assert!(w.total_food() > 0.0);
     }
 
     #[test]
     fn seed_food_cells_have_density_or_zero() {
         let mut w = small_wrap_world();
-        let mut rng = SmallRng::seed_from_u64(42);
         let cfg = default_config();
-        w.seed_food(&mut rng, &cfg);
+        w.apply_food_config(cfg.world.food.clone());
+        let mut rng = SmallRng::seed_from_u64(42);
+        w.seed_food(&mut rng);
         for y in 0..10u16 {
             for x in 0..10u16 {
                 let f = w.food_at(Position::new(x, y));
@@ -220,9 +221,10 @@ mod tests {
         let barrier_pos = Position::new(5, 5);
         w.set_barrier(barrier_pos, true);
         let mut rng = SmallRng::seed_from_u64(0);
-        let mut cfg = default_config();
-        cfg.world.food.initial_coverage = 1.0; // guarantee all non-barrier cells are seeded
-        w.seed_food(&mut rng, &cfg);
+        let mut food_cfg = default_config().world.food;
+        food_cfg.initial_coverage = 1.0; // guarantee all non-barrier cells are seeded
+        w.apply_food_config(food_cfg);
+        w.seed_food(&mut rng);
         assert!((w.food_at(barrier_pos) - 0.0).abs() < 1e-6);
     }
 
@@ -293,11 +295,12 @@ mod tests {
     #[test]
     fn seed_food_uses_exact_coverage_count() {
         let mut w = WorldState::new(10, 1, WorldEdgeMode::Wrap);
-        let mut cfg = default_config();
-        cfg.world.food.initial_coverage = 0.4;
-        cfg.world.food.initial_density = 1.0;
+        let mut food_cfg = default_config().world.food;
+        food_cfg.initial_coverage = 0.4;
+        food_cfg.initial_density = 1.0;
+        w.apply_food_config(food_cfg);
         let mut rng = SmallRng::seed_from_u64(7);
-        w.seed_food(&mut rng, &cfg);
+        w.seed_food(&mut rng);
         let seeded = (0..10u16)
             .filter(|&x| w.food_at(Position::new(x, 0)) > 0.0)
             .count();
@@ -539,11 +542,13 @@ mod tests {
 
     #[test]
     fn seed_food_deterministic() {
-        let cfg = default_config();
+        let food_cfg = default_config().world.food;
         let mut w1 = small_wrap_world();
         let mut w2 = small_wrap_world();
-        w1.seed_food(&mut SmallRng::seed_from_u64(99), &cfg);
-        w2.seed_food(&mut SmallRng::seed_from_u64(99), &cfg);
+        w1.apply_food_config(food_cfg.clone());
+        w2.apply_food_config(food_cfg);
+        w1.seed_food(&mut SmallRng::seed_from_u64(99));
+        w2.seed_food(&mut SmallRng::seed_from_u64(99));
         assert_eq!(w1.total_food(), w2.total_food());
         for y in 0..10u16 {
             for x in 0..10u16 {

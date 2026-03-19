@@ -25,7 +25,8 @@ pub fn generate_poisson_blobs(
         return grid;
     }
 
-    let min_distance = min_radius * 2.0;
+    let (min_r, max_r) = (min_radius.min(max_radius), min_radius.max(max_radius));
+    let min_distance = min_r * 2.0;
     let min_distance_sq = min_distance * min_distance;
     let max_attempts = blob_count as usize * 3;
 
@@ -45,7 +46,7 @@ pub fn generate_poisson_blobs(
         });
 
         if !too_close {
-            let radius = rng.gen_range(min_radius..=max_radius);
+            let radius = rng.gen_range(min_r..=max_r);
             centers.push((cx, cy, radius));
         }
     }

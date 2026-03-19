@@ -261,11 +261,12 @@ fn creatures_can_eat_food() {
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
     let pos = Position::new(5, 5);
     {
-        let mut seed_cfg = cfg.clone();
-        seed_cfg.world.food.initial_coverage = 1.0;
-        seed_cfg.world.food.initial_density = 1.0;
+        let mut food_cfg = cfg.world.food.clone();
+        food_cfg.initial_coverage = 1.0;
+        food_cfg.initial_density = 1.0;
+        world.apply_food_config(food_cfg);
         let mut rng = SmallRng::seed_from_u64(0);
-        world.seed_food(&mut rng, &seed_cfg);
+        world.seed_food(&mut rng);
     }
     let food_before = world.food_at(pos);
 
