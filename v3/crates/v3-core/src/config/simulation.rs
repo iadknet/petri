@@ -11,7 +11,7 @@ pub enum WorldEdgeMode {
 /// Food substrate config. Canonical owner: v3-world-grid-spec.md Section 4.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct WorldFoodConfig {
+pub struct FoodResourceConfig {
     pub growth_rate: f32,
     pub initial_density: f32,
     pub initial_coverage: f32,
@@ -20,9 +20,13 @@ pub struct WorldFoodConfig {
     pub recovery_spawn_rate: f32,
     pub recovery_floor_ratio: f32,
     pub max_density: f32,
+    #[serde(default)]
+    pub fertility: FertilityConfig,
+    #[serde(default)]
+    pub annealing: AnnealingConfig,
 }
 
-impl Default for WorldFoodConfig {
+impl Default for FoodResourceConfig {
     fn default() -> Self {
         Self {
             growth_rate: 0.05,
@@ -33,9 +37,119 @@ impl Default for WorldFoodConfig {
             recovery_spawn_rate: 0.01,
             recovery_floor_ratio: 0.01,
             max_density: 1.0,
+            fertility: FertilityConfig::default(),
+            annealing: AnnealingConfig::default(),
         }
     }
 }
+
+/// Fertility layer algorithm variants.
+#[non_exhaustive]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub enum FertilityAlgorithm {
+    Uniform {
+        value: f32,
+    },
+    Fbm {
+        octaves: u32,
+        frequency: f32,
+        lacunarity: f32,
+        persistence: f32,
+        seed: Option<u64>,
+    },
+    PoissonBlobs {
+        blob_count: u32,
+        min_radius: f32,
+        max_radius: f32,
+        falloff: f32,
+        seed: Option<u64>,
+    },
+}
+
+impl Default for FertilityAlgorithm {
+    fn default() -> Self {
+        FertilityAlgorithm::PoissonBlobs {
+            blob_count: 20,
+            min_radius: 10.0,
+            max_radius: 40.0,
+            falloff: 2.0,
+            seed: None,
+        }
+    }
+}
+
+/// A single weighted fertility layer.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FertilityLayer {
+    pub algorithm: FertilityAlgorithm,
+    /// Blend weight for this layer. Default: 1.0.
+    pub weight: f32,
+}
+
+impl Default for FertilityLayer {
+    fn default() -> Self {
+        Self {
+            algorithm: FertilityAlgorithm::default(),
+            weight: 1.0,
+        }
+    }
+}
+
+/// Fertility map configuration governing per-cell food growth multipliers.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct FertilityConfig {
+    /// Whether the fertility map is applied during food growth. Default: false.
+    pub enabled: bool,
+    /// Minimum fertility value after normalization. Default: 0.0.
+    pub min_fertility: f32,
+    /// Maximum fertility value after normalization. Default: 2.0.
+    pub max_fertility: f32,
+    /// Ordered list of weighted algorithm layers. Default: one PoissonBlobs layer.
+    pub layers: Vec<FertilityLayer>,
+}
+
+impl Default for FertilityConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            min_fertility: 0.0,
+            max_fertility: 2.0,
+            layers: vec![FertilityLayer::default()],
+        }
+    }
+}
+
+/// Annealing configuration that ramps fertility bounds over time.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct AnnealingConfig {
+    /// Whether annealing is active. Default: false.
+    pub enabled: bool,
+    /// Number of ticks over which to ramp from initial to final bounds. Default: 5000.
+    pub ramp_ticks: u64,
+    /// Minimum fertility at tick 0 (before annealing completes). Default: 0.3.
+    pub initial_min_fertility: f32,
+    /// Maximum fertility at tick 0 (before annealing completes). Default: 1.5.
+    pub initial_max_fertility: f32,
+}
+
+impl Default for AnnealingConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            ramp_ticks: 5000,
+            initial_min_fertility: 0.3,
+            initial_max_fertility: 1.5,
+        }
+    }
+}
+
+/// Type alias for backwards compatibility.
+#[allow(dead_code)]
+pub type WorldFoodConfig = FoodResourceConfig;
 
 /// World/grid config. Canonical owner: v3-world-grid-spec.md Section 4.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -44,7 +158,7 @@ pub struct WorldConfig {
     pub width: u16,
     pub height: u16,
     pub edge_mode: WorldEdgeMode,
-    pub food: WorldFoodConfig,
+    pub food: FoodResourceConfig,
 }
 
 impl Default for WorldConfig {
@@ -53,7 +167,7 @@ impl Default for WorldConfig {
             width: 400,
             height: 400,
             edge_mode: WorldEdgeMode::default(),
-            food: WorldFoodConfig::default(),
+            food: FoodResourceConfig::default(),
         }
     }
 }
@@ -1630,5 +1744,32 @@ mod tests {
         assert!(cfg.failed_action_penalty_ramp_active(0));
         assert!(cfg.failed_action_penalty_ramp_active(2));
         assert!(!cfg.failed_action_penalty_ramp_active(3));
+    }
+
+    // ── FoodResourceConfig / FertilityConfig / AnnealingConfig tests ──────
+
+    #[test]
+    fn food_resource_config_default_has_fertility_disabled() {
+        let config = FoodResourceConfig::default();
+        assert!(!config.fertility.enabled);
+        assert_eq!(config.fertility.min_fertility, 0.0);
+        assert_eq!(config.fertility.max_fertility, 2.0);
+        assert!(!config.annealing.enabled);
+        assert_eq!(config.annealing.ramp_ticks, 5000);
+    }
+
+    #[test]
+    fn fertility_config_deserializes_with_defaults_when_omitted() {
+        let json = r#"{"growth_rate":0.05,"initial_density":1.0,"initial_coverage":0.15,"spread_threshold_ratio":0.8,"spread_density_ratio":0.25,"recovery_spawn_rate":0.01,"recovery_floor_ratio":0.01,"max_density":1.0}"#;
+        let config: FoodResourceConfig = serde_json::from_str(json).unwrap();
+        assert!(!config.fertility.enabled);
+        assert!(!config.annealing.enabled);
+    }
+
+    #[test]
+    fn fertility_algorithm_serializes_as_tagged_enum() {
+        let layer = FertilityLayer::default();
+        let json = serde_json::to_string(&layer).unwrap();
+        assert!(json.contains("PoissonBlobs"));
     }
 }
