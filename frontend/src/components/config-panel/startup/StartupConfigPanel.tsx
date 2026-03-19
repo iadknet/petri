@@ -1,6 +1,7 @@
 import { Section } from "../shared/Section.tsx";
 import type { StartupPanelProps } from "../shared/types.ts";
 import { EnergySection } from "./EnergySection.tsx";
+import { FertilitySection } from "./FertilitySection.tsx";
 import { FoodParametersSection } from "./FoodParametersSection.tsx";
 import { PopulationSection } from "./PopulationSection.tsx";
 import { RunSettingsSection } from "./RunSettingsSection.tsx";
@@ -31,6 +32,10 @@ export function StartupConfigPanel({
 			/>
 			<EnergySection startupPreset={startupPreset} updateStartupPreset={updateStartupPreset} />
 			<FoodParametersSection
+				startupPreset={startupPreset}
+				updateStartupPreset={updateStartupPreset}
+			/>
+			<FertilitySection
 				startupPreset={startupPreset}
 				updateStartupPreset={updateStartupPreset}
 			/>
