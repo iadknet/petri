@@ -20,9 +20,11 @@ export interface ViewportState {
 	camera: CameraState;
 	canvasSize: ViewportDimensions;
 	worldSize: ViewportDimensions | null;
+	showFertilityOverlay: boolean;
 	setCamera: (camera: CameraState) => void;
 	setCanvasSize: (width: number, height: number) => void;
 	setWorldSize: (width: number, height: number) => void;
+	toggleFertilityOverlay: () => void;
 	getViewRequest: () => ViewRequest | null;
 	reset: () => void;
 }
@@ -31,6 +33,7 @@ const initialState = {
 	camera: { x: 0, y: 0, zoom: 1 },
 	canvasSize: { width: 0, height: 0 },
 	worldSize: null as ViewportDimensions | null,
+	showFertilityOverlay: false,
 };
 
 function clamp(value: number, min: number, max: number): number {
@@ -84,6 +87,7 @@ export const useViewportStore = create<ViewportState>()((set, get) => ({
 	setCamera: (camera) => set({ camera }),
 	setCanvasSize: (width, height) => set({ canvasSize: { width, height } }),
 	setWorldSize: (width, height) => set({ worldSize: { width, height } }),
+	toggleFertilityOverlay: () => set((s) => ({ showFertilityOverlay: !s.showFertilityOverlay })),
 	getViewRequest: () => deriveViewRequest(get()),
 	reset: () => set(initialState),
 }));

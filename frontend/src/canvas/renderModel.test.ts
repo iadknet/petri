@@ -10,6 +10,8 @@ describe("buildRenderModel", () => {
 				tick: 0,
 				predationEvents: [],
 				camera: { x: 0, y: 0, zoom: 1 },
+				fertilityGrid: null,
+				showFertilityOverlay: false,
 			}),
 		).toBeNull();
 	});
@@ -34,6 +36,8 @@ describe("buildRenderModel", () => {
 				tick: 12,
 				predationEvents: [],
 				camera: { x: 8, y: 4, zoom: 3 },
+				fertilityGrid: null,
+				showFertilityOverlay: false,
 			}),
 		).toEqual({
 			frame: {
@@ -53,6 +57,52 @@ describe("buildRenderModel", () => {
 			tick: 12,
 			predationEvents: [],
 			camera: { x: 8, y: 4, zoom: 3 },
+			fertilityOverlay: null,
 		});
+	});
+
+	it("includes fertility overlay when enabled and grid is present", () => {
+		const grid = [0, 64, 128, 255];
+		const result = buildRenderModel({
+			frame: {
+				width: 2,
+				height: 2,
+				creatures: [],
+				food: [],
+				barriers: [],
+			},
+			overviewView: null,
+			tick: 1,
+			predationEvents: [],
+			camera: { x: 0, y: 0, zoom: 1 },
+			fertilityGrid: grid,
+			showFertilityOverlay: true,
+		});
+
+		expect(result?.fertilityOverlay).toEqual({
+			worldGrid: [0, 64, 128, 255],
+			worldWidth: 2,
+			worldHeight: 2,
+		});
+	});
+
+	it("omits fertility overlay when toggle is off", () => {
+		const result = buildRenderModel({
+			frame: {
+				width: 2,
+				height: 2,
+				creatures: [],
+				food: [],
+				barriers: [],
+			},
+			overviewView: null,
+			tick: 1,
+			predationEvents: [],
+			camera: { x: 0, y: 0, zoom: 1 },
+			fertilityGrid: [0, 64, 128, 255],
+			showFertilityOverlay: false,
+		});
+
+		expect(result?.fertilityOverlay).toBeNull();
 	});
 });

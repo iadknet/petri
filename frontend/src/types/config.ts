@@ -1,3 +1,27 @@
+export type FertilityAlgorithm =
+	| { Uniform: { value: number } }
+	| { Fbm: { octaves: number; frequency: number; lacunarity: number; persistence: number; seed?: number } }
+	| { PoissonBlobs: { blob_count: number; min_radius: number; max_radius: number; falloff: number; seed?: number } };
+
+export interface FertilityLayer {
+	algorithm: FertilityAlgorithm;
+	weight: number;
+}
+
+export interface FertilityConfig {
+	enabled: boolean;
+	min_fertility: number;
+	max_fertility: number;
+	layers: FertilityLayer[];
+}
+
+export interface AnnealingConfig {
+	enabled: boolean;
+	ramp_ticks: number;
+	initial_min_fertility: number;
+	initial_max_fertility: number;
+}
+
 export interface FoodConfig {
 	growth_rate: number;
 	initial_density: number;
@@ -7,6 +31,8 @@ export interface FoodConfig {
 	recovery_spawn_rate: number;
 	recovery_floor_ratio: number;
 	max_density: number;
+	fertility?: FertilityConfig;
+	annealing?: AnnealingConfig;
 }
 
 export type WorldEdgeMode = "Wrap" | "Bounded";

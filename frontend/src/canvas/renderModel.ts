@@ -1,4 +1,4 @@
-import type { Frame, PredationEvent, ViewOverviewPayload } from "../types/api.ts";
+import type { ByteArrayLike, Frame, PredationEvent, ViewOverviewPayload } from "../types/api.ts";
 import type { CameraState } from "./camera.ts";
 
 export interface OverviewRenderLayer {
@@ -9,12 +9,24 @@ export interface OverviewRenderLayer {
 	creatureCounts: number[];
 }
 
+export interface FertilityOverlay {
+	/** Full world-size fertility grid (one u8 per cell). */
+	worldGrid: number[];
+	worldWidth: number;
+	worldHeight: number;
+}
+
 export interface RenderModel {
 	frame: Frame;
 	overview: OverviewRenderLayer | null;
 	tick: number;
 	predationEvents: PredationEvent[];
 	camera: CameraState;
+	fertilityOverlay: FertilityOverlay | null;
+}
+
+function toNumberArray(values: ByteArrayLike): number[] {
+	return Array.from(values);
 }
 
 export function buildRenderModel(input: {
@@ -23,6 +35,8 @@ export function buildRenderModel(input: {
 	tick: number;
 	predationEvents: PredationEvent[];
 	camera: CameraState;
+	fertilityGrid: ByteArrayLike | null;
+	showFertilityOverlay: boolean;
 }): RenderModel | null {
 	if (!input.frame) {
 		return null;
@@ -42,5 +56,13 @@ export function buildRenderModel(input: {
 		tick: input.tick,
 		predationEvents: input.predationEvents,
 		camera: input.camera,
+		fertilityOverlay:
+			input.showFertilityOverlay && input.fertilityGrid
+				? {
+						worldGrid: toNumberArray(input.fertilityGrid),
+						worldWidth: input.frame.width,
+						worldHeight: input.frame.height,
+					}
+				: null,
 	};
 }
