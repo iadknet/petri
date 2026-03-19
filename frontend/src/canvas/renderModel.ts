@@ -25,10 +25,6 @@ export interface RenderModel {
 	fertilityOverlay: FertilityOverlay | null;
 }
 
-function toNumberArray(values: ByteArrayLike): number[] {
-	return Array.from(values);
-}
-
 export function buildRenderModel(input: {
 	frame: Frame | null;
 	overviewView: ViewOverviewPayload | null;
@@ -59,7 +55,7 @@ export function buildRenderModel(input: {
 		fertilityOverlay:
 			input.showFertilityOverlay && input.fertilityGrid
 				? {
-						worldGrid: toNumberArray(input.fertilityGrid),
+						worldGrid: Array.from(input.fertilityGrid),
 						worldWidth: input.frame.width,
 						worldHeight: input.frame.height,
 					}

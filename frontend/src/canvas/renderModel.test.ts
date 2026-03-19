@@ -105,4 +105,24 @@ describe("buildRenderModel", () => {
 
 		expect(result?.fertilityOverlay).toBeNull();
 	});
+
+	it("fertility overlay is null when grid is null even if toggle is on", () => {
+		const result = buildRenderModel({
+			frame: {
+				width: 2,
+				height: 2,
+				creatures: [],
+				food: [],
+				barriers: [],
+			},
+			overviewView: null,
+			tick: 1,
+			predationEvents: [],
+			camera: { x: 0, y: 0, zoom: 1 },
+			fertilityGrid: null,
+			showFertilityOverlay: true,
+		});
+
+		expect(result?.fertilityOverlay).toBeNull();
+	});
 });
