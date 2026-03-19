@@ -40,6 +40,9 @@ const FERT_ALPHA = 0.35;
  * 0 = barren (reddish-brown, full alpha)
  * 128 = neutral (transparent)
  * 255 = fertile (green, full alpha)
+ *
+ * Note: green fertility overlay may visually blend with green food cells.
+ * Consider alternative color schemes if readability becomes an issue.
  */
 function fertilityColor(value: number): [number, number, number, number] {
 	// Normalise: 0 → -1, 128 → 0, 255 → +1
@@ -457,8 +460,14 @@ export class WorldRenderer {
 		for (let i = 0; i < cellCount; i++) {
 			const value = overlay.worldGrid[i] ?? 128;
 			if (value === 128) continue; // neutral — skip for performance
-			const [r, g, b, a] = fertilityColor(value);
+			// Inline color computation to avoid tuple allocation per cell in this hot loop.
+			const t = (value - 128) / 127;
+			const absT = Math.abs(t);
+			const a = absT * FERT_ALPHA;
 			if (a <= 0) continue;
+			const r = t < 0 ? FERT_BARREN_R : FERT_FERTILE_R;
+			const g = t < 0 ? FERT_BARREN_G : FERT_FERTILE_G;
+			const b = t < 0 ? FERT_BARREN_B : FERT_FERTILE_B;
 			const idx = i * 4;
 			data[idx] = Math.round(data[idx]! * (1 - a) + r * a);
 			data[idx + 1] = Math.round(data[idx + 1]! * (1 - a) + g * a);
@@ -471,6 +480,8 @@ export class WorldRenderer {
 		const { x: cx, y: cy, zoom } = camera;
 		const { worldGrid, worldWidth, worldHeight } = overlay;
 
+		// PERF: fillStyle string parsing is expensive per-cell. Consider batching
+		// by alpha bucket or using an offscreen canvas for large worlds.
 		for (let y = 0; y < worldHeight; y++) {
 			for (let x = 0; x < worldWidth; x++) {
 				const value = worldGrid[y * worldWidth + x] ?? 128;

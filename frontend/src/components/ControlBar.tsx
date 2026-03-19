@@ -241,6 +241,7 @@ export function ControlBar() {
 				data-testid="toggle-fertility"
 				onClick={toggleFertilityOverlay}
 				aria-pressed={showFertilityOverlay}
+				aria-label={showFertilityOverlay ? "Hide fertility overlay" : "Show fertility overlay"}
 				className={`px-2 py-1 text-xs rounded transition-colors ${
 					showFertilityOverlay
 						? "bg-emerald-700 text-white hover:bg-emerald-600"
