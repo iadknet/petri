@@ -5,6 +5,7 @@ import { usePanelLayout } from "../stores/layout.tsx";
 import { useSimulationStore } from "../stores/simulation.ts";
 import { buildStartupRequest, useStartupConfigStore } from "../stores/startupConfig.ts";
 import { useStatsHistoryStore } from "../stores/stats.ts";
+import { useViewportStore } from "../stores/viewport.ts";
 import type { SimState, SimulationConfig } from "../types/api.ts";
 import { RUNTIME_PATCH_FIELDS } from "./config-panel/runtime/RuntimeConfigPanel.tsx";
 import { buildPatch, getByPath, mergePatch } from "./config-panel/shared/pathUtils.ts";
@@ -94,6 +95,8 @@ export function ControlBar() {
 	const ticksPerSecond = useSimulationStore((s) => s.ticksPerSecond);
 	const connectionStatus = useSimulationStore((s) => s.connectionStatus);
 	const { toggleConfig, toggleStats } = usePanelLayout();
+	const showFertilityOverlay = useViewportStore((s) => s.showFertilityOverlay);
+	const toggleFertilityOverlay = useViewportStore((s) => s.toggleFertilityOverlay);
 	const [restarting, setRestarting] = useState(false);
 
 	const enabled = buttonEnabled(simState);
@@ -233,6 +236,19 @@ export function ControlBar() {
 			<ConnectionDot status={connectionStatus} />
 
 			{/* Panel toggles */}
+			<button
+				type="button"
+				data-testid="toggle-fertility"
+				onClick={toggleFertilityOverlay}
+				aria-pressed={showFertilityOverlay}
+				className={`px-2 py-1 text-xs rounded transition-colors ${
+					showFertilityOverlay
+						? "bg-emerald-700 text-white hover:bg-emerald-600"
+						: "text-slate-400 hover:text-slate-200 bg-slate-800"
+				}`}
+			>
+				Fertility
+			</button>
 			<button
 				type="button"
 				data-testid="toggle-config"

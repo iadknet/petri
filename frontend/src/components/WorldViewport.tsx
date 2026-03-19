@@ -63,6 +63,8 @@ export function WorldViewport() {
 				tick: sim.tick,
 				predationEvents: worldView.predationEvents,
 				camera: viewport.camera,
+				fertilityGrid: worldView.worldStatic?.food_fertility_u8 ?? null,
+				showFertilityOverlay: viewport.showFertilityOverlay,
 			});
 		});
 
@@ -119,13 +121,14 @@ export function WorldViewport() {
 		});
 	}, [setCamera]);
 
-	// Re-render when camera changes
+	// Re-render when camera or fertility overlay toggle changes
 	useEffect(() => {
 		return useViewportStore.subscribe((state, prev) => {
 			if (
 				state.camera.x !== prev.camera.x ||
 				state.camera.y !== prev.camera.y ||
-				state.camera.zoom !== prev.camera.zoom
+				state.camera.zoom !== prev.camera.zoom ||
+				state.showFertilityOverlay !== prev.showFertilityOverlay
 			) {
 				rendererRef.current?.invalidate();
 			}

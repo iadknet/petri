@@ -137,6 +137,7 @@ export interface WorldStaticPayload {
 	width: number;
 	height: number;
 	barrier_mask: ByteArrayLike;
+	food_fertility_u8?: ByteArrayLike;
 }
 
 export interface ViewRect {
@@ -151,6 +152,7 @@ export interface ViewOverviewPayload {
 	grid_width: number;
 	grid_height: number;
 	food_density_u8: ByteArrayLike;
+	food_fertility_u8?: ByteArrayLike;
 	creature_count_u16: number[];
 }
 
@@ -159,6 +161,7 @@ export interface ViewDetailPayload {
 	width: number;
 	height: number;
 	food_density_u8: ByteArrayLike;
+	food_fertility_u8?: ByteArrayLike;
 	creatures: Creature[];
 	predation_events: PredationEvent[];
 }

@@ -10,7 +10,7 @@ import {
 	zoomCameraFromCenter,
 } from "./camera.ts";
 import { FlashOverlay } from "./flash-overlay.ts";
-import type { OverviewRenderLayer, RenderModel } from "./renderModel.ts";
+import type { FertilityOverlay, OverviewRenderLayer, RenderModel } from "./renderModel.ts";
 
 /** Background color: slate-950 (#020617) */
 const BG_R = 2;
@@ -21,6 +21,36 @@ const BG_B = 23;
 const BARRIER_R = 139;
 const BARRIER_G = 69;
 const BARRIER_B = 19;
+
+/** Fertility overlay: barren color (reddish-brown) */
+const FERT_BARREN_R = 139;
+const FERT_BARREN_G = 69;
+const FERT_BARREN_B = 19;
+
+/** Fertility overlay: fertile color (green) */
+const FERT_FERTILE_R = 34;
+const FERT_FERTILE_G = 197;
+const FERT_FERTILE_B = 94;
+
+/** Fertility overlay alpha (0-1). Semi-transparent so terrain shows through. */
+const FERT_ALPHA = 0.35;
+
+/**
+ * Map a u8 fertility value to an RGBA color.
+ * 0 = barren (reddish-brown, full alpha)
+ * 128 = neutral (transparent)
+ * 255 = fertile (green, full alpha)
+ */
+function fertilityColor(value: number): [number, number, number, number] {
+	// Normalise: 0 → -1, 128 → 0, 255 → +1
+	const t = (value - 128) / 127;
+	const absT = Math.abs(t);
+	// Below neutral → blend toward barren; above → blend toward fertile
+	if (t < 0) {
+		return [FERT_BARREN_R, FERT_BARREN_G, FERT_BARREN_B, absT * FERT_ALPHA];
+	}
+	return [FERT_FERTILE_R, FERT_FERTILE_G, FERT_FERTILE_B, absT * FERT_ALPHA];
+}
 
 /** Zoom threshold for switching from pixel to rect mode */
 const RECT_MODE_THRESHOLD = 4;
@@ -154,7 +184,7 @@ export class WorldRenderer {
 		const model = this.getRenderModel();
 		if (!model) return;
 
-		const { frame, overview, tick, predationEvents, camera } = model;
+		const { frame, overview, tick, predationEvents, camera, fertilityOverlay } = model;
 
 		if (tick !== this.lastRenderedTick) {
 			this.flashOverlay.update(predationEvents, frame.width);
@@ -172,11 +202,11 @@ export class WorldRenderer {
 		const { zoom } = camera;
 
 		if (zoom < RECT_MODE_THRESHOLD) {
-			this.renderPixelMode(frame, camera, overview);
+			this.renderPixelMode(frame, camera, overview, fertilityOverlay);
 		} else {
 			ctx.fillStyle = "#020617";
 			ctx.fillRect(0, 0, canvas.width, canvas.height);
-			this.renderRectMode(frame, camera, zoom >= DETAIL_MODE_THRESHOLD);
+			this.renderRectMode(frame, camera, zoom >= DETAIL_MODE_THRESHOLD, fertilityOverlay);
 		}
 	}
 
@@ -184,6 +214,7 @@ export class WorldRenderer {
 		frame: Frame,
 		camera: CameraState,
 		overview: OverviewRenderLayer | null,
+		fertilityOverlay: FertilityOverlay | null,
 	): void {
 		const { ctx, canvas } = this;
 		const { width, height } = frame;
@@ -214,6 +245,10 @@ export class WorldRenderer {
 				data[idx + 2] = 0;
 				data[idx + 3] = 255;
 			}
+		}
+
+		if (fertilityOverlay) {
+			this.blendFertilityPixels(data, width, height, fertilityOverlay);
 		}
 
 		for (const barrier of frame.barriers) {
@@ -317,7 +352,12 @@ export class WorldRenderer {
 		}
 	}
 
-	private renderRectMode(frame: Frame, camera: CameraState, detailed: boolean): void {
+	private renderRectMode(
+		frame: Frame,
+		camera: CameraState,
+		detailed: boolean,
+		fertilityOverlay: FertilityOverlay | null,
+	): void {
 		const { ctx } = this;
 		const { x: cx, y: cy, zoom } = camera;
 
@@ -326,6 +366,10 @@ export class WorldRenderer {
 			const intensity = Math.min(255, Math.round(density * 180) + 30);
 			ctx.fillStyle = `rgb(0,${intensity},0)`;
 			ctx.fillRect(cx + food.x * zoom, cy + food.y * zoom, zoom, zoom);
+		}
+
+		if (fertilityOverlay) {
+			this.drawFertilityRects(fertilityOverlay, camera);
 		}
 
 		ctx.fillStyle = `rgb(${BARRIER_R},${BARRIER_G},${BARRIER_B})`;
@@ -401,6 +445,42 @@ export class WorldRenderer {
 			ctx.lineTo(cx + worldWidth * zoom, py);
 		}
 		ctx.stroke();
+	}
+
+	private blendFertilityPixels(
+		data: Uint8ClampedArray,
+		worldWidth: number,
+		worldHeight: number,
+		overlay: FertilityOverlay,
+	): void {
+		const cellCount = Math.min(worldWidth * worldHeight, overlay.worldGrid.length);
+		for (let i = 0; i < cellCount; i++) {
+			const value = overlay.worldGrid[i] ?? 128;
+			if (value === 128) continue; // neutral — skip for performance
+			const [r, g, b, a] = fertilityColor(value);
+			if (a <= 0) continue;
+			const idx = i * 4;
+			data[idx] = Math.round(data[idx]! * (1 - a) + r * a);
+			data[idx + 1] = Math.round(data[idx + 1]! * (1 - a) + g * a);
+			data[idx + 2] = Math.round(data[idx + 2]! * (1 - a) + b * a);
+		}
+	}
+
+	private drawFertilityRects(overlay: FertilityOverlay, camera: CameraState): void {
+		const { ctx } = this;
+		const { x: cx, y: cy, zoom } = camera;
+		const { worldGrid, worldWidth, worldHeight } = overlay;
+
+		for (let y = 0; y < worldHeight; y++) {
+			for (let x = 0; x < worldWidth; x++) {
+				const value = worldGrid[y * worldWidth + x] ?? 128;
+				if (value === 128) continue;
+				const [r, g, b, a] = fertilityColor(value);
+				if (a <= 0) continue;
+				ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+				ctx.fillRect(cx + x * zoom, cy + y * zoom, zoom, zoom);
+			}
+		}
 	}
 
 	private previewColor(tool: PaintTool): [number, number, number] {
