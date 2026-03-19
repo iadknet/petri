@@ -4,6 +4,7 @@ use crate::query::spatial_index::ViewRect;
 use crate::state::FramePayload;
 use crate::transport::session::ViewSubscription;
 use v3_core::kernel::paint::{PaintPoint, PaintStats, PaintTool};
+use v3_core::kernel::FoodResource;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, serde::Serialize)]
 pub struct DirtyRect {
@@ -120,18 +121,55 @@ pub fn build_barrier_mask(frame: &FramePayload) -> Box<[u8]> {
     mask.into_boxed_slice()
 }
 
+/// Quantize fertility: raw [-1,1] -> effective [min,max] -> u8 [0,255].
+///
+/// Edge case: when min == max the entire grid gets 128 (mid-point).
+#[must_use]
+pub fn build_food_fertility_u8(food: &FoodResource) -> Box<[u8]> {
+    let config = food.config();
+    let fertility_grid = food.fertility();
+    let min = config.fertility.min_fertility;
+    let max = config.fertility.max_fertility;
+    let width = fertility_grid.width() as usize;
+    let height = fertility_grid.height() as usize;
+
+    if (max - min).abs() < f32::EPSILON {
+        return vec![128u8; width * height].into_boxed_slice();
+    }
+
+    let mut result = Vec::with_capacity(width * height);
+    for y in 0..height {
+        for x in 0..width {
+            let raw = *fertility_grid.get(x as u16, y as u16);
+            // Map raw [-1,1] to [0,1], then to effective [min,max], then to u8 [0,255].
+            let t = (raw + 1.0) / 2.0;
+            let effective = min + t * (max - min);
+            let u8val = ((effective - min) / (max - min) * 255.0)
+                .round()
+                .clamp(0.0, 255.0) as u8;
+            result.push(u8val);
+        }
+    }
+    result.into_boxed_slice()
+}
+
 fn quantize_food_density(density: f32) -> u8 {
     (density.clamp(0.0, 1.0) * 255.0).round() as u8
 }
 
 #[cfg(test)]
 mod tests {
+    use v3_core::config::{FertilityConfig, FertilityLayer, FoodResourceConfig, WorldEdgeMode};
     use v3_core::kernel::paint::{PaintPoint, PaintStats, PaintTool};
+    use v3_core::kernel::FoodResource;
 
     use crate::transport::protocol::ZoomTier;
     use crate::transport::session::ViewSubscription;
 
-    use super::{paint_dirty_rect, view_intersects_dirty_rect, world_static_changed, DirtyRect};
+    use super::{
+        build_food_fertility_u8, paint_dirty_rect, view_intersects_dirty_rect,
+        world_static_changed, DirtyRect,
+    };
 
     #[test]
     fn paint_dirty_rect_expands_and_clamps_to_world() {
@@ -186,5 +224,76 @@ mod tests {
         assert!(world_static_changed(PaintTool::EraseBarrier, &stats));
         assert!(!world_static_changed(PaintTool::Food, &stats));
         assert!(!world_static_changed(PaintTool::EraseFood, &stats));
+    }
+
+    // ── Fertility quantization tests ────────────────────────────────────────
+
+    /// Create a FoodResource with uniform fertility for quantization tests.
+    fn food_with_fertility(
+        width: u16,
+        height: u16,
+        min_fert: f32,
+        max_fert: f32,
+        uniform_value: f32,
+    ) -> FoodResource {
+        let config = FoodResourceConfig {
+            fertility: FertilityConfig {
+                enabled: true,
+                min_fertility: min_fert,
+                max_fertility: max_fert,
+                layers: vec![FertilityLayer {
+                    algorithm: v3_core::config::FertilityAlgorithm::Uniform {
+                        value: uniform_value,
+                    },
+                    weight: 1.0,
+                }],
+            },
+            ..FoodResourceConfig::default()
+        };
+        let mut food = FoodResource::new(width, height, config, WorldEdgeMode::Wrap);
+        food.seed_fertility(42);
+        food
+    }
+
+    #[test]
+    fn quantize_fertility_maps_range_to_u8() {
+        // Uniform value 0.0 → raw fertility = 0.0.
+        // With min=0, max=2: t = (0+1)/2 = 0.5, effective = 0 + 0.5*2 = 1.0,
+        // u8 = ((1.0-0)/(2-0)*255).round() = 128.
+        let food = food_with_fertility(2, 2, 0.0, 2.0, 0.0);
+        let result = build_food_fertility_u8(&food);
+        assert_eq!(result.len(), 4);
+        for &v in result.iter() {
+            assert_eq!(v, 128, "expected 128 for midpoint fertility, got {v}");
+        }
+    }
+
+    #[test]
+    fn quantize_fertility_extreme_values() {
+        // Uniform value 1.0 → raw = 1.0.
+        // t = (1+1)/2 = 1.0, effective = max → u8 = 255.
+        let food = food_with_fertility(2, 2, 0.0, 2.0, 1.0);
+        let result = build_food_fertility_u8(&food);
+        for &v in result.iter() {
+            assert_eq!(v, 255, "expected 255 for max fertility, got {v}");
+        }
+
+        // Uniform value -1.0 → raw = -1.0.
+        // t = (-1+1)/2 = 0.0, effective = min → u8 = 0.
+        let food = food_with_fertility(2, 2, 0.0, 2.0, -1.0);
+        let result = build_food_fertility_u8(&food);
+        for &v in result.iter() {
+            assert_eq!(v, 0, "expected 0 for min fertility, got {v}");
+        }
+    }
+
+    #[test]
+    fn quantize_fertility_min_equals_max_returns_128() {
+        let food = food_with_fertility(3, 3, 1.5, 1.5, 0.5);
+        let result = build_food_fertility_u8(&food);
+        assert_eq!(result.len(), 9);
+        for &v in result.iter() {
+            assert_eq!(v, 128, "expected 128 when min==max, got {v}");
+        }
     }
 }

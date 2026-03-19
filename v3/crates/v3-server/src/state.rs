@@ -109,6 +109,7 @@ pub struct FramePayload {
     pub creatures: Vec<CreatureSnapshot>,
     pub food: Vec<FoodCell>,
     pub barriers: Vec<BarrierCell>,
+    pub food_fertility_u8: Box<[u8]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
