@@ -485,9 +485,17 @@ async fn snapshot_bootstrap_returns_overview_and_revisions() {
         body["world_static"]["barrier_mask"].is_array(),
         "body: {body}"
     );
+    assert!(
+        body["world_static"]["food_fertility_u8"].is_array(),
+        "body: {body}"
+    );
     assert!(body["view"]["grid_width"].is_number(), "body: {body}");
     assert!(body["view"]["grid_height"].is_number(), "body: {body}");
     assert!(body["view"]["food_density_u8"].is_array(), "body: {body}");
+    assert!(
+        body["view"]["food_fertility_u8"].is_null(),
+        "overview view payload should not include static fertility bytes: {body}"
+    );
     assert!(
         body["view"]["creature_count_u16"].is_array(),
         "body: {body}"
@@ -592,6 +600,30 @@ async fn status_and_snapshot_share_projection_when_not_mutating() {
         "reads without an intervening mutation should come from the same published projection"
     );
     assert_eq!(status_body["tick"], snapshot_body["tick"]);
+}
+
+// ── 10f. snapshot_detail_omits_fertility_bytes_from_view_payload ──────────
+
+#[tokio::test]
+async fn snapshot_detail_omits_fertility_bytes_from_view_payload() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":22}"#))
+        .await
+        .unwrap();
+
+    let (status, body) = do_request(a, get_req("/v3/simulation/snapshot?zoom_tier=detail")).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert_eq!(body["view"]["kind"].as_str(), Some("detail"), "body: {body}");
+    assert!(body["view"]["food_density_u8"].is_array(), "body: {body}");
+    assert!(
+        body["view"]["food_fertility_u8"].is_null(),
+        "detail view payload should not include static fertility bytes: {body}"
+    );
+    assert!(
+        body["world_static"]["food_fertility_u8"].is_array(),
+        "world_static must carry fertility bytes: {body}"
+    );
 }
 
 // ── 11. patch_config_world_field_while_running_returns_409 ──────────────────
@@ -754,6 +786,42 @@ async fn patch_config_rejects_startup_fields() {
                     "start": 5.0,
                     "end": 30.0,
                     "target_tick": 1000
+                }
+            }
+        }
+    }"#;
+
+    let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
+    assert_eq!(
+        body["error"].as_str(),
+        Some("validation_rejected"),
+        "body: {body}"
+    );
+}
+
+// ── 11h. patch_config_rejects_fertility_layer_generation_fields ───────────
+
+#[tokio::test]
+async fn patch_config_rejects_fertility_layer_generation_fields() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let patch = r#"{
+        "world": {
+            "food": {
+                "fertility": {
+                    "layers": [
+                        {
+                            "algorithm": {
+                                "Uniform": { "value": 1.0 }
+                            },
+                            "weight": 1.0
+                        }
+                    ]
                 }
             }
         }

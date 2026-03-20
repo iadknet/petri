@@ -71,6 +71,7 @@ fn queued_actions_stop_once_action_exhausts_creature_energy() {
     ]);
     let (mut sim, id) = make_sim_with_custom_genome(1.0, genome);
     sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
+    sim.config.startup.ramps.failed_action_penalty.enabled = false;
 
     let creature = &sim.creatures[id];
     let fatal_eat_cost = sim.config.energy.adjusted_action_cost(
@@ -666,6 +667,7 @@ fn energy_floor_at_zero_after_action_execution() {
     sim.creatures[id].age = 500;
     // Disable energy decay so it doesn't confound the test.
     sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
+    sim.config.startup.ramps.failed_action_penalty.enabled = false;
 
     // Place barrier directly north of creature at (5,5) so moves fail.
     sim.world.set_barrier(Position::new(5, 4), true);

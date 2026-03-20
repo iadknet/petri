@@ -21,7 +21,6 @@ pub fn assemble_detail_payload(
 
     let rect_cells = rect.width as usize * rect.height as usize;
     let mut food_density_u8 = Vec::with_capacity(rect_cells);
-    let mut food_fertility_u8 = Vec::with_capacity(rect_cells);
     let world_width = snapshot.ws_frame.frame.width;
     for y in rect.y..rect.y + rect.height {
         for x in rect.x..rect.x + rect.width {
@@ -31,7 +30,6 @@ pub fn assemble_detail_payload(
                 "detail food density index should stay within the clamped world bounds"
             );
             food_density_u8.push(snapshot.food_density_u8[index]);
-            food_fertility_u8.push(snapshot.food_fertility_u8[index]);
         }
     }
     let predation_events = snapshot
@@ -50,7 +48,6 @@ pub fn assemble_detail_payload(
         width: rect.width,
         height: rect.height,
         food_density_u8,
-        food_fertility_u8,
         creatures,
         predation_events,
     }
@@ -66,7 +63,6 @@ pub fn assemble_overview_payload(
     let grid_height = rect.height.min(128) as usize;
     let grid_cells = grid_width * grid_height;
     let mut food_density_u8 = vec![0u8; grid_cells];
-    let mut food_fertility_u8 = vec![0u8; grid_cells];
     let mut creature_count_u16 = vec![0u16; grid_cells];
 
     for y in 0..grid_height {
@@ -80,7 +76,6 @@ pub fn assemble_overview_payload(
                 "overview food density index should stay within the clamped world bounds"
             );
             food_density_u8[dst] = snapshot.food_density_u8[src];
-            food_fertility_u8[dst] = snapshot.food_fertility_u8[src];
         }
     }
 
@@ -100,7 +95,6 @@ pub fn assemble_overview_payload(
         grid_width: grid_width as u16,
         grid_height: grid_height as u16,
         food_density_u8,
-        food_fertility_u8,
         creature_count_u16,
     }
 }

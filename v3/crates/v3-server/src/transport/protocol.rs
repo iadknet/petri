@@ -125,7 +125,6 @@ pub struct ViewOverviewPayload {
     pub grid_width: u16,
     pub grid_height: u16,
     pub food_density_u8: Vec<u8>,
-    pub food_fertility_u8: Vec<u8>,
     pub creature_count_u16: Vec<u16>,
 }
 
@@ -135,7 +134,6 @@ pub struct ViewDetailPayload {
     pub width: u16,
     pub height: u16,
     pub food_density_u8: Vec<u8>,
-    pub food_fertility_u8: Vec<u8>,
     pub creatures: Vec<CreatureSnapshot>,
     pub predation_events: Vec<PredationEventSnapshot>,
 }
@@ -364,7 +362,6 @@ mod tests {
                 width: 4,
                 height: 5,
                 food_density_u8: vec![0, 1, 2, 3],
-                food_fertility_u8: vec![128, 128, 128, 128],
                 creatures: vec![CreatureSnapshot {
                     id: 42,
                     x: 3,

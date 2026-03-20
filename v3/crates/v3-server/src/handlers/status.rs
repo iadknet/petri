@@ -21,6 +21,15 @@ fn patch_touches_failed_action_penalty(patch: &serde_json::Value) -> bool {
         .is_some()
 }
 
+fn patch_touches_fertility_generation_layers(patch: &serde_json::Value) -> bool {
+    patch
+        .get("world")
+        .and_then(|w| w.get("food"))
+        .and_then(|f| f.get("fertility"))
+        .and_then(|fertility| fertility.get("layers"))
+        .is_some()
+}
+
 pub async fn get_status(State(app): State<AppState>) -> impl IntoResponse {
     let snapshot = {
         app.projection
@@ -54,6 +63,15 @@ pub async fn patch_config(
             field_errors: vec![FieldError {
                 field: "startup".into(),
                 reason: "startup config is restart-only and cannot be patched".into(),
+            }],
+            endpoint: "patch_config",
+        });
+    }
+    if patch_touches_fertility_generation_layers(&patch) {
+        return Err(AppError::ValidationRejected {
+            field_errors: vec![FieldError {
+                field: "world.food.fertility.layers".into(),
+                reason: "fertility layer generation is restart-only and cannot be patched".into(),
             }],
             endpoint: "patch_config",
         });
