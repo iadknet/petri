@@ -124,8 +124,11 @@ pub fn build_barrier_mask(frame: &FramePayload) -> Box<[u8]> {
 /// Quantize fertility: raw [-1,1] -> effective [min,max] -> u8 [0,255].
 ///
 /// Edge case: when min == max the entire grid gets 128 (mid-point).
+///
+/// Returns an `Arc<[u8]>` so the result can be shared across frames without
+/// copying the grid on every projection publish.
 #[must_use]
-pub fn build_food_fertility_u8(food: &FoodResource) -> Box<[u8]> {
+pub fn build_food_fertility_u8(food: &FoodResource) -> std::sync::Arc<[u8]> {
     let config = food.config();
     let fertility_grid = food.fertility();
     let min = config.fertility.min_fertility;
@@ -134,23 +137,20 @@ pub fn build_food_fertility_u8(food: &FoodResource) -> Box<[u8]> {
     let height = fertility_grid.height() as usize;
 
     if (max - min).abs() < f32::EPSILON {
-        return vec![128u8; width * height].into_boxed_slice();
+        return vec![128u8; width * height].into();
     }
 
     let mut result = Vec::with_capacity(width * height);
     for y in 0..height {
         for x in 0..width {
             let raw = *fertility_grid.get(x as u16, y as u16);
-            // Map raw [-1,1] to [0,1], then to effective [min,max], then to u8 [0,255].
+            // Algebraically equivalent to: raw → effective [min,max] → u8. The intermediate effective value cancels out.
             let t = (raw + 1.0) / 2.0;
-            let effective = min + t * (max - min);
-            let u8val = ((effective - min) / (max - min) * 255.0)
-                .round()
-                .clamp(0.0, 255.0) as u8;
+            let u8val = (t * 255.0).round().clamp(0.0, 255.0) as u8;
             result.push(u8val);
         }
     }
-    result.into_boxed_slice()
+    result.into()
 }
 
 fn quantize_food_density(density: f32) -> u8 {
@@ -258,8 +258,7 @@ mod tests {
     #[test]
     fn quantize_fertility_maps_range_to_u8() {
         // Uniform value 0.0 → raw fertility = 0.0.
-        // With min=0, max=2: t = (0+1)/2 = 0.5, effective = 0 + 0.5*2 = 1.0,
-        // u8 = ((1.0-0)/(2-0)*255).round() = 128.
+        // With min=0, max=2: t = (0+1)/2 = 0.5, u8 = (0.5*255).round() = 128.
         let food = food_with_fertility(2, 2, 0.0, 2.0, 0.0);
         let result = build_food_fertility_u8(&food);
         assert_eq!(result.len(), 4);
@@ -271,7 +270,7 @@ mod tests {
     #[test]
     fn quantize_fertility_extreme_values() {
         // Uniform value 1.0 → raw = 1.0.
-        // t = (1+1)/2 = 1.0, effective = max → u8 = 255.
+        // t = (1+1)/2 = 1.0, u8 = (1.0*255).round() = 255.
         let food = food_with_fertility(2, 2, 0.0, 2.0, 1.0);
         let result = build_food_fertility_u8(&food);
         for &v in result.iter() {

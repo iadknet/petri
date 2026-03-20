@@ -1,3 +1,4 @@
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use axum::extract::State;
@@ -9,7 +10,6 @@ use v3_core::mutation::phenotype::channels_to_rgb;
 use v3_core::simulation::{run_tick, seed_simulation};
 
 use crate::error::{AppError, FieldError};
-use crate::query::cache::build_food_fertility_u8;
 use crate::state::{
     AppState, BarrierCell, CreatureSnapshot, FoodCell, FramePayload, HealthPayload,
     LastTickActions, MutationOperatorFunnelPayload, MutationOperatorValueTotalsPayload,
@@ -95,11 +95,14 @@ pub async fn startup(
     let new_sim = seed_simulation(config.clone(), seed);
     let seeded_creatures = new_sim.creatures.len();
     let digest = config_digest(&config);
+    // Fertility is static after seeding; compute once and cache in the handle.
+    let cached_fertility_u8 = crate::query::cache::build_food_fertility_u8(new_sim.world.food());
 
     let mut handle = app.sim.lock().await;
     handle.status = SimulationStatus::Idle;
     handle.sim = new_sim;
     handle.active_trace = None;
+    handle.cached_fertility_u8 = cached_fertility_u8;
     let frame = build_ws_frame(&handle);
     drop(handle);
     app.publish_ws_frame(frame);
@@ -316,7 +319,7 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
         }
     }
 
-    let food_fertility_u8 = build_food_fertility_u8(sim.world.food());
+    let food_fertility_u8 = Arc::clone(&handle.cached_fertility_u8);
 
     let frame = FramePayload {
         width: sim.world.width,

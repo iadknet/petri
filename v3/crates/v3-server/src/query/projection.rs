@@ -12,7 +12,7 @@ pub struct ProjectionSnapshot {
     pub world_static_revision: u64,
     pub ws_frame: WsFrame,
     pub food_density_u8: Box<[u8]>,
-    pub food_fertility_u8: Box<[u8]>,
+    pub food_fertility_u8: std::sync::Arc<[u8]>,
     pub barrier_mask: Box<[u8]>,
     pub creature_tile_index: CreatureTileIndex,
 }

@@ -218,7 +218,7 @@ mod tests {
                         },
                     ],
                     barriers: vec![BarrierCell { x: 3, y: 3 }, BarrierCell { x: 180, y: 180 }],
-                    food_fertility_u8: vec![128u8; 256 * 256].into_boxed_slice(),
+                    food_fertility_u8: vec![128u8; 256 * 256].into(),
                 },
                 health: HealthPayload {
                     population: 2,
