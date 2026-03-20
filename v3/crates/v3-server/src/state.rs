@@ -24,16 +24,21 @@ pub struct SimHandle {
     pub sim: Simulation,
     pub status: SimulationStatus,
     pub active_trace: Option<v3_core::runtime::trace::recording::ActiveTrace>,
+    /// Cached quantized fertility grid. Computed once at startup/restart; fertility
+    /// is static and does not change between resets.
+    pub cached_fertility_u8: Arc<[u8]>,
 }
 
 impl SimHandle {
     pub fn new_default() -> Self {
         let config = SimulationConfig::default();
         let sim = seed_simulation(config, 0);
+        let cached_fertility_u8 = crate::query::cache::build_food_fertility_u8(sim.world.food());
         Self {
             sim,
             status: SimulationStatus::Idle,
             active_trace: None,
+            cached_fertility_u8,
         }
     }
 }
@@ -109,7 +114,7 @@ pub struct FramePayload {
     pub creatures: Vec<CreatureSnapshot>,
     pub food: Vec<FoodCell>,
     pub barriers: Vec<BarrierCell>,
-    pub food_fertility_u8: Box<[u8]>,
+    pub food_fertility_u8: Arc<[u8]>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]

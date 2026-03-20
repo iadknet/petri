@@ -22,6 +22,7 @@ pub fn effective_fertility_range(
 }
 
 /// Map a raw value in [-1, 1] to the effective [min, max] range.
+#[inline]
 pub fn map_fertility(raw: f32, effective_min: f32, effective_max: f32) -> f32 {
     let t = (raw + 1.0) / 2.0; // [-1, 1] -> [0, 1]
     effective_min + t * (effective_max - effective_min)

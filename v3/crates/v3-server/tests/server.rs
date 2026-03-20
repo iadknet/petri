@@ -874,6 +874,7 @@ async fn health_payload_contains_mutation_skip_by_reason() {
     use v3_core::config::SimulationConfig;
     use v3_core::simulation::{run_tick, seed_simulation};
     use v3_server::handlers::lifecycle::build_ws_frame;
+    use v3_server::query::cache::build_food_fertility_u8;
     use v3_server::state::{SimHandle, SimulationStatus};
 
     let mut cfg = SimulationConfig::default();
@@ -894,10 +895,12 @@ async fn health_payload_contains_mutation_skip_by_reason() {
     for _ in 0..20 {
         run_tick(&mut sim, &mut None);
     }
+    let cached_fertility_u8 = build_food_fertility_u8(sim.world.food());
     let handle = SimHandle {
         sim,
         status: SimulationStatus::Paused,
         active_trace: None,
+        cached_fertility_u8,
     };
     let frame = build_ws_frame(&handle);
     // The field always exists as part of the typed struct; verify it's accessible.
@@ -976,13 +979,16 @@ async fn status_payload_includes_state() {
     use v3_core::config::SimulationConfig;
     use v3_core::simulation::seed_simulation;
     use v3_server::handlers::lifecycle::build_ws_frame;
+    use v3_server::query::cache::build_food_fertility_u8;
     use v3_server::state::{SimHandle, SimulationStatus};
 
     let sim = seed_simulation(SimulationConfig::default(), 7);
+    let cached_fertility_u8 = build_food_fertility_u8(sim.world.food());
     let handle = SimHandle {
         sim,
         status: SimulationStatus::Paused,
         active_trace: None,
+        cached_fertility_u8,
     };
 
     let frame = build_ws_frame(&handle);
@@ -1000,16 +1006,19 @@ async fn ws_frame_msgpack_roundtrip() {
     use v3_core::config::SimulationConfig;
     use v3_core::simulation::{run_tick, seed_simulation};
     use v3_server::handlers::lifecycle::build_ws_frame;
+    use v3_server::query::cache::build_food_fertility_u8;
     use v3_server::state::{SimHandle, SimulationStatus, WsFrame};
 
     let mut sim = seed_simulation(SimulationConfig::default(), 99);
     for _ in 0..5 {
         run_tick(&mut sim, &mut None);
     }
+    let cached_fertility_u8 = build_food_fertility_u8(sim.world.food());
     let handle = SimHandle {
         sim,
         status: SimulationStatus::Running,
         active_trace: None,
+        cached_fertility_u8,
     };
 
     let frame = build_ws_frame(&handle);
