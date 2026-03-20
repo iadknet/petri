@@ -18,7 +18,7 @@ export const MUTATION_NEWBORN_FIELDS: FieldDef[] = [
 		max: 1,
 		step: 0.01,
 		testId: "config-field-mutation-birth-graph-initialized-chance",
-		defaultValue: 0.5,
+		defaultValue: 0.8,
 		tooltip: "Given Graph newborn, chance to initialize one input_ref and one CustomOutput wire",
 	},
 	{
@@ -42,7 +42,7 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		max: 1,
 		step: 0.001,
 		testId: "config-field-mutation-mutation-probability",
-		defaultValue: 0.303,
+		defaultValue: 0.1,
 		tooltip: "Probability that a newborn genome undergoes mutation",
 	},
 	{
@@ -173,7 +173,7 @@ export const MUTATION_TOGGLES: BooleanFieldDef[] = [
 		path: "mutation.genome_size_pressure_enabled",
 		label: "Genome Size Pressure",
 		testId: "config-field-mutation-genome-size-pressure-enabled",
-		defaultValue: true,
+		defaultValue: false,
 		tooltip: "When enabled, genomes near the size cap are less likely to gain growth mutations",
 	},
 ];

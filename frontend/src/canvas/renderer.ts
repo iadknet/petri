@@ -60,6 +60,14 @@ const RECT_MODE_THRESHOLD = 4;
 /** Zoom threshold for detailed mode (energy bars, grid lines) */
 const DETAIL_MODE_THRESHOLD = 6;
 
+interface FertilityBlendCache {
+	worldStaticRevision: number;
+	worldWidth: number;
+	worldHeight: number;
+	indices: Uint32Array;
+	colors: Uint8Array;
+}
+
 export class WorldRenderer {
 	private readonly canvas: HTMLCanvasElement;
 	private readonly ctx: CanvasRenderingContext2D;
@@ -75,6 +83,7 @@ export class WorldRenderer {
 	private previewCells: Set<string> | null = null;
 	private previewTool: PaintTool | null = null;
 	private selectedCreatureId: number | null = null;
+	private fertilityBlendCache: FertilityBlendCache | null = null;
 
 	constructor(canvas: HTMLCanvasElement, getRenderModel: () => RenderModel | null) {
 		this.canvas = canvas;
@@ -251,7 +260,7 @@ export class WorldRenderer {
 		}
 
 		if (fertilityOverlay) {
-			this.blendFertilityPixels(data, width, height, fertilityOverlay);
+			this.blendFertilityPixels(data, fertilityOverlay);
 		}
 
 		for (const barrier of frame.barriers) {
@@ -450,40 +459,85 @@ export class WorldRenderer {
 		ctx.stroke();
 	}
 
-	private blendFertilityPixels(
-		data: Uint8ClampedArray,
-		worldWidth: number,
-		worldHeight: number,
-		overlay: FertilityOverlay,
-	): void {
-		const cellCount = Math.min(worldWidth * worldHeight, overlay.worldGrid.length);
+	private blendFertilityPixels(data: Uint8ClampedArray, overlay: FertilityOverlay): void {
+		const cache = this.ensureFertilityBlendCache(overlay);
+		if (!cache) return;
+		const { indices, colors } = cache;
+		for (let entry = 0; entry < indices.length; entry++) {
+			const cellIndex = indices[entry]!;
+			const idx = cellIndex * 4;
+			const colorIndex = entry * 4;
+			const a = colors[colorIndex + 3]!;
+			if (a <= 0) continue;
+			const inv = 255 - a;
+			data[idx] = ((data[idx]! * inv + colors[colorIndex]! * a + 127) / 255) | 0;
+			data[idx + 1] = ((data[idx + 1]! * inv + colors[colorIndex + 1]! * a + 127) / 255) | 0;
+			data[idx + 2] = ((data[idx + 2]! * inv + colors[colorIndex + 2]! * a + 127) / 255) | 0;
+		}
+	}
+
+	private ensureFertilityBlendCache(overlay: FertilityOverlay): FertilityBlendCache | null {
+		const { worldWidth, worldHeight, worldStaticRevision, worldGrid } = overlay;
+		if (worldWidth <= 0 || worldHeight <= 0) {
+			this.fertilityBlendCache = null;
+			return null;
+		}
+		const cached = this.fertilityBlendCache;
+		if (
+			cached &&
+			cached.worldStaticRevision === worldStaticRevision &&
+			cached.worldWidth === worldWidth &&
+			cached.worldHeight === worldHeight
+		) {
+			return cached;
+		}
+
+		const cellCount = Math.min(worldWidth * worldHeight, worldGrid.length);
+		const indices: number[] = [];
+		const colors: number[] = [];
 		for (let i = 0; i < cellCount; i++) {
-			const value = overlay.worldGrid[i] ?? 128;
-			if (value === 128) continue; // neutral — skip for performance
-			// Inline color computation to avoid tuple allocation per cell in this hot loop.
+			const value = worldGrid[i] ?? 128;
+			if (value === 128) continue;
 			const t = (value - 128) / 127;
 			const absT = Math.abs(t);
-			const a = absT * FERT_ALPHA;
-			if (a <= 0) continue;
-			const r = t < 0 ? FERT_BARREN_R : FERT_FERTILE_R;
-			const g = t < 0 ? FERT_BARREN_G : FERT_FERTILE_G;
-			const b = t < 0 ? FERT_BARREN_B : FERT_FERTILE_B;
-			const idx = i * 4;
-			data[idx] = Math.round(data[idx]! * (1 - a) + r * a);
-			data[idx + 1] = Math.round(data[idx + 1]! * (1 - a) + g * a);
-			data[idx + 2] = Math.round(data[idx + 2]! * (1 - a) + b * a);
+			const alpha = Math.round(absT * FERT_ALPHA * 255);
+			if (alpha <= 0) continue;
+			indices.push(i);
+			colors.push(
+				t < 0 ? FERT_BARREN_R : FERT_FERTILE_R,
+				t < 0 ? FERT_BARREN_G : FERT_FERTILE_G,
+				t < 0 ? FERT_BARREN_B : FERT_FERTILE_B,
+				alpha,
+			);
 		}
+
+		const built: FertilityBlendCache = {
+			worldStaticRevision,
+			worldWidth,
+			worldHeight,
+			indices: Uint32Array.from(indices),
+			colors: Uint8Array.from(colors),
+		};
+		this.fertilityBlendCache = built;
+		return built;
 	}
 
 	private drawFertilityRects(overlay: FertilityOverlay, camera: CameraState): void {
 		const { ctx } = this;
 		const { x: cx, y: cy, zoom } = camera;
 		const { worldGrid, worldWidth, worldHeight } = overlay;
+		const viewportStartX = Math.max(0, Math.floor((-cx) / zoom));
+		const viewportStartY = Math.max(0, Math.floor((-cy) / zoom));
+		const viewportEndX = Math.min(worldWidth, Math.ceil((this.canvas.width - cx) / zoom));
+		const viewportEndY = Math.min(worldHeight, Math.ceil((this.canvas.height - cy) / zoom));
+		if (viewportStartX >= viewportEndX || viewportStartY >= viewportEndY) {
+			return;
+		}
 
 		// PERF: fillStyle string parsing is expensive per-cell. Consider batching
 		// by alpha bucket or using an offscreen canvas for large worlds.
-		for (let y = 0; y < worldHeight; y++) {
-			for (let x = 0; x < worldWidth; x++) {
+		for (let y = viewportStartY; y < viewportEndY; y++) {
+			for (let x = viewportStartX; x < viewportEndX; x++) {
 				const value = worldGrid[y * worldWidth + x] ?? 128;
 				if (value === 128) continue;
 				const [r, g, b, a] = fertilityColor(value);

@@ -28,7 +28,7 @@ export const COMPLEXITY_COST_TOGGLES: BooleanFieldDef[] = [
 		path: "energy.complexity_cost.enabled",
 		label: "Complexity Cost",
 		testId: "config-field-complexity-cost-enabled",
-		defaultValue: true,
+		defaultValue: false,
 		tooltip: "When enabled, creatures with complex genomes pay higher energy costs for all actions",
 	},
 ];

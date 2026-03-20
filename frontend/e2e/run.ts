@@ -15,6 +15,7 @@ import { scenarioViewportSmoke } from "./scenarios/e2e-05-viewport-smoke.ts";
 import { scenarioMutationConfig } from "./scenarios/e2e-06-mutation-config.ts";
 import { scenarioPaintDrawing } from "./scenarios/e2e-07-paint-drawing.ts";
 import { scenarioViewportSelection } from "./scenarios/e2e-08-viewport-selection.ts";
+import { scenarioFertilityStartupConfig } from "./scenarios/e2e-09-fertility-startup-config.ts";
 import type { ScenarioDefinition } from "./types.ts";
 
 const scenarios: ScenarioDefinition[] = [
@@ -26,6 +27,7 @@ const scenarios: ScenarioDefinition[] = [
 	scenarioMutationConfig,
 	scenarioPaintDrawing,
 	scenarioViewportSelection,
+	scenarioFertilityStartupConfig,
 ];
 
 async function main(): Promise<void> {

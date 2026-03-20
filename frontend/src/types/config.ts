@@ -1,7 +1,23 @@
 export type FertilityAlgorithm =
 	| { Uniform: { value: number } }
-	| { Fbm: { octaves: number; frequency: number; lacunarity: number; persistence: number; seed?: number } }
-	| { PoissonBlobs: { blob_count: number; min_radius: number; max_radius: number; falloff: number; seed?: number } };
+	| {
+			Fbm: {
+				octaves: number;
+				frequency: number;
+				lacunarity: number;
+				persistence: number;
+				seed?: number;
+			};
+	  }
+	| {
+			PoissonBlobs: {
+				blob_count: number;
+				min_radius: number;
+				max_radius: number;
+				falloff: number;
+				seed?: number;
+			};
+	  };
 
 export interface FertilityLayer {
 	algorithm: FertilityAlgorithm;

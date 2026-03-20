@@ -1464,6 +1464,34 @@ async fn get_creature_invalid_id_returns_404() {
     assert_eq!(body["error"].as_str(), Some("not_found"), "body: {body}");
 }
 
+#[tokio::test]
+async fn get_creature_noncanonical_ffi_id_returns_404() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":42}"#))
+        .await
+        .unwrap();
+
+    let (_, snapshot_body) = do_request(
+        a.clone(),
+        get_req("/v3/simulation/snapshot?zoom_tier=detail"),
+    )
+    .await;
+    let creature_id = snapshot_body["view"]["creatures"][0]["id"]
+        .as_u64()
+        .expect("creature id");
+
+    // Flip bit 32 to produce a non-canonical FFI representation that currently
+    // aliases the same slotmap key through KeyData::from_ffi.
+    let noncanonical_id = creature_id ^ (1_u64 << 32);
+    assert_ne!(noncanonical_id, creature_id, "test setup must alter id");
+
+    let uri = format!("/v3/simulation/creature/{noncanonical_id}");
+    let (status, body) = do_request(a, get_req(&uri)).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "body: {body}");
+    assert_eq!(body["error"].as_str(), Some("not_found"), "body: {body}");
+}
+
 // ── 28. get_creature_on_idle_state_works ─────────────────────────────────────
 
 #[tokio::test]
@@ -1944,6 +1972,33 @@ async fn start_sample_invalid_creature_returns_404() {
     )
     .await;
     assert_eq!(status, StatusCode::NOT_FOUND);
+}
+
+#[tokio::test]
+async fn start_sample_noncanonical_ffi_id_returns_404() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":42}"#))
+        .await
+        .unwrap();
+    let (_, _) = do_request(a.clone(), post_req("/v3/simulation/start")).await;
+    let (_, _) = do_request(a.clone(), post_req("/v3/simulation/pause")).await;
+
+    let (_, snapshot_body) = do_request(
+        a.clone(),
+        get_req("/v3/simulation/snapshot?zoom_tier=detail"),
+    )
+    .await;
+    let creature_id = snapshot_body["view"]["creatures"][0]["id"]
+        .as_u64()
+        .expect("creature id");
+
+    let noncanonical_id = creature_id ^ (1_u64 << 32);
+    assert_ne!(noncanonical_id, creature_id, "test setup must alter id");
+
+    let uri = format!("/v3/simulation/creature/{noncanonical_id}/sample");
+    let (status, body) = do_request(a, post_json(&uri, r#"{"ticks": 5}"#)).await;
+    assert_eq!(status, StatusCode::NOT_FOUND, "body: {body}");
 }
 
 // ── 32. start_sample_while_idle_returns_409 ──────────────────────────────────

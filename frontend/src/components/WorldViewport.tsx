@@ -64,6 +64,7 @@ export function WorldViewport() {
 				predationEvents: worldView.predationEvents,
 				camera: viewport.camera,
 				fertilityGrid: worldView.worldStatic?.food_fertility_u8 ?? null,
+				fertilityRevision: worldView.worldStaticRevision,
 				showFertilityOverlay: viewport.showFertilityOverlay,
 			});
 		});

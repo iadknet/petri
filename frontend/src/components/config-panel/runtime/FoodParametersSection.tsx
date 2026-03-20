@@ -7,7 +7,7 @@ export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 		min: 0,
 		max: 1,
 		step: 0.001,
-		defaultValue: 0.096,
+		defaultValue: 0.09,
 		tooltip: "Rate at which existing food cells regenerate density each tick",
 	},
 	{

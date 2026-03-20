@@ -11,6 +11,7 @@ describe("buildRenderModel", () => {
 				predationEvents: [],
 				camera: { x: 0, y: 0, zoom: 1 },
 				fertilityGrid: null,
+				fertilityRevision: 0,
 				showFertilityOverlay: false,
 			}),
 		).toBeNull();
@@ -37,6 +38,7 @@ describe("buildRenderModel", () => {
 				predationEvents: [],
 				camera: { x: 8, y: 4, zoom: 3 },
 				fertilityGrid: null,
+				fertilityRevision: 0,
 				showFertilityOverlay: false,
 			}),
 		).toEqual({
@@ -76,6 +78,7 @@ describe("buildRenderModel", () => {
 			predationEvents: [],
 			camera: { x: 0, y: 0, zoom: 1 },
 			fertilityGrid: grid,
+			fertilityRevision: 7,
 			showFertilityOverlay: true,
 		});
 
@@ -83,7 +86,39 @@ describe("buildRenderModel", () => {
 			worldGrid: [0, 64, 128, 255],
 			worldWidth: 2,
 			worldHeight: 2,
+			worldStaticRevision: 7,
 		});
+		expect(result?.fertilityOverlay?.worldGrid).toBe(grid);
+	});
+
+	it("reuses overview byte arrays without cloning", () => {
+		const foodDensity = new Uint8Array([0, 64, 128, 255]);
+		const creatureCounts = [1, 2, 3, 4];
+		const result = buildRenderModel({
+			frame: {
+				width: 2,
+				height: 2,
+				creatures: [],
+				food: [],
+				barriers: [],
+			},
+			overviewView: {
+				rect: { x: 0, y: 0, width: 2, height: 2 },
+				grid_width: 2,
+				grid_height: 2,
+				food_density_u8: foodDensity,
+				creature_count_u16: creatureCounts,
+			},
+			tick: 3,
+			predationEvents: [],
+			camera: { x: 0, y: 0, zoom: 1 },
+			fertilityGrid: null,
+			fertilityRevision: 0,
+			showFertilityOverlay: false,
+		});
+
+		expect(result?.overview?.foodDensity).toBe(foodDensity);
+		expect(result?.overview?.creatureCounts).toBe(creatureCounts);
 	});
 
 	it("omits fertility overlay when toggle is off", () => {
@@ -100,6 +135,7 @@ describe("buildRenderModel", () => {
 			predationEvents: [],
 			camera: { x: 0, y: 0, zoom: 1 },
 			fertilityGrid: [0, 64, 128, 255],
+			fertilityRevision: 0,
 			showFertilityOverlay: false,
 		});
 
@@ -120,6 +156,7 @@ describe("buildRenderModel", () => {
 			predationEvents: [],
 			camera: { x: 0, y: 0, zoom: 1 },
 			fertilityGrid: null,
+			fertilityRevision: 0,
 			showFertilityOverlay: true,
 		});
 

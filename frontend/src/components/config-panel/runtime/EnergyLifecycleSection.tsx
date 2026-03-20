@@ -25,7 +25,7 @@ export const ENERGY_LIFECYCLE_FIELDS: FieldDef[] = [
 		min: 0,
 		max: 500,
 		step: 0.5,
-		defaultValue: 1.0,
+		defaultValue: 30.0,
 		tooltip: "Minimum energy required for a creature to reproduce",
 	},
 	{
@@ -34,7 +34,7 @@ export const ENERGY_LIFECYCLE_FIELDS: FieldDef[] = [
 		min: 0,
 		max: 500,
 		step: 0.5,
-		defaultValue: 8.0,
+		defaultValue: 100.0,
 		tooltip: "Starting energy given to newborn creatures",
 	},
 ];

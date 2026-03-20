@@ -8,7 +8,7 @@ const TOGGLE: BooleanFieldDef = {
 	path: "startup.ramps.failed_action_penalty.enabled",
 	label: "Enable Failed Action Penalty Ramp",
 	testId: "startup-field-ramp-failed-action-penalty-enabled",
-	defaultValue: false,
+	defaultValue: true,
 	tooltip:
 		"When enabled, failed action penalty linearly interpolates from Start to End until Target Tick.",
 };
@@ -21,7 +21,7 @@ const FIELDS: FieldDef[] = [
 		max: 100,
 		step: 0.1,
 		testId: "startup-field-ramp-failed-action-penalty-start",
-		defaultValue: 5.0,
+		defaultValue: 0.0,
 		tooltip: "Failed action penalty applied at tick 0 while ramp is enabled.",
 	},
 	{
@@ -31,7 +31,7 @@ const FIELDS: FieldDef[] = [
 		max: 100,
 		step: 0.1,
 		testId: "startup-field-ramp-failed-action-penalty-end",
-		defaultValue: 5.0,
+		defaultValue: 1.0,
 		tooltip:
 			"Target failed action penalty reached at Target Tick and used as runtime config value.",
 	},
@@ -42,7 +42,7 @@ const FIELDS: FieldDef[] = [
 		max: 1_000_000,
 		step: 1,
 		testId: "startup-field-ramp-failed-action-penalty-target-tick",
-		defaultValue: 1000,
+		defaultValue: 62680,
 		tooltip: "Ramp completion tick. Interpolation runs while current tick is less than this value.",
 	},
 ];

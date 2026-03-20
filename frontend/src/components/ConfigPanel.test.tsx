@@ -138,4 +138,142 @@ describe("ConfigPanel", () => {
 		render(<ConfigPanel />);
 		expect(screen.getByTestId("config-field-energy-costs-failed-action-penalty")).toBeDisabled();
 	});
+
+	it("supports fertility startup controls and persists values in startup preset", () => {
+		render(<ConfigPanel />);
+
+		const fertilityToggle = screen.getByTestId("startup-field-fertility-enabled");
+		expect(fertilityToggle).not.toBeChecked();
+		expect(screen.queryByTestId("startup-field-fertility-min")).not.toBeInTheDocument();
+
+		fireEvent.click(fertilityToggle);
+
+		const minField = screen.getByTestId("startup-field-fertility-min");
+		const maxField = screen.getByTestId("startup-field-fertility-max");
+		expect(minField).toHaveValue(0);
+		expect(maxField).toHaveValue(2);
+
+		fireEvent.change(minField, { target: { value: "0.6" } });
+		fireEvent.change(maxField, { target: { value: "1.7" } });
+
+		const annealingToggle = screen.getByTestId("startup-field-annealing-enabled");
+		expect(annealingToggle).not.toBeChecked();
+		fireEvent.click(annealingToggle);
+
+		fireEvent.change(screen.getByTestId("startup-field-annealing-ramp-ticks"), {
+			target: { value: "9000" },
+		});
+		fireEvent.change(screen.getByTestId("startup-field-annealing-initial-min"), {
+			target: { value: "0.8" },
+		});
+		fireEvent.change(screen.getByTestId("startup-field-annealing-initial-max"), {
+			target: { value: "1.4" },
+		});
+
+		expect(useStartupConfigStore.getState().preset.world.food.fertility).toMatchObject({
+			enabled: true,
+			min_fertility: 0.6,
+			max_fertility: 1.7,
+		});
+		expect(useStartupConfigStore.getState().preset.world.food.annealing).toMatchObject({
+			enabled: true,
+			ramp_ticks: 9000,
+			initial_min_fertility: 0.8,
+			initial_max_fertility: 1.4,
+		});
+	});
+
+	it("supports editing fertility layer algorithm settings", () => {
+		render(<ConfigPanel />);
+		fireEvent.click(screen.getByTestId("startup-field-fertility-enabled"));
+
+		expect(screen.getByTestId("startup-field-fertility-layer-0-algorithm")).toBeInTheDocument();
+		fireEvent.change(screen.getByTestId("startup-field-fertility-layer-0-algorithm"), {
+			target: { value: "Fbm" },
+		});
+		fireEvent.change(screen.getByTestId("startup-field-fertility-layer-0-weight"), {
+			target: { value: "0.65" },
+		});
+		fireEvent.change(screen.getByTestId("startup-field-fertility-layer-0-fbm-octaves"), {
+			target: { value: "5" },
+		});
+		fireEvent.change(screen.getByTestId("startup-field-fertility-layer-0-fbm-frequency"), {
+			target: { value: "0.08" },
+		});
+		fireEvent.change(screen.getByTestId("startup-field-fertility-layer-0-fbm-lacunarity"), {
+			target: { value: "2.2" },
+		});
+		fireEvent.change(screen.getByTestId("startup-field-fertility-layer-0-fbm-persistence"), {
+			target: { value: "0.47" },
+		});
+		fireEvent.click(screen.getByTestId("startup-field-fertility-layer-0-fbm-seed-enabled"));
+		fireEvent.change(screen.getByTestId("startup-field-fertility-layer-0-fbm-seed"), {
+			target: { value: "4242" },
+		});
+
+		expect(useStartupConfigStore.getState().preset.world.food.fertility.layers[0]).toEqual({
+			weight: 0.65,
+			algorithm: {
+				Fbm: {
+					octaves: 5,
+					frequency: 0.08,
+					lacunarity: 2.2,
+					persistence: 0.47,
+					seed: 4242,
+				},
+			},
+		});
+	});
+
+	it("shows ELI5 tooltips for FBM fertility controls", () => {
+		render(<ConfigPanel />);
+		fireEvent.click(screen.getByTestId("startup-field-fertility-enabled"));
+		fireEvent.change(screen.getByTestId("startup-field-fertility-layer-0-algorithm"), {
+			target: { value: "Fbm" },
+		});
+		fireEvent.click(screen.getByTestId("startup-field-fertility-layer-0-fbm-seed-enabled"));
+
+		expect(
+			screen.getByText(/detail layers are stacked together for richer texture/i),
+		).toBeInTheDocument();
+		expect(
+			screen.getByText(/how zoomed in the pattern is/i),
+		).toBeInTheDocument();
+		expect(
+			screen.getByText(/how much smaller each next detail layer gets/i),
+		).toBeInTheDocument();
+		expect(
+			screen.getByText(/how strong those smaller detail layers stay/i),
+		).toBeInTheDocument();
+		expect(
+			screen.getByText(/lock the random pattern so it repeats exactly/i),
+		).toBeInTheDocument();
+		expect(
+			screen.getByText(/same seed gives the same pattern/i),
+		).toBeInTheDocument();
+	});
+
+	it("shows ELI5 tooltips for Uniform and Poisson fertility controls", () => {
+		render(<ConfigPanel />);
+		fireEvent.click(screen.getByTestId("startup-field-fertility-enabled"));
+
+		fireEvent.change(screen.getByTestId("startup-field-fertility-layer-0-algorithm"), {
+			target: { value: "Uniform" },
+		});
+		expect(
+			screen.getByText(/single flat fertility value everywhere/i),
+		).toBeInTheDocument();
+
+		fireEvent.change(screen.getByTestId("startup-field-fertility-layer-0-algorithm"), {
+			target: { value: "PoissonBlobs" },
+		});
+		fireEvent.click(screen.getByTestId("startup-field-fertility-layer-0-poisson-seed-enabled"));
+
+		expect(screen.getAllByText(/how many fertility islands to drop on the map/i).length).toBeGreaterThan(0);
+		expect(screen.getAllByText(/smallest island size allowed/i).length).toBeGreaterThan(0);
+		expect(screen.getAllByText(/largest island size allowed/i).length).toBeGreaterThan(0);
+		expect(screen.getAllByText(/how softly each island fades at the edges/i).length).toBeGreaterThan(0);
+		expect(screen.getAllByText(/lock island placement so it repeats exactly/i).length).toBeGreaterThan(0);
+		expect(screen.getAllByText(/same seed gives the same island layout/i).length).toBeGreaterThan(0);
+	});
 });

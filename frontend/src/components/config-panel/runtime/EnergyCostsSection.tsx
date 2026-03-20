@@ -8,7 +8,7 @@ export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 		max: 10,
 		step: 0.01,
 		testId: "config-field-energy-costs-move-cost",
-		defaultValue: 1.0,
+		defaultValue: 0.2,
 		tooltip: "Energy subtracted each time a creature moves to an adjacent cell",
 	},
 	{
@@ -44,7 +44,7 @@ export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 		min: 0,
 		max: 50,
 		step: 0.1,
-		defaultValue: 12.0,
+		defaultValue: 5.0,
 		tooltip: "Energy gained per unit of food density consumed",
 	},
 	{
@@ -53,7 +53,7 @@ export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 		min: 0,
 		max: 20,
 		step: 0.1,
-		defaultValue: 5.0,
+		defaultValue: 1.0,
 		testId: "config-field-energy-costs-failed-action-penalty",
 		tooltip: "Additional energy penalty when an action fails (move blocked, eat empty cell, etc.)",
 	},

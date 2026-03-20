@@ -173,4 +173,22 @@ mod tests {
             "expected non-trivial output from default layer"
         );
     }
+
+    #[test]
+    fn default_poisson_layer_covers_target_fraction_on_large_world() {
+        let config = FertilityConfig {
+            enabled: true,
+            layers: vec![crate::config::FertilityLayer::default()],
+            ..FertilityConfig::default()
+        };
+        let width = 1600u16;
+        let height = 1600u16;
+        let grid = generate_fertility(width, height, &config, 42);
+        let covered = grid.iter().filter(|(_, _, v)| **v > -0.999).count() as f32;
+        let coverage_ratio = covered / (width as f32 * height as f32);
+        assert!(
+            (0.10..=0.15).contains(&coverage_ratio),
+            "expected coverage ratio in [0.10, 0.15], got {coverage_ratio}"
+        );
+    }
 }
