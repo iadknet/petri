@@ -175,6 +175,8 @@ pub struct PerceptionConfig {
     pub max_energy: f32,
     /// Minimum energy to reproduce (for reproduce_ready signal).
     pub min_reproduce_energy: f32,
+    /// Minimum age in ticks to reproduce (for reproduce_ready signal).
+    pub min_reproduce_age: u64,
 }
 
 impl Default for PerceptionConfig {
@@ -184,6 +186,7 @@ impl Default for PerceptionConfig {
             max_food_density: 1.0,
             max_energy: 200.0,
             min_reproduce_energy: 1.0,
+            min_reproduce_age: 20,
         }
     }
 }
@@ -197,6 +200,7 @@ impl PerceptionConfig {
             max_food_density: config.world.food.max_density,
             max_energy: config.energy.lifecycle.max_energy,
             min_reproduce_energy: config.energy.lifecycle.min_reproduce_energy,
+            min_reproduce_age: config.energy.lifecycle.min_reproduce_age,
         }
     }
 }
@@ -313,6 +317,7 @@ mod tests {
         assert!((cfg.max_food_density - 1.0).abs() < f32::EPSILON);
         assert!((cfg.max_energy - 200.0).abs() < f32::EPSILON);
         assert!((cfg.min_reproduce_energy - 1.0).abs() < f32::EPSILON);
+        assert_eq!(cfg.min_reproduce_age, 20);
     }
 
     #[test]
@@ -325,6 +330,10 @@ mod tests {
         assert!(
             (p.min_reproduce_energy - sim_cfg.energy.lifecycle.min_reproduce_energy).abs()
                 < f32::EPSILON
+        );
+        assert_eq!(
+            p.min_reproduce_age,
+            sim_cfg.energy.lifecycle.min_reproduce_age
         );
     }
 

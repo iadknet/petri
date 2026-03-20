@@ -121,6 +121,7 @@ Mutation accounting invariants:
 ### `ReproductionActionResult` rejections (minimum)
 
 - `RejectedInvalidTarget`
+- `RejectedAgeConstraints`
 - `RejectedEnergyConstraints`
 
 These reason names may be mapped to local naming conventions, but one-to-one
@@ -130,6 +131,8 @@ Required spawn-rejection semantic:
 - `RejectedInvalidTarget`: spawn target was not valid at action-time check.
   This includes out-of-bounds, barrier, occupied, and same-tick contention
   cases under first-processed-wins action ordering.
+- `RejectedAgeConstraints`: spawn target was valid, but parent age was below
+  `energy.lifecycle.min_reproduce_age` at action-time validation.
 - `RejectedEnergyConstraints`: spawn target was valid, but reproduce action
   failed energy/transfer validation gates (for example reproduce cost, minimum
   reproduce energy, or transfer constraints).

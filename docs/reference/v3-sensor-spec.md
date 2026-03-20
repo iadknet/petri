@@ -334,7 +334,8 @@ Area-summary denominator rule:
 
 - `energy_ratio = clamp(target.energy / energy.lifecycle.max_energy, 0.0, 1.0)`
 - `reproduce_ready = 1.0` if
-  `target.energy >= energy.lifecycle.min_reproduce_energy`, else `0.0`
+  `target.energy >= energy.lifecycle.min_reproduce_energy` and
+  `target.age >= energy.lifecycle.min_reproduce_age`, else `0.0`
 
 ### 6.5 Nearby Creature Identity
 
