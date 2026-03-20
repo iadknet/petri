@@ -134,6 +134,7 @@ Queue-shape coupling invariant:
 | `energy.lifecycle.max_energy` | `f32` | `200.0` | Must be finite and `>= 1.0`; invalid values fall back to `200.0`. |
 | `energy.lifecycle.energy_decay_per_tick` | `f32` | `0.5` | Must be finite and `>= 0.0`; invalid values fall back to `0.5`. |
 | `energy.lifecycle.min_reproduce_energy` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. |
+| `energy.lifecycle.min_reproduce_age` | `u64` | `20` | Minimum parent age (ticks) required before reproduce can be accepted. No normalization fallback; value is consumed as configured. |
 | `energy.lifecycle.default_offspring_energy` | `f32` | `100.0` | Must be finite and `>= 0.0`; invalid values fall back to `100.0`. |
 | `energy.costs.move_cost` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. |
 | `energy.costs.eat_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; invalid values fall back to `0.0`. |
@@ -194,15 +195,19 @@ Energy posture:
 Reproduction transfer sequencing:
 This sequencing is evaluated only after spawn target validity succeeds, as
 defined in `v3-reproduction-spec.md`.
-1. Pay `energy.costs.reproduce_cost`.
-2. Enforce `energy.lifecycle.min_reproduce_energy` gate.
-3. Compute
+1. Enforce `energy.lifecycle.min_reproduce_age` gate on parent age.
+2. Pay `energy.costs.reproduce_cost`.
+3. Enforce `energy.lifecycle.min_reproduce_energy` gate.
+4. Compute
    `requested_energy_sanitized = clamp_non_negative_finite(requested_energy)`,
    then
    `transfer = min(requested_energy_sanitized, energy.lifecycle.default_offspring_energy)`.
-4. Reject reproduction when `transfer <= 0.0` or parent cannot cover transfer.
+5. Reject reproduction when `transfer <= 0.0` or parent cannot cover transfer.
 
 Outcome mapping:
+- Age-gate failures in this sequencing map to
+  `ReproductionActionResult::RejectedAgeConstraints` in
+  `v3-reproduction-spec.md`.
 - Energy/transfer validation failures in this sequencing map to
   `ReproductionActionResult::RejectedEnergyConstraints` in
   `v3-reproduction-spec.md`.

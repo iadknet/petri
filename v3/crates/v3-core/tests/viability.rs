@@ -345,6 +345,9 @@ fn founder_reproduces_when_energy_allows_and_target_is_open() {
             [0.0; 16],
         )
     });
+    // Phase 0 increments age before action selection, so age=19 here means the
+    // founder acts at age 20 on this tick.
+    creatures[parent_id].age = 19;
     world.place_creature(pos, parent_id);
 
     let mut sim = Simulation::new(world, creatures, 0, cfg, 7);
@@ -360,6 +363,62 @@ fn founder_reproduces_when_energy_allows_and_target_is_open() {
         1,
         "expected exactly one generation-1 child; pop={}.",
         sim.creature_count()
+    );
+}
+
+/// With high energy but age below the reproduction gate, the founder should not
+/// attempt reproduction and should still move/explore.
+#[test]
+fn founder_does_not_attempt_reproduce_when_below_min_reproduce_age() {
+    use slotmap::SlotMap;
+    use v3_core::creature::founder::v3alpha1_founder_genome;
+    use v3_core::creature::state::CreatureState;
+    use v3_core::kernel::WorldState;
+
+    let mut cfg = SimulationConfig::default();
+    cfg.world.width = 10;
+    cfg.world.height = 10;
+    cfg.population.initial_creatures = 0;
+    cfg.world.food.initial_coverage = 0.0;
+    cfg.world.food.growth_rate = 0.0;
+    cfg.runtime.graph_node_base_cost = 0.1;
+    cfg.energy.lifecycle.initial_energy = 80.0;
+    cfg.energy.lifecycle.max_energy = 120.0;
+    cfg.energy.lifecycle.default_offspring_energy = 12.0;
+    cfg.energy.costs.reproduce_cost = 1.0;
+    cfg.energy.lifecycle.min_reproduce_age = 20;
+
+    let start = Position::new(5, 5);
+    let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
+    let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+    let founder_id = creatures.insert_with_key(|id| {
+        CreatureState::new(
+            id,
+            v3alpha1_founder_genome(),
+            start,
+            cfg.energy.lifecycle.initial_energy,
+            0,
+            FOUNDER_CHANNELS,
+            FOUNDER_ACTIVE_CHANNEL,
+            FOUNDER_POLARITY,
+            CreatureIdentityState::default(),
+            [0.0; 16],
+        )
+    });
+    world.place_creature(start, founder_id);
+
+    let mut sim = Simulation::new(world, creatures, 0, cfg, 8);
+    run_tick(&mut sim, &mut None);
+
+    assert_eq!(sim.creature_count(), 1, "no child should be spawned");
+    assert_eq!(
+        sim.stats.last_tick_reproduce, 0,
+        "founder should not attempt reproduce before min age"
+    );
+    let moved_to = sim.creatures[founder_id].position;
+    assert_ne!(
+        moved_to, start,
+        "founder should take fallback movement branch before age gate opens"
     );
 }
 

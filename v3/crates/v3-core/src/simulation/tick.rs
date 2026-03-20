@@ -619,6 +619,9 @@ pub fn run_tick(
                         ReproductionActionResult::RejectedInvalidTarget => {
                             ActionResult::InvalidTarget
                         }
+                        ReproductionActionResult::RejectedAgeConstraints => {
+                            ActionResult::AgeConstraints
+                        }
                         ReproductionActionResult::RejectedEnergyConstraints => {
                             ActionResult::EnergyConstraints
                         }

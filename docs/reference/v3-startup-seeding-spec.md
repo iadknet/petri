@@ -130,6 +130,8 @@ Founder identity state semantics remain owned by
 
 The founder genome is a 2-node mesh with both backend types. The graph backend
 uses the CGP-style layered model (see `v3-graph-backend-spec.md`).
+The founder reproduction gate is derived from runtime config
+`energy.lifecycle.min_reproduce_age` (default `20` ticks).
 
 **Structural layout:**
 
@@ -148,15 +150,27 @@ NodeGenome {
   input_refs: [
     0: World(FoodHere),
     1: DynamicIntrospection(EnergyCurrent),
-    2: World(NeighborFoodRing),      // compound: 8 directions
-    3: World(NeighborOccupiedRing),   // compound: 8 directions
+    2: StaticIntrospection(AgeTicks),
+    3: World(NeighborFoodRing),      // compound: 8 directions
+    4: World(NeighborOccupiedRing),  // compound: 8 directions
   ],
   backend_def: Graph(GraphBackendDef {
     compute_nodes: [
-      // idx 0: reproduce gate (energy >= 24.0)
-      { kind: Threshold(24.0),
+      // idx 0: energy gate (energy >= 30.0)
+      { kind: Threshold(30.0),
         inputs: [{ source: InputLeaf { ref_idx: 1, sub_idx: 0 },
                    weight: 1.0 }] },
+      // idx 1: age gate (age >= energy.lifecycle.min_reproduce_age)
+      // Threshold() uses strict >, so gate uses (min_reproduce_age - 0.5).
+      { kind: Threshold(19.5),
+        inputs: [{ source: InputLeaf { ref_idx: 2, sub_idx: 0 },
+                   weight: 1.0 }] },
+      // idx 2: can_reproduce gate = energy_gate * age_gate
+      { kind: Multiply,
+        inputs: [
+          { source: ComputeNode(0), weight: 1.0 },
+          { source: ComputeNode(1), weight: 1.0 }
+        ] },
     ],
 
     output_sinks: [
@@ -167,22 +181,22 @@ NodeGenome {
                    weight: 1.0 }] },
       // CustomOutput(1): can_reproduce → slot 1
       { kind: CustomOutput(1),
-        inputs: [{ source: ComputeNode(0), weight: 1.0 }] },
+        inputs: [{ source: ComputeNode(2), weight: 1.0 }] },
       // CustomOutput(2): food_N → slot 2
       { kind: CustomOutput(2),
-        inputs: [{ source: InputLeaf { ref_idx: 2, sub_idx: 0 },
+        inputs: [{ source: InputLeaf { ref_idx: 3, sub_idx: 0 },
                    weight: 1.0 }] },
       // CustomOutput(3): food_E → slot 3
       { kind: CustomOutput(3),
-        inputs: [{ source: InputLeaf { ref_idx: 2, sub_idx: 2 },
+        inputs: [{ source: InputLeaf { ref_idx: 3, sub_idx: 2 },
                    weight: 1.0 }] },
       // CustomOutput(4): food_S → slot 4
       { kind: CustomOutput(4),
-        inputs: [{ source: InputLeaf { ref_idx: 2, sub_idx: 4 },
+        inputs: [{ source: InputLeaf { ref_idx: 3, sub_idx: 4 },
                    weight: 1.0 }] },
       // CustomOutput(5): food_W → slot 5
       { kind: CustomOutput(5),
-        inputs: [{ source: InputLeaf { ref_idx: 2, sub_idx: 6 },
+        inputs: [{ source: InputLeaf { ref_idx: 3, sub_idx: 6 },
                    weight: 1.0 }] },
       // CustomOutput(6..11): empty (inert)
       // RouterOutput: empty (default routing)

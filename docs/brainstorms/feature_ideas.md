@@ -1,5 +1,31 @@
 # Feature ideas
 
+## Ideas to improve evolvability of better cognition
+
+Ranked Changes
+
+1. Add better routing primitives.
+This is the highest-leverage change. Right now routing is a single scalar, and one tiny weight can silently kill an entire branch, which is exactly what happened with 15 -> 19. I’d prioritize either multi-bit routing, per-target gating, or a “stay / branch / fanout” style router over the current single normalized scalar in routing.rs (line 15). Expected upside: more modular circuits, less dead latent subgraphs. Risk: more branching can explode search if mutation operators aren’t adjusted.
+
+2. Introduce typed intermediate channels instead of anonymous payload slots.
+The graph-to-VM handoff is currently just numbered floats in output_slots, and this creature effectively used only one of them. That makes coordinated evolution expensive. I’d add a small fixed semantic bank like dir_hint, threat, food_score, goal_score, memory_key, while keeping some free-form slots. This would sit on top of the existing types.rs (line 5) mechanism. Upside: easier graph/VM cooperation. Risk: too much hand-design can overconstrain emergence.
+
+3. Make memory easier to use and harder to accidentally erase.
+The architecture has memory, but it’s 16 untyped scalar slots, and graph nodes can write and clear them in one hop. That favors accidental scratch use over stable working memory. I’d add either protected memory classes like sticky, decaying, tick-local, or explicit write modes. See state.rs (line 71) and cgp.rs (line 111). Upside: much easier emergence of multi-tick state. Risk: stronger memory can let brittle loops dominate unless selection rewards real usefulness.
+
+4. Increase representational richness of perception before increasing radius.
+The current perception is smartly compressed, but it is still summary-heavy: area aggregates plus only 4 nearby creature slots in perception.rs (line 74). I would not increase vision_radius first. I’d first add a few more “decision-ready” summaries such as obstacle corridor openness, food-behind-barrier cues, and path asymmetry signals. Upside: better planning signals without huge sensory dimensionality. Risk: more designer bias.
+
+5. Create environments that actually require cognition.
+This is probably as important as any runtime change. If local greedy foraging works, evolution will keep rediscovering scripts like Move, Eat, fallback Move. To get richer cognition, you need tasks that reward detours, obstacle memory, delayed payoff, or social inference. Without that pressure, smarter architectures may still collapse into cheap heuristics.
+
+6. Add mutation operators biased toward preserving working subcircuits.
+The trace showed live structure and dead structure coexisting. If useful modules are easy to break, evolution stays in shallow reactive basins. I’d add operators that duplicate live branches, retarget inputs while preserving topology, or perturb weights locally around reachable nodes. That fits the existing reachable-bias direction in config and genome analysis. Upside: better hill-climbing on cognition. Risk: too much preservation can reduce novelty.
+
+
+
+
+
 ## Small tasks
  - Change complexity cap so it only does destructive changes. We want to create room for new addative changes to fit in the complexity cap.
 

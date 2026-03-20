@@ -614,7 +614,11 @@ async fn snapshot_detail_omits_fertility_bytes_from_view_payload() {
 
     let (status, body) = do_request(a, get_req("/v3/simulation/snapshot?zoom_tier=detail")).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    assert_eq!(body["view"]["kind"].as_str(), Some("detail"), "body: {body}");
+    assert_eq!(
+        body["view"]["kind"].as_str(),
+        Some("detail"),
+        "body: {body}"
+    );
     assert!(body["view"]["food_density_u8"].is_array(), "body: {body}");
     assert!(
         body["view"]["food_fertility_u8"].is_null(),
