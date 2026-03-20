@@ -49,6 +49,7 @@ fn build_child_plasticity_weights(
 pub enum ReproductionActionResult {
     Spawned,
     RejectedInvalidTarget,
+    RejectedAgeConstraints,
     RejectedEnergyConstraints,
     RejectedPopulationCap,
 }
@@ -60,6 +61,7 @@ impl ReproductionActionResult {
         match self {
             Self::Spawned => "Spawned",
             Self::RejectedInvalidTarget => "RejectedInvalidTarget",
+            Self::RejectedAgeConstraints => "RejectedAgeConstraints",
             Self::RejectedEnergyConstraints => "RejectedEnergyConstraints",
             Self::RejectedPopulationCap => "RejectedPopulationCap",
         }
@@ -138,14 +140,24 @@ pub fn apply_reproduce(
         return ReproductionActionResult::RejectedPopulationCap;
     }
 
-    // Step 4: Deduct reproduce_cost from parent (scaled by genome complexity and age).
+    // Step 4: Enforce minimum reproduction age gate.
+    if sim.creatures[parent_id].age < sim.config.energy.lifecycle.min_reproduce_age {
+        sim.stats.reproduction_actions_rejected_total += 1;
+        *sim.stats
+            .reproduction_actions_rejected_by_reason
+            .entry(ReproductionActionResult::RejectedAgeConstraints)
+            .or_insert(0) += 1;
+        return ReproductionActionResult::RejectedAgeConstraints;
+    }
+
+    // Step 5: Deduct reproduce_cost from parent (scaled by genome complexity and age).
     sim.creatures[parent_id].energy -= sim.config.energy.adjusted_action_cost(
         sim.config.energy.costs.reproduce_cost,
         sim.creatures[parent_id].cached_complexity,
         sim.creatures[parent_id].age,
     );
 
-    // Step 5: Check parent has sufficient energy after cost deduction.
+    // Step 6: Check parent has sufficient energy after cost deduction.
     if sim.creatures[parent_id].energy < sim.config.energy.lifecycle.min_reproduce_energy {
         sim.stats.reproduction_actions_rejected_total += 1;
         *sim.stats
@@ -155,7 +167,7 @@ pub fn apply_reproduce(
         return ReproductionActionResult::RejectedEnergyConstraints;
     }
 
-    // Step 6: Compute energy transfer (clamped to [0, default_offspring_energy]).
+    // Step 7: Compute energy transfer (clamped to [0, default_offspring_energy]).
     let max_transfer = sim.config.energy.lifecycle.default_offspring_energy;
     let transfer = if energy_transfer_request.is_finite() && energy_transfer_request > 0.0 {
         energy_transfer_request.min(max_transfer)
@@ -172,10 +184,10 @@ pub fn apply_reproduce(
         return ReproductionActionResult::RejectedEnergyConstraints;
     }
 
-    // Step 7: Deduct transfer from parent.
+    // Step 8: Deduct transfer from parent.
     sim.creatures[parent_id].energy -= transfer;
 
-    // Step 8: Build offspring draft (clone parent genome + state).
+    // Step 9: Build offspring draft (clone parent genome + state).
     let child_genome = sim.creatures[parent_id].genome.clone();
     let child_shared_memory = sim.creatures[parent_id].shared_memory;
     let child_generation = sim.creatures[parent_id].generation + 1;
@@ -189,7 +201,7 @@ pub fn apply_reproduce(
         .clone();
     let parent_cached_reachable = sim.creatures[parent_id].cached_reachable_nodes.clone();
 
-    // Step 9: Apply genome mutations.
+    // Step 10: Apply genome mutations.
     let mut child_genome = child_genome;
     let summary = MutationEngine::apply_mutations(
         &mut child_genome,
@@ -293,7 +305,7 @@ pub fn apply_reproduce(
     child_birth_mutation_operators.sort_by_key(|operator| operator.as_key());
     let child_birth_mutation_operators = child_birth_mutation_operators.into_boxed_slice();
 
-    // Step 10: Phenotype mutation — triggered only when at least one genome event was applied.
+    // Step 11: Phenotype mutation — triggered only when at least one genome event was applied.
     let (child_channels, child_active_channel, child_polarity) = if summary.applied_events > 0 {
         mutate_phenotype(
             child_channels,
@@ -306,7 +318,7 @@ pub fn apply_reproduce(
         (child_channels, child_active_channel, child_polarity)
     };
 
-    // Step 10b: Identity inheritance — child inherits parent identity, kin-tag
+    // Step 11b: Identity inheritance — child inherits parent identity, kin-tag
     // mutates only when genome mutation applied events.
     let parent_identity = sim.creatures[parent_id].identity;
     let mut child_identity = CreatureIdentityState::inherit(&parent_identity);
@@ -314,10 +326,10 @@ pub fn apply_reproduce(
         child_identity.mutate_kin_tag(rng);
     }
 
-    // Step 11: Build child's plasticity weights (Lamarckian inheritance).
+    // Step 12: Build child's plasticity weights (Lamarckian inheritance).
     let child_plasticity = build_child_plasticity_weights(&child_genome, &parent_plasticity);
 
-    // Step 12–13: Spawn child in slotmap + world.
+    // Step 13–14: Spawn child in slotmap + world.
     // No-mutation fast path: if no genome mutations were applied, the offspring's
     // genome is identical to the parent's — copy cached_complexity to avoid
     // expensive recomputation.

@@ -6,7 +6,7 @@ use slotmap::{SecondaryMap, SlotMap};
 use crate::config::SimulationConfig;
 use crate::contracts::{CreatureId, InputReference, Position, WorldInputKey};
 use crate::creature::action_log::ActionLog;
-use crate::creature::founder::founder_genome;
+use crate::creature::founder::founder_genome_with_min_reproduce_age;
 use crate::creature::genome::CreatureGenome;
 use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::CreatureState;
@@ -61,7 +61,10 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
     let log_capacity = config.action_log.capacity;
 
     for (founder_index, &pos) in positions.iter().take(spawn_count).enumerate() {
-        let genome = founder_genome(config.population.founder_profile);
+        let genome = founder_genome_with_min_reproduce_age(
+            config.population.founder_profile,
+            config.energy.lifecycle.min_reproduce_age,
+        );
         let energy = config.energy.lifecycle.initial_energy;
         let identity = CreatureIdentityState::founder(founder_index, seed);
         // Insert into slotmap to get an id, then fill with actual state.
@@ -340,6 +343,21 @@ mod tests {
         assert!(
             first_eat < first_reproduce,
             "forage-first founder should prioritize eat before reproduce"
+        );
+    }
+
+    #[test]
+    fn seeding_threads_min_reproduce_age_into_founder_gate() {
+        let mut cfg = small_config();
+        cfg.energy.lifecycle.min_reproduce_age = 25;
+        let sim = seed_simulation(cfg, 42);
+        let founder = sim.creatures.values().next().expect("seeded founder");
+        let BackendDef::Graph(graph) = &founder.genome.nodes[0].backend_def else {
+            panic!("node 0 should be graph backend");
+        };
+        assert_eq!(
+            graph.compute_nodes[1].kind,
+            crate::creature::genome::cgp::ComputeNodeKind::Threshold(24.5)
         );
     }
 }

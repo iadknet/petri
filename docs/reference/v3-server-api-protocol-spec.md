@@ -117,6 +117,7 @@ Request (conceptual v3alpha2 shape):
       "max_energy": 200.0,
       "energy_decay_per_tick": 0.5,
       "min_reproduce_energy": 1.0,
+      "min_reproduce_age": 20,
       "default_offspring_energy": 100.0
     },
     "costs": {
@@ -374,6 +375,7 @@ Response:
         "max_energy": 200.0,
         "energy_decay_per_tick": 0.5,
         "min_reproduce_energy": 1.0,
+        "min_reproduce_age": 20,
         "default_offspring_energy": 100.0
       },
       "costs": {
@@ -609,7 +611,7 @@ Field definitions:
 |-------|------|-------------|
 | `tick` | u64 | Simulation tick when the action was executed. |
 | `action_type` | string | One of `NoOp`, `Eat`, `Move`, `Reproduce`, `StealEnergy`. |
-| `result` | string | One of `Success`, `NoFood`, `Blocked`, `InvalidTarget`, `EnergyConstraints`, `PopulationCap`, `TransferredAndKilled`, `NoVictim`. |
+| `result` | string | One of `Success`, `NoFood`, `Blocked`, `InvalidTarget`, `AgeConstraints`, `EnergyConstraints`, `PopulationCap`, `TransferredAndKilled`, `NoVictim`. |
 | `direction` | u8 | Direction parameter (0-7 cardinal+diagonal, 255 = N/A). |
 | `energy_before` | f32 | Creature energy before the action. |
 | `energy_after` | f32 | Creature energy after the action (includes costs). |
@@ -695,7 +697,8 @@ Payload mapping:
   "reproduction_actions_rejected_total": 592,
   "reproduction_actions_rejected_total_by_reason": {
     "RejectedInvalidTarget": 512,
-    "RejectedEnergyConstraints": 80
+    "RejectedAgeConstraints": 30,
+    "RejectedEnergyConstraints": 50
   },
   "mutation_events_skipped_total_by_reason": {
     "ParseabilityViolation": 58,

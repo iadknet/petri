@@ -332,6 +332,7 @@ mod tests {
         // Give parent plenty of energy.
         let pos = Position::new(5, 5);
         let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
+        sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
         assert_eq!(result, ReproductionActionResult::Spawned);
@@ -342,6 +343,7 @@ mod tests {
     fn apply_reproduce_default_cap_allows_twenty_energy_transfer() {
         let pos = Position::new(5, 5);
         let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
+        sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(11);
 
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
@@ -423,15 +425,57 @@ mod tests {
                 .min_reproduce_energy
             - 0.1;
         let (mut sim, parent_id) = make_sim_one_creature(pos, low_energy);
+        sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(3);
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
         assert_eq!(result, ReproductionActionResult::RejectedEnergyConstraints);
     }
 
     #[test]
+    fn apply_reproduce_fails_when_parent_below_min_reproduce_age() {
+        let pos = Position::new(5, 5);
+        let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
+        sim.config.energy.lifecycle.min_reproduce_age = 20;
+        sim.creatures[parent_id].age = 0;
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(31);
+        let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
+        assert_eq!(result, ReproductionActionResult::RejectedAgeConstraints);
+        assert_eq!(sim.creatures.len(), 1, "no child should be spawned");
+    }
+
+    #[test]
+    fn apply_reproduce_age_rejection_does_not_charge_reproduce_cost() {
+        let pos = Position::new(5, 5);
+        let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
+        sim.config.energy.lifecycle.min_reproduce_age = 20;
+        sim.creatures[parent_id].age = 0;
+        let energy_before = sim.creatures[parent_id].energy;
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(32);
+        let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
+        assert_eq!(result, ReproductionActionResult::RejectedAgeConstraints);
+        assert!(
+            (sim.creatures[parent_id].energy - energy_before).abs() < f32::EPSILON,
+            "age rejection should happen before reproduce_cost is charged"
+        );
+    }
+
+    #[test]
+    fn apply_reproduce_succeeds_when_parent_meets_min_reproduce_age() {
+        let pos = Position::new(5, 5);
+        let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
+        sim.config.energy.lifecycle.min_reproduce_age = 20;
+        sim.creatures[parent_id].age = 20;
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(33);
+        let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
+        assert_eq!(result, ReproductionActionResult::Spawned);
+        assert_eq!(sim.creatures.len(), 2, "one child should be spawned");
+    }
+
+    #[test]
     fn apply_reproduce_deducts_cost_from_parent() {
         let pos = Position::new(5, 5);
         let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
+        sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
         let cost = sim.config.energy.costs.reproduce_cost;
         let energy_before = sim.creatures[parent_id].energy;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(4);
@@ -458,6 +502,7 @@ mod tests {
     fn apply_reproduce_child_has_correct_generation() {
         let pos = Position::new(5, 5);
         let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
+        sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
         let parent_gen = sim.creatures[parent_id].generation;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(6);
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
@@ -474,6 +519,7 @@ mod tests {
     fn apply_reproduce_child_inherits_shared_memory() {
         let pos = Position::new(5, 5);
         let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
+        sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
         // Write distinctive values to parent shared_memory.
         sim.creatures[parent_id].shared_memory[3] = 0.42;
         sim.creatures[parent_id].shared_memory[7] = 0.99;
@@ -499,6 +545,7 @@ mod tests {
 
         for seed in 0u64..10_000 {
             let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
+            sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
             sim.config.mutation.mutation_probability = 1.0;
             sim.config.mutation.per_birth_mutation_events_min = 1;
             sim.config.mutation.per_birth_mutation_events_max = 1;
@@ -544,6 +591,7 @@ mod tests {
 
         for seed in 0u64..10_000 {
             let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
+            sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
             sim.config.mutation.mutation_probability = 1.0;
             sim.config.mutation.per_birth_mutation_events_min = 1;
             sim.config.mutation.per_birth_mutation_events_max = 1;
@@ -595,6 +643,7 @@ mod tests {
     fn reproduce_updates_domain_and_operator_mutation_stats() {
         let pos = Position::new(5, 5);
         let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
+        sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
         sim.config.mutation.mutation_probability = 1.0;
         sim.config.mutation.per_birth_mutation_events_min = 3;
         sim.config.mutation.per_birth_mutation_events_max = 3;
@@ -923,6 +972,7 @@ mod tests {
 
         // Low-complexity parent — record energy after reproduce
         let (mut sim_low, parent_low) = make_sim_with_genome(Position::new(5, 5), 80.0, low_genome);
+        sim_low.creatures[parent_low].age = sim_low.config.energy.lifecycle.min_reproduce_age;
         let energy_before_low = sim_low.creatures[parent_low].energy;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
         let _ = apply_reproduce(parent_low, &mut sim_low, Direction::N, 20.0, &mut rng);
@@ -931,6 +981,7 @@ mod tests {
         // High-complexity parent
         let (mut sim_high, parent_high) =
             make_sim_with_genome(Position::new(5, 5), 80.0, high_genome);
+        sim_high.creatures[parent_high].age = sim_high.config.energy.lifecycle.min_reproduce_age;
         let energy_before_high = sim_high.creatures[parent_high].energy;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
         let _ = apply_reproduce(parent_high, &mut sim_high, Direction::N, 20.0, &mut rng);

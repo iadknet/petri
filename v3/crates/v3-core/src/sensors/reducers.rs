@@ -372,12 +372,14 @@ fn fill_nearby_banks(
         } else {
             0.0
         };
-        vitals[vbase + vitals_idx::REPRODUCE_READY] =
-            if target.energy >= config.min_reproduce_energy {
-                1.0
-            } else {
-                0.0
-            };
+        vitals[vbase + vitals_idx::REPRODUCE_READY] = if target.energy
+            >= config.min_reproduce_energy
+            && target.age >= config.min_reproduce_age
+        {
+            1.0
+        } else {
+            0.0
+        };
 
         // Identity fields
         let ibase = slot * identity_idx::FIELDS_PER_SLOT;
@@ -929,6 +931,68 @@ mod tests {
         // Same phenotype → phenotype_similarity = 1.0
         assert!(
             (snap.nearby_identity[identity_idx::PHENOTYPE_SIMILARITY] - 1.0).abs() < f32::EPSILON
+        );
+    }
+
+    #[test]
+    fn nearby_reproduce_ready_requires_energy_and_age() {
+        let mut world = make_world(20, 20);
+        let origin = crate::contracts::Position::new(10, 10);
+
+        let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
+        let observer_id = creatures.insert_with_key(|id| {
+            make_creature(id, origin, 50.0, CreatureIdentityState::default(), [0; 6])
+        });
+        world.place_creature(origin, observer_id);
+
+        let neighbor_pos = crate::contracts::Position::new(11, 10);
+        let neighbor_id = creatures.insert_with_key(|id| {
+            make_creature(
+                id,
+                neighbor_pos,
+                100.0,
+                CreatureIdentityState::default(),
+                [0; 6],
+            )
+        });
+        creatures[neighbor_id].age = 5;
+        world.place_creature(neighbor_pos, neighbor_id);
+
+        let table = get_visibility_table(2);
+        let visible = compute_visible_cells(origin, &world, table);
+        let config = PerceptionConfig {
+            min_reproduce_energy: 30.0,
+            min_reproduce_age: 20,
+            ..PerceptionConfig::default()
+        };
+
+        let snap_underage = assemble_perception(
+            observer_id,
+            &creatures[observer_id],
+            visible.cells(),
+            &world,
+            &creatures,
+            &config,
+        );
+        assert_eq!(
+            snap_underage.nearby_vitals[vitals_idx::REPRODUCE_READY],
+            0.0,
+            "underage creature should not be marked reproduce_ready"
+        );
+
+        creatures[neighbor_id].age = 20;
+        let snap_of_age = assemble_perception(
+            observer_id,
+            &creatures[observer_id],
+            visible.cells(),
+            &world,
+            &creatures,
+            &config,
+        );
+        assert_eq!(
+            snap_of_age.nearby_vitals[vitals_idx::REPRODUCE_READY],
+            1.0,
+            "age+energy eligible creature should be reproduce_ready"
         );
     }
 }

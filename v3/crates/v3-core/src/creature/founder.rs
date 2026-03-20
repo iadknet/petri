@@ -1,73 +1,119 @@
 use crate::config::{FounderProfile, MutationConfig};
-use crate::contracts::{DynamicIntrospectionKey, InputReference, NodeId, WorldInputKey};
+use crate::contracts::{
+    DynamicIntrospectionKey, InputReference, NodeId, StaticIntrospectionKey, WorldInputKey,
+};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
 
-use super::cgp_founder::{build_cgp_founder_graph, build_cgp_founder_graph_with_threshold};
+use super::cgp_founder::{build_cgp_founder_graph, build_cgp_founder_graph_with_thresholds};
+
+const DEFAULT_MIN_REPRODUCE_AGE_TICKS: u64 = 20;
 
 /// Return the canonical v3alpha1 founder genome.
 ///
 /// 2-node mesh: Node 0 (Graph sensor aggregator) -> Node 1 (VM decision emitter).
 /// Spec: v3-startup-seeding-spec.md Section 5.1.
 pub fn v3alpha1_founder_genome() -> CreatureGenome {
+    v3alpha1_founder_genome_with_min_reproduce_age(DEFAULT_MIN_REPRODUCE_AGE_TICKS)
+}
+
+/// Return the canonical v3alpha1 founder genome with a configurable minimum
+/// reproduction age gate (in ticks).
+#[must_use]
+pub fn v3alpha1_founder_genome_with_min_reproduce_age(
+    min_reproduce_age_ticks: u64,
+) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
-        nodes: vec![node0_graph_sensor(), node1_vm_decision()],
+        nodes: vec![
+            node0_graph_sensor(min_reproduce_age_ticks),
+            node1_vm_decision(),
+        ],
     }
 }
 
 /// Return a founder genome variant selected by profile.
 #[must_use]
 pub fn founder_genome(profile: FounderProfile) -> CreatureGenome {
+    founder_genome_with_min_reproduce_age(profile, DEFAULT_MIN_REPRODUCE_AGE_TICKS)
+}
+
+/// Return a founder genome variant selected by profile with a configurable
+/// minimum reproduction age gate (in ticks).
+#[must_use]
+pub fn founder_genome_with_min_reproduce_age(
+    profile: FounderProfile,
+    min_reproduce_age_ticks: u64,
+) -> CreatureGenome {
     match profile {
-        FounderProfile::V3Alpha1 => v3alpha1_founder_genome(),
-        FounderProfile::ForageFirstSparse => forage_first_founder_genome(30.0, 10.0),
-        FounderProfile::ForageFirstSparseConservative => forage_first_founder_genome(60.0, 10.0),
-        FounderProfile::ForageFirstSparseRichOffspring => forage_first_founder_genome(40.0, 20.0),
-        FounderProfile::ForageFirstSparseBalanced => forage_first_founder_genome(50.0, 15.0),
+        FounderProfile::V3Alpha1 => {
+            v3alpha1_founder_genome_with_min_reproduce_age(min_reproduce_age_ticks)
+        }
+        FounderProfile::ForageFirstSparse => {
+            forage_first_founder_genome(30.0, 10.0, min_reproduce_age_ticks)
+        }
+        FounderProfile::ForageFirstSparseConservative => {
+            forage_first_founder_genome(60.0, 10.0, min_reproduce_age_ticks)
+        }
+        FounderProfile::ForageFirstSparseRichOffspring => {
+            forage_first_founder_genome(40.0, 20.0, min_reproduce_age_ticks)
+        }
+        FounderProfile::ForageFirstSparseBalanced => {
+            forage_first_founder_genome(50.0, 15.0, min_reproduce_age_ticks)
+        }
     }
 }
 
 fn forage_first_founder_genome(
     reproduce_energy_threshold: f32,
     reproduce_transfer_energy: f32,
+    min_reproduce_age_ticks: u64,
 ) -> CreatureGenome {
     CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![
-            node0_graph_sensor_with_threshold(reproduce_energy_threshold),
+            node0_graph_sensor_with_threshold(reproduce_energy_threshold, min_reproduce_age_ticks),
             node1_vm_decision_forage_first(reproduce_transfer_energy),
         ],
     }
 }
 
-fn node0_graph_sensor() -> NodeGenome {
+fn node0_graph_sensor(min_reproduce_age_ticks: u64) -> NodeGenome {
     NodeGenome {
         node_id: NodeId::new(0),
         input_refs: vec![
             InputReference::World(WorldInputKey::FoodHere),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
+            InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
             InputReference::World(WorldInputKey::NeighborFoodRing),
             InputReference::World(WorldInputKey::NeighborOccupiedRing),
         ],
-        backend_def: BackendDef::Graph(build_cgp_founder_graph(&MutationConfig::default())),
+        backend_def: BackendDef::Graph(build_cgp_founder_graph(
+            &MutationConfig::default(),
+            min_reproduce_age_ticks as f32,
+        )),
         targets: vec![NodeId::new(1)],
     }
 }
 
-fn node0_graph_sensor_with_threshold(reproduce_energy_threshold: f32) -> NodeGenome {
+fn node0_graph_sensor_with_threshold(
+    reproduce_energy_threshold: f32,
+    min_reproduce_age_ticks: u64,
+) -> NodeGenome {
     NodeGenome {
         node_id: NodeId::new(0),
         input_refs: vec![
             InputReference::World(WorldInputKey::FoodHere),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
+            InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
             InputReference::World(WorldInputKey::NeighborFoodRing),
             InputReference::World(WorldInputKey::NeighborOccupiedRing),
         ],
-        backend_def: BackendDef::Graph(build_cgp_founder_graph_with_threshold(
+        backend_def: BackendDef::Graph(build_cgp_founder_graph_with_thresholds(
             &MutationConfig::default(),
             reproduce_energy_threshold,
+            min_reproduce_age_ticks as f32,
         )),
         targets: vec![NodeId::new(1)],
     }
@@ -481,12 +527,12 @@ mod tests {
         // Node 0: Graph backend
         let node0 = &g.nodes[0];
         assert_eq!(node0.node_id, NodeId::new(0));
-        assert_eq!(node0.input_refs.len(), 4);
+        assert_eq!(node0.input_refs.len(), 5);
         assert_eq!(node0.targets, vec![NodeId::new(1)]);
 
         if let BackendDef::Graph(ref gdef) = node0.backend_def {
-            // CGP founder: 1 compute node (Threshold)
-            assert_eq!(gdef.compute_nodes.len(), 1);
+            // CGP founder: energy gate, age gate, combined can_reproduce output.
+            assert_eq!(gdef.compute_nodes.len(), 3);
         } else {
             panic!("Node 0 must be Graph backend");
         }
@@ -580,10 +626,10 @@ mod tests {
         let BackendDef::Graph(graph) = &node0.backend_def else {
             panic!("Node 0 must be Graph backend");
         };
-        assert_eq!(graph.compute_nodes.len(), 1);
         assert_eq!(
             graph.compute_nodes[0].kind,
-            ComputeNodeKind::Threshold(30.0)
+            ComputeNodeKind::Threshold(30.0),
+            "first compute node should retain energy threshold tuning"
         );
     }
 
@@ -696,10 +742,27 @@ mod tests {
             let BackendDef::Graph(graph) = &node0.backend_def else {
                 panic!("Node 0 must be Graph backend");
             };
-            assert_eq!(graph.compute_nodes.len(), 1);
+            assert_eq!(
+                graph.compute_nodes.len(),
+                3,
+                "founder node0 should combine energy + age gates"
+            );
             assert_eq!(
                 graph.compute_nodes[0].kind,
                 ComputeNodeKind::Threshold(expected_threshold)
+            );
+            assert_eq!(graph.compute_nodes[1].kind, ComputeNodeKind::Threshold(19.5));
+            assert_eq!(graph.compute_nodes[2].kind, ComputeNodeKind::Multiply);
+            assert_eq!(
+                node0.input_refs,
+                vec![
+                    InputReference::World(WorldInputKey::FoodHere),
+                    InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
+                    InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
+                    InputReference::World(WorldInputKey::NeighborFoodRing),
+                    InputReference::World(WorldInputKey::NeighborOccupiedRing),
+                ],
+                "founder node0 inputs should include age ticks"
             );
 
             let node1 = &genome.nodes[1];
