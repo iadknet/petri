@@ -13,6 +13,13 @@ const queryClient = new QueryClient({
 	},
 });
 
+// Handle stale hashed chunks after a new frontend build/deploy.
+// Without this, lazy imports can fail with a 404 until the user manually refreshes.
+window.addEventListener("vite:preloadError", (event) => {
+	event.preventDefault();
+	window.location.reload();
+});
+
 if (import.meta.env.DEV) {
 	void import("./testing/e2eHooks.ts").then(({ installE2ETestHooks }) => {
 		installE2ETestHooks();

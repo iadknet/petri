@@ -139,6 +139,14 @@ fn to_json_value<T: serde::Serialize>(value: T) -> Result<Json<serde_json::Value
     Ok(Json(body))
 }
 
+fn creature_id_from_ffi_exact(id: u64) -> Option<CreatureId> {
+    let key_data = KeyData::from_ffi(id);
+    if key_data.as_ffi() != id {
+        return None;
+    }
+    Some(key_data.into())
+}
+
 fn mesh_read_class_key(class: MeshReadClass) -> &'static str {
     match class {
         MeshReadClass::Food => "food",
@@ -332,7 +340,8 @@ pub async fn get_creature(
     let handle = app.sim.lock().await;
     let sim = &handle.sim;
 
-    let creature_id: CreatureId = KeyData::from_ffi(id).into();
+    let creature_id = creature_id_from_ffi_exact(id)
+        .ok_or_else(|| AppError::NotFound(format!("creature {id} not found")))?;
     let creature = sim
         .creatures
         .get(creature_id)
@@ -459,7 +468,8 @@ pub async fn start_sample(
         });
     }
 
-    let creature_id: CreatureId = KeyData::from_ffi(id).into();
+    let creature_id = creature_id_from_ffi_exact(id)
+        .ok_or_else(|| AppError::NotFound(format!("creature {id} not found")))?;
     if !handle.sim.creatures.contains_key(creature_id) {
         return Err(AppError::NotFound(format!("creature {id} not found")));
     }
@@ -482,7 +492,12 @@ pub async fn get_sample(
 ) -> Result<impl IntoResponse, AppError> {
     let mut handle = app.sim.lock().await;
 
-    let creature_id: CreatureId = KeyData::from_ffi(id).into();
+    let Some(creature_id) = creature_id_from_ffi_exact(id) else {
+        return to_json_value(SampleIdleResponse {
+            protocol_version: PROTOCOL_VERSION,
+            status: "idle",
+        });
+    };
     let Some(active) = handle
         .active_trace
         .as_ref()

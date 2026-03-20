@@ -35,10 +35,7 @@ export function StartupConfigPanel({
 				startupPreset={startupPreset}
 				updateStartupPreset={updateStartupPreset}
 			/>
-			<FertilitySection
-				startupPreset={startupPreset}
-				updateStartupPreset={updateStartupPreset}
-			/>
+			<FertilitySection startupPreset={startupPreset} updateStartupPreset={updateStartupPreset} />
 			<StartupRampsSection
 				startupPreset={startupPreset}
 				updateStartupPreset={updateStartupPreset}

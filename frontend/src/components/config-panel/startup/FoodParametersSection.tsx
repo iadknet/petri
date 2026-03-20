@@ -21,7 +21,7 @@ const FIELDS: FieldDef[] = [
 		max: 1,
 		step: 0.01,
 		testId: "startup-field-food-initial-coverage",
-		defaultValue: 0.15,
+		defaultValue: 0.54,
 		tooltip: "Fraction of world cells that start with food during generation",
 	},
 ];

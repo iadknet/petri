@@ -1,7 +1,21 @@
 import { create } from "zustand";
 import type { SimulationConfig } from "../types/api.ts";
-import type { WorldEdgeMode } from "../types/config.ts";
+import type { FertilityLayer, WorldEdgeMode } from "../types/config.ts";
 import { deepSet } from "../utils/deepSet.ts";
+
+interface StartupFertilityConfig {
+	enabled: boolean;
+	min_fertility: number;
+	max_fertility: number;
+	layers: FertilityLayer[];
+}
+
+interface StartupAnnealingConfig {
+	enabled: boolean;
+	ramp_ticks: number;
+	initial_min_fertility: number;
+	initial_max_fertility: number;
+}
 
 export interface StartupPreset {
 	seed: number;
@@ -15,6 +29,8 @@ export interface StartupPreset {
 		food: {
 			initial_density: number;
 			initial_coverage: number;
+			fertility: StartupFertilityConfig;
+			annealing: StartupAnnealingConfig;
 		};
 	};
 	energy: {
@@ -38,7 +54,7 @@ export interface StartupConfigState {
 	hydrated: boolean;
 
 	setPreset: (next: StartupPreset) => void;
-	updatePreset: (path: string, value: number | string | boolean) => void;
+	updatePreset: (path: string, value: unknown) => void;
 	randomizeSeed: () => void;
 	hydrateFromServerConfig: (config: SimulationConfig) => void;
 	reset: () => void;
@@ -48,27 +64,53 @@ function randomSeed(): number {
 	return Math.floor(Math.random() * 2 ** 32);
 }
 
+function defaultPoissonLayer(): FertilityLayer {
+	return {
+		weight: 1.0,
+		algorithm: {
+			PoissonBlobs: {
+				blob_count: 900,
+				min_radius: 5.0,
+				max_radius: 15.0,
+				falloff: 0.5,
+			},
+		},
+	};
+}
+
 function buildDefaultPreset(): StartupPreset {
 	return {
 		seed: randomSeed(),
-		population: { initial_creatures: 2000 },
+		population: { initial_creatures: 10000 },
 		world: {
-			width: 400,
-			height: 400,
+			width: 1600,
+			height: 1600,
 			edge_mode: "Wrap",
 			food: {
 				initial_density: 1.0,
-				initial_coverage: 0.15,
+				initial_coverage: 0.54,
+				fertility: {
+					enabled: true,
+					min_fertility: 0.0,
+					max_fertility: 2.0,
+					layers: [defaultPoissonLayer(), defaultPoissonLayer()],
+				},
+				annealing: {
+					enabled: false,
+					ramp_ticks: 5000,
+					initial_min_fertility: 0.3,
+					initial_max_fertility: 1.5,
+				},
 			},
 		},
 		energy: { initial_energy: 20.0 },
 		startup: {
 			ramps: {
 				failed_action_penalty: {
-					enabled: false,
-					start: 5.0,
-					end: 5.0,
-					target_tick: 1000,
+					enabled: true,
+					start: 0.0,
+					end: 1.0,
+					target_tick: 62680,
 				},
 			},
 		},
@@ -86,6 +128,20 @@ function fromServerConfig(config: SimulationConfig): StartupPreset {
 			food: {
 				initial_density: config.world.food.initial_density,
 				initial_coverage: config.world.food.initial_coverage,
+				fertility: {
+					enabled: config.world.food.fertility?.enabled ?? false,
+					min_fertility: config.world.food.fertility?.min_fertility ?? 0.0,
+					max_fertility: config.world.food.fertility?.max_fertility ?? 2.0,
+					layers:
+						config.world.food.fertility?.layers ??
+						[defaultPoissonLayer(), defaultPoissonLayer()],
+				},
+				annealing: {
+					enabled: config.world.food.annealing?.enabled ?? false,
+					ramp_ticks: config.world.food.annealing?.ramp_ticks ?? 5000,
+					initial_min_fertility: config.world.food.annealing?.initial_min_fertility ?? 0.3,
+					initial_max_fertility: config.world.food.annealing?.initial_max_fertility ?? 1.5,
+				},
 			},
 		},
 		energy: { initial_energy: config.energy.lifecycle.initial_energy },
@@ -160,7 +216,15 @@ export function buildStartupRequest(preset: StartupPreset) {
 			width: preset.world.width,
 			height: preset.world.height,
 			edge_mode: preset.world.edge_mode,
-			food: { ...preset.world.food },
+			food: {
+				initial_density: preset.world.food.initial_density,
+				initial_coverage: preset.world.food.initial_coverage,
+				fertility: {
+					...preset.world.food.fertility,
+					layers: [...preset.world.food.fertility.layers],
+				},
+				annealing: { ...preset.world.food.annealing },
+			},
 		},
 		energy: {
 			lifecycle: { initial_energy: preset.energy.initial_energy },

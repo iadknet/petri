@@ -168,6 +168,18 @@ describe("ControlBar", () => {
 				food: {
 					initial_density: 1.0,
 					initial_coverage: 0.4,
+					fertility: {
+						enabled: false,
+						min_fertility: 0.0,
+						max_fertility: 2.0,
+						layers: [],
+					},
+					annealing: {
+						enabled: false,
+						ramp_ticks: 5000,
+						initial_min_fertility: 0.3,
+						initial_max_fertility: 1.5,
+					},
 				},
 			},
 			energy: { initial_energy: 20 },
@@ -216,6 +228,18 @@ describe("ControlBar", () => {
 					food: {
 						initial_density: 1.0,
 						initial_coverage: 0.4,
+						fertility: {
+							enabled: false,
+							min_fertility: 0.0,
+							max_fertility: 2.0,
+							layers: [],
+						},
+						annealing: {
+							enabled: false,
+							ramp_ticks: 5000,
+							initial_min_fertility: 0.3,
+							initial_max_fertility: 1.5,
+						},
 					},
 				},
 				energy: {
@@ -251,6 +275,18 @@ describe("ControlBar", () => {
 				food: {
 					initial_density: 1.0,
 					initial_coverage: 0.4,
+					fertility: {
+						enabled: false,
+						min_fertility: 0.0,
+						max_fertility: 2.0,
+						layers: [],
+					},
+					annealing: {
+						enabled: false,
+						ramp_ticks: 5000,
+						initial_min_fertility: 0.3,
+						initial_max_fertility: 1.5,
+					},
 				},
 			},
 			energy: { initial_energy: 20 },
@@ -348,6 +384,92 @@ describe("ControlBar", () => {
 		await waitFor(() => {
 			expect(window.confirm).toHaveBeenCalledTimes(1);
 			expect(api.startup).not.toHaveBeenCalled();
+		});
+	});
+
+	it("restart sends fertility startup settings when configured in preset", async () => {
+		useStartupConfigStore.getState().updatePreset("seed", 987654321);
+		useStartupConfigStore.getState().updatePreset("world.food.fertility.enabled", true);
+		useStartupConfigStore.getState().updatePreset("world.food.fertility.min_fertility", 0.4);
+		useStartupConfigStore.getState().updatePreset("world.food.fertility.max_fertility", 1.9);
+		useStartupConfigStore.getState().updatePreset("world.food.fertility.layers", [
+			{
+				weight: 0.75,
+				algorithm: {
+					Fbm: {
+						octaves: 4,
+						frequency: 0.06,
+						lacunarity: 2.0,
+						persistence: 0.5,
+						seed: 999,
+					},
+				},
+			},
+		]);
+		useStartupConfigStore.getState().updatePreset("world.food.annealing.enabled", true);
+		useStartupConfigStore.getState().updatePreset("world.food.annealing.ramp_ticks", 7000);
+		useStartupConfigStore
+			.getState()
+			.updatePreset("world.food.annealing.initial_min_fertility", 0.7);
+		useStartupConfigStore
+			.getState()
+			.updatePreset("world.food.annealing.initial_max_fertility", 1.3);
+		vi.mocked(api.startup).mockResolvedValue({
+			protocol_version: "v3alpha1",
+			state: "idle",
+			tick: 0,
+			config_digest: "sha256:deadbeef",
+			seeded_creatures: 64,
+		});
+		vi.mocked(api.getConfig).mockResolvedValue({
+			protocol_version: "v3alpha1",
+			state: "idle",
+			config: MOCK_CONFIG,
+		});
+
+		render(
+			<PanelLayoutProvider>
+				<ControlBar />
+			</PanelLayoutProvider>,
+		);
+
+		fireEvent.click(screen.getByTestId("control-restart"));
+
+		await waitFor(() => {
+			expect(api.startup).toHaveBeenCalledWith(
+				expect.objectContaining({
+					seed: 987654321,
+					world: expect.objectContaining({
+						food: expect.objectContaining({
+							fertility: expect.objectContaining({
+								enabled: true,
+								min_fertility: 0.4,
+								max_fertility: 1.9,
+								layers: [
+									{
+										weight: 0.75,
+										algorithm: {
+											Fbm: {
+												octaves: 4,
+												frequency: 0.06,
+												lacunarity: 2.0,
+												persistence: 0.5,
+												seed: 999,
+											},
+										},
+									},
+								],
+							}),
+							annealing: expect.objectContaining({
+								enabled: true,
+								ramp_ticks: 7000,
+								initial_min_fertility: 0.7,
+								initial_max_fertility: 1.3,
+							}),
+						}),
+					}),
+				}),
+			);
 		});
 	});
 });

@@ -29,9 +29,9 @@ pub struct FoodResourceConfig {
 impl Default for FoodResourceConfig {
     fn default() -> Self {
         Self {
-            growth_rate: 0.05,
+            growth_rate: 0.09,
             initial_density: 1.0,
-            initial_coverage: 0.15,
+            initial_coverage: 0.54,
             spread_threshold_ratio: 0.8,
             spread_density_ratio: 0.25,
             recovery_spawn_rate: 0.01,
@@ -70,7 +70,7 @@ pub enum FertilityAlgorithm {
 impl Default for FertilityAlgorithm {
     fn default() -> Self {
         FertilityAlgorithm::PoissonBlobs {
-            blob_count: 8,
+            blob_count: 900,
             min_radius: 5.0,
             max_radius: 15.0,
             falloff: 0.5,
@@ -101,23 +101,23 @@ impl Default for FertilityLayer {
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct FertilityConfig {
-    /// Whether the fertility map is applied during food growth. Default: false.
+    /// Whether the fertility map is applied during food growth. Default: true.
     pub enabled: bool,
     /// Minimum fertility value after normalization. Default: 0.0.
     pub min_fertility: f32,
     /// Maximum fertility value after normalization. Default: 2.0.
     pub max_fertility: f32,
-    /// Ordered list of weighted algorithm layers. Default: one PoissonBlobs layer.
+    /// Ordered list of weighted algorithm layers. Default: two PoissonBlobs layers.
     pub layers: Vec<FertilityLayer>,
 }
 
 impl Default for FertilityConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
+            enabled: true,
             min_fertility: 0.0,
             max_fertility: 2.0,
-            layers: vec![FertilityLayer::default()],
+            layers: vec![FertilityLayer::default(), FertilityLayer::default()],
         }
     }
 }
@@ -160,8 +160,8 @@ pub struct WorldConfig {
 impl Default for WorldConfig {
     fn default() -> Self {
         Self {
-            width: 400,
-            height: 400,
+            width: 1600,
+            height: 1600,
             edge_mode: WorldEdgeMode::default(),
             food: FoodResourceConfig::default(),
         }
@@ -229,7 +229,7 @@ impl Default for EnergyCostsConfig {
             noop_cost: 0.05,
             reproduce_cost: 0.1,
             eat_reward_per_food: 5.0,
-            failed_action_penalty: 5.0,
+            failed_action_penalty: 1.0,
         }
     }
 }
@@ -357,10 +357,10 @@ pub struct FailedActionPenaltyRampConfig {
 impl Default for FailedActionPenaltyRampConfig {
     fn default() -> Self {
         Self {
-            enabled: false,
-            start: 5.0,
-            end: 5.0,
-            target_tick: 1000,
+            enabled: true,
+            start: 0.0,
+            end: 1.0,
+            target_tick: 62680,
         }
     }
 }
@@ -579,12 +579,12 @@ pub struct MutationConfig {
 impl Default for MutationConfig {
     fn default() -> Self {
         Self {
-            mutation_probability: 0.303,
+            mutation_probability: 0.1,
             per_birth_mutation_events_min: 1,
             per_birth_mutation_events_max: 10,
             mesh_layer_probability: 0.2,
             genome_size_cap: 1200,
-            genome_size_pressure_enabled: true,
+            genome_size_pressure_enabled: false,
             action_queue_cap: 4,
             phenotype: PhenotypeConfig::default(),
             reachable_bias: ReachableBiasConfig::default(),
@@ -620,8 +620,8 @@ pub struct PredationConfig {
 impl Default for PredationConfig {
     fn default() -> Self {
         Self {
-            steal_cost_rate: 0.2,
-            kill_complexity_bonus_multiplier: 0.05,
+            steal_cost_rate: 0.05,
+            kill_complexity_bonus_multiplier: 0.0,
         }
     }
 }
@@ -654,7 +654,7 @@ pub struct PopulationConfig {
 impl Default for PopulationConfig {
     fn default() -> Self {
         Self {
-            initial_creatures: 2000,
+            initial_creatures: 10000,
             max_creatures: 100000,
             founder_profile: FounderProfile::default(),
         }
@@ -716,14 +716,14 @@ impl SimulationConfig {
     pub fn normalize(&mut self) {
         let w = &mut self.world;
         if w.width == 0 {
-            w.width = 400;
+            w.width = 1600;
         }
         if w.height == 0 {
-            w.height = 400;
+            w.height = 1600;
         }
         w.food.max_density = normalize_f32_finite_positive(w.food.max_density, 1.0);
-        w.food.growth_rate = normalize_f32_clamp(w.food.growth_rate, 0.0, 1.0, 0.05);
-        w.food.initial_coverage = normalize_f32_clamp(w.food.initial_coverage, 0.0, 1.0, 0.15);
+        w.food.growth_rate = normalize_f32_clamp(w.food.growth_rate, 0.0, 1.0, 0.09);
+        w.food.initial_coverage = normalize_f32_clamp(w.food.initial_coverage, 0.0, 1.0, 0.54);
         w.food.spread_threshold_ratio =
             normalize_f32_clamp(w.food.spread_threshold_ratio, 0.0, 1.0, 0.8);
         w.food.spread_density_ratio =
@@ -753,7 +753,7 @@ impl SimulationConfig {
         ec.noop_cost = normalize_f32_finite_nonneg(ec.noop_cost, 0.05);
         ec.reproduce_cost = normalize_f32_finite_nonneg(ec.reproduce_cost, 0.1);
         ec.eat_reward_per_food = normalize_f32_finite_nonneg(ec.eat_reward_per_food, 5.0);
-        ec.failed_action_penalty = normalize_f32_finite_nonneg(ec.failed_action_penalty, 5.0);
+        ec.failed_action_penalty = normalize_f32_finite_nonneg(ec.failed_action_penalty, 1.0);
         let failed_penalty_fallback = ec.failed_action_penalty;
 
         let ramp = &mut self.startup.ramps.failed_action_penalty;
@@ -859,16 +859,16 @@ impl SimulationConfig {
         }
 
         let pred = &mut self.predation;
-        pred.steal_cost_rate = normalize_f32_clamp(pred.steal_cost_rate, 0.0, 1.0, 0.2);
+        pred.steal_cost_rate = normalize_f32_clamp(pred.steal_cost_rate, 0.0, 1.0, 0.05);
         pred.kill_complexity_bonus_multiplier =
-            normalize_f32_finite_nonneg(pred.kill_complexity_bonus_multiplier, 0.05);
+            normalize_f32_finite_nonneg(pred.kill_complexity_bonus_multiplier, 0.0);
 
         self.shared_memory.decay_rate =
             normalize_f32_clamp(self.shared_memory.decay_rate, 0.0, 1.0, 0.0);
 
         let p = &mut self.population;
         if p.initial_creatures < 1 {
-            p.initial_creatures = 2000;
+            p.initial_creatures = 10000;
         }
         if p.max_creatures < p.initial_creatures {
             p.max_creatures = 100000;
@@ -924,17 +924,40 @@ mod tests {
     fn default_config_matches_spec() {
         let cfg = SimulationConfig::default();
         // World
-        assert_eq!(cfg.world.width, 400);
-        assert_eq!(cfg.world.height, 400);
+        assert_eq!(cfg.world.width, 1600);
+        assert_eq!(cfg.world.height, 1600);
         assert!(matches!(cfg.world.edge_mode, WorldEdgeMode::Wrap));
-        assert!((cfg.world.food.growth_rate - 0.05).abs() < 1e-6);
+        assert!((cfg.world.food.growth_rate - 0.09).abs() < 1e-6);
         assert!((cfg.world.food.initial_density - 1.0).abs() < 1e-6);
-        assert!((cfg.world.food.initial_coverage - 0.15).abs() < 1e-6);
+        assert!((cfg.world.food.initial_coverage - 0.54).abs() < 1e-6);
         assert!((cfg.world.food.spread_threshold_ratio - 0.8).abs() < 1e-6);
         assert!((cfg.world.food.spread_density_ratio - 0.25).abs() < 1e-6);
         assert!((cfg.world.food.recovery_spawn_rate - 0.01).abs() < 1e-6);
         assert!((cfg.world.food.recovery_floor_ratio - 0.01).abs() < 1e-6);
         assert!((cfg.world.food.max_density - 1.0).abs() < 1e-6);
+        assert!(cfg.world.food.fertility.enabled);
+        assert_eq!(cfg.world.food.fertility.min_fertility, 0.0);
+        assert_eq!(cfg.world.food.fertility.max_fertility, 2.0);
+        assert_eq!(cfg.world.food.fertility.layers.len(), 2);
+        for layer in &cfg.world.food.fertility.layers {
+            assert!((layer.weight - 1.0).abs() < f32::EPSILON);
+            match &layer.algorithm {
+                FertilityAlgorithm::PoissonBlobs {
+                    blob_count,
+                    min_radius,
+                    max_radius,
+                    falloff,
+                    seed,
+                } => {
+                    assert_eq!(*blob_count, 900);
+                    assert!((*min_radius - 5.0).abs() < f32::EPSILON);
+                    assert!((*max_radius - 15.0).abs() < f32::EPSILON);
+                    assert!((*falloff - 0.5).abs() < f32::EPSILON);
+                    assert_eq!(*seed, None);
+                }
+                other => panic!("expected PoissonBlobs default layer, got {other:?}"),
+            }
+        }
         // Energy lifecycle
         assert!((cfg.energy.lifecycle.initial_energy - 20.0).abs() < 1e-6);
         assert!((cfg.energy.lifecycle.max_energy - 200.0).abs() < 1e-6);
@@ -955,12 +978,12 @@ mod tests {
         assert!((cfg.energy.costs.noop_cost - 0.05).abs() < 1e-6);
         assert!((cfg.energy.costs.reproduce_cost - 0.1).abs() < 1e-6);
         assert!((cfg.energy.costs.eat_reward_per_food - 5.0).abs() < 1e-6);
-        assert!((cfg.energy.costs.failed_action_penalty - 5.0).abs() < 1e-6);
+        assert!((cfg.energy.costs.failed_action_penalty - 1.0).abs() < 1e-6);
         // Startup ramps
-        assert!(!cfg.startup.ramps.failed_action_penalty.enabled);
-        assert!((cfg.startup.ramps.failed_action_penalty.start - 5.0).abs() < 1e-6);
-        assert!((cfg.startup.ramps.failed_action_penalty.end - 5.0).abs() < 1e-6);
-        assert_eq!(cfg.startup.ramps.failed_action_penalty.target_tick, 1000);
+        assert!(cfg.startup.ramps.failed_action_penalty.enabled);
+        assert!((cfg.startup.ramps.failed_action_penalty.start - 0.0).abs() < 1e-6);
+        assert!((cfg.startup.ramps.failed_action_penalty.end - 1.0).abs() < 1e-6);
+        assert_eq!(cfg.startup.ramps.failed_action_penalty.target_tick, 62680);
         // Runtime
         assert_eq!(cfg.runtime.max_mesh_hops, 1024);
         assert_eq!(cfg.runtime.max_vm_steps, 10000);
@@ -974,14 +997,14 @@ mod tests {
         // Perception
         assert_eq!(cfg.runtime.perception.vision_radius, 5);
         // Mutation
-        assert!((cfg.mutation.mutation_probability - 0.303).abs() < 1e-9);
+        assert!((cfg.mutation.mutation_probability - 0.1).abs() < 1e-9);
         assert_eq!(cfg.mutation.per_birth_mutation_events_min, 1);
         assert_eq!(cfg.mutation.per_birth_mutation_events_max, 10);
         assert!((cfg.mutation.mesh_layer_probability - 0.2).abs() < 1e-9);
         assert_eq!(cfg.mutation.action_queue_cap, 4);
         // Complexity pressure
         assert_eq!(cfg.mutation.genome_size_cap, 1200);
-        assert!(cfg.mutation.genome_size_pressure_enabled);
+        assert!(!cfg.mutation.genome_size_pressure_enabled);
         // Phenotype
         assert_eq!(cfg.mutation.phenotype.channel_step, 1);
         assert!((cfg.mutation.phenotype.channel_change_chance - 0.001).abs() < 1e-6);
@@ -994,10 +1017,10 @@ mod tests {
         // Shared memory
         assert!((cfg.shared_memory.decay_rate - 0.0).abs() < f32::EPSILON);
         // Predation
-        assert!((cfg.predation.steal_cost_rate - 0.2).abs() < 1e-6);
-        assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.05).abs() < 1e-6);
+        assert!((cfg.predation.steal_cost_rate - 0.05).abs() < 1e-6);
+        assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.0).abs() < 1e-6);
         // Population
-        assert_eq!(cfg.population.initial_creatures, 2000);
+        assert_eq!(cfg.population.initial_creatures, 10000);
         assert_eq!(cfg.population.max_creatures, 100000);
         assert_eq!(cfg.population.founder_profile, FounderProfile::V3Alpha1);
     }
@@ -1041,7 +1064,7 @@ mod tests {
         let mut cfg = SimulationConfig::default();
         cfg.world.food.growth_rate = f32::NAN;
         cfg.normalize();
-        assert!((cfg.world.food.growth_rate - 0.05).abs() < 1e-6);
+        assert!((cfg.world.food.growth_rate - 0.09).abs() < 1e-6);
     }
 
     #[test]
@@ -1229,7 +1252,7 @@ mod tests {
     #[test]
     fn config_default_failed_action_penalty() {
         let cfg = SimulationConfig::default();
-        assert!((cfg.energy.costs.failed_action_penalty - 5.0).abs() < 1e-6);
+        assert!((cfg.energy.costs.failed_action_penalty - 1.0).abs() < 1e-6);
     }
 
     #[test]
@@ -1237,7 +1260,7 @@ mod tests {
         let mut cfg = SimulationConfig::default();
         cfg.energy.costs.failed_action_penalty = f32::NAN;
         cfg.normalize();
-        assert!((cfg.energy.costs.failed_action_penalty - 5.0).abs() < 1e-6);
+        assert!((cfg.energy.costs.failed_action_penalty - 1.0).abs() < 1e-6);
     }
 
     #[test]
@@ -1245,7 +1268,7 @@ mod tests {
         let mut cfg = SimulationConfig::default();
         cfg.energy.costs.failed_action_penalty = -3.0;
         cfg.normalize();
-        assert!((cfg.energy.costs.failed_action_penalty - 5.0).abs() < 1e-6);
+        assert!((cfg.energy.costs.failed_action_penalty - 1.0).abs() < 1e-6);
     }
 
     #[test]
@@ -1259,15 +1282,15 @@ mod tests {
     #[test]
     fn predation_config_default_values() {
         let cfg = PredationConfig::default();
-        assert!((cfg.steal_cost_rate - 0.2).abs() < 1e-6);
-        assert!((cfg.kill_complexity_bonus_multiplier - 0.05).abs() < 1e-6);
+        assert!((cfg.steal_cost_rate - 0.05).abs() < 1e-6);
+        assert!((cfg.kill_complexity_bonus_multiplier - 0.0).abs() < 1e-6);
     }
 
     #[test]
     fn simulation_config_has_predation_field() {
         let cfg = SimulationConfig::default();
-        assert!((cfg.predation.steal_cost_rate - 0.2).abs() < 1e-6);
-        assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.05).abs() < 1e-6);
+        assert!((cfg.predation.steal_cost_rate - 0.05).abs() < 1e-6);
+        assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.0).abs() < 1e-6);
     }
 
     #[test]
@@ -1291,7 +1314,7 @@ mod tests {
         let mut cfg = SimulationConfig::default();
         cfg.predation.steal_cost_rate = f32::NAN;
         cfg.normalize();
-        assert!((cfg.predation.steal_cost_rate - 0.2).abs() < 1e-6);
+        assert!((cfg.predation.steal_cost_rate - 0.05).abs() < 1e-6);
     }
 
     #[test]
@@ -1299,7 +1322,7 @@ mod tests {
         let mut cfg = SimulationConfig::default();
         cfg.predation.kill_complexity_bonus_multiplier = -1.0;
         cfg.normalize();
-        assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.05).abs() < 1e-6);
+        assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.0).abs() < 1e-6);
     }
 
     #[test]
@@ -1307,7 +1330,7 @@ mod tests {
         let mut cfg = SimulationConfig::default();
         cfg.predation.kill_complexity_bonus_multiplier = f32::NAN;
         cfg.normalize();
-        assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.05).abs() < 1e-6);
+        assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.0).abs() < 1e-6);
     }
 
     #[test]
@@ -1315,7 +1338,7 @@ mod tests {
         let mut cfg = SimulationConfig::default();
         cfg.predation.kill_complexity_bonus_multiplier = f32::INFINITY;
         cfg.normalize();
-        assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.05).abs() < 1e-6);
+        assert!((cfg.predation.kill_complexity_bonus_multiplier - 0.0).abs() < 1e-6);
     }
 
     // ── SharedMemoryConfig tests ──────────────────────────────────────────
@@ -1706,13 +1729,13 @@ mod tests {
     }
 
     #[test]
-    fn startup_failed_action_penalty_ramp_defaults_to_disabled() {
+    fn startup_failed_action_penalty_ramp_defaults_to_enabled() {
         let cfg = SimulationConfig::default();
-        assert!(!cfg.startup.ramps.failed_action_penalty.enabled);
-        assert!(
-            (cfg.failed_action_penalty_for_tick(0) - cfg.energy.costs.failed_action_penalty).abs()
-                < 1e-6
-        );
+        assert!(cfg.startup.ramps.failed_action_penalty.enabled);
+        assert!((cfg.startup.ramps.failed_action_penalty.start - 0.0).abs() < 1e-6);
+        assert!((cfg.startup.ramps.failed_action_penalty.end - 1.0).abs() < 1e-6);
+        assert_eq!(cfg.startup.ramps.failed_action_penalty.target_tick, 62680);
+        assert!((cfg.failed_action_penalty_for_tick(0) - 0.0).abs() < 1e-6);
     }
 
     #[test]
@@ -1745,20 +1768,38 @@ mod tests {
     // ── FoodResourceConfig / FertilityConfig / AnnealingConfig tests ──────
 
     #[test]
-    fn food_resource_config_default_has_fertility_disabled() {
+    fn food_resource_config_default_has_fertility_enabled_poisson_layer() {
         let config = FoodResourceConfig::default();
-        assert!(!config.fertility.enabled);
+        assert!(config.fertility.enabled);
         assert_eq!(config.fertility.min_fertility, 0.0);
         assert_eq!(config.fertility.max_fertility, 2.0);
+        assert_eq!(config.fertility.layers.len(), 2);
+        for layer in &config.fertility.layers {
+            match &layer.algorithm {
+                FertilityAlgorithm::PoissonBlobs {
+                    blob_count,
+                    min_radius,
+                    max_radius,
+                    falloff,
+                    ..
+                } => {
+                    assert_eq!(*blob_count, 900);
+                    assert!((*min_radius - 5.0).abs() < f32::EPSILON);
+                    assert!((*max_radius - 15.0).abs() < f32::EPSILON);
+                    assert!((*falloff - 0.5).abs() < f32::EPSILON);
+                }
+                other => panic!("expected PoissonBlobs layer, got {other:?}"),
+            }
+        }
         assert!(!config.annealing.enabled);
         assert_eq!(config.annealing.ramp_ticks, 5000);
     }
 
     #[test]
     fn fertility_config_deserializes_with_defaults_when_omitted() {
-        let json = r#"{"growth_rate":0.05,"initial_density":1.0,"initial_coverage":0.15,"spread_threshold_ratio":0.8,"spread_density_ratio":0.25,"recovery_spawn_rate":0.01,"recovery_floor_ratio":0.01,"max_density":1.0}"#;
+        let json = r#"{"growth_rate":0.09,"initial_density":1.0,"initial_coverage":0.54,"spread_threshold_ratio":0.8,"spread_density_ratio":0.25,"recovery_spawn_rate":0.01,"recovery_floor_ratio":0.01,"max_density":1.0}"#;
         let config: FoodResourceConfig = serde_json::from_str(json).unwrap();
-        assert!(!config.fertility.enabled);
+        assert!(config.fertility.enabled);
         assert!(!config.annealing.enabled);
     }
 

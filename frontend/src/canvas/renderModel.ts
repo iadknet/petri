@@ -5,15 +5,16 @@ export interface OverviewRenderLayer {
 	rect: ViewOverviewPayload["rect"];
 	gridWidth: number;
 	gridHeight: number;
-	foodDensity: number[];
+	foodDensity: ByteArrayLike;
 	creatureCounts: number[];
 }
 
 export interface FertilityOverlay {
 	/** Full world-size fertility grid (one u8 per cell). */
-	worldGrid: number[];
+	worldGrid: ByteArrayLike;
 	worldWidth: number;
 	worldHeight: number;
+	worldStaticRevision: number;
 }
 
 export interface RenderModel {
@@ -32,6 +33,7 @@ export function buildRenderModel(input: {
 	predationEvents: PredationEvent[];
 	camera: CameraState;
 	fertilityGrid: ByteArrayLike | null;
+	fertilityRevision: number;
 	showFertilityOverlay: boolean;
 }): RenderModel | null {
 	if (!input.frame) {
@@ -45,8 +47,8 @@ export function buildRenderModel(input: {
 					rect: input.overviewView.rect,
 					gridWidth: input.overviewView.grid_width,
 					gridHeight: input.overviewView.grid_height,
-					foodDensity: Array.from(input.overviewView.food_density_u8),
-					creatureCounts: Array.from(input.overviewView.creature_count_u16),
+					foodDensity: input.overviewView.food_density_u8,
+					creatureCounts: input.overviewView.creature_count_u16,
 				}
 			: null,
 		tick: input.tick,
@@ -55,9 +57,10 @@ export function buildRenderModel(input: {
 		fertilityOverlay:
 			input.showFertilityOverlay && input.fertilityGrid
 				? {
-						worldGrid: Array.from(input.fertilityGrid),
+						worldGrid: input.fertilityGrid,
 						worldWidth: input.frame.width,
 						worldHeight: input.frame.height,
+						worldStaticRevision: input.fertilityRevision,
 					}
 				: null,
 	};

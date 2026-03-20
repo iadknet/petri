@@ -8,7 +8,7 @@ export const PREDATION_FIELDS: FieldDef[] = [
 		max: 1,
 		step: 0.01,
 		testId: "config-field-predation-steal-cost-rate",
-		defaultValue: 0.2,
+		defaultValue: 0.05,
 		tooltip: "Fraction of attempted steal amount paid as attacker energy cost",
 	},
 	{
@@ -18,7 +18,7 @@ export const PREDATION_FIELDS: FieldDef[] = [
 		max: 1,
 		step: 0.01,
 		testId: "config-field-predation-kill-complexity-bonus",
-		defaultValue: 0.05,
+		defaultValue: 0.0,
 		tooltip: "Energy bonus per unit of victim genome complexity on kill",
 	},
 ];

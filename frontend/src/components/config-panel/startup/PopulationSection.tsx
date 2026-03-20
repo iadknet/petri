@@ -11,7 +11,7 @@ const FIELDS: FieldDef[] = [
 		max: 10000,
 		step: 1,
 		testId: "startup-field-population-initial-creatures",
-		defaultValue: 2000,
+		defaultValue: 10000,
 		tooltip: "Number of creatures spawned at world initialization",
 	},
 ];
