@@ -56,6 +56,10 @@ This document does not define:
   if invalid:
     reject RejectedInvalidTarget
     return
+  validates minimum parent age gate
+  if age validation fails:
+    reject RejectedAgeConstraints
+    return
   validates reproduce action + energy transfer
   if energy validation fails:
     reject RejectedEnergyConstraints
@@ -137,8 +141,10 @@ Constraints:
 ## 5. Energy Transfer Contract
 
 Reproduction action semantics:
-- After target validity succeeds, parent pays reproduction action cost according
-  to energy config.
+- After target validity succeeds, parent must satisfy minimum reproduction age
+  before any reproduce action cost is charged.
+- After age gate succeeds, parent pays reproduction action cost according to
+  energy config.
 - Requested child transfer is clamped by configured offspring transfer cap.
 - If parent cannot satisfy required transfer constraints, reproduction fails and
   no child is spawned.
@@ -160,22 +166,24 @@ runtime config contract: `v3-runtime-config-spec.md`.
      -> unresolved : [reject RejectedInvalidTarget; return]
   2. check is_valid_spawn_cell(target, current_world_state)
      -> invalid    : [reject RejectedInvalidTarget; return]
-  3. pay energy.costs.reproduce_cost from parent
-  4. enforce energy.lifecycle.min_reproduce_energy gate on parent
+  3. enforce energy.lifecycle.min_reproduce_age gate on parent
+     -> below threshold : [reject RejectedAgeConstraints; return]
+  4. pay energy.costs.reproduce_cost from parent
+  5. enforce energy.lifecycle.min_reproduce_energy gate on parent
      -> below threshold : [reject RejectedEnergyConstraints; return]
-  5. compute transfer = min(clamp_non_negative_finite(requested_energy),
+  6. compute transfer = min(clamp_non_negative_finite(requested_energy),
                            energy.lifecycle.default_offspring_energy)
      -> reject if transfer <= 0.0 or parent cannot cover transfer
      -> [reject RejectedEnergyConstraints; return]
-  6. deduct transfer from parent; build OffspringDraft with initial_energy = transfer
-  7. call MutationEngine unconditionally on child genome -> MutationSummary
+  7. deduct transfer from parent; build OffspringDraft with initial_energy = transfer
+  8. call MutationEngine unconditionally on child genome -> MutationSummary
      (MutationEngine internally handles the mutation_probability gate;
       see v3-mutation-spec.md Section 4.1)
-  8. derive child identity from parent identity:
+  9. derive child identity from parent identity:
        - inherit lineage_id unchanged
        - mutate kin_tag only if MutationSummary.applied_events > 0
-  9. if MutationSummary.applied_events > 0: mutate phenotype per v3-phenotype-spec.md
- 10. spawn child immediately; occupy cell now
+ 10. if MutationSummary.applied_events > 0: mutate phenotype per v3-phenotype-spec.md
+ 11. spawn child immediately; occupy cell now
 ```
 
 Energy config field names/defaults are canonical in `v3-runtime-config-spec.md`
@@ -206,6 +214,10 @@ If target validation fails:
 - No `OffspringDraft` is created.
 - No mutation event is attempted for that failed reproduce action.
 
+If minimum-age validation fails:
+- Reproduce is rejected as `RejectedAgeConstraints`.
+- No reproduce action cost is charged for that attempt.
+
 ### Ownership boundary
 
 - Action ordering/arbitration is owned by `v3-tick-orchestration-spec.md`.
@@ -223,6 +235,7 @@ If target validation fails:
 
 - `Spawned`
 - `RejectedInvalidTarget`
+- `RejectedAgeConstraints`
 - `RejectedEnergyConstraints`
 
 ---

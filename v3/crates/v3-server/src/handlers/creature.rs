@@ -185,6 +185,7 @@ fn action_result_key(result: ActionResult) -> &'static str {
         ActionResult::NoFood => "NoFood",
         ActionResult::Blocked => "Blocked",
         ActionResult::InvalidTarget => "InvalidTarget",
+        ActionResult::AgeConstraints => "AgeConstraints",
         ActionResult::EnergyConstraints => "EnergyConstraints",
         ActionResult::PopulationCap => "PopulationCap",
         ActionResult::TransferredAndKilled => "TransferredAndKilled",
@@ -531,4 +532,17 @@ pub async fn get_sample(
         ticks_completed: active.ticks.len(),
         ticks_remaining: active.ticks_remaining,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn action_result_key_maps_age_constraints() {
+        assert_eq!(
+            action_result_key(ActionResult::AgeConstraints),
+            "AgeConstraints"
+        );
+    }
 }

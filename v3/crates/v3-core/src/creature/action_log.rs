@@ -30,6 +30,7 @@ pub enum ActionResult {
     PopulationCap = 5,
     TransferredAndKilled = 6,
     NoVictim = 7,
+    AgeConstraints = 8,
 }
 
 /// Single action record in a creature's action log.
@@ -186,5 +187,22 @@ mod tests {
     fn size_of_entry_is_32_bytes() {
         // Runtime check mirrors compile-time assertion
         assert_eq!(size_of::<ActionLogEntry>(), 32);
+    }
+
+    #[test]
+    fn age_constraints_result_is_preserved() {
+        let entry = ActionLogEntry {
+            tick: 7,
+            action_type: ActionType::Reproduce,
+            result: ActionResult::AgeConstraints,
+            direction: 0,
+            energy_before: 40.0,
+            energy_after: 39.0,
+            amount: 0.0,
+            priority_bid: 0.5,
+        };
+        let mut log = ActionLog::new(8);
+        log.push(entry);
+        assert_eq!(log.entries()[0].result, ActionResult::AgeConstraints);
     }
 }

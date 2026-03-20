@@ -193,7 +193,13 @@ pub struct EnergyLifecycleConfig {
     pub max_energy: f32,
     pub energy_decay_per_tick: f32,
     pub min_reproduce_energy: f32,
+    #[serde(default = "default_min_reproduce_age")]
+    pub min_reproduce_age: u64,
     pub default_offspring_energy: f32,
+}
+
+fn default_min_reproduce_age() -> u64 {
+    20
 }
 
 impl Default for EnergyLifecycleConfig {
@@ -203,6 +209,7 @@ impl Default for EnergyLifecycleConfig {
             max_energy: 200.0,
             energy_decay_per_tick: 0.5,
             min_reproduce_energy: 30.0,
+            min_reproduce_age: default_min_reproduce_age(),
             default_offspring_energy: 100.0,
         }
     }
@@ -963,6 +970,7 @@ mod tests {
         assert!((cfg.energy.lifecycle.max_energy - 200.0).abs() < 1e-6);
         assert!((cfg.energy.lifecycle.energy_decay_per_tick - 0.5).abs() < 1e-6);
         assert!((cfg.energy.lifecycle.min_reproduce_energy - 30.0).abs() < 1e-6);
+        assert_eq!(cfg.energy.lifecycle.min_reproduce_age, 20);
         assert!((cfg.energy.lifecycle.default_offspring_energy - 100.0).abs() < 1e-6);
         // Complexity energy cost
         assert!(!cfg.energy.complexity_cost.enabled);
@@ -1122,6 +1130,22 @@ mod tests {
         cfg.energy.lifecycle.max_energy = -1.0;
         cfg.normalize();
         assert!((cfg.energy.lifecycle.max_energy - 200.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_min_reproduce_age_preserves_zero() {
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.lifecycle.min_reproduce_age = 0;
+        cfg.normalize();
+        assert_eq!(cfg.energy.lifecycle.min_reproduce_age, 0);
+    }
+
+    #[test]
+    fn normalize_min_reproduce_age_keeps_configured_value() {
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.lifecycle.min_reproduce_age = 25;
+        cfg.normalize();
+        assert_eq!(cfg.energy.lifecycle.min_reproduce_age, 25);
     }
 
     #[test]
@@ -1514,6 +1538,28 @@ mod tests {
         let ec: EnergyConfig = serde_json::from_str(json).unwrap();
         assert!(ec.age_cost.enabled);
         assert_eq!(ec.age_cost.age_cap, 500);
+    }
+
+    #[test]
+    fn energy_lifecycle_serde_defaults_min_reproduce_age_when_missing() {
+        let json = r#"{"initial_energy":20.0,"max_energy":200.0,"energy_decay_per_tick":0.5,"min_reproduce_energy":30.0,"default_offspring_energy":100.0}"#;
+        let lifecycle: EnergyLifecycleConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(lifecycle.min_reproduce_age, 20);
+    }
+
+    #[test]
+    fn energy_lifecycle_serde_roundtrip_preserves_min_reproduce_age() {
+        let lifecycle = EnergyLifecycleConfig {
+            initial_energy: 20.0,
+            max_energy: 200.0,
+            energy_decay_per_tick: 0.5,
+            min_reproduce_energy: 30.0,
+            min_reproduce_age: 42,
+            default_offspring_energy: 100.0,
+        };
+        let json = serde_json::to_string(&lifecycle).unwrap();
+        let parsed: EnergyLifecycleConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.min_reproduce_age, 42);
     }
 
     #[test]
