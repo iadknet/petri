@@ -162,11 +162,15 @@ pub fn run_tick(
     };
     use crate::sensors::reducers::assemble_perception;
     use crate::sensors::static_inputs::assemble_static_inputs;
+    use crate::sensors::typed_food::{
+        assemble_typed_food_local_snapshot, genome_uses_typed_local_food,
+        TypedFoodLocalSnapshot,
+    };
     use crate::sensors::visibility::{
         compute_visible_cells_into, get_visibility_table, VisibilityScratch,
     };
     use crate::simulation::actions::{
-        apply_eat, apply_move, apply_noop, apply_reproduce, apply_steal_energy,
+        apply_move, apply_noop, apply_reproduce, apply_steal_energy, apply_typed_eat,
         PredationActionResult, ReproductionActionResult,
     };
     use crate::simulation::outcomes::OutcomeAccumulator;
@@ -190,6 +194,9 @@ pub fn run_tick(
     sim.stats.last_tick_food_occupancy_depletion_occupied_cells = 0;
     sim.stats
         .last_tick_food_growth_suppressed_by_occupancy_depletion = 0.0;
+    sim.stats.last_tick_food_cells_with_type_inhibition = 0;
+    sim.stats
+        .last_tick_food_growth_suppressed_by_type_inhibition = 0.0;
 
     run_phase_0(sim);
 
@@ -239,6 +246,11 @@ pub fn run_tick(
         .map(|&id| {
             let creature = &sim.creatures[id];
             let local = assemble_static_inputs(&sim.world, creature);
+            let typed_local_food = if genome_uses_typed_local_food(&creature.genome) {
+                assemble_typed_food_local_snapshot(&sim.world, creature.position)
+            } else {
+                TypedFoodLocalSnapshot::zero()
+            };
             let perception = if genome_uses_extended_perception(&creature.genome) {
                 let visible = compute_visible_cells_into(
                     creature.position,
@@ -257,7 +269,11 @@ pub fn run_tick(
             } else {
                 PerceptionSnapshot::zero()
             };
-            let ss = SensorSnapshot { local, perception };
+            let ss = SensorSnapshot {
+                local,
+                typed_local_food,
+                perception,
+            };
             (id, ss)
         })
         .collect();
@@ -430,13 +446,14 @@ pub fn run_tick(
                         });
                     }
                 }
-                WorldAction::Eat => {
+                WorldAction::Eat { type_idx } => {
                     let mut action_result = ActionResult::Success;
                     let mut amount = 0.0;
                     if let Some(creature) = sim.creatures.get_mut(id) {
                         creature.lifetime_action_attempted_count += 1;
-                        let food_before = sim.world.food_at(creature.position);
-                        let succeeded = apply_eat(creature, &mut sim.world, &sim.config);
+                        let food_before = sim.world.food_at_type(creature.position, type_idx);
+                        let succeeded =
+                            apply_typed_eat(creature, &mut sim.world, &sim.config, type_idx);
                         sim.stats.last_tick_eat += 1;
                         outcome_acc.record_action_result(id, succeeded);
                         if succeeded {

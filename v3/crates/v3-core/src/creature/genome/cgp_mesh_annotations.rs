@@ -130,8 +130,10 @@ fn classify_input_ref(input_ref: &InputReference) -> MeshReadClass {
 
     match input_ref {
         InputReference::World(key) => match key {
-            WorldInputKey::FoodHere | WorldInputKey::AreaFoodSummary => MeshReadClass::Food,
-            WorldInputKey::NeighborFoodRing => MeshReadClass::Food,
+            WorldInputKey::FoodHere { .. } | WorldInputKey::AreaFoodSummary { .. } => {
+                MeshReadClass::Food
+            }
+            WorldInputKey::NeighborFoodRing { .. } => MeshReadClass::Food,
             WorldInputKey::NeighborBarrierRing | WorldInputKey::AreaBarrierSummary => {
                 MeshReadClass::Barrier
             }
@@ -153,6 +155,7 @@ fn classify_input_ref(input_ref: &InputReference) -> MeshReadClass {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::OrdinaryFoodTypeId;
     use crate::contracts::WorldInputKey;
     use crate::creature::genome::cgp::{
         ActionSlot, ActionSlotBehavior, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge,
@@ -204,7 +207,9 @@ mod tests {
             action_bank: Vec::new(),
             execute_gate: ExecuteGate { inputs: Vec::new() },
         };
-        let input_refs = vec![InputReference::World(WorldInputKey::FoodHere)];
+        let input_refs = vec![InputReference::World(WorldInputKey::FoodHere {
+            type_idx: OrdinaryFoodTypeId::default(),
+        })];
         let (reads, writes, _, live) = derive_cgp_annotations(&def, &input_refs);
 
         assert!(writes.contains(&MeshWriteClass::Payload));
@@ -336,7 +341,9 @@ mod tests {
             },
         };
         let input_refs = vec![
-            InputReference::World(WorldInputKey::FoodHere),
+            InputReference::World(WorldInputKey::FoodHere {
+                type_idx: OrdinaryFoodTypeId::default(),
+            }),
             InputReference::World(WorldInputKey::NeighborOccupiedRing),
         ];
         let (reads, writes, _, _) = derive_cgp_annotations(&def, &input_refs);

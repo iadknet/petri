@@ -43,7 +43,7 @@ pub fn resolve_input(reference: &InputReference, sub_idx: u16, ctx: &ResolveCtx<
             ctx.sensors.resolve_compound(key, sub_idx)
         }
         // Scalar world keys: sub_idx is ignored.
-        InputReference::World(key) => ctx.sensors.local.resolve_world(key),
+        InputReference::World(key) => ctx.sensors.resolve_world(key),
         InputReference::StaticIntrospection(key) => ctx.sensors.local.resolve_static(key),
         InputReference::DynamicIntrospection(key) => match key {
             DynamicIntrospectionKey::EnergyCurrent => ctx.energy,
@@ -62,12 +62,14 @@ pub fn resolve_input(reference: &InputReference, sub_idx: u16, ctx: &ResolveCtx<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::OrdinaryFoodTypeId;
     use crate::contracts::{
         ActionQueue, Direction, DynamicIntrospectionKey, InputReference, StaticIntrospectionKey,
         WorldAction, WorldInputKey,
     };
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
+    use crate::sensors::typed_food::TypedFoodLocalSnapshot;
 
     fn make_sensor_snapshot(food_here: f32) -> SensorSnapshot {
         SensorSnapshot {
@@ -79,7 +81,11 @@ mod tests {
                 generation: 3.0,
                 age_ticks: 10.0,
             },
-            perception: PerceptionSnapshot::zero(),
+            typed_local_food: TypedFoodLocalSnapshot {
+                food_here_by_type: vec![food_here],
+                neighbor_food_by_type: vec![[0.5; 8]],
+            },
+            perception: PerceptionSnapshot::zeroed(1),
         }
     }
 
@@ -107,7 +113,11 @@ mod tests {
         let ss = make_sensor_snapshot(0.75);
         let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
-        let v = resolve_input(&InputReference::World(WorldInputKey::FoodHere), 0, &ctx);
+        let v = resolve_input(
+            &InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())),
+            0,
+            &ctx,
+        );
         assert!((v - 0.75).abs() < 1e-6);
     }
 
@@ -118,7 +128,9 @@ mod tests {
         let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
         // NeighborFoodRing is compound, sub_idx=0 → Direction::N
         let v = resolve_input(
-            &InputReference::World(WorldInputKey::NeighborFoodRing),
+            &InputReference::World(WorldInputKey::neighbor_food_ring(
+                OrdinaryFoodTypeId::default(),
+            )),
             0,
             &ctx,
         );
@@ -223,7 +235,7 @@ mod tests {
         let ss = make_sensor_snapshot(0.0);
         let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let mut aq = ActionQueue::new(4);
-        aq.push(WorldAction::Eat); // type 1
+        aq.push(WorldAction::eat(OrdinaryFoodTypeId::default())); // type 1
         let ctx = ResolveCtx {
             sensors: &ss,
             upstream_slots: &upstream,
@@ -311,7 +323,7 @@ mod tests {
         let ctx = make_ctx(&ss, &upstream, 50.0, 3.0);
 
         let refs = vec![
-            InputReference::World(WorldInputKey::FoodHere),
+            InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())),
             InputReference::StaticIntrospection(StaticIntrospectionKey::Generation),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
             InputReference::UpstreamSlot(0),
@@ -338,20 +350,24 @@ mod tests {
     #[test]
     fn extended_key_routes_through_perception_snapshot() {
         let mut ss = make_sensor_snapshot(0.0);
-        ss.perception.area_food[0] = 0.42;
-        ss.perception.area_food[6] = 0.88;
+        ss.perception.typed_area_food[0][0] = 0.42;
+        ss.perception.typed_area_food[0][6] = 0.88;
         let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
 
         let v0 = resolve_input(
-            &InputReference::World(WorldInputKey::AreaFoodSummary),
+            &InputReference::World(WorldInputKey::AreaFoodSummary {
+                type_idx: crate::config::OrdinaryFoodTypeId::default(),
+            }),
             0,
             &ctx,
         );
         assert!((v0 - 0.42).abs() < f32::EPSILON);
 
         let v6 = resolve_input(
-            &InputReference::World(WorldInputKey::AreaFoodSummary),
+            &InputReference::World(WorldInputKey::AreaFoodSummary {
+                type_idx: crate::config::OrdinaryFoodTypeId::default(),
+            }),
             6,
             &ctx,
         );
@@ -361,13 +377,15 @@ mod tests {
     #[test]
     fn compound_oob_sub_idx_wraps() {
         let mut ss = make_sensor_snapshot(0.0);
-        ss.perception.area_food[0] = 0.42;
+        ss.perception.typed_area_food[0][0] = 0.42;
         let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
         let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
 
         // area_food has 7 sub-values; sub_idx=7 wraps to index 0
         let v = resolve_input(
-            &InputReference::World(WorldInputKey::AreaFoodSummary),
+            &InputReference::World(WorldInputKey::AreaFoodSummary {
+                type_idx: crate::config::OrdinaryFoodTypeId::default(),
+            }),
             7,
             &ctx,
         );
@@ -378,7 +396,9 @@ mod tests {
 
         // Large sub_idx also wraps
         let v_large = resolve_input(
-            &InputReference::World(WorldInputKey::AreaFoodSummary),
+            &InputReference::World(WorldInputKey::AreaFoodSummary {
+                type_idx: crate::config::OrdinaryFoodTypeId::default(),
+            }),
             14,
             &ctx,
         );
@@ -433,7 +453,9 @@ mod tests {
         let ctx = make_ctx(&ss, &upstream, 50.0, 0.0);
 
         let keys = [
-            WorldInputKey::AreaFoodSummary,
+            WorldInputKey::AreaFoodSummary {
+                type_idx: crate::config::OrdinaryFoodTypeId::default(),
+            },
             WorldInputKey::AreaBarrierSummary,
             WorldInputKey::AreaOccupancySummary,
             WorldInputKey::NearbyCreatureCore,

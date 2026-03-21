@@ -180,6 +180,7 @@ mod tests {
     use crate::creature::state::GraphRuntimeState;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
+    use crate::sensors::typed_food::TypedFoodLocalSnapshot;
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -197,7 +198,8 @@ mod tests {
                 generation: 0.0,
                 age_ticks: 0.0,
             },
-            perception: PerceptionSnapshot::zero(),
+            typed_local_food: TypedFoodLocalSnapshot::zeroed(1),
+            perception: PerceptionSnapshot::zeroed(1),
         }
     }
 
@@ -392,7 +394,7 @@ mod tests {
 
     // ── Test 5: vm_node_emits_eat_action ─────────────────────────────────────
 
-    /// A VM node that pushes action_type 1 and executes queue → WorldAction::Eat.
+    /// A VM node that pushes action_type 1 and executes queue → WorldAction::Eat { type_idx: crate::config::OrdinaryFoodTypeId::default() }.
     #[test]
     fn vm_node_emits_eat_action() {
         let id0 = NodeId::new(0);
@@ -416,7 +418,12 @@ mod tests {
             &mut gr,
             &config,
         );
-        assert_eq!(output.actions, vec![WorldAction::Eat]);
+        assert_eq!(
+            output.actions,
+            vec![WorldAction::Eat {
+                type_idx: crate::config::OrdinaryFoodTypeId::default()
+            }]
+        );
     }
 
     // ── Test 7: route_wrapping_rem_euclid ────────────────────────────────────
@@ -462,7 +469,9 @@ mod tests {
         );
         assert_eq!(
             output.actions,
-            vec![WorldAction::Eat],
+            vec![WorldAction::Eat {
+                type_idx: crate::config::OrdinaryFoodTypeId::default()
+            }],
             "route=3.7 should select targets[0]"
         );
     }
@@ -509,7 +518,9 @@ mod tests {
         );
         assert_eq!(
             output.actions,
-            vec![WorldAction::Eat],
+            vec![WorldAction::Eat {
+                type_idx: crate::config::OrdinaryFoodTypeId::default()
+            }],
             "route=-1.0 should wrap via rem_euclid and select targets[1]"
         );
     }
@@ -585,7 +596,12 @@ mod tests {
             &config,
         );
         assert_eq!(output.priority_bid, 3.0);
-        assert_eq!(output.actions, vec![WorldAction::Eat]);
+        assert_eq!(
+            output.actions,
+            vec![WorldAction::Eat {
+                type_idx: crate::config::OrdinaryFoodTypeId::default()
+            }]
+        );
     }
 
     #[test]

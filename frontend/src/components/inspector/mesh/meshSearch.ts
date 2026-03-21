@@ -7,7 +7,9 @@ export interface MeshSearchResult {
 }
 
 export function searchMeshSemantics(semantics: MeshSemantics, query: string): MeshSearchResult[] {
-	const normalizedQuery = query.trim().toLowerCase();
+	const normalizedQuery = String(query ?? "")
+		.trim()
+		.toLowerCase();
 	if (!normalizedQuery) {
 		return semantics.nodes.map((node) => ({ nodeId: node.nodeId, score: 0 }));
 	}
@@ -18,14 +20,13 @@ export function searchMeshSemantics(semantics: MeshSemantics, query: string): Me
 	for (const node of semantics.nodes) {
 		let score = 0;
 		let matchedAllTokens = queryTokens.length > 0;
+		const nodeLabel = String(node.label ?? "").toLowerCase();
+		const nodeShortLabel = String(node.shortLabel ?? "").toLowerCase();
 
 		if (String(node.nodeId) === normalizedQuery || `#${node.nodeId}` === normalizedQuery) {
 			score += 200;
 		}
-		if (
-			node.label.toLowerCase() === normalizedQuery ||
-			node.shortLabel.toLowerCase() === normalizedQuery
-		) {
+		if (nodeLabel === normalizedQuery || nodeShortLabel === normalizedQuery) {
 			score += 180;
 		}
 

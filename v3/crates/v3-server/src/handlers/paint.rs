@@ -5,8 +5,8 @@ use serde::{Deserialize, Serialize};
 use v3_core::kernel::paint::{PaintPoint, PaintStats, PaintTool};
 
 use crate::error::{AppError, FieldError};
-use crate::handlers::lifecycle::build_ws_frame;
 use crate::query::cache::{paint_dirty_rect, world_static_changed, DirtyRect};
+use crate::state::build_ws_frame;
 use crate::state::{AppState, SimulationStatus};
 use crate::types::PROTOCOL_VERSION;
 

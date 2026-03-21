@@ -107,7 +107,9 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
         node_id: id_c,
         input_refs: vec![
             InputReference::UpstreamSlot(4),
-            InputReference::World(WorldInputKey::FoodHere),
+            InputReference::World(WorldInputKey::FoodHere {
+                type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
+            }),
         ],
         backend_def: BackendDef::Vm(VmBackendDef {
             register_count: 4,
@@ -150,7 +152,12 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
 
     let tick = run_one_traced_tick(&mut sim, target);
 
-    assert_eq!(tick.final_actions[0], WorldAction::Eat);
+    assert_eq!(
+        tick.final_actions[0],
+        WorldAction::Eat {
+            type_idx: v3_core::config::OrdinaryFoodTypeId::default()
+        }
+    );
     assert_eq!(tick.hops.len(), 3);
     assert!(matches!(tick.hops[0].backend_trace, BackendTrace::Graph(_)));
     assert!(matches!(tick.hops[1].backend_trace, BackendTrace::Graph(_)));
@@ -218,8 +225,12 @@ fn vm_reads_all_inputs_e2e() {
     // ref 7: EnergyConsumedThisTick
     // ref 8: UpstreamSlot(11)
     let input_refs = vec![
-        InputReference::World(WorldInputKey::FoodHere),
-        InputReference::World(WorldInputKey::NeighborFoodRing),
+        InputReference::World(WorldInputKey::FoodHere {
+            type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
+        }),
+        InputReference::World(WorldInputKey::NeighborFoodRing {
+            type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
+        }),
         InputReference::World(WorldInputKey::NeighborBarrierRing),
         InputReference::World(WorldInputKey::NeighborOccupiedRing),
         InputReference::StaticIntrospection(StaticIntrospectionKey::Generation),
@@ -313,7 +324,11 @@ fn vm_reads_all_inputs_e2e() {
     // ref 1: NeighborFoodRing (compound, 8 sub-values)
     for dir in Direction::ALL {
         let idx = dir.to_index();
-        let expected_food = 0.11 + (idx as f32 * 0.07);
+        let expected_food = if idx % 2 == 0 {
+            0.0
+        } else {
+            0.11 + (idx as f32 * 0.07)
+        };
         assert!(
             (observed[&(1, idx as u16)] - expected_food).abs() < 1e-6,
             "NeighborFoodRing[{dir:?}]"
@@ -365,7 +380,13 @@ fn vm_reads_all_inputs_e2e() {
 #[test]
 fn vm_uses_neighbor_barrier_sensor_to_choose_action_e2e() {
     for (north_barrier, expected_action, expected_barrier_value) in [
-        (false, WorldAction::Eat, 0.0f32),
+        (
+            false,
+            WorldAction::Eat {
+                type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
+            },
+            0.0f32,
+        ),
         (true, WorldAction::NoOp, 1.0f32),
     ] {
         let cfg = test_config();

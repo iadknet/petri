@@ -40,10 +40,10 @@ Compound variants resolve to multiple sub-values addressed via `sub_idx`.
 
 Compound inputs in v3alpha1:
 - `ActionQueue`
-- `World(NeighborFoodRing)` — 8 sub-values (N, NE, E, SE, S, SW, W, NW)
+- `World(NeighborFoodRing { type_idx })` — 8 sub-values (N, NE, E, SE, S, SW, W, NW)
 - `World(NeighborBarrierRing)` — 8 sub-values
 - `World(NeighborOccupiedRing)` — 8 sub-values
-- `World(AreaFoodSummary)` — 7 sub-values
+- `World(AreaFoodSummary { type_idx })` — 7 sub-values
 - `World(AreaBarrierSummary)` — 7 sub-values
 - `World(AreaOccupancySummary)` — 7 sub-values
 - `World(NearbyCreatureCore)` — 16 sub-values
@@ -85,11 +85,11 @@ Canonical conceptual world keys:
 
 ```rust
 pub enum WorldInputKey {
-    FoodHere,
-    NeighborFoodRing,
+    FoodHere { type_idx: OrdinaryFoodTypeId },
+    NeighborFoodRing { type_idx: OrdinaryFoodTypeId },
     NeighborBarrierRing,
     NeighborOccupiedRing,
-    AreaFoodSummary,
+    AreaFoodSummary { type_idx: OrdinaryFoodTypeId },
     AreaBarrierSummary,
     AreaOccupancySummary,
     NearbyCreatureCore,
@@ -101,7 +101,12 @@ pub enum WorldInputKey {
 #### Local scalar world sensors
 
 Resolved once per acting-creature turn from the frozen local snapshot:
-- `FoodHere`: `clamp(food_density[self_cell], 0.0, 1.0)` → `[0.0, 1.0]`
+- `FoodHere { type_idx }`: `clamp(food_density[self_cell], 0.0, 1.0)` → `[0.0, 1.0]`
+  for the selected ordinary-food type.
+
+Typed food sensors are bound to the configured ordinary-food type catalog for
+the run. Invalid typed accesses resolve softly to `0.0` rather than hard
+failing the mesh.
 
 #### Ring sensors (compound, 8 sub-values)
 
@@ -109,7 +114,7 @@ Ring sensors provide neighbor cell data as compound inputs with 8 sub-values,
 one per direction indexed by `Direction::to_index()`:
 N=0, NE=1, E=2, SE=3, S=4, SW=5, W=6, NW=7.
 
-- `NeighborFoodRing[dir]`: `clamp(food_density[neighbor], 0.0, 1.0)` → `[0.0, 1.0]`
+- `NeighborFoodRing { type_idx }[dir]`: `clamp(food_density[neighbor], 0.0, 1.0)` → `[0.0, 1.0]`
 - `NeighborBarrierRing[dir]`: `1.0` if barrier, else `0.0`
 - `NeighborOccupiedRing[dir]`: `1.0` if occupied by any creature, else `0.0`
 
@@ -216,6 +221,9 @@ Hidden entities contribute nothing to area summaries or nearby-creature banks.
 
 `sub_value_count = 7`
 
+`AreaFoodSummary { type_idx }` uses the same 7-field layout, but each summary
+is computed for a single configured ordinary-food type.
+
 | `sub_idx` | field |
 | --- | --- |
 | 0 | `total_ratio` |
@@ -310,7 +318,7 @@ Area-summary denominator rule:
 
 ### 6.1 Food
 
-- `total_ratio = visible_food_sum / (max_candidate_cells * world.food.max_density)`
+- `total_ratio = visible_food_sum / (max_candidate_cells * world.food.shared.max_density)`
 - `gradient_x = sum(dx_norm * food_ratio) / max_candidate_cells`
 - `gradient_y = sum(dy_norm * food_ratio) / max_candidate_cells`
 - `max_value = max visible food ratio`
@@ -354,7 +362,7 @@ Missing/absent conventions:
 This absence convention is acceptable because:
 - barriers cannot occupy the observer cell
 - non-self creatures cannot occupy the observer cell
-- food-on-self remains disambiguated by `FoodHere`
+- food-on-self remains disambiguated by `FoodHere { type_idx }`
 
 ---
 

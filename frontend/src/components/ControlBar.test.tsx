@@ -27,17 +27,40 @@ const MOCK_CONFIG: SimulationConfig = {
 		height: 384,
 		edge_mode: "Wrap",
 		food: {
-			growth_rate: 0.2,
-			initial_density: 1.0,
-			initial_coverage: 0.4,
-			spread_threshold_ratio: 0.8,
-			spread_density_ratio: 0.25,
-			recovery_spawn_rate: 0.05,
-			recovery_floor_ratio: 0.04,
-			max_density: 1.0,
-			occupancy_depletion: {
-				enabled: true,
-				deposit_per_occupied_tick: 0.08,
+			shared: {
+				growth_rate: 0.2,
+				initial_density: 1.0,
+				initial_coverage: 0.4,
+				spread_threshold_ratio: 0.8,
+				spread_density_ratio: 0.25,
+				recovery_spawn_rate: 0.05,
+				recovery_floor_ratio: 0.04,
+				max_density: 1.0,
+				occupancy_depletion: {
+					enabled: true,
+					deposit_per_occupied_tick: 0.08,
+				},
+			},
+			types: [
+				{
+					name: "Primary Food",
+					color: "#22c55e",
+					initial_density: 1.0,
+					initial_coverage: 0.4,
+					growth_inhibitor: 0.2,
+				},
+			],
+			fertility: {
+				enabled: false,
+				min_fertility: 0.0,
+				max_fertility: 2.0,
+				layers: [],
+			},
+			annealing: {
+				enabled: false,
+				ramp_ticks: 5000,
+				initial_min_fertility: 0.3,
+				initial_max_fertility: 1.5,
 			},
 		},
 	},
@@ -168,10 +191,18 @@ describe("ControlBar", () => {
 			world: {
 				width: 512,
 				height: 384,
-				edge_mode: "Wrap",
-				food: {
-					initial_density: 1.0,
-					initial_coverage: 0.4,
+					edge_mode: "Wrap",
+					food: {
+						shared: { ...MOCK_CONFIG.world.food.shared },
+					types: [
+						{
+							name: "Primary Food",
+							color: "#22c55e",
+							initial_density: 1.0,
+							initial_coverage: 0.4,
+							growth_inhibitor: 0.2,
+						},
+					],
 					fertility: {
 						enabled: false,
 						min_fertility: 0.0,
@@ -222,44 +253,59 @@ describe("ControlBar", () => {
 		fireEvent.click(screen.getByTestId("control-restart"));
 
 		await waitFor(() => {
-			expect(api.startup).toHaveBeenCalledWith({
-				seed: 424242,
-				population: { initial_creatures: 64 },
-				world: {
-					width: 512,
-					height: 384,
-					edge_mode: "Wrap",
-					food: {
-						initial_density: 1.0,
-						initial_coverage: 0.4,
-						fertility: {
-							enabled: false,
-							min_fertility: 0.0,
-							max_fertility: 2.0,
-							layers: [],
-						},
-						annealing: {
-							enabled: false,
-							ramp_ticks: 5000,
-							initial_min_fertility: 0.3,
-							initial_max_fertility: 1.5,
+			expect(api.startup).toHaveBeenCalledWith(
+				expect.objectContaining({
+					seed: 424242,
+					population: { initial_creatures: 64 },
+					world: expect.objectContaining({
+						width: 512,
+						height: 384,
+						edge_mode: "Wrap",
+						food: expect.objectContaining({
+							shared: expect.objectContaining({
+								occupancy_depletion: {
+									enabled: true,
+									deposit_per_occupied_tick: 0.08,
+								},
+							}),
+							types: [
+								{
+									name: "Primary Food",
+									color: "#22c55e",
+									initial_density: 1.0,
+									initial_coverage: 0.4,
+									growth_inhibitor: 0.2,
+								},
+							],
+							fertility: {
+								enabled: false,
+								min_fertility: 0.0,
+								max_fertility: 2.0,
+								layers: [],
+							},
+							annealing: {
+								enabled: false,
+								ramp_ticks: 5000,
+								initial_min_fertility: 0.3,
+								initial_max_fertility: 1.5,
+							},
+						}),
+					}),
+					energy: {
+						lifecycle: { initial_energy: 20 },
+					},
+					startup: {
+						ramps: {
+							failed_action_penalty: {
+								enabled: false,
+								start: 5,
+								end: 5,
+								target_tick: 1000,
+							},
 						},
 					},
-				},
-				energy: {
-					lifecycle: { initial_energy: 20 },
-				},
-				startup: {
-					ramps: {
-						failed_action_penalty: {
-							enabled: false,
-							start: 5,
-							end: 5,
-							target_tick: 1000,
-						},
-					},
-				},
-			});
+				}),
+			);
 			expect(useSimulationStore.getState().simState).toBe("idle");
 			expect(useSimulationStore.getState().tick).toBe(0);
 			expect(useStatsHistoryStore.getState().statsHistory).toHaveLength(0);
@@ -275,10 +321,18 @@ describe("ControlBar", () => {
 			world: {
 				width: 512,
 				height: 384,
-				edge_mode: "Wrap",
-				food: {
-					initial_density: 1.0,
-					initial_coverage: 0.4,
+					edge_mode: "Wrap",
+					food: {
+						shared: { ...MOCK_CONFIG.world.food.shared },
+					types: [
+						{
+							name: "Primary Food",
+							color: "#22c55e",
+							initial_density: 1.0,
+							initial_coverage: 0.4,
+							growth_inhibitor: 0.2,
+						},
+					],
 					fertility: {
 						enabled: false,
 						min_fertility: 0.0,
@@ -335,10 +389,19 @@ describe("ControlBar", () => {
 			expect(api.patchConfig).toHaveBeenCalledTimes(1);
 		});
 		const patch = vi.mocked(api.patchConfig).mock.calls[0]?.[0] as {
-			world?: { food?: { occupancy_depletion?: { enabled?: boolean; deposit_per_occupied_tick?: number } } };
+			world?: {
+				food?: {
+					shared?: {
+						occupancy_depletion?: {
+							enabled?: boolean;
+							deposit_per_occupied_tick?: number;
+						};
+					};
+				};
+			};
 			energy?: { costs?: { failed_action_penalty?: number } };
 		};
-		expect(patch.world?.food?.occupancy_depletion).toEqual({
+		expect(patch.world?.food?.shared?.occupancy_depletion).toEqual({
 			enabled: true,
 			deposit_per_occupied_tick: 0.08,
 		});
@@ -450,12 +513,26 @@ describe("ControlBar", () => {
 					seed: 987654321,
 					world: expect.objectContaining({
 						food: expect.objectContaining({
+							shared: expect.objectContaining({
+								occupancy_depletion: expect.objectContaining({
+									enabled: true,
+									deposit_per_occupied_tick: 0.08,
+								}),
+							}),
+							types: expect.arrayContaining([
+								expect.objectContaining({
+									name: "Primary Food",
+									color: "#22c55e",
+									initial_density: 1.0,
+									initial_coverage: 0.54,
+								}),
+							]),
 							fertility: expect.objectContaining({
 								enabled: true,
 								min_fertility: 0.4,
 								max_fertility: 1.9,
-								layers: [
-									{
+								layers: expect.arrayContaining([
+									expect.objectContaining({
 										weight: 0.75,
 										algorithm: {
 											Fbm: {
@@ -466,8 +543,9 @@ describe("ControlBar", () => {
 												seed: 999,
 											},
 										},
-									},
-								],
+										target: "AllFoods",
+									}),
+								]),
 							}),
 							annealing: expect.objectContaining({
 								enabled: true,

@@ -24,7 +24,7 @@ This document defines:
 - edge-mode behavior (`wrap` and `bounded`);
 - arbitrary local-offset resolution primitives consumed by perception and action
   targeting;
-- food substrate growth/consume/seeding semantics;
+- ordinary-food substrate growth/consume/seeding semantics;
 - occupancy and barrier invariants;
 - action-time target-validity primitives used by move and reproduce flows.
 
@@ -114,16 +114,29 @@ This file is the canonical owner for world/grid config keys/defaults.
 | `world.width` | `u16` | `400` | Must be `>= 1`; invalid values fall back to `400`. |
 | `world.height` | `u16` | `400` | Must be `>= 1`; invalid values fall back to `400`. |
 | `world.edge_mode` | `enum{wrap,bounded}` | `wrap` | Unknown/invalid values fall back to `wrap`. |
-| `world.food.growth_rate` | `f32` | `0.25` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.25`. |
-| `world.food.initial_density` | `f32` | `1.0` | Clamp to `[0.0, max_density]`; invalid falls back to `max_density`. |
-| `world.food.initial_coverage` | `f32` | `0.15` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.15`. |
-| `world.food.spread_threshold_ratio` | `f32` | `0.75` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.75`. |
-| `world.food.spread_density_ratio` | `f32` | `0.25` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.25`. Fraction of growth delta deposited to neighbor during spread. |
-| `world.food.recovery_spawn_rate` | `f32` | `0.02` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.02`. |
-| `world.food.recovery_floor_ratio` | `f32` | `0.03` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.03`. |
-| `world.food.max_density` | `f32` | `1.0` | Must be finite and `> 0.0`; invalid falls back to `1.0`. |
-| `world.food.occupancy_depletion.enabled` | `bool` | `true` | Enables the occupancy depletion mask that dampens food regrowth on occupied cells. |
-| `world.food.occupancy_depletion.deposit_per_occupied_tick` | `f32` | `0.08` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.08`. Amount of depletion deposited into each occupied passable cell per Phase 0 update. |
+| `world.food.shared.growth_rate` | `f32` | `0.25` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.25`. |
+| `world.food.shared.initial_density` | `f32` | `1.0` | Clamp to `[0.0, max_density]`; invalid falls back to `max_density`. |
+| `world.food.shared.initial_coverage` | `f32` | `0.15` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.15`. |
+| `world.food.shared.spread_threshold_ratio` | `f32` | `0.75` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.75`. |
+| `world.food.shared.spread_density_ratio` | `f32` | `0.25` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.25`. Fraction of growth delta deposited to neighbor during spread. |
+| `world.food.shared.recovery_spawn_rate` | `f32` | `0.02` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.02`. |
+| `world.food.shared.recovery_floor_ratio` | `f32` | `0.03` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.03`. |
+| `world.food.shared.max_density` | `f32` | `1.0` | Must be finite and `> 0.0`; invalid falls back to `1.0`. |
+| `world.food.shared.occupancy_depletion.enabled` | `bool` | `true` | Enables the occupancy depletion mask that dampens food regrowth on occupied cells. |
+| `world.food.shared.occupancy_depletion.deposit_per_occupied_tick` | `f32` | `0.08` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.08`. Amount of depletion deposited into each occupied passable cell per Phase 0 update. |
+| `world.food.types` | `FoodTypeConfig[]` | `[default]` | Ordered list of configured ordinary-food types. List position is the stable per-run `OrdinaryFoodTypeId`; each entry carries display metadata and primary startup seeding knobs. Empty lists normalize to one default type. |
+| `world.food.fertility.layers[].target` | `enum{AllFoods,SingleType{type_idx}}` | `AllFoods` | Fertility layer selector. Invalid/unknown targeted type indices normalize to `AllFoods` during config normalization. |
+
+Food-type catalog posture:
+- `world.food.types` is ordered, and the list index defines the stable per-run
+  `OrdinaryFoodTypeId`.
+- `FoodTypeConfig` currently carries display metadata (`name`, `color`) plus
+  startup seeding fields (`initial_density`, `initial_coverage`).
+- The primary type (`types[0]`) is mirrored into
+  `world.food.shared.initial_density` and
+  `world.food.shared.initial_coverage` during config normalization.
+- Type-targeted fertility layers are startup-only config; runtime patching does
+  not mutate the catalog or layer targets.
 
 World edge-mode behavior:
 - `wrap`: neighbor coordinates wrap with modulo arithmetic in both axes.
@@ -159,20 +172,20 @@ For each non-barrier cell:
 - Apply occupancy depletion recovery/deposit for the current tick using the
   current creature occupancy mask.
 - Compute an occupancy multiplier from the depletion layer for the cell.
-- `delta = source * world.food.growth_rate`.
+- `delta = source * world.food.shared.growth_rate`.
 - Apply local growth:
   `food_density[cell] = clamp(food_density[cell] + delta * occupancy_multiplier, 0.0, max_density)`.
-- If `source >= max_density * world.food.spread_threshold_ratio` and
+- If `source >= max_density * world.food.shared.spread_threshold_ratio` and
   `delta > 0.0`, pick one random valid cardinal neighbor (non-barrier) and add
-  `delta * world.food.spread_density_ratio * occupancy_multiplier_at_target`
+  `delta * world.food.shared.spread_density_ratio * occupancy_multiplier_at_target`
   (clamped to `max_density`).
 
 After local growth/spread pass:
 - Compute `average_density_ratio = sum(snapshot_food) / (total_cells * max_density)`.
-- If `average_density_ratio < world.food.recovery_floor_ratio`, run
-  `round(total_cells * world.food.recovery_spawn_rate)` recovery attempts.
+- If `average_density_ratio < world.food.shared.recovery_floor_ratio`, run
+  `round(total_cells * world.food.shared.recovery_spawn_rate)` recovery attempts.
 - Each attempt picks one random non-barrier cell and adds
-  `max_density * world.food.growth_rate * occupancy_multiplier` (clamped).
+  `max_density * world.food.shared.growth_rate * occupancy_multiplier` (clamped).
 
 Barrier cells are excluded from growth/spread/recovery targets.
 Creature occupancy does not block food growth/spread/recovery directly in
@@ -190,9 +203,9 @@ World initialization food seeding:
 - clear prior food;
 - enumerate non-barrier candidate cells;
 - sample exactly
-  `round(world.food.initial_coverage * candidate_count)` unique cells;
+  `round(world.food.shared.initial_coverage * candidate_count)` unique cells;
 - set sampled cells to
-  `clamp(world.food.initial_density, 0.0, world.food.max_density)`.
+  `clamp(world.food.shared.initial_density, 0.0, world.food.shared.max_density)`.
 
 Startup flow and founder-baseline policy consuming these world seeding semantics
 are canonical in `v3-startup-seeding-spec.md`.

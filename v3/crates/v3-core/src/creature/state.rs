@@ -452,7 +452,9 @@ mod tests {
                 NodeGenome {
                     node_id: NodeId::new(0),
                     input_refs: vec![
-                        InputReference::World(WorldInputKey::AreaFoodSummary),
+                        InputReference::World(WorldInputKey::AreaFoodSummary {
+                            type_idx: crate::config::OrdinaryFoodTypeId::default(),
+                        }),
                         InputReference::World(WorldInputKey::NeighborBarrierRing),
                         InputReference::DynamicIntrospection(
                             DynamicIntrospectionKey::EnergyCurrent,
@@ -531,7 +533,12 @@ mod tests {
 
         let counts: std::collections::HashMap<_, _> =
             state.cached_live_vm_world_inputs.iter().cloned().collect();
-        assert_eq!(counts.get(&WorldInputKey::AreaFoodSummary), Some(&2));
+        assert_eq!(
+            counts.get(&WorldInputKey::AreaFoodSummary {
+                type_idx: crate::config::OrdinaryFoodTypeId::default()
+            }),
+            Some(&2)
+        );
         assert_eq!(counts.get(&WorldInputKey::NeighborBarrierRing), Some(&1));
         assert!(!counts.contains_key(&WorldInputKey::AreaOccupancySummary));
     }

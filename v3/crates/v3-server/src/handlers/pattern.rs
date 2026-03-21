@@ -8,8 +8,8 @@ use v3_core::kernel::paint::{PaintPoint, PaintStats, PaintTool};
 use v3_core::patterns::{generate_pattern_seeded, PatternBounds, PatternParams};
 
 use crate::error::{AppError, FieldError};
-use crate::handlers::lifecycle::build_ws_frame;
 use crate::query::cache::{world_static_changed, DirtyRect};
+use crate::state::build_ws_frame;
 use crate::state::{AppState, SimulationStatus};
 use crate::types::PROTOCOL_VERSION;
 

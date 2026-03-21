@@ -3,7 +3,7 @@ use rand::seq::SliceRandom;
 use rand::SeedableRng;
 use slotmap::{SecondaryMap, SlotMap};
 
-use crate::config::SimulationConfig;
+use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{CreatureId, InputReference, Position, WorldInputKey};
 use crate::creature::action_log::ActionLog;
 use crate::creature::founder::founder_genome_with_min_reproduce_age;
@@ -98,7 +98,9 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
 }
 
 fn inject_extended_perception_input(genome: &mut CreatureGenome) {
-    let marker = InputReference::World(WorldInputKey::AreaFoodSummary);
+    let marker = InputReference::World(WorldInputKey::AreaFoodSummary {
+        type_idx: OrdinaryFoodTypeId::default(),
+    });
     if genome
         .nodes
         .iter()
@@ -287,7 +289,9 @@ mod tests {
         let creature = sim.creatures.values().next().expect("seeded creature");
         assert_eq!(
             creature.genome.nodes[0].input_refs[0],
-            InputReference::World(WorldInputKey::AreaFoodSummary)
+            InputReference::World(WorldInputKey::AreaFoodSummary {
+                type_idx: OrdinaryFoodTypeId::default(),
+            })
         );
     }
 

@@ -3,8 +3,10 @@ use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
 use serde::{Deserialize, Serialize};
+use slotmap::Key;
 use tokio::sync::{broadcast, Mutex};
 use v3_core::config::SimulationConfig;
+use v3_core::mutation::phenotype::channels_to_rgb;
 use v3_core::simulation::{seed_simulation, Simulation};
 
 use crate::query::cache::DirtyRect;
@@ -33,7 +35,8 @@ impl SimHandle {
     pub fn new_default() -> Self {
         let config = SimulationConfig::default();
         let sim = seed_simulation(config, 0);
-        let cached_fertility_u8 = crate::query::cache::build_food_fertility_u8(sim.world.food());
+        let cached_fertility_u8 =
+            crate::query::cache::build_primary_food_fertility_u8(sim.world.food());
         Self {
             sim,
             status: SimulationStatus::Idle,
@@ -85,6 +88,8 @@ pub struct StatusPayload {
     pub last_tick_food_occupancy_depletion_mean: f32,
     pub last_tick_food_occupancy_depletion_occupied_cells: u32,
     pub last_tick_food_growth_suppressed_by_occupancy_depletion: f32,
+    pub last_tick_food_cells_with_type_inhibition: u32,
+    pub last_tick_food_growth_suppressed_by_type_inhibition: f32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -101,7 +106,16 @@ pub struct CreatureSnapshot {
 pub struct FoodCell {
     pub x: u16,
     pub y: u16,
+    pub type_idx: u16,
     pub density: f32,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct FoodTypeSnapshot {
+    pub type_idx: u16,
+    pub name: String,
+    pub color: String,
+    pub growth_inhibitor: f32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -115,6 +129,7 @@ pub struct FramePayload {
     pub width: u16,
     pub height: u16,
     pub creatures: Vec<CreatureSnapshot>,
+    pub food_types: Vec<FoodTypeSnapshot>,
     pub food: Vec<FoodCell>,
     pub barriers: Vec<BarrierCell>,
     pub food_fertility_u8: Arc<[u8]>,
@@ -127,6 +142,8 @@ pub struct HealthPayload {
     pub last_tick_food_occupancy_depletion_mean: f32,
     pub last_tick_food_occupancy_depletion_occupied_cells: u32,
     pub last_tick_food_growth_suppressed_by_occupancy_depletion: f32,
+    pub last_tick_food_cells_with_type_inhibition: u32,
+    pub last_tick_food_growth_suppressed_by_type_inhibition: f32,
     pub mutation_events_attempted_total: u64,
     pub mutation_events_applied_total: u64,
     pub mutation_events_skipped_total: u64,
@@ -235,6 +252,356 @@ pub struct TransportPerfSnapshot {
     pub ws_frame_publish_ms: f64,
 }
 
+pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
+    let sim = &handle.sim;
+    let stats = &sim.stats;
+
+    let status = StatusPayload {
+        state: handle.status,
+        population: sim.creatures.len(),
+        mean_energy: sim.mean_energy(),
+        last_tick_actions: LastTickActions {
+            move_count: stats.last_tick_move,
+            eat: stats.last_tick_eat,
+            reproduce: stats.last_tick_reproduce,
+            noop: stats.last_tick_noop,
+            steal: stats.last_tick_steal,
+            predation_kills: stats.last_tick_predation_kills,
+        },
+        reproduction_actions_attempted_total: stats.reproduction_actions_attempted_total,
+        reproduction_actions_spawned_total: stats.reproduction_actions_spawned_total,
+        reproduction_actions_rejected_total: stats.reproduction_actions_rejected_total,
+        predation_actions_attempted_total: stats.predation_actions_attempted_total,
+        predation_actions_transferred_total: stats.predation_actions_transferred_total,
+        predation_actions_rejected_total: stats.predation_actions_rejected_total,
+        predation_kills_total: stats.predation_kills_total,
+        last_tick_compute_total_mean: stats.last_tick_compute_total_mean,
+        last_tick_compute_total_min: stats.last_tick_compute_total_min,
+        last_tick_compute_total_max: stats.last_tick_compute_total_max,
+        last_tick_compute_vm_mean: stats.last_tick_compute_vm_mean,
+        last_tick_compute_graph_mean: stats.last_tick_compute_graph_mean,
+        last_tick_food_occupancy_depletion_mean: stats.last_tick_food_occupancy_depletion_mean,
+        last_tick_food_occupancy_depletion_occupied_cells: stats
+            .last_tick_food_occupancy_depletion_occupied_cells,
+        last_tick_food_growth_suppressed_by_occupancy_depletion: stats
+            .last_tick_food_growth_suppressed_by_occupancy_depletion,
+        last_tick_food_cells_with_type_inhibition: stats.last_tick_food_cells_with_type_inhibition,
+        last_tick_food_growth_suppressed_by_type_inhibition: stats
+            .last_tick_food_growth_suppressed_by_type_inhibition,
+    };
+
+    let mut creatures = Vec::with_capacity(sim.creatures.len());
+    let mut complexity_sum: u64 = 0;
+    let mut complexity_min: u32 = u32::MAX;
+    let mut complexity_max: u32 = 0;
+    let mut vm_live_read_world_inputs_current = std::collections::HashMap::new();
+    for (id, creature) in &sim.creatures {
+        let c = creature.cached_complexity;
+        complexity_sum += c as u64;
+        complexity_min = complexity_min.min(c);
+        complexity_max = complexity_max.max(c);
+        for (key, count) in creature.cached_live_vm_world_inputs.iter().copied() {
+            *vm_live_read_world_inputs_current.entry(key).or_insert(0u64) += u64::from(count);
+        }
+        creatures.push(CreatureSnapshot {
+            id: id.data().as_ffi(),
+            x: creature.position.x,
+            y: creature.position.y,
+            energy: creature.energy,
+            generation: creature.generation,
+            phenotype_rgb: channels_to_rgb(creature.phenotype_channels),
+        });
+    }
+    let creature_count = creatures.len();
+    let complexity_mean = if creature_count > 0 {
+        complexity_sum as f32 / creature_count as f32
+    } else {
+        0.0
+    };
+    if creature_count == 0 {
+        complexity_min = 0;
+    }
+
+    let food_types = sim
+        .world
+        .food()
+        .food_types()
+        .iter()
+        .map(|food_type| FoodTypeSnapshot {
+            type_idx: food_type.id.get(),
+            name: food_type.config.name.clone(),
+            color: food_type.config.color.clone(),
+            growth_inhibitor: food_type.config.growth_inhibitor,
+        })
+        .collect();
+
+    let mut food = Vec::new();
+    sim.world
+        .food()
+        .for_each_food_cell(|x, y, type_idx, density| {
+            food.push(FoodCell {
+                x,
+                y,
+                type_idx: type_idx.get(),
+                density,
+            });
+        });
+
+    let mut barriers = Vec::new();
+    for y in 0..sim.world.height {
+        for x in 0..sim.world.width {
+            let pos = v3_core::contracts::Position::new(x, y);
+            if sim.world.is_barrier(pos) {
+                barriers.push(BarrierCell { x, y });
+            }
+        }
+    }
+
+    let food_fertility_u8 = Arc::clone(&handle.cached_fertility_u8);
+
+    let frame = FramePayload {
+        width: sim.world.width,
+        height: sim.world.height,
+        creatures,
+        food_types,
+        food,
+        barriers,
+        food_fertility_u8,
+    };
+
+    let map_mutation_value_totals = |totals: &v3_core::simulation::stats::MutationValueTotals| {
+        MutationOperatorValueTotalsPayload {
+            carriers_observed_total: totals.carriers_observed_total,
+            survival_ticks_sum: totals.survival_ticks_sum,
+            offspring_spawned_sum: totals.offspring_spawned_sum,
+            final_energy_sum: totals.final_energy_sum,
+            helpful_total: totals.helpful_total,
+            neutral_total: totals.neutral_total,
+            detrimental_total: totals.detrimental_total,
+            confidence_low_total: totals.confidence_low_total,
+            confidence_medium_total: totals.confidence_medium_total,
+            confidence_high_total: totals.confidence_high_total,
+            viability_score_sum: totals.viability_score_sum,
+            viability_score_delta_sum: totals.viability_score_delta_sum,
+            survived_short_horizon_total: totals.survived_short_horizon_total,
+            survived_long_horizon_total: totals.survived_long_horizon_total,
+            reproduced_once_total: totals.reproduced_once_total,
+            mean_lifetime_energy_sum: totals.mean_lifetime_energy_sum,
+            action_attempted_total: totals.action_attempted_total,
+            blocked_move_total: totals.blocked_move_total,
+            invalid_reproduce_total: totals.invalid_reproduce_total,
+            invalid_action_total: totals.invalid_action_total,
+        }
+    };
+
+    let health = HealthPayload {
+        population: sim.creatures.len(),
+        mean_energy: sim.mean_energy(),
+        last_tick_food_occupancy_depletion_mean: stats.last_tick_food_occupancy_depletion_mean,
+        last_tick_food_occupancy_depletion_occupied_cells: stats
+            .last_tick_food_occupancy_depletion_occupied_cells,
+        last_tick_food_growth_suppressed_by_occupancy_depletion: stats
+            .last_tick_food_growth_suppressed_by_occupancy_depletion,
+        last_tick_food_cells_with_type_inhibition: stats.last_tick_food_cells_with_type_inhibition,
+        last_tick_food_growth_suppressed_by_type_inhibition: stats
+            .last_tick_food_growth_suppressed_by_type_inhibition,
+        mutation_events_attempted_total: stats.mutation_events_attempted_total,
+        mutation_events_applied_total: stats.mutation_events_applied_total,
+        mutation_events_skipped_total: stats.mutation_events_skipped_total,
+        mutation_events_attempted_total_by_domain: stats
+            .mutation_events_attempted_total_by_domain
+            .iter()
+            .map(|(domain, count)| (domain.as_key().to_string(), *count))
+            .collect(),
+        mutation_events_applied_total_by_domain: stats
+            .mutation_events_applied_total_by_domain
+            .iter()
+            .map(|(domain, count)| (domain.as_key().to_string(), *count))
+            .collect(),
+        mutation_events_attempted_total_by_operator: stats
+            .mutation_events_attempted_total_by_operator
+            .iter()
+            .map(|(operator, count)| (operator.as_key().to_string(), *count))
+            .collect(),
+        mutation_events_applied_total_by_operator: stats
+            .mutation_events_applied_total_by_operator
+            .iter()
+            .map(|(operator, count)| (operator.as_key().to_string(), *count))
+            .collect(),
+        mutation_events_skipped_total_by_operator: stats
+            .mutation_events_skipped_total_by_operator
+            .iter()
+            .map(|(operator, count)| (operator.as_key().to_string(), *count))
+            .collect(),
+        mutation_operator_funnel_total_by_operator: stats
+            .mutation_operator_funnel_total_by_operator
+            .iter()
+            .map(|(operator, funnel)| {
+                (
+                    operator.as_key().to_string(),
+                    MutationOperatorFunnelPayload {
+                        attempted: funnel.attempted,
+                        applicable: funnel.applicable,
+                        structurally_valid: funnel.structurally_valid,
+                        applied: funnel.applied,
+                        semantic_change: funnel.semantic_change,
+                        skipped: funnel.skipped,
+                    },
+                )
+            })
+            .collect(),
+        mutation_skip_reasons_total_by_operator: stats
+            .mutation_skip_reasons_total_by_operator
+            .iter()
+            .map(|(operator, reasons)| {
+                (
+                    operator.as_key().to_string(),
+                    reasons
+                        .iter()
+                        .map(|(reason, count)| (reason.as_key().to_string(), *count))
+                        .collect(),
+                )
+            })
+            .collect(),
+        mutation_added_node_input_classes_total_by_operator: stats
+            .mutation_added_node_input_classes_total_by_operator
+            .iter()
+            .map(|(operator, classes)| {
+                (
+                    operator.as_key().to_string(),
+                    classes
+                        .iter()
+                        .map(|(class, count)| (class.as_key().to_string(), *count))
+                        .collect(),
+                )
+            })
+            .collect(),
+        mutation_added_node_world_inputs_total_by_operator: stats
+            .mutation_added_node_world_inputs_total_by_operator
+            .iter()
+            .map(|(operator, inputs)| {
+                (
+                    operator.as_key().to_string(),
+                    inputs
+                        .iter()
+                        .map(|(input, count)| (input.as_key().to_string(), *count))
+                        .collect(),
+                )
+            })
+            .collect(),
+        vm_live_read_world_inputs_current: vm_live_read_world_inputs_current
+            .into_iter()
+            .map(|(key, count)| (key.as_key().to_string(), count))
+            .collect(),
+        mutation_events_applied_total_semantic_noop: stats
+            .mutation_events_applied_total_semantic_noop,
+        mutation_events_applied_total_semantic_change: stats
+            .mutation_events_applied_total_semantic_change,
+        mutation_target_reachability_total: MutationTargetReachabilityTotalPayload {
+            reachable: stats.mutation_reachable_target_total,
+            unreachable: stats.mutation_unreachable_target_total,
+            not_applicable: stats.mutation_not_applicable_target_total,
+        },
+        mutation_value_totals_by_operator: stats
+            .mutation_value_totals_by_operator
+            .iter()
+            .map(|(operator, totals)| {
+                (
+                    operator.as_key().to_string(),
+                    map_mutation_value_totals(totals),
+                )
+            })
+            .collect(),
+        mutation_outcome_summary: map_mutation_value_totals(&stats.mutation_outcome_summary),
+        reproduction_actions_attempted_total: stats.reproduction_actions_attempted_total,
+        reproduction_actions_spawned_total: stats.reproduction_actions_spawned_total,
+        reproduction_actions_rejected_total: stats.reproduction_actions_rejected_total,
+        reproduction_actions_rejected_total_by_reason: stats
+            .reproduction_actions_rejected_by_reason
+            .iter()
+            .map(|(reason, count)| (reason.as_key().to_string(), *count))
+            .collect(),
+        reproduction_actions_rejected_invalid_target_total_by_cause: stats
+            .reproduction_actions_rejected_invalid_target_total_by_cause
+            .iter()
+            .map(|(cause, count)| (cause.as_key().to_string(), *count))
+            .collect(),
+        reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state: stats
+            .reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state
+            .iter()
+            .map(|(state, count)| (state.as_key().to_string(), *count))
+            .collect(),
+        mutation_events_skipped_total_by_reason: stats
+            .mutation_events_skipped_by_reason
+            .iter()
+            .map(|(reason, count)| (reason.as_key().to_string(), *count))
+            .collect(),
+        move_actions_blocked_total_by_cause: stats
+            .move_actions_blocked_total_by_cause
+            .iter()
+            .map(|(cause, count)| (cause.as_key().to_string(), *count))
+            .collect(),
+        move_actions_blocked_avoidable_total_by_reader_state: stats
+            .move_actions_blocked_avoidable_total_by_reader_state
+            .iter()
+            .map(|(state, count)| (state.as_key().to_string(), *count))
+            .collect(),
+        move_attempts_with_barrier_neighbor_total_by_reader_state: stats
+            .move_attempts_with_barrier_neighbor_total_by_reader_state
+            .iter()
+            .map(|(state, count)| (state.as_key().to_string(), *count))
+            .collect(),
+        move_blocked_barrier_with_barrier_neighbor_total_by_reader_state: stats
+            .move_blocked_barrier_with_barrier_neighbor_total_by_reader_state
+            .iter()
+            .map(|(state, count)| (state.as_key().to_string(), *count))
+            .collect(),
+        reproduction_attempts_with_barrier_neighbor_total_by_reader_state: stats
+            .reproduction_attempts_with_barrier_neighbor_total_by_reader_state
+            .iter()
+            .map(|(state, count)| (state.as_key().to_string(), *count))
+            .collect(),
+        reproduction_invalid_target_barrier_with_barrier_neighbor_total_by_reader_state: stats
+            .reproduction_invalid_target_barrier_with_barrier_neighbor_total_by_reader_state
+            .iter()
+            .map(|(state, count)| (state.as_key().to_string(), *count))
+            .collect(),
+        predation_actions_attempted_total: stats.predation_actions_attempted_total,
+        predation_actions_transferred_total: stats.predation_actions_transferred_total,
+        predation_actions_rejected_total: stats.predation_actions_rejected_total,
+        predation_kills_total: stats.predation_kills_total,
+        predation_actions_by_result: stats
+            .predation_actions_by_result
+            .iter()
+            .map(|(result, count)| (result.as_key().to_string(), *count))
+            .collect(),
+        genome_complexity_mean: complexity_mean,
+        genome_complexity_min: complexity_min,
+        genome_complexity_max: complexity_max,
+    };
+
+    let predation_events: Vec<PredationEventSnapshot> = stats
+        .last_tick_predation_events
+        .iter()
+        .map(|event| PredationEventSnapshot {
+            attacker_x: event.attacker_x,
+            attacker_y: event.attacker_y,
+            victim_x: event.victim_x,
+            victim_y: event.victim_y,
+            energy_stolen: event.energy_stolen,
+            killed: event.killed,
+        })
+        .collect();
+
+    WsFrame {
+        tick: sim.tick,
+        status,
+        frame,
+        health,
+        predation_events,
+    }
+}
+
 impl AppState {
     pub fn new() -> Self {
         let handle = SimHandle::new_default();
@@ -259,7 +626,7 @@ impl AppState {
         world_static_changed: bool,
     ) {
         let started = Instant::now();
-        let snapshot = self
+        let projection_revision = self
             .projection
             .write()
             .expect("projection lock poisoned")
@@ -272,7 +639,7 @@ impl AppState {
         perf.projection_publish_ms = projection_publish_ms;
         perf.ws_frame_publish_ms = started.elapsed().as_secs_f64() * 1_000.0;
         let _ = self.ws_tx.send(ProjectionNotice {
-            projection_revision: snapshot.projection_revision,
+            projection_revision,
             dirty_rect,
             world_static_changed,
         });

@@ -1,6 +1,6 @@
 use rand::Rng;
 
-use crate::config::{FoodResourceConfig, WorldEdgeMode};
+use crate::config::{FoodConfig, FoodResourceConfig, OrdinaryFoodTypeId, WorldEdgeMode};
 use crate::contracts::{CreatureId, Direction, Position};
 use crate::kernel::food_resource::{FoodGrowthSummary, FoodResource};
 use crate::kernel::Grid;
@@ -66,10 +66,28 @@ impl WorldState {
         self.food.consume(pos)
     }
 
+    /// Consume food only if the requested type owns the cell.
+    pub fn consume_food_type(&mut self, pos: Position, type_idx: OrdinaryFoodTypeId) -> f32 {
+        self.food.consume_type(pos, type_idx)
+    }
+
     /// Get food density at a position.
     /// Transitional delegate to `FoodResource::food_at`.
     pub fn food_at(&self, pos: Position) -> f32 {
         self.food.food_at(pos)
+    }
+
+    /// Get typed food density at a position, returning 0.0 for invalid types or non-owner cells.
+    pub fn food_at_type(&self, pos: Position, type_idx: OrdinaryFoodTypeId) -> f32 {
+        self.food.food_at_type(pos, type_idx)
+    }
+
+    /// Get the dominant food type (highest per-type density), if any, for a cell.
+    ///
+    /// Compatibility helper for transitional single-type consumers. Cells may
+    /// contain multiple food types simultaneously.
+    pub fn dominant_food_type_at(&self, pos: Position) -> Option<OrdinaryFoodTypeId> {
+        self.food.dominant_food_type_at(pos)
     }
 
     /// Set food density at a position directly.
@@ -78,9 +96,14 @@ impl WorldState {
         self.food.set_food(pos, value);
     }
 
+    /// Set typed food density directly for tests and tooling.
+    pub fn set_food_type(&mut self, pos: Position, type_idx: OrdinaryFoodTypeId, value: f32) {
+        self.food.set_food_type(pos, type_idx, value);
+    }
+
     /// Replace the active food config through the food-kernel transition boundary.
-    pub fn reconfigure_food(&mut self, config: FoodResourceConfig) {
-        self.food.apply_config_transition(config);
+    pub fn reconfigure_food(&mut self, config: impl Into<FoodConfig>) {
+        self.food.apply_config_transition(config.into());
     }
 
     // ── Barriers ─────────────────────────────────────────────────────────────
@@ -147,6 +170,11 @@ impl WorldState {
         self.food.total_food()
     }
 
+    /// Total food owned by a specific type.
+    pub fn total_food_by_type(&self, type_idx: OrdinaryFoodTypeId) -> f32 {
+        self.food.total_food_by_type(type_idx)
+    }
+
     /// Occupancy depletion at a position (for testing and diagnostics).
     #[must_use]
     pub fn occupancy_depletion_at(&self, pos: Position) -> f32 {
@@ -157,7 +185,7 @@ impl WorldState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{FoodResourceConfig, SimulationConfig};
+    use crate::config::{FoodResourceConfig, FoodTypeConfig, SimulationConfig};
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
     use slotmap::SlotMap;
@@ -304,6 +332,8 @@ mod tests {
         let mut food_cfg = default_config().world.food;
         food_cfg.initial_coverage = 0.4;
         food_cfg.initial_density = 1.0;
+        food_cfg.types[0].initial_coverage = 0.4;
+        food_cfg.types[0].initial_density = 1.0;
         w.reconfigure_food(food_cfg);
         let mut rng = SmallRng::seed_from_u64(7);
         w.seed_food(&mut rng);
@@ -522,7 +552,7 @@ mod tests {
         let mut rng = SmallRng::seed_from_u64(34);
         let _ = w.grow_food(0, &mut rng);
 
-        assert_eq!(w.food_at(pos), 0.5);
+        assert_eq!(w.food_at(pos), 0.0);
         assert_eq!(w.occupancy_depletion_at(pos), 0.0);
     }
 
@@ -651,5 +681,54 @@ mod tests {
         };
         w.reconfigure_food(food_cfg);
         assert!((w.food().config().growth_rate - 0.99).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn reconfigure_food_resets_density_when_type_order_changes_with_same_count() {
+        let mut w = WorldState::new(2, 1, WorldEdgeMode::Wrap);
+        let mut initial = default_config().world.food;
+        initial.types = vec![
+            FoodTypeConfig {
+                name: "Type A".to_string(),
+                color: "#22c55e".to_string(),
+                initial_density: 0.5,
+                initial_coverage: 0.5,
+                growth_inhibitor: 0.2,
+            },
+            FoodTypeConfig {
+                name: "Type B".to_string(),
+                color: "#0ea5e9".to_string(),
+                initial_density: 0.5,
+                initial_coverage: 0.5,
+                growth_inhibitor: 0.2,
+            },
+        ];
+        w.reconfigure_food(initial.clone());
+
+        let pos = Position::new(0, 0);
+        w.set_food_type(pos, OrdinaryFoodTypeId::new(0), 0.7);
+        w.set_food_type(pos, OrdinaryFoodTypeId::new(1), 0.4);
+        assert!(w.food_at(pos) > 0.0);
+
+        let mut reordered = initial;
+        reordered.types.swap(0, 1);
+        w.reconfigure_food(reordered);
+
+        assert_eq!(w.food_at(pos), 0.0);
+        assert_eq!(w.food_at_type(pos, OrdinaryFoodTypeId::new(0)), 0.0);
+        assert_eq!(w.food_at_type(pos, OrdinaryFoodTypeId::new(1)), 0.0);
+    }
+
+    #[test]
+    fn reconfigure_food_clamps_existing_density_to_lower_max_density() {
+        let mut w = small_wrap_world();
+        let pos = Position::new(0, 0);
+        w.set_food(pos, 0.9);
+
+        let mut next = default_config().world.food;
+        next.shared.max_density = 0.3;
+        w.reconfigure_food(next);
+
+        assert_eq!(w.food_at(pos), 0.3);
     }
 }

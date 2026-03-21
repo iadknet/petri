@@ -89,12 +89,13 @@ impl ActionQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::OrdinaryFoodTypeId;
     use crate::contracts::Direction;
 
     #[test]
     fn push_within_cap() {
         let mut q = ActionQueue::new(10);
-        q.push(WorldAction::Eat);
+        q.push(WorldAction::eat(OrdinaryFoodTypeId::default()));
         assert_eq!(q.len(), 1);
         q.push(WorldAction::NoOp);
         assert_eq!(q.len(), 2);
@@ -103,16 +104,16 @@ mod tests {
     #[test]
     fn push_at_cap_silently_ignored() {
         let mut q = ActionQueue::new(2);
-        q.push(WorldAction::Eat);
+        q.push(WorldAction::eat(OrdinaryFoodTypeId::default()));
         q.push(WorldAction::NoOp);
-        q.push(WorldAction::Eat); // should be ignored
+        q.push(WorldAction::eat(OrdinaryFoodTypeId::default())); // should be ignored
         assert_eq!(q.len(), 2);
     }
 
     #[test]
     fn pop_removes_last() {
         let mut q = ActionQueue::new(10);
-        q.push(WorldAction::Eat);
+        q.push(WorldAction::eat(OrdinaryFoodTypeId::default()));
         q.push(WorldAction::Move(Direction::N));
         let popped = q.pop();
         assert_eq!(popped, Some(WorldAction::Move(Direction::N)));
@@ -129,7 +130,7 @@ mod tests {
     fn action_type_at_in_range() {
         let mut q = ActionQueue::new(10);
         q.push(WorldAction::NoOp); // type 0
-        q.push(WorldAction::Eat); // type 1
+        q.push(WorldAction::eat(OrdinaryFoodTypeId::default())); // type 1
         q.push(WorldAction::Move(Direction::N)); // type 2
         assert!((q.action_type_at(0) - 0.0).abs() < f32::EPSILON);
         assert!((q.action_type_at(1) - 1.0).abs() < f32::EPSILON);
@@ -163,7 +164,7 @@ mod tests {
     #[test]
     fn param_at_out_of_range() {
         let mut q = ActionQueue::new(10);
-        q.push(WorldAction::Eat);
+        q.push(WorldAction::eat(OrdinaryFoodTypeId::default()));
         assert!((q.param_at(99, 0) - 0.0).abs() < f32::EPSILON); // OOB index
         assert!((q.param_at(0, 99) - 0.0).abs() < f32::EPSILON); // OOB slot
     }
@@ -178,24 +179,27 @@ mod tests {
     #[test]
     fn into_actions_or_noop_non_empty_returns_actions() {
         let mut q = ActionQueue::new(10);
-        q.push(WorldAction::Eat);
+        q.push(WorldAction::eat(OrdinaryFoodTypeId::default()));
         q.push(WorldAction::Move(Direction::N));
         let actions = q.into_actions_or_noop();
         assert_eq!(
             actions,
-            vec![WorldAction::Eat, WorldAction::Move(Direction::N)]
+            vec![
+                WorldAction::eat(OrdinaryFoodTypeId::default()),
+                WorldAction::Move(Direction::N)
+            ]
         );
     }
 
     #[test]
     fn into_actions_returns_vec() {
         let mut q = ActionQueue::new(10);
-        q.push(WorldAction::Eat);
+        q.push(WorldAction::eat(OrdinaryFoodTypeId::default()));
         q.push(WorldAction::Move(Direction::N));
         q.push(WorldAction::NoOp);
         let actions = q.into_actions();
         assert_eq!(actions.len(), 3);
-        assert_eq!(actions[0], WorldAction::Eat);
+        assert_eq!(actions[0], WorldAction::eat(OrdinaryFoodTypeId::default()));
         assert_eq!(actions[1], WorldAction::Move(Direction::N));
         assert_eq!(actions[2], WorldAction::NoOp);
     }

@@ -37,11 +37,17 @@ fn added_node_input_class_keys_are_stable() {
 #[test]
 fn world_input_key_keys_are_stable() {
     assert_eq!(
-        crate::contracts::WorldInputKey::FoodHere.as_key(),
+        crate::contracts::WorldInputKey::FoodHere {
+            type_idx: crate::config::OrdinaryFoodTypeId::default()
+        }
+        .as_key(),
         "FoodHere"
     );
     assert_eq!(
-        crate::contracts::WorldInputKey::AreaFoodSummary.as_key(),
+        crate::contracts::WorldInputKey::AreaFoodSummary {
+            type_idx: crate::config::OrdinaryFoodTypeId::default()
+        }
+        .as_key(),
         "AreaFoodSummary"
     );
     assert_eq!(

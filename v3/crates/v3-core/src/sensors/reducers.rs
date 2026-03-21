@@ -3,6 +3,7 @@
 //! Per v3-sensor-spec.md Sections 5–6: assembles `PerceptionSnapshot` fields
 //! from the set of visible cells computed by the visibility module.
 
+use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::CreatureId;
 use crate::creature::state::CreatureState;
 use crate::sensors::perception::{
@@ -32,7 +33,26 @@ pub fn assemble_perception(
     let max_candidate_cells = (2.0 * r + 1.0) * (2.0 * r + 1.0);
     let max_other_candidate_cells = max_candidate_cells - 1.0;
     let max_dist = (2.0 * r * r).sqrt();
-    let area_food = reduce_food(visible, world, config, r, max_candidate_cells, max_dist);
+    let typed_area_food: Vec<_> = world
+        .food()
+        .food_types()
+        .iter()
+        .map(|food_type| {
+            reduce_food(
+                visible,
+                world,
+                config,
+                food_type.id,
+                r,
+                max_candidate_cells,
+                max_dist,
+            )
+        })
+        .collect();
+    let area_food = typed_area_food
+        .get(usize::from(OrdinaryFoodTypeId::default().get()))
+        .copied()
+        .unwrap_or([0.0; 7]);
     let area_barrier = reduce_barrier(visible, world, r, max_candidate_cells, max_dist);
     let area_occupancy = reduce_occupancy(
         visible,
@@ -56,6 +76,7 @@ pub fn assemble_perception(
 
     PerceptionSnapshot {
         area_food,
+        typed_area_food,
         area_barrier,
         area_occupancy,
         nearby_core,
@@ -69,6 +90,7 @@ fn reduce_food(
     visible: &[VisibleCell],
     world: &WorldState,
     config: &PerceptionConfig,
+    type_idx: OrdinaryFoodTypeId,
     r: f32,
     max_candidate_cells: f32,
     max_dist: f32,
@@ -88,7 +110,7 @@ fn reduce_food(
     let mut nearest_dy = 0.0f32;
 
     for cell in visible {
-        let food = world.food_at(cell.pos);
+        let food = world.food_at_type(cell.pos, type_idx);
         let food_ratio = (food / max_food).clamp(0.0, 1.0);
 
         food_sum += food_ratio;
@@ -485,7 +507,15 @@ mod tests {
         let visible = compute_visible_cells(origin, &world, table);
         let config = PerceptionConfig::default();
 
-        let food = reduce_food(visible.cells(), &world, &config, 2.0, 25.0, (8.0f32).sqrt());
+        let food = reduce_food(
+            visible.cells(),
+            &world,
+            &config,
+            OrdinaryFoodTypeId::default(),
+            2.0,
+            25.0,
+            (8.0f32).sqrt(),
+        );
         assert!((food[food_idx::TOTAL_RATIO] - 0.0).abs() < f32::EPSILON);
         assert!((food[food_idx::MAX_VALUE] - 0.0).abs() < f32::EPSILON);
     }
@@ -502,7 +532,15 @@ mod tests {
         let visible = compute_visible_cells(origin, &world, table);
         let config = PerceptionConfig::default();
 
-        let food = reduce_food(visible.cells(), &world, &config, 2.0, 25.0, (8.0f32).sqrt());
+        let food = reduce_food(
+            visible.cells(),
+            &world,
+            &config,
+            OrdinaryFoodTypeId::default(),
+            2.0,
+            25.0,
+            (8.0f32).sqrt(),
+        );
         // total_ratio = (0.5 + 1.0) / 25.0 = 0.06
         assert!((food[food_idx::TOTAL_RATIO] - 0.06).abs() < 1e-5);
         assert!((food[food_idx::MAX_VALUE] - 1.0).abs() < f32::EPSILON);
@@ -525,6 +563,7 @@ mod tests {
             visible.cells(),
             &world,
             &config,
+            OrdinaryFoodTypeId::default(),
             3.0,
             49.0,
             (18.0f32).sqrt(),
@@ -857,10 +896,20 @@ mod tests {
                 visible.cells(),
                 &world,
                 &config,
+                OrdinaryFoodTypeId::default(),
                 r,
                 max_candidate_cells,
                 max_dist,
             ),
+            typed_area_food: vec![reduce_food(
+                visible.cells(),
+                &world,
+                &config,
+                OrdinaryFoodTypeId::default(),
+                r,
+                max_candidate_cells,
+                max_dist,
+            )],
             area_barrier: reduce_barrier(visible.cells(), &world, r, max_candidate_cells, max_dist),
             area_occupancy: reduce_occupancy(
                 visible.cells(),

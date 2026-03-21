@@ -1,3 +1,4 @@
+use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{Direction, WorldAction};
 
 /// Decode a WorldAction from the raw action_type discriminant and metadata buffer.
@@ -8,7 +9,9 @@ use crate::contracts::{Direction, WorldAction};
 pub fn decode_world_action(action_type: u8, meta: &[f32; 8]) -> WorldAction {
     match action_type {
         0 => WorldAction::NoOp,
-        1 => WorldAction::Eat,
+        1 => WorldAction::Eat {
+            type_idx: decode_food_type_idx(meta[0]),
+        },
         2 => WorldAction::Move(decode_direction(meta[0])),
         3 => WorldAction::Reproduce {
             direction: decode_direction(meta[0]),
@@ -19,6 +22,15 @@ pub fn decode_world_action(action_type: u8, meta: &[f32; 8]) -> WorldAction {
             amount: clamp_non_negative_finite(meta[1]),
         },
         _ => WorldAction::NoOp,
+    }
+}
+
+#[inline]
+fn decode_food_type_idx(raw: f32) -> OrdinaryFoodTypeId {
+    if raw.is_finite() && raw >= 0.0 {
+        OrdinaryFoodTypeId::new(raw.round().clamp(0.0, u16::MAX as f32) as u16)
+    } else {
+        OrdinaryFoodTypeId::default()
     }
 }
 
@@ -61,7 +73,25 @@ mod tests {
 
     #[test]
     fn action_type_1_is_eat() {
-        assert_eq!(decode_world_action(1, &zero_meta()), WorldAction::Eat);
+        assert_eq!(
+            decode_world_action(1, &zero_meta()),
+            WorldAction::Eat {
+                type_idx: OrdinaryFoodTypeId::default(),
+            }
+        );
+    }
+
+    #[test]
+    fn action_type_1_reads_food_type_from_meta_slot_0() {
+        let mut meta = zero_meta();
+        meta[0] = 4.0;
+        meta[1] = 9.0;
+        assert_eq!(
+            decode_world_action(1, &meta),
+            WorldAction::Eat {
+                type_idx: OrdinaryFoodTypeId::new(4),
+            }
+        );
     }
 
     #[test]

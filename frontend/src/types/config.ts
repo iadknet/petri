@@ -6,7 +6,7 @@ export type FertilityAlgorithm =
 				frequency: number;
 				lacunarity: number;
 				persistence: number;
-				seed?: number;
+				seed?: number | null;
 			};
 	  }
 	| {
@@ -15,13 +15,14 @@ export type FertilityAlgorithm =
 				min_radius: number;
 				max_radius: number;
 				falloff: number;
-				seed?: number;
+				seed?: number | null;
 			};
 	  };
 
 export interface FertilityLayer {
 	algorithm: FertilityAlgorithm;
 	weight: number;
+	target?: FoodFertilityLayerTarget;
 }
 
 export interface FertilityConfig {
@@ -29,6 +30,54 @@ export interface FertilityConfig {
 	min_fertility: number;
 	max_fertility: number;
 	layers: FertilityLayer[];
+}
+
+export type FoodFertilityLayerTarget =
+	| "AllFoods"
+	| { SingleType: { type_idx: number } };
+
+export interface FoodSharedConfig {
+	growth_rate: number;
+	initial_density: number;
+	initial_coverage: number;
+	spread_threshold_ratio: number;
+	spread_density_ratio: number;
+	recovery_spawn_rate: number;
+	recovery_floor_ratio: number;
+	max_density: number;
+	occupancy_depletion: OccupancyDepletionConfig;
+}
+
+export interface FoodTypeConfig {
+	name: string;
+	color: string;
+	initial_density: number;
+	initial_coverage: number;
+	growth_inhibitor: number;
+}
+
+export interface StartupFoodRequestLayer {
+	algorithm: FertilityAlgorithm;
+	weight: number;
+	target: FoodFertilityLayerTarget;
+}
+
+export interface StartupFoodRequestFertilityConfig {
+	enabled: boolean;
+	min_fertility: number;
+	max_fertility: number;
+	layers: StartupFoodRequestLayer[];
+}
+
+export interface StartupFoodRequest {
+	shared: FoodSharedConfig;
+	types: FoodTypeConfig[];
+	fertility: StartupFoodRequestFertilityConfig;
+	annealing: AnnealingConfig;
+}
+
+export interface StartupFoodConfig extends Omit<StartupFoodRequest, "fertility"> {
+	fertility: FertilityConfig;
 }
 
 export interface AnnealingConfig {
@@ -44,17 +93,10 @@ export interface OccupancyDepletionConfig {
 }
 
 export interface FoodConfig {
-	growth_rate: number;
-	initial_density: number;
-	initial_coverage: number;
-	spread_threshold_ratio: number;
-	spread_density_ratio: number;
-	recovery_spawn_rate: number;
-	recovery_floor_ratio: number;
-	max_density: number;
-	occupancy_depletion: OccupancyDepletionConfig;
-	fertility?: FertilityConfig;
-	annealing?: AnnealingConfig;
+	shared: FoodSharedConfig;
+	types: FoodTypeConfig[];
+	fertility: FertilityConfig;
+	annealing: AnnealingConfig;
 }
 
 export type WorldEdgeMode = "Wrap" | "Bounded";

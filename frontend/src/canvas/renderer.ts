@@ -1,4 +1,4 @@
-import type { Creature, Frame, PaintTool } from "../types/api.ts";
+import type { Creature, FoodTypeMetadata, Frame, PaintTool } from "../types/api.ts";
 import {
 	type CameraState,
 	canvasToViewportPoint,
@@ -55,6 +55,65 @@ function fertilityColor(value: number): [number, number, number, number] {
 	return [FERT_FERTILE_R, FERT_FERTILE_G, FERT_FERTILE_B, absT * FERT_ALPHA];
 }
 
+export function parseHexColor(color: string): [number, number, number] {
+	const normalized = color.startsWith("#") ? color.slice(1) : color;
+	if (!/^[0-9a-fA-F]{6}$/.test(normalized)) {
+		return [0, 160, 0];
+	}
+	return [
+		Number.parseInt(normalized.slice(0, 2), 16),
+		Number.parseInt(normalized.slice(2, 4), 16),
+		Number.parseInt(normalized.slice(4, 6), 16),
+	];
+}
+
+export const MAX_FOOD_ALPHA = 0.8;
+
+export function foodOpacity(density: number): number {
+	const clampedDensity = Math.max(0, Math.min(1, density));
+	return Math.min(MAX_FOOD_ALPHA, clampedDensity);
+}
+
+function blendPixel(
+	data: Uint8ClampedArray,
+	index: number,
+	r: number,
+	g: number,
+	b: number,
+	alpha: number,
+): void {
+	data[index] = Math.round(data[index]! * (1 - alpha) + r * alpha);
+	data[index + 1] = Math.round(data[index + 1]! * (1 - alpha) + g * alpha);
+	data[index + 2] = Math.round(data[index + 2]! * (1 - alpha) + b * alpha);
+}
+
+function shadeFoodRgb(
+	baseR: number,
+	baseG: number,
+	baseB: number,
+	density: number,
+): [number, number, number] {
+	const clampedDensity = Math.max(0, Math.min(1, density));
+	const floor = 30;
+	const scale = 0.35 + clampedDensity * 0.65;
+	return [
+		Math.min(255, Math.round(baseR * scale + floor * (1 - clampedDensity))),
+		Math.min(255, Math.round(baseG * scale + floor * (1 - clampedDensity))),
+		Math.min(255, Math.round(baseB * scale + floor * (1 - clampedDensity))),
+	];
+}
+
+function buildFoodTypeColorMap(foodTypes: FoodTypeMetadata[]): Map<number, [number, number, number]> {
+	return new Map(foodTypes.map((foodType) => [foodType.type_idx, parseHexColor(foodType.color)]));
+}
+
+function resolveFoodTypeColor(
+	foodTypeColors: Map<number, [number, number, number]>,
+	typeIdx: number,
+): [number, number, number] {
+	return foodTypeColors.get(typeIdx) ?? [34, 197, 94];
+}
+
 /** Zoom threshold for switching from pixel to rect mode */
 const RECT_MODE_THRESHOLD = 4;
 /** Zoom threshold for detailed mode (energy bars, grid lines) */
@@ -66,6 +125,14 @@ interface FertilityBlendCache {
 	worldHeight: number;
 	indices: Uint32Array;
 	colors: Uint8Array;
+}
+
+interface OverviewFoodCache {
+	foodRef: OverviewRenderLayer["food"];
+	foodTypesRef: OverviewRenderLayer["foodTypes"];
+	gridWidth: number;
+	gridHeight: number;
+	bucketColors: Map<number, [number, number, number]>;
 }
 
 export class WorldRenderer {
@@ -84,6 +151,7 @@ export class WorldRenderer {
 	private previewTool: PaintTool | null = null;
 	private selectedCreatureId: number | null = null;
 	private fertilityBlendCache: FertilityBlendCache | null = null;
+	private overviewFoodCache: OverviewFoodCache | null = null;
 
 	constructor(canvas: HTMLCanvasElement, getRenderModel: () => RenderModel | null) {
 		this.canvas = canvas;
@@ -214,16 +282,23 @@ export class WorldRenderer {
 		const { zoom } = camera;
 
 		if (zoom < RECT_MODE_THRESHOLD) {
-			this.renderPixelMode(frame, camera, overview, fertilityOverlay);
+			this.renderPixelMode(frame, model.foodTypes, camera, overview, fertilityOverlay);
 		} else {
 			ctx.fillStyle = "#020617";
 			ctx.fillRect(0, 0, canvas.width, canvas.height);
-			this.renderRectMode(frame, camera, zoom >= DETAIL_MODE_THRESHOLD, fertilityOverlay);
+			this.renderRectMode(
+				frame,
+				model.foodTypes,
+				camera,
+				zoom >= DETAIL_MODE_THRESHOLD,
+				fertilityOverlay,
+			);
 		}
 	}
 
 	private renderPixelMode(
 		frame: Frame,
+		foodTypes: FoodTypeMetadata[],
 		camera: CameraState,
 		overview: OverviewRenderLayer | null,
 		fertilityOverlay: FertilityOverlay | null,
@@ -248,13 +323,15 @@ export class WorldRenderer {
 		if (overview) {
 			this.drawOverviewPixels(data, width, height, overview);
 		} else {
+			const foodTypeColors = buildFoodTypeColorMap(foodTypes);
 			for (const food of frame.food) {
-				const idx = (food.y * width + food.x) * 4;
 				const density = Math.max(0, Math.min(1, food.density));
-				const intensity = Math.min(255, Math.round(density * 180) + 30);
-				data[idx] = 0;
-				data[idx + 1] = intensity;
-				data[idx + 2] = 0;
+				const alpha = foodOpacity(density);
+				if (alpha <= 0) continue;
+				const idx = (food.y * width + food.x) * 4;
+				const [baseR, baseG, baseB] = resolveFoodTypeColor(foodTypeColors, food.type_idx);
+				const [r, g, b] = shadeFoodRgb(baseR, baseG, baseB, density);
+				blendPixel(data, idx, r, g, b, alpha);
 				data[idx + 3] = 255;
 			}
 		}
@@ -320,6 +397,8 @@ export class WorldRenderer {
 		worldHeight: number,
 		overview: OverviewRenderLayer,
 	): void {
+		const cachedFood = this.ensureOverviewFoodCache(overview);
+
 		const maxCreatureCount = overview.creatureCounts.reduce(
 			(max, count) => Math.max(max, count),
 			0,
@@ -335,9 +414,9 @@ export class WorldRenderer {
 
 			for (let gridX = 0; gridX < overview.gridWidth; gridX++) {
 				const index = gridY * overview.gridWidth + gridX;
-				const density = (overview.foodDensity[index] ?? 0) / 255;
+				const bucketColor = cachedFood.bucketColors.get(index);
 				const creatureCount = overview.creatureCounts[index] ?? 0;
-				if (density <= 0 && creatureCount <= 0) {
+				if (!bucketColor && creatureCount <= 0) {
 					continue;
 				}
 
@@ -348,15 +427,18 @@ export class WorldRenderer {
 				const bucketLeft = Math.max(0, Math.min(worldWidth, x0));
 				const bucketRight = Math.max(bucketLeft + 1, Math.min(worldWidth, Math.max(x1, x0 + 1)));
 				const creatureRatio = maxCreatureCount > 0 ? creatureCount / maxCreatureCount : 0;
-				const red = creatureCount > 0 ? Math.round(40 + creatureRatio * 180) : 0;
-				const green = Math.round(Math.max(density * 180 + 30, creatureRatio * 110));
+				let [red, green, blue] = bucketColor ?? [BG_R, BG_G, BG_B];
+				if (creatureCount > 0) {
+					red = Math.max(red, Math.round(40 + creatureRatio * 180));
+					green = Math.max(green, Math.round(creatureRatio * 110));
+				}
 
 				for (let y = bucketTop; y < bucketBottom; y++) {
 					for (let x = bucketLeft; x < bucketRight; x++) {
 						const pixelIndex = (y * worldWidth + x) * 4;
 						data[pixelIndex] = red;
 						data[pixelIndex + 1] = green;
-						data[pixelIndex + 2] = 0;
+						data[pixelIndex + 2] = blue;
 						data[pixelIndex + 3] = 255;
 					}
 				}
@@ -364,19 +446,87 @@ export class WorldRenderer {
 		}
 	}
 
+	private ensureOverviewFoodCache(overview: OverviewRenderLayer): OverviewFoodCache {
+		const cached = this.overviewFoodCache;
+		if (
+			cached &&
+			cached.foodRef === overview.food &&
+			cached.foodTypesRef === overview.foodTypes &&
+			cached.gridWidth === overview.gridWidth &&
+			cached.gridHeight === overview.gridHeight
+		) {
+			return cached;
+		}
+
+		const foodTypeColors = new Map<number, [number, number, number]>(
+			overview.foodTypes.map((foodType) => [foodType.type_idx, parseHexColor(foodType.color)]),
+		);
+		const buckets = new Map<number, Map<number, number>>();
+		for (const cell of overview.food) {
+			const bucketX = cell.bucket_x;
+			const bucketY = cell.bucket_y;
+			if (bucketX < 0 || bucketY < 0 || bucketX >= overview.gridWidth || bucketY >= overview.gridHeight) {
+				continue;
+			}
+			const density = Math.max(0, cell.density);
+			if (density <= 0) continue;
+			const index = bucketY * overview.gridWidth + bucketX;
+			let perTypeDensity = buckets.get(index);
+			if (!perTypeDensity) {
+				perTypeDensity = new Map();
+				buckets.set(index, perTypeDensity);
+			}
+			perTypeDensity.set(cell.type_idx, (perTypeDensity.get(cell.type_idx) ?? 0) + density);
+		}
+		const bucketColors = new Map<number, [number, number, number]>();
+		for (const [index, perTypeDensity] of buckets) {
+			let red = BG_R;
+			let green = BG_G;
+			let blue = BG_B;
+			for (const [typeIdx, rawDensity] of Array.from(perTypeDensity.entries()).toSorted(
+				([leftTypeIdx], [rightTypeIdx]) => leftTypeIdx - rightTypeIdx,
+			)) {
+				const density = Math.max(0, Math.min(1, rawDensity));
+				const alpha = foodOpacity(density);
+				if (alpha <= 0) continue;
+				const [colorR, colorG, colorB] = resolveFoodTypeColor(foodTypeColors, typeIdx);
+				const [shadeR, shadeG, shadeB] = shadeFoodRgb(colorR, colorG, colorB, density);
+				red = Math.round(red * (1 - alpha) + shadeR * alpha);
+				green = Math.round(green * (1 - alpha) + shadeG * alpha);
+				blue = Math.round(blue * (1 - alpha) + shadeB * alpha);
+			}
+			bucketColors.set(index, [red, green, blue]);
+		}
+
+		const built: OverviewFoodCache = {
+			foodRef: overview.food,
+			foodTypesRef: overview.foodTypes,
+			gridWidth: overview.gridWidth,
+			gridHeight: overview.gridHeight,
+			bucketColors,
+		};
+		this.overviewFoodCache = built;
+		return built;
+	}
+
 	private renderRectMode(
 		frame: Frame,
+		foodTypes: FoodTypeMetadata[],
 		camera: CameraState,
 		detailed: boolean,
 		fertilityOverlay: FertilityOverlay | null,
 	): void {
 		const { ctx } = this;
 		const { x: cx, y: cy, zoom } = camera;
+		const foodTypeColors = buildFoodTypeColorMap(foodTypes);
 
 		for (const food of frame.food) {
 			const density = Math.max(0, Math.min(1, food.density));
-			const intensity = Math.min(255, Math.round(density * 180) + 30);
-			ctx.fillStyle = `rgb(0,${intensity},0)`;
+			const alpha = foodOpacity(density);
+			if (alpha <= 0) continue;
+			const [baseR, baseG, baseB] = resolveFoodTypeColor(foodTypeColors, food.type_idx);
+			const [r, g, b] = shadeFoodRgb(baseR, baseG, baseB, density);
+			ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
 			ctx.fillRect(cx + food.x * zoom, cy + food.y * zoom, zoom, zoom);
 		}
 

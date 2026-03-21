@@ -63,7 +63,8 @@ startup(seed, overrides?)
 Conceptual override domains:
 - `population` (initial counts and limits; canonical defaults in
   `v3-runtime-config-spec.md` Section 5),
-- `world` (`width`, `height`, `edge_mode`, food parameters),
+- `world` (`width`, `height`, `edge_mode`, `food.shared`, `food.types`,
+  `food.fertility`),
 - `energy` (lifecycle and action-cost controls),
 - `runtime` (mesh/vm/graph/mutation controls),
 - `startup` (startup-only controls such as early-run ramps).
@@ -95,7 +96,7 @@ Seeding flow contract:
    - v3alpha1 seeds exact coverage over non-barrier cells:
      `round(initial_coverage * eligible_cells)` unique cells.
    - Seeded density uses normalized `f32` food values in canonical `[0.0, 1.0]`
-     scale (clamped by `world.food.max_density`).
+     scale (clamped by `world.food.shared.max_density`).
 3. Seed founders using the canonical founder baseline from Section 5.
 4. Commit simulation state at tick `0` in `idle` state.
 
@@ -148,10 +149,10 @@ CreatureGenome {
 NodeGenome {
   node_id: 0,
   input_refs: [
-    0: World(FoodHere),
+    0: World(FoodHere { type_idx: 0 }),
     1: DynamicIntrospection(EnergyCurrent),
     2: StaticIntrospection(AgeTicks),
-    3: World(NeighborFoodRing),      // compound: 8 directions
+    3: World(NeighborFoodRing { type_idx: 0 }),      // compound: 8 directions
     4: World(NeighborOccupiedRing),  // compound: 8 directions
   ],
   backend_def: Graph(GraphBackendDef {
@@ -238,12 +239,12 @@ NodeGenome {
     constants: [0.5, 1.0, 2.0, 3.0, 20.0],
     program: [
       // Read inputs into registers
-      ReadInput(r0, 0, 0),    // r0 = food_here
+      ReadInput(r0, 0, 0),    // r0 = food_here[type_idx=0]
       ReadInput(r1, 1, 0),    // r1 = can_reproduce
-      ReadInput(r2, 2, 0),    // r2 = food_N
-      ReadInput(r3, 3, 0),    // r3 = food_E
-      ReadInput(r4, 4, 0),    // r4 = food_S
-      ReadInput(r5, 5, 0),    // r5 = food_W
+      ReadInput(r2, 2, 0),    // r2 = food_N[type_idx=0]
+      ReadInput(r3, 3, 0),    // r3 = food_E[type_idx=0]
+      ReadInput(r4, 4, 0),    // r4 = food_S[type_idx=0]
+      ReadInput(r5, 5, 0),    // r5 = food_W[type_idx=0]
 
       // Priority 1: Reproduce if energy sufficient
       CmpGt(r6, r1, r7),     // r6 = can_reproduce?

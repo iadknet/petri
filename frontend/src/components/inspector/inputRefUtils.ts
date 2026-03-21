@@ -1,4 +1,4 @@
-import type { InputReference } from "../../types/genome.ts";
+import type { InputReference, WorldInputReference } from "../../types/genome.ts";
 import type { WorldAction } from "../../types/trace.ts";
 
 export function formatAction(action: WorldAction | null | undefined): string {
@@ -34,13 +34,61 @@ export function isRingSensor(worldKey: string): boolean {
 	return worldKey in RING_LABELS;
 }
 
+export interface ParsedWorldInputReference {
+	key: string;
+	typeIdx: number | null;
+}
+
+export function parseWorldInputRef(world: WorldInputReference): ParsedWorldInputReference {
+	if (typeof world === "string") {
+		return {
+			key: world,
+			typeIdx: null,
+		};
+	}
+
+	const [key, payload] = Object.entries(world)[0] ?? ["?", null];
+	const keyString = String(key);
+	if (
+		payload &&
+		typeof payload === "object" &&
+		"type_idx" in payload &&
+		typeof (payload as { type_idx?: unknown }).type_idx === "number"
+	) {
+		return {
+			key: keyString,
+			typeIdx: (payload as { type_idx: number }).type_idx,
+		};
+	}
+
+	return {
+		key: keyString,
+		typeIdx: null,
+	};
+}
+
 export function formatInputRef(ref: InputReference): string {
 	if (typeof ref === "string") return ref;
-	if ("World" in ref) return RING_LABELS[ref.World] ?? ref.World;
-	if ("StaticIntrospection" in ref) return ref.StaticIntrospection;
-	if ("DynamicIntrospection" in ref) return ref.DynamicIntrospection;
+	if ("World" in ref) {
+		const parsed = parseWorldInputRef(ref.World);
+		const base = RING_LABELS[parsed.key] ?? parsed.key;
+		if (parsed.typeIdx !== null) {
+			return `${base}[${parsed.typeIdx}]`;
+		}
+		return base;
+	}
+	if ("StaticIntrospection" in ref) return String(ref.StaticIntrospection);
+	if ("DynamicIntrospection" in ref) return String(ref.DynamicIntrospection);
 	if ("UpstreamSlot" in ref) return `slot[${ref.UpstreamSlot}]`;
 	return "?";
+}
+
+export function formatInputRefWithSubIndex(ref: InputReference, subIdx: number): string {
+	const label = formatInputRef(ref);
+	if (typeof ref !== "string" && "World" in ref && isRingSensor(parseWorldInputRef(ref.World).key)) {
+		return `${label}[${directionName(subIdx)}]`;
+	}
+	return subIdx > 0 ? `${label}[${subIdx}]` : label;
 }
 
 export function inputRefColor(ref: InputReference): string {

@@ -227,8 +227,9 @@ barrier checks) are owned by `v3-world-grid-spec.md`.
 
 Implications:
 - `Move`: first processed successful move claims destination occupancy.
-- `Eat`: first processed successful eat consumes target food/resource. Later
-  creatures that decided to eat the same cell during cognition will find no food.
+- `Eat`: first processed successful eat consumes the targeted food/resource
+  (including the requested ordinary-food type). Later creatures that decided
+  to eat the same cell during cognition will find no food.
 - `Reproduce`: first processed valid spawn into a target cell succeeds;
   later reproduce actions targeting now-occupied cells fail the invalid-target
   gate.

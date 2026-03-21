@@ -5,6 +5,7 @@ use crate::creature::genome::{VmBackendDef, VmInstruction};
 use crate::runtime::types::{MeshSideOutputs, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;
+use crate::sensors::typed_food::TypedFoodLocalSnapshot;
 
 fn config() -> RuntimeConfig {
     RuntimeConfig::default()
@@ -20,7 +21,8 @@ fn empty_sensor_snapshot() -> SensorSnapshot {
             generation: 0.0,
             age_ticks: 0.0,
         },
-        perception: PerceptionSnapshot::zero(),
+        typed_local_food: TypedFoodLocalSnapshot::zeroed(1),
+        perception: PerceptionSnapshot::zeroed(1),
     }
 }
 

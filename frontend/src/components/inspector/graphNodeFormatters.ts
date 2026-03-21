@@ -5,7 +5,7 @@ import type {
 	InputReference,
 	OutputSinkKind,
 } from "../../types/genome.ts";
-import { directionName, formatInputRef, isRingSensor } from "./inputRefUtils.ts";
+import { formatInputRefWithSubIndex } from "./inputRefUtils.ts";
 
 export function getKindName(kind: ComputeNodeKind): string {
 	if (typeof kind === "string") return kind;
@@ -58,11 +58,7 @@ export function formatGraphSource(source: GraphSource, inputRefs: InputReference
 		const { ref_idx, sub_idx } = source.InputLeaf;
 		if (ref_idx === 0xffff) return sub_idx > 0 ? `Dead[${sub_idx}]` : "Dead";
 		const ref = inputRefs[ref_idx];
-		const label = ref ? formatInputRef(ref) : `In(${ref_idx})`;
-		if (ref && typeof ref !== "string" && "World" in ref && isRingSensor(ref.World)) {
-			return `${label}[${directionName(sub_idx)}]`;
-		}
-		return sub_idx > 0 ? `${label}[${sub_idx}]` : label;
+		return ref ? formatInputRefWithSubIndex(ref, sub_idx) : `In(${ref_idx})`;
 	}
 	return "?";
 }

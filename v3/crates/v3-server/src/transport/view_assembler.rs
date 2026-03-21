@@ -1,8 +1,13 @@
 //! Transitional view-assembly boundary.
 
+use std::collections::BTreeMap;
+
 use crate::query::projection::ProjectionSnapshot;
 use crate::query::spatial_index::ViewRect;
-use crate::transport::protocol::{ViewDetailPayload, ViewOverviewPayload, ViewRectPayload};
+use crate::state::FoodCell;
+use crate::transport::protocol::{
+    OverviewFoodCellPayload, ViewDetailPayload, ViewOverviewPayload, ViewRectPayload,
+};
 use crate::transport::session::ViewSubscription;
 
 #[must_use]
@@ -19,17 +24,34 @@ pub fn assemble_detail_payload(
         }
     }
 
-    let rect_cells = rect.width as usize * rect.height as usize;
-    let mut food_density_u8 = Vec::with_capacity(rect_cells);
-    let world_width = snapshot.ws_frame.frame.width;
-    for y in rect.y..rect.y + rect.height {
-        for x in rect.x..rect.x + rect.width {
-            let index = y as usize * world_width as usize + x as usize;
-            debug_assert!(
-                index < snapshot.food_density_u8.len(),
-                "detail food density index should stay within the clamped world bounds"
-            );
-            food_density_u8.push(snapshot.food_density_u8[index]);
+    let world_width = usize::from(snapshot.ws_frame.frame.width);
+    let type_count = snapshot.ws_frame.frame.food_types.len();
+    let cell_count = world_width * usize::from(snapshot.ws_frame.frame.height);
+    let mut food = Vec::new();
+    for type_idx in 0..type_count {
+        let Ok(type_idx_u16) = u16::try_from(type_idx) else {
+            break;
+        };
+        let plane_start = type_idx * cell_count;
+        for y in rect.y..rect.y.saturating_add(rect.height) {
+            let row_offset = usize::from(y) * world_width;
+            for x in rect.x..rect.x.saturating_add(rect.width) {
+                let idx = plane_start + row_offset + usize::from(x);
+                let density = snapshot
+                    .food_density_planes
+                    .get(idx)
+                    .copied()
+                    .unwrap_or(0.0);
+                if density <= 0.0 {
+                    continue;
+                }
+                food.push(FoodCell {
+                    x,
+                    y,
+                    type_idx: type_idx_u16,
+                    density,
+                });
+            }
         }
     }
     let predation_events = snapshot
@@ -47,7 +69,7 @@ pub fn assemble_detail_payload(
         rect: ViewRectPayload::from(rect),
         width: rect.width,
         height: rect.height,
-        food_density_u8,
+        food,
         creatures,
         predation_events,
     }
@@ -62,20 +84,38 @@ pub fn assemble_overview_payload(
     let grid_width = rect.width.min(128) as usize;
     let grid_height = rect.height.min(128) as usize;
     let grid_cells = grid_width * grid_height;
-    let mut food_density_u8 = vec![0u8; grid_cells];
+    let mut food_by_bucket: BTreeMap<(u16, u16, u16), f32> = BTreeMap::new();
     let mut creature_count_u16 = vec![0u16; grid_cells];
 
-    for y in 0..grid_height {
-        let world_y = rect.y as usize + y * rect.height as usize / grid_height;
-        for x in 0..grid_width {
-            let world_x = rect.x as usize + x * rect.width as usize / grid_width;
-            let src = world_y * snapshot.ws_frame.frame.width as usize + world_x;
-            let dst = y * grid_width + x;
-            debug_assert!(
-                src < snapshot.food_density_u8.len(),
-                "overview food density index should stay within the clamped world bounds"
-            );
-            food_density_u8[dst] = snapshot.food_density_u8[src];
+    let world_width = usize::from(snapshot.ws_frame.frame.width);
+    let type_count = snapshot.ws_frame.frame.food_types.len();
+    let cell_count = world_width * usize::from(snapshot.ws_frame.frame.height);
+    for type_idx in 0..type_count {
+        let Ok(type_idx_u16) = u16::try_from(type_idx) else {
+            break;
+        };
+        let plane_start = type_idx * cell_count;
+        for y in rect.y..rect.y.saturating_add(rect.height) {
+            let row_offset = usize::from(y) * world_width;
+            for x in rect.x..rect.x.saturating_add(rect.width) {
+                let idx = plane_start + row_offset + usize::from(x);
+                let density = snapshot
+                    .food_density_planes
+                    .get(idx)
+                    .copied()
+                    .unwrap_or(0.0);
+                if density <= 0.0 {
+                    continue;
+                }
+                let bucket_x = ((x - rect.x) as usize * grid_width) / rect.width as usize;
+                let bucket_y = ((y - rect.y) as usize * grid_height) / rect.height as usize;
+                let key = (
+                    bucket_x.min(grid_width.saturating_sub(1)) as u16,
+                    bucket_y.min(grid_height.saturating_sub(1)) as u16,
+                    type_idx_u16,
+                );
+                *food_by_bucket.entry(key).or_insert(0.0) += density;
+            }
         }
     }
 
@@ -90,11 +130,23 @@ pub fn assemble_overview_payload(
         creature_count_u16[dst] = creature_count_u16[dst].saturating_add(1);
     }
 
+    let food = food_by_bucket
+        .into_iter()
+        .map(
+            |((bucket_x, bucket_y, type_idx), density)| OverviewFoodCellPayload {
+                bucket_x,
+                bucket_y,
+                type_idx,
+                density,
+            },
+        )
+        .collect();
+
     ViewOverviewPayload {
         rect: ViewRectPayload::from(rect),
         grid_width: grid_width as u16,
         grid_height: grid_height as u16,
-        food_density_u8,
+        food,
         creature_count_u16,
     }
 }
@@ -139,8 +191,8 @@ impl From<ViewRect> for ViewRectPayload {
 mod tests {
     use crate::query::projection::ProjectionSnapshot;
     use crate::state::{
-        BarrierCell, CreatureSnapshot, FoodCell, FramePayload, HealthPayload, LastTickActions,
-        SimulationStatus, StatusPayload, WsFrame,
+        BarrierCell, CreatureSnapshot, FoodCell, FoodTypeSnapshot, FramePayload, HealthPayload,
+        LastTickActions, SimulationStatus, StatusPayload, WsFrame,
     };
     use crate::transport::protocol::ZoomTier;
     use crate::transport::session::ViewSubscription;
@@ -180,6 +232,8 @@ mod tests {
                     last_tick_food_occupancy_depletion_mean: 0.0,
                     last_tick_food_occupancy_depletion_occupied_cells: 0,
                     last_tick_food_growth_suppressed_by_occupancy_depletion: 0.0,
+                    last_tick_food_cells_with_type_inhibition: 0,
+                    last_tick_food_growth_suppressed_by_type_inhibition: 0.0,
                 },
                 frame: FramePayload {
                     width: 256,
@@ -202,16 +256,38 @@ mod tests {
                             phenotype_rgb: [4, 5, 6],
                         },
                     ],
+                    food_types: vec![
+                        FoodTypeSnapshot {
+                            type_idx: 0,
+                            name: "Primary Food".to_string(),
+                            color: "#22c55e".to_string(),
+                            growth_inhibitor: 0.2,
+                        },
+                        FoodTypeSnapshot {
+                            type_idx: 1,
+                            name: "Secondary Food".to_string(),
+                            color: "#0ea5e9".to_string(),
+                            growth_inhibitor: 0.3,
+                        },
+                    ],
                     food: vec![
                         FoodCell {
                             x: 2,
                             y: 2,
+                            type_idx: 0,
                             density: 1.0,
                         },
                         FoodCell {
-                            x: 140,
-                            y: 140,
+                            x: 2,
+                            y: 2,
+                            type_idx: 1,
                             density: 0.5,
+                        },
+                        FoodCell {
+                            x: 3,
+                            y: 3,
+                            type_idx: 0,
+                            density: 0.25,
                         },
                     ],
                     barriers: vec![BarrierCell { x: 3, y: 3 }, BarrierCell { x: 180, y: 180 }],
@@ -223,6 +299,8 @@ mod tests {
                     last_tick_food_occupancy_depletion_mean: 0.0,
                     last_tick_food_occupancy_depletion_occupied_cells: 0,
                     last_tick_food_growth_suppressed_by_occupancy_depletion: 0.0,
+                    last_tick_food_cells_with_type_inhibition: 0,
+                    last_tick_food_growth_suppressed_by_type_inhibition: 0.0,
                     mutation_events_attempted_total: 0,
                     mutation_events_applied_total: 0,
                     mutation_events_skipped_total: 0,
@@ -292,14 +370,17 @@ mod tests {
         assert_eq!(detail.height, 8);
         assert_eq!(detail.creatures.len(), 1);
         assert_eq!(detail.creatures[0].id, 1);
+        assert_eq!(detail.food.len(), 3);
         assert_eq!(
             detail
-                .food_density_u8
+                .food
                 .iter()
-                .filter(|value| **value > 0)
+                .filter(|cell| cell.x == 2 && cell.y == 2)
                 .count(),
-            1
+            2
         );
+        assert!(detail.food.iter().any(|cell| cell.type_idx == 0));
+        assert!(detail.food.iter().any(|cell| cell.type_idx == 1));
     }
 
     #[test]
@@ -320,7 +401,15 @@ mod tests {
 
         assert_eq!(overview.grid_width, 128);
         assert_eq!(overview.grid_height, 128);
-        assert_eq!(overview.food_density_u8.len(), 128 * 128);
+        assert_eq!(overview.food.len(), 2);
+        assert!(overview.food.iter().any(|cell| cell.bucket_x == 1
+            && cell.bucket_y == 1
+            && cell.type_idx == 0
+            && cell.density > 1.0));
+        assert!(overview
+            .food
+            .iter()
+            .any(|cell| cell.bucket_x == 1 && cell.bucket_y == 1 && cell.type_idx == 1));
         assert_eq!(overview.creature_count_u16.len(), 128 * 128);
     }
 }

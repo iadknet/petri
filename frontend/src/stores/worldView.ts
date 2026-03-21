@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { buildFrameFromTransport } from "../adapters/worldFrame.ts";
 import type {
 	Frame,
 	PredationEvent,
@@ -60,59 +61,14 @@ const initialState = {
 	predationEvents: [] as PredationEvent[],
 };
 
-function asNumberArray(values: Uint8Array | number[]): number[] {
-	return Array.from(values);
-}
-
-function decodeBarrierMask(payload: WorldStaticPayload): Frame["barriers"] {
-	const barriers: Frame["barriers"] = [];
-	const bytes = asNumberArray(payload.barrier_mask);
-	const cellCount = payload.width * payload.height;
-
-	for (let index = 0; index < cellCount; index++) {
-		const byte = bytes[Math.floor(index / 8)] ?? 0;
-		const mask = 1 << (index % 8);
-		if ((byte & mask) === 0) continue;
-		barriers.push({
-			x: index % payload.width,
-			y: Math.floor(index / payload.width),
-		});
-	}
-
-	return barriers;
-}
-
-function buildVisibleFoodCells(payload: ViewDetailPayload): Frame["food"] {
-	const food: Frame["food"] = [];
-	const densities = asNumberArray(payload.food_density_u8);
-
-	for (let index = 0; index < densities.length; index++) {
-		const density = densities[index] ?? 0;
-		if (density <= 0) continue;
-
-		food.push({
-			x: payload.rect.x + (index % payload.width),
-			y: payload.rect.y + Math.floor(index / payload.width),
-			density: density / 255,
-		});
-	}
-
-	return food;
-}
-
 function buildLegacyFrame(
 	worldStatic: WorldStaticPayload | null,
 	view: StoredView | null,
 ): Frame | null {
-	if (!worldStatic) return null;
-
-	return {
-		width: worldStatic.width,
-		height: worldStatic.height,
-		barriers: decodeBarrierMask(worldStatic),
-		creatures: view?.kind === "detail" ? view.payload.creatures : [],
-		food: view?.kind === "detail" ? buildVisibleFoodCells(view.payload) : [],
-	};
+	return buildFrameFromTransport(
+		worldStatic,
+		view?.kind === "detail" ? view.payload : null,
+	);
 }
 
 function applyViewUpdate(state: WorldViewState, nextView: StoredView): Partial<WorldViewState> {

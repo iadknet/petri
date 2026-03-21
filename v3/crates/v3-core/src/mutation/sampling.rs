@@ -15,8 +15,12 @@ use crate::runtime::OUTPUT_SLOT_COUNT;
 pub(crate) fn random_input_reference(rng: &mut impl Rng) -> InputReference {
     let idx = rng.gen_range(0u8..23);
     match idx {
-        0 => InputReference::World(WorldInputKey::FoodHere),
-        1 => InputReference::World(WorldInputKey::NeighborFoodRing),
+        0 => InputReference::World(WorldInputKey::FoodHere {
+            type_idx: crate::config::OrdinaryFoodTypeId::default(),
+        }),
+        1 => InputReference::World(WorldInputKey::NeighborFoodRing {
+            type_idx: crate::config::OrdinaryFoodTypeId::default(),
+        }),
         2 => InputReference::World(WorldInputKey::NeighborBarrierRing),
         3 => InputReference::World(WorldInputKey::NeighborOccupiedRing),
         4 => InputReference::StaticIntrospection(StaticIntrospectionKey::Generation),
@@ -24,7 +28,9 @@ pub(crate) fn random_input_reference(rng: &mut impl Rng) -> InputReference {
         6 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
         7 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),
         8 => InputReference::ActionQueue,
-        9 => InputReference::World(WorldInputKey::AreaFoodSummary),
+        9 => InputReference::World(WorldInputKey::AreaFoodSummary {
+            type_idx: crate::config::OrdinaryFoodTypeId::default(),
+        }),
         10 => InputReference::World(WorldInputKey::AreaBarrierSummary),
         11 => InputReference::World(WorldInputKey::AreaOccupancySummary),
         12 => InputReference::World(WorldInputKey::NearbyCreatureCore),

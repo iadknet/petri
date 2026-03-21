@@ -7,6 +7,7 @@ describe("buildRenderModel", () => {
 			buildRenderModel({
 				frame: null,
 				overviewView: null,
+				worldStatic: null,
 				tick: 0,
 				predationEvents: [],
 				camera: { x: 0, y: 0, zoom: 1 },
@@ -31,8 +32,21 @@ describe("buildRenderModel", () => {
 					rect: { x: 0, y: 0, width: 20, height: 10 },
 					grid_width: 4,
 					grid_height: 2,
-					food_density_u8: [0, 64, 128, 255, 0, 0, 0, 0],
+					food: [
+						{ bucket_x: 1, bucket_y: 0, type_idx: 0, density: 0.25 },
+						{ bucket_x: 2, bucket_y: 0, type_idx: 1, density: 0.5 },
+						{ bucket_x: 3, bucket_y: 0, type_idx: 1, density: 1.0 },
+					],
 					creature_count_u16: [0, 1, 2, 3, 0, 0, 0, 0],
+				},
+				worldStatic: {
+					width: 20,
+					height: 10,
+					barrier_mask: [],
+					food_types: [
+						{ type_idx: 0, name: "Primary Food", color: "#22c55e", growth_inhibitor: 0.2 },
+						{ type_idx: 1, name: "Secondary Food", color: "#0ea5e9", growth_inhibitor: 0.3 },
+					],
 				},
 				tick: 12,
 				predationEvents: [],
@@ -49,11 +63,23 @@ describe("buildRenderModel", () => {
 				food: [],
 				barriers: [],
 			},
+			foodTypes: [
+				{ type_idx: 0, name: "Primary Food", color: "#22c55e", growth_inhibitor: 0.2 },
+				{ type_idx: 1, name: "Secondary Food", color: "#0ea5e9", growth_inhibitor: 0.3 },
+			],
 			overview: {
 				rect: { x: 0, y: 0, width: 20, height: 10 },
 				gridWidth: 4,
 				gridHeight: 2,
-				foodDensity: [0, 64, 128, 255, 0, 0, 0, 0],
+				food: [
+					{ bucket_x: 1, bucket_y: 0, type_idx: 0, density: 0.25 },
+					{ bucket_x: 2, bucket_y: 0, type_idx: 1, density: 0.5 },
+					{ bucket_x: 3, bucket_y: 0, type_idx: 1, density: 1.0 },
+				],
+				foodTypes: [
+					{ type_idx: 0, name: "Primary Food", color: "#22c55e", growth_inhibitor: 0.2 },
+					{ type_idx: 1, name: "Secondary Food", color: "#0ea5e9", growth_inhibitor: 0.3 },
+				],
 				creatureCounts: [0, 1, 2, 3, 0, 0, 0, 0],
 			},
 			tick: 12,
@@ -74,6 +100,7 @@ describe("buildRenderModel", () => {
 				barriers: [],
 			},
 			overviewView: null,
+			worldStatic: null,
 			tick: 1,
 			predationEvents: [],
 			camera: { x: 0, y: 0, zoom: 1 },
@@ -91,8 +118,11 @@ describe("buildRenderModel", () => {
 		expect(result?.fertilityOverlay?.worldGrid).toBe(grid);
 	});
 
-	it("reuses overview byte arrays without cloning", () => {
-		const foodDensity = new Uint8Array([0, 64, 128, 255]);
+	it("reuses overview food and creature arrays without cloning", () => {
+		const food = [
+			{ bucket_x: 0, bucket_y: 0, type_idx: 0, density: 0.25 },
+			{ bucket_x: 1, bucket_y: 1, type_idx: 1, density: 1.0 },
+		];
 		const creatureCounts = [1, 2, 3, 4];
 		const result = buildRenderModel({
 			frame: {
@@ -106,8 +136,17 @@ describe("buildRenderModel", () => {
 				rect: { x: 0, y: 0, width: 2, height: 2 },
 				grid_width: 2,
 				grid_height: 2,
-				food_density_u8: foodDensity,
+				food,
 				creature_count_u16: creatureCounts,
+			},
+			worldStatic: {
+				width: 2,
+				height: 2,
+				barrier_mask: [],
+				food_types: [
+					{ type_idx: 0, name: "Primary Food", color: "#22c55e", growth_inhibitor: 0.2 },
+					{ type_idx: 1, name: "Secondary Food", color: "#0ea5e9", growth_inhibitor: 0.3 },
+				],
 			},
 			tick: 3,
 			predationEvents: [],
@@ -117,7 +156,7 @@ describe("buildRenderModel", () => {
 			showFertilityOverlay: false,
 		});
 
-		expect(result?.overview?.foodDensity).toBe(foodDensity);
+		expect(result?.overview?.food).toBe(food);
 		expect(result?.overview?.creatureCounts).toBe(creatureCounts);
 	});
 
@@ -131,6 +170,7 @@ describe("buildRenderModel", () => {
 				barriers: [],
 			},
 			overviewView: null,
+			worldStatic: null,
 			tick: 1,
 			predationEvents: [],
 			camera: { x: 0, y: 0, zoom: 1 },
@@ -152,6 +192,7 @@ describe("buildRenderModel", () => {
 				barriers: [],
 			},
 			overviewView: null,
+			worldStatic: null,
 			tick: 1,
 			predationEvents: [],
 			camera: { x: 0, y: 0, zoom: 1 },

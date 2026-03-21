@@ -1,5 +1,6 @@
 import type { StartupPreset } from "../../../stores/startupConfig.ts";
 import type { SimState, SimulationConfig } from "../../../types/api.ts";
+import type { FoodFertilityLayerTarget, FoodTypeConfig } from "../../../types/config.ts";
 
 export interface FieldDef {
 	path: string;
@@ -27,6 +28,11 @@ export type RuntimeUpdater = (path: string, value: number | string | boolean) =>
 export interface StartupPanelProps {
 	startupPreset: StartupPreset;
 	updateStartupPreset: StartupUpdater;
+	addFoodType: () => void;
+	removeFoodType: (index: number) => void;
+	updateFoodType: (index: number, patch: Partial<FoodTypeConfig>) => void;
+	addFertilityLayer: () => void;
+	updateFertilityLayerTarget: (index: number, target: FoodFertilityLayerTarget) => void;
 	randomizeSeed: () => void;
 }
 

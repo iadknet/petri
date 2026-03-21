@@ -11,7 +11,7 @@ import {
 	formatOutputSinkKind,
 	getKindLabel,
 } from "./graphNodeFormatters.ts";
-import { directionName, formatInputRef, isRingSensor } from "./inputRefUtils.ts";
+import { formatInputRefWithSubIndex } from "./inputRefUtils.ts";
 
 export interface GraphModelNode {
 	id: string;
@@ -56,11 +56,7 @@ function inputLabel(source: GraphSource, inputRefs: InputReference[]): string {
 		if (ref_idx === 0xffff) return sub_idx > 0 ? `Dead[${sub_idx}]` : "Dead";
 		const ref = inputRefs[ref_idx];
 		if (!ref) return `In(${ref_idx})`;
-		const label = formatInputRef(ref);
-		if (typeof ref !== "string" && "World" in ref && isRingSensor(ref.World)) {
-			return `${label}[${directionName(sub_idx)}]`;
-		}
-		return sub_idx > 0 ? `${label}[${sub_idx}]` : label;
+		return formatInputRefWithSubIndex(ref, sub_idx);
 	}
 	if ("SharedMemory" in source) {
 		const { slot, previous } = source.SharedMemory;

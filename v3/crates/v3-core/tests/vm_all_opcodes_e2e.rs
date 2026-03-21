@@ -161,7 +161,9 @@ fn sample_vm_genome() -> CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
-            input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
+            input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
+                type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
+            })],
             backend_def: BackendDef::Vm(VmBackendDef {
                 register_count: 16,
                 constants: vec![5.0, 77.0, 0.1],
@@ -345,7 +347,12 @@ fn sample_program_exercises_all_vm_opcodes_e2e() {
     let emit_trace = emit_trace.expect("trace should remain available");
     assert!(emit_trace.is_complete());
     assert_eq!(emit_trace.ticks.len(), 1);
-    assert_eq!(emit_trace.ticks[0].final_actions[0], WorldAction::Eat);
+    assert_eq!(
+        emit_trace.ticks[0].final_actions[0],
+        WorldAction::Eat {
+            type_idx: v3_core::config::OrdinaryFoodTypeId::default()
+        }
+    );
     assert!(
         (sim_emit.world.food_at(emit_pos) - 0.0).abs() < 1e-6,
         "Eat path should consume food"

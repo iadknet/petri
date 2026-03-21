@@ -1496,7 +1496,9 @@ fn vm_raw_field_mutation_ref_idx_bounded() {
     // Also add a few more input_refs to make the range non-trivial.
     genome.nodes[1].input_refs = vec![
         InputReference::UpstreamSlot(0),
-        InputReference::World(WorldInputKey::FoodHere),
+        InputReference::World(WorldInputKey::FoodHere {
+            type_idx: crate::config::OrdinaryFoodTypeId::default(),
+        }),
         InputReference::UpstreamSlot(1),
     ];
     let num_refs = genome.nodes[1].input_refs.len();
@@ -1535,8 +1537,12 @@ fn vm_raw_field_mutation_sub_idx_bounded() {
     let mut genome = v3alpha1_founder_genome();
     // Set up a compound ring sensor so sub_idx has a meaningful bound (8).
     genome.nodes[1].input_refs = vec![
-        InputReference::World(WorldInputKey::NeighborFoodRing),
-        InputReference::World(WorldInputKey::FoodHere),
+        InputReference::World(WorldInputKey::NeighborFoodRing {
+            type_idx: crate::config::OrdinaryFoodTypeId::default(),
+        }),
+        InputReference::World(WorldInputKey::FoodHere {
+            type_idx: crate::config::OrdinaryFoodTypeId::default(),
+        }),
     ];
     if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
         vm.program = vec![VmInstruction::ReadInput {

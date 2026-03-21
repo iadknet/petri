@@ -2,7 +2,7 @@ import { Section } from "../shared/Section.tsx";
 import type { StartupPanelProps } from "../shared/types.ts";
 import { EnergySection } from "./EnergySection.tsx";
 import { FertilitySection } from "./FertilitySection.tsx";
-import { FoodParametersSection } from "./FoodParametersSection.tsx";
+import { FoodTypesSection } from "./FoodTypesSection.tsx";
 import { PopulationSection } from "./PopulationSection.tsx";
 import { RunSettingsSection } from "./RunSettingsSection.tsx";
 import { StartupRampsSection } from "./StartupRampsSection.tsx";
@@ -11,6 +11,11 @@ import { WorldTopologySection } from "./WorldTopologySection.tsx";
 export function StartupConfigPanel({
 	startupPreset,
 	updateStartupPreset,
+	addFoodType,
+	removeFoodType,
+	updateFoodType,
+	addFertilityLayer,
+	updateFertilityLayerTarget,
 	randomizeSeed,
 }: StartupPanelProps) {
 	return (
@@ -31,11 +36,18 @@ export function StartupConfigPanel({
 				updateStartupPreset={updateStartupPreset}
 			/>
 			<EnergySection startupPreset={startupPreset} updateStartupPreset={updateStartupPreset} />
-			<FoodParametersSection
+			<FoodTypesSection
+				startupPreset={startupPreset}
+				addFoodType={addFoodType}
+				removeFoodType={removeFoodType}
+				updateFoodType={updateFoodType}
+			/>
+			<FertilitySection
 				startupPreset={startupPreset}
 				updateStartupPreset={updateStartupPreset}
+				addFertilityLayer={addFertilityLayer}
+				updateFertilityLayerTarget={updateFertilityLayerTarget}
 			/>
-			<FertilitySection startupPreset={startupPreset} updateStartupPreset={updateStartupPreset} />
 			<StartupRampsSection
 				startupPreset={startupPreset}
 				updateStartupPreset={updateStartupPreset}

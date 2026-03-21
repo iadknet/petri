@@ -5,6 +5,7 @@ mod reproduction;
 pub use predation::{apply_steal_energy, PredationActionResult, PredationEventRecord};
 pub use reproduction::{apply_reproduce, ReproductionActionResult, ReproductionInvalidTargetCause};
 
+use crate::config::OrdinaryFoodTypeId;
 use crate::config::SimulationConfig;
 use crate::contracts::{CreatureId, Direction};
 use crate::creature::state::CreatureState;
@@ -69,6 +70,25 @@ pub fn apply_eat(
     config: &SimulationConfig,
 ) -> bool {
     let food = world.consume_food(creature.position);
+    creature.energy += food * config.energy.costs.eat_reward_per_food;
+    creature.energy = creature.energy.min(config.energy.lifecycle.max_energy);
+    creature.energy -= config.energy.adjusted_action_cost(
+        config.energy.costs.eat_cost,
+        creature.cached_complexity,
+        creature.age,
+    );
+    food > 0.0
+}
+
+/// Apply a typed Eat action using the configured food owner for the cell.
+#[must_use]
+pub fn apply_typed_eat(
+    creature: &mut CreatureState,
+    world: &mut WorldState,
+    config: &SimulationConfig,
+    type_idx: OrdinaryFoodTypeId,
+) -> bool {
+    let food = world.consume_food_type(creature.position, type_idx);
     creature.energy += food * config.energy.costs.eat_reward_per_food;
     creature.energy = creature.energy.min(config.energy.lifecycle.max_energy);
     creature.energy -= config.energy.adjusted_action_cost(
@@ -172,15 +192,7 @@ mod tests {
     fn apply_eat_increases_energy_and_clears_food() {
         let pos = Position::new(3, 3);
         let (mut sim, id) = make_sim_one_creature(pos, 10.0);
-        // Place food on the creature's cell.
-        {
-            let mut food_cfg = small_config().world.food;
-            food_cfg.initial_coverage = 1.0;
-            food_cfg.initial_density = 0.5;
-            sim.world.reconfigure_food(food_cfg);
-        }
-        sim.world
-            .seed_food(&mut rand::rngs::SmallRng::seed_from_u64(0));
+        sim.world.set_food(pos, 0.5);
         let energy_before = sim.creatures[id].energy;
         let creature = sim.creatures.get_mut(id).unwrap();
         let _ = apply_eat(creature, &mut sim.world, &sim.config);
@@ -200,14 +212,7 @@ mod tests {
         let (mut sim, id) = make_sim_one_creature(pos, 95.0);
         sim.config.energy.costs.eat_reward_per_food = 20.0;
         // Place max food to ensure energy would exceed max without cap.
-        {
-            let mut food_cfg = small_config().world.food;
-            food_cfg.initial_coverage = 1.0;
-            food_cfg.initial_density = 1.0;
-            sim.world.reconfigure_food(food_cfg);
-            sim.world
-                .seed_food(&mut rand::rngs::SmallRng::seed_from_u64(0));
-        }
+        sim.world.set_food(pos, 1.0);
         let max = sim.config.energy.lifecycle.max_energy;
         let creature = sim.creatures.get_mut(id).unwrap();
         let _ = apply_eat(creature, &mut sim.world, &sim.config);
@@ -775,14 +780,7 @@ mod tests {
     fn apply_eat_returns_true_with_food() {
         let pos = Position::new(3, 3);
         let (mut sim, id) = make_sim_one_creature(pos, 10.0);
-        {
-            let mut food_cfg = small_config().world.food;
-            food_cfg.initial_coverage = 1.0;
-            food_cfg.initial_density = 0.5;
-            sim.world.reconfigure_food(food_cfg);
-        }
-        sim.world
-            .seed_food(&mut rand::rngs::SmallRng::seed_from_u64(0));
+        sim.world.set_food(pos, 0.5);
         let creature = sim.creatures.get_mut(id).unwrap();
         let result = apply_eat(creature, &mut sim.world, &sim.config);
         assert!(result, "eating food should return true");
