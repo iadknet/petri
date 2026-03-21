@@ -67,22 +67,24 @@ pub struct MeshHopTracePayload {
     pub energy_before: f32,
     pub energy_after: f32,
     pub output_slots: [f32; OUTPUT_SLOT_COUNT],
-    pub route: RouteDecisionPayload,
+    pub route: Option<RouteDecisionPayload>,
     pub backend_trace: BackendTracePayload,
 }
 
 #[derive(Debug, Clone, Serialize)]
 pub struct RouteDecisionPayload {
-    pub kind: RouteKindPayload,
-    pub raw_value: f32,
-    pub resolved_target_index: usize,
+    pub gate_scores: Vec<GateScorePayload>,
+    pub selected_target_idx: usize,
+    pub selected_target_id: u32,
 }
 
-#[derive(Debug, Clone, Copy, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum RouteKindPayload {
-    VmWrap,
-    CgpNormalized,
+#[derive(Debug, Clone, Serialize)]
+pub struct GateScorePayload {
+    pub slot: u8,
+    pub target_id: u32,
+    pub gate_bias: f32,
+    pub runtime_score: f32,
+    pub effective_score: f32,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -99,7 +101,6 @@ pub struct VmTracePayload {
     pub final_registers: Vec<f32>,
     pub final_payload: [f32; OUTPUT_SLOT_COUNT],
     pub final_meta: [f32; 8],
-    pub final_route_value: f32,
     pub slot_writes: Vec<SlotWritePayload>,
 }
 

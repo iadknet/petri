@@ -8,7 +8,7 @@
 //!   - Threshold(min_reproduce_age_ticks - 0.5)
 //!   - Multiply(energy_gate, age_gate)
 //! - Full fixed output catalog (45 sinks), with 6 CustomOutput sinks wired
-//! - RouterOutput unwired (default routing to single target)
+//! - RouterGate sinks unwired (default routing to single target)
 //! - Action bank + ExecuteGate start unwired (blank slate for evolution)
 
 use crate::config::MutationConfig;
@@ -202,13 +202,15 @@ mod tests {
             );
         }
 
-        // RouterOutput (after CustomOutput sinks) unwired
-        let router_idx = CUSTOM_OUTPUT_COUNT as usize;
-        assert_eq!(
-            def.output_sinks[router_idx].kind,
-            OutputSinkKind::RouterOutput
-        );
-        assert!(def.output_sinks[router_idx].inputs.is_empty());
+        // RouterGate sinks (after CustomOutput sinks) all unwired
+        for i in 0..crate::contracts::MAX_GATE_SLOTS {
+            let router_idx = CUSTOM_OUTPUT_COUNT as usize + i;
+            assert_eq!(
+                def.output_sinks[router_idx].kind,
+                OutputSinkKind::RouterGate(i as u8)
+            );
+            assert!(def.output_sinks[router_idx].inputs.is_empty());
+        }
     }
 
     #[test]

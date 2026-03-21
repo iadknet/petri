@@ -1,9 +1,9 @@
-import type { InputReference } from "../../types/genome.ts";
+import type { InputReference, RouteTarget } from "../../types/genome.ts";
 import { formatInputRef } from "./inputRefUtils.ts";
 
 interface NodeConnectionsProps {
 	inputRefs: InputReference[];
-	targets: number[];
+	targets: RouteTarget[];
 }
 
 export function NodeConnections({ inputRefs, targets }: NodeConnectionsProps) {
@@ -16,7 +16,7 @@ export function NodeConnections({ inputRefs, targets }: NodeConnectionsProps) {
 				</span>
 				<span className="text-slate-500">out</span>
 				<span className="text-slate-300">
-					{targets.length > 0 ? targets.map((id) => `#${id}`).join(", ") : "—"}
+					{targets.length > 0 ? targets.map((t) => `#${t.target_id}`).join(", ") : "—"}
 				</span>
 			</div>
 		</div>

@@ -1,7 +1,7 @@
 import { ReactFlow, ReactFlowProvider } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { memo, useEffect, useMemo, useState } from "react";
-import type { GraphBackendDef, InputReference } from "../../types/genome.ts";
+import type { GraphBackendDef, InputReference, RouteTarget } from "../../types/genome.ts";
 import type { GraphTrace } from "../../types/trace.ts";
 import { GraphInternalsNode } from "./GraphInternalsNode.tsx";
 import { buildGraphFlowScene } from "./graphFlowAdapter.ts";
@@ -19,7 +19,7 @@ interface GraphInternalsVizProps {
 	graphDef: GraphBackendDef;
 	liveIndices: number[];
 	inputRefs: InputReference[];
-	targets: number[];
+	targets: RouteTarget[];
 	routeTargetIdx: number | null;
 	trace: GraphTrace | null;
 	detailIndex: number;
@@ -33,19 +33,18 @@ const edgeTypes = {
 };
 
 /** Compute which target node ID was selected given a route value and targets array. */
-export function resolveSelectedTarget(routeTargetIdx: number, targets: number[]): number | null {
+export function resolveSelectedTarget(routeTargetIdx: number, targets: RouteTarget[]): number | null {
 	if (targets.length === 0) return null;
-	const idx = Number.isNaN(routeTargetIdx) ? -1 : Math.floor(routeTargetIdx);
-	const pos = ((idx % targets.length) + targets.length) % targets.length;
-	return targets[pos] ?? null;
+	if (routeTargetIdx < 0 || routeTargetIdx >= targets.length) return null;
+	return targets[routeTargetIdx]?.target_id ?? null;
 }
 
 export const GraphInternalsViz = memo(function GraphInternalsViz({
 	graphDef,
 	liveIndices,
 	inputRefs,
-	targets: _targets, // TODO: wire up resolveSelectedTarget for RouterOutput nodes
-	routeTargetIdx: _routeTargetIdx, // TODO: wire up resolveSelectedTarget for RouterOutput nodes
+	targets: _targets, // TODO: wire up resolveSelectedTarget for RouterGate nodes
+	routeTargetIdx: _routeTargetIdx, // TODO: wire up resolveSelectedTarget for RouterGate nodes
 	trace,
 	detailIndex,
 }: GraphInternalsVizProps) {

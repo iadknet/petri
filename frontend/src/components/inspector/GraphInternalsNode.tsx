@@ -14,9 +14,9 @@ export interface GraphInternalsNodeData extends Record<string, unknown> {
 	outputValue: number | null;
 	/** State change string for stateful nodes, e.g. "0.30→0.51" */
 	stateChange: string | null;
-	/** For RouterOutput: mesh target node IDs, e.g. [3, 5, 7] */
+	/** For RouterGate: mesh target node IDs, e.g. [3, 5, 7] */
 	routeTargets: number[] | null;
-	/** For RouterOutput during execution: which target was selected */
+	/** For RouterGate during execution: which target was selected */
 	selectedTarget: number | null;
 	// Output sink trace
 	weightedSum: number | null;

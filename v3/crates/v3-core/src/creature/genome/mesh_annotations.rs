@@ -112,7 +112,7 @@ fn derive_node_annotation(node: &NodeGenome, reachable: bool) -> MeshNodeAnnotat
                     | super::VmInstruction::SetPriorityBid { .. } => {
                         write_classes.insert(MeshWriteClass::Action);
                     }
-                    super::VmInstruction::WriteRouteTarget { .. } => {
+                    super::VmInstruction::WriteRouteGate { .. } => {
                         write_classes.insert(MeshWriteClass::Route);
                     }
                     _ => {}
@@ -183,13 +183,24 @@ fn classify_world_input(key: &WorldInputKey) -> MeshReadClass {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::contracts::{DynamicIntrospectionKey, InputReference};
+    use crate::contracts::{DynamicIntrospectionKey, InputReference, RouteTarget};
     use crate::creature::genome::analysis::mesh_reachable_nodes;
     use crate::creature::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
         OutputSink, OutputSinkKind,
     };
     use crate::creature::genome::{CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
+
+    fn wrap_targets(ids: Vec<NodeId>) -> Vec<RouteTarget> {
+        ids.into_iter()
+            .enumerate()
+            .map(|(i, id)| RouteTarget {
+                target_id: id,
+                slot: i as u8,
+                gate_bias: 0.0,
+            })
+            .collect()
+    }
 
     #[test]
     fn derives_factual_vm_annotations_from_live_instructions() {
@@ -215,7 +226,7 @@ mod tests {
                             dst: 1,
                             slot_idx: 3,
                         },
-                        VmInstruction::WriteRouteTarget { src: 0 },
+                        VmInstruction::WriteRouteGate { slot: 0, src: 0 },
                         VmInstruction::StoreSlotImm {
                             slot_idx: 4,
                             src: 1,
@@ -246,7 +257,7 @@ mod tests {
 
     #[test]
     fn derives_graph_annotations_and_marks_unreachable_nodes() {
-        // CGP graph: CN0 (AdaptiveGain) with InputLeaf(0,0) → RouterOutput sink
+        // CGP graph: CN0 (AdaptiveGain) with InputLeaf(0,0) → RouterGate(0) sink
         // CN1 (Constant) disconnected (dead)
         let reachable_graph = NodeGenome {
             node_id: NodeId::new(1),
@@ -272,7 +283,7 @@ mod tests {
                     },
                 ],
                 output_sinks: vec![OutputSink {
-                    kind: OutputSinkKind::RouterOutput,
+                    kind: OutputSinkKind::RouterGate(0),
                     inputs: vec![GraphEdge {
                         source: GraphSource::ComputeNode(0),
                         weight: 1.0,
@@ -338,7 +349,7 @@ mod tests {
                 NodeGenome {
                     node_id: NodeId::new(1),
                     input_refs: vec![],
-                    targets: vec![NodeId::new(2)],
+                    targets: wrap_targets(vec![NodeId::new(2)]),
                     backend_def: BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],
@@ -347,7 +358,7 @@ mod tests {
                                 dst: 0,
                                 const_idx: 0,
                             },
-                            VmInstruction::WriteRouteTarget { src: 0 },
+                            VmInstruction::WriteRouteGate { slot: 0, src: 0 },
                         ],
                     }),
                 },
@@ -419,7 +430,7 @@ mod tests {
                 NodeGenome {
                     node_id: NodeId::new(10),
                     input_refs: vec![],
-                    targets: vec![NodeId::new(11)],
+                    targets: wrap_targets(vec![NodeId::new(11)]),
                     backend_def: BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],
@@ -429,7 +440,7 @@ mod tests {
                 NodeGenome {
                     node_id: NodeId::new(11),
                     input_refs: vec![],
-                    targets: vec![NodeId::new(10), NodeId::new(999)],
+                    targets: wrap_targets(vec![NodeId::new(10), NodeId::new(999)]),
                     backend_def: BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],

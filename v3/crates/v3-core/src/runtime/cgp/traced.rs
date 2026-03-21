@@ -144,7 +144,7 @@ pub(crate) fn execute_graph_node_traced(
         return (
             NodeResult::halted(
                 *upstream_slots,
-                crate::runtime::routing::RouteDecision::CgpNormalized { raw_value: 0.0 },
+                crate::runtime::routing::RouteGateMap::default(),
             ),
             trace,
         );

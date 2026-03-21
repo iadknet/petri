@@ -1,6 +1,6 @@
 use slotmap::SlotMap;
 use v3_core::config::MutationConfig;
-use v3_core::contracts::{CreatureId, NodeId, Position, WorldAction};
+use v3_core::contracts::{CreatureId, NodeId, Position, RouteTarget, WorldAction};
 use v3_core::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
@@ -9,13 +9,17 @@ use v3_core::creature::genome::{
 };
 use v3_core::creature::state::CreatureState;
 use v3_core::kernel::WorldState;
-use v3_core::runtime::trace::domain::TraceRouteKind;
 use v3_core::simulation::Simulation;
 
 use crate::support::{insert_creature, run_one_traced_tick, test_config};
 
+/// Gate-based routing: negative gate score on slot 0 causes slot 1 (score 0.0) to win.
+///
+/// CGP graph outputs -1.0 to RouterGate(0) → scores[0] = -1.0.
+/// Target id_noop (slot 0): effective = 0.0 + (-1.0) = -1.0
+/// Target id_eat  (slot 1): effective = 0.0 + 0.0     =  0.0  (wins)
 #[test]
-fn cgp_routing_normalizes_negative_to_first_target_e2e() {
+fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
     let cfg = test_config();
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
     let pos = Position::new(2, 2);
@@ -25,7 +29,7 @@ fn cgp_routing_normalizes_negative_to_first_target_e2e() {
     let id_noop = NodeId::new(1);
     let id_eat = NodeId::new(2);
 
-    // CGP graph: Constant(-1.0) → RouterOutput sink
+    // CGP graph: Constant(-1.0) → RouterGate(0) sink
     let entry_def = {
         let config = MutationConfig::default();
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
@@ -34,11 +38,11 @@ fn cgp_routing_normalizes_negative_to_first_target_e2e() {
             inputs: Vec::new(),
             plasticity: None,
         });
-        // Wire RouterOutput sink to CN0
+        // Wire RouterGate(0) sink to CN0
         if let Some(sink) = def
             .output_sinks
             .iter_mut()
-            .find(|s| s.kind == OutputSinkKind::RouterOutput)
+            .find(|s| s.kind == OutputSinkKind::RouterGate(0))
         {
             sink.inputs.push(GraphEdge {
                 source: GraphSource::ComputeNode(0),
@@ -51,7 +55,18 @@ fn cgp_routing_normalizes_negative_to_first_target_e2e() {
         node_id: id_entry,
         input_refs: vec![],
         backend_def: BackendDef::Graph(entry_def),
-        targets: vec![id_noop, id_eat],
+        targets: vec![
+            RouteTarget {
+                target_id: id_noop,
+                slot: 0,
+                gate_bias: 0.0,
+            },
+            RouteTarget {
+                target_id: id_eat,
+                slot: 1,
+                gate_bias: 0.0,
+            },
+        ],
     };
     let noop = NodeGenome {
         node_id: id_noop,
@@ -91,16 +106,23 @@ fn cgp_routing_normalizes_negative_to_first_target_e2e() {
     let tick = run_one_traced_tick(&mut sim, target);
 
     assert_eq!(tick.hops.len(), 2);
-    assert_eq!(tick.final_actions[0], WorldAction::NoOp);
-    assert!((tick.hops[0].route.raw_value - (-1.0)).abs() < 1e-6);
-    assert!(matches!(
-        tick.hops[0].route.kind,
-        TraceRouteKind::CgpNormalized
-    ));
-    assert_eq!(tick.hops[0].resolved_target_index, 0);
+    // Gate routing: slot 1 (effective 0.0) beats slot 0 (effective -1.0)
+    assert_eq!(tick.final_actions[0], WorldAction::Eat);
+    let route = tick.hops[0]
+        .route
+        .as_ref()
+        .expect("entry hop should have a route decision");
+    assert_eq!(route.selected_target_idx, 1);
+    assert_eq!(route.selected_target_id, id_eat);
+    assert_eq!(route.gate_scores.len(), 2);
+    // Slot 0: runtime_score = -1.0, effective = -1.0
+    assert!((route.gate_scores[0].runtime_score - (-1.0)).abs() < 1e-6);
+    assert!((route.gate_scores[0].effective_score - (-1.0)).abs() < 1e-6);
+    // Slot 1: runtime_score = 0.0, effective = 0.0
+    assert!((route.gate_scores[1].effective_score - 0.0).abs() < 1e-6);
     assert_eq!(
-        tick.hops[1].node_id, id_noop,
-        "route=-1 should clamp to 0 under normalized CGP routing"
+        tick.hops[1].node_id, id_eat,
+        "negative gate on slot 0 should cause slot 1 to win"
     );
 }
 

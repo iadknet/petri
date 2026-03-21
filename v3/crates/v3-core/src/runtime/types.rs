@@ -1,6 +1,6 @@
 use crate::contracts::{ActionQueue, WorldAction};
 use crate::creature::genome::cgp::CUSTOM_OUTPUT_COUNT;
-use crate::runtime::routing::RouteDecision;
+use crate::runtime::routing::RouteGateMap;
 
 /// Number of output slots in a [`NodeResult`].
 pub const OUTPUT_SLOT_COUNT: usize = CUSTOM_OUTPUT_COUNT as usize;
@@ -14,8 +14,8 @@ pub(crate) struct NodeResult {
     /// Output slots for downstream nodes. Initialized from incoming upstream_slots;
     /// only slots written by the node are overwritten.
     pub output_slots: [f32; OUTPUT_SLOT_COUNT],
-    /// Internal routing decision resolved by the mesh executor.
-    pub route: RouteDecision,
+    /// Per-target gate scores for routing decisions.
+    pub route_gates: RouteGateMap,
     /// True when execution should stop (ExecuteActionQueue or Halt).
     pub terminal: bool,
     /// True when the node was halted due to energy exhaustion.
@@ -25,10 +25,10 @@ pub(crate) struct NodeResult {
 
 impl NodeResult {
     /// Create a non-terminal result (halt or step cap reached — node finished but mesh continues).
-    pub fn halted(output_slots: [f32; OUTPUT_SLOT_COUNT], route: RouteDecision) -> Self {
+    pub fn halted(output_slots: [f32; OUTPUT_SLOT_COUNT], route_gates: RouteGateMap) -> Self {
         Self {
             output_slots,
-            route,
+            route_gates,
             terminal: false,
             energy_exhausted: false,
         }
@@ -36,27 +36,19 @@ impl NodeResult {
 
     /// Create a result indicating energy exhaustion.
     pub fn exhausted() -> Self {
-        Self::exhausted_with_route(RouteDecision::VmWrap { raw_value: 0.0 })
-    }
-
-    /// Create a result indicating energy exhaustion with an explicit route decision.
-    ///
-    /// This is mainly used by traced execution so the recorded route kind matches
-    /// the backend that exhausted.
-    pub fn exhausted_with_route(route: RouteDecision) -> Self {
         Self {
             output_slots: [0.0; OUTPUT_SLOT_COUNT],
-            route,
+            route_gates: RouteGateMap::default(),
             terminal: true,
             energy_exhausted: true,
         }
     }
 
     /// Create a terminal result (action emitted or ExecuteActionQueue).
-    pub fn terminal(output_slots: [f32; OUTPUT_SLOT_COUNT], route: RouteDecision) -> Self {
+    pub fn terminal(output_slots: [f32; OUTPUT_SLOT_COUNT], route_gates: RouteGateMap) -> Self {
         Self {
             output_slots,
-            route,
+            route_gates,
             terminal: true,
             energy_exhausted: false,
         }
@@ -163,10 +155,7 @@ mod tests {
 
     #[test]
     fn node_result_halted_is_not_terminal() {
-        let r = NodeResult::halted(
-            [0.0; OUTPUT_SLOT_COUNT],
-            RouteDecision::VmWrap { raw_value: 0.0 },
-        );
+        let r = NodeResult::halted([0.0; OUTPUT_SLOT_COUNT], RouteGateMap::default());
         assert!(!r.terminal);
         assert!(!r.energy_exhausted);
     }
@@ -176,26 +165,12 @@ mod tests {
         let r = NodeResult::exhausted();
         assert!(r.energy_exhausted);
         assert!(r.terminal);
-        assert!(matches!(r.route, RouteDecision::VmWrap { raw_value: 0.0 }));
-    }
-
-    #[test]
-    fn node_result_exhausted_with_route_preserves_route_kind() {
-        let r = NodeResult::exhausted_with_route(RouteDecision::CgpNormalized { raw_value: 0.0 });
-        assert!(r.energy_exhausted);
-        assert!(r.terminal);
-        assert!(matches!(
-            r.route,
-            RouteDecision::CgpNormalized { raw_value: 0.0 }
-        ));
+        assert_eq!(r.route_gates, RouteGateMap::default());
     }
 
     #[test]
     fn node_result_terminal_is_terminal() {
-        let r = NodeResult::terminal(
-            [0.0; OUTPUT_SLOT_COUNT],
-            RouteDecision::VmWrap { raw_value: 0.0 },
-        );
+        let r = NodeResult::terminal([0.0; OUTPUT_SLOT_COUNT], RouteGateMap::default());
         assert!(r.terminal);
         assert!(!r.energy_exhausted);
     }
