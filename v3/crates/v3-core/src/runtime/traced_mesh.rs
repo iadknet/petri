@@ -169,7 +169,7 @@ pub fn execute_creature_mesh_traced(
         }
 
         let target_pos = resolved_target_index;
-        let target_id = node.targets[target_pos];
+        let target_id = node.targets[target_pos].target_id;
 
         if find_node_index(&genome.nodes, target_id).is_none() {
             return (
@@ -198,7 +198,7 @@ fn find_node_index(nodes: &[NodeGenome], id: NodeId) -> Option<usize> {
 mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
-    use crate::contracts::{InputReference, NodeId, WorldAction};
+    use crate::contracts::{InputReference, NodeId, RouteTarget, WorldAction};
     use crate::creature::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
         OutputSink, OutputSinkKind,
@@ -231,6 +231,17 @@ mod tests {
         }
     }
 
+    fn wrap_targets(ids: Vec<NodeId>) -> Vec<RouteTarget> {
+        ids.into_iter()
+            .enumerate()
+            .map(|(i, id)| RouteTarget {
+                target_id: id,
+                slot: i as u8,
+                gate_bias: 0.0,
+            })
+            .collect()
+    }
+
     fn vm_emit_node(node_id: NodeId, action_type: u8, targets: Vec<NodeId>) -> NodeGenome {
         NodeGenome {
             node_id,
@@ -243,7 +254,7 @@ mod tests {
                     VmInstruction::ExecuteActionQueue,
                 ],
             }),
-            targets,
+            targets: wrap_targets(targets),
         }
     }
 
@@ -273,7 +284,7 @@ mod tests {
                 action_bank: vec![],
                 execute_gate: ExecuteGate { inputs: vec![] },
             }),
-            targets: vec![id_vm],
+            targets: wrap_targets(vec![id_vm]),
         };
 
         let vm_node = vm_emit_node(id_vm, 1, vec![]);
@@ -365,7 +376,7 @@ mod tests {
                 action_bank: vec![],
                 execute_gate: ExecuteGate { inputs: vec![] },
             }),
-            targets: vec![id_vm],
+            targets: wrap_targets(vec![id_vm]),
         };
 
         // VM reads upstream slot 5

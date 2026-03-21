@@ -183,13 +183,24 @@ fn classify_world_input(key: &WorldInputKey) -> MeshReadClass {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::contracts::{DynamicIntrospectionKey, InputReference};
+    use crate::contracts::{DynamicIntrospectionKey, InputReference, RouteTarget};
     use crate::creature::genome::analysis::mesh_reachable_nodes;
     use crate::creature::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
         OutputSink, OutputSinkKind,
     };
     use crate::creature::genome::{CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
+
+    fn wrap_targets(ids: Vec<NodeId>) -> Vec<RouteTarget> {
+        ids.into_iter()
+            .enumerate()
+            .map(|(i, id)| RouteTarget {
+                target_id: id,
+                slot: i as u8,
+                gate_bias: 0.0,
+            })
+            .collect()
+    }
 
     #[test]
     fn derives_factual_vm_annotations_from_live_instructions() {
@@ -338,7 +349,7 @@ mod tests {
                 NodeGenome {
                     node_id: NodeId::new(1),
                     input_refs: vec![],
-                    targets: vec![NodeId::new(2)],
+                    targets: wrap_targets(vec![NodeId::new(2)]),
                     backend_def: BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],
@@ -419,7 +430,7 @@ mod tests {
                 NodeGenome {
                     node_id: NodeId::new(10),
                     input_refs: vec![],
-                    targets: vec![NodeId::new(11)],
+                    targets: wrap_targets(vec![NodeId::new(11)]),
                     backend_def: BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],
@@ -429,7 +440,7 @@ mod tests {
                 NodeGenome {
                     node_id: NodeId::new(11),
                     input_refs: vec![],
-                    targets: vec![NodeId::new(10), NodeId::new(999)],
+                    targets: wrap_targets(vec![NodeId::new(10), NodeId::new(999)]),
                     backend_def: BackendDef::Vm(VmBackendDef {
                         register_count: 1,
                         constants: vec![],

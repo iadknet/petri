@@ -152,7 +152,7 @@ pub fn execute_creature_mesh(
             },
         };
         let target_pos = resolve_route_index(node.targets.len(), transitional_route);
-        let target_id = node.targets[target_pos];
+        let target_id = node.targets[target_pos].target_id;
 
         // Soft default: routed target id missing from node set.
         if find_node_index(&genome.nodes, target_id).is_none() {
@@ -182,13 +182,24 @@ fn find_node_index(nodes: &[NodeGenome], id: NodeId) -> Option<usize> {
 mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
-    use crate::contracts::{NodeId, WorldAction};
+    use crate::contracts::{NodeId, RouteTarget, WorldAction};
     use crate::creature::genome::{
         BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
     };
     use crate::creature::state::GraphRuntimeState;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
+
+    fn wrap_targets(ids: Vec<NodeId>) -> Vec<RouteTarget> {
+        ids.into_iter()
+            .enumerate()
+            .map(|(i, id)| RouteTarget {
+                target_id: id,
+                slot: i as u8,
+                gate_bias: 0.0,
+            })
+            .collect()
+    }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -224,7 +235,7 @@ mod tests {
                     VmInstruction::ExecuteActionQueue,
                 ],
             }),
-            targets,
+            targets: wrap_targets(targets),
         }
     }
 
@@ -246,7 +257,7 @@ mod tests {
                     VmInstruction::Halt,
                 ],
             }),
-            targets,
+            targets: wrap_targets(targets),
         }
     }
 
@@ -294,7 +305,7 @@ mod tests {
                 constants: vec![],
                 program: vec![VmInstruction::Halt],
             }),
-            targets: vec![id0], // self-loop
+            targets: wrap_targets(vec![id0]), // self-loop
         };
         let genome = CreatureGenome {
             entry_node_id: id0,
@@ -619,7 +630,7 @@ mod tests {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: vec![id1],
+            targets: wrap_targets(vec![id1]),
         };
 
         // Second node: bid 2.0, then emit Eat

@@ -1,5 +1,6 @@
 use rand::Rng;
 
+use crate::contracts::RouteTarget;
 use crate::creature::genome::CreatureGenome;
 use crate::mutation::reachability::biased_select_from;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
@@ -22,7 +23,7 @@ pub(super) fn apply_retarget_node_target(
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let target_slot = rng.gen_range(0..genome.nodes[node_idx].targets.len());
     let new_target = genome.nodes[rng.gen_range(0..genome.nodes.len())].node_id;
-    genome.nodes[node_idx].targets[target_slot] = new_target;
+    genome.nodes[node_idx].targets[target_slot].target_id = new_target;
     Ok(reachability)
 }
 
@@ -36,7 +37,12 @@ pub(super) fn apply_add_route_target(
     let (node_idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let target_id = genome.nodes[rng.gen_range(0..genome.nodes.len())].node_id;
-    genome.nodes[node_idx].targets.push(target_id);
+    let idx = genome.nodes[node_idx].targets.len();
+    genome.nodes[node_idx].targets.push(RouteTarget {
+        target_id,
+        slot: idx as u8,
+        gate_bias: 0.0,
+    });
     Ok(reachability)
 }
 

@@ -4,7 +4,7 @@ pub(crate) mod cgp_analysis;
 pub(crate) mod cgp_mesh_annotations;
 pub mod mesh_annotations;
 
-use crate::contracts::{InputReference, NodeId};
+use crate::contracts::{InputReference, NodeId, RouteTarget};
 
 /// A single VM instruction. 41 opcodes per v3-vm-isa-spec.md.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -239,7 +239,7 @@ pub struct NodeGenome {
     pub input_refs: Vec<InputReference>,
     pub backend_def: BackendDef,
     /// Candidate routing targets. May contain dangling IDs (junk DNA).
-    pub targets: Vec<NodeId>,
+    pub targets: Vec<RouteTarget>,
 }
 
 /// The complete genome of a creature.
@@ -486,7 +486,11 @@ mod tests {
                         VmInstruction::Halt,
                     ],
                 }),
-                targets: vec![NodeId::new(1)],
+                targets: vec![RouteTarget {
+                    target_id: NodeId::new(1),
+                    slot: 0,
+                    gate_bias: 0.0,
+                }],
             }],
         };
         assert_eq!(genome.genome_size(), 9);
@@ -567,7 +571,11 @@ mod tests {
                         constants: vec![],
                         program: vec![VmInstruction::Halt],
                     }),
-                    targets: vec![NodeId::new(1)],
+                    targets: vec![RouteTarget {
+                        target_id: NodeId::new(1),
+                        slot: 0,
+                        gate_bias: 0.0,
+                    }],
                 },
                 NodeGenome {
                     node_id: NodeId::new(1),
@@ -603,7 +611,11 @@ mod tests {
                             VmInstruction::WriteRouteTarget { src: 0 },
                         ],
                     }),
-                    targets: vec![NodeId::new(1)],
+                    targets: vec![RouteTarget {
+                        target_id: NodeId::new(1),
+                        slot: 0,
+                        gate_bias: 0.0,
+                    }],
                 },
                 NodeGenome {
                     node_id: NodeId::new(1),
