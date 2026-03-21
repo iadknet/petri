@@ -146,6 +146,9 @@ tick                                       (root span, every tick)
 │   ├── energy_decay
 │   ├── shared_memory_decay
 │   └── death_removal
+├── queue_build                            (build turn queue from living CreatureIds)
+│   ├── stable_sort
+│   └── shuffle                            (tick RNG shuffle for fairness)
 ├── phase_1_cognition
 │   ├── sensor_assembly
 │   ├── mesh_execution
@@ -173,6 +176,7 @@ tick                                       (root span, every tick)
 
 - `death_removal`: `deaths.starvation`, `deaths.total`
 - `food_growth`: `food.spawned`, `food.total_after`
+- `queue_build`: `queue.size` (number of living creatures entering the queue)
 - `mesh_execution`: `creatures.executed`, `creatures.traced`
 - `decision_sorting`: `decisions.count`, `priority_bid.mean`, `priority_bid.max`
 
