@@ -188,6 +188,7 @@ fn topology_after_each_operator_passes_parseability_gate() {
         TopologyOperator::CopyMeshForwardSlice,
         TopologyOperator::SpliceNode,
         TopologyOperator::SwapRouteTargets,
+        TopologyOperator::MutateGateBias,
     ];
     for (i, &op) in operators.iter().enumerate() {
         let mut genome = v3alpha1_founder_genome();
@@ -1177,7 +1178,7 @@ fn topology_operator_weights_are_positive() {
     let all = TopologyOperator::ALL;
     assert_eq!(
         all.len(),
-        13,
+        14,
         "ALL must cover every TopologyOperator variant"
     );
     for &op in &all {
@@ -1317,4 +1318,131 @@ fn exempt_operators_return_not_applicable() {
         &mut r2,
     );
     assert_eq!(result, Ok(TargetReachability::NotApplicable));
+}
+
+// ── MutateGateBias tests ──
+
+#[test]
+fn mutate_gate_bias_changes_bias() {
+    use crate::contracts::RouteTarget;
+    let mut genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(crate::creature::genome::VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![crate::creature::genome::VmInstruction::Halt],
+            }),
+            targets: vec![RouteTarget {
+                target_id: NodeId::new(0),
+                slot: 0,
+                gate_bias: 0.0,
+            }],
+        }],
+    };
+    let mut r = rng(42);
+    let result = apply(
+        &mut genome,
+        TopologyOperator::MutateGateBias,
+        &[],
+        0.0,
+        &mut r,
+    );
+    assert!(result.is_ok());
+    let bias = genome.nodes[0].targets[0].gate_bias;
+    assert_ne!(bias, 0.0, "gate_bias must have changed");
+    assert!(
+        (-4.0..=4.0).contains(&bias),
+        "gate_bias {bias} must be within [-4.0, 4.0]"
+    );
+}
+
+#[test]
+fn mutate_gate_bias_noop_on_empty_targets() {
+    let mut genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(crate::creature::genome::VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![crate::creature::genome::VmInstruction::Halt],
+            }),
+            targets: vec![],
+        }],
+    };
+    let mut r = rng(0);
+    let result = apply(
+        &mut genome,
+        TopologyOperator::MutateGateBias,
+        &[],
+        0.0,
+        &mut r,
+    );
+    assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+}
+
+#[test]
+fn mutate_gate_bias_clamps_to_range() {
+    use crate::contracts::RouteTarget;
+    // Set gate_bias near the upper boundary.
+    let mut genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(crate::creature::genome::VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![crate::creature::genome::VmInstruction::Halt],
+            }),
+            targets: vec![RouteTarget {
+                target_id: NodeId::new(0),
+                slot: 0,
+                gate_bias: 3.9,
+            }],
+        }],
+    };
+    // Apply multiple times -- at least one should push toward the boundary.
+    let mut clamped_high = false;
+    let mut clamped_low = false;
+    for seed in 0u64..200 {
+        let mut g = genome.clone();
+        let mut r = rng(seed);
+        let _ = apply(&mut g, TopologyOperator::MutateGateBias, &[], 0.0, &mut r);
+        let bias = g.nodes[0].targets[0].gate_bias;
+        assert!(
+            (-4.0..=4.0).contains(&bias),
+            "gate_bias {bias} out of range after seed {seed}"
+        );
+        if (bias - 4.0).abs() < f32::EPSILON {
+            clamped_high = true;
+        }
+    }
+    // Also test clamping at the low end.
+    genome.nodes[0].targets[0].gate_bias = -3.9;
+    for seed in 0u64..200 {
+        let mut g = genome.clone();
+        let mut r = rng(seed);
+        let _ = apply(&mut g, TopologyOperator::MutateGateBias, &[], 0.0, &mut r);
+        let bias = g.nodes[0].targets[0].gate_bias;
+        assert!(
+            (-4.0..=4.0).contains(&bias),
+            "gate_bias {bias} out of range after seed {seed}"
+        );
+        if (bias - (-4.0)).abs() < f32::EPSILON {
+            clamped_low = true;
+        }
+    }
+    assert!(
+        clamped_high,
+        "expected at least one high-boundary clamp across 200 seeds"
+    );
+    assert!(
+        clamped_low,
+        "expected at least one low-boundary clamp across 200 seeds"
+    );
 }

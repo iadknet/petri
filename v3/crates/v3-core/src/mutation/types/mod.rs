@@ -145,6 +145,7 @@ pub enum MutationOperator {
     TopologyCopyMeshForwardSlice,
     TopologySpliceNode,
     TopologySwapRouteTargets,
+    TopologyMutateGateBias,
     // VM
     VmConstantMutation,
     VmInstructionMutation,
@@ -208,6 +209,7 @@ impl MutationOperator {
             Self::TopologyCopyMeshForwardSlice => "Topology.CopyMeshForwardSlice",
             Self::TopologySpliceNode => "Topology.SpliceNode",
             Self::TopologySwapRouteTargets => "Topology.SwapRouteTargets",
+            Self::TopologyMutateGateBias => "Topology.MutateGateBias",
             Self::VmConstantMutation => "Vm.VmConstantMutation",
             Self::VmInstructionMutation => "Vm.VmInstructionMutation",
             Self::VmDeleteInstruction => "Vm.VmDeleteInstruction",
@@ -267,7 +269,8 @@ impl MutationOperator {
             | Self::TopologyCopyMeshBackwardSlice
             | Self::TopologyCopyMeshForwardSlice
             | Self::TopologySpliceNode
-            | Self::TopologySwapRouteTargets => MutationDomain::Topology,
+            | Self::TopologySwapRouteTargets
+            | Self::TopologyMutateGateBias => MutationDomain::Topology,
             Self::VmConstantMutation
             | Self::VmInstructionMutation
             | Self::VmDeleteInstruction
@@ -339,7 +342,8 @@ impl MutationOperator {
             | Self::TopologyChangeEntryNode
             | Self::TopologySwapNodeBackend
             | Self::TopologyRewriteNodeId
-            | Self::TopologySwapRouteTargets => ComplexityEffect::Neutral,
+            | Self::TopologySwapRouteTargets
+            | Self::TopologyMutateGateBias => ComplexityEffect::Neutral,
             // VM: copy/motif-insert operators are increasing
             Self::VmCopyInstructionBlock
             | Self::VmCopyInstructionBlockRemapped
@@ -390,7 +394,7 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 54] {
+    pub const fn all() -> [Self; 55] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
@@ -405,6 +409,7 @@ impl MutationOperator {
             Self::TopologyCopyMeshForwardSlice,
             Self::TopologySpliceNode,
             Self::TopologySwapRouteTargets,
+            Self::TopologyMutateGateBias,
             Self::VmConstantMutation,
             Self::VmInstructionMutation,
             Self::VmDeleteInstruction,

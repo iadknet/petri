@@ -30,10 +30,11 @@ pub enum TopologyOperator {
     CopyMeshForwardSlice,
     SpliceNode,
     SwapRouteTargets,
+    MutateGateBias,
 }
 
 impl TopologyOperator {
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 14] = [
         Self::AddNode,
         Self::RemoveNode,
         Self::RetargetNodeTarget,
@@ -47,6 +48,7 @@ impl TopologyOperator {
         Self::CopyMeshForwardSlice,
         Self::SpliceNode,
         Self::SwapRouteTargets,
+        Self::MutateGateBias,
     ];
 
     /// Per-operator weight reflecting impact tier.
@@ -67,6 +69,7 @@ impl TopologyOperator {
             Self::CopyMeshForwardSlice => 1,
             Self::SpliceNode => 1,
             Self::SwapRouteTargets => 4,
+            Self::MutateGateBias => 4,
         }
     }
 
@@ -75,7 +78,7 @@ impl TopologyOperator {
         // weight() will still compile (exhaustive match), but ALL will be incomplete.
         // This assertion catches that at compile time.
         assert!(
-            Self::ALL.len() == 13,
+            Self::ALL.len() == 14,
             "ALL must cover every TopologyOperator variant"
         );
         let mut sum = 0u16;
@@ -103,7 +106,8 @@ impl TopologyOperator {
             | Self::ChangeEntryNode
             | Self::SwapNodeBackend
             | Self::RewriteNodeId
-            | Self::SwapRouteTargets => ComplexityEffect::Neutral,
+            | Self::SwapRouteTargets
+            | Self::MutateGateBias => ComplexityEffect::Neutral,
         }
     }
 
@@ -178,6 +182,9 @@ impl TopologyMutator {
             }
             TopologyOperator::SwapRouteTargets => {
                 routing::apply_swap_route_targets(genome, reachable_nodes, bias, rng)
+            }
+            TopologyOperator::MutateGateBias => {
+                routing::apply_mutate_gate_bias(genome, reachable_nodes, bias, rng)
             }
         }
     }
