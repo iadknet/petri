@@ -17,7 +17,7 @@ function makeGenome(): CreatureGenome {
 						constants: [1],
 						program: [
 							{ ReadInput: { dst: 0, input_idx: 0 } },
-							{ WriteRouteTarget: { src: 0 } },
+							{ WriteRouteGate: { slot: 0, src: 0 } },
 							"Halt",
 						],
 					},
@@ -42,7 +42,7 @@ function makeGenome(): CreatureGenome {
 						],
 						output_sinks: [
 							{
-								kind: "RouterOutput",
+								kind: { RouterGate: 0 },
 								inputs: [{ source: { ComputeNode: 0 }, weight: 1 }],
 							},
 						],

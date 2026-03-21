@@ -132,8 +132,8 @@ function formatOperands(
 			return `→ +${f(p, "offset")}`;
 
 		// ── Route / payload / action ──
-		case "WriteRouteTarget":
-			return `route ← ${reg(f(p, "src"))}`;
+		case "WriteRouteGate":
+			return `gate[${f(p, "slot")}] ← ${reg(f(p, "src"))}`;
 		case "WriteInternalPayload":
 			return `payload[${f(p, "slot_idx")}] ← ${reg(f(p, "src"))}`;
 		case "WriteWorldActionMeta":

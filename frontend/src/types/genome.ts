@@ -62,7 +62,7 @@ export interface ComputeNode {
 
 export type OutputSinkKind =
 	| { CustomOutput: number }
-	| "RouterOutput"
+	| { RouterGate: number }
 	| { WriteSlot: number }
 	| { ClearSlot: number };
 
@@ -119,7 +119,7 @@ export type VmInstruction =
 	| { ReadInput: { dst: number; input_idx: number } }
 	| { WriteInternalPayload: { slot_idx: number; src: number } }
 	| { WriteWorldActionMeta: { slot_idx: number; src: number } }
-	| { WriteRouteTarget: { src: number } }
+	| { WriteRouteGate: { slot: number; src: number } }
 	| { PushAction: { action_type: number } }
 	| "PopAction"
 	| { ReadActionQueueLength: { dst: number } }

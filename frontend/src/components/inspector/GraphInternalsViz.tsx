@@ -43,8 +43,8 @@ export const GraphInternalsViz = memo(function GraphInternalsViz({
 	graphDef,
 	liveIndices,
 	inputRefs,
-	targets: _targets, // TODO: wire up resolveSelectedTarget for RouterOutput nodes
-	routeTargetIdx: _routeTargetIdx, // TODO: wire up resolveSelectedTarget for RouterOutput nodes
+	targets: _targets, // TODO: wire up resolveSelectedTarget for RouterGate nodes
+	routeTargetIdx: _routeTargetIdx, // TODO: wire up resolveSelectedTarget for RouterGate nodes
 	trace,
 	detailIndex,
 }: GraphInternalsVizProps) {
