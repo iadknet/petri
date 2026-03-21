@@ -106,37 +106,30 @@ describe("categorizeComputeNode", () => {
 });
 
 describe("resolveSelectedTarget", () => {
-	const targets = [3, 5, 7];
+	const targets = [
+		{ target_id: 3, slot: 0, gate_bias: 0.0 },
+		{ target_id: 5, slot: 1, gate_bias: 0.0 },
+		{ target_id: 7, slot: 2, gate_bias: 0.0 },
+	];
 
-	it("selects target at floor(routeTargetIdx) mod targets.length", () => {
-		expect(resolveSelectedTarget(0.0, targets)).toBe(3); // floor(0) % 3 = 0
-		expect(resolveSelectedTarget(1.0, targets)).toBe(5); // floor(1) % 3 = 1
-		expect(resolveSelectedTarget(2.0, targets)).toBe(7); // floor(2) % 3 = 2
+	it("selects target_id at the given index", () => {
+		expect(resolveSelectedTarget(0, targets)).toBe(3);
+		expect(resolveSelectedTarget(1, targets)).toBe(5);
+		expect(resolveSelectedTarget(2, targets)).toBe(7);
 	});
 
-	it("wraps around with rem_euclid for values >= targets.length", () => {
-		expect(resolveSelectedTarget(3.0, targets)).toBe(3); // floor(3) % 3 = 0
-		expect(resolveSelectedTarget(3.7, targets)).toBe(3); // floor(3.7)=3, 3 % 3 = 0
-		expect(resolveSelectedTarget(5.9, targets)).toBe(7); // floor(5.9)=5, 5 % 3 = 2
-	});
-
-	it("wraps negative values via rem_euclid", () => {
-		expect(resolveSelectedTarget(-1.0, targets)).toBe(7); // floor(-1)=-1, rem_euclid(3)=2
-		expect(resolveSelectedTarget(-2.0, targets)).toBe(5); // floor(-2)=-2, rem_euclid(3)=1
+	it("returns null for out-of-bounds index", () => {
+		expect(resolveSelectedTarget(3, targets)).toBeNull();
+		expect(resolveSelectedTarget(-1, targets)).toBeNull();
 	});
 
 	it("returns null for empty targets", () => {
-		expect(resolveSelectedTarget(0.0, [])).toBeNull();
-	});
-
-	it("handles NaN route value", () => {
-		// NaN -> idx = -1, rem_euclid(3) = 2
-		expect(resolveSelectedTarget(Number.NaN, targets)).toBe(7);
+		expect(resolveSelectedTarget(0, [])).toBeNull();
 	});
 
 	it("works with single target", () => {
-		expect(resolveSelectedTarget(0.0, [42])).toBe(42);
-		expect(resolveSelectedTarget(5.0, [42])).toBe(42);
-		expect(resolveSelectedTarget(-3.0, [42])).toBe(42);
+		const single = [{ target_id: 42, slot: 0, gate_bias: 0.0 }];
+		expect(resolveSelectedTarget(0, single)).toBe(42);
+		expect(resolveSelectedTarget(1, single)).toBeNull();
 	});
 });

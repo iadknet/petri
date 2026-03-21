@@ -10,7 +10,7 @@ function makeCyclicGenome(): CreatureGenome {
 			{
 				node_id: 1,
 				input_refs: [],
-				targets: [2],
+				targets: [{ target_id: 2, slot: 0, gate_bias: 0.0 }],
 				backend_def: {
 					Vm: {
 						register_count: 1,
@@ -22,7 +22,7 @@ function makeCyclicGenome(): CreatureGenome {
 			{
 				node_id: 2,
 				input_refs: [],
-				targets: [1],
+				targets: [{ target_id: 1, slot: 0, gate_bias: 0.0 }],
 				backend_def: {
 					Graph: {
 						compute_nodes: [{ kind: { Constant: 1 }, inputs: [] }],
@@ -35,7 +35,7 @@ function makeCyclicGenome(): CreatureGenome {
 			{
 				node_id: 9,
 				input_refs: [],
-				targets: [42],
+				targets: [{ target_id: 42, slot: 0, gate_bias: 0.0 }],
 				backend_def: {
 					Vm: {
 						register_count: 1,

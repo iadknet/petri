@@ -52,7 +52,7 @@ function makeGenome(): CreatureGenome {
 			{
 				node_id: 1,
 				input_refs: [{ World: "FoodHere" }, { DynamicIntrospection: "AgeTicks" }],
-				targets: [2],
+				targets: [{ target_id: 2, slot: 0, gate_bias: 0.0 }],
 				backend_def: {
 					Vm: {
 						register_count: 2,
