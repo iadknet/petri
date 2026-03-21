@@ -15,6 +15,19 @@ impl Default for RouteGateMap {
     }
 }
 
+impl RouteGateMap {
+    /// Get the runtime gate score for a slot, returning 0.0 for out-of-range slots.
+    #[inline]
+    pub fn score_for_slot(&self, slot: u8) -> f32 {
+        let s = slot as usize;
+        if s < MAX_GATE_SLOTS {
+            self.scores[s]
+        } else {
+            0.0
+        }
+    }
+}
+
 // Hot-path type size assertion — prevent accidental regressions.
 const _: () = assert!(std::mem::size_of::<RouteGateMap>() == 32);
 
@@ -39,12 +52,7 @@ pub(crate) fn resolve_gated_route(
     let mut best_idx = 0;
     let mut best_score = f32::NEG_INFINITY;
     for (i, target) in targets.iter().enumerate() {
-        let runtime = if (target.slot as usize) < MAX_GATE_SLOTS {
-            gates.scores[target.slot as usize]
-        } else {
-            0.0
-        };
-        let effective = target.gate_bias + runtime;
+        let effective = target.gate_bias + gates.score_for_slot(target.slot);
         if effective > best_score {
             best_score = effective;
             best_idx = i;

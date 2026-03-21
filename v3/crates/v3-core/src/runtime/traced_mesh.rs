@@ -125,11 +125,7 @@ pub fn execute_creature_mesh_traced(
                 .targets
                 .iter()
                 .map(|t| {
-                    let runtime = if (t.slot as usize) < MAX_GATE_SLOTS {
-                        result.route_gates.scores[t.slot as usize]
-                    } else {
-                        0.0
-                    };
+                    let runtime = result.route_gates.score_for_slot(t.slot);
                     TraceGateScore {
                         slot: t.slot,
                         target_id: t.target_id,
