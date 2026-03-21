@@ -439,8 +439,8 @@ mod tests {
         let id_b = NodeId::new(2);
         let id_c = NodeId::new(3);
 
-        // Entry node: routes with value 3.7, has 3 targets [id_a, id_b, id_c]
-        // floor(3.7)=3; 3 % 3 = 0 → targets[0] = id_a
+        // Entry node: writes 3.7 to gate slot 0. All 3 targets share slot 0,
+        // so all have the same effective score → first target (id_a) wins tie-break.
         let entry = vm_halt_with_route(id0, 3.7, vec![id_a, id_b, id_c]);
 
         // targets[0] (id_a): emits Eat
@@ -486,11 +486,9 @@ mod tests {
         let id_noop = NodeId::new(1); // targets[0]
         let id_eat = NodeId::new(2); // targets[1]
 
-        // Entry node: sets route=-1.0 → floor(-1.0)=-1 → rem_euclid(2)=1 → targets[1]=id_eat
-        // Note: the NaN→-1 code path in the mesh router is unreachable via current backends
-        // because sanitize_f32 prevents NaN from appearing in any register or output slot.
-        // This test verifies the rem_euclid wrapping behaviour with a directly injected
-        // negative index (-1.0).
+        // Entry node: writes -1.0 to gate slot 0.
+        // targets[0] (id_noop) on slot 0: effective = 0.0 + (-1.0) = -1.0
+        // targets[1] (id_eat) on slot 1: effective = 0.0 + 0.0 = 0.0 (wins)
         let entry = vm_halt_with_route(id0, -1.0, vec![id_noop, id_eat]);
         let node_noop = vm_emit_node(id_noop, 0, vec![]); // NoOp
         let node_eat = vm_emit_node(id_eat, 1, vec![]); // Eat
