@@ -10,7 +10,7 @@ use crate::contracts::{NodeId, WorldAction};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute_graph_node;
-use crate::runtime::routing::{resolve_route_index, RouteDecision};
+use crate::runtime::routing::resolve_gated_route;
 use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
 use crate::runtime::vm::execute_vm_node;
 use crate::sensors::perception::SensorSnapshot;
@@ -133,39 +133,28 @@ pub fn execute_creature_mesh(
             };
         }
 
-        // Routing: if no targets, the chain terminates — preserve accumulated queue.
-        if node.targets.is_empty() {
-            return MeshOutput {
-                actions: side_outputs.action_queue.into_actions_or_noop(),
-                cost_report: report,
-                priority_bid: side_outputs.priority_bid,
-            };
+        // Routing via per-target gate scoring.
+        match resolve_gated_route(&node.targets, &result.route_gates) {
+            Some((_idx, id)) => {
+                if find_node_index(&genome.nodes, id).is_none() {
+                    return MeshOutput {
+                        actions: side_outputs.action_queue.into_actions_or_noop(),
+                        cost_report: report,
+                        priority_bid: side_outputs.priority_bid,
+                    };
+                }
+                upstream_slots = result.output_slots;
+                current_node_id = id;
+                hops += 1;
+            }
+            None => {
+                return MeshOutput {
+                    actions: side_outputs.action_queue.into_actions_or_noop(),
+                    cost_report: report,
+                    priority_bid: side_outputs.priority_bid,
+                };
+            }
         }
-
-        // Transitional: extract scores[0] for old resolve_route_index
-        let transitional_route = match &node.backend_def {
-            BackendDef::Vm(_) => RouteDecision::VmWrap {
-                raw_value: result.route_gates.scores[0],
-            },
-            BackendDef::Graph(_) => RouteDecision::CgpNormalized {
-                raw_value: result.route_gates.scores[0],
-            },
-        };
-        let target_pos = resolve_route_index(node.targets.len(), transitional_route);
-        let target_id = node.targets[target_pos].target_id;
-
-        // Soft default: routed target id missing from node set.
-        if find_node_index(&genome.nodes, target_id).is_none() {
-            return MeshOutput {
-                actions: side_outputs.action_queue.into_actions_or_noop(),
-                cost_report: report,
-                priority_bid: side_outputs.priority_bid,
-            };
-        }
-
-        upstream_slots = result.output_slots;
-        current_node_id = target_id;
-        hops += 1;
     }
 }
 
