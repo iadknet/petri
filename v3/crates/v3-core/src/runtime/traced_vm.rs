@@ -6,7 +6,7 @@
 //! semantics, apply the same changes here and verify with equivalence tests.
 
 use crate::config::RuntimeConfig;
-use crate::contracts::InputReference;
+use crate::contracts::{InputReference, MAX_GATE_SLOTS};
 use crate::creature::genome::VmBackendDef;
 use crate::runtime::action_decode::decode_world_action;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
@@ -424,8 +424,11 @@ pub(crate) fn execute_vm_node_traced(
                 );
             }
 
-            VmInstruction::WriteRouteTarget { src } => {
-                route_gates.scores[0] = regs[nr(*src, reg_count)];
+            VmInstruction::WriteRouteGate { slot, src } => {
+                let s = *slot as usize;
+                if s < MAX_GATE_SLOTS {
+                    route_gates.scores[s] = sanitize_f32(regs[nr(*src, reg_count)]);
+                }
             }
 
             VmInstruction::Halt => {

@@ -347,7 +347,7 @@ fn result_equivalence_energy_exhaustion() {
     );
 }
 
-/// Result equivalence with routing (Halt + WriteRouteTarget).
+/// Result equivalence with routing (Halt + WriteRouteGate).
 #[test]
 fn result_equivalence_routing() {
     let def = VmBackendDef {
@@ -358,7 +358,7 @@ fn result_equivalence_routing() {
                 dst: 0,
                 const_idx: 0,
             },
-            VmInstruction::WriteRouteTarget { src: 0 },
+            VmInstruction::WriteRouteGate { slot: 0, src: 0 },
             VmInstruction::Halt,
         ],
     };
@@ -1040,7 +1040,7 @@ fn result_equivalence_all_41_opcodes() {
             zero_mem,
         ),
         (
-            "WriteRouteTarget",
+            "WriteRouteGate",
             VmBackendDef {
                 register_count: 1,
                 constants: vec![4.25],
@@ -1049,7 +1049,7 @@ fn result_equivalence_all_41_opcodes() {
                         dst: 0,
                         const_idx: 0,
                     },
-                    VmInstruction::WriteRouteTarget { src: 0 },
+                    VmInstruction::WriteRouteGate { slot: 0, src: 0 },
                     VmInstruction::Halt,
                 ],
             },

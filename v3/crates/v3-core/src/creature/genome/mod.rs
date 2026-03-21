@@ -72,8 +72,8 @@ pub enum VmInstruction {
     WriteInternalPayload { slot_idx: u8, src: u8 },
     /// Write world-action metadata slot (0..7); invalid slot write ignored.
     WriteWorldActionMeta { slot_idx: u8, src: u8 },
-    /// Write candidate route target value.
-    WriteRouteTarget { src: u8 },
+    /// Write a route gate score for a specific target slot.
+    WriteRouteGate { slot: u8, src: u8 },
 
     // ── Action Queue ──────────────────────────────────────────────────────────
     /// Decode meta buffer and push action onto queue. Silent no-op if at cap.
@@ -365,7 +365,7 @@ mod tests {
                 slot_idx: 0,
                 src: 1,
             },
-            VmInstruction::WriteRouteTarget { src: 0 },
+            VmInstruction::WriteRouteGate { slot: 0, src: 0 },
             VmInstruction::PushAction { action_type: 1 },
             VmInstruction::PopAction,
             VmInstruction::ReadActionQueueLength { dst: 0 },
@@ -608,7 +608,7 @@ mod tests {
                                 ref_idx: 0,
                                 sub_idx: 0,
                             },
-                            VmInstruction::WriteRouteTarget { src: 0 },
+                            VmInstruction::WriteRouteGate { slot: 0, src: 0 },
                         ],
                     }),
                     targets: vec![RouteTarget {
@@ -678,7 +678,7 @@ mod tests {
                             ref_idx: 0,
                             sub_idx: 0,
                         },
-                        VmInstruction::WriteRouteTarget { src: 0 },
+                        VmInstruction::WriteRouteGate { slot: 0, src: 0 },
                     ],
                 }),
                 targets: vec![],

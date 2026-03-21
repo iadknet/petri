@@ -64,7 +64,7 @@ pub fn vm_register_write(instr: &VmInstruction) -> Option<u8> {
         | VmInstruction::PushAction { .. }
         | VmInstruction::PopAction
         | VmInstruction::ExecuteActionQueue
-        | VmInstruction::WriteRouteTarget { .. }
+        | VmInstruction::WriteRouteGate { .. }
         | VmInstruction::SetPriorityBid { .. }
         | VmInstruction::StoreSlot { .. }
         | VmInstruction::StoreSlotImm { .. }
@@ -123,7 +123,7 @@ pub fn vm_register_read_mask(instr: &VmInstruction) -> u32 {
         VmInstruction::JumpIfZero { cond, .. } => vm_reg_bit(*cond),
         VmInstruction::WriteInternalPayload { src, .. }
         | VmInstruction::WriteWorldActionMeta { src, .. }
-        | VmInstruction::WriteRouteTarget { src }
+        | VmInstruction::WriteRouteGate { src, .. }
         | VmInstruction::SetPriorityBid { src }
         | VmInstruction::StoreSlotImm { src, .. } => vm_reg_bit(*src),
         VmInstruction::LoadSlot { slot_reg, .. } => vm_reg_bit(*slot_reg),
@@ -142,7 +142,7 @@ pub fn vm_is_output_instruction(instr: &VmInstruction) -> bool {
             | VmInstruction::PushAction { .. }
             | VmInstruction::PopAction
             | VmInstruction::ExecuteActionQueue
-            | VmInstruction::WriteRouteTarget { .. }
+            | VmInstruction::WriteRouteGate { .. }
             | VmInstruction::SetPriorityBid { .. }
             | VmInstruction::StoreSlot { .. }
             | VmInstruction::StoreSlotImm { .. }
