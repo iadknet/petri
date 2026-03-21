@@ -82,6 +82,9 @@ pub struct StatusPayload {
     pub last_tick_compute_total_max: f32,
     pub last_tick_compute_vm_mean: f32,
     pub last_tick_compute_graph_mean: f32,
+    pub last_tick_food_occupancy_depletion_mean: f32,
+    pub last_tick_food_occupancy_depletion_occupied_cells: u32,
+    pub last_tick_food_growth_suppressed_by_occupancy_depletion: f32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -121,6 +124,9 @@ pub struct FramePayload {
 pub struct HealthPayload {
     pub population: usize,
     pub mean_energy: f32,
+    pub last_tick_food_occupancy_depletion_mean: f32,
+    pub last_tick_food_occupancy_depletion_occupied_cells: u32,
+    pub last_tick_food_growth_suppressed_by_occupancy_depletion: f32,
     pub mutation_events_attempted_total: u64,
     pub mutation_events_applied_total: u64,
     pub mutation_events_skipped_total: u64,

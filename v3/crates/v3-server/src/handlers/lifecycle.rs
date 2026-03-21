@@ -270,6 +270,11 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
         last_tick_compute_total_max: stats.last_tick_compute_total_max,
         last_tick_compute_vm_mean: stats.last_tick_compute_vm_mean,
         last_tick_compute_graph_mean: stats.last_tick_compute_graph_mean,
+        last_tick_food_occupancy_depletion_mean: stats.last_tick_food_occupancy_depletion_mean,
+        last_tick_food_occupancy_depletion_occupied_cells: stats
+            .last_tick_food_occupancy_depletion_occupied_cells,
+        last_tick_food_growth_suppressed_by_occupancy_depletion: stats
+            .last_tick_food_growth_suppressed_by_occupancy_depletion,
     };
 
     let mut creatures = Vec::with_capacity(sim.creatures.len());
@@ -358,6 +363,11 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
     let health = HealthPayload {
         population: sim.creatures.len(),
         mean_energy: sim.mean_energy(),
+        last_tick_food_occupancy_depletion_mean: stats.last_tick_food_occupancy_depletion_mean,
+        last_tick_food_occupancy_depletion_occupied_cells: stats
+            .last_tick_food_occupancy_depletion_occupied_cells,
+        last_tick_food_growth_suppressed_by_occupancy_depletion: stats
+            .last_tick_food_growth_suppressed_by_occupancy_depletion,
         mutation_events_attempted_total: stats.mutation_events_attempted_total,
         mutation_events_applied_total: stats.mutation_events_applied_total,
         mutation_events_skipped_total: stats.mutation_events_skipped_total,

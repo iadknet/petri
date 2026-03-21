@@ -25,6 +25,8 @@ This document is the canonical owner for config keys/defaults used by:
 - VM step limits and opcode cost scaling,
 - graph convergence budget controls,
 - perception radius for frozen extended sensing,
+- runtime-editable world-food occupancy depletion knobs (cross-referenced from
+  `v3-world-grid-spec.md`),
 - mutation tuning,
 - reproduction energy transfer gates/caps.
 
@@ -259,3 +261,28 @@ transport MUST reject submitted values that violate canonical constraints
 - V3 tick ordering/arbitration reproducibility controls are canonical in
   `v3-tick-orchestration-spec.md` (`Test-Mode Reproducibility Notes (Tick
   Arbitration)`).
+
+---
+
+## 8. World Food Runtime Fields (Cross-Referenced)
+
+The canonical owner for world-food config defaults and normalization is
+`v3-world-grid-spec.md`. This section exists to keep runtime-editable food
+knobs visible in the runtime-config contract.
+
+| Key | Type | Default | Constraint / normalization | Used by |
+| --- | --- | --- | --- | --- |
+| `world.food.occupancy_depletion.enabled` | `bool` | `true` | Enables the occupancy depletion mask that suppresses regrowth on occupied cells. | `v3-world-grid-spec.md`, `v3-tick-orchestration-spec.md` |
+| `world.food.occupancy_depletion.deposit_per_occupied_tick` | `f32` | `0.08` | Must be finite; clamp to `[0.0, 1.0]`; invalid values fall back to `0.08`. | `v3-world-grid-spec.md`, `v3-tick-orchestration-spec.md` |
+
+Runtime config transport posture:
+- These fields are editable through v3alpha2 config GET/PATCH transport.
+- PATCH uses deep merge for accepted keys, but submitted wire values must
+  already satisfy canonical constraints.
+- Invalid wire values are rejected with `422 validation_rejected`; transport
+  does not clamp or apply fallback normalization to bad submitted values.
+- The simulation config layer still normalizes internally constructed config
+  values (for example defaults, tests, or non-transport callers) before use.
+- Canonical semantics for occupancy depletion recovery, growth suppression, and
+  Phase 0 ordering remain in `v3-world-grid-spec.md` and
+  `v3-tick-orchestration-spec.md`.

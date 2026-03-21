@@ -1,4 +1,4 @@
-import type { FieldDef } from "../shared/types.ts";
+import type { BooleanFieldDef, FieldDef } from "../shared/types.ts";
 
 export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 	{
@@ -54,5 +54,28 @@ export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 		step: 0.01,
 		defaultValue: 1.0,
 		tooltip: "Maximum food density per cell (0-1 scale)",
+	},
+];
+
+export const FOOD_OCCUPANCY_DEPLETION_TOGGLES: BooleanFieldDef[] = [
+	{
+		path: "world.food.occupancy_depletion.enabled",
+		label: "Occupancy Depletion Enabled",
+		defaultValue: true,
+		tooltip: "Toggle occupancy-driven food suppression during live food growth",
+		testId: "config-field-food-occupancy-depletion-enabled",
+	},
+];
+
+export const FOOD_OCCUPANCY_DEPLETION_FIELDS: FieldDef[] = [
+	{
+		path: "world.food.occupancy_depletion.deposit_per_occupied_tick",
+		label: "Occupancy Depletion Rate",
+		min: 0,
+		max: 1,
+		step: 0.001,
+		defaultValue: 0.08,
+		tooltip: "Fraction of depletion deposited into each occupied cell per tick",
+		testId: "config-field-food-occupancy-depletion-deposit-per-occupied-tick",
 	},
 ];

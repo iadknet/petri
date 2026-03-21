@@ -93,7 +93,8 @@ fn barrier_reader_state_for_creature(
 /// 4. Death removal (remove creatures where energy <= 0 from slotmap + world occupancy)
 pub fn run_phase_0(sim: &mut Simulation) {
     // Step 1: Food growth
-    sim.world.grow_food(sim.tick, &mut sim.rng);
+    let food_growth = sim.world.grow_food(sim.tick, &mut sim.rng);
+    sim.stats.record_food_growth_summary(food_growth);
 
     // Steps 2 & 3: Age, energy decay, and shared memory snapshot + decay
     let decay_rate = sim.config.shared_memory.decay_rate;
@@ -185,6 +186,10 @@ pub fn run_tick(
     sim.stats.last_tick_compute_graph_mean = 0.0;
     sim.stats.last_tick_priority_bid_mean = 0.0;
     sim.stats.last_tick_priority_bidders_count = 0;
+    sim.stats.last_tick_food_occupancy_depletion_mean = 0.0;
+    sim.stats.last_tick_food_occupancy_depletion_occupied_cells = 0;
+    sim.stats
+        .last_tick_food_growth_suppressed_by_occupancy_depletion = 0.0;
 
     run_phase_0(sim);
 

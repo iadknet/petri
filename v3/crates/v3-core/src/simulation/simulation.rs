@@ -43,7 +43,7 @@ impl Simulation {
     ) -> Self {
         use rand::SeedableRng;
         // Ensure the world's FoodResource uses the simulation's food config.
-        world.apply_food_config(config.world.food.clone());
+        world.reconfigure_food(config.world.food.clone());
         Self {
             world,
             creatures,

@@ -177,6 +177,9 @@ mod tests {
                     last_tick_compute_total_max: 0.0,
                     last_tick_compute_vm_mean: 0.0,
                     last_tick_compute_graph_mean: 0.0,
+                    last_tick_food_occupancy_depletion_mean: 0.0,
+                    last_tick_food_occupancy_depletion_occupied_cells: 0,
+                    last_tick_food_growth_suppressed_by_occupancy_depletion: 0.0,
                 },
                 frame: FramePayload {
                     width: 256,
@@ -217,6 +220,9 @@ mod tests {
                 health: HealthPayload {
                     population: 2,
                     mean_energy: 5.0,
+                    last_tick_food_occupancy_depletion_mean: 0.0,
+                    last_tick_food_occupancy_depletion_occupied_cells: 0,
+                    last_tick_food_growth_suppressed_by_occupancy_depletion: 0.0,
                     mutation_events_attempted_total: 0,
                     mutation_events_applied_total: 0,
                     mutation_events_skipped_total: 0,

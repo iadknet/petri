@@ -4,7 +4,7 @@ use axum::Json;
 use v3_core::config::SimulationConfig;
 
 use crate::error::{AppError, FieldError};
-use crate::state::{SimulationStatus, TransportPerfSnapshot};
+use crate::state::TransportPerfSnapshot;
 use crate::transport::protocol::build_status_event_payload;
 use crate::types::{deep_merge, PROTOCOL_VERSION};
 use crate::{app_state::AppState, query::projection::ProjectionSnapshot};
@@ -28,6 +28,12 @@ fn patch_touches_fertility_generation_layers(patch: &serde_json::Value) -> bool 
         .and_then(|f| f.get("fertility"))
         .and_then(|fertility| fertility.get("layers"))
         .is_some()
+}
+
+fn patch_touches_world_topology(patch: &serde_json::Value) -> bool {
+    patch.get("world").is_some_and(|w| {
+        w.get("width").is_some() || w.get("height").is_some() || w.get("edge_mode").is_some()
+    })
 }
 
 pub async fn get_status(State(app): State<AppState>) -> impl IntoResponse {
@@ -76,6 +82,15 @@ pub async fn patch_config(
             endpoint: "patch_config",
         });
     }
+    if patch_touches_world_topology(&patch) {
+        return Err(AppError::ValidationRejected {
+            field_errors: vec![FieldError {
+                field: "world".into(),
+                reason: "world topology is restart-only and cannot be patched".into(),
+            }],
+            endpoint: "patch_config",
+        });
+    }
 
     let mut handle = app.sim.lock().await;
 
@@ -94,23 +109,12 @@ pub async fn patch_config(
         });
     }
 
-    // Check if patch touches world-topology fields (require Idle state).
-    let topology_touched = patch.get("world").is_some_and(|w| {
-        w.get("width").is_some() || w.get("height").is_some() || w.get("edge_mode").is_some()
-    });
-    if topology_touched && handle.status != SimulationStatus::Idle {
-        return Err(AppError::InvalidStateTransition {
-            expected: Some("idle".into()),
-            current: format!("{:?}", handle.status).to_lowercase(),
-        });
-    }
-
     // Merge patch into current config.
     let mut base = serde_json::to_value(&handle.sim.config)
         .map_err(|e| AppError::Internal(format!("config serialization error: {e}")))?;
     deep_merge(&mut base, patch);
 
-    let mut merged_config: SimulationConfig =
+    let merged_config: SimulationConfig =
         serde_json::from_value(base).map_err(|e| AppError::ValidationRejected {
             field_errors: vec![FieldError {
                 field: "config".into(),
@@ -118,13 +122,27 @@ pub async fn patch_config(
             }],
             endpoint: "patch_config",
         })?;
-    merged_config.normalize();
+    let mut normalized_config = merged_config.clone();
+    normalized_config.normalize();
+    let merged_value = serde_json::to_value(&merged_config)
+        .map_err(|e| AppError::Internal(format!("config serialization error: {e}")))?;
+    let normalized_value = serde_json::to_value(&normalized_config)
+        .map_err(|e| AppError::Internal(format!("config serialization error: {e}")))?;
+    if normalized_value != merged_value {
+        return Err(AppError::ValidationRejected {
+            field_errors: vec![FieldError {
+                field: "config".into(),
+                reason: "runtime config patch contains values outside canonical constraints".into(),
+            }],
+            endpoint: "patch_config",
+        });
+    }
 
-    handle.sim.config = merged_config.clone();
+    handle.sim.config = normalized_config.clone();
     handle
         .sim
         .world
-        .apply_food_config(merged_config.world.food.clone());
+        .reconfigure_food(normalized_config.world.food.clone());
     let state = handle.status;
     let frame = crate::handlers::lifecycle::build_ws_frame(&handle);
     drop(handle);
@@ -133,7 +151,7 @@ pub async fn patch_config(
     Ok(Json(serde_json::json!({
         "protocol_version": PROTOCOL_VERSION,
         "state": state,
-        "config": merged_config,
+        "config": normalized_config,
     })))
 }
 
