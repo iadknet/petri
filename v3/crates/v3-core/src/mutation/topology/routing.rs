@@ -90,6 +90,11 @@ pub(super) fn apply_swap_route_targets(
     if b >= a {
         b += 1;
     }
-    genome.nodes[node_idx].targets.swap(a, b);
+    // Swap only target_id, preserving slot and gate_bias at each position.
+    // This maintains positional slot stability per the design spec.
+    let a_target = genome.nodes[node_idx].targets[a].target_id;
+    let b_target = genome.nodes[node_idx].targets[b].target_id;
+    genome.nodes[node_idx].targets[a].target_id = b_target;
+    genome.nodes[node_idx].targets[b].target_id = a_target;
     Ok(reachability)
 }
