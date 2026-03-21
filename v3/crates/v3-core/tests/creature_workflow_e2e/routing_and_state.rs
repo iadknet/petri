@@ -14,8 +14,13 @@ use v3_core::simulation::Simulation;
 
 use crate::support::{insert_creature, run_one_traced_tick, test_config};
 
+/// Gate-based routing: negative gate score on slot 0 causes slot 1 (score 0.0) to win.
+///
+/// CGP graph outputs -1.0 to RouterOutput → scores[0] = -1.0.
+/// Target id_noop (slot 0): effective = 0.0 + (-1.0) = -1.0
+/// Target id_eat  (slot 1): effective = 0.0 + 0.0     =  0.0  (wins)
 #[test]
-fn cgp_routing_normalizes_negative_to_first_target_e2e() {
+fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
     let cfg = test_config();
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
     let pos = Position::new(2, 2);
@@ -102,16 +107,17 @@ fn cgp_routing_normalizes_negative_to_first_target_e2e() {
     let tick = run_one_traced_tick(&mut sim, target);
 
     assert_eq!(tick.hops.len(), 2);
-    assert_eq!(tick.final_actions[0], WorldAction::NoOp);
+    // Gate routing: slot 1 (effective 0.0) beats slot 0 (effective -1.0)
+    assert_eq!(tick.final_actions[0], WorldAction::Eat);
     assert!((tick.hops[0].route.raw_value - (-1.0)).abs() < 1e-6);
     assert!(matches!(
         tick.hops[0].route.kind,
         TraceRouteKind::CgpNormalized
     ));
-    assert_eq!(tick.hops[0].resolved_target_index, 0);
+    assert_eq!(tick.hops[0].resolved_target_index, 1);
     assert_eq!(
-        tick.hops[1].node_id, id_noop,
-        "route=-1 should clamp to 0 under normalized CGP routing"
+        tick.hops[1].node_id, id_eat,
+        "negative gate on slot 0 should cause slot 1 to win"
     );
 }
 

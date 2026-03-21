@@ -2,7 +2,6 @@
 
 use crate::contracts::{InputReference, NodeId, WorldAction};
 use crate::creature::genome::cgp::ComputeNodeKind;
-use crate::runtime::routing::RouteDecision;
 use crate::runtime::OUTPUT_SLOT_COUNT;
 use crate::sensors::perception::PerceptionSnapshot;
 use crate::sensors::static_inputs::StaticInputs;
@@ -103,22 +102,6 @@ pub enum TraceRouteKind {
 pub struct TraceRouteDecision {
     pub kind: TraceRouteKind,
     pub raw_value: f32,
-}
-
-impl TraceRouteDecision {
-    #[must_use]
-    pub(crate) fn from_internal(route: RouteDecision) -> Self {
-        match route {
-            RouteDecision::VmWrap { raw_value } => Self {
-                kind: TraceRouteKind::VmWrap,
-                raw_value,
-            },
-            RouteDecision::CgpNormalized { raw_value } => Self {
-                kind: TraceRouteKind::CgpNormalized,
-                raw_value,
-            },
-        }
-    }
 }
 
 /// Trace data for a single hop in the mesh chain.
@@ -330,13 +313,18 @@ mod tests {
     }
 
     #[test]
-    fn trace_route_decision_maps_internal_route() {
-        let vm = TraceRouteDecision::from_internal(RouteDecision::VmWrap { raw_value: 2.5 });
+    fn trace_route_decision_constructs_directly() {
+        let vm = TraceRouteDecision {
+            kind: TraceRouteKind::VmWrap,
+            raw_value: 2.5,
+        };
         assert!(matches!(vm.kind, TraceRouteKind::VmWrap));
         assert!((vm.raw_value - 2.5).abs() < 1e-6);
 
-        let cgp =
-            TraceRouteDecision::from_internal(RouteDecision::CgpNormalized { raw_value: 0.4 });
+        let cgp = TraceRouteDecision {
+            kind: TraceRouteKind::CgpNormalized,
+            raw_value: 0.4,
+        };
         assert!(matches!(cgp.kind, TraceRouteKind::CgpNormalized));
         assert!((cgp.raw_value - 0.4).abs() < 1e-6);
     }
