@@ -1,5 +1,5 @@
 import type { InputReference, VmInstruction } from "../../types/genome.ts";
-import { directionName, formatInputRef, isRingSensor } from "./inputRefUtils.ts";
+import { formatInputRefWithSubIndex } from "./inputRefUtils.ts";
 import type { RuntimeIoBadge } from "./mesh/runtimeIoSemantics.ts";
 import { classifyVmInstruction } from "./mesh/runtimeIoSemantics.ts";
 
@@ -26,7 +26,11 @@ export function formatReadableInstruction(
 		return { label: instruction.toLowerCase(), operands: "", badges };
 	}
 
-	const [name, payload] = Object.entries(instruction)[0] as [string, Record<string, number>];
+	const [name, rawPayload] = Object.entries(instruction)[0] ?? ["?", {}];
+	const payload =
+		rawPayload && typeof rawPayload === "object"
+			? (rawPayload as Record<string, number>)
+			: {};
 
 	const operands = formatOperands(name, payload, inputRefs, constants);
 	return { label: name, operands, badges };
@@ -44,13 +48,7 @@ function reg(idx: number): string {
 function resolveInputRef(refIdx: number, subIdx: number, inputRefs: InputReference[]): string {
 	const ref = inputRefs[refIdx];
 	if (!ref) return `input[${refIdx}]`;
-	const label = formatInputRef(ref);
-	// Ring sensors: show direction name instead of raw sub_idx
-	if (typeof ref !== "string" && "World" in ref && isRingSensor(ref.World)) {
-		return `${label}[${directionName(subIdx)}]`;
-	}
-	if (subIdx > 0) return `${label}[${subIdx}]`;
-	return label;
+	return formatInputRefWithSubIndex(ref, subIdx);
 }
 
 function formatOperands(

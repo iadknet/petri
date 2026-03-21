@@ -1,11 +1,20 @@
-import type { ByteArrayLike, Frame, PredationEvent, ViewOverviewPayload } from "../types/api.ts";
+import type {
+	ByteArrayLike,
+	Frame,
+	FoodTypeMetadata,
+	OverviewFoodCellPayload,
+	PredationEvent,
+	ViewOverviewPayload,
+	WorldStaticPayload,
+} from "../types/api.ts";
 import type { CameraState } from "./camera.ts";
 
 export interface OverviewRenderLayer {
 	rect: ViewOverviewPayload["rect"];
 	gridWidth: number;
 	gridHeight: number;
-	foodDensity: ByteArrayLike;
+	food: OverviewFoodCellPayload[];
+	foodTypes: FoodTypeMetadata[];
 	creatureCounts: number[];
 }
 
@@ -19,6 +28,7 @@ export interface FertilityOverlay {
 
 export interface RenderModel {
 	frame: Frame;
+	foodTypes: FoodTypeMetadata[];
 	overview: OverviewRenderLayer | null;
 	tick: number;
 	predationEvents: PredationEvent[];
@@ -29,6 +39,7 @@ export interface RenderModel {
 export function buildRenderModel(input: {
 	frame: Frame | null;
 	overviewView: ViewOverviewPayload | null;
+	worldStatic: WorldStaticPayload | null;
 	tick: number;
 	predationEvents: PredationEvent[];
 	camera: CameraState;
@@ -42,12 +53,14 @@ export function buildRenderModel(input: {
 
 	return {
 		frame: input.frame,
+		foodTypes: input.worldStatic?.food_types ?? [],
 		overview: input.overviewView
 			? {
 					rect: input.overviewView.rect,
 					gridWidth: input.overviewView.grid_width,
 					gridHeight: input.overviewView.grid_height,
-					foodDensity: input.overviewView.food_density_u8,
+					food: input.overviewView.food,
+					foodTypes: input.worldStatic?.food_types ?? [],
 					creatureCounts: input.overviewView.creature_count_u16,
 				}
 			: null,

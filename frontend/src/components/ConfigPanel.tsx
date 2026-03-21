@@ -24,6 +24,13 @@ export function ConfigPanel() {
 
 	const startupPreset = useStartupConfigStore((s) => s.preset);
 	const updateStartupPreset = useStartupConfigStore((s) => s.updatePreset);
+	const addFoodType = useStartupConfigStore((s) => s.addFoodType);
+	const removeFoodType = useStartupConfigStore((s) => s.removeFoodType);
+	const updateFoodType = useStartupConfigStore((s) => s.updateFoodType);
+	const addFertilityLayer = useStartupConfigStore((s) => s.addFertilityLayer);
+	const updateFertilityLayerTarget = useStartupConfigStore(
+		(s) => s.updateFertilityLayerTarget,
+	);
 	const randomizeSeed = useStartupConfigStore((s) => s.randomizeSeed);
 
 	const [error, setError] = useState<string | null>(null);
@@ -62,6 +69,11 @@ export function ConfigPanel() {
 				<StartupConfigPanel
 					startupPreset={startupPreset}
 					updateStartupPreset={updateStartupPreset}
+					addFoodType={addFoodType}
+					removeFoodType={removeFoodType}
+					updateFoodType={updateFoodType}
+					addFertilityLayer={addFertilityLayer}
+					updateFertilityLayerTarget={updateFertilityLayerTarget}
 					randomizeSeed={randomizeSeed}
 				/>
 				<RuntimeConfigPanel

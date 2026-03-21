@@ -79,6 +79,10 @@ function buildWorldStaticPayload(partial?: Partial<WorldStaticPayload>): WorldSt
 		width: 8,
 		height: 6,
 		barrier_mask: [0, 1, 2, 3, 4, 5],
+		food_types: [
+			{ type_idx: 0, name: "Primary Food", color: "#22c55e", growth_inhibitor: 0.2 },
+			{ type_idx: 1, name: "Secondary Food", color: "#0ea5e9", growth_inhibitor: 0.3 },
+		],
 		...partial,
 	};
 }
@@ -88,7 +92,7 @@ function buildOverviewPayload(partial?: Partial<ViewOverviewPayload>): ViewOverv
 		rect: { x: 0, y: 0, width: 8, height: 6 },
 		grid_width: 4,
 		grid_height: 3,
-		food_density_u8: new Array(12).fill(0),
+		food: [],
 		creature_count_u16: new Array(12).fill(0),
 		...partial,
 	};
@@ -99,7 +103,7 @@ function buildDetailPayload(partial?: Partial<ViewDetailPayload>): ViewDetailPay
 		rect: { x: 2, y: 1, width: 4, height: 3 },
 		width: 4,
 		height: 3,
-		food_density_u8: new Array(12).fill(0),
+		food: [],
 		creatures: [{ id: 77, x: 3, y: 2, energy: 9, generation: 1, phenotype_rgb: [1, 2, 3] }],
 		predation_events: [
 			{ attacker_x: 3, attacker_y: 2, victim_x: 4, victim_y: 2, energy_stolen: 1, killed: false },
@@ -215,5 +219,29 @@ describe("WorldViewStore", () => {
 		});
 
 		expect(useWorldViewStore.getState().worldStaticRevision).toBe(3);
+	});
+
+	it("maps detail payload food cells into frame food preserving typed density entries", () => {
+		const store = useWorldViewStore.getState();
+		store.applySnapshot(buildSnapshot());
+		store.applyDetailView({
+			requestId: 12,
+			projectionRevision: 6,
+			worldStaticRevision: 2,
+			tick: 20,
+			payload: buildDetailPayload({
+				food: [
+					{ x: 3, y: 2, type_idx: 0, density: 0.6 },
+					{ x: 3, y: 2, type_idx: 1, density: 0.2 },
+					{ x: 4, y: 2, type_idx: 99, density: 0.4 },
+				],
+			}),
+		});
+
+		expect(useWorldViewStore.getState().frame?.food).toEqual([
+			{ x: 3, y: 2, type_idx: 0, density: 0.6 },
+			{ x: 3, y: 2, type_idx: 1, density: 0.2 },
+			{ x: 4, y: 2, type_idx: 99, density: 0.4 },
+		]);
 	});
 });

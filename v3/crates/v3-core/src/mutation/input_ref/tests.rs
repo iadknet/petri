@@ -1,5 +1,6 @@
 use super::*;
 use crate::config::MutationConfig;
+use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{NodeId, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::cgp::{
@@ -262,8 +263,8 @@ fn random_input_reference_covers_all_categories() {
         let mut r = rng(seed);
         let ir = random_input_reference(&mut r);
         let cat = match ir {
-            InputReference::World(WorldInputKey::FoodHere) => "FoodHere".to_string(),
-            InputReference::World(WorldInputKey::NeighborFoodRing) => {
+            InputReference::World(WorldInputKey::FoodHere { .. }) => "FoodHere".to_string(),
+            InputReference::World(WorldInputKey::NeighborFoodRing { .. }) => {
                 "NeighborFoodRing".to_string()
             }
             InputReference::World(WorldInputKey::NeighborBarrierRing) => {
@@ -272,7 +273,9 @@ fn random_input_reference_covers_all_categories() {
             InputReference::World(WorldInputKey::NeighborOccupiedRing) => {
                 "NeighborOccupiedRing".to_string()
             }
-            InputReference::World(WorldInputKey::AreaFoodSummary) => "AreaFoodSummary".to_string(),
+            InputReference::World(WorldInputKey::AreaFoodSummary { .. }) => {
+                "AreaFoodSummary".to_string()
+            }
             InputReference::World(WorldInputKey::AreaBarrierSummary) => {
                 "AreaBarrierSummary".to_string()
             }
@@ -513,10 +516,14 @@ fn add_input_ref_to_graph_node_wires_correct_ref_idx() {
     // Pre-populate with 2 existing input refs
     genome.nodes[0]
         .input_refs
-        .push(InputReference::World(WorldInputKey::FoodHere));
+        .push(InputReference::World(WorldInputKey::food_here(
+            OrdinaryFoodTypeId::default(),
+        )));
     genome.nodes[0]
         .input_refs
-        .push(InputReference::World(WorldInputKey::FoodHere));
+        .push(InputReference::World(WorldInputKey::food_here(
+            OrdinaryFoodTypeId::default(),
+        )));
     let mut r = rng(99);
     InputRefMutator::apply(
         &mut genome,
@@ -617,8 +624,9 @@ fn add_input_ref_compound_wires_all_sub_indices() {
 
 #[test]
 fn add_input_ref_to_vm_node_inserts_read_input_instruction() {
-    let mut genome =
-        single_node_genome_with_input_ref(InputReference::World(WorldInputKey::FoodHere));
+    let mut genome = single_node_genome_with_input_ref(InputReference::World(
+        WorldInputKey::food_here(OrdinaryFoodTypeId::default()),
+    ));
     genome.nodes[0].input_refs.clear(); // start with 0 refs
     let program_len_before = match &genome.nodes[0].backend_def {
         BackendDef::Vm(vm) => vm.program.len(),
@@ -656,8 +664,9 @@ fn add_input_ref_to_vm_node_inserts_read_input_instruction() {
 
 #[test]
 fn add_input_ref_to_vm_node_with_existing_refs_uses_correct_ref_idx() {
-    let mut genome =
-        single_node_genome_with_input_ref(InputReference::World(WorldInputKey::FoodHere));
+    let mut genome = single_node_genome_with_input_ref(InputReference::World(
+        WorldInputKey::food_here(OrdinaryFoodTypeId::default()),
+    ));
     // Add a second ref so the new one will be at index 2
     genome.nodes[0]
         .input_refs
@@ -697,7 +706,7 @@ fn reindex_vm_decrements_and_noops_orphans() {
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
             input_refs: vec![
-                InputReference::World(WorldInputKey::FoodHere),
+                InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())),
                 InputReference::UpstreamSlot(0),
                 InputReference::UpstreamSlot(1),
             ],
@@ -766,7 +775,9 @@ fn reindex_noop_on_empty_vm_program() {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
-            input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
+            input_refs: vec![InputReference::World(WorldInputKey::food_here(
+                OrdinaryFoodTypeId::default(),
+            ))],
             backend_def: BackendDef::Vm(VmBackendDef {
                 register_count: 1,
                 constants: vec![],
@@ -786,7 +797,7 @@ fn extended_perception_families_reachable_in_pool() {
     for seed in 0u64..5000 {
         let mut r = rng(seed);
         match random_input_reference(&mut r) {
-            InputReference::World(WorldInputKey::AreaFoodSummary) => found[0] = true,
+            InputReference::World(WorldInputKey::AreaFoodSummary { .. }) => found[0] = true,
             InputReference::World(WorldInputKey::AreaBarrierSummary) => found[1] = true,
             InputReference::World(WorldInputKey::AreaOccupancySummary) => found[2] = true,
             InputReference::World(WorldInputKey::NearbyCreatureCore) => found[3] = true,

@@ -1,21 +1,13 @@
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::Json;
-use slotmap::Key;
 use v3_core::config::SimulationConfig;
-use v3_core::mutation::phenotype::channels_to_rgb;
 use v3_core::simulation::{run_tick, seed_simulation};
 
 use crate::error::{AppError, FieldError};
-use crate::state::{
-    AppState, BarrierCell, CreatureSnapshot, FoodCell, FramePayload, HealthPayload,
-    LastTickActions, MutationOperatorFunnelPayload, MutationOperatorValueTotalsPayload,
-    MutationTargetReachabilityTotalPayload, PredationEventSnapshot, SimHandle, SimulationStatus,
-    StatusPayload, WsFrame,
-};
+use crate::state::{AppState, SimHandle, SimulationStatus, WsFrame};
 use crate::types::{config_digest, deep_merge, StepRequest, PROTOCOL_VERSION};
 
 const FRAME_INTERVAL: Duration = Duration::from_millis(100);
@@ -96,7 +88,8 @@ pub async fn startup(
     let seeded_creatures = new_sim.creatures.len();
     let digest = config_digest(&config);
     // Fertility is static after seeding; compute once and cache in the handle.
-    let cached_fertility_u8 = crate::query::cache::build_food_fertility_u8(new_sim.world.food());
+    let cached_fertility_u8 =
+        crate::query::cache::build_primary_food_fertility_u8(new_sim.world.food());
 
     let mut handle = app.sim.lock().await;
     handle.status = SimulationStatus::Idle;
@@ -243,6 +236,11 @@ pub(crate) async fn run_loop(app: AppState) {
 }
 
 pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
+    crate::state::build_ws_frame(handle)
+}
+
+#[cfg(any())]
+fn legacy_build_ws_frame(handle: &SimHandle) -> WsFrame {
     let sim = &handle.sim;
     let stats = &sim.stats;
 
@@ -275,6 +273,9 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             .last_tick_food_occupancy_depletion_occupied_cells,
         last_tick_food_growth_suppressed_by_occupancy_depletion: stats
             .last_tick_food_growth_suppressed_by_occupancy_depletion,
+        last_tick_food_cells_with_type_inhibition: stats.last_tick_food_cells_with_type_inhibition,
+        last_tick_food_growth_suppressed_by_type_inhibition: stats
+            .last_tick_food_growth_suppressed_by_type_inhibition,
     };
 
     let mut creatures = Vec::with_capacity(sim.creatures.len());
@@ -309,15 +310,35 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
         complexity_min = 0;
     }
 
+    let food_types = sim
+        .world
+        .food()
+        .food_types()
+        .iter()
+        .map(|food_type| FoodTypeSnapshot {
+            type_idx: food_type.id.get(),
+            name: food_type.config.name.clone(),
+            color: food_type.config.color.clone(),
+            growth_inhibitor: food_type.config.growth_inhibitor,
+        })
+        .collect();
+
     let mut food = Vec::new();
+    sim.world
+        .food()
+        .for_each_food_cell(|x, y, type_idx, density| {
+            food.push(FoodCell {
+                x,
+                y,
+                type_idx: type_idx.get(),
+                density,
+            });
+        });
+
     let mut barriers = Vec::new();
     for y in 0..sim.world.height {
         for x in 0..sim.world.width {
             let pos = v3_core::contracts::Position::new(x, y);
-            let density = sim.world.food_at(pos);
-            if density > 0.0 {
-                food.push(FoodCell { x, y, density });
-            }
             if sim.world.is_barrier(pos) {
                 barriers.push(BarrierCell { x, y });
             }
@@ -330,6 +351,7 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
         width: sim.world.width,
         height: sim.world.height,
         creatures,
+        food_types,
         food,
         barriers,
         food_fertility_u8,
@@ -368,6 +390,9 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             .last_tick_food_occupancy_depletion_occupied_cells,
         last_tick_food_growth_suppressed_by_occupancy_depletion: stats
             .last_tick_food_growth_suppressed_by_occupancy_depletion,
+        last_tick_food_cells_with_type_inhibition: stats.last_tick_food_cells_with_type_inhibition,
+        last_tick_food_growth_suppressed_by_type_inhibition: stats
+            .last_tick_food_growth_suppressed_by_type_inhibition,
         mutation_events_attempted_total: stats.mutation_events_attempted_total,
         mutation_events_applied_total: stats.mutation_events_applied_total,
         mutation_events_skipped_total: stats.mutation_events_skipped_total,
@@ -562,5 +587,67 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
         frame,
         health,
         predation_events,
+    }
+}
+#[cfg(test)]
+mod tests {
+    use v3_core::config::{FoodTypeConfig, OrdinaryFoodTypeId, SimulationConfig};
+    use v3_core::contracts::Position;
+    use v3_core::simulation::seed_simulation;
+
+    use crate::state::{SimHandle, SimulationStatus};
+
+    use super::build_ws_frame;
+
+    #[test]
+    fn build_ws_frame_serializes_overlapping_food_types_per_cell() {
+        let mut config = SimulationConfig::default();
+        config.world.width = 4;
+        config.world.height = 4;
+        config.population.initial_creatures = 0;
+        config.world.food.types = vec![
+            FoodTypeConfig {
+                name: "Primary Food".to_string(),
+                color: "#22c55e".to_string(),
+                initial_density: 0.0,
+                initial_coverage: 0.0,
+                growth_inhibitor: 0.2,
+            },
+            FoodTypeConfig {
+                name: "Secondary Food".to_string(),
+                color: "#0ea5e9".to_string(),
+                initial_density: 0.0,
+                initial_coverage: 0.0,
+                growth_inhibitor: 0.2,
+            },
+        ];
+
+        let mut sim = seed_simulation(config, 7);
+        let pos = Position::new(1, 1);
+        sim.world
+            .set_food_type(pos, OrdinaryFoodTypeId::new(0), 0.75);
+        sim.world
+            .set_food_type(pos, OrdinaryFoodTypeId::new(1), 0.5);
+
+        let handle = SimHandle {
+            sim,
+            status: SimulationStatus::Paused,
+            active_trace: None,
+            cached_fertility_u8: std::sync::Arc::from(vec![0u8; 16]),
+        };
+
+        let frame = build_ws_frame(&handle);
+
+        assert_eq!(frame.frame.food.len(), 2);
+        assert!(frame
+            .frame
+            .food
+            .iter()
+            .any(|cell| cell.x == 1 && cell.y == 1 && cell.type_idx == 0 && cell.density == 0.75));
+        assert!(frame
+            .frame
+            .food
+            .iter()
+            .any(|cell| cell.x == 1 && cell.y == 1 && cell.type_idx == 1 && cell.density == 0.5));
     }
 }

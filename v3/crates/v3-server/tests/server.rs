@@ -503,7 +503,7 @@ async fn snapshot_bootstrap_returns_overview_and_revisions() {
     );
     assert!(body["view"]["grid_width"].is_number(), "body: {body}");
     assert!(body["view"]["grid_height"].is_number(), "body: {body}");
-    assert!(body["view"]["food_density_u8"].is_array(), "body: {body}");
+    assert!(body["view"]["food"].is_array(), "body: {body}");
     assert!(
         body["view"]["food_fertility_u8"].is_null(),
         "overview view payload should not include static fertility bytes: {body}"
@@ -631,7 +631,7 @@ async fn snapshot_detail_omits_fertility_bytes_from_view_payload() {
         Some("detail"),
         "body: {body}"
     );
-    assert!(body["view"]["food_density_u8"].is_array(), "body: {body}");
+    assert!(body["view"]["food"].is_array(), "body: {body}");
     assert!(
         body["view"]["food_fertility_u8"].is_null(),
         "detail view payload should not include static fertility bytes: {body}"
@@ -700,7 +700,7 @@ async fn get_config_includes_food_occupancy_depletion_defaults() {
 
     let (status, body) = do_request(a, get_req("/v3/simulation/config")).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    let depletion = &body["config"]["world"]["food"]["occupancy_depletion"];
+    let depletion = &body["config"]["world"]["food"]["shared"]["occupancy_depletion"];
     assert!(depletion.is_object(), "missing occupancy_depletion: {body}");
     assert_eq!(depletion["enabled"].as_bool(), Some(true));
     assert_json_f64_close(&depletion["deposit_per_occupied_tick"], 0.08);
@@ -755,9 +755,11 @@ async fn patch_config_roundtrips_food_occupancy_depletion_fields() {
     let patch = r#"{
         "world": {
             "food": {
-                "occupancy_depletion": {
-                    "enabled": false,
-                    "deposit_per_occupied_tick": 0.25
+                "shared": {
+                    "occupancy_depletion": {
+                        "enabled": false,
+                        "deposit_per_occupied_tick": 0.25
+                    }
                 }
             }
         }
@@ -766,13 +768,13 @@ async fn patch_config_roundtrips_food_occupancy_depletion_fields() {
     let (patch_status, patch_body) =
         do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
     assert_eq!(patch_status, StatusCode::OK, "body: {patch_body}");
-    let patched = &patch_body["config"]["world"]["food"]["occupancy_depletion"];
+    let patched = &patch_body["config"]["world"]["food"]["shared"]["occupancy_depletion"];
     assert_eq!(patched["enabled"].as_bool(), Some(false));
     assert_json_f64_close(&patched["deposit_per_occupied_tick"], 0.25);
 
     let (get_status, get_body) = do_request(a, get_req("/v3/simulation/config")).await;
     assert_eq!(get_status, StatusCode::OK, "body: {get_body}");
-    let fetched = &get_body["config"]["world"]["food"]["occupancy_depletion"];
+    let fetched = &get_body["config"]["world"]["food"]["shared"]["occupancy_depletion"];
     assert_eq!(fetched["enabled"].as_bool(), Some(false));
     assert_json_f64_close(&fetched["deposit_per_occupied_tick"], 0.25);
 }
@@ -802,9 +804,11 @@ async fn patch_config_food_occupancy_depletion_live_patch_keeps_world_static_rev
     let patch = r#"{
         "world": {
             "food": {
-                "occupancy_depletion": {
-                    "enabled": false,
-                    "deposit_per_occupied_tick": 0.25
+                "shared": {
+                    "occupancy_depletion": {
+                        "enabled": false,
+                        "deposit_per_occupied_tick": 0.25
+                    }
                 }
             }
         }
@@ -846,8 +850,10 @@ async fn patch_config_rejects_invalid_food_occupancy_depletion_values() {
     let patch = r#"{
         "world": {
             "food": {
-                "occupancy_depletion": {
-                    "deposit_per_occupied_tick": 1.5
+                "shared": {
+                    "occupancy_depletion": {
+                        "deposit_per_occupied_tick": 1.5
+                    }
                 }
             }
         }
@@ -973,6 +979,129 @@ async fn patch_config_rejects_fertility_layer_generation_fields() {
                         }
                     ]
                 }
+            }
+        }
+    }"#;
+
+    let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
+    assert_eq!(
+        body["error"].as_str(),
+        Some("validation_rejected"),
+        "body: {body}"
+    );
+}
+
+// ── 11h. patch_config_rejects_food_types_runtime_patch ────────────────────
+
+#[tokio::test]
+async fn patch_config_rejects_food_types_runtime_patch() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let patch = r##"{
+        "world": {
+            "food": {
+                "types": [
+                    {
+                        "name": "Blue Food",
+                        "color": "#3b82f6",
+                        "initial_density": 0.8,
+                        "initial_coverage": 0.4
+                    }
+                ]
+            }
+        }
+    }"##;
+
+    let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
+    assert_eq!(
+        body["error"].as_str(),
+        Some("validation_rejected"),
+        "body: {body}"
+    );
+}
+
+// ── 11h. patch_config_rejects_food_annealing_runtime_patch ────────────────
+
+#[tokio::test]
+async fn patch_config_rejects_food_annealing_runtime_patch() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let patch = r#"{
+        "world": {
+            "food": {
+                "annealing": {
+                    "enabled": true,
+                    "ramp_ticks": 3000,
+                    "initial_min_fertility": 0.4,
+                    "initial_max_fertility": 1.5
+                }
+            }
+        }
+    }"#;
+
+    let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
+    assert_eq!(
+        body["error"].as_str(),
+        Some("validation_rejected"),
+        "body: {body}"
+    );
+}
+
+// ── 11h. patch_config_rejects_legacy_food_occupancy_path ──────────────────
+
+#[tokio::test]
+async fn patch_config_rejects_legacy_food_occupancy_path() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let patch = r#"{
+        "world": {
+            "food": {
+                "occupancy_depletion": {
+                    "enabled": false,
+                    "deposit_per_occupied_tick": 0.15
+                }
+            }
+        }
+    }"#;
+
+    let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
+    assert_eq!(
+        body["error"].as_str(),
+        Some("validation_rejected"),
+        "body: {body}"
+    );
+}
+
+// ── 11h. patch_config_rejects_non_object_food_shared_patch ────────────────
+
+#[tokio::test]
+async fn patch_config_rejects_non_object_food_shared_patch() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let patch = r#"{
+        "world": {
+            "food": {
+                "shared": 7
             }
         }
     }"#;

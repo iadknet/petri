@@ -54,8 +54,12 @@ fn graph_reads_all_neighbor_sensor_directions_e2e() {
     }
 
     let input_refs = vec![
-        InputReference::World(WorldInputKey::FoodHere), // ref 0: scalar
-        InputReference::World(WorldInputKey::NeighborFoodRing), // ref 1: compound(8)
+        InputReference::World(WorldInputKey::FoodHere {
+            type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
+        }), // ref 0: scalar
+        InputReference::World(WorldInputKey::NeighborFoodRing {
+            type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
+        }), // ref 1: compound(8)
         InputReference::World(WorldInputKey::NeighborBarrierRing), // ref 2: compound(8)
         InputReference::World(WorldInputKey::NeighborOccupiedRing), // ref 3: compound(8)
     ];
@@ -157,7 +161,11 @@ fn graph_reads_all_neighbor_sensor_directions_e2e() {
     // slots 1..=8: NeighborFoodRing per direction index
     for dir in Direction::ALL {
         let idx = dir.to_index();
-        let expected_food = (idx as f32 + 1.0) / 10.0;
+        let expected_food = if idx % 2 == 0 {
+            0.0
+        } else {
+            (idx as f32 + 1.0) / 10.0
+        };
         assert!(
             (evals[1 + idx].output - expected_food).abs() < 1e-6,
             "NeighborFoodRing[{dir:?}]"
@@ -199,8 +207,12 @@ fn graph_reads_inputs_and_writes_outputs_e2e() {
     world.set_barrier(east, true);
 
     let input_refs = vec![
-        InputReference::World(WorldInputKey::FoodHere), // ref 0 (scalar)
-        InputReference::World(WorldInputKey::NeighborFoodRing), // ref 1 (compound, sub_idx=N=0)
+        InputReference::World(WorldInputKey::FoodHere {
+            type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
+        }), // ref 0 (scalar)
+        InputReference::World(WorldInputKey::NeighborFoodRing {
+            type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
+        }), // ref 1 (compound, sub_idx=N=0)
         InputReference::World(WorldInputKey::NeighborBarrierRing), // ref 2 (compound, sub_idx=E=2)
         InputReference::World(WorldInputKey::NeighborOccupiedRing), // ref 3 (compound, sub_idx=W=6)
         InputReference::StaticIntrospection(StaticIntrospectionKey::Generation), // ref 4

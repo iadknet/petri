@@ -16,7 +16,29 @@ export interface Creature {
 export interface FoodCell {
 	x: number;
 	y: number;
+	type_idx: number;
 	density: number;
+}
+
+export interface DetailFoodCellPayload {
+	x: number;
+	y: number;
+	type_idx: number;
+	density: number;
+}
+
+export interface OverviewFoodCellPayload {
+	bucket_x: number;
+	bucket_y: number;
+	type_idx: number;
+	density: number;
+}
+
+export interface FoodTypeMetadata {
+	type_idx: number;
+	name: string;
+	color: string;
+	growth_inhibitor: number;
 }
 
 export interface Barrier {
@@ -137,6 +159,8 @@ export interface WorldStaticPayload {
 	width: number;
 	height: number;
 	barrier_mask: ByteArrayLike;
+	food_types: FoodTypeMetadata[];
+	/** Quantized fertility overlay for primary food type (`type_idx = 0`). */
 	food_fertility_u8?: ByteArrayLike;
 }
 
@@ -151,7 +175,7 @@ export interface ViewOverviewPayload {
 	rect: ViewRect;
 	grid_width: number;
 	grid_height: number;
-	food_density_u8: ByteArrayLike;
+	food: OverviewFoodCellPayload[];
 	food_fertility_u8?: ByteArrayLike;
 	creature_count_u16: number[];
 }
@@ -160,7 +184,7 @@ export interface ViewDetailPayload {
 	rect: ViewRect;
 	width: number;
 	height: number;
-	food_density_u8: ByteArrayLike;
+	food: DetailFoodCellPayload[];
 	food_fertility_u8?: ByteArrayLike;
 	creatures: Creature[];
 	predation_events: PredationEvent[];

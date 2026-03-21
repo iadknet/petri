@@ -89,9 +89,9 @@ impl From<&InputReference> for MutationAddedNodeInputClass {
     fn from(input_ref: &InputReference) -> Self {
         match input_ref {
             InputReference::World(key) => match key {
-                WorldInputKey::FoodHere
-                | WorldInputKey::NeighborFoodRing
-                | WorldInputKey::AreaFoodSummary => Self::Food,
+                WorldInputKey::FoodHere { .. }
+                | WorldInputKey::NeighborFoodRing { .. }
+                | WorldInputKey::AreaFoodSummary { .. } => Self::Food,
                 WorldInputKey::NeighborBarrierRing | WorldInputKey::AreaBarrierSummary => {
                     Self::Barrier
                 }

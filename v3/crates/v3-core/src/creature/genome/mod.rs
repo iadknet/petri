@@ -535,7 +535,9 @@ mod tests {
             entry_node_id: NodeId::new(0),
             nodes: vec![NodeGenome {
                 node_id: NodeId::new(0),
-                input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
+                input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
+                    type_idx: crate::config::OrdinaryFoodTypeId::default(),
+                })],
                 backend_def: BackendDef::Graph(cgp),
                 targets: vec![],
             }],
@@ -571,7 +573,9 @@ mod tests {
                 },
                 NodeGenome {
                     node_id: NodeId::new(1),
-                    input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
+                    input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
+                        type_idx: crate::config::OrdinaryFoodTypeId::default(),
+                    })],
                     backend_def: BackendDef::Graph(cgp),
                     targets: vec![],
                 },
@@ -590,7 +594,9 @@ mod tests {
             nodes: vec![
                 NodeGenome {
                     node_id: NodeId::new(0),
-                    input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
+                    input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
+                        type_idx: crate::config::OrdinaryFoodTypeId::default(),
+                    })],
                     backend_def: BackendDef::Vm(VmBackendDef {
                         register_count: 4,
                         constants: vec![],
@@ -656,7 +662,9 @@ mod tests {
             entry_node_id: NodeId::new(0),
             nodes: vec![NodeGenome {
                 node_id: NodeId::new(0),
-                input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
+                input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
+                    type_idx: crate::config::OrdinaryFoodTypeId::default(),
+                })],
                 backend_def: BackendDef::Vm(VmBackendDef {
                     register_count: 4,
                     constants: vec![],

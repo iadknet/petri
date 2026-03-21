@@ -1,5 +1,6 @@
 use super::super::{run_tick, sort_by_priority_bid};
 use super::support::*;
+use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{CreatureId, Position, WorldAction};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::identity::CreatureIdentityState;
@@ -26,7 +27,7 @@ fn sort_by_priority_bid_orders_descending() {
     let id_c = insert_test_creature(&mut creatures, Position::new(2, 0));
 
     let make_output = |bid: f32| MeshOutput {
-        actions: vec![WorldAction::Eat],
+        actions: vec![WorldAction::eat(OrdinaryFoodTypeId::default())],
         cost_report: ComputeCostReport::default(),
         priority_bid: bid,
     };
@@ -55,7 +56,7 @@ fn sort_by_priority_bid_stable_for_equal_bids() {
     let id_c = insert_test_creature(&mut creatures, Position::new(2, 0));
 
     let make_output = |bid: f32| MeshOutput {
-        actions: vec![WorldAction::Eat],
+        actions: vec![WorldAction::eat(OrdinaryFoodTypeId::default())],
         cost_report: ComputeCostReport::default(),
         priority_bid: bid,
     };

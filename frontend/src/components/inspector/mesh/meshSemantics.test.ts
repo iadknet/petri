@@ -118,4 +118,21 @@ describe("meshSemantics", () => {
 		expect(node?.label).toBe("Slot Reader · Introspection");
 		expect(node?.rationale.confidence).toContain("Inferred");
 	});
+
+	it("handles typed world food references without crashing", () => {
+		const genome = makeGenome();
+		genome.nodes[0]!.input_refs = [
+			{
+				World: {
+					FoodHere: {
+						type_idx: 1,
+					},
+				},
+			} as unknown as CreatureGenome["nodes"][number]["input_refs"][number],
+		];
+
+		expect(() => deriveMeshSemantics(genome, null)).not.toThrow();
+		const semantics = deriveMeshSemantics(genome, null);
+		expect(semantics.nodesById.get(1)?.sourceClass).toBe("food");
+	});
 });

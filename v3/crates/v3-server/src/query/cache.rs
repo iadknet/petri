@@ -3,6 +3,7 @@
 use crate::query::spatial_index::ViewRect;
 use crate::state::FramePayload;
 use crate::transport::session::ViewSubscription;
+use v3_core::config::OrdinaryFoodTypeId;
 use v3_core::kernel::paint::{PaintPoint, PaintStats, PaintTool};
 use v3_core::kernel::FoodResource;
 
@@ -98,13 +99,28 @@ pub fn world_static_changed(tool: PaintTool, stats: &PaintStats) -> bool {
 }
 
 #[must_use]
-pub fn build_food_density_u8(frame: &FramePayload) -> Box<[u8]> {
-    let len = frame.width as usize * frame.height as usize;
-    let mut dense = vec![0u8; len];
-    for cell in &frame.food {
-        let index = cell.y as usize * frame.width as usize + cell.x as usize;
-        dense[index] = quantize_food_density(cell.density);
+pub fn build_food_density_planes(frame: &FramePayload) -> Box<[f32]> {
+    let cell_count = frame.width as usize * frame.height as usize;
+    let type_count = frame.food_types.len();
+    let mut dense = vec![0.0f32; type_count * cell_count];
+
+    if cell_count == 0 || type_count == 0 {
+        return dense.into_boxed_slice();
     }
+
+    for cell in &frame.food {
+        let type_idx = usize::from(cell.type_idx);
+        if type_idx >= type_count {
+            continue;
+        }
+        if cell.density <= 0.0 {
+            continue;
+        }
+        let cell_index = cell.y as usize * frame.width as usize + cell.x as usize;
+        let plane_offset = type_idx * cell_count;
+        dense[plane_offset + cell_index] = cell.density;
+    }
+
     dense.into_boxed_slice()
 }
 
@@ -121,20 +137,23 @@ pub fn build_barrier_mask(frame: &FramePayload) -> Box<[u8]> {
     mask.into_boxed_slice()
 }
 
-/// Quantize fertility: raw [-1,1] -> effective [min,max] -> u8 [0,255].
+/// Quantize fertility for primary food type (`type_idx = 0`): raw [-1,1] ->
+/// effective [min,max] -> u8 [0,255].
 ///
 /// Edge case: when min == max the entire grid gets 128 (mid-point).
 ///
 /// Returns an `Arc<[u8]>` so the result can be shared across frames without
 /// copying the grid on every projection publish.
 #[must_use]
-pub fn build_food_fertility_u8(food: &FoodResource) -> std::sync::Arc<[u8]> {
-    let config = food.config();
-    let fertility_grid = food.fertility();
-    let min = config.fertility.min_fertility;
-    let max = config.fertility.max_fertility;
-    let width = fertility_grid.width() as usize;
-    let height = fertility_grid.height() as usize;
+pub fn build_primary_food_fertility_u8(food: &FoodResource) -> std::sync::Arc<[u8]> {
+    let width = usize::from(food.width());
+    let height = usize::from(food.height());
+    let Some(fertility_grid) = food.fertility_for_type(OrdinaryFoodTypeId::default()) else {
+        return vec![128u8; width * height].into();
+    };
+    let fertility_config = &food.full_config().fertility;
+    let min = fertility_config.min_fertility;
+    let max = fertility_config.max_fertility;
 
     if (max - min).abs() < f32::EPSILON {
         return vec![128u8; width * height].into();
@@ -153,8 +172,9 @@ pub fn build_food_fertility_u8(food: &FoodResource) -> std::sync::Arc<[u8]> {
     result.into()
 }
 
-fn quantize_food_density(density: f32) -> u8 {
-    (density.clamp(0.0, 1.0) * 255.0).round() as u8
+#[must_use]
+pub fn build_food_fertility_u8(food: &FoodResource) -> std::sync::Arc<[u8]> {
+    build_primary_food_fertility_u8(food)
 }
 
 #[cfg(test)]
@@ -163,12 +183,13 @@ mod tests {
     use v3_core::kernel::paint::{PaintPoint, PaintStats, PaintTool};
     use v3_core::kernel::FoodResource;
 
+    use crate::state::{BarrierCell, CreatureSnapshot, FoodCell, FoodTypeSnapshot, FramePayload};
     use crate::transport::protocol::ZoomTier;
     use crate::transport::session::ViewSubscription;
 
     use super::{
-        build_food_fertility_u8, paint_dirty_rect, view_intersects_dirty_rect,
-        world_static_changed, DirtyRect,
+        build_food_density_planes, build_food_fertility_u8, paint_dirty_rect,
+        view_intersects_dirty_rect, world_static_changed, DirtyRect,
     };
 
     #[test]
@@ -246,6 +267,7 @@ mod tests {
                         value: uniform_value,
                     },
                     weight: 1.0,
+                    target: v3_core::config::FertilityLayerTarget::default(),
                 }],
             },
             ..FoodResourceConfig::default()
@@ -294,5 +316,63 @@ mod tests {
         for &v in result.iter() {
             assert_eq!(v, 128, "expected 128 when min==max, got {v}");
         }
+    }
+
+    #[test]
+    fn build_food_density_planes_is_plane_major_and_zero_filled() {
+        let frame = FramePayload {
+            width: 2,
+            height: 2,
+            creatures: vec![CreatureSnapshot {
+                id: 1,
+                x: 0,
+                y: 0,
+                energy: 1.0,
+                generation: 1,
+                phenotype_rgb: [1, 2, 3],
+            }],
+            food_types: vec![
+                FoodTypeSnapshot {
+                    type_idx: 0,
+                    name: "A".to_string(),
+                    color: "#111111".to_string(),
+                    growth_inhibitor: 0.2,
+                },
+                FoodTypeSnapshot {
+                    type_idx: 1,
+                    name: "B".to_string(),
+                    color: "#222222".to_string(),
+                    growth_inhibitor: 0.3,
+                },
+            ],
+            food: vec![
+                FoodCell {
+                    x: 0,
+                    y: 0,
+                    type_idx: 0,
+                    density: 0.25,
+                },
+                FoodCell {
+                    x: 1,
+                    y: 1,
+                    type_idx: 1,
+                    density: 0.75,
+                },
+                FoodCell {
+                    x: 1,
+                    y: 0,
+                    type_idx: 9,
+                    density: 1.0,
+                },
+            ],
+            barriers: vec![BarrierCell { x: 1, y: 0 }],
+            food_fertility_u8: vec![0u8; 4].into(),
+        };
+
+        let result = build_food_density_planes(&frame);
+
+        assert_eq!(result.len(), 8);
+        assert_eq!(&result[..4], &[0.25, 0.0, 0.0, 0.0]);
+        assert_eq!(&result[4..], &[0.0, 0.0, 0.0, 0.75]);
     }
 }

@@ -6,8 +6,10 @@ import {
 	formatAction,
 	formatActionList,
 	formatInputRef,
+	formatInputRefWithSubIndex,
 	inputRefColor,
 	isRingSensor,
+	parseWorldInputRef,
 } from "./inputRefUtils.ts";
 
 describe("formatAction", () => {
@@ -39,6 +41,17 @@ describe("formatInputRef", () => {
 		expect(formatInputRef({ World: "NeighborFoodRing" })).toBe("FoodRing");
 		expect(formatInputRef({ World: "NeighborBarrierRing" })).toBe("BarrierRing");
 		expect(formatInputRef({ World: "NeighborOccupiedRing" })).toBe("OccRing");
+	});
+
+	it("formats typed world food variants", () => {
+		const ref = {
+			World: {
+				FoodHere: {
+					type_idx: 2,
+				},
+			},
+		} as unknown as InputReference;
+		expect(formatInputRef(ref)).toBe("FoodHere[2]");
 	});
 
 	it("formats StaticIntrospection variant", () => {
@@ -89,6 +102,20 @@ describe("inputRefColor", () => {
 	});
 });
 
+describe("formatInputRefWithSubIndex", () => {
+	it("uses direction labels for ring sensors", () => {
+		expect(formatInputRefWithSubIndex({ World: "NeighborFoodRing" }, 2)).toBe("FoodRing[E]");
+	});
+
+	it("uses numeric sub-index for non-ring world refs", () => {
+		expect(formatInputRefWithSubIndex({ World: "FoodHere" }, 3)).toBe("FoodHere[3]");
+	});
+
+	it("passes through base label for zero sub-index", () => {
+		expect(formatInputRefWithSubIndex({ DynamicIntrospection: "AgeTicks" }, 0)).toBe("AgeTicks");
+	});
+});
+
 describe("directionName", () => {
 	it("maps sub_idx 0..7 to direction names", () => {
 		expect(directionName(0)).toBe("N");
@@ -117,5 +144,27 @@ describe("isRingSensor", () => {
 	it("returns false for non-ring keys", () => {
 		expect(isRingSensor("FoodHere")).toBe(false);
 		expect(isRingSensor("AreaFoodSummary")).toBe(false);
+	});
+});
+
+describe("parseWorldInputRef", () => {
+	it("extracts key and type index from typed world payloads", () => {
+		expect(
+			parseWorldInputRef({
+				NeighborFoodRing: {
+					type_idx: 3,
+				},
+			}),
+		).toEqual({
+			key: "NeighborFoodRing",
+			typeIdx: 3,
+		});
+	});
+
+	it("passes through legacy world string payloads", () => {
+		expect(parseWorldInputRef("FoodHere")).toEqual({
+			key: "FoodHere",
+			typeIdx: null,
+		});
 	});
 });

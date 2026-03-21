@@ -22,12 +22,33 @@ fn patch_touches_failed_action_penalty(patch: &serde_json::Value) -> bool {
 }
 
 fn patch_touches_fertility_generation_layers(patch: &serde_json::Value) -> bool {
+    let food = patch.get("world").and_then(|w| w.get("food"));
+    let direct_layers = food
+        .and_then(|f| f.get("fertility"))
+        .and_then(|fertility| fertility.get("layers"));
+    let shared_layers = food
+        .and_then(|f| f.get("shared"))
+        .and_then(|shared| shared.get("fertility"))
+        .and_then(|fertility| fertility.get("layers"));
+    direct_layers.is_some() || shared_layers.is_some()
+}
+
+fn patch_touches_disallowed_food_runtime_paths(patch: &serde_json::Value) -> bool {
+    let Some(food_patch) = patch.get("world").and_then(|w| w.get("food")) else {
+        return false;
+    };
+    let Some(food_obj) = food_patch.as_object() else {
+        return true;
+    };
+    food_obj.keys().any(|key| key != "shared")
+}
+
+fn patch_has_invalid_food_shared_shape(patch: &serde_json::Value) -> bool {
     patch
         .get("world")
         .and_then(|w| w.get("food"))
-        .and_then(|f| f.get("fertility"))
-        .and_then(|fertility| fertility.get("layers"))
-        .is_some()
+        .and_then(|food| food.get("shared"))
+        .is_some_and(|shared| !shared.is_object())
 }
 
 fn patch_touches_world_topology(patch: &serde_json::Value) -> bool {
@@ -37,15 +58,13 @@ fn patch_touches_world_topology(patch: &serde_json::Value) -> bool {
 }
 
 pub async fn get_status(State(app): State<AppState>) -> impl IntoResponse {
-    let snapshot = {
-        app.projection
-            .read()
-            .expect("projection lock poisoned")
-            .current()
-            .clone()
-    };
     let perf = app.perf.read().expect("perf lock poisoned").clone();
-    Json(status_payload(&snapshot, &perf, app.ws_tx.receiver_count()))
+    let subscriber_count = app.ws_tx.receiver_count();
+    let payload = {
+        let projection = app.projection.read().expect("projection lock poisoned");
+        status_payload(projection.current(), &perf, subscriber_count)
+    };
+    Json(payload)
 }
 
 pub async fn get_config(State(app): State<AppState>) -> impl IntoResponse {
@@ -87,6 +106,24 @@ pub async fn patch_config(
             field_errors: vec![FieldError {
                 field: "world".into(),
                 reason: "world topology is restart-only and cannot be patched".into(),
+            }],
+            endpoint: "patch_config",
+        });
+    }
+    if patch_touches_disallowed_food_runtime_paths(&patch) {
+        return Err(AppError::ValidationRejected {
+            field_errors: vec![FieldError {
+                field: "world.food".into(),
+                reason: "runtime food patching is restricted to world.food.shared.*".into(),
+            }],
+            endpoint: "patch_config",
+        });
+    }
+    if patch_has_invalid_food_shared_shape(&patch) {
+        return Err(AppError::ValidationRejected {
+            field_errors: vec![FieldError {
+                field: "world.food.shared".into(),
+                reason: "runtime food patch payload must be an object".into(),
             }],
             endpoint: "patch_config",
         });
@@ -143,8 +180,10 @@ pub async fn patch_config(
         .sim
         .world
         .reconfigure_food(normalized_config.world.food.clone());
+    handle.cached_fertility_u8 =
+        crate::query::cache::build_primary_food_fertility_u8(handle.sim.world.food());
     let state = handle.status;
-    let frame = crate::handlers::lifecycle::build_ws_frame(&handle);
+    let frame = crate::state::build_ws_frame(&handle);
     drop(handle);
     app.publish_ws_frame(frame);
 

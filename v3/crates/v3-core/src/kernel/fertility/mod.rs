@@ -39,6 +39,7 @@ pub fn generate_fertility(
     let default_layer = crate::config::FertilityLayer {
         algorithm: FertilityAlgorithm::default(),
         weight: 1.0,
+        target: crate::config::FertilityLayerTarget::default(),
     };
     let layers: &[crate::config::FertilityLayer] = if config.layers.is_empty() {
         // Use the default PoissonBlobs algorithm when no layers are configured.
@@ -191,6 +192,7 @@ mod tests {
                     seed: None,
                 },
                 weight: 1.0,
+                target: crate::config::FertilityLayerTarget::default(),
             }],
             ..FertilityConfig::default()
         };

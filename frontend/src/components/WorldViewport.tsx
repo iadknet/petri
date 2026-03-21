@@ -60,6 +60,7 @@ export function WorldViewport() {
 				frame: worldView.frame,
 				overviewView:
 					worldView.currentView?.kind === "overview" ? worldView.currentView.payload : null,
+				worldStatic: worldView.worldStatic,
 				tick: sim.tick,
 				predationEvents: worldView.predationEvents,
 				camera: viewport.camera,

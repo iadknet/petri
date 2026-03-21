@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::query::projection::ProjectionSnapshot;
 use crate::state::{
-    CreatureSnapshot, HealthPayload, LastTickActions, MutationOperatorFunnelPayload,
+    CreatureSnapshot, FoodCell, HealthPayload, LastTickActions, MutationOperatorFunnelPayload,
     MutationOperatorValueTotalsPayload, MutationTargetReachabilityTotalPayload,
     PredationEventSnapshot, SimulationStatus, TransportPerfSnapshot,
 };
@@ -96,6 +96,8 @@ pub struct StatusEventPayload {
     pub last_tick_food_occupancy_depletion_mean: f32,
     pub last_tick_food_occupancy_depletion_occupied_cells: u32,
     pub last_tick_food_growth_suppressed_by_occupancy_depletion: f32,
+    pub last_tick_food_cells_with_type_inhibition: u32,
+    pub last_tick_food_growth_suppressed_by_type_inhibition: f32,
     pub last_tick_compute_energy_total_mean: f32,
     pub last_tick_compute_energy_total_min: f32,
     pub last_tick_compute_energy_total_max: f32,
@@ -105,10 +107,20 @@ pub struct StatusEventPayload {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct FoodTypePayload {
+    pub type_idx: u16,
+    pub name: String,
+    pub color: String,
+    pub growth_inhibitor: f32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct WorldStaticPayload {
     pub width: u16,
     pub height: u16,
     pub barrier_mask: Vec<u8>,
+    pub food_types: Vec<FoodTypePayload>,
+    /// Quantized fertility overlay for primary food type (`type_idx = 0`).
     pub food_fertility_u8: Vec<u8>,
 }
 
@@ -127,8 +139,16 @@ pub struct ViewOverviewPayload {
     pub rect: ViewRectPayload,
     pub grid_width: u16,
     pub grid_height: u16,
-    pub food_density_u8: Vec<u8>,
+    pub food: Vec<OverviewFoodCellPayload>,
     pub creature_count_u16: Vec<u16>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+pub struct OverviewFoodCellPayload {
+    pub bucket_x: u16,
+    pub bucket_y: u16,
+    pub type_idx: u16,
+    pub density: f32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -136,7 +156,7 @@ pub struct ViewDetailPayload {
     pub rect: ViewRectPayload,
     pub width: u16,
     pub height: u16,
-    pub food_density_u8: Vec<u8>,
+    pub food: Vec<FoodCell>,
     pub creatures: Vec<CreatureSnapshot>,
     pub predation_events: Vec<PredationEventSnapshot>,
 }
@@ -270,6 +290,9 @@ pub fn build_status_event_payload(
             .last_tick_food_occupancy_depletion_occupied_cells,
         last_tick_food_growth_suppressed_by_occupancy_depletion: status
             .last_tick_food_growth_suppressed_by_occupancy_depletion,
+        last_tick_food_cells_with_type_inhibition: status.last_tick_food_cells_with_type_inhibition,
+        last_tick_food_growth_suppressed_by_type_inhibition: status
+            .last_tick_food_growth_suppressed_by_type_inhibition,
         last_tick_compute_energy_total_mean: status.last_tick_compute_total_mean,
         last_tick_compute_energy_total_min: status.last_tick_compute_total_min,
         last_tick_compute_energy_total_max: status.last_tick_compute_total_max,
@@ -289,6 +312,18 @@ pub fn build_world_static_payload(snapshot: &ProjectionSnapshot) -> WorldStaticP
         width: snapshot.ws_frame.frame.width,
         height: snapshot.ws_frame.frame.height,
         barrier_mask: snapshot.barrier_mask.to_vec(),
+        food_types: snapshot
+            .ws_frame
+            .frame
+            .food_types
+            .iter()
+            .map(|food_type| FoodTypePayload {
+                type_idx: food_type.type_idx,
+                name: food_type.name.clone(),
+                color: food_type.color.clone(),
+                growth_inhibitor: food_type.growth_inhibitor,
+            })
+            .collect(),
         food_fertility_u8: snapshot.food_fertility_u8.to_vec(),
     }
 }
@@ -313,10 +348,11 @@ mod tests {
     use v3_core::config::SimulationConfig;
     use v3_core::simulation::{run_tick, seed_simulation};
 
-    use crate::handlers::lifecycle::build_ws_frame;
     use crate::query::cache::build_food_fertility_u8;
+    use crate::state::build_ws_frame;
     use crate::state::{
-        CreatureSnapshot, LastTickActions, PredationEventSnapshot, SimHandle, SimulationStatus,
+        CreatureSnapshot, FoodCell, LastTickActions, PredationEventSnapshot, SimHandle,
+        SimulationStatus,
     };
 
     use super::{
@@ -373,7 +409,20 @@ mod tests {
                 },
                 width: 4,
                 height: 5,
-                food_density_u8: vec![0, 1, 2, 3],
+                food: vec![
+                    FoodCell {
+                        x: 1,
+                        y: 2,
+                        type_idx: 0,
+                        density: 0.5,
+                    },
+                    FoodCell {
+                        x: 1,
+                        y: 2,
+                        type_idx: 1,
+                        density: 0.25,
+                    },
+                ],
                 creatures: vec![CreatureSnapshot {
                     id: 42,
                     x: 3,
@@ -413,6 +462,9 @@ mod tests {
                 assert_eq!(payload.width, 4);
                 assert_eq!(payload.creatures.len(), 1);
                 assert_eq!(payload.creatures[0].id, 42);
+                assert_eq!(payload.food.len(), 2);
+                assert_eq!(payload.food[0].type_idx, 0);
+                assert_eq!(payload.food[1].type_idx, 1);
             }
             other => panic!("expected view_detail message, got {other:?}"),
         }
@@ -468,6 +520,16 @@ mod tests {
                     frame
                         .health
                         .last_tick_food_growth_suppressed_by_occupancy_depletion
+                );
+                assert_eq!(
+                    payload.last_tick_food_cells_with_type_inhibition,
+                    frame.health.last_tick_food_cells_with_type_inhibition
+                );
+                assert_eq!(
+                    payload.last_tick_food_growth_suppressed_by_type_inhibition,
+                    frame
+                        .health
+                        .last_tick_food_growth_suppressed_by_type_inhibition
                 );
             }
             other => panic!("expected health message, got {other:?}"),
@@ -528,6 +590,8 @@ mod tests {
             last_tick_food_occupancy_depletion_mean: 0.12,
             last_tick_food_occupancy_depletion_occupied_cells: 3,
             last_tick_food_growth_suppressed_by_occupancy_depletion: 0.7,
+            last_tick_food_cells_with_type_inhibition: 4,
+            last_tick_food_growth_suppressed_by_type_inhibition: 0.5,
             last_tick_compute_energy_total_mean: 0.0,
             last_tick_compute_energy_total_min: 0.0,
             last_tick_compute_energy_total_max: 0.0,
@@ -559,6 +623,15 @@ mod tests {
                 .as_f64()
                 .expect("suppressed growth should serialize as f64")
                 - 0.7)
+                .abs()
+                < 1e-6
+        );
+        assert_eq!(encoded["last_tick_food_cells_with_type_inhibition"], 4);
+        assert!(
+            (encoded["last_tick_food_growth_suppressed_by_type_inhibition"]
+                .as_f64()
+                .expect("type inhibition suppression should serialize as f64")
+                - 0.5)
                 .abs()
                 < 1e-6
         );

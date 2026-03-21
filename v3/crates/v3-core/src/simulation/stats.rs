@@ -286,6 +286,10 @@ pub struct SimStats {
     pub last_tick_food_occupancy_depletion_occupied_cells: u32,
     /// Total food growth amount suppressed by occupancy depletion during the Phase 0 food update.
     pub last_tick_food_growth_suppressed_by_occupancy_depletion: f32,
+    /// Number of cells where at least one food type experienced cross-type growth inhibition.
+    pub last_tick_food_cells_with_type_inhibition: u32,
+    /// Total food growth amount suppressed by cross-type inhibition during the Phase 0 food update.
+    pub last_tick_food_growth_suppressed_by_type_inhibition: f32,
 }
 
 const OUTCOME_GENERATION_BUCKET_WIDTH: u64 = 128;
@@ -302,6 +306,9 @@ impl SimStats {
             summary.occupied_cells_with_depletion;
         self.last_tick_food_growth_suppressed_by_occupancy_depletion =
             summary.growth_suppressed_by_occupancy_depletion;
+        self.last_tick_food_cells_with_type_inhibition = summary.cells_with_type_inhibition;
+        self.last_tick_food_growth_suppressed_by_type_inhibition =
+            summary.growth_suppressed_by_type_inhibition;
     }
 
     #[must_use]
@@ -430,10 +437,15 @@ mod tests {
             mean_occupancy_depletion: 0.12,
             occupied_cells_with_depletion: 3,
             growth_suppressed_by_occupancy_depletion: 0.7,
+            cells_with_type_inhibition: 2,
+            growth_suppressed_by_type_inhibition: 0.4,
+            per_type: vec![],
         });
 
         assert!((stats.last_tick_food_occupancy_depletion_mean - 0.12).abs() < 1e-6);
         assert_eq!(stats.last_tick_food_occupancy_depletion_occupied_cells, 3);
         assert!((stats.last_tick_food_growth_suppressed_by_occupancy_depletion - 0.7).abs() < 1e-6);
+        assert_eq!(stats.last_tick_food_cells_with_type_inhibition, 2);
+        assert!((stats.last_tick_food_growth_suppressed_by_type_inhibition - 0.4).abs() < 1e-6);
     }
 }

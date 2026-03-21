@@ -313,7 +313,9 @@ mod tests {
                             param_values: [0.0, 0.0],
                             queue_len_before: 0,
                             queue_len_after: 1,
-                            emitted_action: Some(v3_core::contracts::WorldAction::Eat),
+                            emitted_action: Some(v3_core::contracts::WorldAction::Eat {
+                                type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
+                            }),
                         }],
                         execute_gate: GraphExecuteGateTrace {
                             wired: true,
@@ -323,7 +325,9 @@ mod tests {
                         },
                     }),
                 }],
-                final_actions: vec![v3_core::contracts::WorldAction::Eat],
+                final_actions: vec![v3_core::contracts::WorldAction::Eat {
+                    type_idx: v3_core::config::OrdinaryFoodTypeId::default(),
+                }],
                 termination_reason: core_trace::TerminationReason::ActionEmitted,
                 priority_bid: 0.0,
             }],

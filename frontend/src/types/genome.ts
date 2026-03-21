@@ -143,8 +143,15 @@ export interface VmBackendDef {
 
 export type BackendDef = { Vm: VmBackendDef } | { Graph: GraphBackendDef };
 
+export type WorldInputReference =
+	| string
+	| { FoodHere: { type_idx: number } }
+	| { NeighborFoodRing: { type_idx: number } }
+	| { AreaFoodSummary: { type_idx: number } }
+	| Record<string, unknown>;
+
 export type InputReference =
-	| { World: string }
+	| { World: WorldInputReference }
 	| { StaticIntrospection: string }
 	| { DynamicIntrospection: string }
 	| { UpstreamSlot: number }

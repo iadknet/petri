@@ -14,7 +14,17 @@ describe("StartupConfigStore", () => {
 		const state = useStartupConfigStore.getState();
 		expect(state.preset.population.initial_creatures).toBe(50);
 		expect(state.preset.world.width).toBe(400);
-		expect(state.preset.world.food.initial_density).toBe(1.0);
+		expect(state.preset.world.food.shared.occupancy_depletion).toEqual({
+			enabled: true,
+			deposit_per_occupied_tick: 0.08,
+		});
+		expect(state.preset.world.food.types[0]).toMatchObject({
+			name: "Primary Food",
+			color: "#22c55e",
+			initial_density: 1.0,
+			initial_coverage: 0.15,
+			growth_inhibitor: 0.2,
+		});
 		expect(state.preset.energy.initial_energy).toBe(20);
 	});
 
@@ -25,7 +35,18 @@ describe("StartupConfigStore", () => {
 		expect(preset.population.initial_creatures).toBe(10000);
 		expect(preset.world.width).toBe(1600);
 		expect(preset.world.height).toBe(1600);
-		expect(preset.world.food.initial_coverage).toBe(0.54);
+		expect(preset.world.food.shared.occupancy_depletion).toEqual({
+			enabled: true,
+			deposit_per_occupied_tick: 0.08,
+		});
+		expect(preset.world.food.types).toHaveLength(1);
+		expect(preset.world.food.types[0]).toMatchObject({
+			name: "Primary Food",
+			color: "#22c55e",
+			initial_density: 1.0,
+			initial_coverage: 0.54,
+			growth_inhibitor: 0.2,
+		});
 		expect(preset.world.food.fertility.enabled).toBe(true);
 		expect(preset.world.food.fertility.layers).toEqual([
 			{
@@ -125,6 +146,10 @@ describe("StartupConfigStore", () => {
 		useStartupConfigStore.getState().hydrateFromServerConfig(configWithFertility);
 
 		const preset = useStartupConfigStore.getState().preset;
+		const [primaryType] = preset.world.food.types;
+		expect(primaryType).toBeDefined();
+		expect(primaryType!.initial_density).toBe(1.0);
+		expect(primaryType!.initial_coverage).toBe(0.15);
 		expect(preset.world.food.fertility.enabled).toBe(true);
 		expect(preset.world.food.fertility.min_fertility).toBe(0.4);
 		expect(preset.world.food.fertility.max_fertility).toBe(1.8);
@@ -134,10 +159,90 @@ describe("StartupConfigStore", () => {
 		expect(preset.world.food.annealing.initial_max_fertility).toBe(1.4);
 	});
 
-	it("buildStartupRequest includes fertility and annealing settings", () => {
+	it("supports typed food type actions and retargets fertility layers on removal", () => {
+		const store = useStartupConfigStore.getState();
+		store.updatePreset("world.food.fertility.enabled", true);
+		store.addFertilityLayer();
+		store.updateFertilityLayerTarget(0, { SingleType: { type_idx: 0 } });
+		store.addFoodType();
+		store.updateFoodType(1, {
+			name: "Blue Food",
+			color: "#3b82f6",
+			initial_density: 0.8,
+			initial_coverage: 0.3,
+			growth_inhibitor: 0.45,
+		});
+
+		expect(useStartupConfigStore.getState().preset.world.food.types).toHaveLength(2);
+		expect(useStartupConfigStore.getState().preset.world.food.types[1]).toMatchObject({
+			name: "Blue Food",
+			color: "#3b82f6",
+			initial_density: 0.8,
+			initial_coverage: 0.3,
+			growth_inhibitor: 0.45,
+		});
+
+		store.removeFoodType(0);
+
+		const preset = useStartupConfigStore.getState().preset;
+		expect(preset.world.food.types).toHaveLength(1);
+		expect(preset.world.food.types[0]).toMatchObject({
+			name: "Blue Food",
+			color: "#3b82f6",
+			initial_density: 0.8,
+			initial_coverage: 0.3,
+			growth_inhibitor: 0.45,
+		});
+		expect(preset.world.food.fertility.layers[0]!.target).toEqual("AllFoods");
+	});
+
+	it("defaults and clamps per-type growth inhibitor values", () => {
+		const store = useStartupConfigStore.getState();
+		store.addFoodType();
+
+		expect(useStartupConfigStore.getState().preset.world.food.types[1]!.growth_inhibitor).toBe(
+			0.2,
+		);
+
+		store.updatePreset("world.food.types.0.growth_inhibitor", 4);
+		store.updatePreset("world.food.types.1.growth_inhibitor", -0.5);
+
+		const types = useStartupConfigStore.getState().preset.world.food.types;
+		expect(types[0]!.growth_inhibitor).toBe(1);
+		expect(types[1]!.growth_inhibitor).toBe(0);
+	});
+
+	it("serializes explicit fertility targets in startup requests", () => {
+		const store = useStartupConfigStore.getState();
+		store.addFoodType();
+		store.addFertilityLayer();
+		store.updateFertilityLayerTarget(0, { SingleType: { type_idx: 1 } });
+
+		const req = buildStartupRequest(useStartupConfigStore.getState().preset);
+		expect(req.world?.food?.fertility?.layers[0]?.target).toEqual({
+			SingleType: { type_idx: 1 },
+		});
+	});
+
+	it("retargets invalid single-type fertility targets to all_foods", () => {
+		useStartupConfigStore.getState().updatePreset("world.food.fertility.layers", [
+			{
+				weight: 1.0,
+				algorithm: { Uniform: { value: 0.5 } },
+				target: { SingleType: { type_idx: 999 } },
+			},
+		]);
+
+		const req = buildStartupRequest(useStartupConfigStore.getState().preset);
+		expect(req.world?.food?.fertility?.layers[0]?.target).toBe("AllFoods");
+	});
+
+	it("buildStartupRequest includes split food, fertility, and annealing settings", () => {
 		useStartupConfigStore.getState().updatePreset("world.food.fertility.enabled", true);
 		useStartupConfigStore.getState().updatePreset("world.food.fertility.min_fertility", 0.5);
 		useStartupConfigStore.getState().updatePreset("world.food.fertility.max_fertility", 1.6);
+		useStartupConfigStore.getState().updatePreset("world.food.types.0.initial_density", 0.75);
+		useStartupConfigStore.getState().updatePreset("world.food.types.0.initial_coverage", 0.4);
 		useStartupConfigStore.getState().updatePreset("world.food.annealing.enabled", true);
 		useStartupConfigStore.getState().updatePreset("world.food.annealing.ramp_ticks", 12000);
 		useStartupConfigStore
@@ -146,13 +251,47 @@ describe("StartupConfigStore", () => {
 		useStartupConfigStore
 			.getState()
 			.updatePreset("world.food.annealing.initial_max_fertility", 1.3);
+		useStartupConfigStore.getState().updatePreset("world.food.fertility.layers", [
+			{
+				weight: 0.65,
+				algorithm: {
+					Fbm: {
+						octaves: 4,
+						frequency: 0.07,
+						lacunarity: 2.1,
+						persistence: 0.48,
+						seed: 42,
+					},
+				},
+			},
+		]);
 
 		const req = buildStartupRequest(useStartupConfigStore.getState().preset);
 		expect(req.world?.food).toMatchObject({
+			shared: {
+				occupancy_depletion: {
+					enabled: true,
+					deposit_per_occupied_tick: 0.08,
+				},
+			},
+			types: [
+				{
+					name: "Primary Food",
+					color: "#22c55e",
+					initial_density: 0.75,
+					initial_coverage: 0.4,
+					growth_inhibitor: 0.2,
+				},
+			],
 			fertility: {
 				enabled: true,
 				min_fertility: 0.5,
 				max_fertility: 1.6,
+				layers: [
+					{
+						target: "AllFoods",
+					},
+				],
 			},
 			annealing: {
 				enabled: true,
@@ -193,7 +332,25 @@ describe("StartupConfigStore", () => {
 						seed: 42,
 					},
 				},
+				target: "AllFoods",
 			},
 		]);
+	});
+
+	it("ignores legacy startup food alias writes", () => {
+		useStartupConfigStore.getState().updatePreset("world.food.initial_density", 0.81);
+		useStartupConfigStore.getState().updatePreset("world.food.initial_coverage", 0.22);
+
+		const preset = useStartupConfigStore.getState().preset;
+		expect(preset.world.food.types[0]).toMatchObject({
+			initial_density: 1.0,
+			initial_coverage: 0.54,
+		});
+		expect((preset.world.food as unknown as { initial_density?: number }).initial_density).toBe(
+			undefined,
+		);
+		expect((preset.world.food as unknown as { initial_coverage?: number }).initial_coverage).toBe(
+			undefined,
+		);
 	});
 });

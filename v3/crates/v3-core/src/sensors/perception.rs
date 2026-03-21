@@ -1,5 +1,6 @@
 use crate::contracts::WorldInputKey;
 use crate::sensors::static_inputs::StaticInputs;
+use crate::sensors::typed_food::TypedFoodLocalSnapshot;
 
 /// Number of ranked nearby-creature slots.
 pub const NEARBY_SLOTS: usize = 4;
@@ -70,11 +71,13 @@ pub mod identity_idx {
 /// `v3-sensor-spec.md` Section 5. Stack-allocated, no heap.
 ///
 /// Use `PerceptionSnapshot::zero()` for non-perception genomes.
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct PerceptionSnapshot {
     /// Area food summary: [total_ratio, gradient_x, gradient_y, nearest_dx,
     ///   nearest_dy, nearest_dist, max_value]
     pub area_food: [f32; 7],
+    /// Typed area-food summaries keyed by configured food type.
+    pub typed_area_food: Vec<[f32; 7]>,
     /// Area barrier summary: [density_ratio, blocked_adjacent_ratio, gradient_x,
     ///   gradient_y, nearest_dx, nearest_dy, nearest_dist]
     pub area_barrier: [f32; 7],
@@ -95,6 +98,7 @@ impl PerceptionSnapshot {
     pub const fn zero() -> Self {
         Self {
             area_food: [0.0; 7],
+            typed_area_food: Vec::new(),
             area_barrier: [0.0; 7],
             area_occupancy: [0.0; 7],
             nearby_core: [0.0; 16],
@@ -103,12 +107,20 @@ impl PerceptionSnapshot {
         }
     }
 
+    #[must_use]
+    pub fn zeroed(type_count: usize) -> Self {
+        Self {
+            typed_area_food: vec![[0.0; 7]; type_count],
+            ..Self::zero()
+        }
+    }
+
     /// Returns true if this key is an extended perception compound key.
     #[inline]
     pub fn is_extended_key(key: &WorldInputKey) -> bool {
         matches!(
             key,
-            WorldInputKey::AreaFoodSummary
+            WorldInputKey::AreaFoodSummary { .. }
                 | WorldInputKey::AreaBarrierSummary
                 | WorldInputKey::AreaOccupancySummary
                 | WorldInputKey::NearbyCreatureCore
@@ -126,11 +138,22 @@ impl PerceptionSnapshot {
 pub struct SensorSnapshot {
     /// Local/radius-1 world and static introspection values.
     pub local: StaticInputs,
+    /// Typed local food snapshot keyed by configured food type.
+    pub typed_local_food: TypedFoodLocalSnapshot,
     /// Extended perception summaries and nearby-creature banks.
     pub perception: PerceptionSnapshot,
 }
 
 impl SensorSnapshot {
+    /// Resolve a scalar world key from the frozen sensor snapshot.
+    #[inline]
+    pub fn resolve_world(&self, key: &WorldInputKey) -> f32 {
+        match key {
+            WorldInputKey::FoodHere { type_idx } => self.typed_local_food.food_here(*type_idx),
+            _ => self.local.resolve_world(key),
+        }
+    }
+
     /// Resolve a compound WorldInputKey at the given sub_idx.
     ///
     /// Sub_idx is wrapped via `compound_width()` — out-of-range values wrap to
@@ -146,13 +169,21 @@ impl SensorSnapshot {
         );
         let idx = (sub_idx % key.compound_width()) as usize;
         match key {
-            WorldInputKey::AreaFoodSummary => self.perception.area_food[idx],
+            WorldInputKey::AreaFoodSummary { type_idx } => self
+                .perception
+                .typed_area_food
+                .get(usize::from(type_idx.get()))
+                .and_then(|summary| summary.get(idx))
+                .copied()
+                .unwrap_or(0.0),
             WorldInputKey::AreaBarrierSummary => self.perception.area_barrier[idx],
             WorldInputKey::AreaOccupancySummary => self.perception.area_occupancy[idx],
             WorldInputKey::NearbyCreatureCore => self.perception.nearby_core[idx],
             WorldInputKey::NearbyCreatureVitals => self.perception.nearby_vitals[idx],
             WorldInputKey::NearbyCreatureIdentity => self.perception.nearby_identity[idx],
-            WorldInputKey::NeighborFoodRing => self.local.neighbor_food[idx],
+            WorldInputKey::NeighborFoodRing { type_idx } => {
+                self.typed_local_food.neighbor_food(*type_idx, idx)
+            }
             WorldInputKey::NeighborBarrierRing => self.local.neighbor_barrier[idx],
             WorldInputKey::NeighborOccupiedRing => self.local.neighbor_occupied[idx],
             _ => 0.0,
@@ -220,6 +251,7 @@ pub fn genome_uses_extended_perception(genome: &crate::creature::genome::Creatur
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::OrdinaryFoodTypeId;
     use crate::sensors::static_inputs::StaticInputs;
 
     #[test]
@@ -245,16 +277,22 @@ mod tests {
     #[test]
     fn is_extended_key_classification() {
         assert!(PerceptionSnapshot::is_extended_key(
-            &WorldInputKey::AreaFoodSummary
+            &WorldInputKey::AreaFoodSummary {
+                type_idx: OrdinaryFoodTypeId::default(),
+            }
         ));
         assert!(PerceptionSnapshot::is_extended_key(
             &WorldInputKey::NearbyCreatureIdentity
         ));
         assert!(!PerceptionSnapshot::is_extended_key(
-            &WorldInputKey::FoodHere
+            &WorldInputKey::FoodHere {
+                type_idx: OrdinaryFoodTypeId::default(),
+            }
         ));
         assert!(!PerceptionSnapshot::is_extended_key(
-            &WorldInputKey::NeighborFoodRing
+            &WorldInputKey::NeighborFoodRing {
+                type_idx: OrdinaryFoodTypeId::default(),
+            }
         ));
     }
 
@@ -263,7 +301,10 @@ mod tests {
         // Extended perception arrays
         let p = PerceptionSnapshot::zero();
         assert_eq!(
-            WorldInputKey::AreaFoodSummary.compound_width() as usize,
+            WorldInputKey::AreaFoodSummary {
+                type_idx: OrdinaryFoodTypeId::default(),
+            }
+            .compound_width() as usize,
             p.area_food.len()
         );
         assert_eq!(
@@ -297,7 +338,10 @@ mod tests {
             age_ticks: 0.0,
         };
         assert_eq!(
-            WorldInputKey::NeighborFoodRing.compound_width() as usize,
+            WorldInputKey::NeighborFoodRing {
+                type_idx: OrdinaryFoodTypeId::default(),
+            }
+            .compound_width() as usize,
             local.neighbor_food.len()
         );
         assert_eq!(
@@ -347,7 +391,9 @@ mod tests {
             entry_node_id: NodeId::new(0),
             nodes: vec![NodeGenome {
                 node_id: NodeId::new(0),
-                input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
+                input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
+                    type_idx: OrdinaryFoodTypeId::default(),
+                })],
                 backend_def: BackendDef::Vm(VmBackendDef {
                     register_count: 1,
                     constants: vec![],
@@ -370,8 +416,12 @@ mod tests {
             nodes: vec![NodeGenome {
                 node_id: NodeId::new(0),
                 input_refs: vec![
-                    InputReference::World(WorldInputKey::FoodHere),
-                    InputReference::World(WorldInputKey::AreaFoodSummary),
+                    InputReference::World(WorldInputKey::FoodHere {
+                        type_idx: OrdinaryFoodTypeId::default(),
+                    }),
+                    InputReference::World(WorldInputKey::AreaFoodSummary {
+                        type_idx: OrdinaryFoodTypeId::default(),
+                    }),
                 ],
                 backend_def: BackendDef::Vm(VmBackendDef {
                     register_count: 1,

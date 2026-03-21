@@ -622,7 +622,9 @@ fn functional_complexity_excludes_dead_graph_nodes() {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
-            input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
+            input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
+                type_idx: crate::config::OrdinaryFoodTypeId::default(),
+            })],
             backend_def: BackendDef::Graph(CgpGraphBackendDef {
                 compute_nodes: vec![
                     ComputeNode {
@@ -704,7 +706,9 @@ fn functional_complexity_counts_only_consumed_input_refs() {
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
             input_refs: vec![
-                InputReference::World(WorldInputKey::FoodHere),
+                InputReference::World(WorldInputKey::FoodHere {
+                    type_idx: crate::config::OrdinaryFoodTypeId::default(),
+                }),
                 InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
                 InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
             ],
@@ -736,7 +740,9 @@ fn functional_complexity_equals_genome_size_fully_connected() {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
             node_id: NodeId::new(0),
-            input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
+            input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
+                type_idx: crate::config::OrdinaryFoodTypeId::default(),
+            })],
             backend_def: BackendDef::Vm(VmBackendDef {
                 register_count: 4,
                 constants: vec![],

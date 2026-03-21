@@ -203,6 +203,7 @@ mod tests {
     use crate::runtime::trace::domain::TraceRouteKind;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
+    use crate::sensors::typed_food::TypedFoodLocalSnapshot;
 
     fn default_config() -> RuntimeConfig {
         RuntimeConfig::default()
@@ -218,7 +219,8 @@ mod tests {
                 generation: 0.0,
                 age_ticks: 0.0,
             },
-            perception: PerceptionSnapshot::zero(),
+            typed_local_food: TypedFoodLocalSnapshot::zeroed(1),
+            perception: PerceptionSnapshot::zeroed(1),
         }
     }
 
@@ -307,7 +309,12 @@ mod tests {
         );
 
         assert_eq!(output_a.actions, output_b.actions);
-        assert_eq!(output_b.actions, vec![WorldAction::Eat]);
+        assert_eq!(
+            output_b.actions,
+            vec![WorldAction::Eat {
+                type_idx: crate::config::OrdinaryFoodTypeId::default()
+            }]
+        );
         assert!(
             (energy_a - energy_b).abs() < 1e-6,
             "energy: {energy_a} vs {energy_b}"
@@ -400,7 +407,12 @@ mod tests {
             &config,
         );
 
-        assert_eq!(output.actions, vec![WorldAction::Eat]);
+        assert_eq!(
+            output.actions,
+            vec![WorldAction::Eat {
+                type_idx: crate::config::OrdinaryFoodTypeId::default()
+            }]
+        );
         // Hop 1 (VM) should have upstream_slots[5] = 9.0
         assert!((hops[1].upstream_slots[5] - 9.0).abs() < 1e-5);
     }
@@ -500,7 +512,12 @@ mod tests {
         assert!(graph.action_slots[0].fired);
         assert_eq!(graph.action_slots[0].queue_len_before, 0);
         assert_eq!(graph.action_slots[0].queue_len_after, 1);
-        assert_eq!(graph.action_slots[0].emitted_action, Some(WorldAction::Eat));
+        assert_eq!(
+            graph.action_slots[0].emitted_action,
+            Some(WorldAction::Eat {
+                type_idx: crate::config::OrdinaryFoodTypeId::default()
+            })
+        );
         assert!(graph.action_slots[1].wired);
         assert!(graph.action_slots[1].fired);
         assert_eq!(graph.action_slots[1].queue_len_before, 1);
@@ -567,7 +584,12 @@ mod tests {
 
         assert_eq!(hops.len(), 1);
         assert!(matches!(reason, TerminationReason::ActionEmitted));
-        assert_eq!(output.actions, vec![WorldAction::Eat]);
+        assert_eq!(
+            output.actions,
+            vec![WorldAction::Eat {
+                type_idx: crate::config::OrdinaryFoodTypeId::default()
+            }]
+        );
 
         let BackendTrace::Graph(graph) = &hops[0].backend_trace else {
             panic!("expected graph backend trace");
@@ -578,7 +600,12 @@ mod tests {
         assert!(graph.action_slots[0].fired);
         assert_eq!(graph.action_slots[0].queue_len_before, 0);
         assert_eq!(graph.action_slots[0].queue_len_after, 1);
-        assert_eq!(graph.action_slots[0].emitted_action, Some(WorldAction::Eat));
+        assert_eq!(
+            graph.action_slots[0].emitted_action,
+            Some(WorldAction::Eat {
+                type_idx: crate::config::OrdinaryFoodTypeId::default()
+            })
+        );
         assert!(graph.execute_gate.wired);
         assert!(graph.execute_gate.queue_non_empty);
         assert!(graph.execute_gate.fired);

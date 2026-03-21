@@ -1,3 +1,4 @@
+use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::Direction;
 
 /// The action a creature emits at the end of mesh execution for one tick.
@@ -5,8 +6,8 @@ use crate::contracts::Direction;
 pub enum WorldAction {
     /// Do nothing this tick.
     NoOp,
-    /// Consume food on the current cell.
-    Eat,
+    /// Consume food on the current cell for the configured food type.
+    Eat { type_idx: OrdinaryFoodTypeId },
     /// Move one step in the given direction.
     Move(Direction),
     /// Attempt to spawn an offspring in the given direction, transferring energy.
@@ -19,6 +20,12 @@ pub enum WorldAction {
 }
 
 impl WorldAction {
+    /// Construct a typed Eat action for the given ordinary food type.
+    #[must_use]
+    pub const fn eat(type_idx: OrdinaryFoodTypeId) -> Self {
+        Self::Eat { type_idx }
+    }
+
     pub fn is_noop(&self) -> bool {
         matches!(self, WorldAction::NoOp)
     }
@@ -29,7 +36,7 @@ impl WorldAction {
     pub fn action_type(&self) -> u8 {
         match self {
             WorldAction::NoOp => 0,
-            WorldAction::Eat => 1,
+            WorldAction::Eat { .. } => 1,
             WorldAction::Move(_) => 2,
             WorldAction::Reproduce { .. } => 3,
             WorldAction::StealEnergy { .. } => 4,
@@ -42,6 +49,7 @@ impl WorldAction {
     #[inline]
     pub fn param(&self, slot: usize) -> f32 {
         match (self, slot) {
+            (WorldAction::Eat { type_idx }, 0) => type_idx.get() as f32,
             (WorldAction::Move(dir), 0) => dir.to_index() as f32,
             (WorldAction::Reproduce { direction, .. }, 0) => direction.to_index() as f32,
             (
@@ -60,6 +68,7 @@ impl WorldAction {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::OrdinaryFoodTypeId;
 
     #[test]
     fn noop_is_noop() {
@@ -68,7 +77,10 @@ mod tests {
 
     #[test]
     fn other_actions_not_noop() {
-        assert!(!WorldAction::Eat.is_noop());
+        assert!(!WorldAction::Eat {
+            type_idx: OrdinaryFoodTypeId::default()
+        }
+        .is_noop());
         assert!(!WorldAction::Move(Direction::N).is_noop());
         assert!(!WorldAction::Reproduce {
             direction: Direction::S,
@@ -118,7 +130,9 @@ mod tests {
     fn world_action_serde_roundtrip() {
         let actions = vec![
             WorldAction::NoOp,
-            WorldAction::Eat,
+            WorldAction::Eat {
+                type_idx: OrdinaryFoodTypeId::default(),
+            },
             WorldAction::Move(Direction::W),
             WorldAction::Reproduce {
                 direction: Direction::NE,

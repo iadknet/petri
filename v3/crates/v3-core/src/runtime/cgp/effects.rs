@@ -1,5 +1,6 @@
 //! Post-convergence effect pass for CGP-style graph backend evaluation.
 
+use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{Direction, InputReference, WorldAction};
 use crate::creature::genome::cgp::{
     ActionSlotBehavior, CgpGraphBackendDef, GraphEdge, OutputSinkKind, WorldActionKind,
@@ -66,12 +67,23 @@ fn clamp_non_negative_finite(v: f32) -> f32 {
 }
 
 #[inline]
+fn decode_food_type_idx(raw: f32) -> OrdinaryFoodTypeId {
+    if raw.is_finite() && raw >= 0.0 {
+        OrdinaryFoodTypeId::new(raw.round().clamp(0.0, u16::MAX as f32) as u16)
+    } else {
+        OrdinaryFoodTypeId::default()
+    }
+}
+
+#[inline]
 fn decode_action_from_kind(kind: WorldActionKind, param_values: &[f32]) -> WorldAction {
     let p0 = param_values.first().copied().unwrap_or(0.0);
     let p1 = param_values.get(1).copied().unwrap_or(0.0);
     match kind {
         WorldActionKind::NoOp => WorldAction::NoOp,
-        WorldActionKind::Eat => WorldAction::Eat,
+        WorldActionKind::Eat => WorldAction::Eat {
+            type_idx: decode_food_type_idx(p0),
+        },
         WorldActionKind::Move => WorldAction::Move(decode_direction(p0)),
         WorldActionKind::Reproduce => WorldAction::Reproduce {
             direction: decode_direction(p0),
@@ -271,4 +283,23 @@ pub(crate) fn apply_cgp_graph_effects(
             },
         },
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::decode_action_from_kind;
+    use crate::config::OrdinaryFoodTypeId;
+    use crate::contracts::WorldAction;
+    use crate::creature::genome::cgp::WorldActionKind;
+
+    #[test]
+    fn decode_action_from_kind_eat_uses_first_param_slot_for_type_idx() {
+        let action = decode_action_from_kind(WorldActionKind::Eat, &[3.0, 8.0]);
+        assert_eq!(
+            action,
+            WorldAction::Eat {
+                type_idx: OrdinaryFoodTypeId::new(3),
+            }
+        );
+    }
 }

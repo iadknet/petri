@@ -725,7 +725,7 @@ pub(crate) fn raw_field_mutation(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::MutationConfig;
+    use crate::config::{MutationConfig, OrdinaryFoodTypeId};
     use crate::contracts::{InputReference, WorldInputKey};
     use crate::creature::genome::cgp::{
         ActionSlot, ActionSlotBehavior, ExecuteGate, OutputSink, OutputSinkKind, WorldActionKind,
@@ -820,7 +820,7 @@ mod tests {
         let mut rng = test_rng();
         let before = def.compute_nodes.len();
         let input_refs = vec![
-            InputReference::World(WorldInputKey::FoodHere),
+            InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())),
             InputReference::World(WorldInputKey::NeighborBarrierRing),
         ];
         add_compute_node(&mut def, &input_refs, &mut rng).unwrap();
@@ -908,9 +908,9 @@ mod tests {
             param_inputs: Vec::new(),
         });
         let input_refs = vec![
-            InputReference::World(WorldInputKey::FoodHere), // width 1
+            InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())), // width 1
             InputReference::World(WorldInputKey::NeighborBarrierRing), // width 8
-            InputReference::ActionQueue,                    // width action_bank.len()*3 == 6
+            InputReference::ActionQueue, // width action_bank.len()*3 == 6
         ];
         let mut rng = test_rng();
         add_compute_node(&mut def, &input_refs, &mut rng).unwrap();
@@ -938,10 +938,14 @@ mod tests {
         let mut def = minimal_def();
         let mut rng = test_rng();
         let input_refs = [
-            InputReference::World(WorldInputKey::FoodHere),
-            InputReference::World(WorldInputKey::NeighborFoodRing),
+            InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())),
+            InputReference::World(WorldInputKey::neighbor_food_ring(
+                OrdinaryFoodTypeId::default(),
+            )),
             InputReference::World(WorldInputKey::NeighborBarrierRing),
-            InputReference::World(WorldInputKey::AreaFoodSummary),
+            InputReference::World(WorldInputKey::AreaFoodSummary {
+                type_idx: OrdinaryFoodTypeId::default(),
+            }),
         ];
 
         add_compute_node(&mut def, &input_refs, &mut rng).unwrap();

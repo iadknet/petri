@@ -1,4 +1,8 @@
-import type { FertilityAlgorithm, FertilityLayer } from "../../../types/config.ts";
+import type {
+	FertilityAlgorithm,
+	FertilityLayer,
+	FoodFertilityLayerTarget,
+} from "../../../types/config.ts";
 import { FieldGroup } from "../shared/FieldGroup.tsx";
 import { FieldRow } from "../shared/FieldRow.tsx";
 import { ToggleRow } from "../shared/ToggleRow.tsx";
@@ -136,11 +140,27 @@ function defaultAlgorithm(type: FertilityAlgorithmType): FertilityAlgorithm {
 	}
 }
 
-function defaultLayer(): FertilityLayer {
-	return {
-		weight: 1.0,
-		algorithm: defaultAlgorithm("PoissonBlobs"),
-	};
+function targetValue(target: FoodFertilityLayerTarget | undefined): string {
+	if (!target || target === "AllFoods") {
+		return "all_foods";
+	}
+	return `single_type:${target.SingleType.type_idx}`;
+}
+
+function parseTarget(value: string): FoodFertilityLayerTarget {
+	if (value === "all_foods") {
+		return "AllFoods";
+	}
+
+	const [kind, idx] = value.split(":");
+	if (kind === "single_type") {
+		const parsed = Number(idx);
+		if (Number.isFinite(parsed) && parsed >= 0) {
+			return { SingleType: { type_idx: parsed } };
+		}
+	}
+
+	return "AllFoods";
 }
 
 function algorithmType(algorithm: FertilityAlgorithm): FertilityAlgorithmType {
@@ -186,7 +206,17 @@ function LayerField({ label, testId, value, onChange, tooltip, min, max, step }:
 	);
 }
 
-export function FertilitySection({ startupPreset, updateStartupPreset }: StartupSectionProps) {
+interface FertilitySectionProps extends StartupSectionProps {
+	addFertilityLayer: () => void;
+	updateFertilityLayerTarget: (index: number, target: FoodFertilityLayerTarget) => void;
+}
+
+export function FertilitySection({
+	startupPreset,
+	updateStartupPreset,
+	addFertilityLayer,
+	updateFertilityLayerTarget,
+}: FertilitySectionProps) {
 	const fertilityEnabled = (getByPath(startupPreset, FERTILITY_TOGGLE.path) as boolean) ?? false;
 	const annealingEnabled = (getByPath(startupPreset, ANNEALING_TOGGLE.path) as boolean) ?? false;
 	const fertilityLayers = startupPreset.world.food.fertility.layers;
@@ -205,12 +235,13 @@ export function FertilitySection({ startupPreset, updateStartupPreset }: Startup
 	const handleFertilityToggle = (_path: string, enabled: boolean) => {
 		updateStartupPreset(FERTILITY_TOGGLE.path, enabled);
 		if (enabled && fertilityLayers.length === 0) {
-			setLayers([defaultLayer(), defaultLayer()]);
+			addFertilityLayer();
+			addFertilityLayer();
 		}
 	};
 
 	const addLayer = () => {
-		setLayers([...fertilityLayers, defaultLayer()]);
+		addFertilityLayer();
 	};
 
 	const removeLayer = (index: number) => {
@@ -281,12 +312,37 @@ export function FertilitySection({ startupPreset, updateStartupPreset }: Startup
 											className="px-2 py-0.5 text-[11px] text-rose-200 bg-rose-900/30 hover:bg-rose-900/50 rounded"
 										>
 											Remove
-										</button>
-									</div>
+								</button>
+							</div>
 
-									<div className="mt-2 flex items-center justify-between gap-2">
-										<label
-											htmlFor={`${baseTestId}-algorithm-input`}
+							<div className="mt-2 flex items-center justify-between gap-2">
+								<label
+									htmlFor={`${baseTestId}-target-input`}
+									className="text-[11px] text-slate-400"
+								>
+									Target
+								</label>
+								<select
+									id={`${baseTestId}-target-input`}
+									data-testid={`${baseTestId}-target`}
+									value={targetValue(layer.target)}
+									onChange={(e) =>
+										updateFertilityLayerTarget(index, parseTarget(e.target.value))
+									}
+									className="px-1.5 py-0.5 text-xs bg-slate-800 border border-slate-700 rounded text-slate-200"
+								>
+									<option value="all_foods">All Foods</option>
+									{startupPreset.world.food.types.map((foodType, typeIndex) => (
+										<option key={`${baseTestId}-target-${typeIndex}`} value={`single_type:${typeIndex}`}>
+											{`Type ${typeIndex + 1}: ${foodType.name}`}
+										</option>
+									))}
+								</select>
+							</div>
+
+							<div className="mt-2 flex items-center justify-between gap-2">
+								<label
+									htmlFor={`${baseTestId}-algorithm-input`}
 											className="text-[11px] text-slate-400"
 										>
 											Algorithm
@@ -426,7 +482,7 @@ export function FertilitySection({ startupPreset, updateStartupPreset }: Startup
 													id={`${baseTestId}-fbm-seed-enabled-input`}
 													data-testid={`${baseTestId}-fbm-seed-enabled`}
 													type="checkbox"
-													checked={fbm.seed !== undefined}
+													checked={fbm.seed != null}
 													onChange={(e) => {
 														updateLayer(index, () => ({
 															...layer,
@@ -448,11 +504,11 @@ export function FertilitySection({ startupPreset, updateStartupPreset }: Startup
 													className="accent-emerald-500"
 												/>
 											</div>
-											{fbm.seed !== undefined && (
+											{fbm.seed != null && (
 												<LayerField
 													label="Seed"
 													testId={`${baseTestId}-fbm-seed`}
-													value={fbm.seed}
+													value={fbm.seed ?? 0}
 													tooltip={FBM_TOOLTIPS.seed}
 													min={0}
 													step={1}
@@ -570,7 +626,7 @@ export function FertilitySection({ startupPreset, updateStartupPreset }: Startup
 													id={`${baseTestId}-poisson-seed-enabled-input`}
 													data-testid={`${baseTestId}-poisson-seed-enabled`}
 													type="checkbox"
-													checked={poisson.seed !== undefined}
+													checked={poisson.seed != null}
 													onChange={(e) => {
 														updateLayer(index, () => ({
 															...layer,
@@ -592,11 +648,11 @@ export function FertilitySection({ startupPreset, updateStartupPreset }: Startup
 													className="accent-emerald-500"
 												/>
 											</div>
-											{poisson.seed !== undefined && (
+											{poisson.seed != null && (
 												<LayerField
 													label="Seed"
 													testId={`${baseTestId}-poisson-seed`}
-													value={poisson.seed}
+													value={poisson.seed ?? 0}
 													tooltip={POISSON_TOOLTIPS.seed}
 													min={0}
 													step={1}

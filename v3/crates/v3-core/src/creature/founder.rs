@@ -1,4 +1,4 @@
-use crate::config::{FounderProfile, MutationConfig};
+use crate::config::{FounderProfile, MutationConfig, OrdinaryFoodTypeId};
 use crate::contracts::{
     DynamicIntrospectionKey, InputReference, NodeId, StaticIntrospectionKey, WorldInputKey,
 };
@@ -83,10 +83,12 @@ fn node0_graph_sensor(min_reproduce_age_ticks: u64) -> NodeGenome {
     NodeGenome {
         node_id: NodeId::new(0),
         input_refs: vec![
-            InputReference::World(WorldInputKey::FoodHere),
+            InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
             InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
-            InputReference::World(WorldInputKey::NeighborFoodRing),
+            InputReference::World(WorldInputKey::neighbor_food_ring(
+                OrdinaryFoodTypeId::default(),
+            )),
             InputReference::World(WorldInputKey::NeighborOccupiedRing),
         ],
         backend_def: BackendDef::Graph(build_cgp_founder_graph(
@@ -104,10 +106,12 @@ fn node0_graph_sensor_with_threshold(
     NodeGenome {
         node_id: NodeId::new(0),
         input_refs: vec![
-            InputReference::World(WorldInputKey::FoodHere),
+            InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())),
             InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
             InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
-            InputReference::World(WorldInputKey::NeighborFoodRing),
+            InputReference::World(WorldInputKey::neighbor_food_ring(
+                OrdinaryFoodTypeId::default(),
+            )),
             InputReference::World(WorldInputKey::NeighborOccupiedRing),
         ],
         backend_def: BackendDef::Graph(build_cgp_founder_graph_with_thresholds(
@@ -432,6 +436,7 @@ mod tests {
     use crate::runtime::vm::execute_vm_node;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
+    use crate::sensors::typed_food::TypedFoodLocalSnapshot;
 
     fn run_founder_actions(
         profile: FounderProfile,
@@ -472,7 +477,8 @@ mod tests {
                 generation: 0.0,
                 age_ticks: 0.0,
             },
-            perception: PerceptionSnapshot::zero(),
+            typed_local_food: TypedFoodLocalSnapshot::zeroed(1),
+            perception: PerceptionSnapshot::zeroed(1),
         };
         let runtime = RuntimeConfig::default();
         let mut side_outputs = MeshSideOutputs::new(runtime.max_actions_per_turn);
@@ -687,7 +693,7 @@ mod tests {
             actions.len() >= 2,
             "forage branch should enqueue at least Eat + Move actions"
         );
-        assert_eq!(actions[0], WorldAction::Eat);
+        assert_eq!(actions[0], WorldAction::eat(OrdinaryFoodTypeId::default()));
         assert!(matches!(actions[1], WorldAction::Move(_)));
     }
 
@@ -706,7 +712,7 @@ mod tests {
             actions.len() >= 2,
             "fallback branch should enqueue at least Eat + Move actions"
         );
-        assert_eq!(actions[0], WorldAction::Eat);
+        assert_eq!(actions[0], WorldAction::eat(OrdinaryFoodTypeId::default()));
         assert!(matches!(actions[1], WorldAction::Move(_)));
     }
 
@@ -751,15 +757,20 @@ mod tests {
                 graph.compute_nodes[0].kind,
                 ComputeNodeKind::Threshold(expected_threshold)
             );
-            assert_eq!(graph.compute_nodes[1].kind, ComputeNodeKind::Threshold(19.5));
+            assert_eq!(
+                graph.compute_nodes[1].kind,
+                ComputeNodeKind::Threshold(19.5)
+            );
             assert_eq!(graph.compute_nodes[2].kind, ComputeNodeKind::Multiply);
             assert_eq!(
                 node0.input_refs,
                 vec![
-                    InputReference::World(WorldInputKey::FoodHere),
+                    InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default(),)),
                     InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
                     InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
-                    InputReference::World(WorldInputKey::NeighborFoodRing),
+                    InputReference::World(WorldInputKey::neighbor_food_ring(
+                        OrdinaryFoodTypeId::default(),
+                    )),
                     InputReference::World(WorldInputKey::NeighborOccupiedRing),
                 ],
                 "founder node0 inputs should include age ticks"

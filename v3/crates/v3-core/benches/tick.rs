@@ -5,6 +5,7 @@ use v3_core::sensors::perception::{
 };
 use v3_core::sensors::reducers::assemble_perception;
 use v3_core::sensors::static_inputs::assemble_static_inputs;
+use v3_core::sensors::typed_food::assemble_typed_food_local_snapshot;
 use v3_core::sensors::visibility::{
     compute_visible_cells_into, get_visibility_table, VisibilityScratch,
 };
@@ -81,9 +82,12 @@ fn bench_mesh_execution_only(c: &mut Criterion) {
                 let ids: Vec<_> = sim.creatures.keys().collect();
                 for id in ids {
                     let local = assemble_static_inputs(&sim.world, &sim.creatures[id]);
+                    let typed_local_food =
+                        assemble_typed_food_local_snapshot(&sim.world, sim.creatures[id].position);
                     let ss = SensorSnapshot {
                         local,
                         perception: PerceptionSnapshot::zero(),
+                        typed_local_food,
                     };
                     let creature = sim.creatures.get_mut(id).unwrap();
                     let _ = black_box(execute_creature_mesh(

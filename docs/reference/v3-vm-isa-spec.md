@@ -308,7 +308,7 @@ mapping below:
 | `action_type` | Decoded `WorldAction` | Metadata usage |
 |---|---|---|
 | `0` | `NoOp` | none |
-| `1` | `Eat` | none |
+| `1` | `Eat` | `meta[0]` = food type index |
 | `2` | `Move` | `meta[0]` = direction index |
 | `3` | `Reproduce` | `meta[0]` = direction index, `meta[1]` = offspring transfer energy (scalar `f32`) |
 | `4` | `StealEnergy` | `meta[0]` = direction index, `meta[1]` = steal amount |

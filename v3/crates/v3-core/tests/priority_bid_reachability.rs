@@ -11,6 +11,7 @@ use v3_core::mutation::MutationEngine;
 use v3_core::runtime::execute_creature_mesh;
 use v3_core::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use v3_core::sensors::static_inputs::StaticInputs;
+use v3_core::sensors::typed_food::TypedFoodLocalSnapshot;
 
 const SEARCH_SEEDS: u64 = 512;
 const SEARCH_GENERATIONS: usize = 12;
@@ -30,6 +31,7 @@ fn search_config() -> v3_core::config::MutationConfig {
 fn rich_perception_snapshot() -> PerceptionSnapshot {
     PerceptionSnapshot {
         area_food: [0.9, 0.4, -0.2, 0.2, -0.3, 0.6, 1.0],
+        typed_area_food: vec![[0.9, 0.4, -0.2, 0.2, -0.3, 0.6, 1.0]],
         area_barrier: [0.1, 0.8, -0.4, 0.5, 0.2, -0.1, 0.7],
         area_occupancy: [0.6, -0.2, 0.3, 0.1, -0.4, 0.5, 0.9],
         nearby_core: [
@@ -53,6 +55,10 @@ fn probe_cases() -> [ProbeCase; 4] {
                     generation: 2.0,
                     age_ticks: 5.0,
                 },
+                typed_local_food: TypedFoodLocalSnapshot {
+                    food_here_by_type: vec![1.0],
+                    neighbor_food_by_type: vec![[0.9, 0.1, 0.8, 0.2, 0.7, 0.3, 0.6, 0.4]],
+                },
                 perception: rich_perception_snapshot(),
             },
         },
@@ -66,6 +72,10 @@ fn probe_cases() -> [ProbeCase; 4] {
                     neighbor_occupied: [1.0, 0.0, 1.0, 0.0, 1.0, 0.0, 1.0, 0.0],
                     generation: 8.0,
                     age_ticks: 40.0,
+                },
+                typed_local_food: TypedFoodLocalSnapshot {
+                    food_here_by_type: vec![0.0],
+                    neighbor_food_by_type: vec![[1.0, 0.0, 0.8, 0.0, 0.6, 0.0, 0.4, 0.0]],
                 },
                 perception: rich_perception_snapshot(),
             },
@@ -81,6 +91,10 @@ fn probe_cases() -> [ProbeCase; 4] {
                     generation: 1.0,
                     age_ticks: 120.0,
                 },
+                typed_local_food: TypedFoodLocalSnapshot {
+                    food_here_by_type: vec![0.2],
+                    neighbor_food_by_type: vec![[0.0, 0.4, 0.0, 0.6, 0.0, 0.8, 0.0, 1.0]],
+                },
                 perception: rich_perception_snapshot(),
             },
         },
@@ -95,7 +109,8 @@ fn probe_cases() -> [ProbeCase; 4] {
                     generation: 0.0,
                     age_ticks: 0.0,
                 },
-                perception: PerceptionSnapshot::zero(),
+                typed_local_food: TypedFoodLocalSnapshot::zeroed(1),
+                perception: PerceptionSnapshot::zeroed(1),
             },
         },
     ]

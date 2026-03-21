@@ -1,18 +1,20 @@
+use crate::config::OrdinaryFoodTypeId;
+
 /// Identifies a world-state spatial sensor input.
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize,
 )]
 pub enum WorldInputKey {
     /// Food density on current cell, normalized to [0.0, 1.0].
-    FoodHere,
+    FoodHere { type_idx: OrdinaryFoodTypeId },
     /// Compound: neighbor food ring (8 sub-values, indexed by Direction::to_index()).
-    NeighborFoodRing,
+    NeighborFoodRing { type_idx: OrdinaryFoodTypeId },
     /// Compound: neighbor barrier ring (8 sub-values, indexed by Direction::to_index()).
     NeighborBarrierRing,
     /// Compound: neighbor occupied ring (8 sub-values, indexed by Direction::to_index()).
     NeighborOccupiedRing,
     /// Compound: area food summary (7 sub-values). See v3-sensor-spec.md Section 5.1.
-    AreaFoodSummary,
+    AreaFoodSummary { type_idx: OrdinaryFoodTypeId },
     /// Compound: area barrier summary (7 sub-values). See v3-sensor-spec.md Section 5.2.
     AreaBarrierSummary,
     /// Compound: area occupancy summary (7 sub-values). See v3-sensor-spec.md Section 5.3.
@@ -26,20 +28,49 @@ pub enum WorldInputKey {
 }
 
 impl WorldInputKey {
+    /// Construct a typed food-here key for the given food type.
+    #[must_use]
+    pub const fn food_here(type_idx: OrdinaryFoodTypeId) -> Self {
+        Self::FoodHere { type_idx }
+    }
+
+    /// Construct a typed neighbor-food-ring key for the given food type.
+    #[must_use]
+    pub const fn neighbor_food_ring(type_idx: OrdinaryFoodTypeId) -> Self {
+        Self::NeighborFoodRing { type_idx }
+    }
+
+    /// Construct a typed area-food-summary key for the given food type.
+    #[must_use]
+    pub const fn area_food_summary(type_idx: OrdinaryFoodTypeId) -> Self {
+        Self::AreaFoodSummary { type_idx }
+    }
+
     /// Stable string key used by transport/API boundaries.
     #[must_use]
     pub const fn as_key(self) -> &'static str {
         match self {
-            Self::FoodHere => "FoodHere",
-            Self::NeighborFoodRing => "NeighborFoodRing",
+            Self::FoodHere { .. } => "FoodHere",
+            Self::NeighborFoodRing { .. } => "NeighborFoodRing",
             Self::NeighborBarrierRing => "NeighborBarrierRing",
             Self::NeighborOccupiedRing => "NeighborOccupiedRing",
-            Self::AreaFoodSummary => "AreaFoodSummary",
+            Self::AreaFoodSummary { .. } => "AreaFoodSummary",
             Self::AreaBarrierSummary => "AreaBarrierSummary",
             Self::AreaOccupancySummary => "AreaOccupancySummary",
             Self::NearbyCreatureCore => "NearbyCreatureCore",
             Self::NearbyCreatureVitals => "NearbyCreatureVitals",
             Self::NearbyCreatureIdentity => "NearbyCreatureIdentity",
+        }
+    }
+
+    /// Returns the typed food index for food-specific world keys, or `None` otherwise.
+    #[must_use]
+    pub const fn food_type_idx(self) -> Option<OrdinaryFoodTypeId> {
+        match self {
+            Self::FoodHere { type_idx }
+            | Self::NeighborFoodRing { type_idx }
+            | Self::AreaFoodSummary { type_idx } => Some(type_idx),
+            _ => None,
         }
     }
 
@@ -51,8 +82,12 @@ impl WorldInputKey {
     #[must_use]
     pub fn compound_width(&self) -> u16 {
         match self {
-            Self::AreaFoodSummary | Self::AreaBarrierSummary | Self::AreaOccupancySummary => 7,
-            Self::NeighborFoodRing | Self::NeighborBarrierRing | Self::NeighborOccupiedRing => 8,
+            Self::AreaFoodSummary { .. }
+            | Self::AreaBarrierSummary
+            | Self::AreaOccupancySummary => 7,
+            Self::NeighborFoodRing { .. }
+            | Self::NeighborBarrierRing
+            | Self::NeighborOccupiedRing => 8,
             Self::NearbyCreatureCore => 16,
             Self::NearbyCreatureVitals => 8,
             Self::NearbyCreatureIdentity => 12,
@@ -98,11 +133,16 @@ pub enum InputReference {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::OrdinaryFoodTypeId;
 
     #[test]
     fn world_input_keys_constructible() {
-        let _food = WorldInputKey::FoodHere;
-        let _nfood = WorldInputKey::NeighborFoodRing;
+        let _food = WorldInputKey::FoodHere {
+            type_idx: OrdinaryFoodTypeId::default(),
+        };
+        let _nfood = WorldInputKey::NeighborFoodRing {
+            type_idx: OrdinaryFoodTypeId::default(),
+        };
         let _barrier = WorldInputKey::NeighborBarrierRing;
         let _occ = WorldInputKey::NeighborOccupiedRing;
     }
@@ -120,14 +160,20 @@ mod tests {
     #[test]
     fn input_reference_serde_roundtrip() {
         let refs = vec![
-            InputReference::World(WorldInputKey::FoodHere),
-            InputReference::World(WorldInputKey::AreaFoodSummary),
+            InputReference::World(WorldInputKey::FoodHere {
+                type_idx: OrdinaryFoodTypeId::default(),
+            }),
+            InputReference::World(WorldInputKey::AreaFoodSummary {
+                type_idx: OrdinaryFoodTypeId::default(),
+            }),
             InputReference::World(WorldInputKey::AreaBarrierSummary),
             InputReference::World(WorldInputKey::AreaOccupancySummary),
             InputReference::World(WorldInputKey::NearbyCreatureCore),
             InputReference::World(WorldInputKey::NearbyCreatureVitals),
             InputReference::World(WorldInputKey::NearbyCreatureIdentity),
-            InputReference::World(WorldInputKey::NeighborFoodRing),
+            InputReference::World(WorldInputKey::NeighborFoodRing {
+                type_idx: OrdinaryFoodTypeId::default(),
+            }),
             InputReference::World(WorldInputKey::NeighborBarrierRing),
             InputReference::World(WorldInputKey::NeighborOccupiedRing),
             InputReference::StaticIntrospection(StaticIntrospectionKey::Generation),
@@ -144,9 +190,41 @@ mod tests {
 
     #[test]
     fn ring_sensor_compound_widths() {
-        assert_eq!(WorldInputKey::NeighborFoodRing.compound_width(), 8);
+        assert_eq!(
+            WorldInputKey::NeighborFoodRing {
+                type_idx: OrdinaryFoodTypeId::default(),
+            }
+            .compound_width(),
+            8
+        );
         assert_eq!(WorldInputKey::NeighborBarrierRing.compound_width(), 8);
         assert_eq!(WorldInputKey::NeighborOccupiedRing.compound_width(), 8);
-        assert_eq!(WorldInputKey::FoodHere.compound_width(), 1);
+        assert_eq!(
+            WorldInputKey::FoodHere {
+                type_idx: OrdinaryFoodTypeId::default(),
+            }
+            .compound_width(),
+            1
+        );
+    }
+
+    #[test]
+    fn typed_food_keys_have_stable_keys_and_widths() {
+        let here = WorldInputKey::FoodHere {
+            type_idx: OrdinaryFoodTypeId::default(),
+        };
+        let ring = WorldInputKey::NeighborFoodRing {
+            type_idx: OrdinaryFoodTypeId::default(),
+        };
+        let area = WorldInputKey::AreaFoodSummary {
+            type_idx: OrdinaryFoodTypeId::default(),
+        };
+
+        assert_eq!(here.as_key(), "FoodHere");
+        assert_eq!(ring.as_key(), "NeighborFoodRing");
+        assert_eq!(area.as_key(), "AreaFoodSummary");
+        assert_eq!(here.compound_width(), 1);
+        assert_eq!(ring.compound_width(), 8);
+        assert_eq!(area.compound_width(), 7);
     }
 }

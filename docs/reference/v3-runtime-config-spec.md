@@ -25,8 +25,8 @@ This document is the canonical owner for config keys/defaults used by:
 - VM step limits and opcode cost scaling,
 - graph convergence budget controls,
 - perception radius for frozen extended sensing,
-- runtime-editable world-food occupancy depletion knobs (cross-referenced from
-  `v3-world-grid-spec.md`),
+- runtime-editable `world.food.shared.occupancy_depletion.*` knobs
+  (cross-referenced from `v3-world-grid-spec.md`),
 - mutation tuning,
 - reproduction energy transfer gates/caps.
 
@@ -44,6 +44,8 @@ This document does not define:
 - UI exposure choices,
 - world/grid configuration defaults (owned by `v3-world-grid-spec.md`),
 - runtime action/telemetry behavior contracts (see related references).
+- startup-only ordinary-food type catalogs and fertility-layer targeting
+  (owned by `v3-world-grid-spec.md`).
 
 Transport posture note:
 - This file owns config semantics/defaults/normalization.
@@ -272,8 +274,8 @@ knobs visible in the runtime-config contract.
 
 | Key | Type | Default | Constraint / normalization | Used by |
 | --- | --- | --- | --- | --- |
-| `world.food.occupancy_depletion.enabled` | `bool` | `true` | Enables the occupancy depletion mask that suppresses regrowth on occupied cells. | `v3-world-grid-spec.md`, `v3-tick-orchestration-spec.md` |
-| `world.food.occupancy_depletion.deposit_per_occupied_tick` | `f32` | `0.08` | Must be finite; clamp to `[0.0, 1.0]`; invalid values fall back to `0.08`. | `v3-world-grid-spec.md`, `v3-tick-orchestration-spec.md` |
+| `world.food.shared.occupancy_depletion.enabled` | `bool` | `true` | Enables the occupancy depletion mask that suppresses regrowth on occupied cells. | `v3-world-grid-spec.md`, `v3-tick-orchestration-spec.md` |
+| `world.food.shared.occupancy_depletion.deposit_per_occupied_tick` | `f32` | `0.08` | Must be finite; clamp to `[0.0, 1.0]`; invalid values fall back to `0.08`. | `v3-world-grid-spec.md`, `v3-tick-orchestration-spec.md` |
 
 Runtime config transport posture:
 - These fields are editable through v3alpha2 config GET/PATCH transport.
@@ -286,3 +288,5 @@ Runtime config transport posture:
 - Canonical semantics for occupancy depletion recovery, growth suppression, and
   Phase 0 ordering remain in `v3-world-grid-spec.md` and
   `v3-tick-orchestration-spec.md`.
+- `world.food.shared.*` is runtime-editable; `world.food.types[]` and
+  `world.food.fertility.layers` are restart-only startup config.

@@ -36,7 +36,12 @@ fn emit_eat_action_type_1() {
     );
     let actions = aq.action_queue.into_actions();
     assert_eq!(actions.len(), 1);
-    assert_eq!(actions[0], crate::contracts::WorldAction::Eat);
+    assert_eq!(
+        actions[0],
+        crate::contracts::WorldAction::Eat {
+            type_idx: crate::config::OrdinaryFoodTypeId::default()
+        }
+    );
 }
 
 #[test]
@@ -374,6 +379,7 @@ fn vm_eats_when_food_here() {
     use crate::kernel::WorldState;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::assemble_static_inputs;
+    use crate::sensors::typed_food::assemble_typed_food_local_snapshot;
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
     use slotmap::SlotMap;
@@ -392,7 +398,9 @@ fn vm_eats_when_food_here() {
     let id = sm.insert(());
 
     // Single-node VM: read food_here into r0, compare > 0, jump-if-zero past Eat, else Eat
-    let input_refs = vec![InputReference::World(WorldInputKey::FoodHere)];
+    let input_refs = vec![InputReference::World(WorldInputKey::FoodHere {
+        type_idx: crate::config::OrdinaryFoodTypeId::default(),
+    })];
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
@@ -437,7 +445,8 @@ fn vm_eats_when_food_here() {
     assert!(local.food_here > 0.0);
     let ss = SensorSnapshot {
         local,
-        perception: PerceptionSnapshot::zero(),
+        typed_local_food: assemble_typed_food_local_snapshot(&world, creature.position),
+        perception: PerceptionSnapshot::zeroed(1),
     };
 
     let def = if let BackendDef::Vm(ref v) = creature.genome.nodes[0].backend_def {
@@ -467,7 +476,9 @@ fn vm_eats_when_food_here() {
     let actions = side_outputs.action_queue.into_actions();
     assert_eq!(
         actions.first(),
-        Some(&crate::contracts::WorldAction::Eat),
+        Some(&crate::contracts::WorldAction::Eat {
+            type_idx: crate::config::OrdinaryFoodTypeId::default()
+        }),
         "Expected Eat when food is present"
     );
 }
@@ -483,6 +494,7 @@ fn vm_noop_when_no_food() {
     use crate::kernel::WorldState;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::assemble_static_inputs;
+    use crate::sensors::typed_food::assemble_typed_food_local_snapshot;
     use slotmap::SlotMap;
 
     // World with no food
@@ -491,7 +503,9 @@ fn vm_noop_when_no_food() {
     let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
     let id = sm.insert(());
 
-    let input_refs = vec![InputReference::World(WorldInputKey::FoodHere)];
+    let input_refs = vec![InputReference::World(WorldInputKey::FoodHere {
+        type_idx: crate::config::OrdinaryFoodTypeId::default(),
+    })];
     let genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
@@ -533,7 +547,8 @@ fn vm_noop_when_no_food() {
     assert_eq!(local.food_here, 0.0);
     let ss = SensorSnapshot {
         local,
-        perception: PerceptionSnapshot::zero(),
+        typed_local_food: assemble_typed_food_local_snapshot(&world, creature.position),
+        perception: PerceptionSnapshot::zeroed(1),
     };
 
     let def = if let BackendDef::Vm(ref v) = creature.genome.nodes[0].backend_def {

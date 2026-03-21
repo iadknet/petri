@@ -56,8 +56,9 @@ Version contract:
   server bump does not automatically change the CLI protocol version.
 - Documented v3alpha2 exception: food-density payloads and food config shape
   are migrated in-place to normalized `f32` semantics (`density: f32`,
-  world food recovery/spread/max fields) without a version bump, to keep core,
-  server, and frontend aligned in one compatibility window.
+  `world.food.shared.*`, `world.food.types[]`, and fertility layer targets)
+  without a version bump, to keep core, server, and frontend aligned in one
+  compatibility window.
 
 ---
 
@@ -101,17 +102,47 @@ Request (conceptual v3alpha2 shape):
     "height": 400,
     "edge_mode": "wrap",
     "food": {
-      "growth_rate": 0.096,
-      "initial_density": 1.0,
-      "initial_coverage": 0.15,
-      "spread_threshold_ratio": 0.8,
-      "spread_density_ratio": 0.25,
-      "recovery_spawn_rate": 0.01,
-      "recovery_floor_ratio": 0.01,
-      "max_density": 1.0,
-      "occupancy_depletion": {
+      "shared": {
+        "growth_rate": 0.096,
+        "initial_density": 1.0,
+        "initial_coverage": 0.15,
+        "spread_threshold_ratio": 0.8,
+        "spread_density_ratio": 0.25,
+        "recovery_spawn_rate": 0.01,
+        "recovery_floor_ratio": 0.01,
+        "max_density": 1.0,
+        "occupancy_depletion": {
+          "enabled": true,
+          "deposit_per_occupied_tick": 0.08
+        }
+      },
+      "types": [
+        {
+          "name": "ordinary",
+          "color": "#22c55e",
+          "initial_density": 1.0,
+          "initial_coverage": 0.54
+        }
+      ],
+      "fertility": {
         "enabled": true,
-        "deposit_per_occupied_tick": 0.08
+        "min_fertility": 0.0,
+        "max_fertility": 2.0,
+        "layers": [
+          {
+            "algorithm": {
+              "PoissonBlobs": {
+                "blob_count": 900,
+                "min_radius": 5.0,
+                "max_radius": 15.0,
+                "falloff": 0.5,
+                "seed": null
+              }
+            },
+            "weight": 1.0,
+            "target": "AllFoods"
+          }
+        ]
       }
     }
   },
@@ -366,17 +397,47 @@ Response:
       "height": 400,
       "edge_mode": "wrap",
       "food": {
-        "growth_rate": 0.096,
-        "initial_density": 1.0,
-        "initial_coverage": 0.15,
-        "spread_threshold_ratio": 0.8,
-        "spread_density_ratio": 0.25,
-        "recovery_spawn_rate": 0.01,
-        "recovery_floor_ratio": 0.01,
-        "max_density": 1.0,
-        "occupancy_depletion": {
+        "shared": {
+          "growth_rate": 0.096,
+          "initial_density": 1.0,
+          "initial_coverage": 0.15,
+          "spread_threshold_ratio": 0.8,
+          "spread_density_ratio": 0.25,
+          "recovery_spawn_rate": 0.01,
+          "recovery_floor_ratio": 0.01,
+          "max_density": 1.0,
+          "occupancy_depletion": {
+            "enabled": true,
+            "deposit_per_occupied_tick": 0.08
+          }
+        },
+      "types": [
+        {
+          "name": "ordinary",
+          "color": "#22c55e",
+          "initial_density": 1.0,
+          "initial_coverage": 0.54
+        }
+      ],
+        "fertility": {
           "enabled": true,
-          "deposit_per_occupied_tick": 0.08
+          "min_fertility": 0.0,
+          "max_fertility": 2.0,
+          "layers": [
+            {
+              "algorithm": {
+                "PoissonBlobs": {
+                  "blob_count": 900,
+                  "min_radius": 5.0,
+                  "max_radius": 15.0,
+                  "falloff": 0.5,
+                  "seed": null
+                }
+              },
+              "weight": 1.0,
+              "target": "AllFoods"
+            }
+          ]
         }
       }
     },
@@ -431,8 +492,8 @@ Rules:
 - Unknown fields rejected.
 - PATCH supports the full canonical keyspace from `GET /config`, including all
   top-level `mutation.*` keys owned by `v3-runtime-config-spec.md`, plus the
-  runtime-editable `world.food.occupancy_depletion.*` keys cross-referenced by
-  `v3-runtime-config-spec.md` and semantically owned by
+  runtime-editable `world.food.shared.occupancy_depletion.*` keys
+  cross-referenced by `v3-runtime-config-spec.md` and semantically owned by
   `v3-world-grid-spec.md`.
 - PATCH uses deep merge: only specified keys are updated; unspecified keys
   retain their existing values at every nesting level.
@@ -442,6 +503,8 @@ Rules:
   restart-only and rejected from PATCH.
 - Runtime and energy fields are editable in `idle` and `paused`.
 - `startup.*` fields are restart-only and rejected from PATCH.
+- `world.food.types[]` and `world.food.fertility.layers` are restart-only and
+  rejected from PATCH.
 - `energy.costs.failed_action_penalty` is rejected while an active startup
   failed-action-penalty ramp is still in progress (`tick < target_tick`).
 - Editing configuration in disallowed states returns

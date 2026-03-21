@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/rest.ts";
 import { useConfigStore } from "../stores/config.ts";
@@ -36,20 +36,21 @@ describe("ConfigPanel", () => {
 		expect(screen.getByText("Runtime (Live) Config")).toBeInTheDocument();
 		expect(screen.getByTestId("startup-seed-randomize")).toBeInTheDocument();
 		expect(screen.getByText("Food > Occupancy Depletion")).toBeInTheDocument();
-		expect(screen.getAllByText("Food Parameters").length).toBeGreaterThan(0);
-		expect(screen.getByTestId("startup-field-food-initial-density")).toBeInTheDocument();
-		expect(screen.getByTestId("startup-field-food-initial-coverage")).toBeInTheDocument();
+		expect(screen.getAllByText("Food Types").length).toBeGreaterThan(0);
+		expect(screen.getByTestId("startup-food-type-add")).toBeInTheDocument();
+		expect(screen.getByTestId("startup-field-food-type-0-initial-density")).toBeInTheDocument();
+		expect(screen.getByTestId("startup-field-food-type-0-initial-coverage")).toBeInTheDocument();
 		expect(screen.getByTestId("startup-field-energy-initial-energy")).toBeInTheDocument();
 	});
 
 	it("startup edits do not modify runtime local draft for startup-only fields", () => {
 		render(<ConfigPanel />);
-		fireEvent.change(screen.getByTestId("startup-field-food-initial-density"), {
+		fireEvent.change(screen.getByTestId("startup-field-food-type-0-initial-density"), {
 			target: { value: "0.75" },
 		});
 
-		expect(useStartupConfigStore.getState().preset.world.food.initial_density).toBe(0.75);
-		expect(useConfigStore.getState().localDraft?.world.food.initial_density).toBe(1.0);
+		expect(useStartupConfigStore.getState().preset.world.food.types[0]!.initial_density).toBe(0.75);
+		expect(useConfigStore.getState().localDraft?.world.food.shared.initial_density).toBe(1.0);
 	});
 
 	it("applies runtime field disable rules by simulation state", () => {
@@ -124,7 +125,7 @@ describe("ConfigPanel", () => {
 		fireEvent.click(enabled);
 		fireEvent.change(rate, { target: { value: "0.25" } });
 
-		expect(useConfigStore.getState().localDraft?.world.food.occupancy_depletion).toEqual({
+		expect(useConfigStore.getState().localDraft?.world.food.shared.occupancy_depletion).toEqual({
 			enabled: false,
 			deposit_per_occupied_tick: 0.25,
 		});
@@ -202,6 +203,68 @@ describe("ConfigPanel", () => {
 			initial_min_fertility: 0.8,
 			initial_max_fertility: 1.4,
 		});
+	});
+
+	it("supports adding and removing food types in the startup panel", () => {
+		render(<ConfigPanel />);
+
+		expect(screen.getByTestId("startup-food-type-card-0")).toBeInTheDocument();
+		fireEvent.click(screen.getByTestId("startup-food-type-add"));
+
+		expect(screen.getByTestId("startup-food-type-card-1")).toBeInTheDocument();
+		fireEvent.change(screen.getByTestId("startup-field-food-type-1-name"), {
+			target: { value: "Blue Food" },
+		});
+		fireEvent.change(screen.getByTestId("startup-field-food-type-1-color"), {
+			target: { value: "#3b82f6" },
+		});
+		fireEvent.change(screen.getByTestId("startup-field-food-type-1-growth-inhibitor"), {
+			target: { value: "0.45" },
+		});
+		expect(useStartupConfigStore.getState().preset.world.food.types[1]!.growth_inhibitor).toBe(
+			0.45,
+		);
+		fireEvent.click(screen.getByTestId("startup-food-type-remove-1"));
+
+		expect(screen.queryByTestId("startup-food-type-card-1")).not.toBeInTheDocument();
+		expect(useStartupConfigStore.getState().preset.world.food.types).toHaveLength(1);
+		expect(useStartupConfigStore.getState().preset.world.food.types[0]).toMatchObject({
+			name: "Primary Food",
+			color: "#22c55e",
+			growth_inhibitor: 0.2,
+		});
+	});
+
+	it("updates fertility targets using the current food type list", () => {
+		render(<ConfigPanel />);
+		fireEvent.click(screen.getByTestId("startup-field-fertility-enabled"));
+		fireEvent.click(screen.getByTestId("startup-food-type-add"));
+
+		const target = screen.getByTestId("startup-field-fertility-layer-0-target");
+		expect(target).toHaveValue("all_foods");
+		expect(within(target).getByRole("option", { name: "Type 2: Food 2" })).toBeInTheDocument();
+
+		fireEvent.change(target, { target: { value: "single_type:1" } });
+
+		expect(useStartupConfigStore.getState().preset.world.food.fertility.layers[0]!.target).toEqual({
+			SingleType: { type_idx: 1 },
+		});
+	});
+
+	it("retargets fertility layers to all foods when a targeted type is removed", () => {
+		render(<ConfigPanel />);
+		fireEvent.click(screen.getByTestId("startup-field-fertility-enabled"));
+		fireEvent.click(screen.getByTestId("startup-food-type-add"));
+
+		fireEvent.change(screen.getByTestId("startup-field-fertility-layer-0-target"), {
+			target: { value: "single_type:1" },
+		});
+		fireEvent.click(screen.getByTestId("startup-food-type-remove-1"));
+
+		expect(screen.getByTestId("startup-field-fertility-layer-0-target")).toHaveValue("all_foods");
+		expect(useStartupConfigStore.getState().preset.world.food.fertility.layers[0]!.target).toEqual(
+			"AllFoods",
+		);
 	});
 
 	it("supports editing fertility layer algorithm settings", () => {

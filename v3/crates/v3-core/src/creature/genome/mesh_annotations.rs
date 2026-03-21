@@ -165,9 +165,9 @@ fn classify_input_ref(input_ref: &InputReference) -> MeshReadClass {
 
 fn classify_world_input(key: &WorldInputKey) -> MeshReadClass {
     match key {
-        WorldInputKey::FoodHere
-        | WorldInputKey::NeighborFoodRing
-        | WorldInputKey::AreaFoodSummary => MeshReadClass::Food,
+        WorldInputKey::FoodHere { .. }
+        | WorldInputKey::NeighborFoodRing { .. }
+        | WorldInputKey::AreaFoodSummary { .. } => MeshReadClass::Food,
         WorldInputKey::NeighborBarrierRing | WorldInputKey::AreaBarrierSummary => {
             MeshReadClass::Barrier
         }
@@ -183,6 +183,7 @@ fn classify_world_input(key: &WorldInputKey) -> MeshReadClass {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::OrdinaryFoodTypeId;
     use crate::contracts::{DynamicIntrospectionKey, InputReference};
     use crate::creature::genome::analysis::mesh_reachable_nodes;
     use crate::creature::genome::cgp::{
@@ -198,7 +199,7 @@ mod tests {
             nodes: vec![NodeGenome {
                 node_id: NodeId::new(1),
                 input_refs: vec![
-                    InputReference::World(WorldInputKey::FoodHere),
+                    InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())),
                     InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
                 ],
                 targets: vec![],
@@ -353,7 +354,9 @@ mod tests {
                 },
                 NodeGenome {
                     node_id: NodeId::new(2),
-                    input_refs: vec![InputReference::World(WorldInputKey::FoodHere)],
+                    input_refs: vec![InputReference::World(WorldInputKey::food_here(
+                        OrdinaryFoodTypeId::default(),
+                    ))],
                     targets: vec![],
                     backend_def: BackendDef::Vm(VmBackendDef {
                         register_count: 1,

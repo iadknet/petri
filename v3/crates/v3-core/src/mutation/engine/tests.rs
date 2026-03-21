@@ -202,7 +202,9 @@ fn engine_records_added_input_classes_for_graph_add_internal_graph_node() {
         MutationAddedNodeInputClass::Barrier,
     ];
     let base_genome = single_graph_genome_with_inputs(vec![
-        InputReference::World(WorldInputKey::FoodHere),
+        InputReference::World(WorldInputKey::FoodHere {
+            type_idx: crate::config::OrdinaryFoodTypeId::default(),
+        }),
         InputReference::World(WorldInputKey::NeighborBarrierRing),
     ]);
 
@@ -268,7 +270,9 @@ fn engine_records_added_world_inputs_for_graph_add_internal_graph_node() {
     config.mesh_layer_probability = 0.0;
 
     let base_genome = single_graph_genome_with_inputs(vec![
-        InputReference::World(WorldInputKey::AreaFoodSummary),
+        InputReference::World(WorldInputKey::AreaFoodSummary {
+            type_idx: crate::config::OrdinaryFoodTypeId::default(),
+        }),
         InputReference::World(WorldInputKey::NeighborBarrierRing),
     ]);
 
@@ -284,7 +288,12 @@ fn engine_records_added_world_inputs_for_graph_add_internal_graph_node() {
                 .added_node_world_inputs_by_operator
                 .get(&MutationOperator::GraphAddInternalGraphNode)
                 .expect("world inputs should be recorded");
-            assert_eq!(recorded.get(&WorldInputKey::AreaFoodSummary), Some(&1));
+            assert_eq!(
+                recorded.get(&WorldInputKey::AreaFoodSummary {
+                    type_idx: crate::config::OrdinaryFoodTypeId::default()
+                }),
+                Some(&1)
+            );
             assert_eq!(recorded.get(&WorldInputKey::NeighborBarrierRing), Some(&1));
             return;
         }

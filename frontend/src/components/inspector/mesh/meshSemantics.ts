@@ -5,7 +5,7 @@ import type {
 	MeshWriteClass,
 } from "../../../types/creature-detail.ts";
 import type { CreatureGenome, InputReference, NodeGenome } from "../../../types/genome.ts";
-import { formatInputRef } from "../inputRefUtils.ts";
+import { formatInputRef, parseWorldInputRef } from "../inputRefUtils.ts";
 import { type MeshAnalysis, type MeshBackendKind, analyzeMesh } from "./meshAnalysis.ts";
 import type { RuntimeIoBadge } from "./runtimeIoSemantics.ts";
 import { classifyComputeNodeKind, classifyVmInstruction } from "./runtimeIoSemantics.ts";
@@ -188,17 +188,17 @@ function inferReadClasses(inputRefs: InputReference[]): MeshReadClass[] {
 		}
 
 		if ("World" in inputRef) {
-			const w = inputRef.World;
-			if (w === "NeighborFoodRing") {
+			const worldKey = parseWorldInputRef(inputRef.World).key;
+			if (worldKey === "NeighborFoodRing") {
 				classes.add("neighbor");
 				classes.add("food");
-			} else if (w === "NeighborBarrierRing") {
+			} else if (worldKey === "NeighborBarrierRing") {
 				classes.add("neighbor");
 				classes.add("barrier");
-			} else if (w === "NeighborOccupiedRing") {
+			} else if (worldKey === "NeighborOccupiedRing") {
 				classes.add("neighbor");
 				classes.add("occupancy");
-			} else if (w.toLowerCase().includes("food")) {
+			} else if (String(worldKey).toLowerCase().includes("food")) {
 				classes.add("food");
 			}
 			continue;
@@ -552,8 +552,11 @@ function buildSearchTokens({
 	);
 }
 
-function normalizeSearchText(value: string): string {
-	return value.trim().toLowerCase().replace(/\s+/g, " ");
+function normalizeSearchText(value: unknown): string {
+	return String(value ?? "")
+		.trim()
+		.toLowerCase()
+		.replace(/\s+/g, " ");
 }
 
 export function tokenizeSearchText(value: string): string[] {

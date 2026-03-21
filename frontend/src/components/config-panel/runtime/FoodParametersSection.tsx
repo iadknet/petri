@@ -2,7 +2,7 @@ import type { BooleanFieldDef, FieldDef } from "../shared/types.ts";
 
 export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 	{
-		path: "world.food.growth_rate",
+		path: "world.food.shared.growth_rate",
 		label: "Food Growth Rate",
 		min: 0,
 		max: 1,
@@ -11,7 +11,7 @@ export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 		tooltip: "Rate at which existing food cells regenerate density each tick",
 	},
 	{
-		path: "world.food.spread_threshold_ratio",
+		path: "world.food.shared.spread_threshold_ratio",
 		label: "Spread Threshold Ratio",
 		min: 0,
 		max: 1,
@@ -20,7 +20,7 @@ export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 		tooltip: "Minimum neighbor density ratio to trigger food spread to empty cells",
 	},
 	{
-		path: "world.food.spread_density_ratio",
+		path: "world.food.shared.spread_density_ratio",
 		label: "Spread Density Ratio",
 		min: 0,
 		max: 1,
@@ -29,7 +29,7 @@ export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 		tooltip: "Fraction of growth delta deposited to neighbor during spread",
 	},
 	{
-		path: "world.food.recovery_spawn_rate",
+		path: "world.food.shared.recovery_spawn_rate",
 		label: "Recovery Spawn Rate",
 		min: 0,
 		max: 1,
@@ -38,7 +38,7 @@ export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 		tooltip: "Probability of spontaneous food spawn on empty cells each tick",
 	},
 	{
-		path: "world.food.recovery_floor_ratio",
+		path: "world.food.shared.recovery_floor_ratio",
 		label: "Recovery Floor Ratio",
 		min: 0,
 		max: 1,
@@ -47,7 +47,7 @@ export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 		tooltip: "Minimum population-to-capacity ratio below which recovery spawning activates",
 	},
 	{
-		path: "world.food.max_density",
+		path: "world.food.shared.max_density",
 		label: "Food Max Density",
 		min: 0.1,
 		max: 1,
@@ -59,7 +59,7 @@ export const FOOD_PARAMETERS_FIELDS: FieldDef[] = [
 
 export const FOOD_OCCUPANCY_DEPLETION_TOGGLES: BooleanFieldDef[] = [
 	{
-		path: "world.food.occupancy_depletion.enabled",
+		path: "world.food.shared.occupancy_depletion.enabled",
 		label: "Occupancy Depletion Enabled",
 		defaultValue: true,
 		tooltip: "Toggle occupancy-driven food suppression during live food growth",
@@ -69,7 +69,7 @@ export const FOOD_OCCUPANCY_DEPLETION_TOGGLES: BooleanFieldDef[] = [
 
 export const FOOD_OCCUPANCY_DEPLETION_FIELDS: FieldDef[] = [
 	{
-		path: "world.food.occupancy_depletion.deposit_per_occupied_tick",
+		path: "world.food.shared.occupancy_depletion.deposit_per_occupied_tick",
 		label: "Occupancy Depletion Rate",
 		min: 0,
 		max: 1,

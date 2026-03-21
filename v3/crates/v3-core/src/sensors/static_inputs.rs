@@ -1,3 +1,4 @@
+use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{Direction, StaticIntrospectionKey, WorldInputKey};
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
@@ -34,7 +35,10 @@ impl StaticInputs {
     /// keys are resolved through `SensorSnapshot::resolve_compound()`.
     pub fn resolve_world(&self, key: &WorldInputKey) -> f32 {
         match key {
-            WorldInputKey::FoodHere => self.food_here,
+            WorldInputKey::FoodHere { type_idx } if *type_idx == OrdinaryFoodTypeId::default() => {
+                self.food_here
+            }
+            WorldInputKey::FoodHere { .. } => 0.0,
             // Ring + compound keys are resolved via SensorSnapshot::resolve_compound(), not here.
             _ => 0.0,
         }
@@ -160,6 +164,8 @@ mod tests {
         let mut food_cfg = SimulationConfig::default().world.food;
         food_cfg.initial_coverage = 1.0;
         food_cfg.initial_density = 1.0;
+        food_cfg.types[0].initial_coverage = 1.0;
+        food_cfg.types[0].initial_density = 1.0;
         world.reconfigure_food(food_cfg);
         let mut rng = SmallRng::seed_from_u64(42);
         world.seed_food(&mut rng);
@@ -177,6 +183,8 @@ mod tests {
         let mut food_cfg = SimulationConfig::default().world.food;
         food_cfg.initial_coverage = 1.0;
         food_cfg.initial_density = 1.0;
+        food_cfg.types[0].initial_coverage = 1.0;
+        food_cfg.types[0].initial_density = 1.0;
         world.reconfigure_food(food_cfg);
         let mut rng = SmallRng::seed_from_u64(0);
         world.seed_food(&mut rng);
@@ -257,7 +265,9 @@ mod tests {
         let id = get_id();
         let creature = make_creature(id, Position::new(1, 1));
         let si = assemble_static_inputs(&world, &creature);
-        let result = si.resolve_world(&WorldInputKey::FoodHere);
+        let result = si.resolve_world(&WorldInputKey::FoodHere {
+            type_idx: OrdinaryFoodTypeId::default(),
+        });
         assert_eq!(result, 0.0);
     }
 }
