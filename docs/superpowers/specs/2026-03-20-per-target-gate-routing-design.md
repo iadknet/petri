@@ -122,7 +122,7 @@ These existing-code changes are required to support clean boundaries:
 pub const MAX_GATE_SLOTS: usize = 8;
 
 /// A single routing target with stable identity and evolvable bias.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RouteTarget {
     pub target_id: NodeId,
     /// Stable slot identifier (0..MAX_GATE_SLOTS). Survives topology
@@ -225,12 +225,12 @@ target implicit "default" priority.
 fn resolve_gated_route(
     targets: &[RouteTarget],
     gates: &RouteGateMap,
-) -> Option<NodeId> {
+) -> Option<(usize, NodeId)> {
     if targets.is_empty() {
         return None;
     }
     if targets.len() == 1 {
-        return Some(targets[0].target_id);
+        return Some((0, targets[0].target_id));
     }
 
     let mut best_idx = 0;
@@ -247,7 +247,7 @@ fn resolve_gated_route(
             best_idx = i;
         }
     }
-    Some(targets[best_idx].target_id)
+    Some((best_idx, targets[best_idx].target_id))
 }
 ```
 

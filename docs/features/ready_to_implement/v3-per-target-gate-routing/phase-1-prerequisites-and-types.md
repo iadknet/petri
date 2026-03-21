@@ -29,7 +29,7 @@ use super::NodeId;
 pub const MAX_GATE_SLOTS: usize = 8;
 
 /// A single routing target with stable identity and evolvable bias.
-#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RouteTarget {
     pub target_id: NodeId,
     /// Stable slot identifier (0..MAX_GATE_SLOTS).
@@ -43,7 +43,14 @@ pub struct RouteTarget {
 
 Add `pub mod routing;` and re-export: `pub use routing::{RouteTarget, MAX_GATE_SLOTS};`
 
-- [ ] **Step 3: Write unit test for RouteTarget**
+- [ ] **Step 3: Add size assertion**
+
+```rust
+// Prevent accidental size regression — RouteTarget is stored in Vec per node.
+const _: () = assert!(std::mem::size_of::<RouteTarget>() <= 16);
+```
+
+- [ ] **Step 4: Write unit test for RouteTarget**
 
 ```rust
 #[cfg(test)]
@@ -64,12 +71,12 @@ mod tests {
 }
 ```
 
-- [ ] **Step 4: Run test**
+- [ ] **Step 5: Run test**
 
 Run: `cd v3 && cargo test -p v3-core contracts::routing`
 Expected: PASS
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```
 git add v3/crates/v3-core/src/contracts/routing.rs v3/crates/v3-core/src/contracts/mod.rs
@@ -210,9 +217,14 @@ use crate::contracts::MAX_GATE_SLOTS;
 
 /// Per-slot gate scores produced by node execution.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[must_use]
 pub(crate) struct RouteGateMap {
     pub scores: [f32; MAX_GATE_SLOTS],
 }
+
+// Hot-path type size assertions — prevent accidental regressions.
+const _: () = assert!(std::mem::size_of::<RouteGateMap>() == 32);
+
 
 impl Default for RouteGateMap {
     fn default() -> Self {

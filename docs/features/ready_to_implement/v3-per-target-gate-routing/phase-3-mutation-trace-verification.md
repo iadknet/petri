@@ -42,7 +42,9 @@ use crate::contracts::MAX_GATE_SLOTS;
 const _: () = assert!(MAX_GATE_SLOTS <= 8, "lowest_unused_slot uses u8 bitmask");
 
 fn lowest_unused_slot(targets: &[RouteTarget]) -> Option<u8> {
-    let used: u8 = targets.iter().fold(0u8, |mask, t| mask | (1 << t.slot));
+    let used: u8 = targets.iter()
+        .filter(|t| (t.slot as usize) < MAX_GATE_SLOTS)
+        .fold(0u8, |mask, t| mask | (1 << t.slot));
     (0..MAX_GATE_SLOTS as u8).find(|&s| used & (1 << s) == 0)
 }
 ```
@@ -350,14 +352,14 @@ Delete `TraceRouteKind`, old `TraceRouteDecision`, and `from_internal()`.
 
 Add:
 ```rust
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct TraceRouteDecision {
     pub gate_scores: Vec<TraceGateScore>,
     pub selected_target_idx: usize,
     pub selected_target_id: NodeId,
 }
 
-#[derive(Debug, Clone, serde::Serialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
 pub struct TraceGateScore {
     pub slot: u8,
     pub target_id: NodeId,
@@ -416,16 +418,15 @@ let gate_scores: Vec<TraceGateScore> = node.targets.iter().map(|t| {
 
 let trace_route = TraceRouteDecision {
     gate_scores,
-    selected_target_idx: best_idx, // need to capture this from resolve
+    selected_target_idx: winning_idx, // from resolve_gated_route return
     selected_target_id: target_id,
 };
 ```
 
-**Design decision:** `resolve_gated_route` keeps its `Option<NodeId>` return
-type. The traced mesh computes `TraceRouteDecision` by iterating targets and
-gate scores directly (same argmax logic, but also capturing the per-target
-breakdown). This avoids splitting the routing API and keeps the hot path
-(untraced mesh) lean.
+`resolve_gated_route` returns `Option<(usize, NodeId)>` — both the winning
+index and target ID. The traced mesh uses the index directly for
+`selected_target_idx` and constructs `TraceGateScore` entries by iterating
+targets + gate map. No duplicated argmax logic.
 
 - [ ] **Step 2: Update traced VM**
 
