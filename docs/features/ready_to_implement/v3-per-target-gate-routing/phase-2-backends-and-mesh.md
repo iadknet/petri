@@ -33,7 +33,7 @@ fn gated_route_single_target_skips_scoring() {
     let targets = vec![RouteTarget { target_id: NodeId::new(5), slot: 0, gate_bias: -99.0 }];
     let gates = RouteGateMap::default();
     // Single target always wins regardless of bias
-    assert_eq!(resolve_gated_route(&targets, &gates), Some(NodeId::new(5)));
+    assert_eq!(resolve_gated_route(&targets, &gates), Some((0, NodeId::new(5))));
 }
 
 #[test]
@@ -44,7 +44,7 @@ fn gated_route_picks_highest_effective_score() {
     ];
     let mut gates = RouteGateMap::default();
     gates.scores[1] = 1.0; // slot 1 has higher runtime score
-    assert_eq!(resolve_gated_route(&targets, &gates), Some(NodeId::new(2)));
+    assert_eq!(resolve_gated_route(&targets, &gates), Some((1, NodeId::new(2))));
 }
 
 #[test]
@@ -55,7 +55,7 @@ fn gated_route_bias_plus_runtime() {
     ];
     let mut gates = RouteGateMap::default();
     gates.scores[1] = 4.0; // effective: -1.0 + 4.0 = 3.0 > 2.0
-    assert_eq!(resolve_gated_route(&targets, &gates), Some(NodeId::new(2)));
+    assert_eq!(resolve_gated_route(&targets, &gates), Some((1, NodeId::new(2))));
 }
 
 #[test]
@@ -65,7 +65,7 @@ fn gated_route_first_target_wins_ties() {
         RouteTarget { target_id: NodeId::new(2), slot: 1, gate_bias: 0.0 },
     ];
     let gates = RouteGateMap::default(); // all zeros — tied
-    assert_eq!(resolve_gated_route(&targets, &gates), Some(NodeId::new(1)));
+    assert_eq!(resolve_gated_route(&targets, &gates), Some((0, NodeId::new(1))));
 }
 
 #[test]
@@ -76,7 +76,7 @@ fn gated_route_out_of_range_slot_gets_zero_runtime() {
     ];
     let gates = RouteGateMap::default();
     // slot 200 gets runtime 0.0, effective = 1.0 > 0.0
-    assert_eq!(resolve_gated_route(&targets, &gates), Some(NodeId::new(2)));
+    assert_eq!(resolve_gated_route(&targets, &gates), Some((1, NodeId::new(2))));
 }
 ```
 
@@ -97,12 +97,12 @@ Expected: FAIL — `resolve_gated_route` not found
 pub(crate) fn resolve_gated_route(
     targets: &[RouteTarget],
     gates: &RouteGateMap,
-) -> Option<NodeId> {
+) -> Option<(usize, NodeId)> {
     if targets.is_empty() {
         return None;
     }
     if targets.len() == 1 {
-        return Some(targets[0].target_id);
+        return Some((0, targets[0].target_id));
     }
 
     let mut best_idx = 0;
@@ -119,7 +119,7 @@ pub(crate) fn resolve_gated_route(
             best_idx = i;
         }
     }
-    Some(targets[best_idx].target_id)
+    Some((best_idx, targets[best_idx].target_id))
 }
 ```
 
@@ -151,7 +151,7 @@ use crate::runtime::routing::resolve_gated_route;
 
 // Replace the old resolve_route_index block:
 match resolve_gated_route(&node.targets, &result.route_gates) {
-    Some(id) => {
+    Some((_idx, id)) => {
         if find_node_index(&genome.nodes, id).is_none() {
             return MeshOutput {
                 actions: side_outputs.action_queue.into_actions_or_noop(),
