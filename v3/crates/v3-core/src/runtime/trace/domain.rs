@@ -7,6 +7,16 @@ use crate::sensors::perception::PerceptionSnapshot;
 use crate::sensors::static_inputs::StaticInputs;
 use serde::Serialize;
 
+/// Per-target gate score captured in a route decision trace.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TraceGateScore {
+    pub slot: u8,
+    pub target_id: NodeId,
+    pub gate_bias: f32,
+    pub runtime_score: f32,
+    pub effective_score: f32,
+}
+
 /// A completed execution sample containing traces for multiple ticks.
 #[derive(Debug, Clone, Serialize)]
 pub struct ExecutionSample {
@@ -89,19 +99,12 @@ impl From<&PerceptionSnapshot> for PerceptionDebugSnapshot {
     }
 }
 
-/// Public route decision kind captured in traces.
-#[derive(Debug, Clone, Copy, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum TraceRouteKind {
-    VmWrap,
-    CgpNormalized,
-}
-
-/// Public route decision captured per hop.
-#[derive(Debug, Clone, Copy, Serialize)]
+/// Route decision captured per hop, containing per-target gate scores.
+#[derive(Debug, Clone, PartialEq, Serialize)]
 pub struct TraceRouteDecision {
-    pub kind: TraceRouteKind,
-    pub raw_value: f32,
+    pub gate_scores: Vec<TraceGateScore>,
+    pub selected_target_idx: usize,
+    pub selected_target_id: NodeId,
 }
 
 /// Trace data for a single hop in the mesh chain.
@@ -114,8 +117,7 @@ pub struct MeshHopTrace {
     pub energy_before: f32,
     pub energy_after: f32,
     pub output_slots: [f32; OUTPUT_SLOT_COUNT],
-    pub route: TraceRouteDecision,
-    pub resolved_target_index: usize,
+    pub route: Option<TraceRouteDecision>,
     pub backend_trace: BackendTrace,
 }
 
@@ -135,7 +137,6 @@ pub struct VmTrace {
     pub final_registers: Vec<f32>,
     pub final_payload: [f32; OUTPUT_SLOT_COUNT],
     pub final_meta: [f32; 8],
-    pub final_route_value: f32,
     pub slot_writes: Vec<SlotWrite>,
 }
 
@@ -313,19 +314,31 @@ mod tests {
     }
 
     #[test]
-    fn trace_route_decision_constructs_directly() {
-        let vm = TraceRouteDecision {
-            kind: TraceRouteKind::VmWrap,
-            raw_value: 2.5,
+    fn trace_route_decision_with_gate_scores() {
+        let decision = TraceRouteDecision {
+            gate_scores: vec![
+                TraceGateScore {
+                    slot: 0,
+                    target_id: NodeId::new(1),
+                    gate_bias: 0.0,
+                    runtime_score: -1.0,
+                    effective_score: -1.0,
+                },
+                TraceGateScore {
+                    slot: 1,
+                    target_id: NodeId::new(2),
+                    gate_bias: 0.5,
+                    runtime_score: 0.0,
+                    effective_score: 0.5,
+                },
+            ],
+            selected_target_idx: 1,
+            selected_target_id: NodeId::new(2),
         };
-        assert!(matches!(vm.kind, TraceRouteKind::VmWrap));
-        assert!((vm.raw_value - 2.5).abs() < 1e-6);
-
-        let cgp = TraceRouteDecision {
-            kind: TraceRouteKind::CgpNormalized,
-            raw_value: 0.4,
-        };
-        assert!(matches!(cgp.kind, TraceRouteKind::CgpNormalized));
-        assert!((cgp.raw_value - 0.4).abs() < 1e-6);
+        assert_eq!(decision.gate_scores.len(), 2);
+        assert_eq!(decision.selected_target_idx, 1);
+        assert_eq!(decision.selected_target_id, NodeId::new(2));
+        assert!((decision.gate_scores[0].effective_score - (-1.0)).abs() < 1e-6);
+        assert!((decision.gate_scores[1].effective_score - 0.5).abs() < 1e-6);
     }
 }

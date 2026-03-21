@@ -9,7 +9,6 @@ use v3_core::creature::genome::{
 };
 use v3_core::creature::state::CreatureState;
 use v3_core::kernel::WorldState;
-use v3_core::runtime::trace::domain::TraceRouteKind;
 use v3_core::simulation::Simulation;
 
 use crate::support::{insert_creature, run_one_traced_tick, test_config};
@@ -109,12 +108,18 @@ fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
     assert_eq!(tick.hops.len(), 2);
     // Gate routing: slot 1 (effective 0.0) beats slot 0 (effective -1.0)
     assert_eq!(tick.final_actions[0], WorldAction::Eat);
-    assert!((tick.hops[0].route.raw_value - (-1.0)).abs() < 1e-6);
-    assert!(matches!(
-        tick.hops[0].route.kind,
-        TraceRouteKind::CgpNormalized
-    ));
-    assert_eq!(tick.hops[0].resolved_target_index, 1);
+    let route = tick.hops[0]
+        .route
+        .as_ref()
+        .expect("entry hop should have a route decision");
+    assert_eq!(route.selected_target_idx, 1);
+    assert_eq!(route.selected_target_id, id_eat);
+    assert_eq!(route.gate_scores.len(), 2);
+    // Slot 0: runtime_score = -1.0, effective = -1.0
+    assert!((route.gate_scores[0].runtime_score - (-1.0)).abs() < 1e-6);
+    assert!((route.gate_scores[0].effective_score - (-1.0)).abs() < 1e-6);
+    // Slot 1: runtime_score = 0.0, effective = 0.0
+    assert!((route.gate_scores[1].effective_score - 0.0).abs() < 1e-6);
     assert_eq!(
         tick.hops[1].node_id, id_eat,
         "negative gate on slot 0 should cause slot 1 to win"

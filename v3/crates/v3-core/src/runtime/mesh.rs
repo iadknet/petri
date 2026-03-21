@@ -428,12 +428,12 @@ mod tests {
         assert_eq!(output.actions, vec![WorldAction::Eat]);
     }
 
-    // ── Test 7: route_wrapping_rem_euclid ────────────────────────────────────
+    // ── Test 7: single_slot_gate_routes_to_target ──────────────────────────────
 
-    /// VM sets route=3.7; floor(3.7)=3; 3.rem_euclid(3 targets)=0.
-    /// So the executor routes to targets[0] which emits Eat.
+    /// VM writes 3.7 to gate slot 0; single-slot targets all on slot 0,
+    /// first target wins (all same effective score, tie-break by position).
     #[test]
-    fn route_wrapping_rem_euclid() {
+    fn single_slot_gate_routes_to_target() {
         let id0 = NodeId::new(0);
         let id_a = NodeId::new(1);
         let id_b = NodeId::new(2);
@@ -476,13 +476,12 @@ mod tests {
         );
     }
 
-    // ── Test 8: negative_route_wraps_with_rem_euclid ─────────────────────────
+    // ── Test 8: negative_gate_score_loses_to_zero ───────────────────────────
 
-    /// VM sets route=-1.0 → floor(-1.0)=-1 → (-1).rem_euclid(2)=1 → targets[1].
-    /// targets[1] emits Eat, targets[0] emits NoOp.
-    /// This verifies negative-index wrapping via rem_euclid in the mesh router.
+    /// VM writes -1.0 to gate slot 0; targets[0] on slot 0 (effective -1.0),
+    /// targets[1] on slot 1 (effective 0.0). Slot 1 wins → routes to id_eat.
     #[test]
-    fn negative_route_wraps_with_rem_euclid() {
+    fn negative_gate_score_loses_to_zero() {
         let id0 = NodeId::new(0);
         let id_noop = NodeId::new(1); // targets[0]
         let id_eat = NodeId::new(2); // targets[1]
