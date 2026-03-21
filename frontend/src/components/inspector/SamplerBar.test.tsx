@@ -33,7 +33,7 @@ function buildSample(tickCount = 2): ExecutionSample {
 				energy_before: 10,
 				energy_after: 9.5,
 				output_slots: [],
-				route: { kind: "vm_wrap", raw_value: 0, resolved_target_index: 0 },
+				route: null,
 				backend_trace: {
 					Vm: {
 						register_count: 4,
@@ -50,7 +50,6 @@ function buildSample(tickCount = 2): ExecutionSample {
 						final_registers: [0, 0, 0, 0],
 						final_payload: [],
 						final_meta: [],
-						final_route_value: 0,
 						slot_writes: [],
 					},
 				},
@@ -63,7 +62,7 @@ function buildSample(tickCount = 2): ExecutionSample {
 				energy_before: 9.5,
 				energy_after: 9,
 				output_slots: [],
-				route: { kind: "cgp_normalized", raw_value: 0, resolved_target_index: 0 },
+				route: null,
 				backend_trace: {
 					Graph: {
 						passes: [

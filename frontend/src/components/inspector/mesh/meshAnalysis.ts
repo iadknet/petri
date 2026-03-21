@@ -1,4 +1,4 @@
-import type { CreatureGenome, NodeGenome } from "../../../types/genome.ts";
+import type { CreatureGenome, NodeGenome, RouteTarget } from "../../../types/genome.ts";
 
 export type MeshBackendKind = "vm" | "graph";
 export type MeshBackendFilter = "all" | MeshBackendKind;
@@ -32,15 +32,15 @@ export interface MeshAnalysis {
 	danglingTargetIds: Set<number>;
 }
 
-export function getMeshEdgeOccurrenceIndex(targets: number[], targetIndex: number): number {
-	const targetId = targets[targetIndex];
+export function getMeshEdgeOccurrenceIndex(targets: RouteTarget[], targetIndex: number): number {
+	const targetId = targets[targetIndex]?.target_id;
 	if (targetId === undefined) {
 		return 0;
 	}
 
 	let occurrenceIndex = 0;
 	for (let index = 0; index < targetIndex; index += 1) {
-		if (targets[index] === targetId) {
+		if (targets[index]?.target_id === targetId) {
 			occurrenceIndex += 1;
 		}
 	}
@@ -67,12 +67,13 @@ export function analyzeMesh(genome: CreatureGenome): MeshAnalysis {
 			isEntry: node.node_id === genome.entry_node_id,
 			reachable: reachableNodeIds.has(node.node_id),
 			incomingIds: [],
-			outgoingIds: [...node.targets],
+			outgoingIds: node.targets.map((t) => t.target_id),
 		});
 	}
 
 	for (const node of sortedNodes) {
-		for (const [targetIndex, targetId] of node.targets.entries()) {
+		for (const [targetIndex, routeTarget] of node.targets.entries()) {
+			const targetId = routeTarget.target_id;
 			const target = nodesById.get(targetId);
 			if (!target) {
 				danglingTargetIds.add(targetId);
@@ -101,7 +102,7 @@ export function analyzeMesh(genome: CreatureGenome): MeshAnalysis {
 		const incomingIds =
 			incomingMap.get(node.node_id)?.toSorted((left, right) => left - right) ?? [];
 		analyzedNode.incomingIds = incomingIds;
-		analyzedNode.outgoingIds = [...node.targets].toSorted((left, right) => left - right);
+		analyzedNode.outgoingIds = node.targets.map((t) => t.target_id).toSorted((left, right) => left - right);
 		return analyzedNode;
 	});
 
@@ -176,9 +177,9 @@ function collectReachableNodeIds(genome: CreatureGenome): Set<number> {
 		if (!node) {
 			continue;
 		}
-		for (const targetId of node.targets) {
-			if (nodeMap.has(targetId) && !visited.has(targetId)) {
-				queue.push(targetId);
+		for (const routeTarget of node.targets) {
+			if (nodeMap.has(routeTarget.target_id) && !visited.has(routeTarget.target_id)) {
+				queue.push(routeTarget.target_id);
 			}
 		}
 	}
@@ -189,7 +190,7 @@ function collectReachableNodeIds(genome: CreatureGenome): Set<number> {
 function buildTopologyKey(nodes: NodeGenome[]): string {
 	return nodes
 		.map(
-			(node) => `${node.node_id}:${node.targets.toSorted((left, right) => left - right).join(",")}`,
+			(node) => `${node.node_id}:${node.targets.map((t) => t.target_id).toSorted((left, right) => left - right).join(",")}`,
 		)
 		.join("|");
 }

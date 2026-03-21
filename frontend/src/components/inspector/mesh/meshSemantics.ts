@@ -245,8 +245,8 @@ function inferWriteClasses(node: NodeGenome): MeshWriteClass[] {
 		for (const sink of graph.output_sinks) {
 			if (sink.inputs.length === 0) continue;
 			const kind = sink.kind;
-			if (typeof kind === "string") {
-				if (kind === "RouterOutput") classes.add("route");
+			if (typeof kind !== "string" && "RouterGate" in kind) {
+				classes.add("route");
 			} else if ("CustomOutput" in kind) {
 				classes.add("payload");
 			} else if ("WriteSlot" in kind || "ClearSlot" in kind) {

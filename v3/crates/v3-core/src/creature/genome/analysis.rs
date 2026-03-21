@@ -64,7 +64,7 @@ pub fn vm_register_write(instr: &VmInstruction) -> Option<u8> {
         | VmInstruction::PushAction { .. }
         | VmInstruction::PopAction
         | VmInstruction::ExecuteActionQueue
-        | VmInstruction::WriteRouteTarget { .. }
+        | VmInstruction::WriteRouteGate { .. }
         | VmInstruction::SetPriorityBid { .. }
         | VmInstruction::StoreSlot { .. }
         | VmInstruction::StoreSlotImm { .. }
@@ -123,7 +123,7 @@ pub fn vm_register_read_mask(instr: &VmInstruction) -> u32 {
         VmInstruction::JumpIfZero { cond, .. } => vm_reg_bit(*cond),
         VmInstruction::WriteInternalPayload { src, .. }
         | VmInstruction::WriteWorldActionMeta { src, .. }
-        | VmInstruction::WriteRouteTarget { src }
+        | VmInstruction::WriteRouteGate { src, .. }
         | VmInstruction::SetPriorityBid { src }
         | VmInstruction::StoreSlotImm { src, .. } => vm_reg_bit(*src),
         VmInstruction::LoadSlot { slot_reg, .. } => vm_reg_bit(*slot_reg),
@@ -142,7 +142,7 @@ pub fn vm_is_output_instruction(instr: &VmInstruction) -> bool {
             | VmInstruction::PushAction { .. }
             | VmInstruction::PopAction
             | VmInstruction::ExecuteActionQueue
-            | VmInstruction::WriteRouteTarget { .. }
+            | VmInstruction::WriteRouteGate { .. }
             | VmInstruction::SetPriorityBid { .. }
             | VmInstruction::StoreSlot { .. }
             | VmInstruction::StoreSlotImm { .. }
@@ -272,8 +272,8 @@ pub fn mesh_reachable_nodes(genome: &CreatureGenome) -> Vec<usize> {
     queue.push_back(entry_idx);
 
     while let Some(idx) = queue.pop_front() {
-        for target_id in &genome.nodes[idx].targets {
-            if let Some(target_idx) = find_idx(*target_id) {
+        for target in &genome.nodes[idx].targets {
+            if let Some(target_idx) = find_idx(target.target_id) {
                 if !visited[target_idx] {
                     visited[target_idx] = true;
                     queue.push_back(target_idx);
@@ -324,10 +324,11 @@ pub fn mesh_backward_slice(
             if included[i] || count >= max_size {
                 continue;
             }
-            let targets_included = node
-                .targets
-                .iter()
-                .any(|target_id| node_id_to_idx.get(target_id).is_some_and(|&j| included[j]));
+            let targets_included = node.targets.iter().any(|target| {
+                node_id_to_idx
+                    .get(&target.target_id)
+                    .is_some_and(|&j| included[j])
+            });
             if targets_included {
                 included[i] = true;
                 count += 1;
@@ -380,11 +381,11 @@ pub fn mesh_forward_slice(
     let mut count = 1usize;
 
     while let Some(idx) = queue.pop_front() {
-        for target_id in &genome.nodes[idx].targets {
+        for target in &genome.nodes[idx].targets {
             if count >= max_size {
                 break;
             }
-            if let Some(&target_idx) = node_id_to_idx.get(target_id) {
+            if let Some(&target_idx) = node_id_to_idx.get(&target.target_id) {
                 if !visited[target_idx] {
                     visited[target_idx] = true;
                     queue.push_back(target_idx);
@@ -439,8 +440,8 @@ pub fn functional_complexity(genome: &CreatureGenome) -> u32 {
     queue.push_back(entry_idx);
 
     while let Some(idx) = queue.pop_front() {
-        for target_id in &genome.nodes[idx].targets {
-            if let Some(&target_idx) = node_id_to_idx.get(target_id) {
+        for target in &genome.nodes[idx].targets {
+            if let Some(&target_idx) = node_id_to_idx.get(&target.target_id) {
                 if !reachable[target_idx] {
                     reachable[target_idx] = true;
                     queue.push_back(target_idx);

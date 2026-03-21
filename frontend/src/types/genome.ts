@@ -62,7 +62,7 @@ export interface ComputeNode {
 
 export type OutputSinkKind =
 	| { CustomOutput: number }
-	| "RouterOutput"
+	| { RouterGate: number }
 	| { WriteSlot: number }
 	| { ClearSlot: number };
 
@@ -119,7 +119,7 @@ export type VmInstruction =
 	| { ReadInput: { dst: number; input_idx: number } }
 	| { WriteInternalPayload: { slot_idx: number; src: number } }
 	| { WriteWorldActionMeta: { slot_idx: number; src: number } }
-	| { WriteRouteTarget: { src: number } }
+	| { WriteRouteGate: { slot: number; src: number } }
 	| { PushAction: { action_type: number } }
 	| "PopAction"
 	| { ReadActionQueueLength: { dst: number } }
@@ -150,11 +150,17 @@ export type InputReference =
 	| { UpstreamSlot: number }
 	| "ActionQueue";
 
+export interface RouteTarget {
+	target_id: number;
+	slot: number;
+	gate_bias: number;
+}
+
 export interface NodeGenome {
 	node_id: number;
 	input_refs: InputReference[];
 	backend_def: BackendDef;
-	targets: number[];
+	targets: RouteTarget[];
 }
 
 export interface CreatureGenome {

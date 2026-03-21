@@ -8,7 +8,7 @@ use crate::runtime::cgp::sources::collect_cgp_weighted_inputs;
 use crate::runtime::inputs::ResolveCtx;
 use crate::runtime::plasticity::hebbian;
 use crate::runtime::plasticity::traces;
-use crate::runtime::routing::RouteDecision;
+use crate::runtime::routing::RouteGateMap;
 use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::SensorSnapshot;
 
@@ -77,10 +77,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
 
     // Empty graph: no work, no energy charge.
     if node_count == 0 {
-        return NodeResult::halted(
-            *upstream_slots,
-            RouteDecision::CgpNormalized { raw_value: 0.0 },
-        );
+        return NodeResult::halted(*upstream_slots, RouteGateMap::default());
     }
 
     if graph_runtime.node_state.len() <= node_idx {
@@ -133,9 +130,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
                 state_backup,
                 w_inputs_buf,
             );
-            return NodeResult::exhausted_with_route(RouteDecision::CgpNormalized {
-                raw_value: 0.0,
-            });
+            return NodeResult::exhausted();
         }
 
         tracer.on_pass_start(pass, pass_cost, *energy);
@@ -258,9 +253,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
                 state_backup,
                 w_inputs_buf,
             );
-            return NodeResult::exhausted_with_route(RouteDecision::CgpNormalized {
-                raw_value: 0.0,
-            });
+            return NodeResult::exhausted();
         }
     }
 

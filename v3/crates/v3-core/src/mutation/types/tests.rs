@@ -187,7 +187,8 @@ fn operator_domain_mapping_is_consistent() {
             | MutationOperator::TopologyCopyMeshBackwardSlice
             | MutationOperator::TopologyCopyMeshForwardSlice
             | MutationOperator::TopologySpliceNode
-            | MutationOperator::TopologySwapRouteTargets => {
+            | MutationOperator::TopologySwapRouteTargets
+            | MutationOperator::TopologyMutateGateBias => {
                 assert_eq!(operator.domain(), MutationDomain::Topology)
             }
             MutationOperator::VmConstantMutation
@@ -267,6 +268,7 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
             }
             TopologyOperator::SpliceNode => MutationOperator::TopologySpliceNode,
             TopologyOperator::SwapRouteTargets => MutationOperator::TopologySwapRouteTargets,
+            TopologyOperator::MutateGateBias => MutationOperator::TopologyMutateGateBias,
         };
         assert_eq!(
             mo.complexity_effect(),

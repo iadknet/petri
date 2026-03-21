@@ -67,7 +67,7 @@ pub(crate) fn derive_cgp_annotations(
             OutputSinkKind::CustomOutput(_) => {
                 write_classes.insert(MeshWriteClass::Payload);
             }
-            OutputSinkKind::RouterOutput => {
+            OutputSinkKind::RouterGate(_) => {
                 write_classes.insert(MeshWriteClass::Route);
             }
             OutputSinkKind::WriteSlot(_) | OutputSinkKind::ClearSlot(_) => {
@@ -197,7 +197,7 @@ mod tests {
                     }],
                 },
                 OutputSink {
-                    kind: OutputSinkKind::RouterOutput,
+                    kind: OutputSinkKind::RouterGate(0),
                     inputs: Vec::new(), // unwired — should not count
                 },
             ],

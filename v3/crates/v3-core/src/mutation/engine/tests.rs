@@ -1,6 +1,6 @@
 use super::*;
 use crate::config::SimulationConfig;
-use crate::contracts::{InputReference, NodeId, WorldInputKey};
+use crate::contracts::{InputReference, NodeId, RouteTarget, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::cgp::{CgpGraphBackendDef, ExecuteGate, OutputSink, OutputSinkKind};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
@@ -146,7 +146,11 @@ fn engine_records_added_input_classes_for_topology_splice_node() {
                     action_bank: Vec::new(),
                     execute_gate: ExecuteGate { inputs: Vec::new() },
                 }),
-                targets: vec![NodeId::new(1)],
+                targets: vec![RouteTarget {
+                    target_id: NodeId::new(1),
+                    slot: 0,
+                    gate_bias: 0.0,
+                }],
             },
             NodeGenome {
                 node_id: NodeId::new(1),
@@ -856,7 +860,11 @@ fn engine_with_bias_1_targets_only_reachable_vm_nodes() {
                     constants: vec![1.0],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![NodeId::new(1)],
+                targets: vec![RouteTarget {
+                    target_id: NodeId::new(1),
+                    slot: 0,
+                    gate_bias: 0.0,
+                }],
             },
             NodeGenome {
                 node_id: NodeId::new(1),
@@ -934,7 +942,11 @@ fn engine_pressure_restricted_deletions_bias_toward_unreachable_nodes() {
                     constants: vec![1.0],
                     program: vec![VmInstruction::Noop, VmInstruction::Halt],
                 }),
-                targets: vec![NodeId::new(1)],
+                targets: vec![RouteTarget {
+                    target_id: NodeId::new(1),
+                    slot: 0,
+                    gate_bias: 0.0,
+                }],
             },
             NodeGenome {
                 node_id: NodeId::new(1),

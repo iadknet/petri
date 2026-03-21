@@ -193,21 +193,62 @@ fn write_internal_payload_invalid_slot_ignored() {
 }
 
 #[test]
-fn write_route_target_sets_output() {
+fn write_route_gate_sets_slot_zero() {
     let program = vec![
         VmInstruction::LoadConst {
             dst: 0,
             const_idx: 0,
         }, // r0 = 2.0
-        VmInstruction::WriteRouteTarget { src: 0 },
+        VmInstruction::WriteRouteGate { slot: 0, src: 0 },
         VmInstruction::Halt,
     ];
     let (r, _, _aq) = run_vm(program, 1, vec![2.0], &[], zeroed_upstream(), 100.0);
-    match r.route {
-        crate::runtime::routing::RouteDecision::VmWrap { raw_value } => {
-            assert!((raw_value - 2.0).abs() < 1e-6);
+    assert!((r.route_gates.scores[0] - 2.0).abs() < 1e-6);
+}
+
+#[test]
+fn vm_write_route_gate_sets_slot_score() {
+    // Build a VM program:
+    // LoadConst { dst: 0, const_idx: 0 }  // r0 = 7.5
+    // WriteRouteGate { slot: 3, src: 0 }  // gate[3] = 7.5
+    // Halt
+    let program = vec![
+        VmInstruction::LoadConst {
+            dst: 0,
+            const_idx: 0,
+        },
+        VmInstruction::WriteRouteGate { slot: 3, src: 0 },
+        VmInstruction::Halt,
+    ];
+    let (r, _, _) = run_vm(program, 1, vec![7.5], &[], zeroed_upstream(), 100.0);
+    assert!(
+        (r.route_gates.scores[3] - 7.5).abs() < 1e-6,
+        "gate slot 3 should be 7.5, got {}",
+        r.route_gates.scores[3]
+    );
+    // All other slots remain 0.0
+    for (i, &score) in r.route_gates.scores.iter().enumerate() {
+        if i != 3 {
+            assert_eq!(score, 0.0, "gate slot {i} should be 0.0, got {score}");
         }
-        other => panic!("unexpected route decision: {other:?}"),
+    }
+}
+
+#[test]
+fn vm_write_route_gate_invalid_slot_is_noop() {
+    // WriteRouteGate { slot: 255, src: 0 } — out of range, should be a no-op
+    let program = vec![
+        VmInstruction::LoadConst {
+            dst: 0,
+            const_idx: 0,
+        },
+        VmInstruction::WriteRouteGate { slot: 255, src: 0 },
+        VmInstruction::Halt,
+    ];
+    let (r, _, _) = run_vm(program, 1, vec![42.0], &[], zeroed_upstream(), 100.0);
+    // All gate scores remain 0.0
+    for (i, &score) in r.route_gates.scores.iter().enumerate() {
+        assert_eq!(score, 0.0, "gate slot {i} should be 0.0, got {score}");
     }
 }
 

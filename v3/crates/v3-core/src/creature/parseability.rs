@@ -105,7 +105,11 @@ mod tests {
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![NodeId::new(999)], // dangling
+                targets: vec![crate::contracts::RouteTarget {
+                    target_id: NodeId::new(999),
+                    slot: 0,
+                    gate_bias: 0.0,
+                }], // dangling
             }],
         };
         assert!(ParseabilityGate::validate(&genome).is_ok());
