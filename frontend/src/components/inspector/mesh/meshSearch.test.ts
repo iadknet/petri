@@ -15,7 +15,7 @@ const genome: CreatureGenome = {
 				Vm: {
 					register_count: 1,
 					constants: [],
-					program: [{ WriteRouteTarget: { src: 0 } }, "Halt"],
+					program: [{ WriteRouteGate: { slot: 0, src: 0 } }, "Halt"],
 				},
 			},
 		},
@@ -32,7 +32,7 @@ const genome: CreatureGenome = {
 						},
 					],
 					output_sinks: [
-						{ kind: "RouterOutput", inputs: [{ source: { ComputeNode: 0 }, weight: 1 }] },
+						{ kind: { RouterGate: 0 }, inputs: [{ source: { ComputeNode: 0 }, weight: 1 }] },
 					],
 					action_bank: [],
 					execute_gate: { inputs: [] },

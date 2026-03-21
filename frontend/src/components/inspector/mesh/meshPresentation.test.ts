@@ -20,7 +20,7 @@ const vmNode: NodeGenome = {
 				{ StoreSlotImm: { slot_idx: 4, src: 0 } },
 				{ WriteWorldActionMeta: { slot_idx: 0, src: 0 } },
 				{ PushAction: { action_type: 2 } },
-				{ WriteRouteTarget: { src: 0 } },
+				{ WriteRouteGate: { slot: 0, src: 0 } },
 				"Halt",
 			],
 		},
@@ -45,7 +45,7 @@ const graphNode: NodeGenome = {
 					inputs: [{ source: { ComputeNode: 0 }, weight: 1 }],
 				},
 				{
-					kind: "RouterOutput",
+					kind: { RouterGate: 0 },
 					inputs: [{ source: { ComputeNode: 0 }, weight: 0.5 }],
 				},
 			],
@@ -64,7 +64,7 @@ describe("meshPresentation", () => {
 			"slot",
 		);
 		expect(describeVmInstruction({ PushAction: { action_type: 2 } }).badges).toContain("action");
-		expect(describeVmInstruction({ WriteRouteTarget: { src: 0 } }).badges).toContain("route");
+		expect(describeVmInstruction({ WriteRouteGate: { slot: 0, src: 0 } }).badges).toContain("route");
 		expect(collectNodeBadges(vmNode)).toEqual(
 			expect.arrayContaining(["action", "input", "slot", "route"]),
 		);

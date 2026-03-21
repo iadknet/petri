@@ -40,7 +40,7 @@ function makeCyclicGenome(): CreatureGenome {
 					Vm: {
 						register_count: 1,
 						constants: [],
-						program: [{ WriteRouteTarget: { src: 0 } }, "Halt"],
+						program: [{ WriteRouteGate: { slot: 0, src: 0 } }, "Halt"],
 					},
 				},
 			},
