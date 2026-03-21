@@ -10,7 +10,7 @@ import {
 const vmNode: NodeGenome = {
 	node_id: 5,
 	input_refs: [{ World: "FoodHere" }],
-	targets: [6],
+	targets: [{ target_id: 6, slot: 0, gate_bias: 0.0 }],
 	backend_def: {
 		Vm: {
 			register_count: 2,

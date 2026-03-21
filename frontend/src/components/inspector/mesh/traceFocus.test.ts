@@ -10,7 +10,7 @@ const genome: CreatureGenome = {
 		{
 			node_id: 1,
 			input_refs: [{ World: "FoodHere" }],
-			targets: [2, 4],
+			targets: [{ target_id: 2, slot: 0, gate_bias: 0.0 }, { target_id: 4, slot: 1, gate_bias: 0.0 }],
 			backend_def: {
 				Vm: {
 					register_count: 1,
@@ -71,7 +71,7 @@ const sample: ExecutionSample = {
 					energy_before: 10,
 					energy_after: 9.5,
 					output_slots: [0.7],
-					route: { kind: "vm_wrap", raw_value: 1, resolved_target_index: 1 },
+					route: { gate_scores: [], selected_target_idx: 1, selected_target_id: 4 },
 					backend_trace: {
 						Vm: {
 							register_count: 1,
@@ -88,7 +88,6 @@ const sample: ExecutionSample = {
 							final_registers: [0.7],
 							final_payload: [],
 							final_meta: [],
-							final_route_value: 1,
 							slot_writes: [],
 						},
 					},
@@ -144,7 +143,7 @@ describe("deriveTraceFocus", () => {
 			nodes: [
 				{
 					...routeNode,
-					targets: [4, 4],
+					targets: [{ target_id: 4, slot: 0, gate_bias: 0.0 }, { target_id: 4, slot: 1, gate_bias: 0.0 }],
 				},
 				graphNode,
 				terminalNode,
@@ -159,8 +158,9 @@ describe("deriveTraceFocus", () => {
 						{
 							...sourceHop,
 							route: {
-								...sourceHop.route,
-								resolved_target_index: 1,
+								gate_scores: [],
+								selected_target_idx: 1,
+								selected_target_id: 4,
 							},
 						},
 					],

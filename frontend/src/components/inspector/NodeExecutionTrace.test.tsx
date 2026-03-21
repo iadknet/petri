@@ -26,7 +26,7 @@ describe("NodeExecutionTrace", () => {
 			energy_before: 100,
 			energy_after: 95,
 			output_slots: [1.0],
-			route: { kind: "vm_wrap", raw_value: 0, resolved_target_index: 0 },
+			route: null,
 			backend_trace: {
 				Vm: {
 					register_count: 2,
@@ -35,7 +35,6 @@ describe("NodeExecutionTrace", () => {
 					final_registers: [0, 0],
 					final_payload: [],
 					final_meta: [],
-					final_route_value: 0,
 					slot_writes: [],
 				},
 			},
@@ -55,7 +54,7 @@ describe("NodeExecutionTrace", () => {
 			energy_before: 95,
 			energy_after: 90,
 			output_slots: [0.8],
-			route: { kind: "cgp_normalized", raw_value: 0.8, resolved_target_index: 1 },
+			route: { gate_scores: [], selected_target_idx: 1, selected_target_id: 2 },
 			backend_trace: {
 				Graph: {
 					passes: [],
