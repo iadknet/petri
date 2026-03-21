@@ -19,6 +19,10 @@ Adopt OpenTelemetry as the observability foundation for the Petri simulation, ba
 - Lineage linking across traces (separate feature)
 - Tail-based sampling in OTel Collector (future enhancement — probabilistic head-based sampling for now)
 
+## Prerequisites
+
+- **Tick phase system refactor** (`docs/features/needs_refinement/refactors/tick-phase-system.md`). Currently only `run_phase_0()` is extracted from `run_tick()`. The remaining phases (cognition, action execution, reward-modulated learning) are inline in a ~400-line monolithic function. This feature requires all phases to be exposed as separate callable functions so that `v3-server` can wrap each with tracing spans without putting OTel dependencies into `v3-core`.
+
 ---
 
 ## Infrastructure Layer
@@ -80,6 +84,8 @@ GROUP BY SpanName
 ORDER BY count() DESC
 ```
 
+Note: Table names are SigNoz-version-dependent. The example above is illustrative. Pin a SigNoz version in the docker-compose to ensure schema stability.
+
 ---
 
 ## Rust Instrumentation Architecture
@@ -99,19 +105,21 @@ The `tracing` crate is already a workspace dependency.
 
 `v3-core` remains a pure simulation library with zero observability dependencies. All OTel instrumentation lives in `v3-server`.
 
-To enable per-phase instrumentation, `v3-core` exposes phase functions (`run_phase_0()`, `run_phase_1()`, `run_phase_2()`, `run_phase_2_5()`) that the server calls in sequence, wrapping each with tracing spans. This aligns with the planned tick-phase-system refactor (`docs/features/needs_refinement/refactors/tick-phase-system.md`).
+To enable per-phase instrumentation, `v3-core` exposes phase functions (`run_phase_0()`, `run_phase_1()`, `run_phase_2()`, `run_phase_2_5()`) that the server calls in sequence, wrapping each with tracing spans. This depends on the tick-phase-system refactor (see Prerequisites). Currently only `run_phase_0()` exists; the remaining phases must be extracted before OTel instrumentation can wrap them.
 
 ### Feature Flag
 
-All OTel instrumentation gated behind a cargo feature `otel` in `v3-server`. When disabled, the `tracing` subscriber drops all spans. Useful for CI, profiling, and minimal builds.
+All OTel instrumentation gated behind a cargo feature `otel` in `v3-server`. When disabled, the `tracing` subscriber drops all spans. Useful for CI, profiling, and minimal builds. The `otel` feature should default to off in CI test builds to avoid test flakiness from OTel pipeline issues.
 
 ### Initialization
 
 At server startup:
 1. Configure OTel pipeline with OTLP gRPC exporter pointing at collector endpoint
-2. Set up `tracing-opentelemetry` layer
-3. Register as global tracing subscriber
-4. On shutdown, flush batch processor gracefully
+2. Set OTLP resource attributes: `service.name = "petri-server"`, `service.version` from build info
+3. Set up `tracing-opentelemetry` layer
+4. Register as global tracing subscriber
+5. On shutdown, flush batch processor gracefully
+6. On simulation reset (`POST /v3/simulation/startup`): flush pending spans, start new trace context. The OTel pipeline itself is not restarted — only the trace context resets.
 
 ---
 
@@ -165,27 +173,31 @@ tick                                       (root span, every tick)
 | **Off** | Most creatures (99%+) | No spans emitted |
 | **Full** | Random sample + flagged creatures | Complete cognition trace with per-node execution, signal flow, energy accounting, learning |
 
+**Cross-phase span assembly:** A creature's full tick spans sense/think/decide (Phase 1), actions (Phase 2), and learning (Phase 2.5). The `creature_tick` span is a **synthetic correlation span** — it is created at the start of Phase 1 for traced creatures and kept open until Phase 2.5 completes. Child spans from each phase are parented under it via explicit span context passing, not automatic thread-local propagation.
+
+**Rayon integration:** Phase 1 cognition runs in `rayon::par_iter_mut`. The `tracing` crate's span context is thread-local and does not automatically propagate across Rayon work-stealing threads. For traced creatures, the parent span context must be explicitly passed into the Rayon closure and entered with `Span::enter()` or `in_scope()`. The sampling decision (traced vs not) is made before the parallel pass begins, during sequential input assembly, so only traced creatures pay the span creation cost inside the parallel loop. Untraced creatures execute with zero tracing overhead beyond the sampling check.
+
 **Creature span tree:**
 
 ```
-creature_tick                              (one per traced creature per tick)
-├── creature_sense
+creature_tick                              (synthetic cross-phase span, one per traced creature)
+├── creature_sense                         (Phase 1)
 │   ├── static_input_assembly
 │   └── extended_perception
-├── creature_think
+├── creature_think                         (Phase 1)
 │   ├── mesh_node_{id}                     (one per reachable node, in execution order)
 │   │   ├── node_input_routing
 │   │   ├── node_compute
 │   │   └── node_output_routing
 │   └── mesh_execution_summary
-├── creature_decide
-├── creature_action[0]
+├── creature_decide                        (Phase 1)
+├── creature_action[0]                     (Phase 2)
 │   └── creature_action_outcome
-├── creature_action[1]
+├── creature_action[1]                     (Phase 2)
 │   └── creature_action_outcome
-├── creature_action[N]
+├── creature_action[N]                     (Phase 2)
 │   └── creature_action_outcome
-└── creature_learn
+└── creature_learn                         (Phase 2.5)
     ├── outcome_signal_computation
     └── weight_update[0..M]
 ```
@@ -197,15 +209,14 @@ creature_tick                              (one per traced creature per tick)
 | `creature.id` | string | SlotMap key |
 | `creature.generation` | u32 | birth generation |
 | `creature.age` | u32 | ticks alive |
-| `creature.energy` | f64 | energy before actions |
 | `creature.phenotype_rgb` | string | e.g., "128,64,200" |
 | `creature.mesh_nodes_total` | u32 | |
 | `creature.mesh_nodes_reachable` | u32 | |
 | `creature.trace_reason` | string | "sampled" or "flagged" |
 | `creature.actions_attempted` | u32 | |
 | `creature.actions_succeeded` | u32 | |
-| `creature.energy_start_of_tick` | f64 | |
-| `creature.energy_end_of_tick` | f64 | |
+| `creature.energy_start_of_tick` | f64 | energy after Phase 0 decay, before cognition/actions |
+| `creature.energy_end_of_tick` | f64 | after all actions + costs |
 | `creature.total_energy_delta` | f64 | net change |
 
 ### creature_sense Attributes
@@ -265,6 +276,14 @@ creature_tick                              (one per traced creature per tick)
 | `node.routing_value` | f64 | if routing node |
 | `node.routing_decision` | string | which branch taken |
 
+#### Span Events for Runtime Limits
+
+Within `creature_think` and `mesh_node_{id}` spans, emit span events (not child spans) for exceptional conditions:
+
+- `event!(Level::WARN, event_type = "vm_step_limit_hit", node_id, steps_executed, max_steps)` — when VM execution hits `max_vm_steps`
+- `event!(Level::WARN, event_type = "mesh_hop_limit_hit", hops_executed, max_hops)` — when mesh traversal hits `max_mesh_hops`
+- `event!(Level::INFO, event_type = "node_output_clamped", node_id, raw_value, clamped_value)` — when output is clamped to valid range
+
 ### creature_decide Attributes
 
 | Attribute | Type | Notes |
@@ -289,7 +308,9 @@ creature_tick                              (one per traced creature per tick)
 | `outcome.energy_gained` | f64 | |
 | `outcome.energy_spent` | f64 | |
 | `outcome.offspring_id` | string | if reproduce succeeded |
-| `outcome.victim_id` | string | if predation |
+| `outcome.victim_id` | string | if predation/steal |
+| `outcome.energy_stolen` | f64 | energy transferred from victim (steal/predation) |
+| `outcome.predation_result` | string | "transferred", "killed", "no_victim", "rejected" (maps to `PredationActionResult`) |
 
 ### creature_learn Attributes
 
@@ -342,8 +363,14 @@ Exported via OTel SDK, derived from existing `SimStats` each tick.
 
 - `petri.tick.births`
 - `petri.tick.deaths`
-- `petri.tick.predation_kills`
 - `petri.tick.actions.{move,eat,reproduce,steal,noop}`
+
+### Predation (monotonic counters)
+
+- `petri.predation.attempted`
+- `petri.predation.kills`
+- `petri.predation.transferred` — successful energy steal without kill
+- `petri.predation.rejected` — with attribute `reason` (no_victim, insufficient_energy, etc.)
 
 ### Food Economics (gauges)
 
@@ -457,7 +484,25 @@ pub struct OtelConfig {
 }
 ```
 
-This is runtime state in `v3-server`, not `SimulationConfig` in `v3-core`. Changes take effect on the next tick via the existing config panel WebSocket protocol. No restart required.
+This is runtime state in `v3-server`, not `SimulationConfig` in `v3-core`. Changes take effect on the next tick. No restart required.
+
+### API Endpoints
+
+Observability config uses a **separate endpoint** from `PATCH /v3/simulation/config` to avoid polluting `SimulationConfig` with non-simulation concerns:
+
+- `GET /v3/observability/config` — returns current `OtelConfig`
+- `PATCH /v3/observability/config` — updates `enabled`, `endpoint`, `creature_sample_rate`, `tick_tracing_enabled`
+- `POST /v3/observability/flag/{creature_id}` — toggles trace flag on a creature (adds if not present, removes if present). Returns 409 if at cap (~20) and adding.
+- `GET /v3/observability/flagged` — returns list of flagged creature IDs
+
+The frontend config panel calls these endpoints. The creature inspector's "flag for tracing" button calls the flag toggle endpoint.
+
+### Flagging Semantics
+
+- Flags are keyed by creature ID. When a flagged creature dies, its flag is automatically removed.
+- Flags do not transfer to offspring — flagging is about observing a specific creature, not a lineage.
+- Flags are not persisted across simulation resets (`POST /v3/simulation/startup` clears all flags).
+- The flagged creature list is included in the `GET /v3/observability/config` response so the config panel can display it.
 
 ---
 
@@ -481,8 +526,14 @@ At 100K creatures, ~60 ticks/sec, 0.1% creature sample rate:
 | Signal | Volume | Notes |
 |--------|--------|-------|
 | Tick phase spans | ~360 spans/sec | 6 spans/tick × 60 ticks/sec |
-| Creature cognition spans | ~6K–60K spans/sec | ~100 creatures × ~10-100 spans each × 60 ticks/sec |
-| Metrics | ~30 time series | population, food, mutation, performance |
+| Creature summary spans | ~36K spans/sec | ~100 creatures × ~6 spans each (sense/think/decide/actions/learn) × 60 ticks |
+| Per-node spans | up to ~7.2M spans/sec worst case | ~100 creatures × ~1200 nodes × 60 ticks/sec (genome_size_cap = 1200) |
+| Metrics | ~40 time series | population, food, mutation, predation, performance |
 | Transport spans | ~50 spans/sec | ~10 frames/sec × ~5 spans/frame |
 
-Total: manageable for local ClickHouse. Adjustable via sample rate slider.
+**Per-node span volume is the primary scaling concern.** In practice, most creatures have far fewer than 1200 reachable nodes, but complex evolved creatures can approach the cap. If per-node volume becomes problematic, consider:
+- Reducing sample rate (0.01% = ~10 creatures/tick)
+- Emitting per-node data as span events (single-line records) rather than child spans
+- Adding a "per-node tracing" toggle separate from the main sample rate
+
+Total at typical genome sizes (~50-200 reachable nodes): ~300K-1.2M spans/sec. Manageable for local ClickHouse. Adjustable via sample rate slider.
