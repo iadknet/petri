@@ -30,6 +30,9 @@ See canonical policy set: `docs/strategy/` and `docs/reference/`.
   `docs/reference/` for V3.
 - Runtime-facing telemetry/state values must be derived from applied simulation
   behavior (no synthetic placeholder metrics).
+- Backward compatibility is NOT a project goal. Breaking changes are acceptable by
+  default, and agents should not add migration/compatibility work unless a task
+  explicitly asks for it.
 - Viability tests (`v3/crates/v3-core/tests/viability.rs`) must pass before any
   branch merge. See **Viability Test Policy** below.
 - **Implementation plans MUST include review gate checkmarks.** Every
