@@ -5,6 +5,7 @@
 //! ActionSlot, ExecuteGate).
 
 use crate::config::MutationConfig;
+use crate::contracts::MAX_GATE_SLOTS;
 
 // ── Edge addressing ─────────────────────────────────────────────────────────
 
@@ -111,8 +112,8 @@ pub struct ComputeNode {
 pub enum OutputSinkKind {
     /// Write to `output_slots[slot]`. 12 slots, indices 0-11.
     CustomOutput(u8),
-    /// Write normalized routing scalar.
-    RouterOutput,
+    /// Write to `route_gates.scores[slot]`. 8 slots, indices 0-7.
+    RouterGate(u8),
     /// Write to `shared_memory[slot]`. 16 slots, indices 0-15.
     WriteSlot(u8),
     /// Clear `shared_memory[slot]` to 0.0. 16 slots, indices 0-15.
@@ -187,9 +188,12 @@ pub struct CgpGraphBackendDef {
 pub const CUSTOM_OUTPUT_COUNT: u8 = 24;
 /// Number of shared memory slots (WriteSlot + ClearSlot each).
 pub const SHARED_MEMORY_SLOTS: u8 = 16;
-/// Total fixed sink count: N CustomOutput + 1 Router + 16 WriteSlot + 16 ClearSlot.
-pub const FIXED_SINK_COUNT: usize =
-    CUSTOM_OUTPUT_COUNT as usize + 1 + SHARED_MEMORY_SLOTS as usize * 2;
+/// Total fixed sink count: N CustomOutput + 8 RouterGate + 16 WriteSlot + 16 ClearSlot.
+pub const FIXED_SINK_COUNT: usize = CUSTOM_OUTPUT_COUNT as usize     // 24 CustomOutput slots
+    + MAX_GATE_SLOTS                 // 8 RouterGate sinks
+    + SHARED_MEMORY_SLOTS as usize   // 16 WriteSlot sinks
+    + SHARED_MEMORY_SLOTS as usize; // 16 ClearSlot sinks
+const _: () = assert!(FIXED_SINK_COUNT == 64);
 
 impl CgpGraphBackendDef {
     /// Construct a new graph backend with the full fixed output catalog.
@@ -205,11 +209,13 @@ impl CgpGraphBackendDef {
             });
         }
 
-        // 1 RouterOutput sink
-        output_sinks.push(OutputSink {
-            kind: OutputSinkKind::RouterOutput,
-            inputs: Vec::new(),
-        });
+        // 8 RouterGate sinks
+        for slot in 0..MAX_GATE_SLOTS as u8 {
+            output_sinks.push(OutputSink {
+                kind: OutputSinkKind::RouterGate(slot),
+                inputs: Vec::new(),
+            });
+        }
 
         // 16 WriteSlot sinks
         for slot in 0..SHARED_MEMORY_SLOTS {
@@ -397,20 +403,24 @@ mod tests {
                 OutputSinkKind::CustomOutput(i)
             );
         }
-        assert_eq!(
-            def.output_sinks[CUSTOM_OUTPUT_COUNT as usize].kind,
-            OutputSinkKind::RouterOutput
-        );
+        for i in 0..MAX_GATE_SLOTS {
+            assert_eq!(
+                def.output_sinks[CUSTOM_OUTPUT_COUNT as usize + i].kind,
+                OutputSinkKind::RouterGate(i as u8)
+            );
+        }
         for i in 0..SHARED_MEMORY_SLOTS {
             assert_eq!(
-                def.output_sinks[CUSTOM_OUTPUT_COUNT as usize + 1 + i as usize].kind,
+                def.output_sinks[CUSTOM_OUTPUT_COUNT as usize + MAX_GATE_SLOTS + i as usize].kind,
                 OutputSinkKind::WriteSlot(i)
             );
         }
         for i in 0..SHARED_MEMORY_SLOTS {
             assert_eq!(
-                def.output_sinks
-                    [CUSTOM_OUTPUT_COUNT as usize + 1 + SHARED_MEMORY_SLOTS as usize + i as usize]
+                def.output_sinks[CUSTOM_OUTPUT_COUNT as usize
+                    + MAX_GATE_SLOTS
+                    + SHARED_MEMORY_SLOTS as usize
+                    + i as usize]
                     .kind,
                 OutputSinkKind::ClearSlot(i)
             );

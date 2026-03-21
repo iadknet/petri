@@ -37,11 +37,9 @@ export function deriveTraceFocus(
 	}
 
 	const node = genome.nodes.find((candidate) => candidate.node_id === currentHop.node_id);
-	const routeTargetIdx = currentHop.route.resolved_target_index;
-	const routeTargetId =
-		node && routeTargetIdx >= 0 && routeTargetIdx < node.targets.length
-			? (node.targets[routeTargetIdx] ?? null)
-			: null;
+	const route = currentHop.route;
+	const routeTargetIdx = route?.selected_target_idx ?? -1;
+	const routeTargetId = route?.selected_target_id ?? null;
 
 	return {
 		activeNodeId: currentHop.node_id,

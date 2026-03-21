@@ -508,6 +508,7 @@ fn topology_operator_key(op: TopologyOperator) -> MutationOperator {
         TopologyOperator::CopyMeshForwardSlice => MutationOperator::TopologyCopyMeshForwardSlice,
         TopologyOperator::SpliceNode => MutationOperator::TopologySpliceNode,
         TopologyOperator::SwapRouteTargets => MutationOperator::TopologySwapRouteTargets,
+        TopologyOperator::MutateGateBias => MutationOperator::TopologyMutateGateBias,
     }
 }
 

@@ -1,6 +1,7 @@
 use crate::config::{FounderProfile, MutationConfig, OrdinaryFoodTypeId};
 use crate::contracts::{
-    DynamicIntrospectionKey, InputReference, NodeId, StaticIntrospectionKey, WorldInputKey,
+    DynamicIntrospectionKey, InputReference, NodeId, RouteTarget, StaticIntrospectionKey,
+    WorldInputKey,
 };
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
@@ -95,7 +96,11 @@ fn node0_graph_sensor(min_reproduce_age_ticks: u64) -> NodeGenome {
             &MutationConfig::default(),
             min_reproduce_age_ticks as f32,
         )),
-        targets: vec![NodeId::new(1)],
+        targets: vec![RouteTarget {
+            target_id: NodeId::new(1),
+            slot: 0,
+            gate_bias: 0.0,
+        }],
     }
 }
 
@@ -119,7 +124,11 @@ fn node0_graph_sensor_with_threshold(
             reproduce_energy_threshold,
             min_reproduce_age_ticks as f32,
         )),
-        targets: vec![NodeId::new(1)],
+        targets: vec![RouteTarget {
+            target_id: NodeId::new(1),
+            slot: 0,
+            gate_bias: 0.0,
+        }],
     }
 }
 
@@ -534,7 +543,14 @@ mod tests {
         let node0 = &g.nodes[0];
         assert_eq!(node0.node_id, NodeId::new(0));
         assert_eq!(node0.input_refs.len(), 5);
-        assert_eq!(node0.targets, vec![NodeId::new(1)]);
+        assert_eq!(
+            node0.targets,
+            vec![RouteTarget {
+                target_id: NodeId::new(1),
+                slot: 0,
+                gate_bias: 0.0
+            }]
+        );
 
         if let BackendDef::Graph(ref gdef) = node0.backend_def {
             // CGP founder: energy gate, age gate, combined can_reproduce output.

@@ -11,7 +11,7 @@ describe("NodeBackendDetail", () => {
 				constants: [1, 2],
 				program: [
 					{ ReadInput: { dst: 0, input_idx: 0 } },
-					{ WriteRouteTarget: { src: 0 } },
+					{ WriteRouteGate: { slot: 0, src: 0 } },
 					"Halt",
 				],
 			},

@@ -1,11 +1,23 @@
 use super::*;
 use crate::config::MutationConfig;
+use crate::contracts::RouteTarget;
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::cgp::{GraphSource, OutputSinkKind};
 use crate::creature::genome::{VmBackendDef, VmInstruction};
 use crate::creature::parseability::ParseabilityGate;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
+
+fn wrap_targets(ids: Vec<NodeId>) -> Vec<RouteTarget> {
+    ids.into_iter()
+        .enumerate()
+        .map(|(i, id)| RouteTarget {
+            target_id: id,
+            slot: i as u8,
+            gate_bias: 0.0,
+        })
+        .collect()
+}
 
 fn rng(seed: u64) -> SmallRng {
     SmallRng::seed_from_u64(seed)
@@ -176,6 +188,7 @@ fn topology_after_each_operator_passes_parseability_gate() {
         TopologyOperator::CopyMeshForwardSlice,
         TopologyOperator::SpliceNode,
         TopologyOperator::SwapRouteTargets,
+        TopologyOperator::MutateGateBias,
     ];
     for (i, &op) in operators.iter().enumerate() {
         let mut genome = v3alpha1_founder_genome();
@@ -229,7 +242,7 @@ fn swap_node_backend_toggles_backend_on_single_node_genome() {
 fn rewrite_node_id_rewrites_entry_and_target_references() {
     let mut genome = v3alpha1_founder_genome();
     genome.nodes.truncate(1);
-    genome.nodes[0].targets = vec![genome.nodes[0].node_id];
+    genome.nodes[0].targets = wrap_targets(vec![genome.nodes[0].node_id]);
     genome.entry_node_id = genome.nodes[0].node_id;
     let old_id = genome.nodes[0].node_id;
 
@@ -247,8 +260,12 @@ fn rewrite_node_id_rewrites_entry_and_target_references() {
     assert_ne!(new_id, old_id, "node id should be rewritten");
     assert_eq!(genome.entry_node_id, new_id, "entry id should be rewritten");
     assert_eq!(
-        genome.nodes[0].targets,
-        vec![new_id],
+        genome.nodes[0].targets.len(),
+        1,
+        "target count should be preserved"
+    );
+    assert_eq!(
+        genome.nodes[0].targets[0].target_id, new_id,
         "all target references should be rewritten"
     );
 }
@@ -393,7 +410,7 @@ fn copy_node_sometimes_copies_input_refs_sometimes_not() {
 fn copy_node_always_adds_backlink() {
     for seed in 0u64..200 {
         let mut genome = v3alpha1_founder_genome();
-        let original_targets: Vec<Vec<NodeId>> =
+        let original_targets: Vec<Vec<RouteTarget>> =
             genome.nodes.iter().map(|n| n.targets.clone()).collect();
         let mut r = rng(seed);
         apply(&mut genome, TopologyOperator::CopyNode, &[], 0.0, &mut r).unwrap();
@@ -401,8 +418,8 @@ fn copy_node_always_adds_backlink() {
         // Check that some original node gained the new_id in its targets.
         let backlinked = genome.nodes.iter().enumerate().any(|(i, n)| {
             i < original_targets.len()
-                && n.targets.contains(&new_id)
-                && !original_targets[i].contains(&new_id)
+                && n.targets.iter().any(|t| t.target_id == new_id)
+                && !original_targets[i].iter().any(|t| t.target_id == new_id)
         });
         assert!(
             backlinked,
@@ -435,7 +452,7 @@ fn copy_mesh_backward_slice_duplicates_feeding_pipeline() {
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![NodeId::new(1)],
+                targets: wrap_targets(vec![NodeId::new(1)]),
             },
             NodeGenome {
                 node_id: NodeId::new(1),
@@ -445,7 +462,7 @@ fn copy_mesh_backward_slice_duplicates_feeding_pipeline() {
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![NodeId::new(2)],
+                targets: wrap_targets(vec![NodeId::new(2)]),
             },
             NodeGenome {
                 node_id: NodeId::new(2),
@@ -495,7 +512,7 @@ fn copy_mesh_backward_slice_remaps_internal_targets() {
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![NodeId::new(1)],
+                targets: wrap_targets(vec![NodeId::new(1)]),
             },
             NodeGenome {
                 node_id: NodeId::new(1),
@@ -530,12 +547,12 @@ fn copy_mesh_backward_slice_remaps_internal_targets() {
             assert_eq!(new_nodes.len(), 2);
             if let Some(cloned_with_targets) = new_nodes.iter().find(|n| !n.targets.is_empty()) {
                 for target in &cloned_with_targets.targets {
-                    if !original_ids.contains(target) {
+                    if !original_ids.contains(&target.target_id) {
                         let new_ids: Vec<NodeId> = new_nodes.iter().map(|n| n.node_id).collect();
                         assert!(
-                            new_ids.contains(target),
+                            new_ids.contains(&target.target_id),
                             "remapped target {:?} must be in new node IDs {:?}",
-                            target,
+                            target.target_id,
                             new_ids
                         );
                     }
@@ -560,7 +577,7 @@ fn copy_mesh_forward_slice_duplicates_downstream_subtree() {
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![NodeId::new(1)],
+                targets: wrap_targets(vec![NodeId::new(1)]),
             },
             NodeGenome {
                 node_id: NodeId::new(1),
@@ -570,7 +587,7 @@ fn copy_mesh_forward_slice_duplicates_downstream_subtree() {
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![NodeId::new(2)],
+                targets: wrap_targets(vec![NodeId::new(2)]),
             },
             NodeGenome {
                 node_id: NodeId::new(2),
@@ -653,7 +670,7 @@ fn swap_route_targets_changes_target_order() {
                 constants: vec![],
                 program: vec![VmInstruction::Halt],
             }),
-            targets: vec![NodeId::new(1), NodeId::new(2), NodeId::new(3)],
+            targets: wrap_targets(vec![NodeId::new(1), NodeId::new(2), NodeId::new(3)]),
         }],
     };
     let original_targets = genome.nodes[0].targets.clone();
@@ -682,19 +699,23 @@ fn swap_route_targets_preserves_target_set() {
                 constants: vec![],
                 program: vec![VmInstruction::Halt],
             }),
-            targets: vec![NodeId::new(1), NodeId::new(2), NodeId::new(3)],
+            targets: wrap_targets(vec![NodeId::new(1), NodeId::new(2), NodeId::new(3)]),
         }],
     };
-    let mut original_sorted = genome.nodes[0].targets.clone();
-    original_sorted.sort();
+    let mut original_ids: Vec<NodeId> = genome.nodes[0]
+        .targets
+        .iter()
+        .map(|t| t.target_id)
+        .collect();
+    original_ids.sort();
     for seed in 0u64..50 {
         let mut g = genome.clone();
         let mut r = rng(seed);
         apply(&mut g, TopologyOperator::SwapRouteTargets, &[], 0.0, &mut r).unwrap();
-        let mut after_sorted = g.nodes[0].targets.clone();
-        after_sorted.sort();
+        let mut after_ids: Vec<NodeId> = g.nodes[0].targets.iter().map(|t| t.target_id).collect();
+        after_ids.sort();
         assert_eq!(
-            original_sorted, after_sorted,
+            original_ids, after_ids,
             "swap must preserve the same set of targets"
         );
     }
@@ -712,7 +733,7 @@ fn swap_route_targets_requires_at_least_two_targets() {
                 constants: vec![],
                 program: vec![VmInstruction::Halt],
             }),
-            targets: vec![NodeId::new(1)],
+            targets: wrap_targets(vec![NodeId::new(1)]),
         }],
     };
     let mut r = rng(0);
@@ -741,7 +762,7 @@ fn splice_node_increases_node_count_by_one() {
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![NodeId::new(1)],
+                targets: wrap_targets(vec![NodeId::new(1)]),
             },
             NodeGenome {
                 node_id: NodeId::new(1),
@@ -774,7 +795,7 @@ fn splice_node_creates_a_to_c_to_b_chain() {
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![NodeId::new(1)],
+                targets: wrap_targets(vec![NodeId::new(1)]),
             },
             NodeGenome {
                 node_id: NodeId::new(1),
@@ -794,14 +815,15 @@ fn splice_node_creates_a_to_c_to_b_chain() {
     let c = genome.nodes.last().unwrap();
     let c_id = c.node_id;
     // C's target is B
-    assert_eq!(c.targets, vec![b_id], "C must target B");
+    assert_eq!(c.targets.len(), 1, "C must have one target");
+    assert_eq!(c.targets[0].target_id, b_id, "C must target B");
     // A's target is now C (not B)
     assert!(
-        genome.nodes[0].targets.contains(&c_id),
+        genome.nodes[0].targets.iter().any(|t| t.target_id == c_id),
         "A must now target C"
     );
     assert!(
-        !genome.nodes[0].targets.contains(&b_id),
+        !genome.nodes[0].targets.iter().any(|t| t.target_id == b_id),
         "A must no longer directly target B"
     );
 }
@@ -818,7 +840,7 @@ fn splice_node_new_node_is_blank_vm() {
                 constants: vec![],
                 program: vec![VmInstruction::Halt],
             }),
-            targets: vec![NodeId::new(1)],
+            targets: wrap_targets(vec![NodeId::new(1)]),
         }],
     };
     let config = forced_birth_config(0.0, 1.0, 1.0);
@@ -953,7 +975,7 @@ fn splice_node_can_force_initialized_compute_graph_birth() {
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![NodeId::new(1)],
+                targets: wrap_targets(vec![NodeId::new(1)]),
             },
             NodeGenome {
                 node_id: NodeId::new(1),
@@ -1019,7 +1041,7 @@ fn splice_node_can_force_vm_birth() {
                     constants: vec![],
                     program: vec![VmInstruction::Halt],
                 }),
-                targets: vec![NodeId::new(1)],
+                targets: wrap_targets(vec![NodeId::new(1)]),
             },
             NodeGenome {
                 node_id: NodeId::new(1),
@@ -1156,7 +1178,7 @@ fn topology_operator_weights_are_positive() {
     let all = TopologyOperator::ALL;
     assert_eq!(
         all.len(),
-        13,
+        14,
         "ALL must cover every TopologyOperator variant"
     );
     for &op in &all {
@@ -1296,4 +1318,131 @@ fn exempt_operators_return_not_applicable() {
         &mut r2,
     );
     assert_eq!(result, Ok(TargetReachability::NotApplicable));
+}
+
+// ── MutateGateBias tests ──
+
+#[test]
+fn mutate_gate_bias_changes_bias() {
+    use crate::contracts::RouteTarget;
+    let mut genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(crate::creature::genome::VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![crate::creature::genome::VmInstruction::Halt],
+            }),
+            targets: vec![RouteTarget {
+                target_id: NodeId::new(0),
+                slot: 0,
+                gate_bias: 0.0,
+            }],
+        }],
+    };
+    let mut r = rng(42);
+    let result = apply(
+        &mut genome,
+        TopologyOperator::MutateGateBias,
+        &[],
+        0.0,
+        &mut r,
+    );
+    assert!(result.is_ok());
+    let bias = genome.nodes[0].targets[0].gate_bias;
+    assert_ne!(bias, 0.0, "gate_bias must have changed");
+    assert!(
+        (-4.0..=4.0).contains(&bias),
+        "gate_bias {bias} must be within [-4.0, 4.0]"
+    );
+}
+
+#[test]
+fn mutate_gate_bias_noop_on_empty_targets() {
+    let mut genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(crate::creature::genome::VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![crate::creature::genome::VmInstruction::Halt],
+            }),
+            targets: vec![],
+        }],
+    };
+    let mut r = rng(0);
+    let result = apply(
+        &mut genome,
+        TopologyOperator::MutateGateBias,
+        &[],
+        0.0,
+        &mut r,
+    );
+    assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+}
+
+#[test]
+fn mutate_gate_bias_clamps_to_range() {
+    use crate::contracts::RouteTarget;
+    // Set gate_bias near the upper boundary.
+    let mut genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(crate::creature::genome::VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![crate::creature::genome::VmInstruction::Halt],
+            }),
+            targets: vec![RouteTarget {
+                target_id: NodeId::new(0),
+                slot: 0,
+                gate_bias: 3.9,
+            }],
+        }],
+    };
+    // Apply multiple times -- at least one should push toward the boundary.
+    let mut clamped_high = false;
+    let mut clamped_low = false;
+    for seed in 0u64..200 {
+        let mut g = genome.clone();
+        let mut r = rng(seed);
+        let _ = apply(&mut g, TopologyOperator::MutateGateBias, &[], 0.0, &mut r);
+        let bias = g.nodes[0].targets[0].gate_bias;
+        assert!(
+            (-4.0..=4.0).contains(&bias),
+            "gate_bias {bias} out of range after seed {seed}"
+        );
+        if (bias - 4.0).abs() < f32::EPSILON {
+            clamped_high = true;
+        }
+    }
+    // Also test clamping at the low end.
+    genome.nodes[0].targets[0].gate_bias = -3.9;
+    for seed in 0u64..200 {
+        let mut g = genome.clone();
+        let mut r = rng(seed);
+        let _ = apply(&mut g, TopologyOperator::MutateGateBias, &[], 0.0, &mut r);
+        let bias = g.nodes[0].targets[0].gate_bias;
+        assert!(
+            (-4.0..=4.0).contains(&bias),
+            "gate_bias {bias} out of range after seed {seed}"
+        );
+        if (bias - (-4.0)).abs() < f32::EPSILON {
+            clamped_low = true;
+        }
+    }
+    assert!(
+        clamped_high,
+        "expected at least one high-boundary clamp across 200 seeds"
+    );
+    assert!(
+        clamped_low,
+        "expected at least one low-boundary clamp across 200 seeds"
+    );
 }

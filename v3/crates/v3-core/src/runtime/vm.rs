@@ -1,9 +1,9 @@
 use crate::config::RuntimeConfig;
-use crate::contracts::InputReference;
+use crate::contracts::{InputReference, MAX_GATE_SLOTS};
 use crate::creature::genome::VmBackendDef;
 use crate::runtime::action_decode::decode_world_action;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
-use crate::runtime::routing::RouteDecision;
+use crate::runtime::routing::RouteGateMap;
 use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::SensorSnapshot;
 
@@ -39,13 +39,13 @@ pub(crate) fn execute_vm_node(
     // Safety: register_count == 0 → immediate halt.
     let reg_count = def.register_count as usize;
     if reg_count == 0 {
-        return NodeResult::halted(*upstream_slots, RouteDecision::VmWrap { raw_value: 0.0 });
+        return NodeResult::halted(*upstream_slots, RouteGateMap::default());
     }
 
     // Safety: empty program → immediate halt.
     let program_len = def.program.len();
     if program_len == 0 {
-        return NodeResult::halted(*upstream_slots, RouteDecision::VmWrap { raw_value: 0.0 });
+        return NodeResult::halted(*upstream_slots, RouteGateMap::default());
     }
 
     let max_steps = config.max_vm_steps.max(1) as usize;
@@ -56,7 +56,7 @@ pub(crate) fn execute_vm_node(
     let mut regs = [0.0f32; MAX_REGS];
     let mut payload: [f32; OUTPUT_SLOT_COUNT] = *upstream_slots;
     let mut meta: [f32; 8] = [0.0; 8];
-    let mut route_target: f32 = 0.0;
+    let mut route_gates = RouteGateMap::default();
     let mut pc: usize = 0;
     let mut steps: usize = 0;
 
@@ -75,23 +75,13 @@ pub(crate) fn execute_vm_node(
     loop {
         if steps >= max_steps {
             commit_slots!();
-            return NodeResult::halted(
-                payload,
-                RouteDecision::VmWrap {
-                    raw_value: route_target,
-                },
-            );
+            return NodeResult::halted(payload, route_gates);
         }
 
         // Soft default: if control flow lands outside the program, halt cleanly.
         if pc >= program_len {
             commit_slots!();
-            return NodeResult::halted(
-                payload,
-                RouteDecision::VmWrap {
-                    raw_value: route_target,
-                },
-            );
+            return NodeResult::halted(payload, route_gates);
         }
 
         let instr = &def.program[pc];
@@ -319,26 +309,19 @@ pub(crate) fn execute_vm_node(
 
             VmInstruction::ExecuteActionQueue => {
                 commit_slots!();
-                return NodeResult::terminal(
-                    payload,
-                    RouteDecision::VmWrap {
-                        raw_value: route_target,
-                    },
-                );
+                return NodeResult::terminal(payload, route_gates);
             }
 
-            VmInstruction::WriteRouteTarget { src } => {
-                route_target = regs[nr(*src, reg_count)]; // last-write-wins
+            VmInstruction::WriteRouteGate { slot, src } => {
+                let s = *slot as usize;
+                if s < MAX_GATE_SLOTS {
+                    route_gates.scores[s] = sanitize_f32(regs[nr(*src, reg_count)]);
+                }
             }
 
             VmInstruction::Halt => {
                 commit_slots!();
-                return NodeResult::halted(
-                    payload,
-                    RouteDecision::VmWrap {
-                        raw_value: route_target,
-                    },
-                );
+                return NodeResult::halted(payload, route_gates);
             }
 
             VmInstruction::LoadSlot { dst, slot_reg } => {
@@ -433,7 +416,7 @@ pub(crate) fn opcode_base_cost(instr: &crate::creature::genome::VmInstruction) -
         VmInstruction::ReadActionQueueParam { .. } => 0.12,
         VmInstruction::SetPriorityBid { .. } => 0.20,
         VmInstruction::ExecuteActionQueue => 0.24,
-        VmInstruction::WriteRouteTarget { .. } => 0.10,
+        VmInstruction::WriteRouteGate { .. } => 0.10,
         VmInstruction::Halt => 0.05,
         VmInstruction::LoadSlot { .. } => 0.12,
         VmInstruction::StoreSlot { .. } => 0.14,

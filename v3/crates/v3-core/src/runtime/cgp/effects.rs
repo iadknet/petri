@@ -1,13 +1,13 @@
 //! Post-convergence effect pass for CGP-style graph backend evaluation.
 
 use crate::config::OrdinaryFoodTypeId;
-use crate::contracts::{Direction, InputReference, WorldAction};
+use crate::contracts::{Direction, InputReference, WorldAction, MAX_GATE_SLOTS};
 use crate::creature::genome::cgp::{
     ActionSlotBehavior, CgpGraphBackendDef, GraphEdge, OutputSinkKind, WorldActionKind,
 };
 use crate::runtime::cgp::sources::{resolve_source, resolve_source_post_convergence};
 use crate::runtime::inputs::ResolveCtx;
-use crate::runtime::routing::RouteDecision;
+use crate::runtime::routing::RouteGateMap;
 use crate::runtime::trace::domain::{
     GraphActionSlotTrace, GraphExecuteGateTrace, GraphOutputSinkTrace,
 };
@@ -110,7 +110,7 @@ pub(crate) fn apply_cgp_graph_effects(
     prev_shared_memory: &[f32; 16],
 ) -> (NodeResult, CgpEffectsTrace) {
     let mut output_slots = *upstream_slots;
-    let mut route_raw_value = 0.0f32;
+    let mut route_gates = RouteGateMap::default();
     let compute_count = def.compute_nodes.len();
     let mut buf = Vec::with_capacity(8);
     let mut output_sink_traces = Vec::with_capacity(def.output_sinks.len());
@@ -149,10 +149,14 @@ pub(crate) fn apply_cgp_graph_effects(
                     applied = true;
                 }
             }
-            OutputSinkKind::RouterOutput => {
-                applied_value = sanitize_f32(wsum);
-                route_raw_value = applied_value;
-                applied = true;
+            OutputSinkKind::RouterGate(slot) => {
+                let s = slot as usize;
+                if s < MAX_GATE_SLOTS {
+                    let val = sanitize_f32(wsum);
+                    route_gates.scores[s] = val;
+                    applied_value = val;
+                    applied = true;
+                }
             }
             OutputSinkKind::WriteSlot(s) => {
                 if (s as usize) < 16 {
@@ -266,9 +270,7 @@ pub(crate) fn apply_cgp_graph_effects(
     (
         NodeResult {
             output_slots,
-            route: RouteDecision::CgpNormalized {
-                raw_value: route_raw_value,
-            },
+            route_gates,
             terminal,
             energy_exhausted: false,
         },

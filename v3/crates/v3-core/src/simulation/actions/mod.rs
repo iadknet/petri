@@ -653,7 +653,7 @@ mod tests {
         sim.config.mutation.per_birth_mutation_events_min = 3;
         sim.config.mutation.per_birth_mutation_events_max = 3;
 
-        let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
         assert_eq!(result, ReproductionActionResult::Spawned);
 

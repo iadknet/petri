@@ -16,12 +16,12 @@ const genome: CreatureGenome = {
 		{
 			node_id: 1,
 			input_refs: [{ World: "FoodHere" }],
-			targets: [2],
+			targets: [{ target_id: 2, slot: 0, gate_bias: 0.0 }],
 			backend_def: {
 				Vm: {
 					register_count: 1,
 					constants: [],
-					program: [{ WriteRouteTarget: { src: 0 } }, "Halt"],
+					program: [{ WriteRouteGate: { slot: 0, src: 0 } }, "Halt"],
 				},
 			},
 		},
@@ -44,7 +44,7 @@ const genome: CreatureGenome = {
 					],
 					output_sinks: [
 						{
-							kind: "RouterOutput",
+							kind: { RouterGate: 0 },
 							inputs: [{ source: { ComputeNode: 0 }, weight: 1 }],
 						},
 					],

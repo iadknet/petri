@@ -6,11 +6,11 @@
 //! semantics, apply the same changes here and verify with equivalence tests.
 
 use crate::config::RuntimeConfig;
-use crate::contracts::InputReference;
+use crate::contracts::{InputReference, MAX_GATE_SLOTS};
 use crate::creature::genome::VmBackendDef;
 use crate::runtime::action_decode::decode_world_action;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
-use crate::runtime::routing::RouteDecision;
+use crate::runtime::routing::RouteGateMap;
 use crate::runtime::trace::domain::{SlotWrite, VmStepTrace, VmTrace};
 use crate::runtime::types::{sanitize_f32, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::runtime::vm::{is_truthy, jump_target, nr, opcode_base_cost};
@@ -43,13 +43,12 @@ pub(crate) fn execute_vm_node_traced(
         final_registers: Vec::new(),
         final_payload: *upstream_slots,
         final_meta: [0.0; 8],
-        final_route_value: 0.0,
         slot_writes: Vec::new(),
     };
 
     if reg_count == 0 {
         return (
-            NodeResult::halted(*upstream_slots, RouteDecision::VmWrap { raw_value: 0.0 }),
+            NodeResult::halted(*upstream_slots, RouteGateMap::default()),
             empty_trace(),
         );
     }
@@ -57,7 +56,7 @@ pub(crate) fn execute_vm_node_traced(
     let program_len = def.program.len();
     if program_len == 0 {
         return (
-            NodeResult::halted(*upstream_slots, RouteDecision::VmWrap { raw_value: 0.0 }),
+            NodeResult::halted(*upstream_slots, RouteGateMap::default()),
             empty_trace(),
         );
     }
@@ -69,7 +68,7 @@ pub(crate) fn execute_vm_node_traced(
     let mut regs = [0.0f32; MAX_REGS];
     let mut payload: [f32; OUTPUT_SLOT_COUNT] = *upstream_slots;
     let mut meta: [f32; 8] = [0.0; 8];
-    let mut route_target: f32 = 0.0;
+    let mut route_gates = RouteGateMap::default();
     let mut pc: usize = 0;
     let mut steps_count: usize = 0;
 
@@ -135,7 +134,6 @@ pub(crate) fn execute_vm_node_traced(
                 final_registers: regs[..reg_count].to_vec(),
                 final_payload: payload,
                 final_meta: meta,
-                final_route_value: route_target,
                 slot_writes: $slot_writes_vec,
             }
         };
@@ -146,12 +144,7 @@ pub(crate) fn execute_vm_node_traced(
         if steps_count >= max_steps {
             commit_slots!();
             return (
-                NodeResult::halted(
-                    payload,
-                    RouteDecision::VmWrap {
-                        raw_value: route_target,
-                    },
-                ),
+                NodeResult::halted(payload, route_gates),
                 build_trace!(trace_steps, slot_writes_vec),
             );
         }
@@ -159,12 +152,7 @@ pub(crate) fn execute_vm_node_traced(
         if pc >= program_len {
             commit_slots!();
             return (
-                NodeResult::halted(
-                    payload,
-                    RouteDecision::VmWrap {
-                        raw_value: route_target,
-                    },
-                ),
+                NodeResult::halted(payload, route_gates),
                 build_trace!(trace_steps, slot_writes_vec),
             );
         }
@@ -429,18 +417,16 @@ pub(crate) fn execute_vm_node_traced(
                     register_changes: Vec::new(),
                 });
                 return (
-                    NodeResult::terminal(
-                        payload,
-                        RouteDecision::VmWrap {
-                            raw_value: route_target,
-                        },
-                    ),
+                    NodeResult::terminal(payload, route_gates),
                     build_trace!(trace_steps, slot_writes_vec),
                 );
             }
 
-            VmInstruction::WriteRouteTarget { src } => {
-                route_target = regs[nr(*src, reg_count)];
+            VmInstruction::WriteRouteGate { slot, src } => {
+                let s = *slot as usize;
+                if s < MAX_GATE_SLOTS {
+                    route_gates.scores[s] = sanitize_f32(regs[nr(*src, reg_count)]);
+                }
             }
 
             VmInstruction::Halt => {
@@ -453,12 +439,7 @@ pub(crate) fn execute_vm_node_traced(
                     register_changes: Vec::new(),
                 });
                 return (
-                    NodeResult::halted(
-                        payload,
-                        RouteDecision::VmWrap {
-                            raw_value: route_target,
-                        },
-                    ),
+                    NodeResult::halted(payload, route_gates),
                     build_trace!(trace_steps, slot_writes_vec),
                 );
             }

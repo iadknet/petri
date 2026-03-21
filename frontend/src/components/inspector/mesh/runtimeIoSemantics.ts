@@ -58,7 +58,7 @@ export function classifyVmInstruction(instruction: VmInstruction): RuntimeIoSema
 		case "SetPriorityBid":
 			flags.writesAction = true;
 			break;
-		case "WriteRouteTarget":
+		case "WriteRouteGate":
 			flags.writesRoute = true;
 			break;
 		case "WriteInternalPayload":
