@@ -38,6 +38,11 @@ export interface AnnealingConfig {
 	initial_max_fertility: number;
 }
 
+export interface OccupancyDepletionConfig {
+	enabled: boolean;
+	deposit_per_occupied_tick: number;
+}
+
 export interface FoodConfig {
 	growth_rate: number;
 	initial_density: number;
@@ -47,6 +52,7 @@ export interface FoodConfig {
 	recovery_spawn_rate: number;
 	recovery_floor_ratio: number;
 	max_density: number;
+	occupancy_depletion: OccupancyDepletionConfig;
 	fertility?: FertilityConfig;
 	annealing?: AnnealingConfig;
 }

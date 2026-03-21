@@ -35,7 +35,7 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
         config.world.height,
         config.world.edge_mode,
     );
-    world.apply_food_config(config.world.food.clone());
+    world.reconfigure_food(config.world.food.clone());
     world.seed_fertility(seed);
     world.seed_food(&mut rng);
 

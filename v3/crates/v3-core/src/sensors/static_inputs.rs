@@ -160,7 +160,7 @@ mod tests {
         let mut food_cfg = SimulationConfig::default().world.food;
         food_cfg.initial_coverage = 1.0;
         food_cfg.initial_density = 1.0;
-        world.apply_food_config(food_cfg);
+        world.reconfigure_food(food_cfg);
         let mut rng = SmallRng::seed_from_u64(42);
         world.seed_food(&mut rng);
         let id = get_id();
@@ -177,7 +177,7 @@ mod tests {
         let mut food_cfg = SimulationConfig::default().world.food;
         food_cfg.initial_coverage = 1.0;
         food_cfg.initial_density = 1.0;
-        world.apply_food_config(food_cfg);
+        world.reconfigure_food(food_cfg);
         let mut rng = SmallRng::seed_from_u64(0);
         world.seed_food(&mut rng);
         let id = get_id();
