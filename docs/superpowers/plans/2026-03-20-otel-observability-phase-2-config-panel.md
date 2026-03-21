@@ -13,28 +13,25 @@
 
 - [ ] **Step 1: Write failing test for GET /v3/observability/config**
 
-Create a test in `v3/crates/v3-server/src/handlers/observability.rs` (or a separate test file following the project's test pattern — check how existing handler tests are organized):
+Add to `v3/crates/v3-server/tests/server.rs`, following the existing test pattern that uses `app()` + `do_request()` with tower `oneshot`:
 
 ```rust
-#[cfg(test)]
-mod tests {
-    use axum::http::StatusCode;
-    // Use the same test helpers as other handler tests
-
-    #[tokio::test]
-    async fn get_observability_config_returns_defaults() {
-        let app = test_app();
-        let resp = app.get("/v3/observability/config").await;
-        assert_eq!(resp.status(), StatusCode::OK);
-
-        let body: serde_json::Value = resp.json().await;
-        assert_eq!(body["enabled"], true);
-        assert_eq!(body["creature_sample_rate"], 0.001);
-        assert_eq!(body["tick_tracing_enabled"], true);
-        assert_eq!(body["endpoint"], "http://localhost:4317");
-    }
+#[tokio::test]
+async fn get_observability_config_returns_defaults() {
+    let req = Request::builder()
+        .uri("/v3/observability/config")
+        .body(Body::empty())
+        .unwrap();
+    let (status, body) = do_request(app(), req).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(body["enabled"], true);
+    assert_eq!(body["creature_sample_rate"], 0.001);
+    assert_eq!(body["tick_tracing_enabled"], true);
+    assert_eq!(body["endpoint"], "http://localhost:4317");
 }
 ```
+
+Note: This follows the existing test pattern in `server.rs` where `app()` returns `router(AppState::new())` and `do_request()` sends via tower `oneshot`.
 
 - [ ] **Step 2: Run test to verify it fails**
 
@@ -105,19 +102,28 @@ Expected: PASS
 
 - [ ] **Step 5: Write failing test for PATCH /v3/observability/config**
 
+Note: PATCH + GET in the same test requires a shared `AppState` since `app()` creates a new state each time. Use `AppState::new()` once and build two routers, or use the `spawn_ws_app` pattern for a persistent server. Follow the existing test patterns in `server.rs` for stateful tests.
+
 ```rust
 #[tokio::test]
 async fn patch_observability_config_updates_sample_rate() {
-    let app = test_app();
-    let resp = app.patch("/v3/observability/config")
-        .json(&serde_json::json!({
-            "creature_sample_rate": 0.05
-        }))
-        .await;
-    assert_eq!(resp.status(), StatusCode::OK);
+    let state = AppState::new();
 
-    let resp = app.get("/v3/observability/config").await;
-    let body: serde_json::Value = resp.json().await;
+    let patch_req = Request::builder()
+        .method("PATCH")
+        .uri("/v3/observability/config")
+        .header("content-type", "application/json")
+        .body(Body::from(r#"{"creature_sample_rate": 0.05}"#))
+        .unwrap();
+    let (status, _) = do_request(router(state.clone()), patch_req).await;
+    assert_eq!(status, StatusCode::OK);
+
+    let get_req = Request::builder()
+        .uri("/v3/observability/config")
+        .body(Body::empty())
+        .unwrap();
+    let (status, body) = do_request(router(state), get_req).await;
+    assert_eq!(status, StatusCode::OK);
     assert_eq!(body["creature_sample_rate"], 0.05);
 }
 ```
@@ -169,28 +175,62 @@ Expected: PASS
 
 - [ ] **Step 8: Write failing test for POST /v3/observability/flag/{creature_id}**
 
+This test needs a running simulation with creatures. Use `AppState::new()`, start the simulation (POST /v3/simulation/startup + POST /v3/simulation/start + POST /v3/simulation/step to create creatures), then test flagging. Follow existing stateful test patterns in `server.rs`.
+
 ```rust
 #[tokio::test]
 async fn flag_creature_toggles_tracing() {
-    let app = test_app_with_creatures(); // needs at least one creature
-    let creature_id = get_first_creature_id(&app).await;
+    let state = AppState::new();
+
+    // Start simulation and step to create creatures
+    let startup_req = Request::builder()
+        .method("POST")
+        .uri("/v3/simulation/startup")
+        .header("content-type", "application/json")
+        .body(Body::from("{}"))
+        .unwrap();
+    do_request(router(state.clone()), startup_req).await;
+
+    // Get a creature ID from the simulation
+    // (implementation detail: access state.sim to find a creature ID,
+    //  or GET /v3/simulation/status and extract a creature from the response)
+    let creature_id = {
+        let handle = state.sim.lock().await;
+        let (id, _) = handle.sim.creatures.iter().next().expect("need at least one creature");
+        format!("{}", id.data().as_ffi())
+    };
 
     // Flag creature
-    let resp = app.post(&format!("/v3/observability/flag/{}", creature_id)).await;
-    assert_eq!(resp.status(), StatusCode::OK);
+    let flag_req = Request::builder()
+        .method("POST")
+        .uri(&format!("/v3/observability/flag/{}", creature_id))
+        .body(Body::empty())
+        .unwrap();
+    let (status, _) = do_request(router(state.clone()), flag_req).await;
+    assert_eq!(status, StatusCode::OK);
 
     // Verify flagged
-    let resp = app.get("/v3/observability/flagged").await;
-    let body: serde_json::Value = resp.json().await;
-    assert!(body.as_array().unwrap().iter().any(|v| v.as_str() == Some(&creature_id)));
+    let flagged_req = Request::builder()
+        .uri("/v3/observability/flagged")
+        .body(Body::empty())
+        .unwrap();
+    let (status, body) = do_request(router(state.clone()), flagged_req).await;
+    assert_eq!(status, StatusCode::OK);
+    assert!(!body.as_array().unwrap().is_empty());
 
-    // Unflag (toggle)
-    let resp = app.post(&format!("/v3/observability/flag/{}", creature_id)).await;
-    assert_eq!(resp.status(), StatusCode::OK);
+    // Toggle off
+    let unflag_req = Request::builder()
+        .method("POST")
+        .uri(&format!("/v3/observability/flag/{}", creature_id))
+        .body(Body::empty())
+        .unwrap();
+    do_request(router(state.clone()), unflag_req).await;
 
-    // Verify unflagged
-    let resp = app.get("/v3/observability/flagged").await;
-    let body: serde_json::Value = resp.json().await;
+    let flagged_req = Request::builder()
+        .uri("/v3/observability/flagged")
+        .body(Body::empty())
+        .unwrap();
+    let (_, body) = do_request(router(state), flagged_req).await;
     assert!(body.as_array().unwrap().is_empty());
 }
 ```
@@ -210,7 +250,9 @@ pub async fn toggle_flag(
         config.flagged_creature_ids.remove(&creature_id);
     } else {
         if config.flagged_creature_ids.len() >= crate::observability::config::MAX_FLAGGED_CREATURES {
-            return Err(AppError::Conflict("Maximum flagged creatures reached".into()));
+            return Err(AppError::InvalidRequest(
+                "Maximum flagged creatures reached (20)".into(),
+            ));
         }
         config.flagged_creature_ids.insert(creature_id);
     }
@@ -251,9 +293,10 @@ Expected: PASS
 
 ```rust
 #[tokio::test]
-async fn flag_creature_returns_409_at_cap() {
+async fn flag_creature_returns_400_at_cap() {
     // Flag MAX_FLAGGED_CREATURES creatures, then try one more
-    // Expect 409 Conflict
+    // Expect 400 Bad Request (AppError::InvalidRequest)
+    // Note: AppError has no Conflict variant. Use InvalidRequest.
 }
 ```
 
@@ -304,24 +347,36 @@ git commit -m "feat: add observability API endpoints (config, flag, flagged)"
 - Modify: `frontend/src/components/config-panel/runtime/RuntimeConfigPanel.tsx` (add section)
 - Modify: `frontend/src/api.ts` or equivalent (add observability API calls)
 
-- [ ] **Step 1: Add observability API client functions**
+- [ ] **Step 1: Add observability API client methods**
 
-Find the existing API client module (likely `frontend/src/api.ts` or `frontend/src/lib/api.ts`). Add:
+The API client lives at `frontend/src/api/rest.ts` and uses a class-based pattern (`ApiClient` class with `private async request<T>()` method). Add methods to the existing class:
 
 ```typescript
-export async function getObservabilityConfig(): Promise<ObservabilityConfig> {
-  const res = await fetch('/v3/observability/config');
-  return res.json();
+// In ApiClient class in frontend/src/api/rest.ts
+
+async getObservabilityConfig(): Promise<ObservabilityConfig> {
+  return this.request<ObservabilityConfig>('/v3/observability/config');
 }
 
-export async function patchObservabilityConfig(patch: Partial<ObservabilityConfig>): Promise<void> {
-  await fetch('/v3/observability/config', {
+async patchObservabilityConfig(patch: Partial<ObservabilityConfig>): Promise<void> {
+  await this.request('/v3/observability/config', {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(patch),
   });
 }
 
+async toggleCreatureTraceFlag(creatureId: string): Promise<void> {
+  await this.request(`/v3/observability/flag/${creatureId}`, { method: 'POST' });
+}
+
+async getFlaggedCreatures(): Promise<string[]> {
+  return this.request<string[]>('/v3/observability/flagged');
+}
+```
+
+Add the `ObservabilityConfig` interface in the appropriate types file:
+
+```typescript
 export interface ObservabilityConfig {
   enabled: boolean;
   endpoint: string;
@@ -385,7 +440,7 @@ export function ObservabilitySection() {
 }
 ```
 
-Note: This is a sketch. Follow the exact component patterns, prop types, and styling conventions used by existing sections. The `useObservabilityConfig` hook needs to be created to poll/fetch the observability config from the new API endpoints.
+**Important:** The existing `RuntimeConfigPanel` uses a data-driven pattern: sections are defined as arrays of `FieldDef` objects and rendered through `RuntimeFieldGroup` components, all backed by the shared `localDraft`/`serverConfig` state for `SimulationConfig`. The observability config is **independent server-side state** (not part of `SimulationConfig`), so this section **cannot use the same data-driven pattern**. It needs its own data fetching via the new API endpoints. Place it as a standalone section at the bottom of the runtime panel, visually separated, using the shared `Section`, `FieldRow`, and `ToggleRow` components for consistent styling but with its own state management via `useObservabilityConfig` hook.
 
 - [ ] **Step 3: Create useObservabilityConfig hook**
 

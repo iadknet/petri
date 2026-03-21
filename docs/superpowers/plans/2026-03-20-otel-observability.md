@@ -97,6 +97,12 @@ Before claiming completion of each phase, run and confirm all pass:
 4. `cd v3 && cargo test --workspace --features otel` (OTel-specific tests)
 5. `cd frontend && npm run build` (if frontend files were touched)
 
+## Implementation Notes
+
+- **Cargo.lock changes:** Adding 6+ OTel workspace dependencies will significantly change `Cargo.lock`. These are intentional dependency additions — do NOT revert lockfile changes.
+- **Transport span sub-tree deferred:** The spec defines detailed `ws_frame_publish` sub-spans (`projection_compute` with 3 children, `frame_encoding`, `ws_broadcast`). Phase 1.5 Task 6 implements only the top-level `ws_frame_publish` span. Full sub-tree is deferred to a future iteration.
+- **Global subscriber conflict in tests:** The OTel pipeline calls `tracing_subscriber::registry().init()` which sets the global default subscriber. Test code must NOT call `init_otel_pipeline` — use `try_init` or test-specific subscribers to avoid panics from double-init.
+
 ## Boundary Impact
 
 - **Dependency direction:** `v3-server` depends on `v3-core` (unchanged). OTel crates are `v3-server`-only behind `otel` feature.

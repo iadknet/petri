@@ -143,16 +143,18 @@ otel = [
     "dep:opentelemetry-otlp",
     "dep:tracing-opentelemetry",
     "dep:tracing-subscriber",
-    "dep:uuid",
 ]
 
 [dependencies]
+# Always compiled (no OTel dependency)
+uuid = { workspace = true }
+
+# OTel deps (optional, behind otel feature)
 opentelemetry = { workspace = true, optional = true }
 opentelemetry_sdk = { workspace = true, optional = true }
 opentelemetry-otlp = { workspace = true, optional = true }
 tracing-opentelemetry = { workspace = true, optional = true }
 tracing-subscriber = { workspace = true, optional = true }
-uuid = { workspace = true, optional = true }
 ```
 
 - [ ] **Step 3: Verify build without feature**
@@ -299,6 +301,10 @@ pub struct SimHandle {
 }
 ```
 
+**Design decision:** `OtelConfig` and `run_id` are **always compiled** (no `#[cfg(feature = "otel")]` gating). The config management (sample rates, flagged creatures) does not require OTel libraries. Only the pipeline init, span emission, and metrics export use OTel deps and need `#[cfg]` gating. This means the observability API endpoints (`/v3/observability/*`) are always available, and the frontend can always render controls. When the `otel` feature is disabled, controls are present but export does nothing.
+
+The `uuid` crate must also be an unconditional dependency (not optional) since `run_id` is always generated.
+
 In `SimHandle::new_default()`, generate initial `run_id`:
 
 ```rust
@@ -306,10 +312,7 @@ pub fn new_default() -> Self {
     // ...existing code...
     Self {
         // ...existing fields...
-        #[cfg(feature = "otel")]
         run_id: uuid::Uuid::new_v4().to_string(),
-        #[cfg(not(feature = "otel"))]
-        run_id: String::new(),
         otel_config: Default::default(),
     }
 }
@@ -380,88 +383,28 @@ git commit -m "feat: add OTel pipeline initialization with run_id and OtelConfig
 - Modify: `v3/crates/v3-core/src/simulation/tick.rs` (increment counters)
 - Test: `v3/crates/v3-core/src/simulation/stats.rs` (inline tests)
 
-- [ ] **Step 1: Write failing test for last_tick_births**
+- [ ] **Step 1: Add new per-tick counter fields to SimStats**
 
-Add to `stats.rs` tests:
-
-```rust
-#[test]
-fn last_tick_births_defaults_to_zero() {
-    let stats = SimStats::default();
-    assert_eq!(stats.last_tick_births, 0);
-}
-```
-
-- [ ] **Step 2: Run test to verify it fails**
-
-```bash
-cd v3 && cargo test -p v3-core stats::tests::last_tick_births_defaults_to_zero
-```
-
-Expected: FAIL — field does not exist.
-
-- [ ] **Step 3: Add last_tick_births field**
-
-In `SimStats` struct, in the per-tick section:
+In `SimStats` struct, in the per-tick section (alongside `last_tick_move`, `last_tick_eat`, etc.):
 
 ```rust
 /// Per-tick birth count (successful reproduction spawns). Reset each tick.
 pub last_tick_births: u32,
-```
-
-- [ ] **Step 4: Run test to verify it passes**
-
-```bash
-cd v3 && cargo test -p v3-core stats::tests::last_tick_births_defaults_to_zero
-```
-
-Expected: PASS
-
-- [ ] **Step 5: Write failing test for last_tick_deaths**
-
-```rust
-#[test]
-fn last_tick_deaths_defaults_to_zero() {
-    let stats = SimStats::default();
-    assert_eq!(stats.last_tick_deaths, 0);
-}
-```
-
-- [ ] **Step 6: Add last_tick_deaths field and verify**
-
-```rust
 /// Per-tick death count (creatures removed in Phase 0). Reset each tick.
 pub last_tick_deaths: u32,
-```
-
-```bash
-cd v3 && cargo test -p v3-core stats::tests::last_tick_deaths_defaults_to_zero
-```
-
-Expected: PASS
-
-- [ ] **Step 7: Write failing test for last_tick_food_consumed**
-
-```rust
-#[test]
-fn last_tick_food_consumed_defaults_to_zero() {
-    let stats = SimStats::default();
-    assert_eq!(stats.last_tick_food_consumed, 0);
-}
-```
-
-- [ ] **Step 8: Add last_tick_food_consumed field and verify**
-
-```rust
 /// Per-tick food consumption count (successful Eat actions). Reset each tick.
 pub last_tick_food_consumed: u32,
+/// Per-tick food cells spawned (cells transitioning from 0 to >0). Reset each tick.
+pub last_tick_food_spawned: u32,
 ```
+
+- [ ] **Step 2: Verify build compiles**
 
 ```bash
-cd v3 && cargo test -p v3-core stats::tests::last_tick_food_consumed_defaults_to_zero
+cd v3 && cargo check -p v3-core
 ```
 
-Expected: PASS
+Expected: May fail if existing tests construct `FoodGrowthSummary` with struct literal syntax. Fix any compilation errors in existing tests by adding the new fields (see Step 12b below).
 
 - [ ] **Step 9: Write failing test for food_spawned in FoodGrowthSummary**
 
@@ -498,7 +441,25 @@ Expected: PASS
 
 - [ ] **Step 12: Increment food_spawned in food growth logic**
 
-Find the food growth function (in `v3/crates/v3-core/src/kernel/food_resource/`). Where new food cells are spawned, increment `summary.food_spawned += 1`. The exact location depends on the growth implementation — look for where the summary is built and food cells are set.
+The food growth implementation is in `v3/crates/v3-core/src/kernel/food_resource/growth.rs`. Food growth is continuous (not discrete spawning), so "food spawned" means **cells that transitioned from 0 to >0 food density** during this tick's growth pass. In the `apply_growth` function, check each cell's food value before and after growth application. If it was 0 before and >0 after, increment `food_spawned`.
+
+The `FoodGrowthSummary` is constructed in `FoodResource::grow()` which calls `apply_growth`. The `food_spawned` count should be accumulated during the growth pass and returned as part of the summary.
+
+Also, the existing `SimStats::record_food_growth_summary()` method should be updated to store `food_spawned` in a new SimStats field (e.g., `last_tick_food_spawned: u32`) so it's available for metrics export.
+
+- [ ] **Step 12b: Update existing test that constructs FoodGrowthSummary**
+
+The test `record_food_growth_summary_updates_food_depletion_fields` in `stats.rs` (line ~429) constructs a `FoodGrowthSummary` with struct literal syntax. Adding `food_spawned` to the struct will break this test at compile time. Update it to include `food_spawned: 5` (or any value) and verify the field is stored correctly:
+
+```rust
+stats.record_food_growth_summary(FoodGrowthSummary {
+    mean_occupancy_depletion: 0.12,
+    occupied_cells_with_depletion: 3,
+    growth_suppressed_by_occupancy_depletion: 0.7,
+    food_spawned: 5,
+});
+// Add assertion for food_spawned if stored in SimStats
+```
 
 - [ ] **Step 13: Increment last_tick_deaths in tick.rs death removal**
 
@@ -521,20 +482,36 @@ for id in dead_ids {
 
 - [ ] **Step 14: Increment last_tick_births in reproduction success path**
 
-In `tick.rs`, find where `reproduction_actions_spawned_total` is incremented (successful spawn). Add nearby:
+In `tick.rs`, find the `WorldAction::Reproduce` arm (around line ~585). The cumulative counter `reproduction_actions_spawned_total` is incremented in `actions/reproduction.rs`, but the per-tick `last_tick_births` counter should be incremented in `tick.rs` where the reproduce action outcome is checked. Look for the code path where reproduction succeeds (offspring is created), and add:
 
 ```rust
 sim.stats.last_tick_births += 1;
 ```
 
+Do NOT put this in `actions/reproduction.rs` — keep per-tick counters in `tick.rs` where the other per-tick counters (`last_tick_move`, `last_tick_eat`, etc.) are incremented.
+
 - [ ] **Step 15: Increment last_tick_food_consumed in eat success path**
 
-In `tick.rs`, in the `WorldAction::Eat` arm, after a successful eat:
+In `tick.rs`, in the `WorldAction::Eat` arm (~line 442). The existing code structure is:
+
+```rust
+let succeeded = apply_eat(creature, &mut sim.world, &sim.config);
+// ...
+if succeeded {
+    amount = food_before;
+} else {
+    // action_result = ActionResult::NoFood; etc.
+}
+```
+
+Add the increment **inside** the existing `if succeeded` block (do not restructure the if/else):
 
 ```rust
 if succeeded {
     amount = food_before;
-    sim.stats.last_tick_food_consumed += 1;
+    sim.stats.last_tick_food_consumed += 1;  // <-- add this line
+} else {
+    // ... existing code unchanged ...
 }
 ```
 
