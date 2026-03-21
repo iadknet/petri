@@ -3,11 +3,11 @@
 use v3_core::runtime::trace::domain as core_trace;
 
 use crate::transport::sample_protocol::{
-    BackendTracePayload, ExecutionSamplePayload, GraphActionSlotTracePayload,
+    BackendTracePayload, ExecutionSamplePayload, GateScorePayload, GraphActionSlotTracePayload,
     GraphExecuteGateTracePayload, GraphNodeEvalTracePayload, GraphOutputSinkTracePayload,
     GraphPassTracePayload, GraphTracePayload, MeshHopTracePayload, PerceptionDebugSnapshotPayload,
-    RouteDecisionPayload, RouteKindPayload, SlotWritePayload, StaticInputsSnapshotPayload,
-    TerminationReasonPayload, TickTracePayload, VmStepTracePayload, VmTracePayload,
+    RouteDecisionPayload, SlotWritePayload, StaticInputsSnapshotPayload, TerminationReasonPayload,
+    TickTracePayload, VmStepTracePayload, VmTracePayload,
 };
 
 #[inline]
@@ -93,14 +93,21 @@ fn assemble_hop(hop: core_trace::MeshHopTrace) -> Result<MeshHopTracePayload, se
         energy_before: hop.energy_before,
         energy_after: hop.energy_after,
         output_slots: hop.output_slots,
-        route: RouteDecisionPayload {
-            kind: match hop.route.kind {
-                core_trace::TraceRouteKind::VmWrap => RouteKindPayload::VmWrap,
-                core_trace::TraceRouteKind::CgpNormalized => RouteKindPayload::CgpNormalized,
-            },
-            raw_value: hop.route.raw_value,
-            resolved_target_index: hop.resolved_target_index,
-        },
+        route: hop.route.as_ref().map(|r| RouteDecisionPayload {
+            gate_scores: r
+                .gate_scores
+                .iter()
+                .map(|gs| GateScorePayload {
+                    slot: gs.slot,
+                    target_id: gs.target_id.0,
+                    gate_bias: gs.gate_bias,
+                    runtime_score: gs.runtime_score,
+                    effective_score: gs.effective_score,
+                })
+                .collect(),
+            selected_target_idx: r.selected_target_idx,
+            selected_target_id: r.selected_target_id.0,
+        }),
         backend_trace: match hop.backend_trace {
             core_trace::BackendTrace::Vm(vm) => BackendTracePayload::Vm(VmTracePayload {
                 register_count: vm.register_count,
@@ -121,7 +128,6 @@ fn assemble_hop(hop: core_trace::MeshHopTrace) -> Result<MeshHopTracePayload, se
                 final_registers: vm.final_registers,
                 final_payload: vm.final_payload,
                 final_meta: vm.final_meta,
-                final_route_value: vm.final_route_value,
                 slot_writes: vm
                     .slot_writes
                     .into_iter()
@@ -205,8 +211,8 @@ mod tests {
     use super::*;
     use v3_core::runtime::trace::domain::{
         BackendTrace, ExecutionSample, GraphActionSlotTrace, GraphExecuteGateTrace,
-        GraphOutputSinkTrace, GraphTrace, MeshHopTrace, TickTrace, TraceRouteDecision,
-        TraceRouteKind, VmTrace,
+        GraphOutputSinkTrace, GraphTrace, MeshHopTrace, TickTrace, TraceGateScore,
+        TraceRouteDecision, VmTrace,
     };
     use v3_core::runtime::OUTPUT_SLOT_COUNT;
 
@@ -235,11 +241,26 @@ mod tests {
                     energy_before: 10.0,
                     energy_after: 9.5,
                     output_slots: [0.0; OUTPUT_SLOT_COUNT],
-                    route: TraceRouteDecision {
-                        kind: TraceRouteKind::VmWrap,
-                        raw_value: 3.0,
-                    },
-                    resolved_target_index: 1,
+                    route: Some(TraceRouteDecision {
+                        gate_scores: vec![
+                            TraceGateScore {
+                                slot: 0,
+                                target_id: v3_core::contracts::NodeId::new(10),
+                                gate_bias: 0.0,
+                                runtime_score: -1.0,
+                                effective_score: -1.0,
+                            },
+                            TraceGateScore {
+                                slot: 1,
+                                target_id: v3_core::contracts::NodeId::new(11),
+                                gate_bias: 0.5,
+                                runtime_score: 0.0,
+                                effective_score: 0.5,
+                            },
+                        ],
+                        selected_target_idx: 1,
+                        selected_target_id: v3_core::contracts::NodeId::new(11),
+                    }),
                     backend_trace: BackendTrace::Vm(VmTrace {
                         register_count: 1,
                         constants: vec![],
@@ -247,7 +268,6 @@ mod tests {
                         final_registers: vec![0.0],
                         final_payload: [0.0; OUTPUT_SLOT_COUNT],
                         final_meta: [0.0; 8],
-                        final_route_value: 3.0,
                         slot_writes: vec![],
                     }),
                 }],
@@ -259,10 +279,15 @@ mod tests {
 
         let assembled =
             assemble_execution_sample(sample).expect("valid core trace sample should assemble");
-        let route = &assembled.ticks[0].hops[0].route;
-        assert!(matches!(route.kind, RouteKindPayload::VmWrap));
-        assert!((route.raw_value - 3.0).abs() < 1e-6);
-        assert_eq!(route.resolved_target_index, 1);
+        let route = assembled.ticks[0].hops[0]
+            .route
+            .as_ref()
+            .expect("route should be Some");
+        assert_eq!(route.gate_scores.len(), 2);
+        assert_eq!(route.selected_target_idx, 1);
+        assert_eq!(route.selected_target_id, 11);
+        assert!((route.gate_scores[0].effective_score - (-1.0)).abs() < 1e-6);
+        assert!((route.gate_scores[1].effective_score - 0.5).abs() < 1e-6);
     }
 
     #[test]
@@ -290,11 +315,17 @@ mod tests {
                     energy_before: 5.0,
                     energy_after: 4.5,
                     output_slots: [1.0; OUTPUT_SLOT_COUNT],
-                    route: TraceRouteDecision {
-                        kind: TraceRouteKind::CgpNormalized,
-                        raw_value: 0.25,
-                    },
-                    resolved_target_index: 0,
+                    route: Some(TraceRouteDecision {
+                        gate_scores: vec![TraceGateScore {
+                            slot: 0,
+                            target_id: v3_core::contracts::NodeId::new(5),
+                            gate_bias: 0.0,
+                            runtime_score: 0.25,
+                            effective_score: 0.25,
+                        }],
+                        selected_target_idx: 0,
+                        selected_target_id: v3_core::contracts::NodeId::new(5),
+                    }),
                     backend_trace: BackendTrace::Graph(GraphTrace {
                         passes: vec![],
                         converged: true,
