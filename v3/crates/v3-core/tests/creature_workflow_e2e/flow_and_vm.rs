@@ -20,7 +20,7 @@ use crate::support::{
 };
 
 /// Build a CGP graph backend with a single Constant compute node whose output
-/// is wired to the specified CustomOutput sink and optionally to RouterOutput.
+/// is wired to the specified CustomOutput sink.
 fn cgp_constant_to_custom_output(value: f32, custom_slot: u8) -> CgpGraphBackendDef {
     let config = MutationConfig::default();
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
@@ -86,7 +86,7 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
     let id_b = NodeId::new(1);
     let id_c = NodeId::new(2);
 
-    // Node A: writes 0.8 into slot 2, routes to B (RouterOutput unwired → 0.0 → targets[0]).
+    // Node A: writes 0.8 into slot 2, routes to B (RouterGate sinks unwired → 0.0 → targets[0]).
     let node_a = NodeGenome {
         node_id: id_a,
         input_refs: vec![],

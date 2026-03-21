@@ -16,7 +16,7 @@ use crate::support::{insert_creature, run_one_traced_tick, test_config};
 
 /// Gate-based routing: negative gate score on slot 0 causes slot 1 (score 0.0) to win.
 ///
-/// CGP graph outputs -1.0 to RouterOutput → scores[0] = -1.0.
+/// CGP graph outputs -1.0 to RouterGate(0) → scores[0] = -1.0.
 /// Target id_noop (slot 0): effective = 0.0 + (-1.0) = -1.0
 /// Target id_eat  (slot 1): effective = 0.0 + 0.0     =  0.0  (wins)
 #[test]
@@ -30,7 +30,7 @@ fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
     let id_noop = NodeId::new(1);
     let id_eat = NodeId::new(2);
 
-    // CGP graph: Constant(-1.0) → RouterOutput sink
+    // CGP graph: Constant(-1.0) → RouterGate(0) sink
     let entry_def = {
         let config = MutationConfig::default();
         let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
@@ -39,11 +39,11 @@ fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
             inputs: Vec::new(),
             plasticity: None,
         });
-        // Wire RouterOutput sink to CN0
+        // Wire RouterGate(0) sink to CN0
         if let Some(sink) = def
             .output_sinks
             .iter_mut()
-            .find(|s| s.kind == OutputSinkKind::RouterOutput)
+            .find(|s| s.kind == OutputSinkKind::RouterGate(0))
         {
             sink.inputs.push(GraphEdge {
                 source: GraphSource::ComputeNode(0),

@@ -1,6 +1,6 @@
 //! Post-convergence effect pass for CGP-style graph backend evaluation.
 
-use crate::contracts::{Direction, InputReference, WorldAction};
+use crate::contracts::{Direction, InputReference, WorldAction, MAX_GATE_SLOTS};
 use crate::creature::genome::cgp::{
     ActionSlotBehavior, CgpGraphBackendDef, GraphEdge, OutputSinkKind, WorldActionKind,
 };
@@ -137,10 +137,14 @@ pub(crate) fn apply_cgp_graph_effects(
                     applied = true;
                 }
             }
-            OutputSinkKind::RouterOutput => {
-                applied_value = sanitize_f32(wsum);
-                route_gates.scores[0] = applied_value;
-                applied = true;
+            OutputSinkKind::RouterGate(slot) => {
+                let s = slot as usize;
+                if s < MAX_GATE_SLOTS {
+                    let val = sanitize_f32(wsum);
+                    route_gates.scores[s] = val;
+                    applied_value = val;
+                    applied = true;
+                }
             }
             OutputSinkKind::WriteSlot(s) => {
                 if (s as usize) < 16 {
