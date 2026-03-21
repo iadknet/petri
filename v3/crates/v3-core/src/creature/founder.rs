@@ -229,13 +229,13 @@ fn node1_vm_decision() -> NodeGenome {
                 VmInstruction::Max { dst: 6, a: 2, b: 3 }, // [19] direction heuristic
                 VmInstruction::Max { dst: 7, a: 4, b: 5 }, // [20]
                 VmInstruction::CmpGt { dst: 6, a: 6, b: 7 }, // [21]
+                VmInstruction::PushAction { action_type: 1 }, // [22] push Eat(type 0 via default meta)
                 VmInstruction::WriteWorldActionMeta {
                     slot_idx: 0,
                     src: 7,
-                }, // [22] meta[0]=dir
-                VmInstruction::PushAction { action_type: 2 }, // [23] push Move
-                VmInstruction::PushAction { action_type: 1 }, // [24] push Eat
-                VmInstruction::ExecuteActionQueue,         // [25] terminal → done
+                }, // [23] meta[0]=dir
+                VmInstruction::PushAction { action_type: 2 }, // [24] push Move
+                VmInstruction::ExecuteActionQueue,            // [25] terminal → done
                 // [26..37] Priority 3: Move toward best food direction (fallback)
                 VmInstruction::Sub { dst: 7, a: 7, b: 7 }, // [26] r7 = 0.0 (reset)
                 VmInstruction::Max { dst: 6, a: 2, b: 3 }, // [27] max(food_N, food_E)
@@ -343,11 +343,11 @@ fn node1_vm_decision_forage_first(reproduce_transfer_energy: f32) -> NodeGenome 
                     dst: 0,
                     const_idx: 3,
                 }, // W = 6
+                VmInstruction::PushAction { action_type: 1 }, // Eat(type 0 via default meta)
                 VmInstruction::WriteWorldActionMeta {
                     slot_idx: 0,
                     src: 0,
-                },
-                VmInstruction::PushAction { action_type: 1 }, // Eat
+                }, // dir for Move
                 VmInstruction::PushAction { action_type: 2 }, // Move
                 VmInstruction::ExecuteActionQueue,            // terminal
                 // Priority 2: Reproduce if energy sufficient.
@@ -421,11 +421,11 @@ fn node1_vm_decision_forage_first(reproduce_transfer_energy: f32) -> NodeGenome 
                     dst: 0,
                     const_idx: 3,
                 }, // W = 6
+                VmInstruction::PushAction { action_type: 1 }, // Eat(type 0 via default meta)
                 VmInstruction::WriteWorldActionMeta {
                     slot_idx: 0,
                     src: 0,
-                },
-                VmInstruction::PushAction { action_type: 1 }, // Eat
+                }, // dir for Move
                 VmInstruction::PushAction { action_type: 2 }, // Move
                 VmInstruction::ExecuteActionQueue,            // terminal
             ],
@@ -711,6 +711,19 @@ mod tests {
         );
         assert_eq!(actions[0], WorldAction::eat(OrdinaryFoodTypeId::default()));
         assert!(matches!(actions[1], WorldAction::Move(_)));
+    }
+
+    #[test]
+    fn v3alpha1_forage_branch_eat_targets_default_food_type() {
+        let actions = run_founder_actions(FounderProfile::V3Alpha1, 1.0, 0.0, 0.1, 0.2, 0.95, 0.3);
+        let eat_type = actions
+            .into_iter()
+            .find_map(|action| match action {
+                WorldAction::Eat { type_idx } => Some(type_idx),
+                _ => None,
+            })
+            .expect("forage branch should emit an Eat action");
+        assert_eq!(eat_type, OrdinaryFoodTypeId::default());
     }
 
     #[test]

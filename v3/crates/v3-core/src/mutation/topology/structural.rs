@@ -21,6 +21,7 @@ pub(super) fn next_node_id(genome: &CreatureGenome) -> NodeId {
 pub(super) fn apply_add_node(
     genome: &mut CreatureGenome,
     config: &MutationConfig,
+    food_type_count: usize,
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     let new_id = next_node_id(genome);
@@ -28,6 +29,7 @@ pub(super) fn apply_add_node(
         new_id,
         Vec::new(),
         config,
+        food_type_count,
         rng,
     ));
     Ok(())
@@ -275,6 +277,7 @@ pub(super) fn apply_splice_node(
     bias: f64,
     rng: &mut impl Rng,
     config: &MutationConfig,
+    food_type_count: usize,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let eligible: Vec<usize> = genome
         .nodes
@@ -299,6 +302,7 @@ pub(super) fn apply_splice_node(
             gate_bias: 0.0,
         }],
         config,
+        food_type_count,
         rng,
     ));
     genome.nodes[a_idx].targets[target_slot].target_id = c_id;

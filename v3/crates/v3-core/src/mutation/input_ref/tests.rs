@@ -12,7 +12,7 @@ use crate::creature::genome::{
 };
 use crate::creature::parseability::ParseabilityGate;
 use crate::mutation::compound::sub_value_count;
-use crate::mutation::sampling::random_input_reference;
+use crate::mutation::sampling::{random_input_reference, random_input_reference_for_food_types};
 use crate::runtime::OUTPUT_SLOT_COUNT;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
@@ -839,5 +839,113 @@ fn action_queue_appears_in_random_input_reference_pool() {
     assert!(
         found_aq,
         "ActionQueue must be reachable from random_input_reference"
+    );
+}
+
+fn any_non_default_food_type(input_refs: &[InputReference]) -> bool {
+    input_refs.iter().any(|input_ref| match input_ref {
+        InputReference::World(WorldInputKey::FoodHere { type_idx })
+        | InputReference::World(WorldInputKey::NeighborFoodRing { type_idx })
+        | InputReference::World(WorldInputKey::AreaFoodSummary { type_idx }) => {
+            *type_idx != OrdinaryFoodTypeId::default()
+        }
+        _ => false,
+    })
+}
+
+#[test]
+fn random_input_reference_for_food_types_can_sample_non_default_food_type() {
+    let mut r = rng(0xC0FFEE);
+    let saw_non_default = (0..2048)
+        .map(|_| random_input_reference_for_food_types(&mut r, 3))
+        .any(|input_ref| any_non_default_food_type(&[input_ref]));
+
+    assert!(
+        saw_non_default,
+        "typed sampler should produce food refs with non-default type_idx when 3 food types are available"
+    );
+}
+
+#[test]
+fn input_ref_add_can_introduce_non_default_food_type() {
+    let mut r = rng(0xA11D);
+    let mut saw_non_default = false;
+    for _ in 0..1024 {
+        let mut genome = v3alpha1_founder_genome();
+        let _ = InputRefMutator::apply_with_food_type_count(
+            &mut genome,
+            InputRefOperator::Add,
+            &[],
+            0.0,
+            &mut r,
+            &default_config(),
+            3,
+        );
+        if genome
+            .nodes
+            .iter()
+            .any(|node| any_non_default_food_type(&node.input_refs))
+        {
+            saw_non_default = true;
+            break;
+        }
+    }
+
+    assert!(
+        saw_non_default,
+        "InputRef.Add should be able to introduce food sensors for non-default food types"
+    );
+}
+
+#[test]
+fn input_ref_swap_can_introduce_non_default_food_type() {
+    let mut r = rng(0x5A9);
+    let mut saw_non_default = false;
+    for _ in 0..1024 {
+        let mut genome = v3alpha1_founder_genome();
+        let _ = InputRefMutator::apply_with_food_type_count(
+            &mut genome,
+            InputRefOperator::Swap,
+            &[],
+            0.0,
+            &mut r,
+            &default_config(),
+            4,
+        );
+        if genome
+            .nodes
+            .iter()
+            .any(|node| any_non_default_food_type(&node.input_refs))
+        {
+            saw_non_default = true;
+            break;
+        }
+    }
+
+    assert!(
+        saw_non_default,
+        "InputRef.Swap should be able to produce food refs with non-default type_idx"
+    );
+}
+
+#[test]
+fn input_ref_raw_field_mutation_can_mutate_food_type_idx() {
+    let mut genome = single_node_genome_with_input_ref(InputReference::World(
+        WorldInputKey::food_here(OrdinaryFoodTypeId::default()),
+    ));
+    let mut r = rng(0xFACE);
+    let result = InputRefMutator::apply_with_food_type_count(
+        &mut genome,
+        InputRefOperator::RawFieldMutation,
+        &[],
+        0.0,
+        &mut r,
+        &default_config(),
+        3,
+    );
+
+    assert!(
+        result.is_ok() && any_non_default_food_type(&genome.nodes[0].input_refs),
+        "InputRef.RawFieldMutation should be able to mutate food sensor type_idx when multiple food types exist"
     );
 }

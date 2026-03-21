@@ -1,7 +1,7 @@
 use rand::Rng;
 
-use crate::config::MutationConfig;
-use crate::contracts::InputReference;
+use crate::config::{MutationConfig, OrdinaryFoodTypeId};
+use crate::contracts::{InputReference, WorldInputKey};
 use crate::creature::genome::{CreatureGenome, VmInstruction};
 use crate::mutation::compound::sub_value_count;
 use crate::mutation::reachability::biased_select_from;
@@ -77,6 +77,7 @@ pub struct InputRefMutator;
 
 impl InputRefMutator {
     /// Apply an input ref operator to the genome.
+    #[cfg(test)]
     pub fn apply(
         genome: &mut CreatureGenome,
         op: InputRefOperator,
@@ -85,15 +86,34 @@ impl InputRefMutator {
         rng: &mut impl Rng,
         config: &MutationConfig,
     ) -> Result<TargetReachability, MutationSkipReason> {
+        Self::apply_with_food_type_count(genome, op, reachable_nodes, bias, rng, config, 1)
+    }
+
+    /// Apply an input ref operator with typed-food mutation context.
+    pub fn apply_with_food_type_count(
+        genome: &mut CreatureGenome,
+        op: InputRefOperator,
+        reachable_nodes: &[usize],
+        bias: f64,
+        rng: &mut impl Rng,
+        config: &MutationConfig,
+        food_type_count: usize,
+    ) -> Result<TargetReachability, MutationSkipReason> {
         if genome.nodes.is_empty() {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
 
         match op {
-            InputRefOperator::Add => apply_add(genome, reachable_nodes, bias, rng, config),
+            InputRefOperator::Add => {
+                apply_add(genome, reachable_nodes, bias, rng, config, food_type_count)
+            }
             InputRefOperator::Remove => apply_remove(genome, reachable_nodes, bias, rng),
-            InputRefOperator::Swap => apply_swap(genome, reachable_nodes, bias, rng, config),
-            InputRefOperator::RawFieldMutation => apply_raw_field_mutation(genome, rng, config),
+            InputRefOperator::Swap => {
+                apply_swap(genome, reachable_nodes, bias, rng, config, food_type_count)
+            }
+            InputRefOperator::RawFieldMutation => {
+                apply_raw_field_mutation(genome, rng, config, food_type_count)
+            }
         }
     }
 }
@@ -104,6 +124,7 @@ fn apply_add(
     bias: f64,
     rng: &mut impl Rng,
     config: &MutationConfig,
+    food_type_count: usize,
 ) -> Result<TargetReachability, MutationSkipReason> {
     use crate::creature::genome::cgp::{GraphEdge, GraphSource};
     use crate::creature::genome::BackendDef;
@@ -112,7 +133,11 @@ fn apply_add(
     let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
     let (node_idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let new_ref = sampling::random_input_reference(rng);
+    let new_ref = if food_type_count <= 1 {
+        sampling::random_input_reference(rng)
+    } else {
+        sampling::random_input_reference_for_food_types(rng, food_type_count)
+    };
     genome.nodes[node_idx].input_refs.push(new_ref);
 
     // Compute width before mutable borrow of backend_def (own-borrow-over-clone)
@@ -196,6 +221,7 @@ fn apply_swap(
     bias: f64,
     rng: &mut impl Rng,
     config: &MutationConfig,
+    food_type_count: usize,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let eligible: Vec<usize> = genome
         .nodes
@@ -210,7 +236,11 @@ fn apply_swap(
     let (node_idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let ref_idx = rng.gen_range(0..genome.nodes[node_idx].input_refs.len());
-    let new_ref = sampling::random_input_reference(rng);
+    let new_ref = if food_type_count <= 1 {
+        sampling::random_input_reference(rng)
+    } else {
+        sampling::random_input_reference_for_food_types(rng, food_type_count)
+    };
     genome.nodes[node_idx].input_refs[ref_idx] = new_ref;
     let new_width = sub_value_count(&genome.nodes[node_idx].input_refs[ref_idx], config);
     debug_assert!(ref_idx <= u16::MAX as usize, "input_refs index exceeds u16");
@@ -224,24 +254,29 @@ fn apply_raw_field_mutation(
     genome: &mut CreatureGenome,
     rng: &mut impl Rng,
     _config: &MutationConfig,
+    food_type_count: usize,
 ) -> Result<TargetReachability, MutationSkipReason> {
-    // Count eligible targets: UpstreamSlot input_refs only.
-    // (The old second pool — InputRef graph nodes for sub_idx mutation — no longer
-    // exists in the CGP graph backend. CGP edges use GraphSource::InputLeaf and
-    // sub_idx is mutated via mutation/graph/operators.rs.)
-    let mut upstream_count: usize = 0;
+    // Count eligible targets: UpstreamSlot refs + typed food world refs.
+    let mut upstream_count = 0usize;
+    let mut food_ref_count = 0usize;
     for node in &genome.nodes {
         upstream_count += node
             .input_refs
             .iter()
             .filter(|r| matches!(r, InputReference::UpstreamSlot(_)))
             .count();
+        food_ref_count += node
+            .input_refs
+            .iter()
+            .filter(|r| food_type_idx_ref(r).is_some())
+            .count();
     }
-    if upstream_count == 0 {
+    let total = upstream_count + food_ref_count;
+    if total == 0 {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
 
-    let mut pick = rng.gen_range(0..upstream_count);
+    let mut pick = rng.gen_range(0..total);
 
     for node in &mut genome.nodes {
         for input_ref in &mut node.input_refs {
@@ -251,10 +286,57 @@ fn apply_raw_field_mutation(
                     return Ok(TargetReachability::NotApplicable);
                 }
                 pick -= 1;
+                continue;
+            }
+
+            if let Some(type_idx) = food_type_idx_mut(input_ref) {
+                if pick == 0 {
+                    *type_idx = sample_new_food_type_idx(*type_idx, food_type_count, rng);
+                    return Ok(TargetReachability::NotApplicable);
+                }
+                pick -= 1;
             }
         }
     }
     Ok(TargetReachability::NotApplicable)
+}
+
+fn food_type_idx_ref(input_ref: &InputReference) -> Option<OrdinaryFoodTypeId> {
+    match input_ref {
+        InputReference::World(WorldInputKey::FoodHere { type_idx })
+        | InputReference::World(WorldInputKey::NeighborFoodRing { type_idx })
+        | InputReference::World(WorldInputKey::AreaFoodSummary { type_idx }) => Some(*type_idx),
+        _ => None,
+    }
+}
+
+fn food_type_idx_mut(input_ref: &mut InputReference) -> Option<&mut OrdinaryFoodTypeId> {
+    match input_ref {
+        InputReference::World(WorldInputKey::FoodHere { type_idx })
+        | InputReference::World(WorldInputKey::NeighborFoodRing { type_idx })
+        | InputReference::World(WorldInputKey::AreaFoodSummary { type_idx }) => Some(type_idx),
+        _ => None,
+    }
+}
+
+fn sample_new_food_type_idx(
+    current: OrdinaryFoodTypeId,
+    food_type_count: usize,
+    rng: &mut impl Rng,
+) -> OrdinaryFoodTypeId {
+    let capped = food_type_count.clamp(1, usize::from(u16::MAX) + 1);
+    if capped == 1 {
+        return OrdinaryFoodTypeId::default();
+    }
+
+    let current_idx = usize::from(current.get());
+    if current_idx >= capped {
+        return OrdinaryFoodTypeId::new(rng.gen_range(0..capped) as u16);
+    }
+
+    let draw = rng.gen_range(0..(capped - 1));
+    let remapped = if draw >= current_idx { draw + 1 } else { draw };
+    OrdinaryFoodTypeId::new(remapped as u16)
 }
 
 #[cfg(test)]

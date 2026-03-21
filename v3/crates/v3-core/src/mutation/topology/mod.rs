@@ -134,6 +134,7 @@ impl TopologyMutator {
     /// Returns `Ok(TargetReachability)` on success, or `Err(MutationSkipReason)` if no
     /// applicable target exists. Exempt operators (AddNode, ChangeEntryNode) return
     /// `NotApplicable` since they don't select a target node.
+    #[cfg(test)]
     pub fn apply(
         genome: &mut CreatureGenome,
         op: TopologyOperator,
@@ -142,10 +143,25 @@ impl TopologyMutator {
         rng: &mut impl Rng,
         config: &MutationConfig,
     ) -> Result<TargetReachability, MutationSkipReason> {
+        Self::apply_with_food_type_count(genome, op, reachable_nodes, bias, rng, config, 1)
+    }
+
+    /// Apply a topology operator with typed-food mutation context.
+    pub fn apply_with_food_type_count(
+        genome: &mut CreatureGenome,
+        op: TopologyOperator,
+        reachable_nodes: &[usize],
+        bias: f64,
+        rng: &mut impl Rng,
+        config: &MutationConfig,
+        food_type_count: usize,
+    ) -> Result<TargetReachability, MutationSkipReason> {
         match op {
             // Exempt: these don't select a target node for mutation.
-            TopologyOperator::AddNode => structural::apply_add_node(genome, config, rng)
-                .map(|()| TargetReachability::NotApplicable),
+            TopologyOperator::AddNode => {
+                structural::apply_add_node(genome, config, food_type_count, rng)
+                    .map(|()| TargetReachability::NotApplicable)
+            }
             TopologyOperator::ChangeEntryNode => structural::apply_change_entry_node(genome, rng)
                 .map(|()| TargetReachability::NotApplicable),
             // Biased structural operators:
@@ -167,9 +183,14 @@ impl TopologyMutator {
             TopologyOperator::CopyMeshForwardSlice => {
                 structural::apply_copy_mesh_forward_slice(genome, reachable_nodes, bias, rng)
             }
-            TopologyOperator::SpliceNode => {
-                structural::apply_splice_node(genome, reachable_nodes, bias, rng, config)
-            }
+            TopologyOperator::SpliceNode => structural::apply_splice_node(
+                genome,
+                reachable_nodes,
+                bias,
+                rng,
+                config,
+                food_type_count,
+            ),
             // Biased routing operators:
             TopologyOperator::RetargetNodeTarget => {
                 routing::apply_retarget_node_target(genome, reachable_nodes, bias, rng)
