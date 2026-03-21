@@ -6,7 +6,7 @@ use crate::creature::genome::cgp::{
 };
 use crate::runtime::cgp::sources::{resolve_source, resolve_source_post_convergence};
 use crate::runtime::inputs::ResolveCtx;
-use crate::runtime::routing::RouteDecision;
+use crate::runtime::routing::RouteGateMap;
 use crate::runtime::trace::domain::{
     GraphActionSlotTrace, GraphExecuteGateTrace, GraphOutputSinkTrace,
 };
@@ -98,7 +98,7 @@ pub(crate) fn apply_cgp_graph_effects(
     prev_shared_memory: &[f32; 16],
 ) -> (NodeResult, CgpEffectsTrace) {
     let mut output_slots = *upstream_slots;
-    let mut route_raw_value = 0.0f32;
+    let mut route_gates = RouteGateMap::default();
     let compute_count = def.compute_nodes.len();
     let mut buf = Vec::with_capacity(8);
     let mut output_sink_traces = Vec::with_capacity(def.output_sinks.len());
@@ -139,7 +139,7 @@ pub(crate) fn apply_cgp_graph_effects(
             }
             OutputSinkKind::RouterOutput => {
                 applied_value = sanitize_f32(wsum);
-                route_raw_value = applied_value;
+                route_gates.scores[0] = applied_value;
                 applied = true;
             }
             OutputSinkKind::WriteSlot(s) => {
@@ -254,9 +254,7 @@ pub(crate) fn apply_cgp_graph_effects(
     (
         NodeResult {
             output_slots,
-            route: RouteDecision::CgpNormalized {
-                raw_value: route_raw_value,
-            },
+            route_gates,
             terminal,
             energy_exhausted: false,
         },

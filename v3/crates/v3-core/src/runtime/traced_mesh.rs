@@ -10,7 +10,7 @@ use crate::contracts::{NodeId, WorldAction};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute_graph_node_traced;
-use crate::runtime::routing::resolve_route_index;
+use crate::runtime::routing::{resolve_route_index, RouteDecision};
 use crate::runtime::trace::domain::{
     BackendTrace, MeshHopTrace, TerminationReason, TraceRouteDecision,
 };
@@ -116,10 +116,19 @@ pub fn execute_creature_mesh_traced(
             BackendDef::Graph(_) => report.graph_cost += node_cost,
         }
 
+        // Transitional: extract scores[0] for old resolve_route_index
+        let transitional_route = match &node.backend_def {
+            BackendDef::Vm(_) => RouteDecision::VmWrap {
+                raw_value: result.route_gates.scores[0],
+            },
+            BackendDef::Graph(_) => RouteDecision::CgpNormalized {
+                raw_value: result.route_gates.scores[0],
+            },
+        };
         let resolved_target_index = if node.targets.is_empty() {
             0
         } else {
-            resolve_route_index(node.targets.len(), result.route)
+            resolve_route_index(node.targets.len(), transitional_route)
         };
 
         hop_traces.push(MeshHopTrace {
@@ -130,7 +139,7 @@ pub fn execute_creature_mesh_traced(
             energy_before: node_energy_before,
             energy_after: *energy,
             output_slots: result.output_slots,
-            route: TraceRouteDecision::from_internal(result.route),
+            route: TraceRouteDecision::from_internal(transitional_route),
             resolved_target_index,
             backend_trace,
         });
