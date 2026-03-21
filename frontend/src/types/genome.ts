@@ -150,11 +150,17 @@ export type InputReference =
 	| { UpstreamSlot: number }
 	| "ActionQueue";
 
+export interface RouteTarget {
+	target_id: number;
+	slot: number;
+	gate_bias: number;
+}
+
 export interface NodeGenome {
 	node_id: number;
 	input_refs: InputReference[];
 	backend_def: BackendDef;
-	targets: number[];
+	targets: RouteTarget[];
 }
 
 export interface CreatureGenome {
