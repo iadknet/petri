@@ -10,6 +10,7 @@ use crate::mutation::reachability::biased_select_from;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
 use super::birth;
+use super::routing::lowest_unused_slot;
 
 /// Allocate the next node ID: `max(existing node_ids) + 1` with wrapping u32 arithmetic.
 pub(super) fn next_node_id(genome: &CreatureGenome) -> NodeId {
@@ -152,13 +153,15 @@ pub(super) fn apply_copy_node(
         targets,
     });
 
-    // Always add backlink to ensure the copied node is reachable.
-    let backlink_slot = genome.nodes[source_idx].targets.len() as u8;
-    genome.nodes[source_idx].targets.push(RouteTarget {
-        target_id: new_id,
-        slot: backlink_slot,
-        gate_bias: 0.0,
-    });
+    // Add backlink to ensure the copied node is reachable, using the lowest
+    // unused slot. Skip if all slots are already occupied.
+    if let Some(slot) = lowest_unused_slot(&genome.nodes[source_idx].targets) {
+        genome.nodes[source_idx].targets.push(RouteTarget {
+            target_id: new_id,
+            slot,
+            gate_bias: 0.0,
+        });
+    }
     Ok(reachability)
 }
 
@@ -215,17 +218,19 @@ fn clone_and_remap_slice(genome: &mut CreatureGenome, gene_indices: &[usize], rn
     // remappable), and VM backends don't have CustomOutput node kinds, so
     // this remapping step is now a no-op and has been removed.
 
-    // Always add backlink from random pre-existing node to a random cloned node
-    // to ensure reachability.
+    // Add backlink from random pre-existing node to a random cloned node to
+    // ensure reachability. Use the lowest unused slot; skip if all slots are
+    // already occupied on the selected source node.
     let new_ids: Vec<NodeId> = id_map.values().copied().collect();
     let link_target = new_ids[rng.gen_range(0..new_ids.len())];
     let source_idx = rng.gen_range(0..pre_existing_count);
-    let backlink_slot = genome.nodes[source_idx].targets.len() as u8;
-    genome.nodes[source_idx].targets.push(RouteTarget {
-        target_id: link_target,
-        slot: backlink_slot,
-        gate_bias: 0.0,
-    });
+    if let Some(slot) = lowest_unused_slot(&genome.nodes[source_idx].targets) {
+        genome.nodes[source_idx].targets.push(RouteTarget {
+            target_id: link_target,
+            slot,
+            gate_bias: 0.0,
+        });
+    }
 }
 
 pub(super) fn apply_copy_mesh_backward_slice(

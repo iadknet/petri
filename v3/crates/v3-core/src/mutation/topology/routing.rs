@@ -9,7 +9,7 @@ const _: () = assert!(MAX_GATE_SLOTS <= 8, "lowest_unused_slot uses u8 bitmask")
 
 /// Returns the lowest slot index not already occupied by any target in `targets`.
 /// Returns `None` when all `MAX_GATE_SLOTS` slots are in use.
-fn lowest_unused_slot(targets: &[RouteTarget]) -> Option<u8> {
+pub(super) fn lowest_unused_slot(targets: &[RouteTarget]) -> Option<u8> {
     let used: u8 = targets
         .iter()
         .filter(|t| (t.slot as usize) < MAX_GATE_SLOTS)
