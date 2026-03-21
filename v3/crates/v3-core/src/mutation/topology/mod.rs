@@ -142,10 +142,8 @@ impl TopologyMutator {
             // Exempt: these don't select a target node for mutation.
             TopologyOperator::AddNode => structural::apply_add_node(genome, config, rng)
                 .map(|()| TargetReachability::NotApplicable),
-            TopologyOperator::ChangeEntryNode => {
-                structural::apply_change_entry_node(genome, rng)
-                    .map(|()| TargetReachability::NotApplicable)
-            }
+            TopologyOperator::ChangeEntryNode => structural::apply_change_entry_node(genome, rng)
+                .map(|()| TargetReachability::NotApplicable),
             // Biased structural operators:
             TopologyOperator::RemoveNode => {
                 structural::apply_remove_node(genome, reachable_nodes, bias, rng)

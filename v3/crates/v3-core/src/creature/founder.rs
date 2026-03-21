@@ -751,7 +751,10 @@ mod tests {
                 graph.compute_nodes[0].kind,
                 ComputeNodeKind::Threshold(expected_threshold)
             );
-            assert_eq!(graph.compute_nodes[1].kind, ComputeNodeKind::Threshold(19.5));
+            assert_eq!(
+                graph.compute_nodes[1].kind,
+                ComputeNodeKind::Threshold(19.5)
+            );
             assert_eq!(graph.compute_nodes[2].kind, ComputeNodeKind::Multiply);
             assert_eq!(
                 node0.input_refs,
