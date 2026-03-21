@@ -261,7 +261,7 @@ mod tests {
         let id_graph = NodeId::new(0);
         let id_vm = NodeId::new(1);
 
-        // CGP graph: Constant(0.0) → RouterOutput sink (routes to target 0)
+        // CGP graph: Constant(0.0) → RouterGate(0) sink (routes to target 0)
         let graph_node = NodeGenome {
             node_id: id_graph,
             input_refs: vec![],
@@ -272,7 +272,7 @@ mod tests {
                     plasticity: None,
                 }],
                 output_sinks: vec![OutputSink {
-                    kind: OutputSinkKind::RouterOutput,
+                    kind: OutputSinkKind::RouterGate(0),
                     inputs: vec![GraphEdge {
                         source: GraphSource::ComputeNode(0),
                         weight: 1.0,
@@ -347,7 +347,7 @@ mod tests {
         let id_graph = NodeId::new(0);
         let id_vm = NodeId::new(1);
 
-        // CGP graph writes 9.0 to CustomOutput(5), RouterOutput unwired (default route)
+        // CGP graph writes 9.0 to CustomOutput(5), RouterGate(0) unwired (default route)
         let graph_node = NodeGenome {
             node_id: id_graph,
             input_refs: vec![],
@@ -366,7 +366,7 @@ mod tests {
                         }],
                     },
                     OutputSink {
-                        kind: OutputSinkKind::RouterOutput,
+                        kind: OutputSinkKind::RouterGate(0),
                         inputs: vec![], // unwired = default route
                     },
                 ],
@@ -445,7 +445,7 @@ mod tests {
                             }],
                         },
                         OutputSink {
-                            kind: OutputSinkKind::RouterOutput,
+                            kind: OutputSinkKind::RouterGate(0),
                             inputs: vec![],
                         },
                     ],

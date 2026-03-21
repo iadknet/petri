@@ -112,7 +112,7 @@ fn derive_node_annotation(node: &NodeGenome, reachable: bool) -> MeshNodeAnnotat
                     | super::VmInstruction::SetPriorityBid { .. } => {
                         write_classes.insert(MeshWriteClass::Action);
                     }
-                    super::VmInstruction::WriteRouteTarget { .. } => {
+                    super::VmInstruction::WriteRouteGate { .. } => {
                         write_classes.insert(MeshWriteClass::Route);
                     }
                     _ => {}
@@ -226,7 +226,7 @@ mod tests {
                             dst: 1,
                             slot_idx: 3,
                         },
-                        VmInstruction::WriteRouteTarget { src: 0 },
+                        VmInstruction::WriteRouteGate { slot: 0, src: 0 },
                         VmInstruction::StoreSlotImm {
                             slot_idx: 4,
                             src: 1,
@@ -257,7 +257,7 @@ mod tests {
 
     #[test]
     fn derives_graph_annotations_and_marks_unreachable_nodes() {
-        // CGP graph: CN0 (AdaptiveGain) with InputLeaf(0,0) → RouterOutput sink
+        // CGP graph: CN0 (AdaptiveGain) with InputLeaf(0,0) → RouterGate(0) sink
         // CN1 (Constant) disconnected (dead)
         let reachable_graph = NodeGenome {
             node_id: NodeId::new(1),
@@ -283,7 +283,7 @@ mod tests {
                     },
                 ],
                 output_sinks: vec![OutputSink {
-                    kind: OutputSinkKind::RouterOutput,
+                    kind: OutputSinkKind::RouterGate(0),
                     inputs: vec![GraphEdge {
                         source: GraphSource::ComputeNode(0),
                         weight: 1.0,
@@ -358,7 +358,7 @@ mod tests {
                                 dst: 0,
                                 const_idx: 0,
                             },
-                            VmInstruction::WriteRouteTarget { src: 0 },
+                            VmInstruction::WriteRouteGate { slot: 0, src: 0 },
                         ],
                     }),
                 },
