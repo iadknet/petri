@@ -93,6 +93,9 @@ pub struct StatusEventPayload {
         std::collections::HashMap<String, u64>,
     pub reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state:
         std::collections::HashMap<String, u64>,
+    pub last_tick_food_occupancy_depletion_mean: f32,
+    pub last_tick_food_occupancy_depletion_occupied_cells: u32,
+    pub last_tick_food_growth_suppressed_by_occupancy_depletion: f32,
     pub last_tick_compute_energy_total_mean: f32,
     pub last_tick_compute_energy_total_min: f32,
     pub last_tick_compute_energy_total_max: f32,
@@ -262,6 +265,11 @@ pub fn build_status_event_payload(
         reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state: health
             .reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state
             .clone(),
+        last_tick_food_occupancy_depletion_mean: status.last_tick_food_occupancy_depletion_mean,
+        last_tick_food_occupancy_depletion_occupied_cells: status
+            .last_tick_food_occupancy_depletion_occupied_cells,
+        last_tick_food_growth_suppressed_by_occupancy_depletion: status
+            .last_tick_food_growth_suppressed_by_occupancy_depletion,
         last_tick_compute_energy_total_mean: status.last_tick_compute_total_mean,
         last_tick_compute_energy_total_min: status.last_tick_compute_total_min,
         last_tick_compute_energy_total_max: status.last_tick_compute_total_max,
@@ -302,9 +310,13 @@ pub fn encode_server_message(message: &ServerMessage) -> Result<Vec<u8>, rmp_ser
 #[cfg(test)]
 mod tests {
     use serde_json::json;
+    use v3_core::config::SimulationConfig;
+    use v3_core::simulation::{run_tick, seed_simulation};
 
+    use crate::handlers::lifecycle::build_ws_frame;
+    use crate::query::cache::build_food_fertility_u8;
     use crate::state::{
-        CreatureSnapshot, LastTickActions, PredationEventSnapshot, SimulationStatus,
+        CreatureSnapshot, LastTickActions, PredationEventSnapshot, SimHandle, SimulationStatus,
     };
 
     use super::{
@@ -407,6 +419,62 @@ mod tests {
     }
 
     #[test]
+    fn server_health_roundtrips_food_depletion_metrics_through_msgpack() {
+        let mut sim = seed_simulation(SimulationConfig::default(), 17);
+        run_tick(&mut sim, &mut None);
+        let cached_fertility_u8 = build_food_fertility_u8(sim.world.food());
+        let handle = SimHandle {
+            sim,
+            status: SimulationStatus::Paused,
+            active_trace: None,
+            cached_fertility_u8,
+        };
+        let frame = build_ws_frame(&handle);
+        let message = ServerMessage::Health {
+            protocol_version: PROTOCOL_VERSION.to_string(),
+            projection_revision: 5,
+            world_static_revision: 2,
+            tick: frame.tick,
+            payload: frame.health.clone(),
+        };
+
+        let bytes = rmp_serde::to_vec_named(&message).expect("serialize server message");
+        let decoded: ServerMessage =
+            rmp_serde::from_slice(&bytes).expect("deserialize server message");
+
+        match decoded {
+            ServerMessage::Health {
+                projection_revision,
+                world_static_revision,
+                tick,
+                payload,
+                ..
+            } => {
+                assert_eq!(projection_revision, 5);
+                assert_eq!(world_static_revision, 2);
+                assert_eq!(tick, frame.tick);
+                assert_eq!(
+                    payload.last_tick_food_occupancy_depletion_mean,
+                    frame.health.last_tick_food_occupancy_depletion_mean
+                );
+                assert_eq!(
+                    payload.last_tick_food_occupancy_depletion_occupied_cells,
+                    frame
+                        .health
+                        .last_tick_food_occupancy_depletion_occupied_cells
+                );
+                assert_eq!(
+                    payload.last_tick_food_growth_suppressed_by_occupancy_depletion,
+                    frame
+                        .health
+                        .last_tick_food_growth_suppressed_by_occupancy_depletion
+                );
+            }
+            other => panic!("expected health message, got {other:?}"),
+        }
+    }
+
+    #[test]
     fn status_payload_keeps_action_shape() {
         let payload = super::StatusEventPayload {
             state: SimulationStatus::Paused,
@@ -457,6 +525,9 @@ mod tests {
             reproduction_actions_rejected_invalid_target_total_by_cause: Default::default(),
             reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state:
                 Default::default(),
+            last_tick_food_occupancy_depletion_mean: 0.12,
+            last_tick_food_occupancy_depletion_occupied_cells: 3,
+            last_tick_food_growth_suppressed_by_occupancy_depletion: 0.7,
             last_tick_compute_energy_total_mean: 0.0,
             last_tick_compute_energy_total_min: 0.0,
             last_tick_compute_energy_total_max: 0.0,
@@ -471,6 +542,26 @@ mod tests {
 
         let encoded = serde_json::to_value(payload).expect("serialize status payload");
         assert_eq!(encoded["last_tick_actions"]["move"], 1);
+        assert!(
+            (encoded["last_tick_food_occupancy_depletion_mean"]
+                .as_f64()
+                .expect("mean depletion should serialize as f64")
+                - 0.12)
+                .abs()
+                < 1e-6
+        );
+        assert_eq!(
+            encoded["last_tick_food_occupancy_depletion_occupied_cells"],
+            3
+        );
+        assert!(
+            (encoded["last_tick_food_growth_suppressed_by_occupancy_depletion"]
+                .as_f64()
+                .expect("suppressed growth should serialize as f64")
+                - 0.7)
+                .abs()
+                < 1e-6
+        );
         assert!(encoded.get("last_tick_compute_total_mean").is_none());
     }
 }

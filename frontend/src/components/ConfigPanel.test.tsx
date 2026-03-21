@@ -35,6 +35,7 @@ describe("ConfigPanel", () => {
 		expect(screen.getByText("Startup Config")).toBeInTheDocument();
 		expect(screen.getByText("Runtime (Live) Config")).toBeInTheDocument();
 		expect(screen.getByTestId("startup-seed-randomize")).toBeInTheDocument();
+		expect(screen.getByText("Food > Occupancy Depletion")).toBeInTheDocument();
 		expect(screen.getAllByText("Food Parameters").length).toBeGreaterThan(0);
 		expect(screen.getByTestId("startup-field-food-initial-density")).toBeInTheDocument();
 		expect(screen.getByTestId("startup-field-food-initial-coverage")).toBeInTheDocument();
@@ -106,6 +107,26 @@ describe("ConfigPanel", () => {
 					},
 				},
 			});
+		});
+	});
+
+	it("supports occupancy depletion runtime controls", () => {
+		render(<ConfigPanel />);
+
+		const enabled = screen.getByTestId("config-field-food-occupancy-depletion-enabled");
+		const rate = screen.getByTestId(
+			"config-field-food-occupancy-depletion-deposit-per-occupied-tick",
+		);
+
+		expect(enabled).toBeChecked();
+		expect(rate).toHaveValue(0.08);
+
+		fireEvent.click(enabled);
+		fireEvent.change(rate, { target: { value: "0.25" } });
+
+		expect(useConfigStore.getState().localDraft?.world.food.occupancy_depletion).toEqual({
+			enabled: false,
+			deposit_per_occupied_tick: 0.25,
 		});
 	});
 

@@ -108,7 +108,11 @@ Request (conceptual v3alpha2 shape):
       "spread_density_ratio": 0.25,
       "recovery_spawn_rate": 0.01,
       "recovery_floor_ratio": 0.01,
-      "max_density": 1.0
+      "max_density": 1.0,
+      "occupancy_depletion": {
+        "enabled": true,
+        "deposit_per_occupied_tick": 0.08
+      }
     }
   },
   "energy": {
@@ -302,7 +306,10 @@ Response:
   "last_tick_compute_total_min": 0.0,
   "last_tick_compute_total_max": 52.0,
   "last_tick_compute_vm_mean": 8.1,
-  "last_tick_compute_graph_mean": 10.6
+  "last_tick_compute_graph_mean": 10.6,
+  "last_tick_food_occupancy_depletion_mean": 0.12,
+  "last_tick_food_occupancy_depletion_occupied_cells": 3,
+  "last_tick_food_growth_suppressed_by_occupancy_depletion": 0.7
 }
 ```
 
@@ -366,7 +373,11 @@ Response:
         "spread_density_ratio": 0.25,
         "recovery_spawn_rate": 0.01,
         "recovery_floor_ratio": 0.01,
-        "max_density": 1.0
+        "max_density": 1.0,
+        "occupancy_depletion": {
+          "enabled": true,
+          "deposit_per_occupied_tick": 0.08
+        }
       }
     },
     "energy": {
@@ -419,13 +430,16 @@ Request shape:
 Rules:
 - Unknown fields rejected.
 - PATCH supports the full canonical keyspace from `GET /config`, including all
-  top-level `mutation.*` keys owned by `v3-runtime-config-spec.md`.
+  top-level `mutation.*` keys owned by `v3-runtime-config-spec.md`, plus the
+  runtime-editable `world.food.occupancy_depletion.*` keys cross-referenced by
+  `v3-runtime-config-spec.md` and semantically owned by
+  `v3-world-grid-spec.md`.
 - PATCH uses deep merge: only specified keys are updated; unspecified keys
   retain their existing values at every nesting level.
 - Invalid values rejected with `422 validation_rejected`; transport does not
   apply fallback/clamp normalization to invalid submitted values.
 - World topology fields (`world.width`, `world.height`, `world.edge_mode`) are
-  editable only in `idle`.
+  restart-only and rejected from PATCH.
 - Runtime and energy fields are editable in `idle` and `paused`.
 - `startup.*` fields are restart-only and rejected from PATCH.
 - `energy.costs.failed_action_penalty` is rejected while an active startup
@@ -657,16 +671,20 @@ Allowed events:
 
 Payload mapping:
 - `status` payload is the compact status payload (`state`, `population`,
-  `mean_energy`, `last_tick_actions`, reproduction totals, and last-tick
-  compute summaries).
+  `mean_energy`, `last_tick_actions`, reproduction totals, last-tick compute
+  summaries, and last-tick food occupancy depletion summaries).
 - `frame` payload is the compact frame payload (`width`, `height`, `creatures`,
   `food`, `barriers`).
-- `health` payload:
+- `health` payload mirrors the same last-tick food occupancy depletion
+  summaries alongside the cumulative health counters:
 
 ```json
 {
   "population": 48,
   "mean_energy": 37.4,
+  "last_tick_food_occupancy_depletion_mean": 0.12,
+  "last_tick_food_occupancy_depletion_occupied_cells": 3,
+  "last_tick_food_growth_suppressed_by_occupancy_depletion": 0.7,
   "mutation_events_attempted_total": 509,
   "mutation_events_applied_total": 321,
   "mutation_events_skipped_total": 188,

@@ -44,7 +44,7 @@ pub(super) fn make_sim_two_creatures(
     cfg.world.food.initial_coverage = 0.0;
 
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
-    world.apply_food_config(cfg.world.food.clone());
+    world.reconfigure_food(cfg.world.food.clone());
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
 
     let a_id = creatures.insert_with_key(|id| {
@@ -97,7 +97,7 @@ pub(super) fn make_sim_with_one_creature(energy: f32) -> (Simulation, CreatureId
     cfg.world.food.initial_coverage = 0.0;
 
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
-    world.apply_food_config(cfg.world.food.clone());
+    world.reconfigure_food(cfg.world.food.clone());
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let pos = Position::new(5, 5);
     let id = creatures.insert_with_key(|id| {
@@ -137,7 +137,7 @@ pub(super) fn make_sim_with_custom_genome(
     cfg.world.food.initial_coverage = 0.0;
 
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
-    world.apply_food_config(cfg.world.food.clone());
+    world.reconfigure_food(cfg.world.food.clone());
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let pos = Position::new(5, 5);
     let id = creatures.insert_with_key(|id| {

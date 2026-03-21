@@ -97,14 +97,17 @@ runtime backends or reproduction internals.
 ```
 
 Phase 0 sub-steps (canonical order):
-1. Food growth (per-cell, world-level).
-2. Creature aging (`age_ticks += 1` for each living creature).
-3. Energy decay (`energy -= energy_decay_per_tick` for each living creature).
-4. Death removal: remove all creatures with `energy <= 0.0`.
+1. Occupancy depletion update for food regrowth memory.
+2. Food growth (per-cell, world-level), using the updated depletion layer.
+3. Creature aging (`age_ticks += 1` for each living creature).
+4. Energy decay (`energy -= energy_decay_per_tick` for each living creature).
+5. Death removal: remove all creatures with `energy <= 0.0`.
 
 Canonical food growth behavior is owned by `v3-world-grid-spec.md`.
 Canonical `energy_decay_per_tick` default is owned by
 `v3-runtime-config-spec.md`.
+Canonical occupancy depletion behavior and defaults are owned by
+`v3-world-grid-spec.md`.
 
 Only creatures surviving Phase 0 (including death removal) are eligible for the
 current tick queue.

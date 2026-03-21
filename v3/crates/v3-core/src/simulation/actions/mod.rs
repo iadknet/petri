@@ -177,7 +177,7 @@ mod tests {
             let mut food_cfg = small_config().world.food;
             food_cfg.initial_coverage = 1.0;
             food_cfg.initial_density = 0.5;
-            sim.world.apply_food_config(food_cfg);
+            sim.world.reconfigure_food(food_cfg);
         }
         sim.world
             .seed_food(&mut rand::rngs::SmallRng::seed_from_u64(0));
@@ -204,7 +204,7 @@ mod tests {
             let mut food_cfg = small_config().world.food;
             food_cfg.initial_coverage = 1.0;
             food_cfg.initial_density = 1.0;
-            sim.world.apply_food_config(food_cfg);
+            sim.world.reconfigure_food(food_cfg);
             sim.world
                 .seed_food(&mut rand::rngs::SmallRng::seed_from_u64(0));
         }
@@ -779,7 +779,7 @@ mod tests {
             let mut food_cfg = small_config().world.food;
             food_cfg.initial_coverage = 1.0;
             food_cfg.initial_density = 0.5;
-            sim.world.apply_food_config(food_cfg);
+            sim.world.reconfigure_food(food_cfg);
         }
         sim.world
             .seed_food(&mut rand::rngs::SmallRng::seed_from_u64(0));

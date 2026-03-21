@@ -35,6 +35,10 @@ const MOCK_CONFIG: SimulationConfig = {
 			recovery_spawn_rate: 0.05,
 			recovery_floor_ratio: 0.04,
 			max_density: 1.0,
+			occupancy_depletion: {
+				enabled: true,
+				deposit_per_occupied_tick: 0.08,
+			},
 		},
 	},
 	energy: {
@@ -331,8 +335,13 @@ describe("ControlBar", () => {
 			expect(api.patchConfig).toHaveBeenCalledTimes(1);
 		});
 		const patch = vi.mocked(api.patchConfig).mock.calls[0]?.[0] as {
+			world?: { food?: { occupancy_depletion?: { enabled?: boolean; deposit_per_occupied_tick?: number } } };
 			energy?: { costs?: { failed_action_penalty?: number } };
 		};
+		expect(patch.world?.food?.occupancy_depletion).toEqual({
+			enabled: true,
+			deposit_per_occupied_tick: 0.08,
+		});
 		expect(patch.energy?.costs?.failed_action_penalty).toBeUndefined();
 	});
 

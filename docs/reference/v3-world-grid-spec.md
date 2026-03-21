@@ -122,6 +122,8 @@ This file is the canonical owner for world/grid config keys/defaults.
 | `world.food.recovery_spawn_rate` | `f32` | `0.02` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.02`. |
 | `world.food.recovery_floor_ratio` | `f32` | `0.03` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.03`. |
 | `world.food.max_density` | `f32` | `1.0` | Must be finite and `> 0.0`; invalid falls back to `1.0`. |
+| `world.food.occupancy_depletion.enabled` | `bool` | `true` | Enables the occupancy depletion mask that dampens food regrowth on occupied cells. |
+| `world.food.occupancy_depletion.deposit_per_occupied_tick` | `f32` | `0.08` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.08`. Amount of depletion deposited into each occupied passable cell per Phase 0 update. |
 
 World edge-mode behavior:
 - `wrap`: neighbor coordinates wrap with modulo arithmetic in both axes.
@@ -148,25 +150,33 @@ canonical scale `[0.0, 1.0]`.
 ### Growth
 
 At Phase 0 (tick start), growth uses a source snapshot of pre-growth food
-densities.
+densities. Occupancy does not directly block food growth; instead, the food
+kernel maintains an internal occupancy depletion layer that suppresses
+regrowth on currently occupied cells and then recovers over time.
 
 For each non-barrier cell:
 - `source = clamp(snapshot[cell], 0.0, max_density)`.
+- Apply occupancy depletion recovery/deposit for the current tick using the
+  current creature occupancy mask.
+- Compute an occupancy multiplier from the depletion layer for the cell.
 - `delta = source * world.food.growth_rate`.
-- Apply local growth: `food_density[cell] = clamp(food_density[cell] + delta, 0.0, max_density)`.
+- Apply local growth:
+  `food_density[cell] = clamp(food_density[cell] + delta * occupancy_multiplier, 0.0, max_density)`.
 - If `source >= max_density * world.food.spread_threshold_ratio` and
   `delta > 0.0`, pick one random valid cardinal neighbor (non-barrier) and add
-  `delta * world.food.spread_density_ratio` (clamped to `max_density`).
+  `delta * world.food.spread_density_ratio * occupancy_multiplier_at_target`
+  (clamped to `max_density`).
 
 After local growth/spread pass:
 - Compute `average_density_ratio = sum(snapshot_food) / (total_cells * max_density)`.
 - If `average_density_ratio < world.food.recovery_floor_ratio`, run
   `round(total_cells * world.food.recovery_spawn_rate)` recovery attempts.
 - Each attempt picks one random non-barrier cell and adds
-  `max_density * world.food.growth_rate` (clamped).
+  `max_density * world.food.growth_rate * occupancy_multiplier` (clamped).
 
 Barrier cells are excluded from growth/spread/recovery targets.
-Creature occupancy does not block food growth/spread/recovery in v3alpha1.
+Creature occupancy does not block food growth/spread/recovery directly in
+v3alpha1; it only modulates regrowth through the depletion layer.
 
 ### Consumption
 
