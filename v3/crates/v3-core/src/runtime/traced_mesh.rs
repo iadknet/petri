@@ -6,13 +6,13 @@
 //! here and verify with equivalence tests.
 
 use crate::config::RuntimeConfig;
-use crate::contracts::{NodeId, WorldAction};
+use crate::contracts::{NodeId, WorldAction, MAX_GATE_SLOTS};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute_graph_node_traced;
 use crate::runtime::routing::resolve_gated_route;
 use crate::runtime::trace::domain::{
-    BackendTrace, MeshHopTrace, TerminationReason, TraceRouteDecision, TraceRouteKind,
+    BackendTrace, MeshHopTrace, TerminationReason, TraceGateScore, TraceRouteDecision,
 };
 use crate::runtime::traced_vm::execute_vm_node_traced;
 use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
@@ -118,16 +118,33 @@ pub fn execute_creature_mesh_traced(
 
         // Resolve routing via per-target gate scoring.
         let route_result = resolve_gated_route(&node.targets, &result.route_gates);
-        let resolved_target_index = route_result.map_or(0, |(idx, _)| idx);
 
-        // Build trace route info from the backend type and raw score.
-        let trace_route = TraceRouteDecision {
-            kind: match &node.backend_def {
-                BackendDef::Vm(_) => TraceRouteKind::VmWrap,
-                BackendDef::Graph(_) => TraceRouteKind::CgpNormalized,
-            },
-            raw_value: result.route_gates.scores[0],
-        };
+        // Build trace route decision with per-target gate scores.
+        let trace_route = route_result.map(|(winning_idx, id)| {
+            let gate_scores: Vec<TraceGateScore> = node
+                .targets
+                .iter()
+                .map(|t| {
+                    let runtime = if (t.slot as usize) < MAX_GATE_SLOTS {
+                        result.route_gates.scores[t.slot as usize]
+                    } else {
+                        0.0
+                    };
+                    TraceGateScore {
+                        slot: t.slot,
+                        target_id: t.target_id,
+                        gate_bias: t.gate_bias,
+                        runtime_score: runtime,
+                        effective_score: t.gate_bias + runtime,
+                    }
+                })
+                .collect();
+            TraceRouteDecision {
+                gate_scores,
+                selected_target_idx: winning_idx,
+                selected_target_id: id,
+            }
+        });
 
         hop_traces.push(MeshHopTrace {
             hop_index: hops,
@@ -138,7 +155,6 @@ pub fn execute_creature_mesh_traced(
             energy_after: *energy,
             output_slots: result.output_slots,
             route: trace_route,
-            resolved_target_index,
             backend_trace,
         });
 
@@ -206,7 +222,7 @@ mod tests {
     };
     use crate::creature::state::GraphRuntimeState;
     use crate::runtime::mesh::execute_creature_mesh;
-    use crate::runtime::trace::domain::TraceRouteKind;
+    use crate::runtime::trace::domain::BackendTrace;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
 
@@ -766,7 +782,8 @@ mod tests {
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
         assert!(matches!(reason, TerminationReason::EnergyExhausted));
         assert_eq!(hops.len(), 1);
-        assert!(matches!(hops[0].route.kind, TraceRouteKind::CgpNormalized));
+        // No targets on this node, so route is None.
+        assert!(hops[0].route.is_none());
     }
 
     #[test]
@@ -839,7 +856,8 @@ mod tests {
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
         assert!(matches!(reason, TerminationReason::EnergyExhausted));
         assert_eq!(hops.len(), 1);
-        assert!(matches!(hops[0].route.kind, TraceRouteKind::CgpNormalized));
+        // No targets on this node, so route is None.
+        assert!(hops[0].route.is_none());
     }
 
     /// Traced and non-traced paths produce identical MeshOutput when priority bid is used.

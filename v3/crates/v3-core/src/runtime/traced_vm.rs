@@ -43,7 +43,6 @@ pub(crate) fn execute_vm_node_traced(
         final_registers: Vec::new(),
         final_payload: *upstream_slots,
         final_meta: [0.0; 8],
-        final_route_value: 0.0,
         slot_writes: Vec::new(),
     };
 
@@ -135,7 +134,6 @@ pub(crate) fn execute_vm_node_traced(
                 final_registers: regs[..reg_count].to_vec(),
                 final_payload: payload,
                 final_meta: meta,
-                final_route_value: route_gates.scores[0],
                 slot_writes: $slot_writes_vec,
             }
         };

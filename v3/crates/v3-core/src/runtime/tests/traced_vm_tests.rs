@@ -386,7 +386,7 @@ fn result_equivalence_routing() {
     let mut energy_b = 100.0f32;
     let mut memory_b = [0.0f32; 16];
     let mut aq_b = MeshSideOutputs::new(cfg.max_actions_per_turn);
-    let (result_b, trace) = execute_vm_node_traced(
+    let (result_b, _trace) = execute_vm_node_traced(
         &def,
         &[],
         &[0.0; OUTPUT_SLOT_COUNT],
@@ -404,7 +404,12 @@ fn result_equivalence_routing() {
         (energy_a - energy_b).abs() < 1e-6,
         "energy: {energy_a} vs {energy_b}"
     );
-    assert!((trace.final_route_value - 2.5).abs() < 1e-6);
+    // Route gate values are now captured at mesh level (TraceRouteDecision),
+    // not in VmTrace. Verify the NodeResult route_gates are equivalent.
+    assert!(
+        (result_b.route_gates.scores[0] - 2.5).abs() < 1e-6,
+        "route gate score should be captured in NodeResult"
+    );
 }
 
 #[test]
