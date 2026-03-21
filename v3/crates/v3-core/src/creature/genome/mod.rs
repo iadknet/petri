@@ -4,7 +4,7 @@ pub(crate) mod cgp_analysis;
 pub(crate) mod cgp_mesh_annotations;
 pub mod mesh_annotations;
 
-use crate::contracts::{InputReference, NodeId};
+use crate::contracts::{InputReference, NodeId, RouteTarget};
 
 /// A single VM instruction. 41 opcodes per v3-vm-isa-spec.md.
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -72,8 +72,8 @@ pub enum VmInstruction {
     WriteInternalPayload { slot_idx: u8, src: u8 },
     /// Write world-action metadata slot (0..7); invalid slot write ignored.
     WriteWorldActionMeta { slot_idx: u8, src: u8 },
-    /// Write candidate route target value.
-    WriteRouteTarget { src: u8 },
+    /// Write a route gate score for a specific target slot.
+    WriteRouteGate { slot: u8, src: u8 },
 
     // ── Action Queue ──────────────────────────────────────────────────────────
     /// Decode meta buffer and push action onto queue. Silent no-op if at cap.
@@ -239,7 +239,7 @@ pub struct NodeGenome {
     pub input_refs: Vec<InputReference>,
     pub backend_def: BackendDef,
     /// Candidate routing targets. May contain dangling IDs (junk DNA).
-    pub targets: Vec<NodeId>,
+    pub targets: Vec<RouteTarget>,
 }
 
 /// The complete genome of a creature.
@@ -365,7 +365,7 @@ mod tests {
                 slot_idx: 0,
                 src: 1,
             },
-            VmInstruction::WriteRouteTarget { src: 0 },
+            VmInstruction::WriteRouteGate { slot: 0, src: 0 },
             VmInstruction::PushAction { action_type: 1 },
             VmInstruction::PopAction,
             VmInstruction::ReadActionQueueLength { dst: 0 },
@@ -486,7 +486,11 @@ mod tests {
                         VmInstruction::Halt,
                     ],
                 }),
-                targets: vec![NodeId::new(1)],
+                targets: vec![RouteTarget {
+                    target_id: NodeId::new(1),
+                    slot: 0,
+                    gate_bias: 0.0,
+                }],
             }],
         };
         assert_eq!(genome.genome_size(), 9);
@@ -569,7 +573,11 @@ mod tests {
                         constants: vec![],
                         program: vec![VmInstruction::Halt],
                     }),
-                    targets: vec![NodeId::new(1)],
+                    targets: vec![RouteTarget {
+                        target_id: NodeId::new(1),
+                        slot: 0,
+                        gate_bias: 0.0,
+                    }],
                 },
                 NodeGenome {
                     node_id: NodeId::new(1),
@@ -606,10 +614,14 @@ mod tests {
                                 ref_idx: 0,
                                 sub_idx: 0,
                             },
-                            VmInstruction::WriteRouteTarget { src: 0 },
+                            VmInstruction::WriteRouteGate { slot: 0, src: 0 },
                         ],
                     }),
-                    targets: vec![NodeId::new(1)],
+                    targets: vec![RouteTarget {
+                        target_id: NodeId::new(1),
+                        slot: 0,
+                        gate_bias: 0.0,
+                    }],
                 },
                 NodeGenome {
                     node_id: NodeId::new(1),
@@ -674,7 +686,7 @@ mod tests {
                             ref_idx: 0,
                             sub_idx: 0,
                         },
-                        VmInstruction::WriteRouteTarget { src: 0 },
+                        VmInstruction::WriteRouteGate { slot: 0, src: 0 },
                     ],
                 }),
                 targets: vec![],

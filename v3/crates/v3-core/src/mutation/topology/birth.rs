@@ -1,5 +1,5 @@
 use crate::config::MutationConfig;
-use crate::contracts::NodeId;
+use crate::contracts::{NodeId, RouteTarget};
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
@@ -126,7 +126,7 @@ fn new_graph_or_vm_birth(
 /// Construct a newborn topology node from configured birth policy.
 pub(super) fn new_topology_birth_node(
     node_id: NodeId,
-    targets: Vec<NodeId>,
+    targets: Vec<RouteTarget>,
     config: &MutationConfig,
     rng: &mut impl Rng,
 ) -> NodeGenome {

@@ -9,7 +9,7 @@ function makeGenome(): CreatureGenome {
 			{
 				node_id: 1,
 				input_refs: [{ World: "FoodHere" }],
-				targets: [2],
+				targets: [{ target_id: 2, slot: 0, gate_bias: 0.0 }],
 				backend_def: {
 					Vm: {
 						register_count: 2,
@@ -21,7 +21,7 @@ function makeGenome(): CreatureGenome {
 			{
 				node_id: 2,
 				input_refs: [{ UpstreamSlot: 0 }],
-				targets: [3],
+				targets: [{ target_id: 3, slot: 0, gate_bias: 0.0 }],
 				backend_def: {
 					Graph: {
 						compute_nodes: [
@@ -37,7 +37,7 @@ function makeGenome(): CreatureGenome {
 						],
 						output_sinks: [
 							{
-								kind: "RouterOutput",
+								kind: { RouterGate: 0 },
 								inputs: [{ source: { ComputeNode: 0 }, weight: 1 }],
 							},
 						],
@@ -49,12 +49,12 @@ function makeGenome(): CreatureGenome {
 			{
 				node_id: 3,
 				input_refs: [{ DynamicIntrospection: "AgeTicks" }],
-				targets: [99],
+				targets: [{ target_id: 99, slot: 0, gate_bias: 0.0 }],
 				backend_def: {
 					Vm: {
 						register_count: 1,
 						constants: [],
-						program: [{ WriteRouteTarget: { src: 0 } }, "Halt"],
+						program: [{ WriteRouteGate: { slot: 0, src: 0 } }, "Halt"],
 					},
 				},
 			},
@@ -117,7 +117,7 @@ describe("analyzeMesh", () => {
 
 		genome.nodes[1] = {
 			...duplicatedNode,
-			targets: [3, 3],
+			targets: [{ target_id: 3, slot: 0, gate_bias: 0.0 }, { target_id: 3, slot: 1, gate_bias: 0.0 }],
 		};
 
 		const analysis = analyzeMesh(genome);

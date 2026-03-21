@@ -41,7 +41,6 @@ export interface VmTrace {
 	final_registers: number[];
 	final_payload: number[];
 	final_meta: number[];
-	final_route_value: number;
 	slot_writes: SlotWriteTrace[];
 }
 
@@ -99,12 +98,18 @@ export interface GraphTrace {
 
 export type BackendTrace = { Vm: VmTrace } | { Graph: GraphTrace };
 
-export type TraceRouteKind = "vm_wrap" | "cgp_normalized";
+export interface TraceGateScore {
+	slot: number;
+	target_id: number;
+	gate_bias: number;
+	runtime_score: number;
+	effective_score: number;
+}
 
 export interface TraceRouteDecision {
-	kind: TraceRouteKind;
-	raw_value: number;
-	resolved_target_index: number;
+	gate_scores: TraceGateScore[];
+	selected_target_idx: number;
+	selected_target_id: number;
 }
 
 export interface MeshHopTrace {
@@ -115,7 +120,7 @@ export interface MeshHopTrace {
 	energy_before: number;
 	energy_after: number;
 	output_slots: number[];
-	route: TraceRouteDecision;
+	route: TraceRouteDecision | null;
 	backend_trace: BackendTrace;
 }
 

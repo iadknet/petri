@@ -32,7 +32,7 @@ function makeAnalyzedNode(overrides: Partial<MeshAnalyzedNode> = {}): MeshAnalyz
 		node: {
 			node_id: 1,
 			input_refs: [{ World: "FoodHere" }],
-			targets: [2],
+			targets: [{ target_id: 2, slot: 0, gate_bias: 0.0 }],
 			backend_def: {
 				Vm: {
 					register_count: 2,

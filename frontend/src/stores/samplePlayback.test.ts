@@ -27,7 +27,7 @@ function makeSample(): ExecutionSample {
 						energy_before: 10,
 						energy_after: 9.8,
 						output_slots: [],
-						route: { kind: "vm_wrap", raw_value: 0, resolved_target_index: 0 },
+						route: null,
 						backend_trace: {
 							Vm: {
 								register_count: 2,
@@ -51,7 +51,6 @@ function makeSample(): ExecutionSample {
 								final_registers: [],
 								final_payload: [],
 								final_meta: [],
-								final_route_value: 0,
 								slot_writes: [],
 							},
 						},
@@ -64,7 +63,7 @@ function makeSample(): ExecutionSample {
 						energy_before: 9.8,
 						energy_after: 9.5,
 						output_slots: [],
-						route: { kind: "cgp_normalized", raw_value: 0, resolved_target_index: 0 },
+						route: null,
 						backend_trace: {
 							Graph: {
 								passes: [
@@ -124,7 +123,7 @@ function makeSample(): ExecutionSample {
 						energy_before: 9.5,
 						energy_after: 9,
 						output_slots: [],
-						route: { kind: "vm_wrap", raw_value: 0, resolved_target_index: 0 },
+						route: null,
 						backend_trace: {
 							Vm: {
 								register_count: 1,
@@ -141,7 +140,6 @@ function makeSample(): ExecutionSample {
 								final_registers: [],
 								final_payload: [],
 								final_meta: [],
-								final_route_value: 0,
 								slot_writes: [],
 							},
 						},

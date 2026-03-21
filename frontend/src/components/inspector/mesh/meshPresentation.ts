@@ -123,7 +123,7 @@ export function collectNodeBadges(node: NodeGenome): MeshNodeBadge[] {
 		for (const sink of graph.output_sinks) {
 			if (sink.inputs.length === 0) continue; // unwired sinks don't contribute
 			const sinkName = getOutputSinkKindName(sink.kind);
-			if (sinkName === "RouterOutput") badgeSet.add("route");
+			if (sinkName === "RouterGate") badgeSet.add("route");
 			else if (sinkName === "CustomOutput") badgeSet.add("output");
 			else if (sinkName === "WriteSlot" || sinkName === "ClearSlot") badgeSet.add("slot");
 		}

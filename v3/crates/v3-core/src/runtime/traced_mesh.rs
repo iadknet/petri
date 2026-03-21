@@ -10,9 +10,9 @@ use crate::contracts::{NodeId, WorldAction};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute_graph_node_traced;
-use crate::runtime::routing::resolve_route_index;
+use crate::runtime::routing::resolve_gated_route;
 use crate::runtime::trace::domain::{
-    BackendTrace, MeshHopTrace, TerminationReason, TraceRouteDecision,
+    BackendTrace, MeshHopTrace, TerminationReason, TraceGateScore, TraceRouteDecision,
 };
 use crate::runtime::traced_vm::execute_vm_node_traced;
 use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
@@ -116,11 +116,31 @@ pub fn execute_creature_mesh_traced(
             BackendDef::Graph(_) => report.graph_cost += node_cost,
         }
 
-        let resolved_target_index = if node.targets.is_empty() {
-            0
-        } else {
-            resolve_route_index(node.targets.len(), result.route)
-        };
+        // Resolve routing via per-target gate scoring.
+        let route_result = resolve_gated_route(&node.targets, &result.route_gates);
+
+        // Build trace route decision with per-target gate scores.
+        let trace_route = route_result.map(|(winning_idx, id)| {
+            let gate_scores: Vec<TraceGateScore> = node
+                .targets
+                .iter()
+                .map(|t| {
+                    let runtime = result.route_gates.score_for_slot(t.slot);
+                    TraceGateScore {
+                        slot: t.slot,
+                        target_id: t.target_id,
+                        gate_bias: t.gate_bias,
+                        runtime_score: runtime,
+                        effective_score: t.gate_bias + runtime,
+                    }
+                })
+                .collect();
+            TraceRouteDecision {
+                gate_scores,
+                selected_target_idx: winning_idx,
+                selected_target_id: id,
+            }
+        });
 
         hop_traces.push(MeshHopTrace {
             hop_index: hops,
@@ -130,8 +150,7 @@ pub fn execute_creature_mesh_traced(
             energy_before: node_energy_before,
             energy_after: *energy,
             output_slots: result.output_slots,
-            route: TraceRouteDecision::from_internal(result.route),
-            resolved_target_index,
+            route: trace_route,
             backend_trace,
         });
 
@@ -151,28 +170,27 @@ pub fn execute_creature_mesh_traced(
             );
         }
 
-        if node.targets.is_empty() {
-            return (
-                mesh_output!(side_outputs.action_queue.into_actions_or_noop()),
-                hop_traces,
-                TerminationReason::NoTargets,
-            );
+        match route_result {
+            Some((_idx, id)) => {
+                if find_node_index(&genome.nodes, id).is_none() {
+                    return (
+                        mesh_output!(side_outputs.action_queue.into_actions_or_noop()),
+                        hop_traces,
+                        TerminationReason::MissingNode,
+                    );
+                }
+                upstream_slots = result.output_slots;
+                current_node_id = id;
+                hops += 1;
+            }
+            None => {
+                return (
+                    mesh_output!(side_outputs.action_queue.into_actions_or_noop()),
+                    hop_traces,
+                    TerminationReason::NoTargets,
+                );
+            }
         }
-
-        let target_pos = resolved_target_index;
-        let target_id = node.targets[target_pos];
-
-        if find_node_index(&genome.nodes, target_id).is_none() {
-            return (
-                mesh_output!(side_outputs.action_queue.into_actions_or_noop()),
-                hop_traces,
-                TerminationReason::MissingNode,
-            );
-        }
-
-        upstream_slots = result.output_slots;
-        current_node_id = target_id;
-        hops += 1;
     }
 }
 
@@ -189,7 +207,7 @@ fn find_node_index(nodes: &[NodeGenome], id: NodeId) -> Option<usize> {
 mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
-    use crate::contracts::{InputReference, NodeId, WorldAction};
+    use crate::contracts::{InputReference, NodeId, RouteTarget, WorldAction};
     use crate::creature::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
         OutputSink, OutputSinkKind,
@@ -200,7 +218,7 @@ mod tests {
     };
     use crate::creature::state::GraphRuntimeState;
     use crate::runtime::mesh::execute_creature_mesh;
-    use crate::runtime::trace::domain::TraceRouteKind;
+    use crate::runtime::trace::domain::BackendTrace;
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
     use crate::sensors::typed_food::TypedFoodLocalSnapshot;
@@ -224,6 +242,17 @@ mod tests {
         }
     }
 
+    fn wrap_targets(ids: Vec<NodeId>) -> Vec<RouteTarget> {
+        ids.into_iter()
+            .enumerate()
+            .map(|(i, id)| RouteTarget {
+                target_id: id,
+                slot: i as u8,
+                gate_bias: 0.0,
+            })
+            .collect()
+    }
+
     fn vm_emit_node(node_id: NodeId, action_type: u8, targets: Vec<NodeId>) -> NodeGenome {
         NodeGenome {
             node_id,
@@ -236,7 +265,7 @@ mod tests {
                     VmInstruction::ExecuteActionQueue,
                 ],
             }),
-            targets,
+            targets: wrap_targets(targets),
         }
     }
 
@@ -246,7 +275,7 @@ mod tests {
         let id_graph = NodeId::new(0);
         let id_vm = NodeId::new(1);
 
-        // CGP graph: Constant(0.0) → RouterOutput sink (routes to target 0)
+        // CGP graph: Constant(0.0) → RouterGate(0) sink (routes to target 0)
         let graph_node = NodeGenome {
             node_id: id_graph,
             input_refs: vec![],
@@ -257,7 +286,7 @@ mod tests {
                     plasticity: None,
                 }],
                 output_sinks: vec![OutputSink {
-                    kind: OutputSinkKind::RouterOutput,
+                    kind: OutputSinkKind::RouterGate(0),
                     inputs: vec![GraphEdge {
                         source: GraphSource::ComputeNode(0),
                         weight: 1.0,
@@ -266,7 +295,7 @@ mod tests {
                 action_bank: vec![],
                 execute_gate: ExecuteGate { inputs: vec![] },
             }),
-            targets: vec![id_vm],
+            targets: wrap_targets(vec![id_vm]),
         };
 
         let vm_node = vm_emit_node(id_vm, 1, vec![]);
@@ -337,7 +366,7 @@ mod tests {
         let id_graph = NodeId::new(0);
         let id_vm = NodeId::new(1);
 
-        // CGP graph writes 9.0 to CustomOutput(5), RouterOutput unwired (default route)
+        // CGP graph writes 9.0 to CustomOutput(5), RouterGate(0) unwired (default route)
         let graph_node = NodeGenome {
             node_id: id_graph,
             input_refs: vec![],
@@ -356,14 +385,14 @@ mod tests {
                         }],
                     },
                     OutputSink {
-                        kind: OutputSinkKind::RouterOutput,
+                        kind: OutputSinkKind::RouterGate(0),
                         inputs: vec![], // unwired = default route
                     },
                 ],
                 action_bank: vec![],
                 execute_gate: ExecuteGate { inputs: vec![] },
             }),
-            targets: vec![id_vm],
+            targets: wrap_targets(vec![id_vm]),
         };
 
         // VM reads upstream slot 5
@@ -440,7 +469,7 @@ mod tests {
                             }],
                         },
                         OutputSink {
-                            kind: OutputSinkKind::RouterOutput,
+                            kind: OutputSinkKind::RouterGate(0),
                             inputs: vec![],
                         },
                     ],
@@ -776,7 +805,8 @@ mod tests {
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
         assert!(matches!(reason, TerminationReason::EnergyExhausted));
         assert_eq!(hops.len(), 1);
-        assert!(matches!(hops[0].route.kind, TraceRouteKind::CgpNormalized));
+        // No targets on this node, so route is None.
+        assert!(hops[0].route.is_none());
     }
 
     #[test]
@@ -849,7 +879,8 @@ mod tests {
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
         assert!(matches!(reason, TerminationReason::EnergyExhausted));
         assert_eq!(hops.len(), 1);
-        assert!(matches!(hops[0].route.kind, TraceRouteKind::CgpNormalized));
+        // No targets on this node, so route is None.
+        assert!(hops[0].route.is_none());
     }
 
     /// Traced and non-traced paths produce identical MeshOutput when priority bid is used.

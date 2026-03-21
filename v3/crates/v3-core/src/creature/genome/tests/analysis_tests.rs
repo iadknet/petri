@@ -1,6 +1,7 @@
 use super::*;
 use crate::contracts::{
-    DynamicIntrospectionKey, InputReference, NodeId, StaticIntrospectionKey, WorldInputKey,
+    DynamicIntrospectionKey, InputReference, NodeId, RouteTarget, StaticIntrospectionKey,
+    WorldInputKey,
 };
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
@@ -53,8 +54,8 @@ fn read_mask_noop_is_zero() {
 }
 
 #[test]
-fn read_mask_write_route_target() {
-    let instr = VmInstruction::WriteRouteTarget { src: 5 };
+fn read_mask_write_route_gate() {
+    let instr = VmInstruction::WriteRouteGate { slot: 0, src: 5 };
     assert_eq!(vm_register_read_mask(&instr), vm_reg_bit(5));
 }
 
@@ -63,7 +64,8 @@ fn is_output_matches_side_effecting_writes() {
     assert!(vm_is_output_instruction(&VmInstruction::PushAction {
         action_type: 0
     }));
-    assert!(vm_is_output_instruction(&VmInstruction::WriteRouteTarget {
+    assert!(vm_is_output_instruction(&VmInstruction::WriteRouteGate {
+        slot: 0,
         src: 0
     }));
     assert!(vm_is_output_instruction(
@@ -93,7 +95,7 @@ fn backward_slice_traces_register_deps() {
             const_idx: 0,
         },
         VmInstruction::Add { dst: 1, a: 0, b: 0 },
-        VmInstruction::WriteRouteTarget { src: 1 },
+        VmInstruction::WriteRouteGate { slot: 0, src: 1 },
     ];
     let gene = vm_backward_slice(&program, 2).unwrap();
     assert_eq!(gene.indices, vec![0, 1, 2]);
@@ -115,7 +117,7 @@ fn backward_slice_skips_unrelated_instructions() {
             const_idx: 1,
         },
         VmInstruction::Add { dst: 2, a: 0, b: 0 },
-        VmInstruction::WriteRouteTarget { src: 2 },
+        VmInstruction::WriteRouteGate { slot: 0, src: 2 },
     ];
     let gene = vm_backward_slice(&program, 3).unwrap();
     assert_eq!(gene.indices, vec![0, 2, 3]);
@@ -155,7 +157,7 @@ fn forward_slice_traces_downstream() {
             const_idx: 0,
         },
         VmInstruction::Add { dst: 1, a: 0, b: 0 },
-        VmInstruction::WriteRouteTarget { src: 1 },
+        VmInstruction::WriteRouteGate { slot: 0, src: 1 },
         VmInstruction::Halt,
     ];
     let gene = vm_forward_slice(&program, 0).unwrap();
@@ -178,7 +180,7 @@ fn forward_slice_skips_unrelated() {
             const_idx: 1,
         },
         VmInstruction::Add { dst: 2, a: 0, b: 0 },
-        VmInstruction::WriteRouteTarget { src: 1 },
+        VmInstruction::WriteRouteGate { slot: 0, src: 1 },
     ];
     let gene = vm_forward_slice(&program, 0).unwrap();
     // Starts at 0, picks up 2 (reads r0), does NOT pick up 3 (reads r1, not in produced set)
@@ -240,7 +242,7 @@ fn backward_slice_random_returns_some_for_valid_program() {
             dst: 0,
             const_idx: 0,
         },
-        VmInstruction::WriteRouteTarget { src: 0 },
+        VmInstruction::WriteRouteGate { slot: 0, src: 0 },
     ];
     let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
     let gene = vm_backward_slice_random(&program, &mut rng).unwrap();
@@ -254,7 +256,7 @@ fn forward_slice_random_returns_some_for_valid_program() {
             dst: 0,
             const_idx: 0,
         },
-        VmInstruction::WriteRouteTarget { src: 0 },
+        VmInstruction::WriteRouteGate { slot: 0, src: 0 },
     ];
     let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
     let gene = vm_forward_slice_random(&program, &mut rng).unwrap();
@@ -272,7 +274,15 @@ fn simple_vm_node(id: u32, targets: Vec<u32>) -> NodeGenome {
             constants: vec![],
             program: vec![VmInstruction::Halt],
         }),
-        targets: targets.into_iter().map(NodeId::new).collect(),
+        targets: targets
+            .into_iter()
+            .enumerate()
+            .map(|(i, id)| RouteTarget {
+                target_id: NodeId::new(id),
+                slot: i as u8,
+                gate_bias: 0.0,
+            })
+            .collect(),
     }
 }
 
@@ -546,7 +556,11 @@ fn functional_complexity_excludes_unreachable_nodes() {
                         VmInstruction::ExecuteActionQueue,
                     ],
                 }),
-                targets: vec![NodeId::new(1)],
+                targets: vec![RouteTarget {
+                    target_id: NodeId::new(1),
+                    slot: 0,
+                    gate_bias: 0.0,
+                }],
             },
             NodeGenome {
                 node_id: NodeId::new(1),
@@ -604,7 +618,7 @@ fn functional_complexity_excludes_dead_vm_instructions() {
                         const_idx: 1,
                     }, // DEAD (r1 never consumed)
                     VmInstruction::Add { dst: 2, a: 0, b: 0 }, // live (feeds output)
-                    VmInstruction::WriteRouteTarget { src: 2 }, // output
+                    VmInstruction::WriteRouteGate { slot: 0, src: 2 }, // output
                 ],
             }),
             targets: vec![],
@@ -721,7 +735,7 @@ fn functional_complexity_counts_only_consumed_input_refs() {
                         ref_idx: 0,
                         sub_idx: 0,
                     },
-                    VmInstruction::WriteRouteTarget { src: 0 },
+                    VmInstruction::WriteRouteGate { slot: 0, src: 0 },
                 ],
             }),
             targets: vec![],
@@ -752,7 +766,7 @@ fn functional_complexity_equals_genome_size_fully_connected() {
                         ref_idx: 0,
                         sub_idx: 0,
                     },
-                    VmInstruction::WriteRouteTarget { src: 0 },
+                    VmInstruction::WriteRouteGate { slot: 0, src: 0 },
                 ],
             }),
             targets: vec![],

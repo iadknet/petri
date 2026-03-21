@@ -10,7 +10,7 @@ use crate::contracts::{NodeId, WorldAction};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute_graph_node;
-use crate::runtime::routing::resolve_route_index;
+use crate::runtime::routing::resolve_gated_route;
 use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
 use crate::runtime::vm::execute_vm_node;
 use crate::sensors::perception::SensorSnapshot;
@@ -133,30 +133,28 @@ pub fn execute_creature_mesh(
             };
         }
 
-        // Routing: if no targets, the chain terminates — preserve accumulated queue.
-        if node.targets.is_empty() {
-            return MeshOutput {
-                actions: side_outputs.action_queue.into_actions_or_noop(),
-                cost_report: report,
-                priority_bid: side_outputs.priority_bid,
-            };
+        // Routing via per-target gate scoring.
+        match resolve_gated_route(&node.targets, &result.route_gates) {
+            Some((_idx, id)) => {
+                if find_node_index(&genome.nodes, id).is_none() {
+                    return MeshOutput {
+                        actions: side_outputs.action_queue.into_actions_or_noop(),
+                        cost_report: report,
+                        priority_bid: side_outputs.priority_bid,
+                    };
+                }
+                upstream_slots = result.output_slots;
+                current_node_id = id;
+                hops += 1;
+            }
+            None => {
+                return MeshOutput {
+                    actions: side_outputs.action_queue.into_actions_or_noop(),
+                    cost_report: report,
+                    priority_bid: side_outputs.priority_bid,
+                };
+            }
         }
-
-        let target_pos = resolve_route_index(node.targets.len(), result.route);
-        let target_id = node.targets[target_pos];
-
-        // Soft default: routed target id missing from node set.
-        if find_node_index(&genome.nodes, target_id).is_none() {
-            return MeshOutput {
-                actions: side_outputs.action_queue.into_actions_or_noop(),
-                cost_report: report,
-                priority_bid: side_outputs.priority_bid,
-            };
-        }
-
-        upstream_slots = result.output_slots;
-        current_node_id = target_id;
-        hops += 1;
     }
 }
 
@@ -173,7 +171,7 @@ fn find_node_index(nodes: &[NodeGenome], id: NodeId) -> Option<usize> {
 mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
-    use crate::contracts::{NodeId, WorldAction};
+    use crate::contracts::{NodeId, RouteTarget, WorldAction};
     use crate::creature::genome::{
         BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
     };
@@ -181,6 +179,17 @@ mod tests {
     use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
     use crate::sensors::static_inputs::StaticInputs;
     use crate::sensors::typed_food::TypedFoodLocalSnapshot;
+
+    fn wrap_targets(ids: Vec<NodeId>) -> Vec<RouteTarget> {
+        ids.into_iter()
+            .enumerate()
+            .map(|(i, id)| RouteTarget {
+                target_id: id,
+                slot: i as u8,
+                gate_bias: 0.0,
+            })
+            .collect()
+    }
 
     // ── Helpers ───────────────────────────────────────────────────────────────
 
@@ -217,7 +226,7 @@ mod tests {
                     VmInstruction::ExecuteActionQueue,
                 ],
             }),
-            targets,
+            targets: wrap_targets(targets),
         }
     }
 
@@ -235,11 +244,11 @@ mod tests {
                         dst: 0,
                         const_idx: 0,
                     },
-                    VmInstruction::WriteRouteTarget { src: 0 },
+                    VmInstruction::WriteRouteGate { slot: 0, src: 0 },
                     VmInstruction::Halt,
                 ],
             }),
-            targets,
+            targets: wrap_targets(targets),
         }
     }
 
@@ -287,7 +296,7 @@ mod tests {
                 constants: vec![],
                 program: vec![VmInstruction::Halt],
             }),
-            targets: vec![id0], // self-loop
+            targets: wrap_targets(vec![id0]), // self-loop
         };
         let genome = CreatureGenome {
             entry_node_id: id0,
@@ -426,19 +435,19 @@ mod tests {
         );
     }
 
-    // ── Test 7: route_wrapping_rem_euclid ────────────────────────────────────
+    // ── Test 7: single_slot_gate_routes_to_target ──────────────────────────────
 
-    /// VM sets route=3.7; floor(3.7)=3; 3.rem_euclid(3 targets)=0.
-    /// So the executor routes to targets[0] which emits Eat.
+    /// VM writes 3.7 to gate slot 0; single-slot targets all on slot 0,
+    /// first target wins (all same effective score, tie-break by position).
     #[test]
-    fn route_wrapping_rem_euclid() {
+    fn single_slot_gate_routes_to_target() {
         let id0 = NodeId::new(0);
         let id_a = NodeId::new(1);
         let id_b = NodeId::new(2);
         let id_c = NodeId::new(3);
 
-        // Entry node: routes with value 3.7, has 3 targets [id_a, id_b, id_c]
-        // floor(3.7)=3; 3 % 3 = 0 → targets[0] = id_a
+        // Entry node: writes 3.7 to gate slot 0. All 3 targets share slot 0,
+        // so all have the same effective score → first target (id_a) wins tie-break.
         let entry = vm_halt_with_route(id0, 3.7, vec![id_a, id_b, id_c]);
 
         // targets[0] (id_a): emits Eat
@@ -476,22 +485,19 @@ mod tests {
         );
     }
 
-    // ── Test 8: negative_route_wraps_with_rem_euclid ─────────────────────────
+    // ── Test 8: negative_gate_score_loses_to_zero ───────────────────────────
 
-    /// VM sets route=-1.0 → floor(-1.0)=-1 → (-1).rem_euclid(2)=1 → targets[1].
-    /// targets[1] emits Eat, targets[0] emits NoOp.
-    /// This verifies negative-index wrapping via rem_euclid in the mesh router.
+    /// VM writes -1.0 to gate slot 0; targets[0] on slot 0 (effective -1.0),
+    /// targets[1] on slot 1 (effective 0.0). Slot 1 wins → routes to id_eat.
     #[test]
-    fn negative_route_wraps_with_rem_euclid() {
+    fn negative_gate_score_loses_to_zero() {
         let id0 = NodeId::new(0);
         let id_noop = NodeId::new(1); // targets[0]
         let id_eat = NodeId::new(2); // targets[1]
 
-        // Entry node: sets route=-1.0 → floor(-1.0)=-1 → rem_euclid(2)=1 → targets[1]=id_eat
-        // Note: the NaN→-1 code path in the mesh router is unreachable via current backends
-        // because sanitize_f32 prevents NaN from appearing in any register or output slot.
-        // This test verifies the rem_euclid wrapping behaviour with a directly injected
-        // negative index (-1.0).
+        // Entry node: writes -1.0 to gate slot 0.
+        // targets[0] (id_noop) on slot 0: effective = 0.0 + (-1.0) = -1.0
+        // targets[1] (id_eat) on slot 1: effective = 0.0 + 0.0 = 0.0 (wins)
         let entry = vm_halt_with_route(id0, -1.0, vec![id_noop, id_eat]);
         let node_noop = vm_emit_node(id_noop, 0, vec![]); // NoOp
         let node_eat = vm_emit_node(id_eat, 1, vec![]); // Eat
@@ -626,7 +632,7 @@ mod tests {
                     VmInstruction::Halt,
                 ],
             }),
-            targets: vec![id1],
+            targets: wrap_targets(vec![id1]),
         };
 
         // Second node: bid 2.0, then emit Eat
