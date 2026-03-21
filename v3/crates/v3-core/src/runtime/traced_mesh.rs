@@ -6,7 +6,7 @@
 //! here and verify with equivalence tests.
 
 use crate::config::RuntimeConfig;
-use crate::contracts::{NodeId, WorldAction, MAX_GATE_SLOTS};
+use crate::contracts::{NodeId, WorldAction};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute_graph_node_traced;
