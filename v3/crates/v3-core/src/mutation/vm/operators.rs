@@ -1,7 +1,7 @@
 use rand::Rng;
 
 use crate::config::MutationConfig;
-use crate::contracts::InputReference;
+use crate::contracts::{InputReference, MAX_GATE_SLOTS};
 use crate::creature::genome::analysis::{vm_backward_slice_random, vm_forward_slice_random};
 use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
 use crate::mutation::types::MutationSkipReason;
@@ -174,7 +174,7 @@ pub(super) fn random_vm_instruction(
             src: rng.gen_range(0..rc),
         },
         26 => VmInstruction::WriteRouteGate {
-            slot: 0,
+            slot: rng.gen_range(0..MAX_GATE_SLOTS as u8),
             src: rng.gen_range(0..rc),
         },
         27 => VmInstruction::PushAction {
@@ -298,8 +298,11 @@ fn mutate_instruction_raw_fields(
             *src = rng.gen();
         }
         VmInstruction::WriteRouteGate { slot, src } => {
-            *slot = rng.gen();
-            *src = rng.gen();
+            if rng.gen_bool(0.5) {
+                *slot = rng.gen_range(0..MAX_GATE_SLOTS as u8);
+            } else {
+                *src = rng.gen_range(0..u8::MAX);
+            }
         }
         VmInstruction::LoadSlot { dst, slot_reg } => {
             *dst = rng.gen();
