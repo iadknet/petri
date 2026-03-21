@@ -1,6 +1,15 @@
 # Per-Target Gate Routing Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking. Invoke `rust-skills` for all Rust implementation work.
+> **For agentic workers:**
+>
+> **MANDATORY REQUIREMENTS — non-negotiable:**
+>
+> 1. **Worktree isolation:** Create a new git worktree before starting implementation. Use `superpowers:using-git-worktrees`.
+> 2. **Superpowers required:** Use `superpowers:subagent-driven-development` for task execution. Use `superpowers:dispatching-parallel-agents` for swarm tasks.
+> 3. **Backend skill mandate:** ALL Rust code changes MUST invoke `rust-skills`. This applies to writing, reviewing, AND refactoring.
+> 4. **Frontend skill mandate:** ALL frontend code changes MUST invoke `vercel-react-best-practices` and `vercel-composition-patterns`.
+> 5. **Per-task code review:** Every task MUST be followed by a code review step before advancing. Backend reviews MUST use `rust-skills` via `superpowers:code-reviewer`. Frontend reviews MUST use vercel skills. ALL review issues MUST be fixed and re-reviewed before the next task begins.
+> 6. **Subagent swarms:** Tasks marked `[SWARM]` contain independent subtasks that MUST be dispatched as parallel subagents via `superpowers:dispatching-parallel-agents`.
 
 **Goal:** Replace single-scalar mesh routing with per-target gate scores to remove evolutionary barriers to complex cognition.
 
@@ -106,8 +115,10 @@ Wire-format impact:
 
 ## Required Skills
 
-- Process: `superpowers:using-superpowers`, `superpowers:subagent-driven-development`, `superpowers:verification-before-completion`
-- Backend: `rust-skills`
+- Process (MANDATORY): `superpowers:using-superpowers`, `superpowers:using-git-worktrees`, `superpowers:subagent-driven-development`, `superpowers:dispatching-parallel-agents`, `superpowers:verification-before-completion`, `superpowers:requesting-code-review`
+- Backend (MANDATORY for ALL Rust changes): `rust-skills`
+- Frontend (MANDATORY for ALL frontend changes): `vercel-react-best-practices`, `vercel-composition-patterns`
+- Code review (MANDATORY per task): `superpowers:code-reviewer` with domain skills
 
 ---
 
@@ -116,55 +127,81 @@ Wire-format impact:
 Implementation is split into 3 phases with detailed companion docs. Each phase
 is independently compilable and testable.
 
+**Per-task review protocol:** After EVERY task, dispatch `superpowers:code-reviewer`
+subagent with `rust-skills`. Fix ALL findings. Re-review until clean pass. Do
+NOT advance to the next task until review is clean.
+
+### Phase 0: Worktree Setup
+
+- [ ] Task 0: Create isolated worktree using `superpowers:using-git-worktrees`. All implementation work happens in the worktree, not main.
+
 ### Phase 1: Prerequisites and Core Types
 **See also:** `phase-1-prerequisites-and-types.md`
 
-- [ ] Task 1: Create `contracts/routing.rs` with `RouteTarget` and `MAX_GATE_SLOTS`
-- [ ] Task 2: Split `mutation/topology/mod.rs` into `structural.rs` + `routing.rs` (refactor only, no behavior change)
-- [ ] Task 3: Derive `FIXED_SINK_COUNT` from components in `cgp.rs`
-- [ ] Task 4: Replace `RouteDecision` with `RouteGateMap` in `runtime/routing.rs`
-- [ ] Task 5: Update `NodeResult` in `runtime/types.rs`
-- [ ] Task 6: Change `NodeGenome.targets` from `Vec<NodeId>` to `Vec<RouteTarget>`
+- [ ] Task 1 `[SWARM]`: Parallel prerequisite refactors — dispatch 3 independent subagents:
+  - Subagent A: Create `contracts/routing.rs` with `RouteTarget` and `MAX_GATE_SLOTS` (invoke `rust-skills`)
+  - Subagent B: Split `mutation/topology/mod.rs` into `structural.rs` + `routing.rs` (refactor only, invoke `rust-skills`)
+  - Subagent C: Derive `FIXED_SINK_COUNT` from components in `cgp.rs` (invoke `rust-skills`)
+- [ ] Review Gate: Code review all 3 subagent outputs with `rust-skills` via `superpowers:code-reviewer`. Fix findings, re-review until clean.
+- [ ] Task 2: Replace `RouteDecision` with `RouteGateMap` in `runtime/routing.rs` (invoke `rust-skills`)
+- [ ] Review Gate: Code review Task 2 with `rust-skills`. Fix findings, re-review until clean.
+- [ ] Task 3: Update `NodeResult` in `runtime/types.rs` (invoke `rust-skills`)
+- [ ] Review Gate: Code review Task 3 with `rust-skills`. Fix findings, re-review until clean.
+- [ ] Task 4: Change `NodeGenome.targets` from `Vec<NodeId>` to `Vec<RouteTarget>` (invoke `rust-skills`)
+- [ ] Review Gate: Code review Task 4 with `rust-skills`. Fix findings, re-review until clean.
 - [ ] Commit: Phase 1 checkpoint (code compiles, all existing tests updated to new types)
 
 ### Phase 2: Backends and Mesh Executor
 **See also:** `phase-2-backends-and-mesh.md`
 
-- [ ] Task 7: Implement `resolve_gated_route` with TDD
-- [ ] Task 8: Update mesh executor (`mesh.rs` + `traced_mesh.rs`)
-- [ ] Task 9: VM backend — add `WriteRouteGate`, remove `WriteRouteTarget` (`vm.rs` + `traced_vm.rs`)
-- [ ] Task 10: CGP backend — add `RouterGate(u8)` sinks, update effects pass (`effects.rs` + `traced`)
+- [ ] Task 5: Implement `resolve_gated_route` with TDD (invoke `rust-skills`)
+- [ ] Review Gate: Code review Task 5 with `rust-skills`. Fix findings, re-review until clean.
+- [ ] Task 6: Update mesh executor (`mesh.rs` + `traced_mesh.rs`) (invoke `rust-skills`)
+- [ ] Review Gate: Code review Task 6 with `rust-skills`. Fix findings, re-review until clean.
+- [ ] Task 7 `[SWARM]`: Parallel backend updates — dispatch 2 independent subagents:
+  - Subagent A: VM backend — add `WriteRouteGate`, remove `WriteRouteTarget` (`vm.rs` + `traced_vm.rs`) (invoke `rust-skills`)
+  - Subagent B: CGP backend — add `RouterGate(u8)` sinks, update effects pass (`effects.rs` + `traced`) (invoke `rust-skills`)
+- [ ] Review Gate: Code review both subagent outputs with `rust-skills` via `superpowers:code-reviewer`. Fix findings, re-review until clean.
 - [ ] Commit: Phase 2 checkpoint (routing works end-to-end with new gate system)
 
 ### Phase 3: Mutation, Trace, and Verification
 **See also:** `phase-3-mutation-trace-verification.md`
 
-- [ ] Task 11: Update routing mutation operators (`AddRouteTarget`, `RemoveRouteTarget`, `RetargetNodeTarget`, `SwapRouteTargets`)
-- [ ] Task 12: Add `MutateGateBias` operator + `MutationOperator::TopologyMutateGateBias`
-- [ ] Task 13: Update VM instruction mutation (`WriteRouteTarget` → `WriteRouteGate`)
-- [ ] Task 14: Update `birth.rs` signature and structural operators (CopyNode, SpliceNode, slice operators)
-- [ ] Task 15: Update genome analysis + mesh annotations
-- [ ] Task 16: Update founder genome construction + seeding
-- [ ] Task 17: Update trace domain types (`TraceRouteDecision`, `TraceGateScore`), drop `VmTrace.final_route_value`
-- [ ] Task 18: Update traced mesh + traced VM trace capture
-- [ ] Task 18b: Update v3-server transport types (`sample_protocol.rs`, `sample_assembler.rs`) for new trace shapes
-- [ ] Task 18c: Update e2e tests (`creature_workflow_e2e/`, `vm_all_opcodes_e2e.rs`)
+- [ ] Task 8 `[SWARM]`: Parallel mutation operator updates — dispatch 3 independent subagents:
+  - Subagent A: Update routing mutation operators (`AddRouteTarget`, `RemoveRouteTarget`, `RetargetNodeTarget`, `SwapRouteTargets`) (invoke `rust-skills`)
+  - Subagent B: Add `MutateGateBias` operator + `MutationOperator::TopologyMutateGateBias` (invoke `rust-skills`)
+  - Subagent C: Update VM instruction mutation (`WriteRouteTarget` → `WriteRouteGate`) (invoke `rust-skills`)
+- [ ] Review Gate: Code review all 3 subagent outputs with `rust-skills` via `superpowers:code-reviewer`. Fix findings, re-review until clean.
+- [ ] Task 9: Update `birth.rs` signature and structural operators (CopyNode, SpliceNode, slice operators) (invoke `rust-skills`)
+- [ ] Review Gate: Code review Task 9 with `rust-skills`. Fix findings, re-review until clean.
+- [ ] Task 10 `[SWARM]`: Parallel analysis and founder updates — dispatch 2 independent subagents:
+  - Subagent A: Update genome analysis + mesh annotations (invoke `rust-skills`)
+  - Subagent B: Update founder genome construction + seeding (invoke `rust-skills`)
+- [ ] Review Gate: Code review both subagent outputs with `rust-skills` via `superpowers:code-reviewer`. Fix findings, re-review until clean.
+- [ ] Task 11: Update trace domain types (`TraceRouteDecision`, `TraceGateScore`), drop `VmTrace.final_route_value` (invoke `rust-skills`)
+- [ ] Review Gate: Code review Task 11 with `rust-skills`. Fix findings, re-review until clean.
+- [ ] Task 12: Update traced mesh + traced VM trace capture (invoke `rust-skills`)
+- [ ] Review Gate: Code review Task 12 with `rust-skills`. Fix findings, re-review until clean.
+- [ ] Task 13 `[SWARM]`: Parallel transport and e2e updates — dispatch 2 independent subagents:
+  - Subagent A: Update v3-server transport types (`sample_protocol.rs`, `sample_assembler.rs`) (invoke `rust-skills`)
+  - Subagent B: Update e2e tests (`creature_workflow_e2e/`, `vm_all_opcodes_e2e.rs`) (invoke `rust-skills`)
+- [ ] Review Gate: Code review both subagent outputs with `rust-skills` via `superpowers:code-reviewer`. Fix findings, re-review until clean.
 - [ ] Commit: Phase 3 checkpoint (all mutation, trace, and transport paths updated)
 
 ### Verification Gate
 
-- [ ] Task 19: Run `cargo fmt --all -- --check`
-- [ ] Task 20: Run `cargo clippy --workspace --all-targets -- -D warnings`
-- [ ] Task 21: Run `cargo test --workspace`
-- [ ] Task 22: Run `cargo test -p v3-core --test viability` (merge gate)
-- [ ] Task 23: Run `scripts/check-plan-harness.sh --mode strict`
-- [ ] Task 24: Run `scripts/check-doc-harness.sh --mode strict`
+- [ ] Task 14: Run `cargo fmt --all -- --check`
+- [ ] Task 15: Run `cargo clippy --workspace --all-targets -- -D warnings`
+- [ ] Task 16: Run `cargo test --workspace`
+- [ ] Task 17: Run `cargo test -p v3-core --test viability` (merge gate)
+- [ ] Task 18: Run `scripts/check-plan-harness.sh --mode strict`
+- [ ] Task 19: Run `scripts/check-doc-harness.sh --mode strict`
 
-### Review Gates
+### Final Review Gates
 
-- [ ] Review Gate: Code review — dispatch `superpowers:code-reviewer` subagent with `rust-skills`. Review all changed files for ownership patterns, error handling, naming, memory, API design. Fix findings, re-review until clean pass.
+- [ ] Review Gate: Full code review — dispatch `superpowers:code-reviewer` subagent with `rust-skills`. Review ALL changed files across the entire feature for ownership patterns, error handling, naming, memory, API design. Fix findings, re-review until clean pass.
 - [ ] Review Gate: Architecture & decomposition — verify boundary consistency with `docs/strategy/` and `AGENTS.md`. Confirm RouteTarget in contracts, topology split, FIXED_SINK_COUNT derivation, VmTrace.final_route_value removal. Resolve any issues.
-- [ ] Re-verification after review changes — if code review findings led to code changes, re-run Tasks 19-24.
+- [ ] Re-verification after review changes — if any code review findings led to code changes, re-run Tasks 14-19.
 
 ---
 
