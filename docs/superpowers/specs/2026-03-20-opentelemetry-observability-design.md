@@ -289,7 +289,7 @@ Within `creature_think` and `mesh_node_{id}` spans, emit span events (not child 
 | Attribute | Type | Notes |
 |-----------|------|-------|
 | `decide.actions_count` | u32 | number of actions resolved |
-| `decide.actions_list` | string[] | e.g., `["Move(N)", "Eat", "Reproduce"]` |
+| `decide.actions_list` | string[] | e.g., `["Move(N)", "Eat", "StealEnergy", "Reproduce"]` |
 | `decide.output_slots` | string | JSON of raw slot values |
 | `decide.priority_bid` | f64 | |
 | `decide.confidence` | f64 | margin between top action and runner-up |
@@ -299,7 +299,7 @@ Within `creature_think` and `mesh_node_{id}` spans, emit span events (not child 
 | Attribute | Type | Notes |
 |-----------|------|-------|
 | `action.index` | u32 | 0-based position in tick's action sequence |
-| `action.type` | string | "Move", "Eat", "Reproduce", "Steal", "Noop" |
+| `action.type` | string | "Move", "Eat", "Reproduce", "StealEnergy", "Noop" (matches `WorldAction` variants) |
 | `action.direction` | string | if applicable |
 | `action.target` | string | if applicable |
 | `outcome.result` | string | "success", "blocked_barrier", "blocked_occupied", etc. |
@@ -310,7 +310,7 @@ Within `creature_think` and `mesh_node_{id}` spans, emit span events (not child 
 | `outcome.offspring_id` | string | if reproduce succeeded |
 | `outcome.victim_id` | string | if predation/steal |
 | `outcome.energy_stolen` | f64 | energy transferred from victim (steal/predation) |
-| `outcome.predation_result` | string | "transferred", "killed", "no_victim", "rejected" (maps to `PredationActionResult`) |
+| `outcome.predation_result` | string | "transferred", "transferred_and_killed", "rejected_no_victim" (maps 1:1 to `PredationActionResult` variants) |
 
 ### creature_learn Attributes
 
@@ -363,7 +363,7 @@ Exported via OTel SDK, derived from existing `SimStats` each tick.
 
 - `petri.tick.births`
 - `petri.tick.deaths`
-- `petri.tick.actions.{move,eat,reproduce,steal,noop}`
+- `petri.tick.actions.{move,eat,reproduce,steal_energy,noop}`
 
 ### Predation (monotonic counters)
 
