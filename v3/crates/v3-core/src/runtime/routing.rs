@@ -1,3 +1,4 @@
+use crate::contracts::MAX_GATE_SLOTS;
 use crate::runtime::types::sanitize_f32;
 
 /// Internal routing decision produced by node execution.
@@ -37,6 +38,24 @@ pub(crate) fn resolve_route_index(target_count: usize, route: RouteDecision) -> 
         }
     }
 }
+
+/// Per-slot gate scores produced by node execution.
+#[derive(Debug, Clone, Copy, PartialEq)]
+#[must_use]
+pub(crate) struct RouteGateMap {
+    pub scores: [f32; MAX_GATE_SLOTS],
+}
+
+impl Default for RouteGateMap {
+    fn default() -> Self {
+        Self {
+            scores: [0.0; MAX_GATE_SLOTS],
+        }
+    }
+}
+
+// Hot-path type size assertion — prevent accidental regressions.
+const _: () = assert!(std::mem::size_of::<RouteGateMap>() == 32);
 
 #[cfg(test)]
 mod tests {
@@ -106,5 +125,11 @@ mod tests {
             ),
             7
         );
+    }
+
+    #[test]
+    fn route_gate_map_default_is_all_zeros() {
+        let map = RouteGateMap::default();
+        assert!(map.scores.iter().all(|&s| s == 0.0));
     }
 }
