@@ -175,12 +175,12 @@ Open questions:
 - whether this should affect only ordinary food or other renewable resources too
 
 ### Multiple food types with exclusive occupancy
-Add several ordinary food types, each with its own sensor family, growth parameters, and long-lived fertility topology. Different food types should create different but overlapping ecological opportunities without requiring separate biomes for every niche.
+Add several ordinary food types, each with its own sensor family, eat action, growth parameters, and long-lived fertility topology. Different food types should create different but overlapping ecological opportunities without requiring separate biomes for every niche.
 
 Current inclination:
 - default to exclusive occupancy between ordinary food types
 - if one food type occupies a passable cell, other ordinary food types cannot occupy that same cell at the same time
-- treat overlap as a later experiment, not the initial model
+- Each food gets its own color on the map.
 
 Why exclusivity seems attractive:
 - keeps the world legible
@@ -195,15 +195,13 @@ Important design boundary:
 
 Good differentiation axes:
 - distinct startup fertility patterns
-- different regrowth or spread dynamics
-- different energy yield
-- different sensitivity to depletion
-- different association with barriers, open space, or corridors
 
 Important caveat:
-- jumping directly to 3-6 additional food types may multiply the search space and runtime cost too quickly
-- likely better to prove the pattern with one extra type before scaling upward
 - if exclusive occupancy remains a hard invariant, future implementation should probably avoid paying for a fully independent dense occupancy plane for every food type unless measurement shows it is acceptable
+
+Open Questions:
+- How to handle growth ordering/conflicts?
+  - Randomize order of processing of every cell occupied by any food type?
 
 ### Carrion resource and scavenging action
 When creatures die, leave behind a separate temporary food resource with different dynamics from base food. Carrion should be high-value, decay over time, and likely require separate sensors and a dedicated action to harvest.
@@ -255,6 +253,15 @@ Why this feels promising:
 Good follow-on questions:
 - whether some barrier topologies create especially valuable edge patterns
 - whether barrier food should be affected by occupancy depletion, or remain a partially independent channel so edge niches do not collapse into ordinary grazing dynamics
+
+## Infrastructure & Observability
+
+### OpenTelemetry observability infrastructure
+
+Adopt OpenTelemetry as the observability foundation. Self-hosted SigNoz stack (docker-compose) for storage and visualization. Traces for tick phases and creature cognition at configurable depth. OTel metrics for population aggregates. ClickHouse SQL-queryable storage for agent-driven analysis (Claude/Codex can query directly). Runtime-adjustable tracing controls via config panel.
+
+**Spec:** `docs/superpowers/specs/2026-03-20-opentelemetry-observability-design.md`
+**Plan:** `docs/superpowers/plans/2026-03-20-otel-observability.md`
 
 ## Frontend & UI
 
