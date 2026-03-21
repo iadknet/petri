@@ -1,6 +1,6 @@
 use super::*;
 use crate::config::MutationConfig;
-use crate::contracts::RouteTarget;
+use crate::contracts::{InputReference, RouteTarget, WorldInputKey};
 use crate::creature::founder::v3alpha1_founder_genome;
 use crate::creature::genome::cgp::{GraphSource, OutputSinkKind};
 use crate::creature::genome::{VmBackendDef, VmInstruction};
@@ -51,6 +51,26 @@ fn apply_with_config(
     TopologyMutator::apply(genome, op, reachable_nodes, bias, rng, config)
 }
 
+fn apply_with_config_and_food_type_count(
+    genome: &mut CreatureGenome,
+    op: TopologyOperator,
+    reachable_nodes: &[usize],
+    bias: f64,
+    rng: &mut impl rand::Rng,
+    config: &MutationConfig,
+    food_type_count: usize,
+) -> Result<TargetReachability, MutationSkipReason> {
+    TopologyMutator::apply_with_food_type_count(
+        genome,
+        op,
+        reachable_nodes,
+        bias,
+        rng,
+        config,
+        food_type_count,
+    )
+}
+
 fn forced_birth_config(
     graph_backend_chance: f32,
     graph_initialized_chance: f32,
@@ -70,6 +90,46 @@ fn add_node_increases_node_count_by_one() {
     let mut r = rng(0);
     apply(&mut genome, TopologyOperator::AddNode, &[], 0.0, &mut r).unwrap();
     assert_eq!(genome.nodes.len(), before + 1);
+}
+
+#[test]
+fn add_node_can_birth_non_default_food_input_refs_for_multi_food_runs() {
+    let config = forced_birth_config(1.0, 1.0, 0.0);
+    let mut r = rng(0xBADDCAFE);
+    let mut saw_non_default = false;
+
+    for _ in 0..2_000 {
+        let mut genome = v3alpha1_founder_genome();
+        apply_with_config_and_food_type_count(
+            &mut genome,
+            TopologyOperator::AddNode,
+            &[],
+            0.0,
+            &mut r,
+            &config,
+            3,
+        )
+        .expect("AddNode should apply");
+
+        let newborn = genome.nodes.last().expect("newborn node must exist");
+        let newborn_has_non_default_food = newborn.input_refs.iter().any(|input_ref| match input_ref {
+            InputReference::World(WorldInputKey::FoodHere { type_idx })
+            | InputReference::World(WorldInputKey::NeighborFoodRing { type_idx })
+            | InputReference::World(WorldInputKey::AreaFoodSummary { type_idx }) => {
+                *type_idx != crate::config::OrdinaryFoodTypeId::default()
+            }
+            _ => false,
+        });
+        if newborn_has_non_default_food {
+            saw_non_default = true;
+            break;
+        }
+    }
+
+    assert!(
+        saw_non_default,
+        "Topology AddNode births should be able to sample non-default food type_idx when multiple food types exist"
+    );
 }
 
 #[test]

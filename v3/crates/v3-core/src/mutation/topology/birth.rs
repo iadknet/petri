@@ -4,7 +4,7 @@ use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
 use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
-use crate::mutation::sampling::{random_input_reference, sample_sub_idx_for_input_ref};
+use crate::mutation::sampling::{random_input_reference_for_food_types, sample_sub_idx_for_input_ref};
 use rand::Rng;
 
 /// Current minimal VM backend used by newborn topology nodes.
@@ -90,9 +90,10 @@ fn wire_initialized_newborn_graph(
 
 fn initialized_graph_backend_with_single_input(
     config: &MutationConfig,
+    food_type_count: usize,
     rng: &mut impl Rng,
 ) -> (Vec<crate::contracts::InputReference>, BackendDef) {
-    let input_ref = random_input_reference(rng);
+    let input_ref = random_input_reference_for_food_types(rng, food_type_count);
     let sub_idx = sample_sub_idx_for_input_ref(&input_ref, config, rng);
     let mut graph = CgpGraphBackendDef::new_with_fixed_outputs(config);
     let wired = wire_initialized_newborn_graph(
@@ -110,6 +111,7 @@ fn initialized_graph_backend_with_single_input(
 
 fn new_graph_or_vm_birth(
     config: &MutationConfig,
+    food_type_count: usize,
     rng: &mut impl Rng,
 ) -> (Vec<crate::contracts::InputReference>, BackendDef) {
     if !rng.gen_bool(config.topology_new_node_birth.graph_backend_chance as f64) {
@@ -120,7 +122,7 @@ fn new_graph_or_vm_birth(
         return (Vec::new(), blank_graph_backend(config));
     }
 
-    initialized_graph_backend_with_single_input(config, rng)
+    initialized_graph_backend_with_single_input(config, food_type_count, rng)
 }
 
 /// Construct a newborn topology node from configured birth policy.
@@ -128,9 +130,10 @@ pub(super) fn new_topology_birth_node(
     node_id: NodeId,
     targets: Vec<RouteTarget>,
     config: &MutationConfig,
+    food_type_count: usize,
     rng: &mut impl Rng,
 ) -> NodeGenome {
-    let (input_refs, backend_def) = new_graph_or_vm_birth(config, rng);
+    let (input_refs, backend_def) = new_graph_or_vm_birth(config, food_type_count, rng);
     NodeGenome {
         node_id,
         input_refs,

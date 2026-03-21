@@ -120,7 +120,7 @@ fn sample_vm_program() -> Vec<VmInstruction> {
         },
         VmInstruction::WriteWorldActionMeta {
             slot_idx: 0,
-            src: 14,
+            src: 15,
         },
         VmInstruction::WriteRouteGate { slot: 0, src: 0 },
         // ── Priority bid ────────────────────────────────────────────────────

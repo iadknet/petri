@@ -1,5 +1,5 @@
 use slotmap::SlotMap;
-use v3_core::config::MutationConfig;
+use v3_core::config::{MutationConfig, OrdinaryFoodTypeId};
 use v3_core::contracts::{CreatureId, NodeId, Position, RouteTarget, WorldAction};
 use v3_core::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
@@ -107,7 +107,12 @@ fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
 
     assert_eq!(tick.hops.len(), 2);
     // Gate routing: slot 1 (effective 0.0) beats slot 0 (effective -1.0)
-    assert_eq!(tick.final_actions[0], WorldAction::Eat);
+    assert_eq!(
+        tick.final_actions[0],
+        WorldAction::Eat {
+            type_idx: OrdinaryFoodTypeId::default(),
+        }
+    );
     let route = tick.hops[0]
         .route
         .as_ref()

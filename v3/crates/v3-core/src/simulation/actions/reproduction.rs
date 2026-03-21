@@ -203,11 +203,12 @@ pub fn apply_reproduce(
 
     // Step 10: Apply genome mutations.
     let mut child_genome = child_genome;
-    let summary = MutationEngine::apply_mutations(
+    let summary = MutationEngine::apply_mutations_with_food_type_count(
         &mut child_genome,
         &sim.config.mutation,
         &parent_cached_reachable,
         rng,
+        sim.config.world.food.types.len(),
     );
 
     // Update mutation stats.

@@ -68,6 +68,19 @@ fn collect_expected_world_inputs(input_refs: &[InputReference]) -> Vec<WorldInpu
     keys.into_iter().collect()
 }
 
+fn genome_has_non_default_food_input_ref(genome: &CreatureGenome) -> bool {
+    genome.nodes.iter().any(|node| {
+        node.input_refs.iter().any(|input_ref| match input_ref {
+            InputReference::World(WorldInputKey::FoodHere { type_idx })
+            | InputReference::World(WorldInputKey::NeighborFoodRing { type_idx })
+            | InputReference::World(WorldInputKey::AreaFoodSummary { type_idx }) => {
+                *type_idx != crate::config::OrdinaryFoodTypeId::default()
+            }
+            _ => false,
+        })
+    })
+}
+
 #[test]
 fn engine_accounting_invariant_always_holds() {
     let mut config = SimulationConfig::default().mutation;
@@ -126,6 +139,39 @@ fn engine_records_added_input_classes_for_topology_add_node() {
     }
 
     panic!("failed to observe Topology.AddNode within search budget");
+}
+
+#[test]
+fn engine_with_food_type_count_can_introduce_non_default_food_input_refs() {
+    let mut config = SimulationConfig::default().mutation;
+    config.mutation_probability = 1.0;
+    config.per_birth_mutation_events_min = 1;
+    config.per_birth_mutation_events_max = 1;
+    config.mesh_layer_probability = 0.0; // node-internal domains only
+
+    let mut r = rng(0xF00D);
+    let mut saw_non_default = false;
+    for _ in 0..4_000 {
+        let mut genome = v3alpha1_founder_genome();
+        let summary =
+            MutationEngine::apply_mutations_with_food_type_count(&mut genome, &config, &[], &mut r, 3);
+        if summary
+            .applied_by_domain
+            .get(&MutationDomain::InputRef)
+            .copied()
+            .unwrap_or(0)
+            > 0
+            && genome_has_non_default_food_input_ref(&genome)
+        {
+            saw_non_default = true;
+            break;
+        }
+    }
+
+    assert!(
+        saw_non_default,
+        "MutationEngine should be able to introduce non-default food input refs when food_type_count > 1"
+    );
 }
 
 #[test]
@@ -643,6 +689,7 @@ fn apply_topology_event_threads_config_into_add_node_birth_policy() {
         0.0,
         &mut r,
         &config,
+        1,
     )
     .expect("AddNode should apply");
 

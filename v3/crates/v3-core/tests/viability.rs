@@ -523,7 +523,8 @@ fn mutation_accounting_invariant_in_viability() {
     let mut genome = v3alpha1_founder_genome();
     for seed in 0u64..1000 {
         let mut rng = SmallRng::seed_from_u64(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &cfg, &[], &mut rng);
+        let summary =
+            MutationEngine::apply_mutations_with_food_type_count(&mut genome, &cfg, &[], &mut rng, 1);
         assert_eq!(
             summary.attempted_events,
             summary.applied_events + summary.skipped_events,
@@ -560,7 +561,13 @@ fn mutation_reachability_telemetry_accumulates() {
     for seed in 0u64..500 {
         let mut g = genome.clone();
         let mut rng = SmallRng::seed_from_u64(seed);
-        let summary = MutationEngine::apply_mutations(&mut g, &cfg, &reachable, &mut rng);
+        let summary = MutationEngine::apply_mutations_with_food_type_count(
+            &mut g,
+            &cfg,
+            &reachable,
+            &mut rng,
+            1,
+        );
         total_reachable += summary.reachable_target_events;
         total_unreachable += summary.unreachable_target_events;
         total_na += summary.not_applicable_events;

@@ -25,11 +25,30 @@ impl MutationEngine {
     /// used to bias mutation target selection toward functional structure.
     ///
     /// Accounting invariant: `summary.attempted_events == summary.applied_events + summary.skipped_events`.
+    #[cfg(test)]
     pub fn apply_mutations(
         genome: &mut CreatureGenome,
         config: &MutationConfig,
         parent_reachable_nodes: &[usize],
         rng: &mut impl Rng,
+    ) -> MutationSummary {
+        Self::apply_mutations_with_food_type_count(
+            genome,
+            config,
+            parent_reachable_nodes,
+            rng,
+            1,
+        )
+    }
+
+    /// Apply mutation events to a child genome using the configured number of
+    /// available food types for typed input-ref/topology sampling.
+    pub fn apply_mutations_with_food_type_count(
+        genome: &mut CreatureGenome,
+        config: &MutationConfig,
+        parent_reachable_nodes: &[usize],
+        rng: &mut impl Rng,
+        food_type_count: usize,
     ) -> MutationSummary {
         // Probability gate.
         if !rng.gen_bool(config.mutation_probability) {
@@ -76,6 +95,7 @@ impl MutationEngine {
                         pressure_adjusted_bias(rb.topology, restricted),
                         rng,
                         config,
+                        food_type_count,
                     );
                     if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
                         available.swap_remove(idx);
@@ -206,6 +226,7 @@ impl MutationEngine {
                                 pressure_adjusted_bias(rb.input_ref, restricted),
                                 rng,
                                 config,
+                                food_type_count,
                             );
                             if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
                                 available.swap_remove(idx);
@@ -398,9 +419,18 @@ fn apply_topology_event(
     bias: f64,
     rng: &mut impl Rng,
     config: &MutationConfig,
+    food_type_count: usize,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let snapshot = genome.clone();
-    match TopologyMutator::apply(genome, op, reachable_nodes, bias, rng, config) {
+    match TopologyMutator::apply_with_food_type_count(
+        genome,
+        op,
+        reachable_nodes,
+        bias,
+        rng,
+        config,
+        food_type_count,
+    ) {
         Ok(reachability) => {
             if ParseabilityGate::validate(genome).is_ok() {
                 Ok(reachability)
@@ -475,9 +505,18 @@ fn apply_input_ref_event(
     bias: f64,
     rng: &mut impl Rng,
     config: &MutationConfig,
+    food_type_count: usize,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let snapshot = genome.clone();
-    match InputRefMutator::apply(genome, op, reachable_nodes, bias, rng, config) {
+    match InputRefMutator::apply_with_food_type_count(
+        genome,
+        op,
+        reachable_nodes,
+        bias,
+        rng,
+        config,
+        food_type_count,
+    ) {
         Ok(reachability) => {
             if ParseabilityGate::validate(genome).is_ok() {
                 Ok(reachability)
