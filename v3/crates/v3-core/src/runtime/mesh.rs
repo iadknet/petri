@@ -242,7 +242,7 @@ mod tests {
                         dst: 0,
                         const_idx: 0,
                     },
-                    VmInstruction::WriteRouteTarget { src: 0 },
+                    VmInstruction::WriteRouteGate { slot: 0, src: 0 },
                     VmInstruction::Halt,
                 ],
             }),

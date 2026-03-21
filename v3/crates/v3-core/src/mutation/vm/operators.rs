@@ -173,7 +173,8 @@ pub(super) fn random_vm_instruction(
             slot_idx: rng.gen_range(0u8..8),
             src: rng.gen_range(0..rc),
         },
-        26 => VmInstruction::WriteRouteTarget {
+        26 => VmInstruction::WriteRouteGate {
+            slot: 0,
             src: rng.gen_range(0..rc),
         },
         27 => VmInstruction::PushAction {
@@ -296,7 +297,8 @@ fn mutate_instruction_raw_fields(
             *slot_idx = rng.gen();
             *src = rng.gen();
         }
-        VmInstruction::WriteRouteTarget { src } => {
+        VmInstruction::WriteRouteGate { slot, src } => {
+            *slot = rng.gen();
             *src = rng.gen();
         }
         VmInstruction::LoadSlot { dst, slot_reg } => {
@@ -503,7 +505,7 @@ fn remap_register_refs(instr: &mut VmInstruction, offset: u8, register_count: u8
         VmInstruction::ReadInput { dst, .. } => remap(dst),
         VmInstruction::WriteInternalPayload { src, .. }
         | VmInstruction::WriteWorldActionMeta { src, .. }
-        | VmInstruction::WriteRouteTarget { src } => remap(src),
+        | VmInstruction::WriteRouteGate { src, .. } => remap(src),
         VmInstruction::PushAction { .. }
         | VmInstruction::PopAction
         | VmInstruction::ExecuteActionQueue => {}

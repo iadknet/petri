@@ -122,7 +122,7 @@ fn sample_vm_program() -> Vec<VmInstruction> {
             slot_idx: 0,
             src: 14,
         },
-        VmInstruction::WriteRouteTarget { src: 0 },
+        VmInstruction::WriteRouteGate { slot: 0, src: 0 },
         // ── Priority bid ────────────────────────────────────────────────────
         VmInstruction::SetPriorityBid { src: 13 }, // r13 = 0.0, so no energy deducted
         // ── Action queue introspection opcodes ──────────────────────────────
@@ -218,7 +218,7 @@ fn expected_all_opcode_discriminants() -> HashSet<Discriminant<VmInstruction>> {
             slot_idx: 0,
             src: 0,
         },
-        VmInstruction::WriteRouteTarget { src: 0 },
+        VmInstruction::WriteRouteGate { slot: 0, src: 0 },
         VmInstruction::PushAction { action_type: 0 },
         VmInstruction::PopAction,
         VmInstruction::ReadActionQueueLength { dst: 0 },

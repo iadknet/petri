@@ -1,5 +1,5 @@
 use crate::config::RuntimeConfig;
-use crate::contracts::InputReference;
+use crate::contracts::{InputReference, MAX_GATE_SLOTS};
 use crate::creature::genome::VmBackendDef;
 use crate::runtime::action_decode::decode_world_action;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
@@ -312,8 +312,11 @@ pub(crate) fn execute_vm_node(
                 return NodeResult::terminal(payload, route_gates);
             }
 
-            VmInstruction::WriteRouteTarget { src } => {
-                route_gates.scores[0] = regs[nr(*src, reg_count)]; // last-write-wins
+            VmInstruction::WriteRouteGate { slot, src } => {
+                let s = *slot as usize;
+                if s < MAX_GATE_SLOTS {
+                    route_gates.scores[s] = sanitize_f32(regs[nr(*src, reg_count)]);
+                }
             }
 
             VmInstruction::Halt => {
@@ -413,7 +416,7 @@ pub(crate) fn opcode_base_cost(instr: &crate::creature::genome::VmInstruction) -
         VmInstruction::ReadActionQueueParam { .. } => 0.12,
         VmInstruction::SetPriorityBid { .. } => 0.20,
         VmInstruction::ExecuteActionQueue => 0.24,
-        VmInstruction::WriteRouteTarget { .. } => 0.10,
+        VmInstruction::WriteRouteGate { .. } => 0.10,
         VmInstruction::Halt => 0.05,
         VmInstruction::LoadSlot { .. } => 0.12,
         VmInstruction::StoreSlot { .. } => 0.14,
