@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::contracts::WorldInputKey;
+use crate::kernel::FoodGrowthSummary;
 use crate::mutation::{
     MutationAddedNodeInputClass, MutationDomain, MutationOperator, MutationOperatorFunnel,
     MutationSkipReason,
@@ -279,6 +280,12 @@ pub struct SimStats {
     pub last_tick_priority_bid_mean: f32,
     /// Number of creatures that bid > 0 this tick.
     pub last_tick_priority_bidders_count: u32,
+    /// Mean depletion across passable cells after the Phase 0 food update.
+    pub last_tick_food_occupancy_depletion_mean: f32,
+    /// Number of occupied cells that deposited depletion during the Phase 0 food update.
+    pub last_tick_food_occupancy_depletion_occupied_cells: u32,
+    /// Total food growth amount suppressed by occupancy depletion during the Phase 0 food update.
+    pub last_tick_food_growth_suppressed_by_occupancy_depletion: f32,
 }
 
 const OUTCOME_GENERATION_BUCKET_WIDTH: u64 = 128;
@@ -289,6 +296,14 @@ const OUTCOME_SCORE_STD_DEV_FLOOR: f64 = 0.05;
 const OUTCOME_SCORE_Z_THRESHOLD: f64 = 0.25;
 
 impl SimStats {
+    pub fn record_food_growth_summary(&mut self, summary: FoodGrowthSummary) {
+        self.last_tick_food_occupancy_depletion_mean = summary.mean_occupancy_depletion;
+        self.last_tick_food_occupancy_depletion_occupied_cells =
+            summary.occupied_cells_with_depletion;
+        self.last_tick_food_growth_suppressed_by_occupancy_depletion =
+            summary.growth_suppressed_by_occupancy_depletion;
+    }
+
     #[must_use]
     pub fn classify_mutation_outcome(
         &mut self,
@@ -406,5 +421,19 @@ mod tests {
             "expected positive score delta, got {}",
             eval.score_delta
         );
+    }
+
+    #[test]
+    fn record_food_growth_summary_updates_food_depletion_fields() {
+        let mut stats = SimStats::default();
+        stats.record_food_growth_summary(FoodGrowthSummary {
+            mean_occupancy_depletion: 0.12,
+            occupied_cells_with_depletion: 3,
+            growth_suppressed_by_occupancy_depletion: 0.7,
+        });
+
+        assert!((stats.last_tick_food_occupancy_depletion_mean - 0.12).abs() < 1e-6);
+        assert_eq!(stats.last_tick_food_occupancy_depletion_occupied_cells, 3);
+        assert!((stats.last_tick_food_growth_suppressed_by_occupancy_depletion - 0.7).abs() < 1e-6);
     }
 }

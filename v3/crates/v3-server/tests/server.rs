@@ -113,6 +113,18 @@ fn patch_req(uri: &str, body: &str) -> Request<Body> {
         .unwrap()
 }
 
+fn assert_json_f64_close(value: &serde_json::Value, expected: f64) {
+    assert!(
+        (value
+            .as_f64()
+            .unwrap_or_else(|| panic!("expected f64 JSON value, got {value}"))
+            - expected)
+            .abs()
+            < 1e-6,
+        "expected {expected}, got {value}"
+    );
+}
+
 // ── 1. startup_returns_200_with_required_fields ────────────────────────────
 
 #[tokio::test]
@@ -630,17 +642,13 @@ async fn snapshot_detail_omits_fertility_bytes_from_view_payload() {
     );
 }
 
-// ── 11. patch_config_world_field_while_running_returns_409 ──────────────────
+// ── 11. patch_config_world_topology_fields_are_restart_only ────────────────
 
 #[tokio::test]
-async fn patch_config_world_field_while_running_returns_409() {
+async fn patch_config_world_topology_fields_are_restart_only() {
     let a = app();
     a.clone()
         .oneshot(startup_req(r#"{"seed":1}"#))
-        .await
-        .unwrap();
-    a.clone()
-        .oneshot(post_req("/v3/simulation/start"))
         .await
         .unwrap();
 
@@ -649,10 +657,10 @@ async fn patch_config_world_field_while_running_returns_409() {
         patch_req("/v3/simulation/config", r#"{"world":{"width":200}}"#),
     )
     .await;
-    assert_eq!(status, StatusCode::CONFLICT, "body: {body}");
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
     assert_eq!(
         body["error"].as_str(),
-        Some("invalid_state_transition"),
+        Some("validation_rejected"),
         "body: {body}"
     );
 }
@@ -680,7 +688,25 @@ async fn get_config_includes_topology_new_node_birth_defaults() {
     assert_eq!(birth["graph_compute_gate_chance"].as_f64(), Some(0.5));
 }
 
-// ── 11c. patch_config_roundtrips_topology_new_node_birth_fields ────────────
+// ── 11c. get_config_includes_food_occupancy_depletion_defaults ─────────────
+
+#[tokio::test]
+async fn get_config_includes_food_occupancy_depletion_defaults() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let (status, body) = do_request(a, get_req("/v3/simulation/config")).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    let depletion = &body["config"]["world"]["food"]["occupancy_depletion"];
+    assert!(depletion.is_object(), "missing occupancy_depletion: {body}");
+    assert_eq!(depletion["enabled"].as_bool(), Some(true));
+    assert_json_f64_close(&depletion["deposit_per_occupied_tick"], 0.08);
+}
+
+// ── 11d. patch_config_roundtrips_topology_new_node_birth_fields ────────────
 
 #[tokio::test]
 async fn patch_config_roundtrips_topology_new_node_birth_fields() {
@@ -716,7 +742,127 @@ async fn patch_config_roundtrips_topology_new_node_birth_fields() {
     assert_eq!(fetched["graph_compute_gate_chance"].as_f64(), Some(1.0));
 }
 
-// ── 11e. startup_accepts_founder_profile_and_get_config_roundtrips ─────────
+// ── 11e. patch_config_roundtrips_food_occupancy_depletion_fields ───────────
+
+#[tokio::test]
+async fn patch_config_roundtrips_food_occupancy_depletion_fields() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let patch = r#"{
+        "world": {
+            "food": {
+                "occupancy_depletion": {
+                    "enabled": false,
+                    "deposit_per_occupied_tick": 0.25
+                }
+            }
+        }
+    }"#;
+
+    let (patch_status, patch_body) =
+        do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
+    assert_eq!(patch_status, StatusCode::OK, "body: {patch_body}");
+    let patched = &patch_body["config"]["world"]["food"]["occupancy_depletion"];
+    assert_eq!(patched["enabled"].as_bool(), Some(false));
+    assert_json_f64_close(&patched["deposit_per_occupied_tick"], 0.25);
+
+    let (get_status, get_body) = do_request(a, get_req("/v3/simulation/config")).await;
+    assert_eq!(get_status, StatusCode::OK, "body: {get_body}");
+    let fetched = &get_body["config"]["world"]["food"]["occupancy_depletion"];
+    assert_eq!(fetched["enabled"].as_bool(), Some(false));
+    assert_json_f64_close(&fetched["deposit_per_occupied_tick"], 0.25);
+}
+
+// ── 11f. patch_config_food_occupancy_depletion_live_patch_keeps_world_static ─
+
+#[tokio::test]
+async fn patch_config_food_occupancy_depletion_live_patch_keeps_world_static_revision() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+    a.clone()
+        .oneshot(post_req("/v3/simulation/start"))
+        .await
+        .unwrap();
+    a.clone()
+        .oneshot(post_req("/v3/simulation/pause"))
+        .await
+        .unwrap();
+
+    let (_, before) = do_request(a.clone(), get_req("/v3/simulation/snapshot")).await;
+    let before_projection_revision = before["projection_revision"].as_u64().unwrap_or(0);
+    let before_world_static_revision = before["world_static_revision"].as_u64().unwrap_or(0);
+
+    let patch = r#"{
+        "world": {
+            "food": {
+                "occupancy_depletion": {
+                    "enabled": false,
+                    "deposit_per_occupied_tick": 0.25
+                }
+            }
+        }
+    }"#;
+
+    let (patch_status, patch_body) =
+        do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
+    assert_eq!(patch_status, StatusCode::OK, "body: {patch_body}");
+    assert_eq!(
+        patch_body["state"].as_str(),
+        Some("paused"),
+        "body: {patch_body}"
+    );
+
+    let (_, after) = do_request(a, get_req("/v3/simulation/snapshot")).await;
+    let after_projection_revision = after["projection_revision"].as_u64().unwrap_or(0);
+    let after_world_static_revision = after["world_static_revision"].as_u64().unwrap_or(0);
+
+    assert!(
+        after_projection_revision > before_projection_revision,
+        "projection_revision should advance after a runtime config patch: before={before_projection_revision}, after={after_projection_revision}, body={after}"
+    );
+    assert_eq!(
+        after_world_static_revision, before_world_static_revision,
+        "food depletion config patches must not mark the world static shape as changed: before={before_world_static_revision}, after={after_world_static_revision}"
+    );
+}
+
+// ── 11g. patch_config_rejects_invalid_food_occupancy_depletion_values ──────
+
+#[tokio::test]
+async fn patch_config_rejects_invalid_food_occupancy_depletion_values() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let patch = r#"{
+        "world": {
+            "food": {
+                "occupancy_depletion": {
+                    "deposit_per_occupied_tick": 1.5
+                }
+            }
+        }
+    }"#;
+
+    let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
+    assert_eq!(
+        body["error"].as_str(),
+        Some("validation_rejected"),
+        "body: {body}"
+    );
+}
+
+// ── 11h. startup_accepts_founder_profile_and_get_config_roundtrips ─────────
 
 #[tokio::test]
 async fn startup_accepts_founder_profile_and_get_config_roundtrips() {
@@ -1068,6 +1214,60 @@ async fn status_payload_includes_state() {
         frame.status.state,
         SimulationStatus::Paused,
         "status payload must include current simulation state"
+    );
+}
+
+#[tokio::test]
+async fn status_and_health_include_food_occupancy_depletion_summaries() {
+    use v3_core::config::SimulationConfig;
+    use v3_core::simulation::{run_tick, seed_simulation};
+    use v3_server::handlers::lifecycle::build_ws_frame;
+    use v3_server::query::cache::build_food_fertility_u8;
+    use v3_server::state::{SimHandle, SimulationStatus};
+
+    let mut sim = seed_simulation(SimulationConfig::default(), 7);
+    run_tick(&mut sim, &mut None);
+    let cached_fertility_u8 = build_food_fertility_u8(sim.world.food());
+    let handle = SimHandle {
+        sim,
+        status: SimulationStatus::Paused,
+        active_trace: None,
+        cached_fertility_u8,
+    };
+
+    let frame = build_ws_frame(&handle);
+    assert!(frame.status.last_tick_food_occupancy_depletion_mean >= 0.0);
+    assert!(
+        frame
+            .status
+            .last_tick_food_occupancy_depletion_occupied_cells
+            > 0
+    );
+    assert!(
+        frame
+            .status
+            .last_tick_food_growth_suppressed_by_occupancy_depletion
+            >= 0.0
+    );
+    assert_eq!(
+        frame.status.last_tick_food_occupancy_depletion_mean,
+        frame.health.last_tick_food_occupancy_depletion_mean
+    );
+    assert_eq!(
+        frame
+            .status
+            .last_tick_food_occupancy_depletion_occupied_cells,
+        frame
+            .health
+            .last_tick_food_occupancy_depletion_occupied_cells
+    );
+    assert_eq!(
+        frame
+            .status
+            .last_tick_food_growth_suppressed_by_occupancy_depletion,
+        frame
+            .health
+            .last_tick_food_growth_suppressed_by_occupancy_depletion
     );
 }
 

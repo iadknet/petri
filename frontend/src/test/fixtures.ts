@@ -16,6 +16,10 @@ export const MOCK_CONFIG: SimulationConfig = {
 			recovery_spawn_rate: 0.02,
 			recovery_floor_ratio: 0.03,
 			max_density: 1.0,
+			occupancy_depletion: {
+				enabled: true,
+				deposit_per_occupied_tick: 0.08,
+			},
 		},
 	},
 	energy: {

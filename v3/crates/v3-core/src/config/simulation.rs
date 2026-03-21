@@ -21,6 +21,8 @@ pub struct FoodResourceConfig {
     pub recovery_floor_ratio: f32,
     pub max_density: f32,
     #[serde(default)]
+    pub occupancy_depletion: OccupancyDepletionConfig,
+    #[serde(default)]
     pub fertility: FertilityConfig,
     #[serde(default)]
     pub annealing: AnnealingConfig,
@@ -37,8 +39,28 @@ impl Default for FoodResourceConfig {
             recovery_spawn_rate: 0.01,
             recovery_floor_ratio: 0.01,
             max_density: 1.0,
+            occupancy_depletion: OccupancyDepletionConfig::default(),
             fertility: FertilityConfig::default(),
             annealing: AnnealingConfig::default(),
+        }
+    }
+}
+
+/// Occupancy depletion configuration governing occupancy-driven food suppression.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct OccupancyDepletionConfig {
+    /// Whether occupancy depletion is applied during food growth.
+    pub enabled: bool,
+    /// Depletion deposited into the occupied cell each tick.
+    pub deposit_per_occupied_tick: f32,
+}
+
+impl Default for OccupancyDepletionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            deposit_per_occupied_tick: 0.08,
         }
     }
 }
@@ -739,6 +761,12 @@ impl SimulationConfig {
             normalize_f32_clamp(w.food.recovery_spawn_rate, 0.0, 1.0, 0.01);
         w.food.recovery_floor_ratio =
             normalize_f32_clamp(w.food.recovery_floor_ratio, 0.0, 1.0, 0.01);
+        w.food.occupancy_depletion.deposit_per_occupied_tick = normalize_f32_clamp(
+            w.food.occupancy_depletion.deposit_per_occupied_tick,
+            0.0,
+            1.0,
+            0.08,
+        );
         w.food.initial_density = normalize_f32_clamp(
             w.food.initial_density,
             0.0,
@@ -942,6 +970,8 @@ mod tests {
         assert!((cfg.world.food.recovery_spawn_rate - 0.01).abs() < 1e-6);
         assert!((cfg.world.food.recovery_floor_ratio - 0.01).abs() < 1e-6);
         assert!((cfg.world.food.max_density - 1.0).abs() < 1e-6);
+        assert!(cfg.world.food.occupancy_depletion.enabled);
+        assert!((cfg.world.food.occupancy_depletion.deposit_per_occupied_tick - 0.08).abs() < 1e-6);
         assert!(cfg.world.food.fertility.enabled);
         assert_eq!(cfg.world.food.fertility.min_fertility, 0.0);
         assert_eq!(cfg.world.food.fertility.max_fertility, 2.0);
@@ -1816,6 +1846,8 @@ mod tests {
     #[test]
     fn food_resource_config_default_has_fertility_enabled_poisson_layer() {
         let config = FoodResourceConfig::default();
+        assert!(config.occupancy_depletion.enabled);
+        assert!((config.occupancy_depletion.deposit_per_occupied_tick - 0.08).abs() < 1e-6);
         assert!(config.fertility.enabled);
         assert_eq!(config.fertility.min_fertility, 0.0);
         assert_eq!(config.fertility.max_fertility, 2.0);
@@ -1845,6 +1877,7 @@ mod tests {
     fn fertility_config_deserializes_with_defaults_when_omitted() {
         let json = r#"{"growth_rate":0.09,"initial_density":1.0,"initial_coverage":0.54,"spread_threshold_ratio":0.8,"spread_density_ratio":0.25,"recovery_spawn_rate":0.01,"recovery_floor_ratio":0.01,"max_density":1.0}"#;
         let config: FoodResourceConfig = serde_json::from_str(json).unwrap();
+        assert!(config.occupancy_depletion.enabled);
         assert!(config.fertility.enabled);
         assert!(!config.annealing.enabled);
     }
@@ -1854,5 +1887,25 @@ mod tests {
         let layer = FertilityLayer::default();
         let json = serde_json::to_string(&layer).unwrap();
         assert!(json.contains("PoissonBlobs"));
+    }
+
+    #[test]
+    fn normalize_nan_occupancy_depletion_deposit_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.world.food.occupancy_depletion.deposit_per_occupied_tick = f32::NAN;
+        cfg.normalize();
+        assert!((cfg.world.food.occupancy_depletion.deposit_per_occupied_tick - 0.08).abs() < 1e-6);
+    }
+
+    #[test]
+    fn normalize_occupancy_depletion_deposit_clamps_to_unit_interval() {
+        let mut cfg = SimulationConfig::default();
+        cfg.world.food.occupancy_depletion.deposit_per_occupied_tick = 1.5;
+        cfg.normalize();
+        assert!((cfg.world.food.occupancy_depletion.deposit_per_occupied_tick - 1.0).abs() < 1e-6);
+
+        cfg.world.food.occupancy_depletion.deposit_per_occupied_tick = -0.5;
+        cfg.normalize();
+        assert!((cfg.world.food.occupancy_depletion.deposit_per_occupied_tick - 0.0).abs() < 1e-6);
     }
 }

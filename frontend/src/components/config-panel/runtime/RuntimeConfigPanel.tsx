@@ -9,7 +9,11 @@ import {
 } from "./ComplexityEnergyCostSection.tsx";
 import { ENERGY_COSTS_FIELDS } from "./EnergyCostsSection.tsx";
 import { ENERGY_LIFECYCLE_FIELDS } from "./EnergyLifecycleSection.tsx";
-import { FOOD_PARAMETERS_FIELDS } from "./FoodParametersSection.tsx";
+import {
+	FOOD_OCCUPANCY_DEPLETION_FIELDS,
+	FOOD_OCCUPANCY_DEPLETION_TOGGLES,
+	FOOD_PARAMETERS_FIELDS,
+} from "./FoodParametersSection.tsx";
 import { MUTATION_ALL_FIELDS, MUTATION_FIELDS, MUTATION_TOGGLES } from "./MutationSection.tsx";
 import { POPULATION_FIELDS } from "./PopulationSection.tsx";
 import { PREDATION_FIELDS } from "./PredationSection.tsx";
@@ -18,6 +22,8 @@ import { RUNTIME_FIELDS } from "./RuntimeSection.tsx";
 import { SHARED_MEMORY_FIELDS } from "./SharedMemorySection.tsx";
 
 export const RUNTIME_PATCH_FIELDS: (FieldDef | BooleanFieldDef)[] = [
+	...FOOD_OCCUPANCY_DEPLETION_TOGGLES,
+	...FOOD_OCCUPANCY_DEPLETION_FIELDS,
 	...FOOD_PARAMETERS_FIELDS,
 	...POPULATION_FIELDS,
 	...ENERGY_LIFECYCLE_FIELDS,
@@ -59,6 +65,16 @@ export function RuntimeConfigPanel({
 				</div>
 			) : (
 				<>
+					<RuntimeFieldGroup
+						title="Food > Occupancy Depletion"
+						fields={FOOD_OCCUPANCY_DEPLETION_FIELDS}
+						toggles={FOOD_OCCUPANCY_DEPLETION_TOGGLES}
+						localDraft={localDraft}
+						serverConfig={serverConfig}
+						simState={simState}
+						tick={tick}
+						updateDraft={updateDraft}
+					/>
 					<RuntimeFieldGroup
 						title="Food Parameters"
 						fields={FOOD_PARAMETERS_FIELDS}
