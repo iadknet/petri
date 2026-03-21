@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use rand::Rng;
 
 use crate::config::MutationConfig;
-use crate::contracts::NodeId;
+use crate::contracts::{NodeId, RouteTarget};
 use crate::creature::genome::analysis::{mesh_backward_slice, mesh_forward_slice};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::mutation::reachability::biased_select_from;
@@ -114,8 +114,8 @@ pub(super) fn apply_rewrite_node_id(
 
     for node in &mut genome.nodes {
         for target in &mut node.targets {
-            if *target == old_id {
-                *target = new_id;
+            if target.target_id == old_id {
+                target.target_id = new_id;
             }
         }
     }
@@ -153,7 +153,12 @@ pub(super) fn apply_copy_node(
     });
 
     // Always add backlink to ensure the copied node is reachable.
-    genome.nodes[source_idx].targets.push(new_id);
+    let backlink_slot = genome.nodes[source_idx].targets.len() as u8;
+    genome.nodes[source_idx].targets.push(RouteTarget {
+        target_id: new_id,
+        slot: backlink_slot,
+        gate_bias: 0.0,
+    });
     Ok(reachability)
 }
 
@@ -187,8 +192,12 @@ fn clone_and_remap_slice(genome: &mut CreatureGenome, gene_indices: &[usize], rn
                     .targets
                     .iter()
                     .map(|t| {
-                        if let Some(&new_id) = id_map.get(t) {
-                            new_id // internal target remapped
+                        if let Some(&new_id) = id_map.get(&t.target_id) {
+                            RouteTarget {
+                                target_id: new_id,
+                                slot: t.slot,
+                                gate_bias: t.gate_bias,
+                            }
                         } else {
                             *t // external target preserved
                         }
@@ -211,7 +220,12 @@ fn clone_and_remap_slice(genome: &mut CreatureGenome, gene_indices: &[usize], rn
     let new_ids: Vec<NodeId> = id_map.values().copied().collect();
     let link_target = new_ids[rng.gen_range(0..new_ids.len())];
     let source_idx = rng.gen_range(0..pre_existing_count);
-    genome.nodes[source_idx].targets.push(link_target);
+    let backlink_slot = genome.nodes[source_idx].targets.len() as u8;
+    genome.nodes[source_idx].targets.push(RouteTarget {
+        target_id: link_target,
+        slot: backlink_slot,
+        gate_bias: 0.0,
+    });
 }
 
 pub(super) fn apply_copy_mesh_backward_slice(
@@ -270,14 +284,18 @@ pub(super) fn apply_splice_node(
     let (a_idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let target_slot = rng.gen_range(0..genome.nodes[a_idx].targets.len());
-    let b_id = genome.nodes[a_idx].targets[target_slot];
+    let b_id = genome.nodes[a_idx].targets[target_slot].target_id;
     let c_id = next_node_id(genome);
     genome.nodes.push(birth::new_topology_birth_node(
         c_id,
-        vec![b_id],
+        vec![RouteTarget {
+            target_id: b_id,
+            slot: 0,
+            gate_bias: 0.0,
+        }],
         config,
         rng,
     ));
-    genome.nodes[a_idx].targets[target_slot] = c_id;
+    genome.nodes[a_idx].targets[target_slot].target_id = c_id;
     Ok(reachability)
 }

@@ -1,6 +1,7 @@
 use super::*;
 use crate::contracts::{
-    DynamicIntrospectionKey, InputReference, NodeId, StaticIntrospectionKey, WorldInputKey,
+    DynamicIntrospectionKey, InputReference, NodeId, RouteTarget, StaticIntrospectionKey,
+    WorldInputKey,
 };
 use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
@@ -272,7 +273,15 @@ fn simple_vm_node(id: u32, targets: Vec<u32>) -> NodeGenome {
             constants: vec![],
             program: vec![VmInstruction::Halt],
         }),
-        targets: targets.into_iter().map(NodeId::new).collect(),
+        targets: targets
+            .into_iter()
+            .enumerate()
+            .map(|(i, id)| RouteTarget {
+                target_id: NodeId::new(id),
+                slot: i as u8,
+                gate_bias: 0.0,
+            })
+            .collect(),
     }
 }
 
@@ -546,7 +555,11 @@ fn functional_complexity_excludes_unreachable_nodes() {
                         VmInstruction::ExecuteActionQueue,
                     ],
                 }),
-                targets: vec![NodeId::new(1)],
+                targets: vec![RouteTarget {
+                    target_id: NodeId::new(1),
+                    slot: 0,
+                    gate_bias: 0.0,
+                }],
             },
             NodeGenome {
                 node_id: NodeId::new(1),

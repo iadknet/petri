@@ -1,6 +1,6 @@
 use slotmap::SlotMap;
 use v3_core::config::MutationConfig;
-use v3_core::contracts::{CreatureId, NodeId, Position, WorldAction};
+use v3_core::contracts::{CreatureId, NodeId, Position, RouteTarget, WorldAction};
 use v3_core::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
@@ -51,7 +51,18 @@ fn cgp_routing_normalizes_negative_to_first_target_e2e() {
         node_id: id_entry,
         input_refs: vec![],
         backend_def: BackendDef::Graph(entry_def),
-        targets: vec![id_noop, id_eat],
+        targets: vec![
+            RouteTarget {
+                target_id: id_noop,
+                slot: 0,
+                gate_bias: 0.0,
+            },
+            RouteTarget {
+                target_id: id_eat,
+                slot: 1,
+                gate_bias: 0.0,
+            },
+        ],
     };
     let noop = NodeGenome {
         node_id: id_noop,

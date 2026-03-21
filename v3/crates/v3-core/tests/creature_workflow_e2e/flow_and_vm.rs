@@ -1,7 +1,7 @@
 use slotmap::SlotMap;
 use v3_core::config::MutationConfig;
 use v3_core::contracts::{
-    CreatureId, Direction, DynamicIntrospectionKey, InputReference, NodeId, Position,
+    CreatureId, Direction, DynamicIntrospectionKey, InputReference, NodeId, Position, RouteTarget,
     StaticIntrospectionKey, WorldAction, WorldInputKey,
 };
 use v3_core::creature::genome::cgp::{
@@ -91,7 +91,11 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
         node_id: id_a,
         input_refs: vec![],
         backend_def: BackendDef::Graph(cgp_constant_to_custom_output(0.8, 2)),
-        targets: vec![id_b],
+        targets: vec![RouteTarget {
+            target_id: id_b,
+            slot: 0,
+            gate_bias: 0.0,
+        }],
     };
 
     // Node B: reads upstream slot 2 via InputLeaf and writes it into slot 4, routes to C.
@@ -99,7 +103,11 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
         node_id: id_b,
         input_refs: vec![InputReference::UpstreamSlot(2)],
         backend_def: BackendDef::Graph(cgp_passthrough_input_to_custom_output(0, 0, 4)),
-        targets: vec![id_c],
+        targets: vec![RouteTarget {
+            target_id: id_c,
+            slot: 0,
+            gate_bias: 0.0,
+        }],
     };
 
     // Node C (VM): reads upstream slot 4 + FoodHere; emits Eat when sum > 1.2.
@@ -204,7 +212,11 @@ fn vm_reads_all_inputs_e2e() {
         node_id: id_graph,
         input_refs: vec![],
         backend_def: BackendDef::Graph(cgp_constant_to_custom_output(0.73, 11)),
-        targets: vec![id_vm],
+        targets: vec![RouteTarget {
+            target_id: id_vm,
+            slot: 0,
+            gate_bias: 0.0,
+        }],
     };
 
     // Ring sensors are compound (8 sub-values each, indexed by Direction::to_index()).
