@@ -301,7 +301,7 @@ fn mutate_instruction_raw_fields(
             if rng.gen_bool(0.5) {
                 *slot = rng.gen_range(0..MAX_GATE_SLOTS as u8);
             } else {
-                *src = rng.gen_range(0..u8::MAX);
+                *src = rng.gen::<u8>();
             }
         }
         VmInstruction::LoadSlot { dst, slot_reg } => {
