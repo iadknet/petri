@@ -189,7 +189,11 @@ pub const CUSTOM_OUTPUT_COUNT: u8 = 24;
 pub const SHARED_MEMORY_SLOTS: u8 = 16;
 /// Total fixed sink count: N CustomOutput + 1 Router + 16 WriteSlot + 16 ClearSlot.
 pub const FIXED_SINK_COUNT: usize =
-    CUSTOM_OUTPUT_COUNT as usize + 1 + SHARED_MEMORY_SLOTS as usize * 2;
+    CUSTOM_OUTPUT_COUNT as usize     // 24 CustomOutput slots
+    + 1                              // 1 RouterOutput (will become MAX_GATE_SLOTS later)
+    + SHARED_MEMORY_SLOTS as usize   // 16 WriteSlot sinks
+    + SHARED_MEMORY_SLOTS as usize;  // 16 ClearSlot sinks
+const _: () = assert!(FIXED_SINK_COUNT == 57);
 
 impl CgpGraphBackendDef {
     /// Construct a new graph backend with the full fixed output catalog.
