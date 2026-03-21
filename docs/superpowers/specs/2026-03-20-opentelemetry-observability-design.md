@@ -11,7 +11,7 @@ Adopt OpenTelemetry as the observability foundation for the Petri simulation, ba
 - Population-level metrics dashboards derived from existing `SimStats`
 - Agent-queryable storage (ClickHouse SQL over HTTP) for Claude/Codex troubleshooting and insight generation
 - Runtime-adjustable tracing controls via config panel
-- Zero impact on `v3-core` — all instrumentation lives in `v3-server`
+- No OTel/tracing dependencies in `v3-core` — core returns trace data structs, server emits OTel spans
 
 ## Non-Goals
 
@@ -103,9 +103,17 @@ The `tracing` crate is already a workspace dependency.
 
 ### Instrumentation Boundary
 
-`v3-core` remains a pure simulation library with zero observability dependencies. All OTel instrumentation lives in `v3-server`.
+`v3-core` has **no OTel or `tracing` crate dependencies**. It remains a pure simulation library. However, core is not completely untouched — it must expose data that the server converts into OTel spans:
 
-To enable per-phase instrumentation, `v3-core` exposes phase functions (`run_phase_0()`, `run_phase_1()`, `run_phase_2()`, `run_phase_2_5()`) that the server calls in sequence, wrapping each with tracing spans. This depends on the tick-phase-system refactor (see Prerequisites). Currently only `run_phase_0()` exists; the remaining phases must be extracted before OTel instrumentation can wrap them.
+1. **Phase functions** — `v3-core` exposes `run_phase_0()`, `run_phase_1()`, `run_phase_2()`, `run_phase_2_5()` that the server calls in sequence, wrapping each with tracing spans. This depends on the tick-phase-system refactor (see Prerequisites). Currently only `run_phase_0()` exists.
+
+2. **Trace data structs** — `v3-core` already has rich per-node execution trace types in `runtime::trace::domain` (`MeshHopTrace`, `TickTrace`, `ExecutionSample`). These capture per-hop input/output values, energy before/after, routing decisions, backend-specific traces (VM instruction steps, graph node evaluations), and termination reasons. The OTel creature cognition spans are populated by converting these existing structs into span attributes — **no new OTel-specific types are added to core**.
+
+3. **Multi-creature traced execution** — The current `execute_creature_mesh_traced()` runs sequentially for a single creature. For OTel sampling of ~100 creatures/tick, core needs a **batch traced execution mode** that accepts a set of creature IDs to trace within the parallel cognition pass. This is a new core API surface (not a dependency on OTel), returning `Vec<(CreatureId, Vec<MeshHopTrace>, TerminationReason)>` alongside the normal `MeshOutput` results. The server then converts these into OTel spans.
+
+4. **New per-tick counters in SimStats** — Several OTel metrics require counters not currently in `SimStats` (see Metrics Data Sources below). These are pure simulation bookkeeping additions with no OTel dependency.
+
+**In summary:** `v3-core` gains new API surface (batch traced execution, additional SimStats counters) but zero observability library dependencies. The boundary is "core returns data, server emits spans."
 
 ### Feature Flag
 
@@ -116,10 +124,13 @@ All OTel instrumentation gated behind a cargo feature `otel` in `v3-server`. Whe
 At server startup:
 1. Configure OTel pipeline with OTLP gRPC exporter pointing at collector endpoint
 2. Set OTLP resource attributes: `service.name = "petri-server"`, `service.version` from build info
-3. Set up `tracing-opentelemetry` layer
-4. Register as global tracing subscriber
-5. On shutdown, flush batch processor gracefully
-6. On simulation reset (`POST /v3/simulation/startup`): flush pending spans, start new trace context. The OTel pipeline itself is not restarted — only the trace context resets.
+3. Generate a `simulation.run_id` (UUID v4) and attach it as a span attribute on every tick root span and as a metric attribute on all exported metrics
+4. Set up `tracing-opentelemetry` layer
+5. Register as global tracing subscriber
+6. On shutdown, flush batch processor gracefully
+7. On simulation reset (`POST /v3/simulation/startup`): flush pending spans, generate a **new** `simulation.run_id`, clear flagged creatures. The OTel pipeline itself is not restarted.
+
+**Run isolation:** Since tick numbers reset to 0 on startup, `simulation.run_id` is the only reliable way to separate data from different simulation runs in ClickHouse. Every tick span, creature span, and metric data point carries this attribute. Agents can filter queries with `WHERE simulation.run_id = '<uuid>'` to scope analysis to a single run.
 
 ---
 
@@ -149,6 +160,7 @@ tick                                       (root span, every tick)
 
 | Attribute | Type | Source |
 |-----------|------|--------|
+| `simulation.run_id` | string | UUID v4, generated at startup/reset |
 | `tick.number` | u64 | `sim.tick` |
 | `tick.population` | u32 | creature count |
 | `tick.food_count` | u32 | total food cells |
@@ -176,6 +188,25 @@ tick                                       (root span, every tick)
 **Cross-phase span assembly:** A creature's full tick spans sense/think/decide (Phase 1), actions (Phase 2), and learning (Phase 2.5). The `creature_tick` span is a **synthetic correlation span** — it is created at the start of Phase 1 for traced creatures and kept open until Phase 2.5 completes. Child spans from each phase are parented under it via explicit span context passing, not automatic thread-local propagation.
 
 **Rayon integration:** Phase 1 cognition runs in `rayon::par_iter_mut`. The `tracing` crate's span context is thread-local and does not automatically propagate across Rayon work-stealing threads. For traced creatures, the parent span context must be explicitly passed into the Rayon closure and entered with `Span::enter()` or `in_scope()`. The sampling decision (traced vs not) is made before the parallel pass begins, during sequential input assembly, so only traced creatures pay the span creation cost inside the parallel loop. Untraced creatures execute with zero tracing overhead beyond the sampling check.
+
+### Migration from Single-Active-Trace Contract
+
+The existing tracing system supports exactly one creature at a time via `SimHandle.active_trace: Option<ActiveTrace>`. The OTel system traces ~100+ creatures per tick. These are **separate, coexisting systems**:
+
+| | Existing Sample API | OTel Creature Traces |
+|---|---|---|
+| **Purpose** | Inspector deep-dive (frontend-facing) | Observability backend (SigNoz-facing) |
+| **Cardinality** | 1 creature at a time | N creatures per tick (sampled + flagged) |
+| **Data path** | `execute_creature_mesh_traced()` → `ActiveTrace` → `GET /v3/creature/{id}/sample` | Batch traced execution → server converts to OTel spans → OTLP export |
+| **Output** | `ExecutionSample` JSON returned to frontend | OTel spans exported to collector |
+| **Lifecycle** | Request N ticks, poll for completion, retrieve | Continuous per-tick emission |
+
+**Coexistence rules:**
+- The existing `active_trace` / sample API is **unchanged**. It continues to serve the frontend inspector.
+- OTel tracing operates independently via the new batch traced execution mode in core.
+- If a creature is both the `active_trace` target AND in the OTel sample/flagged set, both systems capture data independently. This is acceptable — the data paths are separate and the overhead is negligible for a single creature.
+- The `POST /v3/observability/flag/{creature_id}` endpoint is distinct from `POST /v3/creature/{id}/sample/start`. They do not interfere.
+- **Future consideration:** Once OTel creature tracing is mature, the existing sample API could be deprecated in favor of querying SigNoz for the same data. This is not part of the current scope.
 
 **Creature span tree:**
 
@@ -349,7 +380,7 @@ Within `creature_think` and `mesh_node_{id}` spans, emit span events (not child 
 
 ## OTel Metrics
 
-Exported via OTel SDK, derived from existing `SimStats` each tick.
+Exported via OTel SDK each tick. All metrics carry the `simulation.run_id` attribute for run isolation.
 
 ### Population (gauges)
 
@@ -408,6 +439,39 @@ Exported via OTel SDK, derived from existing `SimStats` each tick.
 
 - `petri.transport.projection_publish_ms`
 - `petri.transport.ws_frame_publish_ms`
+
+### Metrics Data Sources
+
+Not all metrics are available in existing `SimStats`. The table below documents the actual source of each metric and any new work required:
+
+| Metric | Current Source | New Work Needed |
+|--------|---------------|-----------------|
+| `petri.population.total` | `sim.creatures.len()` (computed on demand) | None — server iterates creatures |
+| `petri.population.mean_energy` | `StatusPayload` computes on demand | None — server iterates creatures |
+| `petri.population.total_energy` | Not tracked | Server computes from creature iteration (same pass as mean_energy) |
+| `petri.population.mean_age` | Not tracked | Server computes from creature iteration |
+| `petri.population.oldest_age` | Not tracked | Server computes from creature iteration |
+| `petri.tick.births` | `SimStats.last_tick_reproduce` counts attempts, not successes | **New per-tick counter needed in SimStats:** `last_tick_births` (incremented on successful spawn) |
+| `petri.tick.deaths` | Implicit in death removal loop, not counted | **New per-tick counter needed in SimStats:** `last_tick_deaths` (incremented during Phase 0 death removal) |
+| `petri.tick.actions.*` | `SimStats.last_tick_{move,eat,noop,reproduce,steal}` | None — already tracked |
+| `petri.predation.*` | `SimStats.predation_*_total` (cumulative) | None — cumulative counters exist; export as monotonic OTel counters |
+| `petri.food.total` | `sim.world.food().count()` (computed on demand) | None — server queries world |
+| `petri.food.spawned_last_tick` | `FoodGrowthSummary` partial data | **New field needed:** explicit `food_spawned` count in `FoodGrowthSummary` or `SimStats` |
+| `petri.food.consumed_last_tick` | Not tracked | **New per-tick counter needed in SimStats:** `last_tick_food_consumed` (incremented on successful Eat) |
+| `petri.mutation.*` | `SimStats.mutation_events_*_total` (cumulative) | None — cumulative counters exist |
+| `petri.reproduction.*` | `SimStats.reproduction_actions_*_total` (cumulative) | None — cumulative counters exist |
+| `petri.compute.*` | `SimStats.last_tick_compute_*` | None — already tracked |
+| `petri.tick.duration_ms` | Not tracked | Server measures wall-clock around phase calls |
+| `petri.tick.phase_*_duration_ms` | Not tracked | Server measures wall-clock around phase calls |
+| `petri.transport.*` | `TransportPerfSnapshot` | None — already tracked |
+
+**Summary of required v3-core changes:**
+- Add `last_tick_births: u32` to `SimStats` (increment on successful reproduction spawn)
+- Add `last_tick_deaths: u32` to `SimStats` (increment during Phase 0 death removal)
+- Add `last_tick_food_consumed: u32` to `SimStats` (increment on successful Eat action)
+- Add `food_spawned: u32` to `FoodGrowthSummary` (count cells that received food during growth)
+
+These are pure bookkeeping additions with no OTel dependency.
 
 ---
 
