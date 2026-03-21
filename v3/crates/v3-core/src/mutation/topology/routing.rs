@@ -45,11 +45,18 @@ pub(super) fn apply_add_route_target(
     bias: f64,
     rng: &mut impl Rng,
 ) -> Result<TargetReachability, MutationSkipReason> {
-    let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
-    let (node_idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
+    // Pre-filter for nodes with free routing slots (< MAX_GATE_SLOTS targets).
+    let eligible: Vec<usize> = genome
+        .nodes
+        .iter()
+        .enumerate()
+        .filter(|(_, n)| n.targets.len() < MAX_GATE_SLOTS)
+        .map(|(i, _)| i)
+        .collect();
+    let (node_idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let slot = lowest_unused_slot(&genome.nodes[node_idx].targets)
-        .ok_or(MutationSkipReason::NoApplicableTarget)?;
+        .expect("pre-filtered for free slots");
     let target_id = genome.nodes[rng.gen_range(0..genome.nodes.len())].node_id;
     genome.nodes[node_idx].targets.push(RouteTarget {
         target_id,
@@ -229,27 +236,27 @@ mod tests {
     }
 
     #[test]
-    fn add_route_target_noop_when_full() {
-        // Fill node 0 with MAX_GATE_SLOTS targets so there is no free slot.
+    fn add_route_target_noop_when_all_nodes_full() {
+        // Fill ALL nodes with MAX_GATE_SLOTS targets so no node has a free slot.
         let mut genome = v3alpha1_founder_genome();
-        genome.nodes[0].targets.clear();
-        for s in 0..MAX_GATE_SLOTS as u8 {
-            genome.nodes[0].targets.push(RouteTarget {
-                target_id: NodeId::new(s as u32),
-                slot: s,
-                gate_bias: 0.0,
-            });
+        for node in &mut genome.nodes {
+            node.targets.clear();
+            for s in 0..MAX_GATE_SLOTS as u8 {
+                node.targets.push(RouteTarget {
+                    target_id: NodeId::new(s as u32),
+                    slot: s,
+                    gate_bias: 0.0,
+                });
+            }
         }
 
-        // Force selection of node 0 (which is definitely full).
         let mut r = rng(7);
-        let result = apply_add_route_target(&mut genome, &[0], 1.0, &mut r);
+        let result = apply_add_route_target(&mut genome, &[0, 1], 1.0, &mut r);
         assert_eq!(
             result,
             Err(MutationSkipReason::NoApplicableTarget),
-            "fully-occupied node must return NoApplicableTarget"
+            "all nodes fully-occupied must return NoApplicableTarget"
         );
-        assert_eq!(genome.nodes[0].targets.len(), MAX_GATE_SLOTS);
     }
 
     // --- apply_remove_route_target test ---
