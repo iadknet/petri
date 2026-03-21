@@ -114,13 +114,18 @@ pub fn record_tick_metrics(sim: &Simulation, run_id: &str, meter: &Meter) {
         .add(stats.last_tick_noop as u64, &attrs);
 
     // Food economics
-    let food_count = sim.world.food().occupied_count();
-    meter.u64_gauge("petri.food.total")
+    // Note: FoodResource::total_food() returns f32 (total density sum, not cell count).
+    // Use f64_gauge, not u64_gauge.
+    let food_total = sim.world.food().total_food();
+    meter.f64_gauge("petri.food.total")
         .build()
-        .record(food_count as u64, &attrs);
-    meter.u64_counter("petri.tick.food_consumed")
+        .record(food_total as f64, &attrs);
+    meter.u64_counter("petri.food.consumed_last_tick")
         .build()
         .add(stats.last_tick_food_consumed as u64, &attrs);
+    // petri.food.spawned_last_tick requires the food_spawned counter from FoodGrowthSummary
+    // (added in Phase 1 Task 4). Access via a new SimStats field that stores it
+    // from record_food_growth_summary().
 
     // Compute cost gauges
     meter.f64_gauge("petri.compute.mean_total_cost")
@@ -340,7 +345,7 @@ if let Some(ref span) = tick_span {
     let total_energy: f64 = h.sim.creatures.values().map(|c| c.energy as f64).sum();
     crate::observability::tracing_spans::record_tick_post_attributes(
         span,
-        h.sim.world.food().occupied_count() as u32,
+        h.sim.world.food().total_food() as u32,
         total_energy,
         h.sim.stats.last_tick_births,
         h.sim.stats.last_tick_deaths,
