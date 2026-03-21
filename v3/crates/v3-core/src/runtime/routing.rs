@@ -1,4 +1,4 @@
-use crate::contracts::MAX_GATE_SLOTS;
+use crate::contracts::{NodeId, RouteTarget, MAX_GATE_SLOTS};
 use crate::runtime::types::sanitize_f32;
 
 /// Internal routing decision produced by node execution.
@@ -57,9 +57,151 @@ impl Default for RouteGateMap {
 // Hot-path type size assertion — prevent accidental regressions.
 const _: () = assert!(std::mem::size_of::<RouteGateMap>() == 32);
 
+/// Resolve which target to route to based on gate scores.
+///
+/// effective(target) = gate_bias + runtime_gate[target.slot]
+/// Winner = argmax. Ties broken by position (first wins via strict `>`).
+/// Returns `(winning_index, winning_target_id)` or `None` if empty.
+#[inline]
+#[must_use]
+pub(crate) fn resolve_gated_route(
+    targets: &[RouteTarget],
+    gates: &RouteGateMap,
+) -> Option<(usize, NodeId)> {
+    if targets.is_empty() {
+        return None;
+    }
+    if targets.len() == 1 {
+        return Some((0, targets[0].target_id));
+    }
+
+    let mut best_idx = 0;
+    let mut best_score = f32::NEG_INFINITY;
+    for (i, target) in targets.iter().enumerate() {
+        let runtime = if (target.slot as usize) < MAX_GATE_SLOTS {
+            gates.scores[target.slot as usize]
+        } else {
+            0.0
+        };
+        let effective = target.gate_bias + runtime;
+        if effective > best_score {
+            best_score = effective;
+            best_idx = i;
+        }
+    }
+    Some((best_idx, targets[best_idx].target_id))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::contracts::{NodeId, RouteTarget};
+
+    #[test]
+    fn gated_route_empty_targets_returns_none() {
+        let gates = RouteGateMap::default();
+        assert_eq!(resolve_gated_route(&[], &gates), None);
+    }
+
+    #[test]
+    fn gated_route_single_target_skips_scoring() {
+        let targets = [RouteTarget {
+            target_id: NodeId::new(5),
+            slot: 0,
+            gate_bias: -99.0,
+        }];
+        let gates = RouteGateMap::default();
+        assert_eq!(
+            resolve_gated_route(&targets, &gates),
+            Some((0, NodeId::new(5)))
+        );
+    }
+
+    #[test]
+    fn gated_route_picks_highest_effective_score() {
+        let targets = [
+            RouteTarget {
+                target_id: NodeId::new(1),
+                slot: 0,
+                gate_bias: 0.0,
+            },
+            RouteTarget {
+                target_id: NodeId::new(2),
+                slot: 1,
+                gate_bias: 0.0,
+            },
+        ];
+        let mut gates = RouteGateMap::default();
+        gates.scores[1] = 1.0;
+        assert_eq!(
+            resolve_gated_route(&targets, &gates),
+            Some((1, NodeId::new(2)))
+        );
+    }
+
+    #[test]
+    fn gated_route_bias_plus_runtime() {
+        let targets = [
+            RouteTarget {
+                target_id: NodeId::new(1),
+                slot: 0,
+                gate_bias: 2.0,
+            },
+            RouteTarget {
+                target_id: NodeId::new(2),
+                slot: 1,
+                gate_bias: -1.0,
+            },
+        ];
+        let mut gates = RouteGateMap::default();
+        gates.scores[1] = 4.0; // effective: -1.0 + 4.0 = 3.0 > 2.0
+        assert_eq!(
+            resolve_gated_route(&targets, &gates),
+            Some((1, NodeId::new(2)))
+        );
+    }
+
+    #[test]
+    fn gated_route_first_target_wins_ties() {
+        let targets = [
+            RouteTarget {
+                target_id: NodeId::new(1),
+                slot: 0,
+                gate_bias: 0.0,
+            },
+            RouteTarget {
+                target_id: NodeId::new(2),
+                slot: 1,
+                gate_bias: 0.0,
+            },
+        ];
+        let gates = RouteGateMap::default();
+        assert_eq!(
+            resolve_gated_route(&targets, &gates),
+            Some((0, NodeId::new(1)))
+        );
+    }
+
+    #[test]
+    fn gated_route_out_of_range_slot_gets_zero_runtime() {
+        let targets = [
+            RouteTarget {
+                target_id: NodeId::new(1),
+                slot: 0,
+                gate_bias: 0.0,
+            },
+            RouteTarget {
+                target_id: NodeId::new(2),
+                slot: 200,
+                gate_bias: 1.0,
+            },
+        ];
+        let gates = RouteGateMap::default();
+        assert_eq!(
+            resolve_gated_route(&targets, &gates),
+            Some((1, NodeId::new(2)))
+        );
+    }
 
     #[test]
     fn vm_wrap_handles_negative_and_wraps() {
