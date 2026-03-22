@@ -3,6 +3,17 @@ import type { InputReference } from "../../types/genome.ts";
 import type { VmTrace } from "../../types/trace.ts";
 import { InputsPanel } from "./InputsPanel.tsx";
 
+const DIRECTION_NAMES = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const;
+
+/** Format action meta slot value with direction decoding for slot 0. */
+function formatMetaSlot(slotIdx: number, value: number): string {
+	// Slot 0 often holds a direction index (0-7) — decode to compass name
+	if (slotIdx === 0 && Number.isInteger(value) && value >= 0 && value <= 7) {
+		return `[${slotIdx}]=${DIRECTION_NAMES[value]}(${value.toFixed(0)})`;
+	}
+	return `[${slotIdx}]=${value.toFixed(2)}`;
+}
+
 interface VmExecutionViewProps {
 	trace: VmTrace;
 	inputRefs: InputReference[];
@@ -85,7 +96,9 @@ export const VmExecutionView = memo(function VmExecutionView({
 					<div>
 						<span className="text-slate-600">meta:</span>{" "}
 						{trace.final_meta.length > 0
-							? trace.final_meta.map((value) => value.toFixed(2)).join(" ")
+							? trace.final_meta
+									.map((value, idx) => formatMetaSlot(idx, value))
+									.join(" ")
 							: "—"}
 					</div>
 				</div>

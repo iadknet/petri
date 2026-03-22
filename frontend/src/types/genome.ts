@@ -116,7 +116,7 @@ export type VmInstruction =
 	| { ToBool: { dst: number; src: number } }
 	| { JumpIfZero: { cond: number; offset: number } }
 	| { Jump: { offset: number } }
-	| { ReadInput: { dst: number; input_idx: number } }
+	| { ReadInput: { dst: number; ref_idx: number; sub_idx: number } }
 	| { WriteInternalPayload: { slot_idx: number; src: number } }
 	| { WriteWorldActionMeta: { slot_idx: number; src: number } }
 	| { WriteRouteGate: { slot: number; src: number } }

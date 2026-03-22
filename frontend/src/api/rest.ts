@@ -136,7 +136,7 @@ class ApiClient {
 		});
 	}
 
-	async startSample(id: number, ticks = 5, signal?: AbortSignal): Promise<StartSampleResponse> {
+	async startSample(id: number, ticks = 10, signal?: AbortSignal): Promise<StartSampleResponse> {
 		return this.request(`/v3/simulation/creature/${id}/sample`, {
 			method: "POST",
 			body: JSON.stringify({ ticks }),

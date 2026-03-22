@@ -14,7 +14,7 @@ function makeGenome(): CreatureGenome {
 					Vm: {
 						register_count: 2,
 						constants: [1],
-						program: [{ ReadInput: { dst: 0, input_idx: 0 } }, "Halt"],
+						program: [{ ReadInput: { dst: 0, ref_idx: 0, sub_idx: 0 } }, "Halt"],
 					},
 				},
 			},
