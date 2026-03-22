@@ -433,7 +433,7 @@ struct StartSampleRequest {
 }
 
 fn default_sample_ticks() -> u32 {
-    5
+    10
 }
 
 pub async fn start_sample(
@@ -443,7 +443,7 @@ pub async fn start_sample(
 ) -> Result<impl IntoResponse, AppError> {
     let req: StartSampleRequest = if body.is_empty() {
         StartSampleRequest {
-            ticks: 5,
+            ticks: 10,
             include_perception_debug: false,
         }
     } else {
