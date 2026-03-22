@@ -24,6 +24,77 @@ const ACTION_PARAM_NAMES: readonly (readonly string[])[] = [
 	["dir", "amt"], // 4: StealEnergy — direction + amount
 ];
 
+// ── Action context: connects WriteWorldActionMeta ↔ PushAction ──────────────
+
+/** Context for a WriteWorldActionMeta instruction (what param name it sets). */
+interface MetaWriteContext {
+	/** Human-readable param name (e.g. "dir", "energy") based on the next PushAction. */
+	paramName: string;
+}
+
+/** Context for a PushAction instruction (which registers supply its params). */
+interface PushActionContext {
+	/** Source register for each param slot, from preceding WriteWorldActionMeta. */
+	paramSources: (string | null)[];
+}
+
+export interface ActionContext {
+	metaWrites: Map<number, MetaWriteContext>;
+	pushActions: Map<number, PushActionContext>;
+}
+
+/**
+ * Pre-scan the program to connect WriteWorldActionMeta → PushAction.
+ * For each PushAction, scan backwards to find which registers were written
+ * to each meta slot. For each WriteWorldActionMeta, look forward to find
+ * the next PushAction and derive the param name from its action type.
+ */
+export function buildActionContext(program: VmInstruction[]): ActionContext {
+	const metaWrites = new Map<number, MetaWriteContext>();
+	const pushActions = new Map<number, PushActionContext>();
+
+	for (let i = 0; i < program.length; i++) {
+		const instr = program[i];
+		if (typeof instr === "string" || !instr || !("PushAction" in instr)) continue;
+
+		const actionType = (instr.PushAction as { action_type: number }).action_type;
+		const paramNames = ACTION_PARAM_NAMES[actionType] ?? [];
+		const paramSources: (string | null)[] = paramNames.map(() => null);
+
+		// Scan backwards to find the most recent WriteWorldActionMeta for each slot
+		for (let j = i - 1; j >= 0; j--) {
+			const prev = program[j];
+			if (typeof prev === "string") {
+				// Stop at ExecuteActionQueue or Halt — these break the action block
+				if (prev === "ExecuteActionQueue" || prev === "Halt") break;
+				continue;
+			}
+			if (!prev) continue;
+			// Stop at another PushAction — its meta writes belong to it, not us
+			if ("PushAction" in prev) break;
+
+			if ("WriteWorldActionMeta" in prev) {
+				const meta = prev.WriteWorldActionMeta as { slot_idx: number; src: number };
+				const slotIdx = meta.slot_idx;
+				const srcReg = `r${meta.src}`;
+
+				// Record this meta write's param name
+				if (slotIdx < paramNames.length) {
+					const paramName = paramNames[slotIdx];
+					if (paramName) {
+						metaWrites.set(j, { paramName });
+						paramSources[slotIdx] = srcReg;
+					}
+				}
+			}
+		}
+
+		pushActions.set(i, { paramSources });
+	}
+
+	return { metaWrites, pushActions };
+}
+
 /**
  * Map raw opcode names to short, readable display labels.
  * These must fit in the ~13-character label column (w-[5.5rem] at 11px mono).
@@ -62,7 +133,7 @@ const OPCODE_LABELS: Record<string, string> = {
 	// Route / payload / action
 	WriteRouteGate: "gate",
 	WriteInternalPayload: "payload",
-	WriteWorldActionMeta: "action",
+	WriteWorldActionMeta: "set",
 	PushAction: "push",
 	SetPriorityBid: "priority",
 	ReadActionQueueLength: "queue",
@@ -80,15 +151,17 @@ const OPCODE_LABELS: Record<string, string> = {
 /**
  * Format a VM instruction with human-readable label and operands.
  * Resolves input ref indices to sensor names, constant indices to values,
- * and jump offsets to absolute line numbers.
+ * jump offsets to absolute line numbers, and action meta writes to param names.
  *
  * @param index - The instruction's position in the program (for computing jump targets).
+ * @param actionCtx - Pre-computed action context connecting meta writes to push actions.
  */
 export function formatReadableInstruction(
 	instruction: VmInstruction,
 	inputRefs: InputReference[],
 	constants: number[],
 	index: number,
+	actionCtx?: ActionContext,
 ): ReadableInstruction {
 	const semantics = classifyVmInstruction(instruction);
 	const badges = semantics.badges;
@@ -104,7 +177,7 @@ export function formatReadableInstruction(
 			: {};
 
 	const label = OPCODE_LABELS[name] ?? name.toLowerCase();
-	const operands = formatOperands(name, payload, inputRefs, constants, index);
+	const operands = formatOperands(name, payload, inputRefs, constants, index, actionCtx);
 	return { label, operands, badges };
 }
 
@@ -148,6 +221,7 @@ function formatOperands(
 	inputRefs: InputReference[],
 	constants: number[],
 	index: number,
+	actionCtx?: ActionContext,
 ): string {
 	switch (name) {
 		// ── Input ──
@@ -233,14 +307,21 @@ function formatOperands(
 			return `payload[${f(p, "slot_idx")}] ← ${reg(f(p, "src"))}`;
 		case "WriteWorldActionMeta": {
 			const slotIdx = f(p, "slot_idx");
-			return `action[${slotIdx}] ← ${reg(f(p, "src"))}`;
+			const metaCtx = actionCtx?.metaWrites.get(index);
+			const slotLabel = metaCtx?.paramName ?? `action[${slotIdx}]`;
+			return `${slotLabel} ← ${reg(f(p, "src"))}`;
 		}
 		case "PushAction": {
 			const actionIdx = f(p, "action_type");
 			const actionName = ACTION_TYPE_NAMES[actionIdx] ?? `type(${actionIdx})`;
-			const params = ACTION_PARAM_NAMES[actionIdx];
-			if (params && params.length > 0) {
-				return `push ${actionName}(${params.join(", ")})`;
+			const paramNames = ACTION_PARAM_NAMES[actionIdx];
+			const pushCtx = actionCtx?.pushActions.get(index);
+			if (paramNames && paramNames.length > 0) {
+				const parts = paramNames.map((pName, i) => {
+					const src = pushCtx?.paramSources[i];
+					return src ? `${pName}=${src}` : pName;
+				});
+				return `push ${actionName}(${parts.join(", ")})`;
 			}
 			return `push ${actionName}`;
 		}
