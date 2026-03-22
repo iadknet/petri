@@ -9,21 +9,92 @@ export interface ReadableInstruction {
 	badges: RuntimeIoBadge[];
 }
 
+/** Action type index → human-readable name (matches WorldActionKind ordering). */
+const ACTION_TYPE_NAMES = ["NoOp", "Eat", "Move", "Reproduce", "Steal"] as const;
+
 /**
- * Format a VM instruction with human-readable operands.
- * Resolves input ref indices to their names (e.g. "Food.S", "slot[0]")
- * and constant indices to their actual values.
+ * Per-action-type parameter names, indexed by [action_type][slot_idx].
+ * Slot 0 = primary param, slot 1 = secondary param.
+ */
+const ACTION_PARAM_NAMES: readonly (readonly string[])[] = [
+	[], // 0: NoOp — no params
+	["food"], // 1: Eat — food type index
+	["dir"], // 2: Move — direction
+	["dir", "energy"], // 3: Reproduce — direction + energy transfer
+	["dir", "amt"], // 4: StealEnergy — direction + amount
+];
+
+/**
+ * Map raw opcode names to short, readable display labels.
+ * These must fit in the ~13-character label column (w-[5.5rem] at 11px mono).
+ */
+const OPCODE_LABELS: Record<string, string> = {
+	// Data movement
+	ReadInput: "read",
+	LoadConst: "const",
+	Move: "copy",
+	// Arithmetic
+	Add: "add",
+	Sub: "sub",
+	Mul: "mul",
+	Div: "div",
+	Min: "min",
+	Max: "max",
+	// Unary
+	Abs: "abs",
+	Neg: "neg",
+	Clamp01: "clamp",
+	Not: "not",
+	// Comparison
+	CmpGt: "cmp.gt",
+	CmpLt: "cmp.lt",
+	CmpEq: "cmp.eq",
+	// Logic
+	And: "and",
+	Or: "or",
+	// Casts
+	ToI32: "to_i32",
+	ToU8: "to_u8",
+	ToBool: "to_bool",
+	// Control flow
+	JumpIfZero: "branch",
+	Jump: "jump",
+	// Route / payload / action
+	WriteRouteGate: "gate",
+	WriteInternalPayload: "payload",
+	WriteWorldActionMeta: "action",
+	PushAction: "push",
+	SetPriorityBid: "priority",
+	ReadActionQueueLength: "queue",
+	ReadActionQueueType: "queue",
+	ReadActionQueueParam: "queue",
+	// Memory
+	LoadSlot: "load",
+	StoreSlot: "store",
+	LoadSlotImm: "load",
+	StoreSlotImm: "store",
+	LoadSlotPrev: "load prev",
+	ClearSlot: "clear",
+};
+
+/**
+ * Format a VM instruction with human-readable label and operands.
+ * Resolves input ref indices to sensor names, constant indices to values,
+ * and jump offsets to absolute line numbers.
+ *
+ * @param index - The instruction's position in the program (for computing jump targets).
  */
 export function formatReadableInstruction(
 	instruction: VmInstruction,
 	inputRefs: InputReference[],
 	constants: number[],
+	index: number,
 ): ReadableInstruction {
 	const semantics = classifyVmInstruction(instruction);
 	const badges = semantics.badges;
 
 	if (typeof instruction === "string") {
-		return { label: instruction.toLowerCase(), operands: "", badges };
+		return formatStringInstruction(instruction, badges);
 	}
 
 	const [name, rawPayload] = Object.entries(instruction)[0] ?? ["?", {}];
@@ -32,8 +103,28 @@ export function formatReadableInstruction(
 			? (rawPayload as Record<string, number>)
 			: {};
 
-	const operands = formatOperands(name, payload, inputRefs, constants);
-	return { label: name, operands, badges };
+	const label = OPCODE_LABELS[name] ?? name.toLowerCase();
+	const operands = formatOperands(name, payload, inputRefs, constants, index);
+	return { label, operands, badges };
+}
+
+/** Format string-type instructions (Noop, PopAction, ExecuteActionQueue, Halt). */
+function formatStringInstruction(
+	instruction: string,
+	badges: RuntimeIoBadge[],
+): ReadableInstruction {
+	switch (instruction) {
+		case "Noop":
+			return { label: "nop", operands: "", badges };
+		case "PopAction":
+			return { label: "pop", operands: "remove last action", badges };
+		case "ExecuteActionQueue":
+			return { label: "emit", operands: "emit queued actions", badges };
+		case "Halt":
+			return { label: "halt", operands: "", badges };
+		default:
+			return { label: instruction.toLowerCase(), operands: "", badges };
+	}
 }
 
 /** Safe field access — defaults to 0 for missing keys. */
@@ -56,6 +147,7 @@ function formatOperands(
 	p: Record<string, number>,
 	inputRefs: InputReference[],
 	constants: number[],
+	index: number,
 ): string {
 	switch (name) {
 		// ── Input ──
@@ -73,7 +165,7 @@ function formatOperands(
 			return `${reg(f(p, "dst"))} ← ${formatted}`;
 		}
 
-		// ── Move ──
+		// ── Copy (register move) ──
 		case "Move":
 			return `${reg(f(p, "dst"))} ← ${reg(f(p, "src"))}`;
 
@@ -107,7 +199,8 @@ function formatOperands(
 		case "CmpLt":
 			return `${reg(f(p, "dst"))} ← ${reg(f(p, "a"))} < ${reg(f(p, "b"))}`;
 		case "CmpEq":
-			return `${reg(f(p, "dst"))} ← ${reg(f(p, "a"))} ≈ ${reg(f(p, "b"))}`;
+			return `${reg(f(p, "dst"))} ← ${reg(f(p, "a"))} ≈ ${reg(f(p, "b"))} (ε=${reg(f(p, "eps"))})`;
+
 
 		// ── Logic ──
 		case "And":
@@ -123,21 +216,34 @@ function formatOperands(
 		case "ToBool":
 			return `${reg(f(p, "dst"))} ← bool(${reg(f(p, "src"))})`;
 
-		// ── Control flow ──
-		case "JumpIfZero":
-			return `if ${reg(f(p, "cond"))} = 0 → +${f(p, "offset")}`;
-		case "Jump":
-			return `→ +${f(p, "offset")}`;
+		// ── Control flow (absolute jump targets) ──
+		case "JumpIfZero": {
+			const target = index + f(p, "offset");
+			return `if ${reg(f(p, "cond"))} = 0 → line ${target}`;
+		}
+		case "Jump": {
+			const target = index + f(p, "offset");
+			return `→ line ${target}`;
+		}
 
 		// ── Route / payload / action ──
 		case "WriteRouteGate":
 			return `gate[${f(p, "slot")}] ← ${reg(f(p, "src"))}`;
 		case "WriteInternalPayload":
 			return `payload[${f(p, "slot_idx")}] ← ${reg(f(p, "src"))}`;
-		case "WriteWorldActionMeta":
-			return `meta[${f(p, "slot_idx")}] ← ${reg(f(p, "src"))}`;
-		case "PushAction":
-			return `push action(${f(p, "action_type")})`;
+		case "WriteWorldActionMeta": {
+			const slotIdx = f(p, "slot_idx");
+			return `action[${slotIdx}] ← ${reg(f(p, "src"))}`;
+		}
+		case "PushAction": {
+			const actionIdx = f(p, "action_type");
+			const actionName = ACTION_TYPE_NAMES[actionIdx] ?? `type(${actionIdx})`;
+			const params = ACTION_PARAM_NAMES[actionIdx];
+			if (params && params.length > 0) {
+				return `push ${actionName}(${params.join(", ")})`;
+			}
+			return `push ${actionName}`;
+		}
 		case "SetPriorityBid":
 			return `priority ← ${reg(f(p, "src"))}`;
 		case "ReadActionQueueLength":
@@ -147,19 +253,19 @@ function formatOperands(
 		case "ReadActionQueueParam":
 			return `${reg(f(p, "dst"))} ← queue[${reg(f(p, "index_src"))}].p${f(p, "param_slot")}`;
 
-		// ── Memory slots ──
+		// ── Shared memory ──
 		case "LoadSlot":
-			return `${reg(f(p, "dst"))} ← slot[${reg(f(p, "slot_reg"))}]`;
+			return `${reg(f(p, "dst"))} ← mem[${reg(f(p, "slot_reg"))}]`;
 		case "StoreSlot":
-			return `slot[${reg(f(p, "slot_reg"))}] ← ${reg(f(p, "src"))}`;
+			return `mem[${reg(f(p, "slot_reg"))}] ← ${reg(f(p, "src"))}`;
 		case "LoadSlotImm":
-			return `${reg(f(p, "dst"))} ← slot[${f(p, "slot_idx")}]`;
+			return `${reg(f(p, "dst"))} ← mem[${f(p, "slot_idx")}]`;
 		case "StoreSlotImm":
-			return `slot[${f(p, "slot_idx")}] ← ${reg(f(p, "src"))}`;
+			return `mem[${f(p, "slot_idx")}] ← ${reg(f(p, "src"))}`;
 		case "LoadSlotPrev":
-			return `${reg(f(p, "dst"))} ← prev[${f(p, "slot_idx")}]`;
+			return `${reg(f(p, "dst"))} ← prev_mem[${f(p, "slot_idx")}]`;
 		case "ClearSlot":
-			return `clear slot[${f(p, "slot_idx")}]`;
+			return `clear mem[${f(p, "slot_idx")}]`;
 
 		default:
 			return Object.entries(p)

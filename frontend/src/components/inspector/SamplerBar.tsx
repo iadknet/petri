@@ -201,7 +201,7 @@ export const SamplerBar = memo(function SamplerBar({
 			<div className="flex-1" />
 			<button
 				type="button"
-				aria-label="Sample 5 Ticks"
+				aria-label="Sample 10 Ticks"
 				onClick={onSample}
 				disabled={isDead}
 				className={`text-[11px] px-2 py-0.5 rounded transition-colors ${
@@ -210,7 +210,7 @@ export const SamplerBar = memo(function SamplerBar({
 						: "bg-white/[0.06] text-cyan-400 hover:bg-white/[0.1]"
 				}`}
 			>
-				Sample 5 Ticks
+				Sample 10 Ticks
 			</button>
 		</div>
 	);

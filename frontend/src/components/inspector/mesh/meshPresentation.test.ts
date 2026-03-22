@@ -16,7 +16,7 @@ const vmNode: NodeGenome = {
 			register_count: 2,
 			constants: [1, 2],
 			program: [
-				{ ReadInput: { dst: 0, input_idx: 0 } },
+				{ ReadInput: { dst: 0, ref_idx: 0, sub_idx: 0 } },
 				{ StoreSlotImm: { slot_idx: 4, src: 0 } },
 				{ WriteWorldActionMeta: { slot_idx: 0, src: 0 } },
 				{ PushAction: { action_type: 2 } },
@@ -57,7 +57,7 @@ const graphNode: NodeGenome = {
 
 describe("meshPresentation", () => {
 	it("classifies VM instructions and node badges", () => {
-		expect(describeVmInstruction({ ReadInput: { dst: 0, input_idx: 0 } }).badges).toContain(
+		expect(describeVmInstruction({ ReadInput: { dst: 0, ref_idx: 0, sub_idx: 0 } }).badges).toContain(
 			"input",
 		);
 		expect(describeVmInstruction({ StoreSlotImm: { slot_idx: 4, src: 0 } }).badges).toContain(

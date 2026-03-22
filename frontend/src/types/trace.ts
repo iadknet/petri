@@ -134,6 +134,7 @@ export type TerminationReason =
 export type WorldAction =
 	| "NoOp"
 	| "Eat"
+	| { Eat: { type_idx: number } }
 	| { Move: string }
 	| { Reproduce: { direction: string; energy_transfer: number } }
 	| { StealEnergy: { direction: string; amount: number } };

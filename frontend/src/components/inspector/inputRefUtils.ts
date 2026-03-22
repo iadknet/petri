@@ -4,6 +4,13 @@ import type { WorldAction } from "../../types/trace.ts";
 export function formatAction(action: WorldAction | null | undefined): string {
 	if (!action) return "?";
 	if (typeof action === "string") return action;
+	if ("Eat" in action) {
+		const payload = action.Eat;
+		if (typeof payload === "object" && payload && "type_idx" in payload) {
+			return `Eat(food${(payload as { type_idx: number }).type_idx})`;
+		}
+		return "Eat";
+	}
 	if ("Move" in action) return `Move(${action.Move})`;
 	if ("Reproduce" in action) return `Reproduce(${action.Reproduce.direction})`;
 	if ("StealEnergy" in action) return `Steal(${action.StealEnergy.direction})`;
@@ -20,6 +27,18 @@ const RING_LABELS: Record<string, string> = {
 	NeighborFoodRing: "FoodRing",
 	NeighborBarrierRing: "BarrierRing",
 	NeighborOccupiedRing: "OccRing",
+};
+
+/** Display-friendly labels for all world sensor keys. */
+const SENSOR_LABELS: Record<string, string> = {
+	...RING_LABELS,
+	FoodHere: "FoodHere",
+	AreaFoodSummary: "AreaFood",
+	AreaBarrierSummary: "AreaBarrier",
+	AreaOccupancySummary: "AreaOcc",
+	NearbyCreatureCore: "NearbyCore",
+	NearbyCreatureVitals: "NearbyVitals",
+	NearbyCreatureIdentity: "NearbyIdent",
 };
 
 const DIRECTION_NAMES = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"] as const;
@@ -71,7 +90,7 @@ export function formatInputRef(ref: InputReference): string {
 	if (typeof ref === "string") return ref;
 	if ("World" in ref) {
 		const parsed = parseWorldInputRef(ref.World);
-		const base = RING_LABELS[parsed.key] ?? parsed.key;
+		const base = SENSOR_LABELS[parsed.key] ?? parsed.key;
 		if (parsed.typeIdx !== null) {
 			return `${base}[${parsed.typeIdx}]`;
 		}

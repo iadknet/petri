@@ -7,9 +7,11 @@ import type {
 import type { NodeCategory } from "./graphNodeCategories.ts";
 import { categorizeComputeNode } from "./graphNodeCategories.ts";
 import {
+	actionSlotSubtitle,
 	formatActionSlotBehavior,
 	formatOutputSinkKind,
 	getKindLabel,
+	outputSinkSubtitle,
 } from "./graphNodeFormatters.ts";
 import { formatInputRefWithSubIndex } from "./inputRefUtils.ts";
 
@@ -176,14 +178,16 @@ export function buildFullGraphModel(
 		const sink = graphDef.output_sinks[i];
 		if (!sink || sink.inputs.length === 0) continue;
 		const label = formatOutputSinkKind(sink.kind);
+		const subtitle = outputSinkSubtitle(sink.kind);
 		nodes.push({
 			id: `sink:${i}`,
 			nodeType: "output_sink",
 			category: "output_value",
 			label,
+			subtitle,
 			arrayIndex: i,
 			baseWidth: computeBaseWidth(label),
-			height: 24,
+			height: subtitle ? 32 : 24,
 		});
 	}
 
@@ -191,15 +195,16 @@ export function buildFullGraphModel(
 		const slot = graphDef.action_bank[i];
 		if (!slot || (slot.gate_inputs.length === 0 && slot.param_inputs.length === 0)) continue;
 		const behaviorLabel = formatActionSlotBehavior(slot.behavior);
+		const subtitle = actionSlotSubtitle(slot.behavior);
 		nodes.push({
 			id: `act:${i}`,
 			nodeType: "action_slot",
 			category: "output_action",
 			label: `Act: ${behaviorLabel}`,
-			subtitle: `slot ${i}`,
+			subtitle,
 			arrayIndex: i,
 			baseWidth: computeBaseWidth(`Act: ${behaviorLabel}`),
-			height: 24,
+			height: 32,
 		});
 	}
 
@@ -209,9 +214,10 @@ export function buildFullGraphModel(
 			nodeType: "execute_gate",
 			category: "output_gate",
 			label: "Exec Gate",
+			subtitle: "Σ > 0 ∧ queue → emit actions",
 			arrayIndex: 0,
-			baseWidth: computeBaseWidth("Exec Gate"),
-			height: 24,
+			baseWidth: computeBaseWidth("Σ > 0 ∧ queue → emit actions"),
+			height: 32,
 		});
 	}
 

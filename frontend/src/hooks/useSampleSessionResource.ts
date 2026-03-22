@@ -42,7 +42,7 @@ export function useSampleSessionResource() {
 	}, [abortRequests, clearPlayTimer, clearPollTimer]);
 
 	const startSampling = useCallback(
-		async (creatureId: number, ticks = 5) => {
+		async (creatureId: number, ticks = 10) => {
 			sessionVersionRef.current += 1;
 			const sessionVersion = sessionVersionRef.current;
 			abortRequests();

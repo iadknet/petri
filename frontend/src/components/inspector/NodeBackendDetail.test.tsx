@@ -10,7 +10,7 @@ describe("NodeBackendDetail", () => {
 				register_count: 2,
 				constants: [1, 2],
 				program: [
-					{ ReadInput: { dst: 0, input_idx: 0 } },
+					{ ReadInput: { dst: 0, ref_idx: 0, sub_idx: 0 } },
 					{ WriteRouteGate: { slot: 0, src: 0 } },
 					"Halt",
 				],
