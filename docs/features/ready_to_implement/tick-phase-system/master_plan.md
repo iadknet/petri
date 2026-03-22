@@ -37,10 +37,10 @@ status: ready_to_implement
 
 | Area | Decision | Rationale |
 |------|----------|-----------|
-| `tick` ↔ `actions` module | No change | Phase 2 function calls the same action application functions (`apply_move`, `apply_reproduce`, etc.). Module boundary preserved. |
-| `tick` ↔ `outcomes` module | Visibility change | `outcomes` module and `OutcomeAccumulator` struct must become `pub` (from `pub(crate)`) for E0446 compliance. `OutcomeRecord` stays `pub(crate)` (not in any public signature). `OutcomeAccumulator` methods (`snapshot_energy`, `record_action_result`, etc.) stay `pub(crate)` (only called within v3-core). No new coupling — just visibility widening of the struct and module. |
-| `tick` ↔ `runtime` module | No change | Phase 1 calls `execute_creature_mesh` / `execute_creature_mesh_traced` as before. |
-| `tick` ↔ `stats` module | Minor: add `reset_per_tick()` method to `SimStats` | Moves stat reset responsibility to the type that owns the data. Correct ownership direction. |
+| `tick` ↔ `actions` module | keep | Phase 2 function calls the same action application functions (`apply_move`, `apply_reproduce`, etc.). Module boundary preserved. |
+| `tick` ↔ `outcomes` module | change | `outcomes` module and `OutcomeAccumulator` struct must become `pub` (from `pub(crate)`) for E0446 compliance. `OutcomeRecord` stays `pub(crate)` (not in any public signature). `OutcomeAccumulator` methods (`snapshot_energy`, `record_action_result`, etc.) stay `pub(crate)` (only called within v3-core). No new coupling — just visibility widening of the struct and module. |
+| `tick` ↔ `runtime` module | keep | Phase 1 calls `execute_creature_mesh` / `execute_creature_mesh_traced` as before. |
+| `tick` ↔ `stats` module | change | Add `reset_per_tick()` method to `SimStats`. Moves stat reset responsibility to the type that owns the data. Correct ownership direction. |
 
 ## Open Questions
 
