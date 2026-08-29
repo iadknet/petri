@@ -4,8 +4,10 @@ This directory contains the local end-to-end suite for the frontend using `agent
 
 ## Run
 
+From the repository root:
+
 ```bash
-cd /Users/istefanek/claude-evolution-game/frontend
+cd frontend
 npm run test:e2e
 ```
 
@@ -24,7 +26,7 @@ npm run test:e2e -- --headed
 ## What the runner does
 
 1. Chooses free backend/frontend ports (or respects `E2E_BACKEND_PORT` / `E2E_FRONTEND_PORT`).
-2. Starts `/Users/istefanek/claude-evolution-game/scripts/dev.sh` with those ports.
+2. Starts `scripts/dev.sh` from the repository root with those ports.
 3. Waits for backend and frontend readiness.
 4. Runs scenarios sequentially with isolated `agent-browser --session` names.
 5. Stops all processes even on failure.

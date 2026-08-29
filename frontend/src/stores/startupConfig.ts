@@ -59,14 +59,7 @@ function randomSeed(): number {
 	return Math.floor(Math.random() * 2 ** 32);
 }
 
-const FOOD_TYPE_COLORS = [
-	"#22c55e",
-	"#38bdf8",
-	"#f97316",
-	"#e879f9",
-	"#facc15",
-	"#2dd4bf",
-];
+const FOOD_TYPE_COLORS = ["#22c55e", "#38bdf8", "#f97316", "#e879f9", "#facc15", "#2dd4bf"];
 
 function createFoodType(index: number): FoodTypeConfig {
 	return {
@@ -355,10 +348,7 @@ function fromServerConfig(config: SimulationConfig): StartupPreset {
 	};
 }
 
-function withFoodPreset(
-	preset: StartupPreset,
-	food: StartupFoodConfig,
-): StartupPreset {
+function withFoodPreset(preset: StartupPreset, food: StartupFoodConfig): StartupPreset {
 	return {
 		...preset,
 		world: {

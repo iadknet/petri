@@ -33,7 +33,10 @@ const edgeTypes = {
 };
 
 /** Compute which target node ID was selected given a route value and targets array. */
-export function resolveSelectedTarget(routeTargetIdx: number, targets: RouteTarget[]): number | null {
+export function resolveSelectedTarget(
+	routeTargetIdx: number,
+	targets: RouteTarget[],
+): number | null {
 	if (targets.length === 0) return null;
 	if (routeTargetIdx < 0 || routeTargetIdx >= targets.length) return null;
 	return targets[routeTargetIdx]?.target_id ?? null;

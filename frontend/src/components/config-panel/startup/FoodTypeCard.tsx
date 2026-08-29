@@ -42,7 +42,13 @@ function TextControl({
 	);
 }
 
-export function FoodTypeCard({ index, foodType, canRemove, onRemove, onChange }: FoodTypeCardProps) {
+export function FoodTypeCard({
+	index,
+	foodType,
+	canRemove,
+	onRemove,
+	onChange,
+}: FoodTypeCardProps) {
 	const densityField: FieldDef = {
 		path: `world.food.types.${index}.initial_density`,
 		label: "Initial Density",
@@ -68,8 +74,7 @@ export function FoodTypeCard({ index, foodType, canRemove, onRemove, onChange }:
 		max: 1,
 		step: 0.01,
 		defaultValue: 0.2,
-		tooltip:
-			"How strongly this type suppresses other food growth in occupied cells",
+		tooltip: "How strongly this type suppresses other food growth in occupied cells",
 	};
 
 	return (

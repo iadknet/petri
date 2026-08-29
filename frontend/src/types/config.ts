@@ -32,9 +32,7 @@ export interface FertilityConfig {
 	layers: FertilityLayer[];
 }
 
-export type FoodFertilityLayerTarget =
-	| "AllFoods"
-	| { SingleType: { type_idx: number } };
+export type FoodFertilityLayerTarget = "AllFoods" | { SingleType: { type_idx: number } };
 
 export interface FoodSharedConfig {
 	growth_rate: number;

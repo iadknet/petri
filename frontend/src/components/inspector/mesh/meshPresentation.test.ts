@@ -57,14 +57,16 @@ const graphNode: NodeGenome = {
 
 describe("meshPresentation", () => {
 	it("classifies VM instructions and node badges", () => {
-		expect(describeVmInstruction({ ReadInput: { dst: 0, ref_idx: 0, sub_idx: 0 } }).badges).toContain(
-			"input",
-		);
+		expect(
+			describeVmInstruction({ ReadInput: { dst: 0, ref_idx: 0, sub_idx: 0 } }).badges,
+		).toContain("input");
 		expect(describeVmInstruction({ StoreSlotImm: { slot_idx: 4, src: 0 } }).badges).toContain(
 			"slot",
 		);
 		expect(describeVmInstruction({ PushAction: { action_type: 2 } }).badges).toContain("action");
-		expect(describeVmInstruction({ WriteRouteGate: { slot: 0, src: 0 } }).badges).toContain("route");
+		expect(describeVmInstruction({ WriteRouteGate: { slot: 0, src: 0 } }).badges).toContain(
+			"route",
+		);
 		expect(collectNodeBadges(vmNode)).toEqual(
 			expect.arrayContaining(["action", "input", "slot", "route"]),
 		);

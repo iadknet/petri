@@ -5,7 +5,7 @@ Frontend-specific instructions for coding agents working in `frontend/`.
 ## Scope
 
 - This file applies to all files under `frontend/`.
-- Follow root policies in `/Users/istefanek/claude-evolution-game/AGENTS.md` first; this file adds frontend-specific constraints.
+- Follow root policies in [`../AGENTS.md`](../AGENTS.md) first; this file adds frontend-specific constraints.
 
 ## Mission
 
@@ -58,9 +58,11 @@ Use `agent-browser` for frontend e2e or flow validation work.
 
 Canonical local e2e entrypoints:
 
-1. `cd /Users/istefanek/claude-evolution-game/frontend && npm run test:e2e`
-2. `cd /Users/istefanek/claude-evolution-game/frontend && npm run test:e2e -- --scenario E2E-03`
-3. `cd /Users/istefanek/claude-evolution-game/frontend && npm run test:e2e -- --headed`
+Run these from the repository root:
+
+1. `cd frontend && npm run test:e2e`
+2. `cd frontend && npm run test:e2e -- --scenario E2E-03`
+3. `cd frontend && npm run test:e2e -- --headed`
 
 Recommended loop:
 

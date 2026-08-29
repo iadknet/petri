@@ -191,9 +191,9 @@ describe("ControlBar", () => {
 			world: {
 				width: 512,
 				height: 384,
-					edge_mode: "Wrap",
-					food: {
-						shared: { ...MOCK_CONFIG.world.food.shared },
+				edge_mode: "Wrap",
+				food: {
+					shared: { ...MOCK_CONFIG.world.food.shared },
 					types: [
 						{
 							name: "Primary Food",
@@ -321,9 +321,9 @@ describe("ControlBar", () => {
 			world: {
 				width: 512,
 				height: 384,
-					edge_mode: "Wrap",
-					food: {
-						shared: { ...MOCK_CONFIG.world.food.shared },
+				edge_mode: "Wrap",
+				food: {
+					shared: { ...MOCK_CONFIG.world.food.shared },
 					types: [
 						{
 							name: "Primary Food",

@@ -96,9 +96,7 @@ export const VmExecutionView = memo(function VmExecutionView({
 					<div>
 						<span className="text-slate-600">meta:</span>{" "}
 						{trace.final_meta.length > 0
-							? trace.final_meta
-									.map((value, idx) => formatMetaSlot(idx, value))
-									.join(" ")
+							? trace.final_meta.map((value, idx) => formatMetaSlot(idx, value)).join(" ")
 							: "—"}
 					</div>
 				</div>

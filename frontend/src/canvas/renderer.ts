@@ -103,7 +103,9 @@ function shadeFoodRgb(
 	];
 }
 
-function buildFoodTypeColorMap(foodTypes: FoodTypeMetadata[]): Map<number, [number, number, number]> {
+function buildFoodTypeColorMap(
+	foodTypes: FoodTypeMetadata[],
+): Map<number, [number, number, number]> {
 	return new Map(foodTypes.map((foodType) => [foodType.type_idx, parseHexColor(foodType.color)]));
 }
 
@@ -465,7 +467,12 @@ export class WorldRenderer {
 		for (const cell of overview.food) {
 			const bucketX = cell.bucket_x;
 			const bucketY = cell.bucket_y;
-			if (bucketX < 0 || bucketY < 0 || bucketX >= overview.gridWidth || bucketY >= overview.gridHeight) {
+			if (
+				bucketX < 0 ||
+				bucketY < 0 ||
+				bucketX >= overview.gridWidth ||
+				bucketY >= overview.gridHeight
+			) {
 				continue;
 			}
 			const density = Math.max(0, cell.density);
@@ -676,8 +683,8 @@ export class WorldRenderer {
 		const { ctx } = this;
 		const { x: cx, y: cy, zoom } = camera;
 		const { worldGrid, worldWidth, worldHeight } = overlay;
-		const viewportStartX = Math.max(0, Math.floor((-cx) / zoom));
-		const viewportStartY = Math.max(0, Math.floor((-cy) / zoom));
+		const viewportStartX = Math.max(0, Math.floor(-cx / zoom));
+		const viewportStartY = Math.max(0, Math.floor(-cy / zoom));
 		const viewportEndX = Math.min(worldWidth, Math.ceil((this.canvas.width - cx) / zoom));
 		const viewportEndY = Math.min(worldHeight, Math.ceil((this.canvas.height - cy) / zoom));
 		if (viewportStartX >= viewportEndX || viewportStartY >= viewportEndY) {

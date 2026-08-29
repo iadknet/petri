@@ -104,7 +104,11 @@ export function formatInputRef(ref: InputReference): string {
 
 export function formatInputRefWithSubIndex(ref: InputReference, subIdx: number): string {
 	const label = formatInputRef(ref);
-	if (typeof ref !== "string" && "World" in ref && isRingSensor(parseWorldInputRef(ref.World).key)) {
+	if (
+		typeof ref !== "string" &&
+		"World" in ref &&
+		isRingSensor(parseWorldInputRef(ref.World).key)
+	) {
 		return `${label}[${directionName(subIdx)}]`;
 	}
 	return subIdx > 0 ? `${label}[${subIdx}]` : label;
