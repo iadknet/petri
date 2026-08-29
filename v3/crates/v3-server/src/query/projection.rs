@@ -226,8 +226,10 @@ mod tests {
                 move_actions_blocked_total_by_cause: Default::default(),
                 move_actions_blocked_avoidable_total_by_reader_state: Default::default(),
                 move_attempts_with_barrier_neighbor_total_by_reader_state: Default::default(),
-                move_blocked_barrier_with_barrier_neighbor_total_by_reader_state: Default::default(),
-                reproduction_attempts_with_barrier_neighbor_total_by_reader_state: Default::default(),
+                move_blocked_barrier_with_barrier_neighbor_total_by_reader_state: Default::default(
+                ),
+                reproduction_attempts_with_barrier_neighbor_total_by_reader_state: Default::default(
+                ),
                 reproduction_invalid_target_barrier_with_barrier_neighbor_total_by_reader_state:
                     Default::default(),
                 predation_actions_attempted_total: 0,

@@ -112,14 +112,15 @@ fn add_node_can_birth_non_default_food_input_refs_for_multi_food_runs() {
         .expect("AddNode should apply");
 
         let newborn = genome.nodes.last().expect("newborn node must exist");
-        let newborn_has_non_default_food = newborn.input_refs.iter().any(|input_ref| match input_ref {
-            InputReference::World(WorldInputKey::FoodHere { type_idx })
-            | InputReference::World(WorldInputKey::NeighborFoodRing { type_idx })
-            | InputReference::World(WorldInputKey::AreaFoodSummary { type_idx }) => {
-                *type_idx != crate::config::OrdinaryFoodTypeId::default()
-            }
-            _ => false,
-        });
+        let newborn_has_non_default_food =
+            newborn.input_refs.iter().any(|input_ref| match input_ref {
+                InputReference::World(WorldInputKey::FoodHere { type_idx })
+                | InputReference::World(WorldInputKey::NeighborFoodRing { type_idx })
+                | InputReference::World(WorldInputKey::AreaFoodSummary { type_idx }) => {
+                    *type_idx != crate::config::OrdinaryFoodTypeId::default()
+                }
+                _ => false,
+            });
         if newborn_has_non_default_food {
             saw_non_default = true;
             break;

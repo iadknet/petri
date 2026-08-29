@@ -55,8 +55,8 @@ pub(super) fn apply_add_route_target(
         .collect();
     let (node_idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let slot = lowest_unused_slot(&genome.nodes[node_idx].targets)
-        .expect("pre-filtered for free slots");
+    let slot =
+        lowest_unused_slot(&genome.nodes[node_idx].targets).expect("pre-filtered for free slots");
     let target_id = genome.nodes[rng.gen_range(0..genome.nodes.len())].node_id;
     genome.nodes[node_idx].targets.push(RouteTarget {
         target_id,
