@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+case "${1:-}" in
+  -s)
+    printf 'Linux\n'
+    ;;
+  -m)
+    printf 'riscv64\n'
+    ;;
+  *)
+    exit 2
+    ;;
+esac
