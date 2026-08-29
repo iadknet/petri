@@ -11,14 +11,27 @@ describe("NodeConnections", () => {
 	it("renders input refs as comma-separated list", () => {
 		const inputRefs: InputReference[] = [{ World: "FoodHere" }, { UpstreamSlot: 0 }];
 
-		render(<NodeConnections inputRefs={inputRefs} targets={[{ target_id: 2, slot: 0, gate_bias: 0.0 }]} />);
+		render(
+			<NodeConnections
+				inputRefs={inputRefs}
+				targets={[{ target_id: 2, slot: 0, gate_bias: 0.0 }]}
+			/>,
+		);
 
 		const text = `${JSON.stringify({ World: "FoodHere" })}, ${JSON.stringify({ UpstreamSlot: 0 })}`;
 		expect(screen.getByText(text)).toBeInTheDocument();
 	});
 
 	it("renders target node IDs", () => {
-		render(<NodeConnections inputRefs={[]} targets={[{ target_id: 2, slot: 0, gate_bias: 0.0 }, { target_id: 4, slot: 1, gate_bias: 0.0 }]} />);
+		render(
+			<NodeConnections
+				inputRefs={[]}
+				targets={[
+					{ target_id: 2, slot: 0, gate_bias: 0.0 },
+					{ target_id: 4, slot: 1, gate_bias: 0.0 },
+				]}
+			/>,
+		);
 
 		expect(screen.getByText("#2, #4")).toBeInTheDocument();
 	});

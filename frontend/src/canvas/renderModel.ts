@@ -1,7 +1,7 @@
 import type {
 	ByteArrayLike,
-	Frame,
 	FoodTypeMetadata,
+	Frame,
 	OverviewFoodCellPayload,
 	PredationEvent,
 	ViewOverviewPayload,

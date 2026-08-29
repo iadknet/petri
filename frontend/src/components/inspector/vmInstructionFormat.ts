@@ -172,9 +172,7 @@ export function formatReadableInstruction(
 
 	const [name, rawPayload] = Object.entries(instruction)[0] ?? ["?", {}];
 	const payload =
-		rawPayload && typeof rawPayload === "object"
-			? (rawPayload as Record<string, number>)
-			: {};
+		rawPayload && typeof rawPayload === "object" ? (rawPayload as Record<string, number>) : {};
 
 	const label = OPCODE_LABELS[name] ?? name.toLowerCase();
 	const operands = formatOperands(name, payload, inputRefs, constants, index, actionCtx);
@@ -274,7 +272,6 @@ function formatOperands(
 			return `${reg(f(p, "dst"))} ← ${reg(f(p, "a"))} < ${reg(f(p, "b"))}`;
 		case "CmpEq":
 			return `${reg(f(p, "dst"))} ← ${reg(f(p, "a"))} ≈ ${reg(f(p, "b"))} (ε=${reg(f(p, "eps"))})`;
-
 
 		// ── Logic ──
 		case "And":

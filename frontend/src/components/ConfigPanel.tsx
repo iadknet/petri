@@ -28,9 +28,7 @@ export function ConfigPanel() {
 	const removeFoodType = useStartupConfigStore((s) => s.removeFoodType);
 	const updateFoodType = useStartupConfigStore((s) => s.updateFoodType);
 	const addFertilityLayer = useStartupConfigStore((s) => s.addFertilityLayer);
-	const updateFertilityLayerTarget = useStartupConfigStore(
-		(s) => s.updateFertilityLayerTarget,
-	);
+	const updateFertilityLayerTarget = useStartupConfigStore((s) => s.updateFertilityLayerTarget);
 	const randomizeSeed = useStartupConfigStore((s) => s.randomizeSeed);
 
 	const [error, setError] = useState<string | null>(null);

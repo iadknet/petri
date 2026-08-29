@@ -109,7 +109,8 @@ const POISSON_TOOLTIPS = {
 	minRadius: "Smallest island size allowed.",
 	maxRadius: "Largest island size allowed.",
 	falloff: "How softly each island fades at the edges. Higher means gentler blending.",
-	useSeed: "Turn this on to lock island placement so it repeats exactly when you use the same seed.",
+	useSeed:
+		"Turn this on to lock island placement so it repeats exactly when you use the same seed.",
 	seed: "A number that picks island placement. Same seed gives the same island layout.",
 } as const;
 
@@ -183,7 +184,10 @@ interface LayerFieldProps {
 function LayerField({ label, testId, value, onChange, tooltip, min, max, step }: LayerFieldProps) {
 	return (
 		<div className="flex items-center justify-between gap-2 py-0.5 pl-2">
-			<label htmlFor={`${testId}-input`} className="flex items-center gap-1 text-[11px] text-slate-400">
+			<label
+				htmlFor={`${testId}-input`}
+				className="flex items-center gap-1 text-[11px] text-slate-400"
+			>
 				{label}
 				{tooltip && (
 					<Tooltip text={tooltip}>
@@ -300,7 +304,10 @@ export function FertilitySection({
 							const poisson =
 								"PoissonBlobs" in layer.algorithm ? layer.algorithm.PoissonBlobs : null;
 							return (
-								<div key={`fertility-layer-${index}`} className="border border-slate-800 rounded p-2 bg-slate-900/40">
+								<div
+									key={`fertility-layer-${index}`}
+									className="border border-slate-800 rounded p-2 bg-slate-900/40"
+								>
 									<div className="flex items-center justify-between gap-2">
 										<p className="text-[11px] uppercase tracking-wide text-slate-400">
 											Layer {index + 1}
@@ -312,37 +319,40 @@ export function FertilitySection({
 											className="px-2 py-0.5 text-[11px] text-rose-200 bg-rose-900/30 hover:bg-rose-900/50 rounded"
 										>
 											Remove
-								</button>
-							</div>
+										</button>
+									</div>
 
-							<div className="mt-2 flex items-center justify-between gap-2">
-								<label
-									htmlFor={`${baseTestId}-target-input`}
-									className="text-[11px] text-slate-400"
-								>
-									Target
-								</label>
-								<select
-									id={`${baseTestId}-target-input`}
-									data-testid={`${baseTestId}-target`}
-									value={targetValue(layer.target)}
-									onChange={(e) =>
-										updateFertilityLayerTarget(index, parseTarget(e.target.value))
-									}
-									className="px-1.5 py-0.5 text-xs bg-slate-800 border border-slate-700 rounded text-slate-200"
-								>
-									<option value="all_foods">All Foods</option>
-									{startupPreset.world.food.types.map((foodType, typeIndex) => (
-										<option key={`${baseTestId}-target-${typeIndex}`} value={`single_type:${typeIndex}`}>
-											{`Type ${typeIndex + 1}: ${foodType.name}`}
-										</option>
-									))}
-								</select>
-							</div>
+									<div className="mt-2 flex items-center justify-between gap-2">
+										<label
+											htmlFor={`${baseTestId}-target-input`}
+											className="text-[11px] text-slate-400"
+										>
+											Target
+										</label>
+										<select
+											id={`${baseTestId}-target-input`}
+											data-testid={`${baseTestId}-target`}
+											value={targetValue(layer.target)}
+											onChange={(e) =>
+												updateFertilityLayerTarget(index, parseTarget(e.target.value))
+											}
+											className="px-1.5 py-0.5 text-xs bg-slate-800 border border-slate-700 rounded text-slate-200"
+										>
+											<option value="all_foods">All Foods</option>
+											{startupPreset.world.food.types.map((foodType, typeIndex) => (
+												<option
+													key={`${baseTestId}-target-${typeIndex}`}
+													value={`single_type:${typeIndex}`}
+												>
+													{`Type ${typeIndex + 1}: ${foodType.name}`}
+												</option>
+											))}
+										</select>
+									</div>
 
-							<div className="mt-2 flex items-center justify-between gap-2">
-								<label
-									htmlFor={`${baseTestId}-algorithm-input`}
+									<div className="mt-2 flex items-center justify-between gap-2">
+										<label
+											htmlFor={`${baseTestId}-algorithm-input`}
 											className="text-[11px] text-slate-400"
 										>
 											Algorithm
@@ -473,9 +483,7 @@ export function FertilitySection({
 												>
 													Use Seed
 													<Tooltip text={FBM_TOOLTIPS.useSeed}>
-														<span className="text-slate-500 cursor-help text-[10px]">
-															&#x24D8;
-														</span>
+														<span className="text-slate-500 cursor-help text-[10px]">&#x24D8;</span>
 													</Tooltip>
 												</label>
 												<input
@@ -617,9 +625,7 @@ export function FertilitySection({
 												>
 													Use Seed
 													<Tooltip text={POISSON_TOOLTIPS.useSeed}>
-														<span className="text-slate-500 cursor-help text-[10px]">
-															&#x24D8;
-														</span>
+														<span className="text-slate-500 cursor-help text-[10px]">&#x24D8;</span>
 													</Tooltip>
 												</label>
 												<input

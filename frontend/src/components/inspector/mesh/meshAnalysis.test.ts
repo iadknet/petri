@@ -117,7 +117,10 @@ describe("analyzeMesh", () => {
 
 		genome.nodes[1] = {
 			...duplicatedNode,
-			targets: [{ target_id: 3, slot: 0, gate_bias: 0.0 }, { target_id: 3, slot: 1, gate_bias: 0.0 }],
+			targets: [
+				{ target_id: 3, slot: 0, gate_bias: 0.0 },
+				{ target_id: 3, slot: 1, gate_bias: 0.0 },
+			],
 		};
 
 		const analysis = analyzeMesh(genome);

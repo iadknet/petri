@@ -200,9 +200,7 @@ describe("StartupConfigStore", () => {
 		const store = useStartupConfigStore.getState();
 		store.addFoodType();
 
-		expect(useStartupConfigStore.getState().preset.world.food.types[1]!.growth_inhibitor).toBe(
-			0.2,
-		);
+		expect(useStartupConfigStore.getState().preset.world.food.types[1]!.growth_inhibitor).toBe(0.2);
 
 		store.updatePreset("world.food.types.0.growth_inhibitor", 4);
 		store.updatePreset("world.food.types.1.growth_inhibitor", -0.5);

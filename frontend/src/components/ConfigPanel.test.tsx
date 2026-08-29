@@ -320,21 +320,11 @@ describe("ConfigPanel", () => {
 		expect(
 			screen.getByText(/detail layers are stacked together for richer texture/i),
 		).toBeInTheDocument();
-		expect(
-			screen.getByText(/how zoomed in the pattern is/i),
-		).toBeInTheDocument();
-		expect(
-			screen.getByText(/how much smaller each next detail layer gets/i),
-		).toBeInTheDocument();
-		expect(
-			screen.getByText(/how strong those smaller detail layers stay/i),
-		).toBeInTheDocument();
-		expect(
-			screen.getByText(/lock the random pattern so it repeats exactly/i),
-		).toBeInTheDocument();
-		expect(
-			screen.getByText(/same seed gives the same pattern/i),
-		).toBeInTheDocument();
+		expect(screen.getByText(/how zoomed in the pattern is/i)).toBeInTheDocument();
+		expect(screen.getByText(/how much smaller each next detail layer gets/i)).toBeInTheDocument();
+		expect(screen.getByText(/how strong those smaller detail layers stay/i)).toBeInTheDocument();
+		expect(screen.getByText(/lock the random pattern so it repeats exactly/i)).toBeInTheDocument();
+		expect(screen.getByText(/same seed gives the same pattern/i)).toBeInTheDocument();
 	});
 
 	it("shows ELI5 tooltips for Uniform and Poisson fertility controls", () => {
@@ -344,20 +334,26 @@ describe("ConfigPanel", () => {
 		fireEvent.change(screen.getByTestId("startup-field-fertility-layer-0-algorithm"), {
 			target: { value: "Uniform" },
 		});
-		expect(
-			screen.getByText(/single flat fertility value everywhere/i),
-		).toBeInTheDocument();
+		expect(screen.getByText(/single flat fertility value everywhere/i)).toBeInTheDocument();
 
 		fireEvent.change(screen.getByTestId("startup-field-fertility-layer-0-algorithm"), {
 			target: { value: "PoissonBlobs" },
 		});
 		fireEvent.click(screen.getByTestId("startup-field-fertility-layer-0-poisson-seed-enabled"));
 
-		expect(screen.getAllByText(/how many fertility islands to drop on the map/i).length).toBeGreaterThan(0);
+		expect(
+			screen.getAllByText(/how many fertility islands to drop on the map/i).length,
+		).toBeGreaterThan(0);
 		expect(screen.getAllByText(/smallest island size allowed/i).length).toBeGreaterThan(0);
 		expect(screen.getAllByText(/largest island size allowed/i).length).toBeGreaterThan(0);
-		expect(screen.getAllByText(/how softly each island fades at the edges/i).length).toBeGreaterThan(0);
-		expect(screen.getAllByText(/lock island placement so it repeats exactly/i).length).toBeGreaterThan(0);
-		expect(screen.getAllByText(/same seed gives the same island layout/i).length).toBeGreaterThan(0);
+		expect(
+			screen.getAllByText(/how softly each island fades at the edges/i).length,
+		).toBeGreaterThan(0);
+		expect(
+			screen.getAllByText(/lock island placement so it repeats exactly/i).length,
+		).toBeGreaterThan(0);
+		expect(screen.getAllByText(/same seed gives the same island layout/i).length).toBeGreaterThan(
+			0,
+		);
 	});
 });

@@ -15,7 +15,10 @@ function makeGenome(): CreatureGenome {
 			{
 				node_id: 1,
 				input_refs: [{ World: "FoodHere" }],
-				targets: [{ target_id: 2, slot: 0, gate_bias: 0.0 }, { target_id: 4, slot: 1, gate_bias: 0.0 }],
+				targets: [
+					{ target_id: 2, slot: 0, gate_bias: 0.0 },
+					{ target_id: 4, slot: 1, gate_bias: 0.0 },
+				],
 				backend_def: {
 					Vm: {
 						register_count: 2,

@@ -102,7 +102,9 @@ export function analyzeMesh(genome: CreatureGenome): MeshAnalysis {
 		const incomingIds =
 			incomingMap.get(node.node_id)?.toSorted((left, right) => left - right) ?? [];
 		analyzedNode.incomingIds = incomingIds;
-		analyzedNode.outgoingIds = node.targets.map((t) => t.target_id).toSorted((left, right) => left - right);
+		analyzedNode.outgoingIds = node.targets
+			.map((t) => t.target_id)
+			.toSorted((left, right) => left - right);
 		return analyzedNode;
 	});
 
@@ -190,7 +192,11 @@ function collectReachableNodeIds(genome: CreatureGenome): Set<number> {
 function buildTopologyKey(nodes: NodeGenome[]): string {
 	return nodes
 		.map(
-			(node) => `${node.node_id}:${node.targets.map((t) => t.target_id).toSorted((left, right) => left - right).join(",")}`,
+			(node) =>
+				`${node.node_id}:${node.targets
+					.map((t) => t.target_id)
+					.toSorted((left, right) => left - right)
+					.join(",")}`,
 		)
 		.join("|");
 }

@@ -49,7 +49,13 @@ export function NodeBackendDetail({
 				</div>
 				<div className="space-y-px overflow-y-auto">
 					{vm.program.map((instruction, index) => {
-						const readable = formatReadableInstruction(instruction, inputRefs, vm.constants, index, actionCtx);
+						const readable = formatReadableInstruction(
+							instruction,
+							inputRefs,
+							vm.constants,
+							index,
+							actionCtx,
+						);
 						const isLive = liveSet.has(index);
 
 						// Execution state overlay

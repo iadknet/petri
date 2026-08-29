@@ -65,10 +65,7 @@ function buildLegacyFrame(
 	worldStatic: WorldStaticPayload | null,
 	view: StoredView | null,
 ): Frame | null {
-	return buildFrameFromTransport(
-		worldStatic,
-		view?.kind === "detail" ? view.payload : null,
-	);
+	return buildFrameFromTransport(worldStatic, view?.kind === "detail" ? view.payload : null);
 }
 
 function applyViewUpdate(state: WorldViewState, nextView: StoredView): Partial<WorldViewState> {

@@ -21,7 +21,9 @@ export function FoodTypesSection({
 	return (
 		<FieldGroup title="Food Types">
 			<div className="flex items-center justify-between gap-2 px-1 pb-1">
-				<p className="text-[11px] text-slate-500">List order defines `type_idx` for sensors and fertility targets.</p>
+				<p className="text-[11px] text-slate-500">
+					List order defines `type_idx` for sensors and fertility targets.
+				</p>
 				<button
 					type="button"
 					data-testid="startup-food-type-add"

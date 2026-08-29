@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { foodOpacity, MAX_FOOD_ALPHA, parseHexColor } from "./renderer.ts";
+import { MAX_FOOD_ALPHA, foodOpacity, parseHexColor } from "./renderer.ts";
 
 describe("renderer food compositing helpers", () => {
 	it("caps food opacity at configured max alpha", () => {
