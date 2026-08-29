@@ -67,7 +67,7 @@ is_allowed_workspace_dep() {
 
 check_workspace_dependency_direction() {
   local manifest
-  for manifest in v3/crates/*/Cargo.toml; do
+  for manifest in crates/*/Cargo.toml; do
     [[ -f "$manifest" ]] || continue
 
     local from_crate
@@ -89,7 +89,7 @@ check_workspace_dependency_direction() {
 }
 
 check_forbidden_runtime_deps_manifest() {
-  local manifest="v3/crates/v3-core/Cargo.toml"
+  local manifest="crates/v3-core/Cargo.toml"
   [[ -f "$manifest" ]] || return
 
   local dep
@@ -105,13 +105,13 @@ check_forbidden_runtime_imports_source() {
     [[ -z "$hit" ]] && continue
     report_violation "forbidden runtime import in pure crate source: ${hit}"
   done < <(
-    rg -n --glob '*.rs' '\b(axum|tokio|hyper|tower_http)::' v3/crates/v3-core/src 2>/dev/null || true
+    rg -n --glob '*.rs' '\b(axum|tokio|hyper|tower_http)::' crates/v3-core/src 2>/dev/null || true
   )
 }
 
 check_lib_rs_export_focus() {
   local lib_file
-  for lib_file in v3/crates/*/src/lib.rs; do
+  for lib_file in crates/*/src/lib.rs; do
     [[ -f "$lib_file" ]] || continue
 
     while IFS= read -r hit; do
@@ -144,7 +144,7 @@ check_production_file_sizes() {
     elif (( line_count > 400 )); then
       report_warning "production file exceeds 400 lines: ${source_file} (${line_count} lines)"
     fi
-  done < <(find v3/crates -type f -path '*/src/*' -name '*.rs' | sort)
+  done < <(find crates -type f -path '*/src/*' -name '*.rs' | sort)
 }
 
 check_workspace_dependency_direction

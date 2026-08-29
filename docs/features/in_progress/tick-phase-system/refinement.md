@@ -8,7 +8,7 @@ status: needs-review
 
 ## Problem Statement
 
-The simulation tick loop lives in a monolithic `run_tick` function (~523 lines) in `v3/crates/v3-core/src/simulation/tick.rs`. It executes 5 phases in sequence:
+The simulation tick loop lives in a monolithic `run_tick` function (~523 lines) in `crates/v3-core/src/simulation/tick.rs`. It executes 5 phases in sequence:
 
 - **Phase 0** — Creature evaluation: runs each creature's genome (VM + graph), producing action queues. Already extracted to `run_phase_0`.
 - **Phase 0.5** — Queue building: collects and sorts creature actions into priority-ordered queues per action type.

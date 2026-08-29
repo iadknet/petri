@@ -15,13 +15,13 @@ system but still uses stub/default routing behavior.
 ### Task 1: Create `contracts/routing.rs`
 
 **Files:**
-- Create: `v3/crates/v3-core/src/contracts/routing.rs`
-- Modify: `v3/crates/v3-core/src/contracts/mod.rs`
+- Create: `crates/v3-core/src/contracts/routing.rs`
+- Modify: `crates/v3-core/src/contracts/mod.rs`
 
 - [ ] **Step 1: Create `routing.rs` with types**
 
 ```rust
-// v3/crates/v3-core/src/contracts/routing.rs
+// crates/v3-core/src/contracts/routing.rs
 
 use super::NodeId;
 
@@ -73,13 +73,13 @@ mod tests {
 
 - [ ] **Step 5: Run test**
 
-Run: `cd v3 && cargo test -p v3-core contracts::routing`
+Run: `cargo test -p v3-core contracts::routing`
 Expected: PASS
 
 - [ ] **Step 6: Commit**
 
 ```
-git add v3/crates/v3-core/src/contracts/routing.rs v3/crates/v3-core/src/contracts/mod.rs
+git add crates/v3-core/src/contracts/routing.rs crates/v3-core/src/contracts/mod.rs
 git commit -m "feat: add RouteTarget and MAX_GATE_SLOTS to contracts"
 ```
 
@@ -88,9 +88,9 @@ git commit -m "feat: add RouteTarget and MAX_GATE_SLOTS to contracts"
 ### Task 2: Split `mutation/topology/mod.rs`
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/mutation/topology/mod.rs` (keep enum + dispatch only)
-- Create: `v3/crates/v3-core/src/mutation/topology/structural.rs`
-- Create: `v3/crates/v3-core/src/mutation/topology/routing.rs`
+- Modify: `crates/v3-core/src/mutation/topology/mod.rs` (keep enum + dispatch only)
+- Create: `crates/v3-core/src/mutation/topology/structural.rs`
+- Create: `crates/v3-core/src/mutation/topology/routing.rs`
 
 This is a pure refactor — no behavior change. Move function implementations to
 the new files. The `TopologyOperator` enum and `TopologyMutator::apply` dispatch
@@ -136,18 +136,18 @@ Remove moved functions from `mod.rs`. Keep the `TopologyOperator` enum,
 
 - [ ] **Step 4: Run all topology tests**
 
-Run: `cd v3 && cargo test -p v3-core mutation::topology`
+Run: `cargo test -p v3-core mutation::topology`
 Expected: All existing tests PASS (pure refactor, no behavior change)
 
 - [ ] **Step 5: Run full test suite to confirm no regressions**
 
-Run: `cd v3 && cargo test --workspace`
+Run: `cargo test --workspace`
 Expected: All tests PASS
 
 - [ ] **Step 6: Commit**
 
 ```
-git add v3/crates/v3-core/src/mutation/topology/
+git add crates/v3-core/src/mutation/topology/
 git commit -m "refactor: split topology mutations into structural.rs + routing.rs"
 ```
 
@@ -156,7 +156,7 @@ git commit -m "refactor: split topology mutations into structural.rs + routing.r
 ### Task 3: Derive `FIXED_SINK_COUNT` from components
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/creature/genome/cgp.rs`
+- Modify: `crates/v3-core/src/creature/genome/cgp.rs`
 
 - [ ] **Step 1: Replace hardcoded constant**
 
@@ -184,7 +184,7 @@ const _: () = assert!(FIXED_SINK_COUNT == 57);
 
 - [ ] **Step 3: Run tests**
 
-Run: `cd v3 && cargo test -p v3-core creature::genome::cgp`
+Run: `cargo test -p v3-core creature::genome::cgp`
 Expected: PASS
 
 - [ ] **Step 4: Commit**
@@ -198,7 +198,7 @@ git commit -m "refactor: derive FIXED_SINK_COUNT from component constants"
 ### Task 4: Replace `RouteDecision` with `RouteGateMap`
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/runtime/routing.rs`
+- Modify: `crates/v3-core/src/runtime/routing.rs`
 
 - [ ] **Step 1: Write test for RouteGateMap default**
 
@@ -235,7 +235,7 @@ impl Default for RouteGateMap {
 
 - [ ] **Step 3: Run test**
 
-Run: `cd v3 && cargo test -p v3-core runtime::routing`
+Run: `cargo test -p v3-core runtime::routing`
 Expected: PASS (new test passes, old RouteDecision tests still pass since we haven't deleted it yet)
 
 - [ ] **Step 4: Commit**
@@ -249,7 +249,7 @@ git commit -m "feat: add RouteGateMap type to runtime/routing.rs"
 ### Task 5: Update `NodeResult` in `runtime/types.rs`
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/runtime/types.rs`
+- Modify: `crates/v3-core/src/runtime/types.rs`
 - Modify: All files that construct or read `NodeResult.route`
 
 This is a large mechanical change. Replace `route: RouteDecision` with
@@ -314,7 +314,7 @@ will delete `resolve_route_index` and `RouteDecision` entirely.
 
 - [ ] **Step 5: Run tests**
 
-Run: `cd v3 && cargo test --workspace`
+Run: `cargo test --workspace`
 Expected: All tests PASS (behavior preserved through transitional wiring)
 
 - [ ] **Step 6: Commit**
@@ -328,7 +328,7 @@ git commit -m "refactor: replace RouteDecision with RouteGateMap in NodeResult"
 ### Task 6: Change `NodeGenome.targets` to `Vec<RouteTarget>`
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/creature/genome/mod.rs`
+- Modify: `crates/v3-core/src/creature/genome/mod.rs`
 - Modify: All files that read/write `node.targets`
 
 - [ ] **Step 1: Change field type**
@@ -362,7 +362,7 @@ routing behavior (first-target-wins tie-break).
 
 - [ ] **Step 3: Run tests**
 
-Run: `cd v3 && cargo test --workspace`
+Run: `cargo test --workspace`
 Expected: All tests PASS
 
 - [ ] **Step 4: Commit**

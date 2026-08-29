@@ -14,7 +14,7 @@ updates trace types, fixes founder genomes, and runs the full verification gate.
 ### Task 11: Update routing mutation operators
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/mutation/topology/routing.rs`
+- Modify: `crates/v3-core/src/mutation/topology/routing.rs`
 
 - [ ] **Step 1: Write failing tests for AddRouteTarget**
 
@@ -90,7 +90,7 @@ genome.nodes[node_idx].targets[b].target_id = a_id;
 
 - [ ] **Step 7: Run tests**
 
-Run: `cd v3 && cargo test -p v3-core mutation::topology::routing`
+Run: `cargo test -p v3-core mutation::topology::routing`
 Expected: PASS
 
 - [ ] **Step 8: Commit**
@@ -104,9 +104,9 @@ git commit -m "feat: routing mutation operators are gate-aware"
 ### Task 12: Add MutateGateBias operator
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/mutation/topology/mod.rs`
-- Modify: `v3/crates/v3-core/src/mutation/topology/routing.rs`
-- Modify: `v3/crates/v3-core/src/mutation/types/mod.rs`
+- Modify: `crates/v3-core/src/mutation/topology/mod.rs`
+- Modify: `crates/v3-core/src/mutation/topology/routing.rs`
+- Modify: `crates/v3-core/src/mutation/types/mod.rs`
 
 - [ ] **Step 1: Write failing test**
 
@@ -174,7 +174,7 @@ display/debug formatting, and any exhaustiveness checks.
 
 - [ ] **Step 6: Run tests**
 
-Run: `cd v3 && cargo test -p v3-core mutation`
+Run: `cargo test -p v3-core mutation`
 Expected: PASS (including cross-consistency test)
 
 - [ ] **Step 7: Commit**
@@ -188,7 +188,7 @@ git commit -m "feat: add MutateGateBias topology operator"
 ### Task 13: Update VM instruction mutation
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/mutation/vm/operators.rs`
+- Modify: `crates/v3-core/src/mutation/vm/operators.rs`
 
 - [ ] **Step 1: Update instruction generation**
 
@@ -215,7 +215,7 @@ VmInstruction::WriteRouteGate { slot, src } => {
 
 - [ ] **Step 3: Run VM mutation tests**
 
-Run: `cd v3 && cargo test -p v3-core mutation::vm`
+Run: `cargo test -p v3-core mutation::vm`
 Expected: PASS
 
 - [ ] **Step 4: Commit**
@@ -229,8 +229,8 @@ git commit -m "feat: VM mutation generates WriteRouteGate instructions"
 ### Task 14: Update birth.rs and structural operators
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/mutation/topology/birth.rs`
-- Modify: `v3/crates/v3-core/src/mutation/topology/structural.rs`
+- Modify: `crates/v3-core/src/mutation/topology/birth.rs`
+- Modify: `crates/v3-core/src/mutation/topology/structural.rs`
 
 - [ ] **Step 1: Update `new_topology_birth_node` signature**
 
@@ -268,7 +268,7 @@ In `clone_and_remap_slice`:
 
 - [ ] **Step 5: Run tests**
 
-Run: `cd v3 && cargo test -p v3-core mutation::topology`
+Run: `cargo test -p v3-core mutation::topology`
 Expected: PASS
 
 - [ ] **Step 6: Commit**
@@ -282,9 +282,9 @@ git commit -m "feat: structural operators construct proper RouteTarget values"
 ### Task 15: Update genome analysis + mesh annotations
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/creature/genome/analysis.rs`
-- Modify: `v3/crates/v3-core/src/creature/genome/mesh_annotations.rs`
-- Modify: `v3/crates/v3-core/src/creature/genome/cgp_mesh_annotations.rs`
+- Modify: `crates/v3-core/src/creature/genome/analysis.rs`
+- Modify: `crates/v3-core/src/creature/genome/mesh_annotations.rs`
+- Modify: `crates/v3-core/src/creature/genome/cgp_mesh_annotations.rs`
 
 - [ ] **Step 1: Update write-class detection**
 
@@ -297,7 +297,7 @@ Both `WriteRouteGate { .. }` and `RouterGate(_)` map to `MeshWriteClass::Route`.
 
 - [ ] **Step 3: Run tests**
 
-Run: `cd v3 && cargo test -p v3-core creature::genome`
+Run: `cargo test -p v3-core creature::genome`
 Expected: PASS
 
 - [ ] **Step 4: Commit**
@@ -311,8 +311,8 @@ git commit -m "feat: genome analysis recognizes WriteRouteGate and RouterGate"
 ### Task 16: Update founder genome + seeding
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/creature/founder.rs`
-- Modify: `v3/crates/v3-core/src/simulation/seeding.rs` (if needed)
+- Modify: `crates/v3-core/src/creature/founder.rs`
+- Modify: `crates/v3-core/src/simulation/seeding.rs` (if needed)
 
 - [ ] **Step 1: Update founder targets**
 
@@ -330,7 +330,7 @@ Update any sink index references.
 
 - [ ] **Step 3: Run founder tests**
 
-Run: `cd v3 && cargo test -p v3-core creature::founder`
+Run: `cargo test -p v3-core creature::founder`
 Expected: PASS
 
 - [ ] **Step 4: Commit**
@@ -344,7 +344,7 @@ git commit -m "feat: founder genomes use RouteTarget and RouterGate(0)"
 ### Task 17: Update trace domain types
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/runtime/trace/domain.rs`
+- Modify: `crates/v3-core/src/runtime/trace/domain.rs`
 
 - [ ] **Step 1: Replace trace types**
 
@@ -394,8 +394,8 @@ git commit -m "feat: trace types use gate score map instead of scalar route"
 ### Task 18: Update traced mesh + traced VM
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/runtime/traced_mesh.rs`
-- Modify: `v3/crates/v3-core/src/runtime/traced_vm.rs`
+- Modify: `crates/v3-core/src/runtime/traced_mesh.rs`
+- Modify: `crates/v3-core/src/runtime/traced_vm.rs`
 
 - [ ] **Step 1: Update traced mesh trace construction**
 
@@ -435,8 +435,8 @@ level, not VM level.
 
 - [ ] **Step 3: Run traced execution tests**
 
-Run: `cd v3 && cargo test -p v3-core runtime::traced`
-Run: `cd v3 && cargo test -p v3-core runtime::trace`
+Run: `cargo test -p v3-core runtime::traced`
+Run: `cargo test -p v3-core runtime::trace`
 Expected: PASS
 
 - [ ] **Step 4: Commit**
@@ -450,8 +450,8 @@ git commit -m "feat: traced execution captures gate score details"
 ### Task 18b: Update v3-server transport types
 
 **Files:**
-- Modify: `v3/crates/v3-server/src/transport/sample_protocol.rs`
-- Modify: `v3/crates/v3-server/src/transport/sample_assembler.rs`
+- Modify: `crates/v3-server/src/transport/sample_protocol.rs`
+- Modify: `crates/v3-server/src/transport/sample_assembler.rs`
 
 - [ ] **Step 1: Update `RouteDecisionPayload` for new trace shape**
 
@@ -465,7 +465,7 @@ scores). Map to the updated protocol payload.
 
 - [ ] **Step 3: Run server tests**
 
-Run: `cd v3 && cargo test -p v3-server`
+Run: `cargo test -p v3-server`
 Expected: PASS
 
 - [ ] **Step 4: Commit**
@@ -479,9 +479,9 @@ git commit -m "feat: v3-server transport uses gate score trace format"
 ### Task 18c: Update e2e tests
 
 **Files:**
-- Modify: `v3/crates/v3-core/tests/creature_workflow_e2e/routing_and_state.rs`
-- Modify: `v3/crates/v3-core/tests/creature_workflow_e2e/flow_and_vm.rs`
-- Modify: `v3/crates/v3-core/tests/vm_all_opcodes_e2e.rs`
+- Modify: `crates/v3-core/tests/creature_workflow_e2e/routing_and_state.rs`
+- Modify: `crates/v3-core/tests/creature_workflow_e2e/flow_and_vm.rs`
+- Modify: `crates/v3-core/tests/vm_all_opcodes_e2e.rs`
 
 - [ ] **Step 1: Update e2e tests**
 
@@ -490,7 +490,7 @@ Replace references to `RouterOutput`, `TraceRouteKind`, `WriteRouteTarget`,
 
 - [ ] **Step 2: Run e2e tests**
 
-Run: `cd v3 && cargo test -p v3-core --test creature_workflow_e2e --test vm_all_opcodes_e2e`
+Run: `cargo test -p v3-core --test creature_workflow_e2e --test vm_all_opcodes_e2e`
 Expected: PASS
 
 - [ ] **Step 3: Commit**
@@ -503,10 +503,10 @@ git commit -m "fix: update e2e tests for gate routing types"
 
 ### Task 19-24: Verification Gate
 
-- [ ] **Task 19:** Run `cd v3 && cargo fmt --all -- --check`
-- [ ] **Task 20:** Run `cd v3 && cargo clippy --workspace --all-targets -- -D warnings`
-- [ ] **Task 21:** Run `cd v3 && cargo test --workspace`
-- [ ] **Task 22:** Run `cd v3 && cargo test -p v3-core --test viability` (merge gate)
+- [ ] **Task 19:** Run `cargo fmt --all -- --check`
+- [ ] **Task 20:** Run `cargo clippy --workspace --all-targets -- -D warnings`
+- [ ] **Task 21:** Run `cargo test --workspace`
+- [ ] **Task 22:** Run `cargo test -p v3-core --test viability` (merge gate)
 - [ ] **Task 23:** Run `scripts/check-plan-harness.sh --mode strict`
 - [ ] **Task 24:** Run `scripts/check-doc-harness.sh --mode strict`
 

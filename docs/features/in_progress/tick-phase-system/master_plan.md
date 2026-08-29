@@ -8,7 +8,7 @@ status: ready_to_implement
 **Goal IDs:** GP-02, GP-03, GP-04
 
 **Scope:**
-- In: `v3/crates/v3-core/src/simulation/tick.rs` (phase extraction), `v3/crates/v3-core/src/simulation/stats.rs` (add `reset_per_tick()` method), `v3/crates/v3-core/src/simulation/outcomes.rs` (visibility change to `pub`), `v3/crates/v3-core/src/simulation/mod.rs` (outcomes module visibility)
+- In: `crates/v3-core/src/simulation/tick.rs` (phase extraction), `crates/v3-core/src/simulation/stats.rs` (add `reset_per_tick()` method), `crates/v3-core/src/simulation/outcomes.rs` (visibility change to `pub`), `crates/v3-core/src/simulation/mod.rs` (outcomes module visibility)
 - Out: No behavior changes, no new phases, no action algorithm modifications, no plugin system, no phase reordering
 
 **Docs Impact:**
