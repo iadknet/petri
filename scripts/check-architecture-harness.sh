@@ -31,6 +31,17 @@ fi
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
 
+BASELINE_FILE="docs/standards/architecture-baseline.tsv"
+CURRENT_DEBT_FILE="$(mktemp)"
+SORTED_BASELINE_FILE="$(mktemp)"
+SORTED_CURRENT_FILE="$(mktemp)"
+TAB=$'\t'
+
+cleanup() {
+  rm -f "$CURRENT_DEBT_FILE" "$SORTED_BASELINE_FILE" "$SORTED_CURRENT_FILE"
+}
+trap cleanup EXIT
+
 violations=0
 warnings=0
 
@@ -48,6 +59,16 @@ report_warning() {
   local message="$1"
   echo "WARN: $message"
   warnings=$((warnings + 1))
+}
+
+fingerprint_declaration() {
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 | awk '{print $1}'
+  elif command -v sha256sum >/dev/null 2>&1; then
+    sha256sum | awk '{print $1}'
+  else
+    return 1
+  fi
 }
 
 is_allowed_workspace_dep() {
@@ -110,6 +131,11 @@ check_forbidden_runtime_imports_source() {
 }
 
 check_lib_rs_export_focus() {
+  if ! command -v shasum >/dev/null 2>&1 && ! command -v sha256sum >/dev/null 2>&1; then
+    report_violation "missing SHA-256 tool for lib.rs declaration fingerprints (need shasum or sha256sum)"
+    return
+  fi
+
   local lib_file
   for lib_file in crates/*/src/lib.rs; do
     [[ -f "$lib_file" ]] || continue
@@ -121,7 +147,17 @@ check_lib_rs_export_focus() {
 
     while IFS= read -r hit; do
       [[ -z "$hit" ]] && continue
-      report_violation "lib.rs must remain export-focused (implementation item found): ${hit}"
+      local declaration
+      declaration="$(printf '%s' "$hit" \
+        | sed -E 's/^[0-9]+://' \
+        | tr -s '[:space:]' ' ' \
+        | sed -E 's/^ //; s/ $//')"
+      local fingerprint
+      if ! fingerprint="$(printf '%s' "$declaration" | fingerprint_declaration)"; then
+        report_violation "failed to fingerprint lib.rs implementation declaration: $lib_file"
+        continue
+      fi
+      printf 'declaration\t%s\t%s\n' "$lib_file" "$fingerprint" >> "$CURRENT_DEBT_FILE"
     done < <(rg -n '^\s*(pub\s+)?(fn|struct|enum)\b|^\s*impl\b' "$lib_file" || true)
   done
 }
@@ -132,19 +168,95 @@ check_production_file_sizes() {
     local base_name
     base_name="$(basename "$source_file")"
 
-    if [[ "$base_name" == "tests.rs" || "$base_name" == test*.rs ]]; then
+    if [[ "$source_file" == */tests/* \
+      || "$base_name" == "test.rs" \
+      || "$base_name" == "tests.rs" \
+      || "$base_name" == test_*.rs \
+      || "$base_name" == *_test.rs \
+      || "$base_name" == *_tests.rs ]]; then
       continue
     fi
 
     local line_count
     line_count="$(wc -l < "$source_file" | tr -d ' ')"
 
-    if (( line_count > 600 )); then
-      report_violation "production file exceeds 600 lines: ${source_file} (${line_count} lines)"
-    elif (( line_count > 400 )); then
-      report_warning "production file exceeds 400 lines: ${source_file} (${line_count} lines)"
+    if (( line_count > 400 )); then
+      printf 'oversize\t%s\t%s\n' "$source_file" "$line_count" >> "$CURRENT_DEBT_FILE"
     fi
   done < <(find crates -type f -path '*/src/*' -name '*.rs' | sort)
+}
+
+check_architecture_debt_baseline() {
+  if [[ ! -f "$BASELINE_FILE" ]]; then
+    report_violation "missing architecture debt baseline: $BASELINE_FILE"
+    return
+  fi
+
+  if ! awk -F "$TAB" '
+    NF != 3 ||
+    ($1 != "declaration" && $1 != "oversize") ||
+    $2 == "" ||
+    $3 == "" ||
+    $2 ~ /[[:space:]]/ ||
+    $3 ~ /[[:space:]]/ {
+      exit 1
+    }
+  ' "$BASELINE_FILE"; then
+    report_violation "invalid architecture debt baseline row in $BASELINE_FILE"
+    return
+  fi
+
+  LC_ALL=C sort "$BASELINE_FILE" > "$SORTED_BASELINE_FILE"
+  LC_ALL=C sort "$CURRENT_DEBT_FILE" > "$SORTED_CURRENT_FILE"
+
+  local duplicate_oversize_paths
+  duplicate_oversize_paths="$(awk -F "$TAB" '$1 == "oversize" && ++seen[$2] == 2 { print $2 }' "$SORTED_BASELINE_FILE")"
+  if [[ -n "$duplicate_oversize_paths" ]]; then
+    local duplicate_oversize_path
+    while IFS= read -r duplicate_oversize_path; do
+      [[ -z "$duplicate_oversize_path" ]] && continue
+      report_violation "duplicate oversized production baseline entry: $duplicate_oversize_path"
+    done <<< "$duplicate_oversize_paths"
+    return
+  fi
+
+  local baseline_declarations
+  local current_declarations
+  baseline_declarations="$(grep -F "declaration${TAB}" "$SORTED_BASELINE_FILE" || true)"
+  current_declarations="$(grep -F "declaration${TAB}" "$SORTED_CURRENT_FILE" || true)"
+  if [[ "$baseline_declarations" != "$current_declarations" ]]; then
+    report_violation "lib.rs declaration fingerprint multiset differs from $BASELINE_FILE"
+  fi
+
+  while IFS="$TAB" read -r kind path fingerprint; do
+    [[ "$kind" == "declaration" ]] || continue
+    if grep -Fxq "$kind"$'\t'"$path"$'\t'"$fingerprint" "$SORTED_CURRENT_FILE"; then
+      report_warning "known lib.rs implementation declaration: $path ($fingerprint)"
+    fi
+  done < "$SORTED_BASELINE_FILE"
+
+  while IFS="$TAB" read -r kind path max_lines; do
+    [[ "$kind" == "oversize" ]] || continue
+    local current_lines
+    current_lines="$(awk -F "$TAB" -v path="$path" \
+      '$1 == "oversize" && $2 == path { print $3 }' "$SORTED_CURRENT_FILE")"
+    if [[ -z "$current_lines" ]]; then
+      report_violation "stale architecture baseline entry: oversize $path $max_lines"
+    elif [[ "$current_lines" != "$max_lines" ]]; then
+      report_violation "oversize baseline mismatch for $path: expected $max_lines lines, found $current_lines"
+    else
+      report_warning "known oversized production file: $path ($current_lines lines)"
+    fi
+  done < "$SORTED_BASELINE_FILE"
+
+  while IFS="$TAB" read -r kind path current_lines; do
+    [[ "$kind" == "oversize" ]] || continue
+    if ! awk -F "$TAB" -v path="$path" \
+      '$1 == "oversize" && $2 == path { found = 1 } END { exit !found }' \
+      "$SORTED_BASELINE_FILE"; then
+      report_violation "new oversized production file: $path ($current_lines lines)"
+    fi
+  done < "$SORTED_CURRENT_FILE"
 }
 
 check_cargo_policy() {
@@ -165,6 +277,7 @@ check_forbidden_runtime_deps_manifest
 check_forbidden_runtime_imports_source
 check_lib_rs_export_focus
 check_production_file_sizes
+check_architecture_debt_baseline
 
 echo ""
 echo "Architecture harness summary: mode=$MODE violations=$violations warnings=$warnings"

@@ -239,23 +239,120 @@ is_ignored_link() {
   local link="$1"
   [[ -z "$link" ]] && return 0
   [[ "$link" == \#* ]] && return 0
-  [[ "$link" == http://* ]] && return 0
-  [[ "$link" == https://* ]] && return 0
-  [[ "$link" == mailto:* ]] && return 0
-  [[ "$link" == javascript:* ]] && return 0
+  [[ "$link" =~ ^[A-Za-z][A-Za-z0-9+.-]*: ]] && return 0
   return 1
 }
 
 normalize_link_target() {
   local raw="$1"
 
-  raw="${raw#<}"
-  raw="${raw%>}"
-  raw="${raw%%\"*}"
-  raw="${raw%%\'*}"
-  raw="${raw%% *}"
+  if [[ "$raw" == \<* ]]; then
+    raw="${raw#<}"
+    raw="${raw%%>*}"
+  else
+    raw="${raw%%\"*}"
+    raw="${raw%%\'*}"
+    raw="${raw%% *}"
+  fi
 
   printf '%s' "$raw"
+}
+
+extract_markdown_link_targets() {
+  local md_file="$1"
+
+  awk '
+    function strip_code_spans(text, output, pos, run_length, close_pos, close_length, character, found) {
+      output = ""
+      pos = 1
+
+      while (pos <= length(text)) {
+        character = substr(text, pos, 1)
+        if (character != "`") {
+          output = output character
+          pos++
+          continue
+        }
+
+        run_length = 1
+        while (substr(text, pos + run_length, 1) == "`") run_length++
+
+        close_pos = pos + run_length
+        found = 0
+        while (close_pos <= length(text)) {
+          if (substr(text, close_pos, 1) != "`") {
+            close_pos++
+            continue
+          }
+
+          close_length = 1
+          while (substr(text, close_pos + close_length, 1) == "`") close_length++
+          if (close_length == run_length) {
+            pos = close_pos + close_length
+            found = 1
+            break
+          }
+          close_pos += close_length
+        }
+
+        if (!found) {
+          output = output substr(text, pos, run_length)
+          pos += run_length
+        }
+      }
+
+      return output
+    }
+
+    function emit_link_targets(text, rest, open_paren, pos, depth, character) {
+      rest = text
+      while (match(rest, /\[[^][]+\]\(/)) {
+        open_paren = RSTART + RLENGTH - 1
+        depth = 1
+        pos = open_paren + 1
+
+        while (pos <= length(rest) && depth > 0) {
+          character = substr(rest, pos, 1)
+          if (character == "\\") {
+            pos += 2
+            continue
+          }
+          if (character == "(") depth++
+          if (character == ")") depth--
+          if (depth > 0) pos++
+        }
+
+        if (depth != 0) return
+        print substr(rest, open_paren + 1, pos - open_paren - 1)
+        rest = substr(rest, pos + 1)
+      }
+    }
+
+    {
+      line = $0
+
+      if (fence == "") {
+        if (line ~ /^[[:space:]]*```/) {
+          fence = "`"
+          next
+        }
+        if (line ~ /^[[:space:]]*~~~/) {
+          fence = "~"
+          next
+        }
+      } else {
+        if ((fence == "`" && line ~ /^[[:space:]]*```/) ||
+            (fence == "~" && line ~ /^[[:space:]]*~~~/)) {
+          fence = ""
+        }
+        next
+      }
+
+      line = strip_code_spans(line)
+      emit_link_targets(line)
+    }
+  ' "$md_file" \
+    || true
 }
 
 check_markdown_links() {
@@ -287,11 +384,12 @@ check_markdown_links() {
       if [[ ! -e "$target_path" ]]; then
         report_violation "broken markdown link in ${md_file#./}: ${link}"
       fi
-    done < <(grep -oE '\[[^][]+\]\(([^)]+)\)' "$md_file" | sed -E 's/^[^\(]*\(([^)]+)\)$/\1/' || true)
+    done < <(extract_markdown_link_targets "$md_file")
   done < <(find . -type f -name '*.md' \
     -not -path './.git/*' \
     -not -path './.worktrees/*' \
     -not -path './.claude/worktrees/*' \
+    -not -path './.claude/skills/*' \
     -not -path './target/*' \
     -not -path './node_modules/*' \
     -not -path '*/node_modules/*' \
