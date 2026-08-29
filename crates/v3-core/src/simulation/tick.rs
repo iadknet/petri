@@ -138,7 +138,7 @@ pub fn run_phase_0(sim: &mut Simulation) {
 ///
 /// The optional `trace` parameter enables execution tracing for a single creature.
 /// When `Some`, the target creature is extracted from the parallel batch and run
-/// sequentially with [`execute_creature_mesh_traced`], recording detailed trace data.
+/// sequentially with `execute_creature_mesh_traced`, recording detailed trace data.
 /// When `None`, behavior is identical to the untraced path.
 pub fn run_tick(
     sim: &mut Simulation,

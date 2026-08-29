@@ -17,14 +17,16 @@ pub const SHARED_MEMORY_SLOTS: usize = 16;
 /// Per-creature runtime state for Graph backends.
 /// Groups all mutable state that graph evaluation reads/writes.
 pub struct GraphRuntimeState {
-    /// Per-node stateful operator state. Indexed [mesh_node_idx][internal_node_idx].
+    /// Per-node stateful operator state. Indexed as `[mesh_node_idx][internal_node_idx]`.
     pub node_state: Vec<Vec<f32>>,
-    /// Per-edge learned plasticity weights. Indexed [mesh_node_idx][internal_node_idx][edge_idx].
+    /// Per-edge learned plasticity weights. Indexed as
+    /// `[mesh_node_idx][internal_node_idx][edge_idx]`.
     /// Empty inner vec = use genome weights. Lazily initialized on first plasticity evaluation.
     /// Uses `Box<[f32]>` since edge count per node is fixed after init.
     pub plasticity_weights: Vec<Vec<Box<[f32]>>>,
     /// Per-edge eligibility traces for reward-modulated plasticity.
-    /// Indexed [mesh_node_idx][internal_node_idx][edge_idx], parallel to `plasticity_weights`.
+    /// Indexed as `[mesh_node_idx][internal_node_idx][edge_idx]`, parallel to
+    /// `plasticity_weights`.
     /// Lazily initialized on first reward-modulated evaluation.
     /// Uses `Box<[f32]>` since edge count per node is fixed after init.
     /// Always reset (not inherited) on reproduction.

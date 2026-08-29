@@ -76,8 +76,8 @@ impl WorldInputKey {
 
     /// Number of sub-values for compound access. Returns 1 for scalar keys.
     ///
-    /// [`opt-inline-small`] Hot path — called per instruction per tick.
-    /// [`api-must-use`] Pure getter.
+    /// `opt-inline-small`: Hot path — called per instruction per tick.
+    /// `api-must-use`: Pure getter.
     #[inline]
     #[must_use]
     pub fn compound_width(&self) -> u16 {

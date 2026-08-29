@@ -147,6 +147,19 @@ check_production_file_sizes() {
   done < <(find crates -type f -path '*/src/*' -name '*.rs' | sort)
 }
 
+check_cargo_policy() {
+  local output
+  if output="$(python3 scripts/check_cargo_policy.py 2>&1)"; then
+    return
+  fi
+
+  while IFS= read -r line; do
+    [[ -z "$line" ]] && continue
+    report_violation "Cargo policy: ${line}"
+  done <<< "$output"
+}
+
+check_cargo_policy
 check_workspace_dependency_direction
 check_forbidden_runtime_deps_manifest
 check_forbidden_runtime_imports_source
