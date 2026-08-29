@@ -48,3 +48,15 @@
 | Plan harness, strict | pass | Zero violations, zero warnings, seven plans checked. |
 
 The baseline failures are accepted only as recorded debt assigned to explicit later steps. No failing gate was silently treated as green.
+
+## Root Workspace Promotion — Pre-move Contract
+
+- Evidence directory: [`evidence/pre-promotion/`](evidence/pre-promotion/).
+- Inventory: 181 tracked `v3/` paths; 176 tracked workspace files below `v3/crates/`, each recorded with a normalized root-relative path and SHA-256 fingerprint.
+- Workspace manifest SHA-256: `10a9a07200f8cfc8530f7a4651c1bc1b72131294ee961f654f5e92b113f596a7`.
+- Lockfile SHA-256: `b84eae9880889c4f5c793f98f54078ff2d0815bb643c5253819b31cf193466af`.
+- rustfmt configuration SHA-256: `7d747a8a7f30129529ab3748f9b0f37f0bd50783d0a862bd8a12676a9069ba88`.
+- Normalized Cargo metadata covers all three packages, targets, features, dependency declarations, and workspace members.
+- Route contract: 176 normalized location/literal occurrences across Rust, frontend, and scripts.
+- Strict harness stdout is preserved verbatim for path-normalized post-move comparison.
+- Live application: E2E-01 boot/connectivity passed on exact Rust 1.93.0 and Node 24.20.0. E2E-02 started and ran the simulation but timed out waiting for the Step control after pausing; this pre-existing failure is recorded so the structural move cannot conceal or worsen it.
