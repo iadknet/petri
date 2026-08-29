@@ -2,6 +2,12 @@
 
 Canonical project documentation lives under `docs/`.
 
+## Project Policies
+
+- [License](../LICENSE)
+- [Contributing](../CONTRIBUTING.md)
+- [Security](../SECURITY.md)
+
 ## Active Spec/Design Docs
 
 - [Strategy Directory](strategy/)

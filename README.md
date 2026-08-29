@@ -18,6 +18,12 @@ This repository contains the active Petri V3 evolutionary simulation.
 
 Compatibility note: `petri-roadmap.md`, `petri-architecture.md`, and `petri-technology-review.md` are root compatibility stubs.
 
+## Project Policies
+
+- [License](LICENSE)
+- [Contributing](CONTRIBUTING.md)
+- [Security](SECURITY.md)
+
 ## Development
 
 Start backend + frontend together from repo root:
