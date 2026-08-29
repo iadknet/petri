@@ -32,13 +32,7 @@ impl MutationEngine {
         parent_reachable_nodes: &[usize],
         rng: &mut impl Rng,
     ) -> MutationSummary {
-        Self::apply_mutations_with_food_type_count(
-            genome,
-            config,
-            parent_reachable_nodes,
-            rng,
-            1,
-        )
+        Self::apply_mutations_with_food_type_count(genome, config, parent_reachable_nodes, rng, 1)
     }
 
     /// Apply mutation events to a child genome using the configured number of

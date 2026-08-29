@@ -4,7 +4,9 @@ use crate::creature::genome::cgp::{
     CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource, OutputSinkKind,
 };
 use crate::creature::genome::{BackendDef, NodeGenome, VmBackendDef, VmInstruction};
-use crate::mutation::sampling::{random_input_reference_for_food_types, sample_sub_idx_for_input_ref};
+use crate::mutation::sampling::{
+    random_input_reference_for_food_types, sample_sub_idx_for_input_ref,
+};
 use rand::Rng;
 
 /// Current minimal VM backend used by newborn topology nodes.

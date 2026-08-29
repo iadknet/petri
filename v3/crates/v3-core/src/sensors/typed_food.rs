@@ -74,7 +74,9 @@ pub fn genome_uses_typed_local_food(genome: &CreatureGenome) -> bool {
         node.input_refs.iter().any(|input_ref| {
             matches!(
                 input_ref,
-                InputReference::World(WorldInputKey::FoodHere { .. } | WorldInputKey::NeighborFoodRing { .. })
+                InputReference::World(
+                    WorldInputKey::FoodHere { .. } | WorldInputKey::NeighborFoodRing { .. }
+                )
             )
         })
     })

@@ -153,8 +153,13 @@ fn engine_with_food_type_count_can_introduce_non_default_food_input_refs() {
     let mut saw_non_default = false;
     for _ in 0..4_000 {
         let mut genome = v3alpha1_founder_genome();
-        let summary =
-            MutationEngine::apply_mutations_with_food_type_count(&mut genome, &config, &[], &mut r, 3);
+        let summary = MutationEngine::apply_mutations_with_food_type_count(
+            &mut genome,
+            &config,
+            &[],
+            &mut r,
+            3,
+        );
         if summary
             .applied_by_domain
             .get(&MutationDomain::InputRef)

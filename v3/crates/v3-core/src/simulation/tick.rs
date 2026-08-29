@@ -163,8 +163,7 @@ pub fn run_tick(
     use crate::sensors::reducers::assemble_perception;
     use crate::sensors::static_inputs::assemble_static_inputs;
     use crate::sensors::typed_food::{
-        assemble_typed_food_local_snapshot, genome_uses_typed_local_food,
-        TypedFoodLocalSnapshot,
+        assemble_typed_food_local_snapshot, genome_uses_typed_local_food, TypedFoodLocalSnapshot,
     };
     use crate::sensors::visibility::{
         compute_visible_cells_into, get_visibility_table, VisibilityScratch,

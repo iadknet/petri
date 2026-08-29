@@ -349,7 +349,7 @@ fn node1_vm_decision_forage_first(reproduce_transfer_energy: f32) -> NodeGenome 
                     src: 0,
                 }, // dir for Move
                 VmInstruction::PushAction { action_type: 2 }, // Move
-                VmInstruction::ExecuteActionQueue,            // terminal
+                VmInstruction::ExecuteActionQueue,         // terminal
                 // Priority 2: Reproduce if energy sufficient.
                 VmInstruction::CmpGt { dst: 6, a: 1, b: 7 }, // r6 = can_reproduce?
                 VmInstruction::JumpIfZero {
@@ -427,7 +427,7 @@ fn node1_vm_decision_forage_first(reproduce_transfer_energy: f32) -> NodeGenome 
                     src: 0,
                 }, // dir for Move
                 VmInstruction::PushAction { action_type: 2 }, // Move
-                VmInstruction::ExecuteActionQueue,            // terminal
+                VmInstruction::ExecuteActionQueue,         // terminal
             ],
         }),
         targets: vec![],
