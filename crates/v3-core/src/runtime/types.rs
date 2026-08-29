@@ -2,7 +2,7 @@ use crate::contracts::{ActionQueue, WorldAction};
 use crate::creature::genome::cgp::CUSTOM_OUTPUT_COUNT;
 use crate::runtime::routing::RouteGateMap;
 
-/// Number of output slots in a [`NodeResult`].
+/// Number of output slots produced by an evaluated cognition node.
 pub const OUTPUT_SLOT_COUNT: usize = CUSTOM_OUTPUT_COUNT as usize;
 
 /// Result returned by a single node evaluation.
@@ -57,7 +57,7 @@ impl NodeResult {
 
 /// Energy cost attributed to VM and graph node execution during one mesh evaluation.
 ///
-/// Returned alongside the [`WorldAction`] by [`execute_creature_mesh`].
+/// Returned alongside queued [`WorldAction`] values by the mesh executor.
 /// Does not include lifecycle decay, move, eat, noop, or reproduce costs.
 #[derive(Debug, Clone, Default)]
 pub struct ComputeCostReport {

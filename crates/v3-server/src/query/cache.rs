@@ -138,7 +138,7 @@ pub fn build_barrier_mask(frame: &FramePayload) -> Box<[u8]> {
 }
 
 /// Quantize fertility for primary food type (`type_idx = 0`): raw [-1,1] ->
-/// effective [min,max] -> u8 [0,255].
+/// effective `[min, max]` range to the `u8` range `[0, 255]`.
 ///
 /// Edge case: when min == max the entire grid gets 128 (mid-point).
 ///

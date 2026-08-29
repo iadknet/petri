@@ -160,7 +160,7 @@ impl SensorSnapshot {
     /// valid indices. The `compound_width_matches_array_sizes` test ensures
     /// width constants stay in sync with actual array lengths.
     ///
-    /// [`opt-inline-small`] Hot path — called per compound input per tick.
+    /// `opt-inline-small`: Hot path — called per compound input per tick.
     #[inline]
     pub fn resolve_compound(&self, key: &WorldInputKey, sub_idx: u16) -> f32 {
         debug_assert!(

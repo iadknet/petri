@@ -20,7 +20,7 @@ use crate::sensors::perception::SensorSnapshot;
 ///
 /// The function walks the genome's node chain starting at `entry_node_id`,
 /// dispatching each node to its VM or Graph backend, routing to subsequent
-/// nodes via the `route` field of [`NodeResult`], and terminating
+/// nodes by resolving each internal node result's route-gate scores, and terminating
 /// when a terminal instruction is reached or a soft-default condition fires.
 ///
 /// All soft-default termination conditions return `vec![WorldAction::NoOp]`.

@@ -1,4 +1,4 @@
-//! Traced VM execution — identical logic to [`super::vm::execute_vm_node`] but
+//! Traced VM execution — identical logic to `super::vm::execute_vm_node` but
 //! records per-instruction trace data for the Execution Sampler.
 //!
 //! **Maintenance note:** This module intentionally duplicates the instruction loop

@@ -79,3 +79,32 @@ The baseline failures are accepted only as recorded debt assigned to explicit la
 - **Terra High implementation/code review:** The first pass found one active refinement document pointing `execute_graph_impl` at nonexistent `runtime/graph.rs`. The path was corrected to `crates/v3-core/src/runtime/cgp/execute.rs`, the symbol and file were verified, affected doc/path checks were rerun, and the reviewer returned a clean second pass. The review also independently confirmed rename-only Rust source, the sole manifest exclusion delta, unchanged `/v3/*` routes, and the untouched owner draft.
 - **Sol Medium architecture/decomposition review:** The first pass found the canonical architecture diagram still nesting the workspace below `v3/` and the roadmap still naming `docs/plans/` as active/runtime implementation as next. Both canonical documents were corrected, affected doc/architecture/plan checks were rerun, and the reviewer returned a clean second pass. The review independently reconfirmed dependency direction, crate responsibilities, wire contracts, test migration, root/frontend integration, historical-evidence handling, and complete tracked `v3/` supersession.
 - **Promotion commit:** `9f899cd` (`refactor: promote active workspace to repository root`).
+
+## Cargo Metadata Quality Policy
+
+### TDD and policy integration
+
+- Added `scripts/check_cargo_policy.py` to require workspace Rust 1.93, the minimal shared Rust/Clippy/rustdoc policy, and exact member inheritance without local lint overrides.
+- Added direct policy regression tests. Before the manifests changed, the production checker failed on all 12 missing workspace/member requirements; after the manifest changes, all four tests and the production checker pass.
+- Review strengthened the negative test into independent mutations for `unsafe_code`, `unexpected_cfgs`, Clippy `correctness`, Clippy `suspicious`, and `broken_intra_doc_links`.
+- Integrated the production checker into the mandatory architecture harness. The isolated integration fixture first failed because the harness accepted a member without `[lints] workspace = true`; after integration, the valid fixture passes and the missing-inheritance fixture fails strict mode with the specific Cargo-policy violation.
+- The real warn-mode architecture baseline remains exactly 32 violations and 16 warnings, with no Cargo-policy violation. Restoration of the pre-existing architecture findings remains parent Step 2 work.
+
+### Exact-toolchain verification
+
+| Gate | Result | Evidence summary |
+| --- | --- | --- |
+| Cargo metadata, locked | pass | All three packages report `rust_version = 1.93`; each member inherits workspace package metadata and lints. |
+| Cargo policy unit/integration checks | pass | Four direct tests (including five weakened-lint subtests), the production checker, and the isolated strict architecture-harness integration test pass. |
+| Rust format | pass | `cargo fmt --all -- --check` is clean on Rust 1.93.0. |
+| Rustdoc, all features, locked | pass | `RUSTDOCFLAGS='-D warnings' cargo doc --workspace --all-features --no-deps --locked` passes after documentation-comment-only repairs to pre-existing malformed/private links. |
+| Viability | pass | 21 passed, zero failed, on production-default economics. |
+| Rust workspace, all features, locked | pass | 1,128 tests passed, including all 76 local-socket server integration tests; zero failed. |
+| Clippy, all targets/features, locked | pass | Clean with `-D warnings` on Rust 1.93.0. |
+| Plan harness, strict | pass | Zero violations and zero warnings. |
+| Diff hygiene | pass | `git diff --check` is clean; `Cargo.lock` is unchanged; Rust source changes are documentation comments only. |
+
+### Metadata policy review gates
+
+- **Terra High implementation/code review with repository `rust-skills`:** clean initial pass. After architecture review prompted stronger mutation coverage and mandatory-harness integration, two focused re-reviews were also clean. The reviewer confirmed policy enforcement, Rust 1.93 inheritance, portability of the isolated shell fixture, absence of runtime changes, and exclusion of the owner draft.
+- **Sol Medium architecture/decomposition review:** found that the initial negative tests did not independently protect every required lint and that the production checker was not reachable from a mandatory completion gate. The tests were made table-driven across every lint, the checker was integrated into the strict architecture harness, and an isolated red/green integration test was added. Final re-review was clean for toolchain compatibility, lint minimality, crate ownership, dependency direction, APIs, behavior, and GP-02/GP-03 alignment.
