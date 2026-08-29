@@ -405,3 +405,4 @@ The Grand Unified Architecture — mapping biological intelligence to CPU-optimi
 - **Eventual multi-crate v3-server split** → `docs/features/needs_refinement/maybe-do/v3-server-crate-split.md`
 - **Ring-based vision sensors** → `docs/features/needs_refinement/maybe-do/ring-based-sensors.md`
 - **Complex barrier painting tools** → `docs/features/needs_refinement/complex-barrier-painting-tools.md`
+- **Public repository readiness** → `docs/features/ready_to_implement/public-repository-readiness/master_plan.md`
