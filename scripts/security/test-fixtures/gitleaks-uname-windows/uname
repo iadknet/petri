@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+case "${1:-}" in
+  -s)
+    printf 'Windows_NT\n'
+    ;;
+  -m)
+    printf 'x86_64\n'
+    ;;
+  *)
+    exit 2
+    ;;
+esac
