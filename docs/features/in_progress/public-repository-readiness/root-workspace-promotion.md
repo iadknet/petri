@@ -91,6 +91,6 @@ Review the promotion as a rename-aware diff, not as deleted and re-created sourc
 - [x] Step 6: Add the Cargo metadata-quality policy in a separate TDD cycle. Added failing manifest-policy checks, then declared/inherited `rust-version = "1.93"` and a validated minimal workspace `unsafe_code`, `unexpected_cfgs`, Clippy correctness/suspicious, and rustdoc broken-link policy. Exact-toolchain Cargo metadata, rustdoc, viability, all-feature locked tests, and all-target/all-feature locked clippy pass. Evidence: [implementation log](implementation_log.md#cargo-metadata-quality-policy).
 - [x] Review Gate: Metadata code review — a Terra High reviewer applied `rust-skills`, returned a clean first pass, then cleanly re-reviewed the review-driven policy-test and mandatory-gate integration changes. Evidence: [implementation log](implementation_log.md#metadata-policy-review-gates).
 - [x] Review Gate: Metadata architecture review — a Sol Medium reviewer identified incomplete negative-test coverage and orphaned checker enforcement; both were fixed, affected verification was rerun, and the final re-review was clean. Evidence: [implementation log](implementation_log.md#metadata-policy-review-gates).
-- [ ] Step 7: Commit the verified MSRV/workspace-lint policy separately and record its evidence in the parent feature implementation log.
+- [x] Step 7: Committed the verified MSRV/workspace-lint policy separately and recorded its evidence in the parent feature implementation log. Commit: `50414406`.
 
 **Review cycles:** 12
