@@ -52,28 +52,28 @@
 
 ## Boundary Impact
 
-- `v3/crates/v3-core/src/contracts/`
+- `crates/v3-core/src/contracts/`
   - New file `routing.rs`: `RouteTarget`, `MAX_GATE_SLOTS`
   - Leaf dependency — no upstream imports
-- `v3/crates/v3-core/src/runtime/`
+- `crates/v3-core/src/runtime/`
   - `routing.rs`: Delete `RouteDecision`, add `RouteGateMap`, `resolve_gated_route`
   - `types.rs`: `NodeResult.route` → `.route_gates`
   - `mesh.rs`, `vm.rs`, `traced_vm.rs`, `traced_mesh.rs`: routing path changes
   - `cgp/effects.rs`, `cgp/traced.rs`, `cgp/execute.rs`: RouterGate sinks
   - `trace/domain.rs`: New `TraceRouteDecision`, `TraceGateScore`
-- `v3/crates/v3-core/src/creature/genome/`
+- `crates/v3-core/src/creature/genome/`
   - `mod.rs`: `WriteRouteTarget` → `WriteRouteGate`, `targets: Vec<RouteTarget>`
   - `cgp.rs`: `RouterOutput` → `RouterGate(u8)`, derived FIXED_SINK_COUNT
   - `analysis.rs`, `mesh_annotations.rs`, `cgp_mesh_annotations.rs`: pattern updates
-- `v3/crates/v3-core/src/mutation/topology/`
+- `crates/v3-core/src/mutation/topology/`
   - `mod.rs` refactored: dispatch only, implementations in new files
   - New `structural.rs`: structural operators (AddNode, RemoveNode, etc.)
   - New `routing.rs`: routing operators (AddRouteTarget, MutateGateBias, etc.)
   - `birth.rs`: signature change `Vec<NodeId>` → `Vec<RouteTarget>`
-- `v3/crates/v3-core/src/mutation/types/mod.rs`
+- `crates/v3-core/src/mutation/types/mod.rs`
   - New `TopologyMutateGateBias` variant in `MutationOperator`
 
-- `v3/crates/v3-server/`
+- `crates/v3-server/`
   - `transport/sample_protocol.rs`: Update `RouteDecisionPayload` for new trace shape
   - `transport/sample_assembler.rs`: Update assembler for `TraceRouteDecision`
 

@@ -21,7 +21,7 @@ See canonical policy set: `docs/strategy/` and `docs/reference/`.
 
 ## Repository Map
 
-- `v3/`: active implementation target
+- `crates/`: active Rust workspace members
 - `docs/`: canonical strategy/reference/features docs
 
 ## Non-Negotiable Invariants
@@ -33,7 +33,7 @@ See canonical policy set: `docs/strategy/` and `docs/reference/`.
 - Backward compatibility is NOT a project goal. Breaking changes are acceptable by
   default, and agents should not add migration/compatibility work unless a task
   explicitly asks for it.
-- Viability tests (`v3/crates/v3-core/tests/viability.rs`) must pass before any
+- Viability tests (`crates/v3-core/tests/viability.rs`) must pass before any
   branch merge. See **Viability Test Policy** below.
 - **Implementation plans MUST include review gate checkmarks.** Every
   `master_plan.md` must contain explicit `- [ ] Review Gate:` checkmark items
@@ -85,7 +85,7 @@ as items in `## Implementation Steps`:
 
 ## Viability Test Policy
 
-The viability tests in `v3/crates/v3-core/tests/viability.rs` are a **merge gate**.
+The viability tests in `crates/v3-core/tests/viability.rs` are a **merge gate**.
 They verify that the simulation's production economics (energy, food, costs, runtime
 limits) support a self-sustaining founder population. Any change to production
 defaults, founder genome behavior, or tick-loop mechanics that breaks viability is
@@ -157,9 +157,9 @@ This cycle is mandatory — a plan that has not completed at least one clean arc
 
 Agents must invoke the appropriate installed skills during architecture, planning, and implementation work. Skills are auto-discovered from `~/.agents/skills/` (Codex) and `~/.claude/skills/` (Claude Code).
 
-### Rust crates (`v3/`)
+### Rust crates (`crates/`)
 
-- **`rust-skills`**: ALWAYS invoke when writing, reviewing, or refactoring Rust code in `v3/`. Covers ownership, error handling, async patterns, API design, memory optimization, performance, and testing.
+- **`rust-skills`**: ALWAYS invoke when writing, reviewing, or refactoring Rust code in `crates/`. Covers ownership, error handling, async patterns, API design, memory optimization, performance, and testing.
 
 ### Frontend
 
@@ -181,9 +181,9 @@ Before claiming completion, run and confirm all pass:
 1. `scripts/check-doc-harness.sh --mode strict`
 2. `scripts/check-architecture-harness.sh --mode strict`
 3. `scripts/check-plan-harness.sh --mode strict`
-4. `cd v3 && cargo fmt --all -- --check`
-5. `cd v3 && cargo test --workspace`
-6. `cd v3 && cargo clippy --workspace --all-targets -- -D warnings`
+4. `cargo fmt --all -- --check`
+5. `cargo test --workspace`
+6. `cargo clippy --workspace --all-targets -- -D warnings`
 7. `cd frontend && npm run build` (if any frontend files were touched)
 
 ## Doc Touch Policy

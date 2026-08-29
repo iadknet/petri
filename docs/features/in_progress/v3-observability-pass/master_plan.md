@@ -17,6 +17,8 @@
 
 **Superseded-By:** none
 
+> **Pre-promotion layout:** Checked `cd v3 && ...` verification commands below are preserved as historical evidence. Current Cargo commands run from the repository root.
+
 ---
 
 ## Goal Alignment
@@ -31,10 +33,10 @@
 
 ## Boundary Impact
 
-- `v3/crates/v3-core/`
+- `crates/v3-core/`
   - Extend simulation stats with typed counters for per-operator skips and action-failure causes.
   - Keep hot-path accounting typed; avoid server/string concerns in core.
-- `v3/crates/v3-server/`
+- `crates/v3-server/`
   - Extend health/status and creature-detail payload assembly for new diagnostics.
   - Preserve existing sampler protocol for this pass.
 - `frontend/`
@@ -91,13 +93,13 @@ Wire-format impact:
 ### Task 1: Backend mutation and action-cause telemetry
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/simulation/stats.rs`
-- Modify: `v3/crates/v3-core/src/simulation/actions/reproduction.rs`
-- Modify: `v3/crates/v3-core/src/simulation/tick.rs`
-- Modify: `v3/crates/v3-server/src/state.rs`
-- Modify: `v3/crates/v3-server/src/handlers/lifecycle.rs`
-- Modify: `v3/crates/v3-server/src/transport/protocol.rs`
-- Modify tests under `v3/crates/v3-core/` and `v3/crates/v3-server/tests/`
+- Modify: `crates/v3-core/src/simulation/stats.rs`
+- Modify: `crates/v3-core/src/simulation/actions/reproduction.rs`
+- Modify: `crates/v3-core/src/simulation/tick.rs`
+- Modify: `crates/v3-server/src/state.rs`
+- Modify: `crates/v3-server/src/handlers/lifecycle.rs`
+- Modify: `crates/v3-server/src/transport/protocol.rs`
+- Modify tests under `crates/v3-core/` and `crates/v3-server/tests/`
 
 **Steps:**
 1. Add per-operator skip counter exposure and mutation reachability counter exposure to server payloads.
@@ -109,9 +111,9 @@ Wire-format impact:
 ### Task 2: Creature diagnostics API exposure
 
 **Files:**
-- Modify: `v3/crates/v3-server/src/handlers/creature.rs`
-- Modify: `v3/crates/v3-server/src/transport/sample_assembler.rs` (only if needed for derivation reuse)
-- Modify tests in `v3/crates/v3-server/tests/`
+- Modify: `crates/v3-server/src/handlers/creature.rs`
+- Modify: `crates/v3-server/src/transport/sample_assembler.rs` (only if needed for derivation reuse)
+- Modify tests in `crates/v3-server/tests/`
 
 **Steps:**
 1. Add `diagnostics` object to creature detail response.

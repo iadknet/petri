@@ -17,6 +17,8 @@
 
 **Superseded-By:** none
 
+> **Pre-promotion layout:** Checked `cd v3 && ...` verification commands below are preserved as historical evidence. Current Cargo commands run from the repository root.
+
 ---
 
 ## Goal Alignment
@@ -31,10 +33,10 @@
 
 ## Boundary Impact
 
-- `v3/crates/v3-core/src/config/`
+- `crates/v3-core/src/config/`
   - Clean up `MutationConfig` so the obsolete field is no longer part of the active emitted config surface.
   - Preserve backward-compatible ingestion of legacy payloads that still include `mutation.input_auto_connect_chance`.
-- `v3/crates/v3-server/`
+- `crates/v3-server/`
   - Keep HTTP startup/PATCH validation aligned with the effective runtime-config contract.
   - Ensure `GET /v3/simulation/config` and PATCH responses reflect only live config fields.
 - `frontend/src/types/` and `frontend/src/components/config-panel/`
@@ -83,8 +85,8 @@ Wire-format impact:
 ### Task 1: Lock the intended contract with failing tests first
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/config/simulation.rs`
-- Modify: `v3/crates/v3-server/tests/server.rs`
+- Modify: `crates/v3-core/src/config/simulation.rs`
+- Modify: `crates/v3-server/tests/server.rs`
 - Modify: `frontend/src/components/ControlBar.test.tsx`
 - Modify: `frontend/src/test/fixtures.ts`
 
@@ -97,9 +99,9 @@ Wire-format impact:
 ### Task 2: Implement the backend compatibility shim and active config cleanup
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/config/simulation.rs`
-- Modify: `v3/crates/v3-server/src/handlers/lifecycle.rs`
-- Modify: `v3/crates/v3-server/src/handlers/status.rs`
+- Modify: `crates/v3-core/src/config/simulation.rs`
+- Modify: `crates/v3-server/src/handlers/lifecycle.rs`
+- Modify: `crates/v3-server/src/handlers/status.rs`
 - Modify: `frontend/src/types/http.ts`
 
 **Steps:**

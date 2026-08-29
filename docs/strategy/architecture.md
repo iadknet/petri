@@ -41,11 +41,11 @@ Active service/UI dependency direction for the viewport transport refactor:
 
 | area | decision | rationale |
 | --- | --- | --- |
-| `v3/crates/v3-core/src/kernel` | keep | world reality independent of cognition backend details |
-| `v3/crates/v3-core/src/sensors` | keep | snapshot assembly separated from runtime mutation logic |
-| `v3/crates/v3-core/src/runtime` | keep | owns chain evaluation, routing, VM/graph execution |
-| `v3/crates/v3-core/src/tick` | keep | phase orchestration and action application stay outside runtime internals |
-| `v3/crates/v3-server` | change | server command/query/transport boundaries are now explicit instead of living in a flat transport shell |
+| `crates/v3-core/src/kernel` | keep | world reality independent of cognition backend details |
+| `crates/v3-core/src/sensors` | keep | snapshot assembly separated from runtime mutation logic |
+| `crates/v3-core/src/runtime` | keep | owns chain evaluation, routing, VM/graph execution |
+| `crates/v3-core/src/simulation/tick` | keep | phase orchestration and action application stay outside runtime internals |
+| `crates/v3-server` | change | server command/query/transport boundaries are now explicit instead of living in a flat transport shell |
 | `frontend/src` viewport transport path | change | viewport state, world-view state, and renderer input boundaries are now first-class |
 | `docs/reference/*.md` | keep | executable contracts stay centralized under active V3 reference specs |
 
@@ -60,18 +60,20 @@ Active service/UI dependency direction for the viewport transport refactor:
 
 ```text
 petri/
-|- v3/
-|  |- crates/
-|  |  \- v3-core/
+|- Cargo.toml               # root virtual workspace
+|- crates/
+|  |- v3-core/
+|  |  \- src/
 |  |     |- kernel/
 |  |     |- sensors/
 |  |     |- creature/
 |  |     |- runtime/
-|  |     |- tick/
+|  |     |- simulation/tick/
 |  |     \- contracts/
-|  \- crates/v3-server/    # command/query/transport surfaces over v3-core
-\- frontend/               # viewport/world-view/render client
-\- docs/                   # canonical strategy/reference docs
+|  |- v3-server/            # command/query/transport surfaces over v3-core
+|  \- v3-cli/               # command-line surfaces over v3-core
+|- frontend/                # viewport/world-view/render client
+\- docs/                    # canonical strategy/reference/feature docs
 ```
 
 ## Runtime Truthfulness Invariant

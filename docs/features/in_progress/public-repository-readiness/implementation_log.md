@@ -60,3 +60,21 @@ The baseline failures are accepted only as recorded debt assigned to explicit la
 - Route contract: 176 normalized location/literal occurrences across Rust, frontend, and scripts.
 - Strict harness stdout is preserved verbatim for path-normalized post-move comparison.
 - Live application: E2E-01 boot/connectivity passed on exact Rust 1.93.0 and Node 24.20.0. E2E-02 started and ran the simulation but timed out waiting for the Step control after pausing; this pre-existing failure is recorded so the structural move cannot conceal or worsen it.
+
+## Root Workspace Promotion — Post-move Verification
+
+- Evidence directory: [`evidence/post-promotion/`](evidence/post-promotion/).
+- All 176 normalized workspace-file SHA-256 entries match the pre-move contract exactly.
+- `Cargo.lock` remains byte-identical at SHA-256 `b84eae9880889c4f5c793f98f54078ff2d0815bb643c5253819b31cf193466af`; `rustfmt.toml` remains byte-identical at `7d747a8a7f30129529ab3748f9b0f37f0bd50783d0a862bd8a12676a9069ba88`.
+- Normalized Cargo package, target, feature, dependency, and workspace-member metadata matches exactly. The only root `Cargo.toml` delta is `exclude = [".claude/skills/rust-skills/checks"]`.
+- The vendored `rust-skills/checks` manifest resolves independently as package `rust-skills-checks` with its own workspace root.
+- All 176 prefix-normalized `/v3/*` route occurrences match exactly; HTTP version paths were not renamed.
+- Strict doc and plan harness stdout match exactly. Architecture stdout matches exactly after normalizing only `v3/crates/` to `crates/`; no violation or warning was added or increased.
+- Rust 1.93.0 checks: format passed; viability passed 21/21; all non-socket workspace tests passed; the six socket-binding server tests initially failed only because the sandbox denied listener creation, then all 76 server integration tests passed with local socket permission; all-target/all-feature Clippy passed with warnings denied.
+- Node 24.20.0 checks: frontend unit suite passed 52 files/261 tests when rerun without concurrent compiler load; production build passed with the unchanged bundle-size warning.
+- Live application from the root workspace: E2E-01 boot/connectivity passed. E2E-02 reproduced the exact pre-move timeout waiting for the Step control after pause, demonstrating no structural-move regression while retaining the separately tracked pre-existing lifecycle-test debt.
+
+### Promotion review gates
+
+- **Terra High implementation/code review:** The first pass found one active refinement document pointing `execute_graph_impl` at nonexistent `runtime/graph.rs`. The path was corrected to `crates/v3-core/src/runtime/cgp/execute.rs`, the symbol and file were verified, affected doc/path checks were rerun, and the reviewer returned a clean second pass. The review also independently confirmed rename-only Rust source, the sole manifest exclusion delta, unchanged `/v3/*` routes, and the untouched owner draft.
+- **Sol Medium architecture/decomposition review:** The first pass found the canonical architecture diagram still nesting the workspace below `v3/` and the roadmap still naming `docs/plans/` as active/runtime implementation as next. Both canonical documents were corrected, affected doc/architecture/plan checks were rerun, and the reviewer returned a clean second pass. The review independently reconfirmed dependency direction, crate responsibilities, wire contracts, test migration, root/frontend integration, historical-evidence handling, and complete tracked `v3/` supersession.

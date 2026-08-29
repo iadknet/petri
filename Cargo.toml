@@ -4,6 +4,7 @@ members = [
     "crates/v3-cli",
     "crates/v3-server",
 ]
+exclude = [".claude/skills/rust-skills/checks"]
 resolver = "2"
 
 [workspace.package]

@@ -10,13 +10,13 @@
 
 Primary architecture/design planning:
 - `docs/strategy/` (active strategy/design direction)
-- `docs/plans/` (active plan set for new work)
+- `docs/features/` (active feature lifecycle, refinement, and implementation plans)
 
 Canonical runtime/contracts specs:
 - `docs/reference/` (active V3 specs)
 
-Archived implementation planning history:
-- `docs/plans/archive/`
+Legacy implementation planning history:
+- `docs/plans/` (superseded planning workflow and archives)
 
 ## Current Program Status
 
@@ -25,11 +25,11 @@ Archived implementation planning history:
 | Architecture reconciliation | complete | Mesh execution model and soft-default philosophy stabilized in docs. |
 | Reference specification sync | complete | Execution/tick-orchestration/runtime-config, VM, graph, genome, sensor, lifecycle, mutation, reproduction, and observability specs aligned. |
 | Documentation archival | complete | Non-active docs moved to archive locations; archived-marked docs removed. |
-| Runtime implementation | next | Continue execution against active strategy and reference specs. |
+| Runtime implementation | active | The root Cargo workspace implements the simulation core, server, and CLI; continued evolution follows active feature plans and canonical specs. |
 
 ## Current Focus
 
-- Preserve strict abstraction boundaries while implementing mesh runtime.
+- Preserve strict abstraction boundaries while evolving the current mesh runtime.
 - Enforce crash-proof evaluation under junk-DNA mutation behavior.
 - Keep test reproducibility guarantees explicit and harness-backed.
 

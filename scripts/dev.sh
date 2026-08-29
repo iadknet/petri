@@ -43,7 +43,7 @@ trap cleanup EXIT INT TERM
 
 echo "Starting backend on http://localhost:${BACKEND_PORT} ..."
 (
-  cd "${ROOT_DIR}/v3"
+  cd "${ROOT_DIR}"
   if [[ "${MODE}" == "release" ]]; then
     V3_SERVER_BIND_ADDR="0.0.0.0:${BACKEND_PORT}" cargo run --release -p v3-server
   else

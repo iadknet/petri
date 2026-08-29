@@ -15,7 +15,7 @@ After this phase, routing works end-to-end with the new gate system.
 ### Task 7: Implement `resolve_gated_route` with TDD
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/runtime/routing.rs`
+- Modify: `crates/v3-core/src/runtime/routing.rs`
 
 - [ ] **Step 1: Write failing tests**
 
@@ -82,7 +82,7 @@ fn gated_route_out_of_range_slot_gets_zero_runtime() {
 
 - [ ] **Step 2: Run tests to verify they fail**
 
-Run: `cd v3 && cargo test -p v3-core runtime::routing`
+Run: `cargo test -p v3-core runtime::routing`
 Expected: FAIL — `resolve_gated_route` not found
 
 - [ ] **Step 3: Implement `resolve_gated_route`**
@@ -125,7 +125,7 @@ pub(crate) fn resolve_gated_route(
 
 - [ ] **Step 4: Run tests**
 
-Run: `cd v3 && cargo test -p v3-core runtime::routing`
+Run: `cargo test -p v3-core runtime::routing`
 Expected: All PASS
 
 - [ ] **Step 5: Commit**
@@ -139,8 +139,8 @@ git commit -m "feat: implement resolve_gated_route with TDD"
 ### Task 8: Update mesh executor
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/runtime/mesh.rs`
-- Modify: `v3/crates/v3-core/src/runtime/traced_mesh.rs`
+- Modify: `crates/v3-core/src/runtime/mesh.rs`
+- Modify: `crates/v3-core/src/runtime/traced_mesh.rs`
 
 - [ ] **Step 1: Replace routing logic in `mesh.rs`**
 
@@ -187,12 +187,12 @@ and their tests. These are now fully replaced.
 
 - [ ] **Step 4: Run mesh tests**
 
-Run: `cd v3 && cargo test -p v3-core runtime::mesh`
+Run: `cargo test -p v3-core runtime::mesh`
 Expected: PASS
 
 - [ ] **Step 5: Run full test suite**
 
-Run: `cd v3 && cargo test --workspace`
+Run: `cargo test --workspace`
 Expected: All PASS
 
 - [ ] **Step 6: Commit**
@@ -206,9 +206,9 @@ git commit -m "feat: mesh executor uses resolve_gated_route"
 ### Task 9: VM backend — WriteRouteGate
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/creature/genome/mod.rs` (VmInstruction enum)
-- Modify: `v3/crates/v3-core/src/runtime/vm.rs`
-- Modify: `v3/crates/v3-core/src/runtime/traced_vm.rs`
+- Modify: `crates/v3-core/src/creature/genome/mod.rs` (VmInstruction enum)
+- Modify: `crates/v3-core/src/runtime/vm.rs`
+- Modify: `crates/v3-core/src/runtime/traced_vm.rs`
 
 - [ ] **Step 1: Replace VmInstruction variant**
 
@@ -279,7 +279,7 @@ fn vm_write_route_gate_invalid_slot_is_noop() {
 
 - [ ] **Step 7: Run tests**
 
-Run: `cd v3 && cargo test -p v3-core runtime::vm`
+Run: `cargo test -p v3-core runtime::vm`
 Expected: PASS
 
 - [ ] **Step 8: Commit**
@@ -293,10 +293,10 @@ git commit -m "feat: VM backend uses WriteRouteGate instruction"
 ### Task 10: CGP backend — RouterGate sinks
 
 **Files:**
-- Modify: `v3/crates/v3-core/src/creature/genome/cgp.rs`
-- Modify: `v3/crates/v3-core/src/runtime/cgp/effects.rs`
-- Modify: `v3/crates/v3-core/src/runtime/cgp/execute.rs`
-- Modify: `v3/crates/v3-core/src/runtime/cgp/traced.rs`
+- Modify: `crates/v3-core/src/creature/genome/cgp.rs`
+- Modify: `crates/v3-core/src/runtime/cgp/effects.rs`
+- Modify: `crates/v3-core/src/runtime/cgp/execute.rs`
+- Modify: `crates/v3-core/src/runtime/cgp/traced.rs`
 
 - [ ] **Step 1: Replace OutputSinkKind variant**
 
@@ -366,12 +366,12 @@ In `cgp_mesh_annotations.rs`: match `RouterGate(_)` instead of `RouterOutput`.
 
 - [ ] **Step 9: Run CGP tests**
 
-Run: `cd v3 && cargo test -p v3-core creature::genome::cgp`
+Run: `cargo test -p v3-core creature::genome::cgp`
 Expected: PASS
 
 - [ ] **Step 10: Run full test suite**
 
-Run: `cd v3 && cargo test --workspace`
+Run: `cargo test --workspace`
 Expected: All PASS
 
 - [ ] **Step 11: Commit**

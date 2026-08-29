@@ -28,7 +28,7 @@ semantically meaningless.
   `WriteActionMeta` (`% 8`), `PushAction` (`% 5`) to prevent wrapping to invalid values
 - `apply_graph_raw_field_mutation`: All parameterized kinds bounded to valid ranges
 
-**Where to apply on main:** `v3/crates/v3-core/src/mutation/graph/operators.rs`
+**Where to apply on main:** `crates/v3-core/src/mutation/graph/operators.rs`
 
 ### 2. Always-backlink on copy operations
 
@@ -44,8 +44,8 @@ copy operation effectively wasted.
   node to a random cloned node
 
 **Where to apply on main:**
-- `v3/crates/v3-core/src/mutation/graph/operators.rs` (`apply_copy_internal_node`)
-- `v3/crates/v3-core/src/mutation/topology/mod.rs` (`clone_and_remap_slice`)
+- `crates/v3-core/src/mutation/graph/operators.rs` (`apply_copy_internal_node`)
+- `crates/v3-core/src/mutation/topology/mod.rs` (`clone_and_remap_slice`)
 
 ## Structural Changes (reassess before re-implementing)
 

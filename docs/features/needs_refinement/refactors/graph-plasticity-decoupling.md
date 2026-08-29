@@ -8,7 +8,7 @@ status: needs-review
 
 ## Problem Statement
 
-The graph evaluation loop in `v3/crates/v3-core/src/runtime/graph.rs` (`execute_graph_impl`) is directly coupled to plasticity modules at three points:
+The graph evaluation loop in `crates/v3-core/src/runtime/cgp/execute.rs` (`execute_graph_impl`) is directly coupled to plasticity modules at three points:
 
 1. **Pre-loop init** (lines ~261-269) — initializes plasticity weight state before the relaxation loop begins.
 2. **Inner-loop weight selection** (lines ~320-340) — during each relaxation iteration, selects between static genome weights and dynamic plasticity weights for plasticity-enabled edges.
