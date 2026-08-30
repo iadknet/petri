@@ -24,6 +24,14 @@ pub struct ProjectionStore {
     snapshot: ProjectionSnapshot,
 }
 
+/// Revisions and static-content change information produced by a projection publish.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use = "projection publications must be forwarded to interested transport sessions"]
+pub(crate) struct ProjectionPublication {
+    pub(crate) projection_revision: u64,
+    pub(crate) world_static_changed: bool,
+}
+
 impl ProjectionStore {
     /// Build an initial projection from the provided simulation handle.
     #[must_use]
@@ -43,26 +51,30 @@ impl ProjectionStore {
         }
     }
 
-    /// Publish a new projection by rebuilding a websocket frame from the simulation handle.
-    pub fn publish_from_handle(&mut self, handle: &SimHandle) -> u64 {
-        self.publish_ws_frame(build_ws_frame(handle))
-    }
-
     /// Publish a new projection from an already-built websocket frame.
-    pub fn publish_ws_frame(&mut self, frame: WsFrame) -> u64 {
+    pub(crate) fn publish_ws_frame(
+        &mut self,
+        frame: WsFrame,
+        force_world_static_invalidation: bool,
+    ) -> ProjectionPublication {
         self.projection_revision += 1;
         let mut next_snapshot = ProjectionSnapshot::from_ws_frame(
             self.projection_revision,
             self.world_static_revision,
             frame,
         );
-        if !same_world_static(&self.snapshot, &next_snapshot) {
+        let world_static_changed =
+            force_world_static_invalidation || !same_world_static(&self.snapshot, &next_snapshot);
+        if world_static_changed {
             self.world_static_revision += 1;
             next_snapshot.world_static_revision = self.world_static_revision;
         }
         self.snapshot = next_snapshot;
 
-        self.snapshot.projection_revision
+        ProjectionPublication {
+            projection_revision: self.snapshot.projection_revision,
+            world_static_changed,
+        }
     }
 
     /// Borrow the currently published snapshot.
@@ -263,9 +275,24 @@ mod tests {
         updated.frame.food_types[1].growth_inhibitor = 0.6;
 
         let mut store = ProjectionStore::new(initial);
-        let published_revision = store.publish_ws_frame(updated);
+        let publication = store.publish_ws_frame(updated, false);
 
-        assert_eq!(published_revision, 2);
+        assert_eq!(publication.projection_revision, 2);
+        assert!(publication.world_static_changed);
         assert_eq!(store.current().world_static_revision, 2);
+    }
+
+    #[test]
+    fn forced_world_static_invalidation_advances_static_revision_for_identical_content() {
+        // Arrange
+        let mut store = ProjectionStore::new(sample_ws_frame());
+
+        // Act
+        let publication = store.publish_ws_frame(sample_ws_frame(), true);
+
+        // Assert
+        assert_eq!(publication.projection_revision, 2);
+        assert_eq!(store.current().world_static_revision, 2);
+        assert!(publication.world_static_changed);
     }
 }

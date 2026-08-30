@@ -104,7 +104,7 @@ pub async fn paint(
 
     let frame = build_ws_frame(&handle);
     drop(handle);
-    app.publish_ws_frame_update(frame, Some(dirty_rect), static_changed);
+    app.publish_ws_frame_update(frame, Some(dirty_rect));
 
     Ok(Json(PaintResponse {
         protocol_version: PROTOCOL_VERSION,

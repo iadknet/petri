@@ -616,21 +616,30 @@ impl AppState {
     }
 
     pub fn publish_ws_frame(&self, frame: WsFrame) {
-        self.publish_ws_frame_update(frame, None, false);
+        self.publish_ws_frame_with_invalidation(frame, None, false);
     }
 
-    pub fn publish_ws_frame_update(
+    pub(crate) fn publish_startup_ws_frame(&self, frame: WsFrame) {
+        self.publish_ws_frame_with_invalidation(frame, None, true);
+    }
+
+    pub(crate) fn publish_ws_frame_update(&self, frame: WsFrame, dirty_rect: Option<DirtyRect>) {
+        self.publish_ws_frame_with_invalidation(frame, dirty_rect, false);
+    }
+
+    fn publish_ws_frame_with_invalidation(
         &self,
         frame: WsFrame,
         dirty_rect: Option<DirtyRect>,
-        world_static_changed: bool,
+        force_world_static_invalidation: bool,
     ) {
         let started = Instant::now();
-        let projection_revision = self
-            .projection
-            .write()
-            .expect("projection lock poisoned")
-            .publish_ws_frame(frame);
+        let publication = {
+            self.projection
+                .write()
+                .expect("projection lock poisoned")
+                .publish_ws_frame(frame, force_world_static_invalidation)
+        };
         let projection_publish_ms = started.elapsed().as_secs_f64() * 1_000.0;
         // Perf timing is diagnostic telemetry only. Readers may briefly observe the
         // new projection revision with the prior wall-clock timing until this write
@@ -639,9 +648,9 @@ impl AppState {
         perf.projection_publish_ms = projection_publish_ms;
         perf.ws_frame_publish_ms = started.elapsed().as_secs_f64() * 1_000.0;
         let _ = self.ws_tx.send(ProjectionNotice {
-            projection_revision,
+            projection_revision: publication.projection_revision,
             dirty_rect,
-            world_static_changed,
+            world_static_changed: publication.world_static_changed,
         });
     }
 }

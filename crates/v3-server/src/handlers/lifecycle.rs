@@ -98,7 +98,7 @@ pub async fn startup(
     handle.cached_fertility_u8 = cached_fertility_u8;
     let frame = build_ws_frame(&handle);
     drop(handle);
-    app.publish_ws_frame(frame);
+    app.publish_startup_ws_frame(frame);
 
     Ok(Json(serde_json::json!({
         "protocol_version": PROTOCOL_VERSION,

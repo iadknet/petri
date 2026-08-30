@@ -163,7 +163,7 @@ pub async fn apply(
 
     let frame = build_ws_frame(&handle);
     drop(handle);
-    app.publish_ws_frame_update(frame, Some(dirty_rect), static_changed);
+    app.publish_ws_frame_update(frame, Some(dirty_rect));
 
     Ok(Json(ApplyResponse {
         protocol_version: PROTOCOL_VERSION,
