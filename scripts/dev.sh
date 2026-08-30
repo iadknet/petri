@@ -23,7 +23,7 @@ fi
 
 if [[ ! -x "${ROOT_DIR}/frontend/node_modules/.bin/vite" ]]; then
   echo "Frontend dependencies are missing."
-  echo "Run: cd \"${ROOT_DIR}/frontend\" && npm install"
+  echo "Use Node 24 LTS (see .nvmrc), then run: cd \"${ROOT_DIR}/frontend\" && npm ci"
   exit 1
 fi
 
