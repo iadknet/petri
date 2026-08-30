@@ -37,6 +37,6 @@ oversize	crates/v3-core/src/simulation/stats.rs	451
 oversize	crates/v3-core/src/simulation/tick.rs	826
 oversize	crates/v3-server/src/handlers/creature.rs	548
 oversize	crates/v3-server/src/handlers/lifecycle.rs	653
-oversize	crates/v3-server/src/state.rs	653
+oversize	crates/v3-server/src/state.rs	601
 oversize	crates/v3-server/src/transport/protocol.rs	640
 oversize	crates/v3-server/src/transport/view_assembler.rs	415
