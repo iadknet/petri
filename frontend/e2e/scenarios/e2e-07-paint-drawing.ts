@@ -51,13 +51,13 @@ export const scenarioPaintDrawing: ScenarioDefinition = {
 		// 7. Click paint toggle to exit → toolbar disappears
 		await ctx.browser.click(selectors.paintToggle);
 		await waitForCondition(async () => {
-			return !(await ctx.browser.isVisible(selectors.paintToolbar)).visible;
+			return (await ctx.browser.getCount(selectors.paintToolbar)).count === 0;
 		}, "paint toolbar hidden after toggle off", 5_000);
 
 		// 8. Re-enter paint mode → toolbar reappears
 		await ctx.browser.click(selectors.paintToggle);
 		await waitForCondition(async () => {
-			return (await ctx.browser.isVisible(selectors.paintToolbar)).visible;
+			return (await ctx.browser.getCount(selectors.paintToolbar)).count > 0;
 		}, "paint toolbar visible after re-toggle", 5_000);
 
 		// 9. Click on canvas to simulate a paint stroke

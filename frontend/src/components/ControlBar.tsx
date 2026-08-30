@@ -182,11 +182,15 @@ export function ControlBar() {
 			<div className="w-px h-6 bg-petri-border" />
 
 			{/* Lifecycle buttons */}
-			<div className="flex items-center gap-1.5">
+			<fieldset
+				aria-busy={restarting}
+				className="flex min-w-0 m-0 p-0 border-0 items-center gap-1.5"
+			>
+				<legend className="sr-only">Simulation lifecycle controls</legend>
 				<SimButton
 					label="Start"
 					testId="control-start"
-					disabled={!enabled.start}
+					disabled={restarting || !enabled.start}
 					active={simState === "running"}
 					pulse={simState === "running"}
 					onClick={handleStart}
@@ -200,16 +204,19 @@ export function ControlBar() {
 				<SimButton
 					label="Pause"
 					testId="control-pause"
-					disabled={!enabled.pause}
+					disabled={restarting || !enabled.pause}
 					onClick={handlePause}
 				/>
 				<SimButton
 					label="Step"
 					testId="control-step"
-					disabled={!enabled.step}
+					disabled={restarting || !enabled.step}
 					onClick={handleStep}
 				/>
-			</div>
+			</fieldset>
+			<output aria-live="polite" aria-atomic="true" className="sr-only">
+				{restarting ? "Restarting simulation" : ""}
+			</output>
 
 			{/* Divider */}
 			<div className="w-px h-6 bg-petri-border" />

@@ -1,9 +1,12 @@
 import { assert, waitForCondition } from "../lib/assertions.ts";
 import type { ScenarioDefinition } from "../types.ts";
 import {
+	DEFAULT_E2E_WORLD_SIZE,
 	openDashboardAndWaitConnection,
 	readTick,
+	restartAndWaitForBusyCycle,
 	selectors,
+	waitForRestartedWorld,
 } from "./common.ts";
 
 export const scenarioStartupLifecycleStep: ScenarioDefinition = {
@@ -14,7 +17,10 @@ export const scenarioStartupLifecycleStep: ScenarioDefinition = {
 
 		await ctx.browser.fill(selectors.startupSeed, "424242");
 		await ctx.browser.fill(selectors.startupPopulation, "64");
-		await ctx.browser.click(selectors.controlRestart);
+	await ctx.browser.fill(selectors.startupWorldWidth, String(DEFAULT_E2E_WORLD_SIZE));
+	await ctx.browser.fill(selectors.startupWorldHeight, String(DEFAULT_E2E_WORLD_SIZE));
+	await restartAndWaitForBusyCycle(ctx);
+	await waitForRestartedWorld(ctx, DEFAULT_E2E_WORLD_SIZE);
 
 		await waitForCondition(async () => {
 			return (await ctx.browser.isEnabled(selectors.controlStart)).enabled;

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { INSPECT_ZOOM_THRESHOLD, useViewportStore } from "./viewport.ts";
+import { INSPECT_ZOOM_THRESHOLD, deriveViewRequest, useViewportStore } from "./viewport.ts";
 
 describe("ViewportStore", () => {
 	beforeEach(() => {
@@ -29,5 +29,15 @@ describe("ViewportStore", () => {
 			canvas: { width: 320, height: 200 },
 			zoomTier: "inspect",
 		});
+	});
+
+	it("returns null when the camera excludes the world and produces a zero-area rect", () => {
+		expect(
+			deriveViewRequest({
+				camera: { x: -3_000, y: -3_000, zoom: 4 },
+				canvasSize: { width: 960, height: 305 },
+				worldSize: { width: 512, height: 512 },
+			}),
+		).toBeNull();
 	});
 });
