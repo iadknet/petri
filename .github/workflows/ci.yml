@@ -27,8 +27,10 @@ jobs:
           scripts/check-doc-harness.sh --mode strict
           scripts/check-architecture-harness.sh --mode strict
           scripts/check-plan-harness.sh --mode strict
-      - name: Verify pinned secret-scan tooling
-        run: scripts/security/test-gitleaks-scan.sh
+      - name: Verify pinned security-tooling harnesses
+        run: |
+          scripts/security/test-gitleaks-scan.sh
+          scripts/security/test-skillspector-scan.sh
 
   rust:
     name: Rust
