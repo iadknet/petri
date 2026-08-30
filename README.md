@@ -77,6 +77,7 @@ scripts/check-doc-harness.sh --mode strict
 scripts/check-architecture-harness.sh --mode strict
 scripts/check-plan-harness.sh --mode strict
 scripts/security/test-gitleaks-scan.sh
+scripts/security/test-skillspector-scan.sh
 cargo fmt --all -- --check
 cargo test --workspace
 cargo clippy --workspace --all-targets -- -D warnings
@@ -92,8 +93,10 @@ For the local browser suite, run:
 cd frontend && npm run test:e2e
 ```
 
-The ordinary CI workflow validates the gitleaks tooling test only. The
-full-history scan remains an explicit local evidence operation.
+The ordinary CI workflow runs both deterministic security-wrapper/tooling
+harnesses. The actual full-history Gitleaks scan and real SkillSpector scan
+remain explicit local evidence operations; the current SkillSpector scan is
+expected to return nonzero, as its linked documentation explains.
 
 For defense-in-depth local auditing of repository skills, first bootstrap the
 pinned scanner image once, then run its networkless scan:
