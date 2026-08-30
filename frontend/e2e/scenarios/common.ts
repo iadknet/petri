@@ -1,6 +1,54 @@
 import { assert, parseTickValue, waitForCondition } from "../lib/assertions.ts";
 import type { RuntimeContext } from "../types.ts";
 
+export const DEFAULT_E2E_WORLD_SIZE = 256;
+
+export interface E2EViewRect {
+	x: number;
+	y: number;
+	width: number;
+	height: number;
+}
+
+export interface E2EActiveViewRequest {
+	rect: E2EViewRect;
+	canvas: { width: number; height: number };
+	zoomTier: "overview" | "detail" | "inspect";
+}
+
+export interface E2EViewPayloadProbe {
+	requestId: number | null;
+	payloadRect: E2EViewRect | null;
+}
+
+export function hasPositiveViewRect(rect: E2EViewRect | null | undefined): rect is E2EViewRect {
+	return rect !== null && rect !== undefined && rect.width > 0 && rect.height > 0;
+}
+
+export function hasPayloadForActiveRequest(
+	activeRequest: E2EActiveViewRequest | null,
+	payload: E2EViewPayloadProbe,
+	minimumRequestId = 0,
+): boolean {
+	if (
+		!activeRequest ||
+		!hasPositiveViewRect(activeRequest.rect) ||
+		!hasPositiveViewRect(payload.payloadRect) ||
+		payload.requestId === null ||
+		payload.requestId <= minimumRequestId
+	) {
+		return false;
+	}
+
+	const { rect } = activeRequest;
+	return (
+		payload.payloadRect.x === rect.x &&
+		payload.payloadRect.y === rect.y &&
+		payload.payloadRect.width === rect.width &&
+		payload.payloadRect.height === rect.height
+	);
+}
+
 export const selectors = {
 	controlStart: '[data-testid="control-start"]',
 	controlRestart: '[data-testid="control-restart"]',
@@ -12,6 +60,8 @@ export const selectors = {
 	tickValue: '[data-testid="tick-value"]',
 	startupSeed: '[data-testid="startup-field-seed"]',
 	startupPopulation: '[data-testid="startup-field-population-initial-creatures"]',
+	startupWorldWidth: '[data-testid="startup-field-world-width"]',
+	startupWorldHeight: '[data-testid="startup-field-world-height"]',
 	startupFertilityEnabled: '[data-testid="startup-field-fertility-enabled"]',
 	startupFertilityMin: '[data-testid="startup-field-fertility-min"]',
 	startupFertilityMax: '[data-testid="startup-field-fertility-max"]',
@@ -61,16 +111,58 @@ export async function openDashboardAndWaitConnection(ctx: RuntimeContext): Promi
 	}, "websocket connection status=connected", ctx.startupTimeoutMs);
 }
 
+export async function restartAndWaitForBusyCycle(ctx: RuntimeContext): Promise<void> {
+	await ctx.browser.click(selectors.controlRestart);
+	await waitForCondition(async () => {
+		return (await ctx.browser.getText(selectors.controlRestart)).text === "Restarting...";
+	}, "restart reports busy state", ctx.startupTimeoutMs);
+	await waitForCondition(async () => {
+		return (await ctx.browser.getText(selectors.controlRestart)).text === "Restart";
+	}, "restart transaction completes", ctx.startupTimeoutMs);
+}
+
+export async function waitForRestartedWorld(
+	ctx: RuntimeContext,
+	worldSize: number,
+): Promise<void> {
+	await waitForCondition(
+		async () => {
+			const viewport = await ctx.browser.eval<{
+				worldSize: { width: number; height: number } | null;
+				viewRequest: { rect: { x: number; y: number; width: number; height: number } } | null;
+			} | null>("window.__PETRI_E2E__?.getViewportState() ?? null");
+			const request = viewport?.viewRequest;
+			return (
+				viewport?.worldSize?.width === worldSize &&
+				viewport.worldSize.height === worldSize &&
+				request !== null &&
+				request !== undefined &&
+				hasPositiveViewRect(request.rect) &&
+				request.rect.x >= 0 &&
+				request.rect.y >= 0 &&
+				request.rect.x + request.rect.width <= worldSize &&
+				request.rect.y + request.rect.height <= worldSize
+			);
+		},
+		`restarted ${worldSize}x${worldSize} world applied on the active dashboard`,
+		ctx.startupTimeoutMs,
+	);
+}
+
 export async function initializePausedSimulation(
 	ctx: RuntimeContext,
 	seed: number = 12345,
 	population: number = 50,
+	worldSize: number = DEFAULT_E2E_WORLD_SIZE,
 ): Promise<void> {
 	await openDashboardAndWaitConnection(ctx);
 
 	await ctx.browser.fill(selectors.startupSeed, String(seed));
 	await ctx.browser.fill(selectors.startupPopulation, String(population));
-	await ctx.browser.click(selectors.controlRestart);
+	await ctx.browser.fill(selectors.startupWorldWidth, String(worldSize));
+	await ctx.browser.fill(selectors.startupWorldHeight, String(worldSize));
+	await restartAndWaitForBusyCycle(ctx);
+	await waitForRestartedWorld(ctx, worldSize);
 
 	await waitForCondition(async () => {
 		return (await ctx.browser.isEnabled(selectors.controlStart)).enabled;

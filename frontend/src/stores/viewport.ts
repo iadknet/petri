@@ -74,8 +74,13 @@ export function deriveViewRequest(input: {
 		return null;
 	}
 
+	const rect = deriveRect(camera, canvasSize, worldSize);
+	if (rect.width <= 0 || rect.height <= 0) {
+		return null;
+	}
+
 	return {
-		rect: deriveRect(camera, canvasSize, worldSize),
+		rect,
 		canvas: canvasSize,
 		zoomTier: zoomTierFor(camera.zoom),
 	};

@@ -1,6 +1,11 @@
 import { assert, waitForCondition } from "../lib/assertions.ts";
 import type { ScenarioDefinition } from "../types.ts";
-import { openDashboardAndWaitConnection, selectors } from "./common.ts";
+import {
+	DEFAULT_E2E_WORLD_SIZE,
+	openDashboardAndWaitConnection,
+	restartAndWaitForBusyCycle,
+	selectors,
+} from "./common.ts";
 
 async function expectNumericValue(
 	ctx: Parameters<ScenarioDefinition["run"]>[0],
@@ -53,8 +58,10 @@ export const scenarioFertilityStartupConfig: ScenarioDefinition = {
 		await ctx.browser.fill(selectors.startupAnnealingRampTicks, "9000");
 		await ctx.browser.fill(selectors.startupAnnealingInitialMin, "0.8");
 		await ctx.browser.fill(selectors.startupAnnealingInitialMax, "1.4");
+		await ctx.browser.fill(selectors.startupWorldWidth, String(DEFAULT_E2E_WORLD_SIZE));
+		await ctx.browser.fill(selectors.startupWorldHeight, String(DEFAULT_E2E_WORLD_SIZE));
 
-		await ctx.browser.click(selectors.controlRestart);
+		await restartAndWaitForBusyCycle(ctx);
 		await waitForCondition(async () => {
 			return (await ctx.browser.isEnabled(selectors.controlStart)).enabled;
 		}, "start control enabled after fertility-configured restart", ctx.startupTimeoutMs);

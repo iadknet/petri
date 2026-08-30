@@ -18,6 +18,8 @@ declare global {
 				projectionRevision: number;
 				worldStaticRevision: number;
 				viewKind: "overview" | "detail" | null;
+				payloadRequestId: number | null;
+				payloadRect: { x: number; y: number; width: number; height: number } | null;
 				frameCreatureCount: number;
 				frameFoodCount: number;
 			};
@@ -102,10 +104,13 @@ export function installE2ETestHooks(): void {
 		},
 		getWorldViewState: () => {
 			const worldView = useWorldViewStore.getState();
+			const currentView = worldView.currentView;
 			return {
 				projectionRevision: worldView.projectionRevision,
 				worldStaticRevision: worldView.worldStaticRevision,
-				viewKind: worldView.currentView?.kind ?? null,
+				viewKind: currentView?.kind ?? null,
+				payloadRequestId: currentView?.requestId ?? null,
+				payloadRect: currentView?.payload.rect ?? null,
 				frameCreatureCount: worldView.frame?.creatures.length ?? 0,
 				frameFoodCount: worldView.frame?.food.length ?? 0,
 			};

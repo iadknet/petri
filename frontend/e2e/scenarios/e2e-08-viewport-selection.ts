@@ -1,23 +1,27 @@
 import { DETAIL_ZOOM_THRESHOLD, INSPECT_ZOOM_THRESHOLD } from "../../src/stores/viewport.ts";
 import { assert, waitForCondition } from "../lib/assertions.ts";
 import type { RuntimeContext, ScenarioDefinition } from "../types.ts";
-import { initializePausedSimulation, selectors } from "./common.ts";
+import {
+	hasPayloadForActiveRequest,
+	initializePausedSimulation,
+	type E2EActiveViewRequest,
+	type E2EViewPayloadProbe,
+	selectors,
+} from "./common.ts";
 
 interface ViewportProbe {
 	camera: { x: number; y: number; zoom: number };
 	canvasSize: { width: number; height: number };
 	worldSize: { width: number; height: number } | null;
-	viewRequest: {
-		rect: { x: number; y: number; width: number; height: number };
-		canvas: { width: number; height: number };
-		zoomTier: "overview" | "detail" | "inspect";
-	} | null;
+	viewRequest: E2EActiveViewRequest | null;
 }
 
 interface WorldViewProbe {
 	projectionRevision: number;
 	worldStaticRevision: number;
 	viewKind: "overview" | "detail" | null;
+	payloadRequestId: number | null;
+	payloadRect: E2EViewPayloadProbe["payloadRect"];
 	frameCreatureCount: number;
 	frameFoodCount: number;
 }
@@ -71,10 +75,17 @@ async function getCanvasContentSummary(ctx: RuntimeContext): Promise<CanvasConte
 	);
 }
 
+function payloadProbe(worldView: WorldViewProbe): E2EViewPayloadProbe {
+	return {
+		requestId: worldView.payloadRequestId,
+		payloadRect: worldView.payloadRect,
+	};
+}
+
 async function zoomToTier(
 	ctx: RuntimeContext,
 	targetTier: "detail" | "inspect",
-	maxClicks = 16,
+	maxClicks = 64,
 ): Promise<void> {
 	for (let attempt = 0; attempt < maxClicks; attempt++) {
 		const viewport = await readViewportState(ctx);
@@ -95,6 +106,16 @@ async function zoomToTier(
 			`zoom transition toward ${targetTier}`,
 			10_000,
 		);
+
+		const nextViewport = await readViewportState(ctx);
+		const reachedDetail = nextViewport.camera.zoom >= DETAIL_ZOOM_THRESHOLD;
+		const reachedInspect = nextViewport.camera.zoom >= INSPECT_ZOOM_THRESHOLD;
+		if (targetTier === "detail" && reachedDetail) {
+			return;
+		}
+		if (targetTier === "inspect" && reachedInspect) {
+			return;
+		}
 	}
 
 	const viewport = await readViewportState(ctx);
@@ -105,7 +126,7 @@ export const scenarioViewportSelection: ScenarioDefinition = {
 	id: "E2E-08",
 	description: "Verifies overview/detail rendering transitions and real creature selection",
 	run: async (ctx) => {
-		await initializePausedSimulation(ctx, 424242, 800);
+		await initializePausedSimulation(ctx, 424242, 800, 512);
 
 		await waitForCondition(
 			async () => {
@@ -123,6 +144,19 @@ export const scenarioViewportSelection: ScenarioDefinition = {
 			"initial overview state settled",
 			10_000,
 		);
+		await waitForCondition(
+			async () => {
+				const viewport = await readViewportState(ctx);
+				const worldView = await readWorldViewState(ctx);
+				return (
+					viewport.viewRequest?.zoomTier === "overview" &&
+					worldView.viewKind === "overview" &&
+					hasPayloadForActiveRequest(viewport.viewRequest, payloadProbe(worldView))
+				);
+			},
+			"overview payload for the active request delivered",
+			10_000,
+		);
 
 		const initialViewport = await readViewportState(ctx);
 		const initialWorldView = await readWorldViewState(ctx);
@@ -132,7 +166,12 @@ export const scenarioViewportSelection: ScenarioDefinition = {
 			"initial camera zoom should be overview scale",
 		);
 		assert(initialWorldView.viewKind === "overview", "initial world view should be overview");
+		assert(
+			hasPayloadForActiveRequest(initialViewport.viewRequest, payloadProbe(initialWorldView)),
+			"initial overview payload should match the active view request",
+		);
 		assert(initialWorldView.frameCreatureCount === 0, "overview should not expose frame creatures");
+		const overviewRequestId = initialWorldView.payloadRequestId ?? 0;
 		await waitForCondition(
 			async () => {
 				const summary = await getCanvasContentSummary(ctx);
@@ -146,10 +185,20 @@ export const scenarioViewportSelection: ScenarioDefinition = {
 
 		await waitForCondition(
 			async () => {
+				const viewport = await readViewportState(ctx);
 				const worldView = await readWorldViewState(ctx);
-				return worldView.viewKind === "detail";
+				return (
+					viewport.viewRequest?.zoomTier === "detail" &&
+					worldView.viewKind === "detail" &&
+					hasPayloadForActiveRequest(
+						viewport.viewRequest,
+						payloadProbe(worldView),
+						overviewRequestId,
+					) &&
+					(worldView.frameCreatureCount > 0 || worldView.frameFoodCount > 0)
+				);
 			},
-			"detail view payload delivered",
+			"detail payload for the active request with visible content delivered",
 			10_000,
 		);
 
@@ -165,6 +214,14 @@ export const scenarioViewportSelection: ScenarioDefinition = {
 			"camera zoom should increase after zooming in",
 		);
 		assert(detailWorldView.viewKind === "detail", "world view should switch to detail");
+		assert(
+			hasPayloadForActiveRequest(
+				detailViewport.viewRequest,
+				payloadProbe(detailWorldView),
+				overviewRequestId,
+			),
+			"detail payload should match the active view request",
+		);
 		await waitForCondition(
 			async () => {
 				const summary = await getCanvasContentSummary(ctx);
@@ -201,7 +258,7 @@ export const scenarioViewportSelection: ScenarioDefinition = {
 		);
 		await waitForCondition(
 			async () => {
-				return (await ctx.browser.isVisible(selectors.creatureInspector)).visible;
+				return (await ctx.browser.getCount(selectors.creatureInspector)).count > 0;
 			},
 			"creature inspector visible after detail click",
 			10_000,
@@ -242,7 +299,7 @@ export const scenarioViewportSelection: ScenarioDefinition = {
 		);
 		await waitForCondition(
 			async () => {
-				return !(await ctx.browser.isVisible(selectors.creatureInspector)).visible;
+				return (await ctx.browser.getCount(selectors.creatureInspector)).count === 0;
 			},
 			"creature inspector hidden in overview after click",
 			10_000,

@@ -105,10 +105,17 @@ export function WorldViewport() {
 		};
 	}, [initRenderer, setCamera, setCanvasSize]);
 
-	// Fit to world when first frame arrives
+	// Fit only when a frame introduces different world dimensions. Subsequent
+	// same-size frames must retain the user's pan and zoom.
 	useEffect(() => {
 		return useWorldViewStore.subscribe((state, prev) => {
-			if (!prev.frame && state.frame && rendererRef.current) {
+			if (
+				rendererRef.current &&
+				state.frame &&
+				(!prev.frame ||
+					state.frame.width !== prev.frame.width ||
+					state.frame.height !== prev.frame.height)
+			) {
 				setCamera(rendererRef.current.fitToWorld(state.frame.width, state.frame.height));
 				rendererRef.current.invalidate();
 				return;

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/rest.ts";
 import { useConfigStore } from "../stores/config.ts";
@@ -151,6 +151,15 @@ const MOCK_CONFIG: SimulationConfig = {
 	},
 };
 
+function deferred<T>() {
+	let resolve!: (value: T) => void;
+	const promise = new Promise<T>((resolvePromise) => {
+		resolve = resolvePromise;
+	});
+
+	return { promise, resolve };
+}
+
 describe("ControlBar", () => {
 	beforeEach(() => {
 		useSimulationStore.getState().reset();
@@ -182,6 +191,76 @@ describe("ControlBar", () => {
 			expect(useSimulationStore.getState().simState).toBe("paused");
 			expect(useSimulationStore.getState().tick).toBe(42);
 		});
+	});
+
+	it("blocks lifecycle commands until the entire restart transaction completes", async () => {
+		const startupRequest = deferred<Awaited<ReturnType<typeof api.startup>>>();
+		const configRequest = deferred<Awaited<ReturnType<typeof api.getConfig>>>();
+		vi.mocked(api.startup).mockImplementation(() => startupRequest.promise);
+		vi.mocked(api.getConfig).mockImplementation(() => configRequest.promise);
+
+		render(
+			<PanelLayoutProvider>
+				<ControlBar />
+			</PanelLayoutProvider>,
+		);
+
+		fireEvent.click(screen.getByTestId("control-restart"));
+
+		await waitFor(() => {
+			expect(api.startup).toHaveBeenCalledTimes(1);
+		});
+
+		const lifecycleControls = screen.getByRole("group", {
+			name: "Simulation lifecycle controls",
+		});
+		expect(lifecycleControls).toHaveAttribute("aria-busy", "true");
+		expect(screen.getByRole("status")).toHaveTextContent("Restarting simulation");
+		expect(screen.getByTestId("control-start")).toBeDisabled();
+		fireEvent.click(screen.getByTestId("control-start"));
+		expect(api.start).not.toHaveBeenCalled();
+
+		await act(async () => {
+			startupRequest.resolve({
+				protocol_version: "v3alpha1",
+				state: "idle",
+				tick: 0,
+				config_digest: "sha256:deadbeef",
+				seeded_creatures: 64,
+			});
+		});
+
+		await waitFor(() => {
+			expect(api.getConfig).toHaveBeenCalledTimes(1);
+		});
+
+		act(() => {
+			useSimulationStore.getState().setSimState("running");
+		});
+		expect(screen.getByTestId("control-pause")).toBeDisabled();
+		fireEvent.click(screen.getByTestId("control-pause"));
+		expect(api.pause).not.toHaveBeenCalled();
+
+		act(() => {
+			useSimulationStore.getState().setSimState("paused");
+		});
+		expect(screen.getByTestId("control-step")).toBeDisabled();
+		fireEvent.click(screen.getByTestId("control-step"));
+		expect(api.step).not.toHaveBeenCalled();
+
+		await act(async () => {
+			configRequest.resolve({
+				protocol_version: "v3alpha1",
+				state: "paused",
+				config: MOCK_CONFIG,
+			});
+		});
+
+		await waitFor(() => {
+			expect(screen.getByTestId("control-step")).toBeEnabled();
+		});
+		expect(lifecycleControls).toHaveAttribute("aria-busy", "false");
+		expect(screen.getByRole("status")).toHaveTextContent("");
 	});
 
 	it("restart from idle calls startup with preset values and reloads config", async () => {
