@@ -2569,6 +2569,120 @@ async fn ws_updates_require_active_subscription() {
     server_task.abort();
 }
 
+// ── 35a. ws_startup_with_changed_dimensions_emits_updated_world_static ───────
+
+#[tokio::test]
+async fn ws_startup_with_changed_dimensions_emits_updated_world_static_for_active_subscriber() {
+    use futures_util::SinkExt;
+    use tokio_tungstenite::connect_async;
+    use tokio_tungstenite::tungstenite::Message;
+    use v3_server::transport::protocol::ServerMessage;
+
+    // Arrange
+    let state = AppState::new();
+    let (ws_url, server_task) = spawn_ws_app(state.clone()).await;
+    let (mut socket, _) = connect_async(ws_url).await.expect("connect websocket");
+    socket
+        .send(Message::Text(
+            serde_json::json!({
+                "type": "subscribe_view",
+                "request_id": 1u64,
+                "x": 0u16,
+                "y": 0u16,
+                "width": 8u16,
+                "height": 8u16,
+                "canvas_width": 320u16,
+                "canvas_height": 240u16,
+                "zoom_tier": "overview"
+            })
+            .to_string(),
+        ))
+        .await
+        .expect("send subscribe message");
+    let initial_messages = recv_server_messages(&mut socket).await;
+    let (initial_projection_revision, initial_world_static_revision) = initial_messages
+        .iter()
+        .find_map(|message| match message {
+            ServerMessage::WorldStatic {
+                projection_revision,
+                world_static_revision,
+                ..
+            } => Some((*projection_revision, *world_static_revision)),
+            _ => None,
+        })
+        .expect("subscribe should prime world static");
+
+    // Act
+    let (startup_status, startup_body) = do_request(
+        router(state.clone()),
+        startup_req(r#"{"seed":424242,"world":{"width":256,"height":256}}"#),
+    )
+    .await;
+    let updated_messages = recv_server_messages(&mut socket).await;
+
+    // Assert
+    assert_eq!(startup_status, StatusCode::OK, "body: {startup_body}");
+    let (updated_projection_revision, updated_world_static_revision, updated_world_static) =
+        updated_messages
+            .iter()
+            .find_map(|message| match message {
+                ServerMessage::WorldStatic {
+                    projection_revision,
+                    world_static_revision,
+                    payload,
+                    ..
+                } => Some((*projection_revision, *world_static_revision, payload)),
+                _ => None,
+            })
+            .expect("startup must emit world static to the active subscriber");
+    assert_eq!(updated_world_static.width, 256);
+    assert_eq!(updated_world_static.height, 256);
+    assert!(
+        updated_world_static_revision > initial_world_static_revision,
+        "startup must advance world static revision: initial={initial_world_static_revision}, updated={updated_world_static_revision}"
+    );
+    assert!(
+        updated_projection_revision > initial_projection_revision,
+        "startup must advance projection revision: initial={initial_projection_revision}, updated={updated_projection_revision}"
+    );
+    assert!(
+        updated_messages.iter().any(|message| matches!(
+            message,
+            ServerMessage::Status {
+                projection_revision,
+                world_static_revision,
+                ..
+            } if *projection_revision == updated_projection_revision
+                && *world_static_revision == updated_world_static_revision
+        )),
+        "startup status must share the world-static publication revisions: {updated_messages:?}"
+    );
+    assert!(
+        updated_messages.iter().any(|message| matches!(
+            message,
+            ServerMessage::ViewOverview {
+                projection_revision,
+                world_static_revision,
+                ..
+            } if *projection_revision == updated_projection_revision
+                && *world_static_revision == updated_world_static_revision
+        )),
+        "startup viewport must share the world-static publication revisions: {updated_messages:?}"
+    );
+
+    let (current_projection_revision, current_world_static_revision) = {
+        let projection = state.projection.read().expect("projection lock poisoned");
+        (
+            projection.current().projection_revision,
+            projection.current().world_static_revision,
+        )
+    };
+    assert_eq!(updated_projection_revision, current_projection_revision);
+    assert_eq!(updated_world_static_revision, current_world_static_revision);
+
+    server_task.abort();
+}
+
 // ── 36. ws_latest_request_id_wins ───────────────────────────────────────────
 
 #[tokio::test]
