@@ -210,7 +210,9 @@ check_conflicting_dependency_direction_statements() {
   local matches_file
   matches_file="$(mktemp)"
 
-  rg -n '(dependency direction|crate direction).*petri-.*->.*petri-.*->.*petri-' AGENTS.md docs 2>/dev/null \
+  while IFS= read -r -d '' source_file; do
+    grep -Ein '(dependency direction|crate direction).*petri-.*->.*petri-.*->.*petri-' "$source_file" 2>/dev/null || true
+  done < <(find AGENTS.md docs -type f -print0) \
     | while IFS= read -r line; do
         local chain
         chain="$(printf '%s' "$line" \

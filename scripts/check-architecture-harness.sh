@@ -44,6 +44,8 @@ trap cleanup EXIT
 
 violations=0
 warnings=0
+baseline_oversize_count=0
+current_oversize_count=0
 
 report_violation() {
   local message="$1"
@@ -126,7 +128,8 @@ check_forbidden_runtime_imports_source() {
     [[ -z "$hit" ]] && continue
     report_violation "forbidden runtime import in pure crate source: ${hit}"
   done < <(
-    rg -n --glob '*.rs' '\b(axum|tokio|hyper|tower_http)::' crates/v3-core/src 2>/dev/null || true
+    find crates/v3-core/src -type f -name '*.rs' -exec \
+      grep -En '(^|[^[:alnum:]_])(axum|tokio|hyper|tower_http)::' {} + 2>/dev/null || true
   )
 }
 
@@ -142,8 +145,11 @@ check_lib_rs_export_focus() {
 
     while IFS= read -r hit; do
       [[ -z "$hit" ]] && continue
-      report_violation "lib.rs must not contain test modules/attributes: ${hit}"
-    done < <(rg -n '^\s*#\[cfg\(test\)\]|^\s*mod\s+tests\b' "$lib_file" || true)
+      report_violation "lib.rs must not contain test modules/attributes: ${lib_file}:${hit}"
+    done < <(
+      grep -En '^[[:space:]]*#\[cfg\(test\)\]|^[[:space:]]*mod[[:space:]]+tests([[:space:]]|$)' \
+        "$lib_file" || true
+    )
 
     while IFS= read -r hit; do
       [[ -z "$hit" ]] && continue
@@ -158,7 +164,10 @@ check_lib_rs_export_focus() {
         continue
       fi
       printf 'declaration\t%s\t%s\n' "$lib_file" "$fingerprint" >> "$CURRENT_DEBT_FILE"
-    done < <(rg -n '^\s*(pub\s+)?(fn|struct|enum)\b|^\s*impl\b' "$lib_file" || true)
+    done < <(
+      grep -En '^[[:space:]]*(pub[[:space:]]+)?(fn|struct|enum)([[:space:]]|$)|^[[:space:]]*impl([[:space:]]|<|$)' \
+        "$lib_file" || true
+    )
   done
 }
 
@@ -208,6 +217,8 @@ check_architecture_debt_baseline() {
 
   LC_ALL=C sort "$BASELINE_FILE" > "$SORTED_BASELINE_FILE"
   LC_ALL=C sort "$CURRENT_DEBT_FILE" > "$SORTED_CURRENT_FILE"
+  baseline_oversize_count="$(awk -F "$TAB" '$1 == "oversize" { count++ } END { print count + 0 }' "$SORTED_BASELINE_FILE")"
+  current_oversize_count="$(awk -F "$TAB" '$1 == "oversize" { count++ } END { print count + 0 }' "$SORTED_CURRENT_FILE")"
 
   local duplicate_oversize_paths
   duplicate_oversize_paths="$(awk -F "$TAB" '$1 == "oversize" && ++seen[$2] == 2 { print $2 }' "$SORTED_BASELINE_FILE")"
@@ -245,7 +256,7 @@ check_architecture_debt_baseline() {
     elif [[ "$current_lines" != "$max_lines" ]]; then
       report_violation "oversize baseline mismatch for $path: expected $max_lines lines, found $current_lines"
     else
-      report_warning "known oversized production file: $path ($current_lines lines)"
+      report_warning "ratcheted known oversized production file: $path ($current_lines lines)"
     fi
   done < "$SORTED_BASELINE_FILE"
 
@@ -280,7 +291,7 @@ check_production_file_sizes
 check_architecture_debt_baseline
 
 echo ""
-echo "Architecture harness summary: mode=$MODE violations=$violations warnings=$warnings"
+echo "Architecture harness summary: mode=$MODE violations=$violations warnings=$warnings ratcheted_debt_baseline_oversize=$baseline_oversize_count current_oversize=$current_oversize_count (no-growth; reductions require baseline update)"
 
 if [[ "$MODE" == "strict" && $violations -gt 0 ]]; then
   exit 1

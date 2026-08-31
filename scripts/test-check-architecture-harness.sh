@@ -7,11 +7,18 @@ trap 'rm -rf "$TEST_ROOT"' EXIT
 
 mkdir -p \
   "$TEST_ROOT/scripts" \
+  "$TEST_ROOT/fake-bin" \
   "$TEST_ROOT/docs/standards" \
   "$TEST_ROOT/crates/v3-cli/src" \
   "$TEST_ROOT/crates/v3-core/src/domain/tests"
 cp "$SOURCE_ROOT/scripts/check-architecture-harness.sh" "$TEST_ROOT/scripts/"
 cp "$SOURCE_ROOT/scripts/check_cargo_policy.py" "$TEST_ROOT/scripts/"
+
+cat > "$TEST_ROOT/fake-bin/rg" <<'EOF'
+#!/usr/bin/env bash
+exit 127
+EOF
+chmod +x "$TEST_ROOT/fake-bin/rg"
 
 printf '%s\n' \
   '[workspace]' \
@@ -75,7 +82,7 @@ printf 'oversize\t%s\t%s\n' \
   >> "$TEST_ROOT/docs/standards/architecture-baseline.tsv"
 
 run_strict() {
-  (cd "$TEST_ROOT" && bash scripts/check-architecture-harness.sh --mode strict)
+  (cd "$TEST_ROOT" && PATH="$TEST_ROOT/fake-bin:$PATH" bash scripts/check-architecture-harness.sh --mode strict)
 }
 
 expect_failure() {
@@ -87,7 +94,24 @@ expect_failure() {
 }
 
 # Exact known debt passes, and nested/conventional test files are not production debt.
-run_strict >/dev/null
+if ! run_strict > "$TEST_ROOT/failure.txt" 2>&1; then
+  cat "$TEST_ROOT/failure.txt"
+  exit 1
+fi
+grep -q 'ratcheted_debt_baseline_oversize=1 current_oversize=1' "$TEST_ROOT/failure.txt"
+
+# Architecture enforcement remains effective when ripgrep is unavailable.
+printf '%s\n' 'use tokio::runtime::Runtime;' > "$TEST_ROOT/crates/v3-core/src/forbidden_import.rs"
+expect_failure 'forbidden runtime import without ripgrep'
+grep -q 'forbidden runtime import in pure crate source: crates/v3-core/src/forbidden_import.rs:1:use tokio::runtime::Runtime;' \
+  "$TEST_ROOT/failure.txt"
+rm -f "$TEST_ROOT/crates/v3-core/src/forbidden_import.rs"
+
+printf '%s\n' '#[cfg(test)]' 'pub mod domain;' > "$TEST_ROOT/crates/v3-core/src/lib.rs"
+expect_failure 'lib.rs test declaration without ripgrep'
+grep -Fq 'lib.rs must not contain test modules/attributes: crates/v3-core/src/lib.rs:1:#[cfg(test)]' \
+  "$TEST_ROOT/failure.txt"
+printf '%s\n' 'pub mod domain;' > "$TEST_ROOT/crates/v3-core/src/lib.rs"
 
 # A production module merely beginning with "test" remains ratcheted as new debt.
 yes '// testing production fixture' | head -n 401 \

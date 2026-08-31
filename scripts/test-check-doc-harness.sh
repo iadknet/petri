@@ -7,9 +7,20 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 
 mkdir -p \
   "$TMP_DIR/scripts" \
+  "$TMP_DIR/fake-bin" \
   "$TMP_DIR/docs/strategy" \
   "$TMP_DIR/.claude/skills/rust-skills"
 cp "$ROOT_DIR/scripts/check-doc-harness.sh" "$TMP_DIR/scripts/check-doc-harness.sh"
+
+cat > "$TMP_DIR/fake-bin/rg" <<'EOF'
+#!/usr/bin/env bash
+exit 127
+EOF
+chmod +x "$TMP_DIR/fake-bin/rg"
+
+run_strict() {
+  (cd "$TMP_DIR" && PATH="$TMP_DIR/fake-bin:$PATH" bash scripts/check-doc-harness.sh --mode strict)
+}
 
 cat > "$TMP_DIR/AGENTS.md" <<'EOF'
 # AGENTS.md
@@ -106,7 +117,7 @@ cat > "$TMP_DIR/docs/guide with space.md" <<'EOF'
 # Angle destination guide
 EOF
 
-if ! (cd "$TMP_DIR" && bash scripts/check-doc-harness.sh --mode strict > "$TMP_DIR/output.txt" 2>&1); then
+if ! run_strict > "$TMP_DIR/output.txt" 2>&1; then
   cat "$TMP_DIR/output.txt"
   exit 1
 fi
@@ -119,7 +130,7 @@ cat > "$TMP_DIR/docs/project.md" <<'EOF'
 Text: ```[Ignored long-span link](ignored-long.md) with ``inner pair`` ``` [Another missing first-party document](missing-after-long.md)
 EOF
 
-if (cd "$TMP_DIR" && bash scripts/check-doc-harness.sh --mode strict > "$TMP_DIR/output.txt" 2>&1); then
+if run_strict > "$TMP_DIR/output.txt" 2>&1; then
   echo "expected strict doc harness to reject a first-party broken link"
   exit 1
 fi
@@ -130,5 +141,24 @@ if grep -Eq 'ignored-double\.md|ignored-long\.md' "$TMP_DIR/output.txt"; then
   echo "markdown code spans must not be treated as links"
   exit 1
 fi
+
+cat > "$TMP_DIR/docs/dependency-a.md" <<'EOF'
+# First dependency direction
+
+Dependency direction: petri-core -> petri-server -> petri-ui
+EOF
+
+cat > "$TMP_DIR/docs/dependency-b.md" <<'EOF'
+# Conflicting dependency direction
+
+Dependency direction: petri-core -> petri-api -> petri-ui
+EOF
+
+if run_strict > "$TMP_DIR/output.txt" 2>&1; then
+  echo "expected strict doc harness to reject conflicting dependency directions without ripgrep"
+  exit 1
+fi
+
+grep -q 'conflicting crate dependency direction statements found' "$TMP_DIR/output.txt"
 
 echo "Doc harness tests passed"

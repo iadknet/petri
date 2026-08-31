@@ -14,6 +14,18 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  secret-scan:
+    name: Secret scan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Scan complete reachable history
+        run: scripts/security/gitleaks-scan.sh
+
   policy-docs:
     name: Policy and docs
     runs-on: ubuntu-24.04
@@ -22,6 +34,10 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
+      - name: Test policy and documentation harnesses
+        run: |
+          scripts/test-check-architecture-harness.sh
+          scripts/test-check-doc-harness.sh
       - name: Verify policy and documentation
         run: |
           scripts/check-doc-harness.sh --mode strict
