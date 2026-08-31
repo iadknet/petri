@@ -53,6 +53,16 @@ When frontend files are touched, also run:
 cd frontend && npm run build
 ```
 
+## Pull-request workflow while private
+
+GitHub Free does not enforce branch protection for this private repository.
+Treat pull requests as the required integration path anyway: do not push
+directly to `main`, keep the branch current, resolve review conversations, and
+wait for green **Secret scan**, **Policy and docs**, **Rust**, and **Frontend**
+jobs before merging. Dependency review and CodeQL are deferred until the
+repository is public or eligible paid security products are deliberately
+enabled.
+
 ## Local SkillSpector audit
 
 SkillSpector is an optional defense-in-depth local audit of the repository's
