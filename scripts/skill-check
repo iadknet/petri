@@ -1,0 +1,37 @@
+#!/bin/sh
+set -eu
+
+require_tools=0
+if [ "${1:-}" = --require-tools ]; then
+  require_tools=1
+  shift
+fi
+
+scanner=.tools/bin/skill-scanner
+if [ ! -x "$scanner" ]; then
+  if [ "$require_tools" -eq 1 ]; then
+    printf 'skill-check: Cisco AI Skill Scanner is missing; run make setup\n' >&2
+    exit 1
+  fi
+  printf 'skill-check: Cisco AI Skill Scanner is not installed; skipping. Run make setup for skill security scanning.\n'
+  exit 0
+fi
+
+roots_found=0
+for skill_root in skills .agents/skills .claude/skills; do
+  [ -d "$skill_root" ] || continue
+  roots_found=1
+  LITELLM_LOCAL_MODEL_COST_MAP=True ORT_DISABLE_TELEMETRY=1 \
+    "$scanner" scan-all "$skill_root" \
+    --recursive \
+    --check-overlap \
+    --use-behavioral \
+    --use-trigger \
+    --policy balanced \
+    --fail-on-severity high \
+    "$@"
+done
+
+if [ "$roots_found" -eq 0 ]; then
+  printf 'skill-check: no project skill directories found; nothing to scan.\n'
+fi

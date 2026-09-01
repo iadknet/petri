@@ -10,13 +10,12 @@
 
 Primary architecture/design planning:
 - `docs/strategy/` (active strategy/design direction)
-- `docs/features/` (active feature lifecycle, refinement, and implementation plans)
+- `docs/prds/active/` (reviewed implementation plans)
 
 Canonical runtime/contracts specs:
 - `docs/reference/` (active V3 specs)
 
-Legacy implementation planning history:
-- `docs/plans/` (superseded planning workflow and archives)
+Historical workflow records are retained only in the private legacy archive.
 
 ## Current Program Status
 
@@ -25,7 +24,7 @@ Legacy implementation planning history:
 | Architecture reconciliation | complete | Mesh execution model and soft-default philosophy stabilized in docs. |
 | Reference specification sync | complete | Execution/tick-orchestration/runtime-config, VM, graph, genome, sensor, lifecycle, mutation, reproduction, and observability specs aligned. |
 | Documentation archival | complete | Non-active docs moved to archive locations; archived-marked docs removed. |
-| Runtime implementation | active | The root Cargo workspace implements the simulation core, server, and CLI; continued evolution follows active feature plans and canonical specs. |
+| Runtime implementation | active | The root Cargo workspace implements the simulation core, server, and CLI; continued evolution follows active PRDs and canonical specs. |
 
 ## Current Focus
 
@@ -33,7 +32,7 @@ Legacy implementation planning history:
 - Enforce crash-proof evaluation under junk-DNA mutation behavior.
 - Keep test reproducibility guarantees explicit and harness-backed.
 
-Determinism scope is canonical in `AGENTS.md` (`Determinism Scope (Canonical)`).
+Test determinism is required where assertions depend on reproducibility.
 
 ## Done Criteria for Current Documentation Phase
 

@@ -1,0 +1,16 @@
+#!/bin/sh
+set -eu
+
+fail() { printf 'bootstrap-check: %s\n' "$*" >&2; exit 1; }
+command -v aqua >/dev/null 2>&1 || fail 'install Aqua >= 2.60.1'
+command -v uv >/dev/null 2>&1 || fail 'install uv 0.12.3'
+command -v rustc >/dev/null 2>&1 || fail 'install Rust 1.93.0'
+command -v node >/dev/null 2>&1 || fail 'install Node 24.20.0'
+command -v npm >/dev/null 2>&1 || fail 'install npm 11.19.0'
+uv_version=$(uv --version | awk '{print $2}')
+[ "$uv_version" = 0.12.3 ] || fail "uv must be 0.12.3, found $uv_version"
+rust_version=$(rustc --version | awk '{print $2}')
+[ "$rust_version" = 1.93.0 ] || fail "Rust must be 1.93.0, found $rust_version"
+[ "$(node --version)" = v24.20.0 ] || fail "Node must be v24.20.0, found $(node --version)"
+[ "$(npm --version)" = 11.19.0 ] || fail "npm must be 11.19.0, found $(npm --version)"
+scripts/aqua install >/dev/null

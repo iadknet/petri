@@ -1,0 +1,37 @@
+#!/bin/sh
+set -eu
+
+require_tools=0
+if [ "${1:-}" = --require-tools ]; then
+  require_tools=1
+  shift
+fi
+[ "$#" -eq 0 ] || { printf 'Usage: scripts/dependency-audit [--require-tools]\n' >&2; exit 2; }
+
+has_lockfile() {
+  find . \
+    -type d \( -name .git -o -name .tools -o -name node_modules \) -prune -o \
+    -type f \( \
+      -name bun.lock -o -name package-lock.json -o -name pnpm-lock.yaml -o -name yarn.lock -o \
+      -name uv.lock -o -name poetry.lock -o -name Pipfile.lock -o -name pylock.toml -o \
+      -name Cargo.lock -o -name Gemfile.lock -o -name composer.lock -o -name go.mod -o \
+      -name mix.lock -o -name pubspec.lock \
+    \) -print -quit | grep -q .
+}
+
+if ! has_lockfile; then
+  printf 'dependency-audit: no supported dependency lockfiles found; skipping.\n'
+  exit 0
+fi
+
+scanner=.tools/aqua/bin/osv-scanner
+if [ ! -x "$scanner" ]; then
+  if [ "$require_tools" -eq 1 ]; then
+    printf 'dependency-audit: OSV-Scanner is missing; run make setup\n' >&2
+    exit 1
+  fi
+  printf 'dependency-audit: OSV-Scanner is not installed; skipping. Run make setup for dependency scanning.\n'
+  exit 0
+fi
+
+scripts/aqua exec osv-scanner scan source --recursive .

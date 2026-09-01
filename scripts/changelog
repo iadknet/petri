@@ -1,0 +1,73 @@
+#!/bin/sh
+set -eu
+
+usage() {
+  printf 'Usage: changelog v<major>.<minor>.<patch>\n' >&2
+  exit 2
+}
+
+[ "$#" -eq 1 ] || usage
+version=$1
+printf '%s\n' "$version" | grep -Eq '^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$' || usage
+
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+cd "$root"
+changelog=CHANGELOG.md
+[ -f "$changelog" ] || { printf 'changelog: %s is missing\n' "$changelog" >&2; exit 1; }
+[ "$(grep -Fxc '## [Unreleased]' "$changelog")" -eq 1 ] || {
+  printf 'changelog: %s must contain exactly one Unreleased heading\n' "$changelog" >&2
+  exit 1
+}
+if grep -Fq "## [$version] -" "$changelog"; then
+  printf 'changelog: %s already contains %s\n' "$changelog" "$version" >&2
+  exit 1
+fi
+
+previous_tag=$(git tag --merged HEAD --list 'v[0-9]*' --sort=-version:refname | head -n 1)
+if [ -n "$previous_tag" ]; then
+  range=$previous_tag..HEAD
+else
+  range=HEAD
+fi
+
+tmp=$(mktemp -d "${TMPDIR:-/tmp}/changelog.XXXXXX")
+trap 'rm -rf "$tmp"' EXIT HUP INT TERM
+added=$tmp/added
+fixed=$tmp/fixed
+changed=$tmp/changed
+commits=$tmp/commits
+git log --no-merges --format='%h%x09%s' "$range" >"$commits"
+[ -s "$commits" ] || { printf 'changelog: no commits found for %s\n' "$version" >&2; exit 1; }
+
+tab=$(printf '\t')
+while IFS="$tab" read -r hash subject; do
+  entry="- $subject (\`$hash\`)"
+  case $subject in
+    feat*) printf '%s\n' "$entry" >>"$added" ;;
+    fix*) printf '%s\n' "$entry" >>"$fixed" ;;
+    *) printf '%s\n' "$entry" >>"$changed" ;;
+  esac
+done <"$commits"
+
+section=$tmp/section
+printf '## [%s] - %s\n' "$version" "$(date +%F)" >"$section"
+for category in Added Fixed Changed; do
+  category_file=$(printf '%s' "$category" | tr '[:upper:]' '[:lower:]')
+  file=$tmp/$category_file
+  [ -s "$file" ] || continue
+  printf '\n### %s\n\n' "$category" >>"$section"
+  cat "$file" >>"$section"
+done
+printf '\n' >>"$section"
+
+awk -v section="$section" '
+  { print }
+  $0 == "## [Unreleased]" {
+    print ""
+    while ((getline line < section) > 0) print line
+    close(section)
+  }
+' "$changelog" >"$tmp/CHANGELOG.md"
+mv "$tmp/CHANGELOG.md" "$changelog"
+
+printf 'Generated %s from %s.\n' "$changelog" "$range"
