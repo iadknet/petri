@@ -12,15 +12,9 @@ scripts/dependency-policy-check
 scripts/skill-provenance-check
 scripts/residual-cruft-check
 
-for shell_file in scripts/*; do
-  [ -f "$shell_file" ] || continue
-  case "$(head -n 1 "$shell_file")" in
-    '#!'*node*|'#!'*python*|*'node'*) continue ;;
-    '#!'*zsh*) zsh -n "$shell_file" || fail "$shell_file has invalid Zsh syntax" ;;
-    '#!'*bash*) bash -n "$shell_file" || fail "$shell_file has invalid Bash syntax" ;;
-    *) sh -n "$shell_file" || fail "$shell_file has invalid POSIX shell syntax" ;;
-  esac
-done
+if find scripts -type f -exec grep -l '^#!.*zsh' {} + | grep -q .; then
+  fail 'Zsh scripts are not supported; use POSIX shell instead'
+fi
 
 for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
   [ -f "$workflow" ] || continue
