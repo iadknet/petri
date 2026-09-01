@@ -10,7 +10,8 @@ name: prd-review
 ---
 # Review a PRD or Its Implementation
 
-Review independently. The master's `Review Count` is the number of automated PRD
+Review independently with compact path/artifact handoffs, never full-history
+forks. The master's `Review Count` is the number of automated PRD
 readiness reviews attempted. It starts at 0 and never exceeds 3. `Review Status`
 is `DRAFT` until readiness is approved, then `APPROVED`. Final-code review does
 not change either readiness field.
@@ -39,8 +40,9 @@ Classify findings:
 2. Increment `Review Count` by one for this attempt, review the current PRD, and
    report severity-ranked findings directly to the user.
 3. P1/P2 findings block automated approval. Make or request authorized in-scope
-   PRD revisions, then repeat from step 1 while the count is below 3. P3 findings
-   do not block approval.
+   PRD revisions, then repeat from step 1 while the count is below 3. Stop for
+   direction if revision exceeds the declared scope budget. P3 findings do not
+   block approval.
 4. If an attempt finds no P1/P2 findings, set `Review Status: APPROVED`, set the
    master and stages to `Ready`, update the index, and run `scripts/prd-check`.
 5. If P1/P2 findings remain after attempt 3, keep `Review Status: DRAFT` and stop
@@ -58,8 +60,10 @@ Do not create separate review-record files.
 
 1. Inspect the actual implementation diff and rerun the verification declared by
    affected stages.
-2. P1/P2 findings block completion. Make or request authorized fixes and review
-   again; P3 findings do not block the stated outcome.
+2. P1/P2 findings block completion. In Lean mode, allow one fix pass by the
+   original implementer, then rerun affected verification and `make check`.
+   Stop for direction instead of opening another review/remediation cycle; P3
+   findings do not block the stated outcome.
 3. On a pass, mark documentation synchronization and final-code review checkboxes
    complete and set the master `Complete` only when every stage and checkbox is
    complete. Update the index, run `scripts/prd-check`, and leave `Review Status`

@@ -2,13 +2,25 @@
 set -eu
 
 usage() {
-  printf 'Usage: scripts/prd-new <kebab-slug> <stage-slug> [stage-slug ...]\n' >&2
+  printf 'Usage: scripts/prd-new [--deep] <kebab-slug> <stage-slug> [stage-slug ...]\n' >&2
 }
+
+execution_mode=Lean
+deep_authorization=NO
+max_stages=2
+max_files=25
+if [ "${1:-}" = --deep ]; then
+  execution_mode=Deep
+  deep_authorization=YES
+  max_stages=99
+  max_files=999
+  shift
+fi
 
 [ "$#" -ge 2 ] || { usage; exit 2; }
 prd_slug=$1
 shift
-[ "$#" -le 99 ] || { printf 'prd-new: at most 99 stages are supported\n' >&2; exit 1; }
+[ "$#" -le "$max_stages" ] || { printf 'prd-new: Lean mode supports at most 2 stages; use --deep only after explicit user opt-in\n' >&2; exit 1; }
 case $prd_slug in ''|*[!a-z0-9-]*|-*|*-|*--*) printf 'prd-new: invalid kebab-case PRD slug: %s\n' "$prd_slug" >&2; exit 1 ;; esac
 
 stage_slugs_seen=' '
@@ -33,7 +45,7 @@ created=$(date +%F)
 
 {
   printf '# %s — Master PRD\n\n' "$prd_title"
-    printf '%s\n' '- Status: Draft' '- Owner: Unassigned' "- Created: $created" '- Review Status: DRAFT' '- Review Count: 0'
+    printf '%s\n' '- Status: Draft' '- Owner: Unassigned' "- Created: $created" '- Review Status: DRAFT' '- Review Count: 0' "- Execution Mode: $execution_mode" "- Deep Authorization: $deep_authorization" "- Scope Budget: Stages <= $max_stages; Affected Files <= $max_files"
   cat <<'EOF'
 
 ## Goal
@@ -92,10 +104,22 @@ Summarize stage ordering and contracts here without duplicating stage tasks.
 
 - [ ] Keep stage links and status summaries current.
 
-## Verification and Observable Success Criteria
+## Acceptance-Criterion-to-Evidence Mapping
+
+| Acceptance criterion | Evidence |
+| --- | --- |
+| Every stage's declared verification passes. | Stage verification records. |
+| Documentation is synchronized or has a no-change rationale. | Documentation gate. |
+| Final-code review passes. | Final review record. |
+
+## Focused Verification
 
 - [ ] Every stage's declared verification has passed.
 - [ ] Affected durable documentation is created, updated, or synchronized, or a no-change rationale is recorded.
+
+## Full Verification
+
+- [ ] Run `make check` before final review and after any P1/P2 fix pass.
 - [ ] The final-code review gate has passed.
 
 ## Current Status
@@ -153,10 +177,20 @@ documentation to create, update, or synchronize. If none is affected, write
 
 - [ ] Complete a concrete task.
 
-## Verification and Observable Success Criteria
+## Acceptance-Criterion-to-Evidence Mapping
+
+| Acceptance criterion | Evidence |
+| --- | --- |
+| State the observable outcome. | Link the focused test, inspection, or command output. |
+
+## Focused Verification
 
 - [ ] Run a concrete check and record the observable result.
 - [ ] Affected durable documentation is created, updated, or synchronized, or a no-change rationale is recorded.
+
+## Full Verification
+
+- [ ] The master PRD records the applicable `make check` result.
 
 ## Current Status
 

@@ -10,6 +10,9 @@ For new work, create a PRD set with:
 scripts/prd-new <kebab-slug> <stage-slug> [stage-slug ...]
 ```
 
+Lean mode permits at most two stages. Use `--deep` only after the user has
+explicitly opted in; the generated PRD records that authorization.
+
 Review security-sensitive reports privately as described in `SECURITY.md`.
 When adding or changing dependencies, follow the age-gate, lockfile, registry,
 and exception rules in `SECURITY.md`; run `make dependency-audit` after setup.

@@ -11,6 +11,10 @@ prd_status() {
   sed -n 's/^- Status: //p' "$1" | sed -n '1p'
 }
 
+prd_metadata() {
+  sed -n "s/^- $2: //p" "$1" | sed -n '1p'
+}
+
 prd_line_count() {
   awk 'END { print NR + 0 }' "$1"
 }
@@ -18,9 +22,12 @@ prd_line_count() {
 prd_check_document() {
   prd_doc=$1
   prd_kind=$2
+  prd_mode=$3
   prd_lines=$(prd_line_count "$prd_doc")
-  if [ "$prd_lines" -gt 750 ]; then
-    prd_error "$prd_doc has $prd_lines physical lines; maximum is 750"
+  prd_max_lines=750
+  [ "$prd_mode" = Lean ] && prd_max_lines=350
+  if [ "$prd_lines" -gt "$prd_max_lines" ]; then
+    prd_error "$prd_doc has $prd_lines physical lines; maximum is $prd_max_lines for $prd_mode mode"
   fi
 
   for prd_heading in \
@@ -33,7 +40,9 @@ prd_check_document() {
     '## Tech Debt and Spaghetti-Code Implications' \
     '## Documentation Impact and Synchronization' \
     '## Implementation or Decision Tasks' \
-    '## Verification and Observable Success Criteria' \
+    '## Acceptance-Criterion-to-Evidence Mapping' \
+    '## Focused Verification' \
+    '## Full Verification' \
     '## Current Status'
   do
     grep -Fqx "$prd_heading" "$prd_doc" || prd_error "$prd_doc is missing heading: $prd_heading"
@@ -70,7 +79,34 @@ prd_check_set() {
 
   prd_master=$prd_set/master-prd.md
   [ -f "$prd_master" ] || { prd_error "$prd_set is missing master-prd.md"; return; }
-  prd_check_document "$prd_master" master
+
+  prd_mode=$(prd_metadata "$prd_master" 'Execution Mode')
+  case $prd_mode in
+    Lean|Deep) ;;
+    *) prd_error "$prd_master has an invalid or missing Execution Mode: ${prd_mode:-<empty>}"; prd_mode=Deep ;;
+  esac
+  prd_deep_authorization=$(prd_metadata "$prd_master" 'Deep Authorization')
+  case $prd_mode:$prd_deep_authorization in
+    Lean:NO|Deep:YES) ;;
+    Lean:*) prd_error "$prd_master Lean mode requires Deep Authorization: NO" ;;
+    Deep:*) prd_error "$prd_master Deep mode requires Deep Authorization: YES" ;;
+  esac
+
+  prd_scope_budget=$(sed -n 's/^- Scope Budget: Stages <= \([0-9][0-9]*\); Affected Files <= \([0-9][0-9]*\)$/\1 \2/p' "$prd_master" | sed -n '1p')
+  set -- $prd_scope_budget
+  if [ "$#" -ne 2 ]; then
+    prd_error "$prd_master has an invalid or missing Scope Budget"
+    prd_scope_stages=99
+    prd_scope_files=9999
+  else
+    prd_scope_stages=$1
+    prd_scope_files=$2
+  fi
+  if [ "$prd_mode" = Lean ] && { [ "$prd_scope_stages" -gt 2 ] || [ "$prd_scope_files" -gt 25 ]; }; then
+    prd_error "$prd_master Lean scope budget exceeds 2 stages or 25 affected files"
+  fi
+
+  prd_check_document "$prd_master" master "$prd_mode"
 
   prd_review_count=$(sed -n 's/^- Review Count: //p' "$prd_master" | sed -n '1p')
   case $prd_review_count in
@@ -108,7 +144,7 @@ prd_check_set() {
     prd_stage_slug=${prd_stage_slug%.md}
     case $prd_stage_slug in ''|*[!a-z0-9-]*|-*|*-|*--*) prd_error "$prd_stage has an invalid kebab-case stage slug" ;; esac
 
-    prd_check_document "$prd_stage" stage
+    prd_check_document "$prd_stage" stage "$prd_mode"
     prd_stage_status=$(prd_status "$prd_stage")
     [ "$prd_stage_status" = Draft ] || prd_all_draft=0
     case $prd_stage_status in Ready|'In Progress'|Complete) ;; *) prd_all_ready=0 ;; esac
@@ -154,6 +190,12 @@ prd_check_set() {
     prd_expected_stage=$((prd_expected_stage + 1))
   done
   [ "$prd_stage_count" -gt 0 ] || prd_error "$prd_set must contain at least one stage"
+  if [ "$prd_mode" = Lean ] && [ "$prd_stage_count" -gt 2 ]; then
+    prd_error "$prd_set Lean mode has $prd_stage_count stages; maximum is 2"
+  fi
+  if [ "$prd_stage_count" -gt "$prd_scope_stages" ]; then
+    prd_error "$prd_set has $prd_stage_count stages; Scope Budget allows $prd_scope_stages"
+  fi
 
   prd_master_stage_count=0
   # shellcheck disable=SC2016 # Backticks are literal Markdown.

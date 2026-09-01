@@ -10,8 +10,10 @@ name: prd-create
 ---
 # Create a PRD Set
 
-Turn an outcome into a lean, executable PRD set under
-`docs/prds/active/<kebab-slug>/`.
+Turn an outcome into a compact, executable PRD set under
+`docs/prds/active/<kebab-slug>/`. Lean is the default: no more than two stages,
+an affected-file budget of 25, and short documents. Use Deep only when the user
+explicitly opts in; record that authorization in the generated metadata.
 
 ## Workflow
 
@@ -20,8 +22,9 @@ Turn an outcome into a lean, executable PRD set under
 2. Research credible existing solutions, standards, and current primary sources
    when a technology or design choice is involved. Record links, tradeoffs, and why
    rejected options do not fit; do not invent custom machinery without evidence.
-3. Run `scripts/prd-new <slug> <stage-slug> [stage-slug ...]` for a new set.
-   Revise existing files in place when the set already exists.
+3. Run `scripts/prd-new <slug> <stage-slug> [stage-slug ...]` for a new Lean
+   set. Use `--deep` only after explicit user opt-in. Revise existing files in
+   place when the set already exists.
 4. Keep the master at outcome and cross-stage level. Put concrete implementation
    and decision tasks in dependency-ordered stages.
 5. For every master and stage, make scope, non-goals, existing-code interactions,
@@ -34,10 +37,20 @@ Turn an outcome into a lean, executable PRD set under
 6. Split a stage when it mixes independently testable components, unrelated
    abstraction levels, or tasks with different dependencies. Do not split merely
    to make files short.
-7. Keep each PRD at or below 750 physical lines and all checkboxes truthful. New
+7. Complete the execution-mode, Deep-authorization, and scope-budget metadata.
+   In Lean mode, keep the budget at no more than two stages and 25 affected
+   files; use compact acceptance-criterion-to-evidence mappings instead of
+   repeated prose. Declare focused checks separately from the one full
+   `make check` gate.
+8. Keep each Lean PRD document at or below 350 physical lines (750 in authorized
+   Deep mode) and all checkboxes truthful. New
    and materially revised PRDs start with status `Draft`, `Review Status: DRAFT`,
    and `Review Count: 0`; `$prd-review` owns subsequent review-state changes.
-8. Run `scripts/prd-index` and `scripts/prd-check` before handing off.
+9. Run `scripts/prd-index` and `scripts/prd-check` before handing off.
+
+Use artifact/path handoffs, never full-history forks. Stop for direction if
+research or decomposition exceeds the declared budget; do not add a recursive
+planning cycle.
 
 Do not implement product code while using this skill unless the user separately
 authorizes implementation.
