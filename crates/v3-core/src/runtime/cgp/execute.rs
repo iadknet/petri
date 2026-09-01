@@ -65,6 +65,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
     upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
     energy: &mut f32,
     energy_consumed: f32,
+    reproductive_reserve: f32,
     node_idx: usize,
     graph_runtime: &mut GraphRuntimeState,
     sensors: &SensorSnapshot,
@@ -140,6 +141,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
             upstream_slots,
             energy: *energy,
             energy_consumed,
+            reproductive_reserve,
             action_queue: &side_outputs.action_queue,
         };
 
@@ -231,6 +233,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
             upstream_slots,
             energy: *energy,
             energy_consumed,
+            reproductive_reserve,
             action_queue: &queue_snapshot,
         };
         let plasticity_cost = hebbian::apply_hebbian_updates(
@@ -264,6 +267,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
             upstream_slots,
             energy: *energy,
             energy_consumed,
+            reproductive_reserve,
             action_queue: &queue_snapshot,
         };
         traces::update_eligibility_traces(
@@ -285,6 +289,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
         upstream_slots,
         energy: *energy,
         energy_consumed,
+        reproductive_reserve,
         action_queue: &queue_snapshot,
     };
     let (result, effects_trace) = apply_cgp_graph_effects(
@@ -311,12 +316,13 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn execute_graph_node(
+pub(crate) fn execute_graph_node_with_reserve(
     def: &CgpGraphBackendDef,
     input_refs: &[InputReference],
     upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
     energy: &mut f32,
     energy_consumed: f32,
+    reproductive_reserve: f32,
     node_idx: usize,
     graph_runtime: &mut GraphRuntimeState,
     sensors: &SensorSnapshot,
@@ -332,6 +338,7 @@ pub(crate) fn execute_graph_node(
         upstream_slots,
         energy,
         energy_consumed,
+        reproductive_reserve,
         node_idx,
         graph_runtime,
         sensors,

@@ -87,6 +87,10 @@ pub struct FoodTypeConfig {
     pub initial_coverage: f32,
     #[serde(default = "default_growth_inhibitor")]
     pub growth_inhibitor: f32,
+    /// Metabolic energy granted per unit of consumed density.
+    pub metabolic_energy_yield: f32,
+    /// Reproductive reserve granted per unit of consumed density.
+    pub reproductive_reserve_yield: f32,
 }
 
 impl Default for FoodTypeConfig {
@@ -97,6 +101,8 @@ impl Default for FoodTypeConfig {
             initial_density: 1.0,
             initial_coverage: 0.54,
             growth_inhibitor: default_growth_inhibitor(),
+            metabolic_energy_yield: 5.0,
+            reproductive_reserve_yield: 0.0,
         }
     }
 }
@@ -232,7 +238,23 @@ pub struct FoodConfig {
 }
 
 fn default_food_types() -> Vec<FoodTypeConfig> {
-    vec![FoodTypeConfig::default()]
+    vec![
+        FoodTypeConfig {
+            name: "Maintenance Food".to_string(),
+            initial_coverage: 0.27,
+            metabolic_energy_yield: 10.0,
+            reproductive_reserve_yield: 0.0,
+            ..FoodTypeConfig::default()
+        },
+        FoodTypeConfig {
+            name: "Reproductive Food".to_string(),
+            color: "#f59e0b".to_string(),
+            initial_coverage: 0.27,
+            metabolic_energy_yield: 0.0,
+            reproductive_reserve_yield: 1.0,
+            ..FoodTypeConfig::default()
+        },
+    ]
 }
 
 impl Default for FoodConfig {
@@ -392,7 +414,6 @@ pub struct EnergyCostsConfig {
     pub eat_cost: f32,
     pub noop_cost: f32,
     pub reproduce_cost: f32,
-    pub eat_reward_per_food: f32,
     /// Additional energy penalty applied when an action fails (move blocked, eat empty cell, etc.).
     pub failed_action_penalty: f32,
 }
@@ -404,8 +425,26 @@ impl Default for EnergyCostsConfig {
             eat_cost: 0.0,
             noop_cost: 0.05,
             reproduce_cost: 0.1,
-            eat_reward_per_food: 5.0,
             failed_action_penalty: 1.0,
+        }
+    }
+}
+
+/// Startup-owned reproductive reserve limits.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct NutritionConfig {
+    /// Maximum reproductive reserve a creature can hold.
+    pub reproductive_reserve_capacity: f32,
+    /// Reserve consumed by each successful reproduction.
+    pub reproductive_reserve_cost: f32,
+}
+
+impl Default for NutritionConfig {
+    fn default() -> Self {
+        Self {
+            reproductive_reserve_capacity: 8.0,
+            reproductive_reserve_cost: 4.0,
         }
     }
 }
@@ -846,6 +885,7 @@ impl Default for PopulationConfig {
 pub struct SimulationConfig {
     pub world: WorldConfig,
     pub energy: EnergyConfig,
+    pub nutrition: NutritionConfig,
     #[serde(default)]
     pub startup: StartupConfig,
     pub runtime: RuntimeConfig,
@@ -905,8 +945,18 @@ impl SimulationConfig {
         ec.eat_cost = normalize_f32_finite_nonneg(ec.eat_cost, 0.0);
         ec.noop_cost = normalize_f32_finite_nonneg(ec.noop_cost, 0.05);
         ec.reproduce_cost = normalize_f32_finite_nonneg(ec.reproduce_cost, 0.1);
-        ec.eat_reward_per_food = normalize_f32_finite_nonneg(ec.eat_reward_per_food, 5.0);
         ec.failed_action_penalty = normalize_f32_finite_nonneg(ec.failed_action_penalty, 1.0);
+        for food_type in &mut self.world.food.types {
+            food_type.metabolic_energy_yield =
+                normalize_f32_finite_nonneg(food_type.metabolic_energy_yield, 5.0);
+            food_type.reproductive_reserve_yield =
+                normalize_f32_finite_nonneg(food_type.reproductive_reserve_yield, 0.0);
+        }
+        self.nutrition.reproductive_reserve_capacity =
+            normalize_f32_finite_positive(self.nutrition.reproductive_reserve_capacity, 8.0);
+        self.nutrition.reproductive_reserve_cost =
+            normalize_f32_finite_positive(self.nutrition.reproductive_reserve_cost, 4.0)
+                .min(self.nutrition.reproductive_reserve_capacity);
         let failed_penalty_fallback = ec.failed_action_penalty;
 
         let ramp = &mut self.startup.ramps.failed_action_penalty;
@@ -1207,7 +1257,10 @@ mod tests {
         assert!((cfg.energy.costs.eat_cost - 0.0).abs() < 1e-6);
         assert!((cfg.energy.costs.noop_cost - 0.05).abs() < 1e-6);
         assert!((cfg.energy.costs.reproduce_cost - 0.1).abs() < 1e-6);
-        assert!((cfg.energy.costs.eat_reward_per_food - 5.0).abs() < 1e-6);
+        assert!((cfg.world.food.types[0].metabolic_energy_yield - 10.0).abs() < 1e-6);
+        assert!((cfg.world.food.types[1].reproductive_reserve_yield - 1.0).abs() < 1e-6);
+        assert!((cfg.nutrition.reproductive_reserve_capacity - 8.0).abs() < 1e-6);
+        assert!((cfg.nutrition.reproductive_reserve_cost - 4.0).abs() < 1e-6);
         assert!((cfg.energy.costs.failed_action_penalty - 1.0).abs() < 1e-6);
         // Startup ramps
         assert!(cfg.startup.ramps.failed_action_penalty.enabled);
@@ -1253,6 +1306,22 @@ mod tests {
         assert_eq!(cfg.population.initial_creatures, 10000);
         assert_eq!(cfg.population.max_creatures, 100000);
         assert_eq!(cfg.population.founder_profile, FounderProfile::V3Alpha1);
+    }
+
+    #[test]
+    fn normalize_nutrition_values_rejects_nonfinite_and_out_of_bounds_values() {
+        let mut cfg = SimulationConfig::default();
+        cfg.world.food.types[0].metabolic_energy_yield = f32::NAN;
+        cfg.world.food.types[1].reproductive_reserve_yield = -1.0;
+        cfg.nutrition.reproductive_reserve_capacity = f32::INFINITY;
+        cfg.nutrition.reproductive_reserve_cost = 100.0;
+
+        cfg.normalize();
+
+        assert!((cfg.world.food.types[0].metabolic_energy_yield - 5.0).abs() < 1e-6);
+        assert_eq!(cfg.world.food.types[1].reproductive_reserve_yield, 0.0);
+        assert!((cfg.nutrition.reproductive_reserve_capacity - 8.0).abs() < 1e-6);
+        assert!((cfg.nutrition.reproductive_reserve_cost - 8.0).abs() < 1e-6);
     }
 
     #[test]
@@ -1756,7 +1825,7 @@ mod tests {
     #[test]
     fn age_cost_config_serde_default_when_missing() {
         // EnergyConfig without age_cost field should get defaults via #[serde(default)]
-        let json = r#"{"lifecycle":{"initial_energy":20.0,"max_energy":200.0,"energy_decay_per_tick":0.5,"min_reproduce_energy":1.0,"default_offspring_energy":100.0},"costs":{"move_cost":1.0,"eat_cost":0.0,"noop_cost":0.05,"reproduce_cost":0.1,"eat_reward_per_food":12.0,"failed_action_penalty":5.0},"complexity_cost":{"enabled":true,"threshold":50,"scaling_factor":0.002}}"#;
+        let json = r#"{"lifecycle":{"initial_energy":20.0,"max_energy":200.0,"energy_decay_per_tick":0.5,"min_reproduce_energy":1.0,"default_offspring_energy":100.0},"costs":{"move_cost":1.0,"eat_cost":0.0,"noop_cost":0.05,"reproduce_cost":0.1,"failed_action_penalty":5.0},"complexity_cost":{"enabled":true,"threshold":50,"scaling_factor":0.002}}"#;
         let ec: EnergyConfig = serde_json::from_str(json).unwrap();
         assert!(ec.age_cost.enabled);
         assert_eq!(ec.age_cost.age_cap, 500);
@@ -2036,12 +2105,13 @@ mod tests {
     // ── Food config / FertilityConfig / AnnealingConfig tests ─────────────
 
     #[test]
-    fn food_config_default_has_one_type_and_all_food_fertility_layers() {
+    fn food_config_default_has_complementary_types_and_all_food_fertility_layers() {
         let config = FoodConfig::default();
         assert!(config.shared.occupancy_depletion.enabled);
         assert!((config.shared.occupancy_depletion.deposit_per_occupied_tick - 0.08).abs() < 1e-6);
-        assert_eq!(config.types.len(), 1);
-        assert_eq!(config.types[0], FoodTypeConfig::default());
+        assert_eq!(config.types.len(), 2);
+        assert_eq!(config.types[0].name, "Maintenance Food");
+        assert_eq!(config.types[1].name, "Reproductive Food");
         assert!(config.fertility.enabled);
         assert_eq!(config.fertility.min_fertility, 0.0);
         assert_eq!(config.fertility.max_fertility, 2.0);
@@ -2075,7 +2145,7 @@ mod tests {
         assert!(config.shared.occupancy_depletion.enabled);
         assert!(config.fertility.enabled);
         assert!(!config.shared.annealing.enabled);
-        assert_eq!(config.types.len(), 1);
+        assert_eq!(config.types.len(), 2);
         assert_eq!(config.fertility.layers.len(), 2);
         assert!(matches!(
             config.fertility.layers[0].target,
@@ -2123,8 +2193,8 @@ mod tests {
 
         assert_eq!(world.width, 1600);
         assert_eq!(world.height, 1600);
-        assert_eq!(world.food.types.len(), 1);
-        assert_eq!(world.food.types[0], FoodTypeConfig::default());
+        assert_eq!(world.food.types.len(), 2);
+        assert_eq!(world.food.types, FoodConfig::default().types);
     }
 
     #[test]
@@ -2163,15 +2233,13 @@ mod tests {
 
     #[test]
     fn food_type_config_defaults_growth_inhibitor_when_field_is_omitted() {
-        let parsed: FoodTypeConfig = serde_json::from_value(serde_json::json!({
+        let result: Result<FoodTypeConfig, _> = serde_json::from_value(serde_json::json!({
             "name": "Legacy Food",
             "color": "#ffffff",
             "initial_density": 0.4,
             "initial_coverage": 0.6
-        }))
-        .expect("legacy food config should deserialize");
-
-        assert!((parsed.growth_inhibitor - 0.2).abs() < 1e-6);
+        }));
+        assert!(result.is_err(), "typed yields are required in the schema");
     }
 
     #[test]

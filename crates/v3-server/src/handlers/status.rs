@@ -13,6 +13,10 @@ fn patch_touches_startup(patch: &serde_json::Value) -> bool {
     patch.get("startup").is_some()
 }
 
+fn patch_touches_nutrition(patch: &serde_json::Value) -> bool {
+    patch.get("nutrition").is_some()
+}
+
 fn patch_touches_failed_action_penalty(patch: &serde_json::Value) -> bool {
     patch
         .get("energy")
@@ -88,6 +92,15 @@ pub async fn patch_config(
             field_errors: vec![FieldError {
                 field: "startup".into(),
                 reason: "startup config is restart-only and cannot be patched".into(),
+            }],
+            endpoint: "patch_config",
+        });
+    }
+    if patch_touches_nutrition(&patch) {
+        return Err(AppError::ValidationRejected {
+            field_errors: vec![FieldError {
+                field: "nutrition".into(),
+                reason: "nutrition config is restart-only and cannot be patched".into(),
             }],
             endpoint: "patch_config",
         });

@@ -8,6 +8,8 @@ export interface CreatureStats {
 	position: { x: number; y: number };
 	energy: number;
 	maxEnergy: number;
+	reproductiveReserve: number;
+	reproductiveReserveCapacity: number;
 	age: number;
 	generation: number;
 	complexity: number;
@@ -54,6 +56,8 @@ interface CreatureInspectorState {
 		position: { x: number; y: number };
 		energy: number;
 		maxEnergy: number;
+		reproductiveReserve: number;
+		reproductiveReserveCapacity: number;
 		age: number;
 		generation: number;
 		complexity: number;
@@ -130,6 +134,8 @@ export const useCreatureInspectorStore = create<CreatureInspectorState>()((set, 
 			position: detail.position,
 			energy: detail.energy,
 			maxEnergy: detail.maxEnergy,
+			reproductiveReserve: detail.reproductiveReserve,
+			reproductiveReserveCapacity: detail.reproductiveReserveCapacity,
 			age: detail.age,
 			generation: detail.generation,
 			complexity: detail.complexity,

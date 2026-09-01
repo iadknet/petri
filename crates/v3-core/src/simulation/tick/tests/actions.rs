@@ -1,11 +1,12 @@
 use super::super::run_tick;
 use super::support::*;
 use crate::contracts::{Direction, InputReference, NodeId, Position, WorldInputKey};
+use crate::creature::action_log::{ActionResult, ActionType};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
 use crate::simulation::actions::{
-    apply_eat, apply_move, apply_reproduce, apply_steal_energy, BarrierReaderState,
+    apply_move, apply_reproduce, apply_steal_energy, apply_typed_eat, BarrierReaderState,
     MoveBlockedCause, ReproductionInvalidTargetCause,
 };
 use crate::simulation::seeding::seed_simulation;
@@ -103,6 +104,88 @@ fn queued_actions_stop_once_action_exhausts_creature_energy() {
 }
 
 #[test]
+fn rejected_reproduction_records_nutrition_constraint_in_action_log() {
+    let genome = vm_program_genome(vec![
+        VmInstruction::PushAction { action_type: 3 },
+        VmInstruction::ExecuteActionQueue,
+    ]);
+    let (mut sim, id) = make_sim_with_custom_genome(80.0, genome);
+    sim.config.energy.lifecycle.min_reproduce_age = 0;
+    sim.creatures[id].reproductive_reserve = 0.0;
+    sim.action_logs
+        .insert(id, crate::creature::action_log::ActionLog::new(8));
+
+    run_tick(&mut sim, &mut None);
+
+    let entry = sim
+        .action_logs
+        .get(id)
+        .expect("creature action log")
+        .entries()
+        .back()
+        .expect("reproduce action log entry");
+    assert_eq!(entry.action_type, ActionType::Reproduce);
+    assert_eq!(entry.result, ActionResult::NutritionConstraints);
+    assert_eq!(sim.stats.last_tick_reproduce, 1);
+}
+
+#[test]
+fn tick_action_log_records_applied_food_type_amount_and_result() {
+    // Arrange
+    let genome = CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                constants: vec![1.0],
+                program: vec![
+                    VmInstruction::LoadConst {
+                        dst: 0,
+                        const_idx: 0,
+                    },
+                    VmInstruction::WriteWorldActionMeta {
+                        slot_idx: 0,
+                        src: 0,
+                    },
+                    VmInstruction::PushAction { action_type: 1 },
+                    VmInstruction::ExecuteActionQueue,
+                ],
+            }),
+            targets: vec![],
+        }],
+    };
+    let (mut sim, id) = make_sim_with_custom_genome(10.0, genome);
+    sim.config.world.food.types[1].metabolic_energy_yield = 3.0;
+    sim.config.world.food.types[1].reproductive_reserve_yield = 2.0;
+    let pos = sim.creatures[id].position;
+    sim.world
+        .set_food_type(pos, crate::config::OrdinaryFoodTypeId::new(1), 0.35);
+    sim.action_logs
+        .insert(id, crate::creature::action_log::ActionLog::new(8));
+
+    // Act
+    run_tick(&mut sim, &mut None);
+
+    // Assert
+    let entry = sim
+        .action_logs
+        .get(id)
+        .expect("creature action log")
+        .entries()
+        .back()
+        .expect("eat action log entry");
+    assert_eq!(entry.action_type, ActionType::Eat);
+    assert_eq!(
+        entry.food_type,
+        Some(crate::config::OrdinaryFoodTypeId::new(1))
+    );
+    assert!((entry.amount - 0.35).abs() < 1e-6);
+    assert_eq!(entry.result, ActionResult::Success);
+}
+
+#[test]
 fn failed_move_deducts_penalty_in_tick() {
     let (mut sim, id) = make_sim_with_one_creature(100.0);
     sim.config.energy.costs.failed_action_penalty = 7.5;
@@ -145,7 +228,12 @@ fn failed_move_deducts_penalty_in_tick() {
             .energy
             .adjusted_action_cost(sim.config.energy.costs.eat_cost, complexity, age);
     let creature = sim.creatures.get_mut(id).unwrap();
-    let eat_succeeded = apply_eat(creature, &mut sim.world, &sim.config);
+    let eat_succeeded = apply_typed_eat(
+        creature,
+        &mut sim.world,
+        &sim.config,
+        crate::config::OrdinaryFoodTypeId::default(),
+    );
     assert!(!eat_succeeded, "eat on empty cell should fail");
     if !eat_succeeded {
         sim.creatures.get_mut(id).unwrap().energy -= adjusted_penalty;

@@ -60,7 +60,11 @@ This document does not define:
   if age validation fails:
     reject RejectedAgeConstraints
     return
-  validates reproduce action + energy transfer
+  validates reserve cost before charging any reproduction energy
+  if reserve validation fails:
+    reject RejectedNutritionConstraints
+    return
+  charges reproduce action cost, then validates energy + transfer
   if energy validation fails:
     reject RejectedEnergyConstraints
     return
@@ -84,11 +88,15 @@ This document does not define:
 - `genome` (parent genome copy after mutation application)
 - `memory` (byte-for-byte copy from parent)
 - `graph_state` (empty map at spawn)
+- `reproductive_reserve` (`0.0` at spawn)
 
 Constraints:
 - Draft creation must not mutate world occupancy state.
 - Draft creation must not allocate `CreatureId`; that runtime identifier is
   assigned on successful immediate spawn.
+- The parent must hold `nutrition.reproductive_reserve_cost` before any
+  reproduction cost or transfer is charged. A successful spawn debits exactly one
+  configured reserve cost; a rejected action preserves reserve.
 
 ---
 
@@ -143,7 +151,10 @@ Constraints:
 Reproduction action semantics:
 - After target validity succeeds, parent must satisfy minimum reproduction age
   before any reproduce action cost is charged.
-- After age gate succeeds, parent pays reproduction action cost according to
+- After age gate succeeds, parent must hold the configured reproductive reserve
+  cost. Reserve rejection is reported as `RejectedNutritionConstraints` and
+  does not charge energy or mutate reserve.
+- After both gates succeed, parent pays reproduction action cost according to
   energy config.
 - Requested child transfer is clamped by configured offspring transfer cap.
 - If parent cannot satisfy required transfer constraints, reproduction fails and
@@ -166,24 +177,26 @@ runtime config contract: `v3-runtime-config-spec.md`.
      -> unresolved : [reject RejectedInvalidTarget; return]
   2. check is_valid_spawn_cell(target, current_world_state)
      -> invalid    : [reject RejectedInvalidTarget; return]
-  3. enforce energy.lifecycle.min_reproduce_age gate on parent
+  3. enforce minimum parent age
      -> below threshold : [reject RejectedAgeConstraints; return]
-  4. pay energy.costs.reproduce_cost from parent
-  5. enforce energy.lifecycle.min_reproduce_energy gate on parent
+  4. enforce nutrition.reproductive_reserve_cost <= parent reserve
+     -> below threshold : [reject RejectedNutritionConstraints; return]
+  5. pay energy.costs.reproduce_cost from parent
+  6. enforce energy.lifecycle.min_reproduce_energy gate on parent
      -> below threshold : [reject RejectedEnergyConstraints; return]
-  6. compute transfer = min(clamp_non_negative_finite(requested_energy),
+  7. compute transfer = min(clamp_non_negative_finite(requested_energy),
                            energy.lifecycle.default_offspring_energy)
      -> reject if transfer <= 0.0 or parent cannot cover transfer
      -> [reject RejectedEnergyConstraints; return]
-  7. deduct transfer from parent; build OffspringDraft with initial_energy = transfer
-  8. call MutationEngine unconditionally on child genome -> MutationSummary
+  8. deduct transfer and one reserve cost from parent; build OffspringDraft with initial_energy = transfer and reserve = 0.0
+  9. call MutationEngine unconditionally on child genome -> MutationSummary
      (MutationEngine internally handles the mutation_probability gate;
       see v3-mutation-spec.md Section 4.1)
-  9. derive child identity from parent identity:
+ 10. derive child identity from parent identity:
        - inherit lineage_id unchanged
        - mutate kin_tag only if MutationSummary.applied_events > 0
- 10. if MutationSummary.applied_events > 0: mutate phenotype per v3-phenotype-spec.md
- 11. spawn child immediately; occupy cell now
+ 11. if MutationSummary.applied_events > 0: mutate phenotype per v3-phenotype-spec.md
+ 12. spawn child immediately; occupy cell now
 ```
 
 Energy config field names/defaults are canonical in `v3-runtime-config-spec.md`

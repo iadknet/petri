@@ -273,6 +273,7 @@ fn build_simulation(food_here: f32) -> (Simulation, CreatureId, Position) {
     cfg.energy.lifecycle.energy_decay_per_tick = 0.0;
 
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
+    world.reconfigure_food(cfg.world.food.clone());
     let pos = Position::new(3, 3);
     world.set_food(pos, food_here);
 

@@ -40,7 +40,23 @@ describe("ConfigPanel", () => {
 		expect(screen.getByTestId("startup-food-type-add")).toBeInTheDocument();
 		expect(screen.getByTestId("startup-field-food-type-0-initial-density")).toBeInTheDocument();
 		expect(screen.getByTestId("startup-field-food-type-0-initial-coverage")).toBeInTheDocument();
+		expect(screen.getByTestId("startup-field-food-type-0-metabolic-yield")).toBeInTheDocument();
+		expect(screen.getByTestId("startup-field-food-type-0-reserve-yield")).toBeInTheDocument();
+		expect(screen.getByTestId("startup-field-nutrition-reserve-capacity")).toBeInTheDocument();
+		expect(screen.getByTestId("startup-field-nutrition-reserve-cost")).toBeInTheDocument();
 		expect(screen.getByTestId("startup-field-energy-initial-energy")).toBeInTheDocument();
+	});
+
+	it("renders the core complementary defaults for food-card controls", () => {
+		act(() => useStartupConfigStore.getState().reset());
+		render(<ConfigPanel />);
+
+		expect(screen.getByTestId("startup-field-food-type-0-initial-coverage")).toHaveValue(0.27);
+		expect(screen.getByTestId("startup-field-food-type-0-metabolic-yield")).toHaveValue(10);
+		expect(screen.getByTestId("startup-field-food-type-0-reserve-yield")).toHaveValue(0);
+		expect(screen.getByTestId("startup-field-food-type-1-initial-coverage")).toHaveValue(0.27);
+		expect(screen.getByTestId("startup-field-food-type-1-metabolic-yield")).toHaveValue(0);
+		expect(screen.getByTestId("startup-field-food-type-1-reserve-yield")).toHaveValue(1);
 	});
 
 	it("startup edits do not modify runtime local draft for startup-only fields", () => {
@@ -242,7 +258,9 @@ describe("ConfigPanel", () => {
 
 		const target = screen.getByTestId("startup-field-fertility-layer-0-target");
 		expect(target).toHaveValue("all_foods");
-		expect(within(target).getByRole("option", { name: "Type 2: Food 2" })).toBeInTheDocument();
+		expect(
+			within(target).getByRole("option", { name: "Type 2: Reproductive Food" }),
+		).toBeInTheDocument();
 
 		fireEvent.change(target, { target: { value: "single_type:1" } });
 

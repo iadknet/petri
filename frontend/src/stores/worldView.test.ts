@@ -80,8 +80,22 @@ function buildWorldStaticPayload(partial?: Partial<WorldStaticPayload>): WorldSt
 		height: 6,
 		barrier_mask: [0, 1, 2, 3, 4, 5],
 		food_types: [
-			{ type_idx: 0, name: "Primary Food", color: "#22c55e", growth_inhibitor: 0.2 },
-			{ type_idx: 1, name: "Secondary Food", color: "#0ea5e9", growth_inhibitor: 0.3 },
+			{
+				type_idx: 0,
+				name: "Primary Food",
+				color: "#22c55e",
+				growth_inhibitor: 0.2,
+				metabolic_energy_yield: 10,
+				reproductive_reserve_yield: 0,
+			},
+			{
+				type_idx: 1,
+				name: "Secondary Food",
+				color: "#0ea5e9",
+				growth_inhibitor: 0.3,
+				metabolic_energy_yield: 0,
+				reproductive_reserve_yield: 1,
+			},
 		],
 		...partial,
 	};
@@ -104,7 +118,17 @@ function buildDetailPayload(partial?: Partial<ViewDetailPayload>): ViewDetailPay
 		width: 4,
 		height: 3,
 		food: [],
-		creatures: [{ id: 77, x: 3, y: 2, energy: 9, generation: 1, phenotype_rgb: [1, 2, 3] }],
+		creatures: [
+			{
+				id: 77,
+				x: 3,
+				y: 2,
+				energy: 9,
+				reproductive_reserve: 0,
+				generation: 1,
+				phenotype_rgb: [1, 2, 3],
+			},
+		],
 		predation_events: [
 			{ attacker_x: 3, attacker_y: 2, victim_x: 4, victim_y: 2, energy_stolen: 1, killed: false },
 		],
@@ -168,7 +192,17 @@ describe("WorldViewStore", () => {
 			worldStaticRevision: 2,
 			tick: 21,
 			payload: buildDetailPayload({
-				creatures: [{ id: 99, x: 4, y: 2, energy: 3, generation: 8, phenotype_rgb: [9, 9, 9] }],
+				creatures: [
+					{
+						id: 99,
+						x: 4,
+						y: 2,
+						energy: 3,
+						reproductive_reserve: 0,
+						generation: 8,
+						phenotype_rgb: [9, 9, 9],
+					},
+				],
 			}),
 		});
 

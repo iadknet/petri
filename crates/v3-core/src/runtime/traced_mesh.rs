@@ -9,12 +9,12 @@ use crate::config::RuntimeConfig;
 use crate::contracts::{NodeId, WorldAction};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
-use crate::runtime::cgp::execute_graph_node_traced;
+use crate::runtime::cgp::execute_graph_node_traced_with_reserve;
 use crate::runtime::routing::resolve_gated_route;
 use crate::runtime::trace::domain::{
     BackendTrace, MeshHopTrace, TerminationReason, TraceGateScore, TraceRouteDecision,
 };
-use crate::runtime::traced_vm::execute_vm_node_traced;
+use crate::runtime::traced_vm::execute_vm_node_traced_with_reserve;
 use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::SensorSnapshot;
 
@@ -27,6 +27,31 @@ pub fn execute_creature_mesh_traced(
     genome: &CreatureGenome,
     sensors: &SensorSnapshot,
     energy: &mut f32,
+    reproductive_reserve: f32,
+    shared_memory: &mut [f32; 16],
+    prev_shared_memory: &[f32; 16],
+    graph_runtime: &mut GraphRuntimeState,
+    config: &RuntimeConfig,
+) -> (MeshOutput, Vec<MeshHopTrace>, TerminationReason) {
+    execute_creature_mesh_traced_with_reserve(
+        genome,
+        sensors,
+        energy,
+        reproductive_reserve,
+        shared_memory,
+        prev_shared_memory,
+        graph_runtime,
+        config,
+    )
+}
+
+/// Execute a traced mesh while resolving live reproductive reserve inputs.
+#[allow(clippy::too_many_arguments)]
+pub fn execute_creature_mesh_traced_with_reserve(
+    genome: &CreatureGenome,
+    sensors: &SensorSnapshot,
+    energy: &mut f32,
+    reproductive_reserve: f32,
     shared_memory: &mut [f32; 16],
     prev_shared_memory: &[f32; 16],
     graph_runtime: &mut GraphRuntimeState,
@@ -77,12 +102,13 @@ pub fn execute_creature_mesh_traced(
 
         let (result, backend_trace) = match &node.backend_def {
             BackendDef::Vm(def) => {
-                let (result, vm_trace) = execute_vm_node_traced(
+                let (result, vm_trace) = execute_vm_node_traced_with_reserve(
                     def,
                     &node.input_refs,
                     &upstream_slots,
                     energy,
                     energy_consumed,
+                    reproductive_reserve,
                     shared_memory,
                     prev_shared_memory,
                     sensors,
@@ -92,12 +118,13 @@ pub fn execute_creature_mesh_traced(
                 (result, BackendTrace::Vm(vm_trace))
             }
             BackendDef::Graph(def) => {
-                let (result, graph_trace) = execute_graph_node_traced(
+                let (result, graph_trace) = execute_graph_node_traced_with_reserve(
                     def,
                     &node.input_refs,
                     &upstream_slots,
                     energy,
                     energy_consumed,
+                    reproductive_reserve,
                     current_idx,
                     graph_runtime,
                     sensors,
@@ -207,7 +234,9 @@ fn find_node_index(nodes: &[NodeGenome], id: NodeId) -> Option<usize> {
 mod tests {
     use super::*;
     use crate::config::RuntimeConfig;
-    use crate::contracts::{InputReference, NodeId, RouteTarget, WorldAction};
+    use crate::contracts::{
+        DynamicIntrospectionKey, InputReference, NodeId, RouteTarget, WorldAction,
+    };
     use crate::creature::genome::cgp::{
         CgpGraphBackendDef, ComputeNode, ComputeNodeKind, ExecuteGate, GraphEdge, GraphSource,
         OutputSink, OutputSinkKind,
@@ -316,6 +345,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy_a,
+            0.0,
             &mut smem_a,
             &prev_a,
             &mut gr_a,
@@ -331,6 +361,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy_b,
+            0.0,
             &mut smem_b,
             &prev_b,
             &mut gr_b,
@@ -430,6 +461,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
+            0.0,
             &mut smem,
             &prev_smem,
             &mut gr,
@@ -515,6 +547,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
+            0.0,
             &mut smem,
             &prev_smem,
             &mut gr,
@@ -605,6 +638,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
+            0.0,
             &mut smem,
             &prev_smem,
             &mut gr,
@@ -696,6 +730,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
+            0.0,
             &mut smem,
             &prev_smem,
             &mut gr,
@@ -747,6 +782,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
+            0.0,
             &mut smem,
             &prev_smem,
             &mut gr,
@@ -796,6 +832,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
+            0.0,
             &mut smem,
             &prev_smem,
             &mut gr,
@@ -870,6 +907,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
+            0.0,
             &mut smem,
             &prev_smem,
             &mut gr,
@@ -924,6 +962,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy_a,
+            0.0,
             &mut smem_a,
             &prev_a,
             &mut gr_a,
@@ -939,6 +978,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy_b,
+            0.0,
             &mut smem_b,
             &prev_b,
             &mut gr_b,
@@ -965,5 +1005,66 @@ mod tests {
             energy_a,
             energy_b
         );
+    }
+
+    #[test]
+    fn traced_and_untraced_meshes_receive_live_reproductive_reserve() {
+        let id0 = NodeId::new(0);
+        let genome = CreatureGenome {
+            entry_node_id: id0,
+            nodes: vec![NodeGenome {
+                node_id: id0,
+                input_refs: vec![InputReference::DynamicIntrospection(
+                    DynamicIntrospectionKey::ReproductiveReserveCurrent,
+                )],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![
+                        VmInstruction::ReadInput {
+                            dst: 0,
+                            ref_idx: 0,
+                            sub_idx: 0,
+                        },
+                        VmInstruction::SetPriorityBid { src: 0 },
+                        VmInstruction::PushAction { action_type: 0 },
+                        VmInstruction::ExecuteActionQueue,
+                    ],
+                }),
+                targets: vec![],
+            }],
+        };
+        let ss = empty_ss();
+        let config = default_config();
+        let mut energy_a = 100.0;
+        let mut memory_a = [0.0; 16];
+        let mut runtime_a = GraphRuntimeState::new();
+        let output_a = execute_creature_mesh(
+            &genome,
+            &ss,
+            &mut energy_a,
+            3.25,
+            &mut memory_a,
+            &[0.0; 16],
+            &mut runtime_a,
+            &config,
+        );
+        let mut energy_b = 100.0;
+        let mut memory_b = [0.0; 16];
+        let mut runtime_b = GraphRuntimeState::new();
+        let (output_b, _, _) = execute_creature_mesh_traced(
+            &genome,
+            &ss,
+            &mut energy_b,
+            3.25,
+            &mut memory_b,
+            &[0.0; 16],
+            &mut runtime_b,
+            &config,
+        );
+
+        assert_eq!(output_a.actions, output_b.actions);
+        assert_eq!(output_a.priority_bid, 3.25);
+        assert_eq!(output_b.priority_bid, 3.25);
     }
 }

@@ -51,6 +51,8 @@ interface VitalsBannerProps {
 	age: number;
 	energy: number;
 	maxEnergy: number;
+	reproductiveReserve: number;
+	reproductiveReserveCapacity: number;
 	position: { x: number; y: number };
 	actionLog: ActionLogEntry[] | null;
 	phenotype?: CreaturePhenotype;
@@ -65,6 +67,8 @@ export const VitalsBanner = memo(function VitalsBanner({
 	age,
 	energy,
 	maxEnergy,
+	reproductiveReserve,
+	reproductiveReserveCapacity,
 	position,
 	actionLog,
 	phenotype,
@@ -77,6 +81,9 @@ export const VitalsBanner = memo(function VitalsBanner({
 	const energyRatio = maxEnergy > 0 ? energy / maxEnergy : 0;
 	const energyBarColor = energyRatio > 0.3 ? "bg-emerald-500" : "bg-red-500";
 	const energyWidthPercent = Math.min(energyRatio * 100, 100);
+	const reserveRatio =
+		reproductiveReserveCapacity > 0 ? reproductiveReserve / reproductiveReserveCapacity : 0;
+	const reserveWidthPercent = Math.min(Math.max(reserveRatio, 0) * 100, 100);
 
 	const visibleActions = actionLog ? actionLog.slice(-MAX_ACTION_DOTS) : [];
 
@@ -120,6 +127,20 @@ export const VitalsBanner = memo(function VitalsBanner({
 					</div>
 					<span className="font-mono text-slate-400 whitespace-nowrap">
 						{Math.round(energy)}/{maxEnergy}
+					</span>
+				</div>
+
+				{/* Applied reproductive reserve */}
+				<div className="flex items-center gap-1.5 min-w-0" title="Current reproductive reserve">
+					<div className="w-16 h-1.5 rounded-full bg-slate-800 overflow-hidden">
+						<div
+							data-testid="reserve-bar-fill"
+							className="h-full rounded-full bg-amber-400"
+							style={{ width: `${reserveWidthPercent}%` }}
+						/>
+					</div>
+					<span className="font-mono text-slate-400 whitespace-nowrap">
+						Reserve {reproductiveReserve.toFixed(1)}/{reproductiveReserveCapacity.toFixed(1)}
 					</span>
 				</div>
 

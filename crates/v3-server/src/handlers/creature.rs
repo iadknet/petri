@@ -49,6 +49,8 @@ struct CreatureDetailResponse<'a> {
     position: CreaturePositionResponse,
     energy: f32,
     max_energy: f32,
+    reproductive_reserve: f32,
+    reproductive_reserve_capacity: f32,
     age: u64,
     generation: u64,
     complexity: u32,
@@ -186,6 +188,7 @@ fn action_result_key(result: ActionResult) -> &'static str {
         ActionResult::Blocked => "Blocked",
         ActionResult::InvalidTarget => "InvalidTarget",
         ActionResult::AgeConstraints => "AgeConstraints",
+        ActionResult::NutritionConstraints => "NutritionConstraints",
         ActionResult::EnergyConstraints => "EnergyConstraints",
         ActionResult::PopulationCap => "PopulationCap",
         ActionResult::TransferredAndKilled => "TransferredAndKilled",
@@ -403,6 +406,8 @@ pub async fn get_creature(
         },
         energy: creature.energy,
         max_energy: sim.config.energy.lifecycle.max_energy,
+        reproductive_reserve: creature.reproductive_reserve,
+        reproductive_reserve_capacity: sim.config.nutrition.reproductive_reserve_capacity,
         age: creature.age,
         generation: creature.generation,
         complexity: creature.cached_complexity,
@@ -543,6 +548,14 @@ mod tests {
         assert_eq!(
             action_result_key(ActionResult::AgeConstraints),
             "AgeConstraints"
+        );
+    }
+
+    #[test]
+    fn action_result_key_maps_nutrition_constraints() {
+        assert_eq!(
+            action_result_key(ActionResult::NutritionConstraints),
+            "NutritionConstraints"
         );
     }
 }

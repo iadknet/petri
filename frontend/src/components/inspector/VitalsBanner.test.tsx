@@ -18,6 +18,7 @@ function makeEntry(overrides: Partial<ActionLogEntry> = {}): ActionLogEntry {
 		energy_before: 100,
 		energy_after: 95,
 		amount: 0,
+		food_type: null,
 		priority_bid: 0.5,
 		...overrides,
 	};
@@ -30,6 +31,8 @@ const defaultProps = {
 	age: 150,
 	energy: 62,
 	maxEnergy: 100,
+	reproductiveReserve: 3,
+	reproductiveReserveCapacity: 8,
 	position: { x: 10, y: 25 },
 	actionLog: null as ActionLogEntry[] | null,
 	isDead: false,
@@ -72,6 +75,14 @@ describe("VitalsBanner", () => {
 		const bar = container.querySelector("[data-testid='energy-bar-fill']") as HTMLElement;
 		expect(bar).not.toBeNull();
 		expect(bar.className).toContain("bg-red-500");
+	});
+
+	it("renders the applied reproductive reserve against capacity", () => {
+		const { container } = render(<VitalsBanner {...defaultProps} />);
+		expect(screen.getByText("Reserve 3.0/8.0")).toBeDefined();
+		const bar = container.querySelector("[data-testid='reserve-bar-fill']") as HTMLElement;
+		expect(bar).not.toBeNull();
+		expect(bar.style.width).toBe("37.5%");
 	});
 
 	it("renders dead banner when isDead is true", () => {

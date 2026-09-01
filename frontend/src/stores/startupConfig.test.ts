@@ -39,13 +39,21 @@ describe("StartupConfigStore", () => {
 			enabled: true,
 			deposit_per_occupied_tick: 0.08,
 		});
-		expect(preset.world.food.types).toHaveLength(1);
+		expect(preset.world.food.types).toHaveLength(2);
 		expect(preset.world.food.types[0]).toMatchObject({
-			name: "Primary Food",
+			name: "Maintenance Food",
 			color: "#22c55e",
 			initial_density: 1.0,
-			initial_coverage: 0.54,
+			initial_coverage: 0.27,
 			growth_inhibitor: 0.2,
+			metabolic_energy_yield: 10.0,
+			reproductive_reserve_yield: 0.0,
+		});
+		expect(preset.world.food.types[1]).toMatchObject({
+			name: "Reproductive Food",
+			initial_coverage: 0.27,
+			metabolic_energy_yield: 0,
+			reproductive_reserve_yield: 1,
 		});
 		expect(preset.world.food.fertility.enabled).toBe(true);
 		expect(preset.world.food.fertility.layers).toEqual([
@@ -77,6 +85,29 @@ describe("StartupConfigStore", () => {
 			start: 0.0,
 			end: 1.0,
 			target_tick: 62680,
+		});
+	});
+
+	it("serializes the exact complementary nutrition fallback for restart", () => {
+		const request = buildStartupRequest(useStartupConfigStore.getState().preset);
+
+		expect(request.world?.food?.types).toEqual([
+			expect.objectContaining({
+				name: "Maintenance Food",
+				initial_coverage: 0.27,
+				metabolic_energy_yield: 10.0,
+				reproductive_reserve_yield: 0.0,
+			}),
+			expect.objectContaining({
+				name: "Reproductive Food",
+				initial_coverage: 0.27,
+				metabolic_energy_yield: 0.0,
+				reproductive_reserve_yield: 1.0,
+			}),
+		]);
+		expect(request.nutrition).toEqual({
+			reproductive_reserve_capacity: 8.0,
+			reproductive_reserve_cost: 4.0,
 		});
 	});
 
@@ -117,6 +148,24 @@ describe("StartupConfigStore", () => {
 			start: 5,
 			end: 30,
 			target_tick: 1000,
+		});
+	});
+
+	it("buildStartupRequest preserves typed yields and nutrition budget", () => {
+		const store = useStartupConfigStore.getState();
+		store.updatePreset("world.food.types.0.metabolic_energy_yield", 12);
+		store.updatePreset("world.food.types.0.reproductive_reserve_yield", 0.25);
+		store.updatePreset("nutrition.reproductive_reserve_capacity", 9);
+		store.updatePreset("nutrition.reproductive_reserve_cost", 3);
+
+		const req = buildStartupRequest(useStartupConfigStore.getState().preset);
+		expect(req.world?.food?.types?.[0]).toMatchObject({
+			metabolic_energy_yield: 12,
+			reproductive_reserve_yield: 0.25,
+		});
+		expect(req.nutrition).toEqual({
+			reproductive_reserve_capacity: 9,
+			reproductive_reserve_cost: 3,
 		});
 	});
 
@@ -173,7 +222,7 @@ describe("StartupConfigStore", () => {
 			growth_inhibitor: 0.45,
 		});
 
-		expect(useStartupConfigStore.getState().preset.world.food.types).toHaveLength(2);
+		expect(useStartupConfigStore.getState().preset.world.food.types).toHaveLength(3);
 		expect(useStartupConfigStore.getState().preset.world.food.types[1]).toMatchObject({
 			name: "Blue Food",
 			color: "#3b82f6",
@@ -185,7 +234,7 @@ describe("StartupConfigStore", () => {
 		store.removeFoodType(0);
 
 		const preset = useStartupConfigStore.getState().preset;
-		expect(preset.world.food.types).toHaveLength(1);
+		expect(preset.world.food.types).toHaveLength(2);
 		expect(preset.world.food.types[0]).toMatchObject({
 			name: "Blue Food",
 			color: "#3b82f6",
@@ -272,15 +321,17 @@ describe("StartupConfigStore", () => {
 					deposit_per_occupied_tick: 0.08,
 				},
 			},
-			types: [
-				{
-					name: "Primary Food",
+			types: expect.arrayContaining([
+				expect.objectContaining({
+					name: "Maintenance Food",
 					color: "#22c55e",
 					initial_density: 0.75,
 					initial_coverage: 0.4,
 					growth_inhibitor: 0.2,
-				},
-			],
+					metabolic_energy_yield: 10,
+					reproductive_reserve_yield: 0,
+				}),
+			]),
 			fertility: {
 				enabled: true,
 				min_fertility: 0.5,
@@ -342,7 +393,7 @@ describe("StartupConfigStore", () => {
 		const preset = useStartupConfigStore.getState().preset;
 		expect(preset.world.food.types[0]).toMatchObject({
 			initial_density: 1.0,
-			initial_coverage: 0.54,
+			initial_coverage: 0.27,
 		});
 		expect((preset.world.food as unknown as { initial_density?: number }).initial_density).toBe(
 			undefined,
