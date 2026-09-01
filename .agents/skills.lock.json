@@ -25,11 +25,11 @@
       "path": "skills/agent-project-scaffold/assets/project-skills/prd-implement",
       "license": "unknown"
     },
-    "rust": {
-      "repository": "joshuadavidthomas/agent-skills",
-      "commit": "516dee7a422b90937b2958d11c03694154ab9c09",
-      "path": "rust",
-      "license": "unknown"
+    "rust-skills": {
+      "repository": "leonardomso/rust-skills",
+      "commit": "fd2a861ab0406a4ac536a55274d14ea6fd1ca9c9",
+      "path": ".",
+      "license": "MIT"
     },
     "react-best-practices": {
       "repository": "vercel-labs/agent-skills",
@@ -45,7 +45,7 @@
     }
   },
   "excluded_files": [
-    "nested AGENTS.md and CLAUDE.md; gh installation metadata"
+    "nested AGENTS.md and CLAUDE.md; gh installation metadata; source checks, contributor, and changelog files"
   ],
   "files": [
     {
@@ -433,300 +433,1072 @@
       "sha256": "f4c7d68b29c82381baad059c4a7f09e868e71ec9c3115a26ad3ae7d24c0dfe1f"
     },
     {
-      "path": "rust/LICENSE",
-      "sha256": "3137c31bb3dff5e35c8b2fc4ad2086104ea8277e34e1414e19eaf2587732254b"
+      "path": "rust-skills/LICENSE",
+      "sha256": "663ce6f8f087dc366602ac34eefd4cf71a5d8db411359422298a1399a014a9d5"
     },
     {
-      "path": "rust/SKILL.md",
-      "sha256": "1eb061a1a959659b5ac1708a756200cbda127dd987f19f1ac6f0057f9114a836"
+      "path": "rust-skills/SKILL.md",
+      "sha256": "5a74070e740c8aacec1264adfc537daeab14c0f629bb604943295c08fd9252e6"
     },
     {
-      "path": "rust/async.md",
-      "sha256": "a113a17117aaf2e859c969dfb0ddfc20543dcf8384f80a59133c7597e05da6e0"
+      "path": "rust-skills/rules/anti-clone-excessive.md",
+      "sha256": "983913692f9f6a22cf0826151c410d84070b7e2a07f40ba3994bf3f68625002e"
     },
     {
-      "path": "rust/atomics.md",
-      "sha256": "2afd898e2c8e8f3626e97b93322a1edcbf9b0874bf262ac991385d47e9114c9e"
+      "path": "rust-skills/rules/anti-collect-intermediate.md",
+      "sha256": "fd6c17f6ec752372d070a3b1bb136e90f2a13a06a7538c89b136a22ff740b31b"
     },
     {
-      "path": "rust/error-handling.md",
-      "sha256": "9a013fd63bf32b7d1dad4ed5fe3fed4e7c0cec8da14622496d005a4223e41a19"
+      "path": "rust-skills/rules/anti-empty-catch.md",
+      "sha256": "c60ab8421dd587bd5d95c8b8fe410886b32a1932f06f8e649af523f11df610f7"
     },
     {
-      "path": "rust/interop.md",
-      "sha256": "6e0226882802b56fe4e7ccdbb2043452506d48396eeba1b96e1091a0ca753583"
+      "path": "rust-skills/rules/anti-expect-lazy.md",
+      "sha256": "62208c2b6d0584b51991ffad5449fb7f6db21e65601e4f6783c07508f5cdc1f2"
     },
     {
-      "path": "rust/macros.md",
-      "sha256": "6a039068537b9b902682461fbf55e67d1d712551e3c53899211a2fced75b8059"
+      "path": "rust-skills/rules/anti-format-hot-path.md",
+      "sha256": "e9db4de4f59209fb989257133ee7abe46ac314b8362fea8f87902ec5116461d7"
     },
     {
-      "path": "rust/ownership.md",
-      "sha256": "684324a590e44b3a0e24f68bb5a9367965772388265b1db4c91f2764bd516fdd"
+      "path": "rust-skills/rules/anti-index-over-iter.md",
+      "sha256": "57e116484ffff5e5fd3ebd36281ba12a7c8c9b000d46f4bcf25f0257438d8e94"
     },
     {
-      "path": "rust/performance.md",
-      "sha256": "dcf22527e189e29a9ca92b69d461de42dc72997fd0a6d23fc309c35864bffb13"
+      "path": "rust-skills/rules/anti-lock-across-await.md",
+      "sha256": "29f56a4d3064b5df41364b323b1c3c02b0e23a38df1754773df3d79607986331"
     },
     {
-      "path": "rust/project-structure.md",
-      "sha256": "757355fddf48016f2c84ba8451fa5f651cf86068db1a5479e7e72638c911dc90"
+      "path": "rust-skills/rules/anti-over-abstraction.md",
+      "sha256": "620cb64669e9e844233f04393c9bffa4ea2e5d9d91640018fe7a2f480a8119be"
     },
     {
-      "path": "rust/references/adapters-and-custom-impls.md",
-      "sha256": "4103e0dbef3bb051632e023cc9c2590d691159cba24b248d055b3ac38a02cf19"
+      "path": "rust-skills/rules/anti-panic-expected.md",
+      "sha256": "5f35f5e5b3447fd39f7610e8b15ef9f737ec860a53b654f6d9da77f80c71afb7"
     },
     {
-      "path": "rust/references/allocation-and-data-structures.md",
-      "sha256": "db49db641d0843d3216eee17a4cf90d0b321c923e1c1231389be521373306121"
+      "path": "rust-skills/rules/anti-premature-optimize.md",
+      "sha256": "3e35bc7532ee9f96d93ed08f9c9608c1e4efd2011f8caef7eb257741f3cd9d12"
     },
     {
-      "path": "rust/references/anyhow-patterns.md",
-      "sha256": "15e728d2b802d4f466b9ef8d395a0828cab293e2d1dff395a91af1a9846b8969"
+      "path": "rust-skills/rules/anti-string-for-str.md",
+      "sha256": "56e65ecb06fb129a4f9a4e159d42ce1402683c21216e608779e39c081292f52c"
     },
     {
-      "path": "rust/references/attributes-cheatsheet.md",
-      "sha256": "313214b271baef34abcc2d4a3ae8e9e7ee3a30b861ab830f1c83711ab7dab0ef"
+      "path": "rust-skills/rules/anti-stringly-typed.md",
+      "sha256": "2c8f37c1d37e9c2a334dc033cf271e9384d9a3d71edc5a133bbd0cfa17474a59"
     },
     {
-      "path": "rust/references/benchmarking-and-fuzzing.md",
-      "sha256": "5842d20dc959a43638295f67b4a425aff9a5cbf0436c20ae68d682f640e5c808"
+      "path": "rust-skills/rules/anti-type-erasure.md",
+      "sha256": "e0fff7b4b25fba5c5565167f1d460375da61510f4bd52f82fc959ab538b9e013"
     },
     {
-      "path": "rust/references/blocking-and-bridging.md",
-      "sha256": "27e2d6299e90cb92f6cc7de93450268da2730f28a988a0cf076fb29501c62c0d"
+      "path": "rust-skills/rules/anti-unwrap-abuse.md",
+      "sha256": "a0b358288113158bee58c04ede081e76ea48119f6f9f5573c526e3e5f435f14a"
     },
     {
-      "path": "rust/references/bool-to-enum.md",
-      "sha256": "2ec502e9f07aef08f0fc4be8fb1c62c35dfe82db7c9590f3069e3da4f5007f83"
+      "path": "rust-skills/rules/anti-vec-for-slice.md",
+      "sha256": "a2c2613b01d4d6c4202ef611abf2f27de45cfdbca29d934a179a00e2d9fd4fbd"
     },
     {
-      "path": "rust/references/borrow-by-default.md",
-      "sha256": "dc031271f8db7d9d8db2ddf18eb3a904a7dcd3b8aa2ea75bf9c5e7abfe994d9c"
+      "path": "rust-skills/rules/api-builder-must-use.md",
+      "sha256": "5ca0d55b9e06e494192e1bfe25efda3391f7acba81e0b58df3616b864938a7c0"
     },
     {
-      "path": "rust/references/builder-patterns.md",
-      "sha256": "ca11adb940d539b6b29b559b747ec022d43d055589b13ab0f04386708c07b8d4"
+      "path": "rust-skills/rules/api-builder-pattern.md",
+      "sha256": "a19135121e3748e8fb9d347797024f7b017ebfc30026916d90919fb5fb3656e8"
     },
     {
-      "path": "rust/references/c-ffi.md",
-      "sha256": "8027a6469765c7c16ad98344057d15462b66a9cf69f74255aa86942b5f6f78c5"
+      "path": "rust-skills/rules/api-common-traits.md",
+      "sha256": "42fda750d732601b90927bddf3c09c3be97fb888b6ed0837ca67d4ad24047d1b"
     },
     {
-      "path": "rust/references/channels-and-select.md",
-      "sha256": "30981aec114d7c15fb50d5126b9649aa4159c7f447d5a32b78e3c1b9f8103571"
+      "path": "rust-skills/rules/api-default-impl.md",
+      "sha256": "295fb69665b77e14d8f2e5b0aa420ac1c6ff68f89ebe62e8f55faa4b9980e0b0"
     },
     {
-      "path": "rust/references/combinators.md",
-      "sha256": "c1255cde99da1a8765532995b57f4892724de965160412686e3bb610c779d6d0"
+      "path": "rust-skills/rules/api-extension-trait.md",
+      "sha256": "f9b022172c12fccaed0b26b4c14bf1656f519cd44d19ea9fb0726d683f9f1746"
     },
     {
-      "path": "rust/references/cxx.md",
-      "sha256": "02464db97b461cfd209bdb16e74eb8e5fd0db172d638c1512b8fd0693903f867"
+      "path": "rust-skills/rules/api-from-not-into.md",
+      "sha256": "1819bcce4f6afa64fba3a2795cbea262752ecdb8450b02b78a12c80e54e53341"
     },
     {
-      "path": "rust/references/designing-error-types.md",
-      "sha256": "50a4158c6a558e86b0c2a926cf1bf5ee0a759eefc33d7cbbb5f059d13ba08908"
+      "path": "rust-skills/rules/api-impl-asref.md",
+      "sha256": "35f38dff818239f70e17728fe9c2af93a2c40593b2da59606f457f2040c39197"
     },
     {
-      "path": "rust/references/dispatch-patterns.md",
-      "sha256": "2aae48db819a28e0e5c455eac616204708a925cb95d3acee967955cee2343485"
+      "path": "rust-skills/rules/api-impl-fromiterator.md",
+      "sha256": "cb8da222b375e0ef6f1919d4d2edb1f43acf015130ae586e8de8a43c2d710bae"
     },
     {
-      "path": "rust/references/enums-as-modeling-tool.md",
-      "sha256": "83e55aad38608f74e9ddc2b40d1123e989db1f44e045732ee59a24f5d2d0a2bf"
+      "path": "rust-skills/rules/api-impl-into.md",
+      "sha256": "e8e633861ad298ecedf348380b7503417498c8520ad4a1ed2baa4081b29d94d9"
     },
     {
-      "path": "rust/references/exhaustive-matching.md",
-      "sha256": "c76928eec623252a3c30d274fb11ec44534614c21706e95ac5c0ce1d7ec74e9f"
+      "path": "rust-skills/rules/api-must-use.md",
+      "sha256": "069a52140597df71c3ce15218ea1e476d83f1fea615d596027ae8ff97d81731c"
     },
     {
-      "path": "rust/references/extension-traits.md",
-      "sha256": "800411f7f2c00e33e26157da5b6908fbb7084f74de954257244b76a6cda4bde4"
+      "path": "rust-skills/rules/api-newtype-safety.md",
+      "sha256": "7c929521716213cd75abde6b64e1d0b39e4e2912b68bcd893db0b39ca0329b0f"
     },
     {
-      "path": "rust/references/features-and-unification.md",
-      "sha256": "bc390bc12f1345e8564648a5c4d1e76f7ed96b3480d79f3e0121c7edaa23fd20"
+      "path": "rust-skills/rules/api-non-exhaustive.md",
+      "sha256": "be7711f71f3f05fec6f527cf3c98ffcdbf054651012001b163af3d81e3fa4d98"
     },
     {
-      "path": "rust/references/function-signatures.md",
-      "sha256": "d6f2a0799d45b8d541fc422eb252b504e862ff71f4d944ea2ae13a99b22024c9"
+      "path": "rust-skills/rules/api-operator-overload.md",
+      "sha256": "0413c8eb0b3db94c4b710bed9e7c18e53d0fbdf6e8f987245bb7e36d95389bec"
     },
     {
-      "path": "rust/references/getter-setter.md",
-      "sha256": "381a20e47925f0b4ad9bb0a841e6ac6bff5c95e7c5e31c4f4a51dbb951c83101"
+      "path": "rust-skills/rules/api-parse-dont-validate.md",
+      "sha256": "70a08fd5e91b74b0b78b3dd97064d000fb00e57b0c4c322d3693fbc0c3662796"
     },
     {
-      "path": "rust/references/impl-namespace.md",
-      "sha256": "5c187870cb5fdd127691355ceea0914b18971a76fcd4eab078c5e224d4759a29"
+      "path": "rust-skills/rules/api-sealed-trait.md",
+      "sha256": "aa5f270c529d68804140abaed19a6aa0515bb0cc9579d272b7533a396efb81ea"
     },
     {
-      "path": "rust/references/iterators-over-indexing.md",
-      "sha256": "4f8b1584a39688c4107c14732341cf6588debe2b1a744172ca56e532e159608f"
+      "path": "rust-skills/rules/api-serde-optional.md",
+      "sha256": "dcb114cc7b56f7e2798572ecfab7761e0ff80bf8a04aed95c75064ac5c013cb2"
     },
     {
-      "path": "rust/references/lifetime-patterns.md",
-      "sha256": "ac5fc1c86eeaeccc63ee8dc76ddc00486fd9542246863d9746d6f0eb7552cb98"
+      "path": "rust-skills/rules/api-typestate.md",
+      "sha256": "dcedc7b398cec8ce7dd136fbd7fa7f5d71c8109c19a7cebc7f3f93dc3b8af8f8"
     },
     {
-      "path": "rust/references/macro_rules-patterns.md",
-      "sha256": "8269ec87345f1799b7ed01b670e21006054adef8e41e0750058b9c56d1b58f87"
+      "path": "rust-skills/rules/async-async-fn-bounds.md",
+      "sha256": "376fcab276d65b81aa8a9300b1149b03947153377227e85c6c1f21de9a1421b9"
     },
     {
-      "path": "rust/references/miri-and-unsafe-testing.md",
-      "sha256": "574d989dd2545d4aca287fe6050b4ad8760f7d6ee143b3c0a87fb70f3ddd7683"
+      "path": "rust-skills/rules/async-bounded-channel.md",
+      "sha256": "30bcb52d58426c65213b35434db4e7ab854a8f5b2cdbd6a273f8cfa0e00b06ef"
     },
     {
-      "path": "rust/references/napi-rs.md",
-      "sha256": "524f8966ffa26301893c33cecdd1122ae84e87644cb62ae9c26febff455c961d"
+      "path": "rust-skills/rules/async-broadcast-pubsub.md",
+      "sha256": "8a6b96f4bd5627aa08601c25bc779c2691ea0f22ddc5276705f66752e329805a"
     },
     {
-      "path": "rust/references/newtype-patterns.md",
-      "sha256": "7fa12d0d80944990d7cabb38f743f9b4f4795b95ef4d071edd674ef486a41d06"
+      "path": "rust-skills/rules/async-cancel-safety.md",
+      "sha256": "bc86cde4fa4c70562cdf3c456331ce76d07f785286896f219074e2feba4689e4"
     },
     {
-      "path": "rust/references/newtypes-and-domain-types.md",
-      "sha256": "e922d644b851f2da8d40700990449fda93f7a449e120efe4905dbe4c4fc83ac1"
+      "path": "rust-skills/rules/async-cancellation-token.md",
+      "sha256": "83f39b1e38812e7e4417593ee462bb18144b38821191f80d8522320792e1cf3c"
     },
     {
-      "path": "rust/references/option-bool-to-enum.md",
-      "sha256": "43add25c8a3eeeca19834e8c7106a1e97e892491ee7c3be2d2687e0647693461"
+      "path": "rust-skills/rules/async-clone-before-await.md",
+      "sha256": "a3f157b72f21ed2e8fd22400c185e52251853872d6bd760620a8cf7b31c27978"
     },
     {
-      "path": "rust/references/option-over-sentinels.md",
-      "sha256": "50bc9d91043332b8a12fc07954e589c5c9d07c4c77150c0a4f8e38696fd14850"
+      "path": "rust-skills/rules/async-fn-in-trait.md",
+      "sha256": "ad92f77e431f6e0e825755b9f334c83cba7e4c7709e456d06fd173a042b1a4c3"
     },
     {
-      "path": "rust/references/ordering-cheatsheet.md",
-      "sha256": "483eda75ddae1dbc0c2c71b312498bc8ab5d0d6be653abc2845a51ceda7997c7"
+      "path": "rust-skills/rules/async-join-parallel.md",
+      "sha256": "a0e2fe11baefdcd4c079676d9ade95b6e06dfee87ba12cdddc625e0270402c2c"
     },
     {
-      "path": "rust/references/ownership-before-refcell.md",
-      "sha256": "190776bf0d1e07df3b745b06b574c1c7678e9014d397fbe95d081f7a5ea62040"
+      "path": "rust-skills/rules/async-joinset-structured.md",
+      "sha256": "2c8688b530e8f98efe5842ac8331a2d900ee80a715573441fc7c534e82bb0a1a"
     },
     {
-      "path": "rust/references/ownership-handoff-deadlocks.md",
-      "sha256": "911bec88fee7e3c547d38ada7ef222e6f9b348b2d5445bce725148361cdbbd61"
+      "path": "rust-skills/rules/async-mpsc-queue.md",
+      "sha256": "66bc260c55aae124611dabdfac90e552d8dd9771ab16d390971d1f8cfb4e0589"
     },
     {
-      "path": "rust/references/parse-dont-validate.md",
-      "sha256": "4b8a5f3c92367b18ec0fd6998b6033005d890e5b1a330bd51e12cacc5a80d3fe"
+      "path": "rust-skills/rules/async-no-lock-await.md",
+      "sha256": "0525695626b4e05729cd82452fc481d81e39f28f566ac9f202f4be90ad27d36d"
     },
     {
-      "path": "rust/references/pattern-matching-tools.md",
-      "sha256": "f149b892462cc823afd966740e0a94ede4d00e4975659bfbda8c81856c75caf1"
+      "path": "rust-skills/rules/async-oneshot-response.md",
+      "sha256": "3f1bf76dc79e3b2903c99aee8f4b2c5ab2f8cda4ea71964f60e02522344fef2d"
     },
     {
-      "path": "rust/references/patterns-from-rust-atomics-and-locks.md",
-      "sha256": "cd4ef12c723b9ab14c8ca54fbc04a9c79679fd523c47cc7f11e34373db9208b1"
+      "path": "rust-skills/rules/async-select-racing.md",
+      "sha256": "5d4606b0bc64b84fdf3239c90cda25ea33d2ff9303ee81b063581c66bdae964e"
     },
     {
-      "path": "rust/references/proc-macro-patterns.md",
-      "sha256": "0994b1479ef8e0d89e8427e4fc6adedef81cf2c78a09875d366fa5b9f78a42e5"
+      "path": "rust-skills/rules/async-spawn-blocking.md",
+      "sha256": "398a926fe15f08ae831d4058695e4910c624460d7262bd6d6248f517eabea51b"
     },
     {
-      "path": "rust/references/production-patterns.md",
-      "sha256": "7c8caa977d01f3753a4ac1f69afe12f0ea54b3e07592b286357f5eb60c6c4428"
+      "path": "rust-skills/rules/async-tokio-fs.md",
+      "sha256": "531839caaf71d189c7f2cbc040cca75086a567372addf70aa5f9de033f647bcf"
     },
     {
-      "path": "rust/references/profiling-and-benchmarking.md",
-      "sha256": "6d57a70743007e53610cadff6056a4514e252d5a28ba42c1ced03ca5dd367ba0"
+      "path": "rust-skills/rules/async-tokio-runtime.md",
+      "sha256": "38c11036c2ad0a453b84a0612321f37d72afe3f9eba768f12bb4bd3cb8d80b99"
     },
     {
-      "path": "rust/references/property-testing.md",
-      "sha256": "77ca93e8c85be5a0a5d488274e76f555a0fae697c8b1ac7c442b9531b3602157"
+      "path": "rust-skills/rules/async-try-join.md",
+      "sha256": "f439708919c289aecd9458bc46356ae3a4de2ce13c0c3050ca807edce3ee9405"
     },
     {
-      "path": "rust/references/public-api-surface.md",
-      "sha256": "2225dca4d3f514433c485444757f14d7125b2c4a3f586e2f5d3e6d59c7cc59be"
+      "path": "rust-skills/rules/async-watch-latest.md",
+      "sha256": "ef07159c6d7da696edfdce6897ef4a14756f5d3df95da21c153e031a0e3230d5"
     },
     {
-      "path": "rust/references/pyo3.md",
-      "sha256": "20fc72c078624d816ee1962ac99ac8a151e16352d0335e5ad60d53c616b99ca1"
+      "path": "rust-skills/rules/closure-disjoint-capture.md",
+      "sha256": "14058ce4714e4f7758024c9736af13ce476d5cce74f90f71e3c5b3254e8ff60c"
     },
     {
-      "path": "rust/references/safety-comments-and-unsafe-contracts.md",
-      "sha256": "ecc6769f93528692c1e0be303e068f3da5b7b32fddcea12be5fe4b72cd021fda"
+      "path": "rust-skills/rules/closure-fn-trait-bounds.md",
+      "sha256": "adfe85d835223da1f0934e94a31259f13b22b5ede93ade6b0292fd3d7c4f8559"
     },
     {
-      "path": "rust/references/smart-pointers.md",
-      "sha256": "1a8c3e337b8c033e9352a9517dae19c2b59366d75c2d2212b6b024f8f92c04bd"
+      "path": "rust-skills/rules/closure-impl-fn-return.md",
+      "sha256": "66b5ed8a8d45ac65a5cb1b2d0bb36b731b2b2cc5909ddf5fc84f03fcd8e10162"
     },
     {
-      "path": "rust/references/snapshot-testing.md",
-      "sha256": "5cd8c1598d953a20da07531e5cbf499cb33b61030841c957140682b708b6262b"
+      "path": "rust-skills/rules/closure-move-capture.md",
+      "sha256": "e6edf52ec7955b4719cd9bd19ca55593b185bafdeb82390196202b9df71f5902"
     },
     {
-      "path": "rust/references/standard-traits.md",
-      "sha256": "0f01714f0531626ac7133166b2f0341a3c97276ad323582fe82ace2526106bb4"
+      "path": "rust-skills/rules/closure-static-vs-dyn.md",
+      "sha256": "c1dcc10f8358580a76248f0e9950c20572aa3e77b8fe3ce07d737915c4813f72"
     },
     {
-      "path": "rust/references/struct-collections.md",
-      "sha256": "54be49b7786188527374c8674f64fcca310a79f99b769d3e12da371cbe1b7d3d"
+      "path": "rust-skills/rules/coll-binaryheap.md",
+      "sha256": "d45bb133abf0e9f1a1526e72e3e157909c0ddb319f749b1643f7eee0ed909544"
     },
     {
-      "path": "rust/references/testing-and-debugging-macros.md",
-      "sha256": "02909b12654bba10091e731efd536d92b528ce8bcabe909051726a702ae443cb"
+      "path": "rust-skills/rules/coll-map-choice.md",
+      "sha256": "7854a0470c0dc09e48a15eaba629144e3605cc00341e70821415c101c0b72cf8"
     },
     {
-      "path": "rust/references/thiserror-patterns.md",
-      "sha256": "acb23df2b3f5851902eda3d0a0c8cf0fb19e7070a313b18940d1c96e321d31eb"
+      "path": "rust-skills/rules/coll-seq-choice.md",
+      "sha256": "8ed03c3f481148712dd3268ff79c612221efa5bf1a0f30f85c383bef4fdd9eca"
     },
     {
-      "path": "rust/references/trait-patterns.md",
-      "sha256": "938f028ae5f60a9b5f6843d38a356f6e281c485c84fe9d450aa0bc71cf591294"
+      "path": "rust-skills/rules/coll-set-membership.md",
+      "sha256": "b645928c78212e1dec8b0b15a0be0559fbdf923eb3b6e270343450cc2c8631d6"
     },
     {
-      "path": "rust/references/transform-over-mutate.md",
-      "sha256": "2cd86e0739caad213982fe402a42de5f13e7e327b29851e3f2a8fad790309303"
+      "path": "rust-skills/rules/conc-atomic-ordering.md",
+      "sha256": "261df660bde33ab0c76ea6d73abaec3ee1525822c05c02fde375a725d562bdde"
     },
     {
-      "path": "rust/references/typestate-patterns.md",
-      "sha256": "eedd8ec0cf99372cf434400029334d60ad8270f9f0dadd89481c8cf6a401d032"
+      "path": "rust-skills/rules/conc-rayon-par-iter.md",
+      "sha256": "cc7bff57ccbb530e6dbdca607fc0dd048bb42abb11890971252f68037f0b27a0"
     },
     {
-      "path": "rust/references/ub-and-validity.md",
-      "sha256": "b7dbfb420f804d6341917c2f2e17cdf83556b67c6354b71b0a2be22f5e488215"
+      "path": "rust-skills/rules/conc-scoped-threads.md",
+      "sha256": "4b19dcecc0d54989c9892b1d9cf5df66518aa6cb7eebea62ff69e75db313205a"
     },
     {
-      "path": "rust/references/ub-boundaries.md",
-      "sha256": "1280365357ed1a737fbee4e8a47176c4332a8ca65f09170bb30c81d78119914b"
+      "path": "rust-skills/rules/conc-thread-local.md",
+      "sha256": "bbbb870a59f85af120888692c4f44592d912fc92b4380f82fda9c2706c8bd86c"
     },
     {
-      "path": "rust/references/uniffi.md",
-      "sha256": "b38337900486a181532f53999fb071aef12d9062bda23290b15907e6e6b2883f"
+      "path": "rust-skills/rules/const-block.md",
+      "sha256": "8f78ce809fe59ba8b9f5a452ba100566fbd35c64aebb137373afdf762a1a3cfb"
     },
     {
-      "path": "rust/references/visibility-and-modules.md",
-      "sha256": "dd76e9e7c34ca806ac72aaa81a29bcbca119a0285e4999222767305cfaafd735"
+      "path": "rust-skills/rules/const-fn.md",
+      "sha256": "eab5b82ee3c486a9b26cd5a377dda6f93cb867226f8448e48e80b3441584774c"
     },
     {
-      "path": "rust/references/wasm-bindgen.md",
-      "sha256": "70070323a4ad676ea69cb9ea39e8170857b6496e9dd06eca1172ccb4b6f535c8"
+      "path": "rust-skills/rules/const-generics.md",
+      "sha256": "d999587775d4f7b73de55e834eb6c96fff8e6dc714173fab520a275369b0a291"
     },
     {
-      "path": "rust/references/workspaces-and-layout.md",
-      "sha256": "8c507e47f6ab06b3f845059045b9ff3e334c132fb11faf42cceace2d032590ed"
+      "path": "rust-skills/rules/const-vs-static.md",
+      "sha256": "cc528ca115cc4bd3fcf1d5b82cabd04ba42eb5252d3f0033492017b27155e752"
     },
     {
-      "path": "rust/serde.md",
-      "sha256": "97cddb54a5d7edc5f29c343acd2e09f0f0d618bd2f88d7726661964f32be959a"
+      "path": "rust-skills/rules/conv-asmut-mutable.md",
+      "sha256": "5da738305828c80e6ea3e37ab1977a15f4ce16b72b9742353ffe2654a130c75b"
     },
     {
-      "path": "rust/testing.md",
-      "sha256": "209e6a7962abfc0d5d03b6a6e4dc8ceb45601b00837a8364e05f04dd2675052f"
+      "path": "rust-skills/rules/conv-fromstr-parsing.md",
+      "sha256": "3760a9495cb1d5ca3c1c68ec005ac335a29bf00ea6e9785cd02008c445f8aa24"
     },
     {
-      "path": "rust/traits.md",
-      "sha256": "81121dc383bf5cb6bce8a484cb586c033b36c602fe416d7f76a7bce508e2432a"
+      "path": "rust-skills/rules/conv-tryfrom-fallible.md",
+      "sha256": "2f781769f99e16e32b79d2e61542b5696a73b4c142c14c6bb091a09d45ed493f"
     },
     {
-      "path": "rust/type-design.md",
-      "sha256": "edb60352bfcc5a42fb4835a0ae80718bbcde401b0571d7510ceb2444689a8af4"
+      "path": "rust-skills/rules/doc-all-public.md",
+      "sha256": "f8001dc7fdb147acf19d78b09c923ecfde15aea69cd590544eae76c90761758e"
     },
     {
-      "path": "rust/unsafe.md",
-      "sha256": "39b23bb0041dc063cf9b3089b87eb93dee73598067a6a35aa23bfe0ea1d1bd78"
+      "path": "rust-skills/rules/doc-cargo-metadata.md",
+      "sha256": "62d0946aa9085af41b4054176b9815ad39eec2126cab8d71dd7ece6e3c3cc948"
+    },
+    {
+      "path": "rust-skills/rules/doc-crate-readme.md",
+      "sha256": "959b42ee2632de15edfab908a466965979d0b037f0c13ecb776cf280bd5a972c"
+    },
+    {
+      "path": "rust-skills/rules/doc-errors-section.md",
+      "sha256": "32bff3e8f672cd812c6237565cbf73efa84b758e66b248e9815754426b7808ba"
+    },
+    {
+      "path": "rust-skills/rules/doc-examples-section.md",
+      "sha256": "89c29e0d57d6906404483a3ac30714ed546a5d99e5e1815d842d3d29e56197a5"
+    },
+    {
+      "path": "rust-skills/rules/doc-hidden-setup.md",
+      "sha256": "d281cf2846d0c67808e72ea28120fab75fbd32cd3431941619716f9c4634cb96"
+    },
+    {
+      "path": "rust-skills/rules/doc-intra-links.md",
+      "sha256": "d70fe6c80b91be7b30ea58c17c2181cac590766be886b4352c7638562885e15a"
+    },
+    {
+      "path": "rust-skills/rules/doc-link-types.md",
+      "sha256": "d595833c6f47b1010032f9188e121b75f720161236ec3ed847552b3062bd7542"
+    },
+    {
+      "path": "rust-skills/rules/doc-module-inner.md",
+      "sha256": "c29a2a6eaa504274a7b82568865a491ae13e5180743c955c95b785227a09dc0c"
+    },
+    {
+      "path": "rust-skills/rules/doc-panics-section.md",
+      "sha256": "e59101cdcfb1b2bb7f03bff86d40a18b4fdbd4d8ff86ec6149ce018f6d93908f"
+    },
+    {
+      "path": "rust-skills/rules/doc-question-mark.md",
+      "sha256": "a621c16fa2d53c9b582132cc1267ff10157260c9fe67f66a69acf6d0e268b470"
+    },
+    {
+      "path": "rust-skills/rules/doc-safety-section.md",
+      "sha256": "9f3da270ef3c7e55392bee3372c567f079e6a3ec0b930f89e66ca1ba4123d436"
+    },
+    {
+      "path": "rust-skills/rules/err-anyhow-app.md",
+      "sha256": "d0842f75d21e38b7dcbe76c2cb884fa8b8990bb798b59a2a7d42ecd697c38f12"
+    },
+    {
+      "path": "rust-skills/rules/err-context-chain.md",
+      "sha256": "efb8f4de050b46100b290e1dcd3ad2921e82c2d9d5050a325672de4353ea18d2"
+    },
+    {
+      "path": "rust-skills/rules/err-custom-type.md",
+      "sha256": "c8b26774f8e159b12e6b5f6dd5c1e4f6e53b1d86199107f684ee1f1a46c54e93"
+    },
+    {
+      "path": "rust-skills/rules/err-doc-errors.md",
+      "sha256": "a34404d30d5dc63b964154124a707f69abf66e749835346aa0424143de39785e"
+    },
+    {
+      "path": "rust-skills/rules/err-expect-bugs-only.md",
+      "sha256": "baec29ab1f30e441d771377749df8918bbfa2e80693124cf0e1a290cdd44ca9e"
+    },
+    {
+      "path": "rust-skills/rules/err-from-impl.md",
+      "sha256": "da2dd2100252f8a5470745827a9b8d1bbc7dc299750a14b654c37fd68f762b4b"
+    },
+    {
+      "path": "rust-skills/rules/err-lowercase-msg.md",
+      "sha256": "96728ac0a168cca376e38d2f80975c2ec1672ceffd626b73d67ff8dd55b3a3b1"
+    },
+    {
+      "path": "rust-skills/rules/err-no-unwrap-prod.md",
+      "sha256": "2424e797305e5e2df6f1931370b4b1f024287b6811cb177be85b3a02366139fb"
+    },
+    {
+      "path": "rust-skills/rules/err-question-mark.md",
+      "sha256": "fd72ad88af23e742c1ed9b1692b6bbf4aab64792d315c85abe44c5532f7af9fb"
+    },
+    {
+      "path": "rust-skills/rules/err-result-over-panic.md",
+      "sha256": "eac1d41336a3255e4f9c479a09a6623dcee01902914bf7adc5aab8099b2a38e9"
+    },
+    {
+      "path": "rust-skills/rules/err-source-chain.md",
+      "sha256": "df3add1a3ca36582ed7178abebfc0723c5a6a45dbf7b94fca52ac6a3ff03aa5b"
+    },
+    {
+      "path": "rust-skills/rules/err-thiserror-lib.md",
+      "sha256": "8375b88b1e2145eb040d66085627f176b191f2bc58efad1b5b643f0c5ef932bc"
+    },
+    {
+      "path": "rust-skills/rules/lint-cargo-metadata.md",
+      "sha256": "b83fb6f6304a9614720223fddccf46ace83653348e7b7cf815fb0b32a26e31d3"
+    },
+    {
+      "path": "rust-skills/rules/lint-cfg-check.md",
+      "sha256": "fcdbea5c7f2a7f4318a815fc292e69d506e694a084e48d363487e33b0dc29efb"
+    },
+    {
+      "path": "rust-skills/rules/lint-clippy-nursery-selected.md",
+      "sha256": "761e2aac35e778c92ac2dbc8740bd6509904d17743b7beeb1f430fe2072968e6"
+    },
+    {
+      "path": "rust-skills/rules/lint-deny-correctness.md",
+      "sha256": "4c7c029fe826c7a3bc8cd01d6ec22ea63ce0393c3cc679b4033662010a49581f"
+    },
+    {
+      "path": "rust-skills/rules/lint-missing-docs.md",
+      "sha256": "0a9fd316760db6b4f503500f324ba8e0ed94c152d9b5cb5d7d04990aed1e9349"
+    },
+    {
+      "path": "rust-skills/rules/lint-pedantic-selective.md",
+      "sha256": "e421399a4671021725d1cb5913d585fb84e646ffa056a5627c7df1e2ba0293fa"
+    },
+    {
+      "path": "rust-skills/rules/lint-rustfmt-check.md",
+      "sha256": "487bd0343b985e0b8791140b01da95b9fb236831535e64acaaf6bc1712626c9f"
+    },
+    {
+      "path": "rust-skills/rules/lint-unsafe-doc.md",
+      "sha256": "57db005a20a1f5f50bfe84a170d2060b55bf6249c22ba53ffb28f7568f9351f8"
+    },
+    {
+      "path": "rust-skills/rules/lint-warn-complexity.md",
+      "sha256": "fde6ab1d1cf1ea3d3375c29ce305e5b1eaa585c52e57d514549c5f560393476f"
+    },
+    {
+      "path": "rust-skills/rules/lint-warn-perf.md",
+      "sha256": "28711ddf0e20df6b304a40955a6526f917bb3e59754f44145ca4e8b1346f829e"
+    },
+    {
+      "path": "rust-skills/rules/lint-warn-style.md",
+      "sha256": "215b87b1262d7616cf43d4ce76f3b4dbc0ff204aa31591fb6b953f07021bd209"
+    },
+    {
+      "path": "rust-skills/rules/lint-warn-suspicious.md",
+      "sha256": "baeb67939fad69b1c85bde793b7296f677c0e9ba514990837523abb6a332a414"
+    },
+    {
+      "path": "rust-skills/rules/lint-workspace-lints.md",
+      "sha256": "31f38c6c838b0016ff9cd772eb9cd260a3be4990490aba7418ae77eaef64796f"
+    },
+    {
+      "path": "rust-skills/rules/macro-export-crate-path.md",
+      "sha256": "74008ade9c0cb83f2b90cad5cc122927b301d4f16bce208767d3a9e58d2a5d9b"
+    },
+    {
+      "path": "rust-skills/rules/macro-fragment-specifiers.md",
+      "sha256": "e9f4ce18312a94a8d3a2b5b93e5652f3fc21396dfc38e14b47f9eca25de3e19a"
+    },
+    {
+      "path": "rust-skills/rules/macro-prefer-functions.md",
+      "sha256": "f8f89e40a69bc547311708e35ea42fcf9e250cd3ece1791dd37089891a596d0a"
+    },
+    {
+      "path": "rust-skills/rules/macro-private-helpers.md",
+      "sha256": "73cace5447b2083f521cce08aa64b52224650fb88d7b37f0a0b5070fd6f7af2e"
+    },
+    {
+      "path": "rust-skills/rules/macro-proc-error-spans.md",
+      "sha256": "6e73e2ace34efb58f48feca16c7a23b788d42c4d084b5c8fef708641b2353842"
+    },
+    {
+      "path": "rust-skills/rules/macro-proc-syn-quote.md",
+      "sha256": "a880da74f52469d92e6f71262772d2852c98675227758c9586d3eff19af53d02"
+    },
+    {
+      "path": "rust-skills/rules/macro-proc-two-crate.md",
+      "sha256": "e30f2e5034b63a1c9e1fa17e61246551fa67d28f5ff901bf4128bd99a59c980b"
+    },
+    {
+      "path": "rust-skills/rules/macro-rules-hygiene.md",
+      "sha256": "acf4977b06bea149a042e11f4a8263f1b8a3c81d4e9e3206a5a6a4e571b691c4"
+    },
+    {
+      "path": "rust-skills/rules/mem-arena-allocator.md",
+      "sha256": "6f02b0d32a7b37483fbbad68d2682665f4822398e094020a6a5a608df617cf7a"
+    },
+    {
+      "path": "rust-skills/rules/mem-arrayvec.md",
+      "sha256": "8114ceb52948d2aad3e320c47a096f351dc24099fb514f79acb0fb1b8e332f82"
+    },
+    {
+      "path": "rust-skills/rules/mem-assert-type-size.md",
+      "sha256": "eaf75c39278c7ffe86a4018a7cde9f58779876908bc0d9bc06ffe226aaa87ec4"
+    },
+    {
+      "path": "rust-skills/rules/mem-avoid-format.md",
+      "sha256": "73aeda367c72ab290024d38ce90cfef726500e9d548a854ec9b9a05579d2d325"
+    },
+    {
+      "path": "rust-skills/rules/mem-box-large-variant.md",
+      "sha256": "30465d721c04fae4652ef704016e35d1ab74fa469ae27a63a6c37d9dea7cbb4f"
+    },
+    {
+      "path": "rust-skills/rules/mem-boxed-slice.md",
+      "sha256": "2d8be9f69e3a7035bc5ad077552209954fa0bd2935fa195208d21a328a3df5c9"
+    },
+    {
+      "path": "rust-skills/rules/mem-clone-from.md",
+      "sha256": "e3cb92e4ef61e445c7df30f5940813f0fc956aa90ffbb803bacdbd3d6613ae33"
+    },
+    {
+      "path": "rust-skills/rules/mem-compact-string.md",
+      "sha256": "a3e001e5cda9e4f8f9de8d1fc1857a299e9a7744b733bb879452f81d7217fb5c"
+    },
+    {
+      "path": "rust-skills/rules/mem-drop-order.md",
+      "sha256": "03828e4267fe3df947b8ae9bb7b16a067f6fcb68f1e3d115e209678833b22923"
+    },
+    {
+      "path": "rust-skills/rules/mem-reuse-collections.md",
+      "sha256": "c9ee9ab2fc10917744217dfb5ea89b7ce86fff9f572de6aa2892371e8f07558f"
+    },
+    {
+      "path": "rust-skills/rules/mem-smaller-integers.md",
+      "sha256": "23723a89cbde43591708293f2459094069ca7751410ce42f7cc4102a721ab68c"
+    },
+    {
+      "path": "rust-skills/rules/mem-smallvec.md",
+      "sha256": "ab9eb03c9de933db73ae249f2c11b21f40379eaae7f4c40e3255cf13c0353c73"
+    },
+    {
+      "path": "rust-skills/rules/mem-take-replace.md",
+      "sha256": "d8c396f4acff5cf1e01d103404d2d5a5d2925373af5e1aba50b20e9ea38baa9b"
+    },
+    {
+      "path": "rust-skills/rules/mem-thinvec.md",
+      "sha256": "50cf1f0cc9b78d2eb8bb48739cc05026176722e5f62b8b5aeb4fdb1de5f8a462"
+    },
+    {
+      "path": "rust-skills/rules/mem-with-capacity.md",
+      "sha256": "65959bc68703ec1c09969971af7c8caf33fbfe12e33996e3bfc59f254e1036d9"
+    },
+    {
+      "path": "rust-skills/rules/mem-write-over-format.md",
+      "sha256": "6d471a299353021b893d5459f1513875ec16a1bd9f9adbd8765b5ab81bc35137"
+    },
+    {
+      "path": "rust-skills/rules/mem-zero-copy.md",
+      "sha256": "0128bf291e401d615032c1c1c5543a3791dc63c249e800e71c2e2012a2681a13"
+    },
+    {
+      "path": "rust-skills/rules/name-acronym-word.md",
+      "sha256": "adf757646953837175f3e8edf19359cb5bf648c534c8c1c04f998efde53ff786"
+    },
+    {
+      "path": "rust-skills/rules/name-as-free.md",
+      "sha256": "aeec77906707628bdc2378bbcd3fbb3b2a0dc6f8b1382f554e2df7c3d3f0c8c5"
+    },
+    {
+      "path": "rust-skills/rules/name-consts-screaming.md",
+      "sha256": "b3a94463e11d6bf4694848370bf019727120df003ef808ef79491e44e93ea844"
+    },
+    {
+      "path": "rust-skills/rules/name-crate-no-rs.md",
+      "sha256": "d2aaf1f2fdb570883146caf1599f1461d1227d72abe7dffe293dd6a71a68cad6"
+    },
+    {
+      "path": "rust-skills/rules/name-funcs-snake.md",
+      "sha256": "9659a3e6e00c943573f6d6cf8e4324e20894665cf7a367db9b7d1f4f8f762d38"
+    },
+    {
+      "path": "rust-skills/rules/name-into-ownership.md",
+      "sha256": "916b405294504d68cb7510bd6940f812efc5471b0f9b2862f448888492ac5f3b"
+    },
+    {
+      "path": "rust-skills/rules/name-is-has-bool.md",
+      "sha256": "54cb26e3cc1d87ab6ae131e1ffe21fdc64479ae9b6bbc7431b6c77610c55b7de"
+    },
+    {
+      "path": "rust-skills/rules/name-iter-convention.md",
+      "sha256": "2ed3e1b80b8846236e748027bf1e0e5119cf2398a3067605dee1c2fbd499e6f9"
+    },
+    {
+      "path": "rust-skills/rules/name-iter-method.md",
+      "sha256": "766cae2bb8934977b03e2496a0609cd53c441469fd77ef21c2cc3cf846c2c1f6"
+    },
+    {
+      "path": "rust-skills/rules/name-iter-type-match.md",
+      "sha256": "676515a2cecc561906a58999e9f7561e4cf79b5cbb57bcd702e5b77cd2a9d8bf"
+    },
+    {
+      "path": "rust-skills/rules/name-lifetime-short.md",
+      "sha256": "6b41b7a418c68a79a8d013d4fdeb9a5141818f5d0d6231f163680f2bb0358423"
+    },
+    {
+      "path": "rust-skills/rules/name-no-get-prefix.md",
+      "sha256": "ac282d65f9cf9d187c561c4248561125e0b47cd447bd3b75ef1510c41c2181ff"
+    },
+    {
+      "path": "rust-skills/rules/name-to-expensive.md",
+      "sha256": "4548a1456caa3bf0c5d3e4f2d8ae0a2af5a1192f637ae52ffa80a7af5ff15ca1"
+    },
+    {
+      "path": "rust-skills/rules/name-type-param-single.md",
+      "sha256": "e1b5083bb60dc80ba2f1666ee303ddb57a6a160cddc1427a867362d727c0a341"
+    },
+    {
+      "path": "rust-skills/rules/name-types-camel.md",
+      "sha256": "73321d6f5ed12a3ff23c5051e2faeb7e70ebf0446436c72d3f7862ec2f3b56ed"
+    },
+    {
+      "path": "rust-skills/rules/name-variants-camel.md",
+      "sha256": "c2a1fb987e439b5f910116a3f8e54eccb0d5c75270bccc1583670a330364f4d3"
+    },
+    {
+      "path": "rust-skills/rules/num-cast-try-from.md",
+      "sha256": "2cec97a24fbf09dba01cbc4cb5b7a904398439163bdbb1d407e536ebe9140195"
+    },
+    {
+      "path": "rust-skills/rules/num-float-compare.md",
+      "sha256": "0af0ed600acab59edfe8ff7f7a49eb0091d06ce581e051550fe33f7e4d50468a"
+    },
+    {
+      "path": "rust-skills/rules/num-nonzero.md",
+      "sha256": "66a09b6d3e59806e80c403aa76eb69c9a1f94614c0784756a6cabac68b30e1a9"
+    },
+    {
+      "path": "rust-skills/rules/num-overflow-explicit.md",
+      "sha256": "e472eefad4531bbacd02622af4904f3f903ed9f21761563b218cb6d41ba00cde"
+    },
+    {
+      "path": "rust-skills/rules/num-saturating-clamp.md",
+      "sha256": "13094dcb7e52a5136a459080f589799b20d75ebe9c5ca3a1137efc9a1a24e147"
+    },
+    {
+      "path": "rust-skills/rules/obs-error-chain.md",
+      "sha256": "bf9431c478a78c013b1f900f7e462747fac32aa80bb115044ba244765eec8507"
+    },
+    {
+      "path": "rust-skills/rules/obs-instrument-spans.md",
+      "sha256": "26192ab33b9afa7f62ba3ffb0b4c247e8b13749c94ef9746e61ca8b3409bfa12"
+    },
+    {
+      "path": "rust-skills/rules/obs-levels-filter.md",
+      "sha256": "79ddf7b046683c10fa77034ea44c293c32fa3b7726b1f97383e0b84018df369d"
+    },
+    {
+      "path": "rust-skills/rules/obs-library-facade.md",
+      "sha256": "e19123adc6b31ef2d332df48f2c61a91d72a0d60ae4de2a10928b5680ae53dcb"
+    },
+    {
+      "path": "rust-skills/rules/obs-no-sensitive-data.md",
+      "sha256": "0c5159885993839cb43267926ede588efcbe0ec907468c5c240903f301ca689c"
+    },
+    {
+      "path": "rust-skills/rules/obs-structured-fields.md",
+      "sha256": "98f91c169f11499e831358c27b241102f530df9a6dbd03a82b04c9fe43aa0b0f"
+    },
+    {
+      "path": "rust-skills/rules/obs-tracing-over-log.md",
+      "sha256": "6fd7d2fd40f59d2f5f7a692450b16d70a0b07ce9bcbda9ca11e265bfc931df56"
+    },
+    {
+      "path": "rust-skills/rules/opt-bounds-check.md",
+      "sha256": "0c334936f0b26d6f7c8e2642d708df671b98f3ba4bb57c4b134b0d3f8ee25910"
+    },
+    {
+      "path": "rust-skills/rules/opt-cache-friendly.md",
+      "sha256": "0ced5ccca71b9a76d912856835017fee688c25d403a4b8ca90f4780a40a61f14"
+    },
+    {
+      "path": "rust-skills/rules/opt-codegen-units.md",
+      "sha256": "6978c8c3d757efce2e2b7201fbc990dbcc51504f037b3093cbeb524aa45250e7"
+    },
+    {
+      "path": "rust-skills/rules/opt-cold-unlikely.md",
+      "sha256": "402ffbeae612c0a7662396311c11a047ed58c15827d65d670caa35f5950e66b4"
+    },
+    {
+      "path": "rust-skills/rules/opt-inline-always-rare.md",
+      "sha256": "c803bdf268d59bfc55dca1877c2a84913c752649b0e15ce139c6ce8a59c23d81"
+    },
+    {
+      "path": "rust-skills/rules/opt-inline-never-cold.md",
+      "sha256": "3e1219d53ddcd4c7e9bca618c141be2b2230d2dd070588630a254d872d457126"
+    },
+    {
+      "path": "rust-skills/rules/opt-inline-small.md",
+      "sha256": "0eb6bcf8e09b7227ad6bf163b6ab401729ba91ef26b8a48380ec7275936d0df1"
+    },
+    {
+      "path": "rust-skills/rules/opt-likely-hint.md",
+      "sha256": "f1651f259b889822dca5ba7146fcae7118821abbabb9b7c9a101ee62b3477f2a"
+    },
+    {
+      "path": "rust-skills/rules/opt-lto-release.md",
+      "sha256": "3f8b28fd8e752f9dee874a5c6cc28b17a5a3fe1feba7f291f8606d43ec46c9b9"
+    },
+    {
+      "path": "rust-skills/rules/opt-pgo-profile.md",
+      "sha256": "2c49fe4784ace1c69b8ad1dc367b1ead240af02b7f2a8842410080a90f9c6958"
+    },
+    {
+      "path": "rust-skills/rules/opt-simd-portable.md",
+      "sha256": "5932e648eab25ee44a470c633d6ce405fc7d2720b216293b604d4c25d231a3af"
+    },
+    {
+      "path": "rust-skills/rules/opt-target-cpu.md",
+      "sha256": "437e6cc771ec258de5560c755f4cb4e567e145a8257fac40fbe1fc0c4c817cf2"
+    },
+    {
+      "path": "rust-skills/rules/own-arc-shared.md",
+      "sha256": "62bfe5de6a545bd572042b2199599d37cca472d7a20192ecc00ee7148930ca2a"
+    },
+    {
+      "path": "rust-skills/rules/own-borrow-over-clone.md",
+      "sha256": "495bbffcdbdd58230585d802b43b28808058e7e9e24a1602427250822a84253b"
+    },
+    {
+      "path": "rust-skills/rules/own-clone-explicit.md",
+      "sha256": "85711b63392ac8fdfdddaef20f06878a00038c01052f2f4322eafc9cf1fb06a2"
+    },
+    {
+      "path": "rust-skills/rules/own-copy-small.md",
+      "sha256": "30b6c640b9f9ab49e2604046392070d255476fe5afd7606e800654873c7cfbdf"
+    },
+    {
+      "path": "rust-skills/rules/own-cow-conditional.md",
+      "sha256": "d32d8021905ec37177377878e86990f718dd35ca8d246fd5df676605ae39b151"
+    },
+    {
+      "path": "rust-skills/rules/own-lifetime-elision.md",
+      "sha256": "8c279310656dff682690aea6b831c7d77340fa3a48ac1a83fd57afaccec05427"
+    },
+    {
+      "path": "rust-skills/rules/own-move-large.md",
+      "sha256": "e1688804ddd6dd56dfae625dd110c6a3f94e8c152a06fbca348af0008f93f866"
+    },
+    {
+      "path": "rust-skills/rules/own-mutex-interior.md",
+      "sha256": "d071f58d4e763740eeaba48f5f7821522170b5791698abfba22c3c6b8cc5da21"
+    },
+    {
+      "path": "rust-skills/rules/own-rc-single-thread.md",
+      "sha256": "557724cbacbced62c3f7b143c6136dcbc28b2fb1343518ca21ae3d5e986781cb"
+    },
+    {
+      "path": "rust-skills/rules/own-refcell-interior.md",
+      "sha256": "85993378fbd8cefbe53d75b32eda36295f6ccfce388b141597e1735afb150269"
+    },
+    {
+      "path": "rust-skills/rules/own-rwlock-readers.md",
+      "sha256": "a39b5a853668e3f337ecdc8a8978484fceb6fafd5c3b0a6afc5d73a47019cdb6"
+    },
+    {
+      "path": "rust-skills/rules/own-slice-over-vec.md",
+      "sha256": "2d8a3df59ae8c5ba76ec49123ad03287be5efffbc5945e414a559275bd6f43ed"
+    },
+    {
+      "path": "rust-skills/rules/pat-at-bindings.md",
+      "sha256": "562ec8fa2c151524cf53a21aed57f400506a888a37d4da7aae595c39d5ba3ecf"
+    },
+    {
+      "path": "rust-skills/rules/pat-exhaustive-enum.md",
+      "sha256": "42184c0f7140afdaf9d5377d0f64d027cb1fa5fa2ec30c9f320114168013e34d"
+    },
+    {
+      "path": "rust-skills/rules/pat-if-let-chains.md",
+      "sha256": "3ce1ed93221bbf0d74311120a0dc2b754ecc6e9573670dfedcd6e323bfef346c"
+    },
+    {
+      "path": "rust-skills/rules/pat-let-else.md",
+      "sha256": "da56508174af078b040e6e713943a9fb184d388b1d55e0bf43514a9a92287002"
+    },
+    {
+      "path": "rust-skills/rules/pat-matches-macro.md",
+      "sha256": "33f9535fee4966692998d83e52450b81832ddcef30eda5b317cc763fb52e34f6"
+    },
+    {
+      "path": "rust-skills/rules/perf-ahash.md",
+      "sha256": "62c03be18979a894006baa4d8f5705a411c5e53abda2f78fff0455fc2a8e665e"
+    },
+    {
+      "path": "rust-skills/rules/perf-black-box-bench.md",
+      "sha256": "e2a8d64fbf902bc1380540d83787aded5729ec4db5371f602e0007b823aa5aa0"
+    },
+    {
+      "path": "rust-skills/rules/perf-chain-avoid.md",
+      "sha256": "bf4704b477009ed4768bc8767ef1eaeaf7fb08616e9a3381e9af0850c3150212"
+    },
+    {
+      "path": "rust-skills/rules/perf-collect-into.md",
+      "sha256": "04439a08a3c0a0272d888952a9fd13a6d60ec4090aa6ffce5b6fb10a1ea0db48"
+    },
+    {
+      "path": "rust-skills/rules/perf-collect-once.md",
+      "sha256": "b60492ab3125906ce7e61534537a4c3a8d804babb85e9762990a95d07e66463d"
+    },
+    {
+      "path": "rust-skills/rules/perf-drain-reuse.md",
+      "sha256": "031a3cbfe64f9afb6cf50f46db7639f1719b7fafe5c39a8ce14e6eb90b9c16f4"
+    },
+    {
+      "path": "rust-skills/rules/perf-entry-api.md",
+      "sha256": "327790871f3a46571549e9967aeaeb51525fb8632f258a5f80dbbd9d910d324c"
+    },
+    {
+      "path": "rust-skills/rules/perf-extend-batch.md",
+      "sha256": "e7f57588fcb26f37a6d1f868107e83bcaeb60ea219843dfb305987fcb7b17bc3"
+    },
+    {
+      "path": "rust-skills/rules/perf-io-buffering.md",
+      "sha256": "e79c82449d5b0805b882a6c3b90def0dbec831c081077458897582ff76cbc8aa"
+    },
+    {
+      "path": "rust-skills/rules/perf-iter-lazy.md",
+      "sha256": "dffdcdf153c715c85d3e21835a97666af91e84363dfe28c4aabfea3c5d9d44ec"
+    },
+    {
+      "path": "rust-skills/rules/perf-iter-over-index.md",
+      "sha256": "3c199c371b338812298813075710a04be75bc705ac76013316e7429f84c73e2f"
+    },
+    {
+      "path": "rust-skills/rules/perf-profile-first.md",
+      "sha256": "8fe8e45ff1ac882cf3405be6899ae55f26c97c3cc6fddd2b1bbba80d133735e3"
+    },
+    {
+      "path": "rust-skills/rules/perf-release-profile.md",
+      "sha256": "2092294d1d844a3cba3f37ab81b49016c2daf932b4f1b6175b5f94329c9d3960"
+    },
+    {
+      "path": "rust-skills/rules/proj-bin-dir.md",
+      "sha256": "d3ec76960da1ee68963b49fecbeb81dac0d0d904fa3d688474b0e35950eb493d"
+    },
+    {
+      "path": "rust-skills/rules/proj-build-rs-minimal.md",
+      "sha256": "0cd0a49c2cb2e4e1589978219d70b1a1a7b4bc4feb1f8903eb5282df90bae384"
+    },
+    {
+      "path": "rust-skills/rules/proj-feature-additive.md",
+      "sha256": "e6f90553463f23206b89156ea780f7ab81b8b5f9d64427d618396db47b73ab86"
+    },
+    {
+      "path": "rust-skills/rules/proj-flat-small.md",
+      "sha256": "4a0335ef126fa30d6ad96f5e3c591a6130fbdbb6300e5914a6bc85c1d43229ee"
+    },
+    {
+      "path": "rust-skills/rules/proj-lib-main-split.md",
+      "sha256": "cbd20ae9dd051ce48c2aed237c408b090c8a9e1081688c1f9e7a16f544990f10"
+    },
+    {
+      "path": "rust-skills/rules/proj-mod-by-feature.md",
+      "sha256": "fc8180f6fa7867c15a41137d5e36d0c48d9dfdc3b403e17a2d58ded814db63f3"
+    },
+    {
+      "path": "rust-skills/rules/proj-mod-rs-dir.md",
+      "sha256": "1714485aeb998ee22d2f19d9f612fbb89524ccf963ad3b584f298725423e335e"
+    },
+    {
+      "path": "rust-skills/rules/proj-msrv-declare.md",
+      "sha256": "6a1cfb6620570248e132d6dc792c839c16a672d6ff427825582720c94331accb"
+    },
+    {
+      "path": "rust-skills/rules/proj-prelude-module.md",
+      "sha256": "ed5cfde6b72b8056db884f3d0d328f104d60e5bd31f10a6ed9be527bf740887f"
+    },
+    {
+      "path": "rust-skills/rules/proj-pub-crate-internal.md",
+      "sha256": "49b056124ed3b6ca0d62434a92f37af8369d7f4317b10611158279278599209d"
+    },
+    {
+      "path": "rust-skills/rules/proj-pub-super-parent.md",
+      "sha256": "27d24ce181584caddb4a8451f92687d9a2f5ea0fe2b920cf1999935e19375ba7"
+    },
+    {
+      "path": "rust-skills/rules/proj-pub-use-reexport.md",
+      "sha256": "64f7d524b4fd31079cd156151ea1d09a97af4d24bd9e302792d0072522d9cc24"
+    },
+    {
+      "path": "rust-skills/rules/proj-workspace-deps.md",
+      "sha256": "71928d7875a9c8351567446d8b3645943da8da9ff9140fccd09c0f2b65d3c123"
+    },
+    {
+      "path": "rust-skills/rules/proj-workspace-large.md",
+      "sha256": "eba7f6546fea1ae4d617cf331775e54b21529360377367a225d12e25a4214716"
+    },
+    {
+      "path": "rust-skills/rules/serde-custom-with.md",
+      "sha256": "332c49af356fb5c0d4a50c00658c66ae6218dd3a710a7eef975a20e7f84b5c33"
+    },
+    {
+      "path": "rust-skills/rules/serde-default-compat.md",
+      "sha256": "463a0533f6afbefc8b0ce78ad19986c7f4071b9262094e675ce7576f5d705b8b"
+    },
+    {
+      "path": "rust-skills/rules/serde-deny-unknown-fields.md",
+      "sha256": "b127f0548708d21e1f4eceaf4bc33410b169167e1ceadcc85dadb3c276bc7fc3"
+    },
+    {
+      "path": "rust-skills/rules/serde-enum-representation.md",
+      "sha256": "d5cd9860b8da7ba5653e231fd356a3e149a872b80839ea183a2d28f5a9359d7e"
+    },
+    {
+      "path": "rust-skills/rules/serde-flatten.md",
+      "sha256": "0d8a09e5afad99e18487f7ea4254c3293618f2b1ab2e21114fdc0b9906b2aa11"
+    },
+    {
+      "path": "rust-skills/rules/serde-rename-all.md",
+      "sha256": "d01831a463257716360783347589f6d8e9ca03e37d65b476e35cc9a00af80017"
+    },
+    {
+      "path": "rust-skills/rules/serde-skip-empty.md",
+      "sha256": "d02963950e9293dc038ea7a69a9074d0f1b10376ee814e395bd9c174c5f960f7"
+    },
+    {
+      "path": "rust-skills/rules/serde-try-from-validate.md",
+      "sha256": "148c1ae58b75e955dc7d3d49160d8367299d3831622fe34d0f7438c94cb09a61"
+    },
+    {
+      "path": "rust-skills/rules/test-arrange-act-assert.md",
+      "sha256": "6a27c8dd0847ad497f6b4f6868bc51a7bb9a9e6e9cdf4fff80a8ce37ba74291d"
+    },
+    {
+      "path": "rust-skills/rules/test-cfg-test-module.md",
+      "sha256": "dbcc710e4ed5f8e32e42fc314278dae62d4d8b73504808bdbf88a5262239bdb8"
+    },
+    {
+      "path": "rust-skills/rules/test-criterion-bench.md",
+      "sha256": "db9db4467476d932cbc55440029405643372fc612c35cf2f99522a3d0f9e6573"
+    },
+    {
+      "path": "rust-skills/rules/test-descriptive-names.md",
+      "sha256": "54544c2220c520fd42f3400a15504e316c223ed38dc03c5023531145bca7db72"
+    },
+    {
+      "path": "rust-skills/rules/test-doctest-examples.md",
+      "sha256": "089375f0571c8f9127a575a36911c73775b34d3951b7ad9964c4c2786c10bca3"
+    },
+    {
+      "path": "rust-skills/rules/test-fixture-raii.md",
+      "sha256": "8fd50c4edb99f7e8895488b2a7dcd690e96b6616c206655a5cc7d4f7f836079e"
+    },
+    {
+      "path": "rust-skills/rules/test-integration-dir.md",
+      "sha256": "42890806719c37a994f0d1e2952f7bbd7ce5dc10892ea29c17a64ac6579b4791"
+    },
+    {
+      "path": "rust-skills/rules/test-loom-concurrency.md",
+      "sha256": "3b0c6184d623b767c152728170f07742999dac5cae8b1030a64bdafb2df9d842"
+    },
+    {
+      "path": "rust-skills/rules/test-mock-traits.md",
+      "sha256": "b169e37c26b899a655d80b899b675cab7ac163193d893336867ab8f1c71c1dd9"
+    },
+    {
+      "path": "rust-skills/rules/test-mockall-mocking.md",
+      "sha256": "1ef9bd7414aafb7040216b0774358541abf7d9bcc2a00fa62c3aafd06a3a7bbf"
+    },
+    {
+      "path": "rust-skills/rules/test-proptest-properties.md",
+      "sha256": "9f712af4639503d73684a9e78a36e61ae44ebc14263abc477358d53b9d02368f"
+    },
+    {
+      "path": "rust-skills/rules/test-should-panic.md",
+      "sha256": "ff852684aa4a4be668223393560a54ccdaa2ef7ad518db72b4738144477b3d72"
+    },
+    {
+      "path": "rust-skills/rules/test-snapshot-testing.md",
+      "sha256": "f63a289fbadc531754620571e4a8aa31aef6d514d5dfe4764fd0a9e0704b86cb"
+    },
+    {
+      "path": "rust-skills/rules/test-tokio-async.md",
+      "sha256": "d935fb1d99151755d22016004d8dd8ecf83aac96b45446e658a8e95e57c73527"
+    },
+    {
+      "path": "rust-skills/rules/test-use-super.md",
+      "sha256": "a0d4bb9275929cc2df7f3e5d086d3151ac336a7a556fe962a76a72e9498aada7"
+    },
+    {
+      "path": "rust-skills/rules/trait-associated-type-vs-generic.md",
+      "sha256": "d7b6f4d8374908db94e5293f7782aee279c85b507f6d50061ed2b1e15a0de082"
+    },
+    {
+      "path": "rust-skills/rules/trait-blanket-impl.md",
+      "sha256": "f7ca3c2d845949872141f16567ba821b3ec63e50443012e60b0b51cb292d479c"
+    },
+    {
+      "path": "rust-skills/rules/trait-coherence-newtype.md",
+      "sha256": "2b83200c3bf2ffee547ac8633322096eef159e9046f70459055b6284e6339cac"
+    },
+    {
+      "path": "rust-skills/rules/trait-default-methods.md",
+      "sha256": "49b37f36353fde6fe1ed07f203cce0ea7398bef9cf9b575951b9b2ca38deb578"
+    },
+    {
+      "path": "rust-skills/rules/trait-dyn-vs-generic.md",
+      "sha256": "eebcf9ff7f642734a151d59491b2c1db30899567ddecbe2d45240923baf4eec8"
+    },
+    {
+      "path": "rust-skills/rules/trait-object-safety.md",
+      "sha256": "f5b6f7a18f8fd23c85593659c59ee365ca98db7b21caf89f19d2fdee049a13d4"
+    },
+    {
+      "path": "rust-skills/rules/type-deref-coercion.md",
+      "sha256": "deff96ce81f5db9e39e9f05975902af2ff801797766aac04d55f667beb8107d9"
+    },
+    {
+      "path": "rust-skills/rules/type-display-vs-debug.md",
+      "sha256": "09a1ae18299dae852b5218181b2e722e63bcfa2c2ac9a1386ee3064097a39781"
+    },
+    {
+      "path": "rust-skills/rules/type-enum-states.md",
+      "sha256": "7049b73333db3f22a14ad66ada87030b3c787d04e6ddd8c6ed71c65b64f1da10"
+    },
+    {
+      "path": "rust-skills/rules/type-generic-bounds.md",
+      "sha256": "b1fc2925d5cbfe0883897a82acbd1920e1da5323565043ba9af73c7b2e93023b"
+    },
+    {
+      "path": "rust-skills/rules/type-never-diverge.md",
+      "sha256": "5bd9a078025c64642538a77cae49f184b20998f30720e3ba7dfaa03e0dad98c6"
+    },
+    {
+      "path": "rust-skills/rules/type-newtype-ids.md",
+      "sha256": "09cb3214212a44a2a0d54eab6a34f19e80118ce7795fc0bb1b3094467d34250e"
+    },
+    {
+      "path": "rust-skills/rules/type-newtype-validated.md",
+      "sha256": "774d2d4caac0eeb8830d1000a4ce1ab6831ef30beb2d7f812db292f420320a23"
+    },
+    {
+      "path": "rust-skills/rules/type-no-stringly.md",
+      "sha256": "3d9393d0d3394bdc2a4f45dc31483b325ee14aeb5020fed9ca5b497fa30eaab7"
+    },
+    {
+      "path": "rust-skills/rules/type-numeric-fmt.md",
+      "sha256": "f4ba074a4904f14ca434aa297eb82a0ae6b4409418d5afb6134e80d852b4a32e"
+    },
+    {
+      "path": "rust-skills/rules/type-option-nullable.md",
+      "sha256": "fef313793530de5b3bd2539f5e42bdca997f8c0784dfc275944e09f99b68e3b0"
+    },
+    {
+      "path": "rust-skills/rules/type-phantom-marker.md",
+      "sha256": "a2e97e545b814ee59d1e543675750224415556d274d8be681ae2a5cd327519c9"
+    },
+    {
+      "path": "rust-skills/rules/type-repr-transparent.md",
+      "sha256": "72dc15f6a5f2e02dfe42251c2d4694427cac3ea78dae2f82c45bb3088b518d78"
+    },
+    {
+      "path": "rust-skills/rules/type-result-fallible.md",
+      "sha256": "ed6d8a6dc6a0c4122fb11e24471e2315bd2978538735e26082511fb8c26686b2"
+    },
+    {
+      "path": "rust-skills/rules/unsafe-extern-block.md",
+      "sha256": "bc876c2a529ef454218aec7f2c78a9dc2d430b5db79119d712ff921daa20aba3"
+    },
+    {
+      "path": "rust-skills/rules/unsafe-maybeuninit.md",
+      "sha256": "d5fbbb609229c22546e4795fe663b94aeb11b95d696362e98b005858966ff03a"
+    },
+    {
+      "path": "rust-skills/rules/unsafe-minimize-scope.md",
+      "sha256": "19d39cc40dbf83bbe2c53073cdcbf1e9406b13b1d24e452c9ba1a1a91ba307b6"
+    },
+    {
+      "path": "rust-skills/rules/unsafe-miri-ci.md",
+      "sha256": "7ded95c281d210623c7ec9046479423e2abd100651b3fface5bb47a83bec2728"
+    },
+    {
+      "path": "rust-skills/rules/unsafe-no-mangle-unsafe.md",
+      "sha256": "429ffbd81bcf9f749614472a06c9ea2c14f3d242294318797ba5e30d7d559cd7"
+    },
+    {
+      "path": "rust-skills/rules/unsafe-safety-comment.md",
+      "sha256": "4892500c59f446eb8031fcf2cc98bf64f3323276abee0355409f4af53cbdcaab"
+    },
+    {
+      "path": "rust-skills/rules/unsafe-send-sync-manual.md",
+      "sha256": "106ca8ba1843ec8dfe9658c5db41fd99d106bcf2b8b4ece41e8db1dd347372f2"
     }
   ]
 }
