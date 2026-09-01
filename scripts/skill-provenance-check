@@ -23,7 +23,7 @@ const codex = files(roots[0]); const claude = files(roots[1]);
 if (JSON.stringify(codex) !== JSON.stringify(claude)) throw new Error('Codex and Claude curated payloads differ');
 const lockedFiles = Object.fromEntries(lock.files.map(({ path, sha256 }) => [path, sha256]));
 if (JSON.stringify(codex) !== JSON.stringify(lockedFiles)) throw new Error('skill lock hash drift or unmanaged skill');
-for (const required of ['project-workflow','prd-create','prd-review','prd-implement','rust','react-best-practices','composition-patterns']) {
+for (const required of ['project-workflow','prd-create','prd-review','prd-implement','rust-skills','react-best-practices','composition-patterns']) {
   if (!lock.sources[required]) throw new Error(`missing provenance for ${required}`);
 }
 console.log('Skill provenance validation passed.');
