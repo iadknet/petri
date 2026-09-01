@@ -2,4 +2,4 @@
 
 This index is maintained by `scripts/prd-index`.
 
-No archived PRDs.
+- [complementary-nutrition-budget](complementary-nutrition-budget/master-prd.md) — Complete

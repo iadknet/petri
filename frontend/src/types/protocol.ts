@@ -9,6 +9,7 @@ export interface Creature {
 	x: number;
 	y: number;
 	energy: number;
+	reproductive_reserve: number;
 	generation: number;
 	phenotype_rgb: [number, number, number];
 }
@@ -39,6 +40,8 @@ export interface FoodTypeMetadata {
 	name: string;
 	color: string;
 	growth_inhibitor: number;
+	metabolic_energy_yield: number;
+	reproductive_reserve_yield: number;
 }
 
 export interface Barrier {

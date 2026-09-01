@@ -13,6 +13,7 @@ function makeEntry(tick: number, actionType: ActionType = ActionType.Move): Acti
 		energy_before: 100,
 		energy_after: 95,
 		amount: 0,
+		food_type: null,
 		priority_bid: 0.5,
 	};
 }
@@ -23,6 +24,8 @@ function makeDetail(overrides: Record<string, unknown> = {}) {
 		position: { x: 10, y: 20 },
 		energy: 100,
 		maxEnergy: 200,
+		reproductiveReserve: 3,
+		reproductiveReserveCapacity: 8,
 		age: 50,
 		generation: 3,
 		complexity: 5,

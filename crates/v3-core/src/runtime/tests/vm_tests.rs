@@ -55,6 +55,7 @@ fn run_vm(
         &upstream,
         &mut e,
         0.0,
+        0.0,
         &mut mem,
         &prev_mem,
         &ss,

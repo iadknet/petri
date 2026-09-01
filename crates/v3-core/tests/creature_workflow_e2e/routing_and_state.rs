@@ -22,6 +22,7 @@ use crate::support::{insert_creature, run_one_traced_tick, test_config};
 fn cgp_negative_gate_routes_to_higher_scoring_target_e2e() {
     let cfg = test_config();
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
+    world.reconfigure_food(cfg.world.food.clone());
     let pos = Position::new(2, 2);
     world.set_food(pos, 1.0);
 
@@ -138,6 +139,7 @@ fn graph_state_persists_across_ticks_e2e() {
     cfg.runtime.graph_convergence_stable_passes = 1;
 
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
+    world.reconfigure_food(cfg.world.food.clone());
     let pos = Position::new(7, 7);
 
     // CGP graph: Constant(1.0) → DecayIntegrator(0.5) → CustomOutput(0)

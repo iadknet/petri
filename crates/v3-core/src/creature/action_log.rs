@@ -1,6 +1,8 @@
 use std::collections::VecDeque;
 use std::mem::size_of;
 
+use crate::config::OrdinaryFoodTypeId;
+
 /// Action type discriminant for log entries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize)]
 #[non_exhaustive]
@@ -31,6 +33,7 @@ pub enum ActionResult {
     TransferredAndKilled = 6,
     NoVictim = 7,
     AgeConstraints = 8,
+    NutritionConstraints = 9,
 }
 
 /// Single action record in a creature's action log.
@@ -50,6 +53,8 @@ pub struct ActionLogEntry {
     pub energy_after: f32,
     /// Action-specific amount (food consumed, energy transferred/stolen, 0.0 for Move/NoOp).
     pub amount: f32,
+    /// Food type selected by an Eat action; `None` for all other action types.
+    pub food_type: Option<OrdinaryFoodTypeId>,
     /// Priority bid value for this tick.
     pub priority_bid: f32,
 }
@@ -115,6 +120,7 @@ mod tests {
             energy_before: 100.0,
             energy_after: 95.0,
             amount: 0.0,
+            food_type: None,
             priority_bid: 0.5,
         }
     }
@@ -167,6 +173,7 @@ mod tests {
             energy_before: 80.0,
             energy_after: 78.0,
             amount: 5.0,
+            food_type: None,
             priority_bid: 0.8,
         };
         let mut log = ActionLog::new(10);
@@ -199,6 +206,7 @@ mod tests {
             energy_before: 40.0,
             energy_after: 39.0,
             amount: 0.0,
+            food_type: None,
             priority_bid: 0.5,
         };
         let mut log = ActionLog::new(8);

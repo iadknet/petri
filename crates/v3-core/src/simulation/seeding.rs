@@ -6,7 +6,7 @@ use slotmap::{SecondaryMap, SlotMap};
 use crate::config::{OrdinaryFoodTypeId, SimulationConfig};
 use crate::contracts::{CreatureId, InputReference, Position, WorldInputKey};
 use crate::creature::action_log::ActionLog;
-use crate::creature::founder::founder_genome_with_min_reproduce_age;
+use crate::creature::founder::founder_genome_with_min_reproduce_age_and_reserve_cost;
 use crate::creature::genome::CreatureGenome;
 use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::CreatureState;
@@ -61,9 +61,10 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
     let log_capacity = config.action_log.capacity;
 
     for (founder_index, &pos) in positions.iter().take(spawn_count).enumerate() {
-        let genome = founder_genome_with_min_reproduce_age(
+        let genome = founder_genome_with_min_reproduce_age_and_reserve_cost(
             config.population.founder_profile,
             config.energy.lifecycle.min_reproduce_age,
+            config.nutrition.reproductive_reserve_cost,
         );
         let energy = config.energy.lifecycle.initial_energy;
         let identity = CreatureIdentityState::founder(founder_index, seed);

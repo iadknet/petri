@@ -137,21 +137,22 @@ Queue-shape coupling invariant:
 | `energy.lifecycle.initial_energy` | `f32` | `20.0` | Must be finite and `>= 0.0`; invalid values fall back to `20.0`. |
 | `energy.lifecycle.max_energy` | `f32` | `200.0` | Must be finite and `>= 1.0`; invalid values fall back to `200.0`. |
 | `energy.lifecycle.energy_decay_per_tick` | `f32` | `0.5` | Must be finite and `>= 0.0`; invalid values fall back to `0.5`. |
-| `energy.lifecycle.min_reproduce_energy` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. |
+| `energy.lifecycle.min_reproduce_energy` | `f32` | `30.0` | Must be finite and `>= 0.0`; invalid values fall back to `30.0`. |
 | `energy.lifecycle.min_reproduce_age` | `u64` | `20` | Minimum parent age (ticks) required before reproduce can be accepted. No normalization fallback; value is consumed as configured. |
 | `energy.lifecycle.default_offspring_energy` | `f32` | `100.0` | Must be finite and `>= 0.0`; invalid values fall back to `100.0`. |
-| `energy.costs.move_cost` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. |
+| `energy.costs.move_cost` | `f32` | `0.2` | Must be finite and `>= 0.0`; invalid values fall back to `0.2`. |
 | `energy.costs.eat_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; invalid values fall back to `0.0`. |
 | `energy.costs.noop_cost` | `f32` | `0.05` | Must be finite and `>= 0.0`; invalid values fall back to `0.05`. |
 | `energy.costs.reproduce_cost` | `f32` | `0.1` | Must be finite and `>= 0.0`; invalid values fall back to `0.1`. |
-| `energy.costs.eat_reward_per_food` | `f32` | `12.0` | Must be finite and `>= 0.0`; invalid values fall back to `12.0`. |
-| `energy.costs.failed_action_penalty` | `f32` | `5.0` | Must be finite and `>= 0.0`; invalid values fall back to `5.0`. |
-| `energy.complexity_cost.enabled` | `bool` | `true` | When `true`, genome complexity scales action energy costs via a linear multiplier. |
+| `energy.costs.failed_action_penalty` | `f32` | `1.0` | Must be finite and `>= 0.0`; invalid values fall back to `1.0`. |
+| `energy.complexity_cost.enabled` | `bool` | `false` | When `true`, genome complexity scales action energy costs via a linear multiplier. |
 | `energy.complexity_cost.threshold` | `u32` | `50` | Complexity at or below this value incurs no extra cost (multiplier = 1.0). |
 | `energy.complexity_cost.scaling_factor` | `f32` | `0.002` | Must be finite and `>= 0.0`; invalid values fall back to `0.002`. Linear scaling: multiplier = `1.0 + max(0, complexity - threshold) * scaling_factor`. |
 | `energy.age_cost.enabled` | `bool` | `true` | When `true`, creature age scales action energy costs via a quadratic multiplier. |
 | `energy.age_cost.age_cap` | `u64` | `500` | Age (in ticks) at which the maximum multiplier applies. Ages beyond this are clamped. `0` disables the multiplier (returns 1.0). |
 | `energy.age_cost.max_multiplier` | `f32` | `10.0` | Must be finite and `>= 1.0`; invalid values fall back to `10.0`. Maximum multiplier reached at or beyond `age_cap`. |
+| `nutrition.reproductive_reserve_capacity` | `f32` | `8.0` | Startup-only; must be finite and `> 0.0`, otherwise falls back to `8.0`. Reserve is clamped to this capacity. |
+| `nutrition.reproductive_reserve_cost` | `f32` | `4.0` | Startup-only; must be finite and `> 0.0` and no greater than capacity, otherwise falls back to `4.0` and is capped at capacity. |
 
 Complexity energy cost:
 - When enabled, all action energy costs (noop, eat, move, reproduce, steal, and
@@ -162,16 +163,16 @@ Complexity energy cost:
   instructions/graph nodes within reachable nodes).
 - Creatures at or below the threshold pay standard costs (multiplier = 1.0).
 - Does NOT apply to `energy_decay_per_tick` (world-level phase 0 cost) or
-  `eat_reward_per_food` (reward, not cost).
-- At default settings: founder genomes (~10 complexity) pay 1.0x; complexity 550
-  pays 2.0x; complexity 1050 pays 3.0x.
+  typed Eat nutrition yields (applied by the action owner).
+- Complexity scaling is disabled at canonical defaults. When enabled, founder genomes
+  (~10 complexity) pay 1.0x; complexity 550 pays 2.0x; complexity 1050 pays 3.0x.
 
 Age energy cost:
 - When enabled, creature age adds a quadratic multiplier to action energy costs.
 - Formula: `1.0 + (max_multiplier - 1.0) * min(1.0, age / age_cap)^2`.
 - Returns 1.0 (no penalty) when disabled or `age_cap` is 0.
 - Does NOT apply to `energy_decay_per_tick` (world-level phase 0 cost) or
-  `eat_reward_per_food` (reward, not cost).
+  typed Eat nutrition yields (applied by the action owner).
 - At default settings (age_cap=500, max_multiplier=10.0): age 0 pays 1.0x;
   age 100 pays 1.36x; age 250 pays 3.25x; age 400 pays 6.76x; age 500+ pays
   10.0x (clamped).

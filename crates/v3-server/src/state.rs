@@ -96,6 +96,7 @@ pub struct CreatureSnapshot {
     pub x: u16,
     pub y: u16,
     pub energy: f32,
+    pub reproductive_reserve: f32,
     pub generation: u64,
     pub phenotype_rgb: [u8; 3],
 }
@@ -114,6 +115,8 @@ pub struct FoodTypeSnapshot {
     pub name: String,
     pub color: String,
     pub growth_inhibitor: f32,
+    pub metabolic_energy_yield: f32,
+    pub reproductive_reserve_yield: f32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -306,6 +309,7 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             x: creature.position.x,
             y: creature.position.y,
             energy: creature.energy,
+            reproductive_reserve: creature.reproductive_reserve,
             generation: creature.generation,
             phenotype_rgb: channels_to_rgb(creature.phenotype_channels),
         });
@@ -330,6 +334,8 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
             name: food_type.config.name.clone(),
             color: food_type.config.color.clone(),
             growth_inhibitor: food_type.config.growth_inhibitor,
+            metabolic_energy_yield: food_type.config.metabolic_energy_yield,
+            reproductive_reserve_yield: food_type.config.reproductive_reserve_yield,
         })
         .collect();
 

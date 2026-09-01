@@ -26,6 +26,8 @@ interface UnifiedInspectorProps {
 		id: number;
 		energy: number;
 		maxEnergy: number;
+		reproductiveReserve: number;
+		reproductiveReserveCapacity: number;
 		age: number;
 		generation: number;
 		complexity: number;
@@ -182,6 +184,8 @@ export function UnifiedInspector({
 				age={stats.age}
 				energy={stats.energy}
 				maxEnergy={stats.maxEnergy}
+				reproductiveReserve={stats.reproductiveReserve}
+				reproductiveReserveCapacity={stats.reproductiveReserveCapacity}
 				position={stats.position}
 				actionLog={actionLog}
 				phenotype={stats.phenotype}
