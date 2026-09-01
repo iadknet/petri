@@ -11,19 +11,24 @@ name: prd-review
 # Review a PRD or Its Implementation
 
 Review independently. The master's `Review Count` is the number of automated PRD
-readiness reviews attempted. It starts at 0 and never exceeds 3. `Review Status`
-is `DRAFT` until readiness is approved, then `APPROVED`. Final-code review does
-not change either readiness field.
+readiness reviews attempted. It starts at 0 and never exceeds 1 in Lean mode or 3
+in authorized Deep mode. `Review Status` is `DRAFT` until readiness is approved,
+then `APPROVED`. Final-code review does not change either readiness field.
 
 ## Review criteria
 
-Inspect repository evidence, not only the prose. Check consistency, dependency
+Inspect repository evidence, not only the prose. For Lean readiness, use the PRD,
+its directly affected code, and the planner's compact handoff; do not repeat broad
+repository exploration unless a concrete claim cannot otherwise be verified.
+Check consistency, dependency
 order, component boundaries, abstraction levels, separation of concerns,
 testability, existing-code impact, technical debt, security implications, and
 accidental complexity. Confirm each stage identifies affected durable
 documentation or gives a supported no-change rationale. For final-code review,
-inspect the actual diff, verify affected documentation matches implemented
-behavior, and rerun the verification declared by affected stages.
+inspect the actual diff rather than the whole repository, verify affected
+documentation matches implemented behavior, and use the recorded verification
+evidence. Rerun a check only when the evidence is missing, stale, or contradicted
+by the diff.
 
 Classify findings:
 
@@ -34,17 +39,20 @@ Classify findings:
 
 ## PRD readiness workflow
 
-1. Require `Review Status: DRAFT`. If `Review Count` is already 3, stop for human
-   intervention instead of beginning another automated review.
+1. Require `Review Status: DRAFT`. Determine the review limit from Execution Mode:
+   1 for Lean and 3 for authorized Deep. At the limit, stop for human intervention
+   instead of beginning another automated review.
 2. Increment `Review Count` by one for this attempt, review the current PRD, and
    report severity-ranked findings directly to the user.
-3. P1/P2 findings block automated approval. Make or request authorized in-scope
-   PRD revisions, then repeat from step 1 while the count is below 3. P3 findings
-   do not block approval.
+3. P1/P2 findings block automated approval. In Lean mode, return a compact finding
+   list and stop; the planner may revise the PRD, but another autonomous readiness
+   review requires user direction or a newly authorized planning cycle. In Deep
+   mode, make or request authorized in-scope revisions and repeat while below its
+   review limit. P3 findings do not block approval.
 4. If an attempt finds no P1/P2 findings, set `Review Status: APPROVED`, set the
    master and stages to `Ready`, update the index, and run `scripts/prd-check`.
-5. If P1/P2 findings remain after attempt 3, keep `Review Status: DRAFT` and stop
-   for a human reviewer. If that reviewer explicitly approves, set `Review Status`
+5. If P1/P2 findings remain at the mode's review limit, keep `Review Status: DRAFT`
+   and stop for a human reviewer. If that reviewer explicitly approves, set `Review Status`
    to `APPROVED`, set the master and stages to `Ready`, update the index, and run
    `scripts/prd-check`. If the reviewer instead requests material revisions and
    authorizes a new automated cycle, apply them and reset the count to 0 before
@@ -56,10 +64,12 @@ Do not create separate review-record files.
 
 ## Final-code workflow
 
-1. Inspect the actual implementation diff and rerun the verification declared by
-   affected stages.
-2. P1/P2 findings block completion. Make or request authorized fixes and review
-   again; P3 findings do not block the stated outcome.
+1. Inspect the actual implementation diff and recorded verification for affected
+   stages. Rerun only checks whose evidence is missing, stale, or contradicted.
+2. P1/P2 findings block completion. In Lean mode, send one compact finding list
+   to the existing implementer for one fix pass, then perform one closure review.
+   If blockers remain, stop for user direction. Deep mode follows the explicit
+   remediation budget in its master PRD. P3 findings do not block the outcome.
 3. On a pass, mark documentation synchronization and final-code review checkboxes
    complete and set the master `Complete` only when every stage and checkbox is
    complete. Update the index, run `scripts/prd-check`, and leave `Review Status`
