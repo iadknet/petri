@@ -197,5 +197,4 @@ This file remains canonical for minimal v3alpha1 CLI event/output contract.
 
 ## 8. Policy References
 
-- Determinism scope is canonical in `AGENTS.md`
-  (`Determinism Scope (Canonical)`).
+- Determinism scope is canonical in root `AGENTS.md`.

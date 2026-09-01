@@ -154,6 +154,6 @@ Wall-clock metric examples:
 
 ## 9. Policy References
 
-- Determinism scope is canonical in `AGENTS.md` (`Determinism Scope (Canonical)`).
+- Determinism scope is canonical in root `AGENTS.md`.
 - World geometry and topology semantics are canonical in `v3-world-grid-spec.md`.
 - Tick ordering and mutation semantics are canonical in `v3-tick-orchestration-spec.md`.

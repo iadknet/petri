@@ -249,8 +249,7 @@ Creatures spawned during tick `T`:
 
 ## 9. Test-Mode Reproducibility Notes (Tick Arbitration)
 
-Project-level determinism scope is canonical in `AGENTS.md`
-(`Determinism Scope (Canonical)`): production runtime determinism is not a
+Project-level determinism scope is canonical in root `AGENTS.md`: production runtime determinism is not a
 product requirement.
 
 For deterministic tests that depend on action-order outcomes, pin:

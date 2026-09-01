@@ -225,8 +225,7 @@ Removed from minimum required set:
 
 ## 8. Policy References
 
-- Project-level determinism scope is canonical in `AGENTS.md`
-  (`Determinism Scope (Canonical)`).
+- Project-level determinism scope is canonical in root `AGENTS.md`.
 - V3 runtime cognition reproducibility controls are canonical in
   `v3-mesh-execution-spec.md` (`Test-Mode Reproducibility Notes`).
 - V3 tick ordering/arbitration reproducibility controls are canonical in

@@ -2,9 +2,8 @@
 
 ## Reporting a vulnerability
 
-Do not open a public issue for a suspected vulnerability. Until the project
-foundation PRD records an approved private reporting channel, contact the
-repository maintainers through an already-established private channel.
+Do not open a public issue for a suspected vulnerability. Contact the repository
+maintainers through an already-established private channel.
 
 This repository does not yet make claims about supported release versions. That
 policy is established after the product and release model are selected.
@@ -23,10 +22,10 @@ LLM skill analysis is intentionally excluded from blocking checks.
 
 ## Dependency acquisition policy
 
-The project remains manifest-free until its stack is selected. Once a Node or
-Python application manifest is added, `make check` enforces a committed lockfile,
-an exact package-manager version, a seven-day minimum package age, and a matching
-seven-day Dependabot cooldown. It checks each independent dependency root. A
+The repository currently has a Cargo workspace and a frontend npm application.
+`make check` enforces committed lockfiles, the frontend's exact npm version, a
+seven-day minimum package age, and matching seven-day Dependabot cooldowns. It
+also checks each newly added independent Node or Python dependency root. A
 workspace may share its root lockfile, configuration, and Dependabot entry with
 its declared members; a nested manifest outside a declared workspace needs its
 own lockfile and matching Dependabot `directory` entry. For Node projects, the
@@ -38,7 +37,7 @@ to new dependency resolution, not to reinstalling a committed lockfile.
   Do not use an additional public index as a fallback for private names.
 - Pin direct Git or URL dependencies to immutable commits and verify their
   content with a checksum or signature where the ecosystem supports it.
-- CI must use the selected package manager's immutable or frozen-lockfile
+- CI must use the declared package manager's immutable or frozen-lockfile
   installation mode. Keep dependency lifecycle scripts disabled or allowlisted
   where the selected manager supports that control.
 - npm requires `package-lock.json` and `min-release-age=7`; `npm-shrinkwrap.json`
@@ -50,7 +49,7 @@ to new dependency resolution, not to reinstalling a committed lockfile.
   package and version. Record the reason in the pull request and remove the
   exception after the package ages in.
 
-The selected-stack PRD should use the package manager's current documentation:
+When adding another supported package manager, use its current documentation:
 [npm](https://docs.npmjs.com/using-npm/config/#min-release-age),
 [pnpm](https://pnpm.io/settings/dependency-resolution#minimumreleaseage),
 [Yarn](https://yarnpkg.com/configuration/yarnrc/#npmMinimalAgeGate), and
@@ -69,8 +68,8 @@ entry in the adjacent `osv-scanner.toml` with its vulnerability ID, reason, and
 
 ## Deferred release controls
 
-After the stack, repository visibility, and release artifact are selected, add
-an SBOM and build provenance attestation, then decide whether GitHub dependency
+After the release artifact is selected, add an SBOM and build provenance
+attestation, then decide whether GitHub dependency
 review, CodeQL, OpenSSF Scorecard, and repository rulesets apply. These controls
 depend on the selected release model and GitHub plan, so they are intentionally
 not enabled in the stack-neutral foundation.

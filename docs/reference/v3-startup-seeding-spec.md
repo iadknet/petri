@@ -366,7 +366,6 @@ posture.
 
 ## 10. Policy References
 
-- Project-level determinism scope is canonical in `AGENTS.md`
-  (`Determinism Scope (Canonical)`).
+- Project-level determinism scope is canonical in root `AGENTS.md`.
 - Runtime truthfulness invariant is canonical in `docs/strategy/architecture.md`
   (`Runtime Truthfulness Invariant`).

@@ -16,8 +16,10 @@ and npm 11.19.0. Run `make setup`, then `make run`. Open
 ## Verification
 
 Run `make check` before completing work. `make audit` performs the explicit
-full-history secret scan. The simulation viability test is run first by
-`make rust-check` whenever Rust validation runs.
+full-history secret scan. `make rust-check` runs format validation, the explicit
+viability merge gate, `make rust-test-all`, and Clippy; `rust-test-all` runs the
+complete named Rust test set. CI fans those named test targets out in parallel.
+Run `make help` to see the individual local targets.
 
 ## Documentation
 

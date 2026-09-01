@@ -3,7 +3,7 @@
 ## Guiding Principles
 
 - V3 mesh architecture is the active implementation target.
-- Checkpoint gates and reference specs are the source of truth for completion.
+- Approved PRDs and reference specs are the source of truth for completion.
 - Test-reproducible, high-confidence contracts take priority over feature breadth.
 
 ## Active Program Structure
@@ -39,4 +39,4 @@ Test determinism is required where assertions depend on reproducibility.
 - No active-doc conflicts on target architecture direction.
 - Canonical references are internally consistent.
 - Superseded references point to canonical replacements.
-- Active strategy, reference, and plan docs agree on V3 as target.
+- Active strategy, reference, and PRD docs agree on V3 as target.

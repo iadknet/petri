@@ -15,7 +15,7 @@ This document defines the active target architecture for the V3 mesh runtime.
 - `GP-04`: observable behavior and runtime introspection suitable for evolution
   debugging.
 
-Determinism scope is canonical in `AGENTS.md` (`Determinism Scope (Canonical)`).
+Determinism scope is canonical in root `AGENTS.md`.
 
 ## Boundary Impact
 
@@ -54,7 +54,7 @@ Active service/UI dependency direction for the viewport transport refactor:
 | question | decision | owner | status |
 | --- | --- | --- | --- |
 | Are there unresolved architecture-direction questions for the active V3 target? | No unresolved direction questions at this time. | user+agent | resolved |
-| Where is determinism policy canonical? | Root `AGENTS.md` (`Determinism Scope (Canonical)`). | user+agent | resolved |
+| Where is determinism policy canonical? | Root `AGENTS.md`. | user+agent | resolved |
 
 ## Repository Architecture (Active Slice)
 
@@ -73,7 +73,7 @@ petri/
 |  |- v3-server/            # command/query/transport surfaces over v3-core
 |  \- v3-cli/               # command-line surfaces over v3-core
 |- frontend/                # viewport/world-view/render client
-\- docs/                    # canonical strategy/reference/feature docs
+\- docs/                    # canonical strategy, reference, and PRD docs
 ```
 
 ## Runtime Truthfulness Invariant
