@@ -171,8 +171,8 @@ mutating `energy` during execution.
 
 ## Test-Mode Reproducibility Notes
 
-Project-level determinism scope is canonical in `AGENTS.md` (`Determinism Scope
-(Canonical)`): production runtime determinism is not a product requirement.
+Project-level determinism scope is canonical in root `AGENTS.md`: production
+runtime determinism is not a product requirement.
 
 This section defines V3-local harness controls for deterministic tests.
 

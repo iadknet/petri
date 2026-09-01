@@ -145,7 +145,6 @@ semantics.
 
 ## 8. Policy References
 
-- Project-level determinism scope is canonical in `AGENTS.md`
-  (`Determinism Scope (Canonical)`).
+- Project-level determinism scope is canonical in root `AGENTS.md`.
 - Tick-level test reproducibility posture is canonical in
   `v3-tick-orchestration-spec.md`.

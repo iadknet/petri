@@ -879,5 +879,4 @@ This file remains canonical for v3alpha2 server transport/API semantics.
 
 - Runtime truthfulness invariant is canonical in
   `docs/strategy/architecture.md` (`Runtime Truthfulness Invariant`).
-- Determinism scope is canonical in `AGENTS.md`
-  (`Determinism Scope (Canonical)`).
+- Determinism scope is canonical in root `AGENTS.md`.
