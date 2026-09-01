@@ -153,9 +153,9 @@ pub fn run_tick(
     use rayon::prelude::*;
 
     use crate::contracts::{CreatureId, WorldAction};
-    use crate::runtime::mesh::execute_creature_mesh;
+    use crate::runtime::mesh::execute_creature_mesh_with_reserve;
     use crate::runtime::trace::domain::{PerceptionDebugSnapshot, StaticInputsSnapshot, TickTrace};
-    use crate::runtime::traced_mesh::execute_creature_mesh_traced;
+    use crate::runtime::traced_mesh::execute_creature_mesh_traced_with_reserve;
     use crate::runtime::types::MeshOutput;
     use crate::sensors::perception::{
         genome_uses_extended_perception, PerceptionConfig, PerceptionSnapshot, SensorSnapshot,
@@ -294,10 +294,11 @@ pub fn run_tick(
         let mut parallel_decisions: Vec<_> = work
             .par_iter_mut()
             .map(|(id, ss, creature)| {
-                let output = execute_creature_mesh(
+                let output = execute_creature_mesh_with_reserve(
                     &creature.genome,
                     ss,
                     &mut creature.energy,
+                    creature.reproductive_reserve,
                     &mut creature.shared_memory,
                     &creature.prev_shared_memory,
                     &mut creature.graph_runtime,
@@ -314,10 +315,11 @@ pub fn run_tick(
                 let tick_number = sim.tick;
                 let si_snapshot = StaticInputsSnapshot::from(&ss.local);
 
-                let (output, hops, termination_reason) = execute_creature_mesh_traced(
+                let (output, hops, termination_reason) = execute_creature_mesh_traced_with_reserve(
                     &creature.genome,
                     ss,
                     &mut creature.energy,
+                    creature.reproductive_reserve,
                     &mut creature.shared_memory,
                     &creature.prev_shared_memory,
                     &mut creature.graph_runtime,
@@ -441,6 +443,7 @@ pub fn run_tick(
                             energy_before,
                             energy_after: sim.creatures.get(id).map_or(0.0, |c| c.energy),
                             amount: 0.0,
+                            food_type: None,
                             priority_bid,
                         });
                     }
@@ -475,6 +478,7 @@ pub fn run_tick(
                             energy_before,
                             energy_after: sim.creatures.get(id).map_or(0.0, |c| c.energy),
                             amount,
+                            food_type: Some(type_idx),
                             priority_bid,
                         });
                     }
@@ -554,6 +558,7 @@ pub fn run_tick(
                             energy_before,
                             energy_after: sim.creatures.get(id).map_or(0.0, |c| c.energy),
                             amount: 0.0,
+                            food_type: None,
                             priority_bid,
                         });
                     }
@@ -646,6 +651,9 @@ pub fn run_tick(
                         ReproductionActionResult::RejectedEnergyConstraints => {
                             ActionResult::EnergyConstraints
                         }
+                        ReproductionActionResult::RejectedNutritionConstraints => {
+                            ActionResult::NutritionConstraints
+                        }
                         ReproductionActionResult::RejectedPopulationCap => {
                             ActionResult::PopulationCap
                         }
@@ -668,6 +676,7 @@ pub fn run_tick(
                             energy_before,
                             energy_after: sim.creatures.get(id).map_or(0.0, |c| c.energy),
                             amount: energy_transfer,
+                            food_type: None,
                             priority_bid,
                         });
                     }
@@ -724,6 +733,7 @@ pub fn run_tick(
                             energy_before,
                             energy_after: sim.creatures.get(id).map_or(0.0, |c| c.energy),
                             amount: actual_stolen,
+                            food_type: None,
                             priority_bid,
                         });
                     }

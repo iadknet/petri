@@ -59,6 +59,8 @@ export interface CreatureDetail {
 	position: { x: number; y: number };
 	energy: number;
 	max_energy: number;
+	reproductive_reserve: number;
+	reproductive_reserve_capacity: number;
 	age: number;
 	generation: number;
 	complexity: number;

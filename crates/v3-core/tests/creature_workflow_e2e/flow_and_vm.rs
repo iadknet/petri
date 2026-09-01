@@ -79,6 +79,7 @@ fn cgp_passthrough_input_to_custom_output(
 fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
     let cfg = test_config();
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
+    world.reconfigure_food(cfg.world.food.clone());
     let pos = Position::new(3, 3);
     world.set_food(pos, 0.5);
 
@@ -186,6 +187,7 @@ fn outputs_flow_graph_to_graph_to_vm_with_sensor_reads_e2e() {
 fn vm_reads_all_inputs_e2e() {
     let cfg = test_config();
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
+    world.reconfigure_food(cfg.world.food.clone());
     let pos = Position::new(6, 6);
     world.set_food(pos, 0.91);
 
@@ -403,6 +405,7 @@ fn vm_uses_neighbor_barrier_sensor_to_choose_action_e2e() {
     ] {
         let cfg = test_config();
         let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
+        world.reconfigure_food(cfg.world.food.clone());
         let pos = Position::new(6, 6);
         world.set_food(pos, 1.0);
         let north = world

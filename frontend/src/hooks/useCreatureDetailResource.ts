@@ -46,6 +46,8 @@ export function useCreatureDetailResource() {
 					position: detail.position,
 					energy: detail.energy,
 					maxEnergy: detail.max_energy,
+					reproductiveReserve: detail.reproductive_reserve,
+					reproductiveReserveCapacity: detail.reproductive_reserve_capacity,
 					age: detail.age,
 					generation: detail.generation,
 					complexity: detail.complexity,

@@ -23,6 +23,7 @@ export const ActionResult = {
 	PopulationCap: "PopulationCap",
 	TransferredAndKilled: "TransferredAndKilled",
 	NoVictim: "NoVictim",
+	NutritionConstraints: "NutritionConstraints",
 } as const;
 
 export type ActionResult = (typeof ActionResult)[keyof typeof ActionResult];
@@ -35,5 +36,7 @@ export interface ActionLogEntry {
 	energy_before: number;
 	energy_after: number;
 	amount: number;
+	/** Selected food type for Eat actions; null for every other action type. */
+	food_type: number | null;
 	priority_bid: number;
 }

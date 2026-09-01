@@ -142,6 +142,7 @@ fn genome_emits_positive_priority_bid_with_real_action(genome: &CreatureGenome) 
             genome,
             &case.sensors,
             &mut energy,
+            0.0,
             &mut shared_memory,
             &prev_shared_memory,
             &mut graph_runtime,

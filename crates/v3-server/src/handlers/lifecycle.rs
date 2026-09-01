@@ -320,6 +320,8 @@ fn legacy_build_ws_frame(handle: &SimHandle) -> WsFrame {
             name: food_type.config.name.clone(),
             color: food_type.config.color.clone(),
             growth_inhibitor: food_type.config.growth_inhibitor,
+            metabolic_energy_yield: food_type.config.metabolic_energy_yield,
+            reproductive_reserve_yield: food_type.config.reproductive_reserve_yield,
         })
         .collect();
 
@@ -612,6 +614,8 @@ mod tests {
                 initial_density: 0.0,
                 initial_coverage: 0.0,
                 growth_inhibitor: 0.2,
+                metabolic_energy_yield: 10.0,
+                reproductive_reserve_yield: 0.0,
             },
             FoodTypeConfig {
                 name: "Secondary Food".to_string(),
@@ -619,6 +623,8 @@ mod tests {
                 initial_density: 0.0,
                 initial_coverage: 0.0,
                 growth_inhibitor: 0.2,
+                metabolic_energy_yield: 0.0,
+                reproductive_reserve_yield: 1.0,
             },
         ];
 

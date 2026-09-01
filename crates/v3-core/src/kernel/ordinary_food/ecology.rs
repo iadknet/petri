@@ -236,6 +236,11 @@ pub(super) fn seed_density(
     }
 
     for entry in catalog.entries() {
+        // Shuffle independently for each food type. Reusing one candidate
+        // ordering would silently co-seed every type and erase the spatial
+        // choice pressure that typed-food cognition is meant to solve.
+        let mut shuffled_candidates = candidates.clone();
+        shuffled_candidates.shuffle(rng);
         let coverage = entry.config.initial_coverage.clamp(0.0, 1.0);
         let target = ((coverage * candidates.len() as f32).round() as usize).min(candidates.len());
         if target == 0 {
@@ -245,9 +250,7 @@ pub(super) fn seed_density(
             .config
             .initial_density
             .clamp(0.0, shared.max_density.max(0.0));
-        let mut shuffled = candidates.clone();
-        shuffled.shuffle(rng);
-        for pos in shuffled.into_iter().take(target) {
+        for pos in shuffled_candidates.iter().copied().take(target) {
             state.set_food_type_density(pos, entry.id, density);
         }
     }
@@ -585,6 +588,41 @@ mod tests {
         assert_eq!(state.food_at_type(pos, OrdinaryFoodTypeId::new(0)), 0.25);
         assert_eq!(state.food_at_type(pos, OrdinaryFoodTypeId::new(1)), 0.75);
         assert_eq!(state.density_at(pos), 1.0);
+    }
+
+    #[test]
+    fn seed_density_shuffles_each_food_type_independently() {
+        let mut config = FoodConfig::default();
+        config.types[0].initial_coverage = 0.5;
+        config.types[1].initial_coverage = 0.5;
+
+        let catalog = OrdinaryFoodCatalog::new(&config);
+        let mut state = OrdinaryFoodState::new(8, 1, catalog.len());
+        let mut occupancy_depletion = OccupancyDepletionLayer::new(8, 1);
+        let mut claim_scratch = Vec::new();
+        let barriers = barrier_grid(8, 1);
+        let mut rng = StdRng::seed_from_u64(0xC0FFEE);
+
+        seed_density(
+            &mut state,
+            &catalog,
+            &config.shared,
+            &mut occupancy_depletion,
+            &mut claim_scratch,
+            &barriers,
+            &mut rng,
+        );
+
+        let maintenance: std::collections::BTreeSet<_> = (0..8)
+            .filter(|&x| state.food_at_type(Position::new(x, 0), OrdinaryFoodTypeId::new(0)) > 0.0)
+            .collect();
+        let reproductive: std::collections::BTreeSet<_> = (0..8)
+            .filter(|&x| state.food_at_type(Position::new(x, 0), OrdinaryFoodTypeId::new(1)) > 0.0)
+            .collect();
+
+        assert_eq!(maintenance.len(), 4);
+        assert_eq!(reproductive.len(), 4);
+        assert_ne!(maintenance, reproductive);
     }
 
     #[test]

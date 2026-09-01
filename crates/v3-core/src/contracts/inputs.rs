@@ -112,6 +112,8 @@ pub enum DynamicIntrospectionKey {
     EnergyCurrent,
     /// Total energy consumed by Eat actions this tick so far.
     EnergyConsumedThisTick,
+    /// Current reproductive reserve in raw reserve units.
+    ReproductiveReserveCurrent,
 }
 
 /// A reference to a specific input source for a node input slot.

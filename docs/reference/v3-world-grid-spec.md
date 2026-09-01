@@ -111,30 +111,36 @@ This file is the canonical owner for world/grid config keys/defaults.
 
 | Key | Type | Default | Constraint / normalization |
 | --- | --- | --- | --- |
-| `world.width` | `u16` | `400` | Must be `>= 1`; invalid values fall back to `400`. |
-| `world.height` | `u16` | `400` | Must be `>= 1`; invalid values fall back to `400`. |
+| `world.width` | `u16` | `1600` | Must be `>= 1`; invalid values fall back to `1600`. |
+| `world.height` | `u16` | `1600` | Must be `>= 1`; invalid values fall back to `1600`. |
 | `world.edge_mode` | `enum{wrap,bounded}` | `wrap` | Unknown/invalid values fall back to `wrap`. |
-| `world.food.shared.growth_rate` | `f32` | `0.25` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.25`. |
+| `world.food.shared.growth_rate` | `f32` | `0.09` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.09`. |
 | `world.food.shared.initial_density` | `f32` | `1.0` | Clamp to `[0.0, max_density]`; invalid falls back to `max_density`. |
-| `world.food.shared.initial_coverage` | `f32` | `0.15` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.15`. |
-| `world.food.shared.spread_threshold_ratio` | `f32` | `0.75` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.75`. |
+| `world.food.shared.initial_coverage` | `f32` | `0.54` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.54`. The two default typed entries seed independently at `0.27` each. |
+| `world.food.shared.spread_threshold_ratio` | `f32` | `0.8` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.8`. |
 | `world.food.shared.spread_density_ratio` | `f32` | `0.25` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.25`. Fraction of growth delta deposited to neighbor during spread. |
-| `world.food.shared.recovery_spawn_rate` | `f32` | `0.02` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.02`. |
-| `world.food.shared.recovery_floor_ratio` | `f32` | `0.03` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.03`. |
+| `world.food.shared.recovery_spawn_rate` | `f32` | `0.01` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.01`. |
+| `world.food.shared.recovery_floor_ratio` | `f32` | `0.01` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.01`. |
 | `world.food.shared.max_density` | `f32` | `1.0` | Must be finite and `> 0.0`; invalid falls back to `1.0`. |
 | `world.food.shared.occupancy_depletion.enabled` | `bool` | `true` | Enables the occupancy depletion mask that dampens food regrowth on occupied cells. |
 | `world.food.shared.occupancy_depletion.deposit_per_occupied_tick` | `f32` | `0.08` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.08`. Amount of depletion deposited into each occupied passable cell per Phase 0 update. |
-| `world.food.types` | `FoodTypeConfig[]` | `[default]` | Ordered list of configured ordinary-food types. List position is the stable per-run `OrdinaryFoodTypeId`; each entry carries display metadata and primary startup seeding knobs. Empty lists normalize to one default type. |
+| `world.food.types` | `FoodTypeConfig[]` | `[Maintenance Food, Reproductive Food]` | Ordered list of configured ordinary-food types. List position is the stable per-run `OrdinaryFoodTypeId`; each entry carries display metadata, typed yields, and startup seeding knobs. Empty lists normalize to the two complementary defaults. |
 | `world.food.fertility.layers[].target` | `enum{AllFoods,SingleType{type_idx}}` | `AllFoods` | Fertility layer selector. Invalid/unknown targeted type indices normalize to `AllFoods` during config normalization. |
 
 Food-type catalog posture:
 - `world.food.types` is ordered, and the list index defines the stable per-run
   `OrdinaryFoodTypeId`.
-- `FoodTypeConfig` currently carries display metadata (`name`, `color`) plus
-  startup seeding fields (`initial_density`, `initial_coverage`).
+- `FoodTypeConfig` carries display metadata (`name`, `color`), startup seeding fields
+  (`initial_density`, `initial_coverage`), and nonnegative typed yields
+  (`metabolic_energy_yield`, `reproductive_reserve_yield`). Yields are applied only
+  from the actual amount consumed by a typed Eat action.
 - The primary type (`types[0]`) is mirrored into
   `world.food.shared.initial_density` and
   `world.food.shared.initial_coverage` during config normalization.
+- Default types are seeded independently: each type shuffles the passable-cell
+  candidate list separately and takes its own rounded coverage target. A shared
+  ordering is not reused across types, so equal coverages do not imply equal
+  spatial placement.
 - Type-targeted fertility layers are startup-only config; runtime patching does
   not mutate the catalog or layer targets.
 

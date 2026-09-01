@@ -112,6 +112,8 @@ pub struct FoodTypePayload {
     pub name: String,
     pub color: String,
     pub growth_inhibitor: f32,
+    pub metabolic_energy_yield: f32,
+    pub reproductive_reserve_yield: f32,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -322,6 +324,8 @@ pub fn build_world_static_payload(snapshot: &ProjectionSnapshot) -> WorldStaticP
                 name: food_type.name.clone(),
                 color: food_type.color.clone(),
                 growth_inhibitor: food_type.growth_inhibitor,
+                metabolic_energy_yield: food_type.metabolic_energy_yield,
+                reproductive_reserve_yield: food_type.reproductive_reserve_yield,
             })
             .collect(),
         food_fertility_u8: snapshot.food_fertility_u8.to_vec(),
@@ -428,6 +432,7 @@ mod tests {
                     x: 3,
                     y: 4,
                     energy: 2.0,
+                    reproductive_reserve: 0.0,
                     generation: 1,
                     phenotype_rgb: [1, 2, 3],
                 }],

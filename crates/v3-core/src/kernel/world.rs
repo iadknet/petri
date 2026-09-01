@@ -243,7 +243,9 @@ mod tests {
             for x in 0..10u16 {
                 let f = w.food_at(Position::new(x, y));
                 assert!(
-                    (f - 0.0).abs() < 1e-6 || (f - cfg.world.food.initial_density).abs() < 1e-6
+                    f >= 0.0
+                        && f <= cfg.world.food.shared.max_density
+                            * cfg.world.food.types.len() as f32
                 );
             }
         }
@@ -334,6 +336,7 @@ mod tests {
         food_cfg.initial_density = 1.0;
         food_cfg.types[0].initial_coverage = 0.4;
         food_cfg.types[0].initial_density = 1.0;
+        food_cfg.types[1].initial_coverage = 0.0;
         w.reconfigure_food(food_cfg);
         let mut rng = SmallRng::seed_from_u64(7);
         w.seed_food(&mut rng);
@@ -694,6 +697,8 @@ mod tests {
                 initial_density: 0.5,
                 initial_coverage: 0.5,
                 growth_inhibitor: 0.2,
+                metabolic_energy_yield: 5.0,
+                reproductive_reserve_yield: 0.0,
             },
             FoodTypeConfig {
                 name: "Type B".to_string(),
@@ -701,6 +706,8 @@ mod tests {
                 initial_density: 0.5,
                 initial_coverage: 0.5,
                 growth_inhibitor: 0.2,
+                metabolic_energy_yield: 5.0,
+                reproductive_reserve_yield: 0.0,
             },
         ];
         w.reconfigure_food(initial.clone());
@@ -725,8 +732,8 @@ mod tests {
         let pos = Position::new(0, 0);
         w.set_food(pos, 0.9);
 
-        let mut next = default_config().world.food;
-        next.shared.max_density = 0.3;
+        let mut next = default_config().world.food.shared;
+        next.max_density = 0.3;
         w.reconfigure_food(next);
 
         assert_eq!(w.food_at(pos), 0.3);

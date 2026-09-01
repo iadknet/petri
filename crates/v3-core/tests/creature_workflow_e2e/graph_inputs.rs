@@ -23,6 +23,7 @@ fn graph_reads_all_neighbor_sensor_directions_e2e() {
     cfg.runtime.graph_convergence_stable_passes = 1;
 
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
+    world.reconfigure_food(cfg.world.food.clone());
     let target_pos = Position::new(6, 6);
     world.set_food(target_pos, 0.9);
 
@@ -197,6 +198,7 @@ fn graph_reads_all_neighbor_sensor_directions_e2e() {
 fn graph_reads_inputs_and_writes_outputs_e2e() {
     let cfg = test_config();
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
+    world.reconfigure_food(cfg.world.food.clone());
 
     let target_pos = Position::new(5, 5);
     let north = Position::new(5, 4);

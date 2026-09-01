@@ -39,15 +39,6 @@ export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 		tooltip: "Energy subtracted from parent when reproduction occurs",
 	},
 	{
-		path: "energy.costs.eat_reward_per_food",
-		label: "Eat Reward",
-		min: 0,
-		max: 50,
-		step: 0.1,
-		defaultValue: 5.0,
-		tooltip: "Energy gained per unit of food density consumed",
-	},
-	{
 		path: "energy.costs.failed_action_penalty",
 		label: "Failed Action Penalty",
 		min: 0,

@@ -92,7 +92,16 @@ function buildWorldStaticPayload(partial?: Partial<WorldStaticPayload>): WorldSt
 		width: 12,
 		height: 10,
 		barrier_mask: new Array(15).fill(0),
-		food_types: [{ type_idx: 0, name: "base", color: "#22c55e", growth_inhibitor: 0.2 }],
+		food_types: [
+			{
+				type_idx: 0,
+				name: "base",
+				color: "#22c55e",
+				growth_inhibitor: 0.2,
+				metabolic_energy_yield: 10,
+				reproductive_reserve_yield: 0,
+			},
+		],
 		...partial,
 	};
 }
@@ -114,7 +123,17 @@ function buildDetailPayload(partial?: Partial<ViewDetailPayload>): ViewDetailPay
 		width: 4,
 		height: 2,
 		food: [],
-		creatures: [{ id: 42, x: 3, y: 4, energy: 8, generation: 1, phenotype_rgb: [1, 2, 3] }],
+		creatures: [
+			{
+				id: 42,
+				x: 3,
+				y: 4,
+				energy: 8,
+				reproductive_reserve: 0,
+				generation: 1,
+				phenotype_rgb: [1, 2, 3],
+			},
+		],
 		predation_events: [],
 		...partial,
 	};

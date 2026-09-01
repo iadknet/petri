@@ -182,8 +182,11 @@ Each world action is applied at the acting creature's turn per Section 5.
 
 - Consume food from creature's current cell using `consume_food` semantics
   from `v3-world-grid-spec.md`.
-- Gain energy: `energy += consumed_amount * energy.costs.eat_reward_per_food`.
-- Cap energy at `energy.lifecycle.max_energy`.
+- Gain typed nutrition from the configured food entry:
+  `energy += consumed_amount * metabolic_energy_yield` and
+  `reproductive_reserve += consumed_amount * reproductive_reserve_yield`.
+- Clamp energy to `energy.lifecycle.max_energy` and reserve to
+  `nutrition.reproductive_reserve_capacity`.
 - Deduct `energy.costs.eat_cost` from creature energy.
 
 ### Move

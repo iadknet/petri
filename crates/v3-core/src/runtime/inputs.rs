@@ -13,6 +13,8 @@ pub struct ResolveCtx<'a> {
     pub upstream_slots: &'a [f32; OUTPUT_SLOT_COUNT],
     pub energy: f32,
     pub energy_consumed: f32,
+    /// Current live reproductive reserve.
+    pub reproductive_reserve: f32,
     pub action_queue: &'a ActionQueue,
 }
 
@@ -48,6 +50,7 @@ pub fn resolve_input(reference: &InputReference, sub_idx: u16, ctx: &ResolveCtx<
         InputReference::DynamicIntrospection(key) => match key {
             DynamicIntrospectionKey::EnergyCurrent => ctx.energy,
             DynamicIntrospectionKey::EnergyConsumedThisTick => ctx.energy_consumed,
+            DynamicIntrospectionKey::ReproductiveReserveCurrent => ctx.reproductive_reserve,
         },
         InputReference::UpstreamSlot(idx) => {
             if *idx < OUTPUT_SLOT_COUNT {
@@ -104,6 +107,7 @@ mod tests {
             upstream_slots: upstream,
             energy,
             energy_consumed,
+            reproductive_reserve: 0.0,
             action_queue: &EMPTY_AQ,
         }
     }
@@ -190,6 +194,23 @@ mod tests {
     }
 
     #[test]
+    fn dynamic_reproductive_reserve_reads_live_context_value() {
+        let ss = make_sensor_snapshot(0.0);
+        let upstream = [0.0f32; OUTPUT_SLOT_COUNT];
+        let ctx = make_ctx(&ss, &upstream, 20.0, 0.0);
+        let mut live_ctx = ctx;
+        live_ctx.reproductive_reserve = 3.25;
+        let value = resolve_input(
+            &InputReference::DynamicIntrospection(
+                DynamicIntrospectionKey::ReproductiveReserveCurrent,
+            ),
+            0,
+            &live_ctx,
+        );
+        assert!((value - 3.25).abs() < 1e-6);
+    }
+
+    #[test]
     fn upstream_slot_in_range() {
         let ss = make_sensor_snapshot(0.0);
         let mut upstream = [0.0f32; OUTPUT_SLOT_COUNT];
@@ -241,6 +262,7 @@ mod tests {
             upstream_slots: &upstream,
             energy: 50.0,
             energy_consumed: 0.0,
+            reproductive_reserve: 0.0,
             action_queue: &aq,
         };
         // sub_idx=0 → slot 0, field 0 (action_type)
@@ -260,6 +282,7 @@ mod tests {
             upstream_slots: &upstream,
             energy: 50.0,
             energy_consumed: 0.0,
+            reproductive_reserve: 0.0,
             action_queue: &aq,
         };
         // sub_idx=3 → slot 1 (3/3=1), field 0 (3%3=0) = action_type = 2.0 (Move)
@@ -287,6 +310,7 @@ mod tests {
             upstream_slots: &upstream,
             energy: 50.0,
             energy_consumed: 0.0,
+            reproductive_reserve: 0.0,
             action_queue: &aq,
         };
         // sub_idx=2 → slot 0, field 2 = param1 = energy_transfer = 0.42
@@ -307,6 +331,7 @@ mod tests {
             upstream_slots: &upstream,
             energy: 50.0,
             energy_consumed: 0.0,
+            reproductive_reserve: 0.0,
             action_queue: &aq,
         };
         // Any sub_idx on empty queue returns 0.0

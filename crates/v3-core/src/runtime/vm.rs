@@ -24,12 +24,43 @@ use crate::sensors::perception::SensorSnapshot;
 /// # Returns
 /// `NodeResult` — the mesh executor checks `terminal` and `energy_exhausted` to decide routing.
 #[allow(clippy::too_many_arguments)]
+#[cfg_attr(not(test), allow(dead_code))]
 pub(crate) fn execute_vm_node(
     def: &VmBackendDef,
     input_refs: &[InputReference],
     upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
     energy: &mut f32,
     energy_consumed: f32,
+    reproductive_reserve: f32,
+    shared_memory: &mut [f32; 16],
+    prev_shared_memory: &[f32; 16],
+    sensors: &SensorSnapshot,
+    config: &RuntimeConfig,
+    side_outputs: &mut MeshSideOutputs,
+) -> NodeResult {
+    execute_vm_node_with_reserve(
+        def,
+        input_refs,
+        upstream_slots,
+        energy,
+        energy_consumed,
+        reproductive_reserve,
+        shared_memory,
+        prev_shared_memory,
+        sensors,
+        config,
+        side_outputs,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn execute_vm_node_with_reserve(
+    def: &VmBackendDef,
+    input_refs: &[InputReference],
+    upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
+    energy: &mut f32,
+    energy_consumed: f32,
+    reproductive_reserve: f32,
     shared_memory: &mut [f32; 16],
     prev_shared_memory: &[f32; 16],
     sensors: &SensorSnapshot,
@@ -245,6 +276,7 @@ pub(crate) fn execute_vm_node(
                         upstream_slots,
                         energy: *energy,
                         energy_consumed,
+                        reproductive_reserve,
                         action_queue: &side_outputs.action_queue,
                     };
                     resolve_input(&input_refs[*ref_idx as usize], *sub_idx, &ctx)

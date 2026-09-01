@@ -9,10 +9,10 @@ use crate::config::RuntimeConfig;
 use crate::contracts::{NodeId, WorldAction};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
-use crate::runtime::cgp::execute_graph_node;
+use crate::runtime::cgp::execute_graph_node_with_reserve;
 use crate::runtime::routing::resolve_gated_route;
 use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
-use crate::runtime::vm::execute_vm_node;
+use crate::runtime::vm::execute_vm_node_with_reserve;
 use crate::sensors::perception::SensorSnapshot;
 
 /// Execute the creature's mesh chain for one tick, returning a [`MeshOutput`]
@@ -40,6 +40,31 @@ pub fn execute_creature_mesh(
     genome: &CreatureGenome,
     sensors: &SensorSnapshot,
     energy: &mut f32,
+    reproductive_reserve: f32,
+    shared_memory: &mut [f32; 16],
+    prev_shared_memory: &[f32; 16],
+    graph_runtime: &mut GraphRuntimeState,
+    config: &RuntimeConfig,
+) -> MeshOutput {
+    execute_creature_mesh_with_reserve(
+        genome,
+        sensors,
+        energy,
+        reproductive_reserve,
+        shared_memory,
+        prev_shared_memory,
+        graph_runtime,
+        config,
+    )
+}
+
+/// Execute a creature mesh while exposing its live reproductive reserve.
+#[allow(clippy::too_many_arguments)]
+pub fn execute_creature_mesh_with_reserve(
+    genome: &CreatureGenome,
+    sensors: &SensorSnapshot,
+    energy: &mut f32,
+    reproductive_reserve: f32,
     shared_memory: &mut [f32; 16],
     prev_shared_memory: &[f32; 16],
     graph_runtime: &mut GraphRuntimeState,
@@ -81,24 +106,26 @@ pub fn execute_creature_mesh(
         // Snapshot energy before node dispatch to attribute cost to the correct backend.
         let node_energy_before = *energy;
         let result = match &node.backend_def {
-            BackendDef::Vm(def) => execute_vm_node(
+            BackendDef::Vm(def) => execute_vm_node_with_reserve(
                 def,
                 &node.input_refs,
                 &upstream_slots,
                 energy,
                 energy_consumed,
+                reproductive_reserve,
                 shared_memory,
                 prev_shared_memory,
                 sensors,
                 config,
                 &mut side_outputs,
             ),
-            BackendDef::Graph(def) => execute_graph_node(
+            BackendDef::Graph(def) => execute_graph_node_with_reserve(
                 def,
                 &node.input_refs,
                 &upstream_slots,
                 energy,
                 energy_consumed,
+                reproductive_reserve,
                 current_idx,
                 graph_runtime,
                 sensors,
@@ -272,6 +299,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
+            0.0,
             &mut shared_mem,
             &prev_shared_mem,
             &mut gr,
@@ -316,6 +344,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
+            0.0,
             &mut shared_mem,
             &prev_shared_mem,
             &mut gr,
@@ -354,6 +383,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
+            0.0,
             &mut shared_mem,
             &prev_shared_mem,
             &mut gr,
@@ -393,6 +423,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
+            0.0,
             &mut shared_mem,
             &prev_shared_mem,
             &mut gr,
@@ -422,6 +453,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
+            0.0,
             &mut shared_mem,
             &prev_shared_mem,
             &mut gr,
@@ -471,6 +503,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
+            0.0,
             &mut shared_mem,
             &prev_shared_mem,
             &mut gr,
@@ -517,6 +550,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
+            0.0,
             &mut shared_mem,
             &prev_shared_mem,
             &mut gr,
@@ -552,6 +586,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
+            0.0,
             &mut shared_mem,
             &prev_shared_mem,
             &mut gr,
@@ -596,6 +631,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
+            0.0,
             &mut shared_mem,
             &prev_shared_mem,
             &mut gr,
@@ -670,6 +706,7 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
+            0.0,
             &mut shared_mem,
             &prev_shared_mem,
             &mut gr,

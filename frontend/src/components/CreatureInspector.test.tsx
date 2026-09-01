@@ -41,6 +41,7 @@ function makeActionEntry(tick: number, actionType: ActionType = ActionType.Move)
 		energy_before: 20,
 		energy_after: 18,
 		amount: 0,
+		food_type: null,
 		priority_bid: 0,
 	};
 }
@@ -116,6 +117,8 @@ function makeDetail(id: number) {
 		position: { x: 4, y: 9 },
 		energy: 18,
 		maxEnergy: 24,
+		reproductiveReserve: 3,
+		reproductiveReserveCapacity: 8,
 		age: 12,
 		generation: 3,
 		complexity: 8,
