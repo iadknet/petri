@@ -1,0 +1,58 @@
+#!/bin/sh
+set -eu
+
+root=$(CDPATH='' cd -- "$(dirname -- "$0")/.." && pwd)
+
+command -v aqua >/dev/null 2>&1 || {
+  printf 'aqua: Aqua is required; install Aqua v2.60.1 or newer and rerun make setup\n' >&2
+  exit 1
+}
+
+aqua_version=$(aqua --version 2>/dev/null | sed -n 's/^aqua version v\{0,1\}\([0-9][0-9.]*\)$/\1/p' | sed -n '1p')
+case $aqua_version in
+  [0-9]*.[0-9]*.[0-9]*) ;;
+  *)
+    printf 'aqua: could not determine the Aqua version; install Aqua v2.60.1 or newer\n' >&2
+    exit 1
+    ;;
+esac
+
+aqua_major=${aqua_version%%.*}
+aqua_remainder=${aqua_version#*.}
+aqua_minor=${aqua_remainder%%.*}
+aqua_patch=${aqua_remainder#*.}
+case $aqua_major:$aqua_minor:$aqua_patch in
+  *[!0-9:]* | *::* | :* | *:)
+    printf 'aqua: could not determine the Aqua version; install Aqua v2.60.1 or newer\n' >&2
+    exit 1
+    ;;
+esac
+if [ "$aqua_major" -lt 2 ] || \
+  { [ "$aqua_major" -eq 2 ] && [ "$aqua_minor" -lt 60 ]; } || \
+  { [ "$aqua_major" -eq 2 ] && [ "$aqua_minor" -eq 60 ] && [ "$aqua_patch" -lt 1 ]; }; then
+  printf 'aqua: Aqua v%s is too old; install Aqua v2.60.1 or newer\n' "$aqua_version" >&2
+  exit 1
+fi
+
+export AQUA_ROOT_DIR="$root/.tools/aqua"
+export AQUA_CONFIG="$root/aqua.yaml"
+export AQUA_ENFORCE_CHECKSUM=true
+export AQUA_ENFORCE_REQUIRE_CHECKSUM=true
+
+case ${1:-} in
+  install)
+    shift
+    [ "$#" -eq 0 ] || { printf 'Usage: scripts/aqua <install|exec> [tool args]\n' >&2; exit 2; }
+    exec aqua install
+    ;;
+  exec)
+    shift
+    [ "$#" -gt 0 ] || { printf 'Usage: scripts/aqua <install|exec> [tool args]\n' >&2; exit 2; }
+    export AQUA_DISABLE_LAZY_INSTALL=true
+    exec aqua exec -- "$@"
+    ;;
+  *)
+    printf 'Usage: scripts/aqua <install|exec> [tool args]\n' >&2
+    exit 2
+    ;;
+esac

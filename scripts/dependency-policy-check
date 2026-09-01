@@ -1,0 +1,255 @@
+#!/bin/sh
+set -eu
+
+repository_root=$(pwd)
+
+fail() {
+  printf 'dependency-policy-check: %s\n' "$*" >&2
+  exit 1
+}
+
+dependabot_has_cooldown() {
+  ecosystem=$1
+  directory=$2
+  [ -f "$repository_root/.github/dependabot.yml" ] || return 1
+  awk -v ecosystem="$ecosystem" -v directory="$directory" '
+    function record_matches() {
+      if (active && configured_directory == directory && has_cooldown) found = 1
+    }
+    /^[[:space:]]*-[[:space:]]*package-ecosystem:[[:space:]]*/ {
+      record_matches()
+      active = $0 ~ "[[:space:]]\"?" ecosystem "\"?[[:space:]]*(#.*)?$"
+      configured_directory = ""
+      has_cooldown = 0
+      next
+    }
+    active && /^[[:space:]]*directory:[[:space:]]*/ {
+      value = $0
+      sub(/^[[:space:]]*directory:[[:space:]]*/, "", value)
+      sub(/[[:space:]]*(#.*)?$/, "", value)
+      gsub(/^[\"]|[\"]$/, "", value)
+      configured_directory = value
+      next
+    }
+    active && /^[[:space:]]*default-days:[[:space:]]*7([[:space:]]*(#.*)?)?$/ { has_cooldown = 1 }
+    END { record_matches(); exit found ? 0 : 1 }
+  ' "$repository_root/.github/dependabot.yml"
+}
+
+exact_version_at_least() {
+  value=$1
+  required_major=$2
+  required_minor=$3
+  version=${value#*@}
+  [ "$version" != "$value" ] || return 1
+  printf '%s\n' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$' || return 1
+  major=${version%%.*}
+  remainder=${version#*.}
+  minor=${remainder%%.*}
+  [ "$major" -gt "$required_major" ] || {
+    [ "$major" -eq "$required_major" ] && [ "$minor" -ge "$required_minor" ]
+  }
+}
+
+package_manager() {
+  node -e '
+    const value = JSON.parse(require("fs").readFileSync("package.json", "utf8")).packageManager;
+    if (typeof value === "string") process.stdout.write(value);
+  '
+}
+
+node_lock_root() {
+  directory=$1
+  while :; do
+    for candidate in package-lock.json pnpm-lock.yaml yarn.lock bun.lock bun.lockb; do
+      [ -f "$directory/$candidate" ] || continue
+      printf '%s\n' "$directory"
+      return 0
+    done
+    [ "$directory" = "$repository_root" ] && return 1
+    directory=$(dirname "$directory")
+  done
+}
+
+node_workspace_declared() {
+  directory=$1
+  manager=$(cd "$directory" && package_manager) || return 1
+  case $manager in
+    pnpm@*) awk '/^[[:space:]]*packages:[[:space:]]*/ { found = 1 } END { exit found ? 0 : 1 }' "$directory/pnpm-workspace.yaml" ;;
+    *) node -e '
+      const value = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).workspaces;
+      const packages = Array.isArray(value) ? value : value && value.packages;
+      process.exit(Array.isArray(packages) && packages.length > 0 ? 0 : 1);
+    ' "$directory/package.json" ;;
+  esac
+}
+
+uv_lock_root() {
+  directory=$1
+  while :; do
+    if [ -f "$directory/uv.lock" ]; then
+      printf '%s\n' "$directory"
+      return 0
+    fi
+    [ "$directory" = "$repository_root" ] && return 1
+    directory=$(dirname "$directory")
+  done
+}
+
+uv_workspace_declared() {
+  directory=$1
+  awk '/^\[tool\.uv\.workspace\][[:space:]]*(#.*)?$/ { found = 1 } END { exit found ? 0 : 1 }' "$directory/pyproject.toml"
+}
+
+manager_version() {
+  manager=$1
+  command=$2
+  expected=${manager#*@}
+  actual=$("$command" --version 2>/dev/null) || fail "$command is required to verify packageManager $manager"
+  [ "$actual" = "$expected" ] || fail "packageManager $manager does not match installed $command version $actual"
+}
+
+config_value_is() {
+  expected=$1
+  shift
+  actual=$("$@" 2>/dev/null) || fail "could not read package-manager configuration with: $*"
+  [ "$actual" = "$expected" ] || fail "package-manager configuration expected $expected, found $actual"
+}
+
+uv_exclude_newer_is_set() {
+  file=$1
+  case $file in
+    pyproject.toml)
+      awk '
+        /^\[tool\.uv\][[:space:]]*(#.*)?$/ { in_uv = 1; next }
+        /^\[/ { in_uv = 0 }
+        in_uv && /^[[:space:]]*exclude-newer[[:space:]]*=[[:space:]]*"7 days"[[:space:]]*(#.*)?$/ { found = 1 }
+        END { exit found ? 0 : 1 }
+      ' "$file"
+      ;;
+    uv.toml)
+      awk '
+        BEGIN { in_root = 1 }
+        /^\[/ { in_root = 0 }
+        in_root && /^[[:space:]]*exclude-newer[[:space:]]*=[[:space:]]*"7 days"[[:space:]]*(#.*)?$/ { found = 1 }
+        END { exit found ? 0 : 1 }
+      ' "$file"
+      ;;
+    *) return 1 ;;
+  esac
+}
+
+check_node() {
+  [ -f package.json ] || return 0
+  manager=$(package_manager) || fail 'package.json must contain valid JSON'
+  [ -n "$manager" ] || fail 'package.json requires an exact packageManager field'
+
+  lock_count=0
+  lock_kind=
+  for candidate in package-lock.json pnpm-lock.yaml yarn.lock bun.lock bun.lockb; do
+    [ -f "$candidate" ] || continue
+    lock_count=$((lock_count + 1))
+    lock_kind=$candidate
+  done
+  [ "$lock_count" -eq 1 ] || fail 'package.json requires exactly one committed Node lockfile'
+
+  case $manager in
+    npm@*)
+      exact_version_at_least "$manager" 11 10 || fail 'npm packageManager must be an exact version at least 11.10.0'
+      manager_version "$manager" npm
+      [ "$lock_kind" = package-lock.json ] || fail "npm requires package-lock.json, found $lock_kind"
+      if [ ! -f .npmrc ]; then
+        fail 'npm requires .npmrc min-release-age=7'
+      fi
+      config_value_is 7 npm config get min-release-age --location=project
+      ;;
+    pnpm@*)
+      exact_version_at_least "$manager" 10 16 || fail 'pnpm packageManager must be an exact version at least 10.16.0'
+      manager_version "$manager" pnpm
+      [ "$lock_kind" = pnpm-lock.yaml ] || fail "pnpm requires pnpm-lock.yaml, found $lock_kind"
+      [ -f pnpm-workspace.yaml ] || fail 'pnpm requires pnpm-workspace.yaml'
+      config_value_is 10080 pnpm config get --location=project minimumReleaseAge
+      config_value_is true pnpm config get --location=project minimumReleaseAgeStrict
+      config_value_is false pnpm config get --location=project minimumReleaseAgeIgnoreMissingTime
+      ;;
+    yarn@*)
+      exact_version_at_least "$manager" 4 12 || fail 'Yarn packageManager must be an exact version at least 4.12.0'
+      manager_version "$manager" yarn
+      [ "$lock_kind" = yarn.lock ] || fail "Yarn requires yarn.lock, found $lock_kind"
+      if [ ! -f .yarnrc.yml ]; then
+        fail 'Yarn requires .yarnrc.yml npmMinimalAgeGate: 7d'
+      fi
+      config_value_is 7d yarn config get npmMinimalAgeGate
+      ;;
+    bun@*) fail 'Bun is not yet supported by the enforced age-gate policy; select npm, pnpm, Yarn, or record a reviewed exception' ;;
+    *) fail "unsupported packageManager: $manager" ;;
+  esac
+  relative_directory=${PWD#"$repository_root"}
+  [ -n "$relative_directory" ] || relative_directory=/
+  dependabot_has_cooldown npm "$relative_directory" || fail "package.json requires an npm Dependabot entry for $relative_directory with default-days: 7"
+}
+
+check_python() {
+  [ -f pyproject.toml ] || return 0
+  grep -Eq '^[[:space:]]*\[project\][[:space:]]*$' pyproject.toml || return 0
+  [ -f uv.lock ] || fail 'Python projects require a committed uv.lock'
+  if [ -f uv.toml ]; then
+    uv_exclude_newer_is_set uv.toml || fail 'Python projects require uv exclude-newer = "7 days"'
+  elif ! uv_exclude_newer_is_set pyproject.toml; then
+    fail 'Python projects require uv exclude-newer = "7 days"'
+  fi
+  relative_directory=${PWD#"$repository_root"}
+  [ -n "$relative_directory" ] || relative_directory=/
+  dependabot_has_cooldown uv "$relative_directory" || fail "Python projects require a uv Dependabot entry for $relative_directory with default-days: 7"
+}
+
+check_osv_exceptions() {
+  find . -type d \( -name .git -o -name .tools \) -prune -o -type f -name osv-scanner.toml -print | while IFS= read -r config; do
+    if grep -Eq '^\[\[PackageOverrides\]\]' "$config"; then
+      fail "$config may not use PackageOverrides; use a narrow IgnoredVulns exception instead"
+    fi
+    awk '
+      function validate() { if (in_block && (!has_id || !has_reason || !has_expiry)) exit 1 }
+      /^\[\[IgnoredVulns\]\]/ { validate(); in_block = 1; has_id = has_reason = has_expiry = 0; next }
+      /^\[\[/ { validate(); in_block = 0 }
+      in_block && /^[[:space:]]*id[[:space:]]*=/ { has_id = 1 }
+      in_block && /^[[:space:]]*reason[[:space:]]*=/ { has_reason = 1 }
+      in_block && /^[[:space:]]*ignoreUntil[[:space:]]*=/ { has_expiry = 1 }
+      END { validate() }
+    ' "$config" || fail "$config exceptions require id, reason, and ignoreUntil"
+  done
+}
+
+check_node_manifest() {
+  manifest=$1
+  manifest_directory=$(CDPATH='' cd -- "$(dirname "$manifest")" && pwd)
+  root=$(node_lock_root "$manifest_directory") || fail "$manifest requires a committed Node lockfile"
+  if [ "$root" != "$manifest_directory" ] && ! node_workspace_declared "$root"; then
+    fail "$manifest has no lockfile and is not under an explicitly declared Node workspace"
+  fi
+  (cd "$root" && check_node)
+}
+
+check_python_manifest() {
+  manifest=$1
+  manifest_directory=$(CDPATH='' cd -- "$(dirname "$manifest")" && pwd)
+  grep -Eq '^[[:space:]]*\[project\][[:space:]]*$' "$manifest" || return 0
+  root=$(uv_lock_root "$manifest_directory") || fail "$manifest requires a committed uv.lock"
+  if [ "$root" != "$manifest_directory" ] && ! uv_workspace_declared "$root"; then
+    fail "$manifest has no uv.lock and is not under an explicitly declared uv workspace"
+  fi
+  (cd "$root" && check_python)
+}
+
+find . -type d \( -name .git -o -name .tools -o -name node_modules \) -prune -o -type f -name package.json -print |
+  while IFS= read -r manifest; do
+    check_node_manifest "$manifest"
+  done
+
+find . -type d \( -name .git -o -name .tools -o -name node_modules \) -prune -o -type f -name pyproject.toml -print |
+  while IFS= read -r manifest; do
+    check_python_manifest "$manifest"
+  done
+
+check_osv_exceptions
+printf 'Dependency policy validation passed.\n'

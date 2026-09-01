@@ -1,0 +1,22 @@
+#!/bin/sh
+set -eu
+
+version=2.0.13
+target=.tools/bin/skill-scanner
+
+if [ -x "$target" ] && "$target" --version 2>/dev/null | grep -Fq "skill-scanner $version"; then
+  printf 'Cisco AI Skill Scanner %s is already installed.\n' "$version"
+  exit 0
+fi
+
+command -v uv >/dev/null 2>&1 || {
+  printf 'install-skill-scanner: uv is required; install it from https://docs.astral.sh/uv/\n' >&2
+  exit 1
+}
+tool_root=$(pwd)/.tools/uv-tools
+bin_root=$(pwd)/.tools/bin
+mkdir -p "$tool_root" "$bin_root"
+UV_TOOL_DIR=$tool_root UV_TOOL_BIN_DIR=$bin_root \
+  uv tool install "cisco-ai-skill-scanner==$version" \
+    --python 3.12 --managed-python --no-progress --exclude-newer '7 days'
+"$target" --version

@@ -1,0 +1,33 @@
+#!/bin/sh
+set -eu
+
+prd_root=${1:-docs/prds}
+[ "$#" -le 1 ] || { printf 'Usage: scripts/prd-index [docs/prds]\n' >&2; exit 2; }
+
+for location in active archive; do
+  directory=$prd_root/$location
+  [ -d "$directory" ] || { printf 'prd-index: missing %s\n' "$directory" >&2; exit 1; }
+  tmp=$directory/README.md.tmp
+  if [ "$location" = active ]; then
+    title='Active PRDs'
+    empty='No active PRDs.'
+  else
+    title='Archived PRDs'
+    empty='No archived PRDs.'
+  fi
+  {
+    printf '# %s\n\n' "$title"
+    # shellcheck disable=SC2016 # Backticks are literal Markdown.
+    printf 'This index is maintained by `scripts/prd-index`.\n\n'
+    found=0
+    for set_dir in "$directory"/*; do
+      [ -d "$set_dir" ] || continue
+      found=1
+      slug=$(basename "$set_dir")
+      status=$(sed -n 's/^- Status: //p' "$set_dir/master-prd.md" | sed -n '1p')
+      printf -- '- [%s](%s/master-prd.md) — %s\n' "$slug" "$slug" "${status:-Unknown}"
+    done
+    [ "$found" -eq 1 ] || printf '%s\n' "$empty"
+  } >"$tmp"
+  mv "$tmp" "$directory/README.md"
+done

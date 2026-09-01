@@ -1,0 +1,53 @@
+#!/bin/sh
+set -eu
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+# shellcheck source-path=SCRIPTDIR
+# shellcheck source=prd-lib.sh
+. "$script_dir/prd-lib.sh"
+
+prd_root=docs/prds
+mode=all
+while [ "$#" -gt 0 ]; do
+  case $1 in
+    --staged) mode=staged; shift ;;
+    --root)
+      [ "$#" -ge 2 ] || { printf 'prd-check: --root requires a path\n' >&2; exit 2; }
+      prd_root=$2
+      shift 2
+      ;;
+    *) printf 'Usage: scripts/prd-check [--staged] [--root <docs/prds>]\n' >&2; exit 2 ;;
+  esac
+done
+
+if [ "$mode" = staged ]; then
+  git rev-parse --git-dir >/dev/null 2>&1 || exit 0
+  if ! git diff --cached --name-only --diff-filter=ACMRD | grep -q '^docs/prds/'; then
+    printf 'No staged PRD changes to validate.\n'
+    exit 0
+  fi
+  prd_tmp=$(mktemp -d "${TMPDIR:-/tmp}/prd-staged.XXXXXX")
+  trap 'rm -rf "$prd_tmp"' EXIT HUP INT TERM
+  git checkout-index --all --prefix="$prd_tmp/"
+  "$0" --root "$prd_tmp/docs/prds"
+  exit $?
+fi
+
+[ -d "$prd_root/active" ] || prd_error "$prd_root/active is missing"
+[ -d "$prd_root/archive" ] || prd_error "$prd_root/archive is missing"
+
+for prd_location in active archive; do
+  if [ -d "$prd_root/$prd_location" ]; then
+    for prd_set in "$prd_root/$prd_location"/*; do
+      [ -d "$prd_set" ] || continue
+      prd_check_set "$prd_set" "$prd_location"
+    done
+    prd_check_index "$prd_root" "$prd_location"
+  fi
+done
+
+if [ "$prd_error_count" -ne 0 ]; then
+  printf 'PRD validation failed with %s error(s).\n' "$prd_error_count" >&2
+  exit 1
+fi
+printf 'PRD validation passed.\n'

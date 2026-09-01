@@ -1,27 +1,23 @@
-.DS_Store
-.worktrees/
-.claude/*
-!.claude/skills/
-target/
-artifacts/
-
-# Profiling output
-dhat-heap.json
-
-# Node/frontend dependencies and build artifacts
-node_modules/
-dist/
-.vite/
-coverage/
-*.tsbuildinfo
-
-# Frontend tool logs
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-
-# Local environment files
+# Local environment and credentials
 .env
 .env.*
 !.env.example
+!.env.*.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Tooling and editor state
+.tools/
+.DS_Store
+.idea/
+.vscode/
+*.swp
+*.tmp
+
+# Common generated outputs; refine after stack selection
+coverage/
+dist/
+build/
+tmp/

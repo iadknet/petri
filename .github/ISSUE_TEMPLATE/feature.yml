@@ -1,0 +1,19 @@
+name: Feature request
+description: Propose an outcome for consideration
+title: "[Feature]: "
+labels: []
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or goal
+      description: Describe the user need without prescribing an implementation.
+    validations:
+      required: true
+  - type: textarea
+    id: success
+    attributes:
+      label: Observable success
+      description: How would we know the need has been met?
+    validations:
+      required: true

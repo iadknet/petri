@@ -2,6 +2,7 @@
   "name": "petri-frontend",
   "private": true,
   "version": "0.0.1",
+  "packageManager": "npm@11.19.0",
   "type": "module",
   "engines": {
     "node": ">=24.20.0 <25"

@@ -1,0 +1,80 @@
+#!/bin/sh
+set -eu
+
+fail() {
+  printf 'policy-check: %s\n' "$*" >&2
+  exit 1
+}
+
+[ -f AGENTS.md ] || fail 'AGENTS.md is missing'
+
+scripts/dependency-policy-check
+scripts/skill-provenance-check
+scripts/residual-cruft-check
+
+for shell_file in scripts/*; do
+  [ -f "$shell_file" ] || continue
+  sh -n "$shell_file" || fail "$shell_file has invalid POSIX shell syntax"
+done
+
+for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
+  [ -f "$workflow" ] || continue
+  grep -Eq '^permissions:$' "$workflow" || fail "$workflow lacks explicit permissions"
+  grep -Eq '^  contents: read$' "$workflow" || fail "$workflow does not use read-only contents permission"
+  if awk '
+    /^permissions:[[:space:]]*(#.*)?$/ { in_permissions = 1; next }
+    in_permissions && /^[^[:space:]]/ { in_permissions = 0 }
+    in_permissions && /^[[:space:]]+[A-Za-z-]+:[[:space:]]*write([[:space:]]*#.*)?$/ { found = 1 }
+    END { exit found ? 0 : 1 }
+  ' "$workflow"; then
+    fail "$workflow grants a write permission at workflow level"
+  fi
+  if awk '
+    function indentation(text, i) {
+      for (i = 1; i <= length(text); i++) {
+        if (substr(text, i, 1) != " ") return i - 1
+      }
+      return length(text)
+    }
+    /^[[:space:]]*($|#)/ { next }
+    {
+      indent = indentation($0)
+      text = substr($0, indent + 1)
+      if (!in_jobs) {
+        if (indent == 0 && text ~ /^jobs:[[:space:]]*(#.*)?$/) {
+          in_jobs = 1
+          job_indent = -1
+        }
+        next
+      }
+      if (indent == 0) {
+        in_jobs = 0
+        next
+      }
+      if (job_indent < 0) job_indent = indent
+      if (indent == job_indent) {
+        if (text ~ /[{,][[:space:]]*permissions[[:space:]]*:/) found = 1
+        property_indent = -1
+        next
+      }
+      if (indent > job_indent) {
+        if (property_indent < 0 || indent < property_indent) property_indent = indent
+        if (indent == property_indent && text ~ /^permissions:[[:space:]]*/) found = 1
+      }
+    }
+    END { exit found ? 0 : 1 }
+  ' "$workflow"; then
+    fail "$workflow contains job-level permissions that override the read-only workflow policy"
+  fi
+  uses_lines=$(sed -n 's/^[[:space:]]*-\{0,1\}[[:space:]]*uses[[:space:]]*:[[:space:]]*\([^ #]*\).*/\1/p' "$workflow")
+  if [ -n "$uses_lines" ]; then
+    printf '%s\n' "$uses_lines" | while IFS= read -r action; do
+      printf '%s\n' "$action" | grep -Eq '@[0-9a-f]{40}$' || {
+        printf 'policy-check: %s contains an unpinned action: %s\n' "$workflow" "$action" >&2
+        exit 1
+      }
+    done || exit 1
+  fi
+done
+
+printf 'Repository policy validation passed.\n'

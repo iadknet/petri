@@ -1,0 +1,18 @@
+minimum_pre_commit_version: '4.5.1'
+
+repos:
+  - repo: local
+    hooks:
+      - id: project-validation
+        name: Project validation
+        entry: scripts/project-precommit
+        language: system
+        pass_filenames: false
+        always_run: true
+      - id: skill-scanner
+        name: Cisco AI Skill Scanner
+        entry: scripts/skill-check --require-tools
+        language: system
+        pass_filenames: false
+        require_serial: true
+        always_run: true

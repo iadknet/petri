@@ -1,0 +1,25 @@
+#!/bin/sh
+set -eu
+
+[ "$#" -eq 1 ] || { printf 'Usage: scripts/prd-archive <kebab-slug>\n' >&2; exit 2; }
+slug=$1
+case $slug in ''|*[!a-z0-9-]*|-*|*-|*--*) printf 'prd-archive: invalid kebab-case slug: %s\n' "$slug" >&2; exit 1 ;; esac
+
+source_dir=docs/prds/active/$slug
+target_dir=docs/prds/archive/$slug
+[ -d "$source_dir" ] || { printf 'prd-archive: active PRD not found: %s\n' "$slug" >&2; exit 1; }
+[ ! -e "$target_dir" ] || { printf 'prd-archive: archive target already exists: %s\n' "$target_dir" >&2; exit 1; }
+
+scripts/prd-check
+status=$(sed -n 's/^- Status: //p' "$source_dir/master-prd.md" | sed -n '1p')
+[ "$status" = Complete ] || { printf 'prd-archive: %s is not Complete\n' "$slug" >&2; exit 1; }
+
+mv "$source_dir" "$target_dir"
+scripts/prd-index
+if ! scripts/prd-check; then
+  mv "$target_dir" "$source_dir"
+  scripts/prd-index
+  printf 'prd-archive: validation failed; archive move was rolled back\n' >&2
+  exit 1
+fi
+printf 'Archived %s.\n' "$slug"

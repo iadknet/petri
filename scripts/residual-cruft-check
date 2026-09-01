@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+
+matches=$(grep -RInE -i \
+  --exclude='legacy-workflow-inventory.md' --exclude='residual-cruft-check' \
+  --exclude-dir=.git --exclude-dir=.tools --exclude-dir=node_modules \
+  'feature-[1-7]|docs/(features|plans|superpowers)|master_plan\.md|(review_log|implementation_log)\.md|superpowers:|SkillSpector|check-(architecture|doc|plan)-harness|check_cargo_policy' \
+  . || true)
+[ -z "$matches" ] || { printf 'residual-cruft-check: retired workflow reference found:\n%s\n' "$matches" >&2; exit 1; }

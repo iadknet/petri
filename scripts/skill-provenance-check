@@ -1,0 +1,29 @@
+#!/usr/bin/env node
+import { createHash } from 'node:crypto';
+import { readdirSync, readFileSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+
+const roots = ['.agents/skills', '.claude/skills'];
+const lock = JSON.parse(readFileSync('.agents/skills.lock.json', 'utf8'));
+function files(root) {
+  const out = {};
+  function walk(dir) {
+    for (const name of readdirSync(dir).sort()) {
+      const full = join(dir, name); const rel = relative(root, full);
+      if (statSync(full).isDirectory()) walk(full);
+      else {
+        if (name === 'AGENTS.md' || name === 'CLAUDE.md') throw new Error(`nested instruction file: ${root}/${rel}`);
+        out[rel] = createHash('sha256').update(readFileSync(full)).digest('hex');
+      }
+    }
+  }
+  walk(root); return out;
+}
+const codex = files(roots[0]); const claude = files(roots[1]);
+if (JSON.stringify(codex) !== JSON.stringify(claude)) throw new Error('Codex and Claude curated payloads differ');
+const lockedFiles = Object.fromEntries(lock.files.map(({ path, sha256 }) => [path, sha256]));
+if (JSON.stringify(codex) !== JSON.stringify(lockedFiles)) throw new Error('skill lock hash drift or unmanaged skill');
+for (const required of ['project-workflow','prd-create','prd-review','prd-implement','rust','react-best-practices','composition-patterns']) {
+  if (!lock.sources[required]) throw new Error(`missing provenance for ${required}`);
+}
+console.log('Skill provenance validation passed.');
