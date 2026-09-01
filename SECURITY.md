@@ -72,4 +72,4 @@ After the release artifact is selected, add an SBOM and build provenance
 attestation, then decide whether GitHub dependency
 review, CodeQL, OpenSSF Scorecard, and repository rulesets apply. These controls
 depend on the selected release model and GitHub plan, so they are intentionally
-not enabled in the stack-neutral foundation.
+not enabled until the release model is established.
