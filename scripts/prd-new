@@ -2,13 +2,25 @@
 set -eu
 
 usage() {
-  printf 'Usage: scripts/prd-new <kebab-slug> <stage-slug> [stage-slug ...]\n' >&2
+  printf 'Usage: scripts/prd-new [--deep] <kebab-slug> <stage-slug> [stage-slug ...]\n' >&2
 }
+
+execution_mode=Lean
+deep_mode_authorization='Not required'
+if [ "${1:-}" = --deep ]; then
+  execution_mode=Deep
+  deep_mode_authorization='Required before readiness'
+  shift
+fi
 
 [ "$#" -ge 2 ] || { usage; exit 2; }
 prd_slug=$1
 shift
 [ "$#" -le 99 ] || { printf 'prd-new: at most 99 stages are supported\n' >&2; exit 1; }
+if [ "$execution_mode" = Lean ] && [ "$#" -gt 2 ]; then
+  printf 'prd-new: Lean mode supports at most 2 stages; narrow the PRD or use --deep after explicit user authorization\n' >&2
+  exit 1
+fi
 case $prd_slug in ''|*[!a-z0-9-]*|-*|*-|*--*) printf 'prd-new: invalid kebab-case PRD slug: %s\n' "$prd_slug" >&2; exit 1 ;; esac
 
 stage_slugs_seen=' '
@@ -34,6 +46,7 @@ created=$(date +%F)
 {
   printf '# %s — Master PRD\n\n' "$prd_title"
     printf '%s\n' '- Status: Draft' '- Owner: Unassigned' "- Created: $created" '- Review Status: DRAFT' '- Review Count: 0'
+    printf '%s\n' "- Execution Mode: $execution_mode" "- Deep Mode Authorization: $deep_mode_authorization" '- Affected-File Budget: 25' '- Actual Affected Files: Pending'
   cat <<'EOF'
 
 ## Goal
@@ -88,12 +101,20 @@ Summarize stage ordering and contracts here without duplicating stage tasks.
 
 - Record decisions shared by multiple stages.
 
+## Acceptance Criteria and Evidence
+
+| ID | Acceptance criterion | Verification | Evidence |
+| --- | --- | --- | --- |
+| AC-1 | State an observable cross-stage outcome. | Name the focused check. | Pending |
+
 ## Implementation or Decision Tasks
 
 - [ ] Keep stage links and status summaries current.
 
 ## Verification and Observable Success Criteria
 
+- [ ] Run focused checks during implementation and record their results in the evidence table.
+- [ ] Run `make check` once before final review and once after fixes only when fixes were required.
 - [ ] Every stage's declared verification has passed.
 - [ ] Affected durable documentation is created, updated, or synchronized, or a no-change rationale is recorded.
 - [ ] The final-code review gate has passed.
@@ -149,13 +170,19 @@ List durable user, operator, developer, architecture, API, or generated-referenc
 documentation to create, update, or synchronize. If none is affected, write
 `No documentation changes required: <rationale>`.
 
+## Acceptance Criteria and Evidence
+
+| ID | Acceptance criterion | Verification | Evidence |
+| --- | --- | --- | --- |
+| AC-1 | State an observable stage outcome. | Name the focused check. | Pending |
+
 ## Implementation or Decision Tasks
 
 - [ ] Complete a concrete task.
 
 ## Verification and Observable Success Criteria
 
-- [ ] Run a concrete check and record the observable result.
+- [ ] Run a focused check and replace `Pending` in the evidence table with the observable result.
 - [ ] Affected durable documentation is created, updated, or synchronized, or a no-change rationale is recorded.
 
 ## Current Status

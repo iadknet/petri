@@ -20,8 +20,11 @@ Turn an outcome into a lean, executable PRD set under
 2. Research credible existing solutions, standards, and current primary sources
    when a technology or design choice is involved. Record links, tradeoffs, and why
    rejected options do not fit; do not invent custom machinery without evidence.
+   In Lean mode, bound research to sources needed for the decision and summarize
+   conclusions instead of preserving narrated exploration.
 3. Run `scripts/prd-new <slug> <stage-slug> [stage-slug ...]` for a new set.
-   Revise existing files in place when the set already exists.
+   Revise existing files in place when the set already exists. Use
+   `scripts/prd-new --deep ...` only after the user authorizes Deep mode.
 4. Keep the master at outcome and cross-stage level. Put concrete implementation
    and decision tasks in dependency-ordered stages.
 5. For every master and stage, make scope, non-goals, existing-code interactions,
@@ -31,13 +34,22 @@ Turn an outcome into a lean, executable PRD set under
    documentation to create, update, or synchronize. When none is affected, record
    a concrete no-change rationale. Write `None identified` when the debt analysis
    genuinely finds none.
-6. Split a stage when it mixes independently testable components, unrelated
+6. Map every acceptance criterion to a focused check and an evidence location.
+   Record `Pending` until the check has actually passed. Declare the affected-file
+   budget and keep Lean mode to no more than two stages and 25 affected files. If
+   credible planning cannot fit those limits, narrow the feature or request Deep
+   mode rather than optimistically understating scope.
+7. Split a stage when it mixes independently testable components, unrelated
    abstraction levels, or tasks with different dependencies. Do not split merely
    to make files short.
-7. Keep each PRD at or below 750 physical lines and all checkboxes truthful. New
+8. Keep Lean masters at or below 250 physical lines and Lean stages at or below
+   150; the absolute ceiling for Deep documents remains 750. Keep all checkboxes
+   truthful. New
    and materially revised PRDs start with status `Draft`, `Review Status: DRAFT`,
    and `Review Count: 0`; `$prd-review` owns subsequent review-state changes.
-8. Run `scripts/prd-index` and `scripts/prd-check` before handing off.
+9. Run `scripts/prd-index` and `scripts/prd-check` before handing off. The handoff
+   is the PRD paths plus a compact decision and scope summary, not planning-chat
+   history.
 
 Do not implement product code while using this skill unless the user separately
 authorizes implementation.
