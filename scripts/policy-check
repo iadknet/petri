@@ -14,7 +14,12 @@ scripts/residual-cruft-check
 
 for shell_file in scripts/*; do
   [ -f "$shell_file" ] || continue
-  sh -n "$shell_file" || fail "$shell_file has invalid POSIX shell syntax"
+  case "$(head -n 1 "$shell_file")" in
+    '#!'*node*|'#!'*python*|*'node'*) continue ;;
+    '#!'*zsh*) zsh -n "$shell_file" || fail "$shell_file has invalid Zsh syntax" ;;
+    '#!'*bash*) bash -n "$shell_file" || fail "$shell_file has invalid Bash syntax" ;;
+    *) sh -n "$shell_file" || fail "$shell_file has invalid POSIX shell syntax" ;;
+  esac
 done
 
 for workflow in .github/workflows/*.yml .github/workflows/*.yaml; do
