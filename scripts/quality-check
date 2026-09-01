@@ -25,6 +25,7 @@ if [ ! -x "$actionlint" ] || [ ! -x "$shellcheck" ]; then
 fi
 
 find scripts -type f | while IFS= read -r script; do
+  case "$script" in *.mjs) continue ;; esac
   case "$(head -n 1 "$script")" in
     '#!'*zsh*) zsh -n "$script" ;;
     '#!'*bash*) bash -n "$script"; scripts/aqua exec shellcheck --shell=bash --external-sources "$script" ;;
