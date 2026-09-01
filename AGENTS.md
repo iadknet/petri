@@ -6,4 +6,5 @@
 - Runtime-facing telemetry and state must derive from applied simulation behavior; backward compatibility is not a default goal.
 - Use TDD for behavior changes and bug fixes. Test determinism is required only where assertions depend on reproducibility.
 - Run `cargo test -p v3-core --test viability` first when production defaults, founder behavior, or tick-loop mechanics change.
+- Shell automation must be POSIX `sh` compatible; do not add Bash or Zsh runtime dependencies.
 - Do not create commits, pull requests, remotes, or external state without explicit user authorization.
