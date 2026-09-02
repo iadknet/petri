@@ -1,6 +1,6 @@
 # Roadmap Workflow Simplification — Master PRD
 
-- Status: Ready
+- Status: In Progress
 - Owner: Codex
 - Created: 2026-09-01
 - Review Status: APPROVED
@@ -8,7 +8,7 @@
 - Execution Mode: Deep
 - Deep Mode Authorization: User explicitly authorized one Deep migration in the 2026-09-01 roadmap-workflow planning session and implementation request.
 - Affected-File Budget: 60
-- Actual Affected Files: Pending
+- Actual Affected Files: 12
 
 ## Goal
 
@@ -84,7 +84,7 @@ archive. Preserve completed PRDs with an explicit historical-only notice.
 
 ## Stage Order and Links
 
-1. [Stage 01 — Roadmap Contract](stage-01-roadmap-contract.md) — `Ready`
+1. [Stage 01 — Roadmap Contract](stage-01-roadmap-contract.md) — `Complete`
 2. [Stage 02 — Workflow Retirement](stage-02-workflow-retirement.md) — `Ready`
 
 Stage 01 establishes the replacement contract and validation. Stage 02 switches
@@ -275,8 +275,8 @@ Maximum remediation passes: 2 total, one per checkpoint.
 
 ## Implementation or Decision Tasks
 
-- [ ] Keep stage links, statuses, affected-file count, and evidence current.
-- [ ] Complete the independent readiness review before implementation.
+- [x] Keep stage links, statuses, affected-file count, and evidence current.
+- [x] Complete the independent readiness review before implementation.
 - [ ] Complete the pre-retirement and final cutover reviews within the declared budget.
 - [ ] Remove the old lifecycle tooling and move this still-In-Progress record to
   the archive in the same authorized cutover; mark it Complete only after the
@@ -284,7 +284,7 @@ Maximum remediation passes: 2 total, one per checkpoint.
 
 ## Verification and Observable Success Criteria
 
-- [ ] Run focused checks during implementation and record their results in the evidence table.
+- [x] Run focused checks during implementation and record their results in the evidence table.
 - [ ] Run `make check` before the final cutover review and again on the exact post-archive closure tree.
 - [ ] Every stage's declared verification has passed.
 - [ ] Affected durable documentation is created, updated, or synchronized, or a no-change rationale is recorded.
@@ -292,8 +292,8 @@ Maximum remediation passes: 2 total, one per checkpoint.
 
 ## Current Status
 
-Ready. The user authorized one new bounded correction/review cycle after the
-initial readiness budget was exhausted. Its independent final check found no
-P1/P2/P3 findings, so this PRD is approved for implementation. Local
-worktree/branch/commit authorization remains in scope; no remote or `main`
-mutation is authorized.
+In Progress. Stage 01 is implemented and its focused contract checks pass. The
+user authorized one bounded pre-retirement remediation pass after independent
+review; Stage 02 remains Ready and is not started. Local worktree, branch, and
+commit authorization remains in scope; no remote or `main` mutation is
+authorized.
