@@ -2,6 +2,7 @@
 set -eu
 
 scripts/prd-check --staged
+scripts/roadmap-check.mjs --staged
 scripts/policy-check
 scripts/dependency-audit --require-tools
 scripts/skill-check --require-tools

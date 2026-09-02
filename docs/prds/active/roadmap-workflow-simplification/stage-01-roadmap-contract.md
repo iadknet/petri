@@ -1,6 +1,6 @@
 # Stage 01 — Roadmap Contract
 
-- Status: Ready
+- Status: Complete
 - Depends on: None
 - Master: [Master PRD](master-prd.md)
 
@@ -62,10 +62,10 @@ Create `docs/roadmaps/README.md`, `_master-template.md`, `_track-template.md`,
 
 | ID | Acceptance criterion | Verification | Evidence |
 | --- | --- | --- | --- |
-| AC-1 | An absent live master passes only when no live tracks or specs exist. | Empty-scaffold checker fixture | Pending |
-| AC-2 | IDs, canonical paths, links, unknown dependencies, duplicate ownership, and cycles are rejected. | Graph and path checker fixtures | Pending |
-| AC-3 | Checked features, complete specs, blocked specs, track rollups, and master completion stay synchronized. | Lifecycle checker fixtures | Pending |
-| AC-4 | The goal prompt contains the requested P1-only, model-role, worktree, verification, integration, and authorization boundaries. | Diff-scoped documentation review | Pending |
+| AC-1 | An absent live master passes only when no live tracks or specs exist. | Empty-scaffold checker fixture | `make roadmap-check-test`: 22 tests passed, including templates-only and live-without-master cases. |
+| AC-2 | IDs, canonical paths, links, unknown dependencies, duplicate ownership, and cycles are rejected. | Graph and path checker fixtures | `make roadmap-check-test`: canonical identity, dependency, later-listed cross-track, duplicate, orphan, noncanonical filename, malformed metadata/path, exact owning-track link, and cycle cases passed; checker emits deterministic diagnostics. |
+| AC-3 | Checked features, complete specs, blocked specs, track rollups, and master completion stay synchronized. | Lifecycle checker fixtures | `make roadmap-check-test`: complete closure, blocked-spec, nested/ordinary unchecked tasks, premature completion, invalid Planning/Active states, and rollup-drift cases passed. |
+| AC-4 | The goal prompt contains the requested P1-only, model-role, worktree, verification, integration, and authorization boundaries. | Diff-scoped documentation review | `docs/roadmaps/_goal-prompt-template.md` records the requested role models, P1-only policy, branch/worktree, focused checks, `make check`, closure, and authorization boundaries. |
 
 The regression matrix is:
 
@@ -83,17 +83,19 @@ The regression matrix is:
 
 ## Implementation or Decision Tasks
 
-- [ ] Write the roadmap contract and four reusable templates without ecosystem content.
-- [ ] Implement the standard-library roadmap parser and validator.
-- [ ] Add fixtures for valid empty and multi-track states plus every required failure mode.
-- [ ] Expose the declared working-tree, fixture-root, and staged-index commands
+- [x] Write the roadmap contract and four reusable templates without ecosystem content.
+- [x] Implement the standard-library roadmap parser and validator.
+- [x] Add fixtures for valid empty and multi-track states plus every required failure mode.
+- [x] Expose the declared working-tree, fixture-root, and staged-index commands
   through the exact Makefile/pre-commit call graph.
 
 ## Verification and Observable Success Criteria
 
-- [ ] Run a focused check and replace `Pending` in the evidence table with the observable result.
-- [ ] Affected durable documentation is created, updated, or synchronized, or a no-change rationale is recorded.
+- [x] Run a focused check and replace `Pending` in the evidence table with the observable result.
+- [x] Affected durable documentation is created, updated, or synchronized, or a no-change rationale is recorded.
 
 ## Current Status
 
-Ready. The independent readiness gate approved the master and both stages.
+Complete. The contract templates, dependency-free checker, regression suite,
+Makefile interfaces, and staged pre-commit hook are implemented and their
+focused verification evidence is recorded above.
