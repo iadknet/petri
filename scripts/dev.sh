@@ -20,7 +20,7 @@ fi
 
 if [ ! -x "${ROOT_DIR}/frontend/node_modules/.bin/vite" ]; then
   echo "Frontend dependencies are missing."
-  echo "Use Node 24 LTS (see .nvmrc), then run: cd \"${ROOT_DIR}/frontend\" && npm ci"
+  echo "Run make setup to provision Petri's pinned frontend toolchain and dependencies."
   exit 1
 fi
 

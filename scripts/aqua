@@ -42,17 +42,24 @@ export AQUA_ENFORCE_REQUIRE_CHECKSUM=true
 case ${1:-} in
   install)
     shift
-    [ "$#" -eq 0 ] || { printf 'Usage: scripts/aqua <install|exec> [tool args]\n' >&2; exit 2; }
+    [ "$#" -eq 0 ] || { printf 'Usage: scripts/aqua <install|exec|env> [tool args]\n' >&2; exit 2; }
     exec aqua install
     ;;
   exec)
     shift
-    [ "$#" -gt 0 ] || { printf 'Usage: scripts/aqua <install|exec> [tool args]\n' >&2; exit 2; }
+    [ "$#" -gt 0 ] || { printf 'Usage: scripts/aqua <install|exec|env> [tool args]\n' >&2; exit 2; }
     export AQUA_DISABLE_LAZY_INSTALL=true
     exec aqua exec -- "$@"
     ;;
+  env)
+    shift
+    [ "$#" -gt 0 ] || { printf 'Usage: scripts/aqua <install|exec|env> [tool args]\n' >&2; exit 2; }
+    export AQUA_DISABLE_LAZY_INSTALL=true
+    export PATH="$AQUA_ROOT_DIR/bin:$PATH"
+    exec "$@"
+    ;;
   *)
-    printf 'Usage: scripts/aqua <install|exec> [tool args]\n' >&2
+    printf 'Usage: scripts/aqua <install|exec|env> [tool args]\n' >&2
     exit 2
     ;;
 esac

@@ -9,8 +9,10 @@ a live spatial ecosystem, and a dashboard backed by applied simulation state.
 
 ## Quick start
 
-Required versions are Aqua >= 2.60.1, uv 0.12.3, Rust 1.93.0, Node 24.20.0,
-and npm 11.19.0. Run `make setup`, then `make run`. Open
+Install Aqua >= 2.60.1 and Rust 1.93.0 through rustup. `make setup` then
+provisions the pinned Node 24.20.0 (including npm 11.19.0), uv 0.12.1, and
+repository CLIs through Aqua before installing hooks and frontend dependencies.
+Run `make setup`, then `make run`. Open
 <http://localhost:5173>.
 
 ## Verification
