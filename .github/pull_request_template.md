@@ -8,6 +8,8 @@
 ## Roadmap and documentation
 
 - [ ] Owning feature spec, track rollup, and master rollup are synchronized.
+- [ ] Feature dependencies and independent execution-approval evidence match the owning
+  roadmap row.
 - [ ] Affected durable documentation is updated, or no-change rationale is recorded.
 
 ## Integration

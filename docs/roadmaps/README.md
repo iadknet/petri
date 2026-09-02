@@ -11,6 +11,13 @@ state. Copy a template, replace every placeholder, and preserve the canonical
 metadata, headings, links, IDs, and checkbox state. Keep dependencies explicit,
 acyclic, and limited to work that is actually required.
 
+Every live feature spec copies its owning roadmap row's exact dependencies into
+`Dependencies` metadata and records `Execution approval`, reviewer identity,
+and approval date. Implementation begins only after an independent `Approved` verdict.
+Decision-relevant research belongs under `Inputs and Invariants`; review
+rationale and non-executable versus deferrable findings belong under
+`Execution Approval` and `Deferred Review Findings`.
+
 Run `make roadmap-check` while editing. A checked feature requires one complete
 feature spec, and a complete spec requires every implementation, verification,
 and success item to be checked. Use `Blocked` only with a concrete blocker;

@@ -335,14 +335,50 @@ function validateRoot(root) {
     } else if (!trackMetadata) {
       errors.push(`${file}: missing **Track** metadata`);
     }
+    const dependencyMetadata = checkMetadata(text, file, errors, 'Dependencies');
+    if (dependencyMetadata) {
+      dependencyList(dependencyMetadata, 'feature', file, errors);
+      if (feature) {
+        const expected = feature.deps.length ? feature.deps.join(', ') : 'None';
+        if (dependencyMetadata !== expected) {
+          errors.push(`${file}: **Dependencies** must exactly match owning roadmap row '${expected}'`);
+        }
+      }
+    }
+    const executionApproval = checkMetadata(text, file, errors, 'Execution approval', [
+      'Not Reviewed', 'Revision Required', 'Approved',
+    ]);
+    const approvalReviewer = checkMetadata(text, file, errors, 'Approval reviewer');
+    const approvalDate = checkMetadata(text, file, errors, 'Approval date');
+    if (executionApproval === 'Not Reviewed') {
+      if (approvalReviewer && approvalReviewer !== 'None') {
+        errors.push(`${file}: Not Reviewed execution approval requires **Approval reviewer**: None`);
+      }
+      if (approvalDate && approvalDate !== 'None') {
+        errors.push(`${file}: Not Reviewed execution approval requires **Approval date**: None`);
+      }
+    } else if (executionApproval) {
+      if (!approvalReviewer || approvalReviewer === 'None') {
+        errors.push(`${file}: ${executionApproval} execution approval requires a concrete **Approval reviewer**`);
+      }
+      if (!approvalDate || !DATE.test(approvalDate)) {
+        errors.push(`${file}: ${executionApproval} execution approval requires a YYYY-MM-DD **Approval date**`);
+      }
+    }
     const sections = checkHeadings(text, file, errors, [
-      'Overview', 'Goal', 'Non-Goals', 'Inputs and Invariants', 'Implementation Tasks',
-      'Verification', 'Success Criteria', 'Blocker', 'Deferred Review Findings', 'Notes for AI Agents',
+      'Overview', 'Goal', 'Non-Goals', 'Inputs and Invariants', 'Execution Approval',
+      'Implementation Tasks', 'Verification', 'Success Criteria', 'Blocker',
+      'Deferred Review Findings', 'Notes for AI Agents',
     ]);
     checkCheckboxSection(sections.get('Implementation Tasks'), file, errors, 'Implementation Tasks');
     checkCheckboxSection(sections.get('Verification'), file, errors, 'Verification');
     checkCheckboxSection(sections.get('Success Criteria'), file, errors, 'Success Criteria');
     const blocker = sections.get('Blocker')?.lines.join('\n').trim() ?? '';
+    const approvalEvidence = sections.get('Execution Approval')?.lines.join('\n').trim() ?? '';
+    if (executionApproval && executionApproval !== 'Not Reviewed'
+      && (!approvalEvidence || /^Not reviewed\.?$/i.test(approvalEvidence))) {
+      errors.push(`${file}: ${executionApproval} execution approval requires concrete Execution Approval evidence`);
+    }
     if (status === 'Blocked') {
       if (feature?.checked) errors.push(`${file}: Blocked feature cannot be checked`);
       if (!blocker || /^None\.?$/i.test(blocker)) errors.push(`${file}: Blocked spec requires a concrete Blocker`);
@@ -352,6 +388,9 @@ function validateRoot(root) {
       for (const dependency of feature.deps) {
         if (!allFeatures.get(dependency)?.checked) errors.push(`${file}: ${status} spec requires checked dependency ${dependency}`);
       }
+    }
+    if (['In Progress', 'Complete'].includes(status) && executionApproval !== 'Approved') {
+      errors.push(`${file}: ${status} spec requires **Execution approval**: Approved`);
     }
     if (status === 'Complete') {
       if (!feature?.checked) errors.push(`${file}: Complete spec requires its feature checked`);
