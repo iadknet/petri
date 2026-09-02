@@ -6,7 +6,7 @@ export AQUA_ENFORCE_CHECKSUM := true
 export AQUA_ENFORCE_REQUIRE_CHECKSUM := true
 export PATH := $(AQUA_ROOT_DIR)/bin:$(PATH)
 
-.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-priority-bid rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc rust-clippy frontend-check frontend-lint frontend-test frontend-build policy-check quality-check dependency-audit skill-check prd-check prd-check-test check audit precommit project-precommit format clean
+.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-priority-bid rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc rust-clippy frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test policy-check quality-check dependency-audit skill-check prd-check prd-check-test check audit precommit project-precommit format clean
 
 help: ## Show the stable project command interface.
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -74,6 +74,12 @@ frontend-test: ## Run frontend unit tests.
 
 frontend-build: ## Build the frontend.
 	@cd frontend && npm run build
+
+roadmap-check: ## Validate the live roadmap contract (set ROADMAP_ROOT for a fixture root).
+	@if [ -n "$(ROADMAP_ROOT)" ]; then scripts/roadmap-check.mjs --root "$(ROADMAP_ROOT)"; else scripts/roadmap-check.mjs; fi
+
+roadmap-check-test: ## Run the roadmap checker regression suite through Aqua's Node runtime.
+	@$(AQUA_ROOT_DIR)/bin/node --test scripts/roadmap-check.test.mjs
 
 prd-check: ## Validate active and archived PRD sets.
 	@scripts/prd-check
