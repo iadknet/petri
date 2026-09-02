@@ -7,15 +7,11 @@ target=.tools/bin/pre-commit
 if [ -x "$target" ] && "$target" --version 2>/dev/null | grep -Fq "pre-commit $version"; then
   printf 'pre-commit %s is already installed.\n' "$version"
 else
-  command -v uv >/dev/null 2>&1 || {
-    printf 'install-pre-commit: uv is required; install it from https://docs.astral.sh/uv/\n' >&2
-    exit 1
-  }
   tool_root=$(pwd)/.tools/uv-tools
   bin_root=$(pwd)/.tools/bin
   mkdir -p "$tool_root" "$bin_root"
   UV_TOOL_DIR=$tool_root UV_TOOL_BIN_DIR=$bin_root \
-    uv tool install "pre-commit==$version" --python 3.12 --managed-python --no-progress --exclude-newer '7 days'
+    scripts/aqua exec uv tool install "pre-commit==$version" --python 3.12 --managed-python --no-progress --exclude-newer '7 days'
 fi
 
 if [ "$(git config --local --get core.hooksPath 2>/dev/null || :)" = .githooks ]; then
