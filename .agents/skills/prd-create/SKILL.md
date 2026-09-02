@@ -17,11 +17,12 @@ Turn an outcome into a lean, executable PRD set under
 
 1. Read `AGENTS.md`, relevant active PRDs, repository code, and durable decision
    records before proposing structure. Distinguish observed facts from assumptions.
-2. Research credible existing solutions, standards, and current primary sources
-   when a technology or design choice is involved. Record links, tradeoffs, and why
-   rejected options do not fit; do not invent custom machinery without evidence.
-   In Lean mode, bound research to sources needed for the decision and summarize
-   conclusions instead of preserving narrated exploration.
+2. Use `$research-first-planning` when a technology, feature, or design choice is
+   involved. Research credible existing solutions, standards, and current primary
+   sources. Record links, tradeoffs, and why rejected options do not fit; do not
+   invent custom machinery without evidence. In Lean mode, bound research to
+   sources needed for the decision and preserve conclusions rather than narrated
+   exploration.
 3. Run `scripts/prd-new <slug> <stage-slug> [stage-slug ...]` for a new set.
    Revise existing files in place when the set already exists. Use
    `scripts/prd-new --deep ...` only after the user authorizes Deep mode.

@@ -10,16 +10,19 @@ name: prd-review
 ---
 # Review a PRD or Its Implementation
 
-Review independently. The master's `Review Count` is the number of automated PRD
-readiness reviews attempted. It starts at 0 and never exceeds 1 in Lean mode or 3
+Review final code independently. For Lean readiness, the coordinator performs a
+compact audit in its existing context and must not spawn another agent. Deep
+readiness remains independent. The master's `Review Count` is the number of
+readiness audits attempted. It starts at 0 and never exceeds 1 in Lean mode or 3
 in authorized Deep mode. `Review Status` is `DRAFT` until readiness is approved,
 then `APPROVED`. Final-code review does not change either readiness field.
 
 ## Review criteria
 
-Inspect repository evidence, not only the prose. For Lean readiness, use the PRD,
-its directly affected code, and the planner's compact handoff; do not repeat broad
-repository exploration unless a concrete claim cannot otherwise be verified.
+Inspect repository evidence, not only the prose. For Lean readiness, the
+coordinator uses the PRD, directly affected code, and the planner's compact
+handoff; do not delegate, repeat broad repository exploration, or reload planning
+history unless a concrete claim cannot otherwise be verified.
 Check consistency, dependency
 order, component boundaries, abstraction levels, separation of concerns,
 testability, existing-code impact, technical debt, security implications, and
