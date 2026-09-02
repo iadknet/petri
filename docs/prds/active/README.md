@@ -2,4 +2,4 @@
 
 This index is maintained by `scripts/prd-index`.
 
-No active PRDs.
+- [roadmap-workflow-simplification](roadmap-workflow-simplification/master-prd.md) — Ready
