@@ -5,7 +5,7 @@
 - Master: [Master PRD](master-prd.md)
 
 Use `scripts/prd-new` to create a conforming PRD set. If adapting this template
-manually, replace every placeholder and keep its headings, metadata, links, and
+manually, replace every placeholder and keep metadata, links, evidence, and
 checkboxes truthful.
 
 ## Goal
@@ -42,15 +42,21 @@ List durable user, operator, developer, architecture, API, or generated-referenc
 documentation to create, update, or synchronize. If none is affected, write
 `No documentation changes required: <rationale>`.
 
+## Acceptance Criteria and Evidence
+
+| ID | Acceptance criterion | Verification | Evidence |
+| --- | --- | --- | --- |
+| AC-1 | State an observable stage outcome. | Name the focused check. | Pending |
+
 ## Implementation or Decision Tasks
 
 - [ ] Complete a concrete task.
 
 ## Verification and Observable Success Criteria
 
-- [ ] Run a concrete check and record the observable result.
+- [ ] Run a focused check and replace `Pending` in the evidence table with the observable result.
 - [ ] Affected durable documentation is created, updated, or synchronized, or a no-change rationale is recorded.
 
 ## Current Status
 
-Draft. Complete the content, then request readiness review.
+Draft. Complete the content, then request the mode-appropriate readiness audit.

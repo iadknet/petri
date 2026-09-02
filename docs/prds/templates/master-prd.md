@@ -5,9 +5,13 @@
 - Created: <YYYY-MM-DD>
 - Review Status: DRAFT
 - Review Count: 0
+- Execution Mode: Lean
+- Deep Mode Authorization: Not required
+- Affected-File Budget: 25
+- Actual Affected Files: Pending
 
 Use `scripts/prd-new` to create a conforming PRD set. If adapting this template
-manually, replace every placeholder and keep its headings, metadata, links, and
+manually, replace every placeholder and keep metadata, links, evidence, and
 checkboxes truthful.
 
 ## Goal
@@ -47,11 +51,17 @@ record a concrete no-change rationale.
 
 1. [Stage 01 — <Title>](stage-01-<stage-slug>.md) — `Draft`
 
-Summarize stage ordering and contracts here without duplicating stage tasks.
+Summarize stage ordering and contracts without duplicating stage tasks.
 
 ## Cross-Stage Decisions
 
 - Record decisions shared by multiple stages.
+
+## Acceptance Criteria and Evidence
+
+| ID | Acceptance criterion | Verification | Evidence |
+| --- | --- | --- | --- |
+| AC-1 | State an observable cross-stage outcome. | Name the focused check. | Pending |
 
 ## Implementation or Decision Tasks
 
@@ -59,10 +69,12 @@ Summarize stage ordering and contracts here without duplicating stage tasks.
 
 ## Verification and Observable Success Criteria
 
+- [ ] Run focused checks during implementation and record their results in the evidence table.
+- [ ] Run `make check` once before final review and once after fixes only when fixes were required.
 - [ ] Every stage's declared verification has passed.
 - [ ] Affected durable documentation is created, updated, or synchronized, or a no-change rationale is recorded.
 - [ ] The final-code review gate has passed.
 
 ## Current Status
 
-Draft. Complete the content, then request readiness review.
+Draft. Complete the content, then request the mode-appropriate readiness audit.
