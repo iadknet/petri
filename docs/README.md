@@ -1,9 +1,12 @@
 # Petri documentation
 
-- [Active PRDs](prds/active/README.md)
-- [Archived PRDs](prds/archive/README.md)
+- [Roadmap contract](roadmaps/README.md)
+- [Roadmap templates](roadmaps/)
+- [Archived PRDs](prds/archive/README.md) (historical only)
+- [Historical V3 roadmap](archive/v3-program-roadmap.md)
 - [Strategy](strategy/)
 - [Reference specifications](reference/)
 - [Legacy workflow inventory](archive/legacy-workflow-inventory.md)
 
-The legacy feature lifecycle is archived and is not active guidance.
+Archived PRDs and the historical V3 roadmap are preserved for reference only
+and are not executable guidance.

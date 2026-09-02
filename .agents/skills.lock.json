@@ -1,30 +1,6 @@
 {
   "version": 1,
   "sources": {
-    "project-workflow": {
-      "repository": "iadknet/new_app_scaffolding_skills",
-      "commit": "83ef0fb281a17c28c584a410b371d1afe7c6b37b",
-      "path": "skills/agent-project-scaffold/assets/project-skills/project-workflow",
-      "license": "unknown"
-    },
-    "prd-create": {
-      "repository": "iadknet/new_app_scaffolding_skills",
-      "commit": "83ef0fb281a17c28c584a410b371d1afe7c6b37b",
-      "path": "skills/agent-project-scaffold/assets/project-skills/prd-create",
-      "license": "unknown"
-    },
-    "prd-review": {
-      "repository": "iadknet/new_app_scaffolding_skills",
-      "commit": "83ef0fb281a17c28c584a410b371d1afe7c6b37b",
-      "path": "skills/agent-project-scaffold/assets/project-skills/prd-review",
-      "license": "unknown"
-    },
-    "prd-implement": {
-      "repository": "iadknet/new_app_scaffolding_skills",
-      "commit": "83ef0fb281a17c28c584a410b371d1afe7c6b37b",
-      "path": "skills/agent-project-scaffold/assets/project-skills/prd-implement",
-      "license": "unknown"
-    },
     "rust-skills": {
       "repository": "leonardomso/rust-skills",
       "commit": "fd2a861ab0406a4ac536a55274d14ea6fd1ca9c9",
@@ -99,38 +75,6 @@
     {
       "path": "composition-patterns/rules/state-lift-state.md",
       "sha256": "74c54038a6c554c748fe31cec673b80861b5d920b7553cf78cdf10d18b4b759b"
-    },
-    {
-      "path": "prd-create/LICENSE",
-      "sha256": "97293f69c8d0e085d4cee8c6cb5c996f6dbbbaa84849e73ecefa7c673e3d7c6f"
-    },
-    {
-      "path": "prd-create/SKILL.md",
-      "sha256": "e42f058671004a4c786257d0a834202422a1f3d4995203fd96f3dcbf2e3180f3"
-    },
-    {
-      "path": "prd-implement/LICENSE",
-      "sha256": "97293f69c8d0e085d4cee8c6cb5c996f6dbbbaa84849e73ecefa7c673e3d7c6f"
-    },
-    {
-      "path": "prd-implement/SKILL.md",
-      "sha256": "b2b36fa8cfc735fc6bffddb3ad519b0cdba38ff0b686246ad1584c5de05820f4"
-    },
-    {
-      "path": "prd-review/LICENSE",
-      "sha256": "97293f69c8d0e085d4cee8c6cb5c996f6dbbbaa84849e73ecefa7c673e3d7c6f"
-    },
-    {
-      "path": "prd-review/SKILL.md",
-      "sha256": "288b4e90fe59fe47e0535947e02030ee1de1434afd3c49c83b4b3f94333b7c98"
-    },
-    {
-      "path": "project-workflow/LICENSE",
-      "sha256": "97293f69c8d0e085d4cee8c6cb5c996f6dbbbaa84849e73ecefa7c673e3d7c6f"
-    },
-    {
-      "path": "project-workflow/SKILL.md",
-      "sha256": "7ad012c1e3fe450419404f6c9e24ee396a1e7184af3444a01bd3d4c833316b20"
     },
     {
       "path": "react-best-practices/README.md",

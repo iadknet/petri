@@ -1,8 +1,5 @@
-# Petri Technology Review (Compatibility Stub)
+# Petri Technology Review (Compatibility Pointer)
 
-Canonical document: `docs/strategy/roadmap.md`.
-
-This root file remains for legacy links from older plans and notes.
-Read and update the canonical document instead:
-
-- [Roadmap](docs/strategy/roadmap.md)
+Current roadmap and execution guidance lives in [Roadmaps](docs/roadmaps/README.md).
+The former V3 program roadmap is preserved as [historical
+documentation](docs/archive/v3-program-roadmap.md).

@@ -17,6 +17,6 @@ and success item to be checked. Use `Blocked` only with a concrete blocker;
 blocked work remains unchecked. A complete track and master rollup must agree
 with their checked criteria.
 
-Roadmap documents describe intent and state. They do not encode model choice,
-review recursion, severity policy, worktree orchestration, or integration
-authority. Those decisions belong in the reusable goal prompt template.
+Roadmap documents describe intent and state. They do not encode agent
+execution policy or integration authority. Those decisions belong in the
+reusable goal prompt template.

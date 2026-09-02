@@ -169,20 +169,34 @@ function loadMarkdown(file) {
   }
 }
 
+function markdownFiles(directory) {
+  if (!existsSync(directory) || !statSync(directory).isDirectory()) return [];
+  const files = [];
+  function visit(current, prefix = '') {
+    for (const entry of readdirSync(current, { withFileTypes: true }).sort((left, right) => left.name.localeCompare(right.name))) {
+      const relativePath = prefix ? join(prefix, entry.name) : entry.name;
+      const fullPath = join(current, entry.name);
+      if (entry.isDirectory()) {
+        visit(fullPath, relativePath);
+      } else if ((entry.isFile() || entry.isSymbolicLink()) && entry.name.endsWith('.md') && entry.name !== 'README.md' && !entry.name.startsWith('_')) {
+        files.push(relativePath);
+      }
+    }
+  }
+  visit(directory);
+  return files;
+}
+
 function validateRoot(root) {
   const errors = [];
   const masterPath = join(root, 'docs', 'roadmap.md');
   const tracksDir = join(root, 'docs', 'roadmaps');
   const specsDir = join(root, 'docs', 'specs', 'roadmap');
   const masterText = loadMarkdown(masterPath);
-  const trackFiles = existsSync(tracksDir) && statSync(tracksDir).isDirectory()
-    ? readdirSync(tracksDir).filter((name) => name.endsWith('.md') && name !== 'README.md' && !name.startsWith('_')).sort()
-    : [];
-  const specFiles = existsSync(specsDir) && statSync(specsDir).isDirectory()
-    ? readdirSync(specsDir).filter((name) => name.endsWith('.md') && name !== 'README.md' && !name.startsWith('_')).sort()
-    : [];
+  const trackFiles = markdownFiles(tracksDir);
+  const specFiles = markdownFiles(specsDir);
 
-  if (!masterText) {
+  if (masterText === undefined) {
     if (trackFiles.length || specFiles.length) {
       errors.push('docs/roadmap.md: live track or feature-spec files require a live master');
     }
@@ -218,10 +232,10 @@ function validateRoot(root) {
   cycleErrors(trackGraph, master, 'track', errors);
 
   const tracks = new Map();
-  for (const name of trackFiles) {
-    const file = `docs/roadmaps/${name}`;
-    const pathMatch = name.match(TRACK_PATH);
-    const text = loadMarkdown(join(tracksDir, name));
+  for (const path of trackFiles) {
+    const file = `docs/roadmaps/${path}`;
+    const pathMatch = path.match(TRACK_PATH);
+    const text = loadMarkdown(join(tracksDir, path));
     if (!pathMatch) {
       errors.push(`${file}: non-canonical track path`);
       continue;
@@ -229,9 +243,9 @@ function validateRoot(root) {
     const id = `T${pathMatch[1]}`;
     const row = trackRowsById.get(id);
     if (!row) errors.push(`${file}: orphan track ${id} is not linked exactly once by the master`);
-    else if (canonicalTrackLink(row.link) !== name) errors.push(`${file}: canonical path does not match master link`);
+    else if (canonicalTrackLink(row.link) !== path) errors.push(`${file}: canonical path does not match master link`);
     if (tracks.has(id)) errors.push(`${file}: duplicate track ID ${id}`);
-    tracks.set(id, { id, name, file, text, row, features: new Map(), featureRows: [], status: undefined });
+    tracks.set(id, { id, name: path, file, text, row, features: new Map(), featureRows: [], status: undefined });
   }
   for (const row of masterRows) {
     const linkedName = canonicalTrackLink(row.link);
@@ -296,10 +310,10 @@ function validateRoot(root) {
   cycleErrors(featureGraph, 'roadmap feature graph', 'feature', errors);
 
   const specs = new Map();
-  for (const name of specFiles) {
-    const file = `docs/specs/roadmap/${name}`;
-    const pathMatch = name.match(SPEC_PATH);
-    const text = loadMarkdown(join(specsDir, name));
+  for (const path of specFiles) {
+    const file = `docs/specs/roadmap/${path}`;
+    const pathMatch = path.match(SPEC_PATH);
+    const text = loadMarkdown(join(specsDir, path));
     if (!pathMatch) {
       errors.push(`${file}: non-canonical feature-spec path`);
       continue;
@@ -345,7 +359,7 @@ function validateRoot(root) {
         errors.push(`${file}: Complete spec cannot contain unchecked implementation, verification, or success items`);
       }
     }
-    specs.set(id, { id, name, file, text, status, sections, feature });
+    specs.set(id, { id, name: path, file, text, status, sections, feature });
   }
 
   for (const feature of allFeatures.values()) {

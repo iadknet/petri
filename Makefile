@@ -6,7 +6,7 @@ export AQUA_ENFORCE_CHECKSUM := true
 export AQUA_ENFORCE_REQUIRE_CHECKSUM := true
 export PATH := $(AQUA_ROOT_DIR)/bin:$(PATH)
 
-.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-priority-bid rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc rust-clippy frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test policy-check quality-check dependency-audit skill-check prd-check prd-check-test check audit precommit project-precommit format clean
+.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-priority-bid rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc rust-clippy frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test residual-cruft-check residual-cruft-check-test policy-check quality-check dependency-audit skill-check check audit precommit project-precommit format clean
 
 help: ## Show the stable project command interface.
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -81,15 +81,14 @@ roadmap-check: ## Validate the live roadmap contract (set ROADMAP_ROOT for a fix
 roadmap-check-test: ## Run the roadmap checker regression suite through Aqua's Node runtime.
 	@$(AQUA_ROOT_DIR)/bin/node --test scripts/roadmap-check.test.mjs
 
-prd-check: ## Validate active and archived PRD sets.
-	@scripts/prd-check
+residual-cruft-check: ## Reject retired workflow references in live repository content.
+	@scripts/residual-cruft-check
 
-prd-check-test: ## Run PRD checker regression tests.
-	@scripts/prd-check-test
+residual-cruft-check-test: ## Run residual workflow-reference regression tests.
+	@scripts/residual-cruft-check-test
 
-policy-check: ## Validate PRD, repository, provenance, and retirement policy.
-	@scripts/prd-check
-	@scripts/prd-check-test
+policy-check: ## Validate roadmap, repository, provenance, and retirement policy.
+	@$(MAKE) roadmap-check roadmap-check-test residual-cruft-check-test
 	@scripts/policy-check
 
 quality-check: ## Check whitespace, shell syntax, ShellCheck, and actionlint.
@@ -107,7 +106,7 @@ check: ## Run all project completion checks.
 audit: ## Scan full Git history with Gitleaks.
 	@scripts/secret-scan history
 
-precommit: ## Run staged PRD, policy, quality, dependency, skill, and secret checks.
+precommit: ## Run staged roadmap, policy, quality, dependency, skill, and secret checks.
 	@.tools/bin/pre-commit run
 
 project-precommit: ## Run the project-validation pre-commit entry point.

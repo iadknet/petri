@@ -1,14 +1,14 @@
 # Contributing
 
-Start with `AGENTS.md` and the applicable active PRD. Keep a change scoped to one
-stage when practical, update its checkboxes only after the work is observable,
-and run the stage's verification plus `make check`.
+Start with `AGENTS.md`, then read the applicable roadmap track and flat feature
+spec. Roadmap execution state lives in `docs/roadmap.md` when a live master is
+needed, track roadmaps under `docs/roadmaps/`, and feature specs under
+`docs/specs/roadmap/`. Templates begin with `_` and are never live state.
 
-For new work, create a PRD set with:
-
-```sh
-scripts/prd-new <kebab-slug> <stage-slug> [stage-slug ...]
-```
+Run `make roadmap-check` while editing roadmap documents and record focused
+verification in the owning feature spec. Keep dependencies, checkboxes, links,
+statuses, dates, and completion rollups truthful. Run `make check` before
+declaring a feature or integration complete.
 
 Review security-sensitive reports privately as described in `SECURITY.md`.
 When adding or changing dependencies, follow the age-gate, lockfile, registry,

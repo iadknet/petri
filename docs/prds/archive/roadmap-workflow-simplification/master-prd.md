@@ -1,6 +1,6 @@
 # Roadmap Workflow Simplification — Master PRD
 
-- Status: In Progress
+- Status: Complete
 - Owner: Codex
 - Created: 2026-09-01
 - Review Status: APPROVED
@@ -8,7 +8,7 @@
 - Execution Mode: Deep
 - Deep Mode Authorization: User explicitly authorized one Deep migration in the 2026-09-01 roadmap-workflow planning session and implementation request.
 - Affected-File Budget: 60
-- Actual Affected Files: 12
+- Actual Affected Files: 50
 
 ## Goal
 
@@ -85,7 +85,7 @@ archive. Preserve completed PRDs with an explicit historical-only notice.
 ## Stage Order and Links
 
 1. [Stage 01 — Roadmap Contract](stage-01-roadmap-contract.md) — `Complete`
-2. [Stage 02 — Workflow Retirement](stage-02-workflow-retirement.md) — `Ready`
+2. [Stage 02 — Workflow Retirement](stage-02-workflow-retirement.md) — `Complete`
 
 Stage 01 establishes the replacement contract and validation. Stage 02 switches
 all live guidance and automated gates to that contract, archives this migration,
@@ -216,6 +216,9 @@ both root roadmap compatibility stubs, `Makefile`, `.github/workflows/ci.yml`,
 `scripts/residual-cruft-check`, `scripts/generate-skills-lock.mjs`,
 `scripts/skill-provenance-check`, and `.agents/skills.lock.json`.
 
+`scripts/policy-check` was inspected and required no content change because it
+already delegates to `scripts/residual-cruft-check`.
+
 Delete the four workflow skill directories and matching `.claude/skills/`
 symlinks, `docs/prds/active/`, `docs/prds/templates/`, and all six `scripts/prd-*`
 files after this record moves to the archive.
@@ -268,32 +271,49 @@ Maximum remediation passes: 2 total, one per checkpoint.
 
 | ID | Acceptance criterion | Verification | Evidence |
 | --- | --- | --- | --- |
-| AC-1 | The roadmap contract and regression fixtures validate all required identity, dependency, and completion invariants. | `make roadmap-check roadmap-check-test` | Pending |
-| AC-2 | Live repository guidance and automation no longer require the retired PRD workflow. | `scripts/residual-cruft-check` and targeted `rg` audit | Pending |
-| AC-3 | Curated skill provenance remains internally consistent after workflow-skill removal. | `scripts/skill-provenance-check` | Pending |
-| AC-4 | All project completion gates pass with no runtime behavior changes. | `git diff --check`, `make quality-check`, and `make check` | Pending |
+| AC-1 | The roadmap contract and regression fixtures validate all required identity, dependency, and completion invariants. | `make roadmap-check roadmap-check-test` | Passed: the live checker passes and all 25 deterministic regression tests pass, including empty-master and nested live-path cases. |
+| AC-2 | Live repository guidance and automation no longer require the retired PRD workflow. | `scripts/residual-cruft-check` and targeted `rg` audit | Passed: residual checker, regression fixtures, and the live denylist audit pass; archive-only history is excluded as specified. |
+| AC-3 | Curated skill provenance remains internally consistent after workflow-skill removal. | `scripts/skill-provenance-check` | Passed: provenance validation passes after lock regeneration. |
+| AC-4 | All project completion gates pass with no runtime behavior changes. | `git diff --check`, `make quality-check`, and `make check` | Passed in root's elevated environment: roadmap/policy, 25 viability, 997 core, 7 creature workflow, 2 priority-bid, 1 VM opcode, 7 CLI, 36 server unit, 2 server binary, 79 server integration, docs/clippy, 54 frontend files/272 tests, build, audits, and skill scan all passed. |
 
 ## Implementation or Decision Tasks
 
 - [x] Keep stage links, statuses, affected-file count, and evidence current.
 - [x] Complete the independent readiness review before implementation.
-- [ ] Complete the pre-retirement and final cutover reviews within the declared budget.
-- [ ] Remove the old lifecycle tooling and move this still-In-Progress record to
-  the archive in the same authorized cutover; mark it Complete only after the
-  full-diff review and evidence update.
+- [x] Complete the first full-diff cutover review and its one authorized
+  remediation pass within the declared budget.
+- [x] Complete the final cutover/closure review; record the user's accepted
+  residual P2/P3 findings truthfully.
+- [x] Remove the old lifecycle tooling and move this still-In-Progress record to
+  the archive in the same authorized cutover; retain In Progress until the final
+  closure review and evidence update.
 
 ## Verification and Observable Success Criteria
 
 - [x] Run focused checks during implementation and record their results in the evidence table.
-- [ ] Run `make check` before the final cutover review and again on the exact post-archive closure tree.
-- [ ] Every stage's declared verification has passed.
-- [ ] Affected durable documentation is created, updated, or synchronized, or a no-change rationale is recorded.
-- [ ] The final-code review gate has passed.
+- [x] Run the elevated full `make check` before closure review and record its
+  complete passing result in the acceptance evidence.
+- [x] Every stage's declared verification has passed.
+- [x] Affected durable documentation is created, updated, or synchronized, or a no-change rationale is recorded.
+- [x] The final-code review completed. The user explicitly accepted the
+  remaining non-runtime P2/P3 findings before merge.
+
+## Review and Remediation
+
+The first full-diff cutover review on 2026-09-02 identified five P2 findings
+covering root invariants, empty-master handling, recursive live-path discovery,
+whitespace-safe residual scanning, and retired-path reintroduction, plus one
+trivial P3 cosmetic compatibility-stub change. The one authorized Stage 02
+remediation pass resolved all six findings and added the corresponding
+regression coverage. The final closure review found one remaining P2: live file
+and directory symlinks can expose excluded archive content without being
+scanned. It also found a P3: dangling canonical roadmap/spec symlinks produce
+an unprefixed JavaScript stack trace. On 2026-09-02 the user explicitly chose
+to stop further hardening and authorized merging with those findings accepted.
 
 ## Current Status
 
-In Progress. Stage 01 is implemented and its focused contract checks pass. The
-user authorized one bounded pre-retirement remediation pass after independent
-review; Stage 02 remains Ready and is not started. Local worktree, branch, and
-commit authorization remains in scope; no remote or `main` mutation is
-authorized.
+Complete by explicit user acceptance. Stage 01 and Stage 02 are implemented,
+the elevated full `make check` passed, and the user accepted the final review's
+non-runtime residual P2/P3 findings before local merge. Local branch/worktree/
+commit authorization remains in scope; no remote mutation is authorized.

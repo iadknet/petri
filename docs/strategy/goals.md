@@ -2,7 +2,7 @@
 
 This file is intentionally minimal and reflects only the current top-priority goals.
 
-Use these goal IDs in `Goal IDs` metadata for active plans and architecture docs.
+Use these goal IDs when connecting roadmap work to strategy and architecture.
 
 ## Goals
 
