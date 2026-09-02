@@ -1,6 +1,6 @@
 # Petri repository instructions
 
-- `make check` is the project completion gate.
+- Use verification proportionate to the changed files. Run `make check` before completing application or runtime source-code or build-configuration changes; documentation-only work uses its relevant focused checks.
 - Commits, remotes, pull requests, and other external state require explicit user authorization.
 - Superpowers and the retired feature lifecycle are prohibited. Historical material remains non-executable.
 - Preserve existing user changes and work carefully in dirty worktrees.

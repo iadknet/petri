@@ -19,6 +19,7 @@ or transient population noise.
 - [ ] Cognitive claims report a profile of effective controller size, temporal dependence, learning dependence, information integration, social contingency, and transfer breadth.
 - [ ] Baseline long-running experiments quantify current collapse, persistence, novelty, and cognitive dependence across independent replicates.
 - [ ] A result-blind confirmatory protocol freezes hypotheses, effect thresholds, uncertainty, replication, exposure, exclusions, and stopping rules before confirmatory runs begin.
+- [ ] A single progress ledger preserves dated evaluation snapshots and makes improvement, regression, and inconclusive evidence visible for every program-level outcome.
 
 ## Executable Features
 
@@ -31,6 +32,7 @@ or transient population noise.
 - [ ] **T01.F07 — Adaptive Novelty and Change-Potential Measures** — Depends on: T01.F03, T01.F04
 - [ ] **T01.F08 — Baseline Collapse and Ablation Characterization** — Depends on: T01.F05, T01.F06, T01.F07, T10.F08
 - [ ] **T01.F09 — Confirmatory Protocol and Threshold Freeze** — Depends on: T01.F08, T10.F07
+- [ ] **T01.F10 — Program Progress Ledger** — Depends on: T01.F09, T10.F08
 
 ## Notes for AI Agents
 
@@ -41,5 +43,7 @@ or transient population noise.
 - Archive and assay the inherited genome, newborn state, and mature learned state separately. Petri inherits shared memory while learned graph runtime normally resets at birth.
 - Measures must be validated against constructed reference cases before they evaluate evolved organisms.
 - T01.F08 is characterization evidence only. T01.F09 must seal a versioned protocol and its hashes before confirmatory data collection; an independent scientific reviewer, not the implementer, approves it using the predeclared smallest-effect, power or precision, and control-calibration rules. An unresolved scientific choice is a concrete blocker rather than permission to tune after seeing outcomes.
+- T01.F10 creates `docs/progress.md` and appends one compact snapshot after each designated evaluation campaign. For every program-level outcome, record the baseline, current estimate and uncertainty, direction (`Improving`, `Unchanged`, `Regressing`, or `Inconclusive`), evidence class, date, code revision, metric or protocol version, and supporting T10 result bundle. Preserve null results and regressions; only confirmatory evidence may advance a final success criterion. When a metric definition changes, start a new clearly labeled series rather than implying direct comparability.
+- Keep the ledger as a plain Markdown document backed by compact result summaries. Do not add a dashboard, database, service, third-party tracking dependency, or composite success score.
 - Research basis reviewed 2026-09-02: [MODES Toolbox](https://doi.org/10.1162/artl_a_00280), [Evolution of Integrated Causal Structures in Animats](https://doi.org/10.1371/journal.pcbi.1003966), [Simplification of genetic programs: a literature survey](https://doi.org/10.1007/s10618-022-00830-7), [Registered Reports](https://www.cos.io/initiatives/registered-reports), and [ADEMP-PreReg for simulation studies](https://doi.org/10.1037/met0000695).
 - Existing options considered were raw genome size, reachable structural size, information-theoretic brain scores, and causal behavioral assays. Use reachable size as one structural axis and causal assays as the primary evidence because architecture-specific or syntactic measures can misclassify bloat.
