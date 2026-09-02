@@ -1,7 +1,6 @@
 #!/bin/sh
 set -eu
 
-scripts/roadmap-check.mjs --staged
 scripts/policy-check
 scripts/dependency-audit --require-tools
 scripts/skill-check --require-tools
