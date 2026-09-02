@@ -31,12 +31,7 @@ concrete blocker and request user direction.
 - Keep one persistent `gpt-5.6-luna` high implementer through implementation
   and any remediation; do not replace the implementer between passes.
 - Only a P1 finding blocks progress. P2 and P3 findings are advisory and must
-  be recorded without expanding the scope after a feature is executable. During
-  readiness, classify P2 findings as `non-executable` when a missing dependency,
-  decomposition boundary, acceptance criterion, or verification method prevents
-  safe implementation; all other P2 findings are `deferrable`. A non-executable
-  P2 yields `Revision Required`, not approval, but does not stop unrelated ready
-  nodes or become a P1 merely to bypass this contract.
+  be recorded without expanding the scope after a feature is executable.
 - The budget is per feature. Allow one readiness revision and one post-review
   remediation pass for each feature. Return any failed required verification
   to the same implementer until it is corrected or the implementer is genuinely
@@ -61,12 +56,11 @@ scope. Do not push, open or update a pull request, or merge into the user's `mai
 ## Implementation and verification contract
 
 Read the owning track and create or update its flat feature spec from the
-canonical template before implementation. Copy the roadmap row's exact
-dependencies into spec metadata, put decision-relevant source evidence in
-`Inputs and Invariants`, and record the independent reviewer and review date.
-Implementation may begin only when the spec says `Execution approval: Approved`; a
-`Revision Required` spec remains `Planned`. Make atomic, truthful
-spec/feature/track/master status/date/commit updates. Update the spec and
+canonical template before implementation. Put decision-relevant source
+evidence and dependency outputs in `Inputs and Invariants`. Complete the
+bounded planning and independent readiness review before implementation, but
+do not add review-approval metadata merely to restate that process. Make
+atomic, truthful spec/feature/track/master status/date/commit updates. Update the spec and
 roadmap atomically and truthfully: feature status, spec status, track rollup,
 master rollup, dates, and commit references must describe what actually exists.
 Create a flat spec just in time when a feature is planned, and keep an unchecked

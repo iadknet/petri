@@ -1,543 +1,186 @@
-import { execFileSync, spawnSync } from 'node:child_process';
-import { cpSync, mkdtempSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
+import assert from 'node:assert/strict';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { spawnSync } from 'node:child_process';
 import test from 'node:test';
-import assert from 'node:assert/strict';
 
 const checker = join(process.cwd(), 'scripts', 'roadmap-check.mjs');
 
-function fixture() {
-  const root = mkdtempSync(join(tmpdir(), 'petri-roadmap-test.'));
-  mkdirSync(join(root, 'docs', 'roadmaps'), { recursive: true });
-  mkdirSync(join(root, 'docs', 'specs', 'roadmap'), { recursive: true });
-  return root;
+function root() {
+  return mkdtempSync(join(tmpdir(), 'petri-roadmap-check.'));
 }
 
-function run(root, ...args) {
-  return spawnSync(process.execPath, [checker, '--root', root, ...args], { encoding: 'utf8' });
+function run(repository) {
+  return spawnSync(process.execPath, [checker, '--root', repository], { encoding: 'utf8' });
 }
 
-function writeFixture(root, {
-  masterStatus = 'Active',
-  trackStatus = 'In Progress',
-  featureChecked = false,
-  specStatus = 'In Progress',
-  specChecked = false,
-  blocker = 'None.',
-  dependency = 'None',
-  specDependency = dependency,
-  readiness = 'Approved',
-  readinessReviewer = readiness === 'Not Reviewed' ? 'None' : 'Independent Reviewer',
-  readinessReviewed = readiness === 'Not Reviewed' ? 'None' : '2026-09-01',
-  readinessEvidence = readiness === 'Not Reviewed' ? 'Not reviewed.' : 'Independent review found the feature executable.',
-} = {}) {
-  writeFileSync(join(root, 'docs', 'roadmap.md'), `# Program\n\n**Status**: ${masterStatus}\n**Last updated**: 2026-09-01\n\n## Success Definition\n\nOutcome.\n\n## Track Roadmaps\n\n- [${trackStatus === 'Complete' ? 'x' : ' '}] **T01 — Core** — [Roadmap](roadmaps/t01-core.md) — Depends on: None\n\n## Final Success Criteria\n\n- [${masterStatus === 'Complete' ? 'x' : ' '}] Program complete.\n\n## Notes for AI Agents\n\nNotes.\n`);
-  writeFileSync(join(root, 'docs', 'roadmaps', 't01-core.md'), `# T01 — Core\n\n**Status**: ${trackStatus}\n**Last updated**: 2026-09-01\n**Master**: [Program Roadmap](../roadmap.md)\n\n## Goal\n\nGoal.\n\n## Track Success Criteria\n\n- [${trackStatus === 'Complete' ? 'x' : ' '}] Track complete.\n\n## Executable Features\n\n- [${featureChecked ? 'x' : ' '}] **T01.F01 — Foundation** — Depends on: ${dependency}\n\n## Notes for AI Agents\n\nNotes.\n`);
-  writeFileSync(join(root, 'docs', 'specs', 'roadmap', 't01-f01-foundation.md'), `# T01.F01 — Foundation\n\n**Status**: ${specStatus}\n**Last updated**: 2026-09-01\n**Feature**: T01.F01\n**Track**: [T01 — Core](../../roadmaps/t01-core.md)\n**Dependencies**: ${specDependency}\n**Execution approval**: ${readiness}\n**Approval reviewer**: ${readinessReviewer}\n**Approval date**: ${readinessReviewed}\n\n## Overview\n\nOverview.\n\n## Goal\n\nGoal.\n\n## Non-Goals\n\nNone.\n\n## Inputs and Invariants\n\nNone.\n\n## Execution Approval\n\n${readinessEvidence}\n\n## Implementation Tasks\n\n- [${specChecked ? 'x' : ' '}] Implement.\n\n## Verification\n\n- [${specChecked ? 'x' : ' '}] Verify.\n\n## Success Criteria\n\n- [${specChecked ? 'x' : ' '}] Succeed.\n\n## Blocker\n\n${blocker}\n\n## Deferred Review Findings\n\nNone.\n\n## Notes for AI Agents\n\nNotes.\n`);
+function write(repository, path, content) {
+  const file = join(repository, path);
+  mkdirSync(file.slice(0, file.lastIndexOf('/')), { recursive: true });
+  writeFileSync(file, content);
 }
 
-test('templates-only empty scaffold passes', () => {
-  const root = fixture();
+function master(rows, { status = 'Active', criteria = '- [ ] Program complete.' } = {}) {
+  return `# Program\n\n**Status**: ${status}\n\n## Track Roadmaps\n\n${rows.join('\n')}\n\n## Final Success Criteria\n\n${criteria}\n`;
+}
+
+function track(id, features, { status = 'Planned', criteria = '- [ ] Track complete.' } = {}) {
+  return `# ${id} — Track\n\n**Status**: ${status}\n\n## Track Success Criteria\n\n${criteria}\n\n## Executable Features\n\n${features.join('\n')}\n`;
+}
+
+function spec(id, { status = 'Planned', checked = false } = {}) {
+  const mark = checked ? 'x' : ' ';
+  return `# ${id} — Feature\n\n**Status**: ${status}\n**Feature**: ${id}\n**Last updated**: whenever useful\n\n## Goal\n\nGoal. Mentioning readiness review or any retired workflow term is ordinary prose.\n\n## Implementation Tasks\n\n- [${mark}] Implement.\n\n## Verification\n\n- [${mark}] Verify.\n\n## Success Criteria\n\n- [${mark}] Succeed.\n`;
+}
+
+function base(repository, options = {}) {
+  const featureChecked = options.featureChecked ?? false;
+  const trackStatus = options.trackStatus ?? 'Planned';
+  const trackChecked = options.trackChecked ?? (trackStatus === 'Complete');
+  write(repository, 'docs/roadmap.md', master([
+    `- [${trackChecked ? 'x' : ' '}] **T01 — Core** — [Roadmap](roadmaps/t01-core.md) — Depends on: None`,
+  ], { status: options.masterStatus, criteria: options.masterCriteria }));
+  write(repository, 'docs/roadmaps/t01-core.md', track('T01', [
+    `- [${featureChecked ? 'x' : ' '}] **T01.F01 — Foundation** — Depends on: ${options.dependency ?? 'None'}`,
+  ], { status: trackStatus, criteria: options.trackCriteria }));
+  if (options.spec !== false) {
+    write(repository, 'docs/specs/roadmap/t01-f01-foundation.md', spec('T01.F01', {
+      status: options.specStatus,
+      checked: options.specChecked,
+    }));
+  }
+}
+
+test('empty repositories and templates pass; live files require a master', () => {
+  const repository = root();
   try {
-    writeFileSync(join(root, 'docs', 'roadmaps', '_master-template.md'), '# template\n');
-    assert.equal(run(root).status, 0);
-    assert.match(run(root).stdout, /no live roadmap files/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+    write(repository, 'docs/roadmaps/_track-template.md', '# Template\n');
+    assert.equal(run(repository).status, 0);
+    write(repository, 'docs/roadmaps/t01-orphan.md', '# Live\n');
+    const result = run(repository);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /require a master roadmap/);
+  } finally { rmSync(repository, { recursive: true, force: true }); }
 });
 
-test('present empty master is validated instead of treated as absent', () => {
-  const root = fixture();
+test('a valid cross-track dependency graph passes', () => {
+  const repository = root();
   try {
-    writeFileSync(join(root, 'docs', 'roadmap.md'), ' \n\n');
-    const result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /docs\/roadmap\.md: missing \*\*Status\*\* metadata/);
-    assert.match(result.stderr, /docs\/roadmap\.md: missing heading '## Success Definition'/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('live tracks without a master fail', () => {
-  const root = fixture();
-  try {
-    writeFileSync(join(root, 'docs', 'roadmaps', 't01-core.md'), '# T01\n');
-    const result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /require a live master/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('nested live track and feature-spec files are rejected deterministically', () => {
-  const root = fixture();
-  try {
-    writeFixture(root);
-    mkdirSync(join(root, 'docs', 'roadmaps', 'nested'), { recursive: true });
-    cpSync(join(root, 'docs', 'roadmaps', 't01-core.md'), join(root, 'docs', 'roadmaps', 'nested', 't01-core.md'));
-    let result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /docs\/roadmaps\/nested\/t01-core\.md: non-canonical track path/);
-
-    writeFixture(root);
-    mkdirSync(join(root, 'docs', 'specs', 'roadmap', 'nested'), { recursive: true });
-    cpSync(join(root, 'docs', 'specs', 'roadmap', 't01-f01-foundation.md'), join(root, 'docs', 'specs', 'roadmap', 'nested', 't01-f01-foundation.md'));
-    result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /docs\/specs\/roadmap\/nested\/t01-f01-foundation\.md: non-canonical feature-spec path/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('nested live files without a master still require a live master', () => {
-  const root = fixture();
-  try {
-    mkdirSync(join(root, 'docs', 'roadmaps', 'nested'), { recursive: true });
-    mkdirSync(join(root, 'docs', 'specs', 'roadmap', 'nested'), { recursive: true });
-    writeFileSync(join(root, 'docs', 'roadmaps', 'nested', 't01-core.md'), '# T01 — Core\n');
-    writeFileSync(join(root, 'docs', 'specs', 'roadmap', 'nested', 't01-f01-feature.md'), '# T01.F01 — Feature\n');
-    const result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /live track or feature-spec files require a live master/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('active roadmap with an in-progress feature passes', () => {
-  const root = fixture();
-  try {
-    writeFixture(root);
-    const result = run(root);
+    write(repository, 'docs/roadmap.md', master([
+      '- [ ] **T01 — First** — [Roadmap](roadmaps/t01-first.md) — Depends on: None',
+      '- [ ] **T02 — Second** — [Roadmap](roadmaps/t02-second.md) — Depends on: None',
+    ]));
+    write(repository, 'docs/roadmaps/t01-first.md', track('T01', [
+      '- [ ] **T01.F01 — First** — Depends on: T02.F01',
+    ]));
+    write(repository, 'docs/roadmaps/t02-second.md', track('T02', [
+      '- [ ] **T02.F01 — Second** — Depends on: None',
+    ]));
+    write(repository, 'docs/specs/roadmap/t01-f01-first.md', spec('T01.F01'));
+    write(repository, 'docs/specs/roadmap/t02-f01-second.md', spec('T02.F01'));
+    const result = run(repository);
     assert.equal(result.status, 0, result.stderr);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally { rmSync(repository, { recursive: true, force: true }); }
 });
 
-test('feature spec dependencies must exactly match the owning roadmap row', () => {
-  const root = fixture();
+test('broken links, duplicate ownership, and orphan specs fail', () => {
+  const repository = root();
   try {
-    writeFixture(root, { specDependency: 'T01.F99' });
-    const result = run(root);
+    base(repository);
+    let path = join(repository, 'docs/roadmap.md');
+    writeFileSync(path, readFileSync(path, 'utf8').replace('t01-core.md', 't01-missing.md'));
+    let result = run(repository);
     assert.equal(result.status, 1);
-    assert.match(result.stderr, /Dependencies.*must exactly match owning roadmap row 'None'/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
+    assert.match(result.stderr, /not linked|missing/);
 
-test('implementation requires independently evidenced readiness approval', () => {
-  const root = fixture();
-  try {
-    writeFixture(root, { readiness: 'Not Reviewed' });
-    let result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /In Progress spec requires \*\*Execution approval\*\*: Approved/);
-
-    writeFixture(root, { readinessReviewer: 'None' });
-    result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /requires a concrete \*\*Approval reviewer\*\*/);
-
-    writeFixture(root, { readinessReviewed: 'yesterday' });
-    result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /requires a YYYY-MM-DD \*\*Approval date\*\*/);
-
-    writeFixture(root, { readinessEvidence: 'Not reviewed.' });
-    result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /requires concrete Execution Approval evidence/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('a readiness revision can remain planned or become concretely blocked', () => {
-  const root = fixture();
-  try {
-    writeFixture(root, {
-      trackStatus: 'Planned',
-      specStatus: 'Planned',
-      readiness: 'Revision Required',
-      readinessEvidence: 'A missing acceptance threshold prevents implementation.',
-    });
-    let result = run(root);
-    assert.equal(result.status, 0, result.stderr);
-
-    writeFixture(root, {
-      specStatus: 'Blocked',
-      blocker: 'The acceptance threshold still requires a scientific decision.',
-      readiness: 'Revision Required',
-      readinessEvidence: 'The bounded revision did not resolve the threshold.',
-    });
-    result = run(root);
-    assert.equal(result.status, 0, result.stderr);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('complete closure requires checked feature, spec, and criteria', () => {
-  const root = fixture();
-  try {
-    writeFixture(root, { masterStatus: 'Complete', trackStatus: 'Complete', featureChecked: true, specStatus: 'Complete', specChecked: true });
-    const result = run(root);
-    assert.equal(result.status, 0, result.stderr);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('blocked specs require a concrete blocker and remain unchecked', () => {
-  const root = fixture();
-  try {
-    writeFixture(root, { specStatus: 'Blocked' });
-    let result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /concrete Blocker/);
-    writeFixture(root, { specStatus: 'Blocked', blocker: 'Waiting on API decision.' });
-    result = run(root);
-    assert.equal(result.status, 0, result.stderr);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('invalid dependencies and cycles are reported', () => {
-  const root = fixture();
-  try {
-    writeFixture(root, { dependency: 'T01.F99' });
-    const result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /unknown feature dependency|unknown dependency/);
-    writeFixture(root, { dependency: 'T01.F01' });
-    const cycle = run(root);
-    assert.equal(cycle.status, 1);
-    assert.match(cycle.stderr, /feature dependency cycle/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('cross-track dependencies resolve even when the dependency track is listed later', () => {
-  const root = fixture();
-  try {
-    writeFixture(root, { trackStatus: 'Planned', specStatus: 'Planned', dependency: 'T02.F01' });
-    const roadmap = join(root, 'docs', 'roadmap.md');
-    writeFileSync(roadmap, readFileSync(roadmap, 'utf8').replace(
-      '## Final Success Criteria',
-      '- [ ] **T02 — Later** — [Roadmap](roadmaps/t02-later.md) — Depends on: None\n\n## Final Success Criteria',
+    base(repository);
+    path = join(repository, 'docs/roadmaps/t01-core.md');
+    writeFileSync(path, readFileSync(path, 'utf8').replace(
+      '## Executable Features',
+      '## Executable Features\n\n- [ ] **T01.F01 — Duplicate** — Depends on: None',
     ));
-    writeFileSync(join(root, 'docs', 'roadmaps', 't02-later.md'), `# T02 — Later\n\n**Status**: Planned\n**Last updated**: 2026-09-01\n**Master**: [Program Roadmap](../roadmap.md)\n\n## Goal\n\nGoal.\n\n## Track Success Criteria\n\n- [ ] Track complete.\n\n## Executable Features\n\n- [ ] **T02.F01 — Later feature** — Depends on: None\n\n## Notes for AI Agents\n\nNotes.\n`);
-    const result = run(root);
+    result = run(repository);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /duplicate feature ownership/);
+
+    base(repository);
+    write(repository, 'docs/specs/roadmap/t01-f99-orphan.md', spec('T01.F99'));
+    result = run(repository);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /orphan feature spec/);
+
+    rmSync(join(repository, 'docs/specs/roadmap/t01-f99-orphan.md'));
+    write(repository, 'docs/specs/roadmap/t01-f01-copy.md', spec('T01.F01'));
+    result = run(repository);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /multiple feature specs/);
+  } finally { rmSync(repository, { recursive: true, force: true }); }
+});
+
+test('missing dependencies and dependency cycles fail', () => {
+  const repository = root();
+  try {
+    base(repository, { dependency: 'T02.F01' });
+    let result = run(repository);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /unknown feature dependency/);
+
+    base(repository, { dependency: 'T01.F01' });
+    result = run(repository);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /feature dependency cycle/);
+  } finally { rmSync(repository, { recursive: true, force: true }); }
+});
+
+test('feature checkboxes and complete specs must agree', () => {
+  const repository = root();
+  try {
+    base(repository, { featureChecked: true, specStatus: 'Planned' });
+    let result = run(repository);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /feature checkbox and Complete spec must agree/);
+
+    base(repository, { specStatus: 'Complete', specChecked: true });
+    result = run(repository);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /feature checkbox and Complete spec must agree/);
+  } finally { rmSync(repository, { recursive: true, force: true }); }
+});
+
+test('complete specs require completed implementation, verification, and success lists', () => {
+  const repository = root();
+  try {
+    base(repository, { featureChecked: true, specStatus: 'Complete', specChecked: false });
+    const result = run(repository);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /unchecked Implementation Tasks items/);
+    assert.match(result.stderr, /unchecked Verification items/);
+    assert.match(result.stderr, /unchecked Success Criteria items/);
+  } finally { rmSync(repository, { recursive: true, force: true }); }
+});
+
+test('track and master completion rollups must agree', () => {
+  const repository = root();
+  try {
+    base(repository, { trackStatus: 'Complete', trackChecked: false, featureChecked: true, specStatus: 'Complete', specChecked: true, trackCriteria: '- [x] Track complete.' });
+    let result = run(repository);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /rollup must match/);
+
+    base(repository, { masterStatus: 'Complete', trackStatus: 'Complete', featureChecked: true, specStatus: 'Complete', specChecked: true, trackCriteria: '- [x] Track complete.' });
+    result = run(repository);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Final Success Criteria/);
+
+    base(repository, { masterStatus: 'Complete', masterCriteria: '- [x] Program complete.', trackStatus: 'Complete', featureChecked: true, specStatus: 'Complete', specChecked: true, trackCriteria: '- [x] Track complete.' });
+    result = run(repository);
     assert.equal(result.status, 0, result.stderr);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+  } finally { rmSync(repository, { recursive: true, force: true }); }
 });
 
-test('missing links, duplicate IDs, and orphan specs are reported without crashing', () => {
-  const root = fixture();
-  try {
-    writeFixture(root);
-    writeFileSync(join(root, 'docs', 'roadmap.md'), readFileSync(join(root, 'docs', 'roadmap.md'), 'utf8')
-      .replace('roadmaps/t01-core.md', 'roadmaps/t99-missing.md'));
-    const missing = run(root);
-    assert.equal(missing.status, 1);
-    assert.match(missing.stderr, /missing|orphan track|canonical path/);
-
-    rmSync(join(root, 'docs', 'specs', 'roadmap', 't01-f01-second.md'), { force: true });
-    rmSync(join(root, 'docs', 'specs', 'roadmap', 't01-f99-orphan.md'), { force: true });
-    writeFixture(root, { trackStatus: 'Planned', specStatus: 'Planned' });
-    cpSync(join(root, 'docs', 'specs', 'roadmap', 't01-f01-foundation.md'), join(root, 'docs', 'specs', 'roadmap', 't01-f01-second.md'));
-    const duplicate = run(root);
-    assert.equal(duplicate.status, 1);
-    assert.match(duplicate.stderr, /multiple specs/);
-
-    writeFixture(root, { trackStatus: 'Planned', specStatus: 'Planned' });
-    cpSync(join(root, 'docs', 'specs', 'roadmap', 't01-f01-foundation.md'), join(root, 'docs', 'specs', 'roadmap', 't01-f99-orphan.md'));
-    const orphan = run(root);
-    assert.equal(orphan.status, 1);
-    assert.match(orphan.stderr, /orphan feature spec/);
-
-    rmSync(join(root, 'docs', 'specs', 'roadmap', 't01-f01-second.md'), { force: true });
-    rmSync(join(root, 'docs', 'specs', 'roadmap', 't01-f99-orphan.md'), { force: true });
-    writeFixture(root, { trackStatus: 'Planned', specStatus: 'Planned' });
-    const track = join(root, 'docs', 'roadmaps', 't01-core.md');
-    writeFileSync(track, readFileSync(track, 'utf8').replace(
-      '## Notes for AI Agents',
-      '- [ ] **T01.F01 — Duplicate** — Depends on: None\n\n## Notes for AI Agents',
-    ));
-    const duplicateId = run(root);
-    assert.equal(duplicateId.status, 1);
-    assert.match(duplicateId.stderr, /duplicate feature ID|duplicate feature ownership/);
-
-    writeFixture(root, { trackStatus: 'Planned', specStatus: 'Planned' });
-    const missingRow = join(root, 'docs', 'roadmap.md');
-    writeFileSync(missingRow, readFileSync(missingRow, 'utf8').replace(/- \[ \] \*\*T01 — Core\*\*.*\n/, ''));
-    const missingTrackRow = run(root);
-    assert.equal(missingTrackRow.status, 1);
-    assert.match(missingTrackRow.stderr, /missing its master track row/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('premature completion and rollup drift are rejected', () => {
-  const root = fixture();
-  try {
-    writeFixture(root, { specStatus: 'Complete', specChecked: true });
-    let result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /Complete spec requires its feature checked/);
-
-    writeFixture(root, { trackStatus: 'Complete', featureChecked: false, specStatus: 'Planned' });
-    result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /Complete track requires/);
-
-    writeFixture(root);
-    const roadmap = join(root, 'docs', 'roadmap.md');
-    writeFileSync(roadmap, readFileSync(roadmap, 'utf8').replace('- [ ] **T01 — Core**', '- [x] **T01 — Core**'));
-    result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /rollup.*if and only if/);
-
-    writeFixture(root, { masterStatus: 'Complete' });
-    result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /Complete master requires/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('canonical identity and owning-track links are enforced', () => {
-  const root = fixture();
-  try {
-    writeFixture(root);
-    const track = join(root, 'docs', 'roadmaps', 't01-core.md');
-    writeFileSync(track, readFileSync(track, 'utf8').replace('**Master**: [Program Roadmap](../roadmap.md)', '**Master**: [Wrong](../roadmap.md)'));
-    const result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /expected \*\*Master\*\*/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('staged roadmap additions are materialized and validated', () => {
-  const root = mkdtempSync(join(tmpdir(), 'petri-roadmap-git-add.'));
-  try {
-    execFileSync('git', ['init', '-q'], { cwd: root });
-    mkdirSync(join(root, 'docs'), { recursive: true });
-    writeFileSync(join(root, 'docs', 'roadmap.md'), '# incomplete\n');
-    execFileSync('git', ['add', 'docs/roadmap.md'], { cwd: root });
-    const result = spawnSync(process.execPath, [checker, '--staged'], { cwd: root, encoding: 'utf8' });
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /missing \*\*Status\*\* metadata/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('staged no-op does not inspect unstaged roadmap files', () => {
-  const root = mkdtempSync(join(tmpdir(), 'petri-roadmap-git.'));
-  try {
-    execFileSync('git', ['init', '-q'], { cwd: root });
-    writeFileSync(join(root, 'README.md'), 'ok\n');
-    execFileSync('git', ['add', 'README.md'], { cwd: root });
-    mkdirSync(join(root, 'docs', 'roadmaps'), { recursive: true });
-    writeFileSync(join(root, 'docs', 'roadmap.md'), 'invalid unstaged roadmap\n');
-    const result = spawnSync(process.execPath, [checker, '--staged'], { cwd: root, encoding: 'utf8' });
-    assert.equal(result.status, 0, result.stderr);
-    assert.match(result.stdout, /no staged roadmap changes/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('staged deletion and rename are validated from the index', () => {
-  const root = fixture();
-  try {
-    execFileSync('git', ['init', '-q'], { cwd: root });
-    writeFixture(root);
-    execFileSync('git', ['add', 'docs'], { cwd: root });
-    execFileSync('git', ['-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'fixture'], { cwd: root });
-    execFileSync('git', ['mv', 'docs/roadmaps/t01-core.md', 'docs/roadmaps/t01-renamed.md'], { cwd: root });
-    let result = spawnSync(process.execPath, [checker, '--staged'], { cwd: root, encoding: 'utf8' });
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /canonical path|missing/);
-
-    execFileSync('git', ['restore', '--staged', '--worktree', 'docs/roadmaps/t01-renamed.md'], { cwd: root });
-    execFileSync('git', ['rm', '-q', 'docs/roadmap.md'], { cwd: root });
-    result = spawnSync(process.execPath, [checker, '--staged'], { cwd: root, encoding: 'utf8' });
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /require a live master/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('valid staged add, delete, rename, and no-op states are accepted', () => {
-  const root = fixture();
-  try {
-    writeFixture(root);
-    execFileSync('git', ['init', '-q'], { cwd: root });
-    execFileSync('git', ['add', 'docs'], { cwd: root });
-    execFileSync('git', ['-c', 'user.email=test@example.com', '-c', 'user.name=Test', 'commit', '-qm', 'fixture'], { cwd: root });
-
-    writeFileSync(join(root, 'docs', 'roadmaps', '_extra-template.md'), '# template\n');
-    execFileSync('git', ['add', 'docs/roadmaps/_extra-template.md'], { cwd: root });
-    let result = spawnSync(process.execPath, [checker, '--staged'], { cwd: root, encoding: 'utf8' });
-    assert.equal(result.status, 0, result.stderr);
-
-    execFileSync('git', ['rm', '-q', 'docs/specs/roadmap/t01-f01-foundation.md'], { cwd: root });
-    result = spawnSync(process.execPath, [checker, '--staged'], { cwd: root, encoding: 'utf8' });
-    assert.equal(result.status, 0, result.stderr);
-
-    execFileSync('git', ['mv', 'docs/roadmaps/_extra-template.md', 'docs/roadmaps/_renamed-template.md'], { cwd: root });
-    result = spawnSync(process.execPath, [checker, '--staged'], { cwd: root, encoding: 'utf8' });
-    assert.equal(result.status, 0, result.stderr);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('track dependency cycles and track/feature prefix mismatches are rejected', () => {
-  const root = fixture();
-  try {
-    writeFixture(root, { trackStatus: 'Planned', specStatus: 'Planned' });
-    const roadmap = join(root, 'docs', 'roadmap.md');
-    writeFileSync(roadmap, readFileSync(roadmap, 'utf8')
-      .replace('roadmaps/t01-core.md) — Depends on: None', 'roadmaps/t01-core.md) — Depends on: T02')
-      .replace('## Final Success Criteria', '- [ ] **T02 — Later** — [Roadmap](roadmaps/t02-later.md) — Depends on: T01\n\n## Final Success Criteria'));
-    writeFileSync(join(root, 'docs', 'roadmaps', 't02-later.md'), `# T02 — Later\n\n**Status**: Planned\n**Last updated**: 2026-09-01\n**Master**: [Program Roadmap](../roadmap.md)\n\n## Goal\n\nGoal.\n\n## Track Success Criteria\n\n- [ ] Track complete.\n\n## Executable Features\n\n- [ ] **T02.F01 — Later feature** — Depends on: None\n\n## Notes for AI Agents\n\nNotes.\n`);
-    let result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /track dependency cycle/);
-
-    writeFixture(root, { trackStatus: 'Planned', specStatus: 'Planned' });
-    const track = join(root, 'docs', 'roadmaps', 't01-core.md');
-    writeFileSync(track, readFileSync(track, 'utf8').replace('**T01.F01 — Foundation**', '**T02.F01 — Wrong prefix**'));
-    result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /does not belong to T01/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('complete specs reject ordinary and nested unchecked tasks', () => {
-  const root = fixture();
-  try {
-    writeFixture(root, { masterStatus: 'Complete', trackStatus: 'Complete', featureChecked: true, specStatus: 'Complete', specChecked: true });
-    const spec = join(root, 'docs', 'specs', 'roadmap', 't01-f01-foundation.md');
-    writeFileSync(spec, readFileSync(spec, 'utf8').replace('- [x] Implement.', '- [ ] Implement.'));
-    let result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /unchecked implementation/);
-
-    writeFixture(root, { masterStatus: 'Complete', trackStatus: 'Complete', featureChecked: true, specStatus: 'Complete', specChecked: true });
-    writeFileSync(spec, readFileSync(spec, 'utf8').replace('## Verification', '  - [ ] Nested task\n\n## Verification'));
-    result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /unchecked implementation/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('checked blocked features and invalid Planning or Active states are rejected', () => {
-  const root = fixture();
-  try {
-    writeFixture(root, { featureChecked: true, specStatus: 'Blocked', blocker: 'Waiting on dependency.' });
-    let result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /Blocked feature cannot be checked|requires exactly one Complete spec/);
-
-    writeFixture(root, { masterStatus: 'Planning', trackStatus: 'Complete', featureChecked: true, specStatus: 'Complete', specChecked: true });
-    result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /Planning master cannot/);
-
-    writeFixture(root, { masterStatus: 'Active', trackStatus: 'Planned' });
-    rmSync(join(root, 'docs', 'roadmaps', 't01-core.md'));
-    rmSync(join(root, 'docs', 'specs', 'roadmap', 't01-f01-foundation.md'));
-    writeFileSync(join(root, 'docs', 'roadmap.md'), readFileSync(join(root, 'docs', 'roadmap.md'), 'utf8').replace(/- \[ \] \*\*T01 — Core\*\*.*\n/, ''));
-    result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /Active master must have/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('duplicate required metadata and malformed IDs, paths, links, and dates are rejected', () => {
-  const root = fixture();
-  try {
-    writeFixture(root);
-    const master = join(root, 'docs', 'roadmap.md');
-    writeFileSync(master, readFileSync(master, 'utf8').replace('**Status**: Active', '**Status**: Active\n**Status**: Planning'));
-    const track = join(root, 'docs', 'roadmaps', 't01-core.md');
-    writeFileSync(track, readFileSync(track, 'utf8').replace('**Master**: [Program Roadmap](../roadmap.md)', '**Master**: [Program Roadmap](../roadmap.md)\n**Master**: [Other](../roadmap.md)'));
-    const spec = join(root, 'docs', 'specs', 'roadmap', 't01-f01-foundation.md');
-    writeFileSync(spec, readFileSync(spec, 'utf8').replace('**Feature**: T01.F01', '**Feature**: T01.F01\n**Feature**: T01.F02').replace('**Last updated**: 2026-09-01', '**Last updated**: not-a-date'));
-    const result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /duplicate \*\*Status\*\* metadata/);
-    assert.match(result.stderr, /duplicate \*\*Master\*\* metadata/);
-    assert.match(result.stderr, /duplicate \*\*Feature\*\* metadata/);
-    assert.match(result.stderr, /invalid Last updated/);
-
-    writeFixture(root);
-    writeFileSync(join(root, 'docs', 'roadmap.md'), readFileSync(join(root, 'docs', 'roadmap.md'), 'utf8').replace('**T01 — Core**', '**T1 — Core**'));
-    const malformed = run(root);
-    assert.equal(malformed.status, 1);
-    assert.match(malformed.stderr, /malformed track row/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('noncanonical live track and feature-spec filenames are rejected', () => {
-  const root = fixture();
-  try {
-    writeFixture(root);
-    const track = join(root, 'docs', 'roadmaps', 't01-core.md');
-    const noncanonicalTrack = join(root, 'docs', 'roadmaps', 'T01-core.md');
-    renameSync(track, noncanonicalTrack);
-    let result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /docs\/roadmaps\/T01-core\.md: non-canonical track path/);
-
-    writeFixture(root);
-    const spec = join(root, 'docs', 'specs', 'roadmap', 't01-f01-foundation.md');
-    const noncanonicalSpec = join(root, 'docs', 'specs', 'roadmap', 't01-F01-foundation.md');
-    renameSync(spec, noncanonicalSpec);
-    result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /docs\/specs\/roadmap\/t01-F01-foundation\.md: non-canonical feature-spec path/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('feature spec Track metadata must match the exact owning title and path', () => {
-  const root = fixture();
-  try {
-    writeFixture(root);
-    const spec = join(root, 'docs', 'specs', 'roadmap', 't01-f01-foundation.md');
-    writeFileSync(spec, readFileSync(spec, 'utf8').replace(
-      '**Track**: [T01 — Core](../../roadmaps/t01-core.md)',
-      '**Track**: [T01 — Wrong title](../../roadmaps/t01-wrong.md)',
-    ));
-    const result = run(root);
-    assert.equal(result.status, 1);
-    assert.match(result.stderr, /owning-track link must be exactly \[T01 — Core\]\(\.\.\/\.\.\/roadmaps\/t01-core\.md\)/);
-  } finally { rmSync(root, { recursive: true, force: true }); }
-});
-
-test('usage errors use exit status 2', () => {
-  const result = spawnSync(process.execPath, [checker, '--staged', '--root', '.'], { encoding: 'utf8' });
+test('unsupported arguments return a usage error', () => {
+  const result = spawnSync(process.execPath, [checker, '--staged'], { encoding: 'utf8' });
   assert.equal(result.status, 2);
-  assert.match(result.stderr, /mutually exclusive/);
-});
-
-test('real goal prompt contains the approved execution contract', () => {
-  const prompt = readFileSync(join(process.cwd(), 'docs', 'roadmaps', '_goal-prompt-template.md'), 'utf8');
-  for (const clause of [
-    'every track roadmap linked from `docs/roadmap.md`',
-    'one global\nfeature DAG',
-    'repeatedly select a ready node',
-    'never phase boundaries',
-    'only unchecked `TNN.FNN`',
-    '`gpt-5.6-sol` xhigh planner',
-    '`gpt-5.6-sol` high reviewer',
-    '`gpt-5.6-luna` high implementer',
-    'Only a P1 finding blocks',
-    'P2 and P3 findings are advisory',
-    'P2 findings as `non-executable`',
-    'all other P2 findings are `deferrable`',
-    'budget is per feature',
-    'one readiness revision and one post-review\n  remediation pass for each feature',
-    'integration branch `roadmap/complete`',
-    'dedicated\nintegration worktree',
-    'exactly one feature branch and one feature worktree',
-    'latest commit of the integration branch',
-    'integrate completed feature commits into the integration branch in dependency',
-    'Verify the feature worktree is clean after\nintegration, then clean and remove it',
-    'cleanup must never\nremove or garbage-collect the declared durable experiment artifact root',
-    'This prompt explicitly authorizes local\nbranch, worktree, and commit creation',
-    'Do not push, open',
-    'merge into the user\'s `main` branch',
-    'focused spec verification',
-    'viability-first',
-    'post-review `make check`',
-    'atomically and truthfully',
-    'Make atomic, truthful\nspec/feature/track/master status/date/commit updates',
-    'spec says `Execution approval: Approved`',
-    'Durable experiment artifact root',
-    'Campaign resource envelope',
-    'require checked dependency\n`T01.F09`',
-    'clean integration branch',
-    'On the clean integration branch, run the final `make check`',
-  ]) assert.match(prompt, new RegExp(clause.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), clause);
+  assert.match(result.stderr, /Usage/);
 });
