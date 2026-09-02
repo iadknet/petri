@@ -15,12 +15,68 @@ prd_line_count() {
   awk 'END { print NR + 0 }' "$1"
 }
 
+prd_metadata_value() {
+  prd_metadata_name=$1
+  prd_metadata_file=$2
+  sed -n "s/^- $prd_metadata_name: //p" "$prd_metadata_file" | sed -n '1p'
+}
+
+prd_check_acceptance_evidence() {
+  prd_evidence_doc=$1
+  prd_evidence_status=$2
+  prd_evidence_complete=0
+  [ "$prd_evidence_status" = Complete ] && prd_evidence_complete=1
+  if ! awk -v completed="$prd_evidence_complete" '
+    function trim(value) {
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      return value
+    }
+    BEGIN { rows = 0; invalid = 0 }
+    /^\|[[:space:]]*AC-[0-9]+[[:space:]]*\|/ {
+      field_count = split($0, fields, "|")
+      if (field_count != 6) {
+        invalid = 1
+        next
+      }
+      id = trim(fields[2])
+      criterion = trim(fields[3])
+      verification = trim(fields[4])
+      evidence = trim(fields[5])
+      rows++
+      if (id !~ /^AC-[0-9]+$/ || criterion == "" || verification == "" || evidence == "") {
+        invalid = 1
+      }
+      if (seen[id]++) {
+        invalid = 1
+      }
+      if (completed && evidence == "Pending") {
+        invalid = 1
+      }
+    }
+    END { if (rows == 0 || invalid) exit 1 }
+  ' "$prd_evidence_doc"; then
+    prd_error "$prd_evidence_doc must contain unique AC-<number> rows with non-empty criterion, verification, and evidence; Complete documents cannot use Pending evidence"
+  fi
+}
+
 prd_check_document() {
   prd_doc=$1
   prd_kind=$2
+  prd_execution_mode=$3
   prd_lines=$(prd_line_count "$prd_doc")
   if [ "$prd_lines" -gt 750 ]; then
     prd_error "$prd_doc has $prd_lines physical lines; maximum is 750"
+  fi
+  if [ "$prd_execution_mode" = Lean ]; then
+    if [ "$prd_kind" = master ]; then
+      prd_lean_line_limit=250
+    else
+      prd_lean_line_limit=150
+    fi
+    if [ "$prd_lines" -gt "$prd_lean_line_limit" ]; then
+      prd_error "$prd_doc has $prd_lines physical lines; Lean-mode maximum is $prd_lean_line_limit"
+    fi
   fi
 
   for prd_heading in \
@@ -50,6 +106,12 @@ prd_check_document() {
   fi
 
   prd_doc_status=$(prd_status "$prd_doc")
+  if [ "$prd_execution_mode" != Legacy ]; then
+    grep -Fqx '## Acceptance Criteria and Evidence' "$prd_doc" || \
+      prd_error "$prd_doc is missing heading: ## Acceptance Criteria and Evidence"
+    prd_check_acceptance_evidence "$prd_doc" "$prd_doc_status"
+  fi
+
   case $prd_doc_status in
     Draft|Ready|'In Progress'|Complete) ;;
     *) prd_error "$prd_doc has invalid or missing status: ${prd_doc_status:-<empty>}" ;;
@@ -70,7 +132,63 @@ prd_check_set() {
 
   prd_master=$prd_set/master-prd.md
   [ -f "$prd_master" ] || { prd_error "$prd_set is missing master-prd.md"; return; }
-  prd_check_document "$prd_master" master
+  prd_execution_mode=$(prd_metadata_value 'Execution Mode' "$prd_master")
+  if [ -z "$prd_execution_mode" ] && [ "$prd_location" = archive ]; then
+    prd_execution_mode=Legacy
+  fi
+  case $prd_execution_mode in
+    Lean|Deep|Legacy) ;;
+    *) prd_error "$prd_master has an invalid or missing Execution Mode: ${prd_execution_mode:-<empty>}" ;;
+  esac
+  prd_check_document "$prd_master" master "$prd_execution_mode"
+
+  prd_master_status=$(prd_status "$prd_master")
+  if [ "$prd_execution_mode" != Legacy ]; then
+    prd_deep_authorization=$(prd_metadata_value 'Deep Mode Authorization' "$prd_master")
+    prd_file_budget=$(prd_metadata_value 'Affected-File Budget' "$prd_master")
+    prd_actual_files=$(prd_metadata_value 'Actual Affected Files' "$prd_master")
+
+    case $prd_file_budget in
+      ''|*[!0-9]*) prd_error "$prd_master has an invalid or missing Affected-File Budget" ;;
+      *)
+        [ "$prd_file_budget" -gt 0 ] || prd_error "$prd_master Affected-File Budget must be greater than zero"
+        if [ "$prd_execution_mode" = Lean ] && [ "$prd_file_budget" -gt 25 ]; then
+          prd_error "$prd_master Lean-mode Affected-File Budget exceeds 25"
+        fi
+        ;;
+    esac
+
+    if [ "$prd_execution_mode" = Lean ]; then
+      [ "$prd_deep_authorization" = 'Not required' ] || \
+        prd_error "$prd_master Lean mode requires Deep Mode Authorization: Not required"
+    elif [ "$prd_master_status" != Draft ]; then
+      case $prd_deep_authorization in
+        ''|'Required before readiness'|'Not required')
+          prd_error "$prd_master Deep mode requires recorded user authorization before readiness"
+          ;;
+      esac
+    fi
+
+    case $prd_actual_files in
+      Pending)
+        case $prd_master_status in
+          'In Progress'|Complete)
+            prd_error "$prd_master $prd_master_status status requires numeric Actual Affected Files"
+            ;;
+        esac
+        ;;
+      ''|*[!0-9]*)
+        prd_error "$prd_master Actual Affected Files must be Pending or numeric"
+        ;;
+      *)
+        case $prd_file_budget in
+          ''|*[!0-9]*) ;;
+          *) [ "$prd_actual_files" -le "$prd_file_budget" ] || \
+            prd_error "$prd_master Actual Affected Files exceeds its declared budget" ;;
+        esac
+        ;;
+    esac
+  fi
 
   prd_review_count=$(sed -n 's/^- Review Count: //p' "$prd_master" | sed -n '1p')
   case $prd_review_count in
@@ -79,8 +197,10 @@ prd_check_set() {
       prd_review_count=0
       ;;
   esac
-  if [ "$prd_review_count" -gt 3 ]; then
-    prd_error "$prd_master Review Count exceeds the maximum of 3"
+  prd_review_limit=3
+  [ "$prd_execution_mode" = Lean ] && prd_review_limit=1
+  if [ "$prd_review_count" -gt "$prd_review_limit" ]; then
+    prd_error "$prd_master Review Count exceeds the $prd_execution_mode-mode maximum of $prd_review_limit"
   fi
 
   prd_review_status=$(sed -n 's/^- Review Status: //p' "$prd_master" | sed -n '1p')
@@ -108,7 +228,7 @@ prd_check_set() {
     prd_stage_slug=${prd_stage_slug%.md}
     case $prd_stage_slug in ''|*[!a-z0-9-]*|-*|*-|*--*) prd_error "$prd_stage has an invalid kebab-case stage slug" ;; esac
 
-    prd_check_document "$prd_stage" stage
+    prd_check_document "$prd_stage" stage "$prd_execution_mode"
     prd_stage_status=$(prd_status "$prd_stage")
     [ "$prd_stage_status" = Draft ] || prd_all_draft=0
     case $prd_stage_status in Ready|'In Progress'|Complete) ;; *) prd_all_ready=0 ;; esac
@@ -154,6 +274,9 @@ prd_check_set() {
     prd_expected_stage=$((prd_expected_stage + 1))
   done
   [ "$prd_stage_count" -gt 0 ] || prd_error "$prd_set must contain at least one stage"
+  if [ "$prd_execution_mode" = Lean ] && [ "$prd_stage_count" -gt 2 ]; then
+    prd_error "$prd_set has $prd_stage_count stages; Lean-mode maximum is 2"
+  fi
 
   prd_master_stage_count=0
   # shellcheck disable=SC2016 # Backticks are literal Markdown.
@@ -164,7 +287,6 @@ prd_check_set() {
   done
   [ "$prd_master_stage_count" -eq "$prd_stage_count" ] || prd_error "$prd_master stage summary count does not match the stage files"
 
-  prd_master_status=$(prd_status "$prd_master")
   case $prd_master_status in
     Draft)
       [ "$prd_review_status" = DRAFT ] || prd_error "Draft PRD $prd_set must have Review Status DRAFT"
