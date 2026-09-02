@@ -18,4 +18,6 @@ orchestration.
 
 Roadmap documents describe intent and state. They do not encode agent
 execution policy or integration authority. Those decisions belong in the
-reusable goal prompt template.
+reusable goal prompt template. Run one goal per feature: the target feature must
+have all dependencies checked, and a goal never implements a prerequisite or an
+unrelated ready feature implicitly.

@@ -1,98 +1,114 @@
-# Roadmap Execution Goal
+# Single-Feature Roadmap Goal
 
-Use this complete prompt for a roadmap-owned Codex goal. Replace the values in
-the first section, preserve the contract below, and keep every document and
-status truthful.
+Use this complete prompt for one roadmap feature. Replace the values in the
+first section, preserve the contract below, and keep every document and status
+truthful.
 
 ## Goal inputs
 
 - Repository: `<local repository path>`
+- Source ref: `<branch or commit containing the current roadmap state>`
 - Roadmap: `docs/roadmap.md`
-- Requested outcome: `<outcome>`
-- Durable experiment artifact root: `<absolute repository-external path>`
-- Campaign resource envelope: `<per-run and aggregate wall-clock, concurrency/CPU, and storage caps>`
+- Target feature: `<exactly one TNN.FNN ID>`
+- Requested outcome: `<concise restatement of the feature outcome>`
+- Durable experiment artifact root: `<absolute repository-external path, or N/A when no experiment artifacts are produced>`
+- Campaign resource envelope: `<wall-clock, concurrency/CPU, and storage caps, or N/A when no experiments run>`
 
-## Outcome and traversal
+## Scope and dependency gate
 
-Load every track roadmap linked from `docs/roadmap.md`, construct one global
-feature DAG, and repeatedly select a ready node. Track order and track-level
-dependencies are organizational summaries, never phase boundaries. Execute
-only unchecked `TNN.FNN` features whose exact feature dependencies are checked.
-Do not invent ecosystem content or bypass a dependency. Work sequentially by
-default; parallel work requires an explicit reason and remains isolated per
-feature. Continue until the roadmap reaches `roadmap/complete`, or stop with a
-concrete blocker and request user direction.
+Load the master roadmap and the owning track, then resolve the exact target
+feature, title, and dependencies. This goal may implement exactly one unchecked
+`TNN.FNN` feature. Do not implement another roadmap feature, an unchecked
+prerequisite, or a downstream feature.
 
-## Roles and bounded review budget
+Resolve the source ref to a commit SHA and record it before creating a branch.
+Read roadmap state from that commit, not from uncommitted files. If the supplied
+repository checkout has uncommitted changes to the master roadmap, owning track,
+or target spec, stop and ask the user to commit them or choose another source
+ref.
 
-- Use a bounded planning pass with a `gpt-5.6-sol` xhigh planner.
+Verify that every declared dependency exists and is checked at the resolved
+source commit. If any dependency is unchecked, stop and report its feature ID as
+the next prerequisite. If the target is already checked, verify its completed
+spec and report that no work is needed. Stop for user direction if the requested
+outcome conflicts with the roadmap feature or materially expands it.
+
+## Roles and bounded review
+
+- Use one bounded planning pass with a `gpt-5.6-sol` xhigh planner.
 - Use an independent `gpt-5.6-sol` high reviewer for readiness and an
   independent `gpt-5.6-sol` high reviewer for the final diff review.
 - Keep one persistent `gpt-5.6-luna` high implementer through implementation
-  and any remediation; do not replace the implementer between passes.
-- Only a P1 finding blocks progress. P2 and P3 findings are advisory and must
-  be recorded without expanding the scope after a feature is executable.
-- The budget is per feature. Allow one readiness revision and one post-review
-  remediation pass for each feature. Return any failed required verification
-  to the same implementer until it is corrected or the implementer is genuinely
-  blocked; do not silently waive a required check. If the bounded readiness
-  revision cannot make a feature executable, mark it `Blocked` with the exact
-  unresolved condition and continue only with unrelated ready nodes.
+  and remediation.
+- Only a P1 finding blocks implementation or completion. Record P2 and P3
+  findings without expanding an executable feature.
+- Allow one readiness revision and one post-review remediation pass. Return
+  failed required verification to the same implementer until corrected or
+  genuinely blocked. If the bounded readiness revision cannot make the feature
+  executable, mark its spec `Blocked` with the concrete reason and stop.
 
-## Branch, worktree, and integration contract
+## Branch and worktree contract
 
-Create or resume the integration branch `roadmap/complete` and a dedicated
-integration worktree as the durable roadmap execution goal. For each feature,
-create or resume exactly one feature branch and one feature worktree based on
-the latest commit of the integration branch. Keep feature work isolated and
-integrate completed feature commits into the integration branch in dependency
-order, sequentially by default. Verify the feature worktree is clean after
-integration, then clean and remove it. Feature-worktree cleanup must never
-remove or garbage-collect the declared durable experiment artifact root.
-This prompt explicitly authorizes local
-branch, worktree, and commit creation or modification within the repository
-scope. Do not push, open or update a pull request, or merge into the user's `main` branch.
+Create or resume one branch named `roadmap/tNN-fNN-<slug>` and one
+dedicated worktree for the target feature, based on the exact source ref. Do not
+modify the source checkout or combine another feature into the branch. Resume
+existing state only when it clearly belongs to the same target feature.
 
-## Implementation and verification contract
+This prompt explicitly authorizes local branch, worktree, and commit creation
+or modification for the target feature. It does not authorize pushing, opening
+or updating a pull request, merging into the source ref or the user's `main`,
+or deleting the feature worktree. Never delete or garbage-collect a declared
+durable experiment artifact root.
 
-Read the owning track and create or update its flat feature spec from the
-canonical template before implementation. Put decision-relevant source
-evidence and dependency outputs in `Inputs and Invariants`. Complete the
-bounded planning and independent readiness review before implementation, but
-do not add review-approval metadata merely to restate that process. Make
-atomic, truthful spec/feature/track/master status/date/commit updates. Update the spec and
-roadmap atomically and truthfully: feature status, spec status, track rollup,
-master rollup, dates, and commit references must describe what actually exists.
-Create a flat spec just in time when a feature is planned, and keep an unchecked
-feature unchecked until its complete spec exists.
+## Planning and implementation contract
 
-Run focused spec verification while implementing, including the viability-first
-check where defaults, founders, or tick-loop mechanics are applicable. Record
-the exact commands and results in the spec. Run the independent readiness and
-final diff reviews within the stated budgets, then run post-review `make check`
-before closure. A failed required verification goes back to the same persistent
-implementer until corrected or genuinely blocked.
+Create or update the target's flat feature spec from the canonical template.
+Put decision-relevant source evidence, dependency outputs, observable behavior,
+non-goals, implementation tasks, and focused verification in the spec. Complete
+the bounded planning and readiness review before implementation; do not add
+approval metadata merely to restate that process.
 
-Classify every experiment manifest as fixture, characterization, or
-confirmatory. Do not use fixture or characterization results as confirmatory
-evidence. Before any confirmatory campaign, require checked dependency
-`T01.F09`, verify its protocol and analysis hashes without inspecting
-confirmatory outcomes, and validate the durable artifact root and resource
-envelope. Stop and request user authorization before exceeding a declared
-wall-clock, concurrency/CPU, or storage cap.
+Implement only the target feature. Use TDD for behavior changes and preserve
+repository boundaries and user changes. Keep the spec, feature checkbox, owning
+track, master rollup, dates, and commits atomic and truthful. An incomplete or
+blocked feature remains unchecked. Do not change unrelated feature status.
+
+After readiness review and immediately before implementation, set the feature
+spec to `In Progress`, promote a `Planned` owning track to `Active`, and promote
+a `Planning` master roadmap to `Active`. On success, set the spec to `Complete`
+and check the target feature. Mark the track `Complete` only when all its
+features and success criteria are checked, and mark the master `Complete` only
+when all tracks and final success criteria are checked. If implementation is
+blocked, set the spec to `Blocked`, leave the feature unchecked, and keep any
+already-active rollups active.
+
+## Verification and experiments
+
+Run the focused checks named by the feature spec and record their exact commands
+and results. Run viability-first testing when production defaults, founders, or
+tick-loop mechanics change. Run the full `make check` only when the feature
+changes application or runtime source code or build configuration; use relevant
+focused checks for documentation-only work. After every roadmap or feature-spec
+status update, run `make roadmap-check` and `git diff --check`.
+
+Only run an experiment when the target feature requires it. Classify its
+manifest as fixture, characterization, or confirmatory. Before any experiment,
+require non-`N/A` goal inputs for a concrete repository-external artifact root
+and wall-clock, concurrency/CPU, and storage caps, then validate them before
+launch. Fixture and characterization results are not confirmatory evidence. A
+confirmatory campaign additionally requires checked dependency `T01.F09` and
+verification of its protocol and analysis hashes without inspecting outcomes.
+Stop for renewed user authorization before exceeding any declared cap.
 
 ## Closure and final report
 
-Close a feature only when its implementation, focused verification, review,
-documentation, dependency, and checkbox gates pass. Update the owning track and
-master only in the same truthful state transition; do not mark a rollup
-complete early. On the clean integration branch, run the final `make check`.
-Close the goal as `roadmap/complete` only when all tracks, features, final
-success criteria, and post-review checks are complete.
+Close the goal when the one target feature is either complete or genuinely
+blocked. Mark it complete only after implementation, focused verification,
+final review, documentation, and commit gates pass. Update its track rollup or
+the master roadmap only if their own completion criteria are now satisfied; do
+not imply that the larger roadmap is complete.
 
-Report the changed files, exact verification commands and results, review
-findings and remediation, blockers, branch/worktree/commit state, integration
-state, and whether `roadmap/complete` was reached. Preserve user changes and
-stop for user direction on unresolved P1 findings, missing dependencies, an
-unauthorized local mutation, a missing or unsafe durable artifact root, a
-resource-envelope increase, or a material scope change.
+Report the target feature, changed files, verification results, review findings
+and remediation, blocker if any, branch/worktree/commit state, and the exact
+status changes. Leave the feature branch and worktree available for user
+inspection.
