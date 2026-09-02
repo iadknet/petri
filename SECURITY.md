@@ -14,9 +14,9 @@ policy is established after the product and release model are selected.
 quality and dependency policy, scans staged secrets, checks project skills for
 HIGH or CRITICAL security findings, and scans dependency lockfiles for known
 vulnerabilities. `make audit` scans repository history. Run `make setup` once
-to install pinned Gitleaks, ShellCheck, actionlint, and OSV-Scanner through
-Aqua, plus pre-commit and Cisco AI Skill Scanner, and install the Git hook. Aqua
-enforces the committed release checksums. CI runs the same
+to install pinned Node/npm, uv, Gitleaks, ShellCheck, actionlint, and OSV-Scanner
+through Aqua, plus pre-commit and Cisco AI Skill Scanner, and install the Git
+hook. Aqua enforces the committed release checksums. CI runs the same
 deterministic checks and offline zizmor analysis over GitHub Actions definitions.
 LLM skill analysis is intentionally excluded from blocking checks.
 

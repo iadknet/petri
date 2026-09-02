@@ -7,17 +7,16 @@ help: ## Show the stable project command interface.
 
 setup: ## Install required tools, hooks, and frontend dependencies.
 	@scripts/bootstrap-check
-	@scripts/aqua install
 	@scripts/install-skill-scanner
 	@scripts/install-pre-commit
-	@cd frontend && npm ci
+	@cd frontend && ../scripts/aqua exec npm ci
 
 run: ## Run the local Petri development stack.
-	@scripts/dev.sh
+	@scripts/aqua env scripts/dev.sh
 
 build: ## Build Rust workspace and frontend.
 	@cargo build --workspace
-	@cd frontend && npm run build
+	@cd frontend && ../scripts/aqua exec npm run build
 
 rust-check: ## Check Rust formatting, viability, tests, and Clippy.
 	@$(MAKE) rust-format-check
@@ -61,13 +60,13 @@ frontend-check: ## Lint, test, and build the frontend.
 	@$(MAKE) frontend-lint frontend-test frontend-build
 
 frontend-lint: ## Lint the frontend.
-	@cd frontend && npm run lint
+	@cd frontend && ../scripts/aqua exec npm run lint
 
 frontend-test: ## Run frontend unit tests.
-	@cd frontend && npm run test
+	@cd frontend && ../scripts/aqua exec npm run test
 
 frontend-build: ## Build the frontend.
-	@cd frontend && npm run build
+	@cd frontend && ../scripts/aqua exec npm run build
 
 prd-check: ## Validate active and archived PRD sets.
 	@scripts/prd-check
@@ -100,7 +99,7 @@ precommit: ## Run staged PRD, policy, quality, dependency, skill, and secret che
 
 format: ## Apply safe Rust and frontend formatting.
 	@cargo fmt --all
-	@cd frontend && npm run lint:fix
+	@cd frontend && ../scripts/aqua exec npm run lint:fix
 
 clean: ## Remove generated Rust and frontend output only.
 	@rm -rf target frontend/dist frontend/coverage
