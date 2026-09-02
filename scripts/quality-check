@@ -13,8 +13,8 @@ if git rev-parse --git-dir >/dev/null 2>&1; then
   git diff --cached --check
 fi
 
-actionlint=.tools/aqua/bin/actionlint
-shellcheck=.tools/aqua/bin/shellcheck
+actionlint=${AQUA_ROOT_DIR:-.tools/aqua}/bin/actionlint
+shellcheck=${AQUA_ROOT_DIR:-.tools/aqua}/bin/shellcheck
 if [ ! -x "$actionlint" ] || [ ! -x "$shellcheck" ]; then
   if [ "$require_tools" -eq 1 ]; then
     printf 'quality-check: pinned quality tools are missing; run make setup\n' >&2
@@ -32,13 +32,13 @@ find scripts -type f | while IFS= read -r script; do
     '#!'*node*|'#!'*python*) continue ;;
     '#!'*bash*)
       bash -n "$script"
-      scripts/aqua exec shellcheck --shell=bash --external-sources "$script"
+      shellcheck --shell=bash --external-sources "$script"
       ;;
     *)
       sh -n "$script"
-      scripts/aqua exec shellcheck --shell=sh --external-sources "$script"
+      shellcheck --shell=sh --external-sources "$script"
       ;;
   esac
 done
-scripts/aqua exec actionlint -shellcheck="$shellcheck"
+actionlint -shellcheck="$shellcheck"
 printf 'Repository quality validation passed.\n'
