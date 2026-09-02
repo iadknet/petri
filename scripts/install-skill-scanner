@@ -13,6 +13,6 @@ tool_root=$(pwd)/.tools/uv-tools
 bin_root=$(pwd)/.tools/bin
 mkdir -p "$tool_root" "$bin_root"
 UV_TOOL_DIR=$tool_root UV_TOOL_BIN_DIR=$bin_root \
-  scripts/aqua exec uv tool install "cisco-ai-skill-scanner==$version" \
+  uv tool install "cisco-ai-skill-scanner==$version" \
     --python 3.12 --managed-python --no-progress --exclude-newer '7 days'
 "$target" --version

@@ -5,7 +5,7 @@ repos:
     hooks:
       - id: project-validation
         name: Project validation
-        entry: scripts/project-precommit
+        entry: make project-precommit
         language: system
         pass_filenames: false
         always_run: true

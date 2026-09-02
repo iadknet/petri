@@ -10,8 +10,8 @@ else
   tool_root=$(pwd)/.tools/uv-tools
   bin_root=$(pwd)/.tools/bin
   mkdir -p "$tool_root" "$bin_root"
-  UV_TOOL_DIR=$tool_root UV_TOOL_BIN_DIR=$bin_root \
-    scripts/aqua exec uv tool install "pre-commit==$version" --python 3.12 --managed-python --no-progress --exclude-newer '7 days'
+UV_TOOL_DIR=$tool_root UV_TOOL_BIN_DIR=$bin_root \
+    uv tool install "pre-commit==$version" --python 3.12 --managed-python --no-progress --exclude-newer '7 days'
 fi
 
 if [ "$(git config --local --get core.hooksPath 2>/dev/null || :)" = .githooks ]; then
