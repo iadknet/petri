@@ -73,7 +73,7 @@ petri/
 |  |- v3-server/            # command/query/transport surfaces over v3-core
 |  \- v3-cli/               # command-line surfaces over v3-core
 |- frontend/                # viewport/world-view/render client
-\- docs/                    # canonical strategy, reference, and PRD docs
+\- docs/                    # canonical strategy, reference, and roadmap docs
 ```
 
 ## Runtime Truthfulness Invariant

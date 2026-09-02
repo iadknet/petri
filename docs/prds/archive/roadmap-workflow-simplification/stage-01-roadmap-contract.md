@@ -62,7 +62,7 @@ Create `docs/roadmaps/README.md`, `_master-template.md`, `_track-template.md`,
 
 | ID | Acceptance criterion | Verification | Evidence |
 | --- | --- | --- | --- |
-| AC-1 | An absent live master passes only when no live tracks or specs exist. | Empty-scaffold checker fixture | `make roadmap-check-test`: 22 tests passed, including templates-only and live-without-master cases. |
+| AC-1 | An absent live master passes only when no live tracks or specs exist. | Empty-scaffold checker fixture | `make roadmap-check-test`: 25 tests passed, including templates-only, present-empty-master, nested-live-without-master, and live-without-master cases. |
 | AC-2 | IDs, canonical paths, links, unknown dependencies, duplicate ownership, and cycles are rejected. | Graph and path checker fixtures | `make roadmap-check-test`: canonical identity, dependency, later-listed cross-track, duplicate, orphan, noncanonical filename, malformed metadata/path, exact owning-track link, and cycle cases passed; checker emits deterministic diagnostics. |
 | AC-3 | Checked features, complete specs, blocked specs, track rollups, and master completion stay synchronized. | Lifecycle checker fixtures | `make roadmap-check-test`: complete closure, blocked-spec, nested/ordinary unchecked tasks, premature completion, invalid Planning/Active states, and rollup-drift cases passed. |
 | AC-4 | The goal prompt contains the requested P1-only, model-role, worktree, verification, integration, and authorization boundaries. | Diff-scoped documentation review | `docs/roadmaps/_goal-prompt-template.md` records the requested role models, P1-only policy, branch/worktree, focused checks, `make check`, closure, and authorization boundaries. |
