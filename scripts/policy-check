@@ -8,7 +8,7 @@ fail() {
 
 [ -f AGENTS.md ] || fail 'AGENTS.md is missing'
 
-scripts/aqua env scripts/dependency-policy-check
+scripts/dependency-policy-check
 scripts/skill-provenance-check
 scripts/residual-cruft-check
 

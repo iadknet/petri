@@ -24,7 +24,7 @@ if ! has_lockfile; then
   exit 0
 fi
 
-scanner=.tools/aqua/bin/osv-scanner
+scanner=${AQUA_ROOT_DIR:-.tools/aqua}/bin/osv-scanner
 if [ ! -x "$scanner" ]; then
   if [ "$require_tools" -eq 1 ]; then
     printf 'dependency-audit: OSV-Scanner is missing; run make setup\n' >&2
@@ -34,4 +34,4 @@ if [ ! -x "$scanner" ]; then
   exit 0
 fi
 
-scripts/aqua exec osv-scanner scan source --recursive .
+osv-scanner scan source --recursive .
