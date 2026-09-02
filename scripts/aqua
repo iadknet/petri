@@ -49,6 +49,7 @@ case ${1:-} in
     shift
     [ "$#" -gt 0 ] || { printf 'Usage: scripts/aqua <install|exec|env> [tool args]\n' >&2; exit 2; }
     export AQUA_DISABLE_LAZY_INSTALL=true
+    export PATH="$AQUA_ROOT_DIR/bin:$PATH"
     exec aqua exec -- "$@"
     ;;
   env)
