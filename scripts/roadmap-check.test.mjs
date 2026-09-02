@@ -18,10 +18,23 @@ function run(root, ...args) {
   return spawnSync(process.execPath, [checker, '--root', root, ...args], { encoding: 'utf8' });
 }
 
-function writeFixture(root, { masterStatus = 'Active', trackStatus = 'In Progress', featureChecked = false, specStatus = 'In Progress', specChecked = false, blocker = 'None.', dependency = 'None' } = {}) {
+function writeFixture(root, {
+  masterStatus = 'Active',
+  trackStatus = 'In Progress',
+  featureChecked = false,
+  specStatus = 'In Progress',
+  specChecked = false,
+  blocker = 'None.',
+  dependency = 'None',
+  specDependency = dependency,
+  readiness = 'Approved',
+  readinessReviewer = readiness === 'Not Reviewed' ? 'None' : 'Independent Reviewer',
+  readinessReviewed = readiness === 'Not Reviewed' ? 'None' : '2026-09-01',
+  readinessEvidence = readiness === 'Not Reviewed' ? 'Not reviewed.' : 'Independent review found the feature executable.',
+} = {}) {
   writeFileSync(join(root, 'docs', 'roadmap.md'), `# Program\n\n**Status**: ${masterStatus}\n**Last updated**: 2026-09-01\n\n## Success Definition\n\nOutcome.\n\n## Track Roadmaps\n\n- [${trackStatus === 'Complete' ? 'x' : ' '}] **T01 — Core** — [Roadmap](roadmaps/t01-core.md) — Depends on: None\n\n## Final Success Criteria\n\n- [${masterStatus === 'Complete' ? 'x' : ' '}] Program complete.\n\n## Notes for AI Agents\n\nNotes.\n`);
   writeFileSync(join(root, 'docs', 'roadmaps', 't01-core.md'), `# T01 — Core\n\n**Status**: ${trackStatus}\n**Last updated**: 2026-09-01\n**Master**: [Program Roadmap](../roadmap.md)\n\n## Goal\n\nGoal.\n\n## Track Success Criteria\n\n- [${trackStatus === 'Complete' ? 'x' : ' '}] Track complete.\n\n## Executable Features\n\n- [${featureChecked ? 'x' : ' '}] **T01.F01 — Foundation** — Depends on: ${dependency}\n\n## Notes for AI Agents\n\nNotes.\n`);
-  writeFileSync(join(root, 'docs', 'specs', 'roadmap', 't01-f01-foundation.md'), `# T01.F01 — Foundation\n\n**Status**: ${specStatus}\n**Last updated**: 2026-09-01\n**Feature**: T01.F01\n**Track**: [T01 — Core](../../roadmaps/t01-core.md)\n\n## Overview\n\nOverview.\n\n## Goal\n\nGoal.\n\n## Non-Goals\n\nNone.\n\n## Inputs and Invariants\n\nNone.\n\n## Implementation Tasks\n\n- [${specChecked ? 'x' : ' '}] Implement.\n\n## Verification\n\n- [${specChecked ? 'x' : ' '}] Verify.\n\n## Success Criteria\n\n- [${specChecked ? 'x' : ' '}] Succeed.\n\n## Blocker\n\n${blocker}\n\n## Deferred Review Findings\n\nNone.\n\n## Notes for AI Agents\n\nNotes.\n`);
+  writeFileSync(join(root, 'docs', 'specs', 'roadmap', 't01-f01-foundation.md'), `# T01.F01 — Foundation\n\n**Status**: ${specStatus}\n**Last updated**: 2026-09-01\n**Feature**: T01.F01\n**Track**: [T01 — Core](../../roadmaps/t01-core.md)\n**Dependencies**: ${specDependency}\n**Execution approval**: ${readiness}\n**Approval reviewer**: ${readinessReviewer}\n**Approval date**: ${readinessReviewed}\n\n## Overview\n\nOverview.\n\n## Goal\n\nGoal.\n\n## Non-Goals\n\nNone.\n\n## Inputs and Invariants\n\nNone.\n\n## Execution Approval\n\n${readinessEvidence}\n\n## Implementation Tasks\n\n- [${specChecked ? 'x' : ' '}] Implement.\n\n## Verification\n\n- [${specChecked ? 'x' : ' '}] Verify.\n\n## Success Criteria\n\n- [${specChecked ? 'x' : ' '}] Succeed.\n\n## Blocker\n\n${blocker}\n\n## Deferred Review Findings\n\nNone.\n\n## Notes for AI Agents\n\nNotes.\n`);
 }
 
 test('templates-only empty scaffold passes', () => {
@@ -91,6 +104,64 @@ test('active roadmap with an in-progress feature passes', () => {
   try {
     writeFixture(root);
     const result = run(root);
+    assert.equal(result.status, 0, result.stderr);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('feature spec dependencies must exactly match the owning roadmap row', () => {
+  const root = fixture();
+  try {
+    writeFixture(root, { specDependency: 'T01.F99' });
+    const result = run(root);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /Dependencies.*must exactly match owning roadmap row 'None'/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('implementation requires independently evidenced readiness approval', () => {
+  const root = fixture();
+  try {
+    writeFixture(root, { readiness: 'Not Reviewed' });
+    let result = run(root);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /In Progress spec requires \*\*Execution approval\*\*: Approved/);
+
+    writeFixture(root, { readinessReviewer: 'None' });
+    result = run(root);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /requires a concrete \*\*Approval reviewer\*\*/);
+
+    writeFixture(root, { readinessReviewed: 'yesterday' });
+    result = run(root);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /requires a YYYY-MM-DD \*\*Approval date\*\*/);
+
+    writeFixture(root, { readinessEvidence: 'Not reviewed.' });
+    result = run(root);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /requires concrete Execution Approval evidence/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('a readiness revision can remain planned or become concretely blocked', () => {
+  const root = fixture();
+  try {
+    writeFixture(root, {
+      trackStatus: 'Planned',
+      specStatus: 'Planned',
+      readiness: 'Revision Required',
+      readinessEvidence: 'A missing acceptance threshold prevents implementation.',
+    });
+    let result = run(root);
+    assert.equal(result.status, 0, result.stderr);
+
+    writeFixture(root, {
+      specStatus: 'Blocked',
+      blocker: 'The acceptance threshold still requires a scientific decision.',
+      readiness: 'Revision Required',
+      readinessEvidence: 'The bounded revision did not resolve the threshold.',
+    });
+    result = run(root);
     assert.equal(result.status, 0, result.stderr);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
@@ -433,21 +504,27 @@ test('usage errors use exit status 2', () => {
 test('real goal prompt contains the approved execution contract', () => {
   const prompt = readFileSync(join(process.cwd(), 'docs', 'roadmaps', '_goal-prompt-template.md'), 'utf8');
   for (const clause of [
-    'track roadmaps linked from `docs/roadmap.md`',
+    'every track roadmap linked from `docs/roadmap.md`',
+    'one global\nfeature DAG',
+    'repeatedly select a ready node',
+    'never phase boundaries',
     'only unchecked `TNN.FNN`',
     '`gpt-5.6-sol` xhigh planner',
     '`gpt-5.6-sol` high reviewer',
     '`gpt-5.6-luna` high implementer',
     'Only a P1 finding blocks',
     'P2 and P3 findings are advisory',
-    'one readiness revision',
-    'one post-review remediation pass',
+    'P2 findings as `non-executable`',
+    'all other P2 findings are `deferrable`',
+    'budget is per feature',
+    'one readiness revision and one post-review\n  remediation pass for each feature',
     'integration branch `roadmap/complete`',
     'dedicated\nintegration worktree',
     'exactly one feature branch and one feature worktree',
     'latest commit of the integration branch',
     'integrate completed feature commits into the integration branch in dependency',
     'Verify the feature worktree is clean after\nintegration, then clean and remove it',
+    'cleanup must never\nremove or garbage-collect the declared durable experiment artifact root',
     'This prompt explicitly authorizes local\nbranch, worktree, and commit creation',
     'Do not push, open',
     'merge into the user\'s `main` branch',
@@ -455,7 +532,11 @@ test('real goal prompt contains the approved execution contract', () => {
     'viability-first',
     'post-review `make check`',
     'atomically and truthfully',
-    'atomic,\ntruthful spec/feature/track/master status/date/commit updates',
+    'Make atomic, truthful\nspec/feature/track/master status/date/commit updates',
+    'spec says `Execution approval: Approved`',
+    'Durable experiment artifact root',
+    'Campaign resource envelope',
+    'require checked dependency\n`T01.F09`',
     'clean integration branch',
     'On the clean integration branch, run the final `make check`',
   ]) assert.match(prompt, new RegExp(clause.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')), clause);
