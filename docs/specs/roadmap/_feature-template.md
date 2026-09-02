@@ -4,14 +4,6 @@
 **Last updated**: <YYYY-MM-DD>
 **Feature**: T01.F01
 **Track**: [T01 — <Track title>](../../roadmaps/t01-<track-slug>.md)
-**Dependencies**: None
-**Execution approval**: Not Reviewed
-**Approval reviewer**: None
-**Approval date**: None
-
-## Overview
-
-Summarize the feature and its context.
 
 ## Goal
 
@@ -24,15 +16,8 @@ State the independently observable feature outcome.
 ## Inputs and Invariants
 
 List source-of-truth inputs, decision-relevant research evidence, exact
-dependency outputs, and invariants. `Dependencies` metadata must exactly match
-the owning roadmap row.
-
-## Execution Approval
-
-Record the independent verdict rationale and distinguish non-executable P2
-findings from deferrable findings. Change `Execution approval` to `Approved`
-only when the feature can be implemented and verified without an unresolved
-design choice.
+dependency outputs, and invariants. The owning roadmap row is the source of
+truth for feature dependencies.
 
 ## Implementation Tasks
 
@@ -46,14 +31,7 @@ design choice.
 
 - [ ] The feature outcome is observable and complete.
 
-## Blocker
-
-None.
-
-## Deferred Review Findings
-
-None.
-
 ## Notes for AI Agents
 
-Record implementation context. Keep orchestration policy in the goal prompt.
+Record implementation context, blockers, and advisory review findings. Keep
+orchestration policy in the goal prompt.

@@ -7,22 +7,14 @@ use `TNN.FNN` IDs. Create a flat feature spec just in time during feature
 planning at `docs/specs/roadmap/tNN-fNN-<kebab-slug>.md`.
 
 The files beginning with `_` are templates and never represent live execution
-state. Copy a template, replace every placeholder, and preserve the canonical
-metadata, headings, links, IDs, and checkbox state. Keep dependencies explicit,
-acyclic, and limited to work that is actually required.
+state. Copy a template, replace its placeholders, and keep IDs, links,
+dependencies, statuses, and checkbox state truthful. Feature dependencies live
+in the owning track roadmap rather than being duplicated in the feature spec.
 
-Every live feature spec copies its owning roadmap row's exact dependencies into
-`Dependencies` metadata and records `Execution approval`, reviewer identity,
-and approval date. Implementation begins only after an independent `Approved` verdict.
-Decision-relevant research belongs under `Inputs and Invariants`; review
-rationale and non-executable versus deferrable findings belong under
-`Execution Approval` and `Deferred Review Findings`.
-
-Run `make roadmap-check` while editing. A checked feature requires one complete
-feature spec, and a complete spec requires every implementation, verification,
-and success item to be checked. Use `Blocked` only with a concrete blocker;
-blocked work remains unchecked. A complete track and master rollup must agree
-with their checked criteria.
+Run `make roadmap-check` while editing. It checks ownership, links, dependency
+existence and cycles, feature/spec completion agreement, and completion rollups.
+It intentionally does not police prose, review procedure, dates, or agent
+orchestration.
 
 Roadmap documents describe intent and state. They do not encode agent
 execution policy or integration authority. Those decisions belong in the
