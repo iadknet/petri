@@ -24,9 +24,11 @@ Lean mode is the ordinary feature path:
 
 1. One bounded planning pass creates a compact PRD with at most two stages and an
    affected-file budget no greater than 25. When agents are requested, use one
-   Sol x-high planner.
-2. Perform one compact readiness review and the mechanical PRD checks. Do not
-   repeat repository discovery or produce a separate narrative review artifact.
+   Sol x-high planner and `$research-first-planning`; hand off only the resulting
+   decisions, sources, PRD paths, and open risks.
+2. The coordinator performs one compact readiness audit in its existing context
+   and runs the mechanical PRD checks. Do not spawn a separate readiness agent,
+   repeat repository discovery, or produce a narrative review artifact.
 3. Use one persistent implementer for all stages and later fixes. When agents are
    requested, use Luna high. Run focused checks while working and `make check`
    once when implementation is ready for final review.
@@ -51,8 +53,10 @@ does not authorize implementation or external side effects by itself.
 ## State routing
 
 - No applicable PRD, or a material scope/design change: use `$prd-create`.
-- `Draft` PRD with `Review Status: DRAFT`: use `$prd-review` for readiness,
-  respecting the mode's review budget.
+- Lean `Draft` PRD with `Review Status: DRAFT`: the coordinator applies the Lean
+  readiness gate in `$prd-review` without delegating another agent.
+- Deep `Draft` PRD with `Review Status: DRAFT`: use an independent `$prd-review`,
+  respecting the Deep review budget.
 - A PRD at its readiness-review limit with unresolved P1/P2 findings: stop for
   human intervention.
 - `Ready` or `In Progress` PRD with `Review Status: APPROVED`: use

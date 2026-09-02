@@ -1,6 +1,6 @@
 .DEFAULT_GOAL := help
 
-.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-priority-bid rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc rust-clippy frontend-check frontend-lint frontend-test frontend-build policy-check quality-check dependency-audit skill-check prd-check check audit precommit format clean
+.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-priority-bid rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc rust-clippy frontend-check frontend-lint frontend-test frontend-build policy-check quality-check dependency-audit skill-check prd-check prd-check-test check audit precommit format clean
 
 help: ## Show the stable project command interface.
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -72,8 +72,12 @@ frontend-build: ## Build the frontend.
 prd-check: ## Validate active and archived PRD sets.
 	@scripts/prd-check
 
+prd-check-test: ## Run PRD checker regression tests.
+	@scripts/prd-check-test
+
 policy-check: ## Validate PRD, repository, provenance, and retirement policy.
 	@scripts/prd-check
+	@scripts/prd-check-test
 	@scripts/policy-check
 
 quality-check: ## Check whitespace, shell syntax, ShellCheck, and actionlint.

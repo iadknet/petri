@@ -21,6 +21,45 @@ prd_metadata_value() {
   sed -n "s/^- $prd_metadata_name: //p" "$prd_metadata_file" | sed -n '1p'
 }
 
+prd_check_acceptance_evidence() {
+  prd_evidence_doc=$1
+  prd_evidence_status=$2
+  prd_evidence_complete=0
+  [ "$prd_evidence_status" = Complete ] && prd_evidence_complete=1
+  if ! awk -v completed="$prd_evidence_complete" '
+    function trim(value) {
+      sub(/^[[:space:]]+/, "", value)
+      sub(/[[:space:]]+$/, "", value)
+      return value
+    }
+    BEGIN { rows = 0; invalid = 0 }
+    /^\|[[:space:]]*AC-[0-9]+[[:space:]]*\|/ {
+      field_count = split($0, fields, "|")
+      if (field_count != 6) {
+        invalid = 1
+        next
+      }
+      id = trim(fields[2])
+      criterion = trim(fields[3])
+      verification = trim(fields[4])
+      evidence = trim(fields[5])
+      rows++
+      if (id !~ /^AC-[0-9]+$/ || criterion == "" || verification == "" || evidence == "") {
+        invalid = 1
+      }
+      if (seen[id]++) {
+        invalid = 1
+      }
+      if (completed && evidence == "Pending") {
+        invalid = 1
+      }
+    }
+    END { if (rows == 0 || invalid) exit 1 }
+  ' "$prd_evidence_doc"; then
+    prd_error "$prd_evidence_doc must contain unique AC-<number> rows with non-empty criterion, verification, and evidence; Complete documents cannot use Pending evidence"
+  fi
+}
+
 prd_check_document() {
   prd_doc=$1
   prd_kind=$2
@@ -66,14 +105,13 @@ prd_check_document() {
     grep -Fq '[Master PRD](master-prd.md)' "$prd_doc" || prd_error "$prd_doc does not link to master-prd.md"
   fi
 
+  prd_doc_status=$(prd_status "$prd_doc")
   if [ "$prd_execution_mode" != Legacy ]; then
     grep -Fqx '## Acceptance Criteria and Evidence' "$prd_doc" || \
       prd_error "$prd_doc is missing heading: ## Acceptance Criteria and Evidence"
-    grep -Eq '^\| AC-[0-9]+ \|[^|]+\|[^|]+\|[^|]+\|$' "$prd_doc" || \
-      prd_error "$prd_doc must map at least one AC-<number> criterion to verification and evidence"
+    prd_check_acceptance_evidence "$prd_doc" "$prd_doc_status"
   fi
 
-  prd_doc_status=$(prd_status "$prd_doc")
   case $prd_doc_status in
     Draft|Ready|'In Progress'|Complete) ;;
     *) prd_error "$prd_doc has invalid or missing status: ${prd_doc_status:-<empty>}" ;;
@@ -81,10 +119,6 @@ prd_check_document() {
 
   if [ "$prd_doc_status" = Complete ] && grep -Eq '^- \[ \]' "$prd_doc"; then
     prd_error "$prd_doc is Complete but contains unchecked tasks"
-  fi
-  if [ "$prd_execution_mode" != Legacy ] && [ "$prd_doc_status" = Complete ] && \
-     grep -Eq '\|[[:space:]]*Pending[[:space:]]*\|[[:space:]]*$' "$prd_doc"; then
-    prd_error "$prd_doc is Complete but contains Pending acceptance evidence"
   fi
 }
 
@@ -135,23 +169,25 @@ prd_check_set() {
       esac
     fi
 
-    if [ "$prd_master_status" = Complete ]; then
-      case $prd_actual_files in
-        ''|*[!0-9]*) prd_error "$prd_master Complete status requires numeric Actual Affected Files" ;;
-        *)
-          case $prd_file_budget in
-            ''|*[!0-9]*) ;;
-            *) [ "$prd_actual_files" -le "$prd_file_budget" ] || \
-              prd_error "$prd_master Actual Affected Files exceeds its declared budget" ;;
-          esac
-          ;;
-      esac
-    else
-      case $prd_actual_files in Pending|''|*[!0-9]*)
-        [ "$prd_actual_files" = Pending ] || prd_error "$prd_master Actual Affected Files must be Pending or numeric"
+    case $prd_actual_files in
+      Pending)
+        case $prd_master_status in
+          'In Progress'|Complete)
+            prd_error "$prd_master $prd_master_status status requires numeric Actual Affected Files"
+            ;;
+        esac
         ;;
-      esac
-    fi
+      ''|*[!0-9]*)
+        prd_error "$prd_master Actual Affected Files must be Pending or numeric"
+        ;;
+      *)
+        case $prd_file_budget in
+          ''|*[!0-9]*) ;;
+          *) [ "$prd_actual_files" -le "$prd_file_budget" ] || \
+            prd_error "$prd_master Actual Affected Files exceeds its declared budget" ;;
+        esac
+        ;;
+    esac
   fi
 
   prd_review_count=$(sed -n 's/^- Review Count: //p' "$prd_master" | sed -n '1p')
