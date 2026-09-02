@@ -7,7 +7,9 @@ needed, track roadmaps under `docs/roadmaps/`, and feature specs under
 
 Run `make roadmap-check` while editing roadmap documents and record focused
 verification in the owning feature spec. Keep dependencies, checkboxes, links,
-statuses, dates, and completion rollups truthful. Run `make check` before
+execution-approval evidence, statuses, dates, and completion rollups truthful. A feature
+may enter implementation only after its exact roadmap dependencies are recorded
+and its independent execution approval is `Approved`. Run `make check` before
 declaring a feature or integration complete.
 
 Review security-sensitive reports privately as described in `SECURITY.md`.
