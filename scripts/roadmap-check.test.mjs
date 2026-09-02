@@ -33,6 +33,17 @@ test('templates-only empty scaffold passes', () => {
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
+test('present empty master is validated instead of treated as absent', () => {
+  const root = fixture();
+  try {
+    writeFileSync(join(root, 'docs', 'roadmap.md'), ' \n\n');
+    const result = run(root);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /docs\/roadmap\.md: missing \*\*Status\*\* metadata/);
+    assert.match(result.stderr, /docs\/roadmap\.md: missing heading '## Success Definition'/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
 test('live tracks without a master fail', () => {
   const root = fixture();
   try {
@@ -40,6 +51,38 @@ test('live tracks without a master fail', () => {
     const result = run(root);
     assert.equal(result.status, 1);
     assert.match(result.stderr, /require a live master/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('nested live track and feature-spec files are rejected deterministically', () => {
+  const root = fixture();
+  try {
+    writeFixture(root);
+    mkdirSync(join(root, 'docs', 'roadmaps', 'nested'), { recursive: true });
+    cpSync(join(root, 'docs', 'roadmaps', 't01-core.md'), join(root, 'docs', 'roadmaps', 'nested', 't01-core.md'));
+    let result = run(root);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /docs\/roadmaps\/nested\/t01-core\.md: non-canonical track path/);
+
+    writeFixture(root);
+    mkdirSync(join(root, 'docs', 'specs', 'roadmap', 'nested'), { recursive: true });
+    cpSync(join(root, 'docs', 'specs', 'roadmap', 't01-f01-foundation.md'), join(root, 'docs', 'specs', 'roadmap', 'nested', 't01-f01-foundation.md'));
+    result = run(root);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /docs\/specs\/roadmap\/nested\/t01-f01-foundation\.md: non-canonical feature-spec path/);
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test('nested live files without a master still require a live master', () => {
+  const root = fixture();
+  try {
+    mkdirSync(join(root, 'docs', 'roadmaps', 'nested'), { recursive: true });
+    mkdirSync(join(root, 'docs', 'specs', 'roadmap', 'nested'), { recursive: true });
+    writeFileSync(join(root, 'docs', 'roadmaps', 'nested', 't01-core.md'), '# T01 — Core\n');
+    writeFileSync(join(root, 'docs', 'specs', 'roadmap', 'nested', 't01-f01-feature.md'), '# T01.F01 — Feature\n');
+    const result = run(root);
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /live track or feature-spec files require a live master/);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
