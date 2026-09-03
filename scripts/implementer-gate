@@ -1,0 +1,46 @@
+#!/bin/sh
+# SubagentStop gate for the roadmap-implementer subagent.
+#
+# Reads the hook payload from stdin, locates the implementer's worktree from its
+# "cwd" field, and, when any roadmap document differs from the merge base with
+# the integration branch, runs the roadmap checker there. Exit 2 blocks the
+# subagent from reporting done and feeds the checker output back to it.
+# Anything the gate cannot evaluate exits 0 so a broken hook never blocks work.
+set -eu
+
+input=$(cat)
+cwd=$(printf '%s' "$input" | sed -n 's/.*"cwd"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+if [ -z "$cwd" ] || [ ! -d "$cwd" ]; then
+  printf 'implementer-gate: no usable cwd in hook input; skipping\n' >&2
+  exit 0
+fi
+root=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null) || exit 0
+
+base_ref=${PETRI_GATE_BASE_REF:-roadmap/complete}
+if ! base=$(git -C "$root" merge-base HEAD "$base_ref" 2>/dev/null); then
+  base=HEAD
+fi
+
+paths='docs/roadmap.md docs/roadmaps docs/specs/roadmap'
+# shellcheck disable=SC2086 # $paths is a deliberate word-split list of pathspecs
+changed=$(git -C "$root" diff --name-only "$base" -- $paths)
+# shellcheck disable=SC2086
+untracked=$(git -C "$root" ls-files --others --exclude-standard -- $paths)
+[ -n "$changed$untracked" ] || exit 0
+
+script_dir=$(cd "$(dirname "$0")" && pwd)
+checker=$script_dir/roadmap-check.mjs
+node=${NODE:-}
+if [ -z "$node" ]; then
+  if command -v node >/dev/null 2>&1; then
+    node=node
+  else
+    node=${AQUA_ROOT_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/aquaproj-aqua}/bin/node
+  fi
+fi
+
+if output=$("$node" "$checker" --root "$root" 2>&1); then
+  exit 0
+fi
+printf 'implementer-gate: roadmap-check failed in %s. Fix the roadmap documents before reporting done.\n%s\n' "$root" "$output" >&2
+exit 2

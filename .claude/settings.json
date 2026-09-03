@@ -1,0 +1,6 @@
+{
+  "advisorModel": "opus",
+  "worktree": {
+    "baseRef": "head"
+  }
+}
