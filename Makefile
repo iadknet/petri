@@ -6,7 +6,7 @@ export AQUA_ENFORCE_CHECKSUM := true
 export AQUA_ENFORCE_REQUIRE_CHECKSUM := true
 export PATH := $(AQUA_ROOT_DIR)/bin:$(PATH)
 
-.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-priority-bid rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc rust-clippy frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test residual-cruft-check residual-cruft-check-test dependency-policy-check-test policy-check quality-check dependency-audit skill-check check audit precommit project-precommit format clean
+.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-priority-bid rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc rust-clippy frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test dependency-policy-check-test policy-check quality-check dependency-audit skill-check check audit precommit project-precommit format clean
 
 help: ## Show the stable project command interface.
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -81,17 +81,11 @@ roadmap-check: ## Validate the live roadmap contract (set ROADMAP_ROOT for a fix
 roadmap-check-test: ## Run the roadmap checker regression suite through Aqua's Node runtime.
 	@$(AQUA_ROOT_DIR)/bin/node --test scripts/roadmap-check.test.mjs
 
-residual-cruft-check: ## Reject retired workflow references in live repository content.
-	@scripts/residual-cruft-check
-
-residual-cruft-check-test: ## Run residual workflow-reference regression tests.
-	@scripts/residual-cruft-check-test
-
 dependency-policy-check-test: ## Run dependency-policy regression tests.
 	@scripts/dependency-policy-check-test
 
 policy-check: ## Validate roadmap, repository, provenance, and retirement policy.
-	@$(MAKE) roadmap-check roadmap-check-test residual-cruft-check-test dependency-policy-check-test
+	@$(MAKE) roadmap-check roadmap-check-test dependency-policy-check-test
 	@scripts/policy-check
 
 quality-check: ## Check whitespace, shell syntax, ShellCheck, and actionlint.
