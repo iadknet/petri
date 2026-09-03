@@ -1,4 +1,4 @@
-//! Transitional query cache boundary.
+//! Query-side simulation caches.
 
 use crate::query::spatial_index::ViewRect;
 use crate::state::FramePayload;

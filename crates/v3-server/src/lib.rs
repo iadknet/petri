@@ -1,9 +1,8 @@
 //! v3-server: HTTP/WS transport over v3-core.
 
-pub mod app_state;
+mod app_state;
 pub mod error;
-pub mod handlers;
-pub mod http;
+mod http;
 pub mod query;
 pub mod state;
 pub mod transport;
@@ -13,7 +12,7 @@ pub mod ws;
 use axum::routing::{get, patch, post};
 use tower_http::compression::CompressionLayer;
 
-pub fn router(state: app_state::AppState) -> axum::Router {
+pub fn router(state: state::AppState) -> axum::Router {
     axum::Router::new()
         .route("/v3/simulation/startup", post(http::lifecycle::startup))
         .route("/v3/simulation/start", post(http::lifecycle::start))

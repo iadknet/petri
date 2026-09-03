@@ -6,7 +6,7 @@ export AQUA_ENFORCE_CHECKSUM := true
 export AQUA_ENFORCE_REQUIRE_CHECKSUM := true
 export PATH := $(AQUA_ROOT_DIR)/bin:$(PATH)
 
-.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-priority-bid rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc rust-clippy frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test residual-cruft-check residual-cruft-check-test policy-check quality-check dependency-audit skill-check check audit precommit project-precommit format clean
+.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-priority-bid rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc rust-clippy frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test residual-cruft-check residual-cruft-check-test dependency-policy-check-test policy-check quality-check dependency-audit skill-check check audit precommit project-precommit format clean
 
 help: ## Show the stable project command interface.
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -37,7 +37,7 @@ rust-format-check: ## Check Rust formatting.
 rust-viability: ## Run the Rust viability merge gate.
 	@cargo test -p v3-core --test viability
 
-rust-test-all: rust-test-core-unit rust-test-creature-workflow rust-test-priority-bid rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc rust-viability ## Run every Rust test subset.
+rust-test-all: rust-test-core-unit rust-test-creature-workflow rust-test-priority-bid rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc ## Run every Rust test subset except the separately ordered viability gate.
 
 rust-test-core-unit: ## Run v3-core unit tests.
 	@cargo test -p v3-core --lib
@@ -87,8 +87,11 @@ residual-cruft-check: ## Reject retired workflow references in live repository c
 residual-cruft-check-test: ## Run residual workflow-reference regression tests.
 	@scripts/residual-cruft-check-test
 
+dependency-policy-check-test: ## Run dependency-policy regression tests.
+	@scripts/dependency-policy-check-test
+
 policy-check: ## Validate roadmap, repository, provenance, and retirement policy.
-	@$(MAKE) roadmap-check roadmap-check-test residual-cruft-check-test
+	@$(MAKE) roadmap-check roadmap-check-test residual-cruft-check-test dependency-policy-check-test
 	@scripts/policy-check
 
 quality-check: ## Check whitespace, shell syntax, ShellCheck, and actionlint.

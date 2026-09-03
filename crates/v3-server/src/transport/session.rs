@@ -1,4 +1,4 @@
-//! Transitional websocket-session boundary.
+//! WebSocket session state and projection notifications.
 
 use crate::query::cache::DirtyRect;
 use crate::transport::protocol::{ClientMessage, ZoomTier};

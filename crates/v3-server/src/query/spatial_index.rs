@@ -1,4 +1,4 @@
-//! Transitional spatial-index boundary.
+//! Query-side spatial index.
 
 use std::collections::HashMap;
 

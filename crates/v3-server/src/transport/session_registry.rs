@@ -1,4 +1,4 @@
-//! Transitional session-registry boundary.
+//! WebSocket session registry.
 
 use std::collections::HashMap;
 

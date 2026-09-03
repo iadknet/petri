@@ -1,8 +1,8 @@
-//! HTTP handler boundary for the server refactor.
+//! Axum request handlers.
 
-pub mod creature;
-pub mod lifecycle;
-pub mod paint;
-pub mod pattern;
-pub mod snapshot;
-pub mod status;
+pub(crate) mod creature;
+pub(crate) mod lifecycle;
+pub(crate) mod paint;
+pub(crate) mod pattern;
+pub(crate) mod snapshot;
+pub(crate) mod status;

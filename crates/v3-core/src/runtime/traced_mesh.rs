@@ -1,27 +1,19 @@
-//! Traced mesh execution — identical routing logic to [`super::mesh::execute_creature_mesh`]
-//! but records per-hop trace data for the Execution Sampler.
-//!
-//! **Maintenance note:** This module duplicates the mesh routing loop from `mesh.rs`
-//! with trace recording. When updating mesh routing logic, apply the same changes
-//! here and verify with equivalence tests.
+//! Trace recording adapter for the shared mesh routing loop.
 
 use crate::config::RuntimeConfig;
-use crate::contracts::{NodeId, WorldAction};
+use crate::contracts::NodeId;
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute_graph_node_traced_with_reserve;
-use crate::runtime::routing::resolve_gated_route;
+use crate::runtime::mesh::{execute_creature_mesh_impl, MeshExecutionMode};
 use crate::runtime::trace::domain::{
     BackendTrace, MeshHopTrace, TerminationReason, TraceGateScore, TraceRouteDecision,
 };
 use crate::runtime::traced_vm::execute_vm_node_traced_with_reserve;
-use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
+use crate::runtime::types::{MeshOutput, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::SensorSnapshot;
 
 /// Execute the creature's mesh chain with trace recording.
-///
-/// Identical routing behavior to [`super::mesh::execute_creature_mesh`] but
-/// returns additional trace data: per-hop `MeshHopTrace` and `TerminationReason`.
 #[allow(clippy::too_many_arguments)]
 pub fn execute_creature_mesh_traced(
     genome: &CreatureGenome,
@@ -57,55 +49,59 @@ pub fn execute_creature_mesh_traced_with_reserve(
     graph_runtime: &mut GraphRuntimeState,
     config: &RuntimeConfig,
 ) -> (MeshOutput, Vec<MeshHopTrace>, TerminationReason) {
-    let mut current_node_id = genome.entry_node_id;
-    let mut upstream_slots = [0.0f32; OUTPUT_SLOT_COUNT];
-    let mut hops: usize = 0;
-    let max_hops = config.max_mesh_hops.max(1) as usize;
-    let start_energy = *energy;
-    let mut report = ComputeCostReport::default();
+    execute_creature_mesh_impl(
+        genome,
+        sensors,
+        energy,
+        reproductive_reserve,
+        shared_memory,
+        prev_shared_memory,
+        graph_runtime,
+        config,
+        RecordingMeshExecution::new(config.max_mesh_hops.max(1) as usize),
+    )
+}
 
-    let mut side_outputs = MeshSideOutputs::new(config.max_actions_per_turn);
-    let mut hop_traces: Vec<MeshHopTrace> = Vec::with_capacity(max_hops);
+struct RecordingMeshExecution {
+    hops: Vec<MeshHopTrace>,
+}
 
-    macro_rules! mesh_output {
-        ($actions:expr) => {
-            MeshOutput {
-                actions: $actions,
-                cost_report: report,
-                priority_bid: side_outputs.priority_bid,
-            }
-        };
-    }
-
-    if find_node_index(&genome.nodes, current_node_id).is_none() {
-        return (
-            mesh_output!(vec![WorldAction::NoOp]),
-            hop_traces,
-            TerminationReason::MissingNode,
-        );
-    }
-
-    loop {
-        if hops >= max_hops {
-            return (
-                mesh_output!(side_outputs.action_queue.into_actions_or_noop()),
-                hop_traces,
-                TerminationReason::MaxHopsReached,
-            );
+impl RecordingMeshExecution {
+    fn new(max_hops: usize) -> Self {
+        Self {
+            hops: Vec::with_capacity(max_hops),
         }
+    }
+}
 
-        let current_idx =
-            find_node_index(&genome.nodes, current_node_id).expect("node must exist in genome");
-        let node = &genome.nodes[current_idx];
-        let energy_consumed = (start_energy - *energy).max(0.0);
-        let node_energy_before = *energy;
+impl MeshExecutionMode for RecordingMeshExecution {
+    type BackendTrace = BackendTrace;
+    type Output = (MeshOutput, Vec<MeshHopTrace>, TerminationReason);
 
-        let (result, backend_trace) = match &node.backend_def {
+    const RECORDS_HOPS: bool = true;
+
+    #[allow(clippy::too_many_arguments)]
+    fn execute_node(
+        &mut self,
+        node: &NodeGenome,
+        node_idx: usize,
+        upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
+        energy: &mut f32,
+        energy_consumed: f32,
+        reproductive_reserve: f32,
+        shared_memory: &mut [f32; 16],
+        prev_shared_memory: &[f32; 16],
+        graph_runtime: &mut GraphRuntimeState,
+        sensors: &SensorSnapshot,
+        config: &RuntimeConfig,
+        side_outputs: &mut MeshSideOutputs,
+    ) -> (NodeResult, BackendTrace) {
+        match &node.backend_def {
             BackendDef::Vm(def) => {
-                let (result, vm_trace) = execute_vm_node_traced_with_reserve(
+                let (result, trace) = execute_vm_node_traced_with_reserve(
                     def,
                     &node.input_refs,
-                    &upstream_slots,
+                    upstream_slots,
                     energy,
                     energy_consumed,
                     reproductive_reserve,
@@ -113,121 +109,81 @@ pub fn execute_creature_mesh_traced_with_reserve(
                     prev_shared_memory,
                     sensors,
                     config,
-                    &mut side_outputs,
+                    side_outputs,
                 );
-                (result, BackendTrace::Vm(vm_trace))
+                (result, BackendTrace::Vm(trace))
             }
             BackendDef::Graph(def) => {
-                let (result, graph_trace) = execute_graph_node_traced_with_reserve(
+                let (result, trace) = execute_graph_node_traced_with_reserve(
                     def,
                     &node.input_refs,
-                    &upstream_slots,
+                    upstream_slots,
                     energy,
                     energy_consumed,
                     reproductive_reserve,
-                    current_idx,
+                    node_idx,
                     graph_runtime,
                     sensors,
                     config,
-                    &mut side_outputs,
+                    side_outputs,
                     shared_memory,
                     prev_shared_memory,
                 );
-                (result, BackendTrace::Graph(graph_trace))
+                (result, BackendTrace::Graph(trace))
             }
-        };
-
-        let node_cost = (node_energy_before - *energy).max(0.0);
-        match &node.backend_def {
-            BackendDef::Vm(_) => report.vm_cost += node_cost,
-            BackendDef::Graph(_) => report.graph_cost += node_cost,
         }
+    }
 
-        // Resolve routing via per-target gate scoring.
-        let route_result = resolve_gated_route(&node.targets, &result.route_gates);
-
-        // Build trace route decision with per-target gate scores.
-        let trace_route = route_result.map(|(winning_idx, id)| {
-            let gate_scores: Vec<TraceGateScore> = node
+    #[allow(clippy::too_many_arguments)]
+    fn record_hop(
+        &mut self,
+        hop_index: usize,
+        node: &NodeGenome,
+        upstream_slots: [f32; OUTPUT_SLOT_COUNT],
+        energy_before: f32,
+        energy_after: f32,
+        result: &NodeResult,
+        route_result: Option<(usize, NodeId)>,
+        backend_trace: BackendTrace,
+    ) {
+        let route = route_result.map(|(selected_target_idx, selected_target_id)| {
+            let gate_scores = node
                 .targets
                 .iter()
-                .map(|t| {
-                    let runtime = result.route_gates.score_for_slot(t.slot);
+                .map(|target| {
+                    let runtime_score = result.route_gates.score_for_slot(target.slot);
                     TraceGateScore {
-                        slot: t.slot,
-                        target_id: t.target_id,
-                        gate_bias: t.gate_bias,
-                        runtime_score: runtime,
-                        effective_score: t.gate_bias + runtime,
+                        slot: target.slot,
+                        target_id: target.target_id,
+                        gate_bias: target.gate_bias,
+                        runtime_score,
+                        effective_score: target.gate_bias + runtime_score,
                     }
                 })
                 .collect();
             TraceRouteDecision {
                 gate_scores,
-                selected_target_idx: winning_idx,
-                selected_target_id: id,
+                selected_target_idx,
+                selected_target_id,
             }
         });
 
-        hop_traces.push(MeshHopTrace {
-            hop_index: hops,
-            node_id: current_node_id,
+        self.hops.push(MeshHopTrace {
+            hop_index,
+            node_id: node.node_id,
             input_refs: node.input_refs.clone(),
             upstream_slots,
-            energy_before: node_energy_before,
-            energy_after: *energy,
+            energy_before,
+            energy_after,
             output_slots: result.output_slots,
-            route: trace_route,
+            route,
             backend_trace,
         });
-
-        if result.energy_exhausted {
-            return (
-                mesh_output!(vec![WorldAction::NoOp]),
-                hop_traces,
-                TerminationReason::EnergyExhausted,
-            );
-        }
-
-        if result.terminal {
-            return (
-                mesh_output!(side_outputs.action_queue.into_actions_or_noop()),
-                hop_traces,
-                TerminationReason::ActionEmitted,
-            );
-        }
-
-        match route_result {
-            Some((_idx, id)) => {
-                if find_node_index(&genome.nodes, id).is_none() {
-                    return (
-                        mesh_output!(side_outputs.action_queue.into_actions_or_noop()),
-                        hop_traces,
-                        TerminationReason::MissingNode,
-                    );
-                }
-                upstream_slots = result.output_slots;
-                current_node_id = id;
-                hops += 1;
-            }
-            None => {
-                return (
-                    mesh_output!(side_outputs.action_queue.into_actions_or_noop()),
-                    hop_traces,
-                    TerminationReason::NoTargets,
-                );
-            }
-        }
     }
-}
 
-/// Find the index of a node by its `NodeId` via linear scan.
-///
-/// For typical genomes (2-10 nodes), linear scan is faster than HashMap
-/// due to cache locality and zero heap allocation.
-#[inline]
-fn find_node_index(nodes: &[NodeGenome], id: NodeId) -> Option<usize> {
-    nodes.iter().position(|n| n.node_id == id)
+    fn finish(self, output: MeshOutput, termination_reason: TerminationReason) -> Self::Output {
+        (output, self.hops, termination_reason)
+    }
 }
 
 #[cfg(test)]
@@ -1066,5 +1022,151 @@ mod tests {
         assert_eq!(output_a.actions, output_b.actions);
         assert_eq!(output_a.priority_bid, 3.25);
         assert_eq!(output_b.priority_bid, 3.25);
+    }
+
+    fn assert_mesh_equivalent_for_termination(
+        label: &str,
+        genome: &CreatureGenome,
+        config: &RuntimeConfig,
+        starting_energy: f32,
+        expected_reason: impl FnOnce(&TerminationReason) -> bool,
+    ) {
+        let sensors = empty_ss();
+        let previous_memory = [0.0; 16];
+
+        let mut energy_a = starting_energy;
+        let mut memory_a = [0.0; 16];
+        let mut runtime_a = GraphRuntimeState::new();
+        let output_a = execute_creature_mesh(
+            genome,
+            &sensors,
+            &mut energy_a,
+            0.0,
+            &mut memory_a,
+            &previous_memory,
+            &mut runtime_a,
+            config,
+        );
+
+        let mut energy_b = starting_energy;
+        let mut memory_b = [0.0; 16];
+        let mut runtime_b = GraphRuntimeState::new();
+        let (output_b, _, reason) = execute_creature_mesh_traced(
+            genome,
+            &sensors,
+            &mut energy_b,
+            0.0,
+            &mut memory_b,
+            &previous_memory,
+            &mut runtime_b,
+            config,
+        );
+
+        assert!(expected_reason(&reason), "{label}: unexpected {reason:?}");
+        assert_eq!(output_a.actions, output_b.actions, "{label}: actions");
+        assert_eq!(output_a.priority_bid, output_b.priority_bid, "{label}: bid");
+        assert!(
+            (output_a.cost_report.vm_cost - output_b.cost_report.vm_cost).abs() < 1e-6,
+            "{label}: VM cost"
+        );
+        assert!(
+            (output_a.cost_report.graph_cost - output_b.cost_report.graph_cost).abs() < 1e-6,
+            "{label}: graph cost"
+        );
+        assert!((energy_a - energy_b).abs() < 1e-6, "{label}: energy");
+        assert_eq!(memory_a, memory_b, "{label}: shared memory");
+    }
+
+    #[test]
+    fn traced_and_untraced_paths_match_for_every_mesh_termination() {
+        let id = NodeId::new(0);
+        let missing = NodeId::new(99);
+        let halt_node = |targets| NodeGenome {
+            node_id: id,
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                constants: vec![],
+                program: vec![VmInstruction::Halt],
+            }),
+            targets,
+        };
+
+        let config = default_config();
+        assert_mesh_equivalent_for_termination(
+            "missing entry",
+            &CreatureGenome {
+                entry_node_id: missing,
+                nodes: vec![],
+            },
+            &config,
+            100.0,
+            |reason| matches!(reason, TerminationReason::MissingNode),
+        );
+        assert_mesh_equivalent_for_termination(
+            "no targets",
+            &CreatureGenome {
+                entry_node_id: id,
+                nodes: vec![halt_node(vec![])],
+            },
+            &config,
+            100.0,
+            |reason| matches!(reason, TerminationReason::NoTargets),
+        );
+        assert_mesh_equivalent_for_termination(
+            "missing routed node",
+            &CreatureGenome {
+                entry_node_id: id,
+                nodes: vec![halt_node(wrap_targets(vec![missing]))],
+            },
+            &config,
+            100.0,
+            |reason| matches!(reason, TerminationReason::MissingNode),
+        );
+
+        let mut max_hops_config = default_config();
+        max_hops_config.max_mesh_hops = 1;
+        assert_mesh_equivalent_for_termination(
+            "maximum hops",
+            &CreatureGenome {
+                entry_node_id: id,
+                nodes: vec![halt_node(wrap_targets(vec![id]))],
+            },
+            &max_hops_config,
+            100.0,
+            |reason| matches!(reason, TerminationReason::MaxHopsReached),
+        );
+
+        assert_mesh_equivalent_for_termination(
+            "action emitted",
+            &CreatureGenome {
+                entry_node_id: id,
+                nodes: vec![vm_emit_node(id, 1, vec![])],
+            },
+            &config,
+            100.0,
+            |reason| matches!(reason, TerminationReason::ActionEmitted),
+        );
+        let mut exhaustion_config = default_config();
+        exhaustion_config.vm.opcode_cost_multiplier = 1.0;
+        assert_mesh_equivalent_for_termination(
+            "energy exhausted",
+            &CreatureGenome {
+                entry_node_id: id,
+                nodes: vec![NodeGenome {
+                    node_id: id,
+                    input_refs: vec![],
+                    backend_def: BackendDef::Vm(VmBackendDef {
+                        register_count: 1,
+                        constants: vec![],
+                        program: vec![VmInstruction::Noop],
+                    }),
+                    targets: vec![],
+                }],
+            },
+            &exhaustion_config,
+            0.01,
+            |reason| matches!(reason, TerminationReason::EnergyExhausted),
+        );
     }
 }
