@@ -133,14 +133,14 @@ Research date: 2026-09-03. Claude Code installed: v2.1.259.
 
 ## Implementation Tasks
 
-- [ ] Add project settings at `.claude/settings.json`:
+- [x] Add project settings at `.claude/settings.json`:
       `"advisorModel": "opus"` and `"worktree": {"baseRef": "head"}` (written
-      2026-09-03; remaining: the notice confirmation below). On the
-      next Fable session confirm Claude Code shows the
-      `Advisor Tool (experimental) is on` notice and the notice that the
-      advisor is not attached to the main model. If neither appears, project
-      scope is not honored for this key: run `/advisor opus` to save it in user
-      settings and record that outcome in the template's launch section.
+      2026-09-03). Notice confirmation 2026-09-03: on the next Fable session
+      the user ran `/advisor opus`, which saved `advisorModel` to user settings
+      and printed the notice that Opus is less capable than Fable so the
+      advisor will not activate on the main model. Whether the project-scope
+      key alone would have produced the startup notice was not observed; the
+      template's launch section already covers the `/advisor opus` fallback.
 - [x] Update `.claude/agents/roadmap-implementer.md`: add `effort: medium`;
       add an "Advisor" section to the body that says to consult the advisor
       before committing to an implementation approach, when the same test or
