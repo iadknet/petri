@@ -1,12 +1,20 @@
 .DEFAULT_GOAL := help
 
-AQUA_ROOT_DIR ?= $(CURDIR)/.tools/aqua
+# Default to Aqua's standard global root so every local checkout and git
+# worktree shares one toolchain. Overridable via the environment; CI sets
+# AQUA_ROOT_DIR explicitly for hermetic, per-job installs.
+XDG_DATA_HOME ?= $(HOME)/.local/share
+AQUA_ROOT_DIR ?= $(XDG_DATA_HOME)/aquaproj-aqua
 export AQUA_ROOT_DIR
+# uv-managed tools (skill-scanner, pre-commit) share the same global root so a
+# fresh worktree reuses one install. Overridable via the environment.
+PETRI_TOOL_ROOT ?= $(XDG_DATA_HOME)/petri-tools
+export PETRI_TOOL_ROOT
 export AQUA_ENFORCE_CHECKSUM := true
 export AQUA_ENFORCE_REQUIRE_CHECKSUM := true
 export PATH := $(AQUA_ROOT_DIR)/bin:$(PATH)
 
-.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-priority-bid rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc rust-clippy frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test policy-check quality-check dependency-audit skill-check check audit precommit project-precommit format clean
+.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-priority-bid rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc rust-clippy frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test dependency-policy-check-test policy-check quality-check dependency-audit skill-check check audit precommit project-precommit format clean
 
 help: ## Show the stable project command interface.
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -37,7 +45,7 @@ rust-format-check: ## Check Rust formatting.
 rust-viability: ## Run the Rust viability merge gate.
 	@cargo test -p v3-core --test viability
 
-rust-test-all: rust-test-core-unit rust-test-creature-workflow rust-test-priority-bid rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc rust-viability ## Run every Rust test subset.
+rust-test-all: rust-test-core-unit rust-test-creature-workflow rust-test-priority-bid rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc ## Run every Rust test subset except the separately ordered viability gate.
 
 rust-test-core-unit: ## Run v3-core unit tests.
 	@cargo test -p v3-core --lib
@@ -78,11 +86,14 @@ frontend-build: ## Build the frontend.
 roadmap-check: ## Validate the live roadmap contract (set ROADMAP_ROOT for a fixture root).
 	@if [ -n "$(ROADMAP_ROOT)" ]; then scripts/roadmap-check.mjs --root "$(ROADMAP_ROOT)"; else scripts/roadmap-check.mjs; fi
 
-roadmap-check-test: ## Run the roadmap checker regression suite.
-	@node --test scripts/roadmap-check.test.mjs
+roadmap-check-test: ## Run the roadmap checker regression suite through Aqua's Node runtime.
+	@$(AQUA_ROOT_DIR)/bin/node --test scripts/roadmap-check.test.mjs
 
-policy-check: ## Validate roadmap structure and stable repository policy.
-	@$(MAKE) roadmap-check roadmap-check-test
+dependency-policy-check-test: ## Run dependency-policy regression tests.
+	@scripts/dependency-policy-check-test
+
+policy-check: ## Validate roadmap, repository, provenance, and retirement policy.
+	@$(MAKE) roadmap-check roadmap-check-test dependency-policy-check-test
 	@scripts/policy-check
 
 quality-check: ## Check whitespace, shell syntax, ShellCheck, and actionlint.
@@ -100,8 +111,8 @@ check: ## Run all project completion checks.
 audit: ## Scan full Git history with Gitleaks.
 	@scripts/secret-scan history
 
-precommit: ## Run the configured project validation hooks.
-	@.tools/bin/pre-commit run
+precommit: ## Run staged roadmap, policy, quality, dependency, skill, and secret checks.
+	@$(PETRI_TOOL_ROOT)/bin/pre-commit run
 
 project-precommit: ## Run the project-validation pre-commit entry point.
 	@scripts/project-precommit

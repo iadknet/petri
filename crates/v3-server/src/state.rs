@@ -30,9 +30,8 @@ pub struct SimHandle {
 }
 
 impl SimHandle {
-    pub fn new_default() -> Self {
-        let config = SimulationConfig::default();
-        let sim = seed_simulation(config, 0);
+    pub(crate) fn new(config: SimulationConfig, seed: u64) -> Self {
+        let sim = seed_simulation(config, seed);
         let cached_fertility_u8 =
             crate::query::cache::build_primary_food_fertility_u8(sim.world.food());
         Self {
@@ -245,6 +244,7 @@ pub struct AppState {
     pub perf: Arc<RwLock<TransportPerfSnapshot>>,
     pub sessions: Arc<RwLock<SessionRegistry>>,
     pub ws_tx: broadcast::Sender<ProjectionNotice>,
+    pub(crate) startup_defaults: Arc<SimulationConfig>,
 }
 
 #[derive(Clone, Debug, Default)]

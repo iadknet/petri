@@ -1,10 +1,10 @@
-//! Projection-backed read model for transitional server refactors.
+//! Projection-backed read model.
 
 use crate::query::cache::{build_barrier_mask, build_food_density_planes};
 use crate::query::spatial_index::{CreatureTileIndex, DEFAULT_TILE_SIZE};
 use crate::state::{build_ws_frame, SimHandle, WsFrame};
 
-/// Published query-side snapshot used by transitional projection-backed reads.
+/// Published query-side snapshot.
 #[derive(Clone, Debug)]
 pub struct ProjectionSnapshot {
     pub projection_revision: u64,

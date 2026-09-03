@@ -25,14 +25,11 @@ LLM skill analysis is intentionally excluded from blocking checks.
 
 The repository currently has a Cargo workspace and a frontend npm application.
 `make check` enforces committed lockfiles, the frontend's exact npm version, a
-seven-day minimum package age, and matching seven-day Dependabot cooldowns. It
-also checks each newly added independent Node or Python dependency root. A
-workspace may share its root lockfile, configuration, and Dependabot entry with
-its declared members; a nested manifest outside a declared workspace needs its
-own lockfile and matching Dependabot `directory` entry. For Node projects, the
-installed package-manager binary must exactly match the declared `packageManager`
-value and its native configuration query must confirm the age gate. This applies
-to new dependency resolution, not to reinstalling a committed lockfile.
+seven-day minimum package age, and matching seven-day Dependabot cooldowns for
+GitHub Actions, Cargo, and the frontend npm application. The installed npm binary
+must exactly match the frontend's `packageManager` value, and npm's project
+configuration must report `min-release-age=7`. The age gate applies to new
+dependency resolution, not to reinstalling the committed lockfile.
 
 - Use HTTPS registries and one authoritative source for each package namespace.
   Do not use an additional public index as a fallback for private names.
@@ -41,31 +38,14 @@ to new dependency resolution, not to reinstalling a committed lockfile.
 - CI must use the declared package manager's immutable or frozen-lockfile
   installation mode. Keep dependency lifecycle scripts disabled or allowlisted
   where the selected manager supports that control.
-- npm requires `package-lock.json` and `min-release-age=7`; `npm-shrinkwrap.json`
-  is not accepted because current npm no longer reads or writes it. pnpm requires
-  `minimumReleaseAge: 10080`, strict age enforcement, and timestamps from
-  registries; Yarn requires `npmMinimalAgeGate: 7d`; Python projects use uv with
-  `exclude-newer = "7 days"`.
+- The frontend requires `package-lock.json` and `min-release-age=7`.
 - An urgent security fix may bypass the age gate only for a specific reviewed
-  package and version. Record the reason in the pull request and remove the
-  exception after the package ages in.
-
-When adding another supported package manager, use its current documentation:
-[npm](https://docs.npmjs.com/using-npm/config/#min-release-age),
-[pnpm](https://pnpm.io/settings/dependency-resolution#minimumreleaseage),
-[Yarn](https://yarnpkg.com/configuration/yarnrc/#npmMinimalAgeGate), and
-[uv](https://docs.astral.sh/uv/concepts/resolution/#dependency-cooldowns).
-For workspace ownership and configuration precedence, also consult
-[npm workspaces](https://docs.npmjs.com/cli/using-npm/workspaces/),
-[pnpm workspaces](https://pnpm.io/workspaces),
-[Yarn workspaces](https://yarnpkg.com/features/workspaces), and
-[uv configuration files](https://docs.astral.sh/uv/configuration/files/).
+  package and version through an explicit, reviewed policy change. Record the
+  reason in the pull request and restore the gate after the package ages in.
 
 `make dependency-audit` uses OSV-Scanner to block known vulnerabilities in
 supported lockfiles. OSV's online service receives package metadata and file
-hashes, not project source. If an exception is necessary, put an `IgnoredVulns`
-entry in the adjacent `osv-scanner.toml` with its vulnerability ID, reason, and
-`ignoreUntil` date; broad package overrides are prohibited.
+hashes, not project source. Any vulnerability exception requires explicit review.
 
 ## Deferred release controls
 

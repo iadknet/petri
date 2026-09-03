@@ -11,6 +11,7 @@ use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute_graph_node_with_reserve;
 use crate::runtime::routing::resolve_gated_route;
+use crate::runtime::trace::domain::TerminationReason;
 use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
 use crate::runtime::vm::execute_vm_node_with_reserve;
 use crate::sensors::perception::SensorSnapshot;
@@ -70,6 +71,137 @@ pub fn execute_creature_mesh_with_reserve(
     graph_runtime: &mut GraphRuntimeState,
     config: &RuntimeConfig,
 ) -> MeshOutput {
+    execute_creature_mesh_impl(
+        genome,
+        sensors,
+        energy,
+        reproductive_reserve,
+        shared_memory,
+        prev_shared_memory,
+        graph_runtime,
+        config,
+        UntracedMeshExecution,
+    )
+}
+
+/// Compile-time seam between normal and trace-recording mesh execution.
+pub(crate) trait MeshExecutionMode {
+    type BackendTrace;
+    type Output;
+
+    const RECORDS_HOPS: bool;
+
+    #[allow(clippy::too_many_arguments)]
+    fn execute_node(
+        &mut self,
+        node: &NodeGenome,
+        node_idx: usize,
+        upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
+        energy: &mut f32,
+        energy_consumed: f32,
+        reproductive_reserve: f32,
+        shared_memory: &mut [f32; 16],
+        prev_shared_memory: &[f32; 16],
+        graph_runtime: &mut GraphRuntimeState,
+        sensors: &SensorSnapshot,
+        config: &RuntimeConfig,
+        side_outputs: &mut MeshSideOutputs,
+    ) -> (crate::runtime::types::NodeResult, Self::BackendTrace);
+
+    #[inline]
+    #[allow(clippy::too_many_arguments)]
+    fn record_hop(
+        &mut self,
+        _hop_index: usize,
+        _node: &NodeGenome,
+        _upstream_slots: [f32; OUTPUT_SLOT_COUNT],
+        _energy_before: f32,
+        _energy_after: f32,
+        _result: &crate::runtime::types::NodeResult,
+        _route_result: Option<(usize, NodeId)>,
+        _backend_trace: Self::BackendTrace,
+    ) {
+    }
+
+    fn finish(self, output: MeshOutput, termination_reason: TerminationReason) -> Self::Output;
+}
+
+pub(crate) struct UntracedMeshExecution;
+
+impl MeshExecutionMode for UntracedMeshExecution {
+    type BackendTrace = ();
+    type Output = MeshOutput;
+
+    const RECORDS_HOPS: bool = false;
+
+    #[inline]
+    #[allow(clippy::too_many_arguments)]
+    fn execute_node(
+        &mut self,
+        node: &NodeGenome,
+        node_idx: usize,
+        upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
+        energy: &mut f32,
+        energy_consumed: f32,
+        reproductive_reserve: f32,
+        shared_memory: &mut [f32; 16],
+        prev_shared_memory: &[f32; 16],
+        graph_runtime: &mut GraphRuntimeState,
+        sensors: &SensorSnapshot,
+        config: &RuntimeConfig,
+        side_outputs: &mut MeshSideOutputs,
+    ) -> (crate::runtime::types::NodeResult, ()) {
+        let result = match &node.backend_def {
+            BackendDef::Vm(def) => execute_vm_node_with_reserve(
+                def,
+                &node.input_refs,
+                upstream_slots,
+                energy,
+                energy_consumed,
+                reproductive_reserve,
+                shared_memory,
+                prev_shared_memory,
+                sensors,
+                config,
+                side_outputs,
+            ),
+            BackendDef::Graph(def) => execute_graph_node_with_reserve(
+                def,
+                &node.input_refs,
+                upstream_slots,
+                energy,
+                energy_consumed,
+                reproductive_reserve,
+                node_idx,
+                graph_runtime,
+                sensors,
+                config,
+                side_outputs,
+                shared_memory,
+                prev_shared_memory,
+            ),
+        };
+        (result, ())
+    }
+
+    #[inline]
+    fn finish(self, output: MeshOutput, _termination_reason: TerminationReason) -> MeshOutput {
+        output
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
+    genome: &CreatureGenome,
+    sensors: &SensorSnapshot,
+    energy: &mut f32,
+    reproductive_reserve: f32,
+    shared_memory: &mut [f32; 16],
+    prev_shared_memory: &[f32; 16],
+    graph_runtime: &mut GraphRuntimeState,
+    config: &RuntimeConfig,
+    mut mode: M,
+) -> M::Output {
     let mut current_node_id = genome.entry_node_id;
     let mut upstream_slots = [0.0f32; OUTPUT_SLOT_COUNT];
     let mut hops: usize = 0;
@@ -80,20 +212,22 @@ pub fn execute_creature_mesh_with_reserve(
 
     // Soft default: entry_node_id missing from node set → return NoOp immediately.
     if find_node_index(&genome.nodes, current_node_id).is_none() {
-        return MeshOutput {
+        let output = MeshOutput {
             actions: vec![WorldAction::NoOp],
             cost_report: report,
             priority_bid: side_outputs.priority_bid,
         };
+        return mode.finish(output, TerminationReason::MissingNode);
     }
 
     loop {
         if hops >= max_hops {
-            return MeshOutput {
+            let output = MeshOutput {
                 actions: side_outputs.action_queue.into_actions_or_noop(),
                 cost_report: report,
                 priority_bid: side_outputs.priority_bid,
             };
+            return mode.finish(output, TerminationReason::MaxHopsReached);
         }
 
         // Invariant: verified present before the loop, and after every routing step.
@@ -105,36 +239,20 @@ pub fn execute_creature_mesh_with_reserve(
 
         // Snapshot energy before node dispatch to attribute cost to the correct backend.
         let node_energy_before = *energy;
-        let result = match &node.backend_def {
-            BackendDef::Vm(def) => execute_vm_node_with_reserve(
-                def,
-                &node.input_refs,
-                &upstream_slots,
-                energy,
-                energy_consumed,
-                reproductive_reserve,
-                shared_memory,
-                prev_shared_memory,
-                sensors,
-                config,
-                &mut side_outputs,
-            ),
-            BackendDef::Graph(def) => execute_graph_node_with_reserve(
-                def,
-                &node.input_refs,
-                &upstream_slots,
-                energy,
-                energy_consumed,
-                reproductive_reserve,
-                current_idx,
-                graph_runtime,
-                sensors,
-                config,
-                &mut side_outputs,
-                shared_memory,
-                prev_shared_memory,
-            ),
-        };
+        let (result, backend_trace) = mode.execute_node(
+            node,
+            current_idx,
+            &upstream_slots,
+            energy,
+            energy_consumed,
+            reproductive_reserve,
+            shared_memory,
+            prev_shared_memory,
+            graph_runtime,
+            sensors,
+            config,
+            &mut side_outputs,
+        );
 
         // Attribute energy delta to the correct backend.
         let node_cost = (node_energy_before - *energy).max(0.0);
@@ -143,43 +261,64 @@ pub fn execute_creature_mesh_with_reserve(
             BackendDef::Graph(_) => report.graph_cost += node_cost,
         }
 
+        let route_result = if M::RECORDS_HOPS || (!result.energy_exhausted && !result.terminal) {
+            resolve_gated_route(&node.targets, &result.route_gates)
+        } else {
+            None
+        };
+
+        mode.record_hop(
+            hops,
+            node,
+            upstream_slots,
+            node_energy_before,
+            *energy,
+            &result,
+            route_result,
+            backend_trace,
+        );
+
         // Check exhaustion first: NodeResult::exhausted() discards the action queue.
         if result.energy_exhausted {
-            return MeshOutput {
+            let output = MeshOutput {
                 actions: vec![WorldAction::NoOp],
                 cost_report: report,
                 priority_bid: side_outputs.priority_bid,
             };
+            return mode.finish(output, TerminationReason::EnergyExhausted);
         }
 
         if result.terminal {
-            return MeshOutput {
+            let output = MeshOutput {
                 actions: side_outputs.action_queue.into_actions_or_noop(),
                 cost_report: report,
                 priority_bid: side_outputs.priority_bid,
             };
+            return mode.finish(output, TerminationReason::ActionEmitted);
         }
 
         // Routing via per-target gate scoring.
-        match resolve_gated_route(&node.targets, &result.route_gates) {
+        match route_result {
             Some((_idx, id)) => {
                 if find_node_index(&genome.nodes, id).is_none() {
-                    return MeshOutput {
+                    let output = MeshOutput {
                         actions: side_outputs.action_queue.into_actions_or_noop(),
                         cost_report: report,
                         priority_bid: side_outputs.priority_bid,
                     };
+                    return mode.finish(output, TerminationReason::MissingNode);
                 }
                 upstream_slots = result.output_slots;
                 current_node_id = id;
                 hops += 1;
             }
             None => {
-                return MeshOutput {
+                let output = MeshOutput {
                     actions: side_outputs.action_queue.into_actions_or_noop(),
                     cost_report: report,
                     priority_bid: side_outputs.priority_bid,
                 };
+                return mode.finish(output, TerminationReason::NoTargets);
             }
         }
     }

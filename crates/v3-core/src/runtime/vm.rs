@@ -1,6 +1,6 @@
 use crate::config::RuntimeConfig;
 use crate::contracts::{InputReference, MAX_GATE_SLOTS};
-use crate::creature::genome::VmBackendDef;
+use crate::creature::genome::{VmBackendDef, VmInstruction};
 use crate::runtime::action_decode::decode_world_action;
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 use crate::runtime::routing::RouteGateMap;
@@ -67,16 +67,109 @@ pub(crate) fn execute_vm_node_with_reserve(
     config: &RuntimeConfig,
     side_outputs: &mut MeshSideOutputs,
 ) -> NodeResult {
+    execute_vm_node_impl(
+        def,
+        input_refs,
+        upstream_slots,
+        energy,
+        energy_consumed,
+        reproductive_reserve,
+        shared_memory,
+        prev_shared_memory,
+        sensors,
+        config,
+        side_outputs,
+        NoopVmTraceSink,
+    )
+    .0
+}
+
+/// Compile-time hook for observing VM execution without duplicating the opcode loop.
+///
+/// The normal executor uses [`NoopVmTraceSink`], whose calls optimize away. The
+/// traced executor supplies the recording implementation from `traced_vm`.
+pub(crate) trait VmTraceSink {
+    type Output;
+
+    fn finish_empty(
+        self,
+        def: &VmBackendDef,
+        upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
+    ) -> Self::Output;
+
+    #[inline]
+    fn before_instruction(&mut self, _pc: usize, _instruction: &VmInstruction, _registers: &[f32]) {
+    }
+
+    #[inline]
+    fn record_slot_write(&mut self, _slot_idx: usize, _old_value: f32, _new_value: f32) {}
+
+    #[inline]
+    fn after_instruction(
+        &mut self,
+        _pc: usize,
+        _instruction: &VmInstruction,
+        _energy_cost: f32,
+        _energy_after: f32,
+        _registers: &[f32],
+    ) {
+    }
+
+    fn finish(
+        self,
+        def: &VmBackendDef,
+        registers: &[f32],
+        payload: [f32; OUTPUT_SLOT_COUNT],
+        meta: [f32; 8],
+    ) -> Self::Output;
+}
+
+pub(crate) struct NoopVmTraceSink;
+
+impl VmTraceSink for NoopVmTraceSink {
+    type Output = ();
+
+    #[inline]
+    fn finish_empty(self, _def: &VmBackendDef, _upstream_slots: &[f32; OUTPUT_SLOT_COUNT]) {}
+
+    #[inline]
+    fn finish(
+        self,
+        _def: &VmBackendDef,
+        _registers: &[f32],
+        _payload: [f32; OUTPUT_SLOT_COUNT],
+        _meta: [f32; 8],
+    ) {
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
+    def: &VmBackendDef,
+    input_refs: &[InputReference],
+    upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
+    energy: &mut f32,
+    energy_consumed: f32,
+    reproductive_reserve: f32,
+    shared_memory: &mut [f32; 16],
+    prev_shared_memory: &[f32; 16],
+    sensors: &SensorSnapshot,
+    config: &RuntimeConfig,
+    side_outputs: &mut MeshSideOutputs,
+    mut trace_sink: T,
+) -> (NodeResult, T::Output) {
     // Safety: register_count == 0 → immediate halt.
     let reg_count = def.register_count as usize;
     if reg_count == 0 {
-        return NodeResult::halted(*upstream_slots, RouteGateMap::default());
+        let result = NodeResult::halted(*upstream_slots, RouteGateMap::default());
+        return (result, trace_sink.finish_empty(def, upstream_slots));
     }
 
     // Safety: empty program → immediate halt.
     let program_len = def.program.len();
     if program_len == 0 {
-        return NodeResult::halted(*upstream_slots, RouteGateMap::default());
+        let result = NodeResult::halted(*upstream_slots, RouteGateMap::default());
+        return (result, trace_sink.finish_empty(def, upstream_slots));
     }
 
     let max_steps = config.max_vm_steps.max(1) as usize;
@@ -94,8 +187,6 @@ pub(crate) fn execute_vm_node_with_reserve(
     // Working copy of shared memory slots (64 bytes — unconditional copy).
     let mut slot_copy: [f32; 16] = *shared_memory;
 
-    use crate::creature::genome::VmInstruction;
-
     /// Commit the working slot copy back to the creature's shared memory.
     macro_rules! commit_slots {
         () => {
@@ -106,23 +197,32 @@ pub(crate) fn execute_vm_node_with_reserve(
     loop {
         if steps >= max_steps {
             commit_slots!();
-            return NodeResult::halted(payload, route_gates);
+            let result = NodeResult::halted(payload, route_gates);
+            let trace = trace_sink.finish(def, &regs[..reg_count], payload, meta);
+            return (result, trace);
         }
 
         // Soft default: if control flow lands outside the program, halt cleanly.
         if pc >= program_len {
             commit_slots!();
-            return NodeResult::halted(payload, route_gates);
+            let result = NodeResult::halted(payload, route_gates);
+            let trace = trace_sink.finish(def, &regs[..reg_count], payload, meta);
+            return (result, trace);
         }
 
         let instr = &def.program[pc];
         let opcode_cost = opcode_base_cost(instr) * cost_mult;
+        let mut step_energy_cost = opcode_cost;
+
+        trace_sink.before_instruction(pc, instr, &regs[..reg_count]);
 
         // Deduct energy before executing; exhaustion halts without side effects.
         *energy -= opcode_cost;
         if *energy <= 0.0 {
             // Do NOT commit memory.
-            return NodeResult::exhausted();
+            trace_sink.after_instruction(pc, instr, step_energy_cost, *energy, &regs[..reg_count]);
+            let trace = trace_sink.finish(def, &regs[..reg_count], payload, meta);
+            return (NodeResult::exhausted(), trace);
         }
 
         steps += 1;
@@ -333,15 +433,33 @@ pub(crate) fn execute_vm_node_with_reserve(
                 let raw = regs[nr(*src, reg_count)];
                 let bid = if raw > 0.0 { raw.min(*energy) } else { 0.0 };
                 *energy -= bid;
+                step_energy_cost += bid;
                 if *energy <= 0.0 {
-                    return NodeResult::exhausted();
+                    trace_sink.after_instruction(
+                        pc,
+                        instr,
+                        step_energy_cost,
+                        *energy,
+                        &regs[..reg_count],
+                    );
+                    let trace = trace_sink.finish(def, &regs[..reg_count], payload, meta);
+                    return (NodeResult::exhausted(), trace);
                 }
                 side_outputs.priority_bid = bid;
             }
 
             VmInstruction::ExecuteActionQueue => {
                 commit_slots!();
-                return NodeResult::terminal(payload, route_gates);
+                trace_sink.after_instruction(
+                    pc,
+                    instr,
+                    step_energy_cost,
+                    *energy,
+                    &regs[..reg_count],
+                );
+                let result = NodeResult::terminal(payload, route_gates);
+                let trace = trace_sink.finish(def, &regs[..reg_count], payload, meta);
+                return (result, trace);
             }
 
             VmInstruction::WriteRouteGate { slot, src } => {
@@ -353,7 +471,16 @@ pub(crate) fn execute_vm_node_with_reserve(
 
             VmInstruction::Halt => {
                 commit_slots!();
-                return NodeResult::halted(payload, route_gates);
+                trace_sink.after_instruction(
+                    pc,
+                    instr,
+                    step_energy_cost,
+                    *energy,
+                    &regs[..reg_count],
+                );
+                let result = NodeResult::halted(payload, route_gates);
+                let trace = trace_sink.finish(def, &regs[..reg_count], payload, meta);
+                return (result, trace);
             }
 
             VmInstruction::LoadSlot { dst, slot_reg } => {
@@ -363,7 +490,10 @@ pub(crate) fn execute_vm_node_with_reserve(
 
             VmInstruction::StoreSlot { slot_reg, src } => {
                 let idx = (regs[nr(*slot_reg, reg_count)] as i64).rem_euclid(16) as usize;
-                slot_copy[idx] = sanitize_f32(regs[nr(*src, reg_count)]);
+                let old_value = slot_copy[idx];
+                let new_value = sanitize_f32(regs[nr(*src, reg_count)]);
+                slot_copy[idx] = new_value;
+                trace_sink.record_slot_write(idx, old_value, new_value);
             }
 
             VmInstruction::LoadSlotImm { dst, slot_idx } => {
@@ -373,7 +503,10 @@ pub(crate) fn execute_vm_node_with_reserve(
 
             VmInstruction::StoreSlotImm { slot_idx, src } => {
                 let idx = (*slot_idx as usize) % 16;
-                slot_copy[idx] = sanitize_f32(regs[nr(*src, reg_count)]);
+                let old_value = slot_copy[idx];
+                let new_value = sanitize_f32(regs[nr(*src, reg_count)]);
+                slot_copy[idx] = new_value;
+                trace_sink.record_slot_write(idx, old_value, new_value);
             }
 
             VmInstruction::LoadSlotPrev { dst, slot_idx } => {
@@ -383,9 +516,13 @@ pub(crate) fn execute_vm_node_with_reserve(
 
             VmInstruction::ClearSlot { slot_idx } => {
                 let idx = (*slot_idx as usize) % 16;
+                let old_value = slot_copy[idx];
                 slot_copy[idx] = 0.0;
+                trace_sink.record_slot_write(idx, old_value, 0.0);
             }
         }
+
+        trace_sink.after_instruction(pc, instr, step_energy_cost, *energy, &regs[..reg_count]);
 
         pc = next_pc;
     }

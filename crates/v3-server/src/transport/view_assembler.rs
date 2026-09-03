@@ -1,4 +1,4 @@
-//! Transitional view-assembly boundary.
+//! View payload assembly.
 
 use std::collections::BTreeMap;
 
