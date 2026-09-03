@@ -26,6 +26,20 @@ truth for feature dependencies.
 ## Verification
 
 - [ ] Run focused tests or checks.
+- [ ] Benchmark report stored at `docs/progress/features/<id>.json`, or
+      `Not applicable: <reason>`.
+
+## Performance and Goal Impact
+
+Record the deterministic work and wall-clock deltas per creature-tick against
+both the previous closed feature and the pinned epoch baseline, whether a
+threshold was crossed, and the dated goal indicator reading. Predeclare and
+justify any expected compute cost here before implementation; a justified cost
+re-pins the epoch baseline in this feature's closing commit. If this feature
+introduces a diversity or cognition measure, wire its indicator into the report
+here or state that it remains `Undefined` and why. The Verification
+item above is `Not applicable` only for a feature that closes before T10.F10 is
+checked or that cannot change simulation cost.
 
 ## Success Criteria
 
