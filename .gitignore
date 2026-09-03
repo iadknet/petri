@@ -10,15 +10,17 @@
 
 # Tooling and editor state
 .tools/
+/.worktrees/
 .DS_Store
 .idea/
 .vscode/
 *.swp
 *.tmp
 
-# Common generated outputs; refine after stack selection
+# Generated outputs
+/target/
+/frontend/tsconfig.tsbuildinfo
 coverage/
 dist/
 build/
 tmp/
-/target/

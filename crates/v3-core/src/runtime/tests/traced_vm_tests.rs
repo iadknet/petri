@@ -78,6 +78,15 @@ fn assert_equivalent(
         "{label}: energy mismatch {energy_a} vs {energy_b}"
     );
     assert_eq!(memory_a, memory_b, "{label}: memory mismatch");
+    assert_eq!(
+        aq_a.action_queue.into_actions(),
+        aq_b.action_queue.into_actions(),
+        "{label}: action queue mismatch"
+    );
+    assert_eq!(
+        aq_a.priority_bid, aq_b.priority_bid,
+        "{label}: priority bid mismatch"
+    );
 }
 
 /// Result equivalence: traced and non-traced produce identical NodeResult

@@ -4,8 +4,8 @@ use futures_util::{SinkExt, StreamExt};
 use tokio::sync::broadcast;
 use tracing::warn;
 
-use crate::app_state::AppState;
 use crate::query::cache::view_intersects_dirty_rect;
+use crate::state::AppState;
 use crate::transport::protocol::{
     build_status_event_payload, build_world_static_payload, decode_client_message_binary,
     decode_client_message_text, encode_server_message, ServerMessage, PROTOCOL_VERSION,
