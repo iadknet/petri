@@ -1,0 +1,117 @@
+#!/bin/sh
+set -eu
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+checker=$script_dir/dependency-policy-check
+test_root=$(mktemp -d "${TMPDIR:-/tmp}/petri-dependency-policy-test.XXXXXX")
+trap 'rm -rf "$test_root"' EXIT HUP INT TERM
+
+fail() {
+  printf 'dependency-policy-check-test: %s\n' "$*" >&2
+  exit 1
+}
+
+write_manifest() {
+  version=$1
+  printf '%s\n' \
+    '{' \
+    '  "name": "fixture",' \
+    "  \"packageManager\": \"$version\"" \
+    '}' >"$test_root/frontend/package.json"
+}
+
+write_dependabot() {
+  github_days=$1
+  cargo_days=$2
+  npm_days=$3
+  printf '%s\n' \
+    'version: 2' \
+    'updates:' \
+    '  - package-ecosystem: github-actions' \
+    '    directory: /' \
+    '    cooldown:' \
+    "      default-days: $github_days" \
+    '  - package-ecosystem: cargo' \
+    '    directory: /' \
+    '    cooldown:' \
+    "      default-days: $cargo_days" \
+    '  - package-ecosystem: npm' \
+    '    directory: /frontend' \
+    '    cooldown:' \
+    "      default-days: $npm_days" >"$test_root/.github/dependabot.yml"
+}
+
+reset_fixture() {
+  rm -rf "${test_root:?}/frontend" "${test_root:?}/.github" "${test_root:?}/bin"
+  mkdir -p "$test_root/frontend" "$test_root/.github" "$test_root/bin"
+  : >"$test_root/Cargo.lock"
+  : >"$test_root/frontend/package-lock.json"
+  printf '%s\n' 'min-release-age=7' >"$test_root/frontend/.npmrc"
+  write_manifest npm@11.19.0
+  write_dependabot 7 7 7
+  # These single-quoted expressions belong to the generated npm fixture.
+  # shellcheck disable=SC2016
+  printf '%s\n' \
+    '#!/bin/sh' \
+    'if [ "${1:-}" = --version ]; then printf "%s\\n" 11.19.0; exit 0; fi' \
+    'if [ "${1:-}" = config ] && [ "${2:-}" = get ] && [ "${3:-}" = min-release-age ]; then' \
+    '  if [ -f .npmrc ]; then sed -n "s/^min-release-age=//p" .npmrc; else printf "%s\\n" undefined; fi' \
+    '  exit 0' \
+    'fi' \
+    'exit 2' >"$test_root/bin/npm"
+  chmod +x "$test_root/bin/npm"
+}
+
+run_checker() {
+  (cd "$test_root" && PATH="$test_root/bin:$PATH" "$checker") 2>&1
+}
+
+expect_pass() {
+  output=$(run_checker) || { printf '%s\n' "$output" >&2; fail 'fixture unexpectedly failed'; }
+}
+
+expect_failure() {
+  expected=$1
+  if output=$(run_checker); then
+    fail 'fixture unexpectedly passed'
+  fi
+  printf '%s\n' "$output" | grep -F "$expected" >/dev/null || {
+    printf '%s\n' "$output" >&2
+    fail "missing expected diagnostic: $expected"
+  }
+}
+
+reset_fixture
+expect_pass
+
+reset_fixture
+rm "$test_root/Cargo.lock"
+expect_failure 'Cargo.lock must exist'
+
+reset_fixture
+rm "$test_root/frontend/package-lock.json"
+expect_failure 'frontend/package-lock.json must exist'
+
+reset_fixture
+write_manifest npm@11
+expect_failure 'packageManager must be an exact npm semantic version'
+
+reset_fixture
+write_manifest npm@11.18.0
+expect_failure 'does not match installed npm version 11.19.0'
+
+reset_fixture
+rm "$test_root/frontend/.npmrc"
+expect_failure 'frontend npm min-release-age must be 7'
+
+for ecosystem in github-actions cargo npm; do
+  reset_fixture
+  case $ecosystem in
+    github-actions) write_dependabot 6 7 7 ;;
+    cargo) write_dependabot 7 6 7 ;;
+    npm) write_dependabot 7 7 6 ;;
+  esac
+  expect_failure "Dependabot $ecosystem entry"
+done
+
+printf 'Dependency policy checker regression tests passed.\n'
