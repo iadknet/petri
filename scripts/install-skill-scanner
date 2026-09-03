@@ -2,15 +2,19 @@
 set -eu
 
 version=2.0.13
-target=.tools/bin/skill-scanner
+# Install into a shared global tool root so every checkout and git worktree
+# reuses one install. Overridable via PETRI_TOOL_ROOT; CI runners are ephemeral,
+# so the default global root stays hermetic per job.
+: "${PETRI_TOOL_ROOT:=${XDG_DATA_HOME:-$HOME/.local/share}/petri-tools}"
+tool_root=$PETRI_TOOL_ROOT/uv-tools
+bin_root=$PETRI_TOOL_ROOT/bin
+target=$bin_root/skill-scanner
 
 if [ -x "$target" ] && "$target" --version 2>/dev/null | grep -Fq "skill-scanner $version"; then
   printf 'Cisco AI Skill Scanner %s is already installed.\n' "$version"
   exit 0
 fi
 
-tool_root=$(pwd)/.tools/uv-tools
-bin_root=$(pwd)/.tools/bin
 mkdir -p "$tool_root" "$bin_root"
 UV_TOOL_DIR=$tool_root UV_TOOL_BIN_DIR=$bin_root \
   uv tool install "cisco-ai-skill-scanner==$version" \

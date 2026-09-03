@@ -4,6 +4,7 @@ use std::sync::{Arc, RwLock};
 use std::time::Instant;
 
 use tokio::sync::{broadcast, Mutex};
+use v3_core::config::SimulationConfig;
 
 use crate::query::cache::DirtyRect;
 use crate::query::projection::ProjectionStore;
@@ -11,11 +12,16 @@ use crate::state::{SimHandle, TransportPerfSnapshot, WsFrame};
 use crate::transport::session::ProjectionNotice;
 use crate::transport::session_registry::SessionRegistry;
 
-pub use crate::state::AppState;
+use crate::state::AppState;
 
 impl AppState {
     pub fn new() -> Self {
-        let handle = SimHandle::new_default();
+        Self::from_config(SimulationConfig::default(), 0)
+    }
+
+    pub fn from_config(config: SimulationConfig, seed: u64) -> Self {
+        let startup_defaults = Arc::new(config.clone());
+        let handle = SimHandle::new(config, seed);
         let (ws_tx, _) = broadcast::channel(16);
         Self {
             projection: Arc::new(RwLock::new(ProjectionStore::from_handle(&handle))),
@@ -23,6 +29,7 @@ impl AppState {
             sessions: Arc::new(RwLock::new(SessionRegistry::default())),
             sim: Arc::new(Mutex::new(handle)),
             ws_tx,
+            startup_defaults,
         }
     }
 

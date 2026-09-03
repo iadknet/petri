@@ -7,7 +7,8 @@ if [ "${1:-}" = --require-tools ]; then
   shift
 fi
 
-scanner=.tools/bin/skill-scanner
+: "${PETRI_TOOL_ROOT:=${XDG_DATA_HOME:-$HOME/.local/share}/petri-tools}"
+scanner=$PETRI_TOOL_ROOT/bin/skill-scanner
 if [ ! -x "$scanner" ]; then
   if [ "$require_tools" -eq 1 ]; then
     printf 'skill-check: Cisco AI Skill Scanner is missing; run make setup\n' >&2

@@ -5,7 +5,7 @@ use axum::response::IntoResponse;
 use axum::Json;
 use serde::Deserialize;
 
-use crate::app_state::AppState;
+use crate::state::AppState;
 use crate::transport::protocol::{
     build_status_event_payload, build_world_static_payload, ZoomTier,
 };

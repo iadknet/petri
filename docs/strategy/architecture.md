@@ -29,10 +29,10 @@ Active dependency direction in V3 core:
 
 Active service/UI dependency direction for the viewport transport refactor:
 - `v3-core` -> authoritative simulation behavior only
-- `v3-server::command` -> mutates and advances `v3-core`
-- `v3-server::query` -> reads command-published projection state only
+- `v3-server::http` -> validates requests and mutates serialized application state
+- `v3-server::state` -> owns the simulation and publishes projections after applied behavior
+- `v3-server::query` -> reads published projection state only
 - `v3-server::transport` -> assembles and delivers view payloads from query state only
-- `v3-server::http` -> validates requests and delegates to command/query/transport services
 - `frontend viewport state` -> computes desired view rect and fidelity tier
 - `frontend world-view state` -> stores static world state plus the latest accepted view payload
 - `frontend renderer` -> draws from a render model and camera state only
@@ -45,7 +45,7 @@ Active service/UI dependency direction for the viewport transport refactor:
 | `crates/v3-core/src/sensors` | keep | snapshot assembly separated from runtime mutation logic |
 | `crates/v3-core/src/runtime` | keep | owns chain evaluation, routing, VM/graph execution |
 | `crates/v3-core/src/simulation/tick` | keep | phase orchestration and action application stay outside runtime internals |
-| `crates/v3-server` | change | server command/query/transport boundaries are now explicit instead of living in a flat transport shell |
+| `crates/v3-server` | keep | HTTP mutates serialized application state; query and transport consume applied-state projections |
 | `frontend/src` viewport transport path | change | viewport state, world-view state, and renderer input boundaries are now first-class |
 | `docs/reference/*.md` | keep | executable contracts stay centralized under active V3 reference specs |
 
@@ -70,7 +70,7 @@ petri/
 |  |     |- runtime/
 |  |     |- simulation/tick/
 |  |     \- contracts/
-|  |- v3-server/            # command/query/transport surfaces over v3-core
+|  |- v3-server/            # HTTP/state/query/transport surfaces over v3-core
 |  \- v3-cli/               # command-line surfaces over v3-core
 |- frontend/                # viewport/world-view/render client
 \- docs/                    # canonical strategy, reference, and roadmap docs
@@ -82,10 +82,3 @@ petri/
 - No synthetic values in state/telemetry surfaces where behavior-backed values
   are expected.
 - Applies to current and future runtime-facing APIs and inspectors.
-
-## Compatibility Posture
-
-- Root compatibility stubs remain pointer-only:
-  - `petri-architecture.md`
-  - `petri-roadmap.md`
-  - `petri-technology-review.md`

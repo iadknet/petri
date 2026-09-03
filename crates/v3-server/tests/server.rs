@@ -7,10 +7,27 @@ use tokio::task::JoinHandle;
 use tokio::time::{timeout, Duration};
 use tower::ServiceExt;
 
-use v3_server::{handlers::lifecycle::build_ws_frame, router, state::AppState};
+use v3_core::config::SimulationConfig;
+use v3_server::{
+    router,
+    state::{build_ws_frame, AppState},
+};
+
+fn test_config() -> SimulationConfig {
+    let mut config = SimulationConfig::default();
+    config.world.width = 64;
+    config.world.height = 64;
+    config.population.initial_creatures = 64;
+    config.population.max_creatures = 512;
+    config
+}
+
+fn test_state() -> AppState {
+    AppState::from_config(test_config(), 0)
+}
 
 fn app() -> axum::Router {
-    router(AppState::new())
+    router(test_state())
 }
 
 async fn spawn_ws_app(state: AppState) -> (String, JoinHandle<()>) {
@@ -142,6 +159,33 @@ async fn startup_returns_200_with_required_fields() {
         body["seeded_creatures"].is_number(),
         "missing seeded_creatures"
     );
+}
+
+#[tokio::test]
+async fn configured_state_supplies_startup_defaults_and_request_overrides() {
+    let mut config = test_config();
+    config.world.width = 48;
+    config.world.height = 48;
+    config.population.initial_creatures = 3;
+    let state = AppState::from_config(config, 7);
+    {
+        let handle = state.sim.lock().await;
+        assert_eq!(handle.sim.config.world.width, 48);
+        assert_eq!(handle.sim.creatures.len(), 3);
+    }
+
+    let (status, body) = do_request(
+        router(state.clone()),
+        startup_req(r#"{"seed":42,"world":{"width":56}}"#),
+    )
+    .await;
+
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert_eq!(body["seeded_creatures"], 3);
+    let handle = state.sim.lock().await;
+    assert_eq!(handle.sim.config.world.width, 56);
+    assert_eq!(handle.sim.config.world.height, 48);
+    assert_eq!(handle.sim.config.population.initial_creatures, 3);
 }
 
 // ── 2. startup_unknown_field_returns_422 ───────────────────────────────────
@@ -533,7 +577,7 @@ async fn snapshot_bootstrap_returns_overview_and_revisions() {
 #[tokio::test]
 async fn projections_preserve_configured_food_yields_and_live_reserve() {
     // Arrange
-    let state = AppState::new();
+    let state = test_state();
     let a = router(state.clone());
     let startup_body = r##"{
         "seed": 7,
@@ -1353,8 +1397,8 @@ async fn config_digest_present_in_startup_response() {
 async fn health_payload_contains_mutation_skip_by_reason() {
     use v3_core::config::SimulationConfig;
     use v3_core::simulation::{run_tick, seed_simulation};
-    use v3_server::handlers::lifecycle::build_ws_frame;
     use v3_server::query::cache::build_food_fertility_u8;
+    use v3_server::state::build_ws_frame;
     use v3_server::state::{SimHandle, SimulationStatus};
 
     let mut cfg = SimulationConfig::default();
@@ -1456,13 +1500,12 @@ async fn health_payload_contains_mutation_skip_by_reason() {
 
 #[tokio::test]
 async fn status_payload_includes_state() {
-    use v3_core::config::SimulationConfig;
     use v3_core::simulation::seed_simulation;
-    use v3_server::handlers::lifecycle::build_ws_frame;
     use v3_server::query::cache::build_food_fertility_u8;
+    use v3_server::state::build_ws_frame;
     use v3_server::state::{SimHandle, SimulationStatus};
 
-    let sim = seed_simulation(SimulationConfig::default(), 7);
+    let sim = seed_simulation(test_config(), 7);
     let cached_fertility_u8 = build_food_fertility_u8(sim.world.food());
     let handle = SimHandle {
         sim,
@@ -1481,13 +1524,12 @@ async fn status_payload_includes_state() {
 
 #[tokio::test]
 async fn status_and_health_include_food_occupancy_depletion_summaries() {
-    use v3_core::config::SimulationConfig;
     use v3_core::simulation::{run_tick, seed_simulation};
-    use v3_server::handlers::lifecycle::build_ws_frame;
     use v3_server::query::cache::build_food_fertility_u8;
+    use v3_server::state::build_ws_frame;
     use v3_server::state::{SimHandle, SimulationStatus};
 
-    let mut sim = seed_simulation(SimulationConfig::default(), 7);
+    let mut sim = seed_simulation(test_config(), 7);
     run_tick(&mut sim, &mut None);
     let cached_fertility_u8 = build_food_fertility_u8(sim.world.food());
     let handle = SimHandle {
@@ -1537,13 +1579,12 @@ async fn status_and_health_include_food_occupancy_depletion_summaries() {
 
 #[tokio::test]
 async fn ws_frame_msgpack_roundtrip() {
-    use v3_core::config::SimulationConfig;
     use v3_core::simulation::{run_tick, seed_simulation};
-    use v3_server::handlers::lifecycle::build_ws_frame;
     use v3_server::query::cache::build_food_fertility_u8;
+    use v3_server::state::build_ws_frame;
     use v3_server::state::{SimHandle, SimulationStatus, WsFrame};
 
-    let mut sim = seed_simulation(SimulationConfig::default(), 99);
+    let mut sim = seed_simulation(test_config(), 99);
     for _ in 0..5 {
         run_tick(&mut sim, &mut None);
     }
@@ -2381,7 +2422,7 @@ async fn get_creature_exclude_omits_fields() {
 
 #[tokio::test]
 async fn get_creature_mesh_annotations_use_cached_reachable_nodes() {
-    let state = AppState::new();
+    let state = test_state();
     let creature_id = {
         let mut handle = state.sim.lock().await;
         let creature_id = handle
@@ -2657,7 +2698,7 @@ async fn ws_updates_require_active_subscription() {
     use tokio_tungstenite::tungstenite::Message;
     use v3_server::transport::protocol::ServerMessage;
 
-    let state = AppState::new();
+    let state = test_state();
     let (ws_url, server_task) = spawn_ws_app(state.clone()).await;
     let (mut socket, _) = connect_async(ws_url).await.expect("connect websocket");
 
@@ -2724,7 +2765,7 @@ async fn ws_startup_with_changed_dimensions_emits_updated_world_static_for_activ
     use v3_server::transport::protocol::ServerMessage;
 
     // Arrange
-    let state = AppState::new();
+    let state = test_state();
     let (ws_url, server_task) = spawn_ws_app(state.clone()).await;
     let (mut socket, _) = connect_async(ws_url).await.expect("connect websocket");
     socket
@@ -2837,7 +2878,7 @@ async fn ws_latest_request_id_wins() {
     use tokio_tungstenite::tungstenite::Message;
     use v3_server::transport::protocol::ServerMessage;
 
-    let state = AppState::new();
+    let state = test_state();
     let (ws_url, server_task) = spawn_ws_app(state.clone()).await;
     let (mut socket, _) = connect_async(ws_url).await.expect("connect websocket");
 
@@ -2909,7 +2950,7 @@ async fn ws_unsubscribe_stops_delivery() {
     use tokio_tungstenite::tungstenite::Message;
     use v3_server::transport::protocol::ServerMessage;
 
-    let state = AppState::new();
+    let state = test_state();
     let (ws_url, server_task) = spawn_ws_app(state.clone()).await;
     let (mut socket, _) = connect_async(ws_url).await.expect("connect websocket");
 
@@ -2974,7 +3015,7 @@ async fn ws_disconnect_cleans_up_session() {
     use tokio_tungstenite::connect_async;
     use tokio_tungstenite::tungstenite::Message;
 
-    let state = AppState::new();
+    let state = test_state();
     let (ws_url, server_task) = spawn_ws_app(state.clone()).await;
     let (mut socket, _) = connect_async(ws_url).await.expect("connect websocket");
 
@@ -3038,7 +3079,7 @@ async fn ws_non_overlapping_paint_does_not_refresh_view() {
     use tokio_tungstenite::tungstenite::Message;
     use v3_server::transport::protocol::ServerMessage;
 
-    let state = AppState::new();
+    let state = test_state();
     let (ws_url, server_task) = spawn_ws_app(state.clone()).await;
     let (mut socket, _) = connect_async(ws_url).await.expect("connect websocket");
 
@@ -3098,7 +3139,7 @@ async fn ws_non_overlapping_barrier_paint_rebroadcasts_world_static_only() {
     use tokio_tungstenite::tungstenite::Message;
     use v3_server::transport::protocol::ServerMessage;
 
-    let state = AppState::new();
+    let state = test_state();
     let (ws_url, server_task) = spawn_ws_app(state.clone()).await;
     let (mut socket, _) = connect_async(ws_url).await.expect("connect websocket");
 
