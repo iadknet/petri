@@ -1,7 +1,15 @@
 .DEFAULT_GOAL := help
 
-AQUA_ROOT_DIR ?= $(CURDIR)/.tools/aqua
+# Default to Aqua's standard global root so every local checkout and git
+# worktree shares one toolchain. Overridable via the environment; CI sets
+# AQUA_ROOT_DIR explicitly for hermetic, per-job installs.
+XDG_DATA_HOME ?= $(HOME)/.local/share
+AQUA_ROOT_DIR ?= $(XDG_DATA_HOME)/aquaproj-aqua
 export AQUA_ROOT_DIR
+# uv-managed tools (skill-scanner, pre-commit) share the same global root so a
+# fresh worktree reuses one install. Overridable via the environment.
+PETRI_TOOL_ROOT ?= $(XDG_DATA_HOME)/petri-tools
+export PETRI_TOOL_ROOT
 export AQUA_ENFORCE_CHECKSUM := true
 export AQUA_ENFORCE_REQUIRE_CHECKSUM := true
 export PATH := $(AQUA_ROOT_DIR)/bin:$(PATH)
@@ -104,7 +112,7 @@ audit: ## Scan full Git history with Gitleaks.
 	@scripts/secret-scan history
 
 precommit: ## Run staged roadmap, policy, quality, dependency, skill, and secret checks.
-	@.tools/bin/pre-commit run
+	@$(PETRI_TOOL_ROOT)/bin/pre-commit run
 
 project-precommit: ## Run the project-validation pre-commit entry point.
 	@scripts/project-precommit
