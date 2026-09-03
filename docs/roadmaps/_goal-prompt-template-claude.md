@@ -73,9 +73,19 @@ commands and results rather than taking them on faith. Read the owning track and
 flat feature spec before delegating. Make atomic, truthful spec/feature/track/
 master status/date/commit updates that describe what actually exists. Ensure the
 exact verification commands and results are recorded in the spec's Verification
-section. Before closure, ensure `make check` passes on the clean integration
-branch. A failed required verification goes back to the same implementer subagent
-until corrected or genuinely blocked.
+section.
+
+Once T10.F10 is checked on the integration branch, have the implementer run its
+benchmark for each feature,
+store the report, and complete the spec's Performance and Goal Impact section.
+A feature that introduces a diversity or cognition measure must also wire its
+indicator into the report. Review that report as part of the final diff review: a severe compute regression
+is a P1 finding that blocks the feature unless its spec predeclared and justified
+the cost. Never accept a weakened threshold or an edited baseline as remediation.
+
+Before closure, ensure `make check` passes on the clean integration branch. A
+failed required verification goes back to the same implementer subagent until
+corrected or genuinely blocked.
 
 ## Closure and final report
 

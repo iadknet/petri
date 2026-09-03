@@ -1,7 +1,7 @@
 # T02 — Environmental Dynamics
 
 **Status**: Planned
-**Last updated**: 2026-09-02
+**Last updated**: 2026-09-03
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -19,7 +19,7 @@ the world an externally scripted puzzle with one permanent solution.
 
 ## Executable Features
 
-- [ ] **T02.F01 — Time-Varying Resource Schedules** — Depends on: T01.F01, T10.F01
+- [ ] **T02.F01 — Time-Varying Resource Schedules** — Depends on: T01.F01, T01.F12, T10.F01
 - [ ] **T02.F02 — Partial and Noisy Environmental Cues** — Depends on: T02.F01
 - [ ] **T02.F03 — Local Asynchronous Resource Cycles** — Depends on: T02.F01
 - [ ] **T02.F04 — History-Dependent Resource Payoffs** — Depends on: T02.F02, T02.F03
@@ -30,6 +30,7 @@ the world an externally scripted puzzle with one permanent solution.
 ## Notes for AI Agents
 
 - Build on typed foods, fertility layers, occupancy depletion, and annealing. Preserve applied world state as the source of telemetry and perception.
+- T02.F01 and T02.F02 are part of the first slice. Their specs must define one schedule and one partial-cue treatment that run in the T01.F12 standard replicate world within its throughput budget, and they must be verified there before any other treatment is added. Richer schedule composition belongs to later features.
 - Simple seasonality plus a perfect current-state sensor is a reactive task. Memory pressure requires partial or noisy cues, delayed consequences, local phase differences, switching costs, or transition effects.
 - Keep authored schedules bounded diagnostic tools. Endogenous changing pressures belong to T05 and T06.
 - T02.F06 and T02.F07 are characterization campaigns used to qualify tasks and estimate effects. They cannot be cited as confirmatory program evidence; final temporal and transfer claims are tested by the T01.F09-gated T09.F07 campaign.

@@ -91,6 +91,14 @@ changes application or runtime source code or build configuration; use relevant
 focused checks for documentation-only work. After every roadmap or feature-spec
 status update, run `make roadmap-check` and `git diff --check`.
 
+Once T10.F10 is checked at the source commit, run its benchmark for the target
+feature, store the report, and complete the spec's Performance and Goal Impact
+section before closure. If the feature introduces a diversity or cognition
+measure, wiring its indicator into the report is part of the feature. Treat a
+severe compute regression as a P1 finding: stop and report it rather than
+closing the feature, unless the spec predeclared and justified that cost. Never
+weaken a threshold or edit a stored baseline to make a feature pass.
+
 Only run an experiment when the target feature requires it. Classify its
 manifest as fixture, characterization, or confirmatory. Before any experiment,
 require non-`N/A` goal inputs for a concrete repository-external artifact root
