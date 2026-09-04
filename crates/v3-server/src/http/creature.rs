@@ -94,8 +94,8 @@ struct CreatureLiveCircuitDiagnostics {
     distinct_upstream_slots_read: Vec<usize>,
     distinct_payload_slots_written: Vec<usize>,
     distinct_custom_output_slots_written: Vec<usize>,
-    reachable_read_class_counts: BTreeMap<MeshReadClass, u32>,
-    reachable_write_class_counts: BTreeMap<MeshWriteClass, u32>,
+    reachable_read_class_counts: BTreeMap<String, u32>,
+    reachable_write_class_counts: BTreeMap<String, u32>,
 }
 
 #[derive(serde::Serialize)]
@@ -149,6 +149,17 @@ fn creature_id_from_ffi_exact(id: u64) -> Option<CreatureId> {
     Some(key_data.into())
 }
 
+/// Diagnostics map key for a fieldless enum, taken from its serde name.
+///
+/// Keying the count maps by `String` keeps the JSON object keys sorted
+/// alphabetically, which is the order clients already receive.
+fn serialized_key<T: serde::Serialize>(value: T) -> String {
+    serde_json::to_value(value)
+        .ok()
+        .and_then(|name| name.as_str().map(str::to_owned))
+        .expect("fieldless enum serializes to its variant name")
+}
+
 fn build_creature_diagnostics(
     sim: &v3_core::simulation::Simulation,
     creature: &v3_core::creature::state::CreatureState,
@@ -163,8 +174,8 @@ fn build_creature_diagnostics(
         neighbor_occupied: static_inputs.neighbor_occupied,
     };
 
-    let mut reachable_read_class_counts: BTreeMap<MeshReadClass, u32> = BTreeMap::new();
-    let mut reachable_write_class_counts: BTreeMap<MeshWriteClass, u32> = BTreeMap::new();
+    let mut reachable_read_class_counts: BTreeMap<String, u32> = BTreeMap::new();
+    let mut reachable_write_class_counts: BTreeMap<String, u32> = BTreeMap::new();
     let mut stateful_reachable_node_count = 0usize;
     let mut barrier_reader_reachable_node_count = 0usize;
     let mut barrier_decision_writer_reachable_node_count = 0usize;
@@ -191,10 +202,14 @@ fn build_creature_diagnostics(
             }
         }
         for class in &annotation.read_classes {
-            *reachable_read_class_counts.entry(*class).or_insert(0) += 1;
+            *reachable_read_class_counts
+                .entry(serialized_key(class))
+                .or_insert(0) += 1;
         }
         for class in &annotation.write_classes {
-            *reachable_write_class_counts.entry(*class).or_insert(0) += 1;
+            *reachable_write_class_counts
+                .entry(serialized_key(class))
+                .or_insert(0) += 1;
         }
     }
 
@@ -488,44 +503,61 @@ mod tests {
     use super::*;
 
     #[test]
-    fn mesh_class_maps_serialize_with_snake_case_keys() {
-        let read_counts: BTreeMap<MeshReadClass, u32> = BTreeMap::from([
-            (MeshReadClass::Food, 1),
-            (MeshReadClass::Neighbor, 2),
-            (MeshReadClass::Barrier, 3),
-            (MeshReadClass::Occupancy, 4),
-            (MeshReadClass::Introspection, 5),
-            (MeshReadClass::Upstream, 6),
-            (MeshReadClass::ActionQueue, 7),
-        ]);
-        let write_counts: BTreeMap<MeshWriteClass, u32> = BTreeMap::from([
-            (MeshWriteClass::Route, 1),
-            (MeshWriteClass::Action, 2),
-            (MeshWriteClass::Memory, 3),
-            (MeshWriteClass::Payload, 4),
-        ]);
+    fn reachable_class_counts_serialize_in_sorted_key_order() {
+        // Arrange: every mesh class present, with distinct counts so a
+        // mis-ordered object is visible in the serialized bytes.
+        let read_classes = [
+            MeshReadClass::Food,
+            MeshReadClass::Neighbor,
+            MeshReadClass::Barrier,
+            MeshReadClass::Occupancy,
+            MeshReadClass::Introspection,
+            MeshReadClass::Upstream,
+            MeshReadClass::ActionQueue,
+        ];
+        let write_classes = [
+            MeshWriteClass::Route,
+            MeshWriteClass::Action,
+            MeshWriteClass::Memory,
+            MeshWriteClass::Payload,
+        ];
+        let live_circuit = CreatureLiveCircuitDiagnostics {
+            reachable_node_count: 0,
+            stateful_reachable_node_count: 0,
+            barrier_reader_reachable_node_count: 0,
+            barrier_decision_writer_reachable_node_count: 0,
+            barrier_reader_without_decision_writer_reachable_node_count: 0,
+            distinct_upstream_slots_read: Vec::new(),
+            distinct_payload_slots_written: Vec::new(),
+            distinct_custom_output_slots_written: Vec::new(),
+            reachable_read_class_counts: read_classes
+                .into_iter()
+                .zip(1u32..)
+                .map(|(class, count)| (serialized_key(class), count))
+                .collect(),
+            reachable_write_class_counts: write_classes
+                .into_iter()
+                .zip(1u32..)
+                .map(|(class, count)| (serialized_key(class), count))
+                .collect(),
+        };
 
-        assert_eq!(
-            serde_json::to_value(&read_counts).expect("serializes"),
-            serde_json::json!({
-                "food": 1,
-                "neighbor": 2,
-                "barrier": 3,
-                "occupancy": 4,
-                "introspection": 5,
-                "upstream": 6,
-                "action_queue": 7,
-            })
+        // Act
+        let json = serde_json::to_string(&live_circuit).expect("serializes");
+
+        // Assert: keys are emitted alphabetically, not in enum declaration
+        // order, so the endpoint bytes stay byte-identical for clients.
+        let expected_read = concat!(
+            r#""reachable_read_class_counts":{"#,
+            r#""action_queue":7,"barrier":3,"food":1,"introspection":5,"#,
+            r#""neighbor":2,"occupancy":4,"upstream":6}"#,
         );
-        assert_eq!(
-            serde_json::to_value(&write_counts).expect("serializes"),
-            serde_json::json!({
-                "route": 1,
-                "action": 2,
-                "memory": 3,
-                "payload": 4,
-            })
+        let expected_write = concat!(
+            r#""reachable_write_class_counts":{"#,
+            r#""action":2,"memory":3,"payload":4,"route":1}"#,
         );
+        assert!(json.contains(expected_read), "{json}");
+        assert!(json.contains(expected_write), "{json}");
     }
 
     #[test]
