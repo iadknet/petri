@@ -44,6 +44,14 @@ on the integration branch itself.
 - Benchmark report and Performance and Goal Impact section when the feature is
   subject to them; a severe compute regression without a predeclared, justified
   cost is P1.
+- Maintainability of the new code, judged as the next feature's author would:
+  a state or level represented as a string where an enum belongs; the same
+  validation or error path written out repeatedly where the framework (clap,
+  serde) could declare it; a growth path where adding one counter, indicator,
+  or variant requires edits in several places; a hand-rolled utility where
+  `std` or an existing crate dependency already provides it; a new module far
+  larger than its spec demands. These are P2 when a later roadmap feature is
+  expected to extend that code, P3 otherwise. Name the smallest refactor.
 
 ## Severity
 
