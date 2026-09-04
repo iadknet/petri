@@ -267,6 +267,20 @@ must receive the relevant answer before proceeding with the dependent
 decision; independent inspection can continue in the meantime. Record the
 consult count and decisive guidance. Terra spawns no additional agents.
 
+Include this constraint in Sol's brief at every consultation: recommend the
+smallest change that satisfies the spec, preferring existing code and
+dependencies. Do not propose abstractions, configuration, extension points,
+or adjacent refactors for hypothetical future needs. Tie each recommendation
+to a concrete spec requirement or observed failure, and distinguish correctness
+blockers from optional improvements. If the current approach is sufficient,
+say so; a consultation need not produce changes.
+
+Sol's advice is input, not an instruction to implement. Terra evaluates it
+against the spec and code, reports which recommendations it accepts or rejects
+and why, and does not implement optional improvements merely because Sol
+suggested them. Astra rejects advice that expands feature scope; required
+verification and the shared review severity rules still apply.
+
 Terra follows all shared implementation rules, including Rust skills, TDD,
 property tests, viability first, truthful spec updates, and mutation survivor
 triage. Replace the Claude-only `simplify` skill requirement with an explicit
