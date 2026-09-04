@@ -62,7 +62,7 @@ rust-test-vm-all-opcodes: ## Run v3-core VM opcode integration tests.
 rust-test-cli: ## Run v3-cli tests.
 	@cargo test -p v3-cli
 
-bench: ## Run the deterministic benchmark harness. Gate: `make bench PROFILE=gate FEATURE=<tNN-fNN-slug>`. Sweep: `make bench PROFILE=sweep BENCH_ARGS="--width 128 --height 128 --founders 256 --seeds 11,22,33 --ticks 300" OUT=<path>`.
+bench: ## Run the deterministic benchmark harness. Gate: `make bench PROFILE=gate FEATURE=<tNN-fNN-slug>` (rejects --food-coverage; its profile is predeclared). Sweep: `make bench PROFILE=sweep BENCH_ARGS="--width 128 --height 128 --founders 256 --seeds 11,22,33 --ticks 300" OUT=<path>`, adding `--food-coverage <x>` only to force one coverage onto every food type instead of the production defaults.
 	@if [ "$(PROFILE)" = "gate" ]; then \
 		if [ -z "$(FEATURE)" ]; then echo "error: FEATURE is required for PROFILE=gate" >&2; exit 1; fi; \
 		cargo run --release -p v3-cli -- bench --profile gate --feature "$(FEATURE)" --out "docs/progress/features/$(FEATURE).json"; \

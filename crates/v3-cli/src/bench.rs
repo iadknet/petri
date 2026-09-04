@@ -29,9 +29,13 @@ pub const COUNTER_NAMES: [&str; 6] = [
 const FLAG_PERCENT: f64 = 10.0;
 const SEVERE_PERCENT: f64 = 50.0;
 
+/// Persistence sampling cadence (T01.F11): every executed tick that is a
+/// multiple of this constant is sampled, plus the last executed tick.
+pub const SAMPLE_EVERY_TICKS: u64 = 100;
+
 // ── Profile parameters ──────────────────────────────────────────────────────
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct ProfileParams {
     pub name: String,
     pub width: u16,
@@ -39,7 +43,10 @@ pub struct ProfileParams {
     pub founders: u32,
     pub seeds: Vec<u64>,
     pub ticks: u64,
-    pub food_coverage: f32,
+    /// `None` leaves `SimulationConfig::default()`'s per-food-type coverage
+    /// untouched (production defaults) and serializes as the profile string
+    /// `default`; `Some(x)` forces `x` onto every food type.
+    pub food_coverage: Option<f32>,
 }
 
 /// Predeclared gate profile constants (T10.F10 Inputs and Invariants).
@@ -58,18 +65,24 @@ pub fn gate_profile_params() -> ProfileParams {
         founders: 256,
         seeds: vec![11, 22, 33],
         ticks: 75,
-        food_coverage: 1.0,
+        food_coverage: Some(1.0),
     }
 }
+
+/// The `profile.food_coverage` report string for a profile that leaves
+/// production food coverage untouched.
+const DEFAULT_FOOD_COVERAGE: &str = "default";
 
 pub fn build_config(params: &ProfileParams) -> SimulationConfig {
     let mut config = SimulationConfig::default();
     config.world.width = params.width;
     config.world.height = params.height;
     config.population.initial_creatures = params.founders;
-    config.world.food.shared.initial_coverage = params.food_coverage;
-    for food_type in &mut config.world.food.types {
-        food_type.initial_coverage = params.food_coverage;
+    if let Some(coverage) = params.food_coverage {
+        config.world.food.shared.initial_coverage = coverage;
+        for food_type in &mut config.world.food.types {
+            food_type.initial_coverage = coverage;
+        }
     }
     config.normalize();
     config
@@ -178,6 +191,32 @@ pub struct PopulationPersistenceSeed {
     pub extinction_tick: Option<u64>,
     pub minimum_population: u64,
     pub final_population: u64,
+    /// Maximum population observed from seeding (tick 0, founders) through
+    /// the last executed tick, and the first tick at which it occurred.
+    #[serde(default)]
+    pub peak_population: u64,
+    #[serde(default)]
+    pub peak_tick: u64,
+    /// Mean population over the ticks executed strictly after
+    /// `0.75 x horizon`; `null` when the run went extinct before that window.
+    #[serde(default)]
+    pub plateau_population: Option<String>,
+    /// Mean creature energy at the last executed tick; `null` at extinction.
+    #[serde(default)]
+    pub mean_energy: Option<String>,
+    #[serde(default)]
+    pub samples: Vec<PersistenceSample>,
+}
+
+/// One persistence sample, taken after `run_tick` on every executed tick that
+/// is a multiple of [`SAMPLE_EVERY_TICKS`] and on the last executed tick.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PersistenceSample {
+    pub tick: u64,
+    pub population: u64,
+    pub mean_energy: Option<String>,
+    /// Cumulative `reproduction_actions_spawned_total` at this tick.
+    pub births_total: u64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -260,11 +299,110 @@ fn ratio(numerator: u64, denominator: u64) -> String {
     six(numerator as f64 / denominator as f64)
 }
 
+// ── Per-seed persistence tracking (T01.F11) ─────────────────────────────────
+
+/// Accumulates the per-seed persistence observations defined by the T01.F11
+/// spec. It never touches the simulation, so it is unit-testable from
+/// synthetic observations alone.
+#[derive(Debug)]
+struct PersistenceAccumulator {
+    horizon: u64,
+    population: u64,
+    minimum_population: u64,
+    peak_population: u64,
+    peak_tick: u64,
+    extinction_tick: Option<u64>,
+    plateau_sum: u64,
+    plateau_ticks: u64,
+    samples: Vec<PersistenceSample>,
+}
+
+impl PersistenceAccumulator {
+    /// `seeded_population` is the founder count observed at tick 0, before
+    /// any tick has run: the first peak and minimum candidate.
+    fn new(horizon: u64, seeded_population: u64) -> Self {
+        Self {
+            horizon,
+            population: seeded_population,
+            minimum_population: seeded_population,
+            peak_population: seeded_population,
+            peak_tick: 0,
+            extinction_tick: None,
+            plateau_sum: 0,
+            plateau_ticks: 0,
+            samples: Vec::new(),
+        }
+    }
+
+    /// The plateau window is the ticks strictly after `0.75 x horizon`,
+    /// compared in exact integer arithmetic.
+    fn in_plateau_window(&self, tick: u64) -> bool {
+        tick * 4 > self.horizon * 3
+    }
+
+    /// A tick is sampled when it is a multiple of [`SAMPLE_EVERY_TICKS`] or is
+    /// the last executed tick — the horizon, or the extinction tick that ends
+    /// the run early. One condition, so the final tick is never duplicated.
+    fn is_sampled(&self, tick: u64, population: u64) -> bool {
+        tick.is_multiple_of(SAMPLE_EVERY_TICKS) || tick == self.horizon || population == 0
+    }
+
+    /// Record one executed tick. `mean_energy` is evaluated only on sampled
+    /// ticks that still have creatures, keeping the `O(population)` energy sum
+    /// to the predeclared cadence and leaving `null` at extinction.
+    fn observe(
+        &mut self,
+        tick: u64,
+        population: u64,
+        births_total: u64,
+        mean_energy: impl FnOnce() -> f64,
+    ) {
+        self.population = population;
+        self.minimum_population = self.minimum_population.min(population);
+        if population > self.peak_population {
+            self.peak_population = population;
+            self.peak_tick = tick;
+        }
+        if population == 0 && self.extinction_tick.is_none() {
+            self.extinction_tick = Some(tick);
+        }
+        if self.in_plateau_window(tick) {
+            self.plateau_sum += population;
+            self.plateau_ticks += 1;
+        }
+        if self.is_sampled(tick, population) {
+            self.samples.push(PersistenceSample {
+                tick,
+                population,
+                mean_energy: (population > 0).then(|| six(mean_energy())),
+                births_total,
+            });
+        }
+    }
+
+    fn finish(self, seed: u64) -> PopulationPersistenceSeed {
+        PopulationPersistenceSeed {
+            seed,
+            extinction_tick: self.extinction_tick,
+            minimum_population: self.minimum_population,
+            final_population: self.population,
+            peak_population: self.peak_population,
+            peak_tick: self.peak_tick,
+            plateau_population: (self.plateau_ticks > 0)
+                .then(|| ratio(self.plateau_sum, self.plateau_ticks)),
+            // The last executed tick is always sampled, so the run's final
+            // mean energy is the last sample's.
+            mean_energy: self.samples.last().and_then(|s| s.mean_energy.clone()),
+            samples: self.samples,
+        }
+    }
+}
+
 // ── Seed execution ───────────────────────────────────────────────────────────
 
 struct SeedRun {
     per_seed: PerSeed,
-    minimum_population: u64,
+    persistence: PopulationPersistenceSeed,
     complexities: Vec<u32>,
     wall_clock_ms: f64,
 }
@@ -272,25 +410,29 @@ struct SeedRun {
 fn run_one_seed(config: &SimulationConfig, seed: u64, horizon: u64) -> SeedRun {
     let start = Instant::now();
     let mut sim = seed_simulation(config.clone(), seed);
-    let mut minimum_population = sim.creatures.len() as u64;
-    let mut extinction_tick: Option<u64> = None;
+    let mut persistence = PersistenceAccumulator::new(horizon, sim.creatures.len() as u64);
 
     let mut ticks_executed: u64 = 0;
     for _ in 0..horizon {
         run_tick(&mut sim, &mut None);
         ticks_executed += 1;
         let population = sim.creatures.len() as u64;
-        if population < minimum_population {
-            minimum_population = population;
-        }
+        persistence.observe(
+            sim.tick,
+            population,
+            sim.stats.reproduction_actions_spawned_total,
+            || {
+                let total: f64 = sim.creatures.values().map(|c| f64::from(c.energy)).sum();
+                total / population as f64
+            },
+        );
         if population == 0 {
-            extinction_tick = Some(sim.tick);
             break;
         }
     }
     let wall_clock_ms = start.elapsed().as_secs_f64() * 1000.0;
 
-    let final_population = sim.creatures.len() as u64;
+    let persistence = persistence.finish(seed);
     let complexities: Vec<u32> = sim
         .creatures
         .values()
@@ -307,13 +449,13 @@ fn run_one_seed(config: &SimulationConfig, seed: u64, horizon: u64) -> SeedRun {
         plasticity_updates: sim.stats.plasticity_updates_total,
         actions_applied: sim.stats.actions_applied_total,
         births: sim.stats.reproduction_actions_spawned_total,
-        final_population,
-        extinction_tick,
+        final_population: persistence.final_population,
+        extinction_tick: persistence.extinction_tick,
     };
 
     SeedRun {
         per_seed,
-        minimum_population,
+        persistence,
         complexities,
         wall_clock_ms,
     }
@@ -379,12 +521,7 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, Vec<SeedWall
             seed,
             wall_clock_ms: run.wall_clock_ms,
         });
-        population_persistence_per_seed.push(PopulationPersistenceSeed {
-            seed,
-            extinction_tick: run.per_seed.extinction_tick,
-            minimum_population: run.minimum_population,
-            final_population: run.per_seed.final_population,
-        });
+        population_persistence_per_seed.push(run.persistence);
         per_seed.push(run.per_seed);
     }
 
@@ -430,7 +567,10 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, Vec<SeedWall
             founders: params.founders,
             seeds: params.seeds.clone(),
             ticks: params.ticks,
-            food_coverage: six(f64::from(params.food_coverage)),
+            food_coverage: params.food_coverage.map_or_else(
+                || DEFAULT_FOOD_COVERAGE.to_string(),
+                |coverage| six(f64::from(coverage)),
+            ),
         },
         per_seed,
         totals,
@@ -784,4 +924,159 @@ pub fn default_gate_references(series_index_path: &Path) -> Result<Vec<PathBuf>,
         }
     }
     Ok(paths)
+}
+
+// ── Persistence accumulator unit tests ──────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Feed the accumulator one observation per tick from a population
+    /// series (index 0 is tick 1), with a constant mean creature energy and
+    /// a cumulative birth count equal to the tick.
+    fn observe_series(
+        horizon: u64,
+        seeded_population: u64,
+        populations: &[u64],
+        energy: f64,
+    ) -> PopulationPersistenceSeed {
+        let mut accumulator = PersistenceAccumulator::new(horizon, seeded_population);
+        for (index, &population) in populations.iter().enumerate() {
+            let tick = index as u64 + 1;
+            accumulator.observe(tick, population, tick, || energy);
+        }
+        accumulator.finish(7)
+    }
+
+    #[test]
+    fn peak_records_the_maximum_population_and_the_first_tick_reaching_it() {
+        let summary = observe_series(8, 10, &[12, 20, 15, 20, 18, 9, 9, 9], 1.0);
+
+        assert_eq!(summary.peak_population, 20);
+        assert_eq!(summary.peak_tick, 2, "the first tick at the peak wins");
+        assert_eq!(summary.minimum_population, 9);
+    }
+
+    #[test]
+    fn seeding_population_is_the_peak_when_no_tick_exceeds_it() {
+        let summary = observe_series(4, 50, &[40, 30, 20, 10], 1.0);
+
+        assert_eq!(summary.peak_population, 50);
+        assert_eq!(summary.peak_tick, 0, "tick 0 is the founder population");
+    }
+
+    #[test]
+    fn plateau_is_null_when_the_run_goes_extinct_before_the_window() {
+        // Horizon 100: the plateau window is ticks 76..=100. Extinction at
+        // tick 3 means no observation ever lands in the window.
+        let summary = observe_series(100, 4, &[3, 1, 0], 1.0);
+
+        assert_eq!(summary.extinction_tick, Some(3));
+        assert_eq!(summary.plateau_population, None);
+        assert_eq!(summary.final_population, 0);
+    }
+
+    #[test]
+    fn plateau_averages_only_the_ticks_executed_inside_a_partial_window() {
+        // Horizon 8: the window is the ticks strictly after 6, so 7 and 8.
+        // The run goes extinct at tick 8, so the window holds 10 and 0.
+        let summary = observe_series(8, 4, &[4, 4, 4, 4, 4, 4, 10, 0], 1.0);
+
+        assert_eq!(summary.extinction_tick, Some(8));
+        assert_eq!(summary.plateau_population.as_deref(), Some("5.000000"));
+    }
+
+    #[test]
+    fn mean_energy_is_null_at_extinction_and_the_final_value_otherwise() {
+        let extinct = observe_series(4, 4, &[4, 2, 0], 2.5);
+        assert_eq!(extinct.mean_energy, None);
+        assert_eq!(
+            extinct
+                .samples
+                .last()
+                .expect("the extinction tick is sampled")
+                .mean_energy,
+            None
+        );
+
+        let survived = observe_series(4, 4, &[4, 4, 4, 4], 2.5);
+        assert_eq!(survived.mean_energy.as_deref(), Some("2.500000"));
+    }
+
+    #[test]
+    fn samples_cover_every_hundredth_tick_plus_a_deduplicated_final_tick() {
+        let populations = [5_u64; 250];
+        let summary = observe_series(250, 5, &populations, 1.0);
+
+        let ticks: Vec<u64> = summary.samples.iter().map(|s| s.tick).collect();
+        assert_eq!(ticks, vec![100, 200, 250], "tick 0 is never sampled");
+        assert_eq!(summary.samples[0].births_total, 100);
+
+        // A horizon that is itself a multiple of the cadence yields one
+        // sample for the final tick, not two.
+        let exact = observe_series(200, 5, &populations[..200], 1.0);
+        let exact_ticks: Vec<u64> = exact.samples.iter().map(|s| s.tick).collect();
+        assert_eq!(exact_ticks, vec![100, 200]);
+    }
+
+    #[test]
+    fn a_horizon_with_no_executed_ticks_reports_the_seeded_population() {
+        let summary = observe_series(0, 6, &[], 1.0);
+
+        assert_eq!(summary.peak_population, 6);
+        assert_eq!(summary.final_population, 6);
+        assert_eq!(summary.plateau_population, None);
+        assert_eq!(summary.mean_energy, None);
+        assert!(summary.samples.is_empty());
+    }
+
+    #[test]
+    fn omitting_food_coverage_leaves_production_coverage_untouched() {
+        let params = ProfileParams {
+            name: "sweep".to_string(),
+            width: 32,
+            height: 32,
+            founders: 8,
+            seeds: vec![1],
+            ticks: 10,
+            food_coverage: None,
+        };
+        let config = build_config(&params);
+
+        let default_config = SimulationConfig::default();
+        let coverages: Vec<f32> = config
+            .world
+            .food
+            .types
+            .iter()
+            .map(|t| t.initial_coverage)
+            .collect();
+        let default_coverages: Vec<f32> = default_config
+            .world
+            .food
+            .types
+            .iter()
+            .map(|t| t.initial_coverage)
+            .collect();
+
+        assert_eq!(coverages, default_coverages);
+        assert!(
+            coverages.iter().all(|c| (c - 0.27).abs() < 1e-6),
+            "production coverage is 0.27 for every default food type, got {coverages:?}"
+        );
+        assert!(
+            (config.world.food.shared.initial_coverage - 0.27).abs() < 1e-6,
+            "normalize() makes the shared coverage follow the primary food type"
+        );
+    }
+
+    #[test]
+    fn forcing_food_coverage_applies_it_to_every_food_type() {
+        let config = build_config(&gate_profile_params());
+
+        for food_type in &config.world.food.types {
+            assert!((food_type.initial_coverage - 1.0).abs() < 1e-6);
+        }
+    }
 }
