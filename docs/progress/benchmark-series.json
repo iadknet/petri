@@ -1,10 +1,17 @@
 {
-  "series": "gate-v1",
-  "epoch_baseline": "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
-  "closed": [
-    "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
-    "docs/progress/features/t01-f11-baseline-persistence-characterization.json",
-    "docs/progress/features/t10-f09-throughput-baseline-and-profiling-budget.json",
-    "docs/progress/features/t10-f11-cross-process-reproducibility-of-seeded-runs.json"
-  ]
+  "gate": {
+    "series": "gate-v1",
+    "epoch_baseline": "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
+    "closed": [
+      "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
+      "docs/progress/features/t01-f11-baseline-persistence-characterization.json",
+      "docs/progress/features/t10-f09-throughput-baseline-and-profiling-budget.json",
+      "docs/progress/features/t10-f11-cross-process-reproducibility-of-seeded-runs.json"
+    ]
+  },
+  "goal": {
+    "series": "goal-v1",
+    "epoch_baseline": "docs/progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table-goal.json",
+    "closed": []
+  }
 }

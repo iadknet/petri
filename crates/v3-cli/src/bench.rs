@@ -5,6 +5,7 @@
 //! same commit and inputs; the `environment` block records host identity and
 //! wall-clock as an unasserted secondary signal.
 
+use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
@@ -12,7 +13,9 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 use serde::{Deserialize, Serialize};
 use v3_core::config::SimulationConfig;
 use v3_core::creature::genome::analysis::functional_complexity;
-use v3_core::simulation::{run_tick, seed_simulation};
+use v3_core::simulation::{
+    observe_final_actions, run_tick, seed_simulation, FinalActionObservation,
+};
 
 pub const SCHEMA_VERSION: u32 = 1;
 
@@ -74,6 +77,19 @@ pub fn gate_profile_params() -> ProfileParams {
         seeds: vec![11, 22, 33],
         ticks: 75,
         food_coverage: Some(1.0),
+    }
+}
+
+/// Predeclared minutes-scale goal profile constants (T01.F12).
+pub fn goal_profile_params() -> ProfileParams {
+    ProfileParams {
+        name: "goal".to_string(),
+        width: 1600,
+        height: 1600,
+        founders: 10_000,
+        seeds: vec![11, 22, 33],
+        ticks: 2_000,
+        food_coverage: None,
     }
 }
 
@@ -175,6 +191,10 @@ pub struct GoalIndicators {
     pub population_persistence: PopulationPersistence,
     pub births_per_100_ticks: String,
     pub reachable_structure_size_distribution: StructureSizeDistribution,
+    #[serde(default = "undefined_lineage_diversity")]
+    pub lineage_diversity: Indicator<LineageDiversity>,
+    #[serde(default = "undefined_memory_sensitivity")]
+    pub memory_sensitivity: Indicator<MemorySensitivity>,
     pub strategy_count: String,
     pub strategy_causal_distinctness: String,
     pub evolutionary_activity: String,
@@ -187,6 +207,55 @@ pub struct GoalIndicators {
 }
 
 const UNDEFINED: &str = "Undefined";
+
+/// A goal-only indicator is either unavailable for a profile or carries its
+/// versioned per-seed observations. Keeping `Undefined` as the wire value
+/// preserves the established report vocabulary for deferred measurements.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum Indicator<T> {
+    Undefined(String),
+    Defined(T),
+}
+
+fn undefined_lineage_diversity() -> Indicator<LineageDiversity> {
+    Indicator::Undefined(UNDEFINED.to_string())
+}
+
+fn undefined_memory_sensitivity() -> Indicator<MemorySensitivity> {
+    Indicator::Undefined(UNDEFINED.to_string())
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LineageDiversity {
+    pub per_seed: Vec<LineageDiversitySeed>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LineageDiversitySeed {
+    pub seed: u64,
+    pub surviving_founder_clade_count: u64,
+    pub shannon_entropy_nats: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MemorySensitivity {
+    pub snapshot_timing: String,
+    pub scramble_algorithm: String,
+    pub per_seed: Vec<MemorySensitivitySeed>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MemorySensitivitySeed {
+    pub seed: u64,
+    pub final_creature_count: u64,
+    pub different_from_zeroed_count: u64,
+    pub different_from_scrambled_count: u64,
+    pub different_from_either_count: u64,
+    pub different_from_zeroed_fraction: String,
+    pub different_from_scrambled_fraction: String,
+    pub different_from_either_fraction: String,
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PopulationPersistence {
@@ -257,6 +326,18 @@ pub struct Environment {
     /// and wall-clock (T10.F09).
     #[serde(default)]
     pub throughput: Throughput,
+    /// Goal-only final-state observation cost, kept outside the existing timed
+    /// tick phases and empty for gate and sweep profiles.
+    #[serde(default)]
+    pub final_state_observation_ms_per_seed: Vec<SeedFinalStateObservation>,
+    #[serde(default)]
+    pub final_state_observation_ms_total: f64,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SeedFinalStateObservation {
+    pub seed: u64,
+    pub wall_clock_ms: f64,
 }
 
 /// One seed's cumulative wall-clock split across the five timed tick phases.
@@ -512,9 +593,16 @@ struct SeedRun {
     per_seed: PerSeed,
     persistence: PopulationPersistenceSeed,
     complexities: Vec<u32>,
+    goal_observation: Option<GoalObservation>,
     wall_clock_ms: f64,
     phase_wall_clock: SeedPhaseWallClock,
     throughput: SeedThroughput,
+}
+
+struct GoalObservation {
+    lineage_diversity: LineageDiversitySeed,
+    memory_sensitivity: MemorySensitivitySeed,
+    wall_clock_ms: f64,
 }
 
 /// `Duration` as fractional milliseconds, the unit every wall-clock field in
@@ -530,9 +618,15 @@ pub struct RunTimings {
     pub wall_clock_ms_per_seed: Vec<SeedWallClock>,
     pub phase_wall_clock_ms_per_seed: Vec<SeedPhaseWallClock>,
     pub throughput_per_seed: Vec<SeedThroughput>,
+    pub final_state_observation_ms_per_seed: Vec<SeedFinalStateObservation>,
 }
 
-fn run_one_seed(config: &SimulationConfig, seed: u64, horizon: u64) -> SeedRun {
+fn run_one_seed(
+    config: &SimulationConfig,
+    seed: u64,
+    horizon: u64,
+    observe_goal_indicators: bool,
+) -> SeedRun {
     let start = Instant::now();
     let mut sim = seed_simulation(config.clone(), seed);
     let mut persistence = PersistenceAccumulator::new(horizon, sim.creatures.len() as u64);
@@ -563,6 +657,20 @@ fn run_one_seed(config: &SimulationConfig, seed: u64, horizon: u64) -> SeedRun {
         .values()
         .map(|c| functional_complexity(&c.genome))
         .collect();
+    let goal_observation = observe_goal_indicators.then(|| {
+        let observation_started = Instant::now();
+        let actions = observe_final_actions(&sim);
+        GoalObservation {
+            lineage_diversity: lineage_diversity(
+                seed,
+                sim.creatures
+                    .values()
+                    .map(|creature| creature.identity.lineage_id),
+            ),
+            memory_sensitivity: memory_sensitivity(seed, &actions),
+            wall_clock_ms: millis(observation_started.elapsed()),
+        }
+    });
 
     let per_seed = PerSeed {
         seed,
@@ -592,6 +700,7 @@ fn run_one_seed(config: &SimulationConfig, seed: u64, horizon: u64) -> SeedRun {
         per_seed,
         persistence,
         complexities,
+        goal_observation,
         wall_clock_ms,
         throughput,
         phase_wall_clock: SeedPhaseWallClock {
@@ -602,6 +711,65 @@ fn run_one_seed(config: &SimulationConfig, seed: u64, horizon: u64) -> SeedRun {
             actions_ms: millis(phases.actions),
             reward_learning_ms: millis(phases.reward_learning),
         },
+    }
+}
+
+fn lineage_diversity(
+    seed: u64,
+    lineage_ids: impl IntoIterator<Item = u32>,
+) -> LineageDiversitySeed {
+    let mut counts = BTreeMap::<u32, u64>::new();
+    for lineage_id in lineage_ids {
+        *counts.entry(lineage_id).or_default() += 1;
+    }
+    let total: u64 = counts.values().sum();
+    let shannon_entropy_nats = if total == 0 {
+        UNDEFINED.to_string()
+    } else {
+        let total = total as f64;
+        let entropy = counts.values().fold(0.0, |acc, &count| {
+            let probability = count as f64 / total;
+            acc - probability * probability.ln()
+        });
+        six(entropy)
+    };
+    LineageDiversitySeed {
+        seed,
+        surviving_founder_clade_count: counts.len() as u64,
+        shannon_entropy_nats,
+    }
+}
+
+fn memory_sensitivity(seed: u64, observations: &[FinalActionObservation]) -> MemorySensitivitySeed {
+    let final_creature_count = observations.len() as u64;
+    let different_from_zeroed_count = observations
+        .iter()
+        .filter(|observation| observation.intact != observation.zeroed)
+        .count() as u64;
+    let different_from_scrambled_count = observations
+        .iter()
+        .filter(|observation| observation.intact != observation.scrambled)
+        .count() as u64;
+    let different_from_either_count = observations
+        .iter()
+        .filter(|observation| {
+            observation.intact != observation.zeroed || observation.intact != observation.scrambled
+        })
+        .count() as u64;
+    let fraction = |count| {
+        (final_creature_count > 0)
+            .then(|| six(count as f64 / final_creature_count as f64))
+            .unwrap_or_else(|| UNDEFINED.to_string())
+    };
+    MemorySensitivitySeed {
+        seed,
+        final_creature_count,
+        different_from_zeroed_count,
+        different_from_scrambled_count,
+        different_from_either_count,
+        different_from_zeroed_fraction: fraction(different_from_zeroed_count),
+        different_from_scrambled_fraction: fraction(different_from_scrambled_count),
+        different_from_either_fraction: fraction(different_from_either_count),
     }
 }
 
@@ -651,9 +819,13 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
     let mut pooled_complexities: Vec<u32> = Vec::new();
     let mut totals = Totals::default();
     let mut population_persistence_per_seed = Vec::with_capacity(params.seeds.len());
+    let mut lineage_diversity_per_seed = Vec::with_capacity(params.seeds.len());
+    let mut memory_sensitivity_per_seed = Vec::with_capacity(params.seeds.len());
+    let mut final_state_observation_ms_per_seed = Vec::with_capacity(params.seeds.len());
+    let observe_goal_indicators = params.name == "goal";
 
     for &seed in &params.seeds {
-        let run = run_one_seed(&config, seed, params.ticks);
+        let run = run_one_seed(&config, seed, params.ticks, observe_goal_indicators);
         totals.ticks += run.per_seed.ticks;
         totals.creature_ticks += run.per_seed.creature_ticks;
         totals.mesh_hops += run.per_seed.mesh_hops;
@@ -670,6 +842,14 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
         throughput_per_seed.push(run.throughput);
         phase_wall_clock.push(run.phase_wall_clock);
         population_persistence_per_seed.push(run.persistence);
+        if let Some(observation) = run.goal_observation {
+            lineage_diversity_per_seed.push(observation.lineage_diversity);
+            memory_sensitivity_per_seed.push(observation.memory_sensitivity);
+            final_state_observation_ms_per_seed.push(SeedFinalStateObservation {
+                seed,
+                wall_clock_ms: observation.wall_clock_ms,
+            });
+        }
         per_seed.push(run.per_seed);
     }
 
@@ -696,6 +876,23 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
         population_persistence,
         births_per_100_ticks,
         reachable_structure_size_distribution: structure_size_distribution(pooled_complexities),
+        lineage_diversity: if observe_goal_indicators {
+            Indicator::Defined(LineageDiversity {
+                per_seed: lineage_diversity_per_seed,
+            })
+        } else {
+            undefined_lineage_diversity()
+        },
+        memory_sensitivity: if observe_goal_indicators {
+            Indicator::Defined(MemorySensitivity {
+                snapshot_timing: "after the final executed tick, before any observation action"
+                    .to_string(),
+                scramble_algorithm: "rotate_left(1) across 16 shared-memory slots".to_string(),
+                per_seed: memory_sensitivity_per_seed,
+            })
+        } else {
+            undefined_memory_sensitivity()
+        },
         strategy_count: UNDEFINED.to_string(),
         strategy_causal_distinctness: UNDEFINED.to_string(),
         evolutionary_activity: UNDEFINED.to_string(),
@@ -730,6 +927,7 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
         wall_clock_ms_per_seed: wall_clock,
         phase_wall_clock_ms_per_seed: phase_wall_clock,
         throughput_per_seed,
+        final_state_observation_ms_per_seed,
     };
 
     (deterministic, timings)
@@ -832,6 +1030,7 @@ fn build_environment(timings: RunTimings, totals: &Totals, threads: usize) -> En
         wall_clock_ms_per_seed,
         phase_wall_clock_ms_per_seed,
         throughput_per_seed,
+        final_state_observation_ms_per_seed,
     } = timings;
     let wall_clock_ms_total: f64 = wall_clock_ms_per_seed.iter().map(|s| s.wall_clock_ms).sum();
     let wall_clock_ms_per_creature_tick = if totals.creature_ticks == 0 {
@@ -848,6 +1047,10 @@ fn build_environment(timings: RunTimings, totals: &Totals, threads: usize) -> En
             wall_clock_ms_total,
         ),
     };
+    let final_state_observation_ms_total = final_state_observation_ms_per_seed
+        .iter()
+        .map(|observation| observation.wall_clock_ms)
+        .sum();
     Environment {
         generated_at: rfc3339_now(),
         host: detect_host(),
@@ -863,6 +1066,8 @@ fn build_environment(timings: RunTimings, totals: &Totals, threads: usize) -> En
         threads: Some(threads),
         phase_wall_clock_ms_per_seed,
         throughput,
+        final_state_observation_ms_per_seed,
+        final_state_observation_ms_total,
     }
 }
 
@@ -1092,6 +1297,12 @@ pub struct SeriesIndex {
     pub closed: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BenchmarkSeriesIndex {
+    pub gate: SeriesIndex,
+    pub goal: SeriesIndex,
+}
+
 /// Resolve the gate profile's default comparison references from the series
 /// index: the epoch baseline and the last closed report (if different).
 /// Returns an empty list when the series index does not exist yet (this
@@ -1102,9 +1313,30 @@ pub fn default_gate_references(series_index_path: &Path) -> Result<Vec<PathBuf>,
     }
     let content = std::fs::read_to_string(series_index_path)
         .map_err(|e| format!("failed to read {}: {e}", series_index_path.display()))?;
-    let index: SeriesIndex = serde_json::from_str(&content)
+    let index: BenchmarkSeriesIndex = serde_json::from_str(&content)
         .map_err(|e| format!("failed to parse {}: {e}", series_index_path.display()))?;
+    references_from_series(&index.gate)
+}
 
+/// Resolve the goal profile's comparison references from its distinct series.
+/// Its initial baseline does not exist until that first goal report is written,
+/// so the first invocation deliberately has no comparison.
+pub fn default_goal_references(series_index_path: &Path) -> Result<Vec<PathBuf>, String> {
+    if !series_index_path.exists() {
+        return Ok(Vec::new());
+    }
+    let content = std::fs::read_to_string(series_index_path)
+        .map_err(|e| format!("failed to read {}: {e}", series_index_path.display()))?;
+    let index: BenchmarkSeriesIndex = serde_json::from_str(&content)
+        .map_err(|e| format!("failed to parse {}: {e}", series_index_path.display()))?;
+    let baseline = PathBuf::from(&index.goal.epoch_baseline);
+    if !baseline.exists() {
+        return Ok(Vec::new());
+    }
+    references_from_series(&index.goal)
+}
+
+fn references_from_series(index: &SeriesIndex) -> Result<Vec<PathBuf>, String> {
     let mut paths = vec![PathBuf::from(&index.epoch_baseline)];
     if let Some(last) = index.closed.last() {
         if last != &index.epoch_baseline {
@@ -1119,6 +1351,9 @@ pub fn default_gate_references(series_index_path: &Path) -> Result<Vec<PathBuf>,
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+    use v3_core::contracts::{Direction, WorldAction};
+    use v3_core::simulation::seed_simulation;
 
     /// Feed the accumulator one observation per tick from a population
     /// series (index 0 is tick 1), with a constant mean creature energy and
@@ -1160,6 +1395,7 @@ mod tests {
                 .collect(),
             phase_wall_clock_ms_per_seed: Vec::new(),
             throughput_per_seed: Vec::new(),
+            final_state_observation_ms_per_seed: Vec::new(),
         }
     }
 
@@ -1365,6 +1601,91 @@ mod tests {
 
         for food_type in &config.world.food.types {
             assert!((food_type.initial_coverage - 1.0).abs() < 1e-6);
+        }
+    }
+
+    #[test]
+    fn lineage_diversity_handles_empty_one_balanced_and_unequal_populations() {
+        assert_eq!(
+            lineage_diversity(11, []).shannon_entropy_nats,
+            UNDEFINED,
+            "empty populations have undefined entropy"
+        );
+        assert_eq!(lineage_diversity(11, [7]).shannon_entropy_nats, "0.000000");
+        assert_eq!(
+            lineage_diversity(11, [3, 9]).shannon_entropy_nats,
+            "0.693147"
+        );
+        assert_eq!(
+            lineage_diversity(11, [3, 3, 3, 9]).shannon_entropy_nats,
+            "0.562335"
+        );
+    }
+
+    #[test]
+    fn memory_sensitivity_counts_full_action_differences_and_union_once() {
+        let mut config = SimulationConfig::default();
+        config.world.width = 16;
+        config.world.height = 16;
+        config.population.initial_creatures = 3;
+        let sim = seed_simulation(config, 11);
+        let ids: Vec<_> = sim.creatures.keys().collect();
+        let intact = vec![WorldAction::Reproduce {
+            direction: Direction::N,
+            energy_transfer: 1.0,
+        }];
+        let payload_changed = vec![WorldAction::Reproduce {
+            direction: Direction::N,
+            energy_transfer: 2.0,
+        }];
+        let direction_changed = vec![WorldAction::Reproduce {
+            direction: Direction::E,
+            energy_transfer: 1.0,
+        }];
+        let readings = vec![
+            FinalActionObservation {
+                creature_id: ids[0],
+                intact: intact.clone(),
+                zeroed: payload_changed.clone(),
+                scrambled: intact.clone(),
+            },
+            FinalActionObservation {
+                creature_id: ids[1],
+                intact: intact.clone(),
+                zeroed: intact.clone(),
+                scrambled: direction_changed.clone(),
+            },
+            FinalActionObservation {
+                creature_id: ids[2],
+                intact: intact.clone(),
+                zeroed: payload_changed,
+                scrambled: direction_changed,
+            },
+        ];
+
+        let indicator = memory_sensitivity(11, &readings);
+        assert_eq!(indicator.different_from_zeroed_count, 2);
+        assert_eq!(indicator.different_from_scrambled_count, 2);
+        assert_eq!(indicator.different_from_either_count, 3);
+        assert_eq!(indicator.different_from_either_fraction, "1.000000");
+        let empty = memory_sensitivity(11, &[]);
+        assert_eq!(empty.final_creature_count, 0);
+        assert_eq!(empty.different_from_either_fraction, UNDEFINED);
+    }
+
+    proptest! {
+        #[test]
+        fn lineage_diversity_count_is_the_number_of_distinct_surviving_lineages(
+            lineage_ids in proptest::collection::vec(0_u32..32, 0..128),
+        ) {
+            let result = lineage_diversity(11, lineage_ids.iter().copied());
+            let distinct: std::collections::BTreeSet<_> = lineage_ids.iter().copied().collect();
+            prop_assert_eq!(result.surviving_founder_clade_count, distinct.len() as u64);
+            if lineage_ids.is_empty() {
+                prop_assert_eq!(result.shannon_entropy_nats, UNDEFINED);
+            } else {
+                prop_assert_ne!(result.shannon_entropy_nats, UNDEFINED);
+            }
         }
     }
 }

@@ -16,6 +16,7 @@ pub const SHARED_MEMORY_SLOTS: usize = 16;
 
 /// Per-creature runtime state for Graph backends.
 /// Groups all mutable state that graph evaluation reads/writes.
+#[derive(Clone)]
 pub struct GraphRuntimeState {
     /// Per-node stateful operator state. Indexed as `[mesh_node_idx][internal_node_idx]`.
     pub node_state: Vec<Vec<f32>>,
