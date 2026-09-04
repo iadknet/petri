@@ -21,6 +21,7 @@ enum Commands {
 #[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
 enum BenchProfile {
     Gate,
+    Goal,
     Sweep,
 }
 
@@ -167,6 +168,43 @@ fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), S
                 .ok_or("--feature is required for --profile gate")?;
             Ok((bench::gate_profile_params(), feature))
         }
+        BenchProfile::Goal => {
+            if args.width.is_some() {
+                return Err(
+                    "--width is not accepted for --profile goal; the goal profile is predeclared"
+                        .to_string(),
+                );
+            }
+            if args.height.is_some() {
+                return Err(
+                    "--height is not accepted for --profile goal; the goal profile is predeclared"
+                        .to_string(),
+                );
+            }
+            if args.founders.is_some() {
+                return Err("--founders is not accepted for --profile goal; the goal profile is predeclared".to_string());
+            }
+            if args.seeds.is_some() {
+                return Err(
+                    "--seeds is not accepted for --profile goal; the goal profile is predeclared"
+                        .to_string(),
+                );
+            }
+            if args.ticks.is_some() {
+                return Err(
+                    "--ticks is not accepted for --profile goal; the goal profile is predeclared"
+                        .to_string(),
+                );
+            }
+            if args.food_coverage.is_some() {
+                return Err("--food-coverage is not accepted for --profile goal; the goal profile is predeclared".to_string());
+            }
+            let feature = args
+                .feature
+                .clone()
+                .ok_or("--feature is required for --profile goal")?;
+            Ok((bench::goal_profile_params(), feature))
+        }
         BenchProfile::Sweep => {
             let width = args
                 .width
@@ -222,6 +260,8 @@ fn run_bench(args: BenchArgs) {
     let out_path = args.out.clone().unwrap_or_else(|| {
         if args.profile == BenchProfile::Gate {
             std::path::PathBuf::from(format!("docs/progress/features/{feature}.json"))
+        } else if args.profile == BenchProfile::Goal {
+            std::path::PathBuf::from(format!("docs/progress/features/{feature}-goal.json"))
         } else {
             eprintln!("error: --out is required for --profile sweep");
             std::process::exit(1);
@@ -235,6 +275,15 @@ fn run_bench(args: BenchArgs) {
     if reference_paths.is_empty() && args.profile == BenchProfile::Gate {
         let series_path = std::path::PathBuf::from("docs/progress/benchmark-series.json");
         match bench::default_gate_references(&series_path) {
+            Ok(paths) => reference_paths = paths,
+            Err(e) => {
+                eprintln!("error: {e}");
+                std::process::exit(1);
+            }
+        }
+    } else if reference_paths.is_empty() && args.profile == BenchProfile::Goal {
+        let series_path = std::path::PathBuf::from("docs/progress/benchmark-series.json");
+        match bench::default_goal_references(&series_path) {
             Ok(paths) => reference_paths = paths,
             Err(e) => {
                 eprintln!("error: {e}");
@@ -394,6 +443,20 @@ mod tests {
             resolved.feature,
             "t01-f11-baseline-persistence-characterization"
         );
+    }
+
+    #[test]
+    fn goal_profile_is_fixed_and_rejects_parameter_overrides() {
+        let resolved = resolve_bench_profile(&bench_args(BenchProfile::Goal))
+            .expect("the goal profile needs only --feature and optional --threads");
+        assert_eq!(resolved.params, bench::goal_profile_params());
+
+        let error = resolve_bench_profile(&BenchArgs {
+            ticks: Some(1),
+            ..bench_args(BenchProfile::Goal)
+        })
+        .expect_err("goal parameters must be predeclared rather than silently ignored");
+        assert!(error.contains("--ticks is not accepted for --profile goal"));
     }
 
     #[test]

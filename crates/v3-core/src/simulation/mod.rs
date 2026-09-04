@@ -8,4 +8,4 @@ pub mod tick;
 pub use seeding::seed_simulation;
 pub use simulation::Simulation;
 pub use stats::SimStats;
-pub use tick::run_tick;
+pub use tick::{observe_final_actions, run_tick, FinalActionObservation};
