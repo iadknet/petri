@@ -268,6 +268,30 @@ impl Default for FoodConfig {
     }
 }
 
+impl FoodConfig {
+    /// Wrap a shared food substrate config into a single-type food config.
+    ///
+    /// The one synthesized food type inherits the shared initial density and
+    /// coverage, and the top-level fertility and annealing settings mirror the
+    /// shared ones, so a world configured this way has exactly one ordinary-food
+    /// type. Used for placeholder configs and for tests that only vary the
+    /// shared substrate.
+    #[must_use]
+    pub fn single_type(shared: FoodResourceConfig) -> Self {
+        let primary_type = FoodTypeConfig {
+            initial_density: shared.initial_density,
+            initial_coverage: shared.initial_coverage,
+            ..FoodTypeConfig::default()
+        };
+        Self {
+            types: vec![primary_type],
+            fertility: shared.fertility.clone(),
+            annealing: shared.annealing.clone(),
+            shared,
+        }
+    }
+}
+
 impl std::ops::Deref for FoodConfig {
     type Target = FoodResourceConfig;
 
@@ -279,37 +303,6 @@ impl std::ops::Deref for FoodConfig {
 impl std::ops::DerefMut for FoodConfig {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.shared
-    }
-}
-
-impl From<FoodConfig> for FoodResourceConfig {
-    fn from(value: FoodConfig) -> Self {
-        let mut shared = value.shared;
-        if let Some(primary_type) = value.types.first() {
-            shared.initial_density = primary_type.initial_density;
-            shared.initial_coverage = primary_type.initial_coverage;
-        }
-        shared.fertility = value.fertility;
-        shared.annealing = value.annealing;
-        shared
-    }
-}
-
-impl From<FoodResourceConfig> for FoodConfig {
-    fn from(value: FoodResourceConfig) -> Self {
-        let fertility = value.fertility.clone();
-        let annealing = value.annealing.clone();
-        let primary_type = FoodTypeConfig {
-            initial_density: value.initial_density,
-            initial_coverage: value.initial_coverage,
-            ..FoodTypeConfig::default()
-        };
-        Self {
-            shared: value,
-            types: vec![primary_type],
-            fertility,
-            annealing,
-        }
     }
 }
 
@@ -2283,7 +2276,7 @@ mod tests {
     }
 
     #[test]
-    fn from_food_resource_config_preserves_top_level_fertility_and_annealing() {
+    fn single_type_preserves_top_level_fertility_and_annealing() {
         let mut shared = FoodResourceConfig::default();
         shared.fertility.enabled = false;
         shared.fertility.min_fertility = 0.25;
@@ -2291,7 +2284,7 @@ mod tests {
         shared.annealing.enabled = true;
         shared.annealing.ramp_ticks = 777;
 
-        let config: FoodConfig = shared.clone().into();
+        let config = FoodConfig::single_type(shared.clone());
 
         assert_eq!(config.fertility.enabled, shared.fertility.enabled);
         assert!((config.fertility.min_fertility - shared.fertility.min_fertility).abs() < 1e-6);
@@ -2301,14 +2294,14 @@ mod tests {
     }
 
     #[test]
-    fn from_food_resource_config_syncs_primary_type_density_and_coverage() {
+    fn single_type_syncs_primary_type_density_and_coverage() {
         let shared = FoodResourceConfig {
             initial_density: 0.77,
             initial_coverage: 0.33,
             ..FoodResourceConfig::default()
         };
 
-        let config: FoodConfig = shared.clone().into();
+        let config = FoodConfig::single_type(shared.clone());
 
         assert_eq!(config.types.len(), 1);
         assert!((config.types[0].initial_density - shared.initial_density).abs() < 1e-6);
