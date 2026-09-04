@@ -15,6 +15,7 @@ Describe this track's independently observable outcome.
 ## Executable Features
 
 - [ ] **T01.F01 — <feature title>** — Depends on: None
+  - Goal: <one sentence in world terms: what the world or a creature can do afterward. For a mechanism feature, name the natural analog first (seasons, terrain blocks sight, pheromone trails).>
 
 ## Notes for AI Agents
 

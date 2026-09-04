@@ -36,7 +36,7 @@ stop gate, because its output is a survivor list to triage, not a score.
 4. Paste the goal command. Nothing else to paste: the goal tells the
    orchestrator to read this file.
 
-**Next-feature rule.** Take the first-slice order in the "Notes for AI Agents"
+**Next-feature rule.** Take the execution order in the "Notes for AI Agents"
 section of `docs/roadmap.md`. The next feature is the first ID in that order
 whose row is unchecked in its track roadmap and whose dependencies are all
 checked. As of 2026-09-04 that is T01.F12.

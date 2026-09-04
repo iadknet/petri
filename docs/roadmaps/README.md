@@ -11,6 +11,12 @@ state. Copy a template, replace its placeholders, and keep IDs, links,
 dependencies, statuses, and checkbox state truthful. Feature dependencies live
 in the owning track roadmap rather than being duplicated in the feature spec.
 
+Every feature row carries one indented `Goal:` line stated in world terms, what
+the world or a creature can do afterward. A mechanism feature's goal line names
+its natural analog first; the master roadmap's natural-analog rule is what the
+reviewer checks it against. Anything longer than a sentence belongs in the
+feature spec, written just in time.
+
 Run `make roadmap-check` while editing. It checks ownership, links, dependency
 existence and cycles, feature/spec completion agreement, and completion rollups.
 It intentionally does not police prose, review procedure, dates, or agent
