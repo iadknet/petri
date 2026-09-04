@@ -1,7 +1,7 @@
 # Diverse Ecosystems and Complex Cognition
 
-**Status**: Planning
-**Last updated**: 2026-09-03
+**Status**: Active
+**Last updated**: 2026-09-04
 
 ## Success Definition
 

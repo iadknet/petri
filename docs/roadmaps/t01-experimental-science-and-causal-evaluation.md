@@ -1,7 +1,7 @@
 # T01 — Experimental Science and Causal Evaluation
 
-**Status**: Planned
-**Last updated**: 2026-09-03
+**Status**: In Progress
+**Last updated**: 2026-09-04
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
