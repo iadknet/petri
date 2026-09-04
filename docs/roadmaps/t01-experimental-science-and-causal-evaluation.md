@@ -35,7 +35,7 @@ or transient population noise.
 - [ ] **T01.F08 — Baseline Collapse and Ablation Characterization** — Depends on: T01.F05, T01.F06, T01.F07, T01.F13, T10.F08
 - [ ] **T01.F09 — Confirmatory Protocol and Threshold Freeze** — Depends on: T01.F08, T10.F07
 - [ ] **T01.F10 — Program Progress Ledger** — Depends on: T01.F09, T10.F08
-- [ ] **T01.F11 — Baseline Persistence Characterization** — Depends on: T10.F10
+- [x] **T01.F11 — Baseline Persistence Characterization** — Depends on: T10.F10
 - [ ] **T01.F12 — Minimum Persistent World and Persistence Gate** — Depends on: T01.F11, T10.F09
 - [ ] **T01.F13 — Evolutionary Activity and Shadow-Model Baseline** — Depends on: T01.F01, T01.F12
 
