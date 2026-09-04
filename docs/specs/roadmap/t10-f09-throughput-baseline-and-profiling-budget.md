@@ -192,7 +192,11 @@ core-parallelism feature must precede any campaign.
 ## Verification
 
 Recorded on the recording host (Apple M1 Pro, 8 logical cores, macOS) as each
-command ran.
+command ran. Every report under `docs/progress/sweeps/t10-f09/` names
+`git_revision` `f78486b2`, the commit that added the phase timers and
+`--threads`; the only later change to `crates/` is test code, so the
+production code that produced those numbers is the code at the closing
+commit.
 
 - [x] `cargo test -p v3-core --test viability` passes before other checks.
       Run first because `tick.rs` changed: 25 passed, 0 failed (1.64 s).
