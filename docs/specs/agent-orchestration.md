@@ -243,12 +243,10 @@ work introduces track orchestration spend, not creature-tick cost.
       and Opus reviewer, and this spec's Notes record whether each role engaged
       as designed, independent of whether the feature closed. 2026-09-03: see
       "Shakeout results" in Notes; the feature closed.
-- [ ] The first executed feature's spec carries a cost record naming usage
+- [x] The first executed feature's spec carries a cost record naming usage
       totals and the implementer's reported advisor consults. 2026-09-03: the
-      T10.F10 spec records advisor consults, reviewer finding counts, and
-      subagent token usage; session `/usage` totals are still missing because
-      `/usage` is a user command. Remaining: the user pastes `/usage` totals
-      and they are added to that record.
+      T10.F10 spec records advisor consults, reviewer finding counts, subagent
+      token usage, and the session `/usage` totals the user pasted at closure.
 - [x] The Claude goal-prompt template no longer describes the design as the
       "advisor pattern" and contains no stale routing or base-branch notes.
 
