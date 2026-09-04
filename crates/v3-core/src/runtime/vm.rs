@@ -144,6 +144,11 @@ impl VmTraceSink for NoopVmTraceSink {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "the opcode dispatch match covers all 41 VM instructions; keeping \
+              them in one interpreter loop keeps the stack and trace sink local"
+)]
 pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
     def: &VmBackendDef,
     input_refs: &[InputReference],

@@ -201,4 +201,9 @@ fn written_register(instruction: &VmInstruction, register_count: usize) -> Optio
 
 #[cfg(test)]
 #[path = "tests/traced_vm_tests.rs"]
+#[allow(
+    clippy::too_many_lines,
+    reason = "the opcode equivalence test enumerates all 41 VM instructions in \
+              one table-driven case"
+)]
 mod tests;

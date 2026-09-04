@@ -253,6 +253,11 @@ pub struct TransportPerfSnapshot {
     pub ws_frame_publish_ms: f64,
 }
 
+#[allow(
+    clippy::too_many_lines,
+    reason = "flat field-by-field assembly of the WebSocket frame; every line \
+              copies one telemetry field from SimStats"
+)]
 pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
     let sim = &handle.sim;
     let stats = &sim.stats;
