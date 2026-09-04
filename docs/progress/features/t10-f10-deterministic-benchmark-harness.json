@@ -49,10 +49,10 @@
         "path": "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
         "severe": false,
         "wall_clock": {
-          "current_ms_per_creature_tick": 0.004709134828699228,
+          "current_ms_per_creature_tick": 0.005447724313076532,
           "level": "ok",
-          "percent_delta": -0.005145299031407846,
-          "reference_ms_per_creature_tick": 0.00470937714023561
+          "percent_delta": 15.684186400356664,
+          "reference_ms_per_creature_tick": 0.004709134828699228
         }
       }
     ],
@@ -176,8 +176,8 @@
   },
   "environment": {
     "build_profile": "release",
-    "generated_at": "2026-09-04T02:38:27Z",
-    "git_revision": "47ede8ede4d95531924b2f9e390043cd303aa767",
+    "generated_at": "2026-09-04T02:39:39Z",
+    "git_revision": "c06c4bd415b28809d46a5a0eb6b4cad7c3c82e1d",
     "host": {
       "arch": "aarch64",
       "cpu_model": "Apple M1 Pro",
@@ -185,22 +185,22 @@
       "logical_cores": 8,
       "os": "macos"
     },
-    "wall_clock_ms_per_creature_tick": 0.004709134828699228,
+    "wall_clock_ms_per_creature_tick": 0.005447724313076532,
     "wall_clock_ms_per_seed": [
       {
         "seed": 11,
-        "wall_clock_ms": 118.89129199999999
+        "wall_clock_ms": 110.931083
       },
       {
         "seed": 22,
-        "wall_clock_ms": 85.134917
+        "wall_clock_ms": 93.4675
       },
       {
         "seed": 33,
-        "wall_clock_ms": 83.38641700000001
+        "wall_clock_ms": 128.092375
       }
     ],
-    "wall_clock_ms_total": 287.412626
+    "wall_clock_ms_total": 332.490958
   },
   "feature": "t10-f10-deterministic-benchmark-harness",
   "schema_version": 1
