@@ -1,4 +1,5 @@
 use std::collections::{HashMap, HashSet};
+use std::time::Instant;
 
 use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
@@ -882,7 +883,9 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<ActiveTrace>) {
     // Reset per-tick counters at the start of each tick.
     sim.stats.reset_tick_counters();
 
+    let phase_started = Instant::now();
     run_phase_0(sim);
+    sim.stats.phase_wall_clock.world_update += phase_started.elapsed();
 
     // Snapshot surviving creature energies for Phase 2.5 reward learning.
     let mut outcome_acc = OutcomeAccumulator::default();
@@ -912,19 +915,28 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<ActiveTrace>) {
         .map(|t| t.creature_id);
 
     // ── Phase 1: Batch cognition (parallel, with optional trace extraction) ──
+    let phase_started = Instant::now();
     let inputs = assemble_sensor_inputs(sim, &queue);
+    sim.stats.phase_wall_clock.sensor_assembly += phase_started.elapsed();
+
+    let phase_started = Instant::now();
     let mut decisions = run_cognition(sim, &inputs, trace, trace_target);
+    sim.stats.phase_wall_clock.cognition += phase_started.elapsed();
 
     // Sort decisions by priority bid descending. Stable sort preserves the
     // pre-existing random shuffle order among creatures with equal bids.
     sort_by_priority_bid(&mut decisions);
 
     // ── Phase 2: Sequential action execution ────────────────────────────────
+    let phase_started = Instant::now();
     let compute = run_phase_2(sim, decisions, &mut outcome_acc, &mut reproduce_rng);
     compute.commit(&mut sim.stats);
+    sim.stats.phase_wall_clock.actions += phase_started.elapsed();
 
     // ── Phase 2.5: Reward-modulated learning pass ────────────────────────
+    let phase_started = Instant::now();
     run_reward_learning(sim, &outcome_acc);
+    sim.stats.phase_wall_clock.reward_learning += phase_started.elapsed();
 
     sim.tick += 1;
 }
