@@ -1507,3 +1507,66 @@ fn mutate_gate_bias_clamps_to_range() {
         "expected at least one low-boundary clamp across 200 seeds"
     );
 }
+
+// --- Cross-process reproducibility of the mesh-slice clone (T10.F11) ---
+
+/// A ring of `n` VM nodes, each targeting the next at slot 0. Every backward
+/// slice of a ring is the whole ring whatever anchor is drawn, so the clone
+/// always has `n` candidates for its backlink target, and slot 1 is free on
+/// every node so the backlink is always added.
+fn ring_genome(n: u32) -> CreatureGenome {
+    CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: (0..n)
+            .map(|i| NodeGenome {
+                node_id: NodeId::new(i),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 1,
+                    constants: vec![],
+                    program: vec![VmInstruction::Halt],
+                }),
+                targets: wrap_targets(vec![NodeId::new((i + 1) % n)]),
+            })
+            .collect(),
+    }
+}
+
+#[test]
+fn copy_mesh_backward_slice_is_reproducible_for_a_seed() {
+    let genome = ring_genome(4);
+    let target_count =
+        |g: &CreatureGenome| -> usize { g.nodes.iter().map(|n| n.targets.len()).sum() };
+    let results: Vec<CreatureGenome> = (0..16)
+        .map(|_| {
+            let mut mutated = genome.clone();
+            let mut r = rng(0x5EED_0F11);
+            apply(
+                &mut mutated,
+                TopologyOperator::CopyMeshBackwardSlice,
+                &[],
+                0.0,
+                &mut r,
+            )
+            .expect("a ring genome always has a backward slice to clone");
+            mutated
+        })
+        .collect();
+    for (i, mutated) in results.iter().enumerate() {
+        assert_eq!(
+            mutated.nodes.len(),
+            8,
+            "application {i} must append the whole four-node ring"
+        );
+        assert_eq!(
+            target_count(mutated),
+            target_count(&genome) + 4 + 1,
+            "application {i} must add the backlink on top of the cloned ring's targets"
+        );
+        assert_eq!(
+            mutated, &results[0],
+            "application {i} produced a different clone than application 0 for the same \
+             seed: the backlink candidate order is not a function of the genome"
+        );
+    }
+}
