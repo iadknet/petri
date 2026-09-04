@@ -1,1 +1,3 @@
+# Smallest threshold at or above 150 that leaves at most six non-test
+# functions over the limit; each of those carries an explained allow.
 too-many-lines-threshold = 167

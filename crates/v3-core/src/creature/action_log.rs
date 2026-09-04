@@ -31,6 +31,9 @@ impl ActionType {
     }
 }
 
+/// Direction byte recorded for actions that carry no direction parameter.
+pub const NO_DIRECTION: u8 = 255;
+
 /// Number of meaningful action type discriminants (NoOp..StealEnergy).
 pub const ACTION_TYPE_COUNT: u8 = 5;
 const _: () = assert!(ActionType::StealEnergy as u8 + 1 == ACTION_TYPE_COUNT);
@@ -82,7 +85,7 @@ pub struct ActionLogEntry {
     pub action_type: ActionType,
     /// Action result.
     pub result: ActionResult,
-    /// Direction parameter (0-7 for cardinal+diagonal, 255=N/A).
+    /// Direction parameter (0-7 for cardinal+diagonal, [`NO_DIRECTION`] for N/A).
     pub direction: u8,
     /// Creature energy BEFORE this action was applied.
     pub energy_before: f32,
@@ -153,7 +156,7 @@ mod tests {
             tick,
             action_type,
             result: ActionResult::Success,
-            direction: 255,
+            direction: NO_DIRECTION,
             energy_before: 100.0,
             energy_after: 95.0,
             amount: 0.0,
@@ -251,40 +254,48 @@ mod tests {
         assert_eq!(log.entries()[0].result, ActionResult::AgeConstraints);
     }
 
-    #[test]
-    fn action_type_as_key_matches_serialized_variant_name() {
-        for action_type in [
-            ActionType::NoOp,
-            ActionType::Eat,
-            ActionType::Move,
-            ActionType::Reproduce,
-            ActionType::StealEnergy,
-        ] {
+    fn assert_keys_match_serialization<T: serde::Serialize + Copy>(
+        values: &[T],
+        key: impl Fn(T) -> &'static str,
+    ) {
+        for value in values {
             assert_eq!(
-                serde_json::to_value(action_type).expect("serializes"),
-                serde_json::Value::String(action_type.as_key().to_string()),
+                serde_json::to_value(value).expect("serializes"),
+                serde_json::Value::String(key(*value).to_string()),
             );
         }
     }
 
     #[test]
+    fn action_type_as_key_matches_serialized_variant_name() {
+        assert_keys_match_serialization(
+            &[
+                ActionType::NoOp,
+                ActionType::Eat,
+                ActionType::Move,
+                ActionType::Reproduce,
+                ActionType::StealEnergy,
+            ],
+            ActionType::as_key,
+        );
+    }
+
+    #[test]
     fn action_result_as_key_matches_serialized_variant_name() {
-        for result in [
-            ActionResult::Success,
-            ActionResult::NoFood,
-            ActionResult::Blocked,
-            ActionResult::InvalidTarget,
-            ActionResult::EnergyConstraints,
-            ActionResult::PopulationCap,
-            ActionResult::TransferredAndKilled,
-            ActionResult::NoVictim,
-            ActionResult::AgeConstraints,
-            ActionResult::NutritionConstraints,
-        ] {
-            assert_eq!(
-                serde_json::to_value(result).expect("serializes"),
-                serde_json::Value::String(result.as_key().to_string()),
-            );
-        }
+        assert_keys_match_serialization(
+            &[
+                ActionResult::Success,
+                ActionResult::NoFood,
+                ActionResult::Blocked,
+                ActionResult::InvalidTarget,
+                ActionResult::EnergyConstraints,
+                ActionResult::PopulationCap,
+                ActionResult::TransferredAndKilled,
+                ActionResult::NoVictim,
+                ActionResult::AgeConstraints,
+                ActionResult::NutritionConstraints,
+            ],
+            ActionResult::as_key,
+        );
     }
 }
