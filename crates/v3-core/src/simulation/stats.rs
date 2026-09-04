@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::time::Duration;
 
 use crate::contracts::WorldInputKey;
 use crate::kernel::FoodGrowthSummary;
@@ -160,6 +161,27 @@ impl RunningStats {
     }
 }
 
+/// Cumulative wall-clock spent inside each timed tick phase (T10.F09).
+///
+/// Wall-clock is host-dependent and noisy: these fields are observational
+/// only, are never reset by [`SimStats::reset_tick_counters`], and no test
+/// asserts their magnitude. The turn-queue build and the priority sort are
+/// deliberately untimed — they are the remainder against a tick's total
+/// wall-clock.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct PhaseWallClock {
+    /// Phase 0: food growth, aging, energy decay, death removal.
+    pub world_update: Duration,
+    /// Phase 1a: sequential sensor-input assembly.
+    pub sensor_assembly: Duration,
+    /// Phase 1b: batch cognition (parallel on the rayon pool in effect).
+    pub cognition: Duration,
+    /// Phase 2: sequential action execution.
+    pub actions: Duration,
+    /// Phase 2.5: reward-modulated learning.
+    pub reward_learning: Duration,
+}
+
 /// Observability counters for the simulation.
 ///
 /// Cumulative counters never reset. Per-tick counters are reset at the start
@@ -257,6 +279,10 @@ pub struct SimStats {
     pub creature_ticks_total: u64,
     /// Every action the action phase executed (move, eat, noop, reproduce, steal).
     pub actions_applied_total: u64,
+
+    // ── Phase wall-clock (cumulative, observational, never asserted) ─────────
+    /// Cumulative wall-clock per tick phase (T10.F09).
+    pub phase_wall_clock: PhaseWallClock,
 
     // ── Predation cumulative ─────────────────────────────────────────────────
     pub predation_actions_attempted_total: u64,

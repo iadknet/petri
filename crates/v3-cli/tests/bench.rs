@@ -10,8 +10,10 @@
 //! exercise `compare_against`'s regression logic directly against a tiny
 //! synthetic report and add negligible time.
 
+use std::num::NonZeroUsize;
 use std::path::PathBuf;
 
+use proptest::prelude::*;
 use v3_cli::bench;
 
 /// Repository root, derived from `CARGO_MANIFEST_DIR` (`crates/v3-cli`) so the
@@ -113,7 +115,7 @@ fn gate_profile_has_no_severe_regression_against_series_references() {
         for counter in &reference.counters {
             assert_ne!(
                 counter.level,
-                "severe",
+                bench::ComparisonLevel::Severe,
                 "counter {} regressed severely against {}: current={} reference={:?} delta%={:?}",
                 counter.name,
                 reference.path,
@@ -151,7 +153,7 @@ fn compare_against_flags_severe_work_counter_regression() {
         .iter()
         .find(|c| c.name == "vm_steps")
         .expect("vm_steps counter must be present");
-    assert_eq!(vm_steps.level, "severe");
+    assert_eq!(vm_steps.level, bench::ComparisonLevel::Severe);
     assert!(
         comparison.severe,
         "a severe counter must mark the reference comparison severe"
@@ -179,7 +181,7 @@ fn compare_against_labels_missing_reference_counter_as_new() {
         .iter()
         .find(|c| c.name == "vm_steps")
         .expect("vm_steps counter must be present");
-    assert_eq!(vm_steps.level, "new");
+    assert_eq!(vm_steps.level, bench::ComparisonLevel::New);
     assert!(vm_steps.reference.is_none());
     assert!(vm_steps.percent_delta.is_none());
     assert!(
@@ -209,7 +211,7 @@ fn compare_against_reports_severe_wall_clock_without_marking_comparison_severe()
     let wall_clock = comparison
         .wall_clock
         .expect("host identity matches, so wall_clock must be populated");
-    assert_eq!(wall_clock.level, "severe");
+    assert_eq!(wall_clock.level, bench::ComparisonLevel::Severe);
     assert!(
         !comparison.severe,
         "wall-clock must never mark the reference comparison severe, even when severe itself"
@@ -244,7 +246,7 @@ fn compare_against_treats_reference_zero_current_positive_as_severe() {
         .iter()
         .find(|c| c.name == "plasticity_updates")
         .expect("plasticity_updates counter must be present");
-    assert_eq!(plasticity_updates.level, "severe");
+    assert_eq!(plasticity_updates.level, bench::ComparisonLevel::Severe);
     assert!(comparison.severe);
 }
 
@@ -371,4 +373,96 @@ fn default_food_coverage_round_trips_through_the_profile_comparison() {
         err.contains("different profile"),
         "error message should explain the profile mismatch, got: {err}"
     );
+}
+
+/// The thread count changes only the `environment` block (T10.F09): the same
+/// sweep run on a one-thread pool and on the rayon global pool produces a
+/// byte-identical `deterministic` block, and each report records the thread
+/// count of the pool that actually ran it.
+#[test]
+fn thread_count_changes_the_environment_but_not_the_deterministic_block() {
+    let params = tiny_sweep_params();
+    let global_threads = rayon::current_num_threads();
+
+    let one_thread = bench::build_report_with_threads(
+        &params,
+        "t10-f09-thread-independence-check",
+        NonZeroUsize::new(1),
+    );
+    let default_pool = bench::build_report(&params, "t10-f09-thread-independence-check");
+
+    assert_eq!(
+        bench::deterministic_block_json(&one_thread),
+        bench::deterministic_block_json(&default_pool),
+        "the thread count must never change simulation results"
+    );
+    assert_eq!(one_thread.environment.threads, Some(1));
+    assert_eq!(
+        default_pool.environment.threads,
+        Some(global_threads),
+        "without --threads the report records the global pool's thread count"
+    );
+
+    for report in [&one_thread, &default_pool] {
+        let phases = &report.environment.phase_wall_clock_ms_per_seed;
+        assert_eq!(phases.len(), params.seeds.len());
+        assert_eq!(phases[0].seed, params.seeds[0]);
+        let phase_total = phases[0].world_update_ms
+            + phases[0].sensor_assembly_ms
+            + phases[0].cognition_ms
+            + phases[0].actions_ms
+            + phases[0].reward_learning_ms;
+        assert!(
+            phase_total > 0.0 && phase_total <= report.environment.wall_clock_ms_total,
+            "the timed phases must be a positive part of the run's wall-clock: \
+             {phase_total} vs {}",
+            report.environment.wall_clock_ms_total
+        );
+        assert_eq!(
+            report.environment.throughput.per_seed.len(),
+            params.seeds.len()
+        );
+        assert!(report.environment.throughput.total.ticks_per_second > 0.0);
+    }
+}
+
+proptest! {
+    /// Every rate multiplied by the elapsed time it was derived from recovers
+    /// its own counter. Relative tolerance, because a u64 counter beyond 2^53
+    /// is not exactly representable as an `f64`.
+    #[test]
+    fn throughput_rates_recover_their_counters(
+        ticks in 0_u64..1_000_000_000,
+        creature_ticks in 0_u64..1_000_000_000_000,
+        births in 0_u64..1_000_000_000,
+        wall_clock_ms in 0.001_f64..1_000_000_000.0,
+    ) {
+        let rates = bench::throughput_rates(ticks, creature_ticks, births, wall_clock_ms);
+        let seconds = wall_clock_ms / 1000.0;
+        let hours = seconds / 3600.0;
+
+        let close = |recovered: f64, counter: u64| {
+            let counter = counter as f64;
+            (recovered - counter).abs() <= 1e-6 * counter.max(1.0)
+        };
+
+        prop_assert!(close(rates.ticks_per_second * seconds, ticks));
+        prop_assert!(close(rates.creature_ticks_per_second * seconds, creature_ticks));
+        prop_assert!(close(rates.ticks_per_hour * hours, ticks));
+        prop_assert!(close(rates.births_per_hour * hours, births));
+    }
+
+    /// A run that recorded no elapsed time reports zero rates rather than
+    /// infinity: a report must always serialize, and `Infinity` is not JSON.
+    #[test]
+    fn a_zero_wall_clock_yields_zero_rates(
+        ticks in 0_u64..1_000_000_000,
+        creature_ticks in 0_u64..1_000_000_000_000,
+        births in 0_u64..1_000_000_000,
+    ) {
+        let rates = bench::throughput_rates(ticks, creature_ticks, births, 0.0);
+
+        prop_assert_eq!(rates, bench::ThroughputRates::default());
+        prop_assert!(serde_json::to_string(&rates).is_ok());
+    }
 }

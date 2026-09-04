@@ -118,7 +118,7 @@ core-parallelism feature must precede any campaign.
 
 ## Implementation Tasks
 
-- [ ] Phase timing in `v3-core`. Add `PhaseWallClock` (five cumulative
+- [x] Phase timing in `v3-core`. Add `PhaseWallClock` (five cumulative
       `std::time::Duration` fields named as in the schema above) to
       `SimStats`, accumulated in `run_tick` around the five phase calls with
       `Instant`; cumulative, never reset by `reset_tick_counters`. TDD: a
@@ -126,7 +126,7 @@ core-parallelism feature must precede any campaign.
       non-decreasing across two `run_tick` calls and that the tick counters
       reset while these do not. Run `cargo test -p v3-core --test viability`
       first, since `tick.rs` changes.
-- [ ] Bench extensions in `crates/v3-cli`. Add `rayon` to the crate's
+- [x] Bench extensions in `crates/v3-cli`. Add `rayon` to the crate's
       dependencies. Add `--threads` per the thread-control rule, rejecting
       `0` in `resolve_bench_profile` (unit test). Record `threads`,
       `phase_wall_clock_ms_per_seed`, and `throughput` in `environment`.
@@ -138,7 +138,7 @@ core-parallelism feature must precede any campaign.
       a one-thread pool and on the default pool and asserts the
       `deterministic_block_json` strings are byte-identical and the
       `environment.threads` values differ as expected.
-- [ ] Pay down two T10.F10 maintainability deferrals touched by this work:
+- [x] Pay down two T10.F10 maintainability deferrals touched by this work:
       comparison levels become a serde-renamed enum, and the wall-clock flag
       and severe thresholds become named constants beside the work-counter
       ones. The serialized `comparison` and `deterministic` JSON must not
@@ -188,11 +188,22 @@ core-parallelism feature must precede any campaign.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` passes before other checks.
-- [ ] `cargo test -p v3-core --lib` passes with the phase-timing test.
-- [ ] `cargo test -p v3-cli` passes with the threads, throughput proptest,
+Recorded on the recording host (Apple M1 Pro, 8 logical cores, macOS) as each
+command ran.
+
+- [x] `cargo test -p v3-core --test viability` passes before other checks.
+      Run first because `tick.rs` changed: 25 passed, 0 failed (1.64 s).
+- [x] `cargo test -p v3-core --lib` passes with the phase-timing test:
+      1013 passed, 0 failed (18.76 s), including the two new
+      `simulation::tick::tests::phase_timing` tests.
+- [x] `cargo test -p v3-cli` passes with the threads, throughput proptest,
       and thread-independence tests, and the two stored gate references still
-      load and match.
+      load and match: 9 + 8 + 12 + 7 + 0 passed, 0 failed (bin unit tests,
+      lib unit tests, `tests/bench.rs`, `tests/cli.rs`, doc-tests). The
+      `gate_profile_has_no_severe_regression_against_series_references` test
+      is the end-to-end proof that the stored T10.F10 and T01.F11 reports
+      still deserialize under the extended `environment` schema and the
+      `comparison.level` enum.
 - [ ] `make rust-check` and `make roadmap-check` pass.
 - [ ] Every `docs/progress/sweeps/t10-f09/*.json` `deterministic` object
       equals its T01.F11 counterpart.

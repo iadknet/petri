@@ -5,6 +5,7 @@
 //! same commit and inputs; the `environment` block records host identity and
 //! wall-clock as an unasserted secondary signal.
 
+use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
@@ -25,9 +26,16 @@ pub const COUNTER_NAMES: [&str; 6] = [
     "births",
 ];
 
-/// Regression thresholds against each reference, per the T10.F10 spec.
+/// Deterministic work-counter regression thresholds against each reference,
+/// per the T10.F10 spec.
 const FLAG_PERCENT: f64 = 10.0;
 const SEVERE_PERCENT: f64 = 50.0;
+
+/// Wall-clock regression thresholds against a host-matching reference. They
+/// are looser than the work-counter ones because wall-clock is a noisy
+/// secondary signal, and a wall-clock level never fails a comparison.
+const WALL_CLOCK_FLAG_PERCENT: f64 = 25.0;
+const WALL_CLOCK_SEVERE_PERCENT: f64 = 100.0;
 
 /// Persistence sampling cadence (T01.F11): every executed tick that is a
 /// multiple of this constant is sampled, plus the last executed tick.
@@ -238,6 +246,80 @@ pub struct Environment {
     pub wall_clock_ms_per_seed: Vec<SeedWallClock>,
     pub wall_clock_ms_total: f64,
     pub wall_clock_ms_per_creature_tick: f64,
+    /// The rayon thread count in effect during the run, read from inside the
+    /// pool that ran it. Absent from reports stored before T10.F09.
+    #[serde(default)]
+    pub threads: Option<usize>,
+    /// Per-seed cumulative wall-clock by tick phase (T10.F09).
+    #[serde(default)]
+    pub phase_wall_clock_ms_per_seed: Vec<SeedPhaseWallClock>,
+    /// Per-seed and total throughput derived from this report's own counters
+    /// and wall-clock (T10.F09).
+    #[serde(default)]
+    pub throughput: Throughput,
+}
+
+/// One seed's cumulative wall-clock split across the five timed tick phases.
+/// The turn-queue build and the priority sort are untimed: they are the
+/// remainder against that seed's `wall_clock_ms`.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct SeedPhaseWallClock {
+    pub seed: u64,
+    pub world_update_ms: f64,
+    pub sensor_assembly_ms: f64,
+    pub cognition_ms: f64,
+    pub actions_ms: f64,
+    pub reward_learning_ms: f64,
+}
+
+/// Throughput rates for one run, per seed and in total.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct Throughput {
+    pub per_seed: Vec<SeedThroughput>,
+    pub total: ThroughputRates,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct SeedThroughput {
+    pub seed: u64,
+    #[serde(flatten)]
+    pub rates: ThroughputRates,
+}
+
+/// Wall-clock rates. `ticks_per_hour` and `births_per_hour` are the per-core
+/// budget when they come from a `--threads 1` report.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+pub struct ThroughputRates {
+    pub ticks_per_second: f64,
+    pub creature_ticks_per_second: f64,
+    pub ticks_per_hour: f64,
+    pub births_per_hour: f64,
+}
+
+/// Derive throughput rates from one run's own counters and its own elapsed
+/// wall-clock. A non-positive elapsed time yields zero rates rather than
+/// infinity or NaN, so a report can always be serialized as JSON.
+#[must_use]
+pub fn throughput_rates(
+    ticks: u64,
+    creature_ticks: u64,
+    births: u64,
+    wall_clock_ms: f64,
+) -> ThroughputRates {
+    let seconds = wall_clock_ms / 1000.0;
+    let per_second = |count: u64| {
+        if seconds > 0.0 {
+            count as f64 / seconds
+        } else {
+            0.0
+        }
+    };
+    ThroughputRates {
+        ticks_per_second: per_second(ticks),
+        creature_ticks_per_second: per_second(creature_ticks),
+        ticks_per_hour: per_second(ticks) * 3600.0,
+        births_per_hour: per_second(births) * 3600.0,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -275,7 +357,7 @@ pub struct CounterComparison {
     pub current: String,
     pub reference: Option<String>,
     pub percent_delta: Option<String>,
-    pub level: String,
+    pub level: ComparisonLevel,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -283,7 +365,33 @@ pub struct WallClockComparison {
     pub current_ms_per_creature_tick: f64,
     pub reference_ms_per_creature_tick: f64,
     pub percent_delta: f64,
-    pub level: String,
+    pub level: ComparisonLevel,
+}
+
+/// How one comparison against a stored reference read. Serializes as the
+/// lowercase strings the stored reports already carry.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ComparisonLevel {
+    /// Within threshold, or no comparable reference value.
+    Ok,
+    Flag,
+    Severe,
+    /// The counter is absent from the reference report (an older schema);
+    /// never treated as a zero-value regression.
+    New,
+}
+
+impl std::fmt::Display for ComparisonLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let name = match self {
+            Self::Ok => "ok",
+            Self::Flag => "flag",
+            Self::Severe => "severe",
+            Self::New => "new",
+        };
+        f.write_str(name)
+    }
 }
 
 // ── Formatting helpers ───────────────────────────────────────────────────────
@@ -405,6 +513,23 @@ struct SeedRun {
     persistence: PopulationPersistenceSeed,
     complexities: Vec<u32>,
     wall_clock_ms: f64,
+    phase_wall_clock: SeedPhaseWallClock,
+    throughput: SeedThroughput,
+}
+
+/// `Duration` as fractional milliseconds, the unit every wall-clock field in
+/// the `environment` block uses. `Duration::as_millis_f64` is still unstable
+/// on the pinned toolchain.
+fn millis(duration: std::time::Duration) -> f64 {
+    duration.as_secs_f64() * 1000.0
+}
+
+/// Every wall-clock observation of a run, for the caller to fold into the
+/// `environment` block. Nothing here may enter the `deterministic` block.
+pub struct RunTimings {
+    pub wall_clock_ms_per_seed: Vec<SeedWallClock>,
+    pub phase_wall_clock_ms_per_seed: Vec<SeedPhaseWallClock>,
+    pub throughput_per_seed: Vec<SeedThroughput>,
 }
 
 fn run_one_seed(config: &SimulationConfig, seed: u64, horizon: u64) -> SeedRun {
@@ -430,7 +555,7 @@ fn run_one_seed(config: &SimulationConfig, seed: u64, horizon: u64) -> SeedRun {
             break;
         }
     }
-    let wall_clock_ms = start.elapsed().as_secs_f64() * 1000.0;
+    let wall_clock_ms = millis(start.elapsed());
 
     let persistence = persistence.finish(seed);
     let complexities: Vec<u32> = sim
@@ -453,11 +578,30 @@ fn run_one_seed(config: &SimulationConfig, seed: u64, horizon: u64) -> SeedRun {
         extinction_tick: persistence.extinction_tick,
     };
 
+    let phases = sim.stats.phase_wall_clock;
+    let throughput = SeedThroughput {
+        seed,
+        rates: throughput_rates(
+            per_seed.ticks,
+            per_seed.creature_ticks,
+            per_seed.births,
+            wall_clock_ms,
+        ),
+    };
     SeedRun {
         per_seed,
         persistence,
         complexities,
         wall_clock_ms,
+        throughput,
+        phase_wall_clock: SeedPhaseWallClock {
+            seed,
+            world_update_ms: millis(phases.world_update),
+            sensor_assembly_ms: millis(phases.sensor_assembly),
+            cognition_ms: millis(phases.cognition),
+            actions_ms: millis(phases.actions),
+            reward_learning_ms: millis(phases.reward_learning),
+        },
     }
 }
 
@@ -495,13 +639,15 @@ fn structure_size_distribution(mut pooled: Vec<u32>) -> StructureSizeDistributio
 }
 
 /// Run the deterministic profile (no host/timestamp data) and return the
-/// `Deterministic` block plus per-seed wall-clock timings for the caller to
-/// fold into the `environment` block.
-pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, Vec<SeedWallClock>) {
+/// `Deterministic` block plus the run's wall-clock observations for the
+/// caller to fold into the `environment` block.
+pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) {
     let config = build_config(params);
 
     let mut per_seed = Vec::with_capacity(params.seeds.len());
     let mut wall_clock = Vec::with_capacity(params.seeds.len());
+    let mut phase_wall_clock = Vec::with_capacity(params.seeds.len());
+    let mut throughput_per_seed = Vec::with_capacity(params.seeds.len());
     let mut pooled_complexities: Vec<u32> = Vec::new();
     let mut totals = Totals::default();
     let mut population_persistence_per_seed = Vec::with_capacity(params.seeds.len());
@@ -521,6 +667,8 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, Vec<SeedWall
             seed,
             wall_clock_ms: run.wall_clock_ms,
         });
+        throughput_per_seed.push(run.throughput);
+        phase_wall_clock.push(run.phase_wall_clock);
         population_persistence_per_seed.push(run.persistence);
         per_seed.push(run.per_seed);
     }
@@ -578,7 +726,13 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, Vec<SeedWall
         goal_indicators,
     };
 
-    (deterministic, wall_clock)
+    let timings = RunTimings {
+        wall_clock_ms_per_seed: wall_clock,
+        phase_wall_clock_ms_per_seed: phase_wall_clock,
+        throughput_per_seed,
+    };
+
+    (deterministic, timings)
 }
 
 // ── Environment (non-deterministic, informational) ──────────────────────────
@@ -673,15 +827,26 @@ fn rfc3339_now() -> String {
     format!("{year:04}-{month:02}-{day:02}T{hour:02}:{minute:02}:{second:02}Z")
 }
 
-fn build_environment(
-    wall_clock_ms_per_seed: Vec<SeedWallClock>,
-    creature_ticks: u64,
-) -> Environment {
+fn build_environment(timings: RunTimings, totals: &Totals, threads: usize) -> Environment {
+    let RunTimings {
+        wall_clock_ms_per_seed,
+        phase_wall_clock_ms_per_seed,
+        throughput_per_seed,
+    } = timings;
     let wall_clock_ms_total: f64 = wall_clock_ms_per_seed.iter().map(|s| s.wall_clock_ms).sum();
-    let wall_clock_ms_per_creature_tick = if creature_ticks == 0 {
+    let wall_clock_ms_per_creature_tick = if totals.creature_ticks == 0 {
         0.0
     } else {
-        wall_clock_ms_total / creature_ticks as f64
+        wall_clock_ms_total / totals.creature_ticks as f64
+    };
+    let throughput = Throughput {
+        per_seed: throughput_per_seed,
+        total: throughput_rates(
+            totals.ticks,
+            totals.creature_ticks,
+            totals.births,
+            wall_clock_ms_total,
+        ),
     };
     Environment {
         generated_at: rfc3339_now(),
@@ -695,16 +860,43 @@ fn build_environment(
         wall_clock_ms_per_seed,
         wall_clock_ms_total,
         wall_clock_ms_per_creature_tick,
+        threads: Some(threads),
+        phase_wall_clock_ms_per_seed,
+        throughput,
     }
 }
 
 // ── Report assembly ─────────────────────────────────────────────────────────
 
+/// Build a full report on the rayon global thread pool.
+pub fn build_report(params: &ProfileParams, feature: &str) -> Report {
+    build_report_with_threads(params, feature, None)
+}
+
 /// Build a full report (deterministic block, environment, and an empty
 /// comparison) for the given profile.
-pub fn build_report(params: &ProfileParams, feature: &str) -> Report {
-    let (deterministic, wall_clock) = run_deterministic(params);
-    let environment = build_environment(wall_clock, deterministic.totals.creature_ticks);
+///
+/// `threads` runs the profile inside a private rayon pool of that many
+/// threads via `ThreadPool::install`, which scopes Phase 1b's `par_iter_mut`
+/// to that pool; `None` uses the global pool. `install` rather than
+/// `build_global` so one process can run a profile at several thread counts.
+/// The recorded thread count is read from inside whichever pool ran the
+/// profile.
+pub fn build_report_with_threads(
+    params: &ProfileParams,
+    feature: &str,
+    threads: Option<NonZeroUsize>,
+) -> Report {
+    let run = || (run_deterministic(params), rayon::current_num_threads());
+    let ((deterministic, timings), threads_used) = match threads {
+        Some(threads) => rayon::ThreadPoolBuilder::new()
+            .num_threads(threads.get())
+            .build()
+            .expect("a rayon pool of at least one thread can always be built")
+            .install(run),
+        None => run(),
+    };
+    let environment = build_environment(timings, &deterministic.totals, threads_used);
     Report {
         schema_version: SCHEMA_VERSION,
         feature: feature.to_string(),
@@ -738,12 +930,12 @@ fn percent_delta(current: f64, reference: f64) -> Option<f64> {
     Some((current - reference) / reference * 100.0)
 }
 
-fn counter_level(delta_percent: Option<f64>) -> &'static str {
+fn counter_level(delta_percent: Option<f64>) -> ComparisonLevel {
     match delta_percent {
-        None => "ok",
-        Some(d) if d > SEVERE_PERCENT => "severe",
-        Some(d) if d > FLAG_PERCENT => "flag",
-        _ => "ok",
+        None => ComparisonLevel::Ok,
+        Some(d) if d > SEVERE_PERCENT => ComparisonLevel::Severe,
+        Some(d) if d > FLAG_PERCENT => ComparisonLevel::Flag,
+        _ => ComparisonLevel::Ok,
     }
 }
 
@@ -781,7 +973,7 @@ pub fn compare_against(
             per_creature_tick_value(&reference.deterministic.per_creature_tick, name);
 
         let (level, reference_str, delta_str) = match reference_value {
-            None => ("new".to_string(), None, None),
+            None => (ComparisonLevel::New, None, None),
             // The reference recorded no work for this counter but the
             // current run does: the ratio is unbounded (division by zero),
             // so treat it as severe rather than silently reporting "ok"
@@ -790,19 +982,15 @@ pub fn compare_against(
             // first plastic founder genome) can trip a regression at all.
             Some(reference_value) if reference_value == 0.0 && current_value > 0.0 => {
                 any_severe = true;
-                ("severe".to_string(), Some(six(reference_value)), None)
+                (ComparisonLevel::Severe, Some(six(reference_value)), None)
             }
             Some(reference_value) => {
                 let delta = percent_delta(current_value, reference_value);
                 let level = counter_level(delta);
-                if level == "severe" {
+                if level == ComparisonLevel::Severe {
                     any_severe = true;
                 }
-                (
-                    level.to_string(),
-                    Some(six(reference_value)),
-                    delta.map(six),
-                )
+                (level, Some(six(reference_value)), delta.map(six))
             }
         };
 
@@ -819,18 +1007,18 @@ pub fn compare_against(
         let current_ms = current.environment.wall_clock_ms_per_creature_tick;
         let reference_ms = reference.environment.wall_clock_ms_per_creature_tick;
         let delta = percent_delta(current_ms, reference_ms).unwrap_or(0.0);
-        let level = if delta > 100.0 {
-            "severe"
-        } else if delta > 25.0 {
-            "flag"
+        let level = if delta > WALL_CLOCK_SEVERE_PERCENT {
+            ComparisonLevel::Severe
+        } else if delta > WALL_CLOCK_FLAG_PERCENT {
+            ComparisonLevel::Flag
         } else {
-            "ok"
+            ComparisonLevel::Ok
         };
         Some(WallClockComparison {
             current_ms_per_creature_tick: current_ms,
             reference_ms_per_creature_tick: reference_ms,
             percent_delta: delta,
-            level: level.to_string(),
+            level,
         })
     } else {
         None

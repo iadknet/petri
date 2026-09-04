@@ -1691,6 +1691,8 @@ name = "v3-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "proptest",
+ "rayon",
  "serde",
  "serde_json",
  "v3-core",
