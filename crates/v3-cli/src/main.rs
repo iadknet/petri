@@ -1,3 +1,5 @@
+use std::num::NonZeroUsize;
+
 use clap::Parser;
 use v3_cli::bench::{self, ProfileParams};
 use v3_cli::RunError;
@@ -49,6 +51,11 @@ struct BenchArgs {
     /// production per-food-type defaults. Sweep-only.
     #[arg(long)]
     food_coverage: Option<f32>,
+    /// Run the profile on a private rayon pool of this many threads (>= 1),
+    /// which scopes the parallel cognition phase to it. Omit it to use the
+    /// rayon global pool. Accepted for both profiles.
+    #[arg(long)]
+    threads: Option<usize>,
 }
 
 #[derive(clap::Args)]
@@ -114,10 +121,34 @@ fn main() {
     }
 }
 
-/// Resolve the benchmark profile and feature name from the parsed arguments.
-/// Returns the error message `run_bench` prints, so the argument rules are
-/// unit-testable without spawning the binary.
-fn resolve_bench_profile(args: &BenchArgs) -> Result<(ProfileParams, String), String> {
+/// The benchmark profile, feature name, and thread count a `bench` run needs.
+#[derive(Debug)]
+struct ResolvedBench {
+    params: ProfileParams,
+    feature: String,
+    /// `None` means the rayon global pool.
+    threads: Option<NonZeroUsize>,
+}
+
+/// Resolve the benchmark profile, feature name, and thread count from the
+/// parsed arguments. Returns the error message `run_bench` prints, so the
+/// argument rules are unit-testable without spawning the binary.
+fn resolve_bench_profile(args: &BenchArgs) -> Result<ResolvedBench, String> {
+    // A zero-thread pool is not a pool. Rejected for both profiles, before
+    // any profile-specific rule, so the message never depends on --profile.
+    let threads = args
+        .threads
+        .map(|threads| NonZeroUsize::new(threads).ok_or("--threads must be >= 1"))
+        .transpose()?;
+    let (params, feature) = resolve_profile_params(args)?;
+    Ok(ResolvedBench {
+        params,
+        feature,
+        threads,
+    })
+}
+
+fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), String> {
     match args.profile {
         BenchProfile::Gate => {
             // clap cannot express "forbidden when --profile gate", and
@@ -176,7 +207,11 @@ fn resolve_bench_profile(args: &BenchArgs) -> Result<(ProfileParams, String), St
 }
 
 fn run_bench(args: BenchArgs) {
-    let (params, feature) = match resolve_bench_profile(&args) {
+    let ResolvedBench {
+        params,
+        feature,
+        threads,
+    } = match resolve_bench_profile(&args) {
         Ok(resolved) => resolved,
         Err(message) => {
             eprintln!("error: {message}");
@@ -193,7 +228,7 @@ fn run_bench(args: BenchArgs) {
         }
     });
 
-    let mut report = bench::build_report(&params, &feature);
+    let mut report = bench::build_report_with_threads(&params, &feature, threads);
 
     let mut reference_paths = args.baseline.clone();
     reference_paths.extend(args.compare.clone());
@@ -271,6 +306,7 @@ mod tests {
             seeds: None,
             ticks: None,
             food_coverage: None,
+            threads: None,
         }
     }
 
@@ -304,9 +340,13 @@ mod tests {
         ]);
         assert_eq!(args.food_coverage, None);
 
-        let (params, _) = resolve_bench_profile(&args).expect("sweep arguments are complete");
-        assert_eq!(params.food_coverage, None);
-        assert_eq!(params.seeds, vec![11, 22, 33]);
+        let resolved = resolve_bench_profile(&args).expect("sweep arguments are complete");
+        assert_eq!(resolved.params.food_coverage, None);
+        assert_eq!(resolved.params.seeds, vec![11, 22, 33]);
+        assert_eq!(
+            resolved.threads, None,
+            "omitting --threads uses the rayon global pool"
+        );
     }
 
     #[test]
@@ -321,9 +361,12 @@ mod tests {
             ..bench_args(BenchProfile::Sweep)
         };
 
-        let (params, feature) = resolve_bench_profile(&args).expect("sweep arguments are complete");
-        assert_eq!(params.food_coverage, Some(0.5));
-        assert_eq!(feature, "t01-f11-baseline-persistence-characterization");
+        let resolved = resolve_bench_profile(&args).expect("sweep arguments are complete");
+        assert_eq!(resolved.params.food_coverage, Some(0.5));
+        assert_eq!(
+            resolved.feature,
+            "t01-f11-baseline-persistence-characterization"
+        );
     }
 
     #[test]
@@ -343,11 +386,41 @@ mod tests {
 
     #[test]
     fn the_gate_profile_still_resolves_without_food_coverage() {
-        let (params, feature) = resolve_bench_profile(&bench_args(BenchProfile::Gate))
+        let resolved = resolve_bench_profile(&bench_args(BenchProfile::Gate))
             .expect("the gate profile needs only --feature");
 
-        assert_eq!(params, bench::gate_profile_params());
-        assert_eq!(feature, "t01-f11-baseline-persistence-characterization");
+        assert_eq!(resolved.params, bench::gate_profile_params());
+        assert_eq!(
+            resolved.feature,
+            "t01-f11-baseline-persistence-characterization"
+        );
+    }
+
+    #[test]
+    fn a_zero_thread_count_is_rejected_for_either_profile() {
+        for profile in [BenchProfile::Gate, BenchProfile::Sweep] {
+            let args = BenchArgs {
+                threads: Some(0),
+                ..bench_args(profile)
+            };
+
+            let error = resolve_bench_profile(&args).expect_err("a zero-thread pool is not a pool");
+            assert!(
+                error.contains("--threads must be >= 1"),
+                "unexpected error: {error}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_positive_thread_count_is_resolved_for_the_gate_profile() {
+        let args = BenchArgs {
+            threads: Some(1),
+            ..bench_args(BenchProfile::Gate)
+        };
+
+        let resolved = resolve_bench_profile(&args).expect("--threads 1 is valid");
+        assert_eq!(resolved.threads, NonZeroUsize::new(1));
     }
 
     #[test]
