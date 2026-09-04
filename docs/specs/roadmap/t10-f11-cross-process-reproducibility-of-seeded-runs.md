@@ -406,6 +406,15 @@ are identical to the references, and every other indicator remains
 
 ## Notes for AI Agents
 
+- Candidate-set equivalence at the mesh-slice clone: the pre-fix `new_ids` was
+  `id_map.values()`, one entry per distinct old `node_id` in the slice, while
+  the fixed `new_ids` has one entry per `gene_indices` entry. The two lengths
+  differ only if a genome holds two nodes with the same `node_id`, which
+  mutation cannot produce (every new id comes from `next_node_id`, `max + 1`,
+  and `RouteTarget` ids may dangle but node ids are unique). Both slice
+  functions also return sorted, unique indices. So the draw count, the draw
+  order, and the candidate set are unchanged, and only the mapping from the
+  draw to the candidate moved.
 - Deferred finding (out of the simulation path):
   `crates/v3-core/src/patterns/noise.rs` collects a `HashSet` into a `Vec` in
   hash order and trims it randomly, so `generate_pattern_seeded` is not
