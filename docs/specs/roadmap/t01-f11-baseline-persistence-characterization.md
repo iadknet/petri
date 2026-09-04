@@ -299,6 +299,13 @@ as marginal: one is a single creature and the other has not settled by tick
 
 ## Notes for AI Agents
 
+- 2026-09-04: T10.F11 regenerated the four sweep reports in place at its fix
+  commit `b8887e13`, and a second run of each command reproduced the
+  `deterministic` block. The numbers in this spec's tables and prose describe
+  the pre-fix draw at `d4d5005a`, when two mutation operators indexed a seeded
+  draw into a list built by iterating a std `HashMap`, so 512-by-512 and above
+  were not reproducible across processes; read them against the regenerated
+  reports, not the other way round.
 - The sweep runs seeds sequentially in one process. Small worlds stop at
   extinction, so their sweeps finish in seconds to minutes; the default world
   is the long one. Do not shorten the horizon below 2,000 or drop a seed to
