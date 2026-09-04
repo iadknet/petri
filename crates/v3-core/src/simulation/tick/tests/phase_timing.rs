@@ -60,7 +60,11 @@ fn run_tick_accumulates_every_phase_wall_clock_field() {
 fn reset_tick_counters_clears_per_tick_counters_but_not_phase_wall_clock() {
     let (mut sim, _id) = make_sim_with_one_creature(10_000.0);
 
-    run_tick(&mut sim, &mut None);
+    // Several ticks, not one: the host clock has a finite resolution, and a
+    // single pass through the cheapest phase can legitimately read zero.
+    for _ in 0..32 {
+        run_tick(&mut sim, &mut None);
+    }
     let before = sim.stats.phase_wall_clock;
     sim.stats.last_tick_noop = 7;
 
