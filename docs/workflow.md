@@ -39,7 +39,7 @@ stop gate, because its output is a survivor list to triage, not a score.
 **Next-feature rule.** Take the first-slice order in the "Notes for AI Agents"
 section of `docs/roadmap.md`. The next feature is the first ID in that order
 whose row is unchecked in its track roadmap and whose dependencies are all
-checked. As of 2026-09-04 that is T10.F11.
+checked. As of 2026-09-04 that is T01.F12.
 
 ## Goal command template
 

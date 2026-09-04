@@ -34,7 +34,7 @@ gate.
 - [ ] **T10.F08 — Provenance and Immutable Result-Bundle Packaging** — Depends on: T10.F05, T10.F06, T10.F07
 - [x] **T10.F09 — Throughput Baseline and Profiling Budget** — Depends on: T01.F11
 - [x] **T10.F10 — Deterministic Benchmark Harness and Per-Feature Report** — Depends on: None
-- [ ] **T10.F11 — Cross-Process Reproducibility of Seeded Runs** — Depends on: T10.F09
+- [x] **T10.F11 — Cross-Process Reproducibility of Seeded Runs** — Depends on: T10.F09
 
 ## Notes for AI Agents
 
