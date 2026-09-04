@@ -6,7 +6,7 @@ description: >-
   P1/P2/P3 findings. Read-only. Use for the final diff review after the
   roadmap-implementer reports a feature complete. Does not implement, edit, or
   adjudicate scope.
-model: opus
+model: fable
 effort: high
 permissionMode: plan
 tools: Read, Grep, Glob, Bash

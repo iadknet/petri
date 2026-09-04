@@ -125,8 +125,12 @@ Research date: 2026-09-03. Claude Code installed: v2.1.259.
   rather than reasoning. Cost: Opus is 2.5 times Sonnet per token and a Fable
   advisor is twice an Opus one per consult. Consequence of the global setting:
   the Fable orchestrator now also has the advisor attached and is instructed
-  in the template not to consult it. The reviewer inherits the Fable advisor
-  and its body already forbids consulting. Revisit with the cost records after
+  in the template not to consult it. Same evening, the user also moved
+  `roadmap-reviewer` to Fable 5.1 at `effort: high`, so the final diff review
+  is now a stronger model than the implementer as well as a fresh context;
+  its body still forbids consulting the (same-tier) advisor. Cost: a Fable
+  review is twice an Opus one per token, on a transcript of roughly 100k
+  tokens per feature. Revisit with the cost records after
   T01.F13; the fallback is a second Sonnet implementer definition for harness
   and characterization features.
 - Independent review: a new read-only `roadmap-reviewer` subagent on Opus at
