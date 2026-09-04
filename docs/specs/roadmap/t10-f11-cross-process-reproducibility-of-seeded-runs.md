@@ -202,11 +202,13 @@ the master roadmap's persistence numbers are refreshed if they moved.
   `crates/v3-core/proptest-regressions/mutation/vm/tests.txt`, committed with
   the fix. After the fix, `cargo test -p v3-core --lib` reports
   `ok. 1016 passed; 0 failed` in 20.55 s.
-- [x] The RNG-indexed pick audit table (fifteen sites, each with the list's
+- [x] The RNG-indexed pick audit table (nineteen sites, each with the list's
       source order) and the hash-map inventory re-check are recorded here.
 
-  All fifteen `<list>[rng.gen_range(0..<list>.len())]` sites in non-test
-  `v3-core` code, taken 2026-09-04 from
+  The plan listed fifteen `<list>[rng.gen_range(0..<list>.len())]` sites; review
+  re-ran the same grep and found four more non-test sites that index a const
+  array or `genome.nodes` directly (rows 3, 5, 13, and 14), nineteen in total.
+  All nineteen sites in non-test `v3-core` code, taken 2026-09-04 from
   `grep -rn "gen_range(0\.\." crates/v3-core/src --include "*.rs" | grep -v "/tests.rs"`
   and filtered to picks that index a named list:
 
@@ -214,19 +216,23 @@ the master roadmap's persistence numbers are refreshed if they moved.
   | - | ---- | ---- | ------------ | ------- |
   | 1 | `creature/genome/analysis.rs:200` | `outputs` | `program.iter().enumerate()` filter | Program order — reproducible |
   | 2 | `creature/genome/analysis.rs:249` | `writers` | `program.iter().enumerate()` filter | Program order — reproducible |
-  | 3 | `mutation/graph/hebbian.rs:201` | `others` | `ALL_RULES.iter()` filter | Const array order — reproducible |
-  | 4 | `mutation/graph/hebbian.rs:310` | `others` | `ALL_CHANNELS.iter()` filter | Const array order — reproducible |
-  | 5 | `mutation/graph/operators.rs:346` | `surfaces` | `0..compute_nodes.len()`, then sinks, then action bank, then `ExecuteGate` | Index-range order — reproducible |
-  | 6 | `mutation/graph/operators.rs:491` | `cluster` | `Vec` grown by the random walk from `seed` | Draw order — reproducible |
-  | 7 | `mutation/graph/operators.rs:514` | `neighbors` | `compute_nodes[current].inputs` then `compute_nodes.iter().enumerate()` | Vec/index order — reproducible |
-  | 8 | `mutation/graph/operators.rs:662` | `eligible` | `compute_nodes.iter().enumerate()` filter | Vec order — reproducible |
-  | 9 | `mutation/reachability.rs:68` | `eligible` | Caller's `Vec<usize>` (node indices) | Vec order — reproducible |
-  | 10 | `mutation/topology/birth.rs:51` | `custom_sink_indices` | `output_sinks.iter().enumerate()` filter | Vec order — reproducible |
-  | 11 | `mutation/topology/structural.rs:79` | `candidates` | `genome.nodes.iter()` filter | Genome order — reproducible |
-  | 12 | `mutation/topology/structural.rs:231` | `new_ids` | **Was** `id_map.values()` (std `HashMap`); **now** pushed in `gene_indices` order | **Defect, fixed** |
-  | 13 | `mutation/vm/operators.rs:744` | `terminal_positions` | `program.iter().enumerate()` filter | Program order — reproducible |
-  | 14 | `mutation/vm/operators.rs:798` | `slot_indices` | `program.iter().enumerate()` filter | Program order — reproducible |
-  | 15 | `mutation/vm/operators.rs:850` | `eligible` | **Was** `groups.into_iter()` (std `HashMap`); **now** a `BTreeMap`, ascending slot index | **Defect, fixed** |
+  | 3 | `mutation/graph/hebbian.rs:166` | `ALL_RULES` | Const array, indexed directly | Const array order — reproducible |
+  | 4 | `mutation/graph/hebbian.rs:201` | `others` | `ALL_RULES.iter()` filter | Const array order — reproducible |
+  | 5 | `mutation/graph/hebbian.rs:257` | `ALL_CHANNELS` | Const array, indexed directly | Const array order — reproducible |
+  | 6 | `mutation/graph/hebbian.rs:310` | `others` | `ALL_CHANNELS.iter()` filter | Const array order — reproducible |
+  | 7 | `mutation/graph/operators.rs:346` | `surfaces` | `0..compute_nodes.len()`, then sinks, then action bank, then `ExecuteGate` | Index-range order — reproducible |
+  | 8 | `mutation/graph/operators.rs:491` | `cluster` | `Vec` grown by the random walk from `seed` | Draw order — reproducible |
+  | 9 | `mutation/graph/operators.rs:514` | `neighbors` | `compute_nodes[current].inputs` then `compute_nodes.iter().enumerate()` | Vec/index order — reproducible |
+  | 10 | `mutation/graph/operators.rs:662` | `eligible` | `compute_nodes.iter().enumerate()` filter | Vec order — reproducible |
+  | 11 | `mutation/reachability.rs:68` | `eligible` | Caller's `Vec<usize>` (node indices) | Vec order — reproducible |
+  | 12 | `mutation/topology/birth.rs:51` | `custom_sink_indices` | `output_sinks.iter().enumerate()` filter | Vec order — reproducible |
+  | 13 | `mutation/topology/routing.rs:37` | `genome.nodes` | `Vec<NodeGenome>`, indexed directly | Genome order — reproducible |
+  | 14 | `mutation/topology/routing.rs:60` | `genome.nodes` | `Vec<NodeGenome>`, indexed directly | Genome order — reproducible |
+  | 15 | `mutation/topology/structural.rs:79` | `candidates` | `genome.nodes.iter()` filter | Genome order — reproducible |
+  | 16 | `mutation/topology/structural.rs:231` | `new_ids` | **Was** `id_map.values()` (std `HashMap`); **now** pushed in `gene_indices` order | **Defect, fixed** |
+  | 17 | `mutation/vm/operators.rs:744` | `terminal_positions` | `program.iter().enumerate()` filter | Program order — reproducible |
+  | 18 | `mutation/vm/operators.rs:798` | `slot_indices` | `program.iter().enumerate()` filter | Program order — reproducible |
+  | 19 | `mutation/vm/operators.rs:850` | `eligible` | **Was** `groups.into_iter()` (std `HashMap`); **now** a `BTreeMap`, ascending slot index | **Defect, fixed** |
 
   Two further RNG-indexed picks on the tick path use a count rather than
   `.len()` and so do not match the pattern above; both are audited here and
