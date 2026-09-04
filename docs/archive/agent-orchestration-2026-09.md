@@ -1,7 +1,12 @@
 # Roadmap Execution Orchestration — Fable Orchestrator, Sonnet Executors, Advisor
 
-**Status**: In progress
+**Status**: Archived (superseded by `docs/workflow.md`, 2026-09-04)
 **Last updated**: 2026-09-03
+
+> Historical design record for the orchestration work done on 2026-09-03. It is
+> preserved as written, including the superseded Sonnet/Opus model assignments
+> and the retired `roadmap/complete` integration branch. It is not executable
+> guidance; the live workflow is [`docs/workflow.md`](../workflow.md).
 
 ## Goal
 

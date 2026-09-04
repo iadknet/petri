@@ -5,6 +5,9 @@ spec. Roadmap execution state lives in `docs/roadmap.md` when a live master is
 needed, track roadmaps under `docs/roadmaps/`, and feature specs under
 `docs/specs/roadmap/`. Templates begin with `_` and are never live state.
 
+Roadmap features are implemented through the workflow in `docs/workflow.md`:
+one goal per feature, in its own worktree, merged into `main`.
+
 Run `make roadmap-check` while editing roadmap documents and record focused
 verification in the owning feature spec. Keep dependencies, checkboxes, links,
 statuses, and completion rollups truthful. Run `make check` before declaring a

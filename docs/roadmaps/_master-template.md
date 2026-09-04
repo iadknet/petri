@@ -17,4 +17,5 @@ Describe the observable program outcome.
 
 ## Notes for AI Agents
 
-Record roadmap constraints and context. Keep execution policy in the goal prompt.
+Record roadmap constraints and context. Keep execution policy in
+`docs/workflow.md`.
