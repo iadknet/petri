@@ -6,7 +6,7 @@
   "deterministic": {
     "goal_indicators": {
       "adaptive_novelty": "Undefined",
-      "births_per_100_ticks": "4784.865745",
+      "births_per_100_ticks": "5636.126932",
       "evolutionary_activity": "Undefined",
       "information_integration": "Undefined",
       "learning_dependence": "Undefined",
@@ -15,12 +15,12 @@
         "per_seed": [
           {
             "extinction_tick": null,
-            "final_population": 9206,
-            "mean_energy": "71.751983",
+            "final_population": 11460,
+            "mean_energy": "76.560150",
             "minimum_population": 42,
-            "peak_population": 22592,
-            "peak_tick": 1182,
-            "plateau_population": "12336.136000",
+            "peak_population": 22220,
+            "peak_tick": 1275,
+            "plateau_population": "15098.792000",
             "samples": [
               {
                 "births_total": 305,
@@ -53,93 +53,93 @@
                 "tick": 500
               },
               {
-                "births_total": 4595,
-                "mean_energy": "26.257600",
-                "population": 2667,
+                "births_total": 4601,
+                "mean_energy": "26.148813",
+                "population": 2669,
                 "tick": 600
               },
               {
-                "births_total": 7832,
-                "mean_energy": "26.966281",
-                "population": 4205,
+                "births_total": 7925,
+                "mean_energy": "26.794443",
+                "population": 4247,
                 "tick": 700
               },
               {
-                "births_total": 13151,
-                "mean_energy": "26.699324",
-                "population": 6673,
+                "births_total": 13338,
+                "mean_energy": "26.280510",
+                "population": 6736,
                 "tick": 800
               },
               {
-                "births_total": 21047,
-                "mean_energy": "26.014295",
-                "population": 9620,
+                "births_total": 21399,
+                "mean_energy": "26.675104",
+                "population": 9702,
                 "tick": 900
               },
               {
-                "births_total": 32798,
-                "mean_energy": "26.504808",
-                "population": 13397,
+                "births_total": 33795,
+                "mean_energy": "27.202502",
+                "population": 14145,
                 "tick": 1000
               },
               {
-                "births_total": 50043,
-                "mean_energy": "27.258866",
-                "population": 19273,
+                "births_total": 49754,
+                "mean_energy": "28.098188",
+                "population": 18453,
                 "tick": 1100
               },
               {
-                "births_total": 69595,
-                "mean_energy": "28.634529",
-                "population": 22534,
+                "births_total": 67716,
+                "mean_energy": "29.811542",
+                "population": 21286,
                 "tick": 1200
               },
               {
-                "births_total": 83524,
-                "mean_energy": "31.625267",
-                "population": 20031,
+                "births_total": 84810,
+                "mean_energy": "32.884440",
+                "population": 22167,
                 "tick": 1300
               },
               {
-                "births_total": 93114,
-                "mean_energy": "36.335157",
-                "population": 17286,
+                "births_total": 98422,
+                "mean_energy": "37.531627",
+                "population": 20795,
                 "tick": 1400
               },
               {
-                "births_total": 100173,
-                "mean_energy": "43.584931",
-                "population": 15444,
+                "births_total": 107969,
+                "mean_energy": "43.219797",
+                "population": 18124,
                 "tick": 1500
               },
               {
-                "births_total": 105299,
-                "mean_energy": "49.964233",
-                "population": 14316,
+                "births_total": 116306,
+                "mean_energy": "47.703669",
+                "population": 17179,
                 "tick": 1600
               },
               {
-                "births_total": 109388,
-                "mean_energy": "55.070181",
-                "population": 13041,
+                "births_total": 123911,
+                "mean_energy": "51.995328",
+                "population": 16328,
                 "tick": 1700
               },
               {
-                "births_total": 112713,
-                "mean_energy": "59.845003",
-                "population": 11890,
+                "births_total": 129934,
+                "mean_energy": "59.266540",
+                "population": 14556,
                 "tick": 1800
               },
               {
-                "births_total": 115000,
-                "mean_energy": "66.436541",
-                "population": 10176,
+                "births_total": 134296,
+                "mean_energy": "68.933611",
+                "population": 12555,
                 "tick": 1900
               },
               {
-                "births_total": 117021,
-                "mean_energy": "71.751983",
-                "population": 9206,
+                "births_total": 137945,
+                "mean_energy": "76.560150",
+                "population": 11460,
                 "tick": 2000
               }
             ],
@@ -209,38 +209,38 @@
       },
       "prediction_dependence": "Undefined",
       "reachable_structure_size_distribution": {
-        "max": 740,
-        "mean": "135.631327",
-        "median": 118,
-        "min": 35,
-        "p25": 103,
-        "p75": 142
+        "max": 413,
+        "mean": "118.729232",
+        "median": 115,
+        "min": 3,
+        "p25": 105,
+        "p75": 119
       },
       "reciprocal_interaction": "Undefined",
       "strategy_causal_distinctness": "Undefined",
       "strategy_count": "Undefined"
     },
     "per_creature_tick": {
-      "actions_applied": "1.260113",
-      "births": "0.006181",
-      "graph_relax_iters": "18.803162",
-      "mesh_hops": "12.133301",
-      "plasticity_updates": "0.179940",
-      "vm_steps": "47902.837737"
+      "actions_applied": "1.276635",
+      "births": "0.006611",
+      "graph_relax_iters": "5.899427",
+      "mesh_hops": "3.376682",
+      "plasticity_updates": "0.169034",
+      "vm_steps": "3285.243161"
     },
     "per_seed": [
       {
-        "actions_applied": 23778171,
-        "births": 117021,
-        "creature_ticks": 18828781,
+        "actions_applied": 26553547,
+        "births": 137945,
+        "creature_ticks": 20756497,
         "extinction_tick": null,
-        "final_population": 9206,
-        "graph_relax_iters": 357031632,
-        "mesh_hops": 230408283,
-        "plasticity_updates": 3423797,
+        "final_population": 11460,
+        "graph_relax_iters": 122868812,
+        "mesh_hops": 70294589,
+        "plasticity_updates": 3542124,
         "seed": 11,
         "ticks": 2000,
-        "vm_steps": 911366485177
+        "vm_steps": 68705649348
       },
       {
         "actions_applied": 102605,
@@ -283,20 +283,20 @@
       "world_width": 512
     },
     "totals": {
-      "actions_applied": 23977722,
-      "births": 117612,
-      "creature_ticks": 19028230,
-      "graph_relax_iters": 357790884,
-      "mesh_hops": 230875251,
-      "plasticity_updates": 3423933,
+      "actions_applied": 26753098,
+      "births": 138536,
+      "creature_ticks": 20955946,
+      "graph_relax_iters": 123628064,
+      "mesh_hops": 70761557,
+      "plasticity_updates": 3542260,
       "ticks": 2458,
-      "vm_steps": 911506214111
+      "vm_steps": 68845378282
     }
   },
   "environment": {
     "build_profile": "release",
-    "generated_at": "2026-09-04T16:28:56Z",
-    "git_revision": "d4d5005af10ce004fcb93315e13a4ff965803cae",
+    "generated_at": "2026-09-04T21:22:35Z",
+    "git_revision": "b8887e1348cfb0657b4f467f411a8d4ec0525ed0",
     "host": {
       "arch": "aarch64",
       "cpu_model": "Apple M1 Pro",
@@ -304,22 +304,80 @@
       "logical_cores": 8,
       "os": "macos"
     },
-    "wall_clock_ms_per_creature_tick": 0.031234533004856464,
+    "phase_wall_clock_ms_per_seed": [
+      {
+        "actions_ms": 7147.070407,
+        "cognition_ms": 57388.836243,
+        "reward_learning_ms": 1808.541897,
+        "seed": 11,
+        "sensor_assembly_ms": 21484.011308,
+        "world_update_ms": 22840.879955999997
+      },
+      {
+        "actions_ms": 20.459798000000003,
+        "cognition_ms": 53.349754,
+        "reward_learning_ms": 3.76879,
+        "seed": 22,
+        "sensor_assembly_ms": 43.259631999999996,
+        "world_update_ms": 3445.904703
+      },
+      {
+        "actions_ms": 16.928175,
+        "cognition_ms": 497.04670400000003,
+        "reward_learning_ms": 3.122409,
+        "seed": 33,
+        "sensor_assembly_ms": 40.272670000000005,
+        "world_update_ms": 2707.245627
+      }
+    ],
+    "threads": 8,
+    "throughput": {
+      "per_seed": [
+        {
+          "births_per_hour": 4412956.406665001,
+          "creature_ticks_per_second": 184448.54514495083,
+          "seed": 11,
+          "ticks_per_hour": 63981.389780927195,
+          "ticks_per_second": 17.772608272479776
+        },
+        {
+          "births_per_hour": 318338.6772188816,
+          "creature_ticks_per_second": 28414.027717665467,
+          "seed": 22,
+          "ticks_per_hour": 255469.28328537205,
+          "ticks_per_second": 70.96368980149224
+        },
+        {
+          "births_per_hour": 296532.0820118779,
+          "creature_ticks_per_second": 29358.25084019967,
+          "seed": 33,
+          "ticks_per_hour": 220218.67855293874,
+          "ticks_per_second": 61.171855153594095
+        }
+      ],
+      "total": {
+        "births_per_hour": 4175482.9925217037,
+        "creature_ticks_per_second": 175448.1709431388,
+        "ticks_per_hour": 74084.26109905259,
+        "ticks_per_second": 20.578961416403494
+      }
+    },
+    "wall_clock_ms_per_creature_tick": 0.005699688943033161,
     "wall_clock_ms_per_seed": [
       {
         "seed": 11,
-        "wall_clock_ms": 587430.657792
+        "wall_clock_ms": 112532.722791
       },
       {
         "seed": 22,
-        "wall_clock_ms": 3610.4928750000004
+        "wall_clock_ms": 3607.478708
       },
       {
         "seed": 33,
-        "wall_clock_ms": 3296.727292
+        "wall_clock_ms": 3302.172208
       }
     ],
-    "wall_clock_ms_total": 594337.877959
+    "wall_clock_ms_total": 119442.37370699999
   },
   "feature": "t01-f11-baseline-persistence-characterization",
   "schema_version": 1

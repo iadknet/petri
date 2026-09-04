@@ -175,8 +175,8 @@
   },
   "environment": {
     "build_profile": "release",
-    "generated_at": "2026-09-04T16:18:37Z",
-    "git_revision": "d4d5005af10ce004fcb93315e13a4ff965803cae",
+    "generated_at": "2026-09-04T21:20:18Z",
+    "git_revision": "b8887e1348cfb0657b4f467f411a8d4ec0525ed0",
     "host": {
       "arch": "aarch64",
       "cpu_model": "Apple M1 Pro",
@@ -184,22 +184,80 @@
       "logical_cores": 8,
       "os": "macos"
     },
-    "wall_clock_ms_per_creature_tick": 0.024926251769563507,
+    "phase_wall_clock_ms_per_seed": [
+      {
+        "actions_ms": 1.24413,
+        "cognition_ms": 27.476842,
+        "reward_learning_ms": 0.15653999999999998,
+        "seed": 11,
+        "sensor_assembly_ms": 1.620538,
+        "world_update_ms": 146.698045
+      },
+      {
+        "actions_ms": 0.93242,
+        "cognition_ms": 12.291122,
+        "reward_learning_ms": 0.182212,
+        "seed": 22,
+        "sensor_assembly_ms": 1.398379,
+        "world_update_ms": 146.07816400000002
+      },
+      {
+        "actions_ms": 0.9846690000000001,
+        "cognition_ms": 12.141910000000001,
+        "reward_learning_ms": 0.15613000000000002,
+        "seed": 33,
+        "sensor_assembly_ms": 1.492957,
+        "world_update_ms": 139.491292
+      }
+    ],
+    "threads": 8,
+    "throughput": {
+      "per_seed": [
+        {
+          "births_per_hour": 291936.8659496192,
+          "creature_ticks_per_second": 36643.48291493554,
+          "seed": 11,
+          "ticks_per_hour": 3133455.6945259133,
+          "ticks_per_second": 870.4043595905315
+        },
+        {
+          "births_per_hour": 307119.1161735825,
+          "creature_ticks_per_second": 39632.99070620993,
+          "seed": 22,
+          "ticks_per_hour": 3838988.952169781,
+          "ticks_per_second": 1066.3858200471614
+        },
+        {
+          "births_per_hour": 387929.6008940332,
+          "creature_ticks_per_second": 44764.03335806638,
+          "seed": 33,
+          "ticks_per_hour": 3810837.844076679,
+          "ticks_per_second": 1058.5660677990775
+        }
+      ],
+      "total": {
+        "births_per_hour": 326731.7531182279,
+        "creature_ticks_per_second": 40139.07479128761,
+        "ticks_per_hour": 3572740.6917058397,
+        "ticks_per_second": 992.4279699182888
+      }
+    },
+    "wall_clock_ms_per_creature_tick": 0.024913379423908772,
     "wall_clock_ms_per_seed": [
       {
         "seed": 11,
-        "wall_clock_ms": 182.014458
+        "wall_clock_ms": 184.97150000000002
       },
       {
         "seed": 22,
-        "wall_clock_ms": 164.603208
+        "wall_clock_ms": 164.105708
       },
       {
         "seed": 33,
-        "wall_clock_ms": 160.48200000000003
+        "wall_clock_ms": 157.760583
       }
     ],
-    "wall_clock_ms_total": 507.099666
+    "wall_clock_ms_total": 506.83779100000004
   },
   "feature": "t01-f11-baseline-persistence-characterization",
   "schema_version": 1
