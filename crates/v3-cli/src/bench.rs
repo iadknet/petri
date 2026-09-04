@@ -95,7 +95,7 @@ pub struct Deterministic {
     pub goal_indicators: GoalIndicators,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProfileBlock {
     pub name: String,
     pub world_width: u16,
@@ -642,6 +642,16 @@ pub fn compare_against(
 
         let (level, reference_str, delta_str) = match reference_value {
             None => ("new".to_string(), None, None),
+            // The reference recorded no work for this counter but the
+            // current run does: the ratio is unbounded (division by zero),
+            // so treat it as severe rather than silently reporting "ok"
+            // with a null delta. This is the only way a feature that
+            // introduces the first nonzero reading of a counter (e.g. the
+            // first plastic founder genome) can trip a regression at all.
+            Some(reference_value) if reference_value == 0.0 && current_value > 0.0 => {
+                any_severe = true;
+                ("severe".to_string(), Some(six(reference_value)), None)
+            }
             Some(reference_value) => {
                 let delta = percent_delta(current_value, reference_value);
                 let level = counter_level(delta);
@@ -709,6 +719,17 @@ pub fn compare_against_path(
             reference_path.display()
         )
     })?;
+    if reference.deterministic.profile != current.deterministic.profile {
+        return Err(format!(
+            "reference {} was generated with a different profile ({:?}) than the \
+             current run ({:?}); a work-counter comparison across different world \
+             size, founder count, seeds, ticks, or food coverage is meaningless. \
+             Re-pin the reference or exclude it.",
+            reference_path.display(),
+            reference.deterministic.profile,
+            current.deterministic.profile
+        ));
+    }
     Ok(compare_against(current, reference_path, &reference))
 }
 
