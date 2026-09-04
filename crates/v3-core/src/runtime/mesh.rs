@@ -216,6 +216,7 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
             actions: vec![WorldAction::NoOp],
             cost_report: report,
             priority_bid: side_outputs.priority_bid,
+            work_counters: side_outputs.work_counters,
         };
         return mode.finish(output, TerminationReason::MissingNode);
     }
@@ -226,6 +227,7 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                 actions: side_outputs.action_queue.into_actions_or_noop(),
                 cost_report: report,
                 priority_bid: side_outputs.priority_bid,
+                work_counters: side_outputs.work_counters,
             };
             return mode.finish(output, TerminationReason::MaxHopsReached);
         }
@@ -236,6 +238,9 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
         let node = &genome.nodes[current_idx];
 
         let energy_consumed = (start_energy - *energy).max(0.0);
+
+        // One mesh hop is one node dispatch, counted regardless of outcome.
+        side_outputs.work_counters.mesh_hops += 1;
 
         // Snapshot energy before node dispatch to attribute cost to the correct backend.
         let node_energy_before = *energy;
@@ -284,6 +289,7 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                 actions: vec![WorldAction::NoOp],
                 cost_report: report,
                 priority_bid: side_outputs.priority_bid,
+                work_counters: side_outputs.work_counters,
             };
             return mode.finish(output, TerminationReason::EnergyExhausted);
         }
@@ -293,6 +299,7 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                 actions: side_outputs.action_queue.into_actions_or_noop(),
                 cost_report: report,
                 priority_bid: side_outputs.priority_bid,
+                work_counters: side_outputs.work_counters,
             };
             return mode.finish(output, TerminationReason::ActionEmitted);
         }
@@ -305,6 +312,7 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                         actions: side_outputs.action_queue.into_actions_or_noop(),
                         cost_report: report,
                         priority_bid: side_outputs.priority_bid,
+                        work_counters: side_outputs.work_counters,
                     };
                     return mode.finish(output, TerminationReason::MissingNode);
                 }
@@ -317,6 +325,7 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
                     actions: side_outputs.action_queue.into_actions_or_noop(),
                     cost_report: report,
                     priority_bid: side_outputs.priority_bid,
+                    work_counters: side_outputs.work_counters,
                 };
                 return mode.finish(output, TerminationReason::NoTargets);
             }
@@ -854,6 +863,141 @@ mod tests {
         assert_eq!(
             output.priority_bid, 2.0,
             "last-write-wins: second node's bid should be returned"
+        );
+    }
+
+    // ── Work counter tests ───────────────────────────────────────────────
+
+    #[test]
+    fn single_hop_vm_node_reports_known_mesh_hops_and_vm_steps() {
+        // A single VM node (PushAction, ExecuteActionQueue = 2 opcodes) with
+        // no routing: exactly one mesh hop and two VM steps.
+        let id0 = NodeId::new(0);
+        let genome = CreatureGenome {
+            entry_node_id: id0,
+            nodes: vec![vm_emit_node(id0, 1, vec![])],
+        };
+        let ss = empty_sensor_snapshot();
+        let mut energy = 100.0f32;
+        let mut shared_mem = [0.0f32; 16];
+        let prev_shared_mem = [0.0f32; 16];
+        let mut gr = GraphRuntimeState::new();
+        let config = default_config();
+
+        let output = execute_creature_mesh(
+            &genome,
+            &ss,
+            &mut energy,
+            0.0,
+            &mut shared_mem,
+            &prev_shared_mem,
+            &mut gr,
+            &config,
+        );
+        assert_eq!(output.work_counters.mesh_hops, 1);
+        assert_eq!(output.work_counters.vm_steps, 2);
+        assert_eq!(output.work_counters.graph_relax_iters, 0);
+        assert_eq!(output.work_counters.plasticity_updates, 0);
+    }
+
+    #[test]
+    fn two_hop_chain_sums_vm_steps_across_both_nodes() {
+        // node0: LoadConst, SetPriorityBid, Halt = 3 opcodes, routes to node1.
+        // node1: LoadConst, SetPriorityBid, PushAction, ExecuteActionQueue = 4 opcodes.
+        // Two mesh hops (one dispatch per node), seven VM steps total.
+        let id0 = NodeId::new(0);
+        let id1 = NodeId::new(1);
+
+        let node0 = NodeGenome {
+            node_id: id0,
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                constants: vec![5.0],
+                program: vec![
+                    VmInstruction::LoadConst {
+                        dst: 0,
+                        const_idx: 0,
+                    },
+                    VmInstruction::SetPriorityBid { src: 0 },
+                    VmInstruction::Halt,
+                ],
+            }),
+            targets: wrap_targets(vec![id1]),
+        };
+
+        let node1 = NodeGenome {
+            node_id: id1,
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 1,
+                constants: vec![2.0],
+                program: vec![
+                    VmInstruction::LoadConst {
+                        dst: 0,
+                        const_idx: 0,
+                    },
+                    VmInstruction::SetPriorityBid { src: 0 },
+                    VmInstruction::PushAction { action_type: 1 },
+                    VmInstruction::ExecuteActionQueue,
+                ],
+            }),
+            targets: vec![],
+        };
+
+        let genome = CreatureGenome {
+            entry_node_id: id0,
+            nodes: vec![node0, node1],
+        };
+        let ss = empty_sensor_snapshot();
+        let mut energy = 100.0f32;
+        let mut shared_mem = [0.0f32; 16];
+        let prev_shared_mem = [0.0f32; 16];
+        let mut gr = GraphRuntimeState::new();
+        let config = default_config();
+
+        let output = execute_creature_mesh(
+            &genome,
+            &ss,
+            &mut energy,
+            0.0,
+            &mut shared_mem,
+            &prev_shared_mem,
+            &mut gr,
+            &config,
+        );
+        assert_eq!(output.work_counters.mesh_hops, 2);
+        assert_eq!(output.work_counters.vm_steps, 7);
+    }
+
+    #[test]
+    fn missing_entry_node_reports_zero_work() {
+        // A genome with no reachable entry node performs no mesh, VM, or
+        // graph work at all.
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(99),
+            nodes: vec![],
+        };
+        let ss = empty_sensor_snapshot();
+        let mut energy = 100.0f32;
+        let mut shared_mem = [0.0f32; 16];
+        let prev_shared_mem = [0.0f32; 16];
+        let mut gr = GraphRuntimeState::new();
+        let config = default_config();
+
+        let output = execute_creature_mesh(
+            &genome,
+            &ss,
+            &mut energy,
+            0.0,
+            &mut shared_mem,
+            &prev_shared_mem,
+            &mut gr,
+            &config,
+        );
+        assert_eq!(
+            output.work_counters,
+            crate::runtime::types::WorkCounters::default()
         );
     }
 }

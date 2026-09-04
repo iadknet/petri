@@ -1,7 +1,7 @@
 # T10.F10 — Deterministic Benchmark Harness and Per-Feature Report
 
-**Status**: Planned
-**Last updated**: 2026-09-03
+**Status**: Complete
+**Last updated**: 2026-09-04
 **Feature**: T10.F10
 **Track**: [T10 — Evolutionary Scale and Experiment Infrastructure](../../roadmaps/t10-evolutionary-scale-and-experiment-infrastructure.md)
 
@@ -53,10 +53,20 @@ compute regression. Every later feature runs it at closure.
 - Gate profile constants (predeclared here; revisable by this feature only
   with a recorded timing reason, and by T01.F12 later): production defaults
   except world 128 by 128, 256 founders, initial food coverage 1.0, seeds
-  `[11, 22, 33]`, horizon 300 ticks. Sized so the two fast tests below finish
-  in under 30 seconds combined in a debug build on the recording host; if they
-  do not, reduce the horizon first, then the founder count, and record the
-  final values in this spec.
+  `[11, 22, 33]`, horizon **75 ticks** (revised down from the originally
+  predeclared 300). Sized so the two fast tests below finish in under 30
+  seconds combined in a debug build on the recording host; if they do not,
+  reduce the horizon first, then the founder count, and record the final
+  values in this spec.
+  - Timing reason for the revision: a `cargo run` (debug) timing probe on the
+    recording host (Apple M1 Pro, 8 logical cores) measured ~8.4s per
+    single-threaded 300-tick seed run at 128x128/256 founders/coverage 1.0.
+    Nine seed-runs are needed for `make check` (two full gate runs in test 1,
+    one comparison run in test 2, three seeds each) — 300 ticks would cost
+    ~76s, over budget. At 75 ticks the same host measured ~2.6-2.7s per seed
+    run (~24s for all nine), leaving headroom. Population does not go extinct
+    within 75 ticks for these seeds (extinction is acceptable but not
+    required; see Notes for AI Agents).
 - Regression thresholds, applied per normalized work counter against each
   reference: flag above +10 percent, severe above +50 percent. Wall-clock per
   creature-tick: flag above +25 percent, severe above a doubling, reported only
@@ -64,7 +74,7 @@ compute regression. Every later feature runs it at closure.
 
 ## Implementation Tasks
 
-- [ ] Add integer work counters. `MeshOutput` gains a `WorkCounters` value
+- [x] Add integer work counters. `MeshOutput` gains a `WorkCounters` value
       with `mesh_hops`, `vm_steps`, `graph_relax_iters`, `plasticity_updates`
       (Hebbian weight updates plus reward-modulated updates), each incremented
       where that work executes in `mesh.rs`, `vm.rs`, `cgp/execute.rs`, and
@@ -75,7 +85,7 @@ compute regression. Every later feature runs it at closure.
       eat, noop, reproduce, steal), accumulated sequentially after the parallel
       phase. Births are the existing `reproduction_actions_spawned_total`.
       Unit tests assert each counter from a run whose expected count is known.
-- [ ] Add `crates/v3-cli/src/bench.rs` with `v3-cli bench` in `main.rs`:
+- [x] Add `crates/v3-cli/src/bench.rs` with `v3-cli bench` in `main.rs`:
       `--profile gate|sweep`, `--out <path>`, `--feature <id>` (required for
       gate), `--compare <report.json>` and `--baseline <report.json>` (each
       optional, repeatable), and for `sweep` only: `--width`, `--height`,
@@ -83,7 +93,7 @@ compute regression. Every later feature runs it at closure.
       (default 1.0). Runs each seed with `seed_simulation` and `run_tick`,
       records per-seed and aggregate results, writes the report, prints the
       comparison, and exits 3 on a severe work regression.
-- [ ] Report schema, one file per feature at
+- [x] Report schema, one file per feature at
       `docs/progress/features/<tNN-fNN-slug>.json`, top-level keys
       `schema_version` (1), `feature`, `deterministic`, `environment`,
       `comparison`:
@@ -110,39 +120,58 @@ compute regression. Every later feature runs it at closure.
     delta, the flag level per counter (`ok`, `flag`, `severe`), counters
     absent from the reference listed as `new`, wall-clock delta only when
     host identity matches, and an overall `severe: bool`.
-- [ ] Series index `docs/progress/benchmark-series.json`: `{"series":
+- [x] Series index `docs/progress/benchmark-series.json`: `{"series":
       "gate-v1", "epoch_baseline": "<report path>", "closed": ["<report
       path>", ...]}` in closure order. This feature's own gate report is the
       epoch baseline and the first closed entry.
-- [ ] Fast tests in `crates/v3-cli/tests/bench.rs`, run by `make rust-test-cli`
+- [x] Fast tests in `crates/v3-cli/tests/bench.rs`, run by `make rust-test-cli`
       and therefore `make check`: (1) run the gate profile twice and assert the
       serialized `deterministic` blocks are byte-identical; (2) run the gate
       profile once and compare against the series' epoch baseline and last
       closed report, failing on any `severe` work counter and never on
       wall-clock. Locate the repository docs from `CARGO_MANIFEST_DIR`.
-- [ ] `make bench` target: `PROFILE=gate FEATURE=<tNN-fNN-slug>` runs the gate
+- [x] `make bench` target: `PROFILE=gate FEATURE=<tNN-fNN-slug>` runs the gate
       profile in release, writes `docs/progress/features/$(FEATURE).json`, and
       compares against the series references; `PROFILE=sweep BENCH_ARGS="..."
       OUT=<path>` runs the sweep profile. Document both forms in the `##` help
       text.
-- [ ] Generate this feature's report with `make bench PROFILE=gate
+- [x] Generate this feature's report with `make bench PROFILE=gate
       FEATURE=t10-f10-deterministic-benchmark-harness`, commit it with the
       series index, and complete Performance and Goal Impact below.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --lib` (counter unit tests) and
+- [x] `cargo test -p v3-core --lib` (counter unit tests) and
       `cargo test -p v3-cli` (bench determinism and regression tests) pass.
-- [ ] `make rust-check` passes (format, viability, tests, Clippy with warnings
-      denied).
-- [ ] `make roadmap-check` passes after the spec and track edits.
-- [ ] Running `make bench PROFILE=gate FEATURE=t10-f10-deterministic-benchmark-harness`
+      Ran: `cargo test -p v3-core --lib` → 1007 passed, 0 failed. Ran:
+      `cargo test -p v3-cli` → 5 bench tests + 7 CLI tests passed, 13.0s for
+      `--test bench` (all five tests run in parallel; well under the 30s
+      budget). The two required tests
+      (`gate_profile_deterministic_block_is_byte_identical_across_two_runs`,
+      `gate_profile_has_no_severe_regression_against_series_references`) run
+      the gate profile; three more synthetic tests exercise `compare_against`
+      directly on a tiny report to prove severe/`new`/wall-clock-only-severe
+      behavior without depending on a real regression existing:
+      `compare_against_flags_severe_work_counter_regression`,
+      `compare_against_labels_missing_reference_counter_as_new`,
+      `compare_against_reports_severe_wall_clock_without_marking_comparison_severe`.
+- [x] `make rust-check` passes (format, viability, tests, Clippy with warnings
+      denied). Ran: `make rust-check` → format check, viability gate
+      (`cargo test -p v3-core --test viability`), full test suite, and Clippy
+      (`-D warnings`) all passed.
+- [x] `make roadmap-check` passes after the spec and track edits. Ran:
+      `make roadmap-check` → passed.
+- [x] Running `make bench PROFILE=gate FEATURE=t10-f10-deterministic-benchmark-harness`
       twice yields a byte-identical `deterministic` block (diff the block, not
-      the file).
-- [ ] `v3-cli bench --profile sweep --width 64 --height 64 --founders 32
+      the file). Ran it twice and diffed the parsed `deterministic` object
+      (Python `json.load` equality, not a raw byte diff of the whole file,
+      since `environment.generated_at`/`wall_clock_ms` legitimately differ
+      run to run) → identical.
+- [x] `v3-cli bench --profile sweep --width 64 --height 64 --founders 32
       --seeds 1,2 --ticks 50 --out <scratch>` produces a report with the same
-      schema as the gate report.
-- [ ] Benchmark report stored at
+      schema as the gate report. Ran it against a scratch path; output
+      matched the gate report's top-level and `deterministic` key set.
+- [x] Benchmark report stored at
       `docs/progress/features/t10-f10-deterministic-benchmark-harness.json`.
 
 ## Performance and Goal Impact
@@ -151,23 +180,51 @@ Predeclared cost: four integer increments inside existing loops plus two
 sequential sums per tick; expected work-counter change none by construction
 (counters do not change control flow), expected wall-clock change under 1
 percent. This feature creates the epoch baseline, so both references are its
-own report and every delta is zero. Record here at closure: the gate profile's
-`per_creature_tick` values, the wall-clock per creature-tick with host
-identity, and the dated readings of the three populated goal indicators.
+own report and every delta is zero — confirmed: the gate report's own
+`comparison.references[0]` (itself, via the series index) shows `percent
+delta 0.000000` and `level ok` for every counter.
+
+Gate profile `per_creature_tick` (2026-09-04, `git_revision`
+`47ede8ede4d95531924b2f9e390043cd303aa767`, release build, host
+Isaacs-MacBook-Pro-2.local / macOS / aarch64 / Apple M1 Pro / 8 logical
+cores):
+
+| Counter | Value |
+| --- | --- |
+| `mesh_hops` | 1.998362 |
+| `vm_steps` | 28.028231 |
+| `graph_relax_iters` | 2.998624 |
+| `plasticity_updates` | 0.000000 (the v3alpha1 founder genome is pure VM; no CGP plastic nodes) |
+| `actions_applied` | 1.000000 |
+| `births` | 0.001212 |
+
+Wall-clock (recorded only, never asserted): `wall_clock_ms_per_creature_tick`
+= 0.00470938 ms, on the host above.
+
+Dated readings of the three populated goal indicators (2026-09-04, same
+report):
+- `population_persistence`: no seed went extinct inside the 75-tick horizon;
+  per seed (11/22/33) minimum population 256/256/256, final population
+  284/260/264.
+- `births_per_100_ticks`: 32.888889.
+- `reachable_structure_size_distribution` (pooled `functional_complexity`
+  over final populations across all three seeds): min 96, p25 96, median 96,
+  p75 96, max 106, mean 96.012376.
+
 Every other indicator remains `Undefined` because no owning measure exists
 yet.
 
 ## Success Criteria
 
-- [ ] `v3-cli bench` exists with gate and sweep profiles emitting one schema,
+- [x] `v3-cli bench` exists with gate and sweep profiles emitting one schema,
       and `make bench` drives both.
-- [ ] The gate profile's `deterministic` block is byte-identical across two
+- [x] The gate profile's `deterministic` block is byte-identical across two
       runs, proven by a test in `make check`.
-- [ ] A severe work-counter regression against the epoch baseline or the last
+- [x] A severe work-counter regression against the epoch baseline or the last
       closed report fails `make check`; wall-clock never does.
-- [ ] `docs/progress/features/` and `docs/progress/benchmark-series.json`
+- [x] `docs/progress/features/` and `docs/progress/benchmark-series.json`
       exist with this feature's report pinned as the epoch baseline.
-- [ ] Every goal indicator named above is present in the report, three
+- [x] Every goal indicator named above is present in the report, three
       populated and the rest `"Undefined"`.
 
 ## Notes for AI Agents
@@ -185,4 +242,31 @@ yet.
 - Small worlds at production defaults went extinct by tick 180 to 300 on
   2026-09-03; an extinction inside the gate horizon is acceptable for a
   benchmark and is recorded as `extinction_tick`, but the counters must still
-  be nonzero for every seed.
+  be nonzero for every seed. At the revised 75-tick gate horizon none of the
+  three seeds went extinct.
+- Deviation from the literal spec text: `plasticity_updates` is defined as
+  "Hebbian weight updates plus reward-modulated updates" on `MeshOutput`, but
+  reward-modulated updates apply in Phase 2.5
+  (`apply_reward_modulated_updates` in `tick.rs`), which runs after
+  `decisions: Vec<(CreatureId, MeshOutput)>` has already been consumed by
+  Phase 2 — there is no `MeshOutput` left to attach a reward-modulated count
+  to. The closest faithful implementation: the Hebbian contribution flows
+  through `MeshOutput.work_counters.plasticity_updates` (summed sequentially
+  in Phase 2, same as the other three work counters), and the
+  reward-modulated contribution is added directly to
+  `SimStats.plasticity_updates_total` at its Phase 2.5 call site. Both
+  additions are sequential (not inside the parallel mesh phase), so the
+  cumulative total is still deterministic; the sum still matches the spec's
+  definition ("Hebbian plus reward-modulated"). The founder genome used by
+  the gate profile has no CGP plastic nodes, so this split is untested by the
+  gate profile itself (`plasticity_updates` reads 0 for both paths); the two
+  new unit tests in `runtime/cgp/execute.rs::work_counter_tests` exercise the
+  Hebbian path directly.
+- Implementation choice, not a deviation: every float inside `deterministic`
+  (`per_creature_tick`, `profile.food_coverage`,
+  `goal_indicators.births_per_100_ticks`, `...mean`) is serialized as a JSON
+  *string* fixed to six decimals (e.g. `"1.998362"`), not a JSON number.
+  `serde_json`'s default `f64`/`f32` formatting (via `ryu`) prints the
+  shortest round-tripping representation, which drops trailing zeros (`0.5`,
+  not `0.500000`) and would not satisfy "fixed six-decimal format" literally.
+  A formatted string is unambiguous and trivially byte-identical.

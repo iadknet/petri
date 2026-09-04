@@ -380,6 +380,12 @@ pub fn run_tick(
     let mut compute_creature_count = 0u32;
     let mut priority_bid_sum = 0.0f32;
     let mut priority_bid_count = 0u32;
+    // Deterministic work counters, summed sequentially after the parallel
+    // mesh phase so the total does not depend on rayon's thread scheduling.
+    let mut mesh_hops_sum: u64 = 0;
+    let mut vm_steps_sum: u64 = 0;
+    let mut graph_relax_iters_sum: u64 = 0;
+    let mut plasticity_updates_sum: u64 = 0;
     let mut successful_spawn_targets: HashSet<crate::contracts::Position> = HashSet::new();
     let failed_action_penalty = sim.config.failed_action_penalty_for_tick(sim.tick);
 
@@ -403,6 +409,15 @@ pub fn run_tick(
             compute_graph_count += 1;
         }
         compute_creature_count += 1;
+
+        // Accumulate deterministic work counters (integers commute exactly,
+        // so summing in queue order is deterministic regardless of the
+        // parallel mesh phase's thread scheduling).
+        let work = output.work_counters;
+        mesh_hops_sum += u64::from(work.mesh_hops);
+        vm_steps_sum += u64::from(work.vm_steps);
+        graph_relax_iters_sum += u64::from(work.graph_relax_iters);
+        plasticity_updates_sum += u64::from(work.plasticity_updates);
 
         // Accumulate priority bid stats.
         priority_bid_sum += output.priority_bid;
@@ -770,6 +785,23 @@ pub fn run_tick(
         sim.stats.last_tick_priority_bidders_count = priority_bid_count;
     }
 
+    // Commit deterministic work counters accumulated during the mesh and
+    // action phases. `plasticity_updates_total` also receives the
+    // reward-modulated contribution below (Phase 2.5), since that phase runs
+    // after `decisions` is consumed and cannot flow through `MeshOutput`.
+    sim.stats.mesh_hops_total += mesh_hops_sum;
+    sim.stats.vm_steps_total += vm_steps_sum;
+    sim.stats.graph_relax_iters_total += graph_relax_iters_sum;
+    sim.stats.plasticity_updates_total += plasticity_updates_sum;
+    sim.stats.creature_ticks_total += u64::from(compute_creature_count);
+    sim.stats.actions_applied_total += u64::from(
+        sim.stats.last_tick_move
+            + sim.stats.last_tick_eat
+            + sim.stats.last_tick_noop
+            + sim.stats.last_tick_reproduce
+            + sim.stats.last_tick_steal,
+    );
+
     // ── Phase 2.5: Reward-modulated learning pass ────────────────────────
     // For each creature with reward-modulated graph nodes, compute outcome
     // signals and apply three-factor weight updates using eligibility traces.
@@ -815,7 +847,7 @@ pub fn run_tick(
             for (node_idx, node) in creature.genome.nodes.iter().enumerate() {
                 if let BackendDef::Graph(ref def) = node.backend_def {
                     if has_any_reward_modulated(def) {
-                        let update_cost = apply_reward_modulated_updates(
+                        let (update_cost, update_count) = apply_reward_modulated_updates(
                             def,
                             node_idx,
                             &mut creature.graph_runtime.plasticity_weights,
@@ -823,6 +855,7 @@ pub fn run_tick(
                             &signals,
                             reward_cost,
                         );
+                        sim.stats.plasticity_updates_total += u64::from(update_count);
                         creature.energy -= update_cost;
                     }
                 }

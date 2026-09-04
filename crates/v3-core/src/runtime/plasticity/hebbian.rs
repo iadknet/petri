@@ -78,9 +78,10 @@ pub(crate) fn apply_hebbian_updates(
     shared_memory: &[f32; 16],
     prev_shared_memory: &[f32; 16],
     cost_per_update: f32,
-) -> f32 {
+) -> (f32, u32) {
     let compute_count = def.compute_nodes.len();
     let mut total_cost: f32 = 0.0;
+    let mut update_count: u32 = 0;
 
     for (i, cnode) in def.compute_nodes.iter().enumerate() {
         let cfg = match &cnode.plasticity {
@@ -143,10 +144,11 @@ pub(crate) fn apply_hebbian_updates(
 
             weights[edge_idx] = (w + dw).clamp(-w_clamp, w_clamp);
             total_cost += cost_per_update;
+            update_count += 1;
         }
     }
 
-    total_cost
+    (total_cost, update_count)
 }
 
 /// Collect weighted inputs using effective weights (learned if available).

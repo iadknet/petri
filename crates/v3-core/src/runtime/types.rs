@@ -75,6 +75,8 @@ pub struct MeshSideOutputs {
     pub action_queue: ActionQueue,
     /// Energy bid for turn-order priority. 0.0 = no bid (default).
     pub priority_bid: f32,
+    /// Deterministic integer work counters accumulated during this mesh evaluation.
+    pub work_counters: WorkCounters,
 }
 
 impl MeshSideOutputs {
@@ -83,8 +85,28 @@ impl MeshSideOutputs {
         Self {
             action_queue: ActionQueue::new(max_actions),
             priority_bid: 0.0,
+            work_counters: WorkCounters::default(),
         }
     }
+}
+
+/// Deterministic integer work counters for one creature's mesh evaluation.
+///
+/// Each field is incremented exactly where that unit of work executes, in
+/// both the plain and traced mesh execution modes (both share the same
+/// underlying loops). These counters are integers, so summing them after the
+/// parallel mesh phase is deterministic regardless of thread scheduling.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct WorkCounters {
+    /// Mesh hops walked in `execute_creature_mesh_impl`'s routing loop.
+    pub mesh_hops: u32,
+    /// VM opcodes successfully executed across all VM node dispatches.
+    pub vm_steps: u32,
+    /// Graph relaxation passes entered across all Graph node dispatches.
+    pub graph_relax_iters: u32,
+    /// Hebbian weight updates applied (reward-modulated updates are counted
+    /// separately in `SimStats`, since they run after the mesh phase).
+    pub plasticity_updates: u32,
 }
 
 /// Complete output of one creature's mesh evaluation for a single tick.
@@ -97,6 +119,8 @@ pub struct MeshOutput {
     pub cost_report: ComputeCostReport,
     /// Energy bid for turn-order priority. 0.0 = no bid (default).
     pub priority_bid: f32,
+    /// Deterministic integer work counters accumulated during this evaluation.
+    pub work_counters: WorkCounters,
 }
 
 /// Sanitize an f32 value per v3-vm-isa-spec.md Section 5:
