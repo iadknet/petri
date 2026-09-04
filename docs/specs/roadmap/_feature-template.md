@@ -47,5 +47,5 @@ checked or that cannot change simulation cost.
 
 ## Notes for AI Agents
 
-Record implementation context, blockers, and advisory review findings. Keep
-orchestration policy in the goal prompt.
+Record implementation context, blockers, advisory review findings, and this
+feature's cost record. Keep execution policy in `docs/workflow.md`.

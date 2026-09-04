@@ -19,10 +19,10 @@ function files(root) {
   }
   walk(root); return out;
 }
-const codex = files(roots[0]); const claude = files(roots[1]);
-if (JSON.stringify(codex) !== JSON.stringify(claude)) throw new Error('Codex and Claude curated payloads differ');
+const source = files(roots[0]); const mirror = files(roots[1]);
+if (JSON.stringify(source) !== JSON.stringify(mirror)) throw new Error(`curated payloads differ between ${roots[0]} and ${roots[1]}`);
 const lockedFiles = Object.fromEntries(lock.files.map(({ path, sha256 }) => [path, sha256]));
-if (JSON.stringify(codex) !== JSON.stringify(lockedFiles)) throw new Error('skill lock hash drift or unmanaged skill');
+if (JSON.stringify(source) !== JSON.stringify(lockedFiles)) throw new Error('skill lock hash drift or unmanaged skill');
 for (const required of ['rust-skills','react-best-practices','composition-patterns']) {
   if (!lock.sources[required]) throw new Error(`missing provenance for ${required}`);
 }

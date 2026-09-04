@@ -27,7 +27,7 @@ function validRoadmap(repository) {
 
 function repo() {
   const repository = mkdtempSync(join(tmpdir(), 'petri-implementer-gate.'));
-  git(repository, 'init', '-q', '-b', 'roadmap/complete');
+  git(repository, 'init', '-q', '-b', 'main');
   git(repository, 'config', 'user.email', 'test@example.com');
   git(repository, 'config', 'user.name', 'Test');
   git(repository, 'config', 'commit.gpgsign', 'false');

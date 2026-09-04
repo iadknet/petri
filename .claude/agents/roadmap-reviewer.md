@@ -23,9 +23,9 @@ on the integration branch itself.
 
 - `docs/roadmaps/README.md` (roadmap contract), the owning track roadmap, and
   the flat feature spec you were given.
-- The diff of the implementer worktree against its merge base with
-  `roadmap/complete`: `git -C <worktree> diff $(git -C <worktree> merge-base HEAD roadmap/complete)`,
-  plus untracked files from `git -C <worktree> status --porcelain`.
+- The diff of the feature worktree against its merge base with `main`:
+  `git -C <worktree> diff $(git -C <worktree> merge-base HEAD main)`, plus
+  untracked files from `git -C <worktree> status --porcelain`.
 
 ## What to check
 
@@ -39,8 +39,8 @@ on the integration branch itself.
   diff does not add, or a viability gate not recorded when defaults, founders,
   or tick-loop mechanics changed).
 - Repository rules from `AGENTS.md`: TDD for behavior changes, POSIX `sh` in
-  shell automation, telemetry derived from applied simulation behavior, no
-  retired-workflow machinery reintroduced.
+  shell automation, telemetry derived from applied simulation behavior, and no
+  workflow machinery introduced outside `docs/workflow.md`.
 - Benchmark report and Performance and Goal Impact section when the feature is
   subject to them; a severe compute regression without a predeclared, justified
   cost is P1.
