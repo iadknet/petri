@@ -335,7 +335,11 @@ yet.
   could never trip a regression, no matter how large the new cost. A
   justified cost still re-pins the epoch baseline in the closing commit, per
   the roadmap's existing rule; this only changes what counts as "justified"
-  by making the transition visible instead of silently `ok`. Covered by
+  by making the transition visible instead of silently `ok`. The asymmetric
+  case (reference `> 0.0`, current exactly `0.0`, i.e. work disappearing) is
+  deliberately left at `level: "ok"` with a `"-100.000000"` delta — a
+  counter going to zero is not a compute regression — so only the
+  zero-to-positive direction is treated as severe. Covered by
   `compare_against_treats_reference_zero_current_positive_as_severe` in
   `crates/v3-cli/tests/bench.rs`.
 - Remediation-pass fix: `compare_against_path` hard-fails (`Err`, not a
@@ -344,8 +348,11 @@ yet.
   food coverage) — a work-counter comparison across different profiles is
   meaningless. This is a live failure mode, not a hypothetical one: the gate
   horizon changed once already during this feature's own implementation
-  (300 to 75 ticks). Covered by `compare_against_path_errors_on_profile_
-  mismatch` in `crates/v3-cli/tests/bench.rs`.
+  (300 to 75 ticks). The comparison is on the whole `ProfileBlock`,
+  including `name`, so a `sweep` report can never serve as a reference for
+  a `gate` run (and vice versa) even when every numeric parameter matches.
+  Covered by `compare_against_path_errors_on_profile_mismatch` in
+  `crates/v3-cli/tests/bench.rs`.
 - Deferred review findings (recorded, not fixed in this feature): (a)
   `actions_applied_total` in `SimStats` sums `last_tick_move + last_tick_eat
   + last_tick_noop + last_tick_reproduce + last_tick_steal`, each of which
