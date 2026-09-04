@@ -1,31 +1,38 @@
 # T06 — Niche Construction and Ecological Inheritance
 
 **Status**: Planned
-**Last updated**: 2026-09-02
+**Last updated**: 2026-09-04
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
 
-Allow creatures to create persistent, costly changes to resources and habitat
-that alter selection for themselves and other lineages across organismal
-lifetimes and generations.
+Let creatures leave lasting marks on the world: burrows, caches, trails,
+dung, and cleared ground that persist or decay and change selection for
+themselves and for other lineages across lifetimes and generations.
 
 ## Track Success Criteria
 
-- [ ] Creature-authored world changes are distinguishable from externally scheduled environment state and have explicit persistence or decay.
+- [ ] Creature-authored world changes are distinguishable from weather and terrain and have explicit persistence or decay.
 - [ ] Resource movement, transformation, and habitat modification create measurable opportunities or costs for other strategies.
 - [ ] Transfer and erasure assays demonstrate ecological inheritance rather than mere correlation with constructor presence.
 - [ ] Long-running treatments sustain multiple construction, exploitation, or avoidance strategies without direct niche rewards.
 
 ## Executable Features
 
-- [ ] **T06.F01 — Durable Creature-Authored World State** — Depends on: T01.F01, T02.F01
+- [ ] **T06.F01 — Durable Creature-Authored World State** — Depends on: T02.F01
+  - Goal: Burrows and trails. Creatures can make lasting changes to a cell through normal actions and energy cost, and those changes persist or decay on their own clock.
 - [ ] **T06.F02 — Resource Transport and Caching** — Depends on: T03.F05, T06.F01
+  - Goal: Caching. Creatures carry food and store it in the world for later, where others can find it too.
 - [ ] **T06.F03 — Resource Transformation and Byproduct Loops** — Depends on: T03.F04, T06.F01
+  - Goal: Dung and decay. Eating produces byproducts that become another food type, so one lineage's waste is another's meal.
 - [ ] **T06.F04 — Habitat Modification Actions** — Depends on: T03.F01, T06.F01
+  - Goal: Dams and clearings. Creatures alter terrain or fertility, making places better or worse for everyone who comes after.
 - [ ] **T06.F05 — Persistence, Decay, and Ecological Inheritance** — Depends on: T06.F02, T06.F03, T06.F04
+  - Goal: Inheritance of place. Constructed changes outlast their makers and shape what their descendants and neighbors face.
 - [ ] **T06.F06 — Constructor Transfer and Erasure Assays** — Depends on: T06.F05, T10.F05
+  - Goal: Deferred proof phase. Erase or transplant constructions and see whether the advantage travels with them.
 - [ ] **T06.F07 — Niche-Construction Diversification Confirmatory Campaign** — Depends on: T01.F06, T01.F09, T04.F06, T06.F06, T10.F08
+  - Goal: Deferred proof phase. Replicated confirmatory runs that construction sustains more ways of living.
 
 ## Notes for AI Agents
 
