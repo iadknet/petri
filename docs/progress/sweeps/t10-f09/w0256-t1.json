@@ -1,0 +1,372 @@
+{
+  "comparison": {
+    "references": [],
+    "severe": false
+  },
+  "deterministic": {
+    "goal_indicators": {
+      "adaptive_novelty": "Undefined",
+      "births_per_100_ticks": "7.665656",
+      "evolutionary_activity": "Undefined",
+      "information_integration": "Undefined",
+      "learning_dependence": "Undefined",
+      "memory_dependence": "Undefined",
+      "population_persistence": {
+        "per_seed": [
+          {
+            "extinction_tick": 151,
+            "final_population": 0,
+            "mean_energy": null,
+            "minimum_population": 0,
+            "peak_population": 309,
+            "peak_tick": 37,
+            "plateau_population": null,
+            "samples": [
+              {
+                "births_total": 62,
+                "mean_energy": "6.099269",
+                "population": 115,
+                "tick": 100
+              },
+              {
+                "births_total": 62,
+                "mean_energy": null,
+                "population": 0,
+                "tick": 151
+              }
+            ],
+            "seed": 11
+          },
+          {
+            "extinction_tick": null,
+            "final_population": 1,
+            "mean_energy": "33.910748",
+            "minimum_population": 1,
+            "peak_population": 304,
+            "peak_tick": 26,
+            "plateau_population": "1.000000",
+            "samples": [
+              {
+                "births_total": 55,
+                "mean_energy": "5.168987",
+                "population": 112,
+                "tick": 100
+              },
+              {
+                "births_total": 55,
+                "mean_energy": "31.092600",
+                "population": 1,
+                "tick": 200
+              },
+              {
+                "births_total": 55,
+                "mean_energy": "28.234144",
+                "population": 1,
+                "tick": 300
+              },
+              {
+                "births_total": 55,
+                "mean_energy": "34.481613",
+                "population": 1,
+                "tick": 400
+              },
+              {
+                "births_total": 55,
+                "mean_energy": "30.106970",
+                "population": 1,
+                "tick": 500
+              },
+              {
+                "births_total": 55,
+                "mean_energy": "31.012552",
+                "population": 1,
+                "tick": 600
+              },
+              {
+                "births_total": 55,
+                "mean_energy": "30.667501",
+                "population": 1,
+                "tick": 700
+              },
+              {
+                "births_total": 55,
+                "mean_energy": "33.779655",
+                "population": 1,
+                "tick": 800
+              },
+              {
+                "births_total": 55,
+                "mean_energy": "33.403057",
+                "population": 1,
+                "tick": 900
+              },
+              {
+                "births_total": 55,
+                "mean_energy": "35.515575",
+                "population": 1,
+                "tick": 1000
+              },
+              {
+                "births_total": 55,
+                "mean_energy": "31.751909",
+                "population": 1,
+                "tick": 1100
+              },
+              {
+                "births_total": 55,
+                "mean_energy": "35.881897",
+                "population": 1,
+                "tick": 1200
+              },
+              {
+                "births_total": 55,
+                "mean_energy": "30.214148",
+                "population": 1,
+                "tick": 1300
+              },
+              {
+                "births_total": 55,
+                "mean_energy": "29.878668",
+                "population": 1,
+                "tick": 1400
+              },
+              {
+                "births_total": 55,
+                "mean_energy": "31.693777",
+                "population": 1,
+                "tick": 1500
+              },
+              {
+                "births_total": 55,
+                "mean_energy": "30.712093",
+                "population": 1,
+                "tick": 1600
+              },
+              {
+                "births_total": 55,
+                "mean_energy": "33.026230",
+                "population": 1,
+                "tick": 1700
+              },
+              {
+                "births_total": 55,
+                "mean_energy": "30.814465",
+                "population": 1,
+                "tick": 1800
+              },
+              {
+                "births_total": 55,
+                "mean_energy": "33.400921",
+                "population": 1,
+                "tick": 1900
+              },
+              {
+                "births_total": 55,
+                "mean_energy": "33.910748",
+                "population": 1,
+                "tick": 2000
+              }
+            ],
+            "seed": 22
+          },
+          {
+            "extinction_tick": 158,
+            "final_population": 0,
+            "mean_energy": null,
+            "minimum_population": 0,
+            "peak_population": 309,
+            "peak_tick": 36,
+            "plateau_population": null,
+            "samples": [
+              {
+                "births_total": 60,
+                "mean_energy": "5.865073",
+                "population": 121,
+                "tick": 100
+              },
+              {
+                "births_total": 60,
+                "mean_energy": null,
+                "population": 0,
+                "tick": 158
+              }
+            ],
+            "seed": 33
+          }
+        ]
+      },
+      "prediction_dependence": "Undefined",
+      "reachable_structure_size_distribution": {
+        "max": 97,
+        "mean": "97.000000",
+        "median": 97,
+        "min": 97,
+        "p25": 97,
+        "p75": 97
+      },
+      "reciprocal_interaction": "Undefined",
+      "strategy_causal_distinctness": "Undefined",
+      "strategy_count": "Undefined"
+    },
+    "per_creature_tick": {
+      "actions_applied": "1.000000",
+      "births": "0.002167",
+      "graph_relax_iters": "6.822025",
+      "mesh_hops": "3.359670",
+      "plasticity_updates": "0.000000",
+      "vm_steps": "28.395302"
+    },
+    "per_seed": [
+      {
+        "actions_applied": 26945,
+        "births": 62,
+        "creature_ticks": 26945,
+        "extinction_tick": 151,
+        "final_population": 0,
+        "graph_relax_iters": 231313,
+        "mesh_hops": 110842,
+        "plasticity_updates": 0,
+        "seed": 11,
+        "ticks": 151,
+        "vm_steps": 766953
+      },
+      {
+        "actions_applied": 27876,
+        "births": 55,
+        "creature_ticks": 27876,
+        "extinction_tick": null,
+        "final_population": 1,
+        "graph_relax_iters": 162973,
+        "mesh_hops": 82288,
+        "plasticity_updates": 0,
+        "seed": 22,
+        "ticks": 2000,
+        "vm_steps": 787511
+      },
+      {
+        "actions_applied": 26876,
+        "births": 60,
+        "creature_ticks": 26876,
+        "extinction_tick": 158,
+        "final_population": 0,
+        "graph_relax_iters": 163053,
+        "mesh_hops": 81345,
+        "plasticity_updates": 0,
+        "seed": 33,
+        "ticks": 158,
+        "vm_steps": 765347
+      }
+    ],
+    "profile": {
+      "food_coverage": "default",
+      "founders": 256,
+      "name": "sweep",
+      "seeds": [
+        11,
+        22,
+        33
+      ],
+      "ticks": 2000,
+      "world_height": 256,
+      "world_width": 256
+    },
+    "totals": {
+      "actions_applied": 81697,
+      "births": 177,
+      "creature_ticks": 81697,
+      "graph_relax_iters": 557339,
+      "mesh_hops": 274475,
+      "plasticity_updates": 0,
+      "ticks": 2309,
+      "vm_steps": 2319811
+    }
+  },
+  "environment": {
+    "build_profile": "release",
+    "generated_at": "2026-09-04T19:20:30Z",
+    "git_revision": "f78486b2a1c1c7f1d6603ef0af771992d00b4dd1",
+    "host": {
+      "arch": "aarch64",
+      "cpu_model": "Apple M1 Pro",
+      "hostname": "Isaacs-MacBook-Pro-2.local",
+      "logical_cores": 8,
+      "os": "macos"
+    },
+    "phase_wall_clock_ms_per_seed": [
+      {
+        "actions_ms": 2.934205,
+        "cognition_ms": 44.374915,
+        "reward_learning_ms": 0.39362199999999997,
+        "seed": 11,
+        "sensor_assembly_ms": 5.429587,
+        "world_update_ms": 500.24349700000005
+      },
+      {
+        "actions_ms": 3.695753,
+        "cognition_ms": 36.290969,
+        "reward_learning_ms": 0.786438,
+        "seed": 22,
+        "sensor_assembly_ms": 6.683375,
+        "world_update_ms": 6511.535471
+      },
+      {
+        "actions_ms": 2.550123,
+        "cognition_ms": 32.661708,
+        "reward_learning_ms": 0.372415,
+        "seed": 33,
+        "sensor_assembly_ms": 5.4101289999999995,
+        "world_update_ms": 508.811715
+      }
+    ],
+    "threads": 1,
+    "throughput": {
+      "per_seed": [
+        {
+          "births_per_hour": 387273.893902208,
+          "creature_ticks_per_second": 46752.21806090948,
+          "seed": 11,
+          "ticks_per_hour": 943199.3222457002,
+          "ticks_per_second": 261.9998117349167
+        },
+        {
+          "births_per_hour": 30122.864014983017,
+          "creature_ticks_per_second": 4240.934127685185,
+          "seed": 22,
+          "ticks_per_hour": 1095376.8732721095,
+          "ticks_per_second": 304.2713536866971
+        },
+        {
+          "births_per_hour": 385224.3573765742,
+          "creature_ticks_per_second": 47931.897355800036,
+          "seed": 33,
+          "ticks_per_hour": 1014424.1410916453,
+          "ticks_per_second": 281.78448363656815
+        }
+      ],
+      "total": {
+        "births_per_hour": 82644.5352085905,
+        "creature_ticks_per_second": 10596.061821933803,
+        "ticks_per_hour": 1078114.3039357937,
+        "ticks_per_second": 299.47619553772046
+      }
+    },
+    "wall_clock_ms_per_creature_tick": 0.09437468531280219,
+    "wall_clock_ms_per_seed": [
+      {
+        "seed": 11,
+        "wall_clock_ms": 576.3362920000001
+      },
+      {
+        "seed": 22,
+        "wall_clock_ms": 6573.080166000001
+      },
+      {
+        "seed": 33,
+        "wall_clock_ms": 560.712208
+      }
+    ],
+    "wall_clock_ms_total": 7710.1286660000005
+  },
+  "feature": "t10-f09-throughput-baseline-and-profiling-budget",
+  "schema_version": 1
+}
