@@ -288,6 +288,12 @@ fn inhibition_penalty(weighted_sum: f32, own_density: f32, own_inhibitor: f32) -
 }
 
 #[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "one food growth pass over the grid; the per-cell claim, spread, \
+              recovery, and inhibition stages share scratch buffers that would \
+              have to be threaded through helpers"
+)]
 pub(super) fn grow<T: Clone>(
     state: &mut OrdinaryFoodState,
     catalog: &OrdinaryFoodCatalog,

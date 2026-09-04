@@ -37,6 +37,7 @@ unexpected_cfgs = "warn"
 [workspace.lints.clippy]
 correctness = { level = "deny", priority = -1 }
 suspicious = { level = "deny", priority = -1 }
+too_many_lines = "warn"        # threshold in clippy.toml
 
 [workspace.lints.rustdoc]
 broken_intra_doc_links = "deny"

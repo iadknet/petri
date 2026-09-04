@@ -96,6 +96,12 @@ impl ReproductionInvalidTargetCause {
 ///
 /// Returns the outcome indicating whether offspring was spawned or why it was rejected.
 #[must_use]
+#[allow(
+    clippy::too_many_lines,
+    reason = "the unified reproduction sequence in v3-reproduction-spec.md \
+              Section 6 is ordered end to end; splitting it would obscure the \
+              spec-mandated gate order"
+)]
 pub fn apply_reproduce(
     parent_id: CreatureId,
     sim: &mut Simulation,
