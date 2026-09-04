@@ -61,6 +61,17 @@ Follow its guidance unless the file contents or a step that fails when tried
 contradict a specific claim; in that case surface the conflict in your report
 rather than following the advice blindly.
 
+## Simplification pass
+
+Before reporting the feature done, and again after any remediation pass that
+adds code, run the `simplify` skill (via the Skill tool) on your feature diff
+against its merge base with `roadmap/complete`. Apply its reuse,
+simplification, and efficiency fixes, then rerun the verification commands
+you recorded. Prefer enums over string-typed states, declarative clap or
+serde constraints over repeated validation, and `std` or existing crate
+dependencies over hand-rolled utilities. Mention in your report what the pass
+changed.
+
 ## Completion gate
 
 A hook runs `scripts/implementer-gate` when you try to stop. If roadmap

@@ -68,7 +68,12 @@ planned, and keep an unchecked feature unchecked until its complete spec exists.
 - Reviewer: delegate the final diff review to the `roadmap-reviewer` subagent
   (Opus, high effort, read-only, fresh context). Give it the implementer
   worktree path, the feature ID, and the spec path. It reports findings; you
-  decide which are P1.
+  decide which are P1. Its brief includes a maintainability lens; treat a
+  maintainability P2 on code a later feature will extend as worth one
+  remediation pass, not as scope creep.
+- Simplification: the implementer runs the `simplify` skill on its own diff
+  before reporting done and after any remediation that adds code. Confirm its
+  report mentions that pass; if it does not, send it back before review.
 - Readiness review (plan and spec, before implementation) stays with you.
 - Only a P1 finding blocks progress. P2 and P3 findings are advisory and must be
   recorded as deferred review findings in the spec's "Notes for AI Agents"

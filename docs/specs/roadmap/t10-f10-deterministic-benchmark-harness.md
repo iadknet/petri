@@ -376,6 +376,20 @@ yet.
   ignores it — the gate profile always uses its own predeclared 1.0 coverage
   regardless of the flag. A future pass should either reject
   `--food-coverage` for `--profile gate` or document the override explicitly.
+- Deferred maintainability findings from the orchestrator's post-closure read
+  of `crates/v3-cli/src/bench.rs` and `main.rs` (P3, pay down in the next
+  feature that extends the harness, expected to be T01.F11 or T10.F09):
+  comparison levels (`ok`, `flag`, `severe`, `new`) are strings compared by
+  equality where a serde-renamed enum belongs; `PerCreatureTick` is six
+  `Option<String>` fields looked up by name through a match with an
+  `unreachable!` arm, a hand-built map; adding a counter touches
+  `WorkCounters`, `SimStats`, `PerSeed`, `Totals`, `PerCreatureTick`,
+  `COUNTER_NAMES`, and the lookup function; the RFC 3339 formatter, hostname,
+  CPU model, and git revision are hand-rolled or shell out where an existing
+  dependency or `std` could serve; `run_bench` in `main.rs` repeats the
+  print-and-exit validation seven times where clap `required_if_eq` would
+  declare it; wall-clock thresholds are inline literals while work thresholds
+  are named constants.
 - Per-feature cost record (closed 2026-09-03 through the Fable orchestrator,
   Sonnet implementer with Opus advisor, and Opus reviewer): implementer
   self-reported advisor consults 4 (3 in the first pass, 1 in remediation);
