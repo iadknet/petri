@@ -144,8 +144,12 @@ plateaus near 5,000 creatures.
 
 ## Verification
 
-Run on 2026-09-04 at commit `d4d5005a` (the code commit; the sweep and gate
-reports all record `git_revision` `d4d5005a`), macOS arm64, 12 logical cores.
+Run on 2026-09-04. Every sweep and the gate report record `git_revision`
+`d4d5005a`, the code commit; the two later commits are documentation and
+reports only, so re-running any command below at this branch's head
+reproduces the same `deterministic` blocks. Recording host, as stored in
+`environment.host`: macos, aarch64, Apple M1 Pro, 8 logical cores, release
+build.
 
 - [x] `cargo test -p v3-cli` passes with the new persistence-field and
       food-coverage tests; the two existing gate tests still pass against the
@@ -169,9 +173,10 @@ reports all record `git_revision` `d4d5005a`), macOS arm64, 12 logical cores.
 - [x] Benchmark report stored at
       `docs/progress/features/t01-f11-baseline-persistence-characterization.json`
       and appended to `closed` in `docs/progress/benchmark-series.json`.
-- [x] `make check` passes (exit 0) after that append, so the gate profile
-      still compares cleanly against both series references — the T10.F10
-      report and this feature's own.
+- [x] `make check` passes (exit 0) at commit `b2c150a8`, which adds only
+      reports and documentation on top of the code at `d4d5005a`. It ran
+      after the series append, so the gate profile compares cleanly against
+      both series references — the T10.F10 report and this feature's own.
 
 Sweep commands, each run once from the repository root, with the wall-clock
 each report recorded in `environment.wall_clock_ms_total` (sum over its three
