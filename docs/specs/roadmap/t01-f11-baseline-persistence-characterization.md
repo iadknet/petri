@@ -1,6 +1,6 @@
 # T01.F11 — Baseline Persistence Characterization
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-04
 **Feature**: T01.F11
 **Track**: [T01 — Experimental Science and Causal Evaluation](../../roadmaps/t01-experimental-science-and-causal-evaluation.md)
@@ -284,15 +284,15 @@ as marginal: one is a single creature and the other has not settled by tick
 
 ## Success Criteria
 
-- [ ] Four sweep reports at production defaults, sizes 128/256/512/1600 with
+- [x] Four sweep reports at production defaults, sizes 128/256/512/1600 with
       density-matched founders, seeds 11/22/33, 2,000 ticks, are committed and
       each is regenerable by the one command recorded in this spec.
-- [ ] Each report records per seed the extinction tick, peak and plateau
+- [x] Each report records per seed the extinction tick, peak and plateau
       population, births per 100 ticks, mean energy, and 100-tick samples.
-- [ ] The Performance and Goal Impact section states whether the 2026-09-03
+- [x] The Performance and Goal Impact section states whether the 2026-09-03
       baseline result is reproduced or superseded, with numbers from the
       reports.
-- [ ] Simulation behavior is unchanged: every work counter's per-creature-tick
+- [x] Simulation behavior is unchanged: every work counter's per-creature-tick
       delta in the gate report is 0 percent against both references, except a
       counter that is zero in both runs, which reports a `null` delta at
       level `ok`.
@@ -313,3 +313,32 @@ as marginal: one is a single creature and the other has not settled by tick
   clap cannot express "forbidden when `--profile gate`" declaratively, so
   one explicit check in the resolution function is acceptable; do not add
   further print-and-exit branches to `run_bench`.
+- Deferred review findings (P3, recorded 2026-09-04, not fixed here because
+  a code change would orphan the `git_revision` the five committed reports
+  record and force a full regeneration): (1) the persistence accumulator's
+  `is_sampled` infers the last executed tick from `population == 0`, which
+  holds only because `run_one_seed` breaks on extinction, and a zero-tick
+  horizon reports `mean_energy` `null` with a nonzero population; smallest
+  fix is to drop that inference and have `finish` push the final sample when
+  the last sample's tick differs. (2) `ProfileBlock.food_coverage` is a
+  string carrying either a six-decimal number or the sentinel `default`;
+  T01.F12 re-pins the epoch and starts a new series, which is the moment to
+  make it `Option<String>` or an untagged enum. (3) The tiny-sweep
+  integration test re-derives the plateau window rule instead of calling a
+  shared `plateau_window_start(horizon)`. (4) The "2,811 identical bytes"
+  figure in Verification is the Python sorted-keys re-serialization of the
+  parsed `deterministic` block, not the harness's compact
+  `deterministic_block_json` form (2,564 bytes); parsed-object equality is
+  the claim that matters. (5) The `make check` record names `b2c150a8`; the
+  two later commits are documentation only, and the orchestrator re-ran
+  `make check` at the closing head. Findings (1) and (3) belong to T01.F12,
+  which reuses the accumulator for its persistence smoke.
+- Per-feature cost record (closed 2026-09-04 through the Fable 5.1
+  orchestrator, Opus 5 implementer with a Fable advisor, and Fable 5.1
+  reviewer): implementer self-reported advisor consults 2 (one before
+  implementing, one before reporting done; its report listed 3 but described
+  two calls); reviewer findings 0 P1, 0 P2, 5 P3; no remediation pass.
+  Implementer subagent usage about 172k tokens over one run of 125 tool
+  uses and 48 minutes, dominated by the four sweeps (about 19 minutes of
+  benchmark wall-clock). Session `/usage` totals were not collected: the run
+  was autonomous and the user was not available to report them.
