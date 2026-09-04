@@ -200,3 +200,64 @@ fn compare_against_reports_severe_wall_clock_without_marking_comparison_severe()
         "wall-clock must never mark the reference comparison severe, even when severe itself"
     );
 }
+
+/// A counter that was exactly zero in the reference but positive in the
+/// current run has an unbounded (division-by-zero) ratio. It must be
+/// reported as `severe`, not silently `ok` with a null delta — otherwise the
+/// first feature to introduce nonzero work for that counter (e.g. the first
+/// plastic founder genome) could never trip a regression.
+#[test]
+fn compare_against_treats_reference_zero_current_positive_as_severe() {
+    let mut current = tiny_report();
+    let mut reference = current.clone();
+
+    // The gate founder genome has no plastic CGP nodes, so plasticity_updates
+    // is 0 in both reports by construction; force the current side nonzero
+    // to exercise the reference==0/current>0 (division-by-zero) path
+    // directly, independent of genome data.
+    current.deterministic.per_creature_tick.plasticity_updates = Some("0.500000".to_string());
+    reference.deterministic.per_creature_tick.plasticity_updates = Some("0.000000".to_string());
+
+    let comparison = bench::compare_against(
+        &current,
+        std::path::Path::new("synthetic-ref.json"),
+        &reference,
+    );
+
+    let plasticity_updates = comparison
+        .counters
+        .iter()
+        .find(|c| c.name == "plasticity_updates")
+        .expect("plasticity_updates counter must be present");
+    assert_eq!(plasticity_updates.level, "severe");
+    assert!(comparison.severe);
+}
+
+/// `compare_against_path` hard-fails when the reference report was generated
+/// with a different profile (world size, founders, seeds, ticks, or food
+/// coverage): a work-counter comparison across different profiles is
+/// meaningless, and this is the live failure mode since the gate horizon
+/// already changed once during this feature's own implementation.
+#[test]
+fn compare_against_path_errors_on_profile_mismatch() {
+    let current = tiny_report();
+
+    let mut reference = current.clone();
+    reference.deterministic.profile.ticks += 1;
+
+    let scratch_path = std::env::temp_dir().join(format!(
+        "t10-f10-bench-profile-mismatch-{}.json",
+        std::process::id()
+    ));
+    std::fs::write(&scratch_path, bench::report_json_pretty(&reference))
+        .expect("failed to write scratch reference report");
+
+    let result = bench::compare_against_path(&current, &scratch_path);
+    let _ = std::fs::remove_file(&scratch_path);
+
+    let err = result.expect_err("a profile mismatch must be a hard error, not a silent skip");
+    assert!(
+        err.contains("different profile"),
+        "error message should explain the profile mismatch, got: {err}"
+    );
+}
