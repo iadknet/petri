@@ -1,0 +1,243 @@
+{
+  "comparison": {
+    "references": [
+      {
+        "counters": [
+          {
+            "current": "1.998362",
+            "level": "ok",
+            "name": "mesh_hops",
+            "percent_delta": "0.000000",
+            "reference": "1.998362"
+          },
+          {
+            "current": "28.028231",
+            "level": "ok",
+            "name": "vm_steps",
+            "percent_delta": "0.000000",
+            "reference": "28.028231"
+          },
+          {
+            "current": "2.998624",
+            "level": "ok",
+            "name": "graph_relax_iters",
+            "percent_delta": "0.000000",
+            "reference": "2.998624"
+          },
+          {
+            "current": "0.000000",
+            "level": "ok",
+            "name": "plasticity_updates",
+            "percent_delta": null,
+            "reference": "0.000000"
+          },
+          {
+            "current": "1.000000",
+            "level": "ok",
+            "name": "actions_applied",
+            "percent_delta": "0.000000",
+            "reference": "1.000000"
+          },
+          {
+            "current": "0.001212",
+            "level": "ok",
+            "name": "births",
+            "percent_delta": "0.000000",
+            "reference": "0.001212"
+          }
+        ],
+        "path": "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
+        "severe": false,
+        "wall_clock": {
+          "current_ms_per_creature_tick": 0.004613928120852653,
+          "level": "ok",
+          "percent_delta": -15.305403583335938,
+          "reference_ms_per_creature_tick": 0.005447724313076532
+        }
+      }
+    ],
+    "severe": false
+  },
+  "deterministic": {
+    "goal_indicators": {
+      "adaptive_novelty": "Undefined",
+      "births_per_100_ticks": "32.888889",
+      "evolutionary_activity": "Undefined",
+      "information_integration": "Undefined",
+      "learning_dependence": "Undefined",
+      "memory_dependence": "Undefined",
+      "population_persistence": {
+        "per_seed": [
+          {
+            "extinction_tick": null,
+            "final_population": 284,
+            "mean_energy": "8.321675",
+            "minimum_population": 256,
+            "peak_population": 290,
+            "peak_tick": 40,
+            "plateau_population": "287.315789",
+            "samples": [
+              {
+                "births_total": 35,
+                "mean_energy": "8.321675",
+                "population": 284,
+                "tick": 75
+              }
+            ],
+            "seed": 11
+          },
+          {
+            "extinction_tick": null,
+            "final_population": 260,
+            "mean_energy": "7.453132",
+            "minimum_population": 256,
+            "peak_population": 274,
+            "peak_tick": 40,
+            "plateau_population": "268.210526",
+            "samples": [
+              {
+                "births_total": 18,
+                "mean_energy": "7.453132",
+                "population": 260,
+                "tick": 75
+              }
+            ],
+            "seed": 22
+          },
+          {
+            "extinction_tick": null,
+            "final_population": 264,
+            "mean_energy": "7.945192",
+            "minimum_population": 256,
+            "peak_population": 277,
+            "peak_tick": 40,
+            "plateau_population": "268.736842",
+            "samples": [
+              {
+                "births_total": 21,
+                "mean_energy": "7.945192",
+                "population": 264,
+                "tick": 75
+              }
+            ],
+            "seed": 33
+          }
+        ]
+      },
+      "prediction_dependence": "Undefined",
+      "reachable_structure_size_distribution": {
+        "max": 106,
+        "mean": "96.012376",
+        "median": 96,
+        "min": 96,
+        "p25": 96,
+        "p75": 96
+      },
+      "reciprocal_interaction": "Undefined",
+      "strategy_causal_distinctness": "Undefined",
+      "strategy_count": "Undefined"
+    },
+    "per_creature_tick": {
+      "actions_applied": "1.000000",
+      "births": "0.001212",
+      "graph_relax_iters": "2.998624",
+      "mesh_hops": "1.998362",
+      "plasticity_updates": "0.000000",
+      "vm_steps": "28.028231"
+    },
+    "per_seed": [
+      {
+        "actions_applied": 20872,
+        "births": 35,
+        "creature_ticks": 20872,
+        "extinction_tick": null,
+        "final_population": 284,
+        "graph_relax_iters": 62616,
+        "mesh_hops": 41744,
+        "plasticity_updates": 0,
+        "seed": 11,
+        "ticks": 75,
+        "vm_steps": 585790
+      },
+      {
+        "actions_applied": 20055,
+        "births": 18,
+        "creature_ticks": 20055,
+        "extinction_tick": null,
+        "final_population": 260,
+        "graph_relax_iters": 60165,
+        "mesh_hops": 40074,
+        "plasticity_updates": 0,
+        "seed": 22,
+        "ticks": 75,
+        "vm_steps": 561217
+      },
+      {
+        "actions_applied": 20106,
+        "births": 21,
+        "creature_ticks": 20106,
+        "extinction_tick": null,
+        "final_population": 264,
+        "graph_relax_iters": 60234,
+        "mesh_hops": 40148,
+        "plasticity_updates": 0,
+        "seed": 33,
+        "ticks": 75,
+        "vm_steps": 563640
+      }
+    ],
+    "profile": {
+      "food_coverage": "1.000000",
+      "founders": 256,
+      "name": "gate",
+      "seeds": [
+        11,
+        22,
+        33
+      ],
+      "ticks": 75,
+      "world_height": 128,
+      "world_width": 128
+    },
+    "totals": {
+      "actions_applied": 61033,
+      "births": 74,
+      "creature_ticks": 61033,
+      "graph_relax_iters": 183015,
+      "mesh_hops": 121966,
+      "plasticity_updates": 0,
+      "ticks": 225,
+      "vm_steps": 1710647
+    }
+  },
+  "environment": {
+    "build_profile": "release",
+    "generated_at": "2026-09-04T16:29:29Z",
+    "git_revision": "d4d5005af10ce004fcb93315e13a4ff965803cae",
+    "host": {
+      "arch": "aarch64",
+      "cpu_model": "Apple M1 Pro",
+      "hostname": "Isaacs-MacBook-Pro-2.local",
+      "logical_cores": 8,
+      "os": "macos"
+    },
+    "wall_clock_ms_per_creature_tick": 0.004613928120852653,
+    "wall_clock_ms_per_seed": [
+      {
+        "seed": 11,
+        "wall_clock_ms": 104.17691699999999
+      },
+      {
+        "seed": 22,
+        "wall_clock_ms": 88.99775
+      },
+      {
+        "seed": 33,
+        "wall_clock_ms": 88.427208
+      }
+    ],
+    "wall_clock_ms_total": 281.601875
+  },
+  "feature": "t01-f11-baseline-persistence-characterization",
+  "schema_version": 1
+}
