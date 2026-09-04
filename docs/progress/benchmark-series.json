@@ -1,0 +1,5 @@
+{
+  "series": "gate-v1",
+  "epoch_baseline": "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
+  "closed": ["docs/progress/features/t10-f10-deterministic-benchmark-harness.json"]
+}

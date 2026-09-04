@@ -175,3 +175,5 @@ fn emit<W: std::io::Write, T: Serialize>(out: &mut W, event: &T) -> Result<(), R
         .map_err(|e| RunError::RuntimeError(format!("serialization error: {e}")))?;
     writeln!(out, "{json}").map_err(|e| RunError::RuntimeError(format!("IO error: {e}")))
 }
+
+pub mod bench;

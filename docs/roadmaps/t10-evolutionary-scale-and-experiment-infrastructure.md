@@ -33,7 +33,7 @@ gate.
 - [ ] **T10.F07 — Evolutionary Throughput Benchmark and Budget** — Depends on: T10.F03, T10.F06, T10.F09
 - [ ] **T10.F08 — Provenance and Immutable Result-Bundle Packaging** — Depends on: T10.F05, T10.F06, T10.F07
 - [ ] **T10.F09 — Throughput Baseline and Profiling Budget** — Depends on: T01.F11
-- [ ] **T10.F10 — Deterministic Benchmark Harness and Per-Feature Report** — Depends on: None
+- [x] **T10.F10 — Deterministic Benchmark Harness and Per-Feature Report** — Depends on: None
 
 ## Notes for AI Agents
 
