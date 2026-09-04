@@ -67,15 +67,18 @@ rust-test-vm-all-opcodes: ## Run v3-core VM opcode integration tests.
 rust-test-cli: ## Run v3-cli tests.
 	@cargo test -p v3-cli
 
-bench: ## Run the deterministic benchmark harness. Gate: `make bench PROFILE=gate FEATURE=<tNN-fNN-slug>` (rejects --food-coverage; its profile is predeclared). Sweep: `make bench PROFILE=sweep BENCH_ARGS="--width 128 --height 128 --founders 256 --seeds 11,22,33 --ticks 300" OUT=<path>`, adding `--food-coverage <x>` only to force one coverage onto every food type instead of the production defaults. Either profile accepts `--threads <n>` (n >= 1) to run on a private rayon pool of that size instead of the global pool.
+bench: ## Run the deterministic benchmark harness. Gate: `make bench PROFILE=gate FEATURE=<tNN-fNN-slug> [OUT=<path>]`; goal: `make bench PROFILE=goal FEATURE=<tNN-fNN-slug> [OUT=<path>]`; sweep: `make bench PROFILE=sweep BENCH_ARGS="--width 128 --height 128 --founders 256 --seeds 11,22,33 --ticks 300" OUT=<path>`. Fixed profiles reject parameter overrides; all profiles accept `--threads <n>` through BENCH_ARGS.
 	@if [ "$(PROFILE)" = "gate" ]; then \
 		if [ -z "$(FEATURE)" ]; then echo "error: FEATURE is required for PROFILE=gate" >&2; exit 1; fi; \
-		cargo run --release -p v3-cli -- bench --profile gate --feature "$(FEATURE)" --out "docs/progress/features/$(FEATURE).json"; \
+		cargo run --release -p v3-cli -- bench --profile gate --feature "$(FEATURE)" --out "$(if $(OUT),$(OUT),docs/progress/features/$(FEATURE).json)" $(BENCH_ARGS); \
+	elif [ "$(PROFILE)" = "goal" ]; then \
+		if [ -z "$(FEATURE)" ]; then echo "error: FEATURE is required for PROFILE=goal" >&2; exit 1; fi; \
+		cargo run --release -p v3-cli -- bench --profile goal --feature "$(FEATURE)" --out "$(if $(OUT),$(OUT),docs/progress/features/$(FEATURE)-goal.json)" $(BENCH_ARGS); \
 	elif [ "$(PROFILE)" = "sweep" ]; then \
 		if [ -z "$(OUT)" ]; then echo "error: OUT is required for PROFILE=sweep" >&2; exit 1; fi; \
 		cargo run --release -p v3-cli -- bench --profile sweep --out "$(OUT)" $(BENCH_ARGS); \
 	else \
-		echo "error: set PROFILE=gate or PROFILE=sweep" >&2; exit 1; \
+		echo "error: set PROFILE=gate, goal, or sweep" >&2; exit 1; \
 	fi
 
 rust-test-server: ## Run v3-server tests.

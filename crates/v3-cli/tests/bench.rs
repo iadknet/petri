@@ -62,6 +62,18 @@ fn tiny_sweep_params() -> bench::ProfileParams {
     }
 }
 
+fn tiny_goal_params() -> bench::ProfileParams {
+    bench::ProfileParams {
+        name: "goal".to_string(),
+        width: 32,
+        height: 32,
+        founders: 8,
+        seeds: vec![11],
+        ticks: 30,
+        food_coverage: None,
+    }
+}
+
 /// The gate profile's `deterministic` block is byte-identical across two
 /// independent runs at the same commit and inputs.
 #[test]
@@ -436,6 +448,96 @@ fn tiny_sweep_records_persistence_fields_identically_across_two_runs() {
         bench::deterministic_block_json(&report_b),
         "the persistence fields must be byte-identical across two runs"
     );
+}
+
+/// Goal observations use the same read-only path at tiny scale in tests. Their
+/// deterministic block is stable across independent runs and thread counts,
+/// while the new probe timing stays in the environment block.
+#[test]
+fn tiny_goal_profile_observations_are_deterministic_and_goal_only() {
+    let params = tiny_goal_params();
+    let one_thread =
+        bench::build_report_with_threads(&params, "t01-f12-tiny-goal-check", NonZeroUsize::new(1));
+    let default_pool = bench::build_report(&params, "t01-f12-tiny-goal-check");
+
+    assert_eq!(
+        bench::deterministic_block_json(&one_thread),
+        bench::deterministic_block_json(&default_pool),
+        "goal readings must not depend on the cognition pool"
+    );
+    assert!(matches!(
+        one_thread.deterministic.goal_indicators.lineage_diversity,
+        bench::Indicator::Defined(_)
+    ));
+    assert!(matches!(
+        one_thread.deterministic.goal_indicators.memory_sensitivity,
+        bench::Indicator::Defined(_)
+    ));
+    assert_eq!(
+        one_thread
+            .environment
+            .final_state_observation_ms_per_seed
+            .len(),
+        params.seeds.len()
+    );
+
+    let sweep = bench::build_report(&tiny_sweep_params(), "t01-f12-sweep-undefined-check");
+    assert!(matches!(
+        sweep.deterministic.goal_indicators.lineage_diversity,
+        bench::Indicator::Undefined(ref value) if value == "Undefined"
+    ));
+    assert!(matches!(
+        sweep.deterministic.goal_indicators.memory_sensitivity,
+        bench::Indicator::Undefined(ref value) if value == "Undefined"
+    ));
+    assert!(sweep
+        .environment
+        .final_state_observation_ms_per_seed
+        .is_empty());
+}
+
+#[test]
+fn gate_and_goal_series_select_only_their_own_references() {
+    let scratch_dir =
+        std::env::temp_dir().join(format!("t01-f12-series-index-{}", std::process::id()));
+    std::fs::create_dir_all(&scratch_dir).expect("create scratch directory");
+    let gate_epoch = scratch_dir.join("gate-epoch.json");
+    let gate_latest = scratch_dir.join("gate-latest.json");
+    let goal_epoch = scratch_dir.join("goal-epoch.json");
+    for path in [&gate_epoch, &gate_latest, &goal_epoch] {
+        std::fs::write(path, "{}").expect("create reference placeholder");
+    }
+    let index = bench::BenchmarkSeriesIndex {
+        gate: bench::SeriesIndex {
+            series: "gate-v1".to_string(),
+            epoch_baseline: gate_epoch.display().to_string(),
+            closed: vec![
+                gate_epoch.display().to_string(),
+                gate_latest.display().to_string(),
+            ],
+        },
+        goal: bench::SeriesIndex {
+            series: "goal-v1".to_string(),
+            epoch_baseline: goal_epoch.display().to_string(),
+            closed: vec![],
+        },
+    };
+    let index_path = scratch_dir.join("benchmark-series.json");
+    std::fs::write(
+        &index_path,
+        serde_json::to_string(&index).expect("serialize series index"),
+    )
+    .expect("write series index");
+
+    assert_eq!(
+        bench::default_gate_references(&index_path).expect("read gate references"),
+        vec![gate_epoch.clone(), gate_latest]
+    );
+    assert_eq!(
+        bench::default_goal_references(&index_path).expect("read goal references"),
+        vec![goal_epoch]
+    );
+    std::fs::remove_dir_all(&scratch_dir).expect("remove scratch directory");
 }
 
 /// A profile that leaves production food coverage in place round-trips its

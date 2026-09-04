@@ -203,6 +203,78 @@ fn assemble_sensor_inputs(
         .collect()
 }
 
+/// The complete action queue selected for one final-state observation.
+///
+/// The three queues are evaluated from the same frozen sensor snapshot. Each
+/// evaluation owns fresh copies of the mutable cognition state, so this is
+/// observational and never changes the simulation.
+#[derive(Debug, Clone, PartialEq)]
+pub struct FinalActionObservation {
+    pub creature_id: CreatureId,
+    pub intact: Vec<WorldAction>,
+    pub zeroed: Vec<WorldAction>,
+    pub scrambled: Vec<WorldAction>,
+}
+
+/// Observe every living creature's selected action queue at the simulation's
+/// final state without advancing or mutating the simulation.
+///
+/// Creature IDs are sorted before sensor assembly to make the returned order
+/// stable. The scramble is a fixed left rotation of the 16 shared-memory
+/// slots; it preserves the memory multiset and does not consume the simulation
+/// RNG. The normal mesh executor itself has no RNG input.
+pub fn observe_final_actions(sim: &Simulation) -> Vec<FinalActionObservation> {
+    let mut creature_ids: Vec<_> = sim.creatures.keys().collect();
+    creature_ids.sort();
+    let inputs = assemble_sensor_inputs(sim, &creature_ids);
+
+    inputs
+        .into_iter()
+        .map(|(creature_id, sensors)| {
+            let creature = &sim.creatures[creature_id];
+            let mut scrambled_memory = creature.shared_memory;
+            scrambled_memory.rotate_left(1);
+            FinalActionObservation {
+                creature_id,
+                intact: observe_action_queue(
+                    creature,
+                    &sensors,
+                    creature.shared_memory,
+                    &sim.config.runtime,
+                ),
+                zeroed: observe_action_queue(creature, &sensors, [0.0; 16], &sim.config.runtime),
+                scrambled: observe_action_queue(
+                    creature,
+                    &sensors,
+                    scrambled_memory,
+                    &sim.config.runtime,
+                ),
+            }
+        })
+        .collect()
+}
+
+fn observe_action_queue(
+    creature: &CreatureState,
+    sensors: &SensorSnapshot,
+    mut shared_memory: [f32; 16],
+    runtime_config: &crate::config::RuntimeConfig,
+) -> Vec<WorldAction> {
+    let mut energy = creature.energy;
+    let mut graph_runtime = creature.graph_runtime.clone();
+    execute_creature_mesh_with_reserve(
+        &creature.genome,
+        sensors,
+        &mut energy,
+        creature.reproductive_reserve,
+        &mut shared_memory,
+        &creature.prev_shared_memory,
+        &mut graph_runtime,
+        runtime_config,
+    )
+    .actions
+}
+
 /// Phase 1b: cognition — parallel for all creatures, sequential for the traced one.
 ///
 /// Cognition only mutates each creature's private state (energy, memory,
@@ -939,4 +1011,127 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<ActiveTrace>) {
     sim.stats.phase_wall_clock.reward_learning += phase_started.elapsed();
 
     sim.tick += 1;
+}
+
+#[cfg(test)]
+mod final_action_observation_tests {
+    use super::*;
+    use crate::config::SimulationConfig;
+    use crate::contracts::{Direction, NodeId, WorldAction};
+    use crate::creature::genome::{
+        BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
+    };
+    use crate::simulation::seed_simulation;
+    use rand::RngCore;
+
+    fn memory_direction_genome() -> CreatureGenome {
+        CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Vm(VmBackendDef {
+                    register_count: 3,
+                    constants: vec![0.5],
+                    program: vec![
+                        VmInstruction::LoadSlotImm {
+                            dst: 0,
+                            slot_idx: 0,
+                        },
+                        VmInstruction::LoadConst {
+                            dst: 1,
+                            const_idx: 0,
+                        },
+                        VmInstruction::CmpGt { dst: 2, a: 0, b: 1 },
+                        VmInstruction::WriteWorldActionMeta {
+                            slot_idx: 0,
+                            src: 2,
+                        },
+                        VmInstruction::WriteWorldActionMeta {
+                            slot_idx: 1,
+                            src: 0,
+                        },
+                        VmInstruction::PushAction { action_type: 3 },
+                        VmInstruction::ExecuteActionQueue,
+                    ],
+                }),
+                targets: vec![],
+            }],
+        }
+    }
+
+    #[test]
+    fn final_action_observation_uses_full_actions_and_leaves_simulation_unchanged() {
+        let mut config = SimulationConfig::default();
+        config.world.width = 16;
+        config.world.height = 16;
+        config.population.initial_creatures = 1;
+        let mut sim = seed_simulation(config, 11);
+        let id = sim.creatures.keys().next().expect("one founder");
+        let creature = &mut sim.creatures[id];
+        creature.genome = memory_direction_genome();
+        creature.shared_memory[0] = 1.0;
+        creature.shared_memory[1] = 0.25;
+        creature.prev_shared_memory[0] = 0.75;
+        creature.graph_runtime.node_state = vec![vec![0.5]];
+        creature.graph_runtime.plasticity_weights = vec![vec![Box::new([0.25])]];
+        creature.graph_runtime.eligibility_traces = vec![vec![Box::new([0.125])]];
+        creature.graph_runtime.scratch_prev = vec![1.0];
+        creature.graph_runtime.scratch_curr = vec![2.0];
+        creature.graph_runtime.scratch_backup = vec![3.0];
+        creature.graph_runtime.scratch_w_inputs = vec![4.0];
+
+        let memory_before = creature.shared_memory;
+        let previous_memory_before = creature.prev_shared_memory;
+        let energy_before = creature.energy;
+        let graph_state_before = creature.graph_runtime.clone();
+        let mut rng_before = sim.rng.clone();
+
+        let observations = observe_final_actions(&sim);
+
+        assert_eq!(observations.len(), 1);
+        let observation = &observations[0];
+        assert_eq!(observation.creature_id, id);
+        assert_eq!(
+            observation.intact,
+            vec![WorldAction::Reproduce {
+                direction: Direction::NE,
+                energy_transfer: 1.0,
+            }]
+        );
+        assert_ne!(observation.intact, observation.zeroed);
+        assert_ne!(observation.intact, observation.scrambled);
+        assert_eq!(sim.creatures[id].shared_memory, memory_before);
+        assert_eq!(sim.creatures[id].prev_shared_memory, previous_memory_before);
+        assert_eq!(sim.creatures[id].energy, energy_before);
+        assert_eq!(
+            sim.creatures[id].graph_runtime.node_state,
+            graph_state_before.node_state
+        );
+        assert_eq!(
+            sim.creatures[id].graph_runtime.plasticity_weights,
+            graph_state_before.plasticity_weights
+        );
+        assert_eq!(
+            sim.creatures[id].graph_runtime.eligibility_traces,
+            graph_state_before.eligibility_traces
+        );
+        assert_eq!(
+            sim.creatures[id].graph_runtime.scratch_prev,
+            graph_state_before.scratch_prev
+        );
+        assert_eq!(
+            sim.creatures[id].graph_runtime.scratch_curr,
+            graph_state_before.scratch_curr
+        );
+        assert_eq!(
+            sim.creatures[id].graph_runtime.scratch_backup,
+            graph_state_before.scratch_backup
+        );
+        assert_eq!(
+            sim.creatures[id].graph_runtime.scratch_w_inputs,
+            graph_state_before.scratch_w_inputs
+        );
+        assert_eq!(sim.rng.next_u64(), rng_before.next_u64());
+    }
 }
