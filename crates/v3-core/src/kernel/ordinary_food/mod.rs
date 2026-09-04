@@ -32,13 +32,7 @@ pub struct FoodResource {
 
 impl FoodResource {
     #[must_use]
-    pub fn new<C: Into<FoodConfig>>(
-        width: u16,
-        height: u16,
-        config: C,
-        edge_mode: WorldEdgeMode,
-    ) -> Self {
-        let config = config.into();
+    pub fn new(width: u16, height: u16, config: FoodConfig, edge_mode: WorldEdgeMode) -> Self {
         let catalog = OrdinaryFoodCatalog::new(&config);
         let type_count = catalog.len();
         let total_cells = width as usize * height as usize;
@@ -172,8 +166,7 @@ impl FoodResource {
         self.state.for_each_food_cell(visitor);
     }
 
-    pub fn apply_config_transition<C: Into<FoodConfig>>(&mut self, config: C) {
-        let next = config.into();
+    pub fn apply_config_transition(&mut self, next: FoodConfig) {
         let next_catalog = OrdinaryFoodCatalog::new(&next);
         let catalog_shape_changed = self.catalog != next_catalog;
         apply_config_transition(

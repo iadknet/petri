@@ -27,7 +27,12 @@ impl WorldState {
             height,
             edge_mode,
             // Config is replaced by reconfigure_food() before seeding.
-            food: FoodResource::new(width, height, FoodResourceConfig::default(), edge_mode),
+            food: FoodResource::new(
+                width,
+                height,
+                FoodConfig::single_type(FoodResourceConfig::default()),
+                edge_mode,
+            ),
             barriers: Grid::new(width, height, false),
             creature_at: Grid::new(width, height, None),
         }
@@ -102,8 +107,8 @@ impl WorldState {
     }
 
     /// Replace the active food config through the food-kernel transition boundary.
-    pub fn reconfigure_food(&mut self, config: impl Into<FoodConfig>) {
-        self.food.apply_config_transition(config.into());
+    pub fn reconfigure_food(&mut self, config: FoodConfig) {
+        self.food.apply_config_transition(config);
     }
 
     // ── Barriers ─────────────────────────────────────────────────────────────
@@ -206,7 +211,7 @@ mod tests {
         food_cfg: FoodResourceConfig,
     ) -> WorldState {
         let mut w = WorldState::new(width, height, edge_mode);
-        w.reconfigure_food(food_cfg);
+        w.reconfigure_food(FoodConfig::single_type(food_cfg));
         w
     }
 
@@ -515,7 +520,7 @@ mod tests {
         assert!(w.occupancy_depletion_at(pos) > 0.0);
 
         config.occupancy_depletion.enabled = false;
-        w.reconfigure_food(config);
+        w.reconfigure_food(FoodConfig::single_type(config));
 
         assert_eq!(w.occupancy_depletion_at(pos), 0.0);
     }
@@ -536,7 +541,7 @@ mod tests {
         let before = w.occupancy_depletion_at(pos);
 
         config.occupancy_depletion.deposit_per_occupied_tick = 0.25;
-        w.reconfigure_food(config);
+        w.reconfigure_food(FoodConfig::single_type(config));
 
         assert_eq!(w.occupancy_depletion_at(pos), before);
     }
@@ -682,7 +687,7 @@ mod tests {
             growth_rate: 0.99,
             ..FoodResourceConfig::default()
         };
-        w.reconfigure_food(food_cfg);
+        w.reconfigure_food(FoodConfig::single_type(food_cfg));
         assert!((w.food().config().growth_rate - 0.99).abs() < f32::EPSILON);
     }
 
@@ -734,7 +739,7 @@ mod tests {
 
         let mut next = default_config().world.food.shared;
         next.max_density = 0.3;
-        w.reconfigure_food(next);
+        w.reconfigure_food(FoodConfig::single_type(next));
 
         assert_eq!(w.food_at(pos), 0.3);
     }
