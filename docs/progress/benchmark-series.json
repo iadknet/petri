@@ -4,6 +4,7 @@
   "closed": [
     "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
     "docs/progress/features/t01-f11-baseline-persistence-characterization.json",
-    "docs/progress/features/t10-f09-throughput-baseline-and-profiling-budget.json"
+    "docs/progress/features/t10-f09-throughput-baseline-and-profiling-budget.json",
+    "docs/progress/features/t10-f11-cross-process-reproducibility-of-seeded-runs.json"
   ]
 }
