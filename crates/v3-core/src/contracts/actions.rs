@@ -1,5 +1,5 @@
-use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::Direction;
+use crate::contracts::OrdinaryFoodTypeId;
 
 /// The action a creature emits at the end of mesh execution for one tick.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -68,7 +68,7 @@ impl WorldAction {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::OrdinaryFoodTypeId;
+    use crate::contracts::OrdinaryFoodTypeId;
 
     #[test]
     fn noop_is_noop() {

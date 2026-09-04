@@ -89,8 +89,8 @@ impl ActionQueue {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::OrdinaryFoodTypeId;
     use crate::contracts::Direction;
+    use crate::contracts::OrdinaryFoodTypeId;
 
     #[test]
     fn push_within_cap() {

@@ -1,3 +1,5 @@
+use crate::contracts::OrdinaryFoodTypeId;
+
 /// Edge mode for the world grid.
 /// Canonical owner: v3-world-grid-spec.md Section 4.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
@@ -6,37 +8,6 @@ pub enum WorldEdgeMode {
     #[default]
     Wrap,
     Bounded,
-}
-
-/// Stable identifier for a configured ordinary-food type in a run.
-#[derive(
-    Debug,
-    Clone,
-    Copy,
-    Default,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    serde::Serialize,
-    serde::Deserialize,
-)]
-#[serde(transparent)]
-pub struct OrdinaryFoodTypeId(pub u16);
-
-impl OrdinaryFoodTypeId {
-    #[inline]
-    #[must_use]
-    pub const fn new(raw: u16) -> Self {
-        Self(raw)
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn get(self) -> u16 {
-        self.0
-    }
 }
 
 /// Shared ordinary-food substrate config. Canonical owner: v3-world-grid-spec.md Section 4.
