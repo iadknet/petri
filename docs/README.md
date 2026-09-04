@@ -1,13 +1,14 @@
 # Petri documentation
 
+- [Roadmap execution workflow](workflow.md) (how a feature gets implemented)
 - [Roadmap contract](roadmaps/README.md)
 - [Roadmap templates](roadmaps/)
-- [Roadmap execution orchestration](specs/agent-orchestration.md) (agents, advisor, review gate)
-- [Archived PRDs](prds/archive/README.md) (historical only)
-- [Historical V3 roadmap](archive/v3-program-roadmap.md)
 - [Strategy](strategy/)
 - [Reference specifications](reference/)
-- [Legacy workflow inventory](archive/legacy-workflow-inventory.md)
 
-Archived PRDs and the historical V3 roadmap are preserved for reference only
-and are not executable guidance.
+Historical, non-executable material:
+
+- [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md)
+- [Archived PRDs](prds/archive/README.md)
+- [Historical V3 roadmap](archive/v3-program-roadmap.md)
+- [Legacy workflow inventory](archive/legacy-workflow-inventory.md)

@@ -2,12 +2,12 @@
 name: roadmap-implementer
 description: >-
   Implements exactly one roadmap feature (TNN.FNN) against its flat feature
-  spec, in an isolated feature worktree. Delegate all roadmap feature
-  implementation and remediation to this agent; keep it alive across passes via
-  SendMessage so it retains context. Does not plan scope or review other work.
+  spec, in the feature worktree the orchestrator is working in. Delegate all
+  roadmap feature implementation and remediation to this agent; keep it alive
+  across passes via SendMessage so it retains context. Does not plan scope or
+  review other work.
 model: opus
 effort: high
-isolation: worktree
 tools: Read, Edit, Write, Bash, Grep, Glob, Skill
 hooks:
   Stop:
@@ -23,8 +23,9 @@ or spawn further subagents.
 
 ## Working rules
 
-- You work only in your own isolated worktree. Implement exactly the feature
-  (TNN.FNN) the orchestrator assigns — no adjacent features or speculative work.
+- You work in the feature worktree the orchestrator entered, under
+  `.claude/worktrees/`. Implement exactly the feature (TNN.FNN) the orchestrator
+  assigns — no adjacent features or speculative work.
 - Before coding, read the roadmap contract (`docs/roadmaps/README.md`), the
   owning track roadmap, and the flat feature spec at
   `docs/specs/roadmap/tNN-fNN-<slug>.md`.
@@ -65,7 +66,7 @@ rather than following the advice blindly.
 
 Before reporting the feature done, and again after any remediation pass that
 adds code, run the `simplify` skill (via the Skill tool) on your feature diff
-against its merge base with `roadmap/complete`. Apply its reuse,
+against its merge base with `main`. Apply its reuse,
 simplification, and efficiency fixes, then rerun the verification commands
 you recorded. Prefer enums over string-typed states, declarative clap or
 serde constraints over repeated validation, and `std` or existing crate

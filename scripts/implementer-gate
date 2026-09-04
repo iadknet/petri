@@ -3,8 +3,8 @@
 #
 # Reads the hook payload from stdin, locates the implementer's worktree from its
 # "cwd" field, and, when any roadmap document differs from the merge base with
-# the integration branch, runs the roadmap checker there. Exit 2 blocks the
-# subagent from reporting done and feeds the checker output back to it.
+# the integration branch "main", runs the roadmap checker there. Exit 2 blocks
+# the subagent from reporting done and feeds the checker output back to it.
 # Anything the gate cannot evaluate exits 0 so a broken hook never blocks work.
 set -eu
 
@@ -16,7 +16,7 @@ if [ -z "$cwd" ] || [ ! -d "$cwd" ]; then
 fi
 root=$(git -C "$cwd" rev-parse --show-toplevel 2>/dev/null) || exit 0
 
-base_ref=${PETRI_GATE_BASE_REF:-roadmap/complete}
+base_ref=${PETRI_GATE_BASE_REF:-main}
 if ! base=$(git -C "$root" merge-base HEAD "$base_ref" 2>/dev/null); then
   base=HEAD
 fi

@@ -11,6 +11,7 @@
 # Tooling and editor state
 .tools/
 /.worktrees/
+.claude/worktrees/
 .DS_Store
 .idea/
 .vscode/

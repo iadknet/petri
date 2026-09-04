@@ -18,4 +18,5 @@ Describe this track's independently observable outcome.
 
 ## Notes for AI Agents
 
-Record track context and constraints. Keep execution policy in the goal prompt.
+Record track context and constraints. Keep execution policy in
+`docs/workflow.md`.

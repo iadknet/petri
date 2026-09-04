@@ -17,7 +17,8 @@ It intentionally does not police prose, review procedure, dates, or agent
 orchestration.
 
 Roadmap documents describe intent and state. They do not encode agent
-execution policy or integration authority. Those decisions belong in the
-reusable goal prompt template. Run one goal per feature: the target feature must
-have all dependencies checked, and a goal never implements a prerequisite or an
-unrelated ready feature implicitly.
+execution policy or integration authority. Those belong in
+[`docs/workflow.md`](../workflow.md), the one live execution workflow. It runs
+one feature per goal, in dependency order: the target feature must have all
+dependencies checked, and a goal never implements a prerequisite or an unrelated
+ready feature implicitly.

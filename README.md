@@ -29,6 +29,7 @@ to see the individual local targets.
 ## Documentation
 
 - [Documentation index](docs/README.md)
+- [Roadmap execution workflow](docs/workflow.md)
 - [Contributing](CONTRIBUTING.md)
 - [Security](SECURITY.md)
 - [Changelog](CHANGELOG.md)
