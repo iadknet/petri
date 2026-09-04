@@ -811,8 +811,12 @@ pub(super) fn apply_mutate_paired_slot_address(
         // Group immediate-addressed slot instructions by slot_idx, tracking which have
         // loads and stores. Register-indirect variants (LoadSlot/StoreSlot) are excluded
         // because they have no static slot_idx field to co-mutate.
-        let mut groups: std::collections::HashMap<u8, (Vec<usize>, bool, bool)> =
-            std::collections::HashMap::new();
+        //
+        // The map is ordered (not a std HashMap) so that `eligible` below is ordered by
+        // ascending slot index, making the candidate the seeded draw picks a function of
+        // genome content alone rather than of per-process hash order (T10.F11).
+        let mut groups: std::collections::BTreeMap<u8, (Vec<usize>, bool, bool)> =
+            std::collections::BTreeMap::new();
         for (i, instr) in vm.program.iter().enumerate() {
             match instr {
                 VmInstruction::LoadSlotImm { slot_idx, .. }
