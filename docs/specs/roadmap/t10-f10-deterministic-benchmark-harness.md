@@ -382,5 +382,8 @@ yet.
   reviewer findings 3 P1, 5 P2, 7 P3, all P1 and P2 remediated in one pass;
   implementer subagent usage about 700k tokens over three runs, one of which
   was cut short by an API spend limit and resumed; reviewer about 100k
-  tokens. Session `/usage` totals at closure were not captured because
-  `/usage` is a user command; add them here when available.
+  tokens. Session `/usage` at closure (2026-09-04T03:04Z, orchestrator
+  only): Fable 5.1 17.8k input, 29.7k output, 13.2M cache read, 800.3k cache
+  write; plan limits at that moment: session 38 percent, weekly all models 14
+  percent, weekly scoped 22 percent. Subagent usage is not included in the
+  session line and is the token figure above.
