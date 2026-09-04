@@ -38,9 +38,20 @@ on the integration branch itself.
   recorded result is implausible given the code (for example, a test file the
   diff does not add, or a viability gate not recorded when defaults, founders,
   or tick-loop mechanics changed).
-- Repository rules from `AGENTS.md`: TDD for behavior changes, POSIX `sh` in
-  shell automation, telemetry derived from applied simulation behavior, and no
-  workflow machinery introduced outside `docs/workflow.md`.
+- Mutation survivor record: the spec's Verification section carries the
+  `make rust-mutants` summary line, its output path, and the full survivor list
+  (missed and timed-out mutants), each resolved as killed (with a test the diff
+  adds or strengthens), equivalent (with a one-sentence reason), or deferred
+  (recorded in "Notes for AI Agents"). When the output directory is readable,
+  compare the recorded list with its `missed.txt` and `timeout.txt`. A
+  survivor "killed" by a production-code edit rather than a test is a finding.
+  Any `#[mutants::skip]` attribute or `exclude_re` entry in the diff must carry
+  a written justification.
+- Repository rules from `AGENTS.md`: TDD for behavior changes, property tests
+  for pure invariants with assertions that do not depend on which cases were
+  drawn, POSIX `sh` in shell automation, telemetry derived from applied
+  simulation behavior, and no workflow machinery introduced outside
+  `docs/workflow.md`.
 - Benchmark report and Performance and Goal Impact section when the feature is
   subject to them; a severe compute regression without a predeclared, justified
   cost is P1.
@@ -56,8 +67,12 @@ on the integration branch itself.
 ## Severity
 
 - P1: wrong behavior, untruthful spec state, a waived required check, scope
-  beyond the feature, or a blocking regression. Blocks closure.
-- P2: likely to cause rework or mislead a later feature. Advisory.
+  beyond the feature, or a blocking regression. Blocks closure. A missing
+  mutation survivor list, or a `#[mutants::skip]` or `exclude_re` without
+  justification, is a waived check.
+- P2: likely to cause rework or mislead a later feature. Advisory. An
+  unresolved survivor (listed but neither killed, justified as equivalent, nor
+  recorded as deferred) is P2.
 - P3: wording, organization, or small cleanups. Advisory.
 
 ## Report

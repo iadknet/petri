@@ -25,3 +25,6 @@ coverage/
 dist/
 build/
 tmp/
+
+# cargo-mutants output when run directly instead of through make rust-mutants
+/mutants.out*

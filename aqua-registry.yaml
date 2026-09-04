@@ -1,0 +1,11 @@
+# Local aqua registry for tools absent from the standard registry.
+# cargo-mutants publishes no arm64 macOS binary, so aqua builds it with
+# `cargo install --locked`. Update the version in aqua.yaml.
+packages:
+  - name: crates.io/cargo-mutants
+    type: cargo
+    repo_owner: sourcefrog
+    repo_name: cargo-mutants
+    crate: cargo-mutants
+    cargo:
+      locked: true

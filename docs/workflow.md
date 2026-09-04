@@ -14,6 +14,13 @@ implements one feature, in its own worktree, and merges it into `main`.
 `.claude/settings.json` sets `advisorModel: fable` and `worktree.baseRef: head`.
 `scripts/implementer-gate` is a SubagentStop hook that blocks the implementer
 from reporting done while `make roadmap-check` fails in its worktree.
+`scripts/implementer-compile-check` is a PostToolUse hook on the implementer's
+Edit and Write calls: after a `.rs` edit it runs
+`cargo check --workspace --all-targets` and returns the last 30 lines of output
+when the build fails or exceeds 300 seconds. It is feedback, not a gate.
+`make rust-mutants` runs cargo-mutants (installed through aqua's local
+registry) on the feature diff; it is deliberately outside `make check` and the
+stop gate, because its output is a survivor list to triage, not a score.
 
 ## Run the next feature
 
@@ -80,11 +87,27 @@ no feature code yourself. Spawn exactly one implementer per feature and continue
 that same agent with `SendMessage` across every pass, so it keeps its context;
 never spawn a fresh implementer per pass. Give it a tight brief: the feature ID,
 the spec path, and the specific change requested. It carries the detailed rules
-($rust-skills, TDD, viability gate first, `make roadmap-check` on document
-edits, POSIX `sh`), runs the `simplify` skill on its own diff before reporting
-done, and reports its advisor consult count. Verify its reported commands and
-results rather than taking them on faith; if its report does not mention the
-simplify pass, send it back before review.
+($rust-skills, TDD, property tests for pure invariants, viability gate first,
+`make roadmap-check` on document edits, POSIX `sh`), runs the `simplify` skill
+on its own diff before reporting done, and reports its advisor consult count.
+Verify its reported commands and results rather than taking them on faith; if
+its report does not mention the simplify pass or the mutation run, send it back
+before review.
+
+**Mutation survivors.** After the simplify pass and before reporting done, the
+implementer runs `make rust-mutants` once. The target diffs the worktree
+(committed, uncommitted, and untracked) against its merge base with `main`,
+runs `cargo mutants --in-diff` with the caps in `.cargo/mutants.toml`, writes
+its output under `~/.local/share/petri-tools/mutants/<worktree>/`, and prints
+every survivor: mutants missed by every test and mutants that timed out. The
+implementer records in the spec's Verification section the summary line, the
+output path, and the full survivor list, each survivor resolved as **killed**
+(a test added or strengthened, then the target rerun), **equivalent** (one
+sentence on why it cannot change observable behavior), or **deferred** (a
+deferred finding in "Notes for AI Agents"). Production code is never edited to
+kill a mutant, and any `#[mutants::skip]` or `exclude_re` entry carries a
+written justification. "No survivors" or "nothing to mutate" are valid records
+when that is what the target printed.
 
 ### Review
 
@@ -95,6 +118,13 @@ AI Agents" without expanding scope; a maintainability P2 on code a later feature
 will extend is worth one remediation pass, not scope creep. Allow one
 post-review remediation pass, routed back to the same implementer. Never
 silently waive a required check.
+
+The reviewer audits the mutation survivor record against the diff and, where
+readable, against the `missed.txt` and `timeout.txt` in the recorded output
+path. A missing survivor list, or a `#[mutants::skip]` or `exclude_re` without
+justification, is a waived check and P1. An unresolved survivor is P2. A
+survivor "killed" by editing production code rather than a test is a finding at
+the severity of the behavior change it made.
 
 Every feature closed after T10.F10 stores a benchmark report and completes the
 spec's Performance and Goal Impact section. A severe compute regression without
@@ -150,6 +180,16 @@ Research date 2026-09-04, Claude Code 2.1.260.
   observable end states. [Goal](https://code.claude.com/docs/en/goal).
 - Worktree creation, entry, isolation enforcement, and removal are Claude Code
   primitives. [Worktrees](https://code.claude.com/docs/en/worktrees).
+- The three deterministic quality checks added on 2026-09-04: cargo-mutants is
+  the only maintained Rust mutation tool, is absent from aqua's standard
+  registry and ships no arm64 macOS binary, so `aqua-registry.yaml` builds it
+  with `cargo install --locked` under `aqua-policy.yaml`. A feature diff yields
+  tens to a few hundred mutants at roughly 25 seconds each for v3-cli and
+  longer for v3-core at two jobs, so the run is diff-scoped and one-shot.
+  Mutation score is a weak signal that agents game, so the check is survivor
+  triage. PostToolUse hooks cannot block, so the compile hook reports (exit 2)
+  rather than gates. proptest covers pure invariants where example tests only
+  pin one case.
 
 Rejected: agent teams (experimental; a named subagent becomes a teammate, which
 breaks resuming the same implementer); dynamic workflows (built for large
