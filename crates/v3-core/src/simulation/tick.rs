@@ -7,7 +7,7 @@ use rayon::prelude::*;
 
 use crate::config::{EnergyConfig, OrdinaryFoodTypeId};
 use crate::contracts::{CreatureId, Direction, Position, WorldAction};
-use crate::creature::action_log::{ActionLogEntry, ActionResult, ActionType};
+use crate::creature::action_log::{ActionLogEntry, ActionResult, ActionType, NO_DIRECTION};
 use crate::creature::genome::BackendDef;
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
@@ -47,9 +47,6 @@ use self::helpers::{remove_creature_from_sim, remove_creature_if_dead};
 #[cfg(test)]
 #[path = "tick/tests/mod.rs"]
 mod tests;
-
-/// Direction byte recorded for actions that carry no direction parameter.
-const NO_DIRECTION: u8 = 255;
 
 fn classify_move_blocked_cause(
     world: &WorldState,
@@ -461,35 +458,33 @@ fn debit_failed_action(creature: &mut CreatureState, energy: &EnergyConfig, pena
 }
 
 /// Barrier-awareness telemetry captured before a move or reproduce attempt.
+///
+/// `position` is `None` when the creature is already gone, in which case the
+/// remaining fields carry the neutral "no barrier awareness" values.
 #[derive(Clone, Copy)]
 struct BarrierContext {
+    position: Option<Position>,
     has_barrier_neighbor: bool,
     reader_state: BarrierReaderState,
     has_alternative_target: bool,
 }
 
 impl BarrierContext {
-    fn for_creature(sim: &Simulation, id: CreatureId) -> (Self, Option<Position>) {
-        sim.creatures
-            .get(id)
-            .map_or((Self::absent(), None), |creature| {
-                let position = creature.position;
-                (
-                    Self {
-                        has_barrier_neighbor: has_neighbor_barrier(&sim.world, position),
-                        reader_state: barrier_reader_state_for_creature(creature),
-                        has_alternative_target: has_any_valid_adjacent_target(&sim.world, position),
-                    },
-                    Some(position),
-                )
-            })
-    }
-
-    fn absent() -> Self {
+    fn for_creature(sim: &Simulation, id: CreatureId) -> Self {
+        let Some(creature) = sim.creatures.get(id) else {
+            return Self {
+                position: None,
+                has_barrier_neighbor: false,
+                reader_state: BarrierReaderState::NoBarrierReader,
+                has_alternative_target: false,
+            };
+        };
+        let position = creature.position;
         Self {
-            has_barrier_neighbor: false,
-            reader_state: BarrierReaderState::NoBarrierReader,
-            has_alternative_target: false,
+            position: Some(position),
+            has_barrier_neighbor: has_neighbor_barrier(&sim.world, position),
+            reader_state: barrier_reader_state_for_creature(creature),
+            has_alternative_target: has_any_valid_adjacent_target(&sim.world, position),
         }
     }
 }
@@ -553,7 +548,7 @@ fn execute_move(
 ) {
     let mut action_result = ActionResult::Success;
     let mut blocked_cause = None;
-    let (barrier, _) = BarrierContext::for_creature(sim, ctx.id);
+    let barrier = BarrierContext::for_creature(sim, ctx.id);
     if barrier.has_barrier_neighbor {
         *sim.stats
             .move_attempts_with_barrier_neighbor_total_by_reader_state
@@ -611,8 +606,10 @@ fn execute_reproduce(
     reproduce_rng: &mut SmallRng,
     successful_spawn_targets: &mut HashSet<Position>,
 ) {
-    let (barrier, position) = BarrierContext::for_creature(sim, ctx.id);
-    let reproduction_target = position.and_then(|pos| sim.world.resolve_neighbor(pos, direction));
+    let barrier = BarrierContext::for_creature(sim, ctx.id);
+    let reproduction_target = barrier
+        .position
+        .and_then(|pos| sim.world.resolve_neighbor(pos, direction));
     if barrier.has_barrier_neighbor {
         *sim.stats
             .reproduction_attempts_with_barrier_neighbor_total_by_reader_state
