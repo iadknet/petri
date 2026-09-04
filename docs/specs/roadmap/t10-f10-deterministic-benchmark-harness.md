@@ -185,9 +185,12 @@ own report and every delta is zero — confirmed: the gate report's own
 delta 0.000000` and `level ok` for every counter.
 
 Gate profile `per_creature_tick` (2026-09-04, `git_revision`
-`47ede8ede4d95531924b2f9e390043cd303aa767`, release build, host
-Isaacs-MacBook-Pro-2.local / macOS / aarch64 / Apple M1 Pro / 8 logical
-cores):
+`c06c4bd415b28809d46a5a0eb6b4cad7c3c82e1d` — the commit that introduced this
+harness; the report was regenerated once at that commit so `git_revision`
+identifies code where `v3-cli bench` actually exists, per the note above that
+the closing commit's hash cannot appear inside `deterministic` itself —
+release build, host Isaacs-MacBook-Pro-2.local / macOS / aarch64 / Apple M1
+Pro / 8 logical cores):
 
 | Counter | Value |
 | --- | --- |
