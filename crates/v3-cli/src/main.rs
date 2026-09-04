@@ -45,8 +45,10 @@ struct BenchArgs {
     seeds: Option<String>,
     #[arg(long)]
     ticks: Option<u64>,
-    #[arg(long, default_value = "1.0")]
-    food_coverage: f32,
+    /// Force this initial coverage onto every food type. Omit it to keep the
+    /// production per-food-type defaults. Sweep-only.
+    #[arg(long)]
+    food_coverage: Option<f32>,
 }
 
 #[derive(clap::Args)]
@@ -112,50 +114,52 @@ fn main() {
     }
 }
 
-fn run_bench(args: BenchArgs) {
-    let (params, feature) = match args.profile {
+/// Resolve the benchmark profile and feature name from the parsed arguments.
+/// Returns the error message `run_bench` prints, so the argument rules are
+/// unit-testable without spawning the binary.
+fn resolve_bench_profile(args: &BenchArgs) -> Result<(ProfileParams, String), String> {
+    match args.profile {
         BenchProfile::Gate => {
-            let feature = match args.feature {
-                Some(f) => f,
-                None => {
-                    eprintln!("error: --feature is required for --profile gate");
-                    std::process::exit(1);
-                }
-            };
-            (bench::gate_profile_params(), feature)
+            // clap cannot express "forbidden when --profile gate", and
+            // silently ignoring the flag would misreport the profile the
+            // gate report was generated with.
+            if args.food_coverage.is_some() {
+                return Err(
+                    "--food-coverage is not accepted for --profile gate; the gate profile's \
+                     food coverage is predeclared"
+                        .to_string(),
+                );
+            }
+            let feature = args
+                .feature
+                .clone()
+                .ok_or("--feature is required for --profile gate")?;
+            Ok((bench::gate_profile_params(), feature))
         }
         BenchProfile::Sweep => {
-            let width = args.width.unwrap_or_else(|| {
-                eprintln!("error: --width is required for --profile sweep");
-                std::process::exit(1);
-            });
-            let height = args.height.unwrap_or_else(|| {
-                eprintln!("error: --height is required for --profile sweep");
-                std::process::exit(1);
-            });
-            let founders = args.founders.unwrap_or_else(|| {
-                eprintln!("error: --founders is required for --profile sweep");
-                std::process::exit(1);
-            });
-            let ticks = args.ticks.unwrap_or_else(|| {
-                eprintln!("error: --ticks is required for --profile sweep");
-                std::process::exit(1);
-            });
-            let seeds_arg = args.seeds.clone().unwrap_or_else(|| {
-                eprintln!("error: --seeds is required for --profile sweep");
-                std::process::exit(1);
-            });
-            let seeds: Vec<u64> = match seeds_arg
+            let width = args
+                .width
+                .ok_or("--width is required for --profile sweep")?;
+            let height = args
+                .height
+                .ok_or("--height is required for --profile sweep")?;
+            let founders = args
+                .founders
+                .ok_or("--founders is required for --profile sweep")?;
+            let ticks = args
+                .ticks
+                .ok_or("--ticks is required for --profile sweep")?;
+            let seeds_arg = args
+                .seeds
+                .as_deref()
+                .ok_or("--seeds is required for --profile sweep")?;
+            let seeds: Vec<u64> = seeds_arg
                 .split(',')
                 .map(|s| s.trim().parse::<u64>())
                 .collect::<Result<Vec<_>, _>>()
-            {
-                Ok(s) if !s.is_empty() => s,
-                _ => {
-                    eprintln!("error: --seeds must be a non-empty comma-separated list of u64");
-                    std::process::exit(1);
-                }
-            };
+                .ok()
+                .filter(|s| !s.is_empty())
+                .ok_or("--seeds must be a non-empty comma-separated list of u64")?;
             let params = ProfileParams {
                 name: "sweep".to_string(),
                 width,
@@ -165,8 +169,18 @@ fn run_bench(args: BenchArgs) {
                 ticks,
                 food_coverage: args.food_coverage,
             };
-            let feature = args.feature.unwrap_or_else(|| "sweep".to_string());
-            (params, feature)
+            let feature = args.feature.clone().unwrap_or_else(|| "sweep".to_string());
+            Ok((params, feature))
+        }
+    }
+}
+
+fn run_bench(args: BenchArgs) {
+    let (params, feature) = match resolve_bench_profile(&args) {
+        Ok(resolved) => resolved,
+        Err(message) => {
+            eprintln!("error: {message}");
+            std::process::exit(1);
         }
     };
 
@@ -237,5 +251,125 @@ fn run_bench(args: BenchArgs) {
     if severe {
         eprintln!("error: severe work-counter regression against a stored reference");
         std::process::exit(3);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn bench_args(profile: BenchProfile) -> BenchArgs {
+        BenchArgs {
+            profile,
+            out: None,
+            feature: Some("t01-f11-baseline-persistence-characterization".to_string()),
+            compare: Vec::new(),
+            baseline: Vec::new(),
+            width: None,
+            height: None,
+            founders: None,
+            seeds: None,
+            ticks: None,
+            food_coverage: None,
+        }
+    }
+
+    fn parse_bench(argv: &[&str]) -> BenchArgs {
+        match Cli::try_parse_from(argv)
+            .expect("arguments must parse")
+            .command
+        {
+            Commands::Bench(args) => args,
+            Commands::Run(_) => panic!("expected the bench subcommand"),
+        }
+    }
+
+    #[test]
+    fn omitted_food_coverage_parses_as_none() {
+        let args = parse_bench(&[
+            "v3-cli",
+            "bench",
+            "--profile",
+            "sweep",
+            "--width",
+            "128",
+            "--height",
+            "128",
+            "--founders",
+            "64",
+            "--seeds",
+            "11,22,33",
+            "--ticks",
+            "2000",
+        ]);
+        assert_eq!(args.food_coverage, None);
+
+        let (params, _) = resolve_bench_profile(&args).expect("sweep arguments are complete");
+        assert_eq!(params.food_coverage, None);
+        assert_eq!(params.seeds, vec![11, 22, 33]);
+    }
+
+    #[test]
+    fn explicit_food_coverage_is_forwarded_to_the_sweep_profile() {
+        let args = BenchArgs {
+            width: Some(32),
+            height: Some(32),
+            founders: Some(8),
+            seeds: Some("1".to_string()),
+            ticks: Some(30),
+            food_coverage: Some(0.5),
+            ..bench_args(BenchProfile::Sweep)
+        };
+
+        let (params, feature) = resolve_bench_profile(&args).expect("sweep arguments are complete");
+        assert_eq!(params.food_coverage, Some(0.5));
+        assert_eq!(feature, "t01-f11-baseline-persistence-characterization");
+    }
+
+    #[test]
+    fn food_coverage_is_rejected_for_the_gate_profile() {
+        let args = BenchArgs {
+            food_coverage: Some(0.5),
+            ..bench_args(BenchProfile::Gate)
+        };
+
+        let error = resolve_bench_profile(&args)
+            .expect_err("the gate profile's food coverage is predeclared");
+        assert!(
+            error.contains("--food-coverage is not accepted for --profile gate"),
+            "unexpected error: {error}"
+        );
+    }
+
+    #[test]
+    fn the_gate_profile_still_resolves_without_food_coverage() {
+        let (params, feature) = resolve_bench_profile(&bench_args(BenchProfile::Gate))
+            .expect("the gate profile needs only --feature");
+
+        assert_eq!(params, bench::gate_profile_params());
+        assert_eq!(feature, "t01-f11-baseline-persistence-characterization");
+    }
+
+    #[test]
+    fn a_missing_sweep_argument_is_an_error_rather_than_a_default() {
+        let args = bench_args(BenchProfile::Sweep);
+
+        let error = resolve_bench_profile(&args).expect_err("--width is required");
+        assert!(error.contains("--width"), "unexpected error: {error}");
+    }
+
+    #[test]
+    fn an_unparsable_seed_list_is_rejected() {
+        let args = BenchArgs {
+            width: Some(32),
+            height: Some(32),
+            founders: Some(8),
+            seeds: Some("11,not-a-seed".to_string()),
+            ticks: Some(30),
+            ..bench_args(BenchProfile::Sweep)
+        };
+
+        let error = resolve_bench_profile(&args).expect_err("seeds must parse as u64");
+        assert!(error.contains("--seeds"), "unexpected error: {error}");
     }
 }

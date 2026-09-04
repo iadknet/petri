@@ -40,9 +40,24 @@ fn tiny_report() -> bench::Report {
         founders: 4,
         seeds: vec![1],
         ticks: 3,
-        food_coverage: 1.0,
+        food_coverage: Some(1.0),
     };
     bench::build_report(&params, "t10-f10-synthetic-check")
+}
+
+/// The tiny sweep profile used by the T01.F11 persistence-field tests: small
+/// enough to run twice in a debug build, long enough to exercise the
+/// accumulator against a real simulation at production food coverage.
+fn tiny_sweep_params() -> bench::ProfileParams {
+    bench::ProfileParams {
+        name: "sweep".to_string(),
+        width: 32,
+        height: 32,
+        founders: 8,
+        seeds: vec![11],
+        ticks: 30,
+        food_coverage: None,
+    }
 }
 
 /// The gate profile's `deterministic` block is byte-identical across two
@@ -256,6 +271,102 @@ fn compare_against_path_errors_on_profile_mismatch() {
     let _ = std::fs::remove_file(&scratch_path);
 
     let err = result.expect_err("a profile mismatch must be a hard error, not a silent skip");
+    assert!(
+        err.contains("different profile"),
+        "error message should explain the profile mismatch, got: {err}"
+    );
+}
+
+/// A sweep at production food coverage populates every T01.F11 persistence
+/// field, and the whole `deterministic` block — samples included — is
+/// byte-identical across two runs.
+#[test]
+fn tiny_sweep_records_persistence_fields_identically_across_two_runs() {
+    let params = tiny_sweep_params();
+
+    let report_a = bench::build_report(&params, "t01-f11-persistence-check");
+    let report_b = bench::build_report(&params, "t01-f11-persistence-check");
+
+    assert_eq!(
+        report_a.deterministic.profile.food_coverage, "default",
+        "a sweep without --food-coverage records production coverage as `default`"
+    );
+
+    let seeds = &report_a
+        .deterministic
+        .goal_indicators
+        .population_persistence
+        .per_seed;
+    assert_eq!(seeds.len(), 1);
+    let seed = &seeds[0];
+    assert!(
+        seed.peak_population >= params.founders.into(),
+        "the peak must include the founder population, got {}",
+        seed.peak_population
+    );
+    assert!(seed.peak_tick <= params.ticks);
+    let last = seed
+        .samples
+        .last()
+        .expect("the last executed tick is always sampled");
+    assert_eq!(
+        last.tick,
+        seed.extinction_tick.unwrap_or(params.ticks),
+        "the final sample is the last executed tick"
+    );
+    assert_eq!(last.population, seed.final_population);
+    assert_eq!(last.mean_energy, seed.mean_energy);
+    assert_eq!(
+        seed.mean_energy.is_none(),
+        seed.final_population == 0,
+        "mean energy is null exactly when the population is zero"
+    );
+    assert_eq!(
+        seed.plateau_population.is_none(),
+        seed.extinction_tick
+            .is_some_and(|tick| tick * 4 <= params.ticks * 3),
+        "the plateau is null exactly when the run ended before its window"
+    );
+
+    assert_eq!(
+        bench::deterministic_block_json(&report_a),
+        bench::deterministic_block_json(&report_b),
+        "the persistence fields must be byte-identical across two runs"
+    );
+}
+
+/// A profile that leaves production food coverage in place round-trips its
+/// `default` coverage string through the profile-mismatch comparison: it
+/// matches itself and is rejected against an otherwise identical profile that
+/// forced a numeric coverage.
+#[test]
+fn default_food_coverage_round_trips_through_the_profile_comparison() {
+    let current = bench::build_report(&tiny_sweep_params(), "t01-f11-default-coverage-check");
+    let forced = bench::build_report(
+        &bench::ProfileParams {
+            food_coverage: Some(1.0),
+            ..tiny_sweep_params()
+        },
+        "t01-f11-forced-coverage-check",
+    );
+
+    let scratch_path = std::env::temp_dir().join(format!(
+        "t01-f11-bench-default-coverage-{}.json",
+        std::process::id()
+    ));
+
+    std::fs::write(&scratch_path, bench::report_json_pretty(&current))
+        .expect("failed to write scratch reference report");
+    let same = bench::compare_against_path(&current, &scratch_path);
+
+    std::fs::write(&scratch_path, bench::report_json_pretty(&forced))
+        .expect("failed to write scratch reference report");
+    let different = bench::compare_against_path(&current, &scratch_path);
+
+    let _ = std::fs::remove_file(&scratch_path);
+
+    same.expect("a `default` coverage profile must match itself after a JSON round-trip");
+    let err = different.expect_err("`default` and `1.000000` are different profiles");
     assert!(
         err.contains("different profile"),
         "error message should explain the profile mismatch, got: {err}"
