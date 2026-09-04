@@ -1,6 +1,6 @@
 # T10.F09 — Throughput Baseline and Profiling Budget
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-04
 **Feature**: T10.F09
 **Track**: [T10 — Evolutionary Scale and Experiment Infrastructure](../../roadmaps/t10-evolutionary-scale-and-experiment-infrastructure.md)
@@ -114,9 +114,10 @@ core-parallelism feature must precede any campaign.
   1600² world (the top of the T01.F11 horizon range), extrapolated linearly
   from the one-thread 2,000-tick sweep's slowest seed. A core-parallelism
   feature is required before any campaign if and only if `T` exceeds eight
-  hours, an overnight run. If required, add the row `T10.F11 — Sequential
-  Tick-Phase Parallelism — Depends on: T10.F09` to the T10 track, make
-  T10.F07 depend on it, and write no code for it here. Independently of that
+  hours, an overnight run. If required, add a row `Sequential Tick-Phase
+  Parallelism — Depends on: T10.F09` to the T10 track under the next free ID
+  (T10.F12, since T10.F11 was assigned to reproducibility on 2026-09-04),
+  make T10.F07 depend on it, and write no code for it here. Independently of that
   outcome, record for T10.F04 which of `8 / c` and `S` is larger: it decides
   whether campaigns run one replicate per core on one thread or replicates
   in sequence on all cores.
@@ -182,8 +183,8 @@ core-parallelism feature must precede any campaign.
       and eight-thread 1600² ticks per second and stating that Phase 1b
       already runs on the rayon global pool while every other phase is
       sequential, and append one sentence of T10.F04 guidance from the
-      decision. If the rule requires parallelism, add the T10.F11 row and
-      the T10.F07 dependency. In `docs/roadmap.md` replace the "about 3 ticks
+      decision. If the rule requires parallelism, add the parallelism row
+      under the next free ID and the T10.F07 dependency. In `docs/roadmap.md` replace the "about 3 ticks
       per second single-threaded (2026-09-03; T10.F09 owns re-measuring it)"
       sentence with the measured one-thread and eight-thread 1600² figures
       citing `docs/progress/sweeps/t10-f09/`. Leave the T10 track success
@@ -284,7 +285,9 @@ baseline is not re-pinned.
 
 Stored at
 `docs/progress/features/t10-f09-throughput-baseline-and-profiling-budget.json`,
-generated 2026-09-04 on the recording host at the closing code commit and
+generated 2026-09-04 on the recording host at `f7c4fcf5` (a documentation
+commit; production code under `crates/` is identical at `f78486b2`,
+`f7c4fcf5`, and the closing commit, as the Verification preamble records) and
 appended to `closed` in `docs/progress/benchmark-series.json`. Both reference
 comparisons are `severe=false`, and every work counter's per-creature-tick
 delta is exactly as predeclared:
@@ -444,7 +447,9 @@ wait
   (9 minutes 29 seconds).
 - Rule: a core-parallelism feature is required if and only if `T` exceeds
   eight hours. `T` is 0.158 hours, so **core parallelism is not required
-  before a campaign** and no `T10.F11` row is added.
+  before a campaign** and no parallelism row is added. The T10.F11 ID was
+  assigned to reproducibility on 2026-09-04; a parallelism feature, if ever
+  required, takes the next free ID.
 - For T10.F04: `S` (1.106) is larger than `8 / c` (0.867), so campaigns on
   this host should run replicates **in sequence on all cores**, not one
   replicate per core. The margin is small and the mechanism is clear —
@@ -515,8 +520,10 @@ run, as this feature's own gate report shows.
 - [x] The tick profile is recorded: phase shares at one and eight threads for
       every sweep point and the ten heaviest sampled frames.
 - [x] The parallelism decision is recorded with `S`, `c`, and `T`, and the
-      T10 track carries the T10.F11 row exactly when the rule requires it:
-      `T` = 0.158 hours does not exceed eight hours, so no row is added.
+      T10 track carries a parallelism row exactly when the rule requires it:
+      `T` = 0.158 hours does not exceed eight hours, so no parallelism row is
+      added (the T10.F11 ID the rule originally named now belongs to
+      reproducibility).
 - [x] Every work counter's per-creature-tick delta in the gate report is 0
       percent against both references, except a counter that is zero in both
       runs, which reports a `null` delta at level `ok`.
@@ -574,3 +581,34 @@ run, as this feature's own gate report shows.
 - The concurrency probe's `c` is host-bound: 8 copies × 1.157 GB against 16 GB
   of RAM, on 6 performance plus 2 efficiency cores. Re-measure it, not just
   reuse the number, on any other machine or with a smaller world.
+- Deferred review findings (recorded 2026-09-04, advisory, not fixed here):
+  (1) `--threads` is parsed as `Option<usize>` and checked for zero by hand
+  where clap could take `Option<NonZeroUsize>`; the predeclared unit test pins
+  the current error string, so revisiting it means loosening
+  `bench_subcommand_writes_a_report_and_rejects_zero_threads`. (2) Adding a
+  sixth timed phase touches `PhaseWallClock`, two lines of `run_tick`,
+  `SeedPhaseWallClock` and its mapping in `bench.rs`, the `phases()` helper in
+  `phase_timing.rs`, and one sum in the thread-independence test; the
+  smallest refactor when a phase is added is a `PhaseWallClock` accessor that
+  yields the phases in order for the mapping and both tests. (3) The
+  thread-independence test in `crates/v3-cli/tests/bench.rs` asserts
+  byte-identical `deterministic` blocks for two in-process 32², 30-tick runs
+  and shares the T10.F10 determinism test's exposure to the pre-existing
+  nondeterminism if those operators are ever reached at that size; T10.F11
+  owns it. (4) TDD ordering cannot be confirmed from history because code
+  and tests landed in one commit. (5) The scratch reports behind the "code at
+  `5421b17e`" reproduction carry `git_revision f78486b2` because the harness
+  records the checked-out revision at run time, not the compiled one; the
+  orchestrator's own two-process reproduction at `f5fef9a5` is the
+  independent confirmation.
+- Per-feature cost record (closed 2026-09-04 through the Fable 5.1
+  orchestrator, Opus 5 implementer with a Fable advisor, and Fable 5.1
+  reviewer): implementer self-reported advisor consults 3 (before the
+  approach, on the determinism divergence, before reporting done); reviewer
+  findings 0 P1, 1 P2, 6 P3; the P2 (spec passages naming the parallelism
+  row `T10.F11` after that ID went to reproducibility) and two document P3s
+  were fixed by the orchestrator in the closing commit, with no implementer
+  remediation pass. Implementer subagent usage about 307k tokens over one
+  run of 225 tool uses and 87 minutes, dominated by the eight sweeps and the
+  one-thread probe; reviewer about 130k tokens over 48 tool uses. Session
+  `/usage` totals were not collected at closure.
