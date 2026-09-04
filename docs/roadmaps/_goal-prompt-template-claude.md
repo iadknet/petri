@@ -6,7 +6,7 @@ in the first section, preserve the contract below, and keep every document and
 status truthful. This variant uses the **orchestrator strategy with advisor**
 from Anthropic's model-routing guidance: a Fable 5.1 session orchestrates
 (planning, review adjudication, integration), Opus `roadmap-implementer`
-subagents execute with a Fable advisor attached, and a read-only Opus
+subagents execute with a Fable advisor attached, and a read-only Fable
 `roadmap-reviewer` subagent reviews each final diff from a fresh context. Agent
 definitions live in `.claude/agents/`; the advisor and worktree-base settings
 live in `.claude/settings.json`; the design rationale is
@@ -69,7 +69,7 @@ planned, and keep an unchecked feature unchecked until its complete spec exists.
   ID, the spec path, and the specific change requested. Its report includes how
   often it consulted the advisor; keep that number for the cost record.
 - Reviewer: delegate the final diff review to the `roadmap-reviewer` subagent
-  (Opus, high effort, read-only, fresh context). Give it the implementer
+  (Fable, high effort, read-only, fresh context). Give it the implementer
   worktree path, the feature ID, and the spec path. It reports findings; you
   decide which are P1. Its brief includes a maintainability lens; treat a
   maintainability P2 on code a later feature will extend as worth one
