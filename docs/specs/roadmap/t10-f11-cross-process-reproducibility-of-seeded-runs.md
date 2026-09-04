@@ -1,6 +1,6 @@
 # T10.F11 — Cross-Process Reproducibility of Seeded Runs
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-04
 **Feature**: T10.F11
 **Track**: [T10 — Evolutionary Scale and Experiment Infrastructure](../../roadmaps/t10-evolutionary-scale-and-experiment-infrastructure.md)
@@ -426,3 +426,23 @@ are identical to the references, and every other indicator remains
   hash order and trims it randomly, so `generate_pattern_seeded` is not
   reproducible across processes. It serves only the `v3-server` pattern
   endpoint; the first feature that seeds barriers from patterns owns the fix.
+- Review 2026-09-04 (roadmap-reviewer, fresh context): 0 P1, 0 P2, 4 P3.
+  Three P3s (the audit table under-counting its own grep, the master
+  roadmap's rounded 1600² peak range, a redundant future-tense clause in the
+  T10 determinism bullet) were fixed in the one remediation pass at
+  `08e0569a`. Deferred review finding, P3:
+  `crates/v3-core/tests/reproducibility.rs` fingerprints a projection
+  (position, energy, reserve, age, generation, genome) and a hand-listed set
+  of six work counters rather than a full serialization, so a feature that
+  adds a work counter or per-creature runtime state must extend the test or
+  the new field goes unchecked; the first such feature (T01.F13 activity
+  statistics is the likely one) owns switching the comparison to a
+  `serde_json` serialization of `sim.stats` and each creature.
+- Orchestration deviation: the `SendMessage` tool was absent from the
+  orchestrator's session, so the remediation pass ran on a second
+  implementer with a tight brief instead of continuing the first; both
+  agents' reports are in the goal transcript.
+- Cost record at closure: `/usage` totals not collected (autonomous session;
+  `/usage` is a user command). Implementer advisor consults: 2 in the
+  implementation pass, 2 in the remediation pass. Reviewer findings: P1 0,
+  P2 0, P3 4.
