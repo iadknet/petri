@@ -15,6 +15,22 @@ pub enum ActionType {
     StealEnergy = 4,
 }
 
+impl ActionType {
+    /// Stable diagnostics key for this action type.
+    ///
+    /// Matches the variant name emitted by the derived `Serialize` impl.
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::NoOp => "NoOp",
+            Self::Eat => "Eat",
+            Self::Move => "Move",
+            Self::Reproduce => "Reproduce",
+            Self::StealEnergy => "StealEnergy",
+        }
+    }
+}
+
 /// Number of meaningful action type discriminants (NoOp..StealEnergy).
 pub const ACTION_TYPE_COUNT: u8 = 5;
 const _: () = assert!(ActionType::StealEnergy as u8 + 1 == ACTION_TYPE_COUNT);
@@ -34,6 +50,27 @@ pub enum ActionResult {
     NoVictim = 7,
     AgeConstraints = 8,
     NutritionConstraints = 9,
+}
+
+impl ActionResult {
+    /// Stable diagnostics key for this action result.
+    ///
+    /// Matches the variant name emitted by the derived `Serialize` impl.
+    #[must_use]
+    pub const fn as_key(self) -> &'static str {
+        match self {
+            Self::Success => "Success",
+            Self::NoFood => "NoFood",
+            Self::Blocked => "Blocked",
+            Self::InvalidTarget => "InvalidTarget",
+            Self::EnergyConstraints => "EnergyConstraints",
+            Self::PopulationCap => "PopulationCap",
+            Self::TransferredAndKilled => "TransferredAndKilled",
+            Self::NoVictim => "NoVictim",
+            Self::AgeConstraints => "AgeConstraints",
+            Self::NutritionConstraints => "NutritionConstraints",
+        }
+    }
 }
 
 /// Single action record in a creature's action log.
@@ -212,5 +249,42 @@ mod tests {
         let mut log = ActionLog::new(8);
         log.push(entry);
         assert_eq!(log.entries()[0].result, ActionResult::AgeConstraints);
+    }
+
+    #[test]
+    fn action_type_as_key_matches_serialized_variant_name() {
+        for action_type in [
+            ActionType::NoOp,
+            ActionType::Eat,
+            ActionType::Move,
+            ActionType::Reproduce,
+            ActionType::StealEnergy,
+        ] {
+            assert_eq!(
+                serde_json::to_value(action_type).expect("serializes"),
+                serde_json::Value::String(action_type.as_key().to_string()),
+            );
+        }
+    }
+
+    #[test]
+    fn action_result_as_key_matches_serialized_variant_name() {
+        for result in [
+            ActionResult::Success,
+            ActionResult::NoFood,
+            ActionResult::Blocked,
+            ActionResult::InvalidTarget,
+            ActionResult::EnergyConstraints,
+            ActionResult::PopulationCap,
+            ActionResult::TransferredAndKilled,
+            ActionResult::NoVictim,
+            ActionResult::AgeConstraints,
+            ActionResult::NutritionConstraints,
+        ] {
+            assert_eq!(
+                serde_json::to_value(result).expect("serializes"),
+                serde_json::Value::String(result.as_key().to_string()),
+            );
+        }
     }
 }
