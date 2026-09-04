@@ -21,7 +21,8 @@
 //! exercised from the first birth onward.
 
 use v3_core::config::SimulationConfig;
-use v3_core::creature::genome::{BackendDef, VmInstruction};
+use v3_core::contracts::Position;
+use v3_core::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
 use v3_core::mutation::MutationOperator;
 use v3_core::simulation::{run_tick, seed_simulation, Simulation};
 
@@ -49,23 +50,22 @@ fn reproducibility_config() -> SimulationConfig {
 fn run(seed: u64) -> Simulation {
     let mut sim = seed_simulation(reproducibility_config(), seed);
     for (_, creature) in sim.creatures.iter_mut() {
-        let Some(node) = creature
+        let vm = creature
             .genome
             .nodes
             .iter_mut()
-            .find(|n| matches!(n.backend_def, BackendDef::Vm(_)))
-        else {
-            continue;
-        };
-        if let BackendDef::Vm(ref mut vm) = node.backend_def {
-            vm.program
-                .extend(INJECTED_PAIRED_SLOTS.into_iter().flat_map(|slot_idx| {
-                    [
-                        VmInstruction::LoadSlotImm { dst: 0, slot_idx },
-                        VmInstruction::StoreSlotImm { slot_idx, src: 0 },
-                    ]
-                }));
-        }
+            .find_map(|n| match n.backend_def {
+                BackendDef::Vm(ref mut vm) => Some(vm),
+                BackendDef::Graph(_) => None,
+            })
+            .expect("every founder genome has a VM node");
+        vm.program
+            .extend(INJECTED_PAIRED_SLOTS.into_iter().flat_map(|slot_idx| {
+                [
+                    VmInstruction::LoadSlotImm { dst: 0, slot_idx },
+                    VmInstruction::StoreSlotImm { slot_idx, src: 0 },
+                ]
+            }));
     }
     for _ in 0..TICKS {
         run_tick(&mut sim, &mut None);
@@ -73,20 +73,22 @@ fn run(seed: u64) -> Simulation {
     sim
 }
 
-/// One line per creature, in `SlotMap` order: position, energy and reserve as
-/// raw bits, age, generation, and the serialized genome.
-fn population_fingerprint(sim: &Simulation) -> Vec<String> {
+/// One entry per creature, in `SlotMap` order: position, energy and reserve as
+/// raw bits, age, generation, and the genome, compared by the genome's derived
+/// `PartialEq`. Floats go through `to_bits`, so equality is bit-for-bit.
+type CreatureFingerprint<'a> = (Position, u32, u32, u64, u64, &'a CreatureGenome);
+
+fn population_fingerprint(sim: &Simulation) -> Vec<CreatureFingerprint<'_>> {
     sim.creatures
         .values()
         .map(|c| {
-            format!(
-                "{:?} e={:08x} r={:08x} age={} gen={} {}",
+            (
                 c.position,
                 c.energy.to_bits(),
                 c.reproductive_reserve.to_bits(),
                 c.age,
                 c.generation,
-                serde_json::to_string(&c.genome).expect("genome serializes"),
+                &c.genome,
             )
         })
         .collect()
