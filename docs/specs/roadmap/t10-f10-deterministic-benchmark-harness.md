@@ -376,3 +376,11 @@ yet.
   ignores it — the gate profile always uses its own predeclared 1.0 coverage
   regardless of the flag. A future pass should either reject
   `--food-coverage` for `--profile gate` or document the override explicitly.
+- Per-feature cost record (closed 2026-09-03 through the Fable orchestrator,
+  Sonnet implementer with Opus advisor, and Opus reviewer): implementer
+  self-reported advisor consults 4 (3 in the first pass, 1 in remediation);
+  reviewer findings 3 P1, 5 P2, 7 P3, all P1 and P2 remediated in one pass;
+  implementer subagent usage about 700k tokens over three runs, one of which
+  was cut short by an API spend limit and resumed; reviewer about 100k
+  tokens. Session `/usage` totals at closure were not captured because
+  `/usage` is a user command; add them here when available.

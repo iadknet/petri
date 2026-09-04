@@ -193,14 +193,15 @@ Research date: 2026-09-03. Claude Code installed: v2.1.259.
     orchestrator records `/usage` totals and the implementer's self-reported
     advisor consult count into that feature's spec Notes for AI Agents.
 - [x] Link this spec from `docs/README.md`.
-- [ ] Run T10.F10 through the finished machinery as ordinary roadmap work under
+- [x] Run T10.F10 through the finished machinery as ordinary roadmap work under
       the rewritten goal prompt. This is the shakeout: record in this spec's
       Notes whether the orchestrator wrote no feature code, the implementer
       consulted the advisor and survived a `SendMessage` remediation pass, the
       gate hook fired on a roadmap document edit, and the reviewer returned
       findings from a fresh context. Record that feature's cost record in its
       own spec. The feature's closure gates are governed by its spec and the
-      goal prompt, not by this document.
+      goal prompt, not by this document. Done 2026-09-03; see "Shakeout
+      results" in Notes.
 
 ## Verification
 
@@ -213,13 +214,21 @@ Research date: 2026-09-03. Claude Code installed: v2.1.259.
       2026-09-03: gate suite 5 tests, 5 pass, 0 fail.
 - [x] `make check` passes before this spec is closed. 2026-09-03: exit 0 with
       the machinery in place, after `npm ci` in `frontend/` for this fresh
-      worktree. Rerun at closure after task 7.
-- [ ] During T10.F10, `git merge-base roadmap/complete <implementer-worktree-HEAD>`
+      worktree. Rerun at closure after task 7: 2026-09-03, exit 0 on
+      `roadmap/complete` at `9dbf3fed` with T10.F10 integrated (1008 core
+      unit tests, 7 bench tests, Clippy, frontend, dependency audit).
+- [x] During T10.F10, `git merge-base roadmap/complete <implementer-worktree-HEAD>`
       equals the `roadmap/complete` tip at spawn time, proving the implementer
-      branched from the integration branch.
+      branched from the integration branch. 2026-09-03: both were
+      `47ede8ed`, checked from the orchestrator session while the implementer
+      was running.
 - [ ] Observed by the user in the agent panel during T10.F10: the session shows
       the advisor notices from the first task, and the implementer's transcript
-      shows an `Advising` line with the Opus model name at least once.
+      shows an `Advising` line with the Opus model name at least once. Partial
+      2026-09-03: the `/advisor opus` output confirmed the not-attached notice
+      for the main model; the implementer self-reported four consults with
+      substantive Opus guidance, but the user has not yet confirmed seeing the
+      `Advising` line in the agent panel.
 - [ ] Benchmark report stored at `docs/progress/features/<id>.json`:
       Not applicable: process change, no simulation cost.
 
@@ -230,11 +239,16 @@ work introduces track orchestration spend, not creature-tick cost.
 
 ## Success Criteria
 
-- [ ] T10.F10 was executed through the Fable orchestrator, Sonnet implementer,
+- [x] T10.F10 was executed through the Fable orchestrator, Sonnet implementer,
       and Opus reviewer, and this spec's Notes record whether each role engaged
-      as designed, independent of whether the feature closed.
+      as designed, independent of whether the feature closed. 2026-09-03: see
+      "Shakeout results" in Notes; the feature closed.
 - [ ] The first executed feature's spec carries a cost record naming usage
-      totals and the implementer's reported advisor consults.
+      totals and the implementer's reported advisor consults. 2026-09-03: the
+      T10.F10 spec records advisor consults, reviewer finding counts, and
+      subagent token usage; session `/usage` totals are still missing because
+      `/usage` is a user command. Remaining: the user pastes `/usage` totals
+      and they are added to that record.
 - [x] The Claude goal-prompt template no longer describes the design as the
       "advisor pattern" and contains no stale routing or base-branch notes.
 
@@ -259,3 +273,38 @@ work introduces track orchestration spend, not creature-tick cost.
 - Unverified assumptions to confirm during the first task: project-scope
   `advisorModel` is honored; plan-mode Bash permits `git diff` for the
   reviewer; feature-flag fetching is not disabled in this environment.
+  Outcome 2026-09-03: project-scope honoring was not isolated because the
+  user also ran `/advisor opus`; plan-mode Bash did permit `git diff` and
+  `git show` for the reviewer; feature flags were evidently fetched, since
+  the implementer reported Opus advisor guidance.
+
+**Shakeout results (T10.F10, 2026-09-03).**
+
+- Orchestrator wrote no feature code: yes. Its only edits were the T10.F10
+  flat spec, this spec, and the merge onto `roadmap/complete`.
+- Implementer consulted the advisor and survived `SendMessage` continuation:
+  yes. Four self-reported consults; the first caught a gate horizon that
+  was 2.5 times over the test-time budget before any artifact existed, the
+  second caught an unreachable comparison level and unevidenced checked
+  boxes, the third caught a report `git_revision` naming a commit without the
+  harness. The same agent was resumed twice: once after an API spend-limit
+  interruption mid-implementation, once for the post-review remediation
+  pass. Context survived both.
+- Gate hook fired on roadmap edits: yes. The implementer's transcript
+  references `implementer-gate` seven times across its three runs, and no
+  stop was allowed while `make roadmap-check` failed.
+- Reviewer returned findings from a fresh context: yes. 3 P1 (all
+  untruthful statements in the spec's Performance section), 5 P2, 7 P3, with
+  file and line for each. The orchestrator adjudicated the P1 and P2 findings
+  into one remediation pass and deferred the P3 findings into the feature
+  spec's Notes.
+- Friction observed: `/goal` and `/usage` are user commands, so the
+  orchestrator asked the user to run them; the auto-mode classifier blocked
+  one Bash call that combined read-only verification with `git merge`, and
+  the merge succeeded when issued alone; a Sonnet monthly spend limit
+  terminated the implementer once and the resume worked without changes.
+- Integration: this session ran in the worktree that originally held the
+  machinery branch and created `roadmap/complete` there with `git switch -c`,
+  so no session restart was needed and `worktree.baseRef: head` still made
+  the implementer branch from the integration tip. The feature branch was
+  fast-forwarded onto `roadmap/complete`.
