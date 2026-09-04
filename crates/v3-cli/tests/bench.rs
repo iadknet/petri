@@ -218,6 +218,107 @@ fn compare_against_reports_severe_wall_clock_without_marking_comparison_severe()
     );
 }
 
+/// The wall-clock thresholds are strict: a synthetic delta of exactly +25
+/// percent is `ok` and exactly +100 percent is `flag`, not the next level up.
+/// The values are assigned, not timed, so no timing is asserted.
+#[test]
+fn wall_clock_levels_are_strict_at_their_thresholds() {
+    // One synthetic report, cloned per case: the comparison reads only the
+    // two wall-clock fields the case assigns.
+    let base = tiny_report();
+    let level_for = |current_ms: f64, reference_ms: f64| {
+        let mut current = base.clone();
+        let mut reference = base.clone();
+        current.environment.wall_clock_ms_per_creature_tick = current_ms;
+        reference.environment.wall_clock_ms_per_creature_tick = reference_ms;
+        let comparison = bench::compare_against(
+            &current,
+            std::path::Path::new("synthetic-ref.json"),
+            &reference,
+        );
+        let wall_clock = comparison
+            .wall_clock
+            .expect("host identity matches, so wall_clock must be populated");
+        assert!(
+            !comparison.severe,
+            "wall-clock never marks a comparison severe"
+        );
+        (wall_clock.level, wall_clock.percent_delta)
+    };
+
+    assert_eq!(level_for(1.0, 1.0), (bench::ComparisonLevel::Ok, 0.0));
+    assert_eq!(level_for(0.5, 1.0), (bench::ComparisonLevel::Ok, -50.0));
+    assert_eq!(
+        level_for(1.25, 1.0),
+        (bench::ComparisonLevel::Ok, 25.0),
+        "exactly +25 percent is inside the flag threshold"
+    );
+    assert_eq!(level_for(1.5, 1.0), (bench::ComparisonLevel::Flag, 50.0));
+    assert_eq!(
+        level_for(2.0, 1.0),
+        (bench::ComparisonLevel::Flag, 100.0),
+        "exactly +100 percent is inside the severe threshold"
+    );
+    assert_eq!(level_for(3.0, 1.0), (bench::ComparisonLevel::Severe, 200.0));
+}
+
+/// The `bench` subcommand is wired end to end: it writes the report the
+/// `--out` path names on the thread count `--threads` asked for, and it
+/// rejects `--threads 0` before running anything.
+#[test]
+fn bench_subcommand_writes_a_report_and_rejects_zero_threads() {
+    let sweep_args = |threads: &str, out: &std::path::Path| {
+        let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_v3-cli"));
+        command.args([
+            "bench",
+            "--profile",
+            "sweep",
+            "--width",
+            "16",
+            "--height",
+            "16",
+            "--founders",
+            "4",
+            "--seeds",
+            "11",
+            "--ticks",
+            "5",
+            "--threads",
+            threads,
+            "--feature",
+            "t10-f09-bench-cli-check",
+            "--out",
+        ]);
+        command.arg(out);
+        command.output().expect("the v3-cli binary must run")
+    };
+
+    let out = std::env::temp_dir().join(format!("t10-f09-bench-cli-{}.json", std::process::id()));
+    let _ = std::fs::remove_file(&out);
+
+    let accepted = sweep_args("1", &out);
+    assert!(
+        accepted.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&accepted.stderr)
+    );
+    let written = std::fs::read_to_string(&out).expect("--out must name a written report");
+    let _ = std::fs::remove_file(&out);
+    let report: bench::Report = serde_json::from_str(&written).expect("the report must parse");
+    assert_eq!(report.environment.threads, Some(1));
+    assert_eq!(report.deterministic.profile.ticks, 5);
+    assert_eq!(report.feature, "t10-f09-bench-cli-check");
+
+    let rejected = sweep_args("0", &out);
+    assert!(!rejected.status.success(), "--threads 0 must be rejected");
+    assert!(
+        String::from_utf8_lossy(&rejected.stderr).contains("--threads must be >= 1"),
+        "stderr: {}",
+        String::from_utf8_lossy(&rejected.stderr)
+    );
+    assert!(!out.exists(), "a rejected argument must not write a report");
+}
+
 /// A counter that was exactly zero in the reference but positive in the
 /// current run has an unbounded (division-by-zero) ratio. It must be
 /// reported as `severe`, not silently `ok` with a null delta — otherwise the

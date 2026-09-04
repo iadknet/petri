@@ -1137,6 +1137,106 @@ mod tests {
         accumulator.finish(7)
     }
 
+    /// `millis` converts to fractional milliseconds. A pure unit conversion,
+    /// not a wall-clock magnitude: the input duration is synthetic.
+    #[test]
+    fn millis_converts_a_duration_to_fractional_milliseconds() {
+        use std::time::Duration;
+
+        assert_eq!(millis(Duration::from_millis(1500)), 1500.0);
+        assert_eq!(millis(Duration::from_micros(1)), 0.001);
+        assert_eq!(millis(Duration::ZERO), 0.0);
+    }
+
+    fn synthetic_timings(seed_wall_clock_ms: &[f64]) -> RunTimings {
+        RunTimings {
+            wall_clock_ms_per_seed: seed_wall_clock_ms
+                .iter()
+                .enumerate()
+                .map(|(index, &wall_clock_ms)| SeedWallClock {
+                    seed: index as u64,
+                    wall_clock_ms,
+                })
+                .collect(),
+            phase_wall_clock_ms_per_seed: Vec::new(),
+            throughput_per_seed: Vec::new(),
+        }
+    }
+
+    /// `build_environment` sums the per-seed wall-clock, divides it by the
+    /// run's creature-ticks, and records the thread count it was given. The
+    /// inputs are synthetic, so this asserts the arithmetic, never a timing.
+    #[test]
+    fn build_environment_derives_the_per_creature_tick_cost_and_throughput() {
+        let totals = Totals {
+            ticks: 200,
+            creature_ticks: 4_000,
+            births: 50,
+            ..Totals::default()
+        };
+
+        let environment = build_environment(synthetic_timings(&[300.0, 500.0]), &totals, 4);
+
+        assert_eq!(environment.wall_clock_ms_total, 800.0);
+        assert_eq!(environment.wall_clock_ms_per_creature_tick, 0.2);
+        assert_eq!(environment.threads, Some(4));
+        assert_eq!(
+            environment.throughput.total,
+            throughput_rates(200, 4_000, 50, 800.0)
+        );
+        assert_eq!(environment.throughput.total.ticks_per_second, 250.0);
+    }
+
+    /// A run with no creature-ticks reports a zero per-creature-tick cost
+    /// rather than dividing by zero.
+    #[test]
+    fn build_environment_reports_zero_cost_when_no_creature_ran() {
+        let environment = build_environment(synthetic_timings(&[12.5]), &Totals::default(), 1);
+
+        assert_eq!(environment.wall_clock_ms_total, 12.5);
+        assert_eq!(environment.wall_clock_ms_per_creature_tick, 0.0);
+    }
+
+    /// Every level's `Display` string is the string it serializes to, which
+    /// is what `run_bench` prints and what the stored reports carry.
+    #[test]
+    fn comparison_level_displays_as_its_serialized_string() {
+        for level in [
+            ComparisonLevel::Ok,
+            ComparisonLevel::Flag,
+            ComparisonLevel::Severe,
+            ComparisonLevel::New,
+        ] {
+            let serialized = serde_json::to_value(level).expect("a level always serializes");
+            assert_eq!(
+                level.to_string(),
+                serialized.as_str().expect("levels serialize as strings")
+            );
+        }
+        assert_eq!(ComparisonLevel::Severe.to_string(), "severe");
+    }
+
+    /// The work-counter thresholds are strict: a delta exactly at 10 percent
+    /// is `ok` and one exactly at 50 percent is `flag`, not the next level up.
+    #[test]
+    fn counter_levels_are_strict_at_their_thresholds() {
+        assert_eq!(counter_level(None), ComparisonLevel::Ok);
+        assert_eq!(counter_level(Some(0.0)), ComparisonLevel::Ok);
+        assert_eq!(counter_level(Some(-80.0)), ComparisonLevel::Ok);
+        assert_eq!(
+            counter_level(percent_delta(11.0, 10.0)),
+            ComparisonLevel::Ok,
+            "exactly +10 percent is inside the flag threshold"
+        );
+        assert_eq!(counter_level(Some(10.5)), ComparisonLevel::Flag);
+        assert_eq!(
+            counter_level(percent_delta(1.5, 1.0)),
+            ComparisonLevel::Flag,
+            "exactly +50 percent is inside the severe threshold"
+        );
+        assert_eq!(counter_level(Some(60.0)), ComparisonLevel::Severe);
+    }
+
     #[test]
     fn peak_records_the_maximum_population_and_the_first_tick_reaching_it() {
         let summary = observe_series(8, 10, &[12, 20, 15, 20, 18, 9, 9, 9], 1.0);
