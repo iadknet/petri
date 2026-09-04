@@ -1,4 +1,4 @@
-use crate::config::OrdinaryFoodTypeId;
+use crate::contracts::OrdinaryFoodTypeId;
 
 /// Identifies a world-state spatial sensor input.
 #[derive(
@@ -135,7 +135,7 @@ pub enum InputReference {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::OrdinaryFoodTypeId;
+    use crate::contracts::OrdinaryFoodTypeId;
 
     #[test]
     fn world_input_keys_constructible() {
