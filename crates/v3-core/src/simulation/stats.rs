@@ -314,6 +314,31 @@ const OUTCOME_SCORE_STD_DEV_FLOOR: f64 = 0.05;
 const OUTCOME_SCORE_Z_THRESHOLD: f64 = 0.25;
 
 impl SimStats {
+    /// Clear the per-tick (`last_tick_*`) counters at the start of a tick.
+    ///
+    /// Cumulative totals and the `*_by_*` breakdown maps are untouched.
+    pub fn reset_tick_counters(&mut self) {
+        self.last_tick_move = 0;
+        self.last_tick_eat = 0;
+        self.last_tick_noop = 0;
+        self.last_tick_reproduce = 0;
+        self.last_tick_steal = 0;
+        self.last_tick_predation_events.clear();
+        self.last_tick_predation_kills = 0;
+        self.last_tick_compute_total_mean = 0.0;
+        self.last_tick_compute_total_min = 0.0;
+        self.last_tick_compute_total_max = 0.0;
+        self.last_tick_compute_vm_mean = 0.0;
+        self.last_tick_compute_graph_mean = 0.0;
+        self.last_tick_priority_bid_mean = 0.0;
+        self.last_tick_priority_bidders_count = 0;
+        self.last_tick_food_occupancy_depletion_mean = 0.0;
+        self.last_tick_food_occupancy_depletion_occupied_cells = 0;
+        self.last_tick_food_growth_suppressed_by_occupancy_depletion = 0.0;
+        self.last_tick_food_cells_with_type_inhibition = 0;
+        self.last_tick_food_growth_suppressed_by_type_inhibition = 0.0;
+    }
+
     pub fn record_food_growth_summary(&mut self, summary: FoodGrowthSummary) {
         self.last_tick_food_occupancy_depletion_mean = summary.mean_occupancy_depletion;
         self.last_tick_food_occupancy_depletion_occupied_cells =
