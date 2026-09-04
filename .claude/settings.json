@@ -1,5 +1,5 @@
 {
-  "advisorModel": "opus",
+  "advisorModel": "fable",
   "worktree": {
     "baseRef": "head"
   }

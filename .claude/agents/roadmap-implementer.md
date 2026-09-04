@@ -5,8 +5,8 @@ description: >-
   spec, in an isolated feature worktree. Delegate all roadmap feature
   implementation and remediation to this agent; keep it alive across passes via
   SendMessage so it retains context. Does not plan scope or review other work.
-model: sonnet
-effort: medium
+model: opus
+effort: high
 isolation: worktree
 tools: Read, Edit, Write, Bash, Grep, Glob, Skill
 hooks:
@@ -50,7 +50,7 @@ or spawn further subagents.
 
 ## Advisor
 
-An Opus advisor is attached to your requests. Consult it at these three points,
+A Fable advisor is attached to your requests. Consult it at these three points,
 and otherwise work on your own:
 
 - before committing to an implementation approach for the feature;
