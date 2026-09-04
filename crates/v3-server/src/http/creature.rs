@@ -94,8 +94,8 @@ struct CreatureLiveCircuitDiagnostics {
     distinct_upstream_slots_read: Vec<usize>,
     distinct_payload_slots_written: Vec<usize>,
     distinct_custom_output_slots_written: Vec<usize>,
-    reachable_read_class_counts: BTreeMap<String, u32>,
-    reachable_write_class_counts: BTreeMap<String, u32>,
+    reachable_read_class_counts: BTreeMap<MeshReadClass, u32>,
+    reachable_write_class_counts: BTreeMap<MeshWriteClass, u32>,
 }
 
 #[derive(serde::Serialize)]
@@ -149,54 +149,6 @@ fn creature_id_from_ffi_exact(id: u64) -> Option<CreatureId> {
     Some(key_data.into())
 }
 
-fn mesh_read_class_key(class: MeshReadClass) -> &'static str {
-    match class {
-        MeshReadClass::Food => "food",
-        MeshReadClass::Neighbor => "neighbor",
-        MeshReadClass::Barrier => "barrier",
-        MeshReadClass::Occupancy => "occupancy",
-        MeshReadClass::Introspection => "introspection",
-        MeshReadClass::Upstream => "upstream",
-        MeshReadClass::ActionQueue => "action_queue",
-    }
-}
-
-fn mesh_write_class_key(class: MeshWriteClass) -> &'static str {
-    match class {
-        MeshWriteClass::Route => "route",
-        MeshWriteClass::Action => "action",
-        MeshWriteClass::Memory => "memory",
-        MeshWriteClass::Payload => "payload",
-    }
-}
-
-fn action_type_key(kind: ActionType) -> &'static str {
-    match kind {
-        ActionType::NoOp => "NoOp",
-        ActionType::Eat => "Eat",
-        ActionType::Move => "Move",
-        ActionType::Reproduce => "Reproduce",
-        ActionType::StealEnergy => "StealEnergy",
-        _ => "Unknown",
-    }
-}
-
-fn action_result_key(result: ActionResult) -> &'static str {
-    match result {
-        ActionResult::Success => "Success",
-        ActionResult::NoFood => "NoFood",
-        ActionResult::Blocked => "Blocked",
-        ActionResult::InvalidTarget => "InvalidTarget",
-        ActionResult::AgeConstraints => "AgeConstraints",
-        ActionResult::NutritionConstraints => "NutritionConstraints",
-        ActionResult::EnergyConstraints => "EnergyConstraints",
-        ActionResult::PopulationCap => "PopulationCap",
-        ActionResult::TransferredAndKilled => "TransferredAndKilled",
-        ActionResult::NoVictim => "NoVictim",
-        _ => "Unknown",
-    }
-}
-
 fn build_creature_diagnostics(
     sim: &v3_core::simulation::Simulation,
     creature: &v3_core::creature::state::CreatureState,
@@ -211,8 +163,8 @@ fn build_creature_diagnostics(
         neighbor_occupied: static_inputs.neighbor_occupied,
     };
 
-    let mut reachable_read_class_counts: BTreeMap<String, u32> = BTreeMap::new();
-    let mut reachable_write_class_counts: BTreeMap<String, u32> = BTreeMap::new();
+    let mut reachable_read_class_counts: BTreeMap<MeshReadClass, u32> = BTreeMap::new();
+    let mut reachable_write_class_counts: BTreeMap<MeshWriteClass, u32> = BTreeMap::new();
     let mut stateful_reachable_node_count = 0usize;
     let mut barrier_reader_reachable_node_count = 0usize;
     let mut barrier_decision_writer_reachable_node_count = 0usize;
@@ -239,14 +191,10 @@ fn build_creature_diagnostics(
             }
         }
         for class in &annotation.read_classes {
-            *reachable_read_class_counts
-                .entry(mesh_read_class_key(*class).to_string())
-                .or_insert(0) += 1;
+            *reachable_read_class_counts.entry(*class).or_insert(0) += 1;
         }
         for class in &annotation.write_classes {
-            *reachable_write_class_counts
-                .entry(mesh_write_class_key(*class).to_string())
-                .or_insert(0) += 1;
+            *reachable_write_class_counts.entry(*class).or_insert(0) += 1;
         }
     }
 
@@ -298,11 +246,7 @@ fn build_creature_diagnostics(
     let mut blocked_move_count = 0u32;
     let mut invalid_target_reproduce_count = 0u32;
     for entry in &recent_window {
-        let key = format!(
-            "{}:{}",
-            action_type_key(entry.action_type),
-            action_result_key(entry.result)
-        );
+        let key = format!("{}:{}", entry.action_type.as_key(), entry.result.as_key());
         *by_action_result.entry(key).or_insert(0) += 1;
         if entry.action_type == ActionType::Move && entry.result == ActionResult::Blocked {
             blocked_move_count += 1;
@@ -544,17 +488,52 @@ mod tests {
     use super::*;
 
     #[test]
-    fn action_result_key_maps_age_constraints() {
+    fn mesh_class_maps_serialize_with_snake_case_keys() {
+        let read_counts: BTreeMap<MeshReadClass, u32> = BTreeMap::from([
+            (MeshReadClass::Food, 1),
+            (MeshReadClass::Neighbor, 2),
+            (MeshReadClass::Barrier, 3),
+            (MeshReadClass::Occupancy, 4),
+            (MeshReadClass::Introspection, 5),
+            (MeshReadClass::Upstream, 6),
+            (MeshReadClass::ActionQueue, 7),
+        ]);
+        let write_counts: BTreeMap<MeshWriteClass, u32> = BTreeMap::from([
+            (MeshWriteClass::Route, 1),
+            (MeshWriteClass::Action, 2),
+            (MeshWriteClass::Memory, 3),
+            (MeshWriteClass::Payload, 4),
+        ]);
+
         assert_eq!(
-            action_result_key(ActionResult::AgeConstraints),
-            "AgeConstraints"
+            serde_json::to_value(&read_counts).expect("serializes"),
+            serde_json::json!({
+                "food": 1,
+                "neighbor": 2,
+                "barrier": 3,
+                "occupancy": 4,
+                "introspection": 5,
+                "upstream": 6,
+                "action_queue": 7,
+            })
+        );
+        assert_eq!(
+            serde_json::to_value(&write_counts).expect("serializes"),
+            serde_json::json!({
+                "route": 1,
+                "action": 2,
+                "memory": 3,
+                "payload": 4,
+            })
         );
     }
 
     #[test]
-    fn action_result_key_maps_nutrition_constraints() {
+    fn action_log_keys_use_variant_names() {
+        assert_eq!(ActionType::Move.as_key(), "Move");
+        assert_eq!(ActionResult::AgeConstraints.as_key(), "AgeConstraints");
         assert_eq!(
-            action_result_key(ActionResult::NutritionConstraints),
+            ActionResult::NutritionConstraints.as_key(),
             "NutritionConstraints"
         );
     }
