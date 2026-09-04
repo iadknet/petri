@@ -1,0 +1,12 @@
+# aqua policy: trust the standard registry and this repository's local
+# registry (aqua-registry.yaml). The Makefile exports AQUA_POLICY_CONFIG so no
+# per-user `aqua policy allow` step is needed.
+registries:
+  - type: standard
+    ref: semver(">= 3.0.0")
+  - name: local
+    type: local
+    path: aqua-registry.yaml
+packages:
+  - registry: standard
+  - registry: local

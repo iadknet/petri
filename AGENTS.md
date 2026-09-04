@@ -8,6 +8,7 @@
 - Preserve existing user changes and work carefully in dirty worktrees.
 - Runtime-facing telemetry and state must derive from applied simulation behavior; backward compatibility is not a default goal.
 - Use TDD for behavior changes and bug fixes. Test determinism is required only where assertions depend on reproducibility.
+- Pure invariants get property tests (proptest in v3-core); assertions must not depend on which cases were drawn, and `proptest-regressions/` files are committed when they appear.
 - Use `$rust-skills` for every Rust change, loading only the rule files relevant to the affected code.
 - Run `cargo test -p v3-core --test viability` first when production defaults, founder behavior, or tick-loop mechanics change.
 - Shell automation must be POSIX `sh` compatible; do not add Bash or Zsh runtime dependencies.

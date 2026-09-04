@@ -317,6 +317,8 @@ impl CreatureGenome {
 mod tests {
     use super::*;
     use crate::contracts::{DynamicIntrospectionKey, StaticIntrospectionKey, WorldInputKey};
+    use proptest::prelude::*;
+    use proptest::strategy::Union;
 
     #[test]
     fn vm_instruction_all_41_variants_constructible() {
@@ -417,6 +419,98 @@ mod tests {
         let json = serde_json::to_string(&instr).unwrap();
         let instr2: VmInstruction = serde_json::from_str(&json).unwrap();
         assert_eq!(instr, instr2);
+    }
+
+    fn nullary(instr: VmInstruction) -> BoxedStrategy<VmInstruction> {
+        Just(instr).boxed()
+    }
+
+    fn unary(make: fn(u8) -> VmInstruction) -> BoxedStrategy<VmInstruction> {
+        any::<u8>().prop_map(make).boxed()
+    }
+
+    fn binary(make: fn(u8, u8) -> VmInstruction) -> BoxedStrategy<VmInstruction> {
+        (any::<u8>(), any::<u8>())
+            .prop_map(move |(x, y)| make(x, y))
+            .boxed()
+    }
+
+    fn ternary(make: fn(u8, u8, u8) -> VmInstruction) -> BoxedStrategy<VmInstruction> {
+        (any::<u8>(), any::<u8>(), any::<u8>())
+            .prop_map(move |(x, y, z)| make(x, y, z))
+            .boxed()
+    }
+
+    /// Every one of the 41 opcodes with arbitrary operands.
+    fn any_vm_instruction() -> impl Strategy<Value = VmInstruction> {
+        use VmInstruction::*;
+        Union::new(vec![
+            nullary(Noop),
+            binary(|dst, const_idx| LoadConst { dst, const_idx }),
+            binary(|dst, src| Move { dst, src }),
+            ternary(|dst, a, b| Add { dst, a, b }),
+            ternary(|dst, a, b| Sub { dst, a, b }),
+            ternary(|dst, a, b| Mul { dst, a, b }),
+            ternary(|dst, a, b| Div { dst, a, b }),
+            ternary(|dst, a, b| Min { dst, a, b }),
+            ternary(|dst, a, b| Max { dst, a, b }),
+            binary(|dst, src| Abs { dst, src }),
+            binary(|dst, src| Neg { dst, src }),
+            binary(|dst, src| Clamp01 { dst, src }),
+            ternary(|dst, a, b| CmpGt { dst, a, b }),
+            ternary(|dst, a, b| CmpLt { dst, a, b }),
+            (any::<u8>(), any::<u8>(), any::<u8>(), any::<u8>())
+                .prop_map(|(dst, a, b, eps)| CmpEq { dst, a, b, eps })
+                .boxed(),
+            ternary(|dst, a, b| And { dst, a, b }),
+            ternary(|dst, a, b| Or { dst, a, b }),
+            binary(|dst, src| Not { dst, src }),
+            binary(|dst, src| ToI32 { dst, src }),
+            binary(|dst, src| ToU8 { dst, src }),
+            binary(|dst, src| ToBool { dst, src }),
+            (any::<u8>(), any::<i32>())
+                .prop_map(|(cond, offset)| JumpIfZero { cond, offset })
+                .boxed(),
+            any::<i32>().prop_map(|offset| Jump { offset }).boxed(),
+            (any::<u8>(), any::<u16>(), any::<u16>())
+                .prop_map(|(dst, ref_idx, sub_idx)| ReadInput {
+                    dst,
+                    ref_idx,
+                    sub_idx,
+                })
+                .boxed(),
+            binary(|slot_idx, src| WriteInternalPayload { slot_idx, src }),
+            binary(|slot_idx, src| WriteWorldActionMeta { slot_idx, src }),
+            binary(|slot, src| WriteRouteGate { slot, src }),
+            unary(|action_type| PushAction { action_type }),
+            nullary(PopAction),
+            unary(|dst| ReadActionQueueLength { dst }),
+            binary(|index_src, dst| ReadActionQueueType { index_src, dst }),
+            ternary(|index_src, param_slot, dst| ReadActionQueueParam {
+                index_src,
+                param_slot,
+                dst,
+            }),
+            unary(|src| SetPriorityBid { src }),
+            nullary(ExecuteActionQueue),
+            nullary(Halt),
+            binary(|dst, slot_reg| LoadSlot { dst, slot_reg }),
+            binary(|slot_reg, src| StoreSlot { slot_reg, src }),
+            binary(|dst, slot_idx| LoadSlotImm { dst, slot_idx }),
+            binary(|slot_idx, src| StoreSlotImm { slot_idx, src }),
+            binary(|dst, slot_idx| LoadSlotPrev { dst, slot_idx }),
+            unary(|slot_idx| ClearSlot { slot_idx }),
+        ])
+    }
+
+    proptest! {
+        /// Serde round-trip is the identity for every opcode and operand value.
+        #[test]
+        fn vm_instruction_serde_roundtrip_holds_for_any_opcode(instr in any_vm_instruction()) {
+            let json = serde_json::to_string(&instr).unwrap();
+            let decoded: VmInstruction = serde_json::from_str(&json).unwrap();
+            prop_assert_eq!(decoded, instr);
+        }
     }
 
     #[test]
