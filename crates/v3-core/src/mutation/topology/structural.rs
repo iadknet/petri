@@ -176,12 +176,17 @@ const MESH_SLICE_MAX_SIZE: usize = 8;
 /// to avoid clobbering the originals. Always adds a backlink from a random
 /// pre-existing node to a random cloned node to ensure reachability.
 fn clone_and_remap_slice(genome: &mut CreatureGenome, gene_indices: &[usize], rng: &mut impl Rng) {
-    // Build old_id -> new_id mapping
+    // Build old_id -> new_id mapping. `new_ids` records the fresh ids in
+    // `gene_indices` order (ascending, since the slice functions return sorted
+    // indices) so the backlink target the seeded draw picks below is a function
+    // of genome content alone rather than of the map's hash order (T10.F11).
     let mut id_map = HashMap::with_capacity(gene_indices.len());
+    let mut new_ids: Vec<NodeId> = Vec::with_capacity(gene_indices.len());
     let mut next_id = next_node_id(genome);
     for &idx in gene_indices {
         let old_id = genome.nodes[idx].node_id;
         id_map.insert(old_id, next_id);
+        new_ids.push(next_id);
         next_id = NodeId::new(next_id.0.wrapping_add(1));
     }
 
@@ -223,7 +228,6 @@ fn clone_and_remap_slice(genome: &mut CreatureGenome, gene_indices: &[usize], rn
     // Add backlink from random pre-existing node to a random cloned node to
     // ensure reachability. Use the lowest unused slot; skip if all slots are
     // already occupied on the selected source node.
-    let new_ids: Vec<NodeId> = id_map.values().copied().collect();
     let link_target = new_ids[rng.gen_range(0..new_ids.len())];
     let source_idx = rng.gen_range(0..pre_existing_count);
     if let Some(slot) = lowest_unused_slot(&genome.nodes[source_idx].targets) {

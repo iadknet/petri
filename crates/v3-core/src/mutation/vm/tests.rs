@@ -6,6 +6,7 @@ use crate::creature::genome::{
 };
 use crate::creature::parseability::ParseabilityGate;
 use crate::mutation::types::MutationSkipReason;
+use proptest::prelude::*;
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
@@ -1585,5 +1586,100 @@ fn vm_raw_field_mutation_sub_idx_bounded() {
                 }
             }
         }
+    }
+}
+
+// --- Cross-process reproducibility of the paired-slot operator (T10.F11) ---
+
+/// A single-VM-node genome running `program`.
+fn slot_program_genome(program: Vec<VmInstruction>) -> CreatureGenome {
+    CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 2,
+                constants: vec![],
+                program,
+            }),
+            targets: vec![],
+        }],
+    }
+}
+
+/// One paired slot group per entry of `slots`: each slot gets both a load and
+/// a store, which is what makes it an eligible `VmMutatePairedSlotAddress`
+/// candidate.
+fn paired_slot_program(slots: &[u8]) -> Vec<VmInstruction> {
+    slots
+        .iter()
+        .flat_map(|&slot_idx| {
+            [
+                VmInstruction::LoadSlotImm { dst: 0, slot_idx },
+                VmInstruction::StoreSlotImm { slot_idx, src: 0 },
+            ]
+        })
+        .collect()
+}
+
+/// Apply `VmMutatePairedSlotAddress` once to a fresh clone of `genome` with a
+/// freshly seeded RNG and return the mutated genome.
+fn apply_paired_slot_address(genome: &CreatureGenome, seed: u64) -> CreatureGenome {
+    let mut mutated = genome.clone();
+    let mut r = rng(seed);
+    VmMutator::apply(
+        &mut mutated,
+        VmOperator::VmMutatePairedSlotAddress,
+        &[],
+        0.0,
+        &mut r,
+        &MutationConfig::default(),
+    )
+    .expect("a genome with a paired slot group must be an applicable target");
+    mutated
+}
+
+#[test]
+fn vm_mutate_paired_slot_address_is_reproducible_for_a_seed() {
+    let genome = slot_program_genome(paired_slot_program(&[2, 5, 9, 13]));
+    let results: Vec<CreatureGenome> = (0..16)
+        .map(|_| apply_paired_slot_address(&genome, 90_210))
+        .collect();
+    for (i, mutated) in results.iter().enumerate() {
+        assert_ne!(
+            mutated, &genome,
+            "application {i} must re-address the slot group it picked"
+        );
+        assert_eq!(
+            mutated, &results[0],
+            "application {i} picked a different slot group than application 0 for the \
+             same seed: the candidate order is not a function of the genome"
+        );
+    }
+}
+
+proptest! {
+    /// Two applications of the paired-slot operator with the same seed to the
+    /// same program produce the same program, whatever slot instructions the
+    /// program holds.
+    #[test]
+    fn vm_mutate_paired_slot_address_is_reproducible_for_any_slot_program(
+        forced_slot in 0u8..16,
+        extra in prop::collection::vec((0u8..16, 0u8..4), 0..24),
+        seed in any::<u64>(),
+    ) {
+        let mut program = paired_slot_program(&[forced_slot]);
+        program.extend(extra.into_iter().map(|(slot_idx, kind)| match kind {
+            0 => VmInstruction::LoadSlotImm { dst: 0, slot_idx },
+            1 => VmInstruction::StoreSlotImm { slot_idx, src: 0 },
+            2 => VmInstruction::LoadSlotPrev { dst: 0, slot_idx },
+            _ => VmInstruction::ClearSlot { slot_idx },
+        }));
+        let genome = slot_program_genome(program);
+        prop_assert_eq!(
+            apply_paired_slot_address(&genome, seed),
+            apply_paired_slot_address(&genome, seed)
+        );
     }
 }
