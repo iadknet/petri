@@ -1,14 +1,15 @@
 # T07 — Communication and Social Evolution
 
 **Status**: Planned
-**Last updated**: 2026-09-02
+**Last updated**: 2026-09-04
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
 
-Provide evolvable, costly signaling and reciprocal interaction primitives from
-which communication, cooperation, deception, partner choice, and stable social
-strategies can emerge and be tested causally.
+Give creatures scent and voice: costly signals in a medium that spreads and
+fades, with no meaning assigned, from which communication, cooperation,
+deception, partner choice, and stable social strategies can emerge and be
+tested.
 
 ## Track Success Criteria
 
@@ -19,19 +20,27 @@ strategies can emerge and be tested causally.
 
 ## Executable Features
 
-- [ ] **T07.F01 — Costly Evolvable Signal Emission** — Depends on: T01.F01, T03.F01
+- [ ] **T07.F01 — Costly Evolvable Signal Emission** — Depends on: T03.F01
+  - Goal: Scent. Creatures can emit signals on a few channels at an energy cost, with no meaning attached by the simulation.
 - [ ] **T07.F02 — Signal Perception and Identity Context** — Depends on: T07.F01
+  - Goal: Smelling. Creatures perceive nearby signals along with kin and identity context, so meaning can arise from who sent what.
 - [ ] **T07.F03 — Spatial and Temporal Signal Medium** — Depends on: T07.F01
+  - Goal: Pheromone trails. Signals diffuse through space and fade over time, so a signal carries history and place.
 - [ ] **T07.F04 — Live, Replay, and Ghost Social Assays** — Depends on: T07.F02, T07.F03, T10.F05
+  - Goal: Deferred proof phase. Replace a partner with a recording or a ghost and see whether the behavior still works.
 - [ ] **T07.F05 — Resource Transfer and Social Conflict Actions** — Depends on: T03.F05, T05.F01, T07.F02
-- [ ] **T07.F06 — Reciprocity and Partner-Choice Opportunities** — Depends on: T07.F04, T07.F05, T09.F01
+  - Goal: Sharing and fighting. Creatures can give energy to another or take it, so cooperation and exploitation are both possible.
+- [ ] **T07.F06 — Reciprocity and Partner-Choice Opportunities** — Depends on: T07.F03, T07.F05
+  - Goal: Reciprocity. Repeated encounters with recognizable partners make helping, cheating, and choosing partners possible.
 - [ ] **T07.F07 — Social Strategy Coexistence Confirmatory Campaign** — Depends on: T01.F09, T04.F06, T05.F04, T07.F06, T10.F08
+  - Goal: Deferred proof phase. Replicated confirmatory runs that more than one social strategy persists.
 
 ## Notes for AI Agents
 
 - Do not encode meanings such as food, danger, kin, or cooperation into signal channels. Meaning must arise from sender-receiver effects.
 - Existing identity and kin-affinity inputs may provide context, but lineage labels must not become automatic cooperation bonuses.
 - A social-cognition claim requires loss under a nonresponsive or temporally mismatched partner, not merely activity near another creature.
+- T07.F06 depends on the medium and the transfer actions, not on the T07.F04 assays or the T09.F01 qualification suite; those belong to the deferred proof phase.
 - T07.F01 through T07.F03 must retain signal channel count, energetic cost, diffusion, decay, and noise as treatment parameters. Their feature specs must include a bounded fixture or short-evolution comparison of at least two viable parameterizations; no cited study selects Petri's numerical values in advance.
 - Research basis reviewed 2026-09-02: [Evolutionary Conditions for the Emergence of Communication in Robots](https://doi.org/10.1016/j.cub.2007.01.058), [Partner choice promotes cooperation](https://doi.org/10.1016/j.jtbi.2013.11.019), and [Embodied Dyadic Interaction Increases Complexity of Neural Dynamics](https://doi.org/10.3389/fpsyg.2019.00540).
 
