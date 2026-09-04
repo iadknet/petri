@@ -226,6 +226,7 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
         }
 
         steps += 1;
+        side_outputs.work_counters.vm_steps += 1;
         let mut next_pc = pc + 1;
 
         match instr {

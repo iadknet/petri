@@ -244,6 +244,20 @@ pub struct SimStats {
     /// Global fallback baseline used when cohort-local sample sizes are small.
     pub mutation_outcome_baseline_global: RunningStats,
 
+    // ── Deterministic work counters (cumulative) ──────────────────────────────
+    /// Mesh hops walked across all creatures, all ticks.
+    pub mesh_hops_total: u64,
+    /// VM opcodes executed across all creatures, all ticks.
+    pub vm_steps_total: u64,
+    /// Graph relaxation passes entered across all creatures, all ticks.
+    pub graph_relax_iters_total: u64,
+    /// Hebbian plus reward-modulated plasticity weight updates applied.
+    pub plasticity_updates_total: u64,
+    /// Creatures that ran the mesh, summed per tick.
+    pub creature_ticks_total: u64,
+    /// Every action the action phase executed (move, eat, noop, reproduce, steal).
+    pub actions_applied_total: u64,
+
     // ── Predation cumulative ─────────────────────────────────────────────────
     pub predation_actions_attempted_total: u64,
     pub predation_actions_transferred_total: u64,
@@ -428,6 +442,17 @@ mod tests {
             "expected positive score delta, got {}",
             eval.score_delta
         );
+    }
+
+    #[test]
+    fn work_counter_totals_default_to_zero() {
+        let stats = SimStats::default();
+        assert_eq!(stats.mesh_hops_total, 0);
+        assert_eq!(stats.vm_steps_total, 0);
+        assert_eq!(stats.graph_relax_iters_total, 0);
+        assert_eq!(stats.plasticity_updates_total, 0);
+        assert_eq!(stats.creature_ticks_total, 0);
+        assert_eq!(stats.actions_applied_total, 0);
     }
 
     #[test]

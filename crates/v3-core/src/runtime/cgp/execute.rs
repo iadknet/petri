@@ -119,6 +119,9 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
     let mut w_inputs_buf = std::mem::take(&mut graph_runtime.scratch_w_inputs);
 
     for pass in 0..max_passes {
+        // One relaxation pass entered, counted regardless of whether it completes.
+        side_outputs.work_counters.graph_relax_iters += 1;
+
         let pass_cost = config.graph_node_base_cost * node_count as f32;
         *energy -= pass_cost;
         if *energy <= 0.0 {
@@ -236,7 +239,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
             reproductive_reserve,
             action_queue: &queue_snapshot,
         };
-        let plasticity_cost = hebbian::apply_hebbian_updates(
+        let (plasticity_cost, plasticity_update_count) = hebbian::apply_hebbian_updates(
             def,
             node_idx,
             &mut graph_runtime.plasticity_weights,
@@ -247,6 +250,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
             prev_shared_memory,
             config.plasticity_update_cost,
         );
+        side_outputs.work_counters.plasticity_updates += plasticity_update_count;
         *energy -= plasticity_cost;
         if *energy <= 0.0 {
             restore_scratch(
@@ -361,4 +365,168 @@ fn restore_scratch(
     graph_runtime.scratch_curr = curr;
     graph_runtime.scratch_backup = backup;
     graph_runtime.scratch_w_inputs = w_inputs;
+}
+
+#[cfg(test)]
+mod work_counter_tests {
+    use crate::config::RuntimeConfig;
+    use crate::contracts::NodeId;
+    use crate::creature::genome::cgp::{
+        ActionSlot, ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind,
+        ExecuteGate, GraphEdge, GraphSource, WorldActionKind,
+    };
+    use crate::creature::genome::{
+        BackendDef, CreatureGenome, HebbianRule, NodeGenome, PlasticityConfig,
+    };
+    use crate::creature::state::GraphRuntimeState;
+    use crate::runtime::mesh::execute_creature_mesh;
+    use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
+    use crate::sensors::static_inputs::StaticInputs;
+    use crate::sensors::typed_food::TypedFoodLocalSnapshot;
+
+    fn empty_ss() -> SensorSnapshot {
+        SensorSnapshot {
+            local: StaticInputs {
+                food_here: 0.0,
+                neighbor_food: [0.0; 8],
+                neighbor_barrier: [0.0; 8],
+                neighbor_occupied: [0.0; 8],
+                generation: 0.0,
+                age_ticks: 0.0,
+            },
+            typed_local_food: TypedFoodLocalSnapshot::zeroed(1),
+            perception: PerceptionSnapshot::zeroed(1),
+        }
+    }
+
+    /// A single-node graph outputting a non-zero constant takes one extra
+    /// pass to converge beyond `graph_convergence_stable_passes` (default 2):
+    /// pass 1 computes a delta of 1.0 against the zero-initialized previous
+    /// outputs (not stable), pass 2 repeats the same output (first stable
+    /// pass), pass 3 repeats it again (second stable pass, loop breaks).
+    #[test]
+    fn single_node_graph_reports_known_relax_iters_and_no_plasticity() {
+        let id0 = NodeId::new(0);
+        let genome = CreatureGenome {
+            entry_node_id: id0,
+            nodes: vec![NodeGenome {
+                node_id: id0,
+                input_refs: vec![],
+                backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    compute_nodes: vec![ComputeNode {
+                        kind: ComputeNodeKind::Constant(1.0),
+                        inputs: vec![],
+                        plasticity: None,
+                    }],
+                    output_sinks: vec![],
+                    action_bank: vec![],
+                    execute_gate: ExecuteGate { inputs: vec![] },
+                }),
+                targets: vec![],
+            }],
+        };
+
+        let ss = empty_ss();
+        let config = RuntimeConfig::default();
+        let mut energy = 100.0f32;
+        let mut smem = [0.0f32; 16];
+        let prev_smem = [0.0f32; 16];
+        let mut gr = GraphRuntimeState::new();
+
+        let output = execute_creature_mesh(
+            &genome,
+            &ss,
+            &mut energy,
+            0.0,
+            &mut smem,
+            &prev_smem,
+            &mut gr,
+            &config,
+        );
+
+        assert_eq!(output.work_counters.mesh_hops, 1);
+        assert_eq!(output.work_counters.vm_steps, 0);
+        assert_eq!(
+            output.work_counters.graph_relax_iters,
+            config.graph_convergence_stable_passes + 1
+        );
+        assert_eq!(output.work_counters.plasticity_updates, 0);
+    }
+
+    /// A single compute node with one Hebbian-plastic edge applies exactly
+    /// one weight update (one edge) after the relaxation loop converges.
+    #[test]
+    fn hebbian_plastic_node_reports_one_plasticity_update() {
+        let id0 = NodeId::new(0);
+        let genome = CreatureGenome {
+            entry_node_id: id0,
+            nodes: vec![NodeGenome {
+                node_id: id0,
+                input_refs: vec![],
+                backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    compute_nodes: vec![ComputeNode {
+                        kind: ComputeNodeKind::Constant(1.0),
+                        inputs: vec![GraphEdge {
+                            source: GraphSource::SharedMemory {
+                                slot: 0,
+                                previous: false,
+                            },
+                            weight: 1.0,
+                        }],
+                        plasticity: Some(PlasticityConfig {
+                            rule: HebbianRule::Classic,
+                            learning_rate: 0.5,
+                            weight_clamp: 1.0,
+                            lamarckian: false,
+                            modulation: None,
+                        }),
+                    }],
+                    output_sinks: vec![],
+                    action_bank: vec![ActionSlot {
+                        behavior: ActionSlotBehavior::Emit(WorldActionKind::Eat),
+                        gate_inputs: vec![GraphEdge {
+                            source: GraphSource::ComputeNode(0),
+                            weight: 1.0,
+                        }],
+                        param_inputs: vec![],
+                    }],
+                    execute_gate: ExecuteGate {
+                        inputs: vec![GraphEdge {
+                            source: GraphSource::ComputeNode(0),
+                            weight: 1.0,
+                        }],
+                    },
+                }),
+                targets: vec![],
+            }],
+        };
+
+        let ss = empty_ss();
+        let config = RuntimeConfig {
+            graph_node_base_cost: 0.01,
+            plasticity_update_cost: 0.01,
+            ..RuntimeConfig::default()
+        };
+        let mut energy = 100.0f32;
+        let mut smem = [0.0f32; 16];
+        let prev_smem = [0.0f32; 16];
+        let mut gr = GraphRuntimeState::new();
+
+        let output = execute_creature_mesh(
+            &genome,
+            &ss,
+            &mut energy,
+            0.0,
+            &mut smem,
+            &prev_smem,
+            &mut gr,
+            &config,
+        );
+
+        assert_eq!(output.work_counters.plasticity_updates, 1);
+        assert_eq!(
+            output.work_counters.graph_relax_iters,
+            config.graph_convergence_stable_passes + 1
+        );
+    }
 }

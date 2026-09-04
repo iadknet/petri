@@ -30,6 +30,7 @@ fn sort_by_priority_bid_orders_descending() {
         actions: vec![WorldAction::eat(OrdinaryFoodTypeId::default())],
         cost_report: ComputeCostReport::default(),
         priority_bid: bid,
+        work_counters: Default::default(),
     };
 
     let mut decisions = vec![
@@ -59,6 +60,7 @@ fn sort_by_priority_bid_stable_for_equal_bids() {
         actions: vec![WorldAction::eat(OrdinaryFoodTypeId::default())],
         cost_report: ComputeCostReport::default(),
         priority_bid: bid,
+        work_counters: Default::default(),
     };
 
     let mut decisions = vec![

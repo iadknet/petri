@@ -14,7 +14,7 @@ export AQUA_ENFORCE_CHECKSUM := true
 export AQUA_ENFORCE_REQUIRE_CHECKSUM := true
 export PATH := $(AQUA_ROOT_DIR)/bin:$(PATH)
 
-.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-priority-bid rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc rust-clippy frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test implementer-gate-test dependency-policy-check-test policy-check quality-check dependency-audit skill-check check audit precommit project-precommit format clean
+.PHONY: help setup run build rust-check rust-format-check rust-viability rust-test-all rust-test-core-unit rust-test-creature-workflow rust-test-priority-bid rust-test-vm-all-opcodes rust-test-cli rust-test-server rust-test-doc rust-clippy frontend-check frontend-lint frontend-test frontend-build roadmap-check roadmap-check-test implementer-gate-test dependency-policy-check-test policy-check quality-check dependency-audit skill-check check audit precommit project-precommit format clean bench
 
 help: ## Show the stable project command interface.
 	@awk 'BEGIN {FS = ":.*## "} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-18s %s\\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -61,6 +61,17 @@ rust-test-vm-all-opcodes: ## Run v3-core VM opcode integration tests.
 
 rust-test-cli: ## Run v3-cli tests.
 	@cargo test -p v3-cli
+
+bench: ## Run the deterministic benchmark harness. Gate: `make bench PROFILE=gate FEATURE=<tNN-fNN-slug>`. Sweep: `make bench PROFILE=sweep BENCH_ARGS="--width 128 --height 128 --founders 256 --seeds 11,22,33 --ticks 300" OUT=<path>`.
+	@if [ "$(PROFILE)" = "gate" ]; then \
+		if [ -z "$(FEATURE)" ]; then echo "error: FEATURE is required for PROFILE=gate" >&2; exit 1; fi; \
+		cargo run --release -p v3-cli -- bench --profile gate --feature "$(FEATURE)" --out "docs/progress/features/$(FEATURE).json"; \
+	elif [ "$(PROFILE)" = "sweep" ]; then \
+		if [ -z "$(OUT)" ]; then echo "error: OUT is required for PROFILE=sweep" >&2; exit 1; fi; \
+		cargo run --release -p v3-cli -- bench --profile sweep --out "$(OUT)" $(BENCH_ARGS); \
+	else \
+		echo "error: set PROFILE=gate or PROFILE=sweep" >&2; exit 1; \
+	fi
 
 rust-test-server: ## Run v3-server tests.
 	@cargo test -p v3-server

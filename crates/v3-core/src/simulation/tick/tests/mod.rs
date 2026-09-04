@@ -4,3 +4,4 @@ mod ordering;
 mod phase0;
 mod support;
 mod trace;
+mod work_counters;
