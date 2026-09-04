@@ -37,6 +37,11 @@ impl MutationEngine {
 
     /// Apply mutation events to a child genome using the configured number of
     /// available food types for typed input-ref/topology sampling.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one match arm per mutation event kind; splitting it would spread \
+                  the operator dispatch table across several functions"
+    )]
     pub fn apply_mutations_with_food_type_count(
         genome: &mut CreatureGenome,
         config: &MutationConfig,

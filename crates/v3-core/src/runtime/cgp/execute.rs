@@ -58,6 +58,11 @@ impl GraphTracer for NoopTracer {
 }
 
 #[allow(clippy::too_many_arguments)]
+#[allow(
+    clippy::too_many_lines,
+    reason = "the graph relaxation loop is a single hot path; extracting stages \
+              would add borrow plumbing for the node and weight buffers"
+)]
 pub(crate) fn execute_graph_impl<T: GraphTracer>(
     tracer: &mut T,
     def: &CgpGraphBackendDef,
