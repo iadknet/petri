@@ -5,8 +5,8 @@ Use this complete prompt for a roadmap-owned Claude Code goal. Replace the value
 in the first section, preserve the contract below, and keep every document and
 status truthful. This variant uses the **orchestrator strategy with advisor**
 from Anthropic's model-routing guidance: a Fable 5.1 session orchestrates
-(planning, review adjudication, integration), Sonnet `roadmap-implementer`
-subagents execute with an Opus advisor attached, and a read-only Opus
+(planning, review adjudication, integration), Opus `roadmap-implementer`
+subagents execute with a Fable advisor attached, and a read-only Opus
 `roadmap-reviewer` subagent reviews each final diff from a fresh context. Agent
 definitions live in `.claude/agents/`; the advisor and worktree-base settings
 live in `.claude/settings.json`; the design rationale is
@@ -29,10 +29,13 @@ live in `.claude/settings.json`; the design rationale is
 2. Start `claude --model fable` in auto mode, then `/effort high`. Auto mode is
    required: `/goal` does not change the permission mode, and an unattended
    goal cannot progress through permission prompts.
-3. Confirm the startup notices: `Advisor Tool (experimental) is on`, and the
-   notice that the advisor is not attached to the main model. Fable rejects an
-   Opus advisor; Sonnet subagents still receive it. If the advisor notice is
-   missing, run `/advisor opus` once to save the setting in user settings.
+3. Confirm the startup notice `Advisor Tool (experimental) is on`. The
+   project sets `advisorModel: fable`, which a Fable main model accepts, so
+   the advisor is attached to you as well as to the Opus implementers. Do not
+   consult it yourself: a same-tier consult sends your whole transcript to a
+   second Fable for little measured gain. Its value is on the implementer,
+   where Opus plus Fable is a cross-tier pairing. If the notice is missing,
+   run `/advisor fable` once to save the setting in user settings.
 4. Set the goal, for example:
    `/goal every feature in <TNN.FNN list> is checked on roadmap/complete and make check passed on that branch in this conversation, or a concrete blocker has been reported to the user; stop after <N> turns`.
    The evaluator reads only this conversation, so surface `make check` output
@@ -59,7 +62,7 @@ planned, and keep an unchecked feature unchecked until its complete spec exists.
 - Planning: run one bounded planning pass before any code, producing the plan
   and the just-in-time track/feature spec skeleton.
 - Implementer: delegate ALL implementation and remediation to the
-  `roadmap-implementer` subagent (Sonnet, medium effort, Opus advisor). Spawn
+  `roadmap-implementer` subagent (Opus, high effort, Fable advisor). Spawn
   exactly one implementer per feature and continue that SAME agent via
   SendMessage across every pass so it retains context — do not spawn a fresh
   implementer per pass or swap implementers. Give it a tight brief: the feature

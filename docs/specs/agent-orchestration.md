@@ -116,6 +116,19 @@ Research date: 2026-09-03. Claude Code installed: v2.1.259.
   means anyone cloning pays Opus advisor usage on Sonnet subagents. Promote to
   `"fable"` only if accumulated per-feature records show the implementer's
   advisor consults are the quality bottleneck.
+- Revision 2026-09-03, after the T10.F10 shakeout: the executor is now
+  `roadmap-implementer` on Opus 5 at `effort: high`, and `advisorModel` is
+  `"fable"` so the executor keeps a cross-tier pairing (Opus plus Opus would
+  gain little). The user chose this because the remaining first-slice
+  features mostly change simulation behavior or introduce new measures, and
+  the T10.F10 run showed Sonnet's weaknesses were discipline and code shape
+  rather than reasoning. Cost: Opus is 2.5 times Sonnet per token and a Fable
+  advisor is twice an Opus one per consult. Consequence of the global setting:
+  the Fable orchestrator now also has the advisor attached and is instructed
+  in the template not to consult it. The reviewer inherits the Fable advisor
+  and its body already forbids consulting. Revisit with the cost records after
+  T01.F13; the fallback is a second Sonnet implementer definition for harness
+  and characterization features.
 - Independent review: a new read-only `roadmap-reviewer` subagent on Opus at
   `effort: high` runs the final diff review from a fresh context. It inherits
   the Opus advisor (a same-tier pairing with little measured gain), so its
