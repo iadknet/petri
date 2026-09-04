@@ -169,6 +169,9 @@ reports all record `git_revision` `d4d5005a`), macOS arm64, 12 logical cores.
 - [x] Benchmark report stored at
       `docs/progress/features/t01-f11-baseline-persistence-characterization.json`
       and appended to `closed` in `docs/progress/benchmark-series.json`.
+- [x] `make check` passes (exit 0) after that append, so the gate profile
+      still compares cleanly against both series references — the T10.F10
+      report and this feature's own.
 
 Sweep commands, each run once from the repository root, with the wall-clock
 each report recorded in `environment.wall_clock_ms_total` (sum over its three
