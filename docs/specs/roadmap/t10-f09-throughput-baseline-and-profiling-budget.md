@@ -73,7 +73,12 @@ core-parallelism feature must precede any campaign.
   T01.F11 report at the same sweep point, on either thread count; thread
   count and every timing live only in `environment`; wall-clock is never
   asserted; work counters change by exactly 0 percent; production code is
-  never edited to kill a mutant; shell automation is POSIX `sh`.
+  never edited to kill a mutant; shell automation is POSIX `sh`. (Corrected
+  2026-09-04 during implementation: the equality half of the first invariant
+  was false of the code before this feature. Seeded runs diverge between
+  processes at 512² and above; see the determinism finding under Performance
+  and Goal Impact. The serialization of the block is unchanged, which the
+  gate references prove; it is the simulation that is not reproducible.)
 - Report schema additions, all under `environment`, all `#[serde(default)]`
   so stored reports still load:
   - `threads`: the rayon thread count in effect during the run, read with
@@ -215,9 +220,12 @@ commit.
 - [x] `make rust-check` (format, viability, every test subset, Clippy with
       warnings denied) and `make roadmap-check` (`validation passed`) both
       exit 0.
-- [ ] Every `docs/progress/sweeps/t10-f09/*.json` `deterministic` object
-      equals its T01.F11 counterpart. **Not met, and not achievable at this
-      commit.** Checked with `python3` (`json.load`, whole-object equality)
+- [x] Every `docs/progress/sweeps/t10-f09/*.json` `deterministic` object was
+      compared with its T01.F11 counterpart and the result recorded. Equality
+      holds at 128² and 256² only; the item as originally written ("equals")
+      is not achievable at this commit, and the user reassigned the fix to
+      T10.F11 on 2026-09-04 (see Notes for AI Agents). Checked with `python3`
+      (`json.load`, whole-object equality)
       against `docs/progress/sweeps/t01-f11/<point>.json`:
       `w0128-t1` True, `w0128-t8` True, `w0256-t1` True, `w0256-t8` True,
       `w0512-t1` False (seed 11), `w0512-t8` False (seed 11), `w1600-t1`
@@ -490,13 +498,16 @@ run, as this feature's own gate report shows.
 
 ## Success Criteria
 
-- [ ] Eight sweep reports at the T01.F11 grid, one and eight threads, are
-      committed, each regenerable by the one command form above, each with a
-      `deterministic` object equal to the T01.F11 report at that sweep point.
-      The eight reports are committed and regenerable; the equality half fails
-      at 512² (seed 11) and 1600² (all three seeds) because the simulation is
-      not reproducible across processes at that scale. This criterion cannot
-      be met without a determinism fix outside this feature's scope.
+- [x] Eight sweep reports at the T01.F11 grid, one and eight threads, are
+      committed, each produced by the one command form above, and each was
+      compared with the T01.F11 report at that sweep point with the result
+      recorded: equal at 128² and 256², different at 512² seed 11 and every
+      1600² seed. As originally written this criterion required equality
+      everywhere; it was amended on 2026-09-04 at the user's direction
+      because the simulation is not reproducible across processes at that
+      scale, a pre-existing defect now owned by T10.F11. The wall-clock,
+      phase, and throughput figures this feature exists to record do not
+      depend on that equality.
 - [x] Every bench report records `threads`, per-phase wall-clock, and
       throughput in `environment`, and the per-core budget in ticks and
       births per wall-clock hour at every sweep point is written in this spec
@@ -520,6 +531,26 @@ run, as this feature's own gate report shows.
   in-process tests.
 - Timings are wall-clock: they belong in `environment`, never in
   `deterministic`, and no test asserts their magnitude.
+- Determinism finding disposition (2026-09-04): the orchestrator reproduced
+  the divergence independently (two 100-tick 1600² seed-11 runs in separate
+  processes: 2,087,946 against 2,087,974 creature-ticks) and put the closure
+  path to the user, who chose to treat reproducibility as a core feature.
+  The T10 track gained `T10.F11 — Cross-Process Reproducibility of Seeded
+  Runs` (depends on T10.F09), T01.F12 now depends on it, and the master
+  first-slice order places it directly after this feature, so it is the next
+  feature implemented. The eight sweep reports here stay as measured at
+  `f78486b2`; T10.F11 regenerates the T01.F11 reports, not these. The T10
+  track's determinism-contract paragraph carries the dated caveat.
+- Wording deviations recorded by the implementer: `docs/roadmap.md` carries
+  one extra sentence flagging the nondeterminism beyond the mandated
+  throughput replacement, and the sweep task text says "detached and polled"
+  rather than "detached with `nohup`", matching what ran. The simplify pass
+  ran inline in one pass (the fan-out variant was unavailable to the
+  subagent); it reused the `millis` helper for `wall_clock_ms`, moved
+  per-seed throughput into `run_one_seed`, and built `tiny_report()` once in
+  the threshold test. `Option<NonZeroUsize>` for `--threads` was considered
+  and skipped because the spec predeclares the `0` rejection in
+  `resolve_bench_profile` with a unit test.
 - **P1, program level, for the orchestrator to own:** the T10.F10 determinism
   contract ("the same commit and the same inputs must produce a byte-identical
   deterministic block") does not hold across processes on long, large
