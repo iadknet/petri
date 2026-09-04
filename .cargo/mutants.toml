@@ -1,0 +1,16 @@
+# cargo-mutants configuration for `make rust-mutants` (see docs/workflow.md).
+#
+# cargo-mutants 27.1.0 has no config keys for a fixed-seconds timeout or the
+# job count; scripts/rust-mutants passes `--jobs` (MUTANTS_JOBS, default 2)
+# and an optional `--timeout` (MUTANTS_TIMEOUT) on the command line.
+
+# Cap the automatic test timeout at 3x the baseline test time (the tool's
+# default is 5x), with a 30 second floor.
+timeout_multiplier = 3.0
+minimum_test_timeout = 30.0
+# Builds have no timeout by default; cap them so a runaway build ends the run.
+build_timeout_multiplier = 4.0
+# Integration-test helpers and benches are not code under test.
+exclude_globs = ["**/tests/**", "**/benches/**"]
+# Do not let a mutant that only trips a lint count as unviable.
+cap_lints = true

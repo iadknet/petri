@@ -10,6 +10,12 @@ model: opus
 effort: high
 tools: Read, Edit, Write, Bash, Grep, Glob, Skill
 hooks:
+  PostToolUse:
+    - matcher: "Edit|Write"
+      hooks:
+        - type: command
+          command: "${CLAUDE_PROJECT_DIR}/scripts/implementer-compile-check"
+          timeout: 360
   Stop:
     - hooks:
         - type: command
@@ -33,6 +39,9 @@ or spawn further subagents.
   rule files relevant to the code you touch.
 - Use TDD for behavior changes and bug fixes. Test determinism is required only
   where an assertion depends on reproducibility.
+- Pure invariants (serde round-trips, VM opcode algebra, encode/decode pairs)
+  get a proptest property test; assertions must not depend on which cases were
+  drawn. Commit any `proptest-regressions/` file a failure creates.
 - When production defaults, founder behavior, or tick-loop mechanics change, run
   the viability gate FIRST: `cargo test -p v3-core --test viability`
   (or `make rust-viability`), before other verification.
@@ -73,6 +82,39 @@ serde constraints over repeated validation, and `std` or existing crate
 dependencies over hand-rolled utilities. Mention in your report what the pass
 changed.
 
+## Mutation survivors
+
+After the simplification pass and before reporting done, run `make rust-mutants`
+once. It mutation-tests only the code your diff touches (merge base with
+`main`, uncommitted and untracked files included) and prints every survivor:
+mutants missed by every test and mutants that timed out. Record in the spec's
+Verification section the summary line, the output path it printed, and the
+full survivor list, with each survivor resolved one of three ways:
+
+- **killed** — you added or strengthened a test that catches it and reran the
+  target (record the second summary line);
+- **equivalent** — the mutant cannot change observable behavior; say why in one
+  sentence;
+- **deferred** — a real gap you are not closing in this feature; record it as
+  a deferred finding in the spec's "Notes for AI Agents".
+
+Never edit production code to kill a mutant: a survivor is a test gap, never a
+reason to reshape the code under test. Never add `#[mutants::skip]` or an
+`exclude_re` entry without a written justification next to it; the reviewer
+treats an unjustified one as a waived check. Read timeouts as survivors, not
+noise. "No survivors" and "no changes against the merge base; nothing to
+mutate" are both valid records when they are what the target printed. The
+first run in a fresh environment builds cargo-mutants through aqua and can
+take several minutes before the report begins.
+
+## Compile feedback
+
+A hook runs `scripts/implementer-compile-check` after every Edit or Write of a
+`.rs` file: `cargo check --workspace --all-targets` in your worktree, with the
+last 30 lines of output returned to you on failure or after a 300 second
+timeout. It cannot undo the edit; treat its output as the compiler's verdict
+and fix the build before moving on.
+
 ## Completion gate
 
 A hook runs `scripts/implementer-gate` when you try to stop. If roadmap
@@ -82,7 +124,8 @@ checker output and you keep working until it passes. Do not try to bypass it.
 ## Reporting back
 
 When you finish (or hit a blocker), report to the orchestrator: the changed
-files, the exact commands you ran and their results, how many times you
-consulted the advisor and the decisive guidance from each consult, and any
-blocker. Then stop and wait — expect follow-up remediation messages on this same
-task and preserve your context across them.
+files, the exact commands you ran and their results, the `make rust-mutants`
+summary line and survivor resolutions, how many times you consulted the
+advisor and the decisive guidance from each consult, and any blocker. Then stop
+and wait — expect follow-up remediation messages on this same task and preserve
+your context across them.

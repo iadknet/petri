@@ -1,0 +1,68 @@
+#!/bin/sh
+# Diff-scoped mutation testing for the change under review.
+#
+# Builds a unified diff of the working tree (tracked and untracked files)
+# against the merge base with the integration branch "main", then runs
+# `cargo mutants --in-diff` on it with the settings in .cargo/mutants.toml.
+# Output goes outside the source tree, under
+# $PETRI_TOOL_ROOT/mutants/<checkout-name>/mutants.out, keyed per checkout
+# because cargo-mutants holds a lock on its output directory.
+#
+# The check is survivor triage, not a score: missed and timed-out mutants are
+# printed for the implementer to resolve and never fail this script. Only a
+# tool, baseline, or diff failure exits non-zero.
+#
+# Environment:
+#   MUTANTS_BASE     ref to diff against (default: merge base of HEAD and main)
+#   MUTANTS_JOBS     parallel cargo-mutants jobs (default 2)
+#   MUTANTS_TIMEOUT  fixed per-mutant test timeout in seconds (default: the
+#                    automatic timeout capped by .cargo/mutants.toml)
+#   MUTANTS_OUT      output directory (default: under PETRI_TOOL_ROOT)
+set -eu
+
+root=$(git rev-parse --show-toplevel)
+cd "$root"
+base=${MUTANTS_BASE:-$(git merge-base HEAD main)}
+tool_root=${PETRI_TOOL_ROOT:-${XDG_DATA_HOME:-$HOME/.local/share}/petri-tools}
+out=${MUTANTS_OUT:-$tool_root/mutants/$(basename "$root")}
+mkdir -p "$out"
+diff_file=$out/in-diff.patch
+
+git diff "$base" >"$diff_file"
+git ls-files --others --exclude-standard | while IFS= read -r file; do
+  # --no-index exits 1 whenever the files differ, which is the point.
+  git diff --no-index -- /dev/null "$file" >>"$diff_file" || true
+done
+
+if [ ! -s "$diff_file" ]; then
+  printf 'rust-mutants: no changes against %s; nothing to mutate\n' "$base"
+  exit 0
+fi
+
+set -- --in-diff "$diff_file" --output "$out" --jobs "${MUTANTS_JOBS:-2}"
+[ -z "${MUTANTS_TIMEOUT:-}" ] || set -- "$@" --timeout "$MUTANTS_TIMEOUT"
+printf 'rust-mutants: diff against %s, output in %s\n' "$base" "$out/mutants.out"
+status=0
+cargo mutants "$@" || status=$?
+
+survivors() {
+  file=$out/mutants.out/$1
+  [ -s "$file" ] || return 0
+  printf '\nrust-mutants: %s (%s):\n' "$2" "$file"
+  cat "$file"
+  found=1
+}
+
+case $status in
+  0 | 2 | 3)
+    found=0
+    survivors missed.txt 'survivors: missed by every test'
+    survivors timeout.txt 'survivors: timed out'
+    [ "$found" -eq 1 ] || printf 'rust-mutants: no survivors\n'
+    exit 0
+    ;;
+  *)
+    printf 'rust-mutants: cargo mutants exited %s (1 usage, 4 baseline failed, 5 diff does not match the tree, 6 invalid diff, 70 internal)\n' "$status" >&2
+    exit "$status"
+    ;;
+esac

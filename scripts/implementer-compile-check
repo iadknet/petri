@@ -1,0 +1,61 @@
+#!/bin/sh
+# PostToolUse hook (Edit|Write) for the roadmap-implementer subagent.
+#
+# Reads the hook payload from stdin. When the edited file is a Rust source
+# file, runs `cargo check --workspace --all-targets` in that file's repository
+# and, on failure or timeout, exits 2 with the last 30 lines of output so the
+# implementer sees the compiler's verdict at once. A PostToolUse hook cannot
+# undo a completed edit, so this is feedback, not a gate. Anything the hook
+# cannot evaluate exits 0 so a broken hook never disturbs work.
+#
+# Environment:
+#   PETRI_COMPILE_CHECK_TIMEOUT  seconds before the check is abandoned (300)
+set -eu
+
+input=$(cat)
+# Only the tool input carries an unescaped "file_path" key: the same text
+# inside Write content or Edit strings is JSON-escaped as \"file_path\".
+file=$(printf '%s' "$input" | sed -n 's/.*"file_path"[[:space:]]*:[[:space:]]*"\([^"]*\)".*/\1/p' | head -n 1)
+case $file in
+  *.rs) ;;
+  *) exit 0 ;;
+esac
+dir=$(dirname "$file")
+[ -d "$dir" ] || exit 0
+root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || exit 0
+[ -f "$root/Cargo.toml" ] || exit 0
+
+timeout_seconds=${PETRI_COMPILE_CHECK_TIMEOUT:-300}
+log=$(mktemp "${TMPDIR:-/tmp}/petri-compile-check.XXXXXX")
+expired=$log.expired
+trap 'rm -f "$log" "$expired"' EXIT HUP INT TERM
+
+cd "$root"
+CARGO_TERM_COLOR=never cargo check --workspace --all-targets >"$log" 2>&1 &
+cargo_pid=$!
+# Watchdog: after the timeout, mark the run expired and stop cargo. Its stdio
+# is detached so a lingering sleep cannot hold the hook's pipes open.
+(
+  trap 'kill "$sleep_pid" 2>/dev/null; exit 0' TERM
+  sleep "$timeout_seconds" &
+  sleep_pid=$!
+  wait "$sleep_pid" || exit 0
+  : >"$expired"
+  kill "$cargo_pid" 2>/dev/null
+) >/dev/null 2>&1 </dev/null &
+watchdog_pid=$!
+
+status=0
+wait "$cargo_pid" || status=$?
+kill "$watchdog_pid" 2>/dev/null || true
+
+if [ -f "$expired" ]; then
+  verdict="timed out after ${timeout_seconds}s"
+elif [ "$status" -ne 0 ]; then
+  verdict="failed (exit $status)"
+else
+  exit 0
+fi
+printf 'implementer-compile-check: cargo check --workspace --all-targets %s after editing %s. Last 30 lines:\n' "$verdict" "$file" >&2
+tail -n 30 "$log" >&2
+exit 2

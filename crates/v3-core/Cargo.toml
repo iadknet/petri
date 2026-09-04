@@ -26,6 +26,7 @@ optional = true
 [dev-dependencies]
 serde_json = { workspace = true }
 criterion = "0.5"
+proptest = "1.11"
 
 [[bench]]
 name = "tick"
