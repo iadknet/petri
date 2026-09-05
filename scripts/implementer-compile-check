@@ -9,7 +9,7 @@
 # cannot evaluate exits 0 so a broken hook never disturbs work.
 #
 # Environment:
-#   PETRI_COMPILE_CHECK_TIMEOUT  seconds before the check is abandoned (300)
+#   PETRI_COMPILE_CHECK_TIMEOUT  seconds before the check is abandoned (900)
 set -eu
 
 input=$(cat)
@@ -25,7 +25,7 @@ dir=$(dirname "$file")
 root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || exit 0
 [ -f "$root/Cargo.toml" ] || exit 0
 
-timeout_seconds=${PETRI_COMPILE_CHECK_TIMEOUT:-300}
+timeout_seconds=${PETRI_COMPILE_CHECK_TIMEOUT:-900}
 log=$(mktemp "${TMPDIR:-/tmp}/petri-compile-check.XXXXXX")
 expired=$log.expired
 trap 'rm -f "$log" "$expired"' EXIT HUP INT TERM
