@@ -8,14 +8,16 @@
       "docs/progress/features/t10-f09-throughput-baseline-and-profiling-budget.json",
       "docs/progress/features/t10-f11-cross-process-reproducibility-of-seeded-runs.json",
       "docs/progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table.json",
-      "docs/progress/features/t11-f05-temporal-controller-fixtures.json"
+      "docs/progress/features/t11-f05-temporal-controller-fixtures.json",
+      "docs/progress/features/t11-f01-mutational-neighborhood-indicator.json"
     ]
   },
   "goal": {
     "series": "goal-v1",
     "epoch_baseline": "docs/progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table-goal.json",
     "closed": [
-      "docs/progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table-goal.json"
+      "docs/progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table-goal.json",
+      "docs/progress/features/t11-f01-mutational-neighborhood-indicator-goal.json"
     ]
   }
 }
