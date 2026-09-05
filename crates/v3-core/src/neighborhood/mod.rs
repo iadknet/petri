@@ -105,5 +105,8 @@ pub fn evaluate_genome(
         birth_count,
         seed_offset,
     );
-    GenomeEvaluation { operator_rows, births }
+    GenomeEvaluation {
+        operator_rows,
+        births,
+    }
 }

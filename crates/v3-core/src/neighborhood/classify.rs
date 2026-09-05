@@ -23,7 +23,9 @@ pub enum Class {
 }
 
 fn is_all_noop(actions: &[WorldAction]) -> bool {
-    actions.iter().all(|action| matches!(action, WorldAction::NoOp))
+    actions
+        .iter()
+        .all(|action| matches!(action, WorldAction::NoOp))
 }
 
 /// One classification's full detail: the class, whether the two signatures
@@ -60,7 +62,10 @@ pub fn classify(base: &Signature, candidate: &Signature) -> Classification {
     let class = if differing_executions == 0 {
         Class::Silent
     } else {
-        let all_noop = candidate.snapshots.iter().all(|actions| is_all_noop(actions))
+        let all_noop = candidate
+            .snapshots
+            .iter()
+            .all(|actions| is_all_noop(actions))
             && candidate
                 .sequences
                 .iter()
@@ -213,9 +218,16 @@ mod tests {
     #[test]
     fn every_execution_noop_and_differing_is_dead_even_with_an_empty_action_queue() {
         let base = signature_from_bits(&[true], &[]);
-        let candidate = Signature { snapshots: vec![Vec::new()], sequences: Vec::new() };
+        let candidate = Signature {
+            snapshots: vec![Vec::new()],
+            sequences: Vec::new(),
+        };
         let result = classify(&base, &candidate);
-        assert_eq!(result.class, Class::Dead, "an empty action queue is vacuously all-NoOp");
+        assert_eq!(
+            result.class,
+            Class::Dead,
+            "an empty action queue is vacuously all-NoOp"
+        );
     }
 
     #[test]
@@ -253,6 +265,91 @@ mod tests {
             total_executions: 80,
         });
         assert_eq!(tally.mean_fraction_differing(), 0.0);
+    }
+
+    #[test]
+    fn mean_fraction_differing_divides_the_recorded_totals() {
+        let tally = Tally::default().record(Classification {
+            class: Class::Changed,
+            changed_only_in_sequences: false,
+            differing_executions: 5,
+            total_executions: 10,
+        });
+        assert_eq!(tally.mean_fraction_differing(), 0.5);
+    }
+
+    /// Every field of `record` starts at `0` (`Tally::default`), so `+=` and
+    /// `*=` diverge on the very first call: `0 += 1 == 1` but `0 *= 1 == 0`.
+    /// Two calls from different classes pin every field to a concrete count,
+    /// including the `!matches!(.., Silent)` guard around the execution
+    /// totals (a `Silent`-only counter-check would not distinguish it).
+    #[test]
+    fn record_accumulates_every_field_by_addition_not_multiplication() {
+        let tally = Tally::default().record(Classification {
+            class: Class::Changed,
+            changed_only_in_sequences: true,
+            differing_executions: 3,
+            total_executions: 4,
+        });
+        assert_eq!(tally.silent, 0);
+        assert_eq!(tally.changed, 1);
+        assert_eq!(tally.dead, 0);
+        assert_eq!(tally.changed_only_in_sequences, 1);
+        assert_eq!(tally.differing_executions_total, 3);
+        assert_eq!(tally.total_executions_total, 4);
+
+        let tally = tally.record(Classification {
+            class: Class::Dead,
+            changed_only_in_sequences: false,
+            differing_executions: 2,
+            total_executions: 5,
+        });
+        assert_eq!(tally.changed, 1);
+        assert_eq!(tally.dead, 1);
+        assert_eq!(
+            tally.changed_only_in_sequences, 1,
+            "unchanged by the second, non-changed_only_in_sequences call"
+        );
+        assert_eq!(tally.differing_executions_total, 5);
+        assert_eq!(tally.total_executions_total, 9);
+    }
+
+    /// `merge` is field-wise integer addition; commutativity and
+    /// associativity alone (asserted above) do not distinguish it from
+    /// multiplication, which satisfies both algebraic laws too. Concrete,
+    /// non-0/1 field values pin it down: addition and multiplication give
+    /// different results for them.
+    #[test]
+    fn merge_adds_every_field_rather_than_multiplying() {
+        let a = Tally {
+            trials: 2,
+            skipped: 3,
+            silent: 4,
+            changed: 5,
+            dead: 6,
+            changed_only_in_sequences: 7,
+            differing_executions_total: 8,
+            total_executions_total: 9,
+        };
+        let b = Tally {
+            trials: 10,
+            skipped: 11,
+            silent: 12,
+            changed: 13,
+            dead: 14,
+            changed_only_in_sequences: 15,
+            differing_executions_total: 16,
+            total_executions_total: 17,
+        };
+        let merged = a.merge(b);
+        assert_eq!(merged.trials, 12);
+        assert_eq!(merged.skipped, 14);
+        assert_eq!(merged.silent, 16);
+        assert_eq!(merged.changed, 18);
+        assert_eq!(merged.dead, 20);
+        assert_eq!(merged.changed_only_in_sequences, 22);
+        assert_eq!(merged.differing_executions_total, 24);
+        assert_eq!(merged.total_executions_total, 26);
     }
 
     proptest! {
@@ -300,25 +397,34 @@ mod tests {
     }
 
     fn tally_strategy() -> impl Strategy<Value = Tally> {
-        (0u32..20, 0u32..20, 0u32..20, 0u32..20, 0u32..20, 0u64..500, 0u64..2000).prop_map(
-            |(
-                skipped,
-                silent,
-                changed,
-                dead,
-                changed_only_in_sequences,
-                differing_executions_total,
-                total_executions_total,
-            )| Tally {
-                trials: skipped + silent + changed + dead,
-                skipped,
-                silent,
-                changed,
-                dead,
-                changed_only_in_sequences,
-                differing_executions_total,
-                total_executions_total,
-            },
+        (
+            0u32..20,
+            0u32..20,
+            0u32..20,
+            0u32..20,
+            0u32..20,
+            0u64..500,
+            0u64..2000,
         )
+            .prop_map(
+                |(
+                    skipped,
+                    silent,
+                    changed,
+                    dead,
+                    changed_only_in_sequences,
+                    differing_executions_total,
+                    total_executions_total,
+                )| Tally {
+                    trials: skipped + silent + changed + dead,
+                    skipped,
+                    silent,
+                    changed,
+                    dead,
+                    changed_only_in_sequences,
+                    differing_executions_total,
+                    total_executions_total,
+                },
+            )
     }
 }

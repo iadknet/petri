@@ -85,7 +85,17 @@ fn tiny_goal_params() -> bench::ProfileParams {
 /// independent runs at the same commit and inputs.
 #[test]
 fn gate_profile_deterministic_block_is_byte_identical_across_two_runs() {
-    let params = bench::gate_profile_params();
+    // Runs the gate profile at the small fixture `NeighborhoodSizes::default()`
+    // rather than `NeighborhoodSizes::PRODUCTION` (T11.F01 spec, "Compute
+    // limits"): a debug-build timing measurement at production sizes found
+    // this test alone taking ~41s and the regression test below ~15s, against
+    // a pre-feature combined total of ~30s for both, well past the 10-second
+    // growth budget. In-process byte-identity does not depend on trial count.
+    // `make bench` alone produces the production reading.
+    let params = bench::ProfileParams {
+        neighborhood: bench::NeighborhoodSizes::default(),
+        ..bench::gate_profile_params()
+    };
 
     let report_a = bench::build_report(&params, "t10-f10-determinism-check");
     let report_b = bench::build_report(&params, "t10-f10-determinism-check");
@@ -124,7 +134,14 @@ fn gate_profile_has_no_severe_regression_against_series_references() {
         .map(|p| repo_root().join(p))
         .collect();
 
-    let params = bench::gate_profile_params();
+    // Same reduced-fixture rationale as the byte-identity test above: the
+    // work-counter and profile comparisons below do not depend on
+    // neighborhood trial count, and the production reading only needs to
+    // exist once, produced by `make bench`.
+    let params = bench::ProfileParams {
+        neighborhood: bench::NeighborhoodSizes::default(),
+        ..bench::gate_profile_params()
+    };
     let mut report = bench::build_report(&params, "t10-f10-regression-check");
 
     let severe = bench::apply_comparisons(&mut report, &resolved_paths)
@@ -548,12 +565,18 @@ fn tiny_goal_profile_observations_are_deterministic_and_goal_only() {
         one_thread.deterministic.goal_indicators.memory_sensitivity,
         bench::Indicator::Defined(_)
     ));
-    match &one_thread.deterministic.goal_indicators.mutational_neighborhood {
+    match &one_thread
+        .deterministic
+        .goal_indicators
+        .mutational_neighborhood
+    {
         bench::Indicator::Defined(neighborhood) => assert!(
             matches!(neighborhood.evolved, bench::Indicator::Defined(_)),
             "the evolved half must be defined in the goal profile"
         ),
-        bench::Indicator::Undefined(_) => panic!("mutational_neighborhood must be defined in the goal profile"),
+        bench::Indicator::Undefined(_) => {
+            panic!("mutational_neighborhood must be defined in the goal profile")
+        }
     }
     assert_eq!(
         one_thread

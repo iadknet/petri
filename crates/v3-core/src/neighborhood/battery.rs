@@ -85,15 +85,24 @@ fn draw_scenario(rng: &mut SmallRng, food_type_count: usize) -> Scenario {
             generation: 0.0,
             age_ticks: age,
         },
-        typed_local_food: TypedFoodLocalSnapshot { food_here_by_type, neighbor_food_by_type },
+        typed_local_food: TypedFoodLocalSnapshot {
+            food_here_by_type,
+            neighbor_food_by_type,
+        },
         perception: PerceptionSnapshot::zeroed(food_type_count),
     };
-    Scenario { sensors, energy, reserve }
+    Scenario {
+        sensors,
+        energy,
+        reserve,
+    }
 }
 
 fn draw_scenarios(seed: u64, count: usize, food_type_count: usize) -> Vec<Scenario> {
     let mut rng = SmallRng::seed_from_u64(seed);
-    (0..count).map(|_| draw_scenario(&mut rng, food_type_count)).collect()
+    (0..count)
+        .map(|_| draw_scenario(&mut rng, food_type_count))
+        .collect()
 }
 
 /// The complete `neighborhood-v1` battery: the fixed snapshot and sequence
@@ -112,13 +121,19 @@ impl Battery {
     #[must_use]
     pub fn generate(food_type_count: usize) -> Self {
         let snapshots = draw_scenarios(SNAPSHOT_SEED, SNAPSHOT_COUNT, food_type_count);
-        let sequence_scenarios =
-            draw_scenarios(SEQUENCE_SEED, SEQUENCE_COUNT * SEQUENCE_LEN, food_type_count);
+        let sequence_scenarios = draw_scenarios(
+            SEQUENCE_SEED,
+            SEQUENCE_COUNT * SEQUENCE_LEN,
+            food_type_count,
+        );
         let sequences = sequence_scenarios
             .chunks(SEQUENCE_LEN)
             .map(<[Scenario]>::to_vec)
             .collect();
-        Self { snapshots, sequences }
+        Self {
+            snapshots,
+            sequences,
+        }
     }
 
     /// Evaluate `genome`'s complete execution signature against this battery.
@@ -144,7 +159,10 @@ impl Battery {
                 self.execute_sequence(genome, sequence, runtime, shared_memory_decay_rate)
             })
             .collect();
-        Signature { snapshots, sequences }
+        Signature {
+            snapshots,
+            sequences,
+        }
     }
 
     fn execute_single_tick(
@@ -249,7 +267,10 @@ mod tests {
         let battery = Battery::generate(2);
         let founder = founder_genome(FounderProfile::V3Alpha1);
         let signature = battery.signature(&founder, &RuntimeConfig::default(), 0.0);
-        assert_eq!(signature.execution_count(), SNAPSHOT_COUNT + SEQUENCE_COUNT * SEQUENCE_LEN);
+        assert_eq!(
+            signature.execution_count(),
+            SNAPSHOT_COUNT + SEQUENCE_COUNT * SEQUENCE_LEN
+        );
     }
 
     #[test]
@@ -259,6 +280,74 @@ mod tests {
         let runtime = RuntimeConfig::default();
         let a = battery.signature(&founder, &runtime, 0.0);
         let b = battery.signature(&founder, &runtime, 0.0);
-        assert_eq!(a, b, "the same genome against the same battery always yields the same signature");
+        assert_eq!(
+            a, b,
+            "the same genome against the same battery always yields the same signature"
+        );
+    }
+
+    #[test]
+    fn execute_single_tick_never_returns_an_empty_action_queue() {
+        // `into_actions_or_noop()` guarantees a NoOp fallback, so a fresh
+        // subject's single-tick action queue is never empty; a stub that
+        // always returns `vec![]` would fail this on every scenario.
+        let battery = Battery::generate(2);
+        let founder = founder_genome(FounderProfile::V3Alpha1);
+        let runtime = RuntimeConfig::default();
+        for scenario in &battery.snapshots {
+            let actions = battery.execute_single_tick(&founder, scenario, &runtime);
+            assert!(!actions.is_empty());
+        }
+    }
+
+    #[test]
+    fn nonzero_or_zero_is_always_zero_when_p_zero_is_one() {
+        let mut rng = SmallRng::seed_from_u64(3);
+        for _ in 0..10 {
+            assert_eq!(nonzero_or_zero(&mut rng, 1.0), 0.0);
+        }
+    }
+
+    #[test]
+    fn nonzero_or_zero_is_in_range_when_p_zero_is_zero() {
+        let mut rng = SmallRng::seed_from_u64(3);
+        for _ in 0..50 {
+            let value = nonzero_or_zero(&mut rng, 0.0);
+            assert!((0.1..=1.0).contains(&value), "{value}");
+        }
+    }
+
+    /// `draw_scenario` gives the first food type a lower zero-probability
+    /// (`0.5`) than every other type (`0.6`), per Appendix A's generator.
+    /// Swapping the `type_idx == 0` test would swap which type gets which
+    /// probability; a large fixed-seed sample distinguishes the two by its
+    /// per-type zero fraction (SE ~0.008 at 4,000 trials, so a 0.05 margin
+    /// is far from flaky).
+    #[test]
+    fn draw_scenario_uses_a_lower_zero_probability_for_the_first_food_type_than_others() {
+        let mut rng = SmallRng::seed_from_u64(42);
+        let trials = 4_000u32;
+        let mut zero_first = 0u32;
+        let mut zero_second = 0u32;
+        for _ in 0..trials {
+            let scenario = draw_scenario(&mut rng, 2);
+            let food = &scenario.sensors.typed_local_food.food_here_by_type;
+            if food[0] == 0.0 {
+                zero_first += 1;
+            }
+            if food[1] == 0.0 {
+                zero_second += 1;
+            }
+        }
+        let frac_first = f64::from(zero_first) / f64::from(trials);
+        let frac_second = f64::from(zero_second) / f64::from(trials);
+        assert!(
+            (frac_first - 0.5).abs() < 0.05,
+            "food type 0's zero fraction should be near 0.5, got {frac_first}"
+        );
+        assert!(
+            (frac_second - 0.6).abs() < 0.05,
+            "food type 1's zero fraction should be near 0.6, got {frac_second}"
+        );
     }
 }

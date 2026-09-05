@@ -97,7 +97,10 @@ fn specific_operators_are_fully_silent_on_the_founder_as_the_audit_recorded() {
 #[test]
 fn every_operator_in_the_four_domains_produces_a_row() {
     let evaluation = founder_evaluation(1);
-    assert_eq!(evaluation.operator_rows.len(), v3_core::neighborhood::operator_catalog().len());
+    assert_eq!(
+        evaluation.operator_rows.len(),
+        v3_core::neighborhood::operator_catalog().len()
+    );
     for row in &evaluation.operator_rows {
         assert_eq!(row.tally.trials, REDUCED_OPERATOR_TRIALS);
     }
@@ -111,6 +114,9 @@ fn per_birth_buckets_account_for_every_attempted_birth() {
     let births = &evaluation.births;
     assert_eq!(births.births_total, REDUCED_BIRTHS);
     let bucketed_trials: u32 = births.by_events.values().map(|tally| tally.trials).sum();
-    assert_eq!(births.zero_event_births + bucketed_trials, births.births_total);
+    assert_eq!(
+        births.zero_event_births + bucketed_trials,
+        births.births_total
+    );
     assert_eq!(births.any_events.trials, bucketed_trials);
 }
