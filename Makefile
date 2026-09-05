@@ -93,7 +93,7 @@ rust-test-doc: ## Run Rust documentation tests.
 rust-clippy: ## Run Clippy with warnings denied.
 	@cargo clippy --workspace --all-targets -- -D warnings
 
-rust-mutants: ## Mutation-test the diff against the merge base with main (survivor triage; not part of check). Env: MUTANTS_BASE, MUTANTS_JOBS, MUTANTS_TIMEOUT.
+rust-mutants: ## Mutation-test the diff against the merge base with main (survivor triage; not part of check). Waits for any running cargo-mutants first. Env: MUTANTS_BASE, MUTANTS_JOBS, MUTANTS_TIMEOUT, BENCH_WAIT_TIMEOUT.
 	@scripts/rust-mutants
 
 frontend-check: ## Lint, test, and build the frontend.

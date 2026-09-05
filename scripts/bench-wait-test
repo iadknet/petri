@@ -115,6 +115,35 @@ for timeout in invalid -1 ''; do
   [ "$status" -eq 2 ] || fail 'invalid timeout accepted'
   [ ! -f "$test_root/ran" ] || fail 'benchmark ran with invalid timeout'
 done
+unset timeout
+
+# BENCH_WAIT_BLOCKERS=mutants waits only for cargo-mutants: a running server
+# or benchmark must not hold up a mutation run.
+reset_fixture
+printf '123 S /tools/cargo-mutants\n' >"$test_root/processes"
+: >"$test_root/next"
+BENCH_WAIT_BLOCKERS=mutants run_checker
+expect_run
+[ "$(cat "$test_root/sleeps")" = 5 ] || fail 'mutants mode did not wait for cargo-mutants'
+grep -F 'running mutation test' "$test_root/output" >/dev/null || fail 'mutants mode diagnostic missing'
+
+reset_fixture
+cat >"$test_root/processes" <<'PROCESSES'
+123 S /repo/target/debug/v3-server
+124 S /another/target/release/v3-cli
+125 S /tmp/target/debug/deps/v3_core-a8330ce714f663f7
+PROCESSES
+BENCH_WAIT_BLOCKERS=mutants run_checker
+expect_run
+[ ! -f "$test_root/sleeps" ] || fail 'mutants mode waited for a non-mutants process'
+
+reset_fixture
+BENCH_WAIT_BLOCKERS=benchmarks run_checker
+[ "$status" -eq 2 ] || fail 'invalid blocker mode accepted'
+[ ! -f "$test_root/ran" ] || fail 'command ran with invalid blocker mode'
+# An assignment before a function call persists in POSIX sh; do not leak the
+# mode into the make-target cases below.
+unset BENCH_WAIT_BLOCKERS
 
 # Every public benchmark profile must go through the guard.
 for profile in gate goal sweep; do
@@ -129,5 +158,16 @@ for profile in gate goal sweep; do
   [ ! -f "$test_root/ran" ] || fail "make bench PROFILE=$profile started cargo while blocked"
   grep -F 'timed out' "$test_root/output" >/dev/null || fail "profile $profile did not invoke guard"
 done
+
+# make rust-mutants must not start while another cargo-mutants is running.
+reset_fixture
+printf '123 S /tools/cargo-mutants\n' >"$test_root/processes"
+if PATH="$test_root/bin:$PATH" BENCH_WAIT_TIMEOUT=0 MUTANTS_BASE=HEAD~1 \
+  MUTANTS_OUT="$test_root/mutants" \
+  make -s -C "$script_dir/.." rust-mutants >"$test_root/output" 2>&1; then
+  fail 'make rust-mutants ignored a running cargo-mutants'
+fi
+[ ! -f "$test_root/ran" ] || fail 'make rust-mutants started cargo while blocked'
+grep -F 'timed out' "$test_root/output" >/dev/null || fail 'make rust-mutants did not invoke guard'
 
 printf 'Benchmark wait regression tests passed.\n'
