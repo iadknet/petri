@@ -1,7 +1,7 @@
 # T01.F12 — Goal Profile, Basic Indicators, and Progress Table
 
-**Status**: In Progress
-**Last updated**: 2026-09-04
+**Status**: Complete
+**Last updated**: 2026-09-05
 **Feature**: T01.F12
 **Track**: [T01 — Experimental Science and Causal Evaluation](../../roadmaps/t01-experimental-science-and-causal-evaluation.md)
 
@@ -10,8 +10,8 @@
 A fixed, minutes-scale goal benchmark reports final-population lineage diversity
 and memory sensitivity without changing the simulation. A plain progress table
 shows both compute comparisons and every indicator, backed by separate gate and
-goal series. Implementation and automated review are complete; manual
-verification and integration remain pending.
+goal series. Implementation, automated review, and the user's manual verification
+(2026-09-05) are complete.
 
 ## Non-Goals
 
@@ -67,7 +67,8 @@ verification and integration remain pending.
 - Preserve the gate series label, epoch reference, and four closed references.
   Add a distinct goal-v1 series with the first goal report as baseline. The
   current feature is pending manual verification: do not append it to a `closed`
-  list. Its goal baseline is explicitly provisional until integration.
+  list. Its goal baseline is explicitly provisional until integration. (Resolved:
+  the user verified on 2026-09-05 and both reports were appended to their series.)
 
 ### Indicator definitions (goal-v1)
 
@@ -147,7 +148,7 @@ verification and integration remain pending.
       clean `888fadfcc3f29849cfb0560121e9ea1571e3f628`. Root will repeat the
       full check after this status-only commit and record that tested hash in the
       task handoff (a commit cannot embed its own hash).
-- [ ] User manual verification and integration (intentionally pending).
+- [x] User manual verification and integration: verified by the user on 2026-09-05; the T01.F12 row is checked, this spec is Complete, and both reports are appended to their series.
 
 TDD record: `cargo test -p v3-core final_action_observation_uses_full_actions_and_leaves_simulation_unchanged`
 was red before `GraphRuntimeState::Clone` and `observe_final_actions` existed;
@@ -197,8 +198,8 @@ survivor, outside simulation counters. Include probe time in a separately named
 environment timing or the report's measured total so the observation cost is
 visible; preserve the existing gate timing boundary. No gate epoch re-pin.
 
-The first goal-v1 reading below is a provisional program baseline pending manual
-verification/integration, not evidence of improvement.
+The first goal-v1 reading below is the goal-v1 program baseline, verified by the
+user on 2026-09-05; it is a baseline, not evidence of improvement.
 
 Measured on 2026-09-04/05 with committed producer revision
 `e94569b8ebed8b28dd7bce1db5d35e134ecdc3f4` on Apple M1 Pro, 8 logical cores:
@@ -256,7 +257,7 @@ the minimal correct semantics; no correction was needed.
 - [x] Automated gates, mutation triage, benchmark reporting, and independent
       review passed on clean `888fadfcc3f29849cfb0560121e9ea1571e3f628`;
       root will repeat `make check` after this status-only commit.
-- [ ] Manual verification and integration are approved (intentionally pending).
+- [x] Manual verification and integration are approved (2026-09-05).
 
 ## Notes for AI Agents
 
