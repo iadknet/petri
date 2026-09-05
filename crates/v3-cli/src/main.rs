@@ -1,7 +1,7 @@
 use std::num::NonZeroUsize;
 
 use clap::Parser;
-use v3_cli::bench::{self, ProfileParams};
+use v3_cli::bench::{self, NeighborhoodSizes, ProfileParams};
 use v3_cli::RunError;
 use v3_core::config::SimulationConfig;
 
@@ -221,6 +221,7 @@ fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), S
                 seeds,
                 ticks,
                 food_coverage: args.food_coverage,
+                neighborhood: NeighborhoodSizes::default(),
             };
             let feature = args.feature.clone().unwrap_or_else(|| "sweep".to_string());
             Ok((params, feature))

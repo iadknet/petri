@@ -43,6 +43,7 @@ fn tiny_report() -> bench::Report {
         seeds: vec![1],
         ticks: 3,
         food_coverage: Some(1.0),
+        neighborhood: bench::NeighborhoodSizes::default(),
     };
     bench::build_report(&params, "t10-f10-synthetic-check")
 }
@@ -59,9 +60,14 @@ fn tiny_sweep_params() -> bench::ProfileParams {
         seeds: vec![11],
         ticks: 30,
         food_coverage: None,
+        neighborhood: bench::NeighborhoodSizes::default(),
     }
 }
 
+/// Small mutational-neighborhood sizes (T11.F01), distinct from the
+/// production `NeighborhoodSizes::PRODUCTION` reading, so this fixture
+/// exercises the same goal-profile code path as `make bench PROFILE=goal`
+/// without paying production cost in a debug-build test.
 fn tiny_goal_params() -> bench::ProfileParams {
     bench::ProfileParams {
         name: "goal".to_string(),
@@ -71,6 +77,7 @@ fn tiny_goal_params() -> bench::ProfileParams {
         seeds: vec![11],
         ticks: 30,
         food_coverage: None,
+        neighborhood: bench::NeighborhoodSizes::default(),
     }
 }
 
@@ -541,6 +548,13 @@ fn tiny_goal_profile_observations_are_deterministic_and_goal_only() {
         one_thread.deterministic.goal_indicators.memory_sensitivity,
         bench::Indicator::Defined(_)
     ));
+    match &one_thread.deterministic.goal_indicators.mutational_neighborhood {
+        bench::Indicator::Defined(neighborhood) => assert!(
+            matches!(neighborhood.evolved, bench::Indicator::Defined(_)),
+            "the evolved half must be defined in the goal profile"
+        ),
+        bench::Indicator::Undefined(_) => panic!("mutational_neighborhood must be defined in the goal profile"),
+    }
     assert_eq!(
         one_thread
             .environment
@@ -556,6 +570,10 @@ fn tiny_goal_profile_observations_are_deterministic_and_goal_only() {
     ));
     assert!(matches!(
         sweep.deterministic.goal_indicators.memory_sensitivity,
+        bench::Indicator::Undefined(ref value) if value == "Undefined"
+    ));
+    assert!(matches!(
+        sweep.deterministic.goal_indicators.mutational_neighborhood,
         bench::Indicator::Undefined(ref value) if value == "Undefined"
     ));
     assert!(sweep
