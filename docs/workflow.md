@@ -155,6 +155,18 @@ spec's Performance and Goal Impact section. A severe compute regression without
 a predeclared, justified cost is a P1. Never weaken a threshold or edit a stored
 baseline to make a feature pass.
 
+The goal profile runs **once** per closure. A second goal run to re-check its
+`deterministic` block is not required and must not be reinstated as a lost
+safeguard: the run costs about eleven minutes, and cross-process
+reproducibility is already covered by
+`crates/v3-core/tests/reproducibility.rs` inside `make check` (user decision,
+2026-09-05, taken to cut per-feature closure cost). A spec's Verification item
+for a second goal run is closed with that reason recorded against it, in
+either the `Not applicable` or the stored-reports-only form, and is never
+left unchecked. The gate profile's
+two-run byte-identical check is unaffected: it is seconds-scale and runs
+inside `make check` as an ordinary test.
+
 Use `make bench` for measured gate, goal, and sweep reports. Its
 `scripts/bench-wait` preflight waits for other `v3-server`, `v3-cli`, and
 `v3-core` executables, their `v3_*` unit-test binaries, and `cargo-mutants`

@@ -34,7 +34,7 @@ truth for feature dependencies.
 Record the gate profile's deterministic work and wall-clock deltas per
 creature-tick against both the previous closed feature and the pinned epoch
 baseline, whether a threshold was crossed, and the dated goal-profile indicator
-readings with the second-run determinism check. Predeclare and
+readings from its single closure run. Predeclare and
 justify any expected compute cost here before implementation; a justified cost
 re-pins the epoch baseline in this feature's closing commit. If this feature
 introduces a diversity or cognition measure, wire its indicator into the goal
