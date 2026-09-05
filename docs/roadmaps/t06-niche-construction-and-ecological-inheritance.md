@@ -19,14 +19,14 @@ themselves and for other lineages across lifetimes and generations.
 
 ## Executable Features
 
-- [ ] **T06.F01 — Durable Creature-Authored World State** — Depends on: T02.F01
-  - Goal: Burrows and trails. Creatures can make lasting changes to a cell through normal actions and energy cost, and those changes persist or decay on their own clock.
-- [ ] **T06.F02 — Resource Transport and Caching** — Depends on: T03.F05, T06.F01
-  - Goal: Caching. Creatures carry food and store it in the world for later, where others can find it too.
+- [ ] **T06.F01 — Material Carrying and Barrier Construction** — Depends on: T02.F02
+  - Goal: Burrows and walls. Creatures use four shared storage slots to pick up and relocate barriers at an action energy cost and a movement penalty per occupied slot, leaving changes that persist beyond their makers.
+- [ ] **T06.F02 — Food Transport and Caching** — Depends on: T06.F01
+  - Goal: Caching. Creatures use the same four slots to carry food, eat it later, or deposit it for any creature to discover, preserving its properties and decay clock while paying the same movement penalty per occupied slot.
 - [ ] **T06.F03 — Resource Transformation and Byproduct Loops** — Depends on: T03.F04, T06.F01
   - Goal: Dung and decay. Eating produces byproducts that become another food type, so one lineage's waste is another's meal.
 - [ ] **T06.F04 — Habitat Modification Actions** — Depends on: T03.F01, T06.F01
-  - Goal: Dams and clearings. Creatures alter terrain or fertility, making places better or worse for everyone who comes after.
+  - Goal: Soil engineering. Creatures alter habitat properties such as fertility beyond barrier relocation, making places better or worse for everyone who comes after.
 - [ ] **T06.F05 — Persistence, Decay, and Ecological Inheritance** — Depends on: T06.F02, T06.F03, T06.F04
   - Goal: Inheritance of place. Constructed changes outlast their makers and shape what their descendants and neighbors face.
 - [ ] **T06.F06 — Constructor Transfer and Erasure Assays** — Depends on: T06.F05, T10.F05
@@ -36,6 +36,7 @@ themselves and for other lineages across lifetimes and generations.
 
 ## Notes for AI Agents
 
+- Advance designs requested 2026-09-04: [T06.F01 spec](../specs/roadmap/t06-f01-material-carrying-and-barrier-construction.md) and [T06.F02 spec](../specs/roadmap/t06-f02-food-transport-and-caching.md). Both remain Planned. F01 reuses T02.F02 seeded barriers; F02 transports uneaten food and does not require T03.F05 internal energy-storage traits. Trails are outside these two features. F04 covers habitat properties beyond F01's barrier relocation.
 - The applied world grid owns environmental truth. Construction actions must change that state through normal action resolution and energy accounting.
 - A creature merely consuming or occupying a cell is not sufficient evidence of niche construction; the change must alter later selection and survive long enough to be assayed.
 - Treat persistence as an experimental variable. Too little prevents inheritance, while excessive persistence can lock in stale or maladaptive structures.
