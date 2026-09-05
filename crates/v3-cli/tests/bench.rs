@@ -354,10 +354,8 @@ fn sweep_output_and_reference_selection_stay_separate_from_goal() {
         "t01-f12-sweep-output-check",
     ];
 
-    let missing_out_dir = std::env::temp_dir().join(format!(
-        "t01-f12-sweep-missing-out-{}",
-        std::process::id()
-    ));
+    let missing_out_dir =
+        std::env::temp_dir().join(format!("t01-f12-sweep-missing-out-{}", std::process::id()));
     std::fs::create_dir_all(&missing_out_dir).expect("create isolated working directory");
     let rejected = std::process::Command::new(env!("CARGO_BIN_EXE_v3-cli"))
         .args(base_args)
@@ -365,7 +363,10 @@ fn sweep_output_and_reference_selection_stay_separate_from_goal() {
         .output()
         .expect("the v3-cli binary must run");
     let _ = std::fs::remove_dir_all(&missing_out_dir);
-    assert!(!rejected.status.success(), "a sweep without --out must fail");
+    assert!(
+        !rejected.status.success(),
+        "a sweep without --out must fail"
+    );
     assert!(
         String::from_utf8_lossy(&rejected.stderr).contains("--out is required for --profile sweep"),
         "stderr: {}",
