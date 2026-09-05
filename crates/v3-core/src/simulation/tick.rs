@@ -110,6 +110,21 @@ fn barrier_reader_state_for_creature(creature: &CreatureState) -> BarrierReaderS
     }
 }
 
+/// Snapshot `shared_memory` into `prev_shared_memory`, then decay `shared_memory`
+/// in place by `decay_rate` (a no-op multiply guard at the production default of
+/// `0.0`). This is the one rule for how shared memory crosses a tick boundary;
+/// `run_phase_0` and the mutational-neighborhood indicator's multi-tick battery
+/// (T11.F01) both call it rather than duplicating the snapshot-then-decay order.
+pub fn advance_shared_memory(shared_memory: &mut [f32; 16], prev_shared_memory: &mut [f32; 16], decay_rate: f32) {
+    *prev_shared_memory = *shared_memory;
+    if decay_rate > 0.0 {
+        let factor = 1.0 - decay_rate;
+        for slot in shared_memory.iter_mut() {
+            *slot *= factor;
+        }
+    }
+}
+
 /// Run Phase 0 of a tick: food growth, creature aging, energy decay, dead-creature removal.
 ///
 /// Sub-step canonical order (v3-tick-orchestration-spec.md Section 3):
@@ -130,14 +145,7 @@ pub fn run_phase_0(sim: &mut Simulation) {
         creature.lifetime_energy_sum += f64::from(creature.energy.max(0.0));
         creature.lifetime_energy_sample_count += 1;
 
-        // Snapshot shared_memory → prev_shared_memory, then apply decay.
-        creature.prev_shared_memory = creature.shared_memory;
-        if decay_rate > 0.0 {
-            let factor = 1.0 - decay_rate;
-            for slot in &mut creature.shared_memory {
-                *slot *= factor;
-            }
-        }
+        advance_shared_memory(&mut creature.shared_memory, &mut creature.prev_shared_memory, decay_rate);
     }
 
     // Step 4: Collect dead IDs first to avoid borrow conflict during removal.

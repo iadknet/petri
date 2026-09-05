@@ -11,8 +11,13 @@ use std::path::{Path, PathBuf};
 use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
-use v3_core::config::SimulationConfig;
+use v3_core::config::{MutationConfig, SimulationConfig};
+use v3_core::creature::founder::founder_genome;
 use v3_core::creature::genome::analysis::functional_complexity;
+use v3_core::neighborhood::{
+    self, evaluate_genome, evolved_sample_ranks, structural_companions, Battery, BirthResult,
+    EvalContext, GenomeEvaluation, OperatorRow, StructuralCompanions, Tally, BATTERY_VERSION,
+};
 use v3_core::simulation::{
     observe_final_actions, run_tick, seed_simulation, FinalActionObservation,
 };
@@ -44,6 +49,55 @@ const WALL_CLOCK_SEVERE_PERCENT: f64 = 100.0;
 /// multiple of this constant is sampled, plus the last executed tick.
 pub const SAMPLE_EVERY_TICKS: u64 = 100;
 
+/// Mutational-neighborhood (T11.F01) battery trial and birth counts. Carried
+/// on `ProfileParams` rather than fixed constants, so a tiny test fixture can
+/// exercise the same goal/gate observation code path as production at a
+/// fraction of the cost (the T01.F12 precedent for the lineage and memory
+/// indicators). Never written to `ProfileBlock` — `compare_against_path`
+/// hard-fails on `ProfileBlock` inequality, and only `gate_profile_params()`
+/// and `goal_profile_params()` carry the production reading the floors and
+/// the no-regression rule depend on. The actual sizes used are recorded
+/// truthfully in the report's `NeighborhoodBattery` block instead.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct NeighborhoodSizes {
+    pub founder_operator_trials: u32,
+    pub founder_births: u32,
+    pub evolved_operator_trials: u32,
+    pub evolved_births: u32,
+}
+
+impl NeighborhoodSizes {
+    /// The production sizes, halved once from the originally predeclared
+    /// 100 operator trials / 1,000 births after a debug-build timing
+    /// measurement showed the founder half's two full-report calls inside
+    /// `gate_profile_deterministic_block_is_byte_identical_across_two_runs`
+    /// growing that test well past its 10-second budget (see the T11.F01
+    /// spec's Verification section for the measured numbers). Release wall
+    /// time at the original sizes was ~0.8s against the 10s release budget,
+    /// so the halving is driven by the debug-build constraint alone. The
+    /// evolved-half sizes are unaffected by that halving, since the evolved
+    /// half never runs inside a debug-build gate test.
+    pub const PRODUCTION: Self = Self {
+        founder_operator_trials: 50,
+        founder_births: 500,
+        evolved_operator_trials: 20,
+        evolved_births: 200,
+    };
+}
+
+impl Default for NeighborhoodSizes {
+    /// Small sizes for test fixtures and synthetic profiles: fast, and never
+    /// mistaken for a production reading.
+    fn default() -> Self {
+        Self {
+            founder_operator_trials: 2,
+            founder_births: 5,
+            evolved_operator_trials: 2,
+            evolved_births: 5,
+        }
+    }
+}
+
 // ── Profile parameters ──────────────────────────────────────────────────────
 
 #[derive(Debug, Clone, PartialEq)]
@@ -58,6 +112,7 @@ pub struct ProfileParams {
     /// untouched (production defaults) and serializes as the profile string
     /// `default`; `Some(x)` forces `x` onto every food type.
     pub food_coverage: Option<f32>,
+    pub neighborhood: NeighborhoodSizes,
 }
 
 /// Predeclared gate profile constants (T10.F10 Inputs and Invariants).
@@ -77,6 +132,7 @@ pub fn gate_profile_params() -> ProfileParams {
         seeds: vec![11, 22, 33],
         ticks: 75,
         food_coverage: Some(1.0),
+        neighborhood: NeighborhoodSizes::PRODUCTION,
     }
 }
 
@@ -90,6 +146,7 @@ pub fn goal_profile_params() -> ProfileParams {
         seeds: vec![11, 22, 33],
         ticks: 2_000,
         food_coverage: None,
+        neighborhood: NeighborhoodSizes::PRODUCTION,
     }
 }
 
@@ -195,6 +252,8 @@ pub struct GoalIndicators {
     pub lineage_diversity: Indicator<LineageDiversity>,
     #[serde(default = "undefined_memory_sensitivity")]
     pub memory_sensitivity: Indicator<MemorySensitivity>,
+    #[serde(default = "undefined_mutational_neighborhood")]
+    pub mutational_neighborhood: Indicator<MutationalNeighborhood>,
     pub strategy_count: String,
     pub strategy_causal_distinctness: String,
     pub evolutionary_activity: String,
@@ -255,6 +314,136 @@ pub struct MemorySensitivitySeed {
     pub different_from_zeroed_fraction: String,
     pub different_from_scrambled_fraction: String,
     pub different_from_either_fraction: String,
+}
+
+fn undefined_mutational_neighborhood() -> Indicator<MutationalNeighborhood> {
+    Indicator::Undefined(UNDEFINED.to_string())
+}
+
+fn undefined_evolved_neighborhood() -> Indicator<EvolvedNeighborhoodHalf> {
+    Indicator::Undefined(UNDEFINED.to_string())
+}
+
+/// One class's count and, against the applied count, its six-decimal
+/// fraction (`Undefined` when nothing applied). `mean_fraction_differing` is
+/// the mean fraction of a signature's executions that differ, among changed
+/// and dead trials only.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NeighborhoodTally {
+    pub trials: u32,
+    pub skipped: u32,
+    pub applied: u32,
+    pub silent: u32,
+    pub changed: u32,
+    pub dead: u32,
+    pub changed_only_in_sequences: u32,
+    pub silent_fraction: String,
+    pub changed_fraction: String,
+    pub dead_fraction: String,
+    pub mean_fraction_differing: String,
+}
+
+/// One operator's family, name, and tally.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NeighborhoodOperatorRow {
+    pub family: String,
+    pub operator: String,
+    pub tally: NeighborhoodTally,
+}
+
+/// One applied-event-count bucket's tally.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NeighborhoodBirthBucket {
+    pub applied_events: u32,
+    pub tally: NeighborhoodTally,
+}
+
+/// The per-birth reading: total births attempted, how many drew zero applied
+/// events (counted, not evaluated, since they are identical to the base by
+/// construction), the pooled "any events" tally, and the same trials
+/// bucketed by their exact `applied_events` count, ascending.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NeighborhoodBirths {
+    pub births_total: u32,
+    pub zero_event_births: u32,
+    pub any_events: NeighborhoodTally,
+    pub by_events: Vec<NeighborhoodBirthBucket>,
+}
+
+/// Structural facts about a sampled genome's reachable mesh (T11.F01
+/// "Structural companions"), so a zero reading is attributed to absent
+/// structure, inert structure, or a probe blind spot rather than assumed.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct NeighborhoodCompanions {
+    pub functional_complexity: u32,
+    pub reachable_node_count: u64,
+    pub reads_shared_memory: bool,
+    pub writes_shared_memory: bool,
+    pub has_stateful_compute_node: bool,
+    pub has_plasticity: bool,
+}
+
+/// The predeclared `neighborhood-v1` battery: version, seeds, sizes, and the
+/// battery's total execution count per genome (48 snapshots + 32 sequence
+/// ticks at the predeclared sizes), recorded here rather than restated.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NeighborhoodBattery {
+    pub version: String,
+    pub snapshot_seed: u64,
+    pub sequence_seed: u64,
+    pub snapshot_count: u32,
+    pub sequence_count: u32,
+    pub sequence_len: u32,
+    pub executions_per_genome: u32,
+    pub founder_operator_trials: u32,
+    pub founder_birth_count: u32,
+    pub evolved_operator_trials: u32,
+    pub evolved_birth_count: u32,
+    pub evolved_sample_size: u32,
+}
+
+/// The founder half: always present when `mutational_neighborhood` is
+/// defined (gate and goal).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NeighborhoodFounderHalf {
+    pub reachable_node_count: u64,
+    pub operator_rows: Vec<NeighborhoodOperatorRow>,
+    pub births: NeighborhoodBirths,
+}
+
+/// One sampled evolved genome's rank, id, and complete neighborhood reading.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NeighborhoodSampledGenome {
+    pub rank: u64,
+    pub creature_id: String,
+    pub operator_rows: Vec<NeighborhoodOperatorRow>,
+    pub births: NeighborhoodBirths,
+    pub companions: NeighborhoodCompanions,
+}
+
+/// One seed's evolved-sample reading: the sampled genomes and the pooled
+/// per-operator and per-birth tallies across the sample.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NeighborhoodEvolvedSeed {
+    pub seed: u64,
+    pub final_population_size: u64,
+    pub sampled_genomes: Vec<NeighborhoodSampledGenome>,
+    pub pooled_operator_rows: Vec<NeighborhoodOperatorRow>,
+    pub pooled_births: NeighborhoodBirths,
+}
+
+/// The evolved half: `Undefined` outside the goal profile.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct EvolvedNeighborhoodHalf {
+    pub per_seed: Vec<NeighborhoodEvolvedSeed>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MutationalNeighborhood {
+    pub battery: NeighborhoodBattery,
+    pub founder: NeighborhoodFounderHalf,
+    #[serde(default = "undefined_evolved_neighborhood")]
+    pub evolved: Indicator<EvolvedNeighborhoodHalf>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -332,6 +521,16 @@ pub struct Environment {
     pub final_state_observation_ms_per_seed: Vec<SeedFinalStateObservation>,
     #[serde(default)]
     pub final_state_observation_ms_total: f64,
+    /// Founder-half mutational-neighborhood wall time (T11.F01), computed
+    /// once per report, kept outside every simulation and final-state
+    /// observation timing above. Zero for the sweep profile.
+    #[serde(default)]
+    pub neighborhood_founder_wall_clock_ms: f64,
+    /// Evolved-half neighborhood wall time per seed (goal profile only).
+    #[serde(default)]
+    pub neighborhood_evolved_wall_clock_ms_per_seed: Vec<SeedFinalStateObservation>,
+    #[serde(default)]
+    pub neighborhood_evolved_wall_clock_ms_total: f64,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -603,6 +802,10 @@ struct GoalObservation {
     lineage_diversity: LineageDiversitySeed,
     memory_sensitivity: MemorySensitivitySeed,
     wall_clock_ms: f64,
+    /// `Some` only in the goal profile, where the evolved-genome half of the
+    /// mutational-neighborhood indicator runs.
+    evolved_neighborhood: Option<NeighborhoodEvolvedSeed>,
+    evolved_neighborhood_wall_clock_ms: f64,
 }
 
 /// `Duration` as fractional milliseconds, the unit every wall-clock field in
@@ -619,6 +822,11 @@ pub struct RunTimings {
     pub phase_wall_clock_ms_per_seed: Vec<SeedPhaseWallClock>,
     pub throughput_per_seed: Vec<SeedThroughput>,
     pub final_state_observation_ms_per_seed: Vec<SeedFinalStateObservation>,
+    /// Founder-half neighborhood wall time (T11.F01), computed once per
+    /// report outside every per-seed timing above.
+    pub neighborhood_founder_wall_clock_ms: f64,
+    /// Evolved-half neighborhood wall time per seed (goal profile only).
+    pub neighborhood_evolved_wall_clock_ms_per_seed: Vec<SeedFinalStateObservation>,
 }
 
 fn run_one_seed(
@@ -626,6 +834,8 @@ fn run_one_seed(
     seed: u64,
     horizon: u64,
     observe_goal_indicators: bool,
+    neighborhood_battery: Option<&Battery>,
+    neighborhood_sizes: NeighborhoodSizes,
 ) -> SeedRun {
     let start = Instant::now();
     let mut sim = seed_simulation(config.clone(), seed);
@@ -660,15 +870,35 @@ fn run_one_seed(
     let goal_observation = observe_goal_indicators.then(|| {
         let observation_started = Instant::now();
         let actions = observe_final_actions(&sim);
-        GoalObservation {
-            lineage_diversity: lineage_diversity(
+        let lineage_diversity_seed = lineage_diversity(
+            seed,
+            sim.creatures
+                .values()
+                .map(|creature| creature.identity.lineage_id),
+        );
+        let memory_sensitivity_seed = memory_sensitivity(seed, &actions);
+        let wall_clock_ms = millis(observation_started.elapsed());
+
+        let evolved_neighborhood_started = Instant::now();
+        let evolved_neighborhood = neighborhood_battery.map(|battery| {
+            let context = EvalContext::from_config(config);
+            evolved_neighborhood_for_seed(
                 seed,
-                sim.creatures
-                    .values()
-                    .map(|creature| creature.identity.lineage_id),
-            ),
-            memory_sensitivity: memory_sensitivity(seed, &actions),
-            wall_clock_ms: millis(observation_started.elapsed()),
+                &sim,
+                battery,
+                &config.mutation,
+                &context,
+                neighborhood_sizes,
+            )
+        });
+        let evolved_neighborhood_wall_clock_ms = millis(evolved_neighborhood_started.elapsed());
+
+        GoalObservation {
+            lineage_diversity: lineage_diversity_seed,
+            memory_sensitivity: memory_sensitivity_seed,
+            wall_clock_ms,
+            evolved_neighborhood,
+            evolved_neighborhood_wall_clock_ms,
         }
     });
 
@@ -771,6 +1001,188 @@ fn memory_sensitivity(seed: u64, observations: &[FinalActionObservation]) -> Mem
     }
 }
 
+// ── Mutational neighborhood (T11.F01) ───────────────────────────────────────
+
+/// The battery's total executions per genome: every single-tick snapshot
+/// plus every sequence's ticks.
+fn neighborhood_battery_execution_count() -> u32 {
+    (neighborhood::battery::SNAPSHOT_COUNT
+        + neighborhood::battery::SEQUENCE_COUNT * neighborhood::battery::SEQUENCE_LEN) as u32
+}
+
+fn fraction_or_undefined(count: u32, denominator: u32) -> String {
+    if denominator == 0 {
+        UNDEFINED.to_string()
+    } else {
+        six(f64::from(count) / f64::from(denominator))
+    }
+}
+
+fn to_neighborhood_tally(tally: &Tally) -> NeighborhoodTally {
+    let applied = tally.applied();
+    NeighborhoodTally {
+        trials: tally.trials,
+        skipped: tally.skipped,
+        applied,
+        silent: tally.silent,
+        changed: tally.changed,
+        dead: tally.dead,
+        changed_only_in_sequences: tally.changed_only_in_sequences,
+        silent_fraction: fraction_or_undefined(tally.silent, applied),
+        changed_fraction: fraction_or_undefined(tally.changed, applied),
+        dead_fraction: fraction_or_undefined(tally.dead, applied),
+        mean_fraction_differing: six(tally.mean_fraction_differing()),
+    }
+}
+
+fn to_neighborhood_operator_rows(rows: &[OperatorRow]) -> Vec<NeighborhoodOperatorRow> {
+    rows.iter()
+        .map(|row| NeighborhoodOperatorRow {
+            family: row.family.to_string(),
+            operator: row.operator.clone(),
+            tally: to_neighborhood_tally(&row.tally),
+        })
+        .collect()
+}
+
+fn to_neighborhood_births(result: &BirthResult) -> NeighborhoodBirths {
+    NeighborhoodBirths {
+        births_total: result.births_total,
+        zero_event_births: result.zero_event_births,
+        any_events: to_neighborhood_tally(&result.any_events),
+        by_events: result
+            .by_events
+            .iter()
+            .map(|(&applied_events, tally)| NeighborhoodBirthBucket {
+                applied_events,
+                tally: to_neighborhood_tally(tally),
+            })
+            .collect(),
+    }
+}
+
+fn to_neighborhood_companions(companions: &StructuralCompanions) -> NeighborhoodCompanions {
+    NeighborhoodCompanions {
+        functional_complexity: companions.functional_complexity,
+        reachable_node_count: companions.reachable_node_count as u64,
+        reads_shared_memory: companions.reads_shared_memory,
+        writes_shared_memory: companions.writes_shared_memory,
+        has_stateful_compute_node: companions.has_stateful_compute_node,
+        has_plasticity: companions.has_plasticity,
+    }
+}
+
+/// Merge one evolved genome's per-birth result into a running pool by
+/// integer addition (see [`Tally::merge`]).
+fn merge_birth_results(mut pooled: BirthResult, genome: &BirthResult) -> BirthResult {
+    pooled.births_total += genome.births_total;
+    pooled.zero_event_births += genome.zero_event_births;
+    pooled.any_events = pooled.any_events.merge(genome.any_events);
+    for (&applied_events, tally) in &genome.by_events {
+        let entry = pooled.by_events.entry(applied_events).or_default();
+        *entry = entry.merge(*tally);
+    }
+    pooled
+}
+
+/// The founder half: always computed when `mutational_neighborhood` is
+/// defined (gate and goal), once per report — outside the per-seed loop,
+/// since it depends only on the founder genome and the production mutation
+/// config, never on a world trajectory.
+fn compute_founder_neighborhood(
+    config: &SimulationConfig,
+    battery: &Battery,
+    sizes: NeighborhoodSizes,
+) -> NeighborhoodFounderHalf {
+    let subject = founder_genome(config.population.founder_profile);
+    let context = EvalContext::from_config(config);
+    let evaluation: GenomeEvaluation = evaluate_genome(
+        &subject,
+        battery,
+        &config.mutation,
+        &context,
+        sizes.founder_operator_trials,
+        sizes.founder_births,
+        0,
+    );
+    NeighborhoodFounderHalf {
+        reachable_node_count: structural_companions(&subject).reachable_node_count as u64,
+        operator_rows: to_neighborhood_operator_rows(&evaluation.operator_rows),
+        births: to_neighborhood_births(&evaluation.births),
+    }
+}
+
+/// The evolved half for one seed's final living population: the predeclared
+/// rank sample, each sampled genome's full reading and structural
+/// companions, and the pooled per-operator and per-birth tallies across the
+/// sample.
+fn evolved_neighborhood_for_seed(
+    seed: u64,
+    sim: &v3_core::simulation::Simulation,
+    battery: &Battery,
+    mutation_config: &MutationConfig,
+    context: &EvalContext,
+    sizes: NeighborhoodSizes,
+) -> NeighborhoodEvolvedSeed {
+    let mut creature_ids: Vec<_> = sim.creatures.keys().collect();
+    creature_ids.sort();
+    let population_size = creature_ids.len();
+    let ranks = evolved_sample_ranks(population_size);
+    let catalog = v3_core::neighborhood::operator_catalog();
+
+    let mut sampled_genomes = Vec::with_capacity(ranks.len());
+    let mut pooled_operator_tallies: Vec<Tally> = vec![Tally::default(); catalog.len()];
+    let mut pooled_births = BirthResult::default();
+
+    for (genome_index, &rank) in ranks.iter().enumerate() {
+        let creature_id = creature_ids[rank];
+        let creature = &sim.creatures[creature_id];
+        let seed_offset =
+            v3_core::neighborhood::EVOLVED_SEED_MULTIPLIER * (genome_index as u64 + 1);
+        let evaluation = evaluate_genome(
+            &creature.genome,
+            battery,
+            mutation_config,
+            context,
+            sizes.evolved_operator_trials,
+            sizes.evolved_births,
+            seed_offset,
+        );
+        let companions = structural_companions(&creature.genome);
+
+        for (pooled, row) in pooled_operator_tallies.iter_mut().zip(&evaluation.operator_rows) {
+            *pooled = pooled.merge(row.tally);
+        }
+        pooled_births = merge_birth_results(pooled_births, &evaluation.births);
+
+        sampled_genomes.push(NeighborhoodSampledGenome {
+            rank: rank as u64,
+            creature_id: format!("{creature_id:?}"),
+            operator_rows: to_neighborhood_operator_rows(&evaluation.operator_rows),
+            births: to_neighborhood_births(&evaluation.births),
+            companions: to_neighborhood_companions(&companions),
+        });
+    }
+
+    let pooled_operator_rows = catalog
+        .iter()
+        .zip(pooled_operator_tallies.iter())
+        .map(|((family, name), tally)| NeighborhoodOperatorRow {
+            family: (*family).to_string(),
+            operator: name.clone(),
+            tally: to_neighborhood_tally(tally),
+        })
+        .collect();
+
+    NeighborhoodEvolvedSeed {
+        seed,
+        final_population_size: population_size as u64,
+        sampled_genomes,
+        pooled_operator_rows,
+        pooled_births: to_neighborhood_births(&pooled_births),
+    }
+}
+
 fn percentile(sorted: &[u32], p: f64) -> u32 {
     if sorted.is_empty() {
         return 0;
@@ -820,10 +1232,36 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
     let mut lineage_diversity_per_seed = Vec::with_capacity(params.seeds.len());
     let mut memory_sensitivity_per_seed = Vec::with_capacity(params.seeds.len());
     let mut final_state_observation_ms_per_seed = Vec::with_capacity(params.seeds.len());
+    let mut evolved_neighborhood_per_seed = Vec::with_capacity(params.seeds.len());
+    let mut neighborhood_evolved_wall_clock_ms_per_seed = Vec::with_capacity(params.seeds.len());
     let observe_goal_indicators = params.name == "goal";
 
+    // The founder half runs for exactly the gate and goal profiles (never
+    // sweep, and never a test-only or synthetic profile name), and only once
+    // per report — it depends only on the founder genome and the production
+    // mutation config, never on any seed's world trajectory, so it is
+    // computed outside the per-seed loop and timed separately from every
+    // per-seed wall-clock field.
+    let run_neighborhood = params.name == "gate" || observe_goal_indicators;
+    let neighborhood_battery =
+        run_neighborhood.then(|| Battery::generate(config.world.food.types.len()));
+    let neighborhood_founder_start = Instant::now();
+    let neighborhood_founder = neighborhood_battery
+        .as_ref()
+        .map(|battery| compute_founder_neighborhood(&config, battery, params.neighborhood));
+    let neighborhood_founder_wall_clock_ms = millis(neighborhood_founder_start.elapsed());
+
     for &seed in &params.seeds {
-        let run = run_one_seed(&config, seed, params.ticks, observe_goal_indicators);
+        let evolved_battery =
+            if observe_goal_indicators { neighborhood_battery.as_ref() } else { None };
+        let run = run_one_seed(
+            &config,
+            seed,
+            params.ticks,
+            observe_goal_indicators,
+            evolved_battery,
+            params.neighborhood,
+        );
         totals.ticks += run.per_seed.ticks;
         totals.creature_ticks += run.per_seed.creature_ticks;
         totals.mesh_hops += run.per_seed.mesh_hops;
@@ -847,6 +1285,13 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
                 seed,
                 wall_clock_ms: observation.wall_clock_ms,
             });
+            if let Some(evolved) = observation.evolved_neighborhood {
+                evolved_neighborhood_per_seed.push(evolved);
+                neighborhood_evolved_wall_clock_ms_per_seed.push(SeedFinalStateObservation {
+                    seed,
+                    wall_clock_ms: observation.evolved_neighborhood_wall_clock_ms,
+                });
+            }
         }
         per_seed.push(run.per_seed);
     }
@@ -891,6 +1336,33 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
         } else {
             undefined_memory_sensitivity()
         },
+        mutational_neighborhood: match neighborhood_founder {
+            Some(founder) => Indicator::Defined(MutationalNeighborhood {
+                battery: NeighborhoodBattery {
+                    version: BATTERY_VERSION.to_string(),
+                    snapshot_seed: neighborhood::battery::SNAPSHOT_SEED,
+                    sequence_seed: neighborhood::battery::SEQUENCE_SEED,
+                    snapshot_count: neighborhood::battery::SNAPSHOT_COUNT as u32,
+                    sequence_count: neighborhood::battery::SEQUENCE_COUNT as u32,
+                    sequence_len: neighborhood::battery::SEQUENCE_LEN as u32,
+                    executions_per_genome: neighborhood_battery_execution_count(),
+                    founder_operator_trials: params.neighborhood.founder_operator_trials,
+                    founder_birth_count: params.neighborhood.founder_births,
+                    evolved_operator_trials: params.neighborhood.evolved_operator_trials,
+                    evolved_birth_count: params.neighborhood.evolved_births,
+                    evolved_sample_size: neighborhood::SAMPLE_SIZE as u32,
+                },
+                founder,
+                evolved: if observe_goal_indicators {
+                    Indicator::Defined(EvolvedNeighborhoodHalf {
+                        per_seed: evolved_neighborhood_per_seed,
+                    })
+                } else {
+                    undefined_evolved_neighborhood()
+                },
+            }),
+            None => undefined_mutational_neighborhood(),
+        },
         strategy_count: UNDEFINED.to_string(),
         strategy_causal_distinctness: UNDEFINED.to_string(),
         evolutionary_activity: UNDEFINED.to_string(),
@@ -926,6 +1398,8 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
         phase_wall_clock_ms_per_seed: phase_wall_clock,
         throughput_per_seed,
         final_state_observation_ms_per_seed,
+        neighborhood_founder_wall_clock_ms,
+        neighborhood_evolved_wall_clock_ms_per_seed,
     };
 
     (deterministic, timings)
@@ -1029,6 +1503,8 @@ fn build_environment(timings: RunTimings, totals: &Totals, threads: usize) -> En
         phase_wall_clock_ms_per_seed,
         throughput_per_seed,
         final_state_observation_ms_per_seed,
+        neighborhood_founder_wall_clock_ms,
+        neighborhood_evolved_wall_clock_ms_per_seed,
     } = timings;
     let wall_clock_ms_total: f64 = wall_clock_ms_per_seed.iter().map(|s| s.wall_clock_ms).sum();
     let wall_clock_ms_per_creature_tick = if totals.creature_ticks == 0 {
@@ -1049,6 +1525,10 @@ fn build_environment(timings: RunTimings, totals: &Totals, threads: usize) -> En
         .iter()
         .map(|observation| observation.wall_clock_ms)
         .sum();
+    let neighborhood_evolved_wall_clock_ms_total = neighborhood_evolved_wall_clock_ms_per_seed
+        .iter()
+        .map(|observation| observation.wall_clock_ms)
+        .sum();
     Environment {
         generated_at: rfc3339_now(),
         host: detect_host(),
@@ -1066,6 +1546,9 @@ fn build_environment(timings: RunTimings, totals: &Totals, threads: usize) -> En
         throughput,
         final_state_observation_ms_per_seed,
         final_state_observation_ms_total,
+        neighborhood_founder_wall_clock_ms,
+        neighborhood_evolved_wall_clock_ms_per_seed,
+        neighborhood_evolved_wall_clock_ms_total,
     }
 }
 
@@ -1394,6 +1877,8 @@ mod tests {
             phase_wall_clock_ms_per_seed: Vec::new(),
             throughput_per_seed: Vec::new(),
             final_state_observation_ms_per_seed: Vec::new(),
+            neighborhood_founder_wall_clock_ms: 0.0,
+            neighborhood_evolved_wall_clock_ms_per_seed: Vec::new(),
         }
     }
 
@@ -1563,6 +2048,7 @@ mod tests {
             seeds: vec![1],
             ticks: 10,
             food_coverage: None,
+            neighborhood: NeighborhoodSizes::default(),
         };
         let config = build_config(&params);
 
@@ -1729,5 +2215,115 @@ mod tests {
                 prop_assert_eq!(result.different_from_either_fraction, six(union_count as f64 / total));
             }
         }
+    }
+
+    // ── Mutational neighborhood (T11.F01) ───────────────────────────────
+
+    fn small_profile(name: &str) -> ProfileParams {
+        ProfileParams {
+            name: name.to_string(),
+            width: 8,
+            height: 8,
+            founders: 4,
+            seeds: vec![1],
+            ticks: 2,
+            food_coverage: Some(1.0),
+            neighborhood: NeighborhoodSizes::default(),
+        }
+    }
+
+    #[test]
+    fn neighborhood_tally_conversion_computes_fractions_against_applied_not_trials() {
+        let tally = Tally {
+            trials: 10,
+            skipped: 2,
+            silent: 3,
+            changed: 4,
+            dead: 1,
+            changed_only_in_sequences: 1,
+            differing_executions_total: 40,
+            total_executions_total: 400,
+        };
+        let report = to_neighborhood_tally(&tally);
+        assert_eq!(report.applied, 8);
+        assert_eq!(report.silent_fraction, "0.375000");
+        assert_eq!(report.changed_fraction, "0.500000");
+        assert_eq!(report.dead_fraction, "0.125000");
+    }
+
+    #[test]
+    fn neighborhood_tally_conversion_reports_undefined_fractions_when_nothing_applied() {
+        let tally = Tally { trials: 5, skipped: 5, ..Tally::default() };
+        let report = to_neighborhood_tally(&tally);
+        assert_eq!(report.applied, 0);
+        assert_eq!(report.silent_fraction, UNDEFINED);
+        assert_eq!(report.changed_fraction, UNDEFINED);
+        assert_eq!(report.dead_fraction, UNDEFINED);
+    }
+
+    #[test]
+    fn merge_birth_results_sums_totals_and_merges_matching_buckets() {
+        let mut a = BirthResult { births_total: 10, zero_event_births: 4, ..BirthResult::default() };
+        a.any_events = Tally { trials: 6, silent: 2, changed: 3, dead: 1, ..Tally::default() };
+        a.by_events.insert(1, a.any_events);
+
+        let mut b = BirthResult { births_total: 5, zero_event_births: 1, ..BirthResult::default() };
+        b.any_events = Tally { trials: 4, silent: 1, changed: 3, ..Tally::default() };
+        b.by_events.insert(1, b.any_events);
+
+        let merged = merge_birth_results(a, &b);
+        assert_eq!(merged.births_total, 15);
+        assert_eq!(merged.zero_event_births, 5);
+        assert_eq!(merged.any_events.trials, 10);
+        assert_eq!(merged.by_events[&1].trials, 10);
+    }
+
+    #[test]
+    fn goal_indicators_defaults_mutational_neighborhood_to_undefined_when_the_field_is_absent() {
+        let report = build_report(&small_profile("synthetic"), "t11-f01-serde-default-check");
+        let mut value = serde_json::to_value(&report).expect("a report always serializes");
+        value["deterministic"]["goal_indicators"]
+            .as_object_mut()
+            .expect("goal_indicators is an object")
+            .remove("mutational_neighborhood");
+
+        let reparsed: Report =
+            serde_json::from_value(value).expect("a missing field falls back to the serde default");
+        assert!(matches!(
+            reparsed.deterministic.goal_indicators.mutational_neighborhood,
+            Indicator::Undefined(ref value) if value == "Undefined"
+        ));
+    }
+
+    #[test]
+    fn mutational_neighborhood_is_defined_only_for_the_gate_and_goal_profile_names() {
+        let (gate_det, _) = run_deterministic(&small_profile("gate"));
+        let Indicator::Defined(gate_neighborhood) = gate_det.goal_indicators.mutational_neighborhood
+        else {
+            panic!("the gate profile must define mutational_neighborhood");
+        };
+        assert!(
+            matches!(gate_neighborhood.evolved, Indicator::Undefined(_)),
+            "the evolved half never runs in the gate profile"
+        );
+
+        let (goal_det, _) = run_deterministic(&small_profile("goal"));
+        let Indicator::Defined(goal_neighborhood) = goal_det.goal_indicators.mutational_neighborhood
+        else {
+            panic!("the goal profile must define mutational_neighborhood");
+        };
+        assert!(
+            matches!(goal_neighborhood.evolved, Indicator::Defined(_)),
+            "the evolved half runs in the goal profile"
+        );
+
+        let (synthetic_det, _) = run_deterministic(&small_profile("synthetic"));
+        assert!(matches!(
+            synthetic_det.goal_indicators.mutational_neighborhood,
+            Indicator::Undefined(_)
+        ));
+
+        let (sweep_det, _) = run_deterministic(&small_profile("sweep"));
+        assert!(matches!(sweep_det.goal_indicators.mutational_neighborhood, Indicator::Undefined(_)));
     }
 }
