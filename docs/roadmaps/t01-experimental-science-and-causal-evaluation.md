@@ -46,7 +46,7 @@ and hold the falsifiable causal measures ready for the deferred proof phase.
   - Goal: Deferred proof phase. Add campaign-grade evidence rows to the `docs/progress.md` table that T01.F12 creates.
 - [x] **T01.F11 — Baseline Persistence Characterization** — Depends on: T10.F10
   - Goal: Measure how long populations persist at each world size under production defaults, so every later reading has a baseline.
-- [ ] **T01.F12 — Goal Profile, Basic Indicators, and Progress Table** — Depends on: T01.F11, T10.F09, T10.F11
+- [x] **T01.F12 — Goal Profile, Basic Indicators, and Progress Table** — Depends on: T01.F11, T10.F09, T10.F11
   - Goal: Read diversity and cognition once per closed feature: a minutes-scale goal profile, a lineage-diversity indicator, a memory-sensitivity indicator, and `docs/progress.md` with one row per feature.
 - [ ] **T01.F13 — Evolutionary Activity and Shadow-Model Baseline** — Depends on: T01.F12
   - Goal: Optional supplement to the diagnostic checkpoint. Is selection doing anything at all, measured as activity above a neutral shadow run with the same births and deaths?

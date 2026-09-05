@@ -48,7 +48,7 @@ In Codex, use the [Codex launch instructions](#codex-adapter) instead.
 **Next-feature rule.** Take the execution order in the "Notes for AI Agents"
 section of `docs/roadmap.md`. The next feature is the first ID in that order
 whose row is unchecked in its track roadmap and whose dependencies are all
-checked. As of 2026-09-04 that is T01.F12.
+checked. As of 2026-09-05 that is T11.F01.
 
 **Concurrent sessions.** Before launching, inspect `git worktree list` for
 existing Claude and Codex feature worktrees. An unchecked feature may already
