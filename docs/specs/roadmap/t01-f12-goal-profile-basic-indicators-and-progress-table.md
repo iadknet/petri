@@ -148,6 +148,36 @@ manual verification; integration remains pending.
       tested hash in the task handoff (a commit cannot embed its own hash).
 - [ ] User manual verification and integration (intentionally pending).
 
+TDD record: `cargo test -p v3-core final_action_observation_uses_full_actions_and_leaves_simulation_unchanged`
+was red before `GraphRuntimeState::Clone` and `observe_final_actions` existed;
+it was green after the observer implementation. The goal resolver test was
+likewise red before the `Goal` profile and `goal_profile_params`, then green.
+The final focused checks were `cargo test -p v3-core final_action_observation`
+(3 passed), `cargo test -p v3-cli --test bench sweep_output_and_reference_selection_stay_separate_from_goal`
+(1 passed), and `cargo test -p v3-cli --lib memory_sensitivity_union_and_fractions_match_generated_differences`
+(1 passed). Final suites were `cargo test -p v3-core` (1019 passed) and
+`cargo test -p v3-cli` (18 library, 9 binary, 17 benchmark integration, and 7
+CLI integration tests passed). `cargo check --workspace --all-targets` and
+`make roadmap-check` passed; tick mechanics, defaults, and founder behavior
+were untouched, so viability-first was not applicable.
+
+Mutation record: the initial `make rust-mutants` run used
+`/Users/istefanek/.local/share/petri-tools/mutants/t01-f12/mutants.out` and
+reported 54 total: 33 caught, 18 unviable, 3 missed, and 0 timeout. Its full
+missed list was `crates/v3-cli/src/main.rs:247:32: replace == with != in run_bench`,
+`crates/v3-cli/src/main.rs:268:42: replace && with || in run_bench`, and
+`crates/v3-cli/src/main.rs:268:58: replace == with != in run_bench`. Each was
+killed by the test-only `sweep_output_and_reference_selection_stay_separate_from_goal`
+coverage; no production code changed. The rerun ended 2026-09-05T00:55:13Z
+with 54 total, 36 caught, 18 unviable, 0 missed, and 0 timeout. The final
+`missed.txt` and `timeout.txt` are empty; no survivor was equivalent or deferred.
+
+Fresh Astra review found 0 P1, 2 P2, and 2 P3 items. This remediation preserves
+each historical report's stored comparison references, labels historical gate
+measurements separately from goal-v1 indicators, repairs local links, corrects
+the Make help, and formats Rust. Independent-review completion remains pending
+confirmation after this remediation pass.
+
 ## Performance and Goal Impact
 
 Predeclared compute cost: no simulation work-counter change, exactly 0% for
@@ -159,15 +189,13 @@ survivor, outside simulation counters. Include probe time in a separately named
 environment timing or the report's measured total so the observation cost is
 visible; preserve the existing gate timing boundary. No gate epoch re-pin.
 
-Record measured gate deltas and levels, threshold crossings, dated per-seed goal
-readings, observation overhead, both total run times, and second-run equality
-here after the runs. The first goal-v1 reading is a provisional program baseline
-pending manual verification/integration, not evidence of improvement.
+The first goal-v1 reading below is a provisional program baseline pending manual
+verification/integration, not evidence of improvement.
 
 Measured on 2026-09-04/05 with committed producer revision
 `e94569b8ebed8b28dd7bce1db5d35e134ecdc3f4` on Apple M1 Pro, 8 logical cores:
 
-- Gate report: [evidence](../../../progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table.json).
+- Gate report: [evidence](../../progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table.json).
   The five nonzero normalized work counters were exactly 0.000000% against
   T10.F10 and T10.F11; plasticity was zero on both sides and therefore
   `null`/ok. Both comparisons were non-severe. Gate wall time was
@@ -175,7 +203,7 @@ Measured on 2026-09-04/05 with committed producer revision
   versus T10.F11, both ok. The gate report's new lineage and memory indicators
   are `Undefined`; the remaining deterministic object equals T10.F11 after
   removing only those two new keys.
-- Goal report: [stored evidence](../../../progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table-goal.json);
+- Goal report: [stored evidence](../../progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table-goal.json);
   sequential repeat: `/private/tmp/t01-f12-goal-final-second.json`. Fixed
   inputs were 1600 by 1600, 10,000 founders, seeds 11/22/33, 2,000 ticks, and
   production food coverage. The stored/repeat wall totals were 583820.333 ms
@@ -204,16 +232,6 @@ check passed before the regenerated reports. The observer remains isolated from
 `run_tick`, production defaults, and founder behavior, so viability-first did
 not apply.
 
-Mutation evidence: initial `make rust-mutants` reported 54 mutants at
-`/Users/istefanek/.local/share/petri-tools/mutants/t01-f12/mutants.out`:
-33 caught, 18 unviable, 3 missed, 0 timeout. The complete missed list was
-`main.rs:247 == -> !=`, `main.rs:268 && -> ||`, and
-`main.rs:268 == -> !=`; each was killed by the test-only explicit-sweep-output
-and no-goal-reference integration test. The rerun ended 2026-09-05T00:55:13Z
-with 54 total, 36 caught, 18 unviable, 0 missed, and 0 timeout; both
-`missed.txt` and `timeout.txt` are empty. No survivor was equivalent or
-deferred.
-
 Advisor record: 2 Sol consultations, both accepted and none rejected. Before
 approach, Sol recommended the narrow `&Simulation` observer, sorted IDs,
 one sensor assembly, fresh local mutable state, `GraphRuntimeState::clone`,
@@ -223,9 +241,9 @@ the minimal correct semantics; no correction was needed.
 
 ## Success Criteria
 
-- [ ] The fixed goal benchmark provides truthful, reproducible lineage and memory
+- [x] The fixed goal benchmark provides truthful, reproducible lineage and memory
       sensitivity readings, while the gate trajectory stays unchanged.
-- [ ] One progress table exposes every indicator, links its evidence, and clearly
+- [x] One progress table exposes every indicator, links its evidence, and clearly
       distinguishes historical undefined goals from the new pending baseline.
 - [ ] Automated gates, mutation triage, benchmark reporting, and independent
       review pass on committed content in a clean feature worktree.
@@ -240,12 +258,13 @@ the minimal correct semantics; no correction was needed.
 - Planning readiness review: no P1/P2/P3 findings; Ready. Template, current track
   requirements, dependency outputs, empty-population handling, measurement
   isolation, gate preservation, and manual-verification override were checked.
-  Implementation and measured performance remain to be verified.
+  Implementation and measured performance are recorded; final review confirmation
+  and the orchestrator's final clean-commit check remain pending.
 - User override: implementation and automated review must finish here, but keep
   feature unchecked and spec In Progress. Manual verification and integration
   are pending. Preserve worktree and branch and stop for the user's decision.
 - Manual verification and integration steps (intentionally pending): inspect
-  [docs/progress.md](../../../progress.md) to confirm the T01.F12 row remains
+  [docs/progress.md](../../progress.md) to confirm the T01.F12 row remains
   pending and all historical lineage/memory values are `Undefined`. To repeat
   the fixed benchmark without replacing committed evidence, run
   `caffeinate -i make bench PROFILE=goal FEATURE=t01-f12-goal-profile-basic-indicators-and-progress-table OUT=/private/tmp/t01-f12-manual-goal.json`
