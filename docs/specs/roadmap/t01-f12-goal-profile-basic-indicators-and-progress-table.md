@@ -10,8 +10,8 @@
 A fixed, minutes-scale goal benchmark reports final-population lineage diversity
 and memory sensitivity without changing the simulation. A plain progress table
 shows both compute comparisons and every indicator, backed by separate gate and
-goal series. This run delivers committed implementation and automated review for
-manual verification; integration remains pending.
+goal series. This run delivers committed implementation and independent review;
+the final automated check, manual verification, and integration remain pending.
 
 ## Non-Goals
 
@@ -141,7 +141,7 @@ manual verification; integration remains pending.
       the actual lineage and memory readings, including null/zero results.
 - [x] Sol consultations received before approach and before reporting done (also
       after a repeated failure), with accepted/rejected guidance and count.
-- [ ] Fresh Astra independent final review and required remediation completed;
+- [x] Fresh Astra independent final review and required remediation completed;
       record finding counts and advisory deferrals.
 - [ ] Orchestrator independently runs `make roadmap-check`, commits all final
       content, and runs `make check` against that exact clean commit. Record the
@@ -171,12 +171,16 @@ killed by the test-only `sweep_output_and_reference_selection_stay_separate_from
 coverage; no production code changed. The rerun ended 2026-09-05T00:55:13Z
 with 54 total, 36 caught, 18 unviable, 0 missed, and 0 timeout. The final
 `missed.txt` and `timeout.txt` are empty; no survivor was equivalent or deferred.
+After the behavior-equivalent Clippy correction to the empty-population fraction,
+the final rerun ended 2026-09-05T01:22:06Z with 52 total, 34 caught, 18
+unviable, 0 missed, and 0 timeout. Its complete missed and timeout lists are
+empty; no survivor was equivalent or deferred.
 
-Fresh Astra review found 0 P1, 2 P2, and 2 P3 items. This remediation preserves
-each historical report's stored comparison references, labels historical gate
-measurements separately from goal-v1 indicators, repairs local links, corrects
-the Make help, and formats Rust. Independent-review completion remains pending
-confirmation after this remediation pass.
+Fresh Astra review initially found 0 P1, 2 P2, and 2 P3 items. This remediation
+preserves each historical report's stored comparison references, labels historical
+gate measurements separately from goal-v1 indicators, repairs local links,
+corrects the Make help, and formats Rust. The follow-up review verified all four
+items resolved and found 0 P1, 0 P2, and 0 P3 remaining.
 
 ## Performance and Goal Impact
 
@@ -255,11 +259,15 @@ the minimal correct semantics; no correction was needed.
   target unclaimed and all owning-row dependencies checked. Worktree:
   `/Users/istefanek/projects/petri/.worktrees/t01-f12`, branch `codex/t01-f12`.
   Session metadata confirms orchestrator `gpt-6-astra`, effort `high`.
+- Main subsequently advanced externally to
+  `941c498e92928ec0386be4542ad0ea687fb580e3`. This feature remains isolated on
+  its recorded merge base; later integration requires a separate reconciliation
+  decision.
 - Planning readiness review: no P1/P2/P3 findings; Ready. Template, current track
   requirements, dependency outputs, empty-population handling, measurement
   isolation, gate preservation, and manual-verification override were checked.
-  Implementation and measured performance are recorded; final review confirmation
-  and the orchestrator's final clean-commit check remain pending.
+  Implementation and measured performance are recorded; the orchestrator's final
+  clean-commit check remains pending.
 - User override: implementation and automated review must finish here, but keep
   feature unchecked and spec In Progress. Manual verification and integration
   are pending. Preserve worktree and branch and stop for the user's decision.
@@ -272,4 +280,5 @@ the minimal correct semantics; no correction was needed.
   `deterministic` object with the committed goal report. Expect final
   populations 5291/10997/8130, lineage counts 142/144/140, entropies
   2.780730/2.947968/2.668014, and zero memory sensitivity for seeds 11/22/33.
-- Usage unavailable. Two advisor consultations completed; fresh Astra review is pending.
+- Usage unavailable. Two advisor consultations completed; the fresh Astra review
+  found no remaining findings.
