@@ -331,6 +331,73 @@ fn bench_subcommand_writes_a_report_and_rejects_zero_threads() {
     assert!(!out.exists(), "a rejected argument must not write a report");
 }
 
+/// Sweep output must be explicit, and an explicit sweep output must not select
+/// goal references just because the goal series has a baseline. This keeps the
+/// fixed goal profile separate from user-configured sweep runs.
+#[test]
+fn sweep_output_and_reference_selection_stay_separate_from_goal() {
+    let base_args = [
+        "bench",
+        "--profile",
+        "sweep",
+        "--width",
+        "16",
+        "--height",
+        "16",
+        "--founders",
+        "4",
+        "--seeds",
+        "11",
+        "--ticks",
+        "5",
+        "--feature",
+        "t01-f12-sweep-output-check",
+    ];
+
+    let missing_out_dir = std::env::temp_dir().join(format!(
+        "t01-f12-sweep-missing-out-{}",
+        std::process::id()
+    ));
+    std::fs::create_dir_all(&missing_out_dir).expect("create isolated working directory");
+    let rejected = std::process::Command::new(env!("CARGO_BIN_EXE_v3-cli"))
+        .args(base_args)
+        .current_dir(&missing_out_dir)
+        .output()
+        .expect("the v3-cli binary must run");
+    let _ = std::fs::remove_dir_all(&missing_out_dir);
+    assert!(!rejected.status.success(), "a sweep without --out must fail");
+    assert!(
+        String::from_utf8_lossy(&rejected.stderr).contains("--out is required for --profile sweep"),
+        "stderr: {}",
+        String::from_utf8_lossy(&rejected.stderr)
+    );
+
+    let out = std::env::temp_dir().join(format!(
+        "t01-f12-sweep-reference-selection-{}.json",
+        std::process::id()
+    ));
+    let accepted = std::process::Command::new(env!("CARGO_BIN_EXE_v3-cli"))
+        .args(base_args)
+        .args(["--out", out.to_str().expect("UTF-8 output path")])
+        .current_dir(repo_root())
+        .output()
+        .expect("the v3-cli binary must run");
+    assert!(
+        accepted.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&accepted.stderr)
+    );
+    let report: bench::Report = serde_json::from_str(
+        &std::fs::read_to_string(&out).expect("the explicit sweep output must be written"),
+    )
+    .expect("the sweep report must parse");
+    let _ = std::fs::remove_file(&out);
+    assert!(
+        report.comparison.references.is_empty(),
+        "a sweep without --baseline/--compare must not auto-select goal references"
+    );
+}
+
 /// A counter that was exactly zero in the reference but positive in the
 /// current run has an unbounded (division-by-zero) ratio. It must be
 /// reported as `severe`, not silently `ok` with a null delta — otherwise the
