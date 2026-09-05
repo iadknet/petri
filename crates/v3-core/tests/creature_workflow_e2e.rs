@@ -1,3 +1,5 @@
+mod common;
+
 #[path = "creature_workflow_e2e/support.rs"]
 mod support;
 

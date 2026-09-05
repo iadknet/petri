@@ -1,6 +1,6 @@
 # T11 — Brain Genotype-Phenotype Map
 
-**Status**: Planned
+**Status**: In Progress
 **Last updated**: 2026-09-05
 **Master**: [Program Roadmap](../roadmap.md)
 
@@ -39,7 +39,7 @@ representation only where the neighborhood reading still shows a gap.
   - Goal: New neural connections. A compute node joins the circuit disconnected or by splitting an existing edge with its function preserved, copies never rewire live nodes, and new edges can reach every sensor sub-value.
 - [ ] **T11.F04 — Mutation Supply and Neutral Scaffold** — Depends on: T11.F02, T11.F03
   - Goal: Point mutations one at a time. The same expected mutation supply arrives as mostly single events instead of ten-event bursts, mutation lands on inactive structure as readily as on live code, and persistence is re-read after the change.
-- [ ] **T11.F05 — Temporal Controller Fixtures** — Depends on: None
+- [x] **T11.F05 — Temporal Controller Fixtures** — Depends on: None
   - Goal: Check the brain's building blocks with small delayed-cue, memory-retention, and delayed-reward fixtures on constructed controllers, recording capability and measured gaps before interpreting evolution.
 - [ ] **T11.F06 — Graph Memory Clock** — Depends on: T11.F01, T11.F05
   - Goal: Neural timescales. Remembered graph state, including what a backward edge reads, advances once per world tick, so extra settling passes or disconnected computation cannot speed up forgetting.
