@@ -300,7 +300,15 @@ input-reference policy.
   mutation branch ranges (440,456); register remapping body/operators (532,
   534-536); splice position/deletion mapping (634,648,678); read/store and
   load/compare motif adjacency (883,972); and indirect slot-field matching
-  (1078). The two unviable mutants were founder default and input-reference
+  (1078). Exact first-run survivors are preserved in
+  `/Users/istefanek/.local/share/petri-tools/mutants/t11-f02/mutants.out/missed.txt`.
+  The second target `/Users/istefanek/.local/share/petri-tools/mutants/t11-f02-remediation/mutants.out`
+  completed 129 tested: 123 caught, 4 missed, 2 unviable, 0 timeout. Its
+  `nudge_u16` zero arm and splice `||` guard are killed by the final test-only
+  batch. The two `new_len > i32::MAX` replacements (`==`, `>=`) are deferred:
+  distinguishing them requires allocating and cloning vectors at least about
+  2.1 billion elements; they are not equivalent. A third final target rerun is
+  pending to verify these dispositions. The two unviable mutants were founder default and input-reference
   `Ok(Default)` changes. Survivor-driven test strengthening and the separate
   paired-slot overflow repair are ready for the required distinct-output rerun;
   no production edit was made merely to kill a mutant.
