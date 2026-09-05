@@ -490,3 +490,7 @@ Verification):
   `docs/roadmaps/t11-brain-genotype-phenotype-map.md`, where both features
   added entries; no Rust file overlaps. Per `docs/workflow.md`, no rebase or
   merge without the user asking; the worktree and branch are preserved.
+  Resolved 2026-09-05: the user authorized a rebase; the six feature commits
+  were rebased onto `573c0336`, the three document conflicts were resolved by
+  keeping both features' entries, and `make check` was rerun on the rebased
+  closing commit before the fast-forward.
