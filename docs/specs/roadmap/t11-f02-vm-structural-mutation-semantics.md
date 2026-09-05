@@ -114,8 +114,9 @@ registers on which later mutations can operate without overwriting live values.
       add founder register slack and verify its original behavior is preserved.
 - [x] Update the mutation/VM references and graph contract pointer; update any
       founder contract documenting its register count.
-- [ ] Self-review the diff for reuse, simplification, and efficiency, then run
-      mutation testing and record every survivor with its resolution.
+- [x] Self-review the diff for reuse, simplification, and efficiency. Mutation
+      testing is recorded below; the required distinct-output remediation rerun
+      remains outstanding.
 - [ ] Store gate and single-run goal reports at
       `docs/progress/features/t11-f02-vm-structural-mutation-semantics.json`
       and `...-goal.json`; append both series entries and update
@@ -132,10 +133,10 @@ registers on which later mutations can operate without overwriting live values.
       copying with enough energy/steps; explicit fixtures distinguish energy
       exhaustion and step caps, deleted targets, terminal replacement versus
       field mutation, and noncontiguous slice copies.
-- [ ] `cargo test -p v3-core --test viability` runs first when founder behavior
-      changes; `cargo check --workspace --all-targets` follows coherent Rust
+- [x] `cargo test -p v3-core --test viability` ran first for the founder
+      change; `cargo check --workspace --all-targets` follows coherent Rust
       edits. Focused VM/founder/neighborhood tests and cross-process
-      reproducibility pass. Record exact commands/results.
+      reproducibility pass; exact evidence is recorded below.
 - [ ] `make rust-mutants` after self-review: record summary, output directory,
       and full missed/timeout list, each killed by a strengthened test and rerun,
       equivalent with reason, or deferred in Notes. Do not alter production
@@ -257,7 +258,52 @@ input-reference policy.
   release-only `debug_assert!` mutation omission above. Focused integration
   (`viability` 25/25, neighborhood 4/4, reproducibility 1/1, VM E2E 1/1)
   passed in `/private/tmp/t11-f02-focused-integration-final.log`; no remaining
-  simplification or efficiency finding requires a production change.
+  simplification or efficiency finding requires a production change. A second
+  review after survivor remediation found one composition bug introduced by the
+  expanded encoded-slot domain: paired slot-address mutation added `u8` values
+  before reducing modulo 16. The maximum-slot red regression in
+  `/private/tmp/t11-f02-paired-slot-raw255-red.log` panicked in debug. The
+  production repair widens that existing arithmetic to `u16` before reduction;
+  it preserves the macro's modulo-16 policy. A proptest now covers every raw
+  slot and seed, requiring co-addressed immediate load/store operands below 16
+  and a changed effective address.
+- Remediation verification (2026-09-05): after the paired-slot repair and
+  survivor-driven test strengthening, `cargo check --workspace --all-targets`
+  passed (`/private/tmp/t11-f02-cargo-check-remediation-final.log`) and
+  `cargo test -p v3-core --lib` passed 1,095/1,095
+  (`/private/tmp/t11-f02-v3-core-lib-remediation-final.log`). The exact
+  remapped-copy regression passed 1/1 in
+  `/private/tmp/t11-f02-remapped-all-fields-green-exact.log`; the VM module
+  passed 78/78 in `/private/tmp/t11-f02-vm-module-remediation.log`; and its
+  release filter passed 78/78 with the expected zero-test integration binaries
+  in `/private/tmp/t11-f02-vm-release-remediation-final.log`. The two earlier
+  attempted multi-filter cargo invocations are retained as command-usage
+  failures in `/private/tmp/t11-f02-survivor-coverage-red.log`; they executed
+  no tests and are not validation evidence.
+- Sol consultations (2026-09-05): consultation 3, accepted, required existing
+  bounded seeded calibration rather than a custom RNG for register direction
+  and numeric-boundary tests. Consultation 4, accepted after a remapped-copy
+  red failure, replaced whole-instruction equality with register-field identity
+  because a surviving conditional jump's offset may be reencoded; it also
+  required one Cargo positional filter per command. Four consultations total;
+  no guidance rejected.
+- Original mutation run (2026-09-05): `make rust-mutants` generated
+  `/Users/istefanek/.local/share/petri-tools/mutants/t11-f02/mutants.out` from
+  the captured feature diff. Its terminal `cargo-mutants` summary was 122
+  tested, 96 caught, 24 missed, 2 unviable, and 0 timeouts. The retained
+  process chain was make 53683, script 53685, cargo-mutants 53705. The outer
+  execution wrapper did not retain a terminal session id, so its direct make
+  exit status is not asserted; the terminal summary is preserved in
+  `/private/tmp/t11-f02-rust-mutants.log`. Missed locations: register-count
+  negation (operators.rs:55); u8 boundary arms/guards (252-253); u16 boundary
+  arms/guards (260-262); i32 boundary arms/guards (269-271); instruction
+  mutation branch ranges (440,456); register remapping body/operators (532,
+  534-536); splice position/deletion mapping (634,648,678); read/store and
+  load/compare motif adjacency (883,972); and indirect slot-field matching
+  (1078). The two unviable mutants were founder default and input-reference
+  `Ok(Default)` changes. Survivor-driven test strengthening and the separate
+  paired-slot overflow repair are ready for the required distinct-output rerun;
+  no production edit was made merely to kill a mutant.
 - Integration blocker (2026-09-05): while this feature was at implementation
   commit `e63248591faa7eb51f79014068a6920cc305ecb1`, `main` at
   `/Users/istefanek/projects/petri` advanced from the recorded base
@@ -271,10 +317,9 @@ input-reference policy.
   and gate evidence above; the gate report is present at
   `docs/progress/features/t11-f02-vm-structural-mutation-semantics.json` but
   has not been appended to the series because the goal report is outstanding.
-  Required mutation testing was already live against the captured diff when
-  this blocker was discovered (`cargo-mutants` PID 53705; output
-  `/Users/istefanek/.local/share/petri-tools/mutants/t11-f02/mutants.out`), so
-  it is being preserved and polled without restart. Outstanding work after
-  authorization: complete and triage that one mutation run, reconcile to the
-  approved main revision, rerun affected validation, make the one goal
-  benchmark run, append series/progress evidence, final review, and integration.
+  The original mutation run has since reached the terminal summary recorded
+  above. Outstanding feature-branch work is the required distinct-output
+  survivor rerun, the replacement gate and one goal benchmark run, and progress
+  evidence. Reconciliation to the approved main revision, final review, and
+  integration remain blocked on explicit authority; no rebase or merge has been
+  performed.
