@@ -104,7 +104,7 @@ the node-type-contract behavior; "status" is filled in by the implementer.
 | D3 backward-edge recurrence | Graph: node 0 `Constant(1.0)`; node 1 `Add` with edges from node 0 and from itself (`ComputeNode(1)`), both weight 1; node 1 wired to `WriteSlot(0)`. Read slot 0 after ticks 1..3. | A one-tick memory element: 1, 2, 3. | Observed: slot0 = 15.0, 15.0, 15.0 across ticks 1-3 (not 1, 2, 3). The self-loop reads `prev_outputs` (reset to zero every tick, not the previous tick's converged output — `Add` has no persistent `state`), so it accumulates by 1.0 per relaxation pass and is capped at `max_graph_relax_iters` = 15 every tick, giving the same value every tick instead of a genuinely advancing one-tick memory element. **Gap — assigned to T11.F06**: a backward edge reads the previous relaxation pass, not the previous world tick. | gap (T11.F06) |
 | E1 exact one-edge update, immediate reward | Graph: node 0 `Constant(1.0)`; node 1 `Add` with one edge from node 0, weight 1, `PlasticityConfig { rule: Classic, learning_rate: 0.5, weight_clamp: 10, modulation: Some { reward_source: <channel>, trace_decay: 0.5 } }`; node 1 wired to the execute gate and an `Eat` action slot so the controller acts every tick. Choose the outcome channel whose signal the test controls exactly (`ActionSuccess` with `Eat` on a food cell gives 1.0; `EnergyDelta` is read from `energy` before and after) and record it. Read `eligibility_traces` and `plasticity_weights` after tick 1. | One calibrated rule with the learning rate applied once: `dw = eta * signal * pre * post`. | Chosen channel: `ActionSuccess` (the wired `Eat` succeeds every tick with food present, giving signal = 1.0 exactly — the only attempted action). Observed after tick 1: `eligibility_traces[0][1][0] = 0.5` (= eta·pre·post, matches `decay·0 + eta·pre·post`); `plasticity_weights[0][1][0] = 1.25` (genome weight 1.0 + 0.25). The realized gain is 0.25 = eta² · signal · pre · post, not eta · signal · pre · post (0.5) — the learning rate is folded into the trace and applied again at the reward update. **Gap — assigned to T11.F07**: one calibrated rule, not a double application of eta. | gap (T11.F07) |
 | E2 delayed reward, visited every tick | E1 with the signal held at 0 on ticks 2..d and nonzero at tick d + 1, for d in {1, 2, 4} (control the signal through the world, for example food present only on the reward tick). | Credit at tick d + 1 is discounted by elapsed world time: `eta * signal * decay^d * trace_1` plus the tick's own activity term. | For d in {1,2,4} (reward tick d+1 = 2, 3, 5), the observed trace at the reward tick matched the elapsed-tick recurrence `trace_n = decay·trace_{n-1} + eta·pre·post` computed over `n = d+1` ticks (e.g. d=1: trace=0.75, weight=1.375; d=4: trace≈0.96875, weight≈1.484375) within 1e-5. **Timing: meets** — because the module runs every tick, decay correctly tracks elapsed world time (contrast with E3). **Gain: inherits E1's gap** — the weight update still folds eta into the trace and again into the reward update (`expected_weight = 1.0 + eta·signal·expected_trace` where `expected_trace` already carries one factor of eta), so this fixture does not clear T11.F07 on gain, only on timing. | meets (timing) / gap (T11.F07, gain) |
-| E3 skipped module visits | Entry VM node routes to the E1 graph node only on ticks with FoodHere > 0 (`WriteRouteGate` toward the graph target, otherwise `NoOp` + `ExecuteActionQueue`). Visit at tick 1, skip ticks 2..3 with a nonzero signal on a skipped tick (energy moves by VM cost, or food placed for a reactive `Eat` in the VM branch). Read traces and weights after each tick. | Traces reflect elapsed ticks whether or not the module ran; a skipped tick carries no stale credit. | Reward channel: `EnergyDelta` (measured directly from `creature.energy` around each tick), with no action bank wired on the graph node, so the signal is ordinary VM/graph opcode cost independent of food. Visit tick 1: trace = 0.5 (eta·pre·post), weight = 1.0 + eta·signal_1·trace_1. Skipped ticks 2 and 3: **trace stayed frozen at the tick-1 value (within 1e-9)** — it does not reflect the two elapsed ticks — while **the weight still moved** each skipped tick by `eta·signal·trace_1` (the stale, frozen trace), because `run_reward_learning` applies to every creature with a reward-modulated node every tick regardless of whether that node's mesh hop executed. **Gap — assigned to T11.F07**: traces do not advance with elapsed ticks when the module is skipped, and reward learning still spends stale credit on skipped ticks rather than withholding it. | gap (T11.F07) |
+| E3 skipped module visits | Entry VM node routes to the E1 graph node only on ticks with FoodHere > 0 (`WriteRouteGate` toward the graph target, otherwise `NoOp` + `ExecuteActionQueue`). Visit at tick 1, skip ticks 2..3. Read traces and weights after each tick. | Traces reflect elapsed ticks whether or not the module ran; a skipped tick carries no stale credit. | Reward channel: `EnergyDelta` (measured directly from `creature.energy` around each tick, and asserted nonzero on every tick so the weight-moved claim below is not vacuous), with no action bank wired on the graph node. The signal is not "ordinary VM/graph opcode cost": on the visit tick the graph node has no route targets of its own, so the mesh soft-defaults to `NoOp`; on a skipped tick the entry VM explicitly pushes `NoOp`; both paths land on Phase 2's `noop_cost` (0.05, `crates/v3-core/src/config/simulation.rs:390`), which dominates the VM/graph opcode costs it sits on top of (1e-6 to 1e-5 scale). Measured signal ≈ -0.05 per tick (signal_1 ≈ -0.050079, skipped signal ≈ -0.050018). Visit tick 1: trace = 0.5 (eta·pre·post), weight = 1.0 + eta·signal_1·trace_1. Skipped ticks 2 and 3: **trace stayed frozen at the tick-1 value (within 1e-9)** — it does not reflect the two elapsed ticks — while **the weight still moved** each skipped tick by `eta·signal·trace_1` ≈ -0.0125 (the stale, frozen trace), because `run_reward_learning` applies to every creature with a reward-modulated node every tick regardless of whether that node's mesh hop executed. **Gap — assigned to T11.F07**: traces do not advance with elapsed ticks when the module is skipped, and reward learning still spends stale credit on skipped ticks rather than withholding it. | gap (T11.F07) |
 
 Property test (pure invariant, proptest): for any `a`, `b` in [0, 1], any
 finite `state` and `input` in [-1e6, 1e6], one `DecayIntegrator(a)` step and
@@ -164,7 +164,32 @@ cases are drawn. Commit any `proptest-regressions/` file that appears.
       ```
       This diff touches only `tests/*.rs` files (no `src/` production code),
       so `cargo mutants --in-diff` found no production lines to mutate.
-      Record: no survivors — valid for a test-only diff.
+      Record: no survivors — valid for a test-only diff. The stated output
+      path's `mutants.out` directory was not created; only `in-diff.patch`
+      exists at `/Users/istefanek/.local/share/petri-tools/mutants/t11-f05/`,
+      because cargo-mutants found no mutants in the diff at all (`INFO No
+      mutants to filter`) and so had no mutant run to write a report
+      directory for. "no survivors" is the tool's report for that empty
+      mutant set, not evidence of a completed-and-clean mutant run.
+      Second run (remediation pass, 2026-09-05, after the simplify pass
+      below): identical result —
+      ```
+      rust-mutants: diff against ae012a87427ae262bc3355d166aa95957ac3187f, output in /Users/istefanek/.local/share/petri-tools/mutants/t11-f05/mutants.out
+       INFO No mutants to filter
+      rust-mutants: no survivors
+      ```
+      `mutants.out` still not created (only `in-diff.patch`), for the same
+      reason as the first run: the diff still touches only `tests/*.rs`.
+- [x] Remediation pass (2026-09-05, one P2 and five P3 review findings)
+      applied and re-verified: `cargo fmt --all -- --check` (exit 0),
+      `cargo test -p v3-core --test temporal_fixtures` (13 passed),
+      `cargo test -p v3-core --test creature_workflow_e2e` (7 passed),
+      `make rust-clippy` (exit 0, no warnings), `make roadmap-check`
+      (`validation passed`), a single-pass `simplify` skill run (Agent tool
+      unavailable; one fix applied — see Notes for AI Agents), and a second
+      `make rust-mutants` run (recorded above). `git diff --stat
+      main...HEAD -- crates/*/src/` remained empty (production code still
+      untouched).
 - [x] `make roadmap-check` passes after the document edits (`roadmap-check:
       validation passed`).
 - [x] Benchmark report stored at
@@ -175,11 +200,13 @@ cases are drawn. Commit any `proptest-regressions/` file that appears.
       format/viability/all Rust test subsets including
       `rust-test-temporal-fixtures`/clippy, frontend-check, dependency-audit,
       skill-check all green; `temporal_fixtures`: 13 passed;
-      `creature_workflow_e2e`: 7 passed). The one commit after that
-      (`ea4dd270`) is documentation-only (this spec's prose), re-verified
-      separately with `make roadmap-check` (passed) and
+      `creature_workflow_e2e`: 7 passed). The commits after that
+      (`ea4dd270`, `2bacadc1`, and this remediation pass's commit) are
+      spec-only (this document's prose), each re-verified with
+      `make roadmap-check` (passed) and
       `git diff --stat main...HEAD -- crates/*/src/` (empty) rather than a
-      second full `make check`.
+      second full `make check`; the orchestrator records this remediation
+      pass's own `make check` result at closure.
 
 ## Performance and Goal Impact
 
@@ -250,7 +277,14 @@ both inside the 25 percent flag threshold. Report:
   with elapsed ticks when the module is skipped — they freeze at the last
   visited tick's value — yet the reward-learning pass still spends that
   stale, frozen trace on every skipped tick because it does not check
-  whether the node's mesh hop executed).
+  whether the node's mesh hop executed; the signal driving this is not
+  ordinary VM/graph opcode cost as the fixture's genome comment originally
+  claimed — the graph node has no route targets, so the mesh soft-defaults
+  to `NoOp` on the visit tick and the entry VM explicitly pushes `NoOp` on a
+  skipped tick, and both land on Phase 2's `noop_cost` (0.05), which
+  dominates the 1e-6 to 1e-5-scale opcode costs; measured signal ≈ -0.05 per
+  tick and weight movement ≈ -0.0125 per skipped tick, both now asserted
+  nonzero in the fixture so the claim cannot pass vacuously).
 - Motif constructors T11.F01 (and T09.F08, T09.F01, T11.F10) can lift
   directly from `crates/v3-core/tests/temporal_fixtures.rs`: reactive control
   — `reactive_control_vm_genome()`; shared-memory delayed cue —
@@ -277,6 +311,13 @@ both inside the 25 percent flag threshold. Report:
   implementation uses the correct type. Left as a discrepancy note rather
   than rewriting the Inputs section, per the instruction to record gaps
   rather than edit around them.
+- Second spec-text discrepancy (remediation pass, 2026-09-05): the proptest's
+  `max_graph_relax_iters = 1` setting is a third labeled permitted deviation
+  (documented in the test file's header), but the Inputs and Invariants
+  section still reads "the only permitted deviations are ... and the one
+  labeled decay treatment in fixture C2" (two). Left as a discrepancy note
+  rather than rewriting the Inputs section's count, for the same reason as
+  the `AgeTicks` discrepancy above.
 - Advisor consulted twice. **Deviation from the standing three-checkpoint
   rule**: consult 1 happened after the twelve fixtures and the proptest were
   already written and passing, not before committing to the implementation
@@ -301,3 +342,60 @@ both inside the 25 percent flag threshold. Report:
   actual exit status on the closing commit rather than an in-flight run, and
   confirm mechanically (not just by assertion) that no production file
   changed (`git diff --stat main...HEAD -- crates/*/src/` is empty).
+- Remediation pass (fresh implementer, 2026-09-05; the `SendMessage`
+  deviation above applies again). Applied a reviewed one-P2/five-P3 finding
+  set: E3's `EnergyDelta` signal now asserted nonzero on the visit tick and
+  every skipped tick (probed and confirmed: signal_1 ≈ -0.050079, skipped
+  signal ≈ -0.050018, both dominated by `noop_cost` 0.05, not by opcode
+  cost); E3's two doc comments and its catalogue row and Notes entry
+  reworded to attribute the signal to the mesh's soft-default `NoOp` (visit
+  tick, no route targets) and the entry VM's explicit `NoOp` (skipped
+  ticks), not to "ordinary VM/graph opcode costs"; the D1/D2 test bodies now
+  assert against the literal `D1_PASSES`/`D1_STATES`/`D2_PASSES`/`D2_STATES`
+  constants recorded from the catalogue instead of a duplicated
+  `simulate_decay_integrator_clock` helper (deleted, along with its
+  never-converging variant, since nothing else called them); the proptest's
+  `max_graph_relax_iters = 1` setting is now the file header's third labeled
+  deviation, with a discrepancy note above recording that the Inputs and
+  Invariants section's deviation count predates it; the redundant
+  `#[path = "common/mod.rs"]` attributes were removed from both test files
+  (a plain `mod common;` already resolves `tests/common/mod.rs`); the
+  Verification section's stale "one commit after that" sentence was
+  corrected to name both spec-only commits after `ccf50afa`
+  (`ea4dd270`, `2bacadc1`) and this pass's own commit, without implying a
+  fresh full `make check` ran during the pass (the orchestrator records
+  that at closure); and a note was added recording that `mutants.out` was
+  never created because cargo-mutants found no mutants at all, not because
+  a mutant run completed clean. Two advisor consults. Consult 1, before
+  starting the edits: confirmed the probed E3 signal values against the
+  finding's description (noop_cost, not move_cost or failed_action_penalty),
+  flagged that both E3 doc comments (the genome constructor's and the
+  test's) carry the same error and both needed rewording, identified three
+  more stale spots the D1/D2 helper deletion touches beyond the assertions
+  themselves (the "── D helpers" section comment, D1's doc-comment
+  cross-reference to the deleted helper, and D2's second call to the deleted
+  helper for its `d1_states`/`d1_passes` comparison), and recommended
+  verifying the `git log` range and the mutants output directory's actual
+  contents before wording items 2 and 5 rather than transcribing the
+  brief's text unverified. Consult 2, before reporting done: caught that the
+  rewritten "D helpers and literals" comment (written per consult 1's
+  guidance) had overcorrected into a false claim — it said the literals
+  "were derived by, and match to float precision, the documented capped
+  Gauss-Seidel recurrence" and gave pseudocode with no term for the
+  disconnected oscillator, so a reader running that pseudocode would get
+  D1's numbers, not D2's; directed rewording it to state the literals are
+  measured from the production tick path with the recurrence explained only
+  as the mechanism (why), not a re-derivable formula. It also caught a
+  forward reference in the E3 doc comment ("see the assertions below for
+  the exact recorded value") pointing at assertions that only check
+  `> 1e-3`, no exact value; replaced with the measured numbers directly.
+  Both fixes are applied in the file. The single-pass `simplify` skill run
+  (Agent tool unavailable
+  in this session, so it ran as one inline pass rather than the usual
+  4-agent fan-out) found one fix: `assert_eq!`/`assert_ne!` comparisons were
+  calling `.to_vec()` on the `D1_PASSES`/`D2_PASSES` array constants before
+  comparing against `Vec<u32>`, an unneeded allocation — `Vec<T>` already
+  implements `PartialEq<[T; N]>`, so the comparisons now compare the array
+  directly. No reuse, altitude, or other efficiency findings; the doc
+  comments and constant layout were left as sized for a 4-tick fixture, not
+  worth compressing further.

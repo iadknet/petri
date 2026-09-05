@@ -23,7 +23,7 @@
 //!
 //! Settings held at production values throughout (`RuntimeConfig::default()`
 //! and `shared_memory.decay_rate == 0.0`), per the spec's Inputs and
-//! Invariants section. The only two permitted deviations, each labeled at
+//! Invariants section. The only three permitted deviations, each labeled at
 //! its use site:
 //! 1. `test_config()` (shared with `creature_workflow_e2e`): tiny 12x12
 //!    world, zero food coverage/growth, zero energy decay, zero mutation
@@ -31,10 +31,13 @@
 //!    tick-loop setting.
 //! 2. Fixture C2 sets `shared_memory.decay_rate = 0.1` to characterize
 //!    retention under decay (contrasted with C1's production decay of 0.0).
+//! 3. The proptest sets `max_graph_relax_iters = 1` to force exactly one
+//!    relaxation pass per `execute_creature_mesh` call, isolating a single
+//!    stateful-node step (the invariant under test) from the pass-count gap
+//!    D1/D2 record.
 //!
 //! No production source file is edited by this feature.
 
-#[path = "common/mod.rs"]
 mod common;
 
 use common::{graph_hop, insert_creature, run_one_traced_tick, test_config};
@@ -463,10 +466,13 @@ fn reward_modulated_node_genome(reward_source: OutcomeChannel) -> CreatureGenome
 
 /// E3's reward-modulated graph node: identical compute nodes to
 /// [`reward_modulated_node_genome`], but with no action bank or execute-gate
-/// wiring, so the tick's `EnergyDelta` reflects only ordinary VM/graph
-/// opcode costs (small and deterministic) rather than an `Eat` outcome —
-/// giving a clean, always-nonzero reward signal independent of food
-/// placement.
+/// wiring and no route targets of its own. With no route target, the mesh
+/// soft-default terminates the tick with `vec![WorldAction::NoOp]`, and
+/// Phase 2 charges `noop_cost` (0.05, `crates/v3-core/src/config/
+/// simulation.rs:390`) — an order of magnitude larger than the VM/graph
+/// opcode costs it sits on top of (1e-6 to 1e-5 scale), so it dominates the
+/// tick's `EnergyDelta` and gives a clean, always-nonzero (negative) reward
+/// signal (about -0.05 per tick) independent of food placement.
 fn reward_modulated_node_genome_inert(reward_source: OutcomeChannel) -> CreatureGenome {
     reward_modulated_node_genome_impl(reward_source, false)
 }
@@ -878,73 +884,32 @@ fn c3_graph_slot_write_and_previous_read() {
     }
 }
 
-// ── D helpers: replicate the documented relaxation recurrence in pure Rust,
-// ── independent of production code, so the fixtures assert against the
-// ── formula stated in the spec's Inputs and Invariants section rather than
-// ── hand-derived magic numbers. ──────────────────────────────────────────────
-
-/// Simulate `max_passes`-capped Gauss-Seidel relaxation of a single
-/// `DecayIntegrator(a)` node fed by a constant `input`, across `ticks` ticks,
-/// per the documented rule: `prev_outputs` resets to zero at the start of
-/// each tick; `curr_outputs` (and persistent `state`) carry forward from the
-/// last completed pass; the loop runs at least one pass and at most
-/// `max_passes`, stopping after `stable_passes` consecutive passes with
-/// `delta <= epsilon`. Returns `(state_after_each_tick, passes_per_tick)`.
-fn simulate_decay_integrator_clock(
-    a: f32,
-    input: f32,
-    max_passes: u32,
-    epsilon: f32,
-    req_stable: u32,
-    ticks: usize,
-) -> (Vec<f32>, Vec<u32>) {
-    let mut state = 0.0f32;
-    let mut states = Vec::with_capacity(ticks);
-    let mut passes_per_tick = Vec::with_capacity(ticks);
-    for _ in 0..ticks {
-        let mut prev = 0.0f32;
-        let mut stable_passes = 0u32;
-        let mut passes_run = 0u32;
-        for _ in 0..max_passes {
-            let new_state = (1.0 - a) * state + a * input;
-            let delta = (new_state - prev).abs();
-            state = new_state;
-            prev = new_state;
-            passes_run += 1;
-            if delta <= epsilon {
-                stable_passes += 1;
-            } else {
-                stable_passes = 0;
-            }
-            if stable_passes >= req_stable {
-                break;
-            }
-        }
-        states.push(state);
-        passes_per_tick.push(passes_run);
-    }
-    (states, passes_per_tick)
-}
-
-/// The same relaxation shape as [`simulate_decay_integrator_clock`], but for
-/// a graph that never converges (delta is pinned above `epsilon` forever by
-/// a companion oscillating node), so every tick runs the full `max_passes`.
-fn simulate_decay_integrator_clock_never_converging(
-    a: f32,
-    input: f32,
-    max_passes: u32,
-    ticks: usize,
-) -> Vec<f32> {
-    let mut state = 0.0f32;
-    let mut states = Vec::with_capacity(ticks);
-    for _ in 0..ticks {
-        for _ in 0..max_passes {
-            state = (1.0 - a) * state + a * input;
-        }
-        states.push(state);
-    }
-    states
-}
+// ── D helpers and literals ───────────────────────────────────────────────────
+//
+// D1_STATES/D1_PASSES and D2_STATES/D2_PASSES are measured from the
+// production tick path (recorded in the spec catalogue's Observed column);
+// the fixtures assert against these literals directly rather than against a
+// duplicate of the production relaxation recurrence, so a repair to that
+// recurrence (T11.F06) needs only one line flipped per fixture instead of
+// two divergent implementations kept in sync.
+//
+// Why the values land where they do (mechanism, not a re-derivable
+// formula): each tick's relaxation loop compares the persisted `node_state`
+// against `prev_outputs`, which resets to zero at the start of every tick;
+// it runs at least one pass and at most `max_graph_relax_iters` (15),
+// stopping once `graph_convergence_stable_passes` (2) consecutive passes
+// have `delta <= graph_convergence_epsilon` (1e-3). D1's lone
+// `DecayIntegrator(0.5)` fed a constant input of 1.0 races toward its fixed
+// point during tick 1's artificial zero-baseline comparison (11 passes),
+// then settles quickly in later ticks (3, 3, 3) once `node_state` already
+// sits near the fixed point. D2 adds a companion `Oscillator` node with no
+// inputs and no consumers; its own output cycles 1, 0, -1, 0, ... every
+// pass and never satisfies the epsilon, so the stable-pass counter never
+// reaches 2 and every tick instead runs the full 15-pass cap.
+const D1_PASSES: [u32; 4] = [11, 3, 3, 3];
+const D1_STATES: [f32; 4] = [0.9995117, 0.99993896, 0.9999924, 0.99999905];
+const D2_PASSES: [u32; 4] = [15, 15, 15, 15];
+const D2_STATES: [f32; 4] = [0.9999695, 1.0, 1.0, 1.0];
 
 /// Run `ticks` traced ticks against the entry node's single graph hop,
 /// recording the number of relaxation passes and the persisted
@@ -974,30 +939,23 @@ fn run_and_observe_integrator_clock(
 /// 2`), a `DecayIntegrator` advances on every relaxation *pass*, not once per
 /// world tick. Status: gap, assigned to T11.F06. The idealized one-pass-per-
 /// tick clock would give states 0.5, 0.75, 0.875, 0.9375; the observed
-/// per-tick pass counts and states are recorded below, replicating the
-/// documented recurrence (`simulate_decay_integrator_clock`) rather than a
-/// hand-derived constant.
+/// per-tick pass counts and states are the `D1_PASSES`/`D1_STATES` literals
+/// (see the D helpers comment for their derivation).
 #[test]
 fn d1_integrator_clock() {
     let pos = Position::new(1, 1);
     let (mut sim, target) = one_creature_sim(decay_integrator_graph_genome(), pos, 100.0);
 
-    let (expected_states, expected_passes) =
-        simulate_decay_integrator_clock(0.5, 1.0, 15, 1e-3, 2, 4);
     let (observed_states, observed_passes) = run_and_observe_integrator_clock(&mut sim, target, 4);
 
     assert_eq!(
-        observed_passes, expected_passes,
-        "passes per tick should match the documented Gauss-Seidel relaxation recurrence"
+        observed_passes, D1_PASSES,
+        "passes per tick should match the catalogue's recorded observation"
     );
-    for (i, (&obs, &exp)) in observed_states
-        .iter()
-        .zip(expected_states.iter())
-        .enumerate()
-    {
+    for (i, (&obs, &exp)) in observed_states.iter().zip(D1_STATES.iter()).enumerate() {
         assert!(
             (obs - exp).abs() < 1e-5,
-            "tick {}: integrator state {obs} should match the recurrence-predicted {exp}",
+            "tick {}: integrator state {obs} should match the catalogue's recorded {exp}",
             i + 1
         );
     }
@@ -1019,7 +977,9 @@ fn d1_integrator_clock() {
 /// assigned to T11.F06. The oscillator's own output never satisfies the
 /// convergence epsilon (it moves by a fixed nonzero step every pass), which
 /// forces every tick to run the full `max_graph_relax_iters = 15` passes and
-/// gives the integrator a different trajectory than D1's.
+/// gives the integrator a different trajectory than D1's — the observed
+/// per-tick pass counts and states are the `D2_PASSES`/`D2_STATES` literals
+/// (see the D helpers comment for their derivation).
 #[test]
 fn d2_disconnected_node_perturbation() {
     let pos = Position::new(1, 1);
@@ -1029,35 +989,29 @@ fn d2_disconnected_node_perturbation() {
         100.0,
     );
 
-    let expected_states = simulate_decay_integrator_clock_never_converging(0.5, 1.0, 15, 4);
     let (observed_states, observed_passes) = run_and_observe_integrator_clock(&mut sim, target, 4);
 
-    assert!(
-        observed_passes.iter().all(|&p| p == 15),
+    assert_eq!(
+        observed_passes, D2_PASSES,
         "every tick should hit the max_graph_relax_iters cap because the disconnected \
-         oscillator never lets the graph converge; observed passes: {observed_passes:?}"
+         oscillator never lets the graph converge"
     );
-    for (i, (&obs, &exp)) in observed_states
-        .iter()
-        .zip(expected_states.iter())
-        .enumerate()
-    {
+    for (i, (&obs, &exp)) in observed_states.iter().zip(D2_STATES.iter()).enumerate() {
         assert!(
             (obs - exp).abs() < 1e-4,
-            "tick {}: integrator state {obs} should match the always-15-passes recurrence {exp}",
+            "tick {}: integrator state {obs} should match the catalogue's recorded {exp}",
             i + 1
         );
     }
 
     // Contract violation: the disconnected, unconsumed oscillator changed
     // both the pass count and the integrator's trajectory relative to D1.
-    let (d1_states, d1_passes) = simulate_decay_integrator_clock(0.5, 1.0, 15, 1e-3, 2, 4);
     assert_ne!(
-        observed_passes, d1_passes,
+        observed_passes, D1_PASSES,
         "gap: a disconnected, unconsumed node changed the pass count per tick"
     );
     assert!(
-        (observed_states[0] - d1_states[0]).abs() > 1e-6,
+        (observed_states[0] - D1_STATES[0]).abs() > 1e-6,
         "gap: a disconnected, unconsumed node changed the integrator's tick-1 trajectory"
     );
 }
@@ -1217,14 +1171,21 @@ fn e2_delayed_reward_visited_every_tick() {
 /// graph node only on ticks with `FoodHere > 0` (tick 1); ticks 2 and 3 skip
 /// the module entirely (`NoOp` + `ExecuteActionQueue` terminates the mesh
 /// before any routing decision). The reward-source channel is `EnergyDelta`
-/// (nonzero every tick from ordinary VM/graph opcode costs, independent of
-/// whether the module ran) rather than `ActionSuccess`, so a nonzero signal
-/// is available on skipped ticks too. Status: gap, assigned to T11.F07. The
-/// eligibility trace is frozen at its tick-1 value on skipped ticks (the
-/// module never re-evaluates it), but the reward-learning pass still applies
-/// `dw = eta * signal * trace` every tick to every creature with a
-/// reward-modulated node — using that stale, frozen trace — because it does
-/// not check whether the node's mesh hop executed this tick.
+/// (nonzero and independent of whether the module ran) rather than
+/// `ActionSuccess`, so a nonzero signal is available on skipped ticks too:
+/// on the visit tick, the graph node has no route targets of its own, so the
+/// mesh soft-default terminates with `NoOp`; on a skipped tick, the entry VM
+/// explicitly pushes `NoOp`. Both paths land on the same Phase 2 charge,
+/// `noop_cost` (0.05), which dominates the VM/graph opcode costs it sits on
+/// top of (1e-6 to 1e-5 scale) and gives a measured signal of about -0.05 per
+/// tick (signal_1 ≈ -0.050079, skipped ≈ -0.050018). Status:
+/// gap, assigned to T11.F07. The eligibility trace is frozen at its tick-1
+/// value on skipped ticks (the module never re-evaluates it), but the
+/// reward-learning pass still applies `dw = eta * signal * trace` every tick
+/// to every creature with a reward-modulated node — using that stale,
+/// frozen trace, so the weight still moves by about -0.0125 per skipped
+/// tick — because it does not check whether the node's mesh hop executed
+/// this tick.
 ///
 /// The test measures the `EnergyDelta` signal itself by reading
 /// `creature.energy` around each `run_tick` call, rather than hand-deriving
@@ -1275,6 +1236,12 @@ fn e3_skipped_module_visits() {
     );
     let energy_after_1 = sim.creatures.get(target).expect("alive").energy;
     let signal_1 = energy_after_1 - energy_before_1;
+    assert!(
+        signal_1.abs() > 1e-3,
+        "tick1 signal should be nonzero (the mesh soft-default NoOp's noop_cost, about \
+         -0.05) so the weight-moved-by-eta*signal*trace claim below is not vacuous; got \
+         {signal_1}"
+    );
 
     let creature = sim.creatures.get(target).expect("alive");
     let trace_1 = creature.graph_runtime.eligibility_traces[1][1][0];
@@ -1306,6 +1273,12 @@ fn e3_skipped_module_visits() {
         );
         let energy_after = sim.creatures.get(target).expect("alive").energy;
         let signal = energy_after - energy_before;
+        assert!(
+            signal.abs() > 1e-3,
+            "skipped tick {skipped_tick} signal should be nonzero (the entry VM's explicit \
+             NoOp noop_cost, about -0.05) so the weight-still-moved claim below is not \
+             vacuous; got {signal}"
+        );
 
         let creature = sim.creatures.get(target).expect("alive");
         let trace_now = creature.graph_runtime.eligibility_traces[1][1][0];
