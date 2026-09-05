@@ -191,6 +191,10 @@ Use the shared Plan, Implement, Review, and Close contract above with these
 substitutions. This adapter uses native subagents and Git; it adds no runner,
 plugin, separate roadmap, or global model settings.
 
+The project default in [`.codex/config.toml`](../.codex/config.toml) is
+`gpt-6-astra` with `high` reasoning effort. Explicit session selections can
+override that default, so verify the model and effort when launching a feature.
+
 | Role | Model | Effort | Responsibility |
 | --- | --- | --- | --- |
 | Orchestrator | `gpt-6-astra` | `high` | Plan, delegate, verify, integrate |
