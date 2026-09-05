@@ -95,7 +95,10 @@ fn reactive_control_vm_genome() -> CreatureGenome {
             dst: 3,
             const_idx: 1,
         }, // r3 = DIR_E
-        VmInstruction::WriteWorldActionMeta { slot_idx: 0, src: 3 },
+        VmInstruction::WriteWorldActionMeta {
+            slot_idx: 0,
+            src: 3,
+        },
         VmInstruction::PushAction {
             action_type: ACTION_MOVE,
         },
@@ -140,8 +143,14 @@ fn delayed_cue_vm_genome() -> CreatureGenome {
             dst: 6,
             const_idx: 1,
         }, // idx4: r6 = 1.0
-        VmInstruction::StoreSlotImm { slot_idx: 0, src: 6 }, // idx5: slot0 = 1.0
-        VmInstruction::LoadSlotImm { dst: 3, slot_idx: 0 }, // idx6: r3 = slot0
+        VmInstruction::StoreSlotImm {
+            slot_idx: 0,
+            src: 6,
+        }, // idx5: slot0 = 1.0
+        VmInstruction::LoadSlotImm {
+            dst: 3,
+            slot_idx: 0,
+        }, // idx6: r3 = slot0
         VmInstruction::LoadConst {
             dst: 4,
             const_idx: 0,
@@ -152,15 +161,18 @@ fn delayed_cue_vm_genome() -> CreatureGenome {
             dst: 7,
             const_idx: 2,
         }, // idx10: r7 = DIR_E
-        VmInstruction::WriteWorldActionMeta { slot_idx: 0, src: 7 }, // idx11
+        VmInstruction::WriteWorldActionMeta {
+            slot_idx: 0,
+            src: 7,
+        }, // idx11
         VmInstruction::PushAction {
             action_type: ACTION_MOVE,
         }, // idx12
-        VmInstruction::ExecuteActionQueue, // idx13
+        VmInstruction::ExecuteActionQueue,           // idx13
         VmInstruction::PushAction {
             action_type: ACTION_NOOP,
         }, // idx14
-        VmInstruction::ExecuteActionQueue, // idx15
+        VmInstruction::ExecuteActionQueue,           // idx15
     ];
     CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -207,7 +219,10 @@ fn previous_slot_cue_vm_genome() -> CreatureGenome {
             dst: 4,
             const_idx: 0,
         }, // idx5: r4 = 1.0
-        VmInstruction::StoreSlotImm { slot_idx: 0, src: 4 }, // idx6: slot0 = 1.0
+        VmInstruction::StoreSlotImm {
+            slot_idx: 0,
+            src: 4,
+        }, // idx6: slot0 = 1.0
         VmInstruction::LoadConst {
             dst: 5,
             const_idx: 1,
@@ -219,13 +234,16 @@ fn previous_slot_cue_vm_genome() -> CreatureGenome {
             eps: 2,
         }, // idx8: r6 = (age == 2)
         VmInstruction::JumpIfZero { cond: 6, offset: 1 }, // idx9: -> idx11 if age != 2
-        VmInstruction::ClearSlot { slot_idx: 0 },          // idx10: slot0 = 0
-        VmInstruction::LoadSlotPrev { dst: 7, slot_idx: 0 }, // idx11: r7 = prev_slot0
+        VmInstruction::ClearSlot { slot_idx: 0 },         // idx10: slot0 = 0
+        VmInstruction::LoadSlotPrev {
+            dst: 7,
+            slot_idx: 0,
+        }, // idx11: r7 = prev_slot0
         VmInstruction::LoadConst {
             dst: 8,
             const_idx: 3,
         }, // idx12: r8 = 0.0
-        VmInstruction::CmpGt { dst: 9, a: 7, b: 8 }, // idx13: r9 = prev_slot0 > 0
+        VmInstruction::CmpGt { dst: 9, a: 7, b: 8 },      // idx13: r9 = prev_slot0 > 0
         VmInstruction::JumpIfZero { cond: 9, offset: 4 }, // idx14: -> idx19 if prev_slot0 <= 0
         VmInstruction::LoadConst {
             dst: 10,
@@ -238,11 +256,11 @@ fn previous_slot_cue_vm_genome() -> CreatureGenome {
         VmInstruction::PushAction {
             action_type: ACTION_MOVE,
         }, // idx17
-        VmInstruction::ExecuteActionQueue, // idx18
+        VmInstruction::ExecuteActionQueue,                // idx18
         VmInstruction::PushAction {
             action_type: ACTION_NOOP,
         }, // idx19
-        VmInstruction::ExecuteActionQueue, // idx20
+        VmInstruction::ExecuteActionQueue,                // idx20
     ];
     CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -288,11 +306,14 @@ fn slot_write_once_vm_genome(slot: u8, value: f32) -> CreatureGenome {
             dst: 4,
             const_idx: 2,
         }, // idx5: r4 = value
-        VmInstruction::StoreSlotImm { slot_idx: slot, src: 4 }, // idx6: slot[slot] = value
+        VmInstruction::StoreSlotImm {
+            slot_idx: slot,
+            src: 4,
+        }, // idx6: slot[slot] = value
         VmInstruction::PushAction {
             action_type: ACTION_NOOP,
         }, // idx7
-        VmInstruction::ExecuteActionQueue, // idx8
+        VmInstruction::ExecuteActionQueue,                // idx8
     ];
     CreatureGenome {
         entry_node_id: NodeId::new(0),
@@ -450,7 +471,10 @@ fn reward_modulated_node_genome_inert(reward_source: OutcomeChannel) -> Creature
     reward_modulated_node_genome_impl(reward_source, false)
 }
 
-fn reward_modulated_node_genome_impl(reward_source: OutcomeChannel, wire_action: bool) -> CreatureGenome {
+fn reward_modulated_node_genome_impl(
+    reward_source: OutcomeChannel,
+    wire_action: bool,
+) -> CreatureGenome {
     let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&MutationConfig::default());
     def.compute_nodes.push(ComputeNode {
         kind: ComputeNodeKind::Constant(1.0),
@@ -500,7 +524,11 @@ fn reward_modulated_node_genome_impl(reward_source: OutcomeChannel, wire_action:
 /// `FoodHere > 0` (`WriteRouteGate` toward the graph target's slot);
 /// otherwise pushes `NoOp` and executes immediately, so the mesh never
 /// reaches the graph node this tick (a skipped module visit).
-fn conditional_route_vm_node(node_id: NodeId, graph_target: NodeId, alt_target: NodeId) -> NodeGenome {
+fn conditional_route_vm_node(
+    node_id: NodeId,
+    graph_target: NodeId,
+    alt_target: NodeId,
+) -> NodeGenome {
     let program = vec![
         VmInstruction::ReadInput {
             dst: 0,
@@ -518,7 +546,7 @@ fn conditional_route_vm_node(node_id: NodeId, graph_target: NodeId, alt_target: 
             const_idx: 1,
         }, // idx4: r3 = 1000.0 (large gate boost)
         VmInstruction::WriteRouteGate { slot: 0, src: 3 }, // idx5: boost graph target's gate
-        VmInstruction::Halt,                               // idx6: non-terminal, routes via targets
+        VmInstruction::Halt,                         // idx6: non-terminal, routes via targets
         VmInstruction::PushAction {
             action_type: ACTION_NOOP,
         }, // idx7: skip branch
@@ -567,7 +595,11 @@ fn noop_vm_node(node_id: NodeId) -> NodeGenome {
 
 /// Build a one-creature `Simulation` at production runtime settings (plus
 /// the labeled `test_config` world deviations) with `genome` at `pos`.
-fn one_creature_sim(genome: CreatureGenome, pos: Position, energy: f32) -> (Simulation, CreatureId) {
+fn one_creature_sim(
+    genome: CreatureGenome,
+    pos: Position,
+    energy: f32,
+) -> (Simulation, CreatureId) {
     sim_with_config(genome, pos, energy, test_config())
 }
 
@@ -624,7 +656,8 @@ fn a1_reactive_control() {
         WorldAction::NoOp,
     ];
     for (tick_idx, (&food_present, &want)) in toggles.iter().zip(expected.iter()).enumerate() {
-        sim.world.set_food(pos, if food_present { 1.0 } else { 0.0 });
+        sim.world
+            .set_food(pos, if food_present { 1.0 } else { 0.0 });
         let tick = run_one_traced_tick(&mut sim, target);
         assert_eq!(
             tick.final_actions[0], want,
@@ -725,7 +758,11 @@ fn b2_previous_slot_one_tick_cue() {
     let (mut sim, target) = one_creature_sim(previous_slot_cue_vm_genome(), pos, 100.0);
 
     let tick1 = run_one_traced_tick(&mut sim, target);
-    assert_eq!(tick1.final_actions[0], WorldAction::NoOp, "tick1: no prior cue yet");
+    assert_eq!(
+        tick1.final_actions[0],
+        WorldAction::NoOp,
+        "tick1: no prior cue yet"
+    );
 
     let tick2 = run_one_traced_tick(&mut sim, target);
     assert_eq!(
@@ -815,19 +852,29 @@ fn c2_retention_under_decay() {
 #[test]
 fn c3_graph_slot_write_and_previous_read() {
     let pos = Position::new(2, 2);
-    let (mut sim, target) = one_creature_sim(slot_write_and_previous_read_graph_genome(), pos, 100.0);
+    let (mut sim, target) =
+        one_creature_sim(slot_write_and_previous_read_graph_genome(), pos, 100.0);
 
     run_one_traced_tick(&mut sim, target);
     {
         let creature = sim.creatures.get(target).expect("creature alive");
-        assert!((creature.shared_memory[0] - 0.6).abs() < 1e-6, "tick1 slot0");
-        assert!((creature.shared_memory[1] - 0.0).abs() < 1e-6, "tick1 slot1");
+        assert!(
+            (creature.shared_memory[0] - 0.6).abs() < 1e-6,
+            "tick1 slot0"
+        );
+        assert!(
+            (creature.shared_memory[1] - 0.0).abs() < 1e-6,
+            "tick1 slot1"
+        );
     }
 
     run_one_traced_tick(&mut sim, target);
     {
         let creature = sim.creatures.get(target).expect("creature alive");
-        assert!((creature.shared_memory[1] - 0.6).abs() < 1e-6, "tick2 slot1 sees tick1's slot0");
+        assert!(
+            (creature.shared_memory[1] - 0.6).abs() < 1e-6,
+            "tick2 slot1 sees tick1's slot0"
+        );
     }
 }
 
@@ -943,7 +990,11 @@ fn d1_integrator_clock() {
         observed_passes, expected_passes,
         "passes per tick should match the documented Gauss-Seidel relaxation recurrence"
     );
-    for (i, (&obs, &exp)) in observed_states.iter().zip(expected_states.iter()).enumerate() {
+    for (i, (&obs, &exp)) in observed_states
+        .iter()
+        .zip(expected_states.iter())
+        .enumerate()
+    {
         assert!(
             (obs - exp).abs() < 1e-5,
             "tick {}: integrator state {obs} should match the recurrence-predicted {exp}",
@@ -986,7 +1037,11 @@ fn d2_disconnected_node_perturbation() {
         "every tick should hit the max_graph_relax_iters cap because the disconnected \
          oscillator never lets the graph converge; observed passes: {observed_passes:?}"
     );
-    for (i, (&obs, &exp)) in observed_states.iter().zip(expected_states.iter()).enumerate() {
+    for (i, (&obs, &exp)) in observed_states
+        .iter()
+        .zip(expected_states.iter())
+        .enumerate()
+    {
         assert!(
             (obs - exp).abs() < 1e-4,
             "tick {}: integrator state {obs} should match the always-15-passes recurrence {exp}",
@@ -1213,7 +1268,11 @@ fn e3_skipped_module_visits() {
     sim.world.set_food(pos, 1.0);
     let energy_before_1 = sim.creatures.get(target).expect("alive").energy;
     let tick1 = run_one_traced_tick(&mut sim, target);
-    assert_eq!(tick1.hops.len(), 2, "tick1 should route into the graph node");
+    assert_eq!(
+        tick1.hops.len(),
+        2,
+        "tick1 should route into the graph node"
+    );
     let energy_after_1 = sim.creatures.get(target).expect("alive").energy;
     let signal_1 = energy_after_1 - energy_before_1;
 
