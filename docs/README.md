@@ -4,6 +4,7 @@
 - [Roadmap contract](roadmaps/README.md)
 - [Roadmap templates](roadmaps/)
 - [Strategy](strategy/)
+- [Brain evolvability audit, 2026-09-04](strategy/brain-evolvability-audit-2026-09-04.md) (companion to the T11 track)
 - [Reference specifications](reference/)
 
 Historical, non-executable material:
