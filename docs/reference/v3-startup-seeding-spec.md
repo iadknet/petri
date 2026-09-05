@@ -293,10 +293,11 @@ NodeGenome {
     12: UpstreamSlot(12), // reproductive-food neighbor W
   ],
   backend_def: Vm(VmBackendDef {
-    registers: 16,
+    registers: 20,
     constants: [0.0, 1.0, 2.0, 4.0, 6.0, reserve_cost,
                 offspring_transfer, energy_threshold],
-    // The generated VM reads all upstream slots 0..12 and clears r15 to zero.
+    // The generated VM reads all upstream slots 0..12 and clears r15 to zero;
+    // r16 through r19 are spare capacity for later small mutations.
     // Its profile-specific branch order is:
     //   1. canonical profile: reproduce when can_reproduce (slot 1) is true;
     //      forage-first profiles check this after their resource branches;

@@ -181,7 +181,11 @@ fn apply_add(
                 sub_idx,
             };
             let pos = rng.gen_range(0..=vm.program.len());
-            vm.program.insert(pos, read);
+            crate::mutation::vm::insert_new_instruction_with_reference_repair(
+                &mut vm.program,
+                pos,
+                read,
+            )?;
         }
     }
 
