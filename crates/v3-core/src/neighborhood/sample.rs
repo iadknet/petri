@@ -17,7 +17,9 @@ pub fn evolved_sample_ranks(population_size: usize) -> Vec<usize> {
     if population_size < SAMPLE_SIZE {
         return (0..population_size).collect();
     }
-    (0..SAMPLE_SIZE).map(|i| i * population_size / SAMPLE_SIZE).collect()
+    (0..SAMPLE_SIZE)
+        .map(|i| i * population_size / SAMPLE_SIZE)
+        .collect()
 }
 
 #[cfg(test)]
@@ -45,7 +47,10 @@ mod tests {
     fn population_above_sample_size_spreads_ranks_and_stays_distinct() {
         let ranks = evolved_sample_ranks(100);
         assert_eq!(ranks.len(), 12);
-        assert!(ranks.windows(2).all(|w| w[0] < w[1]), "ranks must be strictly increasing: {ranks:?}");
+        assert!(
+            ranks.windows(2).all(|w| w[0] < w[1]),
+            "ranks must be strictly increasing: {ranks:?}"
+        );
         assert!(*ranks.last().unwrap() < 100);
     }
 
@@ -54,7 +59,10 @@ mod tests {
         for n in [13, 24, 1000, 24_418] {
             let ranks = evolved_sample_ranks(n);
             assert_eq!(ranks.len(), 12, "n={n}");
-            assert!(ranks.windows(2).all(|w| w[0] < w[1]), "n={n} ranks={ranks:?}");
+            assert!(
+                ranks.windows(2).all(|w| w[0] < w[1]),
+                "n={n} ranks={ranks:?}"
+            );
             assert!(*ranks.last().unwrap() < n, "n={n} ranks={ranks:?}");
         }
     }

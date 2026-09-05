@@ -687,6 +687,19 @@ fn ratio(numerator: u64, denominator: u64) -> String {
     six(numerator as f64 / denominator as f64)
 }
 
+/// A six-decimal fraction against `denominator`, or `Undefined` when
+/// `denominator` is zero — the empty-population/no-applied-trials convention
+/// used by `memory_sensitivity` and the mutational-neighborhood tallies,
+/// distinct from [`ratio`]'s zero-when-empty convention used by the
+/// per-creature-tick counters.
+fn fraction_or_undefined(count: u64, denominator: u64) -> String {
+    if denominator == 0 {
+        UNDEFINED.to_string()
+    } else {
+        six(count as f64 / denominator as f64)
+    }
+}
+
 // ── Per-seed persistence tracking (T01.F11) ─────────────────────────────────
 
 /// Accumulates the per-seed persistence observations defined by the T01.F11
@@ -982,22 +995,24 @@ fn memory_sensitivity(seed: u64, observations: &[FinalActionObservation]) -> Mem
                 counts.2 + u64::from(different_from_zeroed || different_from_scrambled),
             )
         });
-    let fraction = |count| {
-        if final_creature_count == 0 {
-            UNDEFINED.to_string()
-        } else {
-            six(count as f64 / final_creature_count as f64)
-        }
-    };
     MemorySensitivitySeed {
         seed,
         final_creature_count,
         different_from_zeroed_count,
         different_from_scrambled_count,
         different_from_either_count,
-        different_from_zeroed_fraction: fraction(different_from_zeroed_count),
-        different_from_scrambled_fraction: fraction(different_from_scrambled_count),
-        different_from_either_fraction: fraction(different_from_either_count),
+        different_from_zeroed_fraction: fraction_or_undefined(
+            different_from_zeroed_count,
+            final_creature_count,
+        ),
+        different_from_scrambled_fraction: fraction_or_undefined(
+            different_from_scrambled_count,
+            final_creature_count,
+        ),
+        different_from_either_fraction: fraction_or_undefined(
+            different_from_either_count,
+            final_creature_count,
+        ),
     }
 }
 
@@ -1010,14 +1025,6 @@ fn neighborhood_battery_execution_count() -> u32 {
         + neighborhood::battery::SEQUENCE_COUNT * neighborhood::battery::SEQUENCE_LEN) as u32
 }
 
-fn fraction_or_undefined(count: u32, denominator: u32) -> String {
-    if denominator == 0 {
-        UNDEFINED.to_string()
-    } else {
-        six(f64::from(count) / f64::from(denominator))
-    }
-}
-
 fn to_neighborhood_tally(tally: &Tally) -> NeighborhoodTally {
     let applied = tally.applied();
     NeighborhoodTally {
@@ -1028,9 +1035,9 @@ fn to_neighborhood_tally(tally: &Tally) -> NeighborhoodTally {
         changed: tally.changed,
         dead: tally.dead,
         changed_only_in_sequences: tally.changed_only_in_sequences,
-        silent_fraction: fraction_or_undefined(tally.silent, applied),
-        changed_fraction: fraction_or_undefined(tally.changed, applied),
-        dead_fraction: fraction_or_undefined(tally.dead, applied),
+        silent_fraction: fraction_or_undefined(tally.silent.into(), applied.into()),
+        changed_fraction: fraction_or_undefined(tally.changed.into(), applied.into()),
+        dead_fraction: fraction_or_undefined(tally.dead.into(), applied.into()),
         mean_fraction_differing: six(tally.mean_fraction_differing()),
     }
 }
@@ -1150,7 +1157,10 @@ fn evolved_neighborhood_for_seed(
         );
         let companions = structural_companions(&creature.genome);
 
-        for (pooled, row) in pooled_operator_tallies.iter_mut().zip(&evaluation.operator_rows) {
+        for (pooled, row) in pooled_operator_tallies
+            .iter_mut()
+            .zip(&evaluation.operator_rows)
+        {
             *pooled = pooled.merge(row.tally);
         }
         pooled_births = merge_birth_results(pooled_births, &evaluation.births);
@@ -1216,6 +1226,45 @@ fn structure_size_distribution(mut pooled: Vec<u32>) -> StructureSizeDistributio
     }
 }
 
+/// Assemble the report's `mutational_neighborhood` indicator (T11.F01):
+/// `Undefined` when the founder half did not run (the sweep and synthetic
+/// profiles), otherwise the battery block, the founder half, and the evolved
+/// half (only defined for the goal profile).
+fn build_mutational_neighborhood_indicator(
+    neighborhood_founder: Option<NeighborhoodFounderHalf>,
+    params: &ProfileParams,
+    observe_goal_indicators: bool,
+    evolved_neighborhood_per_seed: Vec<NeighborhoodEvolvedSeed>,
+) -> Indicator<MutationalNeighborhood> {
+    let Some(founder) = neighborhood_founder else {
+        return undefined_mutational_neighborhood();
+    };
+    Indicator::Defined(MutationalNeighborhood {
+        battery: NeighborhoodBattery {
+            version: BATTERY_VERSION.to_string(),
+            snapshot_seed: neighborhood::battery::SNAPSHOT_SEED,
+            sequence_seed: neighborhood::battery::SEQUENCE_SEED,
+            snapshot_count: neighborhood::battery::SNAPSHOT_COUNT as u32,
+            sequence_count: neighborhood::battery::SEQUENCE_COUNT as u32,
+            sequence_len: neighborhood::battery::SEQUENCE_LEN as u32,
+            executions_per_genome: neighborhood_battery_execution_count(),
+            founder_operator_trials: params.neighborhood.founder_operator_trials,
+            founder_birth_count: params.neighborhood.founder_births,
+            evolved_operator_trials: params.neighborhood.evolved_operator_trials,
+            evolved_birth_count: params.neighborhood.evolved_births,
+            evolved_sample_size: neighborhood::SAMPLE_SIZE as u32,
+        },
+        founder,
+        evolved: if observe_goal_indicators {
+            Indicator::Defined(EvolvedNeighborhoodHalf {
+                per_seed: evolved_neighborhood_per_seed,
+            })
+        } else {
+            undefined_evolved_neighborhood()
+        },
+    })
+}
+
 /// Run the deterministic profile (no host/timestamp data) and return the
 /// `Deterministic` block plus the run's wall-clock observations for the
 /// caller to fold into the `environment` block.
@@ -1252,14 +1301,16 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
     let neighborhood_founder_wall_clock_ms = millis(neighborhood_founder_start.elapsed());
 
     for &seed in &params.seeds {
-        let evolved_battery =
-            if observe_goal_indicators { neighborhood_battery.as_ref() } else { None };
+        // `run_one_seed` only reads `neighborhood_battery` inside its own
+        // `observe_goal_indicators`-gated closure, so passing it unconditionally
+        // here is equivalent to nulling it out for non-goal profiles and one
+        // branch simpler.
         let run = run_one_seed(
             &config,
             seed,
             params.ticks,
             observe_goal_indicators,
-            evolved_battery,
+            neighborhood_battery.as_ref(),
             params.neighborhood,
         );
         totals.ticks += run.per_seed.ticks;
@@ -1336,33 +1387,12 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
         } else {
             undefined_memory_sensitivity()
         },
-        mutational_neighborhood: match neighborhood_founder {
-            Some(founder) => Indicator::Defined(MutationalNeighborhood {
-                battery: NeighborhoodBattery {
-                    version: BATTERY_VERSION.to_string(),
-                    snapshot_seed: neighborhood::battery::SNAPSHOT_SEED,
-                    sequence_seed: neighborhood::battery::SEQUENCE_SEED,
-                    snapshot_count: neighborhood::battery::SNAPSHOT_COUNT as u32,
-                    sequence_count: neighborhood::battery::SEQUENCE_COUNT as u32,
-                    sequence_len: neighborhood::battery::SEQUENCE_LEN as u32,
-                    executions_per_genome: neighborhood_battery_execution_count(),
-                    founder_operator_trials: params.neighborhood.founder_operator_trials,
-                    founder_birth_count: params.neighborhood.founder_births,
-                    evolved_operator_trials: params.neighborhood.evolved_operator_trials,
-                    evolved_birth_count: params.neighborhood.evolved_births,
-                    evolved_sample_size: neighborhood::SAMPLE_SIZE as u32,
-                },
-                founder,
-                evolved: if observe_goal_indicators {
-                    Indicator::Defined(EvolvedNeighborhoodHalf {
-                        per_seed: evolved_neighborhood_per_seed,
-                    })
-                } else {
-                    undefined_evolved_neighborhood()
-                },
-            }),
-            None => undefined_mutational_neighborhood(),
-        },
+        mutational_neighborhood: build_mutational_neighborhood_indicator(
+            neighborhood_founder,
+            params,
+            observe_goal_indicators,
+            evolved_neighborhood_per_seed,
+        ),
         strategy_count: UNDEFINED.to_string(),
         strategy_causal_distinctness: UNDEFINED.to_string(),
         evolutionary_activity: UNDEFINED.to_string(),
@@ -2253,7 +2283,11 @@ mod tests {
 
     #[test]
     fn neighborhood_tally_conversion_reports_undefined_fractions_when_nothing_applied() {
-        let tally = Tally { trials: 5, skipped: 5, ..Tally::default() };
+        let tally = Tally {
+            trials: 5,
+            skipped: 5,
+            ..Tally::default()
+        };
         let report = to_neighborhood_tally(&tally);
         assert_eq!(report.applied, 0);
         assert_eq!(report.silent_fraction, UNDEFINED);
@@ -2262,13 +2296,123 @@ mod tests {
     }
 
     #[test]
+    fn neighborhood_battery_execution_count_is_48_snapshots_plus_32_sequence_ticks() {
+        assert_eq!(neighborhood_battery_execution_count(), 80);
+    }
+
+    #[test]
+    fn to_neighborhood_operator_rows_preserves_every_row_in_order() {
+        let rows = vec![
+            OperatorRow {
+                family: "vm",
+                operator: "Example".to_string(),
+                tally: Tally::default(),
+            },
+            OperatorRow {
+                family: "graph",
+                operator: "Other".to_string(),
+                tally: Tally::default(),
+            },
+        ];
+        let converted = to_neighborhood_operator_rows(&rows);
+        assert_eq!(converted.len(), 2);
+        assert_eq!(converted[0].family, "vm");
+        assert_eq!(converted[0].operator, "Example");
+        assert_eq!(converted[1].family, "graph");
+        assert_eq!(converted[1].operator, "Other");
+    }
+
+    /// `evolved_neighborhood_for_seed` seeds sampled genome `i` (in rank
+    /// order) by `EVOLVED_SEED_MULTIPLIER * (i + 1)`. This reconstructs the
+    /// same per-genome reading independently, via the same public
+    /// `evaluate_genome` seam, and checks it against the function's own
+    /// output: a `+`, `/`, or a `*` swapped for the `+` inside
+    /// `(genome_index + 1)` would draw a different seed offset and, with
+    /// overwhelming likelihood, a different reading.
+    #[test]
+    fn evolved_neighborhood_for_seed_offsets_each_sampled_genome_by_its_rank_order() {
+        let mut config = SimulationConfig::default();
+        config.world.width = 16;
+        config.world.height = 16;
+        config.population.initial_creatures = 3;
+        let sim = seed_simulation(config.clone(), 11);
+        let battery = Battery::generate(config.world.food.types.len());
+        let context = EvalContext::from_config(&config);
+        // Larger than `NeighborhoodSizes::default()`'s fixture sizes: at the
+        // production ~8.8% mutated birth rate and near-deterministic
+        // per-operator classes, a handful of trials can coincidentally match
+        // under a wrong seed offset. 60 births and 3 operator trials make
+        // that implausible while staying well under a second for 3 genomes.
+        let sizes = NeighborhoodSizes {
+            evolved_operator_trials: 3,
+            evolved_births: 60,
+            ..NeighborhoodSizes::default()
+        };
+
+        let actual =
+            evolved_neighborhood_for_seed(11, &sim, &battery, &config.mutation, &context, sizes);
+
+        let mut creature_ids: Vec<_> = sim.creatures.keys().collect();
+        creature_ids.sort();
+        assert_eq!(
+            actual.sampled_genomes.len(),
+            creature_ids.len(),
+            "a population below the sample size takes every rank"
+        );
+
+        for (genome_index, &creature_id) in creature_ids.iter().enumerate() {
+            let creature = &sim.creatures[creature_id];
+            let seed_offset =
+                v3_core::neighborhood::EVOLVED_SEED_MULTIPLIER * (genome_index as u64 + 1);
+            let expected = evaluate_genome(
+                &creature.genome,
+                &battery,
+                &config.mutation,
+                &context,
+                sizes.evolved_operator_trials,
+                sizes.evolved_births,
+                seed_offset,
+            );
+            assert_eq!(
+                actual.sampled_genomes[genome_index].operator_rows,
+                to_neighborhood_operator_rows(&expected.operator_rows),
+                "genome_index {genome_index}"
+            );
+            assert_eq!(
+                actual.sampled_genomes[genome_index].births,
+                to_neighborhood_births(&expected.births),
+                "genome_index {genome_index}"
+            );
+        }
+    }
+
+    #[test]
     fn merge_birth_results_sums_totals_and_merges_matching_buckets() {
-        let mut a = BirthResult { births_total: 10, zero_event_births: 4, ..BirthResult::default() };
-        a.any_events = Tally { trials: 6, silent: 2, changed: 3, dead: 1, ..Tally::default() };
+        let mut a = BirthResult {
+            births_total: 10,
+            zero_event_births: 4,
+            ..BirthResult::default()
+        };
+        a.any_events = Tally {
+            trials: 6,
+            silent: 2,
+            changed: 3,
+            dead: 1,
+            ..Tally::default()
+        };
         a.by_events.insert(1, a.any_events);
 
-        let mut b = BirthResult { births_total: 5, zero_event_births: 1, ..BirthResult::default() };
-        b.any_events = Tally { trials: 4, silent: 1, changed: 3, ..Tally::default() };
+        let mut b = BirthResult {
+            births_total: 5,
+            zero_event_births: 1,
+            ..BirthResult::default()
+        };
+        b.any_events = Tally {
+            trials: 4,
+            silent: 1,
+            changed: 3,
+            ..Tally::default()
+        };
         b.by_events.insert(1, b.any_events);
 
         let merged = merge_birth_results(a, &b);
@@ -2298,7 +2442,8 @@ mod tests {
     #[test]
     fn mutational_neighborhood_is_defined_only_for_the_gate_and_goal_profile_names() {
         let (gate_det, _) = run_deterministic(&small_profile("gate"));
-        let Indicator::Defined(gate_neighborhood) = gate_det.goal_indicators.mutational_neighborhood
+        let Indicator::Defined(gate_neighborhood) =
+            gate_det.goal_indicators.mutational_neighborhood
         else {
             panic!("the gate profile must define mutational_neighborhood");
         };
@@ -2308,7 +2453,8 @@ mod tests {
         );
 
         let (goal_det, _) = run_deterministic(&small_profile("goal"));
-        let Indicator::Defined(goal_neighborhood) = goal_det.goal_indicators.mutational_neighborhood
+        let Indicator::Defined(goal_neighborhood) =
+            goal_det.goal_indicators.mutational_neighborhood
         else {
             panic!("the goal profile must define mutational_neighborhood");
         };
@@ -2324,6 +2470,9 @@ mod tests {
         ));
 
         let (sweep_det, _) = run_deterministic(&small_profile("sweep"));
-        assert!(matches!(sweep_det.goal_indicators.mutational_neighborhood, Indicator::Undefined(_)));
+        assert!(matches!(
+            sweep_det.goal_indicators.mutational_neighborhood,
+            Indicator::Undefined(_)
+        ));
     }
 }
