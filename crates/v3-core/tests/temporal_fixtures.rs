@@ -43,8 +43,8 @@ use proptest::prelude::*;
 use slotmap::SlotMap;
 use v3_core::config::{MutationConfig, OrdinaryFoodTypeId};
 use v3_core::contracts::{
-    CreatureId, InputReference, NodeId, Position, RouteTarget, StaticIntrospectionKey, WorldAction,
-    WorldInputKey,
+    CreatureId, Direction, InputReference, NodeId, Position, RouteTarget, StaticIntrospectionKey,
+    WorldAction, WorldInputKey,
 };
 use v3_core::creature::genome::cgp::{
     ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
@@ -568,13 +568,36 @@ fn noop_vm_node(node_id: NodeId) -> NodeGenome {
 /// Build a one-creature `Simulation` at production runtime settings (plus
 /// the labeled `test_config` world deviations) with `genome` at `pos`.
 fn one_creature_sim(genome: CreatureGenome, pos: Position, energy: f32) -> (Simulation, CreatureId) {
-    let cfg = test_config();
+    sim_with_config(genome, pos, energy, test_config())
+}
+
+/// Build a one-creature `Simulation` from an explicit `cfg`, for the one
+/// fixture (C2) that needs a labeled non-default runtime setting.
+fn sim_with_config(
+    genome: CreatureGenome,
+    pos: Position,
+    energy: f32,
+    cfg: v3_core::config::SimulationConfig,
+) -> (Simulation, CreatureId) {
     let mut world = WorldState::new(cfg.world.width, cfg.world.height, cfg.world.edge_mode);
     world.reconfigure_food(cfg.world.food.clone());
     let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
     let target = insert_creature(&mut creatures, &mut world, genome, pos, energy, 0);
     let sim = Simulation::new(world, creatures, 0, cfg, 41);
     (sim, target)
+}
+
+/// Place a barrier on the cell immediately east of `pos`, so a successful
+/// `Move(E)` action can never relocate the creature off `pos`. Several
+/// fixtures assert on the *decided* action at a fixed position across
+/// several ticks; without this, a genome that once decides `Move(E)` would
+/// walk the creature away from the cell the test keeps observing.
+fn block_east_neighbor(sim: &mut Simulation, pos: Position) {
+    let east = sim
+        .world
+        .resolve_neighbor(pos, Direction::E)
+        .expect("center position has an east neighbor");
+    sim.world.set_barrier(east, true);
 }
 
 // ── A1: reactive control ────────────────────────────────────────────────────
@@ -589,20 +612,15 @@ fn one_creature_sim(genome: CreatureGenome, pos: Position, energy: f32) -> (Simu
 fn a1_reactive_control() {
     let pos = Position::new(5, 5);
     let (mut sim, target) = one_creature_sim(reactive_control_vm_genome(), pos, 100.0);
-    // Block the Move(E) destination so a successful move never relocates the
-    // creature off `pos`; the fixture is about the *decided* action tracking
-    // the current observation, not about locomotion.
-    let east = sim
-        .world
-        .resolve_neighbor(pos, v3_core::contracts::Direction::E)
-        .expect("center position has an east neighbor");
-    sim.world.set_barrier(east, true);
+    // The fixture is about the *decided* action tracking the current
+    // observation, not about locomotion.
+    block_east_neighbor(&mut sim, pos);
 
     let toggles = [true, false, true, false];
     let expected = [
-        WorldAction::Move(v3_core::contracts::Direction::E),
+        WorldAction::Move(Direction::E),
         WorldAction::NoOp,
-        WorldAction::Move(v3_core::contracts::Direction::E),
+        WorldAction::Move(Direction::E),
         WorldAction::NoOp,
     ];
     for (tick_idx, (&food_present, &want)) in toggles.iter().zip(expected.iter()).enumerate() {
@@ -641,11 +659,7 @@ fn b1_shared_memory_delayed_cue() {
                 // the destination in both trials identically so the
                 // creature — and thus every subsequent observation — stays
                 // on `pos` regardless of trial.
-                let east = sim
-                    .world
-                    .resolve_neighbor(pos, v3_core::contracts::Direction::E)
-                    .expect("center position has an east neighbor");
-                sim.world.set_barrier(east, true);
+                block_east_neighbor(&mut sim, pos);
 
                 let mut decision_snapshot = None;
                 for tick_num in 1..=decision_tick {
@@ -660,7 +674,7 @@ fn b1_shared_memory_delayed_cue() {
                             // tick in both trials: always NoOp.
                             WorldAction::NoOp
                         } else if cue_present {
-                            WorldAction::Move(v3_core::contracts::Direction::E)
+                            WorldAction::Move(Direction::E)
                         } else {
                             WorldAction::NoOp
                         };
@@ -716,7 +730,7 @@ fn b2_previous_slot_one_tick_cue() {
     let tick2 = run_one_traced_tick(&mut sim, target);
     assert_eq!(
         tick2.final_actions[0],
-        WorldAction::Move(v3_core::contracts::Direction::E),
+        WorldAction::Move(Direction::E),
         "tick2: LoadSlotPrev sees the tick-1 latched value"
     );
 
@@ -767,27 +781,12 @@ fn c1_retention() {
 #[test]
 fn c2_retention_under_decay() {
     let pos = Position::new(3, 3);
-    let cfg_energy_decay = {
+    let cfg = {
         let mut cfg = test_config();
         cfg.shared_memory.decay_rate = 0.1; // labeled deviation
         cfg
     };
-    let mut world = WorldState::new(
-        cfg_energy_decay.world.width,
-        cfg_energy_decay.world.height,
-        cfg_energy_decay.world.edge_mode,
-    );
-    world.reconfigure_food(cfg_energy_decay.world.food.clone());
-    let mut creatures: SlotMap<CreatureId, CreatureState> = SlotMap::with_key();
-    let target = insert_creature(
-        &mut creatures,
-        &mut world,
-        slot_write_once_vm_genome(3, 0.75),
-        pos,
-        100.0,
-        0,
-    );
-    let mut sim = Simulation::new(world, creatures, 0, cfg_energy_decay, 41);
+    let (mut sim, target) = sim_with_config(slot_write_once_vm_genome(3, 0.75), pos, 100.0, cfg);
 
     let mut tick_num = 0u64;
     for delay in [1u64, 2, 4, 8, 16] {
@@ -900,6 +899,27 @@ fn simulate_decay_integrator_clock_never_converging(
     states
 }
 
+/// Run `ticks` traced ticks against the entry node's single graph hop,
+/// recording the number of relaxation passes and the persisted
+/// `DecayIntegrator` state (`node_state[0][1]`) after each tick. Shared by
+/// D1 and D2, whose only difference is the genome under test.
+fn run_and_observe_integrator_clock(
+    sim: &mut Simulation,
+    target: CreatureId,
+    ticks: usize,
+) -> (Vec<f32>, Vec<u32>) {
+    let mut observed_states = Vec::with_capacity(ticks);
+    let mut observed_passes = Vec::with_capacity(ticks);
+    for _ in 0..ticks {
+        let tick = run_one_traced_tick(sim, target);
+        let gtrace = graph_hop(&tick, 0);
+        observed_passes.push(gtrace.passes.len() as u32);
+        let creature = sim.creatures.get(target).expect("creature alive");
+        observed_states.push(creature.graph_runtime.node_state[0][1]);
+    }
+    (observed_states, observed_passes)
+}
+
 // ── D1: integrator clock ────────────────────────────────────────────────────
 
 /// D1 integrator clock: at production settings (`max_graph_relax_iters = 15`,
@@ -917,16 +937,7 @@ fn d1_integrator_clock() {
 
     let (expected_states, expected_passes) =
         simulate_decay_integrator_clock(0.5, 1.0, 15, 1e-3, 2, 4);
-
-    let mut observed_states = Vec::with_capacity(4);
-    let mut observed_passes = Vec::with_capacity(4);
-    for _ in 0..4 {
-        let tick = run_one_traced_tick(&mut sim, target);
-        let gtrace = graph_hop(&tick, 0);
-        observed_passes.push(gtrace.passes.len() as u32);
-        let creature = sim.creatures.get(target).expect("creature alive");
-        observed_states.push(creature.graph_runtime.node_state[0][1]);
-    }
+    let (observed_states, observed_passes) = run_and_observe_integrator_clock(&mut sim, target, 4);
 
     assert_eq!(
         observed_passes, expected_passes,
@@ -968,16 +979,7 @@ fn d2_disconnected_node_perturbation() {
     );
 
     let expected_states = simulate_decay_integrator_clock_never_converging(0.5, 1.0, 15, 4);
-
-    let mut observed_states = Vec::with_capacity(4);
-    let mut observed_passes = Vec::with_capacity(4);
-    for _ in 0..4 {
-        let tick = run_one_traced_tick(&mut sim, target);
-        let gtrace = graph_hop(&tick, 0);
-        observed_passes.push(gtrace.passes.len() as u32);
-        let creature = sim.creatures.get(target).expect("creature alive");
-        observed_states.push(creature.graph_runtime.node_state[0][1]);
-    }
+    let (observed_states, observed_passes) = run_and_observe_integrator_clock(&mut sim, target, 4);
 
     assert!(
         observed_passes.iter().all(|&p| p == 15),
