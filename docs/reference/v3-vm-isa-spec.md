@@ -12,6 +12,9 @@ Related references:
 - `v3-reproduction-spec.md`
 - `v3-runtime-config-spec.md`
 
+VM structural-mutation semantics and the mesh-wide node-type evolvability
+contract are defined in `v3-mutation-spec.md`.
+
 ---
 
 ## 1. Registers and Values
@@ -160,6 +163,11 @@ All genome-derived indexes are handled without panic:
 - **World-action metadata slot index**: valid when `< 8`; otherwise write ignored.
 
 If `register_count == 0`, VM halts immediately (no action emission).
+
+Mutation width changes preserve effective register identity: they canonicalize
+operands under the old width and skip a shrink that would remove a referenced
+effective register. The founder has 20 registers; its original program uses r0
+through r15, leaving r16 through r19 available to mutations.
 
 ### `ReadInput` and Upstream Slot Resolution
 

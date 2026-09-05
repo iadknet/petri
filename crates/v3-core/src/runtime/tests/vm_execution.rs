@@ -1,4 +1,5 @@
 use super::*;
+use proptest::prelude::*;
 
 // ── Halt and empty program ────────────────────────────────────────────────
 
@@ -475,4 +476,268 @@ fn oversized_bid_produces_exact_all_in_exhaustion() {
         r.energy_exhausted,
         "creature should be exhausted after all-in capped bid",
     );
+}
+
+#[test]
+fn inserted_noop_preserves_outputs_with_ample_budget_but_charges_its_cost() {
+    let original = vec![
+        VmInstruction::LoadConst {
+            dst: 0,
+            const_idx: 0,
+        },
+        VmInstruction::WriteInternalPayload {
+            slot_idx: 0,
+            src: 0,
+        },
+        VmInstruction::Halt,
+    ];
+    let mut inserted = original.clone();
+    crate::mutation::vm::insert_new_instruction_with_reference_repair(
+        &mut inserted,
+        1,
+        VmInstruction::Noop,
+    )
+    .unwrap();
+
+    let mut cfg = config();
+    cfg.vm.opcode_cost_multiplier = 1.0;
+    let (original_result, original_energy, original_side_outputs) = run_vm_with_config(
+        original,
+        1,
+        vec![7.0],
+        &[],
+        zeroed_upstream(),
+        100.0,
+        cfg.clone(),
+    );
+    let (inserted_result, inserted_energy, inserted_side_outputs) =
+        run_vm_with_config(inserted, 1, vec![7.0], &[], zeroed_upstream(), 100.0, cfg);
+
+    assert_eq!(inserted_result, original_result);
+    assert_eq!(
+        inserted_side_outputs.action_queue.into_actions(),
+        original_side_outputs.action_queue.into_actions()
+    );
+    assert!(
+        inserted_energy < original_energy,
+        "executed Noop must retain its defined energy cost"
+    );
+}
+
+#[test]
+fn copied_unreachable_middle_span_preserves_outputs_with_ample_budget() {
+    use crate::mutation::vm::{splice_program_with_reference_repair, SpliceInstruction};
+
+    // The entry jump skips indices 1..=3.  The copied action suffix remains
+    // unreachable because repair follows the original output instruction.
+    let original = vec![
+        VmInstruction::Jump { offset: 3 },
+        VmInstruction::PushAction { action_type: 9 },
+        VmInstruction::ExecuteActionQueue,
+        VmInstruction::Noop,
+        VmInstruction::LoadConst {
+            dst: 0,
+            const_idx: 0,
+        },
+        VmInstruction::WriteInternalPayload {
+            slot_idx: 0,
+            src: 0,
+        },
+        VmInstruction::Halt,
+    ];
+    let mut copied = original.clone();
+    let selected = [1, 2]
+        .into_iter()
+        .map(|source_index| SpliceInstruction {
+            instruction: original[source_index].clone(),
+            source_index: Some(source_index),
+        })
+        .collect();
+    splice_program_with_reference_repair(&mut copied, 1..1, selected).unwrap();
+
+    let (original_result, _, original_side_outputs) =
+        run_vm(original, 1, vec![7.0], &[], zeroed_upstream(), 100.0);
+    let (copied_result, _, copied_side_outputs) =
+        run_vm(copied, 1, vec![7.0], &[], zeroed_upstream(), 100.0);
+
+    assert_eq!(copied_result, original_result);
+    assert_eq!(
+        copied_side_outputs.action_queue.into_actions(),
+        original_side_outputs.action_queue.into_actions()
+    );
+}
+
+proptest! {
+    #[test]
+    fn noop_insertion_preserves_behavior_under_ample_budget(value in -1000.0f32..1000.0) {
+        // The jump reaches the suffix after a terminal.  Repair must keep that
+        // target tied to the original LoadConst when the entry Noop is inserted.
+        let original = vec![
+            VmInstruction::Jump { offset: 1 },
+            VmInstruction::Halt,
+            VmInstruction::LoadConst { dst: 0, const_idx: 0 },
+            VmInstruction::WriteInternalPayload { slot_idx: 0, src: 0 },
+            VmInstruction::Halt,
+        ];
+        let mut cfg = config();
+        cfg.vm.opcode_cost_multiplier = 1.0;
+        for insert_at in 0..=original.len() {
+            let mut inserted = original.clone();
+            crate::mutation::vm::insert_new_instruction_with_reference_repair(
+                &mut inserted,
+                insert_at,
+                VmInstruction::Noop,
+            )
+            .unwrap();
+
+            let (original_result, original_energy, original_outputs) = run_vm_with_config(
+                original.clone(),
+                1,
+                vec![value],
+                &[],
+                zeroed_upstream(),
+                100.0,
+                cfg.clone(),
+            );
+            let (inserted_result, inserted_energy, inserted_outputs) =
+                run_vm_with_config(
+                    inserted,
+                    1,
+                    vec![value],
+                    &[],
+                    zeroed_upstream(),
+                    100.0,
+                    cfg.clone(),
+                );
+
+            prop_assert_eq!(inserted_result, original_result);
+            prop_assert_eq!(
+                inserted_outputs.action_queue.into_actions(),
+                original_outputs.action_queue.into_actions()
+            );
+            if matches!(insert_at, 0 | 3 | 4) {
+                prop_assert!(inserted_energy < original_energy);
+            } else {
+                prop_assert_eq!(inserted_energy, original_energy);
+            }
+        }
+    }
+
+    #[test]
+    fn copied_unreachable_suffix_preserves_behavior_under_ample_budget(
+        value in -1000.0f32..1000.0,
+        action_type in any::<u8>(),
+    ) {
+        let original = vec![
+            VmInstruction::Jump { offset: 3 },
+            VmInstruction::PushAction { action_type },
+            VmInstruction::ExecuteActionQueue,
+            VmInstruction::Noop,
+            VmInstruction::LoadConst { dst: 0, const_idx: 0 },
+            VmInstruction::WriteInternalPayload { slot_idx: 0, src: 0 },
+            VmInstruction::Halt,
+        ];
+        let mut copied = original.clone();
+        let selected = [1, 2]
+            .into_iter()
+            .map(|source_index| crate::mutation::vm::SpliceInstruction {
+                instruction: original[source_index].clone(),
+                source_index: Some(source_index),
+            })
+            .collect();
+        crate::mutation::vm::splice_program_with_reference_repair(
+            &mut copied,
+            original.len()..original.len(),
+            selected,
+        )
+        .unwrap();
+
+        let (original_result, _, original_outputs) =
+            run_vm(original, 1, vec![value], &[], zeroed_upstream(), 100.0);
+        let (copied_result, _, copied_outputs) =
+            run_vm(copied, 1, vec![value], &[], zeroed_upstream(), 100.0);
+
+        prop_assert_eq!(copied_result, original_result);
+        prop_assert_eq!(
+            copied_outputs.action_queue.into_actions(),
+            original_outputs.action_queue.into_actions()
+        );
+    }
+}
+
+#[test]
+fn noop_insertion_can_change_step_cap_without_being_an_energy_exhaustion() {
+    let original = vec![
+        VmInstruction::PushAction { action_type: 3 },
+        VmInstruction::ExecuteActionQueue,
+    ];
+    let mut inserted = original.clone();
+    crate::mutation::vm::insert_new_instruction_with_reference_repair(
+        &mut inserted,
+        0,
+        VmInstruction::Noop,
+    )
+    .unwrap();
+    let mut cfg = config();
+    cfg.max_vm_steps = 2;
+    cfg.vm.opcode_cost_multiplier = 1.0;
+
+    let (original_result, _, _) = run_vm_with_config(
+        original,
+        1,
+        vec![],
+        &[],
+        zeroed_upstream(),
+        100.0,
+        cfg.clone(),
+    );
+    let (inserted_result, _, _) =
+        run_vm_with_config(inserted, 1, vec![], &[], zeroed_upstream(), 100.0, cfg);
+
+    assert!(original_result.terminal);
+    assert!(
+        !inserted_result.terminal,
+        "the added step reaches the cap first"
+    );
+    assert!(!inserted_result.energy_exhausted);
+}
+
+#[test]
+fn noop_insertion_can_cause_energy_exhaustion_without_reaching_the_step_cap() {
+    let original = vec![
+        VmInstruction::LoadConst {
+            dst: 0,
+            const_idx: 0,
+        },
+        VmInstruction::WriteInternalPayload {
+            slot_idx: 0,
+            src: 0,
+        },
+        VmInstruction::Halt,
+    ];
+    let mut inserted = original.clone();
+    crate::mutation::vm::insert_new_instruction_with_reference_repair(
+        &mut inserted,
+        0,
+        VmInstruction::Noop,
+    )
+    .unwrap();
+    let mut cfg = config();
+    cfg.max_vm_steps = 10;
+    cfg.vm.opcode_cost_multiplier = 1.0;
+
+    let (original_result, _, _) = run_vm_with_config(
+        original,
+        1,
+        vec![7.0],
+        &[],
+        zeroed_upstream(),
+        0.30,
+        cfg.clone(),
+    );
+    let (inserted_result, _, _) =
+        run_vm_with_config(inserted, 1, vec![7.0], &[], zeroed_upstream(), 0.30, cfg);
+
+    assert!(!original_result.energy_exhausted);
+    assert!(inserted_result.energy_exhausted);
 }

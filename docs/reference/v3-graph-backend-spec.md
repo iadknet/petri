@@ -13,6 +13,10 @@ Related references:
 - `v3-reproduction-spec.md`
 - `v3-runtime-config-spec.md`
 
+The graph backend is subject to the mesh-wide node-type evolvability contract
+in `v3-mutation-spec.md`. T11.F03 owns its neutral-growth/reference repair and
+T11.F06 owns its one-world-tick persistent-state clock.
+
 ---
 
 ## 1. Architecture Overview

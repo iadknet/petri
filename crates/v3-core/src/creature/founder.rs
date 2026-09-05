@@ -498,7 +498,7 @@ fn node1_vm_deficiency_decision(
         node_id: NodeId::new(1),
         input_refs,
         backend_def: BackendDef::Vm(VmBackendDef {
-            register_count: 16,
+            register_count: 20,
             constants: vec![
                 0.0,
                 1.0,
@@ -732,7 +732,7 @@ mod tests {
         assert!(node1.targets.is_empty());
 
         if let BackendDef::Vm(ref vdef) = node1.backend_def {
-            assert_eq!(vdef.register_count, 16);
+            assert_eq!(vdef.register_count, 20);
             assert_eq!(
                 vdef.constants,
                 vec![0.0, 1.0, 2.0, 4.0, 6.0, 4.0, 20.0, 30.0]
@@ -1129,6 +1129,26 @@ mod tests {
                 profile,
                 expected_transfer,
                 vm.constants[6]
+            );
+        }
+    }
+
+    #[test]
+    fn founder_vm_reserves_four_registers_without_rewriting_live_references() {
+        let genome = v3alpha1_founder_genome();
+        let BackendDef::Vm(vm) = &genome.nodes[1].backend_def else {
+            panic!("Node 1 must be VM backend");
+        };
+
+        assert_eq!(vm.register_count, 20);
+        for instruction in &vm.program {
+            assert!(
+                crate::creature::genome::analysis::vm_register_write(instruction)
+                    .is_none_or(|register| register < 16)
+            );
+            assert_eq!(
+                crate::creature::genome::analysis::vm_register_read_mask(instruction) & !0xffff,
+                0
             );
         }
     }

@@ -109,6 +109,40 @@ Topology newborn policy note:
 - `VmMutatePairedSlotAddress` (co-mutate all LoadSlotImm/StoreSlotImm
   instructions sharing the same slot_idx to a new random slot)
 
+VM structural-edit contract:
+
+- Every instruction insertion, deletion, replacement, or copy resolves old
+  jump targets using the VM runtime's signed relative-target rule before the
+  edit and re-encodes surviving references afterward. Insertion preserves old
+  instruction identities; replacement preserves its incoming position; a
+  deleted target follows the next survivor, wrapping at the tail.
+- A copied jump follows a copied selected target and otherwise follows the
+  surviving original target. This is based on source indices, never instruction
+  equality, so repeated identical instructions remain distinct. Newly authored
+  instructions retain their authored offsets.
+- `VmInstructionRawFieldMutation` changes one encoded operand by one bounded
+  unit and never replaces the opcode. Fieldless instructions skip. The paired
+  slot-address operator remains a linked-address macro; the standalone slot
+  address operator moves one address by one unit.
+- Register capacity changes only between widths 1 and 32. Raw register fields
+  are canonicalized under the old width, and a shrink skips when any read or
+  write uses the removed effective register. Widths outside that range skip
+  without changing the genome.
+
+### Node-type evolvability contract
+
+Every current or future mesh backend must meet these four requirements:
+
+1. references are stable by identity or remapped on every structural edit;
+2. every growth operation preserves function at the moment it fires;
+3. persistent state advances once per world tick; and
+4. mutation supply arrives as small steps.
+
+T11.F02 establishes the VM reference and operand portions. T11.F03 owns graph
+growth, T11.F04 mutation supply, T11.F06 the graph state clock, T11.F07 the
+trace/reward clock, T11.F08 duplication, and T11.F09 learned-state
+correspondence. Those later guarantees remain pending.
+
 ### Graph domain
 
 Topology mutations operate on `compute_nodes` only. Fixed structural outputs

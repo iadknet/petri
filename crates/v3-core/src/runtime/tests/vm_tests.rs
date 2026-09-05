@@ -38,6 +38,26 @@ fn run_vm(
     upstream: [f32; OUTPUT_SLOT_COUNT],
     energy: f32,
 ) -> (NodeResult, f32, MeshSideOutputs) {
+    run_vm_with_config(
+        program,
+        register_count,
+        constants,
+        input_refs,
+        upstream,
+        energy,
+        config(),
+    )
+}
+
+fn run_vm_with_config(
+    program: Vec<VmInstruction>,
+    register_count: u8,
+    constants: Vec<f32>,
+    input_refs: &[InputReference],
+    upstream: [f32; OUTPUT_SLOT_COUNT],
+    energy: f32,
+    cfg: RuntimeConfig,
+) -> (NodeResult, f32, MeshSideOutputs) {
     let def = VmBackendDef {
         register_count,
         constants,
@@ -47,7 +67,6 @@ fn run_vm(
     let mut e = energy;
     let mut mem = [0.0f32; 16];
     let prev_mem = [0.0f32; 16];
-    let cfg = config();
     let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
     let result = execute_vm_node(
         &def,
