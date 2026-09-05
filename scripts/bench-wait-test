@@ -159,15 +159,39 @@ for profile in gate goal sweep; do
   grep -F 'timed out' "$test_root/output" >/dev/null || fail "profile $profile did not invoke guard"
 done
 
-# make rust-mutants must not start while another cargo-mutants is running.
+# scripts/rust-mutants must not start a second run while one is in progress.
+# Drive it against a throwaway repository: the guard sits after the diff the
+# script builds, so a case run against this checkout would depend on its
+# history depth (CI clones shallow, where HEAD~1 does not resolve and the
+# diff aborts before the guard) and would have to leave a fixture file in a
+# tree other sessions share.
+mutants_repo=$test_root/mutants-repo
+mkdir "$mutants_repo"
+git -C "$mutants_repo" init -q
+printf 'base\n' >"$mutants_repo/subject.txt"
+git -C "$mutants_repo" add subject.txt
+git -C "$mutants_repo" -c user.name=test -c user.email=test@example.invalid \
+  commit -q -m 'base'
+printf 'changed\n' >"$mutants_repo/subject.txt"
+
 reset_fixture
 printf '123 S /tools/cargo-mutants\n' >"$test_root/processes"
-if PATH="$test_root/bin:$PATH" BENCH_WAIT_TIMEOUT=0 MUTANTS_BASE=HEAD~1 \
-  MUTANTS_OUT="$test_root/mutants" \
-  make -s -C "$script_dir/.." rust-mutants >"$test_root/output" 2>&1; then
-  fail 'make rust-mutants ignored a running cargo-mutants'
-fi
-[ ! -f "$test_root/ran" ] || fail 'make rust-mutants started cargo while blocked'
-grep -F 'timed out' "$test_root/output" >/dev/null || fail 'make rust-mutants did not invoke guard'
+status=0
+(cd "$mutants_repo" && PATH="$test_root/bin:$PATH" BENCH_WAIT_TIMEOUT=0 \
+  MUTANTS_BASE=HEAD MUTANTS_OUT="$test_root/mutants" \
+  sh "$script_dir/rust-mutants") >"$test_root/output" 2>&1 || status=$?
+[ "$status" -ne 0 ] || fail 'rust-mutants ignored a running cargo-mutants'
+[ ! -f "$test_root/ran" ] || fail 'rust-mutants started cargo while blocked'
+grep -F 'timed out' "$test_root/output" >/dev/null || fail 'rust-mutants did not invoke guard'
+
+# With no mutation run in progress the guard is transparent: the script
+# reaches cargo-mutants and passes the diff through.
+reset_fixture
+status=0
+(cd "$mutants_repo" && PATH="$test_root/bin:$PATH" BENCH_WAIT_TIMEOUT=0 \
+  MUTANTS_BASE=HEAD MUTANTS_OUT="$test_root/mutants" \
+  sh "$script_dir/rust-mutants") >"$test_root/output" 2>&1 || status=$?
+[ -f "$test_root/ran" ] || fail 'rust-mutants did not reach cargo on an idle host'
+grep -F 'mutants' "$test_root/ran" >/dev/null || fail 'cargo was not invoked as cargo mutants'
 
 printf 'Benchmark wait regression tests passed.\n'
