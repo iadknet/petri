@@ -2296,11 +2296,17 @@ fn raw_field_mutation_exercises_bounded_numeric_directions() {
             &mut rng(seed)
         ));
         let VmInstruction::ReadInput {
-            ref_idx, sub_idx, ..
+            dst,
+            ref_idx,
+            sub_idx,
         } = instruction
         else {
-            unreachable!();
+            unreachable!()
         };
+        assert!(matches!(
+            (dst, ref_idx, sub_idx),
+            (1, 0, 0) | (0, 1, 0) | (0, 0, 1)
+        ));
         observed_zero_u16 |= ref_idx == 1 || sub_idx == 1;
     }
     assert!(
@@ -3142,6 +3148,15 @@ fn noncontiguous_conditional_slice_copy_preserves_selected_target_identity() {
 }
 
 proptest! {
+    #[test]
+    fn splice_rejects_invalid_ranges_atomically(len in 1usize..16, start in 0usize..20, end in 0usize..20) {
+        prop_assume!(start > end || end > len);
+        let mut program = vec![VmInstruction::Noop; len];
+        let before = program.clone();
+        prop_assert_eq!(splice_program_with_reference_repair(&mut program, start..end, vec![]), Err(MutationSkipReason::NoApplicableTarget));
+        prop_assert_eq!(program, before);
+    }
+
     /// Two applications of the paired-slot operator with the same seed to the
     /// same program produce the same program, whatever slot instructions the
     /// program holds.
