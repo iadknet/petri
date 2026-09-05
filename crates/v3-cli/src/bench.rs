@@ -742,19 +742,16 @@ fn lineage_diversity(
 
 fn memory_sensitivity(seed: u64, observations: &[FinalActionObservation]) -> MemorySensitivitySeed {
     let final_creature_count = observations.len() as u64;
-    let (
-        different_from_zeroed_count,
-        different_from_scrambled_count,
-        different_from_either_count,
-    ) = observations.iter().fold((0, 0, 0), |counts, observation| {
-        let different_from_zeroed = observation.intact != observation.zeroed;
-        let different_from_scrambled = observation.intact != observation.scrambled;
-        (
-            counts.0 + u64::from(different_from_zeroed),
-            counts.1 + u64::from(different_from_scrambled),
-            counts.2 + u64::from(different_from_zeroed || different_from_scrambled),
-        )
-    });
+    let (different_from_zeroed_count, different_from_scrambled_count, different_from_either_count) =
+        observations.iter().fold((0, 0, 0), |counts, observation| {
+            let different_from_zeroed = observation.intact != observation.zeroed;
+            let different_from_scrambled = observation.intact != observation.scrambled;
+            (
+                counts.0 + u64::from(different_from_zeroed),
+                counts.1 + u64::from(different_from_scrambled),
+                counts.2 + u64::from(different_from_zeroed || different_from_scrambled),
+            )
+        });
     let fraction = |count| {
         (final_creature_count > 0)
             .then(|| six(count as f64 / final_creature_count as f64))
