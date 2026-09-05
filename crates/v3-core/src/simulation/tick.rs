@@ -1096,6 +1096,17 @@ mod final_action_observation_tests {
         }
     }
 
+    fn expected_memory_action(value: f32) -> Vec<WorldAction> {
+        vec![WorldAction::Reproduce {
+            direction: if value > 0.5 {
+                Direction::NE
+            } else {
+                Direction::N
+            },
+            energy_transfer: value,
+        }]
+    }
+
     #[test]
     fn final_action_observation_uses_full_actions_and_leaves_simulation_unchanged() {
         let mut config = SimulationConfig::default();
@@ -1199,17 +1210,28 @@ mod final_action_observation_tests {
 
     proptest! {
         #[test]
-        fn scramble_rotation_preserves_the_shared_memory_multiset(bits in prop::array::uniform16(any::<u32>())) {
-            let memory = bits.map(f32::from_bits);
-            let mut scrambled = memory;
-            scrambled.rotate_left(1);
+        fn observation_scramble_reads_slot_one_while_intact_reads_slot_zero(
+            slot_zero in 0.0f32..1.0,
+            slot_one in 0.0f32..1.0,
+        ) {
+            let mut config = SimulationConfig::default();
+            config.world.width = 16;
+            config.world.height = 16;
+            config.population.initial_creatures = 1;
+            let mut sim = seed_simulation(config, 11);
+            let id = sim.creatures.keys().next().expect("one founder");
+            let creature = &mut sim.creatures[id];
+            creature.genome = memory_direction_genome();
+            creature.shared_memory[0] = slot_zero;
+            creature.shared_memory[1] = slot_one;
 
-            let mut original_bits = memory.map(f32::to_bits);
-            let mut scrambled_bits = scrambled.map(f32::to_bits);
-            original_bits.sort_unstable();
-            scrambled_bits.sort_unstable();
+            let observation = observe_final_actions(&sim).pop().expect("one observation");
 
-            prop_assert_eq!(scrambled_bits, original_bits);
+            prop_assert_eq!(observation.intact, expected_memory_action(slot_zero));
+            prop_assert_eq!(observation.zeroed, expected_memory_action(0.0));
+            prop_assert_eq!(observation.scrambled, expected_memory_action(slot_one));
+            prop_assert_eq!(sim.creatures[id].shared_memory[0], slot_zero);
+            prop_assert_eq!(sim.creatures[id].shared_memory[1], slot_one);
         }
     }
 }

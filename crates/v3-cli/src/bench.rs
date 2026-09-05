@@ -1686,5 +1686,49 @@ mod tests {
                 prop_assert_ne!(result.shannon_entropy_nats, UNDEFINED);
             }
         }
+
+        #[test]
+        fn memory_sensitivity_union_and_fractions_match_generated_differences(
+            differences in proptest::collection::vec((any::<bool>(), any::<bool>()), 0..64),
+        ) {
+            let mut config = SimulationConfig::default();
+            config.world.width = 16;
+            config.world.height = 16;
+            config.population.initial_creatures = 1;
+            let sim = seed_simulation(config, 11);
+            let creature_id = sim.creatures.keys().next().expect("one founder");
+            let intact = vec![WorldAction::NoOp];
+            let changed = vec![WorldAction::Move(Direction::N)];
+            let observations: Vec<_> = differences
+                .iter()
+                .map(|&(zeroed_differs, scrambled_differs)| FinalActionObservation {
+                    creature_id,
+                    intact: intact.clone(),
+                    zeroed: if zeroed_differs { changed.clone() } else { intact.clone() },
+                    scrambled: if scrambled_differs { changed.clone() } else { intact.clone() },
+                })
+                .collect();
+
+            let result = memory_sensitivity(11, &observations);
+            let zeroed_count = differences.iter().filter(|(zeroed, _)| *zeroed).count() as u64;
+            let scrambled_count = differences.iter().filter(|(_, scrambled)| *scrambled).count() as u64;
+            let both_count = differences.iter().filter(|(zeroed, scrambled)| *zeroed && *scrambled).count() as u64;
+            let union_count = zeroed_count + scrambled_count - both_count;
+
+            prop_assert_eq!(result.different_from_zeroed_count, zeroed_count);
+            prop_assert_eq!(result.different_from_scrambled_count, scrambled_count);
+            prop_assert_eq!(result.different_from_either_count, union_count);
+            prop_assert!(union_count >= zeroed_count && union_count >= scrambled_count);
+            if differences.is_empty() {
+                prop_assert_eq!(result.different_from_zeroed_fraction, UNDEFINED);
+                prop_assert_eq!(result.different_from_scrambled_fraction, UNDEFINED);
+                prop_assert_eq!(result.different_from_either_fraction, UNDEFINED);
+            } else {
+                let total = differences.len() as f64;
+                prop_assert_eq!(result.different_from_zeroed_fraction, six(zeroed_count as f64 / total));
+                prop_assert_eq!(result.different_from_scrambled_fraction, six(scrambled_count as f64 / total));
+                prop_assert_eq!(result.different_from_either_fraction, six(union_count as f64 / total));
+            }
+        }
     }
 }
