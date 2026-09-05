@@ -170,7 +170,16 @@ cases are drawn. Commit any `proptest-regressions/` file that appears.
 - [x] Benchmark report stored at
       `docs/progress/features/t11-f05-temporal-controller-fixtures.json` and
       appended to the gate `closed` list.
-- [x] `make check` passes (exit 0) at the closing commit.
+- [x] `make check` passes (exit 0). Ran to completion (exit 0) covering
+      commit `ccf50afa` (policy-check, quality-check, rust-check —
+      format/viability/all Rust test subsets including
+      `rust-test-temporal-fixtures`/clippy, frontend-check, dependency-audit,
+      skill-check all green; `temporal_fixtures`: 13 passed;
+      `creature_workflow_e2e`: 7 passed). The one commit after that
+      (`ea4dd270`) is documentation-only (this spec's prose), re-verified
+      separately with `make roadmap-check` (passed) and
+      `git diff --stat main...HEAD -- crates/*/src/` (empty) rather than a
+      second full `make check`.
 
 ## Performance and Goal Impact
 
