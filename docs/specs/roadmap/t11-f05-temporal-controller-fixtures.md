@@ -268,24 +268,27 @@ both inside the 25 percent flag threshold. Report:
   implementation uses the correct type. Left as a discrepancy note rather
   than rewriting the Inputs section, per the instruction to record gaps
   rather than edit around them.
-- Advisor consulted twice. First (before committing to the implementation
-  approach, after reading the spec and the relevant runtime/mutation source):
-  confirmed the design — one `#[test]` per fixture in a single
-  `temporal_fixtures.rs`, genome construction mirroring the existing
-  `creature_workflow_e2e` helper patterns, `common/mod.rs` for the three
-  named shared helpers, and computing D1–D3's expected values via a small
-  pure-Rust replica of the documented relaxation recurrence rather than
-  hand-derived constants. Second (after all 13 fixtures passed and before
-  reporting done): caught that B1's cue-trial creature physically walked off
-  its start position after the cue latched (the same genome keeps emitting
-  `Move(E)` every tick once the cue is seen), making the fixture's
-  food-removal step vacuous and its decision-tick comparison meaningless;
-  directed a fix mirroring A1's barrier-blocking and a full `static_inputs`
-  field comparison instead of `food_here` alone. Also flagged (applied): E2's
-  "meets" status needed to be qualified as inheriting E1's gain gap; three
-  simplify-pass items (inline the `ActionSlotBehavior` shim, replace the
-  function-pointer identity check with an explicit tuple flag, move
-  `graph_hop` into `common/mod.rs`); and two documentation notes (the
-  `WorldInputKey`/`AgeTicks` discrepancy above, and E3's `EnergyDelta`
-  measurement depending on `energy_decay_per_tick == 0.0` and
-  `reward_learning_cost == 0.0` staying at their current defaults).
+- Advisor consulted twice. **Deviation from the standing three-checkpoint
+  rule**: consult 1 happened after the twelve fixtures and the proptest were
+  already written and passing, not before committing to the implementation
+  approach as the standing instructions direct — recorded here per the
+  `SendMessage`-deviation precedent above. Consult 1 caught that B1's
+  cue-trial creature physically walked off its start position after the cue
+  latched (the same genome keeps emitting `Move(E)` every tick once the cue
+  is seen), making the fixture's food-removal step vacuous and its
+  decision-tick comparison meaningless; directed a fix mirroring A1's
+  barrier-blocking plus a full `static_inputs` field comparison instead of
+  `food_here` alone. It also directed: qualifying E2's "meets" status as
+  inheriting E1's `eta^2` gain gap; dumping and transcribing D1/D2/D3's
+  actual measured values into the catalogue rather than relying solely on
+  the in-test helper-vs-observed equality; three simplify-pass items (inline
+  the `ActionSlotBehavior` shim, replace the function-pointer identity check
+  with an explicit tuple flag, move `graph_hop` into `common/mod.rs`); and
+  two documentation notes (the `WorldInputKey`/`AgeTicks` discrepancy above,
+  and E3's `EnergyDelta` measurement depending on `energy_decay_per_tick ==
+  0.0` and `reward_learning_cost == 0.0` staying at their current defaults).
+  Consult 2 (this one, before reporting done) verified the fixes were
+  correctly applied and flagged two closing gaps: confirm `make check`'s
+  actual exit status on the closing commit rather than an in-flight run, and
+  confirm mechanically (not just by assertion) that no production file
+  changed (`git diff --stat main...HEAD -- crates/*/src/` is empty).
