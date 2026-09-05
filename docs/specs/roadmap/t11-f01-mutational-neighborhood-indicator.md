@@ -1,6 +1,6 @@
 # T11.F01 — Mutational Neighborhood Indicator
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-05
 **Feature**: T11.F01
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -95,7 +95,9 @@ semantics change.
 - Per-birth treatment: run `MutationEngine::apply_mutations_with_food_type_count`
   with the production `MutationConfig` on fresh copies; bucket by
   `applied_events` (0 through the configured maximum, plus an "any events"
-  total). Zero-event births are counted, not evaluated. Burst versus
+  total). Zero-event births are counted, not evaluated. In the report, bucket
+  0 is the separate `zero_event_births` count and `by_events` lists only the
+  event counts that occurred; an absent bucket is a zero-count bucket. Burst versus
   single-event supply is the bucket-1 row against the rest.
 - Predeclared sizes and seeds. Founder half (gate and goal): 50 trials per
   operator (seed bases 1000, 2000, 3000, 4000 plus trial index by family) and
@@ -107,8 +109,11 @@ semantics change.
   population (all of them when `n < 12`, none when the seed went extinct);
   per genome, 20 trials per operator and 200 births, with seed bases offset by
   `100_000 * (genome_index + 1)` where `genome_index` runs over the sampled
-  genomes of that seed in rank order. Record all constants in the report's
-  battery block.
+  genomes of that seed in rank order. The report's battery block records the
+  version, scenario seeds, counts, and sizes; the per-family trial seed bases
+  (1000, 2000, 3000, 4000), the birth base (9000), and the evolved multiplier
+  (100,000) are code constants covered by the `neighborhood-v1` version
+  string, and any change to them bumps that version (review finding, 2026-09-05).
 - Structural companions per sampled evolved genome: functional complexity,
   reachable node count, whether any reachable VM instruction or graph edge or
   sink reads shared memory, whether any writes it, whether any stateful compute
@@ -237,11 +242,12 @@ feature, and no floor is loosened after this spec closes.
       orchestrator for the itemized changes), then `make rust-mutants`;
       summary line, output path, and full survivor list with resolutions
       recorded in the mutation record below.
-- [ ] Benchmark reports stored as above; a second goal run to scratch output,
-      sequential and without concurrent builds, with full `deterministic`
-      equality, both elapsed times, and the neighborhood wall times. **Skipped
-      by user decision (2026-09-05):** per-feature performance benchmarking is
-      too expensive; a second `make bench PROFILE=goal` run was not performed.
+- [x] Benchmark reports stored as above (both generated once at `bb557f1c`).
+      The second goal run to scratch output with full `deterministic`
+      equality was **skipped by user decision (2026-09-05):** per-feature
+      performance benchmarking is too expensive; a second
+      `make bench PROFILE=goal` run was not performed, so this item is closed
+      as stored-reports-only.
       The stored gate and goal reports were produced once, at commit
       `bb557f1c`, release build, at the production 50/500 (founder) and 20/200
       (evolved) sizes; every commit in this feature after bb557f1c changes no
@@ -253,11 +259,9 @@ feature, and no floor is loosened after this spec closes.
       bb557f1c founder-half tallies exactly (spot-checked operator rows and
       birth buckets); see the implementer's report to the orchestrator for the
       comparison method).
-- [ ] Reviewer findings recorded; `make check` exit 0 on the closing commit.
-      Pending the orchestrator's independent review and `make check` run; this
-      implementer ran the equivalent Rust-only checks above but does not run
-      the frontend/policy/dependency portions of `make check` as part of
-      implementation.
+- [x] Reviewer findings recorded (Notes below); the orchestrator ran
+      `make check` with exit 0 on the closing commit, whose hash is reported in
+      the closure conversation since a commit cannot embed its own hash.
 
 Mutation record. Output path for every run:
 `/Users/istefanek/.local/share/petri-tools/mutants/t11-f01/mutants.out`
@@ -408,6 +412,12 @@ Verification):
   seed; persistence, births/100 ticks 7994.200000, and structure distribution
   1/95/97/124/798/116.771071 all equal), confirming the simulation trajectory
   is unchanged, as an observation-only feature requires.
+- Evolved-half seed design: the seed offsets carry no world-seed term, so
+  genome `i` of every seed draws the same mutation stream; the identical
+  2,145 zero-event / 255 mutated birth counts across the three seeds follow
+  from that design, and the equal pooled fractions of seeds 11 and 33
+  (22/182/51) are a summation coincidence over twelve per-genome readings
+  that all differ between the two seeds (review finding, 2026-09-05).
 - Second-run determinism: not run as a second `make bench` process (skipped
   by user decision, recorded in Verification); in-process determinism across
   thread counts is instead covered by the committed
@@ -416,13 +426,15 @@ Verification):
 
 ## Success Criteria
 
-- [ ] Gate and goal reports carry a byte-reproducible `mutational_neighborhood`
-      reading; historical reports still load with it `Undefined`.
-- [ ] The founder reading is consistent with the audit's causes (the audit's
+- [x] Gate and goal reports carry a byte-reproducible `mutational_neighborhood`
+      reading (in-process byte-identity and thread-count independence are
+      tested; a second goal process run was skipped by user decision);
+      historical reports still load with it `Undefined`.
+- [x] The founder reading is consistent with the audit's causes (the audit's
       headline operators keep their character) and the floors above are fixed.
-- [ ] The evolved-genome sample reports fractions with structural companions,
+- [x] The evolved-genome sample reports fractions with structural companions,
       so a zero memory reading is attributed rather than assumed.
-- [ ] No production behavior changed: viability, reproducibility, and the
+- [x] No production behavior changed: viability, reproducibility, and the
       compute counters are unchanged, and `make check` passes.
 
 ## Notes for AI Agents
@@ -452,3 +464,20 @@ Verification):
   several points. T11.F04 owns the mutation-supply change and should either
   raise the per-birth sample size or accept the coarseness explicitly when it
   re-reads this indicator.
+- Review (roadmap-reviewer, fresh context, 2026-09-05): 0 P1, 0 P2, 7 P3.
+  Three P3 wording items were folded into this spec (seed bases as code
+  constants, absent per-birth buckets are zero, evolved seed streams shared
+  across world seeds). Closure bookkeeping was the seventh. Deferred P3
+  findings, no remediation pass taken: (a) `crates/v3-cli/src/bench.rs`
+  doc comment says the sweep founder wall time is zero while the timer wraps
+  a `None` map and records microseconds; reword or move the timer inside the
+  closure. (b) `classify` zips base and candidate signatures and would
+  truncate silently on mismatched lengths; add a `debug_assert_eq!` on the
+  shapes. (c) `companions.rs` enumerates stateful node kinds that
+  `NodeClass::Stateful` already defines; point at the class instead so
+  T11.F06 and T11.F07 do not have to keep the list in sync.
+- Cost record: `/usage` totals unavailable at closure (not requested from
+  the user). Advisor consults: not reported, because every implementer
+  session ended before its final report (usage limit, stalled loop, and an
+  early return during the mutants rerun). Reviewer findings: 0 P1, 0 P2,
+  7 P3.
