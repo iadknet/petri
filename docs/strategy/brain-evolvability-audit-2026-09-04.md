@@ -386,10 +386,19 @@ that matters most.
 - "Changed" is not "worse". Some changed offspring are the adaptive ones.
   The claim is about the shape of the neighborhood (too few neutral and
   near-neutral neighbors, too many dead ones), not that change is bad.
-- Only the founder was probed. Lineages 2,000 ticks into a run may have
-  evolved toward more robust genotypes, as quasispecies theory predicts; the
-  T11.F01 sample from an evolved population will show it. That would confirm
-  the mechanism rather than excuse it.
+- Only the founder's neighborhood was probed. T01.F12's goal-v1 baseline,
+  read the same day and verified on 2026-09-05, supplies the evolved-population
+  half of the picture: after 2,000 ticks at production defaults, zero of
+  24,418 final creatures across three seeds changed their action queue when
+  shared memory was zeroed or rotated, and reachable structure had grown to a
+  median of 97, a p75 of 124, and a maximum of 798 against the founder's 96.
+  Structure grows; memory use does not. Whether evolved genotypes are also
+  more mutationally robust than the founder, as quasispecies theory predicts,
+  is what T11.F01's evolved-genome sample will show; that would confirm the
+  mechanism rather than excuse it. The sensitivity probe perturbs current
+  shared memory only, so previous-tick slots and stateful graph nodes are
+  outside its reach; T11.F01 adds structural companions and T11.F06 a
+  versioned component for persisted graph state.
 - Repairing the map does not guarantee cognition. It removes a sufficient
   reason for its absence. Whether the ecology then rewards memory is what
   T11.F10, T09.F08, and T02 test.
