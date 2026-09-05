@@ -1,6 +1,6 @@
 # T11.F05 — Temporal Controller Fixtures
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-05
 **Feature**: T11.F05
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -53,7 +53,8 @@ changes. T11.F01, T09.F08, T09.F01, and T11.F10 reuse the fixture genomes.
   `CgpGraphBackendDef::new_with_fixed_outputs`, `OutputSinkKind::WriteSlot`,
   `GraphSource::SharedMemory { previous }`, `VmInstruction::{ReadInput,
   StoreSlotImm, LoadSlotImm, LoadSlotPrev, JumpIfZero, WriteRouteGate,
-  PushAction, ExecuteActionQueue, Halt}`, `WorldInputKey::{FoodHere, AgeTicks}`.
+  PushAction, ExecuteActionQueue, Halt}`, `WorldInputKey::FoodHere`, and
+  `StaticIntrospectionKey::AgeTicks`.
 - Production settings held fixed and never edited by a fixture:
   `RuntimeConfig::default()` (`max_graph_relax_iters` 15,
   `graph_convergence_epsilon` 1e-3, `graph_convergence_stable_passes` 2,
@@ -61,8 +62,10 @@ changes. T11.F01, T09.F08, T09.F01, and T11.F10 reuse the fixture genomes.
   `reward_learning_cost` 0, `max_mesh_hops` 1024) and
   `shared_memory.decay_rate` 0. The only permitted deviations are the
   existing `test_config` precedent (tiny world, zero food coverage and
-  growth, zero energy decay, zero mutation probability) and the one labeled
-  decay treatment in fixture C2; the file's doc comment records them.
+  growth, zero energy decay, zero mutation probability), the one labeled
+  decay treatment in fixture C2, and `max_graph_relax_iters` 1 in the
+  property test so one dispatch is one operator step; the file's doc
+  comment records them.
 - Observed semantics the fixtures pin, from the code on 2026-09-05:
   `run_phase_0` copies `shared_memory` into `prev_shared_memory` then applies
   decay; `execute_graph_impl` zeroes `prev_outputs`/`curr_outputs` at every
@@ -304,20 +307,6 @@ both inside the 25 percent flag threshold. Report:
   outside that test binary needs to either duplicate the small construction
   or the two crates need a shared, more visible location — left to T11.F01
   to decide since this feature does not touch production visibility.
-- Spec-text discrepancy: this spec's Inputs and Invariants section (Seams
-  bullet) lists `WorldInputKey::{FoodHere, AgeTicks}`, but `AgeTicks` is
-  actually `StaticIntrospectionKey::AgeTicks` (via
-  `InputReference::StaticIntrospection`), not a `WorldInputKey` variant — the
-  implementation uses the correct type. Left as a discrepancy note rather
-  than rewriting the Inputs section, per the instruction to record gaps
-  rather than edit around them.
-- Second spec-text discrepancy (remediation pass, 2026-09-05): the proptest's
-  `max_graph_relax_iters = 1` setting is a third labeled permitted deviation
-  (documented in the test file's header), but the Inputs and Invariants
-  section still reads "the only permitted deviations are ... and the one
-  labeled decay treatment in fixture C2" (two). Left as a discrepancy note
-  rather than rewriting the Inputs section's count, for the same reason as
-  the `AgeTicks` discrepancy above.
 - Advisor consulted twice. **Deviation from the standing three-checkpoint
   rule**: consult 1 happened after the twelve fixtures and the proptest were
   already written and passing, not before committing to the implementation
@@ -399,3 +388,16 @@ both inside the 25 percent flag threshold. Report:
   directly. No reuse, altitude, or other efficiency findings; the doc
   comments and constant layout were left as sized for a 4-tick fixture, not
   worth compressing further.
+- Closure (orchestrator, 2026-09-05): the two spec-text discrepancies the
+  implementer recorded (`AgeTicks` is a `StaticIntrospectionKey`, and the
+  property test's `max_graph_relax_iters` 1 is a third labeled deviation)
+  were corrected in the Inputs and Invariants section at closure and their
+  notes removed. Review 2026-09-05 (roadmap-reviewer, fresh context): 0 P1,
+  1 P2, 5 P3; all six were fixed in the one remediation pass at `13c6b69c`.
+  No deferred review findings. `make check` exited 0 on the closing content
+  (the closing commit cannot embed its own hash; the goal transcript shows
+  the hash and the exit code).
+- Cost record at closure: `/usage` totals not collected (autonomous session;
+  `/usage` is a user command). Implementer advisor consults: 2 in the
+  implementation pass, 2 in the remediation pass. Reviewer findings: P1 0,
+  P2 1, P3 5.
