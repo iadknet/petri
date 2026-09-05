@@ -10,8 +10,8 @@
 A fixed, minutes-scale goal benchmark reports final-population lineage diversity
 and memory sensitivity without changing the simulation. A plain progress table
 shows both compute comparisons and every indicator, backed by separate gate and
-goal series. This run delivers committed implementation and independent review;
-the final automated check, manual verification, and integration remain pending.
+goal series. Implementation and automated review are complete; manual
+verification and integration remain pending.
 
 ## Non-Goals
 
@@ -143,9 +143,10 @@ the final automated check, manual verification, and integration remain pending.
       after a repeated failure), with accepted/rejected guidance and count.
 - [x] Fresh Astra independent final review and required remediation completed;
       record finding counts and advisory deferrals.
-- [ ] Orchestrator independently runs `make roadmap-check`, commits all final
-      content, and runs `make check` against that exact clean commit. Record the
-      tested hash in the task handoff (a commit cannot embed its own hash).
+- [x] Orchestrator independently ran `make roadmap-check` and `make check` on
+      clean `888fadfcc3f29849cfb0560121e9ea1571e3f628`. Root will repeat the
+      full check after this status-only commit and record that tested hash in the
+      task handoff (a commit cannot embed its own hash).
 - [ ] User manual verification and integration (intentionally pending).
 
 TDD record: `cargo test -p v3-core final_action_observation_uses_full_actions_and_leaves_simulation_unchanged`
@@ -157,9 +158,12 @@ The final focused checks were `cargo test -p v3-core final_action_observation`
 (1 passed), and `cargo test -p v3-cli --lib memory_sensitivity_union_and_fractions_match_generated_differences`
 (1 passed). Final suites were `cargo test -p v3-core` (1019 passed) and
 `cargo test -p v3-cli` (18 library, 9 binary, 17 benchmark integration, and 7
-CLI integration tests passed). `cargo check --workspace --all-targets` and
-`make roadmap-check` passed; tick mechanics, defaults, and founder behavior
-were untouched, so viability-first was not applicable.
+CLI integration tests passed). `cargo check --workspace --all-targets` passed
+again after the Clippy correction. `make roadmap-check` passed, and the
+orchestrator's `make check` passed with exit 0 on
+`888fadfcc3f29849cfb0560121e9ea1571e3f628`
+([log](/private/tmp/t01-f12-check-888fadfc.log)). Tick mechanics, defaults,
+and founder behavior were untouched, so viability-first was not applicable.
 
 Mutation record: the initial `make rust-mutants` run used
 `/Users/istefanek/.local/share/petri-tools/mutants/t01-f12/mutants.out` and
@@ -249,8 +253,9 @@ the minimal correct semantics; no correction was needed.
       sensitivity readings, while the gate trajectory stays unchanged.
 - [x] One progress table exposes every indicator, links its evidence, and clearly
       distinguishes historical undefined goals from the new pending baseline.
-- [ ] Automated gates, mutation triage, benchmark reporting, and independent
-      review pass on committed content in a clean feature worktree.
+- [x] Automated gates, mutation triage, benchmark reporting, and independent
+      review passed on clean `888fadfcc3f29849cfb0560121e9ea1571e3f628`;
+      root will repeat `make check` after this status-only commit.
 - [ ] Manual verification and integration are approved (intentionally pending).
 
 ## Notes for AI Agents
@@ -266,8 +271,9 @@ the minimal correct semantics; no correction was needed.
 - Planning readiness review: no P1/P2/P3 findings; Ready. Template, current track
   requirements, dependency outputs, empty-population handling, measurement
   isolation, gate preservation, and manual-verification override were checked.
-  Implementation and measured performance are recorded; the orchestrator's final
-  clean-commit check remains pending.
+  Implementation and measured performance are recorded. The orchestrator's
+  `make check` passed on `888fadfcc3f29849cfb0560121e9ea1571e3f628`; root will
+  repeat it after this status-only commit.
 - User override: implementation and automated review must finish here, but keep
   feature unchecked and spec In Progress. Manual verification and integration
   are pending. Preserve worktree and branch and stop for the user's decision.
