@@ -1,0 +1,203 @@
+# T11.F02 — VM Structural Mutation Semantics
+
+**Status**: In Progress
+**Last updated**: 2026-09-05
+**Feature**: T11.F02
+**Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
+
+## Goal
+
+VM instruction edits preserve surviving control-flow references, operand
+mutations make one small change without rewriting the opcode, and register
+capacity can change without aliasing existing registers. Founders carry spare
+registers on which later mutations can operate without overwriting live values.
+
+## Non-Goals
+
+- No labels, new controller family, graph-growth or clock repair, mutation
+  probability/weight/reachability changes, or learned-state inheritance changes.
+- No claim that arbitrary live insertion, replacement, deletion, or copying is
+  behaviorally neutral. T11.F08 owns neutral production duplication and its
+  activation; this feature repairs reference integrity for every existing VM
+  splice and proves neutral insertion/copying under the conditions below.
+- No benchmark threshold changes, baseline replacement, or second goal run.
+
+## Inputs and Invariants
+
+- Sources: the owning track's T11.F02 and node-type-contract notes,
+  [T11.F01](t11-f01-mutational-neighborhood-indicator.md), the
+  [brain evolvability audit](../../strategy/brain-evolvability-audit-2026-09-04.md),
+  and the [VM ISA](../../reference/v3-vm-isa-spec.md) and
+  [mutation](../../reference/v3-mutation-spec.md) reference specs.
+- Existing seams: `mutation/vm/operators.rs`, `runtime/vm.rs::jump_target`
+  (also used by traced execution), the genome slice analyses, founder builder,
+  and `neighborhood` battery. Extend these using `std` and existing dependencies;
+  do not introduce an alternate mutation or execution path.
+- Research checked 2026-09-05: repair positional references in place, or adopt
+  label/tag addressing. [SignalGP](https://arxiv.org/abs/1804.05445) associates
+  events and functions through evolvable tags; [Avida's instruction set](https://github.com/devosoft/avida/wiki/Instruction-Set)
+  includes relative head jumps and template-based flow control. Those are
+  credible representation alternatives, but require ISA and analysis changes
+  beyond this repair. Retain the roadmap's in-place repair; T11.F11 remains the
+  conditional label alternative. The local audit directly identifies the
+  missing splice repair, so no additional library or architecture is needed.
+- Jump policy: resolve each old jump's absolute target as
+  `(old_pc + 1 + offset).rem_euclid(old_len)` using signed wide arithmetic.
+  After an edit, encode `new_target - (new_pc + 1)`. This applies to wrapped,
+  forward, backward, conditional, self, and extreme-i32 offsets alike. Reuse
+  the runtime's target semantics instead of maintaining a second definition.
+- Insertion preserves the identities of all old instructions, including the
+  one at the insertion boundary. A surviving old jump follows that instruction
+  past the inserted span. Replacement retains its position as the target of
+  incoming jumps; the replacement's own operands are newly authored. Deletion
+  redirects a jump into the deleted span to the first surviving instruction
+  after that span, wrapping to the first survivor when deleting the tail.
+  Existing nonempty programs are never emptied by a deletion operator.
+- Copy policy: map each selected source instruction to its copied position.
+  A copied jump to another selected instruction targets that copy; a copied
+  jump to an unselected instruction targets the surviving original. This map
+  covers contiguous blocks and noncontiguous forward/backward slices. Old
+  jumps keep targeting originals, even when the insertion splits the source
+  span. Both block-copy variants obey this rule; the remapped variant retains
+  its explicit register-renaming behavior, independently of jump repair.
+  Newly authored motif-internal offsets are interpreted in the new program.
+- Operand steps: `VmInstructionRawFieldMutation` keeps its operator identity
+  and weight but selects one operand-bearing instruction and changes exactly
+  one encoded field by a one-unit step (inward at a numeric boundary; no large
+  wraparound). Jump offsets use the same bounded plus/minus-one step, with no
+  overflow. This is field mutation, not opcode replacement. `Noop`, `Halt`,
+  `ExecuteActionQueue`, and `PopAction` have no operands and are ineligible;
+  an empty/no-operand program reports `NoApplicableTarget`. Other operands and
+  the opcode are unchanged. The standalone `VmMutateSlotAddress` also moves
+  its one address field by one unit. The existing paired-slot operation is
+  explicitly a linked-address macro, not a single-field event; its coordinated
+  changes and the macro instruction-replacement operator stay available.
+- Register-capacity policy: grow by one up to 32; shrink by one only if the
+  highest effective register is unused by every register-typed operand.
+  Resolve/canonicalize existing raw register operands under the old runtime
+  width before changing the count, preserving each effective register's
+  identity; otherwise skip. Never fold a referenced removed register onto 0.
+  Widths outside 1 through 32 skip without altering the genome, preserving
+  the runtime's immediate halt at zero and its existing larger-width behavior.
+  Add four spare registers to the 16-register founder (20 total), retaining
+  every instruction, constant, action, and existing register reference.
+- Neutrality means identical action/output/shared-memory behavior when both
+  executions have enough energy and steps. A Noop inserted anywhere into an
+  in-range-target program preserves that behavior. A block copied to a proven
+  unreachable suffix does likewise; a terminal alone does not prove a suffix
+  unreachable if a jump reaches it. Executed Noops still consume their defined
+  energy and steps. Do not hide those costs or claim neutrality at exhaustion.
+- Record the four-part node-type contract in `v3-mutation-spec.md`, with links
+  from the VM and graph backend specs: stable/remapped references, neutral
+  growth, one world-tick persistent-state clock, and small mutation steps.
+  Name the remaining T11 owners rather than claiming these are already all
+  satisfied. Update owning reference documents for every changed semantic rule.
+
+## Implementation Tasks
+
+- [ ] Add failing example/property tests for splice references, copied-target
+      mapping, one-field steps, terminal stability, register identity, and
+      neutral Noop/unreachable-copy behavior before implementation.
+- [ ] Route every VM insertion/deletion/replacement, motif, block, and slice
+      copy through the shared reference-remapping rule; preserve deterministic
+      seeded behavior and the production/traced execution agreement.
+- [ ] Implement one-field operand steps and safe register-capacity changes;
+      add founder register slack and verify its original behavior is preserved.
+- [ ] Update the mutation/VM references and graph contract pointer; update any
+      founder contract documenting its register count.
+- [ ] Self-review the diff for reuse, simplification, and efficiency, then run
+      mutation testing and record every survivor with its resolution.
+- [ ] Store gate and single-run goal reports at
+      `docs/progress/features/t11-f02-vm-structural-mutation-semantics.json`
+      and `...-goal.json`; append both series entries and update
+      `docs/progress.md` with measured comparisons and every indicator reading.
+
+## Verification
+
+- [ ] TDD evidence: record initial failing commands and the regression they
+      exposed. Property tests cover old-to-new jump targets for all edit kinds,
+      copied internal/external targets, modulo-wrapped references, one-field
+      bounded changes for all operand-bearing opcodes, and register identity.
+      Commit any generated `proptest-regressions/` files.
+- [ ] Behavioral property tests cover Noop insertion and unreachable block
+      copying with enough energy/steps; explicit fixtures distinguish energy
+      exhaustion and step caps, deleted targets, terminal replacement versus
+      field mutation, and noncontiguous slice copies.
+- [ ] `cargo test -p v3-core --test viability` runs first when founder behavior
+      changes; `cargo check --workspace --all-targets` follows coherent Rust
+      edits. Focused VM/founder/neighborhood tests and cross-process
+      reproducibility pass. Record exact commands/results.
+- [ ] `make rust-mutants` after self-review: record summary, output directory,
+      and full missed/timeout list, each killed by a strengthened test and rerun,
+      equivalent with reason, or deferred in Notes. Do not alter production
+      code to kill mutants or add unjustified exclusions.
+- [ ] `make bench PROFILE=gate FEATURE=t11-f02-vm-structural-mutation-semantics`
+      and one `PROFILE=goal` run pass and their reports are stored. Measurement
+      uses the existing host-contention preflight and unchanged profile sizes.
+- [x] Second goal-profile determinism run: Not applicable per the 2026-09-05
+      workflow decision; cross-process reproducibility remains in `make check`.
+- [ ] `make roadmap-check` on document edits, independently by the orchestrator
+      before accepting implementation; final `make check` exits 0 for the
+      content committed and integrated into `main`.
+
+## Performance and Goal Impact
+
+Natural analog: gene insertion, deletion, and duplication. Reproduction applies
+small changes to inherited VM programs; stable references allow descendants to
+retain behavior while acquiring structure.
+
+Predeclared cost: remapping scans the edited program at mutation time, and four
+spare founder registers enlarge dispatch initialization slightly; no per-opcode
+cost or work-counter definition changes. No severe compute regression is
+budgeted, and no baseline re-pin is authorized. Gate simulation counters should
+stay close to T11.F01 and the T10.F10 epoch, but changed offspring behavior can
+change them. Record all six normalized work and wall-clock deltas against both
+references and investigate any threshold crossing without weakening a gate.
+
+Neighborhood expectations before implementation: founder VM field-mutation and
+register-capacity silence should increase; repaired insertion/motif silence
+should generally increase and dead fractions should decrease. Reference repair
+does not promise neutrality for live macro copies/replacements: their silent
+fractions may fall when correctly retained control flow makes a formerly inert
+edit execute. Such movement is predeclared only for the affected VM structural
+operators and must be attributed to their corrected targets. Founder slack
+changes which registers VM operand/motif/copy mutations sample, so those rows
+may move in either direction from register interference; report that separately.
+Founder non-VM operator rows should remain unchanged because founder execution
+is preserved and their mutation rules are untouched. Mutated-birth silence is
+expected to rise and dead fractions fall; report every bucket and investigate
+any reversal, mindful of T11.F01's four-sample single-event bucket.
+
+The evolved sample, lineage diversity, persistence, and memory sensitivity may
+shift in either direction because the inherited mutation map changes the
+population, not merely the measurement. Record the actual shifts against
+T11.F01 and T01.F12, distinguishing changed subjects from operator regressions;
+do not assert a cognition gain. All T11.F01 floors remain fixed and are due by
+T11.F10. No operator family is disabled/down-weighted to improve a reading.
+Closure readings and comparison conclusions remain to be recorded here.
+
+## Success Criteria
+
+- [ ] Every existing VM splice preserves surviving references under the
+      stated target policy, including copied internal/external references.
+- [ ] Operand events change one field by one unit, keep terminals unchanged,
+      and register-count events preserve effective register identities.
+- [ ] Founder slack preserves unmutated behavior; neutral edit properties,
+      applied-cost fixtures, viability, and reproducibility pass.
+- [ ] Reference contracts, mutation triage, benchmark/progress evidence, and
+      final review are complete; the checked feature and Complete spec land on
+      clean `main` at the tested commit, with worktree and branch removed.
+
+## Notes for AI Agents
+
+- Start: clean main `c1e3b406ddd82b6bc42b431411011326d634af5e`;
+  worktree `/Users/istefanek/projects/petri/.worktrees/t11-f02`, branch
+  `codex/t11-f02`. T11.F01 is checked; no other session owns T11.F02.
+- The user explicitly selected Astra `xhigh` for this task after the initial
+  launch check. Terra, Sol, and the fresh Astra reviewer use `high`.
+- Planning readiness review (Astra, 2026-09-05): Ready after one revision;
+  clarified the standalone slot-address step and out-of-range register-count
+  policy. Requirements cover each roadmap obligation without extending into
+  neutral production duplication or the remaining T11 repairs. Runtime behavior
+  and performance remain implementation verification, not planning claims.
+- Closure cost and review records pending.
