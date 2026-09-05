@@ -753,9 +753,11 @@ fn memory_sensitivity(seed: u64, observations: &[FinalActionObservation]) -> Mem
             )
         });
     let fraction = |count| {
-        (final_creature_count > 0)
-            .then(|| six(count as f64 / final_creature_count as f64))
-            .unwrap_or_else(|| UNDEFINED.to_string())
+        if final_creature_count == 0 {
+            UNDEFINED.to_string()
+        } else {
+            six(count as f64 / final_creature_count as f64)
+        }
     };
     MemorySensitivitySeed {
         seed,
