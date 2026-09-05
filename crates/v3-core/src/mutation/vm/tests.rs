@@ -1,6 +1,11 @@
+use super::operators::{
+    apply_register_count_mutation, mutate_one_instruction_field,
+    splice_program_with_reference_repair, SpliceInstruction,
+};
 use super::*;
 use crate::contracts::NodeId;
 use crate::creature::founder::v3alpha1_founder_genome;
+use crate::creature::genome::analysis::vm_forward_slice;
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
@@ -359,13 +364,12 @@ fn random_vm_instruction_generates_slot_opcodes() {
 }
 
 #[test]
-fn raw_field_mutation_can_produce_out_of_range_action_type() {
+fn raw_field_mutation_nudges_action_type_by_one() {
     let mut genome = v3alpha1_founder_genome();
     if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
         vm.program = vec![VmInstruction::PushAction { action_type: 0 }];
     }
 
-    let mut saw_out_of_range = false;
     for seed in 0u64..512 {
         let mut g = genome.clone();
         let mut r = rng(seed);
@@ -379,18 +383,12 @@ fn raw_field_mutation_can_produce_out_of_range_action_type() {
         )
         .unwrap();
         if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
-            if let VmInstruction::PushAction { action_type } = vm.program[0] {
-                if action_type > 3 {
-                    saw_out_of_range = true;
-                    break;
-                }
-            }
+            assert!(matches!(
+                vm.program[0],
+                VmInstruction::PushAction { action_type: 1 }
+            ));
         }
     }
-    assert!(
-        saw_out_of_range,
-        "raw field mutation should produce action_type values outside 0..=3"
-    );
 }
 
 #[test]
@@ -459,12 +457,8 @@ fn vm_instruction_mutation_program_never_empty() {
 
 #[test]
 fn vm_register_count_increments_and_decrements() {
-    let genome = v3alpha1_founder_genome();
-    let original_rc = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
-        vm.register_count
-    } else {
-        panic!("expected VM");
-    };
+    let genome = slot_program_genome(vec![VmInstruction::Move { dst: 0, src: 0 }]);
+    let original_rc = 2;
     let mut saw_increment = false;
     let mut saw_decrement = false;
     for seed in 0u64..100 {
@@ -480,7 +474,7 @@ fn vm_register_count_increments_and_decrements() {
         )
         .is_ok()
         {
-            let new_rc = if let BackendDef::Vm(ref vm) = g.nodes[1].backend_def {
+            let new_rc = if let BackendDef::Vm(ref vm) = g.nodes[0].backend_def {
                 vm.register_count
             } else {
                 original_rc
@@ -591,7 +585,7 @@ fn copy_instruction_block_on_empty_returns_no_applicable_target() {
 
 #[test]
 fn copy_instruction_block_preserves_content() {
-    // All original instructions must still be present somewhere after copy.
+    // All original instruction identities must remain in order after copy.
     let mut genome = v3alpha1_founder_genome();
     let original = if let BackendDef::Vm(ref vm) = genome.nodes[1].backend_def {
         vm.program.clone()
@@ -613,14 +607,24 @@ fn copy_instruction_block_preserves_content() {
     } else {
         panic!()
     };
-    // Every original instruction must appear in the result.
-    for (i, instr) in original.iter().enumerate() {
-        assert!(
-            after.contains(instr),
-            "original instruction at index {} not found in result",
-            i
-        );
+    let original_non_jumps: Vec<_> = original
+        .iter()
+        .filter(|instruction| {
+            !matches!(
+                instruction,
+                VmInstruction::Jump { .. } | VmInstruction::JumpIfZero { .. }
+            )
+        })
+        .collect();
+    let mut original_index = 0;
+    for instruction in after {
+        if original_index < original_non_jumps.len()
+            && instruction == *original_non_jumps[original_index]
+        {
+            original_index += 1;
+        }
     }
+    assert_eq!(original_index, original_non_jumps.len());
 }
 
 #[test]
@@ -1657,6 +1661,1089 @@ fn vm_mutate_paired_slot_address_is_reproducible_for_a_seed() {
              same seed: the candidate order is not a function of the genome"
         );
     }
+}
+
+#[test]
+fn raw_field_mutation_keeps_terminal_instruction_unchanged() {
+    // Arrange
+    let mut genome = slot_program_genome(vec![VmInstruction::Halt]);
+    let before = genome.clone();
+    let mut r = rng(7);
+
+    // Act
+    let result = VmMutator::apply(
+        &mut genome,
+        VmOperator::VmInstructionRawFieldMutation,
+        &[],
+        0.0,
+        &mut r,
+        &MutationConfig::default(),
+    );
+
+    // Assert
+    assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+    assert_eq!(genome, before);
+}
+
+#[test]
+fn raw_field_mutation_changes_exactly_one_encoded_field() {
+    // Arrange
+    let mut genome = slot_program_genome(vec![VmInstruction::LoadConst {
+        dst: 4,
+        const_idx: 8,
+    }]);
+    let mut r = rng(7);
+
+    // Act
+    VmMutator::apply(
+        &mut genome,
+        VmOperator::VmInstructionRawFieldMutation,
+        &[],
+        0.0,
+        &mut r,
+        &MutationConfig::default(),
+    )
+    .unwrap();
+
+    // Assert
+    let BackendDef::Vm(vm) = &genome.nodes[0].backend_def else {
+        panic!("expected VM backend");
+    };
+    let VmInstruction::LoadConst { dst, const_idx } = vm.program[0] else {
+        panic!("field mutation must not replace the opcode");
+    };
+    assert_eq!(u8::from(dst != 4) + u8::from(const_idx != 8), 1);
+}
+
+fn operand_bearing_instructions() -> Vec<VmInstruction> {
+    vec![
+        VmInstruction::LoadConst {
+            dst: 4,
+            const_idx: 8,
+        },
+        VmInstruction::Move { dst: 4, src: 8 },
+        VmInstruction::Add {
+            dst: 4,
+            a: 8,
+            b: 12,
+        },
+        VmInstruction::Sub {
+            dst: 4,
+            a: 8,
+            b: 12,
+        },
+        VmInstruction::Mul {
+            dst: 4,
+            a: 8,
+            b: 12,
+        },
+        VmInstruction::Div {
+            dst: 4,
+            a: 8,
+            b: 12,
+        },
+        VmInstruction::Min {
+            dst: 4,
+            a: 8,
+            b: 12,
+        },
+        VmInstruction::Max {
+            dst: 4,
+            a: 8,
+            b: 12,
+        },
+        VmInstruction::Abs { dst: 4, src: 8 },
+        VmInstruction::Neg { dst: 4, src: 8 },
+        VmInstruction::Clamp01 { dst: 4, src: 8 },
+        VmInstruction::CmpGt {
+            dst: 4,
+            a: 8,
+            b: 12,
+        },
+        VmInstruction::CmpLt {
+            dst: 4,
+            a: 8,
+            b: 12,
+        },
+        VmInstruction::CmpEq {
+            dst: 4,
+            a: 8,
+            b: 12,
+            eps: 16,
+        },
+        VmInstruction::And {
+            dst: 4,
+            a: 8,
+            b: 12,
+        },
+        VmInstruction::Or {
+            dst: 4,
+            a: 8,
+            b: 12,
+        },
+        VmInstruction::Not { dst: 4, src: 8 },
+        VmInstruction::ToI32 { dst: 4, src: 8 },
+        VmInstruction::ToU8 { dst: 4, src: 8 },
+        VmInstruction::ToBool { dst: 4, src: 8 },
+        VmInstruction::JumpIfZero {
+            cond: 4,
+            offset: 17,
+        },
+        VmInstruction::Jump { offset: 17 },
+        VmInstruction::ReadInput {
+            dst: 4,
+            ref_idx: 8,
+            sub_idx: 12,
+        },
+        VmInstruction::WriteInternalPayload {
+            slot_idx: 4,
+            src: 8,
+        },
+        VmInstruction::WriteWorldActionMeta {
+            slot_idx: 4,
+            src: 8,
+        },
+        VmInstruction::WriteRouteGate { slot: 4, src: 8 },
+        VmInstruction::PushAction { action_type: 4 },
+        VmInstruction::ReadActionQueueLength { dst: 4 },
+        VmInstruction::ReadActionQueueType {
+            index_src: 4,
+            dst: 8,
+        },
+        VmInstruction::ReadActionQueueParam {
+            index_src: 4,
+            param_slot: 8,
+            dst: 12,
+        },
+        VmInstruction::SetPriorityBid { src: 4 },
+        VmInstruction::LoadSlot {
+            dst: 4,
+            slot_reg: 8,
+        },
+        VmInstruction::StoreSlot {
+            slot_reg: 4,
+            src: 8,
+        },
+        VmInstruction::LoadSlotImm {
+            dst: 4,
+            slot_idx: 8,
+        },
+        VmInstruction::StoreSlotImm {
+            slot_idx: 4,
+            src: 8,
+        },
+        VmInstruction::LoadSlotPrev {
+            dst: 4,
+            slot_idx: 8,
+        },
+        VmInstruction::ClearSlot { slot_idx: 4 },
+    ]
+}
+
+fn encoded_fields(instruction: &VmInstruction) -> Vec<i64> {
+    match instruction {
+        VmInstruction::Noop
+        | VmInstruction::Halt
+        | VmInstruction::ExecuteActionQueue
+        | VmInstruction::PopAction => vec![],
+        VmInstruction::LoadConst { dst, const_idx } => vec![i64::from(*dst), i64::from(*const_idx)],
+        VmInstruction::Move { dst, src }
+        | VmInstruction::Abs { dst, src }
+        | VmInstruction::Neg { dst, src }
+        | VmInstruction::Clamp01 { dst, src }
+        | VmInstruction::Not { dst, src }
+        | VmInstruction::ToI32 { dst, src }
+        | VmInstruction::ToU8 { dst, src }
+        | VmInstruction::ToBool { dst, src }
+        | VmInstruction::ReadActionQueueType {
+            index_src: dst,
+            dst: src,
+        } => {
+            vec![i64::from(*dst), i64::from(*src)]
+        }
+        VmInstruction::Add { dst, a, b }
+        | VmInstruction::Sub { dst, a, b }
+        | VmInstruction::Mul { dst, a, b }
+        | VmInstruction::Div { dst, a, b }
+        | VmInstruction::Min { dst, a, b }
+        | VmInstruction::Max { dst, a, b }
+        | VmInstruction::CmpGt { dst, a, b }
+        | VmInstruction::CmpLt { dst, a, b }
+        | VmInstruction::And { dst, a, b }
+        | VmInstruction::Or { dst, a, b } => {
+            vec![i64::from(*dst), i64::from(*a), i64::from(*b)]
+        }
+        VmInstruction::CmpEq { dst, a, b, eps } => {
+            vec![
+                i64::from(*dst),
+                i64::from(*a),
+                i64::from(*b),
+                i64::from(*eps),
+            ]
+        }
+        VmInstruction::JumpIfZero { cond, offset } => vec![i64::from(*cond), i64::from(*offset)],
+        VmInstruction::Jump { offset } => vec![i64::from(*offset)],
+        VmInstruction::ReadInput {
+            dst,
+            ref_idx,
+            sub_idx,
+        } => {
+            vec![i64::from(*dst), i64::from(*ref_idx), i64::from(*sub_idx)]
+        }
+        VmInstruction::WriteInternalPayload { slot_idx, src }
+        | VmInstruction::WriteWorldActionMeta { slot_idx, src } => {
+            vec![i64::from(*slot_idx), i64::from(*src)]
+        }
+        VmInstruction::WriteRouteGate { slot, src } => vec![i64::from(*slot), i64::from(*src)],
+        VmInstruction::PushAction { action_type }
+        | VmInstruction::SetPriorityBid { src: action_type }
+        | VmInstruction::ReadActionQueueLength { dst: action_type }
+        | VmInstruction::ClearSlot {
+            slot_idx: action_type,
+        } => vec![i64::from(*action_type)],
+        VmInstruction::ReadActionQueueParam {
+            index_src,
+            param_slot,
+            dst,
+        } => {
+            vec![
+                i64::from(*index_src),
+                i64::from(*param_slot),
+                i64::from(*dst),
+            ]
+        }
+        VmInstruction::LoadSlot { dst, slot_reg } => vec![i64::from(*dst), i64::from(*slot_reg)],
+        VmInstruction::StoreSlot { slot_reg, src } => vec![i64::from(*slot_reg), i64::from(*src)],
+        VmInstruction::LoadSlotImm { dst, slot_idx }
+        | VmInstruction::LoadSlotPrev { dst, slot_idx } => {
+            vec![i64::from(*dst), i64::from(*slot_idx)]
+        }
+        VmInstruction::StoreSlotImm { slot_idx, src } => {
+            vec![i64::from(*slot_idx), i64::from(*src)]
+        }
+    }
+}
+
+#[test]
+fn raw_field_mutation_visits_each_operand_field_without_changing_its_opcode() {
+    for (instruction_index, instruction) in operand_bearing_instructions().into_iter().enumerate() {
+        let before_fields = encoded_fields(&instruction);
+        let mut changed_fields = vec![false; before_fields.len()];
+        for seed in 0..128 {
+            let mut mutated = instruction.clone();
+            let mut r = rng(seed + (instruction_index as u64 * 1_000));
+            assert!(mutate_one_instruction_field(&mut mutated, &mut r));
+            assert_eq!(
+                std::mem::discriminant(&mutated),
+                std::mem::discriminant(&instruction),
+                "raw mutation must retain the opcode"
+            );
+            let after_fields = encoded_fields(&mutated);
+            let changed: Vec<_> = before_fields
+                .iter()
+                .zip(&after_fields)
+                .enumerate()
+                .filter_map(|(index, (before, after))| (before != after).then_some(index))
+                .collect();
+            assert_eq!(changed.len(), 1, "exactly one operand must change");
+            assert_eq!(
+                (after_fields[changed[0]] - before_fields[changed[0]]).abs(),
+                1,
+                "the selected operand must be nudged by one"
+            );
+            changed_fields[changed[0]] = true;
+        }
+        assert!(
+            changed_fields.into_iter().all(|visited| visited),
+            "every encoded operand must be selectable for {instruction:?}"
+        );
+    }
+}
+
+#[test]
+fn raw_field_mutation_nudges_numeric_boundaries_inward() {
+    for offset in [i32::MIN, i32::MAX] {
+        let mut instruction = VmInstruction::Jump { offset };
+        assert!(mutate_one_instruction_field(
+            &mut instruction,
+            &mut rng(u64::from(offset as u32))
+        ));
+        let VmInstruction::Jump { offset: after } = instruction else {
+            panic!("jump mutation must retain its opcode");
+        };
+        assert_eq!(
+            after,
+            if offset == i32::MIN {
+                offset + 1
+            } else {
+                offset - 1
+            }
+        );
+    }
+
+    for instruction in [
+        VmInstruction::LoadConst {
+            dst: u8::MAX,
+            const_idx: u8::MAX,
+        },
+        VmInstruction::ReadInput {
+            dst: u8::MAX,
+            ref_idx: u16::MAX,
+            sub_idx: u16::MAX,
+        },
+    ] {
+        let before = encoded_fields(&instruction);
+        let mut mutated = instruction.clone();
+        assert!(mutate_one_instruction_field(&mut mutated, &mut rng(37)));
+        let after = encoded_fields(&mutated);
+        let changed: Vec<_> = before
+            .iter()
+            .zip(&after)
+            .enumerate()
+            .filter_map(|(index, (before, after))| (before != after).then_some(index))
+            .collect();
+        assert_eq!(changed.len(), 1);
+        assert_eq!(after[changed[0]], before[changed[0]] - 1);
+    }
+}
+
+proptest! {
+    #[test]
+    fn raw_field_mutation_is_a_one_step_opcode_preserving_property(seed in any::<u64>()) {
+        for (instruction_index, instruction) in operand_bearing_instructions().into_iter().enumerate() {
+            let before_fields = encoded_fields(&instruction);
+            let mut mutated = instruction.clone();
+            let mut r = rng(seed.wrapping_add(instruction_index as u64));
+            prop_assert!(mutate_one_instruction_field(&mut mutated, &mut r));
+            prop_assert_eq!(
+                std::mem::discriminant(&mutated),
+                std::mem::discriminant(&instruction),
+            );
+            let after_fields = encoded_fields(&mutated);
+            let changed: Vec<_> = before_fields
+                .iter()
+                .zip(&after_fields)
+                .enumerate()
+                .filter_map(|(index, (before, after))| (before != after).then_some(index))
+                .collect();
+            prop_assert_eq!(changed.len(), 1);
+            prop_assert_eq!(
+                (after_fields[changed[0]] - before_fields[changed[0]]).abs(),
+                1,
+            );
+        }
+    }
+}
+
+#[test]
+fn raw_field_mutation_skips_programs_without_operands() {
+    // Arrange
+    let mut genome = slot_program_genome(vec![
+        VmInstruction::Noop,
+        VmInstruction::Halt,
+        VmInstruction::ExecuteActionQueue,
+        VmInstruction::PopAction,
+    ]);
+    let before = genome.clone();
+    let mut r = rng(9);
+
+    // Act
+    let result = VmMutator::apply(
+        &mut genome,
+        VmOperator::VmInstructionRawFieldMutation,
+        &[],
+        0.0,
+        &mut r,
+        &MutationConfig::default(),
+    );
+
+    // Assert
+    assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+    assert_eq!(genome, before);
+}
+
+#[test]
+fn register_count_mutation_skips_runtime_out_of_range_widths() {
+    for register_count in [0, 33] {
+        // Arrange
+        let mut genome = slot_program_genome(vec![VmInstruction::Move { dst: 0, src: 0 }]);
+        let BackendDef::Vm(vm) = &mut genome.nodes[0].backend_def else {
+            panic!("expected VM backend");
+        };
+        vm.register_count = register_count;
+        let before = genome.clone();
+        let mut r = rng(u64::from(register_count));
+
+        // Act
+        let result = VmMutator::apply(
+            &mut genome,
+            VmOperator::VmRegisterCountMutation,
+            &[],
+            0.0,
+            &mut r,
+            &MutationConfig::default(),
+        );
+
+        // Assert
+        assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+        assert_eq!(genome, before);
+    }
+}
+
+fn register_bearing_instructions(raw: u8) -> Vec<VmInstruction> {
+    vec![
+        VmInstruction::LoadConst {
+            dst: raw,
+            const_idx: 0,
+        },
+        VmInstruction::Move { dst: raw, src: raw },
+        VmInstruction::Add {
+            dst: raw,
+            a: raw,
+            b: raw,
+        },
+        VmInstruction::Sub {
+            dst: raw,
+            a: raw,
+            b: raw,
+        },
+        VmInstruction::Mul {
+            dst: raw,
+            a: raw,
+            b: raw,
+        },
+        VmInstruction::Div {
+            dst: raw,
+            a: raw,
+            b: raw,
+        },
+        VmInstruction::Min {
+            dst: raw,
+            a: raw,
+            b: raw,
+        },
+        VmInstruction::Max {
+            dst: raw,
+            a: raw,
+            b: raw,
+        },
+        VmInstruction::Abs { dst: raw, src: raw },
+        VmInstruction::Neg { dst: raw, src: raw },
+        VmInstruction::Clamp01 { dst: raw, src: raw },
+        VmInstruction::CmpGt {
+            dst: raw,
+            a: raw,
+            b: raw,
+        },
+        VmInstruction::CmpLt {
+            dst: raw,
+            a: raw,
+            b: raw,
+        },
+        VmInstruction::CmpEq {
+            dst: raw,
+            a: raw,
+            b: raw,
+            eps: 0,
+        },
+        VmInstruction::And {
+            dst: raw,
+            a: raw,
+            b: raw,
+        },
+        VmInstruction::Or {
+            dst: raw,
+            a: raw,
+            b: raw,
+        },
+        VmInstruction::Not { dst: raw, src: raw },
+        VmInstruction::ToI32 { dst: raw, src: raw },
+        VmInstruction::ToU8 { dst: raw, src: raw },
+        VmInstruction::ToBool { dst: raw, src: raw },
+        VmInstruction::JumpIfZero {
+            cond: raw,
+            offset: 0,
+        },
+        VmInstruction::ReadInput {
+            dst: raw,
+            ref_idx: 0,
+            sub_idx: 0,
+        },
+        VmInstruction::WriteInternalPayload {
+            slot_idx: 0,
+            src: raw,
+        },
+        VmInstruction::WriteWorldActionMeta {
+            slot_idx: 0,
+            src: raw,
+        },
+        VmInstruction::WriteRouteGate { slot: 0, src: raw },
+        VmInstruction::ReadActionQueueLength { dst: raw },
+        VmInstruction::ReadActionQueueType {
+            index_src: raw,
+            dst: raw,
+        },
+        VmInstruction::ReadActionQueueParam {
+            index_src: raw,
+            param_slot: 0,
+            dst: raw,
+        },
+        VmInstruction::SetPriorityBid { src: raw },
+        VmInstruction::LoadSlot {
+            dst: raw,
+            slot_reg: raw,
+        },
+        VmInstruction::StoreSlot {
+            slot_reg: raw,
+            src: raw,
+        },
+        VmInstruction::LoadSlotImm {
+            dst: raw,
+            slot_idx: 0,
+        },
+        VmInstruction::StoreSlotImm {
+            slot_idx: 0,
+            src: raw,
+        },
+        VmInstruction::LoadSlotPrev {
+            dst: raw,
+            slot_idx: 0,
+        },
+    ]
+}
+
+fn register_fields(instruction: &VmInstruction) -> Vec<u8> {
+    match instruction {
+        VmInstruction::Noop
+        | VmInstruction::Halt
+        | VmInstruction::ExecuteActionQueue
+        | VmInstruction::PopAction
+        | VmInstruction::Jump { .. }
+        | VmInstruction::PushAction { .. }
+        | VmInstruction::ClearSlot { .. } => vec![],
+        VmInstruction::LoadConst { dst, .. }
+        | VmInstruction::ReadInput { dst, .. }
+        | VmInstruction::ReadActionQueueLength { dst }
+        | VmInstruction::LoadSlotImm { dst, .. }
+        | VmInstruction::LoadSlotPrev { dst, .. } => vec![*dst],
+        VmInstruction::Move { dst, src }
+        | VmInstruction::Abs { dst, src }
+        | VmInstruction::Neg { dst, src }
+        | VmInstruction::Clamp01 { dst, src }
+        | VmInstruction::Not { dst, src }
+        | VmInstruction::ToI32 { dst, src }
+        | VmInstruction::ToU8 { dst, src }
+        | VmInstruction::ToBool { dst, src }
+        | VmInstruction::ReadActionQueueType {
+            index_src: dst,
+            dst: src,
+        }
+        | VmInstruction::LoadSlot { dst, slot_reg: src } => vec![*dst, *src],
+        VmInstruction::Add { dst, a, b }
+        | VmInstruction::Sub { dst, a, b }
+        | VmInstruction::Mul { dst, a, b }
+        | VmInstruction::Div { dst, a, b }
+        | VmInstruction::Min { dst, a, b }
+        | VmInstruction::Max { dst, a, b }
+        | VmInstruction::CmpGt { dst, a, b }
+        | VmInstruction::CmpLt { dst, a, b }
+        | VmInstruction::And { dst, a, b }
+        | VmInstruction::Or { dst, a, b } => vec![*dst, *a, *b],
+        VmInstruction::CmpEq { dst, a, b, .. } => vec![*dst, *a, *b],
+        VmInstruction::JumpIfZero { cond, .. } | VmInstruction::SetPriorityBid { src: cond } => {
+            vec![*cond]
+        }
+        VmInstruction::WriteInternalPayload { src, .. }
+        | VmInstruction::WriteWorldActionMeta { src, .. }
+        | VmInstruction::WriteRouteGate { src, .. }
+        | VmInstruction::StoreSlotImm { src, .. } => vec![*src],
+        VmInstruction::ReadActionQueueParam { index_src, dst, .. } => vec![*index_src, *dst],
+        VmInstruction::StoreSlot { slot_reg, src } => vec![*slot_reg, *src],
+    }
+}
+
+proptest! {
+    #[test]
+    fn register_count_shrink_canonicalizes_every_register_field_or_skips_atomically(raw in any::<u8>()) {
+        let expected = raw % 4;
+        for instruction in register_bearing_instructions(raw) {
+            let register_field_count = register_fields(&instruction).len();
+            let mut original = slot_program_genome(vec![instruction]);
+            let BackendDef::Vm(vm) = &mut original.nodes[0].backend_def else {
+                unreachable!("fixture must contain a VM");
+            };
+            vm.register_count = 4;
+            let mut found_shrink = false;
+            for seed in 0..128 {
+                let mut genome = original.clone();
+                let before = genome.clone();
+                let mut r = rng(seed);
+                let result = apply_register_count_mutation(&mut genome, 0, &mut r);
+                let BackendDef::Vm(vm) = &genome.nodes[0].backend_def else {
+                    unreachable!("fixture must remain a VM");
+                };
+                if expected == 3 {
+                    if result != Err(MutationSkipReason::NoApplicableTarget) {
+                        continue;
+                    }
+                    found_shrink = true;
+                    prop_assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));
+                    prop_assert_eq!(genome, before);
+                } else {
+                    if vm.register_count != 3 {
+                        continue;
+                    }
+                    found_shrink = true;
+                    prop_assert_eq!(result, Ok(()));
+                    prop_assert_eq!(register_fields(&vm.program[0]), vec![expected; register_field_count]);
+                }
+                break;
+            }
+            prop_assert!(found_shrink, "a bounded seed search must find a decrement");
+        }
+    }
+}
+
+#[test]
+fn register_count_shrink_preserves_or_skips_effective_register_identity() {
+    let mut blocked = slot_program_genome(vec![VmInstruction::Move { dst: 7, src: 6 }]);
+    let BackendDef::Vm(vm) = &mut blocked.nodes[0].backend_def else {
+        panic!("expected VM backend");
+    };
+    vm.register_count = 4;
+    let mut saw_blocked_shrink = false;
+    for seed in 0..128 {
+        let mut genome = blocked.clone();
+        let before = genome.clone();
+        let mut r = rng(seed);
+        let result = VmMutator::apply(
+            &mut genome,
+            VmOperator::VmRegisterCountMutation,
+            &[],
+            0.0,
+            &mut r,
+            &MutationConfig::default(),
+        );
+        if result == Err(MutationSkipReason::NoApplicableTarget) {
+            assert_eq!(genome, before, "blocked shrink must be atomic");
+            saw_blocked_shrink = true;
+            break;
+        }
+    }
+    assert!(saw_blocked_shrink, "expected a seeded decrement attempt");
+
+    let mut permitted = slot_program_genome(vec![VmInstruction::Move { dst: 6, src: 6 }]);
+    let BackendDef::Vm(vm) = &mut permitted.nodes[0].backend_def else {
+        panic!("expected VM backend");
+    };
+    vm.register_count = 4;
+    let mut saw_permitted_shrink = false;
+    for seed in 0..128 {
+        let mut genome = permitted.clone();
+        let mut r = rng(seed);
+        VmMutator::apply(
+            &mut genome,
+            VmOperator::VmRegisterCountMutation,
+            &[],
+            0.0,
+            &mut r,
+            &MutationConfig::default(),
+        )
+        .ok();
+        let BackendDef::Vm(vm) = &genome.nodes[0].backend_def else {
+            panic!("expected VM backend");
+        };
+        if vm.register_count == 3 {
+            assert_eq!(
+                vm.program,
+                vec![VmInstruction::Move { dst: 2, src: 2 }],
+                "raw r6 resolves to r2 under the old width and remains r2 after shrink"
+            );
+            saw_permitted_shrink = true;
+            break;
+        }
+    }
+    assert!(
+        saw_permitted_shrink,
+        "expected a seeded permitted decrement"
+    );
+}
+
+#[test]
+fn motif_insertion_keeps_old_jump_target_identity() {
+    for seed in 0..128 {
+        // Arrange
+        let mut genome = slot_program_genome(vec![
+            VmInstruction::Jump { offset: 1 },
+            VmInstruction::Noop,
+            VmInstruction::PushAction { action_type: 37 },
+            VmInstruction::ExecuteActionQueue,
+        ]);
+        let mut r = rng(seed);
+
+        // Act
+        VmMutator::apply(
+            &mut genome,
+            VmOperator::VmInsertLoadCompareMotif,
+            &[],
+            0.0,
+            &mut r,
+            &MutationConfig::default(),
+        )
+        .unwrap();
+
+        // Assert
+        let BackendDef::Vm(vm) = &genome.nodes[0].backend_def else {
+            panic!("expected VM backend");
+        };
+        let (jump_pc, offset) = vm
+            .program
+            .iter()
+            .enumerate()
+            .find_map(|(pc, instruction)| match instruction {
+                VmInstruction::Jump { offset } => Some((pc, *offset)),
+                _ => None,
+            })
+            .expect("the old jump must survive insertion");
+        let target = crate::runtime::vm::jump_target(jump_pc, offset, vm.program.len());
+        assert!(matches!(
+            vm.program[target],
+            VmInstruction::PushAction { action_type: 37 }
+        ));
+    }
+}
+
+proptest! {
+    #[test]
+    fn insertion_preserves_old_jump_target_for_every_offset_and_boundary(
+        offset in any::<i32>(),
+        insert_at in 0usize..=4,
+    ) {
+        let mut program = vec![
+            VmInstruction::Jump { offset },
+            VmInstruction::PushAction { action_type: 1 },
+            VmInstruction::PushAction { action_type: 2 },
+            VmInstruction::Halt,
+        ];
+        let old_target = crate::runtime::vm::jump_target(0, offset, program.len());
+
+        insert_new_instruction_with_reference_repair(
+            &mut program,
+            insert_at,
+            VmInstruction::Noop,
+        )
+        .unwrap();
+
+        let new_pc = usize::from(insert_at == 0);
+        let VmInstruction::Jump { offset } = program[new_pc] else {
+            panic!("the old jump must survive insertion");
+        };
+        let expected_target = old_target + usize::from(old_target >= insert_at);
+        prop_assert_eq!(
+            crate::runtime::vm::jump_target(new_pc, offset, program.len()),
+            expected_target,
+        );
+    }
+
+    #[test]
+    fn deletion_preserves_or_redirects_old_jump_targets(
+        offset in any::<i32>(),
+        delete_at in 1usize..5,
+    ) {
+        let mut program = vec![
+            VmInstruction::Jump { offset },
+            VmInstruction::PushAction { action_type: 1 },
+            VmInstruction::PushAction { action_type: 2 },
+            VmInstruction::PushAction { action_type: 3 },
+            VmInstruction::Halt,
+        ];
+        let old_target = crate::runtime::vm::jump_target(0, offset, program.len());
+
+        splice_program_with_reference_repair(&mut program, delete_at..delete_at + 1, vec![])
+            .unwrap();
+
+        let VmInstruction::Jump { offset } = program[0] else {
+            panic!("the old jump must survive deletion");
+        };
+        let redirected_old_target = if old_target == delete_at {
+            (old_target + 1) % 5
+        } else {
+            old_target
+        };
+        let expected_target = redirected_old_target
+            - usize::from(redirected_old_target > delete_at);
+        prop_assert_eq!(
+            crate::runtime::vm::jump_target(0, offset, program.len()),
+            expected_target,
+        );
+    }
+
+    #[test]
+    fn copied_jumps_follow_copied_internal_targets_and_old_jumps_keep_originals(
+        old_offset in any::<i32>(),
+        insert_at in 0usize..=5,
+    ) {
+        let mut program = vec![
+            VmInstruction::Jump { offset: old_offset },
+            VmInstruction::Jump { offset: 0 },
+            VmInstruction::PushAction { action_type: 1 },
+            VmInstruction::PushAction { action_type: 2 },
+            VmInstruction::Halt,
+        ];
+        let old_target = crate::runtime::vm::jump_target(0, old_offset, program.len());
+        let copied = [1, 2]
+            .into_iter()
+            .map(|source_index| SpliceInstruction {
+                instruction: program[source_index].clone(),
+                source_index: Some(source_index),
+            })
+            .collect();
+
+        splice_program_with_reference_repair(&mut program, insert_at..insert_at, copied).unwrap();
+
+        let old_jump_pc = 2 * usize::from(insert_at == 0);
+        let VmInstruction::Jump { offset } = program[old_jump_pc] else {
+            panic!("the old jump must survive copy insertion");
+        };
+        let expected_old_target = old_target + 2 * usize::from(old_target >= insert_at);
+        prop_assert_eq!(
+            crate::runtime::vm::jump_target(old_jump_pc, offset, program.len()),
+            expected_old_target,
+        );
+        let VmInstruction::Jump { offset } = program[insert_at] else {
+            panic!("the copied jump must be at the copied source position");
+        };
+        prop_assert_eq!(
+            crate::runtime::vm::jump_target(insert_at, offset, program.len()),
+            insert_at + 1,
+        );
+    }
+
+    #[test]
+    fn insertion_remaps_targets_when_the_old_jump_moves(
+        offset in any::<i32>(),
+        jump_pc in 0usize..6,
+        insert_at in 0usize..=6,
+    ) {
+        let mut program = vec![VmInstruction::Noop; 6];
+        program[jump_pc] = VmInstruction::Jump { offset };
+        let old_target = crate::runtime::vm::jump_target(jump_pc, offset, program.len());
+
+        insert_new_instruction_with_reference_repair(
+            &mut program,
+            insert_at,
+            VmInstruction::Noop,
+        )
+        .unwrap();
+
+        let new_jump_pc = jump_pc + usize::from(jump_pc >= insert_at);
+        let VmInstruction::Jump { offset } = program[new_jump_pc] else {
+            panic!("the old jump must move with its instruction identity");
+        };
+        let expected_target = old_target + usize::from(old_target >= insert_at);
+        prop_assert_eq!(
+            crate::runtime::vm::jump_target(new_jump_pc, offset, program.len()),
+            expected_target,
+        );
+    }
+
+    #[test]
+    fn deletion_remaps_targets_when_the_old_jump_moves(
+        offset in any::<i32>(),
+        jump_pc in 0usize..6,
+        delete_at in 0usize..6,
+    ) {
+        prop_assume!(jump_pc != delete_at);
+        let mut program = vec![VmInstruction::Noop; 6];
+        program[jump_pc] = VmInstruction::Jump { offset };
+        let old_target = crate::runtime::vm::jump_target(jump_pc, offset, program.len());
+
+        splice_program_with_reference_repair(&mut program, delete_at..delete_at + 1, vec![])
+            .unwrap();
+
+        let new_jump_pc = jump_pc - usize::from(jump_pc > delete_at);
+        let VmInstruction::Jump { offset } = program[new_jump_pc] else {
+            panic!("the old jump must survive deletion");
+        };
+        let redirected = if old_target == delete_at {
+            (old_target + 1) % 6
+        } else {
+            old_target
+        };
+        let expected_target = redirected - usize::from(redirected > delete_at);
+        prop_assert_eq!(
+            crate::runtime::vm::jump_target(new_jump_pc, offset, program.len()),
+            expected_target,
+        );
+    }
+
+    #[test]
+    fn replacement_keeps_incoming_targets_and_new_offsets_for_every_old_offset(
+        offset in any::<i32>(),
+        jump_pc in 0usize..5,
+        replace_at in 0usize..5,
+    ) {
+        prop_assume!(jump_pc != replace_at);
+        let mut program = vec![VmInstruction::Noop; 5];
+        program[jump_pc] = VmInstruction::Jump { offset };
+        let old_target = crate::runtime::vm::jump_target(jump_pc, offset, program.len());
+
+        splice_program_with_reference_repair(
+            &mut program,
+            replace_at..replace_at + 1,
+            vec![SpliceInstruction {
+                instruction: VmInstruction::Jump { offset: i32::MAX },
+                source_index: None,
+            }],
+        )
+        .unwrap();
+
+        let VmInstruction::Jump { offset } = program[jump_pc] else {
+            panic!("the surviving old jump must retain its opcode");
+        };
+        prop_assert_eq!(
+            crate::runtime::vm::jump_target(jump_pc, offset, program.len()),
+            old_target,
+        );
+        let VmInstruction::Jump { offset } = program[replace_at] else {
+            panic!("replacement jump must retain its authored opcode");
+        };
+        prop_assert_eq!(offset, i32::MAX);
+    }
+}
+
+#[test]
+fn splice_repair_handles_deleted_and_replaced_targets() {
+    let mut middle_delete = vec![
+        VmInstruction::Jump { offset: 0 },
+        VmInstruction::PushAction { action_type: 1 },
+        VmInstruction::PushAction { action_type: 2 },
+    ];
+    splice_program_with_reference_repair(&mut middle_delete, 1..2, vec![]).unwrap();
+    let VmInstruction::Jump { offset } = middle_delete[0] else {
+        panic!("jump must survive deletion");
+    };
+    assert_eq!(
+        crate::runtime::vm::jump_target(0, offset, middle_delete.len()),
+        1,
+        "a deleted middle target follows the first survivor"
+    );
+    assert!(matches!(
+        middle_delete[1],
+        VmInstruction::PushAction { action_type: 2 }
+    ));
+
+    let mut tail_delete = vec![
+        VmInstruction::Jump { offset: 1 },
+        VmInstruction::Noop,
+        VmInstruction::PushAction { action_type: 3 },
+    ];
+    splice_program_with_reference_repair(&mut tail_delete, 2..3, vec![]).unwrap();
+    let VmInstruction::Jump { offset } = tail_delete[0] else {
+        panic!("jump must survive deletion");
+    };
+    assert_eq!(
+        crate::runtime::vm::jump_target(0, offset, tail_delete.len()),
+        0
+    );
+
+    let mut replacement = vec![VmInstruction::Jump { offset: 0 }, VmInstruction::Noop];
+    splice_program_with_reference_repair(
+        &mut replacement,
+        1..2,
+        vec![SpliceInstruction {
+            instruction: VmInstruction::Jump { offset: i32::MAX },
+            source_index: None,
+        }],
+    )
+    .unwrap();
+    let VmInstruction::Jump { offset } = replacement[0] else {
+        panic!("incoming jump must survive replacement");
+    };
+    assert_eq!(
+        crate::runtime::vm::jump_target(0, offset, replacement.len()),
+        1
+    );
+    assert!(matches!(
+        replacement[1],
+        VmInstruction::Jump { offset: i32::MAX }
+    ));
+}
+
+#[test]
+fn copy_repair_uses_selected_copies_only_for_copied_jumps() {
+    let mut program = vec![
+        VmInstruction::Jump { offset: 1 },
+        VmInstruction::Jump { offset: 0 },
+        VmInstruction::PushAction { action_type: 1 },
+        VmInstruction::Jump { offset: 0 },
+        VmInstruction::PushAction { action_type: 2 },
+        VmInstruction::Halt,
+    ];
+    let copies = [1, 2, 3]
+        .into_iter()
+        .map(|source_index| SpliceInstruction {
+            instruction: program[source_index].clone(),
+            source_index: Some(source_index),
+        })
+        .collect();
+
+    splice_program_with_reference_repair(&mut program, 1..1, copies).unwrap();
+
+    let jump_target = |pc| match program[pc] {
+        VmInstruction::Jump { offset } => {
+            crate::runtime::vm::jump_target(pc, offset, program.len())
+        }
+        _ => panic!("expected jump"),
+    };
+    assert_eq!(jump_target(0), 5, "old jump must keep the original target");
+    assert_eq!(jump_target(1), 2, "copied internal target follows its copy");
+    assert_eq!(
+        jump_target(3),
+        7,
+        "copied external target follows the original"
+    );
+}
+
+#[test]
+fn noncontiguous_conditional_slice_copy_preserves_selected_target_identity() {
+    let mut program = vec![
+        VmInstruction::LoadConst {
+            dst: 0,
+            const_idx: 0,
+        },
+        VmInstruction::JumpIfZero { cond: 0, offset: 1 },
+        VmInstruction::Noop,
+        VmInstruction::WriteInternalPayload {
+            slot_idx: 0,
+            src: 0,
+        },
+        VmInstruction::Halt,
+    ];
+    let gene = vm_forward_slice(&program, 0).expect("LoadConst must seed a forward slice");
+    assert_eq!(gene.indices, vec![0, 1, 3]);
+    let copied = gene
+        .indices
+        .into_iter()
+        .map(|source_index| SpliceInstruction {
+            instruction: program[source_index].clone(),
+            source_index: Some(source_index),
+        })
+        .collect();
+
+    splice_program_with_reference_repair(&mut program, 2..2, copied).unwrap();
+
+    let VmInstruction::JumpIfZero { offset, .. } = program[3] else {
+        panic!("conditional source must be copied into the noncontiguous slice");
+    };
+    assert_eq!(crate::runtime::vm::jump_target(3, offset, program.len()), 4);
+    assert!(matches!(
+        program[4],
+        VmInstruction::WriteInternalPayload {
+            slot_idx: 0,
+            src: 0
+        }
+    ));
 }
 
 proptest! {

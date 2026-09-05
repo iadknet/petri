@@ -29,10 +29,12 @@ registers on which later mutations can operate without overwriting live values.
   [brain evolvability audit](../../strategy/brain-evolvability-audit-2026-09-04.md),
   and the [VM ISA](../../reference/v3-vm-isa-spec.md) and
   [mutation](../../reference/v3-mutation-spec.md) reference specs.
-- Existing seams: `mutation/vm/operators.rs`, `runtime/vm.rs::jump_target`
-  (also used by traced execution), the genome slice analyses, founder builder,
-  and `neighborhood` battery. Extend these using `std` and existing dependencies;
-  do not introduce an alternate mutation or execution path.
+- Existing seams: `mutation/vm/operators.rs`, `mutation/input_ref/mod.rs`
+  (which inserts VM `ReadInput` instructions when an input reference is added),
+  `runtime/vm.rs::jump_target` (also used by traced execution), the genome
+  slice analyses, founder builder, and `neighborhood` battery. Extend these
+  using `std` and existing dependencies; do not introduce an alternate mutation
+  or execution path.
 - Research checked 2026-09-05: repair positional references in place, or adopt
   label/tag addressing. [SignalGP](https://arxiv.org/abs/1804.05445) associates
   events and functions through evolvable tags; [Avida's instruction set](https://github.com/devosoft/avida/wiki/Instruction-Set)
@@ -61,6 +63,13 @@ registers on which later mutations can operate without overwriting live values.
   span. Both block-copy variants obey this rule; the remapped variant retains
   its explicit register-renaming behavior, independently of jump repair.
   Newly authored motif-internal offsets are interpreted in the new program.
+- Every VM splice uses provenance-aware old instruction indices, never
+  instruction equality: copied items retain their source index while newly
+  authored instructions have none. This includes automatic `ReadInput`
+  insertion during input-reference addition. Repairing that existing operator
+  changes control flow around the inserted span, including old jumps that now
+  skip it while following their original target; its input-reference
+  growth/wiring policy remains owned by its existing feature area.
 - Operand steps: `VmInstructionRawFieldMutation` keeps its operator identity
   and weight but selects one operand-bearing instruction and changes exactly
   one encoded field by a one-unit step (inward at a numeric boundary; no large
@@ -95,15 +104,15 @@ registers on which later mutations can operate without overwriting live values.
 
 ## Implementation Tasks
 
-- [ ] Add failing example/property tests for splice references, copied-target
+- [x] Add failing example/property tests for splice references, copied-target
       mapping, one-field steps, terminal stability, register identity, and
       neutral Noop/unreachable-copy behavior before implementation.
-- [ ] Route every VM insertion/deletion/replacement, motif, block, and slice
+- [x] Route every VM insertion/deletion/replacement, motif, block, and slice
       copy through the shared reference-remapping rule; preserve deterministic
       seeded behavior and the production/traced execution agreement.
-- [ ] Implement one-field operand steps and safe register-capacity changes;
+- [x] Implement one-field operand steps and safe register-capacity changes;
       add founder register slack and verify its original behavior is preserved.
-- [ ] Update the mutation/VM references and graph contract pointer; update any
+- [x] Update the mutation/VM references and graph contract pointer; update any
       founder contract documenting its register count.
 - [ ] Self-review the diff for reuse, simplification, and efficiency, then run
       mutation testing and record every survivor with its resolution.
@@ -114,12 +123,12 @@ registers on which later mutations can operate without overwriting live values.
 
 ## Verification
 
-- [ ] TDD evidence: record initial failing commands and the regression they
+- [x] TDD evidence: record initial failing commands and the regression they
       exposed. Property tests cover old-to-new jump targets for all edit kinds,
       copied internal/external targets, modulo-wrapped references, one-field
       bounded changes for all operand-bearing opcodes, and register identity.
       Commit any generated `proptest-regressions/` files.
-- [ ] Behavioral property tests cover Noop insertion and unreachable block
+- [x] Behavioral property tests cover Noop insertion and unreachable block
       copying with enough energy/steps; explicit fixtures distinguish energy
       exhaustion and step caps, deleted targets, terminal replacement versus
       field mutation, and noncontiguous slice copies.
@@ -164,9 +173,11 @@ operators and must be attributed to their corrected targets. Founder slack
 changes which registers VM operand/motif/copy mutations sample, so those rows
 may move in either direction from register interference; report that separately.
 Founder non-VM operator rows should remain unchanged because founder execution
-is preserved and their mutation rules are untouched. Mutated-birth silence is
-expected to rise and dead fractions fall; report every bucket and investigate
-any reversal, mindful of T11.F01's four-sample single-event bucket.
+is preserved and their mutation rules are untouched, except input-reference
+addition on VM nodes, whose auto-wired insertion now has repaired jump
+targeting. Mutated-birth silence is expected to rise and dead fractions fall;
+report every bucket and investigate any reversal, mindful of T11.F01's
+four-sample single-event bucket.
 
 The evolved sample, lineage diversity, persistence, and memory sensitivity may
 shift in either direction because the inherited mutation map changes the
@@ -175,6 +186,8 @@ T11.F01 and T01.F12, distinguishing changed subjects from operator regressions;
 do not assert a cognition gain. All T11.F01 floors remain fixed and are due by
 T11.F10. No operator family is disabled/down-weighted to improve a reading.
 Closure readings and comparison conclusions remain to be recorded here.
+Record that input-reference-addition effect separately from its unchanged
+input-reference policy.
 
 ## Success Criteria
 
@@ -201,3 +214,47 @@ Closure readings and comparison conclusions remain to be recorded here.
   neutral production duplication or the remaining T11 repairs. Runtime behavior
   and performance remain implementation verification, not planning claims.
 - Closure cost and review records pending.
+- Sol consultation 1 (2026-09-05, accepted): route every VM splice, including
+  input-reference auto-wiring, through a provenance-aware old-index map using
+  runtime jump-target semantics; use exhaustive register-field canonicalization
+  and remove positional jump-offset adjustment. Consultation 2 (accepted after
+  the register-count smoke-test failure recurred): use a width-2, r0-only
+  fixture to demonstrate permitted grow/shrink, retain the founder as a
+  required shrink skip, and cover width-4 raw-register canonicalization and
+  atomic skips separately. No guidance was rejected.
+- TDD and coverage evidence (2026-09-05): initial
+  `cargo test -p v3-core mutation::vm::tests` recorded 51 passing and five
+  intentional red tests (terminal/no-operand raw-field skips, one-field step,
+  out-of-range width atomicity, and insertion target identity). Founder slack first recorded
+  16-versus-required-20 in `/private/tmp/t11-f02-founder-slack-red.log`, then
+  `cargo test -p v3-core --test viability` passed 25/25 before the founder
+  change's subsequent all-target compile. Final focused library coverage
+  passed 1,087/1,087 in `/private/tmp/t11-f02-v3-core-lib-full-pass-2.log`;
+  it includes property coverage for all splice kinds and wrapped offsets,
+  all operand opcode fields, every register-typed read/write field, actual
+  noncontiguous conditional forward slices, Noop insertion at every boundary,
+  and unreachable copied suffixes. The Noop fixtures separately show applied
+  step-cap and energy-exhaustion differences. `cargo check --workspace
+  --all-targets` passed in `/private/tmp/t11-f02-cargo-check-final-coverage.log`.
+  The generated `proptest-regressions/runtime/tests/vm_execution.txt` seed is
+  retained for the prior zero-cost-default counterexample.
+- Release-only regression evidence (2026-09-05):
+  `cargo test -p v3-core --release
+  mutation::vm::tests::raw_field_mutation_changes_exactly_one_encoded_field
+  -- --exact` initially failed because `debug_assert!` compiled out the actual
+  field mutation; `/private/tmp/t11-f02-raw-field-release-red.log` records the
+  0-versus-1 changed-field assertion. The unconditional mutation path then
+  passed the same exact release test in
+  `/private/tmp/t11-f02-raw-field-release-pass.log`. The full release VM
+  filter then passed 70/70 in `/private/tmp/t11-f02-vm-release-final.log`.
+- Self-review (2026-09-05): inspected every production VM program structural
+  edit with `rg`, leaving no direct `insert`, `remove`, or `splice` outside
+  tests; routed the empty-program mutation through the same splice seam as all
+  other insertions. Reviewed provenance handling, signed offset encoding,
+  register mapping, input-reference insertion, and all changed reference text.
+  Reused the exhaustive register mapper for canonicalization and remapped
+  copies, removed the obsolete raw-field redraw path, and found/fixed the
+  release-only `debug_assert!` mutation omission above. Focused integration
+  (`viability` 25/25, neighborhood 4/4, reproducibility 1/1, VM E2E 1/1)
+  passed in `/private/tmp/t11-f02-focused-integration-final.log`; no remaining
+  simplification or efficiency finding requires a production change.

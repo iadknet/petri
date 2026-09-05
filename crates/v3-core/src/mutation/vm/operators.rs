@@ -1,7 +1,8 @@
 use rand::Rng;
+use std::ops::Range;
 
 use crate::config::MutationConfig;
-use crate::contracts::{InputReference, MAX_GATE_SLOTS};
+use crate::contracts::MAX_GATE_SLOTS;
 use crate::creature::genome::analysis::{vm_backward_slice_random, vm_forward_slice_random};
 use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
 use crate::mutation::types::MutationSkipReason;
@@ -32,13 +33,33 @@ pub(super) fn apply_register_count_mutation(
 ) -> Result<(), MutationSkipReason> {
     let node = &mut genome.nodes[node_idx];
     if let BackendDef::Vm(ref mut vm) = node.backend_def {
-        if rng.gen_bool(0.5) {
-            // Increment, clamped to 32.
-            vm.register_count = vm.register_count.saturating_add(1).min(32);
-        } else {
-            // Decrement, clamped to 1.
-            vm.register_count = vm.register_count.saturating_sub(1).max(1);
+        let old_width = vm.register_count;
+        if !(1..=32).contains(&old_width) {
+            return Err(MutationSkipReason::NoApplicableTarget);
         }
+        let grow = rng.gen_bool(0.5);
+        let new_width = if grow {
+            old_width.checked_add(1)
+        } else {
+            old_width.checked_sub(1)
+        }
+        .filter(|width| (1..=32).contains(width))
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
+
+        let mut canonical_program = vm.program.clone();
+        let removed_register = old_width - 1;
+        let mut uses_removed_register = false;
+        for instruction in &mut canonical_program {
+            for_each_register_ref(instruction, &mut |register| {
+                *register %= old_width;
+                uses_removed_register |= !grow && *register == removed_register;
+            });
+        }
+        if uses_removed_register {
+            return Err(MutationSkipReason::NoApplicableTarget);
+        }
+        vm.program = canonical_program;
+        vm.register_count = new_width;
     }
     Ok(())
 }
@@ -225,21 +246,50 @@ pub(super) fn random_vm_instruction(
     }
 }
 
-fn mutate_instruction_raw_fields(
-    instr: &mut VmInstruction,
+fn nudge_u8(value: &mut u8, rng: &mut impl Rng) {
+    *value = match *value {
+        0 => 1,
+        u8::MAX => u8::MAX - 1,
+        _ if rng.gen_bool(0.5) => value.saturating_add(1),
+        _ => value.saturating_sub(1),
+    };
+}
+
+fn nudge_u16(value: &mut u16, rng: &mut impl Rng) {
+    *value = match *value {
+        0 => 1,
+        u16::MAX => u16::MAX - 1,
+        _ if rng.gen_bool(0.5) => value.saturating_add(1),
+        _ => value.saturating_sub(1),
+    };
+}
+
+fn nudge_i32(value: &mut i32, rng: &mut impl Rng) {
+    *value = match *value {
+        i32::MIN => i32::MIN + 1,
+        i32::MAX => i32::MAX - 1,
+        _ if rng.gen_bool(0.5) => value.saturating_add(1),
+        _ => value.saturating_sub(1),
+    };
+}
+
+fn nudge_one_u8(fields: &mut [&mut u8], rng: &mut impl Rng) {
+    let selected = rng.gen_range(0..fields.len());
+    nudge_u8(fields[selected], rng);
+}
+
+pub(super) fn mutate_one_instruction_field(
+    instruction: &mut VmInstruction,
     rng: &mut impl Rng,
-    input_refs: &[InputReference],
-    config: &MutationConfig,
-) {
-    match instr {
-        VmInstruction::Noop | VmInstruction::Halt => {
-            *instr = VmInstruction::PushAction {
-                action_type: rng.gen(),
-            };
-        }
+) -> bool {
+    match instruction {
+        VmInstruction::Noop
+        | VmInstruction::Halt
+        | VmInstruction::ExecuteActionQueue
+        | VmInstruction::PopAction => false,
         VmInstruction::LoadConst { dst, const_idx } => {
-            *dst = rng.gen();
-            *const_idx = rng.gen();
+            nudge_one_u8(&mut [dst, const_idx], rng);
+            true
         }
         VmInstruction::Move { dst, src }
         | VmInstruction::Abs { dst, src }
@@ -248,9 +298,13 @@ fn mutate_instruction_raw_fields(
         | VmInstruction::Not { dst, src }
         | VmInstruction::ToI32 { dst, src }
         | VmInstruction::ToU8 { dst, src }
-        | VmInstruction::ToBool { dst, src } => {
-            *dst = rng.gen();
-            *src = rng.gen();
+        | VmInstruction::ToBool { dst, src }
+        | VmInstruction::ReadActionQueueType {
+            index_src: dst,
+            dst: src,
+        } => {
+            nudge_one_u8(&mut [dst, src], rng);
+            true
         }
         VmInstruction::Add { dst, a, b }
         | VmInstruction::Sub { dst, a, b }
@@ -262,104 +316,79 @@ fn mutate_instruction_raw_fields(
         | VmInstruction::CmpLt { dst, a, b }
         | VmInstruction::And { dst, a, b }
         | VmInstruction::Or { dst, a, b } => {
-            *dst = rng.gen();
-            *a = rng.gen();
-            *b = rng.gen();
+            nudge_one_u8(&mut [dst, a, b], rng);
+            true
         }
         VmInstruction::CmpEq { dst, a, b, eps } => {
-            *dst = rng.gen();
-            *a = rng.gen();
-            *b = rng.gen();
-            *eps = rng.gen();
+            nudge_one_u8(&mut [dst, a, b, eps], rng);
+            true
         }
         VmInstruction::JumpIfZero { cond, offset } => {
-            *cond = rng.gen();
-            *offset = rng.gen();
+            if rng.gen_bool(0.5) {
+                nudge_u8(cond, rng);
+            } else {
+                nudge_i32(offset, rng);
+            }
+            true
         }
         VmInstruction::Jump { offset } => {
-            *offset = rng.gen();
+            nudge_i32(offset, rng);
+            true
         }
         VmInstruction::ReadInput {
             dst,
             ref_idx,
             sub_idx,
         } => {
-            *dst = rng.gen();
-            *ref_idx = rng.gen_range(0..input_refs.len().max(1) as u16);
-            let width = input_refs
-                .get(*ref_idx as usize)
-                .map(|r| crate::mutation::compound::sub_value_count(r, config))
-                .unwrap_or(1);
-            *sub_idx = rng.gen_range(0..width);
+            match rng.gen_range(0..3) {
+                0 => nudge_u8(dst, rng),
+                1 => nudge_u16(ref_idx, rng),
+                _ => nudge_u16(sub_idx, rng),
+            }
+            true
         }
         VmInstruction::WriteInternalPayload { slot_idx, src }
         | VmInstruction::WriteWorldActionMeta { slot_idx, src } => {
-            *slot_idx = rng.gen();
-            *src = rng.gen();
+            nudge_one_u8(&mut [slot_idx, src], rng);
+            true
         }
         VmInstruction::WriteRouteGate { slot, src } => {
-            if rng.gen_bool(0.5) {
-                *slot = rng.gen_range(0..MAX_GATE_SLOTS as u8);
-            } else {
-                *src = rng.gen::<u8>();
-            }
+            nudge_one_u8(&mut [slot, src], rng);
+            true
         }
-        VmInstruction::LoadSlot { dst, slot_reg } => {
-            *dst = rng.gen();
-            *slot_reg = rng.gen();
-        }
-        VmInstruction::StoreSlot { slot_reg, src } => {
-            *slot_reg = rng.gen();
-            *src = rng.gen();
-        }
-        VmInstruction::LoadSlotImm { dst, slot_idx } => {
-            *dst = rng.gen();
-            *slot_idx = rng.gen_range(0..16);
-        }
-        VmInstruction::StoreSlotImm { slot_idx, src } => {
-            *slot_idx = rng.gen_range(0..16);
-            *src = rng.gen();
-        }
-        VmInstruction::LoadSlotPrev { dst, slot_idx } => {
-            *dst = rng.gen();
-            *slot_idx = rng.gen_range(0..16);
-        }
-        VmInstruction::ClearSlot { slot_idx } => {
-            *slot_idx = rng.gen_range(0..16);
-        }
-        VmInstruction::PushAction { action_type } => {
-            *action_type = rng.gen();
-        }
-        VmInstruction::PopAction => {
-            // No fields to mutate; swap to a different instruction.
-            *instr = VmInstruction::PushAction {
-                action_type: rng.gen(),
-            };
-        }
-        VmInstruction::ReadActionQueueLength { dst } => {
-            *dst = rng.gen();
-        }
-        VmInstruction::ReadActionQueueType { index_src, dst } => {
-            *index_src = rng.gen();
-            *dst = rng.gen();
+        VmInstruction::PushAction { action_type }
+        | VmInstruction::SetPriorityBid { src: action_type }
+        | VmInstruction::ReadActionQueueLength { dst: action_type }
+        | VmInstruction::ClearSlot {
+            slot_idx: action_type,
+        } => {
+            nudge_u8(action_type, rng);
+            true
         }
         VmInstruction::ReadActionQueueParam {
             index_src,
             param_slot,
             dst,
         } => {
-            *index_src = rng.gen();
-            *param_slot = rng.gen();
-            *dst = rng.gen();
+            nudge_one_u8(&mut [index_src, param_slot, dst], rng);
+            true
         }
-        VmInstruction::ExecuteActionQueue => {
-            // No fields to mutate; swap to a different instruction.
-            *instr = VmInstruction::PushAction {
-                action_type: rng.gen(),
-            };
+        VmInstruction::LoadSlot { dst, slot_reg } => {
+            nudge_one_u8(&mut [dst, slot_reg], rng);
+            true
         }
-        VmInstruction::SetPriorityBid { src } => {
-            *src = rng.gen();
+        VmInstruction::StoreSlot { slot_reg, src } => {
+            nudge_one_u8(&mut [slot_reg, src], rng);
+            true
+        }
+        VmInstruction::LoadSlotImm { dst, slot_idx }
+        | VmInstruction::LoadSlotPrev { dst, slot_idx } => {
+            nudge_one_u8(&mut [dst, slot_idx], rng);
+            true
+        }
+        VmInstruction::StoreSlotImm { slot_idx, src } => {
+            nudge_one_u8(&mut [slot_idx, src], rng);
+            true
         }
     }
 }
@@ -385,12 +414,11 @@ pub(super) fn apply_instruction_mutation(
     if let BackendDef::Vm(ref mut vm) = node.backend_def {
         if vm.program.is_empty() {
             // Edge case: empty program — insert a random instruction.
-            vm.program.push(random_vm_instruction(
-                rng,
-                register_count,
-                constants_len,
-                input_refs_len,
-            ));
+            insert_new_instruction_with_reference_repair(
+                &mut vm.program,
+                0,
+                random_vm_instruction(rng, register_count, constants_len, input_refs_len),
+            )?;
             return Ok(());
         }
 
@@ -402,23 +430,45 @@ pub(super) fn apply_instruction_mutation(
                 let pos = rng.gen_range(0..=vm.program.len());
                 let instr =
                     random_vm_instruction(rng, register_count, constants_len, input_refs_len);
-                vm.program.insert(pos, instr);
+                insert_new_instruction_with_reference_repair(&mut vm.program, pos, instr)?;
             }
             1 => {
                 // Replace: replace a random instruction with a random one.
                 let idx = rng.gen_range(0..vm.program.len());
-                vm.program[idx] =
-                    random_vm_instruction(rng, register_count, constants_len, input_refs_len);
+                splice_program_with_reference_repair(
+                    &mut vm.program,
+                    idx..idx + 1,
+                    vec![SpliceInstruction {
+                        instruction: random_vm_instruction(
+                            rng,
+                            register_count,
+                            constants_len,
+                            input_refs_len,
+                        ),
+                        source_index: None,
+                    }],
+                )?;
             }
             _ => {
                 // Delete: remove a random instruction, keep at least 1.
                 if vm.program.len() > 1 {
                     let idx = rng.gen_range(0..vm.program.len());
-                    vm.program.remove(idx);
+                    splice_program_with_reference_repair(&mut vm.program, idx..idx + 1, vec![])?;
                 } else {
                     // Single instruction — replace with random rather than emptying the program.
-                    vm.program[0] =
-                        random_vm_instruction(rng, register_count, constants_len, input_refs_len);
+                    splice_program_with_reference_repair(
+                        &mut vm.program,
+                        0..1,
+                        vec![SpliceInstruction {
+                            instruction: random_vm_instruction(
+                                rng,
+                                register_count,
+                                constants_len,
+                                input_refs_len,
+                            ),
+                            source_index: None,
+                        }],
+                    )?;
                 }
             }
         }
@@ -437,7 +487,7 @@ pub(super) fn apply_delete_instruction(
             return Err(MutationSkipReason::NoApplicableTarget);
         }
         let idx = rng.gen_range(0..vm.program.len());
-        vm.program.remove(idx);
+        splice_program_with_reference_repair(&mut vm.program, idx..idx + 1, vec![])?;
     }
     Ok(())
 }
@@ -446,32 +496,56 @@ pub(super) fn apply_instruction_raw_field_mutation(
     genome: &mut CreatureGenome,
     node_idx: usize,
     rng: &mut impl Rng,
-    config: &MutationConfig,
+    _config: &MutationConfig,
 ) -> Result<(), MutationSkipReason> {
     let node = &mut genome.nodes[node_idx];
     let BackendDef::Vm(ref mut vm) = node.backend_def else {
         return Ok(());
     };
-    if vm.program.is_empty() {
-        vm.program.push(VmInstruction::PushAction {
-            action_type: rng.gen(),
-        });
-        return Ok(());
+    let eligible: Vec<usize> = vm
+        .program
+        .iter()
+        .enumerate()
+        .filter(|(_, instruction)| {
+            !matches!(
+                instruction,
+                VmInstruction::Noop
+                    | VmInstruction::Halt
+                    | VmInstruction::ExecuteActionQueue
+                    | VmInstruction::PopAction
+            )
+        })
+        .map(|(index, _)| index)
+        .collect();
+    let index = *eligible
+        .get(rng.gen_range(0..eligible.len().max(1)))
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
+    if mutate_one_instruction_field(&mut vm.program[index], rng) {
+        Ok(())
+    } else {
+        Err(MutationSkipReason::NoApplicableTarget)
     }
-    let idx = rng.gen_range(0..vm.program.len());
-    mutate_instruction_raw_fields(&mut vm.program[idx], rng, &node.input_refs, config);
-    Ok(())
 }
 
 /// Remap all register-typed fields: `(reg + offset) % register_count`.
 fn remap_register_refs(instr: &mut VmInstruction, offset: u8, register_count: u8) {
     let rc = register_count.max(1);
-    let remap = |reg: &mut u8| {
-        *reg = (*reg).wrapping_add(offset) % rc;
-    };
-    match instr {
-        VmInstruction::Noop | VmInstruction::Halt => {}
-        VmInstruction::LoadConst { dst, .. } => remap(dst),
+    for_each_register_ref(instr, &mut |reg| {
+        let canonical = *reg % rc;
+        let shifted = u16::from(canonical) + u16::from(offset);
+        *reg = u8::try_from(shifted % u16::from(rc))
+            .expect("register remapping result is bounded by register_count");
+    });
+}
+
+fn for_each_register_ref(instruction: &mut VmInstruction, callback: &mut impl FnMut(&mut u8)) {
+    match instruction {
+        VmInstruction::Noop | VmInstruction::Halt | VmInstruction::Jump { .. } => {}
+        VmInstruction::LoadConst { dst, .. }
+        | VmInstruction::ReadInput { dst, .. }
+        | VmInstruction::ReadActionQueueLength { dst }
+        | VmInstruction::LoadSlotImm { dst, .. }
+        | VmInstruction::LoadSlotPrev { dst, .. } => callback(dst),
         VmInstruction::Move { dst, src }
         | VmInstruction::Abs { dst, src }
         | VmInstruction::Neg { dst, src }
@@ -480,8 +554,8 @@ fn remap_register_refs(instr: &mut VmInstruction, offset: u8, register_count: u8
         | VmInstruction::ToI32 { dst, src }
         | VmInstruction::ToU8 { dst, src }
         | VmInstruction::ToBool { dst, src } => {
-            remap(dst);
-            remap(src);
+            callback(dst);
+            callback(src);
         }
         VmInstruction::Add { dst, a, b }
         | VmInstruction::Sub { dst, a, b }
@@ -493,58 +567,149 @@ fn remap_register_refs(instr: &mut VmInstruction, offset: u8, register_count: u8
         | VmInstruction::CmpLt { dst, a, b }
         | VmInstruction::And { dst, a, b }
         | VmInstruction::Or { dst, a, b } => {
-            remap(dst);
-            remap(a);
-            remap(b);
+            callback(dst);
+            callback(a);
+            callback(b);
         }
         VmInstruction::CmpEq { dst, a, b, eps } => {
-            remap(dst);
-            remap(a);
-            remap(b);
-            remap(eps);
+            callback(dst);
+            callback(a);
+            callback(b);
+            callback(eps);
         }
-        VmInstruction::JumpIfZero { cond, .. } => remap(cond),
-        VmInstruction::Jump { .. } => {}
-        VmInstruction::ReadInput { dst, .. } => remap(dst),
+        VmInstruction::JumpIfZero { cond, .. } => callback(cond),
         VmInstruction::WriteInternalPayload { src, .. }
         | VmInstruction::WriteWorldActionMeta { src, .. }
-        | VmInstruction::WriteRouteGate { src, .. } => remap(src),
+        | VmInstruction::WriteRouteGate { src, .. }
+        | VmInstruction::SetPriorityBid { src }
+        | VmInstruction::StoreSlotImm { src, .. } => callback(src),
         VmInstruction::PushAction { .. }
         | VmInstruction::PopAction
-        | VmInstruction::ExecuteActionQueue => {}
-        VmInstruction::SetPriorityBid { src } => remap(src),
-        VmInstruction::ReadActionQueueLength { dst } => remap(dst),
-        VmInstruction::ReadActionQueueType { index_src, dst } => {
-            remap(index_src);
-            remap(dst);
-        }
-        VmInstruction::ReadActionQueueParam { index_src, dst, .. } => {
-            remap(index_src);
-            remap(dst);
+        | VmInstruction::ExecuteActionQueue
+        | VmInstruction::ClearSlot { .. } => {}
+        VmInstruction::ReadActionQueueType { index_src, dst }
+        | VmInstruction::ReadActionQueueParam { index_src, dst, .. } => {
+            callback(index_src);
+            callback(dst);
         }
         VmInstruction::LoadSlot { dst, slot_reg } => {
-            remap(dst);
-            remap(slot_reg);
+            callback(dst);
+            callback(slot_reg);
         }
         VmInstruction::StoreSlot { slot_reg, src } => {
-            remap(slot_reg);
-            remap(src);
+            callback(slot_reg);
+            callback(src);
         }
-        VmInstruction::LoadSlotImm { dst, .. } => remap(dst),
-        VmInstruction::StoreSlotImm { src, .. } => remap(src),
-        VmInstruction::LoadSlotPrev { dst, .. } => remap(dst),
-        VmInstruction::ClearSlot { .. } => {}
     }
 }
 
-/// Adjust jump offsets for Jump and JumpIfZero instructions.
-fn adjust_jump_offset(instr: &mut VmInstruction, delta: i32) {
-    match instr {
-        VmInstruction::Jump { offset } | VmInstruction::JumpIfZero { offset, .. } => {
-            *offset = offset.wrapping_add(delta);
-        }
-        _ => {}
+#[derive(Clone)]
+pub(crate) struct SpliceInstruction {
+    pub(crate) instruction: VmInstruction,
+    pub(crate) source_index: Option<usize>,
+}
+
+pub(crate) fn insert_new_instruction_with_reference_repair(
+    program: &mut Vec<VmInstruction>,
+    insert_at: usize,
+    instruction: VmInstruction,
+) -> Result<(), MutationSkipReason> {
+    splice_program_with_reference_repair(
+        program,
+        insert_at..insert_at,
+        vec![SpliceInstruction {
+            instruction,
+            source_index: None,
+        }],
+    )
+}
+
+pub(crate) fn splice_program_with_reference_repair(
+    program: &mut Vec<VmInstruction>,
+    replaced: Range<usize>,
+    inserted: Vec<SpliceInstruction>,
+) -> Result<(), MutationSkipReason> {
+    let old_program = program.clone();
+    let old_len = old_program.len();
+    if replaced.start > replaced.end || replaced.end > old_len {
+        return Err(MutationSkipReason::NoApplicableTarget);
     }
+    if inserted
+        .iter()
+        .any(|item| item.source_index.is_some_and(|source| source >= old_len))
+    {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
+    let inserted_len = inserted.len();
+    let new_len = old_len
+        .checked_sub(replaced.end - replaced.start)
+        .and_then(|remaining| remaining.checked_add(inserted.len()))
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
+    if new_len > i32::MAX as usize {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
+
+    let mut new_items = Vec::with_capacity(new_len);
+    for (old_index, instruction) in old_program.iter().take(replaced.start).enumerate() {
+        new_items.push(SpliceInstruction {
+            instruction: instruction.clone(),
+            source_index: Some(old_index),
+        });
+    }
+    new_items.extend(inserted);
+    for (old_index, instruction) in old_program.iter().enumerate().skip(replaced.end) {
+        new_items.push(SpliceInstruction {
+            instruction: instruction.clone(),
+            source_index: Some(old_index),
+        });
+    }
+
+    let mut old_target_positions = vec![None; old_len];
+    let mut copied_target_positions = vec![None; old_len];
+    for (new_index, item) in new_items.iter().enumerate() {
+        if let Some(source_index) = item.source_index {
+            if (replaced.start..replaced.start + inserted_len).contains(&new_index) {
+                copied_target_positions[source_index] = Some(new_index);
+            } else {
+                old_target_positions[source_index] = Some(new_index);
+            }
+        }
+    }
+    if replaced.end - replaced.start == 1 && new_items.len() == old_len {
+        old_target_positions[replaced.start] = Some(replaced.start);
+    }
+
+    for (new_pc, item) in new_items.iter_mut().enumerate() {
+        let Some(source_index) = item.source_index else {
+            continue;
+        };
+        let old_offset = match old_program[source_index] {
+            VmInstruction::Jump { offset } | VmInstruction::JumpIfZero { offset, .. } => offset,
+            _ => continue,
+        };
+        let old_target = crate::runtime::vm::jump_target(source_index, old_offset, old_len);
+        let target = if (replaced.start..replaced.start + inserted_len).contains(&new_pc) {
+            copied_target_positions[old_target].or(old_target_positions[old_target])
+        } else {
+            old_target_positions[old_target]
+        }
+        .or_else(|| {
+            (1..old_len)
+                .map(|distance| (old_target + distance) % old_len)
+                .find_map(|candidate| old_target_positions[candidate])
+        })
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
+        let encoded = i32::try_from(target as i64 - (new_pc as i64 + 1))
+            .map_err(|_| MutationSkipReason::NoApplicableTarget)?;
+        match &mut item.instruction {
+            VmInstruction::Jump { offset } | VmInstruction::JumpIfZero { offset, .. } => {
+                *offset = encoded;
+            }
+            _ => unreachable!("only old jump instructions reach this branch"),
+        }
+    }
+    *program = new_items.into_iter().map(|item| item.instruction).collect();
+    Ok(())
 }
 
 // ── VM Copy Operators ──
@@ -561,10 +726,16 @@ pub(super) fn apply_copy_instruction_block(
         }
         let block_size = rng.gen_range(2..=32).min(vm.program.len());
         let source_start = rng.gen_range(0..=vm.program.len() - block_size);
-        let block: Vec<VmInstruction> =
-            vm.program[source_start..source_start + block_size].to_vec();
+        let block = vm.program[source_start..source_start + block_size]
+            .iter()
+            .enumerate()
+            .map(|(offset, instruction)| SpliceInstruction {
+                instruction: instruction.clone(),
+                source_index: Some(source_start + offset),
+            })
+            .collect();
         let insert_at = rng.gen_range(0..=vm.program.len());
-        vm.program.splice(insert_at..insert_at, block);
+        splice_program_with_reference_repair(&mut vm.program, insert_at..insert_at, block)?;
     }
     Ok(())
 }
@@ -587,16 +758,20 @@ pub(super) fn apply_copy_instruction_block_remapped(
         }
         let block_size = rng.gen_range(2..=32).min(vm.program.len());
         let source_start = rng.gen_range(0..=vm.program.len() - block_size);
-        let mut block: Vec<VmInstruction> =
-            vm.program[source_start..source_start + block_size].to_vec();
+        let mut block = vm.program[source_start..source_start + block_size]
+            .iter()
+            .enumerate()
+            .map(|(offset, instruction)| SpliceInstruction {
+                instruction: instruction.clone(),
+                source_index: Some(source_start + offset),
+            })
+            .collect::<Vec<_>>();
         let reg_offset = rng.gen_range(1..register_count.max(2));
         let insert_at = rng.gen_range(0..=vm.program.len());
-        let delta = insert_at as i32 - source_start as i32;
-        for instr in &mut block {
-            remap_register_refs(instr, reg_offset, register_count);
-            adjust_jump_offset(instr, delta);
+        for item in &mut block {
+            remap_register_refs(&mut item.instruction, reg_offset, register_count);
         }
-        vm.program.splice(insert_at..insert_at, block);
+        splice_program_with_reference_repair(&mut vm.program, insert_at..insert_at, block)?;
     }
     Ok(())
 }
@@ -631,13 +806,16 @@ pub(super) fn apply_copy_gene_backward_slice(
             return Err(MutationSkipReason::NoApplicableTarget);
         }
         if let Some(gene) = vm_backward_slice_random(&vm.program, rng) {
-            let extracted: Vec<VmInstruction> = gene
+            let extracted = gene
                 .indices
                 .iter()
-                .map(|&i| vm.program[i].clone())
+                .map(|&source_index| SpliceInstruction {
+                    instruction: vm.program[source_index].clone(),
+                    source_index: Some(source_index),
+                })
                 .collect();
             let insert_at = rng.gen_range(0..=vm.program.len());
-            vm.program.splice(insert_at..insert_at, extracted);
+            splice_program_with_reference_repair(&mut vm.program, insert_at..insert_at, extracted)?;
         } else {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
@@ -656,13 +834,16 @@ pub(super) fn apply_copy_gene_forward_slice(
             return Err(MutationSkipReason::NoApplicableTarget);
         }
         if let Some(gene) = vm_forward_slice_random(&vm.program, rng) {
-            let extracted: Vec<VmInstruction> = gene
+            let extracted = gene
                 .indices
                 .iter()
-                .map(|&i| vm.program[i].clone())
+                .map(|&source_index| SpliceInstruction {
+                    instruction: vm.program[source_index].clone(),
+                    source_index: Some(source_index),
+                })
                 .collect();
             let insert_at = rng.gen_range(0..=vm.program.len());
-            vm.program.splice(insert_at..insert_at, extracted);
+            splice_program_with_reference_repair(&mut vm.program, insert_at..insert_at, extracted)?;
         } else {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
@@ -696,7 +877,13 @@ pub(super) fn apply_insert_read_store_motif(
             VmInstruction::StoreSlotImm { slot_idx, src: dst },
         ];
         let pos = rng.gen_range(0..=vm.program.len());
-        vm.program.splice(pos..pos, pair);
+        for (offset, instruction) in pair.into_iter().enumerate() {
+            insert_new_instruction_with_reference_repair(
+                &mut vm.program,
+                pos + offset,
+                instruction,
+            )?;
+        }
     }
     Ok(())
 }
@@ -744,7 +931,13 @@ pub(super) fn apply_insert_read_bid_motif(
             terminal_positions[rng.gen_range(0..terminal_positions.len())]
         };
 
-        vm.program.splice(pos..pos, pair);
+        for (offset, instruction) in pair.into_iter().enumerate() {
+            insert_new_instruction_with_reference_repair(
+                &mut vm.program,
+                pos + offset,
+                instruction,
+            )?;
+        }
     }
     Ok(())
 }
@@ -773,7 +966,13 @@ pub(super) fn apply_insert_load_compare_motif(
             },
         ];
         let pos = rng.gen_range(0..=vm.program.len());
-        vm.program.splice(pos..pos, pair);
+        for (offset, instruction) in pair.into_iter().enumerate() {
+            insert_new_instruction_with_reference_repair(
+                &mut vm.program,
+                pos + offset,
+                instruction,
+            )?;
+        }
     }
     Ok(())
 }
@@ -874,11 +1073,11 @@ fn mutate_slot_idx_field(instr: &mut VmInstruction, rng: &mut impl Rng) {
         | VmInstruction::StoreSlotImm { slot_idx, .. }
         | VmInstruction::LoadSlotPrev { slot_idx, .. }
         | VmInstruction::ClearSlot { slot_idx } => {
-            *slot_idx = rng.gen_range(0u8..16);
+            nudge_u8(slot_idx, rng);
         }
         VmInstruction::LoadSlot { slot_reg, .. } | VmInstruction::StoreSlot { slot_reg, .. } => {
             // For register-indirect slot access, mutate the slot_reg.
-            *slot_reg = rng.gen();
+            nudge_u8(slot_reg, rng);
         }
         _ => {}
     }

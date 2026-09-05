@@ -6,7 +6,10 @@ use crate::mutation::reachability::biased_select_from;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
 mod operators;
+pub(crate) use operators::insert_new_instruction_with_reference_repair;
 use operators::*;
+#[cfg(test)]
+pub(crate) use operators::{splice_program_with_reference_repair, SpliceInstruction};
 
 /// VM mutation operator variants.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
