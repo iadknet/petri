@@ -1,6 +1,6 @@
 # T11 — Brain Genotype-Phenotype Map
 
-**Status**: Planned
+**Status**: In Progress
 **Last updated**: 2026-09-05
 **Master**: [Program Roadmap](../roadmap.md)
 
