@@ -123,6 +123,46 @@ fn vm_instruction_mutation_changes_program() {
 }
 
 #[test]
+fn vm_instruction_mutation_reaches_insert_replace_and_delete() {
+    let genome = slot_program_genome(vec![
+        VmInstruction::Noop,
+        VmInstruction::PushAction { action_type: 1 },
+        VmInstruction::Halt,
+    ]);
+    let original = match &genome.nodes[0].backend_def {
+        BackendDef::Vm(vm) => vm.program.clone(),
+        _ => unreachable!("fixture must be a VM"),
+    };
+    let mut saw_insert = false;
+    let mut saw_replacement = false;
+    let mut saw_delete = false;
+    for seed in 0..256 {
+        let mut mutated = genome.clone();
+        VmMutator::apply(
+            &mut mutated,
+            VmOperator::VmInstructionMutation,
+            &[],
+            0.0,
+            &mut rng(seed),
+            &MutationConfig::default(),
+        )
+        .expect("the nonempty VM fixture is applicable");
+        let BackendDef::Vm(vm) = &mut mutated.nodes[0].backend_def else {
+            unreachable!("fixture must remain a VM");
+        };
+        match vm.program.len().cmp(&original.len()) {
+            std::cmp::Ordering::Greater => saw_insert = true,
+            std::cmp::Ordering::Less => saw_delete = true,
+            std::cmp::Ordering::Equal if vm.program != original => saw_replacement = true,
+            _ => {}
+        }
+    }
+    assert!(saw_insert, "bounded seeds must reach insertion");
+    assert!(saw_replacement, "bounded seeds must reach replacement");
+    assert!(saw_delete, "bounded seeds must reach deletion");
+}
+
+#[test]
 fn vm_delete_instruction_removes_one_instruction() {
     let mut genome = v3alpha1_founder_genome();
     if let BackendDef::Vm(ref mut vm) = genome.nodes[1].backend_def {
@@ -719,6 +759,56 @@ fn copy_instruction_block_remapped_wraps_registers() {
 }
 
 #[test]
+fn copy_instruction_block_remapped_cyclically_shifts_every_register_field() {
+    for raw in [0, 4, u8::MAX] {
+        for instruction in register_bearing_instructions(raw) {
+            let field_count = register_fields(&instruction).len();
+            let mut genome = slot_program_genome(vec![instruction]);
+            let BackendDef::Vm(vm) = &mut genome.nodes[0].backend_def else {
+                unreachable!("fixture must be a VM");
+            };
+            vm.register_count = 4;
+            for seed in 0..32 {
+                let mut mutated = genome.clone();
+                VmMutator::apply(
+                    &mut mutated,
+                    VmOperator::VmCopyInstructionBlockRemapped,
+                    &[],
+                    0.0,
+                    &mut rng(seed),
+                    &MutationConfig::default(),
+                )
+                .expect("the one-instruction VM fixture is applicable");
+                let BackendDef::Vm(vm) = &mut mutated.nodes[0].backend_def else {
+                    unreachable!("fixture must remain a VM");
+                };
+                assert_eq!(vm.program.len(), 2);
+                let original_fields = vec![raw; field_count];
+                assert_eq!(
+                    vm.program
+                        .iter()
+                        .filter(|candidate| register_fields(candidate) == original_fields)
+                        .count(),
+                    1,
+                    "one original instruction must retain its raw register fields"
+                );
+                let remapped = vm
+                    .program
+                    .iter()
+                    .find(|candidate| register_fields(candidate) != original_fields)
+                    .expect("the copied instruction must have a nonzero register shift");
+                let fields = register_fields(remapped);
+                assert_eq!(fields.len(), field_count);
+                assert!(fields.iter().all(|field| *field < 4));
+                let shift = (fields[0] + 4 - raw % 4) % 4;
+                assert_ne!(shift, 0, "the copied register shift must be nonzero");
+                assert_eq!(fields, vec![(raw % 4 + shift) % 4; field_count]);
+            }
+        }
+    }
+}
+
+#[test]
 fn copy_instruction_block_remapped_preserves_non_register_fields() {
     // Non-register fields (const_idx, action_type, etc.) must not change.
     let mut genome = v3alpha1_founder_genome();
@@ -1233,6 +1323,37 @@ fn vm_insert_read_store_motif_inserts_read_input_and_store_slot_pair() {
 }
 
 #[test]
+fn vm_insert_read_store_motif_keeps_the_generated_pair_adjacent_for_each_seed() {
+    use crate::contracts::InputReference;
+    let mut genome = slot_program_genome(vec![VmInstruction::Noop]);
+    genome.nodes[0].input_refs = vec![InputReference::UpstreamSlot(0)];
+    for seed in 0..128 {
+        let mut mutated = genome.clone();
+        VmMutator::apply(
+            &mut mutated,
+            VmOperator::VmInsertReadStoreMotif,
+            &[],
+            0.0,
+            &mut rng(seed),
+            &MutationConfig::default(),
+        )
+        .expect("the fixture has an input reference");
+        let BackendDef::Vm(vm) = &mut mutated.nodes[0].backend_def else {
+            unreachable!("fixture must remain a VM");
+        };
+        assert_eq!(vm.program.len(), 3);
+        assert!(
+            vm.program.windows(2).any(|pair| matches!(
+                pair,
+                [VmInstruction::ReadInput { dst, .. }, VmInstruction::StoreSlotImm { src, .. }]
+                    if dst == src
+            )),
+            "seed {seed} must retain the ordered, wired read/store motif"
+        );
+    }
+}
+
+#[test]
 fn vm_insert_read_bid_motif_inserts_read_input_and_priority_bid_pair() {
     let genome = v3alpha1_founder_genome();
     let mut found_pair = false;
@@ -1350,6 +1471,35 @@ fn vm_insert_load_compare_motif_inserts_load_slot_and_cmp_gt_pair() {
 }
 
 #[test]
+fn vm_insert_load_compare_motif_keeps_the_generated_pair_adjacent_for_each_seed() {
+    let genome = slot_program_genome(vec![VmInstruction::Noop]);
+    for seed in 0..128 {
+        let mut mutated = genome.clone();
+        VmMutator::apply(
+            &mut mutated,
+            VmOperator::VmInsertLoadCompareMotif,
+            &[],
+            0.0,
+            &mut rng(seed),
+            &MutationConfig::default(),
+        )
+        .expect("the nonempty VM fixture is applicable");
+        let BackendDef::Vm(vm) = &mut mutated.nodes[0].backend_def else {
+            unreachable!("fixture must remain a VM");
+        };
+        assert_eq!(vm.program.len(), 3);
+        assert!(
+            vm.program.windows(2).any(|pair| matches!(
+                pair,
+                [VmInstruction::LoadSlotImm { dst, .. }, VmInstruction::CmpGt { a, .. }]
+                    if dst == a
+            )),
+            "seed {seed} must retain the ordered, wired load/compare motif"
+        );
+    }
+}
+
+#[test]
 fn vm_mutate_slot_address_changes_slot_idx() {
     // Build a genome with slot opcodes.
     let mut genome = v3alpha1_founder_genome();
@@ -1399,6 +1549,37 @@ fn vm_mutate_slot_address_changes_slot_idx() {
         changed,
         "VmMutateSlotAddress must sometimes change slot_idx"
     );
+}
+
+#[test]
+fn vm_mutate_slot_address_nudges_register_indirect_slot_fields() {
+    let genome = slot_program_genome(vec![VmInstruction::LoadSlot {
+        dst: 0,
+        slot_reg: 127,
+    }]);
+    let mut observed = Vec::new();
+    for seed in 0..128 {
+        let mut mutated = genome.clone();
+        VmMutator::apply(
+            &mut mutated,
+            VmOperator::VmMutateSlotAddress,
+            &[],
+            0.0,
+            &mut rng(seed),
+            &MutationConfig::default(),
+        )
+        .expect("the register-indirect slot instruction is applicable");
+        let BackendDef::Vm(vm) = &mut mutated.nodes[0].backend_def else {
+            unreachable!("fixture must remain a VM");
+        };
+        let [VmInstruction::LoadSlot { dst, slot_reg }] = &vm.program[..] else {
+            panic!("the standalone nudge must preserve the LoadSlot opcode");
+        };
+        assert_eq!(*dst, 0);
+        observed.push(*slot_reg);
+    }
+    assert!(observed.contains(&126));
+    assert!(observed.contains(&128));
 }
 
 #[test]
@@ -1456,6 +1637,44 @@ fn vm_mutate_paired_slot_address_co_mutates_load_and_store() {
         co_mutated,
         "VmMutatePairedSlotAddress must co-mutate both load and store to same new slot"
     );
+}
+
+#[test]
+fn paired_slot_address_handles_maximum_encoded_slot_after_single_field_nudge() {
+    let mut genome = slot_program_genome(vec![
+        VmInstruction::LoadSlotImm {
+            dst: 0,
+            slot_idx: u8::MAX,
+        },
+        VmInstruction::StoreSlotImm {
+            slot_idx: u8::MAX,
+            src: 0,
+        },
+    ]);
+    let mut r = rng(0);
+
+    VmMutator::apply(
+        &mut genome,
+        VmOperator::VmMutatePairedSlotAddress,
+        &[],
+        0.0,
+        &mut r,
+        &MutationConfig::default(),
+    )
+    .expect("paired macro must handle a slot value produced by a standalone nudge");
+
+    let BackendDef::Vm(vm) = &genome.nodes[0].backend_def else {
+        panic!("expected VM backend");
+    };
+    let [VmInstruction::LoadSlotImm { slot_idx: load, .. }, VmInstruction::StoreSlotImm {
+        slot_idx: store, ..
+    }] = &vm.program[..]
+    else {
+        panic!("fixture instructions must remain paired immediate slot accesses");
+    };
+    assert_eq!(load, store);
+    assert!(*load < 16);
+    assert_ne!(*load, u8::MAX % 16);
 }
 
 #[test]
@@ -2007,6 +2226,112 @@ fn raw_field_mutation_nudges_numeric_boundaries_inward() {
     }
 }
 
+#[test]
+fn raw_field_mutation_exercises_bounded_numeric_directions() {
+    let mut u8_directions = Vec::new();
+    for seed in 0..128 {
+        let mut instruction = VmInstruction::PushAction { action_type: 127 };
+        assert!(mutate_one_instruction_field(
+            &mut instruction,
+            &mut rng(seed)
+        ));
+        let VmInstruction::PushAction { action_type } = instruction else {
+            unreachable!();
+        };
+        u8_directions.push(action_type);
+    }
+    assert!(u8_directions.contains(&126));
+    assert!(u8_directions.contains(&128));
+    for seed in 0..128 {
+        let mut instruction = VmInstruction::PushAction {
+            action_type: u8::MAX,
+        };
+        assert!(mutate_one_instruction_field(
+            &mut instruction,
+            &mut rng(seed)
+        ));
+        assert!(matches!(
+            instruction,
+            VmInstruction::PushAction { action_type: 254 }
+        ));
+    }
+
+    let mut u16_directions = Vec::new();
+    for seed in 0..256 {
+        let mut instruction = VmInstruction::ReadInput {
+            dst: 0,
+            ref_idx: 17,
+            sub_idx: 31,
+        };
+        assert!(mutate_one_instruction_field(
+            &mut instruction,
+            &mut rng(seed)
+        ));
+        let VmInstruction::ReadInput {
+            ref_idx, sub_idx, ..
+        } = instruction
+        else {
+            unreachable!();
+        };
+        if ref_idx != 17 {
+            u16_directions.push(ref_idx);
+        }
+        if sub_idx != 31 {
+            u16_directions.push(sub_idx);
+        }
+    }
+    assert!(u16_directions.contains(&16));
+    assert!(u16_directions.contains(&18));
+    assert!(u16_directions.contains(&30));
+    assert!(u16_directions.contains(&32));
+    let mut observed_zero_u16 = false;
+    for seed in 0..256 {
+        let mut instruction = VmInstruction::ReadInput {
+            dst: 0,
+            ref_idx: 0,
+            sub_idx: 0,
+        };
+        assert!(mutate_one_instruction_field(
+            &mut instruction,
+            &mut rng(seed)
+        ));
+        let VmInstruction::ReadInput {
+            ref_idx, sub_idx, ..
+        } = instruction
+        else {
+            unreachable!();
+        };
+        observed_zero_u16 |= ref_idx == 1 || sub_idx == 1;
+    }
+    assert!(
+        observed_zero_u16,
+        "a bounded seed set must select a u16 field"
+    );
+
+    let mut i32_directions = Vec::new();
+    for seed in 0..128 {
+        let mut instruction = VmInstruction::Jump { offset: 0 };
+        assert!(mutate_one_instruction_field(
+            &mut instruction,
+            &mut rng(seed)
+        ));
+        let VmInstruction::Jump { offset } = instruction else {
+            unreachable!();
+        };
+        i32_directions.push(offset);
+    }
+    assert!(i32_directions.contains(&-1));
+    assert!(i32_directions.contains(&1));
+    for seed in 0..128 {
+        let mut instruction = VmInstruction::Jump { offset: i32::MIN };
+        assert!(mutate_one_instruction_field(
+            &mut instruction,
+            &mut rng(seed)
+        ));
+        assert!(matches!(instruction, VmInstruction::Jump { offset } if offset == i32::MIN + 1));
+    }
+}
+
 proptest! {
     #[test]
     fn raw_field_mutation_is_a_one_step_opcode_preserving_property(seed in any::<u64>()) {
@@ -2144,7 +2469,7 @@ fn register_bearing_instructions(raw: u8) -> Vec<VmInstruction> {
             dst: raw,
             a: raw,
             b: raw,
-            eps: 0,
+            eps: raw,
         },
         VmInstruction::And {
             dst: raw,
@@ -2249,7 +2574,7 @@ fn register_fields(instruction: &VmInstruction) -> Vec<u8> {
         | VmInstruction::CmpLt { dst, a, b }
         | VmInstruction::And { dst, a, b }
         | VmInstruction::Or { dst, a, b } => vec![*dst, *a, *b],
-        VmInstruction::CmpEq { dst, a, b, .. } => vec![*dst, *a, *b],
+        VmInstruction::CmpEq { dst, a, b, eps } => vec![*dst, *a, *b, *eps],
         VmInstruction::JumpIfZero { cond, .. } | VmInstruction::SetPriorityBid { src: cond } => {
             vec![*cond]
         }
@@ -2302,6 +2627,72 @@ proptest! {
             prop_assert!(found_shrink, "a bounded seed search must find a decrement");
         }
     }
+}
+
+fn register_count_result_for_seed(
+    program: Vec<VmInstruction>,
+    seed: u64,
+) -> (CreatureGenome, Result<(), MutationSkipReason>) {
+    let mut genome = slot_program_genome(program);
+    let BackendDef::Vm(vm) = &mut genome.nodes[0].backend_def else {
+        unreachable!("fixture must contain a VM");
+    };
+    vm.register_count = 4;
+    let mut r = rng(seed);
+    let result = apply_register_count_mutation(&mut genome, 0, &mut r);
+    (genome, result)
+}
+
+#[test]
+fn register_count_direction_seeds_distinguish_growth_from_shrink() {
+    let neutral = vec![VmInstruction::Move { dst: 0, src: 0 }];
+    let shrink_seed = (0..128)
+        .find(|&seed| {
+            let (genome, result) = register_count_result_for_seed(neutral.clone(), seed);
+            matches!(result, Ok(()))
+                && matches!(genome.nodes[0].backend_def, BackendDef::Vm(ref vm) if vm.register_count == 3)
+        })
+        .expect("bounded calibration must find a decrement seed");
+    let grow_seed = (0..128)
+        .find(|&seed| {
+            let (genome, result) = register_count_result_for_seed(neutral.clone(), seed);
+            matches!(result, Ok(()))
+                && matches!(genome.nodes[0].backend_def, BackendDef::Vm(ref vm) if vm.register_count == 5)
+        })
+        .expect("bounded calibration must find an increment seed");
+
+    let raw7 = vec![VmInstruction::Move { dst: 7, src: 7 }];
+    let (blocked, blocked_result) = register_count_result_for_seed(raw7.clone(), shrink_seed);
+    assert_eq!(blocked_result, Err(MutationSkipReason::NoApplicableTarget));
+    let mut expected_blocked = slot_program_genome(raw7.clone());
+    let BackendDef::Vm(expected_vm) = &mut expected_blocked.nodes[0].backend_def else {
+        unreachable!();
+    };
+    expected_vm.register_count = 4;
+    assert_eq!(blocked, expected_blocked);
+
+    let (grown, grown_result) = register_count_result_for_seed(raw7, grow_seed);
+    assert_eq!(grown_result, Ok(()));
+    let BackendDef::Vm(grown_vm) = &grown.nodes[0].backend_def else {
+        unreachable!();
+    };
+    assert_eq!(grown_vm.register_count, 5);
+    assert_eq!(
+        grown_vm.program,
+        vec![VmInstruction::Move { dst: 3, src: 3 }]
+    );
+
+    let (shrunk, shrunk_result) =
+        register_count_result_for_seed(vec![VmInstruction::Move { dst: 6, src: 6 }], shrink_seed);
+    assert_eq!(shrunk_result, Ok(()));
+    let BackendDef::Vm(shrunk_vm) = &shrunk.nodes[0].backend_def else {
+        unreachable!();
+    };
+    assert_eq!(shrunk_vm.register_count, 3);
+    assert_eq!(
+        shrunk_vm.program,
+        vec![VmInstruction::Move { dst: 2, src: 2 }]
+    );
 }
 
 #[test]
@@ -2646,6 +3037,10 @@ fn splice_repair_handles_deleted_and_replaced_targets() {
         crate::runtime::vm::jump_target(0, offset, tail_delete.len()),
         0
     );
+    assert_eq!(
+        offset, -1,
+        "the wrapped target must use canonical offset encoding"
+    );
 
     let mut replacement = vec![VmInstruction::Jump { offset: 0 }, VmInstruction::Noop];
     splice_program_with_reference_repair(
@@ -2751,6 +3146,35 @@ proptest! {
     /// same program produce the same program, whatever slot instructions the
     /// program holds.
     #[test]
+    fn paired_slot_address_is_bounded_and_changes_effective_address(
+        raw_slot in any::<u8>(),
+        seed in any::<u64>(),
+    ) {
+        let mut genome = slot_program_genome(vec![
+            VmInstruction::LoadSlotImm { dst: 0, slot_idx: raw_slot },
+            VmInstruction::StoreSlotImm { slot_idx: raw_slot, src: 0 },
+        ]);
+        let mut r = rng(seed);
+        VmMutator::apply(
+            &mut genome,
+            VmOperator::VmMutatePairedSlotAddress,
+            &[],
+            0.0,
+            &mut r,
+            &MutationConfig::default(),
+        )
+        .expect("the paired immediate-slot fixture is always eligible");
+        let BackendDef::Vm(vm) = &genome.nodes[0].backend_def else {
+            panic!("fixture must remain a VM backend");
+        };
+        let [VmInstruction::LoadSlotImm { slot_idx: load, .. }, VmInstruction::StoreSlotImm { slot_idx: store, .. }] = &vm.program[..] else {
+            panic!("fixture instructions must remain a paired immediate-slot access");
+        };
+        prop_assert_eq!(load, store);
+        prop_assert!(*load < 16);
+        prop_assert_ne!(*load, raw_slot % 16);
+    }
+
     fn vm_mutate_paired_slot_address_is_reproducible_for_any_slot_program(
         forced_slot in 0u8..16,
         extra in prop::collection::vec((0u8..16, 0u8..4), 0..24),
