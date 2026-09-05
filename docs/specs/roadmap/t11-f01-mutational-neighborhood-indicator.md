@@ -481,3 +481,12 @@ Verification):
   session ended before its final report (usage limit, stalled loop, and an
   early return during the mutants rerun). Reviewer findings: 0 P1, 0 P2,
   7 P3.
+- Integration blocker (orchestrator, 2026-09-05): `git merge --ff-only
+  worktree-t11-f01` was refused because `main` advanced from `ae012a87` to
+  `573c0336` (the T11.F05 merge and a build commit) while this feature was in
+  flight. The feature branch is complete at `44b4bdf0` with `make check` exit
+  0. A rebase onto `main` conflicts only in `docs/progress.md`,
+  `docs/progress/benchmark-series.json`, and
+  `docs/roadmaps/t11-brain-genotype-phenotype-map.md`, where both features
+  added entries; no Rust file overlaps. Per `docs/workflow.md`, no rebase or
+  merge without the user asking; the worktree and branch are preserved.
