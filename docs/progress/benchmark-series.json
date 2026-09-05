@@ -7,7 +7,8 @@
       "docs/progress/features/t01-f11-baseline-persistence-characterization.json",
       "docs/progress/features/t10-f09-throughput-baseline-and-profiling-budget.json",
       "docs/progress/features/t10-f11-cross-process-reproducibility-of-seeded-runs.json",
-      "docs/progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table.json"
+      "docs/progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table.json",
+      "docs/progress/features/t11-f05-temporal-controller-fixtures.json"
     ]
   },
   "goal": {
