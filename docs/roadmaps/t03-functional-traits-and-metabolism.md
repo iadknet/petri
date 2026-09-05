@@ -34,7 +34,7 @@ fitness bonuses.
   - Goal: Claws and shells. Offensive, defensive, and escape traits trade off, and an encounter's outcome falls out of both bodies.
 - [ ] **T03.F07 — Life-History and Offspring Investment Traits** — Depends on: T03.F01
   - Goal: Litters. Few well-provisioned offspring or many cheap ones, and when to mature, as heritable choices.
-- [ ] **T03.F08 — Computational Capacity and Maintenance Tradeoffs** — Depends on: T03.F01, T09.F02
+- [ ] **T03.F08 — Computational Capacity and Maintenance Tradeoffs** — Depends on: T03.F01, T11.F10
   - Goal: Brains are expensive. Larger or more active controllers cost more to maintain, so cognition has to pay for itself.
 - [ ] **T03.F09 — Functional Specialization Confirmatory Campaign** — Depends on: T01.F06, T01.F09, T03.F02, T03.F03, T03.F04, T03.F05, T03.F07, T10.F08
   - Goal: Deferred proof phase. Replicated confirmatory runs that specialists coexist rather than one generalist winning.
