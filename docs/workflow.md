@@ -155,6 +155,20 @@ spec's Performance and Goal Impact section. A severe compute regression without
 a predeclared, justified cost is a P1. Never weaken a threshold or edit a stored
 baseline to make a feature pass.
 
+Use `make bench` for measured gate, goal, and sweep reports. Its
+`scripts/bench-wait` preflight waits for other `v3-server`, `v3-cli`, and
+`v3-core` executables, their `v3_*` unit-test binaries, and `cargo-mutants`
+anywhere on the host, including other checkouts. It prints blocking PIDs,
+polls every five seconds, and fails without starting the benchmark after
+one hour (override with `BENCH_WAIT_TIMEOUT=<seconds>`; `0` checks once).
+Process-inspection failure also blocks the benchmark. It never stops another
+process; an orphaned server needs deliberate cleanup before retrying.
+This is a preflight, not host isolation: do not start competing benchmarks,
+servers, builds, or test runs during measurement. Direct CLI invocations bypass
+the guard; wrap profiling commands with `scripts/bench-wait <command> ...`.
+The ordinary `make check` tests remain unguarded: their gates use deterministic
+counters, not host wall-clock timings.
+
 ### Close and integrate
 
 In the worktree: set the spec to `Complete`, check the feature row, update the

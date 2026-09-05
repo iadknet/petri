@@ -1,0 +1,54 @@
+#!/bin/sh
+# Preflight for measured runs; use executable names so shell arguments and
+# processes in other checkouts cannot hide or falsely trigger a blocker.
+set -eu
+
+timeout=${BENCH_WAIT_TIMEOUT-3600}
+case "$timeout" in
+  ''|*[!0-9]*) printf 'bench-wait: BENCH_WAIT_TIMEOUT must be a nonnegative integer in seconds\n' >&2; exit 2 ;;
+esac
+# Normalize decimal input before shell arithmetic (e.g. 08 is eight seconds).
+timeout=$(printf '%s\n' "$timeout" | sed 's/^0*//')
+timeout=${timeout:-0}
+[ "$#" -gt 0 ] || { printf 'Usage: scripts/bench-wait command [args...]\n' >&2; exit 2; }
+
+waited=0
+previous=''
+while :; do
+  # Do not turn denied process visibility (e.g. an agent sandbox) into an
+  # apparently idle host. Capture ps separately from the filtering pipeline.
+  if ! processes=$(ps -A -o pid= -o stat= -o comm=); then
+    printf 'bench-wait: cannot inspect host processes; benchmark not started\n' >&2
+    exit 1
+  fi
+  blockers=$(printf '%s\n' "$processes" | awk '
+    $2 !~ /^Z/ {
+      pid = $1
+      sub(/^[[:space:]]*[0-9]+[[:space:]]+[^[:space:]]+[[:space:]]+/, "")
+      executable = $0
+      sub(/^.*\//, "", executable)
+      if (executable ~ /^v3-(server|cli|core)$/ ||
+          executable ~ /^v3_(server|cli|core)-[[:xdigit:]]+$/ ||
+          executable == "cargo-mutants")
+        printf "  PID %s: %s\n", pid, $0
+    }
+  ')
+  [ -n "$blockers" ] || break
+  if [ "$blockers" != "$previous" ]; then
+    printf 'bench-wait: waiting for competing Petri runs or mutation tests:\n%s\n' "$blockers" >&2
+    previous=$blockers
+  fi
+  if [ "$waited" -ge "$timeout" ]; then
+    printf 'bench-wait: timed out after %s seconds; benchmark not started. Let the listed processes finish or stop them deliberately, then retry. BENCH_WAIT_TIMEOUT controls the wait limit.\n' "$waited" >&2
+    exit 1
+  fi
+  delay=$((timeout - waited))
+  [ "$delay" -le 5 ] || delay=5
+  sleep "$delay"
+  waited=$((waited + delay))
+done
+
+if [ "$waited" -gt 0 ]; then
+  printf 'bench-wait: competing processes exited; starting benchmark\n' >&2
+fi
+exec "$@"
