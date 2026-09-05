@@ -98,48 +98,48 @@ manual verification; integration remains pending.
 
 ## Implementation Tasks
 
-- [ ] Add fixed `goal` CLI profile and `make bench PROFILE=goal FEATURE=...`.
+- [x] Add fixed `goal` CLI profile and `make bench PROFILE=goal FEATURE=...`.
       Reject conflicting profile-parameter overrides rather than ignore them;
       retain explicit thread and output selection. Keep goal outside `make check`.
-- [ ] Implement the isolated final-state probe and stable lineage/memory report
+- [x] Implement the isolated final-state probe and stable lineage/memory report
       aggregation with the definitions above, reusing production sensor/runtime
       functions. Keep the simulation trajectory and counters unchanged.
-- [ ] Extend report loading and the series index to separate gate and goal
+- [x] Extend report loading and the series index to separate gate and goal
       references; tests prove reference selection and profile mismatch rejection.
-- [ ] Create `docs/progress.md` as one table: four closed historical feature rows
+- [x] Create `docs/progress.md` as one table: four closed historical feature rows
       back-filled from stored reports and one clearly labeled pending T01.F12
       row. Include date, report links, compute delta against both references,
       and every indicator. Historical goal readings are `Undefined`, since those
       profiles never ran; their gate compute deltas remain historical evidence.
-- [ ] Commit implementation, generate gate and goal reports with that provenance,
+- [x] Commit implementation, generate gate and goal reports with that provenance,
       then record results, series baseline, and pending manual status. Keep the
       owning feature checkbox unchecked and this spec In Progress.
 
 ## Verification
 
-- [ ] TDD evidence for profile resolution, lineage examples (empty, one, balanced,
+- [x] TDD evidence for profile resolution, lineage examples (empty, one, balanced,
       unequal), constructed memory-insensitive and memory-sensitive controllers,
       full-action differences, zero/scramble union, and no live-state/RNG changes.
       Pure aggregation/permutation invariants receive proptests; preserve any
       generated regression file. Use tiny goal fixtures for report determinism
       across repeated runs and thread counts, plus old gate-field equality.
-- [ ] Run viability first if tick mechanics/defaults/founders are touched; run
+- [x] Run viability first if tick mechanics/defaults/founders are touched; run
       `cargo check --workspace --all-targets` after coherent Rust edits, focused
       tests, and `make roadmap-check` after document edits.
-- [ ] Explicit simplification self-review for reuse, enums, existing dependencies,
+- [x] Explicit simplification self-review for reuse, enums, existing dependencies,
       redundant computation, and scope; record changes and affected rechecks.
-- [ ] `make rust-mutants` after simplification; record its summary, output path,
+- [x] `make rust-mutants` after simplification; record its summary, output path,
       complete missed/timeout survivor list and each killed/equivalent/deferred
       resolution. Only strengthen tests to kill mutants, then rerun the target.
-- [ ] Store `docs/progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table.json`
+- [x] Store `docs/progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table.json`
       (gate) and `docs/progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table-goal.json`
       (goal) through `make bench`; record both compute references and report
       provenance. No threshold or stored baseline edits to obtain a pass.
-- [ ] Run goal a second time in a separate process to scratch output, sequentially
+- [x] Run goal a second time in a separate process to scratch output, sequentially
       without concurrent builds/benchmarks, and require full deterministic-block
       equality. Record both elapsed times, births and deaths on every seed, and
       the actual lineage and memory readings, including null/zero results.
-- [ ] Sol consultations received before approach and before reporting done (also
+- [x] Sol consultations received before approach and before reporting done (also
       after a repeated failure), with accepted/rejected guidance and count.
 - [ ] Fresh Astra independent final review and required remediation completed;
       record finding counts and advisory deferrals.
@@ -164,6 +164,63 @@ readings, observation overhead, both total run times, and second-run equality
 here after the runs. The first goal-v1 reading is a provisional program baseline
 pending manual verification/integration, not evidence of improvement.
 
+Measured on 2026-09-04/05 with committed producer revision
+`e94569b8ebed8b28dd7bce1db5d35e134ecdc3f4` on Apple M1 Pro, 8 logical cores:
+
+- Gate report: [evidence](../../../progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table.json).
+  The five nonzero normalized work counters were exactly 0.000000% against
+  T10.F10 and T10.F11; plasticity was zero on both sides and therefore
+  `null`/ok. Both comparisons were non-severe. Gate wall time was
+  0.004590127 ms per creature tick: -15.742295% versus T10.F10 and +0.295879%
+  versus T10.F11, both ok. The gate report's new lineage and memory indicators
+  are `Undefined`; the remaining deterministic object equals T10.F11 after
+  removing only those two new keys.
+- Goal report: [stored evidence](../../../progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table-goal.json);
+  sequential repeat: `/private/tmp/t01-f12-goal-final-second.json`. Fixed
+  inputs were 1600 by 1600, 10,000 founders, seeds 11/22/33, 2,000 ticks, and
+  production food coverage. The stored/repeat wall totals were 583820.333 ms
+  and 583464.009 ms; final observation overhead was 1302.799 ms and 1298.477
+  ms, respectively. Parsed deterministic objects were exactly equal using
+  Node `util.isDeepStrictEqual` (not a serialization hash). Both readings had
+  births/final population/deaths of 134117/5291/138826 (seed 11),
+  179125/10997/178128 (seed 22), and 166410/8130/168280 (seed 33), with no
+  extinction. The earlier, sleep-interrupted bd2ad9b4 repeat is retained only
+  as superseded evidence; its maintenance-sleep intervals are not attributed
+  to probe cost.
+- Goal lineage count/entropy was 142/2.780730, 144/2.947968, and 140/2.668014.
+  Memory sensitivity was zeroed/scrambled/either = 0/0/0 and fraction
+  0.000000 for every seed. The probe uses the complete selected action queue
+  (`Vec<WorldAction>`, including order, length, variant, direction, and payload),
+  after the final executed tick and before observation actions; it compares
+  intact memory with zeroed memory and fixed `rotate_left(1)` scrambling of the
+  16 shared-memory slots. It does not assess applied-action success, priority,
+  traces, or adaptive benefit.
+
+Simplification review found no new abstraction, dependency, enum, or framework
+need. It reduced the six duplicated goal-override branches to one local flag
+loop while preserving each exact error, and reduced memory-sensitivity counting
+from three traversals to one fold. The focused CLI/core tests and workspace
+check passed before the regenerated reports. The observer remains isolated from
+`run_tick`, production defaults, and founder behavior, so viability-first did
+not apply.
+
+Mutation evidence: initial `make rust-mutants` reported 54 mutants at
+`/Users/istefanek/.local/share/petri-tools/mutants/t01-f12/mutants.out`:
+33 caught, 18 unviable, 3 missed, 0 timeout. The complete missed list was
+`main.rs:247 == -> !=`, `main.rs:268 && -> ||`, and
+`main.rs:268 == -> !=`; each was killed by the test-only explicit-sweep-output
+and no-goal-reference integration test. The rerun ended 2026-09-05T00:55:13Z
+with 54 total, 36 caught, 18 unviable, 0 missed, and 0 timeout; both
+`missed.txt` and `timeout.txt` are empty. No survivor was equivalent or
+deferred.
+
+Advisor record: 2 Sol consultations, both accepted and none rejected. Before
+approach, Sol recommended the narrow `&Simulation` observer, sorted IDs,
+one sensor assembly, fresh local mutable state, `GraphRuntimeState::clone`,
+fixed rotation, and complete queue comparison. Before reporting, Sol confirmed
+that complete ordered `Vec<WorldAction>` equality and union-once counting are
+the minimal correct semantics; no correction was needed.
+
 ## Success Criteria
 
 - [ ] The fixed goal benchmark provides truthful, reproducible lineage and memory
@@ -187,4 +244,13 @@ pending manual verification/integration, not evidence of improvement.
 - User override: implementation and automated review must finish here, but keep
   feature unchecked and spec In Progress. Manual verification and integration
   are pending. Preserve worktree and branch and stop for the user's decision.
-- Usage unavailable. Advisor consultation and reviewer counts pending.
+- Manual verification and integration steps (intentionally pending): inspect
+  [docs/progress.md](../../../progress.md) to confirm the T01.F12 row remains
+  pending and all historical lineage/memory values are `Undefined`. To repeat
+  the fixed benchmark without replacing committed evidence, run
+  `caffeinate -i make bench PROFILE=goal FEATURE=t01-f12-goal-profile-basic-indicators-and-progress-table OUT=/private/tmp/t01-f12-manual-goal.json`
+  from this worktree (about ten minutes), then compare the full parsed
+  `deterministic` object with the committed goal report. Expect final
+  populations 5291/10997/8130, lineage counts 142/144/140, entropies
+  2.780730/2.947968/2.668014, and zero memory sensitivity for seeds 11/22/33.
+- Usage unavailable. Two advisor consultations completed; fresh Astra review is pending.
