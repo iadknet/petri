@@ -1017,11 +1017,16 @@ pub fn run_tick(sim: &mut Simulation, trace: &mut Option<ActiveTrace>) {
 mod final_action_observation_tests {
     use super::*;
     use crate::config::SimulationConfig;
-    use crate::contracts::{Direction, NodeId, WorldAction};
+    use crate::contracts::{Direction, NodeId, OrdinaryFoodTypeId, WorldAction};
+    use crate::creature::genome::cgp::{
+        ActionSlot, ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind,
+        ExecuteGate, GraphEdge, GraphSource, WorldActionKind,
+    };
     use crate::creature::genome::{
         BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
     };
     use crate::simulation::seed_simulation;
+    use proptest::prelude::*;
     use rand::RngCore;
 
     fn memory_direction_genome() -> CreatureGenome {
@@ -1054,6 +1059,37 @@ mod final_action_observation_tests {
                         VmInstruction::PushAction { action_type: 3 },
                         VmInstruction::ExecuteActionQueue,
                     ],
+                }),
+                targets: vec![],
+            }],
+        }
+    }
+
+    fn runtime_state_action_genome() -> CreatureGenome {
+        let runtime_output = GraphEdge {
+            source: GraphSource::ComputeNode(0),
+            weight: 1.0,
+        };
+        CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    compute_nodes: vec![ComputeNode {
+                        kind: ComputeNodeKind::DecayIntegrator(0.0),
+                        inputs: vec![],
+                        plasticity: None,
+                    }],
+                    output_sinks: vec![],
+                    action_bank: vec![ActionSlot {
+                        behavior: ActionSlotBehavior::Emit(WorldActionKind::Eat),
+                        gate_inputs: vec![runtime_output],
+                        param_inputs: vec![],
+                    }],
+                    execute_gate: ExecuteGate {
+                        inputs: vec![runtime_output],
+                    },
                 }),
                 targets: vec![],
             }],
@@ -1133,5 +1169,47 @@ mod final_action_observation_tests {
             graph_state_before.scratch_w_inputs
         );
         assert_eq!(sim.rng.next_u64(), rng_before.next_u64());
+    }
+
+    #[test]
+    fn final_action_observation_preserves_learned_runtime_for_memory_insensitive_controller() {
+        let mut config = SimulationConfig::default();
+        config.world.width = 16;
+        config.world.height = 16;
+        config.population.initial_creatures = 1;
+        let mut sim = seed_simulation(config, 11);
+        let id = sim.creatures.keys().next().expect("one founder");
+        let creature = &mut sim.creatures[id];
+        creature.genome = runtime_state_action_genome();
+        creature.shared_memory[0] = 1.0;
+        creature.shared_memory[1] = 0.25;
+        creature.graph_runtime.node_state = vec![vec![1.0]];
+
+        let observations = observe_final_actions(&sim);
+
+        let expected = vec![WorldAction::Eat {
+            type_idx: OrdinaryFoodTypeId::new(0),
+        }];
+        let observation = observations.first().expect("one observation");
+        assert_eq!(observation.intact, expected);
+        assert_eq!(observation.zeroed, expected);
+        assert_eq!(observation.scrambled, expected);
+        assert_eq!(sim.creatures[id].graph_runtime.node_state, vec![vec![1.0]]);
+    }
+
+    proptest! {
+        #[test]
+        fn scramble_rotation_preserves_the_shared_memory_multiset(bits in prop::array::uniform16(any::<u32>())) {
+            let memory = bits.map(f32::from_bits);
+            let mut scrambled = memory;
+            scrambled.rotate_left(1);
+
+            let mut original_bits = memory.map(f32::to_bits);
+            let mut scrambled_bits = scrambled.map(f32::to_bits);
+            original_bits.sort_unstable();
+            scrambled_bits.sort_unstable();
+
+            prop_assert_eq!(scrambled_bits, original_bits);
+        }
     }
 }
