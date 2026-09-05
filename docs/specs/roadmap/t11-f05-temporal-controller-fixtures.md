@@ -401,3 +401,19 @@ both inside the 25 percent flag threshold. Report:
   `/usage` is a user command). Implementer advisor consults: 2 in the
   implementation pass, 2 in the remediation pass. Reviewer findings: P1 0,
   P2 1, P3 5.
+- Integration blocker (orchestrator, 2026-09-05): after `ExitWorktree`,
+  `git merge --ff-only worktree-t11-f05` on `main` (still at `ae012a87`)
+  refused with "Your local changes to the following files would be
+  overwritten by merge: Makefile". The main checkout carried uncommitted
+  work that is not part of this feature (a `scripts/bench-wait` benchmark
+  preflight: modified `Makefile` and `docs/workflow.md`, untracked
+  `scripts/bench-wait` and `scripts/bench-wait-test`, written 08:59 to 09:00
+  the same day). The orchestrator did not stash, commit, or discard it. The
+  feature branch is complete at `2544dd42`, where `make check` exited 0; this
+  note is a documentation-only commit verified with `make roadmap-check`. To
+  integrate: commit or set aside the bench-wait work in the main checkout,
+  then run `git merge --ff-only worktree-t11-f05` (if `main` has moved by
+  then, a regular merge is needed; the branch's `Makefile` edits are the
+  `.PHONY` and `rust-test-all` lines and do not overlap the `bench` recipe),
+  then `git worktree remove .claude/worktrees/t11-f05` and
+  `git branch -d worktree-t11-f05`.
