@@ -331,3 +331,39 @@ input-reference policy.
   evidence. Reconciliation to the approved main revision, final review, and
   integration remain blocked on explicit authority; no rebase or merge has been
   performed.
+
+- Final mutation evidence (2026-09-05): runs exited 0: original 122 tested/96 caught/24 missed/2 unviable/0 timeout; remediation 129/123/4/2/0; final 129/125/2/2/0. Outputs: `t11-f02`, `t11-f02-remediation`, and `t11-f02-final` under `/Users/istefanek/.local/share/petri-tools/mutants/`.
+  Original survivors and final dispositions:
+  - `crates/v3-core/src/mutation/vm/operators.rs:55:42: delete ! in apply_register_count_mutation` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:252:9: delete match arm u8::MAX in nudge_u8` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:253:14: replace match guard rng.gen_bool(0.5) with true in nudge_u8` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:253:14: replace match guard rng.gen_bool(0.5) with false in nudge_u8` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:260:9: delete match arm 0 in nudge_u16` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:262:14: replace match guard rng.gen_bool(0.5) with true in nudge_u16` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:262:14: replace match guard rng.gen_bool(0.5) with false in nudge_u16` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:269:9: delete match arm i32::MIN in nudge_i32` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:271:14: replace match guard rng.gen_bool(0.5) with true in nudge_i32` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:271:14: replace match guard rng.gen_bool(0.5) with false in nudge_i32` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:440:30: replace + with * in apply_instruction_mutation` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:456:84: replace + with * in apply_instruction_mutation` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:532:5: replace remap_register_refs with ()` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:534:30: replace % with / in remap_register_refs` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:534:30: replace % with + in remap_register_refs` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:535:44: replace + with * in remap_register_refs` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:536:37: replace % with / in remap_register_refs` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:634:38: replace || with && in splice_program_with_reference_repair` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with == in splice_program_with_reference_repair` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with >= in splice_program_with_reference_repair` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:678:43: replace && with || in splice_program_with_reference_repair` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:883:21: replace + with * in apply_insert_read_store_motif` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:972:21: replace + with * in apply_insert_load_compare_motif` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:1078:9: delete match arm VmInstruction::LoadSlot{slot_reg, ..} | VmInstruction::StoreSlot{slot_reg, ..} in mutate_slot_idx_field` — caught in final rerun.
+  Second-run survivors:
+  - `crates/v3-core/src/mutation/vm/operators.rs:260:9: delete match arm 0 in nudge_u16` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:634:38: replace || with && in splice_program_with_reference_repair` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with == in splice_program_with_reference_repair` — deferred: requires vectors of about 2.1 billion elements to distinguish this huge-allocation guard.
+  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with >= in splice_program_with_reference_repair` — deferred: requires vectors of about 2.1 billion elements to distinguish this huge-allocation guard.
+  Final misses:
+  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with == in splice_program_with_reference_repair` — deferred: requires vectors of about 2.1 billion elements to distinguish this huge-allocation guard.
+  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with >= in splice_program_with_reference_repair` — deferred: requires vectors of about 2.1 billion elements to distinguish this huge-allocation guard.
+  Consultations 1–6 were accepted; none rejected. Only reconciliation/integration remains approval-blocked.
