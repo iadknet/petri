@@ -1,0 +1,133 @@
+#!/bin/sh
+set -eu
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+checker=$script_dir/bench-wait
+test_root=$(mktemp -d "${TMPDIR:-/tmp}/petri-bench-wait-test.XXXXXX")
+trap 'rm -rf "$test_root"' 0
+trap 'exit 130' INT
+trap 'exit 143' HUP TERM
+export BENCH_WAIT_FIXTURE="$test_root"
+mkdir "$test_root/bin"
+
+cat >"$test_root/bin/ps" <<'STUB'
+#!/bin/sh
+set -eu
+[ "$*" = '-A -o pid= -o stat= -o comm=' ]
+[ ! -f "$BENCH_WAIT_FIXTURE/ps-fails" ] || exit 1
+cat "$BENCH_WAIT_FIXTURE/processes"
+STUB
+cat >"$test_root/bin/sleep" <<'STUB'
+#!/bin/sh
+set -eu
+printf '%s\n' "$1" >>"$BENCH_WAIT_FIXTURE/sleeps"
+if [ -f "$BENCH_WAIT_FIXTURE/next" ]; then
+  mv "$BENCH_WAIT_FIXTURE/next" "$BENCH_WAIT_FIXTURE/processes"
+fi
+STUB
+cat >"$test_root/bin/cargo" <<'STUB'
+#!/bin/sh
+printf '%s\n' "$@" >"$BENCH_WAIT_FIXTURE/ran"
+exit 7
+STUB
+chmod +x "$test_root/bin/ps" "$test_root/bin/sleep" "$test_root/bin/cargo"
+
+fail() { printf 'bench-wait-test: %s\n' "$*" >&2; exit 1; }
+reset_fixture() {
+  rm -f "$test_root/ran" "$test_root/sleeps" "$test_root/next" "$test_root/ps-fails"
+  : >"$test_root/processes"
+}
+run_checker() {
+  status=0
+  PATH="$test_root/bin:$PATH" BENCH_WAIT_TIMEOUT="${timeout-10}" \
+    sh "$checker" cargo 'argument with spaces' >"$test_root/output" 2>&1 || status=$?
+}
+expect_run() {
+  [ "$status" -eq 7 ] || { cat "$test_root/output" >&2; fail "command did not run (status $status)"; }
+  [ "$(cat "$test_root/ran")" = 'argument with spaces' ] || fail 'arguments were not preserved'
+}
+
+reset_fixture
+run_checker
+expect_run
+[ ! -f "$test_root/sleeps" ] || fail 'idle host waited'
+
+# Real executable names, independent of checkout, profile, and path spaces.
+for executable in /repo/target/debug/v3-server /another/target/release/v3-cli \
+  /tmp/target/debug/deps/v3_core-a8330ce714f663f7 \
+  /tmp/target/debug/deps/v3_cli-a8330ce714f663f7 \
+  /tmp/target/debug/deps/v3_server-a8330ce714f663f7 \
+  '/repo with spaces/target/debug/v3-server' /tools/cargo-mutants; do
+  reset_fixture
+  printf '123 S %s\n' "$executable" >"$test_root/processes"
+  : >"$test_root/next"
+  run_checker
+  expect_run
+  [ "$(cat "$test_root/sleeps")" = 5 ] || fail "did not wait for $executable"
+  grep -F '123' "$test_root/output" >/dev/null || fail 'blocking PID not shown'
+done
+
+# Ignore lookalikes, zombies, and shell arguments mentioning the server.
+reset_fixture
+cat >"$test_root/processes" <<'PROCESSES'
+123 S /tools/v3-server-helper
+124 S /tools/not-v3-server
+125 Z /repo/target/debug/v3-server
+126 Ss /bin/sh
+127 S /bin/rg
+PROCESSES
+run_checker
+expect_run
+[ ! -f "$test_root/sleeps" ] || fail 'unrelated or zombie processes blocked benchmark'
+
+reset_fixture
+printf '123 S /repo/target/debug/v3-server\n' >"$test_root/processes"
+run_checker
+[ "$status" -eq 1 ] || fail 'persistent server did not time out'
+[ ! -f "$test_root/ran" ] || fail 'benchmark ran while server remained'
+grep -F 'timed out' "$test_root/output" >/dev/null || fail 'missing timeout diagnostic'
+[ "$(wc -l <"$test_root/sleeps" | tr -d ' ')" -eq 2 ] || fail 'timeout exceeded expected polling budget'
+
+reset_fixture
+: >"$test_root/ps-fails"
+run_checker
+[ "$status" -eq 1 ] || fail 'process inspection failure was ignored'
+[ ! -f "$test_root/ran" ] || fail 'benchmark ran without process visibility'
+grep -F 'cannot inspect' "$test_root/output" >/dev/null || fail 'missing inspection diagnostic'
+
+for timeout in 0 3 08; do
+  reset_fixture
+  printf '123 S /repo/target/debug/v3-server\n' >"$test_root/processes"
+  run_checker
+  [ "$status" -eq 1 ] || fail "timeout $timeout did not block the command"
+  [ ! -f "$test_root/ran" ] || fail 'benchmark ran while blocked'
+  if [ "$timeout" = 0 ]; then
+    [ ! -f "$test_root/sleeps" ] || fail 'zero timeout slept'
+  else
+    total=$(awk '{ sum += $1 } END { print sum }' "$test_root/sleeps")
+    [ "$total" -eq "$timeout" ] || fail 'poll exceeded wait limit'
+  fi
+done
+
+for timeout in invalid -1 ''; do
+  reset_fixture
+  run_checker
+  [ "$status" -eq 2 ] || fail 'invalid timeout accepted'
+  [ ! -f "$test_root/ran" ] || fail 'benchmark ran with invalid timeout'
+done
+
+# Every public benchmark profile must go through the guard.
+for profile in gate goal sweep; do
+  reset_fixture
+  printf '123 S /repo/target/debug/v3-server\n' >"$test_root/processes"
+  if PATH="$test_root/bin:$PATH" BENCH_WAIT_TIMEOUT=0 \
+    make -s -C "$script_dir/.." bench PROFILE="$profile" FEATURE=t01-f01-test \
+      OUT="$test_root/report.json" AQUA_ROOT_DIR="$test_root/unused" \
+      >"$test_root/output" 2>&1; then
+    fail "make bench PROFILE=$profile ignored blocker"
+  fi
+  [ ! -f "$test_root/ran" ] || fail "make bench PROFILE=$profile started cargo while blocked"
+  grep -F 'timed out' "$test_root/output" >/dev/null || fail "profile $profile did not invoke guard"
+done
+
+printf 'Benchmark wait regression tests passed.\n'
