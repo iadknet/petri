@@ -169,35 +169,19 @@ fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), S
             Ok((bench::gate_profile_params(), feature))
         }
         BenchProfile::Goal => {
-            if args.width.is_some() {
-                return Err(
-                    "--width is not accepted for --profile goal; the goal profile is predeclared"
-                        .to_string(),
-                );
-            }
-            if args.height.is_some() {
-                return Err(
-                    "--height is not accepted for --profile goal; the goal profile is predeclared"
-                        .to_string(),
-                );
-            }
-            if args.founders.is_some() {
-                return Err("--founders is not accepted for --profile goal; the goal profile is predeclared".to_string());
-            }
-            if args.seeds.is_some() {
-                return Err(
-                    "--seeds is not accepted for --profile goal; the goal profile is predeclared"
-                        .to_string(),
-                );
-            }
-            if args.ticks.is_some() {
-                return Err(
-                    "--ticks is not accepted for --profile goal; the goal profile is predeclared"
-                        .to_string(),
-                );
-            }
-            if args.food_coverage.is_some() {
-                return Err("--food-coverage is not accepted for --profile goal; the goal profile is predeclared".to_string());
+            for (flag, supplied) in [
+                ("--width", args.width.is_some()),
+                ("--height", args.height.is_some()),
+                ("--founders", args.founders.is_some()),
+                ("--seeds", args.seeds.is_some()),
+                ("--ticks", args.ticks.is_some()),
+                ("--food-coverage", args.food_coverage.is_some()),
+            ] {
+                if supplied {
+                    return Err(format!(
+                        "{flag} is not accepted for --profile goal; the goal profile is predeclared"
+                    ));
+                }
             }
             let feature = args
                 .feature
