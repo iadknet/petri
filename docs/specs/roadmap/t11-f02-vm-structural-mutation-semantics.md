@@ -1,6 +1,6 @@
 # T11.F02 — VM Structural Mutation Semantics
 
-**Status**: In Progress
+**Status**: Blocked
 **Last updated**: 2026-09-05
 **Feature**: T11.F02
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -258,3 +258,23 @@ input-reference policy.
   (`viability` 25/25, neighborhood 4/4, reproducibility 1/1, VM E2E 1/1)
   passed in `/private/tmp/t11-f02-focused-integration-final.log`; no remaining
   simplification or efficiency finding requires a production change.
+- Integration blocker (2026-09-05): while this feature was at implementation
+  commit `e63248591faa7eb51f79014068a6920cc305ecb1`, `main` at
+  `/Users/istefanek/projects/petri` advanced from the recorded base
+  `c1e3b406ddd82b6bc42b431411011326d634af5e` to
+  `eddfacae43cc5e32a3748b9e2a589e14acba1172` (`test: fix rust-mutants guard
+  case against a shallow checkout`). The main change is limited to
+  `scripts/bench-wait-test`, which does not overlap this feature's paths, but
+  workflow requires explicit reconciliation authority before rebasing or
+  merging. No reconciliation has been performed. Completed validation is the
+  debug/release VM, viability, neighborhood, reproducibility, VM E2E, docs,
+  and gate evidence above; the gate report is present at
+  `docs/progress/features/t11-f02-vm-structural-mutation-semantics.json` but
+  has not been appended to the series because the goal report is outstanding.
+  Required mutation testing was already live against the captured diff when
+  this blocker was discovered (`cargo-mutants` PID 53705; output
+  `/Users/istefanek/.local/share/petri-tools/mutants/t11-f02/mutants.out`), so
+  it is being preserved and polled without restart. Outstanding work after
+  authorization: complete and triage that one mutation run, reconcile to the
+  approved main revision, rerun affected validation, make the one goal
+  benchmark run, append series/progress evidence, final review, and integration.
