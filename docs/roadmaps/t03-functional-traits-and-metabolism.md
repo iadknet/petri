@@ -34,7 +34,7 @@ fitness bonuses.
   - Goal: Claws and shells. Offensive, defensive, and escape traits trade off, and an encounter's outcome falls out of both bodies.
 - [ ] **T03.F07 — Life-History and Offspring Investment Traits** — Depends on: T03.F01
   - Goal: Litters. Few well-provisioned offspring or many cheap ones, and when to mature, as heritable choices.
-- [ ] **T03.F08 — Computational Capacity and Maintenance Tradeoffs** — Depends on: T03.F01
+- [ ] **T03.F08 — Computational Capacity and Maintenance Tradeoffs** — Depends on: T03.F01, T09.F02
   - Goal: Brains are expensive. Larger or more active controllers cost more to maintain, so cognition has to pay for itself.
 - [ ] **T03.F09 — Functional Specialization Confirmatory Campaign** — Depends on: T01.F06, T01.F09, T03.F02, T03.F03, T03.F04, T03.F05, T03.F07, T10.F08
   - Goal: Deferred proof phase. Replicated confirmatory runs that specialists coexist rather than one generalist winning.
@@ -44,6 +44,7 @@ fitness bonuses.
 - The existing phenotype color walk is identity and visualization state, not functional morphology. Do not overload it as a causal trait system.
 - Keep energy conserved and behavior-backed: sensing, motion, storage, digestion, defense, reproduction, and computation must affect the same applied accounting used for survival and reproduction. T03.F01 is a set of heritable numbers with costs wired into that accounting, not a lookup table or a generic framework.
 - Introduce continuous or otherwise locally mutable trait spaces where practical so useful specializations have reachable stepping stones.
+- T03.F08 follows basic controller qualification and founder accessibility. Measure realized energy deltas and executed work before adding maintenance costs; do not assume current cognition is too expensive or use a cost change to compensate for a runtime defect.
 - Morphology can facilitate control as well as impose cost; do not automatically attribute behavior enabled by a body trait to controller cognition.
 - Research basis reviewed 2026-09-02: [What Is Morphological Computation?](https://doi.org/10.1162/ARTL_a_00219) and [Evolving embodied intelligence from materials to machines](https://doi.org/10.1038/s42256-018-0009-9). Added 2026-09-03: [The Emergence of Complex Behavior in Large-Scale Ecological Environments](https://arxiv.org/abs/2510.18221) reports that adding a directional sense and then vision produced qualitatively new foraging and predation strategies; T03.F02 should adopt that nested sensor-ablation treatment design (resource sense only, plus direction, plus vision) so perception tradeoffs are compared against a known-effective control structure.
 - Options considered were fixed creature capabilities, direct niche labels, and evolvable applied traits. Use applied traits because fixed capabilities constrain niche count and direct labels create developer-assigned roles rather than evolved specialization.
