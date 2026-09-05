@@ -1,6 +1,14 @@
 #!/bin/sh
-# Preflight for measured runs; use executable names so shell arguments and
-# processes in other checkouts cannot hide or falsely trigger a blocker.
+# Preflight for measured runs and mutation tests; use executable names so
+# shell arguments and processes in other checkouts cannot hide or falsely
+# trigger a blocker.
+#
+# Environment:
+#   BENCH_WAIT_TIMEOUT   seconds to wait before giving up (3600; 0 checks once)
+#   BENCH_WAIT_BLOCKERS  which processes block: `all` (default) waits for
+#                        v3-server, v3-cli, v3-core, their v3_* test
+#                        binaries, and cargo-mutants; `mutants` waits only
+#                        for cargo-mutants
 set -eu
 
 timeout=${BENCH_WAIT_TIMEOUT-3600}
@@ -10,6 +18,12 @@ esac
 # Normalize decimal input before shell arithmetic (e.g. 08 is eight seconds).
 timeout=$(printf '%s\n' "$timeout" | sed 's/^0*//')
 timeout=${timeout:-0}
+blockers_mode=${BENCH_WAIT_BLOCKERS-all}
+case "$blockers_mode" in
+  all) only_mutants=0; what='competing Petri runs or mutation tests' ;;
+  mutants) only_mutants=1; what='a running mutation test' ;;
+  *) printf 'bench-wait: BENCH_WAIT_BLOCKERS must be all or mutants\n' >&2; exit 2 ;;
+esac
 [ "$#" -gt 0 ] || { printf 'Usage: scripts/bench-wait command [args...]\n' >&2; exit 2; }
 
 waited=0
@@ -18,28 +32,29 @@ while :; do
   # Do not turn denied process visibility (e.g. an agent sandbox) into an
   # apparently idle host. Capture ps separately from the filtering pipeline.
   if ! processes=$(ps -A -o pid= -o stat= -o comm=); then
-    printf 'bench-wait: cannot inspect host processes; benchmark not started\n' >&2
+    printf 'bench-wait: cannot inspect host processes; command not started\n' >&2
     exit 1
   fi
-  blockers=$(printf '%s\n' "$processes" | awk '
+  blockers=$(printf '%s\n' "$processes" | awk -v only_mutants="$only_mutants" '
     $2 !~ /^Z/ {
       pid = $1
       sub(/^[[:space:]]*[0-9]+[[:space:]]+[^[:space:]]+[[:space:]]+/, "")
       executable = $0
       sub(/^.*\//, "", executable)
-      if (executable ~ /^v3-(server|cli|core)$/ ||
-          executable ~ /^v3_(server|cli|core)-[[:xdigit:]]+$/ ||
-          executable == "cargo-mutants")
+      if (executable == "cargo-mutants" ||
+          (!only_mutants &&
+           (executable ~ /^v3-(server|cli|core)$/ ||
+            executable ~ /^v3_(server|cli|core)-[[:xdigit:]]+$/)))
         printf "  PID %s: %s\n", pid, $0
     }
   ')
   [ -n "$blockers" ] || break
   if [ "$blockers" != "$previous" ]; then
-    printf 'bench-wait: waiting for competing Petri runs or mutation tests:\n%s\n' "$blockers" >&2
+    printf 'bench-wait: waiting for %s:\n%s\n' "$what" "$blockers" >&2
     previous=$blockers
   fi
   if [ "$waited" -ge "$timeout" ]; then
-    printf 'bench-wait: timed out after %s seconds; benchmark not started. Let the listed processes finish or stop them deliberately, then retry. BENCH_WAIT_TIMEOUT controls the wait limit.\n' "$waited" >&2
+    printf 'bench-wait: timed out after %s seconds; command not started. Let the listed processes finish or stop them deliberately, then retry. BENCH_WAIT_TIMEOUT controls the wait limit.\n' "$waited" >&2
     exit 1
   fi
   delay=$((timeout - waited))
@@ -49,6 +64,6 @@ while :; do
 done
 
 if [ "$waited" -gt 0 ]; then
-  printf 'bench-wait: competing processes exited; starting benchmark\n' >&2
+  printf 'bench-wait: competing processes exited; starting command\n' >&2
 fi
 exec "$@"

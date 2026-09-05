@@ -15,7 +15,7 @@ hooks:
       hooks:
         - type: command
           command: "${CLAUDE_PROJECT_DIR}/scripts/implementer-compile-check"
-          timeout: 360
+          timeout: 960
   Stop:
     - hooks:
         - type: command
@@ -111,7 +111,7 @@ take several minutes before the report begins.
 
 A hook runs `scripts/implementer-compile-check` after every Edit or Write of a
 `.rs` file: `cargo check --workspace --all-targets` in your worktree, with the
-last 30 lines of output returned to you on failure or after a 300 second
+last 30 lines of output returned to you on failure or after a 900 second
 timeout. It cannot undo the edit; treat its output as the compiler's verdict
 and fix the build before moving on.
 

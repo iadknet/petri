@@ -18,8 +18,11 @@
 #   MUTANTS_TIMEOUT  fixed per-mutant test timeout in seconds (default: the
 #                    automatic timeout capped by .cargo/mutants.toml)
 #   MUTANTS_OUT      output directory (default: under PETRI_TOOL_ROOT)
+#   BENCH_WAIT_TIMEOUT  seconds to wait for a running cargo-mutants to finish
+#                    before giving up (scripts/bench-wait default: 3600)
 set -eu
 
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 root=$(git rev-parse --show-toplevel)
 cd "$root"
 base=${MUTANTS_BASE:-$(git merge-base HEAD main)}
@@ -41,6 +44,12 @@ fi
 
 set -- --in-diff "$diff_file" --output "$out" --jobs "${MUTANTS_JOBS:-2}"
 [ -z "${MUTANTS_TIMEOUT:-}" ] || set -- "$@" --timeout "$MUTANTS_TIMEOUT"
+# Never start a second mutation run on this host: two runs thrash the CPU and
+# memory budget cargo-mutants already saturates, and the slower one times out
+# mutants that would otherwise be caught. The preflight runs before rather
+# than around cargo-mutants so its exit status is never mistaken for the
+# tool's own usage exit code below.
+BENCH_WAIT_BLOCKERS=mutants "$script_dir/bench-wait" true
 printf 'rust-mutants: diff against %s, output in %s\n' "$base" "$out/mutants.out"
 status=0
 cargo mutants "$@" || status=$?

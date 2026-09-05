@@ -24,7 +24,7 @@ from reporting done while `make roadmap-check` fails in its worktree.
 `scripts/implementer-compile-check` is a PostToolUse hook on the implementer's
 Edit and Write calls: after a `.rs` edit it runs
 `cargo check --workspace --all-targets` and returns the last 30 lines of output
-when the build fails or exceeds 300 seconds. It is feedback, not a gate.
+when the build fails or exceeds 900 seconds. It is feedback, not a gate.
 `make rust-mutants` runs cargo-mutants (installed through aqua's local
 registry) on the feature diff; it is deliberately outside `make check` and the
 stop gate, because its output is a survivor list to triage, not a score.
@@ -168,6 +168,15 @@ servers, builds, or test runs during measurement. Direct CLI invocations bypass
 the guard; wrap profiling commands with `scripts/bench-wait <command> ...`.
 The ordinary `make check` tests remain unguarded: their gates use deterministic
 counters, not host wall-clock timings.
+
+`make rust-mutants` runs the same preflight restricted to `cargo-mutants`
+(`BENCH_WAIT_BLOCKERS=mutants`), so a second mutation run never starts while
+one is in progress anywhere on the host; a running server or benchmark does
+not hold it up. The per-mutant caps in `.cargo/mutants.toml` are deliberately
+generous (five times the baseline test time with a two minute floor, eight
+times for builds): a mutant that times out is reported as a survivor to
+triage, so a tight cap on a loaded host manufactures survivors and a retriage
+loop rather than catching anything.
 
 ### Close and integrate
 
