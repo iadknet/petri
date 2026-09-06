@@ -114,9 +114,8 @@ registers on which later mutations can operate without overwriting live values.
       add founder register slack and verify its original behavior is preserved.
 - [x] Update the mutation/VM references and graph contract pointer; update any
       founder contract documenting its register count.
-- [x] Self-review the diff for reuse, simplification, and efficiency. Mutation
-      testing is recorded below; the required distinct-output remediation rerun
-      remains outstanding.
+- [x] Self-review the diff for reuse, simplification, and efficiency; mutation
+      evidence is recorded below.
 - [ ] Store gate and single-run goal reports at
       `docs/progress/features/t11-f02-vm-structural-mutation-semantics.json`
       and `...-goal.json`; append both series entries and update
@@ -285,7 +284,7 @@ input-reference policy.
   and numeric-boundary tests. Consultation 4, accepted after a remapped-copy
   red failure, replaced whole-instruction equality with register-field identity
   because a surviving conditional jump's offset may be reencoded; it also
-  required one Cargo positional filter per command. Four consultations total;
+  required one Cargo positional filter per command. Six consultations total;
   no guidance rejected.
 - Original mutation run (2026-09-05): `make rust-mutants` generated
   `/Users/istefanek/.local/share/petri-tools/mutants/t11-f02/mutants.out` from
@@ -308,7 +307,7 @@ input-reference policy.
   batch. The two `new_len > i32::MAX` replacements (`==`, `>=`) are deferred:
   distinguishing them requires allocating and cloning vectors at least about
   2.1 billion elements; they are not equivalent. A third final target rerun is
-  pending to verify these dispositions. The two unviable mutants were founder default and input-reference
+  verified by the final target. The two unviable mutants were founder default and input-reference
   `Ok(Default)` changes. Survivor-driven test strengthening and the separate
   paired-slot overflow repair are ready for the required distinct-output rerun;
   no production edit was made merely to kill a mutant.
@@ -324,7 +323,7 @@ input-reference policy.
   debug/release VM, viability, neighborhood, reproducibility, VM E2E, docs,
   and gate evidence above; the gate report is present at
   `docs/progress/features/t11-f02-vm-structural-mutation-semantics.json` but
-  has not been appended to the series because the goal report is outstanding.
+  has not been appended to the series because closure-series append remains held for reconciliation authorization.
   The original mutation run has since reached the terminal summary recorded
   above. Outstanding feature-branch work is the required distinct-output
   survivor rerun, the replacement gate and one goal benchmark run, and progress
@@ -332,7 +331,7 @@ input-reference policy.
   integration remain blocked on explicit authority; no rebase or merge has been
   performed.
 
-- Final mutation evidence (2026-09-05): runs exited 0: original 122 tested/96 caught/24 missed/2 unviable/0 timeout; remediation 129/123/4/2/0; final 129/125/2/2/0. Outputs: `t11-f02`, `t11-f02-remediation`, and `t11-f02-final` under `/Users/istefanek/.local/share/petri-tools/mutants/`.
+- Final mutation evidence (2026-09-05): original wrapper exit was not retained: original 122 tested/96 caught/24 missed/2 unviable/0 timeout; remediation 129/123/4/2/0; final 129/125/2/2/0. Outputs: `t11-f02`, `t11-f02-remediation`, and `t11-f02-final` under `/Users/istefanek/.local/share/petri-tools/mutants/`.
   Original survivors and final dispositions:
   - `crates/v3-core/src/mutation/vm/operators.rs:55:42: delete ! in apply_register_count_mutation` — caught in final rerun.
   - `crates/v3-core/src/mutation/vm/operators.rs:252:9: delete match arm u8::MAX in nudge_u8` — caught in final rerun.
@@ -352,8 +351,8 @@ input-reference policy.
   - `crates/v3-core/src/mutation/vm/operators.rs:535:44: replace + with * in remap_register_refs` — caught in final rerun.
   - `crates/v3-core/src/mutation/vm/operators.rs:536:37: replace % with / in remap_register_refs` — caught in final rerun.
   - `crates/v3-core/src/mutation/vm/operators.rs:634:38: replace || with && in splice_program_with_reference_repair` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with == in splice_program_with_reference_repair` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with >= in splice_program_with_reference_repair` — caught in final rerun.
+  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with == in splice_program_with_reference_repair` — deferred: distinguishing requires vectors of about 2.1 billion elements.
+  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with >= in splice_program_with_reference_repair` — deferred: distinguishing requires vectors of about 2.1 billion elements.
   - `crates/v3-core/src/mutation/vm/operators.rs:678:43: replace && with || in splice_program_with_reference_repair` — caught in final rerun.
   - `crates/v3-core/src/mutation/vm/operators.rs:883:21: replace + with * in apply_insert_read_store_motif` — caught in final rerun.
   - `crates/v3-core/src/mutation/vm/operators.rs:972:21: replace + with * in apply_insert_load_compare_motif` — caught in final rerun.
@@ -367,3 +366,5 @@ input-reference policy.
   - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with == in splice_program_with_reference_repair` — deferred: requires vectors of about 2.1 billion elements to distinguish this huge-allocation guard.
   - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with >= in splice_program_with_reference_repair` — deferred: requires vectors of about 2.1 billion elements to distinguish this huge-allocation guard.
   Consultations 1–6 were accepted; none rejected. Only reconciliation/integration remains approval-blocked.
+
+- Final benchmarks: replacement gate and the single goal run both exited 0. Goal report has no severe regression; plasticity updates are +23.452613% (flagged) while VM steps are -51.407250%. This follows altered mutation application/neighborhood behavior, not a work-counter or per-opcode runtime change; source review found only mutation-time splice repair and paired-slot arithmetic changes.
