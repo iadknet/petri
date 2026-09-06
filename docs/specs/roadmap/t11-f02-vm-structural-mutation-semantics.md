@@ -152,7 +152,41 @@ registers on which later mutations can operate without overwriting live values.
 
 ## Performance and Goal Impact
 
-Predeclared expectations above remain historical. Stored reports show no severe
+Predeclared cost: remapping scans the edited program at mutation time, and four
+spare founder registers enlarge dispatch initialization slightly; no per-opcode
+cost or work-counter definition changes. No severe compute regression is
+budgeted, and no baseline re-pin is authorized. Gate simulation counters should
+stay close to T11.F01 and the T10.F10 epoch, but changed offspring behavior can
+change them. Record all six normalized work and wall-clock deltas against both
+references and investigate any threshold crossing without weakening a gate.
+
+Neighborhood expectations before implementation: founder VM field-mutation and
+register-capacity silence should increase; repaired insertion/motif silence
+should generally increase and dead fractions should decrease. Reference repair
+does not promise neutrality for live macro copies/replacements: their silent
+fractions may fall when correctly retained control flow makes a formerly inert
+edit execute. Such movement is predeclared only for the affected VM structural
+operators and must be attributed to their corrected targets. Founder slack
+changes which registers VM operand/motif/copy mutations sample, so those rows
+may move in either direction from register interference; report that separately.
+Founder non-VM operator rows should remain unchanged because founder execution
+is preserved and their mutation rules are untouched, except input-reference
+addition on VM nodes, whose auto-wired insertion now has repaired jump
+targeting. Mutated-birth silence is expected to rise and dead fractions fall;
+report every bucket and investigate any reversal, mindful of T11.F01's
+four-sample single-event bucket.
+
+The evolved sample, lineage diversity, persistence, and memory sensitivity may
+shift in either direction because the inherited mutation map changes the
+population, not merely the measurement. Record the actual shifts against
+T11.F01 and T01.F12, distinguishing changed subjects from operator regressions;
+do not assert a cognition gain. All T11.F01 floors remain fixed and are due by
+T11.F10. No operator family is disabled/down-weighted to improve a reading.
+Closure readings and comparison conclusions remain to be recorded here.
+Record that input-reference-addition effect separately from its unchanged
+input-reference policy.
+
+Stored reports show no severe
 compute regression. Gate current / delta versus both T10.F10 and T11.F01:
 
 | counter | current | delta |
@@ -163,7 +197,47 @@ compute regression. Gate current / delta versus both T10.F10 and T11.F01:
 | plasticity | 0.000000 | n/a (both zero) |
 | actions | 1.000000 | 0.000000% |
 | births | 0.001196 | -1.320132% |
-| wall ms/tick | 0.004221 | -22.515619% / -12.646248% |
+| wall ms/creature-tick | 0.004221 | -22.515619% / -12.646248% |
+
+
+Founder VM and input-reference outcomes (silent/changed/dead; applied/skipped):
+
+| operator | baseline | current |
+|---|---|---|
+| vm:VmConstantMutation | 0.620000/0.380000/0.000000 (50/0) | 0.620000/0.380000/0.000000 (50/0) |
+| vm:VmInstructionMutation | 0.040000/0.920000/0.040000 (50/0) | 0.380000/0.620000/0.000000 (50/0) |
+| vm:VmDeleteInstruction | 0.000000/1.000000/0.000000 (50/0) | 0.040000/0.960000/0.000000 (50/0) |
+| vm:VmRegisterCountMutation | 0.480000/0.520000/0.000000 (50/0) | 1.000000/0.000000/0.000000 (50/0) |
+| vm:VmInstructionRawFieldMutation | 0.020000/0.980000/0.000000 (50/0) | 0.080000/0.920000/0.000000 (50/0) |
+| vm:VmCopyInstructionBlock | 0.040000/0.960000/0.000000 (50/0) | 0.400000/0.600000/0.000000 (50/0) |
+| vm:VmCopyInstructionBlockRemapped | 0.020000/0.940000/0.040000 (50/0) | 0.320000/0.680000/0.000000 (50/0) |
+| vm:VmCopyConstantBlock | 1.000000/0.000000/0.000000 (50/0) | 1.000000/0.000000/0.000000 (50/0) |
+| vm:VmCopyGeneBackwardSlice | 0.060000/0.800000/0.140000 (50/0) | 0.560000/0.340000/0.100000 (50/0) |
+| vm:VmCopyGeneForwardSlice | 0.080000/0.920000/0.000000 (50/0) | 0.400000/0.600000/0.000000 (50/0) |
+| vm:VmInsertReadStoreMotif | 0.120000/0.880000/0.000000 (50/0) | 0.900000/0.100000/0.000000 (50/0) |
+| vm:VmInsertReadBidMotif | 0.120000/0.840000/0.040000 (50/0) | 0.860000/0.140000/0.000000 (50/0) |
+| vm:VmInsertLoadCompareMotif | 0.060000/0.940000/0.000000 (50/0) | 0.760000/0.240000/0.000000 (50/0) |
+| vm:VmMutateSlotAddress | Undefined/Undefined/Undefined (0/50) | Undefined/Undefined/Undefined (0/50) |
+| vm:VmMutatePairedSlotAddress | Undefined/Undefined/Undefined (0/50) | Undefined/Undefined/Undefined (0/50) |
+| input_ref:Add | 0.400000/0.600000/0.000000 (50/0) | 0.660000/0.340000/0.000000 (50/0) |
+
+Founder births (silent/changed/dead; applied/skipped):
+
+| events | baseline | current |
+|---|---|---|
+| any | 0.068182/0.704545/0.227273 (44/0) | 0.068182/0.727273/0.204545 (44/0) |
+| 1 | 0.500000/0.500000/0.000000 (4/0) | 0.500000/0.500000/0.000000 (4/0) |
+| 2 | 0.166667/0.833333/0.000000 (6/0) | 0.166667/0.833333/0.000000 (6/0) |
+| 3 | 0.000000/0.666667/0.333333 (3/0) | 0.000000/0.666667/0.333333 (3/0) |
+| 4 | 0.000000/0.571429/0.428571 (7/0) | 0.000000/0.571429/0.428571 (7/0) |
+| 5 | 0.000000/0.333333/0.666667 (3/0) | 0.000000/0.333333/0.666667 (3/0) |
+| 6 | 0.000000/1.000000/0.000000 (3/0) | 0.000000/1.000000/0.000000 (3/0) |
+| 7 | 0.000000/0.800000/0.200000 (5/0) | 0.000000/0.800000/0.200000 (5/0) |
+| 8 | 0.000000/0.500000/0.500000 (2/0) | 0.000000/0.500000/0.500000 (2/0) |
+| 9 | 0.000000/0.857143/0.142857 (7/0) | 0.000000/0.857143/0.142857 (7/0) |
+| 10 | 0.000000/0.750000/0.250000 (4/0) | 0.000000/1.000000/0.000000 (4/0) |
+
+Zero-event births: 456 / 456. Any-event silence is unchanged at 3/44=.068182; dead falls 10 to 9; one-event silence stays 2/4. Input-reference Add silence rises .400000 to .660000 because repaired old jumps preserve their original target around auto-inserted ReadInput; its policy is unchanged.
 
 Goal current / delta versus T01.F12 and T11.F01 (the two references have the
 same counter baselines):
@@ -176,7 +250,7 @@ same counter baselines):
 | plasticity | 0.124060 | +23.452613% (flagged) |
 | actions | 1.157620 | +6.608783% |
 | births | 0.008218 | +1.007866% |
-| wall ms/tick | 0.008461 | -14.561153% / -22.336763% |
+| wall ms/creature-tick | 0.008461 | -14.561153% / -22.336763% |
 
 The flagged plasticity value reflects changed trajectories and applied-update
 counts: seed 11 moved .0981469563 to .1217268032, seed 22 .0763916402 to
@@ -188,7 +262,7 @@ fraction rose .121569 to .184314; seed 33 single-event silence fell .5625 to
 Nine goal indicators (adaptive novelty, evolutionary activity, information
 integration, learning/prediction/memory dependence, lineage diversity, memory
 sensitivity, persistence, and reciprocal/strategy measures) are Undefined;
-births per 100 ticks is 32.444444. Closure-series append and progress.md stay
+births per 100 ticks is 9356.566667 versus 7994.2 baseline. Lineage diversity, memory sensitivity, and population persistence are measured; their stored readings will be tabulated in the next evidence pass. Closure-series append and progress.md stay
 held for reconciliation/integration authorization.
 
 ## Success Criteria
@@ -369,3 +443,46 @@ held for reconciliation/integration authorization.
   Consultations 1–6 were accepted; none rejected. Only reconciliation/integration remains approval-blocked.
 
 - Final benchmarks: replacement gate and the single goal run both exited 0. Goal report has no severe regression; plasticity updates are +23.452613% (flagged) while VM steps are -51.407250%. This follows altered mutation application/neighborhood behavior, not a work-counter or per-opcode runtime change; source review found only mutation-time splice repair and paired-slot arithmetic changes.
+
+### Goal indicator readings
+
+T11.F01 is the goal baseline; T01.F12 has the same core counters but no neighborhood.
+
+| seed | final population | births | min population | peak population | plateau |
+
+|---|---:|---:|---:|---:|---:|
+
+| 11 | 5291→9940 | 134117→184433 | 3243→6595 | 35279→36036 | 4682.102000→10045.570000 |
+
+| 22 | 10997→9477 | 179125→177196 | 5830→6865 | 36369→36628 | 9737.116000→8343.666000 |
+
+| 33 | 8130→10882 | 166410→199765 | 5031→6242 | 35433→35813 | 7631.720000→10839.180000 |
+
+
+| structure | baseline | current |
+|---|---:|---:|
+
+| min | 1 | 1 |
+
+| p25 | 95 | 96 |
+
+| median | 97 | 102 |
+
+| p75 | 124 | 139 |
+
+| max | 798 | 519 |
+
+| mean | 116.771071 | 121.588270 |
+
+
+| seed | clades | entropy | zero/scramble/either count,fraction |
+|---|---|---|---|
+
+| 11 | 142→118 | 2.780730→3.296956 | 0/0/0,0.000000 → 0/11/11,0.001107 |
+
+| 22 | 144→131 | 2.947968→3.026739 | 0/0/0,0.000000 → 0/2/2,0.000211 |
+
+| 33 | 140→96 | 2.668014→2.698148 | 0/0/0,0.000000 → 0/0/0,0.000000 |
+
+
+Same fixed probe: final-tick snapshot and rotate_left(1) over 16 slots. Undefined: adaptive_novelty, evolutionary_activity, information_integration, learning_dependence, memory_dependence, prediction_dependence, reciprocal_interaction, strategy_causal_distinctness, strategy_count. Goal births/100 ticks: 7994.200000→9356.566667. Gate T01.F11: seed11 population/births 284/35→283/34; seeds22/33 unchanged 260/18 and264/21; no extinction, 75 ticks; gate births/100 32.888889→32.444444. Seed22 dead increase and seed33 one-event silence drop are changed samples, not matched genomes or cognition evidence.
