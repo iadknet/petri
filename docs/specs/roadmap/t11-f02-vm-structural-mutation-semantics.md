@@ -116,10 +116,11 @@ registers on which later mutations can operate without overwriting live values.
       founder contract documenting its register count.
 - [x] Self-review the diff for reuse, simplification, and efficiency; mutation
       evidence is recorded below.
-- [ ] Store gate and single-run goal reports at
+- [x] Store gate and single-run goal reports at
       `docs/progress/features/t11-f02-vm-structural-mutation-semantics.json`
-      and `...-goal.json`; append both series entries and update
-      `docs/progress.md` with measured comparisons and every indicator reading.
+      and `...-goal.json`.
+- [ ] Append held closure-series entries and update `docs/progress.md` after
+      reconciliation/integration authorization.
 
 ## Verification
 
@@ -136,11 +137,11 @@ registers on which later mutations can operate without overwriting live values.
       change; `cargo check --workspace --all-targets` follows coherent Rust
       edits. Focused VM/founder/neighborhood tests and cross-process
       reproducibility pass; exact evidence is recorded below.
-- [ ] `make rust-mutants` after self-review: record summary, output directory,
+- [x] `make rust-mutants` after self-review: record summary, output directory,
       and full missed/timeout list, each killed by a strengthened test and rerun,
       equivalent with reason, or deferred in Notes. Do not alter production
       code to kill mutants or add unjustified exclusions.
-- [ ] `make bench PROFILE=gate FEATURE=t11-f02-vm-structural-mutation-semantics`
+- [x] `make bench PROFILE=gate FEATURE=t11-f02-vm-structural-mutation-semantics`
       and one `PROFILE=goal` run pass and their reports are stored. Measurement
       uses the existing host-contention preflight and unchanged profile sizes.
 - [x] Second goal-profile determinism run: Not applicable per the 2026-09-05
@@ -191,11 +192,11 @@ input-reference policy.
 
 ## Success Criteria
 
-- [ ] Every existing VM splice preserves surviving references under the
+- [x] Every existing VM splice preserves surviving references under the
       stated target policy, including copied internal/external references.
-- [ ] Operand events change one field by one unit, keep terminals unchanged,
+- [x] Operand events change one field by one unit, keep terminals unchanged,
       and register-count events preserve effective register identities.
-- [ ] Founder slack preserves unmutated behavior; neutral edit properties,
+- [x] Founder slack preserves unmutated behavior; neutral edit properties,
       applied-cost fixtures, viability, and reproducibility pass.
 - [ ] Reference contracts, mutation triage, benchmark/progress evidence, and
       final review are complete; the checked feature and Complete spec land on
@@ -284,7 +285,7 @@ input-reference policy.
   and numeric-boundary tests. Consultation 4, accepted after a remapped-copy
   red failure, replaced whole-instruction equality with register-field identity
   because a surviving conditional jump's offset may be reencoded; it also
-  required one Cargo positional filter per command. Six consultations total;
+  required one Cargo positional filter per command. Seven consultations total;
   no guidance rejected.
 - Original mutation run (2026-09-05): `make rust-mutants` generated
   `/Users/istefanek/.local/share/petri-tools/mutants/t11-f02/mutants.out` from
@@ -325,10 +326,9 @@ input-reference policy.
   `docs/progress/features/t11-f02-vm-structural-mutation-semantics.json` but
   has not been appended to the series because closure-series append remains held for reconciliation authorization.
   The original mutation run has since reached the terminal summary recorded
-  above. Outstanding feature-branch work is the required distinct-output
-  survivor rerun, the replacement gate and one goal benchmark run, and progress
-  evidence. Reconciliation to the approved main revision, final review, and
-  integration remain blocked on explicit authority; no rebase or merge has been
+  above. Implementation, mutation testing, and both benchmarks are complete. A fresh
+  feature-branch review may proceed; reconciliation, integration, and closure
+  updates remain blocked on explicit authority; no rebase or merge has been
   performed.
 
 - Final mutation evidence (2026-09-05): original wrapper exit was not retained: original 122 tested/96 caught/24 missed/2 unviable/0 timeout; remediation 129/123/4/2/0; final 129/125/2/2/0. Outputs: `t11-f02`, `t11-f02-remediation`, and `t11-f02-final` under `/Users/istefanek/.local/share/petri-tools/mutants/`.
