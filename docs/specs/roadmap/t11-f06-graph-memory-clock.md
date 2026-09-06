@@ -124,6 +124,87 @@ accelerate that clock. Ordered combinational paths still compute in one visit.
       and `make check` exit 0 on final feature content; record the tested
       commit in this task after committing and checking for hook edits.
 
+### Implementation evidence (in progress)
+
+- TDD red: `cargo test -p v3-core --test temporal_fixtures d -- --nocapture`
+  exited 101 before production edits; D1 observed [11,3,3,3] vs [1,1,1,1],
+  D2 [15,15,15,15] vs [1,1,1,1], D3 15 vs 1.
+  Log: `/private/tmp/t11-f06-tdd-red.log`.
+- First verification after semantic edit: `cargo test -p v3-core --test viability`
+  exited 0, 25 tests. Log: `/private/tmp/t11-f06-viability.log`.
+- Green: `cargo test -p v3-core --test temporal_fixtures` exited 0, 13 tests;
+  `/private/tmp/t11-f06-temporal.log`. Temporal substrate positive controls pass
+  in `/private/tmp/t11-f06-observation.log`. Workspace/all-target compiler
+  feedback was run explicitly after coherent edits.
+- The first `make check` passed core/CLI tests but seven server WebSocket
+  tests could not bind localhost in the sandbox. The same checks were
+  rerun successfully with authorized local listener access; no tests were weakened.
+- Reuse/simplification/efficiency self-review: kept the source resolver and
+  allocation-reusing scratch buffers; committed candidate temporal state only
+  after affordability; shared one intact observation across three substrates
+  (seven graph observations rather than nine), used enum interventions and
+  fixed arrays, removed obsolete internal convergence bookkeeping. Trace
+  candidates carry `temporal_committed` and inspector labels match that state.
+- Advisor consultations: 3, all accepted. First endorsed frozen bases,
+  candidate commit, explicit outer clock and per-vector interventions. Second
+  confirmed graph-only observation preparation from final committed state with
+  sensors/current/previous slots fixed and no shared-memory snapshot/decay.
+  No rejected advice or scope expansion. Consultation 3 is recorded in Notes below.
+
+- Authorized local-listener rerun: `make check` exited 0 (exec session 36862),
+  including 25 viability tests, 1,141 core unit tests, 13 temporal fixtures,
+  reproducibility, CLI gate two-run byte identity, 80 server integration tests,
+  Clippy, 54 frontend test files / 273 tests and frontend production build.
+  Log: `/private/tmp/t11-f06-make-check.log`. A subsequently added focused
+  inspector commit-status regression passes 2 tests in
+  `/private/tmp/t11-f06-ui-test.log`; final orchestrator check remains required.
+- `make roadmap-check` exited 0 in `/private/tmp/t11-f06-roadmap2.log`.
+
+### Mutation survivor audit
+
+Fresh run 1 (`MUTANTS_ITERATE=0 make rust-mutants`) exited 0:
+`40 mutants tested in 4m: 8 missed, 19 caught, 13 unviable`; no timeouts.
+Original output: `/Users/istefanek/.local/share/petri-tools/mutants/t11-f06/mutants.out`,
+preserved before rerun at `/private/tmp/t11-f06-mutants-fresh1-output`.
+Log: `/private/tmp/t11-f06-mutants-fresh1.log`.
+
+Full initial survivor list (line numbers from that run):
+
+| Survivor | Resolution |
+| --- | --- |
+| `crates/v3-cli/src/bench.rs:184:5` replace `legacy_graph_work_definition -> String` with `String::new()` | **Killed** by literal historical-metadata assertion; confirmed fresh run 2. |
+| `crates/v3-cli/src/bench.rs:184:5` replace `legacy_graph_work_definition -> String` with `"xyzzy".into()` | **Killed** by the same literal assertion; confirmed fresh run 2. |
+| `crates/v3-cli/src/bench.rs:1069:57` replace `==` with `!=` in `temporal_memory_sensitivity` | **Killed** by report-level positive control for per-substrate denominator/differences; confirmed fresh run 2. |
+| `crates/v3-core/src/simulation/tick.rs:300:5` replace `observe_temporal_actions` with `vec![]` | **Killed** by requiring all three observations; confirmed fresh run 2. |
+| `crates/v3-core/src/runtime/cgp/execute.rs:119:49` replace `*` with `/` | **Killed** by two-node actual energy assertion (100 to 99.5 at cost 0.25); confirmed fresh run 2. |
+| `crates/v3-core/src/runtime/cgp/execute.rs:153:27` replace `&&` with `\|\|` | **Equivalent**: a plastic node implies `has_any_hebbian`; nonplastic nodes have empty learned slices (also under child inheritance) and the alternative collector uses the same resolver and genome weights via `effective_weight` fallback. Living genomes are immutable. |
+| `crates/v3-core/src/runtime/cgp/execute.rs:210:26` replace `-` with `+` | **Killed** by trace tick-start delta assertions 1, 0.5, 0.25; confirmed fresh run 2. |
+| `crates/v3-core/src/runtime/cgp/execute.rs:210:26` replace `-` with `/` | **Killed** by the same trace-delta assertions; confirmed fresh run 2. |
+
+Only tests changed for survivor remediation. No exclusions or skip attributes
+were added. Repeated self-review found no further production simplifications;
+the strengthened assertions use explicit expected values and non-vacuous counts.
+Targeted verification: workspace/all-target check exited 0 in
+`/private/tmp/t11-f06-check-compile2.log`; clock tests passed in
+`/private/tmp/t11-f06-clock-tests2.log`; all 30 CLI unit tests passed in
+`/private/tmp/t11-f06-cli-tests2.log`.
+
+Fresh closure run 2 (`MUTANTS_ITERATE=0 make rust-mutants`) exited 0:
+`40 mutants tested in 4m: 1 missed, 26 caught, 13 unviable`; no timeouts.
+Output: `/Users/istefanek/.local/share/petri-tools/mutants/t11-f06/mutants.out`
+(`run-mode.txt` in its parent records `fresh`). Log:
+`/private/tmp/t11-f06-mutants-fresh2.log`. Full final survivor list:
+
+- **Equivalent**: `crates/v3-core/src/runtime/cgp/execute.rs:153:27`, replace
+  `&&` with `||` in `execute_graph_impl`, for the empty-learned-slice fallback
+  reason above. There are no deferred mutation findings.
+
+Applied charge audit: fixtures assert actual paid energy independently of
+entered-visit counters, including multiple nodes, repeated visits, and both
+exhaustion boundaries. The benchmark measures work and wall time; it does not
+add a graph-specific cumulative energy series or infer one from visit counts,
+because compute-node counts vary. No baseline or threshold is changed.
+
 ## Performance and Goal Impact
 
 Predeclared before implementation: natural analog is neural timescales,
@@ -179,86 +260,26 @@ loosened, and no operator family is disabled or reweighted.
 - Launch evidence: clean main at `adb8e203b357d62e6aea3df8b5ab55c05bdeba41`;
   worktree `/Users/istefanek/projects/petri/.worktrees/t11-f06`, branch
   `codex/t11-f06`. Session metadata verified Astra `gpt-6-astra`, `xhigh`.
-- Cost record: pending closure; task usage unavailable, advisor count and
-  reviewer finding counts to be recorded before the final commit.
+- Cost record: pending closure; task usage unavailable; advisor consults 3 (all accepted),
+  final reviewer not yet run.
 
-### Implementation evidence (in progress)
 
-- TDD red: `cargo test -p v3-core --test temporal_fixtures d -- --nocapture`
-  exited 101 before production edits; D1 observed [11,3,3,3] vs [1,1,1,1],
-  D2 [15,15,15,15] vs [1,1,1,1], D3 15 vs 1.
-  Log: `/private/tmp/t11-f06-tdd-red.log`.
-- First verification after semantic edit: `cargo test -p v3-core --test viability`
-  exited 0, 25 tests. Log: `/private/tmp/t11-f06-viability.log`.
-- Green: `cargo test -p v3-core --test temporal_fixtures` exited 0, 13 tests;
-  `/private/tmp/t11-f06-temporal.log`. Temporal substrate positive controls pass
-  in `/private/tmp/t11-f06-observation.log`. Workspace/all-target compiler
-  feedback was run explicitly after coherent edits.
-- The first `make check` passed core/CLI tests but seven server WebSocket
-  tests could not bind localhost in the sandbox. The same checks are being
-  rerun with authorized local listener access; no tests were weakened.
-- Reuse/simplification/efficiency self-review: kept the source resolver and
-  allocation-reusing scratch buffers; committed candidate temporal state only
-  after affordability; shared one intact observation across three substrates
-  (seven graph observations rather than nine), used enum interventions and
-  fixed arrays, removed obsolete internal convergence bookkeeping. Trace
-  candidates carry `temporal_committed` and inspector labels match that state.
-- Advisor consultations so far: 2, both accepted. First endorsed frozen bases,
-  candidate commit, explicit outer clock and per-vector interventions. Second
-  confirmed graph-only observation preparation from final committed state with
-  sensors/current/previous slots fixed and no shared-memory snapshot/decay.
-  No rejected advice or scope expansion. Final consultation pending.
-
-- Authorized local-listener rerun: `make check` exited 0 (exec session 36862),
-  including 25 viability tests, 1,141 core unit tests, 13 temporal fixtures,
-  reproducibility, CLI gate two-run byte identity, 80 server integration tests,
-  Clippy, 54 frontend test files / 273 tests and frontend production build.
-  Log: `/private/tmp/t11-f06-make-check.log`. A subsequently added focused
-  inspector commit-status regression passes 2 tests in
-  `/private/tmp/t11-f06-ui-test.log`; final orchestrator check remains required.
-- `make roadmap-check` exited 0 in `/private/tmp/t11-f06-roadmap2.log`.
-
-### Mutation survivor audit
-
-Fresh run 1 (`MUTANTS_ITERATE=0 make rust-mutants`) exited 0:
-`40 mutants tested in 4m: 8 missed, 19 caught, 13 unviable`; no timeouts.
-Original output: `/Users/istefanek/.local/share/petri-tools/mutants/t11-f06/mutants.out`,
-preserved before rerun at `/private/tmp/t11-f06-mutants-fresh1-output`.
-Log: `/private/tmp/t11-f06-mutants-fresh1.log`.
-
-Full initial survivor list (line numbers from that run):
-
-| Survivor | Resolution |
-| --- | --- |
-| `crates/v3-cli/src/bench.rs:184:5` replace `legacy_graph_work_definition -> String` with `String::new()` | **Killed** by literal historical-metadata assertion; confirmed fresh run 2. |
-| `crates/v3-cli/src/bench.rs:184:5` replace `legacy_graph_work_definition -> String` with `"xyzzy".into()` | **Killed** by the same literal assertion; confirmed fresh run 2. |
-| `crates/v3-cli/src/bench.rs:1069:57` replace `==` with `!=` in `temporal_memory_sensitivity` | **Killed** by report-level positive control for per-substrate denominator/differences; confirmed fresh run 2. |
-| `crates/v3-core/src/simulation/tick.rs:300:5` replace `observe_temporal_actions` with `vec![]` | **Killed** by requiring all three observations; confirmed fresh run 2. |
-| `crates/v3-core/src/runtime/cgp/execute.rs:119:49` replace `*` with `/` | **Killed** by two-node actual energy assertion (100 to 99.5 at cost 0.25); confirmed fresh run 2. |
-| `crates/v3-core/src/runtime/cgp/execute.rs:153:27` replace `&&` with `\|\|` | **Equivalent**: a plastic node implies `has_any_hebbian`; nonplastic nodes have empty learned slices (also under child inheritance) and the alternative collector uses the same resolver and genome weights via `effective_weight` fallback. Living genomes are immutable. |
-| `crates/v3-core/src/runtime/cgp/execute.rs:210:26` replace `-` with `+` | **Killed** by trace tick-start delta assertions 1, 0.5, 0.25; confirmed fresh run 2. |
-| `crates/v3-core/src/runtime/cgp/execute.rs:210:26` replace `-` with `/` | **Killed** by the same trace-delta assertions; confirmed fresh run 2. |
-
-Only tests changed for survivor remediation. No exclusions or skip attributes
-were added. Repeated self-review found no further production simplifications;
-the strengthened assertions use explicit expected values and non-vacuous counts.
-Targeted verification: workspace/all-target check exited 0 in
-`/private/tmp/t11-f06-check-compile2.log`; clock tests passed in
-`/private/tmp/t11-f06-clock-tests2.log`; all 30 CLI unit tests passed in
-`/private/tmp/t11-f06-cli-tests2.log`.
-
-Fresh closure run 2 (`MUTANTS_ITERATE=0 make rust-mutants`) exited 0:
-`40 mutants tested in 4m: 1 missed, 26 caught, 13 unviable`; no timeouts.
-Output: `/Users/istefanek/.local/share/petri-tools/mutants/t11-f06/mutants.out`
-(`run-mode.txt` in its parent records `fresh`). Log:
-`/private/tmp/t11-f06-mutants-fresh2.log`. Full final survivor list:
-
-- **Equivalent**: `crates/v3-core/src/runtime/cgp/execute.rs:153:27`, replace
-  `&&` with `||` in `execute_graph_impl`, for the empty-learned-slice fallback
-  reason above. There are no deferred mutation findings.
-
-Applied charge audit: fixtures assert actual paid energy independently of
-entered-visit counters, including multiple nodes, repeated visits, and both
-exhaustion boundaries. The benchmark measures work and wall time; it does not
-add a graph-specific cumulative energy series or infer one from visit counts,
-because compute-node counts vary. No baseline or threshold is changed.
+- Advisor consultation 3 (pre-completion code/evidence audit): accepted.
+  No correctness blocker; confirmed frozen snapshots, transactional temporal
+  commit, production/sequence clock boundaries, graph-only probe preparation,
+  substrate isolation, nonmutation evidence, and final survivor equivalence.
+  Applied only a stale-comment correction in `runtime/plasticity/hebbian.rs`
+  (ordered evaluation replaces relaxation terminology); learning code unchanged.
+  Performance conclusions, final review, and orchestrator check remain pending.
+- Concrete measurement blocker (2026-09-06): the required measured gate's
+  `scripts/bench-wait` was held by PID 59652, `target/release/v3-server`,
+  parent PID 1, cwd `/Users/istefanek/projects/petri`, started 00:14:03 local.
+  No measured gate or goal report has been produced. The orchestrator asked
+  the user whether to stop that exact server, which may hold their simulation;
+  approval is pending and the implementer has not stopped it or bypassed the
+  guard. Before pausing, only this task's waiting guard (PID 84202) was
+  stopped; its make command exited 2 without starting measurement, while
+  server PID 59652 was left running. Resume requires an explicit new guarded
+  benchmark command after the server decision.
+  Log: `/private/tmp/t11-f06-bench-gate.log`. The feature remains In
+  Progress and unchecked; required benchmark evidence is not waived.
