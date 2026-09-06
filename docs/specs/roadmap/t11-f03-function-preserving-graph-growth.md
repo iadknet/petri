@@ -1,6 +1,6 @@
 # T11.F03 — Function-Preserving Graph Growth
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-05
 **Feature**: T11.F03
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -400,11 +400,12 @@ was disabled or down-weighted.
       report).
 - [x] New graph edges can reach every input sub-value, and the graph raw-field
       operator changes one field by one step.
-- [ ] The taxonomy and changed semantics are recorded in the reference specs;
+- [x] The taxonomy and changed semantics are recorded in the reference specs;
       mutation triage, benchmark reports, progress row, and review are
-      complete; the checked row and Complete spec land on clean `main`. Not
-      done: review and the roadmap row/Complete status are the
-      orchestrator's to close.
+      complete; the checked row and Complete spec land on clean `main`
+      (review 2026-09-05: P1=0, P2=2, P3=7, one remediation pass taken; the
+      feature branch was rebased onto `main` at `8dae8d5a`, a docs-only
+      commit, with no conflicts before the closing `make check`).
 
 ## Notes for AI Agents
 
@@ -414,6 +415,9 @@ was disabled or down-weighted.
   the split insert shares with node removal (T11.F09 owns learned-weight
   correspondence), corrected the pass-count claim for backward-edge splits,
   and simplified the raw-field `ref_idx` rule. Ready.
+- Cost record: `/usage` totals unavailable at closure (autonomous goal run;
+  not requested from the user); implementer advisor consults 5; reviewer
+  findings P1=0, P2=2, P3=7. Telemetry only.
 - Post-review remediation (2026-09-05, reviewer counts P1=0, P2=2, P3=7): all
   7 items addressed except one deferred finding recorded here.
   - Deferred (P2-2): the split append-branch `InputLeaf(EnergyCurrent)` +
