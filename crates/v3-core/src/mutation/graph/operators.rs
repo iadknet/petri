@@ -31,6 +31,24 @@ fn graph_def_mut(
     }
 }
 
+/// The target node's graph backend def alongside a clone of its
+/// `input_refs`, for operators (`random_graph_source` callers) that need
+/// both: the clone is taken before the mutable borrow of `backend_def` so
+/// both are available together despite living on the same `NodeGenome`.
+#[inline]
+fn graph_def_mut_with_input_refs(
+    genome: &mut CreatureGenome,
+    node_idx: usize,
+) -> Result<(&mut CgpGraphBackendDef, Vec<InputReference>), MutationSkipReason> {
+    let input_refs = genome
+        .nodes
+        .get(node_idx)
+        .map(|n| n.input_refs.clone())
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
+    let def = graph_def_mut(genome, node_idx)?;
+    Ok((def, input_refs))
+}
+
 pub(super) fn alter_edge_weight(
     genome: &mut CreatureGenome,
     node_idx: usize,
@@ -73,12 +91,7 @@ pub(super) fn add_internal_node(
     rng: &mut impl Rng,
     config: &MutationConfig,
 ) -> Result<(), MutationSkipReason> {
-    let input_refs = genome
-        .nodes
-        .get(node_idx)
-        .map(|n| n.input_refs.clone())
-        .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let def = graph_def_mut(genome, node_idx)?;
+    let (def, input_refs) = graph_def_mut_with_input_refs(genome, node_idx)?;
     add_compute_node(def, &input_refs, config, rng)
 }
 
@@ -88,12 +101,7 @@ pub(super) fn add_graph_edge(
     rng: &mut impl Rng,
     config: &MutationConfig,
 ) -> Result<(), MutationSkipReason> {
-    let input_refs = genome
-        .nodes
-        .get(node_idx)
-        .map(|n| n.input_refs.clone())
-        .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let def = graph_def_mut(genome, node_idx)?;
+    let (def, input_refs) = graph_def_mut_with_input_refs(genome, node_idx)?;
     add_edge(def, &input_refs, config, rng)
 }
 
@@ -112,12 +120,7 @@ pub(super) fn retarget_graph_edge(
     rng: &mut impl Rng,
     config: &MutationConfig,
 ) -> Result<(), MutationSkipReason> {
-    let input_refs = genome
-        .nodes
-        .get(node_idx)
-        .map(|n| n.input_refs.clone())
-        .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let def = graph_def_mut(genome, node_idx)?;
+    let (def, input_refs) = graph_def_mut_with_input_refs(genome, node_idx)?;
     retarget_edge(def, &input_refs, config, rng)
 }
 
@@ -136,12 +139,7 @@ pub(super) fn apply_graph_raw_field_mutation(
     rng: &mut impl Rng,
     config: &MutationConfig,
 ) -> Result<(), MutationSkipReason> {
-    let input_refs = genome
-        .nodes
-        .get(node_idx)
-        .map(|n| n.input_refs.clone())
-        .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let def = graph_def_mut(genome, node_idx)?;
+    let (def, input_refs) = graph_def_mut_with_input_refs(genome, node_idx)?;
     raw_field_mutation(def, &input_refs, config, rng)
 }
 
@@ -460,35 +458,35 @@ pub(crate) fn split_existing_edge(
         // also shifts `old_source` in place if it targets a ComputeNode at or
         // above `consumer_idx`, including a self-loop) runs before the new
         // node's own input is read back.
-        def.insert_compute_node_at(
-            consumer_idx,
-            ComputeNode {
-                kind: ComputeNodeKind::Add,
-                inputs: Vec::new(),
-                plasticity: None,
-            },
-        );
-        let consumer_idx = consumer_idx + 1; // shifted by the insert above
-        let new_idx = (consumer_idx - 1) as u16;
-        let remapped_source = def.compute_nodes[consumer_idx].inputs[edge_idx].source;
-        def.compute_nodes[consumer_idx - 1].inputs.push(GraphEdge {
+        def.insert_compute_node_at(consumer_idx, identity_add_node(Vec::new()));
+        let new_idx = consumer_idx as u16;
+        let shifted_consumer_idx = consumer_idx + 1; // shifted by the insert above
+        let remapped_source = def.compute_nodes[shifted_consumer_idx].inputs[edge_idx].source;
+        def.compute_nodes[consumer_idx].inputs.push(GraphEdge {
             source: remapped_source,
             weight: 1.0,
         });
-        def.compute_nodes[consumer_idx].inputs[edge_idx].source = GraphSource::ComputeNode(new_idx);
+        def.compute_nodes[shifted_consumer_idx].inputs[edge_idx].source =
+            GraphSource::ComputeNode(new_idx);
     } else {
         let new_idx = def.compute_nodes.len() as u16;
-        def.compute_nodes.push(ComputeNode {
-            kind: ComputeNodeKind::Add,
-            inputs: vec![GraphEdge {
-                source: old_source,
-                weight: 1.0,
-            }],
-            plasticity: None,
-        });
+        def.compute_nodes.push(identity_add_node(vec![GraphEdge {
+            source: old_source,
+            weight: 1.0,
+        }]));
         get_edge_vec_mut(def, surface)[edge_idx].source = GraphSource::ComputeNode(new_idx);
     }
     Ok(())
+}
+
+/// An identity `Add` node (weighted sum reproduces a single input exactly)
+/// with the given inputs: the node the split-edge form inserts or appends.
+fn identity_add_node(inputs: Vec<GraphEdge>) -> ComputeNode {
+    ComputeNode {
+        kind: ComputeNodeKind::Add,
+        inputs,
+        plasticity: None,
+    }
 }
 
 /// Remove a random compute node and remap all edges.
