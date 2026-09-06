@@ -1,11 +1,10 @@
 //! Hebbian learning — weight adaptation for graph nodes at runtime.
 //!
 //! Called by [`crate::runtime::cgp::execute::execute_graph_node`] and
-//! [`crate::runtime::cgp::traced::execute_graph_node_traced`] after the relaxation loop
-//! converges.
+//! [`crate::runtime::cgp::traced::execute_graph_node_traced`] after ordered graph evaluation.
 //!
 //! **Module boundary:** This module owns the learning math (weight init,
-//! update rules, clamping). Graph relaxation lives in `runtime/cgp/execute.rs`.
+//! update rules, clamping). Ordered graph evaluation lives in `runtime/cgp/execute.rs`.
 
 use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{CgpGraphBackendDef, ComputeNode};
@@ -60,7 +59,7 @@ pub(crate) fn effective_weight(
     }
 }
 
-/// Apply Hebbian weight updates after graph relaxation converges.
+/// Apply Hebbian weight updates after ordered graph evaluation.
 ///
 /// Uses `final_outputs` for pre/post activations: for each Hebbian node, the
 /// node's own output is the "post" activation, and each input source's output
@@ -157,7 +156,7 @@ pub(crate) fn apply_hebbian_updates(
 /// Hebbian weights for genome weights when available.
 ///
 /// Resolves all `GraphSource` variants through the shared CGP source resolver,
-/// preserving the same Gauss-Seidel semantics used by the non-plastic path.
+/// preserving the same current-visit/frozen-tick source semantics as the non-plastic path.
 #[inline]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn collect_weighted_inputs_hebbian(
