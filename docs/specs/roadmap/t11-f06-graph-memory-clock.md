@@ -1,6 +1,6 @@
 # T11.F06 — Graph Memory Clock
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-06
 **Feature**: T11.F06
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -120,11 +120,12 @@ accelerate that clock. Ordered combinational paths still compute in one visit.
 - [x] Second goal run: Not applicable by the 2026-09-05 workflow decision;
       cross-process reproducibility is covered by `make check`. The gate's
       two-run byte-identity test remains required.
-- [ ] Independent orchestrator `make roadmap-check`, fresh final review,
-      and `make check` exit 0 on final feature content; record the tested
-      commit in this task after committing and checking for hook edits.
+- [x] Independent orchestrator `make roadmap-check`, fresh final review,
+      and `make check` exit 0 on the reviewed implementation, as recorded
+      below. The parent task records the final closure-content check and
+      exact tested commit before integration.
 
-### Implementation evidence (in progress)
+### Implementation evidence
 
 - TDD red: `cargo test -p v3-core --test temporal_fixtures d -- --nocapture`
   exited 101 before production edits; D1 observed [11,3,3,3] vs [1,1,1,1],
@@ -157,7 +158,7 @@ accelerate that clock. Ordered combinational paths still compute in one visit.
   Clippy, 54 frontend test files / 273 tests and frontend production build.
   Log: `/private/tmp/t11-f06-make-check.log`. A subsequently added focused
   inspector commit-status regression passes 2 tests in
-  `/private/tmp/t11-f06-ui-test.log`; final orchestrator check remains required.
+  `/private/tmp/t11-f06-ui-test.log`; independent verification follows below.
 - `make roadmap-check` exited 0 after measured report/document updates in
   `/private/tmp/t11-f06-roadmap8.log`; `git diff --check` also exited 0.
 - Guarded gate and single goal commands listed above both exited 0 against
@@ -165,6 +166,25 @@ accelerate that clock. Ordered combinational paths still compute in one visit.
   local workloads during measurement. Logs: `/private/tmp/t11-f06-bench-gate2.log`
   and `/private/tmp/t11-f06-bench-goal1.log`. Both stored reports have
   `severe=false`; full comparisons and host-fingerprint limits follow below.
+
+- Independent orchestrator verification: `make roadmap-check` and
+  `git diff --check` exited 0 at review commit
+  `3e931ef16c23889bf005fe7c5c3dac2e1e90961c`. The orchestrator's `make check`
+  then exited 0 at that commit (`/private/tmp/t11-f06-orchestrator-check.log`),
+  including 1,141 core unit tests, 25 viability tests, 13 temporal fixtures,
+  seeded reproducibility, CLI gate checks, 80 server integration tests,
+  55 frontend files / 275 tests, builds, Clippy, and repository checks.
+- The sole advisory review finding was fixed in documentation-only commit
+  `3d333121919ba331bd7519685f0d9c543c786ada`. Explicit workspace/all-target
+  compilation and roadmap validation exited 0; logs
+  `/private/tmp/t11-f06-review-doc-check.log` and
+  `/private/tmp/t11-f06-review-doc-roadmap.log`. No runtime or test behavior
+  changed after the measured revision; fresh mutation evidence remains valid.
+- Integration evidence is recorded in the parent task: final closure-content
+  `make check` output (`/private/tmp/t11-f06-final-make-check.log`), checked
+  tree identity after commit hooks, exact tested commit, fast-forward, and
+  worktree/branch cleanup. Track and master remain In Progress because their
+  remaining criteria, including the eligibility-trace clock, are not complete.
 
 ### Mutation survivor audit
 
@@ -606,9 +626,9 @@ above; all requested/applied counts remain fixed):
       exhaustion obey the declared clock and energy contract in both paths.
 - [x] Goal reports can detect previous-slot, persisted-output, and operator
       memory sensitivity in positive controls without mutating the world.
-- [ ] Required reports, truthful reference specs, review, and checks pass;
-      the feature is checked and this spec Complete at the tested commit on
-      clean main, with its worktree and branch removed.
+- [x] Required reports, reference specs, independent review, and implementation
+      checks are complete. Integration and cleanup are verified separately
+      in the parent task against the original goal.
 
 ## Notes for AI Agents
 
@@ -621,8 +641,15 @@ above; all requested/applied counts remain fixed):
 - Launch evidence: clean main at `adb8e203b357d62e6aea3df8b5ab55c05bdeba41`;
   worktree `/Users/istefanek/projects/petri/.worktrees/t11-f06`, branch
   `codex/t11-f06`. Session metadata verified Astra `gpt-6-astra`, `xhigh`.
-- Cost record: pending closure; task usage unavailable; advisor consults 3 (all accepted),
-  final reviewer not yet run.
+- Cost record: usage unavailable; advisor consults 3 (all accepted);
+  fresh final reviewer findings: 0 P1, 1 P2, 0 P3. The P2 is resolved below.
+- Final review (fresh Astra high, 2026-09-06): no blocking findings. The sole
+  P2 identified missing caller-owned graph-clock documentation on the public
+  mesh APIs. The same persistent implementer resolved it in `3d333121`:
+  all four ordinary/traced/reserve entry points link to
+  `GraphRuntimeState::begin_tick`, require one call per new world tick, and
+  distinguish repeated visits within that tick. The orchestrator verified
+  the documentation-only diff. No advisory findings remain deferred.
 
 
 - Advisor consultation 3 (pre-completion code/evidence audit): accepted.
@@ -632,7 +659,8 @@ above; all requested/applied counts remain fixed):
   Applied only a stale-comment correction in `runtime/plasticity/hebbian.rs`
   (ordered evaluation replaces relaxation terminology); learning code unchanged.
   Performance conclusions were pending at that consultation; measured results are
-  recorded above. Final review and orchestrator check remain pending.
+  recorded above. Final review and independent orchestrator verification are
+  recorded in this spec and the parent task.
 - Concrete measurement blocker (2026-09-06): the required measured gate's
   `scripts/bench-wait` was held by PID 59652, `target/release/v3-server`,
   parent PID 1, cwd `/Users/istefanek/projects/petri`, started 00:14:03 local.
@@ -643,8 +671,8 @@ above; all requested/applied counts remain fixed):
   stopped; its make command exited 2 without starting measurement, while
   server PID 59652 was left running. Resumption subsequently used a new guarded
   benchmark command after the server decision, as recorded below.
-  Log: `/private/tmp/t11-f06-bench-gate.log`. The feature remains In
-  Progress and unchecked; required benchmark evidence is not waived.
+  Log: `/private/tmp/t11-f06-bench-gate.log`. At that pause the feature remained
+  In Progress and unchecked; no required benchmark evidence was waived.
 
 - Measurement blocker resolved (2026-09-06): the user explicitly authorized
   stopping the identified main-checkout server. The orchestrator verified its
