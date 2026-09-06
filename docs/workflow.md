@@ -175,6 +175,18 @@ spec's Performance and Goal Impact section. A severe compute regression without
 a predeclared, justified cost is a P1. Never weaken a threshold or edit a stored
 baseline to make a feature pass.
 
+From T11.F14 onward, the evolved-neighborhood observation cap is **180 seconds
+per goal-profile run, summed across seeds**
+(`environment.neighborhood_evolved_wall_clock_ms_total`). This permanent
+budget adjustment was explicitly authorized by the user on 2026-09-06 and
+supersedes T11.F01's 90-second cap for T11.F14 and future closures. The
+founder-neighborhood cap remains 10 seconds of release wall time per profile
+run, and the 15-minute total goal-profile investigation threshold remains.
+Profile parameters, sample/trial counts, mutation floors, normalized compute
+thresholds, and stored baselines are unchanged. Preserve historical readings
+and their original acceptance results; an exceeded current cap still requires
+resolution before closure.
+
 The goal profile runs **once** per closure. A second goal run to re-check its
 `deterministic` block is not required and must not be reinstated as a lost
 safeguard: the run costs about eleven minutes, and cross-process
