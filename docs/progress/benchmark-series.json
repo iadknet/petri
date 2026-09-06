@@ -17,12 +17,13 @@
   },
   "goal": {
     "series": "goal-v1",
-    "epoch_baseline": "docs/progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table-goal.json",
+    "epoch_baseline": "docs/progress/features/t11-f04-mutation-supply-and-neutral-scaffold-goal.json",
     "closed": [
       "docs/progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table-goal.json",
       "docs/progress/features/t11-f01-mutational-neighborhood-indicator-goal.json",
       "docs/progress/features/t11-f02-vm-structural-mutation-semantics-goal.json",
-      "docs/progress/features/t11-f03-function-preserving-graph-growth-goal.json"
+      "docs/progress/features/t11-f03-function-preserving-graph-growth-goal.json",
+      "docs/progress/features/t11-f04-mutation-supply-and-neutral-scaffold-goal.json"
     ]
   }
 }
