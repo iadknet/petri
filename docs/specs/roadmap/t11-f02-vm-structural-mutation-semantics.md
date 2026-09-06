@@ -150,6 +150,44 @@ registers on which later mutations can operate without overwriting live values.
       before accepting implementation; final `make check` exits 0 for the
       content committed and integrated into `main`.
 
+### Mutation evidence
+
+- Final mutation evidence (2026-09-05): original wrapper exit was not retained: original 122 tested/96 caught/24 missed/2 unviable/0 timeout; remediation 129/123/4/2/0; final 129/125/2/2/0. Original output `/Users/istefanek/.local/share/petri-tools/mutants/t11-f02/mutants.out` (make exit unretained); remediation output `/Users/istefanek/.local/share/petri-tools/mutants/t11-f02-remediation/mutants.out`, log `/private/tmp/t11-f02-rust-mutants-remediation.log`, exit 0; final output `/Users/istefanek/.local/share/petri-tools/mutants/t11-f02-final/mutants.out`, log `/private/tmp/t11-f02-rust-mutants-final.log`, exit 0.
+  Original survivors and final dispositions:
+  - `crates/v3-core/src/mutation/vm/operators.rs:55:42: delete ! in apply_register_count_mutation` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::register_count_direction_seeds_distinguish_growth_from_shrink`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:252:9: delete match arm u8::MAX in nudge_u8` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::raw_field_mutation_exercises_bounded_numeric_directions`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:253:14: replace match guard rng.gen_bool(0.5) with true in nudge_u8` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::raw_field_mutation_exercises_bounded_numeric_directions`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:253:14: replace match guard rng.gen_bool(0.5) with false in nudge_u8` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::raw_field_mutation_exercises_bounded_numeric_directions`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:260:9: delete match arm 0 in nudge_u16` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::raw_field_mutation_exercises_bounded_numeric_directions`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:262:14: replace match guard rng.gen_bool(0.5) with true in nudge_u16` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::raw_field_mutation_exercises_bounded_numeric_directions`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:262:14: replace match guard rng.gen_bool(0.5) with false in nudge_u16` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::raw_field_mutation_exercises_bounded_numeric_directions`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:269:9: delete match arm i32::MIN in nudge_i32` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::raw_field_mutation_exercises_bounded_numeric_directions`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:271:14: replace match guard rng.gen_bool(0.5) with true in nudge_i32` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::raw_field_mutation_exercises_bounded_numeric_directions`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:271:14: replace match guard rng.gen_bool(0.5) with false in nudge_i32` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::raw_field_mutation_exercises_bounded_numeric_directions`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:440:30: replace + with * in apply_instruction_mutation` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::vm_instruction_mutation_reaches_insert_replace_and_delete`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:456:84: replace + with * in apply_instruction_mutation` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::vm_instruction_mutation_reaches_insert_replace_and_delete`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:532:5: replace remap_register_refs with ()` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::copy_instruction_block_remapped_cyclically_shifts_every_register_field`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:534:30: replace % with / in remap_register_refs` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::copy_instruction_block_remapped_cyclically_shifts_every_register_field`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:534:30: replace % with + in remap_register_refs` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::copy_instruction_block_remapped_cyclically_shifts_every_register_field`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:535:44: replace + with * in remap_register_refs` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::copy_instruction_block_remapped_cyclically_shifts_every_register_field`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:536:37: replace % with / in remap_register_refs` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::copy_instruction_block_remapped_cyclically_shifts_every_register_field`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:634:38: replace || with && in splice_program_with_reference_repair` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::splice_rejects_invalid_ranges_atomically`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with == in splice_program_with_reference_repair` — deferred: distinguishing requires vectors of about 2.1 billion elements.
+  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with >= in splice_program_with_reference_repair` — deferred: distinguishing requires vectors of about 2.1 billion elements.
+  - `crates/v3-core/src/mutation/vm/operators.rs:678:43: replace && with || in splice_program_with_reference_repair` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::splice_repair_handles_deleted_and_replaced_targets`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:883:21: replace + with * in apply_insert_read_store_motif` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::vm_insert_read_store_motif_keeps_the_generated_pair_adjacent_for_each_seed`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:972:21: replace + with * in apply_insert_load_compare_motif` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::vm_insert_load_compare_motif_keeps_the_generated_pair_adjacent_for_each_seed`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:1078:9: delete match arm VmInstruction::LoadSlot{slot_reg, ..} | VmInstruction::StoreSlot{slot_reg, ..} in mutate_slot_idx_field` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::vm_mutate_slot_address_nudges_register_indirect_slot_fields`.
+  Second-run survivors:
+  - `crates/v3-core/src/mutation/vm/operators.rs:260:9: delete match arm 0 in nudge_u16` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::raw_field_mutation_exercises_bounded_numeric_directions`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:634:38: replace || with && in splice_program_with_reference_repair` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::splice_rejects_invalid_ranges_atomically`.
+  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with == in splice_program_with_reference_repair` — deferred: requires vectors of about 2.1 billion elements to distinguish this huge-allocation guard.
+  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with >= in splice_program_with_reference_repair` — deferred: requires vectors of about 2.1 billion elements to distinguish this huge-allocation guard.
+  Final misses:
+  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with == in splice_program_with_reference_repair` — deferred: requires vectors of about 2.1 billion elements to distinguish this huge-allocation guard.
+  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with >= in splice_program_with_reference_repair` — deferred: requires vectors of about 2.1 billion elements to distinguish this huge-allocation guard.
+
+
 ## Performance and Goal Impact
 
 Predeclared cost: remapping scans the edited program at mutation time, and four
@@ -187,7 +225,6 @@ input-reference policy.
 
 Stored reports show no severe
 compute regression. Gate current / delta versus both T10.F10 and T11.F01:
-
 | counter | current | delta |
 |---|---:|---:|
 | mesh hops | 1.998951 | +0.029474% |
@@ -200,7 +237,6 @@ compute regression. Gate current / delta versus both T10.F10 and T11.F01:
 
 
 Founder VM and input-reference outcomes (silent/changed/dead; applied/skipped):
-
 | operator | baseline | current |
 |---|---|---|
 | vm:VmConstantMutation | 0.620000/0.380000/0.000000 (50/0) | 0.620000/0.380000/0.000000 (50/0) |
@@ -221,7 +257,6 @@ Founder VM and input-reference outcomes (silent/changed/dead; applied/skipped):
 | input_ref:Add | 0.400000/0.600000/0.000000 (50/0) | 0.660000/0.340000/0.000000 (50/0) |
 
 Founder births (silent/changed/dead; applied/skipped):
-
 | events | baseline | current |
 |---|---|---|
 | any | 0.068182/0.704545/0.227273 (44/0) | 0.068182/0.727273/0.204545 (44/0) |
@@ -240,7 +275,6 @@ Zero-event births: 456 / 456. Any-event silence is unchanged at 3/44=.068182; de
 
 Goal current / delta versus T01.F12 and T11.F01 (the two references have the
 same counter baselines):
-
 | counter | current | delta |
 |---|---:|---:|
 | mesh hops | 3.044647 | -3.652241% |
@@ -258,54 +292,40 @@ byte-identical and final sampled genomes have plasticity 3 to 1, so this is
 the small final sample (3 to 1 with plasticity) cannot establish trajectory prevalence or a cognition gain; applied-update work did increase. Evolved seed 22 dead
 fraction rose .121569 to .184314; seed 33 single-event silence fell .5625 to
 .375. These are changed sampled subjects, not universal operator regressions.
-Nine goal indicators (adaptive novelty, evolutionary activity, information
-integration, learning/prediction/memory dependence, lineage diversity, memory
-sensitivity, persistence, and reciprocal/strategy measures) are Undefined;
-births per 100 ticks is 9356.566667 versus 7994.2 baseline. Closure-series append and progress.md stay
-held for reconciliation/integration authorization.
-
 ### Goal indicator readings
 
 T11.F01 is the goal baseline; T01.F12 has the same core counters but no neighborhood.
-
 | seed | final population | births | min population | peak population | plateau |
-
 |---|---:|---:|---:|---:|---:|
-
 | 11 | 5291→9940 | 134117→184433 | 3243→6595 | 35279→36036 | 4682.102000→10045.570000 |
-
 | 22 | 10997→9477 | 179125→177196 | 5830→6865 | 36369→36628 | 9737.116000→8343.666000 |
-
 | 33 | 8130→10882 | 166410→199765 | 5031→6242 | 35433→35813 | 7631.720000→10839.180000 |
-
 
 | structure | baseline | current |
 |---|---:|---:|
-
 | min | 1 | 1 |
-
 | p25 | 95 | 96 |
-
 | median | 97 | 102 |
-
 | p75 | 124 | 139 |
-
 | max | 798 | 519 |
-
 | mean | 116.771071 | 121.588270 |
-
 
 | seed | clades | entropy | zero/scramble/either count; scrambled/either fraction (zeroed fraction 0) |
 |---|---|---|---|
-
 | 11 | 142→118 | 2.780730→3.296956 | 0/0/0,0.000000 → 0/11/11,0.001107 |
-
 | 22 | 144→131 | 2.947968→3.026739 | 0/0/0,0.000000 → 0/2/2,0.000211 |
-
 | 33 | 140→96 | 2.668014→2.698148 | 0/0/0,0.000000 → 0/0/0,0.000000 |
 
 
 Same fixed probe: final-tick snapshot and rotate_left(1) over 16 slots. Undefined: adaptive_novelty, evolutionary_activity, information_integration, learning_dependence, memory_dependence, prediction_dependence, reciprocal_interaction, strategy_causal_distinctness, strategy_count. Goal births/100 ticks: 7994.200000→9356.566667. Gate T01.F11: seed11 population/births 284/35→283/34; seeds22/33 unchanged 260/18 and264/21; no extinction, 75 ticks; gate births/100 32.888889→32.444444. Seed22 dead increase and seed33 one-event silence drop are changed samples, not matched genomes or cognition evidence.
+
+| seed | any-event baseline→current S/C/D | event1 baseline→current S/C/D | companions baseline→current (P/state/read/write) |
+|---|---|---|---|
+| 11 | .086275/.713725/.200000 → .149020/.686275/.164706 | .437500/.562500/0 → .437500/.562500/0 | 0/0/2/3 → 1/0/3/3 |
+| 22 | .156863/.721569/.121569 → .184314/.631373/.184314 | .562500/.437500/0 → .562500/.437500/0 | 1/0/2/3 → 0/0/5/2 |
+| 33 | .086275/.713725/.200000 → .168627/.698039/.133333 | .562500/.437500/0 → .375000/.625000/0 | 2/0/3/2 → 0/0/2/5 |
+
+Evolved outcomes use 12 sampled genomes, 255 pooled mutated births and 16 event-one births per seed. T01.F12 has the same core goal baselines but no neighborhood. Seed22 dead and seed33 event-one silence are changed sampled subjects; no cognition claim follows.
 
 ## Success Criteria
 
@@ -321,6 +341,9 @@ Same fixed probe: final-tick snapshot and rotate_left(1) over 16 slots. Undefine
 
 ## Notes for AI Agents
 
+- Deferred guards: `==` distinguishes values above i32::MAX; `>=` distinguishes exactly i32::MAX. Both require impractically huge vectors.
+
+
 - Start: clean main `c1e3b406ddd82b6bc42b431411011326d634af5e`;
   worktree `/Users/istefanek/projects/petri/.worktrees/t11-f02`, branch
   `codex/t11-f02`. T11.F01 is checked; no other session owns T11.F02.
@@ -331,7 +354,7 @@ Same fixed probe: final-tick snapshot and rotate_left(1) over 16 slots. Undefine
   policy. Requirements cover each roadmap obligation without extending into
   neutral production duplication or the remaining T11 repairs. Runtime behavior
   and performance remain implementation verification, not planning claims.
-- Closure cost and review records pending.
+- usage unavailable; advisor consultations 7; reviewer findings pending.
 - Sol consultation 1 (2026-09-05, accepted): route every VM splice, including
   input-reference auto-wiring, through a provenance-aware old-index map using
   runtime jump-target semantics; use exhaustive register-field canonicalization
@@ -339,7 +362,7 @@ Same fixed probe: final-tick snapshot and rotate_left(1) over 16 slots. Undefine
   the register-count smoke-test failure recurred): use a width-2, r0-only
   fixture to demonstrate permitted grow/shrink, retain the founder as a
   required shrink skip, and cover width-4 raw-register canonicalization and
-  atomic skips separately. No guidance was rejected.
+  atomic skips separately. No guidance was rejected. Consultations 5–7 accepted: #5 deferred huge-allocation guards; #6 required exact all-zero ReadInput tuples and final mutation rerun; #7 required truthful evidence consolidation without new runs.
 - TDD and coverage evidence (2026-09-05): initial
   `cargo test -p v3-core mutation::vm::tests` recorded 51 passing and five
   intentional red tests (terminal/no-operand raw-field skips, one-field step,
@@ -447,41 +470,5 @@ Same fixed probe: final-tick snapshot and rotate_left(1) over 16 slots. Undefine
   feature-branch review may proceed; reconciliation, integration, and closure
   updates remain blocked on explicit authority; no rebase or merge has been
   performed.
-
-- Final mutation evidence (2026-09-05): original wrapper exit was not retained: original 122 tested/96 caught/24 missed/2 unviable/0 timeout; remediation 129/123/4/2/0; final 129/125/2/2/0. Outputs: `t11-f02`, `t11-f02-remediation`, and `t11-f02-final` under `/Users/istefanek/.local/share/petri-tools/mutants/`.
-  Original survivors and final dispositions:
-  - `crates/v3-core/src/mutation/vm/operators.rs:55:42: delete ! in apply_register_count_mutation` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:252:9: delete match arm u8::MAX in nudge_u8` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:253:14: replace match guard rng.gen_bool(0.5) with true in nudge_u8` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:253:14: replace match guard rng.gen_bool(0.5) with false in nudge_u8` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:260:9: delete match arm 0 in nudge_u16` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:262:14: replace match guard rng.gen_bool(0.5) with true in nudge_u16` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:262:14: replace match guard rng.gen_bool(0.5) with false in nudge_u16` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:269:9: delete match arm i32::MIN in nudge_i32` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:271:14: replace match guard rng.gen_bool(0.5) with true in nudge_i32` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:271:14: replace match guard rng.gen_bool(0.5) with false in nudge_i32` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:440:30: replace + with * in apply_instruction_mutation` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:456:84: replace + with * in apply_instruction_mutation` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:532:5: replace remap_register_refs with ()` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:534:30: replace % with / in remap_register_refs` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:534:30: replace % with + in remap_register_refs` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:535:44: replace + with * in remap_register_refs` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:536:37: replace % with / in remap_register_refs` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:634:38: replace || with && in splice_program_with_reference_repair` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with == in splice_program_with_reference_repair` — deferred: distinguishing requires vectors of about 2.1 billion elements.
-  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with >= in splice_program_with_reference_repair` — deferred: distinguishing requires vectors of about 2.1 billion elements.
-  - `crates/v3-core/src/mutation/vm/operators.rs:678:43: replace && with || in splice_program_with_reference_repair` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:883:21: replace + with * in apply_insert_read_store_motif` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:972:21: replace + with * in apply_insert_load_compare_motif` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:1078:9: delete match arm VmInstruction::LoadSlot{slot_reg, ..} | VmInstruction::StoreSlot{slot_reg, ..} in mutate_slot_idx_field` — caught in final rerun.
-  Second-run survivors:
-  - `crates/v3-core/src/mutation/vm/operators.rs:260:9: delete match arm 0 in nudge_u16` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:634:38: replace || with && in splice_program_with_reference_repair` — caught in final rerun.
-  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with == in splice_program_with_reference_repair` — deferred: requires vectors of about 2.1 billion elements to distinguish this huge-allocation guard.
-  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with >= in splice_program_with_reference_repair` — deferred: requires vectors of about 2.1 billion elements to distinguish this huge-allocation guard.
-  Final misses:
-  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with == in splice_program_with_reference_repair` — deferred: requires vectors of about 2.1 billion elements to distinguish this huge-allocation guard.
-  - `crates/v3-core/src/mutation/vm/operators.rs:648:16: replace > with >= in splice_program_with_reference_repair` — deferred: requires vectors of about 2.1 billion elements to distinguish this huge-allocation guard.
-  Consultations 1–6 were accepted; none rejected. Only reconciliation/integration remains approval-blocked.
 
 - Final benchmarks: replacement gate and the single goal run both exited 0. Goal report has no severe regression; plasticity updates are +23.452613% (flagged) while VM steps are -51.407250%. This follows altered mutation application/neighborhood behavior, not a work-counter or per-opcode runtime change; source review found only mutation-time splice repair and paired-slot arithmetic changes.
