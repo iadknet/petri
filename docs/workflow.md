@@ -119,12 +119,20 @@ its report does not mention the simplify pass or the mutation run, send it back
 before review.
 
 **Mutation survivors.** After the simplify pass and before reporting done, the
-implementer runs `make rust-mutants` once. The target diffs the worktree
-(committed, uncommitted, and untracked) against its merge base with `main`,
+implementer runs a fresh `make rust-mutants` (`MUTANTS_ITERATE=0`, the default).
+The target diffs the worktree (committed, uncommitted, and untracked) against
+its merge base with `main`,
 runs `cargo mutants --in-diff` with the caps in `.cargo/mutants.toml`, writes
 its output under `~/.local/share/petri-tools/mutants/<worktree>/`, and prints
 every survivor: mutants missed by every test and mutants that timed out. The
-implementer records in the spec's Verification section the summary line, the
+diff limits where mutations are generated; each viable mutant invokes the
+affected package's unfiltered test suite, including integration tests and
+doctests. Test filtering and reducing property-test case counts are not part of
+this target.
+The `mutants` Cargo profile uses optimization level 1 with debug assertions and
+overflow checks retained. The wrapper records `fresh` or `incremental` in
+`run-mode.txt` beside `mutants.out` and identifies the mode in its output.
+The implementer records in the spec's Verification section the summary line, the
 output path, and the full survivor list, each survivor resolved as **killed**
 (a test added or strengthened, then the target rerun), **equivalent** (one
 sentence on why it cannot change observable behavior), or **deferred** (a
@@ -132,6 +140,17 @@ deferred finding in "Notes for AI Agents"). Production code is never edited to
 kill a mutant, and any `#[mutants::skip]` or `exclude_re` entry carries a
 written justification. "No survivors" or "nothing to mutate" are valid records
 when that is what the target printed.
+
+While adding or strengthening tests to resolve survivors on unchanged production
+content, use `MUTANTS_ITERATE=1 make rust-mutants` for intermediate feedback.
+This passes cargo-mutants' `--iterate`: prior caught/unviable results in the
+same output directory may be reused, with accumulated entries in
+`mutants.out/previously_caught.txt`. Matching is heuristic and does not prove
+that coverage survived other changes. Incremental output is never closure
+evidence, even if no survivors remain in that pass. After remediation, run
+`MUTANTS_ITERATE=0 make rust-mutants` and record its fresh survivor list. Use a
+fresh run immediately after production, test-selection, or tool-configuration
+changes, or after deleting or weakening tests.
 
 ### Review
 
@@ -432,8 +451,9 @@ Research date 2026-09-04, Claude Code 2.1.260.
   the only maintained Rust mutation tool, is absent from aqua's standard
   registry and ships no arm64 macOS binary, so `aqua-registry.yaml` builds it
   with `cargo install --locked` under `aqua-policy.yaml`. A feature diff yields
-  tens to a few hundred mutants at roughly 25 seconds each for v3-cli and
-  longer for v3-core at two jobs, so the run is diff-scoped and one-shot.
+  tens to a few hundred mutants, so mutation generation is diff-scoped. The
+  measured `mutants` build profile accelerates repeated tests; intermediate
+  remediation can reuse results, and closure always requires a fresh run.
   Mutation score is a weak signal that agents game, so the check is survivor
   triage. PostToolUse hooks cannot block, so the compile hook reports (exit 2)
   rather than gates. proptest covers pure invariants where example tests only

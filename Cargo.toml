@@ -53,3 +53,13 @@ debug = true          # Keep debug symbols for profiling
 inherits = "release"
 debug = true
 strip = false
+
+# Mutation tests keep test assertions while optimizing repeated simulation
+# execution. No LTO: each mutant requires an incremental rebuild.
+[profile.mutants]
+inherits = "test"
+opt-level = 1
+debug = 0
+debug-assertions = true
+overflow-checks = true
+lto = false

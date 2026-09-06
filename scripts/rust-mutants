@@ -17,10 +17,18 @@
 #   MUTANTS_JOBS     parallel cargo-mutants jobs (default 2)
 #   MUTANTS_TIMEOUT  fixed per-mutant test timeout in seconds (default: the
 #                    automatic timeout capped by .cargo/mutants.toml)
+#   MUTANTS_ITERATE  1 reuses caught/unviable results while adding tests;
+#                    0 (default) runs fresh, as required for feature closure
 #   MUTANTS_OUT      output directory (default: under PETRI_TOOL_ROOT)
 #   BENCH_WAIT_TIMEOUT  seconds to wait for a running cargo-mutants to finish
 #                    before giving up (scripts/bench-wait default: 3600)
 set -eu
+
+iterate=${MUTANTS_ITERATE-0}
+case "$iterate" in
+  0 | 1) ;;
+  *) printf 'rust-mutants: MUTANTS_ITERATE must be 0 or 1\n' >&2; exit 2 ;;
+esac
 
 script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 root=$(git rev-parse --show-toplevel)
@@ -28,8 +36,12 @@ cd "$root"
 base=${MUTANTS_BASE:-$(git merge-base HEAD main)}
 tool_root=${PETRI_TOOL_ROOT:-${XDG_DATA_HOME:-$HOME/.local/share}/petri-tools}
 out=${MUTANTS_OUT:-$tool_root/mutants/$(basename "$root")}
-mkdir -p "$out"
-diff_file=$out/in-diff.patch
+# Prepare the diff without touching a previous run's evidence until the
+# concurrent-run guard succeeds.
+diff_file=$(mktemp "${TMPDIR:-/tmp}/petri-mutants-diff.XXXXXX")
+trap 'rm -f "$diff_file"' 0
+trap 'exit 130' INT
+trap 'exit 143' HUP TERM
 
 git diff "$base" >"$diff_file"
 git ls-files --others --exclude-standard | while IFS= read -r file; do
@@ -42,14 +54,24 @@ if [ ! -s "$diff_file" ]; then
   exit 0
 fi
 
-set -- --in-diff "$diff_file" --output "$out" --jobs "${MUTANTS_JOBS:-2}"
+set -- --in-diff "$out/in-diff.patch" --output "$out" --jobs "${MUTANTS_JOBS:-2}"
 [ -z "${MUTANTS_TIMEOUT:-}" ] || set -- "$@" --timeout "$MUTANTS_TIMEOUT"
+[ "$iterate" -eq 0 ] || set -- "$@" --iterate
 # Never start a second mutation run on this host: two runs thrash the CPU and
 # memory budget cargo-mutants already saturates, and the slower one times out
 # mutants that would otherwise be caught. The preflight runs before rather
 # than around cargo-mutants so its exit status is never mistaken for the
 # tool's own usage exit code below.
 BENCH_WAIT_BLOCKERS=mutants "$script_dir/bench-wait" true
+mkdir -p "$out"
+cp "$diff_file" "$out/in-diff.patch"
+if [ "$iterate" -eq 1 ]; then
+  printf 'incremental\n' >"$out/run-mode.txt"
+  printf 'rust-mutants: incremental remediation; prior caught/unviable results may be reused; not closure evidence\n'
+else
+  printf 'fresh\n' >"$out/run-mode.txt"
+  printf 'rust-mutants: fresh run; no prior mutant results reused\n'
+fi
 printf 'rust-mutants: diff against %s, output in %s\n' "$base" "$out/mutants.out"
 status=0
 cargo mutants "$@" || status=$?
@@ -67,7 +89,12 @@ case $status in
     found=0
     survivors missed.txt 'survivors: missed by every test'
     survivors timeout.txt 'survivors: timed out'
-    [ "$found" -eq 1 ] || printf 'rust-mutants: no survivors\n'
+    if [ "$iterate" -eq 1 ]; then
+      [ "$found" -eq 1 ] || printf 'rust-mutants: no survivors in this incremental pass\n'
+      printf 'rust-mutants: fresh run required before closure (MUTANTS_ITERATE=0); see %s/previously_caught.txt for accumulated results\n' "$out/mutants.out"
+    else
+      [ "$found" -eq 1 ] || printf 'rust-mutants: no survivors\n'
+    fi
     exit 0
     ;;
   *)
