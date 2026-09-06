@@ -152,7 +152,7 @@ registers on which later mutations can operate without overwriting live values.
 
 ### Mutation evidence
 
-- Final mutation evidence (2026-09-05): original wrapper exit was not retained: original 122 tested/96 caught/24 missed/2 unviable/0 timeout; remediation 129/123/4/2/0; final 129/125/2/2/0. Original output `/Users/istefanek/.local/share/petri-tools/mutants/t11-f02/mutants.out` (make exit unretained); remediation output `/Users/istefanek/.local/share/petri-tools/mutants/t11-f02-remediation/mutants.out`, log `/private/tmp/t11-f02-rust-mutants-remediation.log`, exit 0; final output `/Users/istefanek/.local/share/petri-tools/mutants/t11-f02-final/mutants.out`, log `/private/tmp/t11-f02-rust-mutants-final.log`, exit 0.
+- Final mutation evidence (2026-09-05): original wrapper exit was not retained: original 122 tested/96 caught/24 missed/2 unviable/0 timeout; remediation 129/123/4/2/0; final 129/125/2/2/0. Original output `/Users/istefanek/.local/share/petri-tools/mutants/t11-f02/mutants.out`, log `/private/tmp/t11-f02-rust-mutants.log` (make exit unretained); remediation output `/Users/istefanek/.local/share/petri-tools/mutants/t11-f02-remediation/mutants.out`, log `/private/tmp/t11-f02-rust-mutants-remediation.log`, exit 0; final output `/Users/istefanek/.local/share/petri-tools/mutants/t11-f02-final/mutants.out`, log `/private/tmp/t11-f02-rust-mutants-final.log`, exit 0.
   Original survivors and final dispositions:
   - `crates/v3-core/src/mutation/vm/operators.rs:55:42: delete ! in apply_register_count_mutation` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::register_count_direction_seeds_distinguish_growth_from_shrink`.
   - `crates/v3-core/src/mutation/vm/operators.rs:252:9: delete match arm u8::MAX in nudge_u8` — caught in final rerun by `mutation::vm::tests::mutation::vm::tests::raw_field_mutation_exercises_bounded_numeric_directions`.
@@ -427,31 +427,6 @@ Evolved outcomes use 12 sampled genomes, 255 pooled mutated births and 16 event-
   because a surviving conditional jump's offset may be reencoded; it also
   required one Cargo positional filter per command. Seven consultations total;
   no guidance rejected.
-- Original mutation run (2026-09-05): `make rust-mutants` generated
-  `/Users/istefanek/.local/share/petri-tools/mutants/t11-f02/mutants.out` from
-  the captured feature diff. Its terminal `cargo-mutants` summary was 122
-  tested, 96 caught, 24 missed, 2 unviable, and 0 timeouts. The retained
-  process chain was make 53683, script 53685, cargo-mutants 53705. The outer
-  execution wrapper did not retain a terminal session id, so its direct make
-  exit status is not asserted; the terminal summary is preserved in
-  `/private/tmp/t11-f02-rust-mutants.log`. Missed locations: register-count
-  negation (operators.rs:55); u8 boundary arms/guards (252-253); u16 boundary
-  arms/guards (260-262); i32 boundary arms/guards (269-271); instruction
-  mutation branch ranges (440,456); register remapping body/operators (532,
-  534-536); splice position/deletion mapping (634,648,678); read/store and
-  load/compare motif adjacency (883,972); and indirect slot-field matching
-  (1078). Exact first-run survivors are preserved in
-  `/Users/istefanek/.local/share/petri-tools/mutants/t11-f02/mutants.out/missed.txt`.
-  The second target `/Users/istefanek/.local/share/petri-tools/mutants/t11-f02-remediation/mutants.out`
-  completed 129 tested: 123 caught, 4 missed, 2 unviable, 0 timeout. Its
-  `nudge_u16` zero arm and splice `||` guard are killed by the final test-only
-  batch. The two `new_len > i32::MAX` replacements (`==`, `>=`) are deferred:
-  distinguishing them requires allocating and cloning vectors at least about
-  2.1 billion elements; they are not equivalent. A third final target rerun is
-  verified by the final target. The two unviable mutants were founder default and input-reference
-  `Ok(Default)` changes. Survivor-driven test strengthening and the separate
-  paired-slot overflow repair are ready for the required distinct-output rerun;
-  no production edit was made merely to kill a mutant.
 - Integration blocker (2026-09-05): while this feature was at implementation
   commit `e63248591faa7eb51f79014068a6920cc305ecb1`, `main` at
   `/Users/istefanek/projects/petri` advanced from the recorded base
