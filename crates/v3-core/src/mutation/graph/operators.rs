@@ -1704,19 +1704,8 @@ mod tests {
         use crate::contracts::NodeId;
         use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 
-        fn count_edges(def: &CgpGraphBackendDef) -> usize {
-            def.compute_nodes.iter().map(|n| n.inputs.len()).sum::<usize>()
-                + def.output_sinks.iter().map(|s| s.inputs.len()).sum::<usize>()
-                + def
-                    .action_bank
-                    .iter()
-                    .map(|a| a.gate_inputs.len() + a.param_inputs.len())
-                    .sum::<usize>()
-                + def.execute_gate.inputs.len()
-        }
-
         let def = minimal_def();
-        let before = count_edges(&def);
+        let before = total_edge_count(&def);
         let mut genome = CreatureGenome {
             entry_node_id: NodeId::new(0),
             nodes: vec![NodeGenome {
@@ -1732,7 +1721,7 @@ mod tests {
         let BackendDef::Graph(after_def) = &genome.nodes[0].backend_def else {
             panic!("expected a Cgp graph node");
         };
-        assert_eq!(count_edges(after_def), before + 1);
+        assert_eq!(total_edge_count(after_def), before + 1);
     }
 
     /// With `compute_count == 0`, `random_graph_source`'s first branch is
