@@ -440,10 +440,75 @@ pub struct NeighborhoodBattery {
     pub evolved_sample_size: u32,
 }
 
+/// Mesh measurements on the existing neighborhood battery, never a fitness signal.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct MeshExecution {
+    pub version: String,
+    pub executions_per_genome: u32,
+    pub snapshot_route_probes: u32,
+    pub knockout_method: String,
+    pub total_node_count: u64,
+    pub reachable_node_count: u64,
+    pub executed_node_count: u64,
+    pub knockout_count: u64,
+    pub route_varies_with_input: bool,
+    pub hop_cap_hits: u64,
+}
+
+fn undefined_mesh_execution() -> Indicator<MeshExecution> {
+    Indicator::Undefined(UNDEFINED.to_string())
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct GenerationDistribution {
+    pub median: u64,
+    pub max: u64,
+}
+
+fn undefined_generation_distribution() -> Indicator<GenerationDistribution> {
+    Indicator::Undefined(UNDEFINED.to_string())
+}
+
+fn generation_distribution(mut generations: Vec<u64>) -> Indicator<GenerationDistribution> {
+    if generations.is_empty() {
+        return undefined_generation_distribution();
+    }
+    generations.sort_unstable();
+    Indicator::Defined(GenerationDistribution {
+        median: generations[generations.len() / 2],
+        max: generations[generations.len() - 1],
+    })
+}
+
+fn mesh_execution(
+    battery: &Battery,
+    genome: &v3_core::creature::genome::CreatureGenome,
+    context: &EvalContext,
+) -> Indicator<MeshExecution> {
+    use v3_core::neighborhood::mesh_execution::{KNOCKOUT_METHOD, MESH_EXECUTION_VERSION};
+    let reading = battery.mesh_execution(genome, context.runtime, context.shared_memory_decay_rate);
+    Indicator::Defined(MeshExecution {
+        version: MESH_EXECUTION_VERSION.to_string(),
+        executions_per_genome: neighborhood_battery_execution_count(),
+        snapshot_route_probes: neighborhood::battery::SNAPSHOT_COUNT as u32,
+        knockout_method: KNOCKOUT_METHOD.to_string(),
+        total_node_count: reading.total_node_count as u64,
+        reachable_node_count: reading.reachable_node_count as u64,
+        executed_node_count: reading.executed_node_count as u64,
+        knockout_count: reading.knockout_count as u64,
+        route_varies_with_input: reading.route_varies_with_input,
+        hop_cap_hits: reading.hop_cap_hits as u64,
+    })
+}
+
 /// The founder half: always present when `mutational_neighborhood` is
 /// defined (gate and goal).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NeighborhoodFounderHalf {
+    #[serde(default)]
+    pub generation: Option<u64>,
+    #[serde(default = "undefined_mesh_execution")]
+    pub mesh_execution: Indicator<MeshExecution>,
     pub reachable_node_count: u64,
     pub operator_rows: Vec<NeighborhoodOperatorRow>,
     pub births: NeighborhoodBirths,
@@ -452,6 +517,10 @@ pub struct NeighborhoodFounderHalf {
 /// One sampled evolved genome's rank, id, and complete neighborhood reading.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NeighborhoodSampledGenome {
+    #[serde(default)]
+    pub generation: Option<u64>,
+    #[serde(default = "undefined_mesh_execution")]
+    pub mesh_execution: Indicator<MeshExecution>,
     pub rank: u64,
     pub creature_id: String,
     pub operator_rows: Vec<NeighborhoodOperatorRow>,
@@ -463,6 +532,8 @@ pub struct NeighborhoodSampledGenome {
 /// per-operator and per-birth tallies across the sample.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NeighborhoodEvolvedSeed {
+    #[serde(default = "undefined_generation_distribution")]
+    pub generation_distribution: Indicator<GenerationDistribution>,
     pub seed: u64,
     pub final_population_size: u64,
     pub sampled_genomes: Vec<NeighborhoodSampledGenome>,
@@ -1189,6 +1260,8 @@ fn compute_founder_neighborhood(
         0,
     );
     NeighborhoodFounderHalf {
+        generation: Some(0),
+        mesh_execution: mesh_execution(battery, &subject, &context),
         reachable_node_count: structural_companions(&subject).reachable_node_count as u64,
         operator_rows: to_neighborhood_operator_rows(&evaluation.operator_rows),
         births: to_neighborhood_births(&evaluation.births),
@@ -1242,6 +1315,8 @@ fn evolved_neighborhood_for_seed(
         pooled_births = merge_birth_results(pooled_births, &evaluation.births);
 
         sampled_genomes.push(NeighborhoodSampledGenome {
+            generation: Some(creature.generation),
+            mesh_execution: mesh_execution(battery, &creature.genome, context),
             rank: rank as u64,
             creature_id: format!("{creature_id:?}"),
             operator_rows: to_neighborhood_operator_rows(&evaluation.operator_rows),
@@ -1261,6 +1336,12 @@ fn evolved_neighborhood_for_seed(
         .collect();
 
     NeighborhoodEvolvedSeed {
+        generation_distribution: generation_distribution(
+            sim.creatures
+                .values()
+                .map(|creature| creature.generation)
+                .collect(),
+        ),
         seed,
         final_population_size: population_size as u64,
         sampled_genomes,
@@ -2657,6 +2738,129 @@ mod tests {
     }
 
     #[test]
+    fn evolved_depth_uses_whole_population_and_actual_sample_generation() {
+        let mut config = SimulationConfig::default();
+        config.world.width = 16;
+        config.world.height = 16;
+        config.population.initial_creatures = 25;
+        let mut sim = seed_simulation(config.clone(), 11);
+        let mut ids: Vec<_> = sim.creatures.keys().collect();
+        ids.sort();
+        let ranks = evolved_sample_ranks(ids.len());
+        let high = u64::from(u32::MAX) + 12;
+        for (rank, id) in ids.iter().enumerate() {
+            sim.creatures.get_mut(*id).unwrap().generation = if rank == ranks[0] {
+                high + 1
+            } else if ranks.contains(&rank) {
+                3
+            } else {
+                high
+            };
+        }
+        let battery = Battery::generate(config.world.food.types.len());
+        let reading = evolved_neighborhood_for_seed(
+            11,
+            &sim,
+            &battery,
+            &config.mutation,
+            &EvalContext::from_config(&config),
+            NeighborhoodSizes::default(),
+        );
+        assert_eq!(reading.final_population_size, 25);
+        assert_eq!(
+            reading.generation_distribution,
+            Indicator::Defined(GenerationDistribution {
+                median: high,
+                max: high + 1
+            })
+        );
+        for sample in reading.sampled_genomes {
+            assert_eq!(
+                sample.generation,
+                Some(sim.creatures[ids[sample.rank as usize]].generation)
+            );
+            assert_eq!(
+                sample.generation,
+                Some(if sample.rank == ranks[0] as u64 {
+                    high + 1
+                } else {
+                    3
+                })
+            );
+            assert!(matches!(sample.mesh_execution, Indicator::Defined(_)));
+        }
+    }
+
+    #[test]
+    fn mesh_report_deterministic_fields_match_across_runs_and_threads() {
+        for profile in ["gate", "goal"] {
+            let params = small_profile(profile);
+            let run = |threads| {
+                rayon::ThreadPoolBuilder::new()
+                    .num_threads(threads)
+                    .build()
+                    .unwrap()
+                    .install(|| serde_json::to_vec(&run_deterministic(&params).0).unwrap())
+            };
+            assert_eq!(run(1), run(2));
+        }
+    }
+
+    #[test]
+    fn population_depth_uses_u64_upper_median_and_extinction_is_undefined() {
+        assert!(matches!(
+            generation_distribution(vec![]),
+            Indicator::Undefined(_)
+        ));
+        assert_eq!(
+            generation_distribution(vec![9, 1, 5]),
+            Indicator::Defined(GenerationDistribution { median: 5, max: 9 })
+        );
+        let large = u64::from(u32::MAX) + 9;
+        assert_eq!(
+            generation_distribution(vec![large, 0, 2, 1]),
+            Indicator::Defined(GenerationDistribution {
+                median: 2,
+                max: large
+            })
+        );
+    }
+
+    #[test]
+    fn historical_mesh_fields_default_to_unmeasured() {
+        let (det, _) = run_deterministic(&small_profile("goal"));
+        let Indicator::Defined(neighborhood) = det.goal_indicators.mutational_neighborhood else {
+            panic!("goal reading");
+        };
+        let mut founder = serde_json::to_value(&neighborhood.founder).unwrap();
+        founder.as_object_mut().unwrap().remove("mesh_execution");
+        founder.as_object_mut().unwrap().remove("generation");
+        let founder: NeighborhoodFounderHalf = serde_json::from_value(founder).unwrap();
+        assert!(matches!(founder.mesh_execution, Indicator::Undefined(_)));
+        assert_eq!(founder.generation, None);
+        let Indicator::Defined(evolved) = neighborhood.evolved else {
+            panic!("evolved reading");
+        };
+        let mut seed = serde_json::to_value(&evolved.per_seed[0]).unwrap();
+        seed.as_object_mut()
+            .unwrap()
+            .remove("generation_distribution");
+        for sample in seed["sampled_genomes"].as_array_mut().unwrap() {
+            sample.as_object_mut().unwrap().remove("mesh_execution");
+            sample.as_object_mut().unwrap().remove("generation");
+        }
+        let seed: NeighborhoodEvolvedSeed = serde_json::from_value(seed).unwrap();
+        assert!(matches!(
+            seed.generation_distribution,
+            Indicator::Undefined(_)
+        ));
+        for sample in seed.sampled_genomes {
+            assert_eq!(sample.generation, None);
+            assert!(matches!(sample.mesh_execution, Indicator::Undefined(_)));
+        }
+    }
+
+    #[test]
     fn mutational_neighborhood_is_defined_only_for_the_gate_and_goal_profile_names() {
         let (gate_det, _) = run_deterministic(&small_profile("gate"));
         let Indicator::Defined(gate_neighborhood) =
@@ -2664,6 +2868,14 @@ mod tests {
         else {
             panic!("the gate profile must define mutational_neighborhood");
         };
+        assert_eq!(gate_neighborhood.founder.generation, Some(0));
+        let Indicator::Defined(mesh) = &gate_neighborhood.founder.mesh_execution else {
+            panic!("founder mesh reading");
+        };
+        assert_eq!(mesh.version, "mesh-execution-v1");
+        assert_eq!(mesh.executions_per_genome, 80);
+        assert_eq!(mesh.snapshot_route_probes, 48);
+        assert_eq!(mesh.knockout_method, "static-successor-bypass-v1");
         assert!(
             matches!(gate_neighborhood.evolved, Indicator::Undefined(_)),
             "the evolved half never runs in the gate profile"

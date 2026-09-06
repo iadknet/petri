@@ -18,7 +18,7 @@ use crate::config::RuntimeConfig;
 use crate::contracts::WorldAction;
 use crate::creature::genome::CreatureGenome;
 use crate::creature::state::GraphRuntimeState;
-use crate::runtime::mesh::execute_creature_mesh_with_reserve;
+use crate::runtime::mesh::{execute_creature_mesh_impl, MeshExecutionMode, UntracedMeshExecution};
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;
 use crate::sensors::typed_food::TypedFoodLocalSnapshot;
@@ -147,35 +147,62 @@ impl Battery {
         runtime: &RuntimeConfig,
         shared_memory_decay_rate: f32,
     ) -> Signature {
+        let (snapshots, sequences) =
+            self.execute_with_mode(genome, runtime, shared_memory_decay_rate, || {
+                UntracedMeshExecution
+            });
+        Signature {
+            snapshots: snapshots.into_iter().map(|output| output.actions).collect(),
+            sequences: sequences
+                .into_iter()
+                .map(|sequence| sequence.into_iter().map(|output| output.actions).collect())
+                .collect(),
+        }
+    }
+
+    pub(super) fn execute_with_mode<M: MeshExecutionMode>(
+        &self,
+        genome: &CreatureGenome,
+        runtime: &RuntimeConfig,
+        decay_rate: f32,
+        mut mode: impl FnMut() -> M,
+    ) -> (Vec<M::Output>, Vec<Vec<M::Output>>) {
         let snapshots = self
             .snapshots
             .iter()
-            .map(|scenario| self.execute_single_tick(genome, scenario, runtime))
+            .map(|scenario| self.execute_single_tick_with_mode(genome, scenario, runtime, mode()))
             .collect();
         let sequences = self
             .sequences
             .iter()
-            .map(|sequence| {
-                self.execute_sequence(genome, sequence, runtime, shared_memory_decay_rate)
-            })
+            .map(|sequence| self.execute_sequence(genome, sequence, runtime, decay_rate, &mut mode))
             .collect();
-        Signature {
-            snapshots,
-            sequences,
-        }
+        (snapshots, sequences)
     }
 
+    #[cfg(test)]
     fn execute_single_tick(
         &self,
         genome: &CreatureGenome,
         scenario: &Scenario,
         runtime: &RuntimeConfig,
     ) -> Vec<WorldAction> {
+        self.execute_single_tick_with_mode(genome, scenario, runtime, UntracedMeshExecution)
+            .actions
+    }
+
+    fn execute_single_tick_with_mode<M: MeshExecutionMode>(
+        &self,
+        genome: &CreatureGenome,
+        scenario: &Scenario,
+        runtime: &RuntimeConfig,
+        mode: M,
+    ) -> M::Output {
         let mut energy = scenario.energy;
         let mut shared_memory = [0.0f32; 16];
         let prev_shared_memory = [0.0f32; 16];
         let mut graph_runtime = GraphRuntimeState::new();
-        execute_creature_mesh_with_reserve(
+        execute_creature_mesh_impl(
             genome,
             &scenario.sensors,
             &mut energy,
@@ -184,8 +211,8 @@ impl Battery {
             &prev_shared_memory,
             &mut graph_runtime,
             runtime,
+            mode,
         )
-        .actions
     }
 
     /// Execute one sequence of ticks, applying the production shared-memory
@@ -193,13 +220,14 @@ impl Battery {
     /// tick's cognition, mirroring `run_phase_0`'s order within a tick).
     /// Energy and reserve reset to each tick's scenario values; shared memory
     /// and graph state persist across the sequence.
-    fn execute_sequence(
+    fn execute_sequence<M: MeshExecutionMode>(
         &self,
         genome: &CreatureGenome,
         sequence: &[Scenario],
         runtime: &RuntimeConfig,
         decay_rate: f32,
-    ) -> Vec<Vec<WorldAction>> {
+        mode: &mut impl FnMut() -> M,
+    ) -> Vec<M::Output> {
         let mut shared_memory = [0.0f32; 16];
         let mut prev_shared_memory = [0.0f32; 16];
         let mut graph_runtime = GraphRuntimeState::new();
@@ -209,7 +237,7 @@ impl Battery {
                 graph_runtime.begin_tick(&genome.nodes);
                 advance_shared_memory(&mut shared_memory, &mut prev_shared_memory, decay_rate);
                 let mut energy = scenario.energy;
-                execute_creature_mesh_with_reserve(
+                execute_creature_mesh_impl(
                     genome,
                     &scenario.sensors,
                     &mut energy,
@@ -218,8 +246,8 @@ impl Battery {
                     &prev_shared_memory,
                     &mut graph_runtime,
                     runtime,
+                    mode(),
                 )
-                .actions
             })
             .collect()
     }
