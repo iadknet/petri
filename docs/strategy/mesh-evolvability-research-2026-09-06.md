@@ -5,7 +5,7 @@
 **Code**: baseline probes on `main` at c387e423 (T11.F06 closed); counterfactual probes in a scratch worktree at 43d966c1; V3Alpha1 founder, production defaults
 **Method**: code reading; re-analysis of the stored goal reports; a functional census probe run on mutation-only walks and on one whole goal-profile population; three cumulative counterfactual patches to the mesh operators and executor, each re-read with the same probes; primary literature read in full text (fourteen papers, listed in Section 6)
 **Prompted by**: an observed `serve` run after T11.F02 through T11.F06 in which VM and graph structure visibly evolved while the mesh did not
-**Addendum**: Section 10 records the arXiv scan run later on 2026-09-06 and the roadmap amendments it produced; Sections 1 to 9 are unchanged from the morning draft
+**Addendum**: Section 10 records the arXiv scan run later on 2026-09-06 and the roadmap amendments it produced; Sections 7 and 8 carry its A9 and C11 in place; the evidence and probes of Sections 1 to 6 and 9 are unchanged from the morning draft
 **Prior draft**: an Opus session earlier the same day wrote a structure-only note and two roadmap edits; the user discarded that draft on 2026-09-06 once this note superseded it. Its four structural probes are reproduced here (Section 3.4), the two numbers taken from it that were not re-run are quoted where used (Sections 4 and 9), and its diagnosis is corrected by the functional census and the counterfactuals
 
 ## Question
@@ -272,6 +272,7 @@ Every row is from full text read on 2026-09-06 unless marked; quotations are ver
 | A6 | Rebalance weights toward growth with a bid (A1, splice, copies) and raise `mesh_layer_probability` | Tuning | Weight changes alone do not change the outcome mix (Section 3.2 is per operator). | Fold into A1 to A5; do not tune alone. |
 | A7 | Size-scaled mutation supply (Sims) as an answer to dilution (item 10) | Supply policy | Holds per-genome events constant against junk growth; interacts with T11.F04's provisional 0.55 and T11.F13's characterization. | **Defer** to T11.F13 as a treatment arm. |
 | A8 | Mutation opportunity by depth: protect interior, mutate near the root (TPG) | Supply policy | TPG's "only root teams are subject to modification" avoids unlearning; in Petri the analog is a reachable-depth weighting, the inverse of uniform targeting. | **Defer**; a T11.F13 or T11.F12 characterization knob, not a repair. |
+| A9 | Fold `AddNode` into the detour form: every new node is born on the executed chain as a pass-through to the incumbent successor, seeded tied-but-losing like A2, so no operator creates a disconnected node | Operator | `AddNode` reads 1.000 silent and never activates (Section 3.2); CF1 left it untouched (Appendix B). Dang, Kalkreuth, and Opris 2026 (Section 10.1) credit active non-contributing gates, connected and executed, and not inactive ones; NEAT's GNARL critique (Section 6). | **Adopt** (added by Section 10 after the arXiv scan). |
 
 ### 7.2 Mesh properties, topology, and execution contract
 
@@ -287,35 +288,36 @@ Every row is from full text read on 2026-09-06 unless marked; quotations are ver
 | C8 | **Population-level module library** | Shared modules any creature can route into. | PADO's 150 library programs; TPG's subsumed root teams. | Needs T08 homology and lineage attribution; ecological selection has no population-level bookkeeping. | T08.F06 evidence. | **Defer** to T08. |
 | C9 | **New node kinds** (Markov gate bank, Sims' oscillator or memory node) | Another backend under the contract. | Markov Brains; Sims. | Welcome by the contract; orthogonal to routing. | Contract compliance and floors only. | Not a mesh fix; unchanged. |
 | C10 | **Modularly varying pressure from the world** | Nothing in the mesh; T02.F01 seasons and T02.F03 offsets stay where they are in the priority order. | Kashtan and Alon; Clune's remark that bacterial network modularity tracks environmental change frequency. | | | Keep T02 after the mesh repairs so their readings land on a substrate that can route. |
+| C11 | **Knockout count** | Per sampled genome, bypass each executed node on the battery (its successor takes its place) and count the nodes whose removal changes no scenario output: the executed-but-non-contributing material. | The staging sublevel of the 2026 CGP runtime proof (Section 10.1); Miller and Smith's 95% inactive gates as quoted by Wright and Laue. Analog: silent synapses, present and firing but not yet driving the postsynaptic cell. | Seconds in the battery; no simulation change. | Expected to rise before route variation does under A1, A2, A9. | **Adopt** with C2 (added by Section 10 after the arXiv scan). |
 
 ## 8. Recommendation
 
 Two bounded T11 features, in this order, added to the roadmap on 2026-09-06. The discarded Opus draft had proposed the same pair as T11.F14 and T11.F15 with the same priority placement (F14 after T11.F07, F15 before T11.F10); the scope below differs in what F14 measures and in what F15 makes neutral and conditional.
 
-### T11.F14, mesh execution observability (C2)
+### T11.F14, mesh execution observability (C2, C11)
 
 Goal line: *Generations, not ticks; executed, not reachable.* Record what a lineage's mesh actually runs and how deep the profile reaches, so mesh-layer claims are read at a depth and in a unit that can support them; observation only.
 
-- Per sampled genome, alongside the T11.F01 companions: total node count, reachable count, executed node count over the battery, route-variation flag, hop-cap hits; founder half in the gate profile, evolved half in the goal profile.
+- Per sampled genome, alongside the T11.F01 companions: total node count, reachable count, executed node count over the battery, route-variation flag, hop-cap hits, knockout count (C11); founder half in the gate profile, evolved half in the goal profile.
 - Generation distribution of the final population (median and maximum), so every mesh claim states its depth.
 - Keep T01.F12's goal parameters; if the recorded depth argues for a deeper or cheaper profile, hand that to T01 as a finding.
 - Serde-default fields; readings in the `deterministic` block.
 
-### T11.F15, mesh routing connection semantics (A1 to A5, C1)
+### T11.F15, mesh routing connection semantics (A1 to A5, A9, C1)
 
 Goal line: *A synapse forms with its own trigger.* A new route branch is born pointing at something that already works and carrying its own bid, so it is silent at birth and conditional from its first win; retargeting lands near, removal is not usually lethal, and a node runs at most once per tick.
 
-1. Branch born with a bid (A1) onto an activation-neutral destination (A2), seeded tied-but-losing; `CopyNode` as paralog off a predecessor.
+1. Branch born with a bid (A1) onto an activation-neutral destination (A2), seeded tied-but-losing; `CopyNode` as paralog off a predecessor; `AddNode` folded into the detour form so no operator creates a disconnected node (A9).
 2. Local retargeting (A3); junk-first removal with bypass and losing-branch-only removal (A4); retire `RewriteNodeId`, split `SwapNodeBackend`, demote `ChangeEntryNode` (A5).
 3. Single-visit routing (C1), recorded in the mesh execution spec in place of the self-loop sentence.
-4. Taxonomy: place all eight connection operators in the growth-versus-connection classes in `v3-mutation-spec.md` with this feature as owner.
-5. Predeclared indicator directions, from Section 5.1: route-variation fraction above zero on the evolved half; executed count up; hop-cap hits to zero; `RemoveNode`, `RemoveRouteTarget`, and `RetargetNodeTarget` dead fractions down on the evolved half; founder rows unchanged except `RewriteNodeId` retired; per-birth dead fraction not up.
+4. Taxonomy: place all eight connection operators, and `AddNode` in its detour form, in the growth-versus-connection classes in `v3-mutation-spec.md` with this feature as owner.
+5. Predeclared indicator directions, from Section 5.1: route-variation fraction above zero on the evolved half; executed count up; hop-cap hits to zero; `RemoveNode`, `RemoveRouteTarget`, and `RetargetNodeTarget` dead fractions down on the evolved half; founder rows unchanged except `RewriteNodeId` retired; per-birth dead fraction not up. Added by Section 10: the evolved-half silent fraction is expected to fall as route variation rises (Wright and Laue 2022: robustness is the silent fraction, and complex phenotypes have low robustness), a predeclared move and not a regression.
 
 No floor is retro-fitted; T11.F15 predeclares its own targets, which then fall under the no-regression rule.
 
 ### Recorded but not scheduled
 
-C3 (persistent routing position) after T11.F10; C4 (tags) contingent on C2 readings; C5 (cost) to T03.F08; A7 and A8 to T11.F13; C6, C7 rejected; C8 to T08; C10 a sequencing note for T02. Section 10, added after the arXiv scan later the same day, folds `AddNode` into the detour form (A9) and adds a knockout reading (C11), a silent-fraction predeclaration, a T11.F13 reference arm, and a T02.F01 closure reading.
+C3 (persistent routing position) after T11.F10; C4 (tags) contingent on C2 readings; C5 (cost) to T03.F08; A7 and A8 to T11.F13; C6, C7 rejected; C8 to T08; C10 a sequencing note for T02. Section 10, added after the arXiv scan later the same day, is the ground for A9 and C11 above and for three items recorded in its Section 10.3 only: the silent-fraction predeclaration (folded into T11.F15's item 5), the T11.F13 reference arm, and the T02.F01 closure reading.
 
 ## 9. Remaining uncertainty and the cheap proofs
 
