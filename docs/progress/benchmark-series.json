@@ -13,7 +13,8 @@
       "docs/progress/features/t11-f02-vm-structural-mutation-semantics.json",
       "docs/progress/features/t11-f03-function-preserving-graph-growth.json",
       "docs/progress/features/t11-f04-mutation-supply-and-neutral-scaffold.json",
-      "docs/progress/features/t11-f06-graph-memory-clock.json"
+      "docs/progress/features/t11-f06-graph-memory-clock.json",
+      "docs/progress/features/t11-f07-reward-trace-clock.json"
     ]
   },
   "goal": {
@@ -25,7 +26,8 @@
       "docs/progress/features/t11-f02-vm-structural-mutation-semantics-goal.json",
       "docs/progress/features/t11-f03-function-preserving-graph-growth-goal.json",
       "docs/progress/features/t11-f04-mutation-supply-and-neutral-scaffold-goal.json",
-      "docs/progress/features/t11-f06-graph-memory-clock-goal.json"
+      "docs/progress/features/t11-f06-graph-memory-clock-goal.json",
+      "docs/progress/features/t11-f07-reward-trace-clock-goal.json"
     ]
   },
   "counter_definition_changes": [
