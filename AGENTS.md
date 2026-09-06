@@ -3,7 +3,7 @@
 - Use verification proportionate to the changed files. Run `make check` before completing application or runtime source-code or build-configuration changes; documentation-only work uses its relevant focused checks.
 - Commits, remotes, pull requests, and other external state require explicit user authorization.
 - Roadmap features are executed through the workflow in `docs/workflow.md`. Do not add parallel workflow machinery.
-- For Codex roadmap execution, follow the Codex adapter in that workflow, including its T11.F07 trial: Astra at `medium` effort orchestrates that feature with a separate Astra `xhigh` spec owner; other features use an Astra `xhigh` orchestrator. Delegate implementation and remediation to one persistent Astra `low` subagent, use Astra `high` for advisory consultations, and use a fresh Astra `high` subagent for final review. This delegation applies to feature execution, not requests to generate a goal prompt or edit the workflow.
+- For every Codex roadmap feature, follow the Codex adapter in that workflow: Astra at `medium` effort orchestrates with a separate persistent Astra `xhigh` spec owner for spec writing, readiness review, and escalation decisions. Delegate implementation and remediation to one persistent Astra `low` subagent, use Astra `high` for advisory consultations, and use a fresh Astra `high` subagent for final review. This delegation applies to feature execution, not requests to generate a goal prompt or edit the workflow.
 - When asked for the next roadmap goal command, produce it from `docs/workflow.md` and do not implement the feature in that session.
 - `docs/archive/` and `docs/prds/archive/` are historical and non-executable.
 - Preserve existing user changes and work carefully in dirty worktrees.
