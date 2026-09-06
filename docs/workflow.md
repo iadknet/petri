@@ -257,15 +257,15 @@ The implementer uses `low` reasoning effort ("Astra light").
 | Role | Model | Effort | Responsibility |
 | --- | --- | --- | --- |
 | Orchestrator | `gpt-6-astra` | `medium` | Delegate, verify, integrate |
-| Spec owner | `gpt-6-astra` | `xhigh` | Write spec, review readiness, resolve escalations; same agent throughout |
+| Spec owner and advisor | `gpt-6-astra` | `xhigh` | Write spec, review readiness, advise implementation, resolve escalations; same agent throughout |
 | Implementer | `gpt-6-astra` | `low` | All feature code and remediation; same agent across passes |
-| Advisor | `gpt-6-astra` | `high` | Read-only implementation advice |
 | Reviewer | `gpt-6-astra` | `high` | Fresh-context final review |
 
 The reviewer uses a fresh Astra context at `high` effort for independent
-review. The advisor is a separate subagent, not an attached Claude advisor.
-Read-only here is an instruction: native subagents inherit the session's
-sandbox; this adapter does not claim a separate permission boundary.
+review. The spec owner also provides implementation advice in the same
+persistent context; do not spawn a separate advisor. Advice is read-only with
+respect to feature code. Native subagents inherit the session's sandbox;
+this adapter does not claim a separate permission boundary.
 
 ### Planning and spec ownership
 
@@ -294,8 +294,13 @@ it cannot expand user scope or waive required checks. Unresolvable decisions
 follow the existing blocker rule. All code remediation remains with the same
 implementer. Serialize document edits between agents.
 
-The fresh final reviewer checks the original roadmap intent as well as the
-spec and diff; do not reuse the spec owner or advisor for that review.
+The spec owner's advice must challenge mistaken assumptions against the
+original requirements, not defend the spec merely because it wrote it.
+Spec revisions are explicit document changes, serialized with the
+implementer's edits and checked with `make roadmap-check` before dependent
+implementation proceeds. The combined role's self-review and advice are not
+independent validation. The fresh final reviewer checks the original roadmap
+intent as well as the spec and diff; do not reuse the spec owner for that review.
 
 ### Launch and goal prompt
 
@@ -311,7 +316,7 @@ spec and diff; do not reuse the spec owner or advisor for that review.
    token budget. Use the native tool's rules for goal status and blockers.
 
 ```text
-Set a goal: roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md and follow its shared per-feature contract and Codex adapter. Use Astra (gpt-6-astra, medium) as orchestrator. Delegate spec writing and readiness review to a separate persistent Astra (gpt-6-astra, xhigh) spec owner, and return to it for requirement corrections, conflicting technical advice, verification exceptions, and integration decisions that change behavior. Use one persistent Astra (gpt-6-astra, low) subagent for all implementation and remediation, Astra (gpt-6-astra, high) as advisor, and a fresh Astra (gpt-6-astra, high) subagent for final review. Start in the main checkout on clean main. I authorize creating .worktrees/<tnn-fnn> on codex/<tnn-fnn>, local planning and implementation commits, rebasing codex/<tnn-fnn> onto main and rerunning the required checks when main moves, fast-forwarding main after all required checks pass, and removing that completed worktree and branch. Do not push or mutate remotes. Done means the feature row is checked and its spec is Complete on main; make check exited 0 for the final feature content and its tested commit (the rebased one when a rebase was needed) is now main; the feature worktree and branch are removed; and main is clean. Show the evidence in this task and record the workflow's required model/effort settings, advisor consultations, review findings, remediation passes, requirement corrections, user interventions, and total usage when available. If a concrete blocker prevents completion, record it in the spec when one exists, report it, and preserve the worktree; never report the goal complete with required work remaining.
+Set a goal: roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md and follow its shared per-feature contract and Codex adapter. Use Astra (gpt-6-astra, medium) as orchestrator. Delegate spec writing, readiness review, and implementation advice to one separate persistent Astra (gpt-6-astra, xhigh) spec owner and advisor. Return to that same agent at the workflow's advisor checkpoints and for requirement corrections, conflicting technical advice, verification exceptions, and integration decisions that change behavior; do not spawn a separate advisor. Use one persistent Astra (gpt-6-astra, low) subagent for all implementation and remediation and a fresh Astra (gpt-6-astra, high) subagent for final review. Start in the main checkout on clean main. I authorize creating .worktrees/<tnn-fnn> on codex/<tnn-fnn>, local planning and implementation commits, rebasing codex/<tnn-fnn> onto main and rerunning the required checks when main moves, fast-forwarding main after all required checks pass, and removing that completed worktree and branch. Do not push or mutate remotes. Done means the feature row is checked and its spec is Complete on main; make check exited 0 for the final feature content and its tested commit (the rebased one when a rebase was needed) is now main; the feature worktree and branch are removed; and main is clean. Show the evidence in this task and record the workflow's required model/effort settings, advisor consultations, review findings, remediation passes, requirement corrections, user interventions, and total usage when available. If a concrete blocker prevents completion, record it in the spec when one exists, report it, and preserve the worktree; never report the goal complete with required work remaining.
 ```
 
 ### Start and worktree
@@ -353,17 +358,20 @@ the implementer owns code edits; avoid simultaneous writes to the same documents
 
 The implementer requests advice through the orchestrator at the three existing
 advisor checkpoints: before choosing an approach, after the same failure
-recurs twice, and before reporting done. The orchestrator spawns one
-`roadmap_advisor` using `gpt-6-astra`, `high`, and `fork_turns: none`, then
-resumes it for subsequent consultations. Supply the implementer's question, current
-evidence, and worktree/spec paths; relay each answer back to the implementer. The advisor reads
-and advises, never edits, runs builds, changes scope, or integrates. The implementer
-must receive the relevant answer before proceeding with the dependent
-decision; independent inspection can continue in the meantime. Record the
-consult count and decisive guidance. The implementer spawns no additional agents.
+recurs twice, and before reporting done. The orchestrator returns to the
+existing `roadmap_spec_owner` at `xhigh`, using `followup_task` when idle or
+`send_message` when running. Supply the implementer's question, current
+evidence, and worktree/spec paths; relay each answer back to the implementer.
+During consultations the spec owner reads and advises; it does not edit
+feature code, run builds or tests, or integrate. Necessary spec revisions
+follow the planning rules above. The implementer must receive the relevant
+answer before proceeding with the dependent decision; independent inspection
+can continue in the meantime. Count these consultations in the existing
+advisor count and record decisive guidance; planning/readiness review alone
+does not count as an advisor consultation. The implementer spawns no additional agents.
 
-Include this constraint in the advisor's brief at every consultation: recommend the
-smallest change that satisfies the spec, preferring existing code and
+Include this constraint in the spec owner's brief at every consultation:
+recommend the smallest change that satisfies the spec, preferring existing code and
 dependencies. Do not propose abstractions, configuration, extension points,
 or adjacent refactors for hypothetical future needs. Tie each recommendation
 to a concrete spec requirement or observed failure, and distinguish correctness
@@ -395,7 +403,7 @@ For final review, spawn `roadmap_reviewer` using `gpt-6-astra`, `high`, and
 `fork_turns: none`. Provide the worktree/spec paths and feature ID; instruct it
 to read the shared Review contract and `.claude/agents/roadmap-reviewer.md`
 as a checklist, ignoring its Claude model/tool front matter. It must not edit,
-run tests/builds, or consult the advisor. Do not reuse the advisor as reviewer. Apply
+run tests/builds, or consult the spec owner. Do not reuse the spec owner as reviewer. Apply
 the existing severity rules and route remediation to the same implementer agent.
 
 ### Close and integrate in Codex
@@ -509,6 +517,14 @@ Codex workflow for every roadmap feature: a `medium` orchestrator with a
 persistent `xhigh` spec owner. Historical feature specs retain their trial
 records. Adoption does not establish measured cost savings or quality
 equivalence with other role allocations.
+
+Later that day, the user combined spec ownership and implementation advice
+in the same persistent `xhigh` agent. Compared with retaining a separate
+advisor, this preserves requirement context and reduces handoffs; the fresh
+final reviewer remains separate to challenge shared blind spots. This follows
+[OpenAI's guidance](https://openai.com/business/guides-and-resources/a-practical-guide-to-building-ai-agents/)
+to justify additional agents against their coordination overhead. Net cost
+savings remain unmeasured, since consultations now use `xhigh` rather than `high`.
 
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
