@@ -33,7 +33,7 @@ representation only where the neighborhood reading still shows a gap.
 
 - [x] **T11.F01 — Mutational Neighborhood Indicator** — Depends on: T01.F12
   - Goal: One step away. At every closure, read how often a single mutation leaves a brain acting like its parent, acting differently, or not acting at all, on the founder and on evolved genomes, with floors predeclared before any repair; observation only.
-- [ ] **T11.F02 — VM Structural Mutation Semantics** — Depends on: T11.F01
+- [x] **T11.F02 — VM Structural Mutation Semantics** — Depends on: T11.F01
   - Goal: Gene insertion, deletion, and duplication. Adding, removing, replacing, or copying instructions keeps every surviving jump pointing where it did, an operand mutation changes one field by a small step, terminals stay terminals, and a register count never aliases registers.
 - [ ] **T11.F03 — Function-Preserving Graph Growth** — Depends on: T11.F01
   - Goal: New neural connections. A compute node joins the circuit disconnected or by splitting an existing edge with its function preserved, copies never rewire live nodes, and new edges can reach every sensor sub-value.
