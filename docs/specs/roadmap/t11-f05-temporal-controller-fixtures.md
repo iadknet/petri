@@ -423,3 +423,12 @@ both inside the 25 percent flag threshold. Report:
   outputs 1, 2, 3. Their executable assertions now pin the repaired clock.
   Earlier measurements above remain historical evidence; reward fixtures
   E1–E3 and their T11.F07 ownership are unchanged.
+
+- Current capability update (T11.F07, 2026-09-06): E1 now records trace 1,
+  weight 1.5 at eta 0.5 and unit activity/reward. E2 retains correct timing
+  and now uses activity-only recurrence (d=1/2/4: traces 1.5/1.75/1.9375,
+  weights 1.75/1.875/1.96875). E3 traces are 1, 0.5, 0.25 while nonzero
+  measured skipped-tick EnergyDelta updates weights from decayed credit.
+  Skipped activity is withheld; delayed reward access is preserved. Historical
+  measurements above remain the pre-repair record; their gain/timing gaps are
+  resolved by [T11.F07](t11-f07-reward-trace-clock.md).

@@ -782,3 +782,66 @@ fn energy_floor_at_zero_after_action_execution() {
         );
     }
 }
+
+#[test]
+fn reproduction_resets_reward_credit_including_frozen_tick_base() {
+    use crate::creature::genome::cgp::{
+        CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
+    };
+    use crate::creature::genome::{
+        HebbianRule, OutcomeChannel, PlasticityConfig, RewardModulationConfig,
+    };
+    for lamarckian in [false, true] {
+        let mut def =
+            CgpGraphBackendDef::new_with_fixed_outputs(&crate::config::MutationConfig::default());
+        def.compute_nodes.push(ComputeNode {
+            kind: ComputeNodeKind::Constant(1.0),
+            inputs: vec![GraphEdge {
+                source: GraphSource::SharedMemory {
+                    slot: 0,
+                    previous: false,
+                },
+                weight: 0.5,
+            }],
+            plasticity: Some(PlasticityConfig {
+                rule: HebbianRule::Classic,
+                learning_rate: 0.5,
+                weight_clamp: 2.0,
+                lamarckian,
+                modulation: Some(RewardModulationConfig {
+                    reward_source: OutcomeChannel::EnergyDelta,
+                    trace_decay: 0.5,
+                }),
+            }),
+        });
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                backend_def: BackendDef::Graph(def),
+                targets: vec![],
+            }],
+        };
+        let (mut sim, parent) = make_sim_with_custom_genome(1000.0, genome);
+        sim.config.mutation.mutation_probability = 0.0;
+        sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
+        sim.creatures[parent].reproductive_reserve = sim.config.nutrition.reproductive_reserve_cost;
+        sim.creatures[parent].graph_runtime.eligibility_traces = vec![vec![Box::new([3.0])]];
+        sim.creatures[parent]
+            .graph_runtime
+            .tick_start_eligibility_traces = vec![vec![Box::new([1.0])]];
+        sim.creatures[parent].graph_runtime.plasticity_weights = vec![vec![Box::new([1.5])]];
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(42);
+        let _ = apply_reproduce(parent, &mut sim, Direction::N, 20.0, &mut rng);
+        assert_eq!(sim.creatures.len(), 2, "reproduction must actually succeed");
+        let (_, child) = sim.creatures.iter().find(|(id, _)| *id != parent).unwrap();
+        assert!(child.graph_runtime.eligibility_traces.is_empty());
+        assert!(child.graph_runtime.tick_start_eligibility_traces.is_empty());
+        assert_eq!(child.age, 0);
+        assert_eq!(
+            sim.creatures[parent].graph_runtime.eligibility_traces[0][0][0],
+            3.0
+        );
+    }
+}

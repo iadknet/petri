@@ -243,8 +243,9 @@ evolvable only through edge mutations on the execute gate.
 
 ## 8. Evaluation Order and World-Tick Clock
 
-Phase 0 calls `GraphRuntimeState::begin_tick`, also used by neighborhood
-sequences. It snapshots committed operator state and outputs. Mesh entry and
+Phase 0 calls `graph_runtime.begin_tick(&genome.nodes)`, also used by neighborhood
+sequences, standalone multi-tick callers, and cloned observations. It snapshots
+committed operator state and outputs and decays initialized eligibility. Mesh entry and
 module visits do not advance this clock. Each nonempty graph visit evaluates
 all compute nodes once in index order, including disconnected nodes.
 
@@ -366,7 +367,8 @@ If energy is exhausted during graph evaluation, node evaluation halts and mesh
 execution returns `WorldAction::NoOp`. Evaluation-cost and plasticity-cost
 exhaustion preserve the prior successful temporal state and outputs and emit
 no graph effects. Actual charge and entered work remain recorded; learned
-weight and reward rollback are outside this temporal transaction.
+pure Hebbian weight and reward rollback are outside this temporal transaction.
+Reward-trace activity commits at this same successful boundary.
 
 Note: fixed structural outputs (sinks, action bank, execute gate) are not
 counted in the per-visit energy cost. They are evaluated once post-evaluation.
@@ -407,20 +409,39 @@ Plasticity weights (`plasticity_weights`) and eligibility traces
 `GraphRuntimeState`. Both use `Vec<Vec<Box<[f32]>>>` layout — one `Box<[f32]>`
 per compute node, one `f32` per input edge.
 
-- Plasticity weights are lazy-initialized to `1.0` on first use.
+- Plasticity weights are lazy-initialized from each genome edge weight on first use.
 - Eligibility traces are lazy-initialized to `0.0` on first use.
 - Offspring start with empty traces. Plasticity weights are inherited only
   if `lamarckian` is true.
 
-### Eligibility trace update (Phase 1, post-evaluation)
+### Eligibility trace clock and activity (Phases 0 and 1)
 
-After successful graph evaluation, for each reward-modulated compute node:
+At world-tick start, every initialized reward-modulated edge decays once,
+including modules never visited this tick. The decayed base is frozen:
 
 ```text
-trace[edge] = decay * old_trace + hebbian_delta(pre, post, weight)
+base_t = clamp(trace_decay, 0, 1) * trace_(t-1)
+trace_t = base_t + activity(pre, post, weight)
 ```
 
-where `hebbian_delta` applies the node's `HebbianRule` (Classic, Oja, etc.).
+Each successful visit replaces its activity contribution from that base;
+repeated visits do not add decay or duplicate credit. A skipped tick leaves
+only the base. Lambda 0 forgets prior credit; lambda 1 retains it. An isolated
+pulse is discounted by lambda^d after d skipped ticks. Clock bookkeeping
+never initializes unvisited weights/traces or adds energy/work charges.
+
+Activity excludes learning rate: Classic `pre*post`, Oja
+`post*(pre-weight*post)`, AntiHebb `-pre*post`, Covariance
+`(pre-0.5)*(post-0.5)`. It uses the unweighted source actually evaluated,
+the node's resulting output and effective evaluation weight. Lower-index
+sources use current-visit outputs; self/higher sources use frozen tick-start
+outputs. Input context includes evaluation-time energy, before later pure
+Hebbian costs. Pure Hebbian updates retain their existing semantics.
+
+Commit activity only after evaluation and plasticity costs are affordable,
+before graph effects. A failed first visit leaves only the decayed base;
+a failed revisit preserves the last successful contribution. Elapsed-time
+decay is never rolled back. Existing charges and work counters still apply.
 
 ### Reward-modulated weight update (Phase 2.5)
 
@@ -428,6 +449,13 @@ where `hebbian_delta` applies the node's `HebbianRule` (Classic, Oja, etc.).
 dw = learning_rate * outcome_signal[reward_source] * trace[edge]
 new_weight = clamp(weight + dw, -weight_clamp, weight_clamp)
 ```
+
+Learning rate is clamped to [0,1] and weight-clamp magnitude to [0.01,10].
+Eta applies once: unit activity/reward at eta 0.5 yields trace 1 and delta
+0.5. At lambda 0 and unit reward, a feed-forward edge matches its pure
+Hebbian update. Phase 2.5 updates every initialized modulated edge each tick,
+even on skipped visits or zero deltas, retaining configured cost/work
+semantics. Reward does not clear eligibility.
 
 ---
 

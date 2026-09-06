@@ -135,7 +135,12 @@ Every current or future mesh backend must meet these four requirements:
 
 1. references are stable by identity or remapped on every structural edit;
 2. every growth operation preserves function at the moment it fires;
-3. persistent state advances once per world tick; and
+3. persistent state advances once per world tick: graph temporal reads and
+   reward eligibility use an explicit boundary. Initialized eligibility decays
+   even on skipped visits; successful revisits replace activity from one frozen
+   decayed base, using actual evaluation inputs. Reward gain applies eta once
+   to activity-only credit; failed visits never overwrite successful activity;
+   and
 4. mutation supply arrives as small steps: at provisional production defaults,
    80% of triggered births request one event, with a bounded configurable tail
    and uniform opportunity across eligible live and inactive mesh nodes.

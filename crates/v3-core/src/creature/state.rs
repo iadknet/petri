@@ -7,7 +7,7 @@ use crate::creature::genome::mesh_annotations::{
     collect_live_vm_instruction_indices, derive_mesh_annotations_with_reachable_indices,
     MeshReadClass,
 };
-use crate::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
+use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome, VmInstruction};
 use crate::creature::identity::CreatureIdentityState;
 use crate::mutation::MutationOperator;
 
@@ -37,6 +37,8 @@ pub struct GraphRuntimeState {
     /// Uses `Box<[f32]>` since edge count per node is fixed after init.
     /// Always reset (not inherited) on reproduction.
     pub eligibility_traces: Vec<Vec<Box<[f32]>>>,
+    /// Decayed credit frozen at the world boundary; visits replace activity from this base.
+    pub(crate) tick_start_eligibility_traces: Vec<Vec<Box<[f32]>>>,
     /// Scratch: prev_outputs buffer reused across graph evaluations.
     pub(crate) scratch_prev: Vec<f32>,
     /// Scratch: curr_outputs buffer reused across graph evaluations.
@@ -48,10 +50,17 @@ pub struct GraphRuntimeState {
 }
 
 impl GraphRuntimeState {
-    /// Begin one world tick before any mesh visits. Unvisited modules hold state.
-    pub fn begin_tick(&mut self) {
+    /// Begin one world tick before any mesh visits, using the creature genome nodes.
+    /// Unvisited graph outputs hold; initialized eligibility decays with elapsed time.
+    pub fn begin_tick(&mut self, nodes: &[NodeGenome]) {
         self.tick_start_state.clone_from(&self.node_state);
         self.tick_start_outputs.clone_from(&self.node_outputs);
+        crate::runtime::plasticity::traces::decay_eligibility_traces(
+            nodes,
+            &mut self.eligibility_traces,
+        );
+        self.tick_start_eligibility_traces
+            .clone_from(&self.eligibility_traces);
     }
 
     /// Create a new empty graph runtime state.
@@ -63,6 +72,7 @@ impl GraphRuntimeState {
             tick_start_outputs: Vec::new(),
             plasticity_weights: Vec::new(),
             eligibility_traces: Vec::new(),
+            tick_start_eligibility_traces: Vec::new(),
             scratch_prev: Vec::new(),
             scratch_curr: Vec::new(),
             scratch_backup: Vec::new(),
@@ -325,6 +335,7 @@ mod tests {
         assert!(state.graph_runtime.tick_start_outputs.is_empty());
         assert!(state.graph_runtime.plasticity_weights.is_empty());
         assert!(state.graph_runtime.eligibility_traces.is_empty());
+        assert!(state.graph_runtime.tick_start_eligibility_traces.is_empty());
         assert_eq!(state.generation, 0);
         assert!((state.energy - 20.0).abs() < f32::EPSILON);
         assert!(state.reproductive_reserve.abs() < f32::EPSILON);

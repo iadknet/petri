@@ -10,9 +10,33 @@
 
 use crate::contracts::InputReference;
 use crate::creature::genome::cgp::CgpGraphBackendDef;
-use crate::creature::genome::HebbianRule;
-use crate::runtime::cgp::sources::resolve_source_post_convergence;
+use crate::creature::genome::{BackendDef, HebbianRule, NodeGenome};
+use crate::runtime::cgp::sources::resolve_source;
 use crate::runtime::inputs::ResolveCtx;
+
+/// Advance initialized credit once per world tick without initializing weights or traces.
+pub(crate) fn decay_eligibility_traces(
+    nodes: &[NodeGenome],
+    eligibility_traces: &mut [Vec<Box<[f32]>>],
+) {
+    for (node, module_traces) in nodes.iter().zip(eligibility_traces) {
+        let BackendDef::Graph(def) = &node.backend_def else {
+            continue;
+        };
+        for (compute, traces) in def.compute_nodes.iter().zip(module_traces) {
+            if let Some(modulation) = compute
+                .plasticity
+                .as_ref()
+                .and_then(|p| p.modulation.as_ref())
+            {
+                let decay = modulation.trace_decay.clamp(0.0, 1.0);
+                for trace in traces {
+                    *trace *= decay;
+                }
+            }
+        }
+    }
+}
 
 /// Ensure `eligibility_traces` is properly sized for the given mesh node.
 ///
@@ -49,23 +73,17 @@ pub(crate) fn ensure_eligibility_traces(
     }
 }
 
-/// Update eligibility traces after graph convergence.
-///
-/// For each reward-modulated node, compute the Hebbian delta using the same
-/// rule as pure Hebbian learning, then accumulate into the trace with decay:
-///
-/// ```text
-/// trace[edge] = decay * old_trace + hebbian_delta(pre, post, w)
-/// ```
-///
-/// Pure Hebbian nodes (no modulation) are skipped — they are updated
-/// directly by [`super::hebbian::apply_hebbian_updates`].
+/// Commit the last successful visit's activity from the frozen, decayed tick base.
+/// Activity has no learning-rate factor; eta is applied once when reward arrives.
+/// Source replay uses the evaluation context and ordered temporal read bases.
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn update_eligibility_traces(
     def: &CgpGraphBackendDef,
     node_idx: usize,
     eligibility_traces: &mut [Vec<Box<[f32]>>],
+    tick_start_traces: &[Vec<Box<[f32]>>],
     plasticity_weights: &[Vec<Box<[f32]>>],
+    prev_outputs: &[f32],
     final_outputs: &[f32],
     input_refs: &[InputReference],
     resolve_ctx: &ResolveCtx<'_>,
@@ -81,18 +99,13 @@ pub(crate) fn update_eligibility_traces(
         };
 
         // Only update traces for reward-modulated nodes.
-        let modulation = match &cfg.modulation {
-            Some(m) => m,
-            None => continue,
-        };
+        if cfg.modulation.is_none() {
+            continue;
+        }
 
         if cnode.inputs.is_empty() {
             continue;
         }
-
-        // Clamp decay to [0.0, 1.0] at runtime.
-        let decay = modulation.trace_decay.clamp(0.0, 1.0);
-        let eta = cfg.learning_rate.clamp(0.0, 1.0);
 
         let post = if i < final_outputs.len() {
             final_outputs[i]
@@ -117,14 +130,19 @@ pub(crate) fn update_eligibility_traces(
                 &[][..]
             };
 
+        let base_traces = tick_start_traces
+            .get(node_idx)
+            .and_then(|module| module.get(i));
         for (edge_idx, edge) in cnode.inputs.iter().enumerate() {
             if edge_idx >= traces.len() {
                 break;
             }
 
-            let pre = resolve_source_post_convergence(
+            let pre = resolve_source(
                 &edge.source,
+                i,
                 compute_count,
+                prev_outputs,
                 final_outputs,
                 input_refs,
                 resolve_ctx,
@@ -138,16 +156,20 @@ pub(crate) fn update_eligibility_traces(
                 edge.weight // fall back to genome weight
             };
 
-            // Compute the Hebbian delta (same rules as pure Hebbian).
-            let hebbian_delta = match cfg.rule {
-                HebbianRule::Classic => eta * pre * post,
-                HebbianRule::Oja => eta * post * (pre - w * post),
-                HebbianRule::AntiHebb => -eta * pre * post,
-                HebbianRule::Covariance => eta * (pre - 0.5) * (post - 0.5),
+            // Compute activity only; reward applies the learning rate.
+            let activity = match cfg.rule {
+                HebbianRule::Classic => pre * post,
+                HebbianRule::Oja => post * (pre - w * post),
+                HebbianRule::AntiHebb => -pre * post,
+                HebbianRule::Covariance => (pre - 0.5) * (post - 0.5),
             };
 
-            // Accumulate: trace = decay * old_trace + hebbian_delta
-            traces[edge_idx] = decay * traces[edge_idx] + hebbian_delta;
+            // A module first initialized this tick has no prior credit, even on a revisit.
+            let base = base_traces
+                .and_then(|edges| edges.get(edge_idx))
+                .copied()
+                .unwrap_or(0.0);
+            traces[edge_idx] = base + activity;
         }
     }
 }

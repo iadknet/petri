@@ -20,7 +20,7 @@ use crate::sensors::perception::SensorSnapshot;
 /// containing the queued actions, a [`ComputeCostReport`], and the priority bid.
 ///
 /// Before the first mesh execution of each new world tick, the caller must call
-/// [`GraphRuntimeState::begin_tick`] on `graph_runtime`. Mesh execution does not
+/// `graph_runtime.begin_tick(&genome.nodes)`. Mesh execution does not
 /// advance the graph clock. Repeated mesh visits in the same tick must reuse the
 /// existing snapshots without calling `begin_tick` again.
 ///
@@ -67,7 +67,7 @@ pub fn execute_creature_mesh(
 /// Execute a creature mesh while exposing its live reproductive reserve.
 ///
 /// Before the first mesh execution of each new world tick, the caller must call
-/// [`GraphRuntimeState::begin_tick`] on `graph_runtime`. Mesh execution does not
+/// `graph_runtime.begin_tick(&genome.nodes)`. Mesh execution does not
 /// advance the graph clock. Repeated mesh visits in the same tick must reuse the
 /// existing snapshots without calling `begin_tick` again.
 #[allow(clippy::too_many_arguments)]

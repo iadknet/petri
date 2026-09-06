@@ -159,7 +159,7 @@ pub const OUTCOME_CHANNEL_COUNT: usize = 4;
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct RewardModulationConfig {
     pub reward_source: OutcomeChannel,
-    /// Eligibility trace decay factor, clamped to [0.0, 1.0] at runtime.
+    /// Eligibility retention per world tick, clamped to [0.0, 1.0] at runtime.
     pub trace_decay: f32,
 }
 
@@ -167,12 +167,12 @@ pub struct RewardModulationConfig {
 ///
 /// Governs both pure Hebbian and reward-modulated (three-factor) learning.
 /// When `modulation` is `None`, this is pure Hebbian learning. When `Some`,
-/// the Hebbian delta is accumulated into an eligibility trace and weight
+/// activity without the learning-rate factor replaces the tick contribution to an eligibility trace; weight
 /// updates are deferred to the reward-modulated learning pass.
 #[derive(Debug, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct PlasticityConfig {
     pub rule: HebbianRule,
-    /// Learning rate, clamped to [0.0, 1.0] at runtime.
+    /// Learning rate, applied once per weight update and clamped to [0.0, 1.0].
     pub learning_rate: f32,
     /// Symmetric weight clamp magnitude, clamped to [0.01, 10.0] at runtime.
     pub weight_clamp: f32,
