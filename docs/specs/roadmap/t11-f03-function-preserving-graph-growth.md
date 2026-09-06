@@ -139,7 +139,7 @@ relies on.
       pinned spraying, backlinks, and auto-wiring.
 - [x] Update `v3-mutation-spec.md` (taxonomy, graph and InputRef domain
       entries, node-type contract owner text) and `v3-graph-backend-spec.md`.
-- [ ] Self-review the diff (`simplify`), then fresh `make rust-mutants`; record
+- [x] Self-review the diff (`simplify`), then fresh `make rust-mutants`; record
       evidence below.
 - [ ] Store gate and single goal reports at
       `docs/progress/features/t11-f03-function-preserving-graph-growth.json`
@@ -174,8 +174,48 @@ relies on.
       above), `mutational_neighborhood` (4 passed), and `reproducibility` (1
       passed) tests pass; full `cargo test -p v3-core --lib` (1119 passed)
       and `cargo test -p v3-core` (all integration suites) pass.
-- [ ] `make rust-mutants` (fresh, `MUTANTS_ITERATE=0`): summary line, output
-      path, full survivor list, each killed, equivalent, or deferred.
+- [x] `make rust-mutants` (fresh, `MUTANTS_ITERATE=0`): output path
+      `/Users/istefanek/.local/share/petri-tools/mutants/t11-f03/mutants.out`.
+      First fresh run: `99 mutants tested in 10m: 27 missed, 60 caught, 12
+      unviable`. Added 6 tests (`add_graph_edge_wrapper_increases_edge_count`,
+      `random_graph_source_input_leaf_is_the_majority_when_compute_is_empty`,
+      `add_compute_node_reaches_all_three_forms_with_distinct_signatures`,
+      `valid_edge_field_moves_compute_node_bounds`,
+      `valid_edge_field_moves_input_leaf_bounds`,
+      `apply_edge_field_move_moves_by_the_exact_signed_delta`) closing 21 of
+      27 survivors; a second fresh run: `99 mutants tested in 8m: 6 missed, 81
+      caught, 12 unviable`. Extended two of those tests with two more exact
+      boundary cases (an `InputLeaf` sub_idx-equals-neighbor-width case
+      killing both remaining `valid_edge_field_moves` `<=` survivors on the
+      `RefIdx` width checks, and a new
+      `valid_edge_field_moves_shared_memory_always_offers_three_moves` test
+      killing the `SharedSlot(-1)` sign-deletion survivor); simplify pass
+      (see below) deduped one test's helper. Third fresh run, the closure
+      run: `99 mutants tested in 8m: 3 missed, 84 caught, 12 unviable`.
+      Remaining 3 survivors, all in `crates/v3-core/src/mutation/graph/operators.rs`:
+      - `191:20: replace < with <=` in `random_graph_source` — **deferred**.
+        `rand` 0.8.6's `Standard` impl for `f32` (`distributions/float.rs`,
+        `float_impls!` macro, precision 24) draws `scale * (rng.gen::<u32>()
+        >> 8) as f32` where `scale = 2^-24`, i.e. every multiple of `2^-24`
+        in `[0, 1)` is reachable with probability `2^-24`. `0.8f32`'s bit
+        pattern (`0.800000011920929`) lies in the `[0.5, 1)` binade where the
+        f32 ULP is exactly `2^-24`, so it is one of those reachable grid
+        points (not proven impossible, contradicting an earlier equivalence
+        hypothesis checked against `rand`'s own source before this
+        disposition was written) — but hitting that exact draw needs a
+        targeted search over up to 2^24 seeds, impractical within the test
+        budget. Mirrors the T11.F02 precedent's "~2.1 billion elements"
+        deferral for a similar unreachable-in-practice boundary.
+      - `812:28: replace < with <=` and `812:24: replace + with *`, both on
+        the `if ref_idx + 1 < ref_count` guard in `valid_edge_field_moves` —
+        **equivalent**. `ref_count == input_refs.len()` and the guarded block
+        immediately re-derives the same candidate index (`ref_idx + 1`,
+        computed on its own unmutated line) and looks it up with
+        `input_refs.get(candidate)`; that `Option` check alone already
+        excludes every `candidate >= ref_count`, so the outer guard cannot
+        change which branch executes for any input — the mutated and
+        unmutated code produce byte-identical `Vec<EdgeFieldMove>` output on
+        every call.
 - [ ] `make bench PROFILE=gate FEATURE=t11-f03-function-preserving-graph-growth`
       and one `PROFILE=goal` run stored; second goal run: Not applicable per
       the 2026-09-05 workflow decision.
