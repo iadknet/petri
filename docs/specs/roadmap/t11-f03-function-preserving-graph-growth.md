@@ -166,14 +166,18 @@ relies on.
       `mutation/graph/operators.rs`'s inline tests, replacing each with its
       inverse (zero edges wired, VM program byte-identical).
 - [x] `cargo test -p v3-core --test viability` ran before the first
-      production edit (25 passed) and again at closure (25 passed);
+      production edit (25 passed), again after the production edits (25
+      passed), and again at final closure after the mutation-survivor
+      remediation tests and the rustfmt/clippy fixes (25 passed; that
+      remediation was test-only, so no production behavior was at risk);
       `cargo check --workspace --all-targets` after every coherent Rust edit
       (enforced by the implementer-compile-check hook); focused
-      `mutation::graph` (48 passed), `mutation::input_ref` (23 passed),
+      `mutation::graph` (65 passed), `mutation::input_ref` (23 passed),
       `mutation::engine` (all passed, including the two stress tests fixed
       above), `mutational_neighborhood` (4 passed), and `reproducibility` (1
-      passed) tests pass; full `cargo test -p v3-core --lib` (1119 passed)
-      and `cargo test -p v3-core` (all integration suites) pass.
+      passed) tests pass; full `cargo test -p v3-core --lib` (1126 passed)
+      and `make check` (exit 0, see the roadmap-check/`make check` bullet
+      below) pass.
 - [x] `make rust-mutants` (fresh, `MUTANTS_ITERATE=0`): output path
       `/Users/istefanek/.local/share/petri-tools/mutants/t11-f03/mutants.out`.
       First fresh run: `99 mutants tested in 10m: 27 missed, 60 caught, 12
@@ -221,8 +225,16 @@ relies on.
       `docs/progress/features/t11-f03-function-preserving-graph-growth.json`
       and `...-goal.json`; both `severe=false`; second goal run: not
       applicable per the 2026-09-05 workflow decision.
-- [ ] `make roadmap-check` on document edits; final `make check` exits 0 at
-      the commit that lands on `main`.
+- [x] `make roadmap-check` passed after every document edit. `make check`
+      ran to completion with an explicitly captured `exit=0` at commit
+      `4722a362` (rustfmt and one clippy `nonminimal_bool` fix on a test
+      assertion were needed first and are included in that commit and
+      `4324e19c`; both are test/format-only, postdate the closure mutants
+      run, and cannot change its `3 missed, 84 caught, 12 unviable`
+      result). This spec's own text changed after `4722a362`; no other file
+      changed after that commit, so the `make check` result still describes
+      the tree. The orchestrator confirms `make check` again at the commit
+      that actually lands on `main`.
 
 ## Performance and Goal Impact
 
@@ -306,11 +318,13 @@ row not listed below is byte-identical to T11.F02:
 `AddGraphEdge` and `RetargetGraphEdge` moved within the "either way, report
 without adjustment" allowance (-0.02 and unchanged respectively).
 `GraphRawFieldMutation` moved **against** the predeclared direction: silent
-fell from 0.10 to 0.08 (changed rose to 0.92) instead of rising toward 0.74;
-the one-field-one-unit step is evidently *more* likely to produce an
-observable change than the prior implementation on this founder, not less.
-This is reported as measured, not adjusted toward the prediction; no floor
-is asserted here (floor (c) is T11.F10's).
+fell from 0.10 to 0.08 (changed rose to 0.92) instead of rising toward 0.74.
+Measured as one trial's worth of movement on the 50-trial battery (5 silent
+→ 4 silent), within the same trial-coarseness already applied to the birth
+buckets below, not a claim that the one-field-one-unit step is now more
+likely to produce an observable change in general. This is reported as
+measured, not adjusted toward the prediction; no floor is asserted here
+(floor (c) is T11.F10's).
 
 Founder mutated-birth outcomes (silent/changed/dead; trials), current vs
 T11.F02 gate reference:
