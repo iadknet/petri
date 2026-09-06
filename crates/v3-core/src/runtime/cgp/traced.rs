@@ -17,8 +17,7 @@ pub(crate) struct RecordingTracer {
     current_pass_cost: f32,
     current_pass_energy: f32,
     final_outputs: Vec<f32>,
-    final_stable_passes: u32,
-    final_converged: bool,
+    temporal_committed: bool,
     output_sinks: Vec<GraphOutputSinkTrace>,
     action_slots: Vec<GraphActionSlotTrace>,
     execute_gate: GraphExecuteGateTrace,
@@ -32,8 +31,7 @@ impl RecordingTracer {
             current_pass_cost: 0.0,
             current_pass_energy: 0.0,
             final_outputs: Vec::new(),
-            final_stable_passes: 0,
-            final_converged: false,
+            temporal_committed: false,
             output_sinks: Vec::new(),
             action_slots: Vec::new(),
             execute_gate: GraphExecuteGateTrace {
@@ -48,8 +46,9 @@ impl RecordingTracer {
     pub(crate) fn into_trace(self) -> GraphTrace {
         GraphTrace {
             passes: self.passes,
-            converged: self.final_converged,
-            stable_passes_count: self.final_stable_passes,
+            converged: false,
+            temporal_committed: self.temporal_committed,
+            stable_passes_count: 0,
             final_outputs: self.final_outputs,
             output_sinks: self.output_sinks,
             action_slots: self.action_slots,
@@ -96,10 +95,9 @@ impl GraphTracer for RecordingTracer {
         });
     }
 
-    fn on_finish(&mut self, curr_outputs: &[f32], stable_passes: u32, converged: bool) {
+    fn on_finish(&mut self, curr_outputs: &[f32], temporal_committed: bool) {
         self.final_outputs = curr_outputs.to_vec();
-        self.final_stable_passes = stable_passes;
-        self.final_converged = converged;
+        self.temporal_committed = temporal_committed;
     }
 
     fn on_effects(&mut self, effects: CgpEffectsTrace) {
@@ -131,6 +129,7 @@ pub(crate) fn execute_graph_node_traced_with_reserve(
         let trace = GraphTrace {
             passes: Vec::new(),
             converged: false,
+            temporal_committed: false,
             stable_passes_count: 0,
             final_outputs: Vec::new(),
             output_sinks: Vec::new(),
@@ -151,7 +150,7 @@ pub(crate) fn execute_graph_node_traced_with_reserve(
         );
     }
 
-    let mut tracer = RecordingTracer::new(config.max_graph_relax_iters, node_count);
+    let mut tracer = RecordingTracer::new(1, node_count);
 
     let result = execute_graph_impl(
         &mut tracer,

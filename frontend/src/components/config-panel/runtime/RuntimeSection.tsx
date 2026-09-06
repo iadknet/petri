@@ -21,30 +21,33 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 	},
 	{
 		path: "runtime.max_graph_relax_iters",
-		label: "Graph Relax Iters",
+		label: "Graph Relax Iters (inactive)",
 		min: 1,
 		max: 100,
 		step: 1,
 		defaultValue: 15,
-		tooltip: "Maximum iterations for graph relaxation convergence",
+		tooltip:
+			"Retained configuration field; graphs now evaluate once per visit on the world-tick clock",
 	},
 	{
 		path: "runtime.graph_convergence_epsilon",
-		label: "Convergence Epsilon",
+		label: "Convergence Epsilon (inactive)",
 		min: 0.0001,
 		max: 1,
 		step: 0.0001,
 		defaultValue: 0.001,
-		tooltip: "Threshold below which graph relaxation is considered converged",
+		tooltip:
+			"Retained configuration field; graphs now evaluate once per visit on the world-tick clock",
 	},
 	{
 		path: "runtime.graph_convergence_stable_passes",
-		label: "Stable Passes",
+		label: "Stable Passes (inactive)",
 		min: 1,
 		max: 10,
 		step: 1,
 		defaultValue: 2,
-		tooltip: "Consecutive stable passes required before declaring convergence",
+		tooltip:
+			"Retained configuration field; graphs now evaluate once per visit on the world-tick clock",
 	},
 	{
 		path: "runtime.graph_node_base_cost",

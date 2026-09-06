@@ -271,7 +271,8 @@ pub struct SimStats {
     pub mesh_hops_total: u64,
     /// VM opcodes executed across all creatures, all ticks.
     pub vm_steps_total: u64,
-    /// Graph relaxation passes entered across all creatures, all ticks.
+    /// Entered nonempty graph visits across all creatures/ticks (single evaluation
+    /// since T11.F06; retained wire counter formerly counted relaxation passes).
     pub graph_relax_iters_total: u64,
     /// Hebbian plus reward-modulated plasticity weight updates applied.
     pub plasticity_updates_total: u64,

@@ -29,10 +29,11 @@ export const GraphExecutionView = memo(function GraphExecutionView({
 			{/* Pass selector */}
 			<div>
 				<div className="text-[10px] text-slate-500 uppercase tracking-wider font-medium mb-1">
-					Pass {detailIndex + 1}/{trace.passes.length}
+					Evaluation {detailIndex + 1}/{trace.passes.length}
 					{currentPass && (
 						<span className="ml-2 text-slate-600">
-							Δ={currentPass.max_delta.toFixed(4)} cost={currentPass.energy_cost.toFixed(4)}e
+							Δ={currentPass.max_delta.toFixed(4)} cost=
+							{currentPass.energy_cost.toFixed(4)}e
 						</span>
 					)}
 				</div>
@@ -86,14 +87,12 @@ export const GraphExecutionView = memo(function GraphExecutionView({
 				)}
 			</div>
 
-			{/* Convergence footer */}
+			{/* Temporal commit footer */}
 			<div className="text-[10px] font-mono flex items-center gap-2">
-				<span className={trace.converged ? "text-emerald-400" : "text-amber-400"}>
-					{trace.converged ? "Converged" : "Not converged"}
+				<span className={trace.temporal_committed ? "text-emerald-400" : "text-amber-400"}>
+					{trace.temporal_committed ? "Temporal state committed" : "Candidate state not committed"}
 				</span>
-				<span className="text-slate-600">
-					{trace.stable_passes_count} stable · {trace.passes.length} passes
-				</span>
+				<span className="text-slate-600">{trace.passes.length} entered evaluations</span>
 			</div>
 		</div>
 	);

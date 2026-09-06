@@ -87,6 +87,7 @@ export interface GraphExecuteGateTrace {
 }
 
 export interface GraphTrace {
+	temporal_committed: boolean;
 	passes: GraphPassTrace[];
 	converged: boolean;
 	stable_passes_count: number;
