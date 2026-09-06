@@ -94,6 +94,7 @@ export const MOCK_CONFIG: SimulationConfig = {
 		mutation_probability: 0.01,
 		per_birth_mutation_events_min: 1,
 		per_birth_mutation_events_max: 4,
+		per_birth_mutation_event_continuation_probability: 0.2,
 		mesh_layer_probability: 0.2,
 		genome_size_cap: 1200,
 		genome_size_pressure_enabled: true,
