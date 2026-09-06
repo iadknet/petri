@@ -1,7 +1,7 @@
 # T11.F04 — Mutation Supply and Neutral Scaffold
 
-**Status**: In Progress
-**Last updated**: 2026-09-05
+**Status**: Complete
+**Last updated**: 2026-09-06
 **Feature**: T11.F04
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
 
@@ -89,7 +89,7 @@ neighborhood reports show the effect of these production defaults.
 - [x] Store gate, one goal, and four sweep reports; compare against T11.F03
       and the pinned baselines, append the benchmark series and progress row,
       and update the master's dated persistence baseline note.
-- [ ] Complete independent review, closure metadata and track row, final
+- [x] Complete independent review, closure metadata and track row, final
       checks and local commit; integrate and clean up through the orchestrator.
 
 ## Verification
@@ -107,7 +107,7 @@ neighborhood reports show the effect of these production defaults.
       decision; cross-process reproducibility is covered by `make check`.
 - [x] Four predeclared sweep reports exist; report extinction, peaks,
       plateaus, final population, births and energy against T01.F11.
-- [ ] `make roadmap-check` passes on document edits and independently before
+- [x] `make roadmap-check` passes on document edits and independently before
       the orchestrator accepts implementation; final `make check` exits 0
       for final content, with its tested commit reported in the parent task.
 
@@ -326,8 +326,7 @@ compare against T11.F03's zero and fail. No comparator thresholds or runtime
 behavior changed. The preserved report still truthfully records its original
 severe comparisons against T10.F10 and T11.F03. At this gate-only decision, goal references remained T01.F12
 and T11.F03 for its later measured run; that run was not covered by this gate-cost
-acceptance. The separate goal approval below subsequently governs its re-pin. The feature remains In Progress until all required checks and
-review complete.
+acceptance. The separate goal approval below subsequently governs its re-pin. Closure staging and final verification are recorded below.
 
 ### Founder neighborhood at the blocked gate
 
@@ -503,7 +502,8 @@ sampled-genome rows are not matched subjects across features.
 All four required sweeps ran sequentially through the normal host guard, with
 no competing build, test or benchmark. Each exited 0; source revision is
 `c542c87f0d3f65d76143918901a4c679d822f2a7`, with documentation/evidence edits
-only. Food coverage remains the production default 0.54. These are sweep runs,
+only. Food coverage remains the production default (0.27 for each configured
+food type). These are sweep runs,
 not additional goal runs. The 1600 sweep's simulation totals exactly match the
 single goal run: 97,785,854 creature-ticks, 121,013,912,316 VM steps and 797,050
 births. Historical T01.F11 reports remain unchanged.
@@ -560,9 +560,9 @@ The dated master note and progress row record this evidence.
       event when triggered, with the configurable bounded tail verified.
 - [x] Inactive eligible nodes receive uniform target opportunity; no operator
       family is disabled or down-weighted to improve the indicator.
-- [ ] Viability, reproducibility, required checks, mutation triage, independent
+- [x] Viability, reproducibility, required checks, mutation triage, independent
       review, persistence comparisons, and stored reports are complete.
-- [ ] Checked feature row and Complete spec are on clean main at the tested
+- [x] Checked feature row and Complete spec are on clean main at the tested
       commit, with the feature branch and worktree removed.
 
 ## Notes for AI Agents
@@ -637,4 +637,22 @@ The dated master note and progress row record this evidence.
   approvals and deferred timeout. Clarified the pre-feature default wording,
   pooled versus individual evolved rows, and historical gate-only goal references.
   No source change, second goal run or additional mutation run was needed.
-- Cost record: usage unavailable; advisor consultations 5; review pending.
+- Fresh independent review (2026-09-06): 0 P1, 0 P2, 1 P3; no blocker.
+  The P3 found a blank line ending the progress table before the T11.F04 row.
+  Removed that separator in this single post-review documentation pass. The
+  parent identified the sweep prose error, now corrected to effective production coverage,
+  0.27 per configured food type; report inputs and measured results were already
+  correct. No source, test, benchmark or mutation changes were warranted.
+- Closure staging (2026-09-06): Complete status, checked feature row and closure
+  checkboxes are prepared together for the orchestrator's final transaction.
+  These marks do not assert that integration has already run. The parent task
+  records the final `make check` result, tested closure commit, clean-main
+  integration and branch/worktree cleanup after accepting this working content.
+  Source remains `c542c87f`; measured report revisions above are distinct from
+  that final closure-tested commit. T11 remains In Progress, with its remaining
+  floors and features unchanged.
+- Cost snapshot: the native goal tool at 2026-09-06 07:04:20 UTC returned
+  `tokensUsed=961043` and `timeUsedSeconds=5643`. This is a pre-closure snapshot,
+  not the final task total. Monetary cost and per-model usage are unavailable.
+  Advisor consultations: 5; fresh reviewer findings: 0 P1 / 0 P2 / 1 P3,
+  with the P3 resolved as described above.

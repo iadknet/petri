@@ -1,7 +1,7 @@
 # T11 — Brain Genotype-Phenotype Map
 
 **Status**: In Progress
-**Last updated**: 2026-09-05
+**Last updated**: 2026-09-06
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -37,7 +37,7 @@ representation only where the neighborhood reading still shows a gap.
   - Goal: Gene insertion, deletion, and duplication. Adding, removing, replacing, or copying instructions keeps every surviving jump pointing where it did, an operand mutation changes one field by a small step, terminals stay terminals, and a register count never aliases registers.
 - [x] **T11.F03 — Function-Preserving Graph Growth** — Depends on: T11.F01
   - Goal: New neural connections. A compute node joins the circuit disconnected or by splitting an existing edge with its function preserved, copies never rewire live nodes, and new edges can reach every sensor sub-value.
-- [ ] **T11.F04 — Mutation Supply and Neutral Scaffold** — Depends on: T11.F02, T11.F03
+- [x] **T11.F04 — Mutation Supply and Neutral Scaffold** — Depends on: T11.F02, T11.F03
   - Goal: Point mutations one at a time. Mutation arrives mostly as single events at a provisional mean of about 0.55 requested events per birth, inactive structure receives the same target opportunity as live code, and persistence is re-read after the change.
 - [x] **T11.F05 — Temporal Controller Fixtures** — Depends on: None
   - Goal: Check the brain's building blocks with small delayed-cue, memory-retention, and delayed-reward fixtures on constructed controllers, recording capability and measured gaps before interpreting evolution.
