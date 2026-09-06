@@ -250,14 +250,14 @@ Use the shared Plan, Implement, Review, and Close contract above with these
 substitutions. This adapter uses native subagents and Git; it adds no runner,
 plugin, separate roadmap, or global model settings.
 
-Select `gpt-6-astra` with `xhigh` reasoning effort when launching a feature,
-except T11.F07, which uses `medium` under the trial below.
+Select `gpt-6-astra` with `medium` reasoning effort when launching any feature.
 Verify the active session model and effort; this workflow does not set them.
 The implementer uses `low` reasoning effort ("Astra light").
 
 | Role | Model | Effort | Responsibility |
 | --- | --- | --- | --- |
-| Orchestrator | `gpt-6-astra` | `xhigh` | Plan, delegate, verify, integrate |
+| Orchestrator | `gpt-6-astra` | `medium` | Delegate, verify, integrate |
+| Spec owner | `gpt-6-astra` | `xhigh` | Write spec, review readiness, resolve escalations; same agent throughout |
 | Implementer | `gpt-6-astra` | `low` | All feature code and remediation; same agent across passes |
 | Advisor | `gpt-6-astra` | `high` | Read-only implementation advice |
 | Reviewer | `gpt-6-astra` | `high` | Fresh-context final review |
@@ -267,12 +267,11 @@ review. The advisor is a separate subagent, not an attached Claude advisor.
 Read-only here is an instruction: native subagents inherit the session's
 sandbox; this adapter does not claim a separate permission boundary.
 
-### T11.F07 orchestration trial
+### Planning and spec ownership
 
-For T11.F07 only, use an Astra `medium` orchestrator and a separate Astra
-`xhigh` spec owner. Keep the implementer, advisor, and fresh final reviewer
-at the settings above. This trial changes role allocation, not required
-checks, review severity rules, or integration conditions.
+Every Codex roadmap feature uses the roles above. The separate spec owner
+handles the shared Plan step; required checks, review severity rules, and
+integration conditions still follow the shared contract.
 
 After worktree setup, delegate the shared Plan step to `roadmap_spec_owner`
 with `model: gpt-6-astra`, `reasoning_effort: xhigh`, and `fork_turns: none`.
@@ -297,18 +296,13 @@ implementer. Serialize document edits between agents.
 
 The fresh final reviewer checks the original roadmap intent as well as the
 spec and diff; do not reuse the spec owner or advisor for that review.
-At closure, add the trial model/effort settings, remediation-pass count,
-requirement corrections, and user interventions to the existing cost record.
-Record total usage across the orchestrator and subagents only when available,
-otherwise `usage unavailable`. Savings and quality remain unproven until
-compared with completed feature runs; do not extend the trial automatically.
 
 ### Launch and goal prompt
 
 1. Ask **"give me the Codex goal prompt for the next roadmap feature."** Apply
    the shared next-feature rule using the current roadmap, not its dated example.
 2. Start a new **Local** Codex task in the main checkout on clean `main`.
-   Select **Astra**, effort **extra high** (`xhigh`), or **medium** for T11.F07.
+   Select **Astra**, effort **medium**.
    The task stays rooted there while all
    feature edits and checks use the feature worktree's absolute path.
 3. Paste the substituted prompt below. The requested goal is explicit; use
@@ -316,13 +310,8 @@ compared with completed feature runs; do not extend the trial automatically.
    transcript evaluator, or 80-turn limit exists in Codex. Do not invent a
    token budget. Use the native tool's rules for goal status and blockers.
 
-For T11.F07, substitute `medium` for the orchestrator's `xhigh` in the prompt
-and add: "Follow the T11.F07 trial: delegate spec writing and readiness review
-to a separate persistent Astra (gpt-6-astra, xhigh) spec owner, and return to it
-for the trial's escalation decisions."
-
 ```text
-Set a goal: roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md and follow its shared per-feature contract and Codex adapter. Use Astra (gpt-6-astra, xhigh) as orchestrator, one persistent Astra (gpt-6-astra, low) subagent for all implementation and remediation, Astra (gpt-6-astra, high) as advisor, and a fresh Astra (gpt-6-astra, high) subagent for final review. Start in the main checkout on clean main. I authorize creating .worktrees/<tnn-fnn> on codex/<tnn-fnn>, local planning and implementation commits, rebasing codex/<tnn-fnn> onto main and rerunning the required checks when main moves, fast-forwarding main after all required checks pass, and removing that completed worktree and branch. Do not push or mutate remotes. Done means the feature row is checked and its spec is Complete on main; make check exited 0 for the final feature content and its tested commit (the rebased one when a rebase was needed) is now main; the feature worktree and branch are removed; and main is clean. Show the evidence in this task. If a concrete blocker prevents completion, record it in the spec when one exists, report it, and preserve the worktree; never report the goal complete with required work remaining.
+Set a goal: roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md and follow its shared per-feature contract and Codex adapter. Use Astra (gpt-6-astra, medium) as orchestrator. Delegate spec writing and readiness review to a separate persistent Astra (gpt-6-astra, xhigh) spec owner, and return to it for requirement corrections, conflicting technical advice, verification exceptions, and integration decisions that change behavior. Use one persistent Astra (gpt-6-astra, low) subagent for all implementation and remediation, Astra (gpt-6-astra, high) as advisor, and a fresh Astra (gpt-6-astra, high) subagent for final review. Start in the main checkout on clean main. I authorize creating .worktrees/<tnn-fnn> on codex/<tnn-fnn>, local planning and implementation commits, rebasing codex/<tnn-fnn> onto main and rerunning the required checks when main moves, fast-forwarding main after all required checks pass, and removing that completed worktree and branch. Do not push or mutate remotes. Done means the feature row is checked and its spec is Complete on main; make check exited 0 for the final feature content and its tested commit (the rebased one when a rebase was needed) is now main; the feature worktree and branch are removed; and main is clean. Show the evidence in this task and record the workflow's required model/effort settings, advisor consultations, review findings, remediation passes, requirement corrections, user interventions, and total usage when available. If a concrete blocker prevents completion, record it in the spec when one exists, report it, and preserve the worktree; never report the goal complete with required work remaining.
 ```
 
 ### Start and worktree
@@ -412,9 +401,12 @@ the existing severity rules and route remediation to the same implementer agent.
 ### Close and integrate in Codex
 
 Before the final commit, record advisor count and reviewer finding counts in
-the spec. Record task-specific usage only when actually available; otherwise
-write `usage unavailable`. Account-wide rate limits are not task costs. This
-replaces the post-closure Claude `/usage` request and stays non-blocking.
+the spec, along with model/effort settings, remediation-pass count,
+requirement corrections, and user interventions. Record total task-specific
+usage across the orchestrator and subagents only when actually available;
+otherwise write `usage unavailable`. Account-wide rate limits are not task
+costs. This replaces the post-closure Claude `/usage` request and stays
+non-blocking.
 
 Complete the shared closure document updates and run `make check` in the
 feature worktree. Commit the final content, inspect any pre-commit changes,
@@ -511,6 +503,12 @@ third-party advisor plugins (they predate the shipped advisor tool and lack
 transcript access).
 
 ## History
+
+On 2026-09-06, the user adopted the T11.F07 role allocation as the canonical
+Codex workflow for every roadmap feature: a `medium` orchestrator with a
+persistent `xhigh` spec owner. Historical feature specs retain their trial
+records. Adoption does not establish measured cost savings or quality
+equivalence with other role allocations.
 
 Superseded material is historical and non-executable: the
 [2026-09 orchestration design record](archive/agent-orchestration-2026-09.md),
