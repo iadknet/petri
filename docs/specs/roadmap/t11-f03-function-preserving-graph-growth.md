@@ -96,7 +96,15 @@ relies on.
   (`plasticity_update_cost = 0.0`) this has no observable effect; it applies
   once that cost is configured nonzero. A code fix (skip that source for
   post-convergence consumers) is deferred to T11.F08 (see Notes for AI
-  Agents). A split never targets an edge whose source is
+  Agents). `split_existing_edge_is_neutral_at_fire_time`'s `plasticity_def`
+  fixture run excludes this exact case via `is_documented_split_exception`
+  rather than weakening the assertion; measured directly, it currently
+  excludes roughly one in six `plasticity_def` split seeds (343 of 2000 in
+  a targeted check) that would in fact still pass today (cost 0.0 makes the
+  difference exactly 0), so the property's coverage of the append branch on
+  that fixture is reduced now without the exception itself being
+  observable; it becomes load-bearing once `plasticity_update_cost` is
+  nonzero. A split never targets an edge whose source is
   `ComputeNode(u16::MAX)` or otherwise out of range; skip with
   `NoApplicableTarget` when the graph has no edge. Remove the per-sub-value
   spraying loop and the duplicate `input_ref_width`. Insert-with-remap shifts
