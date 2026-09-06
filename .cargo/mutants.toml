@@ -4,6 +4,12 @@
 # job count; scripts/rust-mutants passes `--jobs` (MUTANTS_JOBS, default 2)
 # and an optional `--timeout` (MUTANTS_TIMEOUT) on the command line.
 
+# Optimize repeated simulation tests while retaining test assertions and
+# overflow checks. The measured profile is defined in the workspace manifest.
+profile = "mutants"
+# Keep automatic doctest coverage; nextest did not improve the measured pilot.
+test_tool = "cargo"
+
 # Per-mutant test timeout: the tool's default 5x the baseline test time, with
 # a two minute floor. A timed-out mutant is reported as a survivor the
 # implementer must triage, so the caps are generous: a mutant that runs long

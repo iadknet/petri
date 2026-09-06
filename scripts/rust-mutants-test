@@ -1,0 +1,128 @@
+#!/bin/sh
+set -eu
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+test_root=$(mktemp -d "${TMPDIR:-/tmp}/petri-rust-mutants-test.XXXXXX")
+trap 'rm -rf "$test_root"' 0
+trap 'exit 130' INT
+trap 'exit 143' HUP TERM
+export MUTANTS_FIXTURE="$test_root"
+mkdir -p "$test_root/bin" "$test_root/repo" "$test_root/output with spaces"
+cat >"$test_root/bin/ps" <<'STUB'
+#!/bin/sh
+cat "$MUTANTS_FIXTURE/processes"
+STUB
+cat >"$test_root/bin/cargo" <<'STUB'
+#!/bin/sh
+set -eu
+printf '%s\n' "$@" >"$MUTANTS_FIXTURE/args"
+[ "$1" = mutants ]
+shift
+out=''
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --output) out=$2; shift ;;
+    --in-diff) cp "$2" "$MUTANTS_FIXTURE/actual.patch"; shift ;;
+  esac
+  shift
+done
+mkdir -p "$out/mutants.out"
+cp "$MUTANTS_FIXTURE/missed" "$out/mutants.out/missed.txt"
+cp "$MUTANTS_FIXTURE/timeout" "$out/mutants.out/timeout.txt"
+exit "${STUB_CARGO_STATUS:-0}"
+STUB
+chmod +x "$test_root/bin/ps" "$test_root/bin/cargo"
+git -C "$test_root/repo" init -q -b main
+printf 'original\n' >"$test_root/repo/subject.txt"
+git -C "$test_root/repo" add subject.txt
+git -C "$test_root/repo" -c user.name=test -c user.email=test@example.invalid commit -q -m base
+base=$(git -C "$test_root/repo" rev-parse HEAD)
+printf 'committed change\n' >"$test_root/repo/subject.txt"
+git -C "$test_root/repo" add subject.txt
+git -C "$test_root/repo" -c user.name=test -c user.email=test@example.invalid commit -q -m feature
+printf 'uncommitted change\n' >>"$test_root/repo/subject.txt"
+printf 'untracked content\n' >"$test_root/repo/new file.txt"
+
+fail() { printf 'rust-mutants-test: %s\n' "$*" >&2; exit 1; }
+reset_fixture() {
+  rm -f "$test_root/args" "$test_root/actual.patch"
+  : >"$test_root/processes"
+  : >"$test_root/missed"
+  : >"$test_root/timeout"
+}
+run_mutants() {
+  status=0
+  (unset MUTANTS_ITERATE
+    cd "$test_root/repo" && env PATH="$test_root/bin:$PATH" \
+    MUTANTS_BASE="$base" MUTANTS_OUT="$test_root/output with spaces" \
+    MUTANTS_JOBS=2 MUTANTS_TIMEOUT='' BENCH_WAIT_TIMEOUT=0 STUB_CARGO_STATUS=0 \
+    "$@" sh "$script_dir/rust-mutants") >"$test_root/log" 2>&1 || status=$?
+}
+
+reset_fixture
+run_mutants
+[ "$status" -eq 0 ] || fail 'fresh run failed'
+grep -Fx -- '--iterate' "$test_root/args" >/dev/null && fail 'fresh run reused results'
+grep -F 'fresh run' "$test_root/log" >/dev/null || fail 'fresh mode not identified'
+[ "$(cat "$test_root/output with spaces/run-mode.txt")" = fresh ] || fail 'fresh mode not recorded'
+for text in 'committed change' 'uncommitted change' 'untracked content'; do
+  grep -F "+$text" "$test_root/actual.patch" >/dev/null || fail "diff omitted $text"
+done
+
+reset_fixture
+run_mutants MUTANTS_ITERATE=1 MUTANTS_JOBS=3 MUTANTS_TIMEOUT=40
+[ "$status" -eq 0 ] || fail 'incremental run failed'
+grep -Fx -- '--iterate' "$test_root/args" >/dev/null || fail 'incremental flag missing'
+grep -Fx -- '3' "$test_root/args" >/dev/null || fail 'job count lost'
+grep -Fx -- '40' "$test_root/args" >/dev/null || fail 'timeout lost'
+grep -F 'not closure evidence' "$test_root/log" >/dev/null || fail 'cache caveat missing'
+grep -F 'fresh run required' "$test_root/log" >/dev/null || fail 'empty incremental pass looked final'
+[ "$(cat "$test_root/output with spaces/run-mode.txt")" = incremental ] || fail 'incremental mode not recorded'
+
+# A normal invocation after an incremental one must still be fresh.
+reset_fixture
+run_mutants
+grep -Fx -- '--iterate' "$test_root/args" >/dev/null && fail 'incremental mode leaked'
+[ "$(cat "$test_root/output with spaces/run-mode.txt")" = fresh ] || fail 'stale mode record'
+
+for value in '' 2 true invalid; do
+  reset_fixture
+  run_mutants "MUTANTS_ITERATE=$value"
+  [ "$status" -eq 2 ] || fail 'invalid incremental setting accepted'
+  [ ! -f "$test_root/args" ] || fail 'invalid setting invoked cargo'
+done
+
+for cargo_status in 0 2 3; do
+  reset_fixture
+  printf 'missed mutant\n' >"$test_root/missed"
+  printf 'timed-out mutant\n' >"$test_root/timeout"
+  run_mutants "STUB_CARGO_STATUS=$cargo_status"
+  [ "$status" -eq 0 ] || fail 'survivor result rejected'
+  grep -Fx 'missed mutant' "$test_root/log" >/dev/null || fail 'missed survivor omitted'
+  grep -Fx 'timed-out mutant' "$test_root/log" >/dev/null || fail 'timeout survivor omitted'
+done
+for cargo_status in 1 4 5 6 70; do
+  reset_fixture
+  run_mutants "STUB_CARGO_STATUS=$cargo_status"
+  [ "$status" -eq "$cargo_status" ] || fail 'tool failure status lost'
+done
+
+# A blocked remediation must not overwrite evidence from the prior run.
+reset_fixture
+printf '123 S /tools/cargo-mutants\n' >"$test_root/processes"
+printf 'prior diff\n' >"$test_root/output with spaces/in-diff.patch"
+printf 'prior mode\n' >"$test_root/output with spaces/run-mode.txt"
+run_mutants MUTANTS_ITERATE=1
+[ "$status" -eq 1 ] || fail 'concurrent run was accepted'
+[ ! -f "$test_root/args" ] || fail 'cargo ran while blocked'
+[ "$(cat "$test_root/output with spaces/in-diff.patch")" = 'prior diff' ] || fail 'blocked run overwrote prior diff'
+[ "$(cat "$test_root/output with spaces/run-mode.txt")" = 'prior mode' ] || fail 'blocked run overwrote prior mode'
+
+reset_fixture
+git -C "$test_root/repo" add .
+git -C "$test_root/repo" -c user.name=test -c user.email=test@example.invalid commit -q -m complete
+run_mutants MUTANTS_BASE=HEAD
+[ "$status" -eq 0 ] || fail 'empty diff failed'
+[ ! -f "$test_root/args" ] || fail 'empty diff invoked cargo'
+grep -F 'nothing to mutate' "$test_root/log" >/dev/null || fail 'empty diff not explained'
+printf 'Mutation wrapper regression tests passed.\n'

@@ -93,7 +93,7 @@ rust-test-doc: ## Run Rust documentation tests.
 rust-clippy: ## Run Clippy with warnings denied.
 	@cargo clippy --workspace --all-targets -- -D warnings
 
-rust-mutants: ## Mutation-test the diff against the merge base with main (survivor triage; not part of check). Waits for any running cargo-mutants first. Env: MUTANTS_BASE, MUTANTS_JOBS, MUTANTS_TIMEOUT, BENCH_WAIT_TIMEOUT.
+rust-mutants: ## Mutation-test the feature diff (full package tests; not part of check). Fresh by default; MUTANTS_ITERATE=1 reuses results for remediation only. Env: MUTANTS_BASE, MUTANTS_OUT, MUTANTS_JOBS, MUTANTS_TIMEOUT, BENCH_WAIT_TIMEOUT.
 	@scripts/rust-mutants
 
 frontend-check: ## Lint, test, and build the frontend.
@@ -130,6 +130,7 @@ policy-check: ## Validate roadmap, repository, provenance, and retirement policy
 quality-check: ## Check whitespace, shell syntax, ShellCheck, and actionlint.
 	@scripts/quality-check
 	@scripts/bench-wait-test
+	@sh scripts/rust-mutants-test
 
 dependency-audit: ## Scan Cargo and npm dependency locks with OSV.
 	@scripts/dependency-audit
