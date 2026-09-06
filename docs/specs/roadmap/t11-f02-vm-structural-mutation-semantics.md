@@ -182,7 +182,6 @@ population, not merely the measurement. Record the actual shifts against
 T11.F01 and T01.F12, distinguishing changed subjects from operator regressions;
 do not assert a cognition gain. All T11.F01 floors remain fixed and are due by
 T11.F10. No operator family is disabled/down-weighted to improve a reading.
-Closure readings and comparison conclusions remain to be recorded here.
 Record that input-reference-addition effect separately from its unchanged
 input-reference policy.
 
@@ -256,14 +255,57 @@ The flagged plasticity value reflects changed trajectories and applied-update
 counts: seed 11 moved .0981469563 to .1217268032, seed 22 .0763916402 to
 .1687418021, and seed 33 .1286415215 to .0838937116. Founder blocks are
 byte-identical and final sampled genomes have plasticity 3 to 1, so this is
-not evidence of more plasticity or a cognition gain. Evolved seed 22 dead
+the small final sample (3 to 1 with plasticity) cannot establish trajectory prevalence or a cognition gain; applied-update work did increase. Evolved seed 22 dead
 fraction rose .121569 to .184314; seed 33 single-event silence fell .5625 to
 .375. These are changed sampled subjects, not universal operator regressions.
 Nine goal indicators (adaptive novelty, evolutionary activity, information
 integration, learning/prediction/memory dependence, lineage diversity, memory
 sensitivity, persistence, and reciprocal/strategy measures) are Undefined;
-births per 100 ticks is 9356.566667 versus 7994.2 baseline. Lineage diversity, memory sensitivity, and population persistence are measured; their stored readings will be tabulated in the next evidence pass. Closure-series append and progress.md stay
+births per 100 ticks is 9356.566667 versus 7994.2 baseline. Closure-series append and progress.md stay
 held for reconciliation/integration authorization.
+
+### Goal indicator readings
+
+T11.F01 is the goal baseline; T01.F12 has the same core counters but no neighborhood.
+
+| seed | final population | births | min population | peak population | plateau |
+
+|---|---:|---:|---:|---:|---:|
+
+| 11 | 5291→9940 | 134117→184433 | 3243→6595 | 35279→36036 | 4682.102000→10045.570000 |
+
+| 22 | 10997→9477 | 179125→177196 | 5830→6865 | 36369→36628 | 9737.116000→8343.666000 |
+
+| 33 | 8130→10882 | 166410→199765 | 5031→6242 | 35433→35813 | 7631.720000→10839.180000 |
+
+
+| structure | baseline | current |
+|---|---:|---:|
+
+| min | 1 | 1 |
+
+| p25 | 95 | 96 |
+
+| median | 97 | 102 |
+
+| p75 | 124 | 139 |
+
+| max | 798 | 519 |
+
+| mean | 116.771071 | 121.588270 |
+
+
+| seed | clades | entropy | zero/scramble/either count; scrambled/either fraction (zeroed fraction 0) |
+|---|---|---|---|
+
+| 11 | 142→118 | 2.780730→3.296956 | 0/0/0,0.000000 → 0/11/11,0.001107 |
+
+| 22 | 144→131 | 2.947968→3.026739 | 0/0/0,0.000000 → 0/2/2,0.000211 |
+
+| 33 | 140→96 | 2.668014→2.698148 | 0/0/0,0.000000 → 0/0/0,0.000000 |
+
+
+Same fixed probe: final-tick snapshot and rotate_left(1) over 16 slots. Undefined: adaptive_novelty, evolutionary_activity, information_integration, learning_dependence, memory_dependence, prediction_dependence, reciprocal_interaction, strategy_causal_distinctness, strategy_count. Goal births/100 ticks: 7994.200000→9356.566667. Gate T01.F11: seed11 population/births 284/35→283/34; seeds22/33 unchanged 260/18 and264/21; no extinction, 75 ticks; gate births/100 32.888889→32.444444. Seed22 dead increase and seed33 one-event silence drop are changed samples, not matched genomes or cognition evidence.
 
 ## Success Criteria
 
@@ -443,46 +485,3 @@ held for reconciliation/integration authorization.
   Consultations 1–6 were accepted; none rejected. Only reconciliation/integration remains approval-blocked.
 
 - Final benchmarks: replacement gate and the single goal run both exited 0. Goal report has no severe regression; plasticity updates are +23.452613% (flagged) while VM steps are -51.407250%. This follows altered mutation application/neighborhood behavior, not a work-counter or per-opcode runtime change; source review found only mutation-time splice repair and paired-slot arithmetic changes.
-
-### Goal indicator readings
-
-T11.F01 is the goal baseline; T01.F12 has the same core counters but no neighborhood.
-
-| seed | final population | births | min population | peak population | plateau |
-
-|---|---:|---:|---:|---:|---:|
-
-| 11 | 5291→9940 | 134117→184433 | 3243→6595 | 35279→36036 | 4682.102000→10045.570000 |
-
-| 22 | 10997→9477 | 179125→177196 | 5830→6865 | 36369→36628 | 9737.116000→8343.666000 |
-
-| 33 | 8130→10882 | 166410→199765 | 5031→6242 | 35433→35813 | 7631.720000→10839.180000 |
-
-
-| structure | baseline | current |
-|---|---:|---:|
-
-| min | 1 | 1 |
-
-| p25 | 95 | 96 |
-
-| median | 97 | 102 |
-
-| p75 | 124 | 139 |
-
-| max | 798 | 519 |
-
-| mean | 116.771071 | 121.588270 |
-
-
-| seed | clades | entropy | zero/scramble/either count,fraction |
-|---|---|---|---|
-
-| 11 | 142→118 | 2.780730→3.296956 | 0/0/0,0.000000 → 0/11/11,0.001107 |
-
-| 22 | 144→131 | 2.947968→3.026739 | 0/0/0,0.000000 → 0/2/2,0.000211 |
-
-| 33 | 140→96 | 2.668014→2.698148 | 0/0/0,0.000000 → 0/0/0,0.000000 |
-
-
-Same fixed probe: final-tick snapshot and rotate_left(1) over 16 slots. Undefined: adaptive_novelty, evolutionary_activity, information_integration, learning_dependence, memory_dependence, prediction_dependence, reciprocal_interaction, strategy_causal_distinctness, strategy_count. Goal births/100 ticks: 7994.200000→9356.566667. Gate T01.F11: seed11 population/births 284/35→283/34; seeds22/33 unchanged 260/18 and264/21; no extinction, 75 ticks; gate births/100 32.888889→32.444444. Seed22 dead increase and seed33 one-event silence drop are changed samples, not matched genomes or cognition evidence.
