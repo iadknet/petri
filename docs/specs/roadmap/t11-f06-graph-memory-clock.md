@@ -679,3 +679,18 @@ above; all requested/applied counts remain fixed):
   identity, sent TERM, and confirmed PID 59652 absent. A new guarded gate ran
   successfully; the single goal run also completed successfully. The earlier paused attempt
   performed no measurement and is not counted as a goal run.
+
+- Integration blocker (2026-09-06): main gained the untracked file
+  `docs/strategy/mesh-routing-evolvability-research-2026-09-06.md` while the
+  feature was being completed. The user confirmed that another session is
+  still working on it. Main remains at
+  `adb8e203b357d62e6aea3df8b5ab55c05bdeba41`; the Codex adapter requires clean
+  main before integration. That session's file was left untouched. The
+  feature worktree and `codex/t11-f06` branch are preserved; fast-forward
+  integration and cleanup remain outstanding, so the task goal is not complete.
+  The final feature check exited 0 at content tree
+  `b0b6b622917fbc29dd52f4f84f7bdc5cef865acf`, exactly matching commit
+  `99e998edfadfdd59eb8c8e05e2d663079fe4806f` before this blocker-only note.
+  Log: `/private/tmp/t11-f06-final-make-check.log`. Once main is clean,
+  rebase if it advanced, run the required final check on the resulting
+  content, record its tested commit, then integrate and clean up.
