@@ -10,7 +10,8 @@
       "docs/progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table.json",
       "docs/progress/features/t11-f05-temporal-controller-fixtures.json",
       "docs/progress/features/t11-f01-mutational-neighborhood-indicator.json",
-      "docs/progress/features/t11-f02-vm-structural-mutation-semantics.json"
+      "docs/progress/features/t11-f02-vm-structural-mutation-semantics.json",
+      "docs/progress/features/t11-f03-function-preserving-graph-growth.json"
     ]
   },
   "goal": {
@@ -19,7 +20,8 @@
     "closed": [
       "docs/progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table-goal.json",
       "docs/progress/features/t11-f01-mutational-neighborhood-indicator-goal.json",
-      "docs/progress/features/t11-f02-vm-structural-mutation-semantics-goal.json"
+      "docs/progress/features/t11-f02-vm-structural-mutation-semantics-goal.json",
+      "docs/progress/features/t11-f03-function-preserving-graph-growth-goal.json"
     ]
   }
 }
