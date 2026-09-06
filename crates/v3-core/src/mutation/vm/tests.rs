@@ -3157,9 +3157,6 @@ proptest! {
         prop_assert_eq!(program, before);
     }
 
-    /// Two applications of the paired-slot operator with the same seed to the
-    /// same program produce the same program, whatever slot instructions the
-    /// program holds.
     #[test]
     fn paired_slot_address_is_bounded_and_changes_effective_address(
         raw_slot in any::<u8>(),
@@ -3190,6 +3187,10 @@ proptest! {
         prop_assert_ne!(*load, raw_slot % 16);
     }
 
+    /// Two applications of the paired-slot operator with the same seed to the
+    /// same program produce the same program, whatever slot instructions the
+    /// program holds.
+    #[test]
     fn vm_mutate_paired_slot_address_is_reproducible_for_any_slot_program(
         forced_slot in 0u8..16,
         extra in prop::collection::vec((0u8..16, 0u8..4), 0..24),
