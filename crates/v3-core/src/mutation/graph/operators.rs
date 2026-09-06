@@ -1688,4 +1688,301 @@ mod tests {
             Err(MutationSkipReason::NoApplicableTarget)
         );
     }
+
+    // ── Mutation-survivor coverage ──────────────────────────────────────────
+    //
+    // The tests below were added to close `cargo-mutants` survivors found in
+    // the fresh run recorded in the T11.F03 spec's Verification section. Each
+    // pins an exact structural outcome so the named operator mutation (an
+    // inverted comparison, a flipped arithmetic sign, or a deleted match arm)
+    // changes the asserted value.
+
+    /// `add_graph_edge`'s wrapper must actually add an edge, not just report
+    /// success (kills the `-> Ok(())` stub mutant at its definition).
+    #[test]
+    fn add_graph_edge_wrapper_increases_edge_count() {
+        use crate::contracts::NodeId;
+        use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
+
+        fn count_edges(def: &CgpGraphBackendDef) -> usize {
+            def.compute_nodes.iter().map(|n| n.inputs.len()).sum::<usize>()
+                + def.output_sinks.iter().map(|s| s.inputs.len()).sum::<usize>()
+                + def
+                    .action_bank
+                    .iter()
+                    .map(|a| a.gate_inputs.len() + a.param_inputs.len())
+                    .sum::<usize>()
+                + def.execute_gate.inputs.len()
+        }
+
+        let def = minimal_def();
+        let before = count_edges(&def);
+        let mut genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: sample_input_refs(),
+                backend_def: BackendDef::Graph(def),
+                targets: Vec::new(),
+            }],
+        };
+        let mut rng = test_rng();
+        let config = MutationConfig::default();
+        add_graph_edge(&mut genome, 0, &mut rng, &config).expect("edge add should succeed");
+        let BackendDef::Graph(after_def) = &genome.nodes[0].backend_def else {
+            panic!("expected a Cgp graph node");
+        };
+        assert_eq!(count_edges(after_def), before + 1);
+    }
+
+    /// With `compute_count == 0`, `random_graph_source`'s first branch is
+    /// unreachable, so the `roll < 0.8` comparison alone decides InputLeaf
+    /// (80%) vs SharedMemory (20%). Flipping it to `>` swaps the majority to
+    /// SharedMemory; a wide margin over many fixed draws catches that
+    /// inversion without depending on which cases were drawn. The `<=`
+    /// variant is equivalent: `rng.gen::<f32>()` draws from a 2^-24 grid and
+    /// the literal `0.8f32` sample value is not reachable within the test
+    /// budget, so `<` and `<=` observe the same outcomes in practice.
+    #[test]
+    fn random_graph_source_input_leaf_is_the_majority_when_compute_is_empty() {
+        let input_refs = vec![InputReference::World(WorldInputKey::NeighborBarrierRing)];
+        let config = MutationConfig::default();
+        let mut rng = test_rng();
+        let mut input_leaf_count = 0u32;
+        let mut shared_memory_count = 0u32;
+        for _ in 0..2000 {
+            match random_graph_source(0, &input_refs, &config, &mut rng) {
+                GraphSource::InputLeaf { .. } => input_leaf_count += 1,
+                GraphSource::SharedMemory { .. } => shared_memory_count += 1,
+                GraphSource::ComputeNode(_) => {
+                    panic!("compute_count == 0 must never yield a ComputeNode source")
+                }
+            }
+        }
+        assert!(
+            input_leaf_count > shared_memory_count * 2,
+            "expected InputLeaf (~80%) to dominate SharedMemory (~20%); saw {input_leaf_count} vs {shared_memory_count}"
+        );
+    }
+
+    /// `add_compute_node`'s three-way dispatch must reach every form. The
+    /// fixture's only edge lives on the execute gate (not a compute-node
+    /// consumer), so `split_existing_edge` always appends its new node and
+    /// retargets that one edge — giving each form an exact, non-overlapping
+    /// structural fingerprint (kills both match-arm-deletion mutants).
+    #[test]
+    fn add_compute_node_reaches_all_three_forms_with_distinct_signatures() {
+        fn fixture() -> CgpGraphBackendDef {
+            CgpGraphBackendDef {
+                compute_nodes: vec![ComputeNode {
+                    kind: ComputeNodeKind::Negate,
+                    inputs: Vec::new(),
+                    plasticity: None,
+                }],
+                output_sinks: Vec::new(),
+                action_bank: Vec::new(),
+                execute_gate: ExecuteGate {
+                    inputs: vec![GraphEdge {
+                        source: GraphSource::ComputeNode(0),
+                        weight: 0.5,
+                    }],
+                },
+            }
+        }
+
+        let input_refs = sample_input_refs();
+        let config = MutationConfig::default();
+        let mut rng = test_rng();
+        let mut saw_disconnected = false;
+        let mut saw_bootstrap = false;
+        let mut saw_split = false;
+        for _ in 0..300 {
+            let mut def = fixture();
+            add_compute_node(&mut def, &input_refs, &config, &mut rng).unwrap();
+            assert_eq!(def.compute_nodes.len(), 2, "every form appends exactly one node");
+            let new_node = &def.compute_nodes[1];
+            let gate_source = def.execute_gate.inputs[0].source;
+            if gate_source == GraphSource::ComputeNode(1) {
+                // Split: the pre-existing edge now sources the new identity
+                // node, which reproduces the old source exactly.
+                assert_eq!(def.execute_gate.inputs[0].weight, 0.5, "split preserves the old weight");
+                assert_eq!(new_node.kind, ComputeNodeKind::Add);
+                assert_eq!(
+                    new_node.inputs,
+                    vec![GraphEdge {
+                        source: GraphSource::ComputeNode(0),
+                        weight: 1.0,
+                    }]
+                );
+                saw_split = true;
+            } else {
+                assert_eq!(gate_source, GraphSource::ComputeNode(0), "only split retargets the gate edge");
+                match new_node.inputs.len() {
+                    0 => saw_disconnected = true,
+                    1 => saw_bootstrap = true,
+                    n => panic!("unexpected input count {n} for a non-split form"),
+                }
+            }
+        }
+        assert!(saw_disconnected, "disconnected form never observed");
+        assert!(saw_bootstrap, "bootstrap form never observed");
+        assert!(saw_split, "split form never observed");
+    }
+
+    /// Exhaustive boundary cases for `valid_edge_field_moves`'s `ComputeNode`
+    /// branch: no valid move at either end of a length-1 range, one move
+    /// each at the two ends of a longer range, both moves in the interior,
+    /// and no moves for a dangling out-of-range index (including exactly
+    /// `idx == compute_count`, distinct from `idx > compute_count`).
+    #[test]
+    fn valid_edge_field_moves_compute_node_bounds() {
+        let config = MutationConfig::default();
+        assert_eq!(
+            valid_edge_field_moves(GraphSource::ComputeNode(0), 1, &[], &config),
+            vec![]
+        );
+        assert_eq!(
+            valid_edge_field_moves(GraphSource::ComputeNode(0), 3, &[], &config),
+            vec![EdgeFieldMove::ComputeIdx(1)]
+        );
+        assert_eq!(
+            valid_edge_field_moves(GraphSource::ComputeNode(2), 3, &[], &config),
+            vec![EdgeFieldMove::ComputeIdx(-1)]
+        );
+        assert_eq!(
+            valid_edge_field_moves(GraphSource::ComputeNode(1), 3, &[], &config),
+            vec![EdgeFieldMove::ComputeIdx(-1), EdgeFieldMove::ComputeIdx(1)]
+        );
+        assert_eq!(
+            valid_edge_field_moves(GraphSource::ComputeNode(3), 3, &[], &config),
+            vec![],
+            "idx == compute_count is out of range, not the last valid index"
+        );
+        assert_eq!(
+            valid_edge_field_moves(GraphSource::ComputeNode(5), 3, &[], &config),
+            vec![]
+        );
+    }
+
+    /// Exhaustive boundary cases for `valid_edge_field_moves`'s `InputLeaf`
+    /// branch, using references wide enough (8 sub-values each) that a
+    /// middling `ref_idx`/`sub_idx` exercises `RefIdx` and `SubIdx` moves in
+    /// both directions simultaneously.
+    #[test]
+    fn valid_edge_field_moves_input_leaf_bounds() {
+        let config = MutationConfig::default();
+        let wide_refs = vec![
+            InputReference::World(WorldInputKey::NeighborBarrierRing),
+            InputReference::World(WorldInputKey::NeighborBarrierRing),
+            InputReference::World(WorldInputKey::NeighborBarrierRing),
+        ];
+
+        // Interior ref_idx and interior sub_idx: all four moves, in
+        // RefIdx(-1), RefIdx(1), SubIdx(-1), SubIdx(1) order.
+        assert_eq!(
+            valid_edge_field_moves(
+                GraphSource::InputLeaf { ref_idx: 1, sub_idx: 3 },
+                0,
+                &wide_refs,
+                &config
+            ),
+            vec![
+                EdgeFieldMove::RefIdx(-1),
+                EdgeFieldMove::RefIdx(1),
+                EdgeFieldMove::SubIdx(-1),
+                EdgeFieldMove::SubIdx(1),
+            ]
+        );
+        // sub_idx at the reference's first slot: no SubIdx(-1).
+        assert_eq!(
+            valid_edge_field_moves(
+                GraphSource::InputLeaf { ref_idx: 1, sub_idx: 0 },
+                0,
+                &wide_refs,
+                &config
+            ),
+            vec![EdgeFieldMove::RefIdx(-1), EdgeFieldMove::RefIdx(1), EdgeFieldMove::SubIdx(1)]
+        );
+        // sub_idx at the reference's last slot: no SubIdx(1).
+        assert_eq!(
+            valid_edge_field_moves(
+                GraphSource::InputLeaf { ref_idx: 1, sub_idx: 7 },
+                0,
+                &wide_refs,
+                &config
+            ),
+            vec![EdgeFieldMove::RefIdx(-1), EdgeFieldMove::RefIdx(1), EdgeFieldMove::SubIdx(-1)]
+        );
+        // First ref_idx: no RefIdx(-1); last ref_idx: no RefIdx(1).
+        assert_eq!(
+            valid_edge_field_moves(
+                GraphSource::InputLeaf { ref_idx: 0, sub_idx: 3 },
+                0,
+                &wide_refs,
+                &config
+            ),
+            vec![EdgeFieldMove::RefIdx(1), EdgeFieldMove::SubIdx(-1), EdgeFieldMove::SubIdx(1)]
+        );
+        assert_eq!(
+            valid_edge_field_moves(
+                GraphSource::InputLeaf { ref_idx: 2, sub_idx: 3 },
+                0,
+                &wide_refs,
+                &config
+            ),
+            vec![EdgeFieldMove::RefIdx(-1), EdgeFieldMove::SubIdx(-1), EdgeFieldMove::SubIdx(1)]
+        );
+        // A candidate neighbor too narrow to hold the current sub_idx
+        // excludes the RefIdx move toward it, even though the neighbor
+        // exists.
+        let mixed_refs = vec![
+            InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())), // width 1
+            InputReference::World(WorldInputKey::NeighborBarrierRing),                      // width 8
+            InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())), // width 1
+        ];
+        assert_eq!(
+            valid_edge_field_moves(
+                GraphSource::InputLeaf { ref_idx: 1, sub_idx: 5 },
+                0,
+                &mixed_refs,
+                &config
+            ),
+            vec![EdgeFieldMove::SubIdx(-1), EdgeFieldMove::SubIdx(1)],
+            "neither width-1 neighbor can hold sub_idx 5"
+        );
+        // Dangling ref_idx out of range: no moves at all.
+        assert_eq!(
+            valid_edge_field_moves(
+                GraphSource::InputLeaf { ref_idx: 5, sub_idx: 0 },
+                0,
+                &mixed_refs,
+                &config
+            ),
+            vec![]
+        );
+    }
+
+    /// `apply_edge_field_move` must move each numeric field by exactly the
+    /// signed delta, not its negation (kills both `+` → `-` sign-flip
+    /// mutants: a flipped sign on `ComputeIdx(1)` from index 3 would produce
+    /// 2, not 4; on `SharedSlot(-1)` from slot 0 it would produce 1 before
+    /// wrapping, not 15).
+    #[test]
+    fn apply_edge_field_move_moves_by_the_exact_signed_delta() {
+        let mut source = GraphSource::ComputeNode(3);
+        apply_edge_field_move(&mut source, EdgeFieldMove::ComputeIdx(1));
+        assert_eq!(source, GraphSource::ComputeNode(4));
+        apply_edge_field_move(&mut source, EdgeFieldMove::ComputeIdx(-1));
+        assert_eq!(source, GraphSource::ComputeNode(3));
+
+        let mut source = GraphSource::SharedMemory { slot: 5, previous: false };
+        apply_edge_field_move(&mut source, EdgeFieldMove::SharedSlot(1));
+        assert_eq!(source, GraphSource::SharedMemory { slot: 6, previous: false });
+        apply_edge_field_move(&mut source, EdgeFieldMove::SharedSlot(-1));
+        assert_eq!(source, GraphSource::SharedMemory { slot: 5, previous: false });
+
+        let mut at_zero = GraphSource::SharedMemory { slot: 0, previous: false };
+        apply_edge_field_move(&mut at_zero, EdgeFieldMove::SharedSlot(-1));
+        assert_eq!(at_zero, GraphSource::SharedMemory { slot: 15, previous: false });
+    }
 }
