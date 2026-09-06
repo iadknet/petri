@@ -197,9 +197,7 @@ impl GraphMutator {
             GraphOperator::RemoveInternalGraphNode => {
                 operators::remove_internal_node(genome, node_idx, rng)
             }
-            GraphOperator::AddGraphEdge => {
-                operators::add_graph_edge(genome, node_idx, rng, config)
-            }
+            GraphOperator::AddGraphEdge => operators::add_graph_edge(genome, node_idx, rng, config),
             GraphOperator::RetargetGraphEdge => {
                 operators::retarget_graph_edge(genome, node_idx, rng, config)
             }

@@ -1459,8 +1459,10 @@ mod tests {
         let mut seen: std::collections::HashSet<u16> = std::collections::HashSet::new();
         let mut rng = test_rng();
         for _ in 0..2000 {
-            if let GraphSource::InputLeaf { ref_idx: 0, sub_idx } =
-                random_graph_source(0, &input_refs, &config, &mut rng)
+            if let GraphSource::InputLeaf {
+                ref_idx: 0,
+                sub_idx,
+            } = random_graph_source(0, &input_refs, &config, &mut rng)
             {
                 seen.insert(sub_idx);
             }
@@ -1788,13 +1790,20 @@ mod tests {
         for _ in 0..300 {
             let mut def = fixture();
             add_compute_node(&mut def, &input_refs, &config, &mut rng).unwrap();
-            assert_eq!(def.compute_nodes.len(), 2, "every form appends exactly one node");
+            assert_eq!(
+                def.compute_nodes.len(),
+                2,
+                "every form appends exactly one node"
+            );
             let new_node = &def.compute_nodes[1];
             let gate_source = def.execute_gate.inputs[0].source;
             if gate_source == GraphSource::ComputeNode(1) {
                 // Split: the pre-existing edge now sources the new identity
                 // node, which reproduces the old source exactly.
-                assert_eq!(def.execute_gate.inputs[0].weight, 0.5, "split preserves the old weight");
+                assert_eq!(
+                    def.execute_gate.inputs[0].weight, 0.5,
+                    "split preserves the old weight"
+                );
                 assert_eq!(new_node.kind, ComputeNodeKind::Add);
                 assert_eq!(
                     new_node.inputs,
@@ -1805,7 +1814,11 @@ mod tests {
                 );
                 saw_split = true;
             } else {
-                assert_eq!(gate_source, GraphSource::ComputeNode(0), "only split retargets the gate edge");
+                assert_eq!(
+                    gate_source,
+                    GraphSource::ComputeNode(0),
+                    "only split retargets the gate edge"
+                );
                 match new_node.inputs.len() {
                     0 => saw_disconnected = true,
                     1 => saw_bootstrap = true,
@@ -1870,7 +1883,10 @@ mod tests {
         // RefIdx(-1), RefIdx(1), SubIdx(-1), SubIdx(1) order.
         assert_eq!(
             valid_edge_field_moves(
-                GraphSource::InputLeaf { ref_idx: 1, sub_idx: 3 },
+                GraphSource::InputLeaf {
+                    ref_idx: 1,
+                    sub_idx: 3
+                },
                 0,
                 &wide_refs,
                 &config
@@ -1885,53 +1901,84 @@ mod tests {
         // sub_idx at the reference's first slot: no SubIdx(-1).
         assert_eq!(
             valid_edge_field_moves(
-                GraphSource::InputLeaf { ref_idx: 1, sub_idx: 0 },
+                GraphSource::InputLeaf {
+                    ref_idx: 1,
+                    sub_idx: 0
+                },
                 0,
                 &wide_refs,
                 &config
             ),
-            vec![EdgeFieldMove::RefIdx(-1), EdgeFieldMove::RefIdx(1), EdgeFieldMove::SubIdx(1)]
+            vec![
+                EdgeFieldMove::RefIdx(-1),
+                EdgeFieldMove::RefIdx(1),
+                EdgeFieldMove::SubIdx(1)
+            ]
         );
         // sub_idx at the reference's last slot: no SubIdx(1).
         assert_eq!(
             valid_edge_field_moves(
-                GraphSource::InputLeaf { ref_idx: 1, sub_idx: 7 },
+                GraphSource::InputLeaf {
+                    ref_idx: 1,
+                    sub_idx: 7
+                },
                 0,
                 &wide_refs,
                 &config
             ),
-            vec![EdgeFieldMove::RefIdx(-1), EdgeFieldMove::RefIdx(1), EdgeFieldMove::SubIdx(-1)]
+            vec![
+                EdgeFieldMove::RefIdx(-1),
+                EdgeFieldMove::RefIdx(1),
+                EdgeFieldMove::SubIdx(-1)
+            ]
         );
         // First ref_idx: no RefIdx(-1); last ref_idx: no RefIdx(1).
         assert_eq!(
             valid_edge_field_moves(
-                GraphSource::InputLeaf { ref_idx: 0, sub_idx: 3 },
+                GraphSource::InputLeaf {
+                    ref_idx: 0,
+                    sub_idx: 3
+                },
                 0,
                 &wide_refs,
                 &config
             ),
-            vec![EdgeFieldMove::RefIdx(1), EdgeFieldMove::SubIdx(-1), EdgeFieldMove::SubIdx(1)]
+            vec![
+                EdgeFieldMove::RefIdx(1),
+                EdgeFieldMove::SubIdx(-1),
+                EdgeFieldMove::SubIdx(1)
+            ]
         );
         assert_eq!(
             valid_edge_field_moves(
-                GraphSource::InputLeaf { ref_idx: 2, sub_idx: 3 },
+                GraphSource::InputLeaf {
+                    ref_idx: 2,
+                    sub_idx: 3
+                },
                 0,
                 &wide_refs,
                 &config
             ),
-            vec![EdgeFieldMove::RefIdx(-1), EdgeFieldMove::SubIdx(-1), EdgeFieldMove::SubIdx(1)]
+            vec![
+                EdgeFieldMove::RefIdx(-1),
+                EdgeFieldMove::SubIdx(-1),
+                EdgeFieldMove::SubIdx(1)
+            ]
         );
         // A candidate neighbor too narrow to hold the current sub_idx
         // excludes the RefIdx move toward it, even though the neighbor
         // exists.
         let mixed_refs = vec![
             InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())), // width 1
-            InputReference::World(WorldInputKey::NeighborBarrierRing),                      // width 8
+            InputReference::World(WorldInputKey::NeighborBarrierRing), // width 8
             InputReference::World(WorldInputKey::food_here(OrdinaryFoodTypeId::default())), // width 1
         ];
         assert_eq!(
             valid_edge_field_moves(
-                GraphSource::InputLeaf { ref_idx: 1, sub_idx: 5 },
+                GraphSource::InputLeaf {
+                    ref_idx: 1,
+                    sub_idx: 5
+                },
                 0,
                 &mixed_refs,
                 &config
@@ -1942,7 +1989,10 @@ mod tests {
         // Dangling ref_idx out of range: no moves at all.
         assert_eq!(
             valid_edge_field_moves(
-                GraphSource::InputLeaf { ref_idx: 5, sub_idx: 0 },
+                GraphSource::InputLeaf {
+                    ref_idx: 5,
+                    sub_idx: 0
+                },
                 0,
                 &mixed_refs,
                 &config
@@ -1954,7 +2004,10 @@ mod tests {
         // `sub_idx < width` must reject this, not `sub_idx <= width`.
         assert_eq!(
             valid_edge_field_moves(
-                GraphSource::InputLeaf { ref_idx: 1, sub_idx: 1 },
+                GraphSource::InputLeaf {
+                    ref_idx: 1,
+                    sub_idx: 1
+                },
                 0,
                 &mixed_refs,
                 &config
@@ -1971,7 +2024,10 @@ mod tests {
         let config = MutationConfig::default();
         assert_eq!(
             valid_edge_field_moves(
-                GraphSource::SharedMemory { slot: 5, previous: false },
+                GraphSource::SharedMemory {
+                    slot: 5,
+                    previous: false
+                },
                 0,
                 &[],
                 &config
@@ -1997,14 +2053,38 @@ mod tests {
         apply_edge_field_move(&mut source, EdgeFieldMove::ComputeIdx(-1));
         assert_eq!(source, GraphSource::ComputeNode(3));
 
-        let mut source = GraphSource::SharedMemory { slot: 5, previous: false };
+        let mut source = GraphSource::SharedMemory {
+            slot: 5,
+            previous: false,
+        };
         apply_edge_field_move(&mut source, EdgeFieldMove::SharedSlot(1));
-        assert_eq!(source, GraphSource::SharedMemory { slot: 6, previous: false });
+        assert_eq!(
+            source,
+            GraphSource::SharedMemory {
+                slot: 6,
+                previous: false
+            }
+        );
         apply_edge_field_move(&mut source, EdgeFieldMove::SharedSlot(-1));
-        assert_eq!(source, GraphSource::SharedMemory { slot: 5, previous: false });
+        assert_eq!(
+            source,
+            GraphSource::SharedMemory {
+                slot: 5,
+                previous: false
+            }
+        );
 
-        let mut at_zero = GraphSource::SharedMemory { slot: 0, previous: false };
+        let mut at_zero = GraphSource::SharedMemory {
+            slot: 0,
+            previous: false,
+        };
         apply_edge_field_move(&mut at_zero, EdgeFieldMove::SharedSlot(-1));
-        assert_eq!(at_zero, GraphSource::SharedMemory { slot: 15, previous: false });
+        assert_eq!(
+            at_zero,
+            GraphSource::SharedMemory {
+                slot: 15,
+                previous: false
+            }
+        );
     }
 }

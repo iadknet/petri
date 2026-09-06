@@ -141,7 +141,7 @@ relies on.
       entries, node-type contract owner text) and `v3-graph-backend-spec.md`.
 - [x] Self-review the diff (`simplify`), then fresh `make rust-mutants`; record
       evidence below.
-- [ ] Store gate and single goal reports at
+- [x] Store gate and single goal reports at
       `docs/progress/features/t11-f03-function-preserving-graph-growth.json`
       and `...-goal.json`, append both to `docs/progress/benchmark-series.json`,
       and add the T11.F03 row to `docs/progress.md`.
@@ -216,9 +216,11 @@ relies on.
         change which branch executes for any input — the mutated and
         unmutated code produce byte-identical `Vec<EdgeFieldMove>` output on
         every call.
-- [ ] `make bench PROFILE=gate FEATURE=t11-f03-function-preserving-graph-growth`
-      and one `PROFILE=goal` run stored; second goal run: Not applicable per
-      the 2026-09-05 workflow decision.
+- [x] `make bench PROFILE=gate FEATURE=t11-f03-function-preserving-graph-growth`
+      and one `PROFILE=goal` run stored at
+      `docs/progress/features/t11-f03-function-preserving-graph-growth.json`
+      and `...-goal.json`; both `severe=false`; second goal run: not
+      applicable per the 2026-09-05 workflow decision.
 - [ ] `make roadmap-check` on document edits; final `make check` exits 0 at
       the commit that lands on `main`.
 
@@ -251,16 +253,103 @@ may shift either way because the inherited map changes the population; record
 them against T11.F02 without a cognition claim. No operator family is
 disabled or down-weighted.
 
+### Measured results
+
+Reports: `docs/progress/features/t11-f03-function-preserving-graph-growth.json`
+(gate) and `...-goal.json` (goal); both `comparison.severe=false` against
+both stated references.
+
+Gate current / delta vs T10.F10 / delta vs T11.F02:
+| counter | current | vs T10.F10 | vs T11.F02 |
+|---|---:|---:|---:|
+| mesh hops | 1.999410 | +0.052443% | +0.022962% |
+| VM steps | 28.031758 | +0.012584% | -0.043239% |
+| graph relax | 3.000000 | +0.045888% | +0.045888% |
+| plasticity | 0.000000 | n/a (both zero) | n/a (both zero) |
+| actions | 1.000000 | 0.000000% | 0.000000% |
+| births | 0.001148 | -5.280528% | -4.013378% |
+
+Goal current / delta vs T01.F12 / delta vs T11.F02:
+| counter | current | vs T01.F12 | vs T11.F02 |
+|---|---:|---:|---:|
+| mesh hops | 2.998942 | -5.098574% | -1.501159% |
+| VM steps | 151.579212 | -86.122256% | -71.440711% |
+| graph relax | 5.571117 | -2.073774% | +3.388342% |
+| plasticity | 0.115330 | +14.765354% (flagged) | -7.036918% |
+| actions | 1.056764 | -2.679356% | -8.712358% |
+| births | 0.007915 | -2.716323% | -3.687028% |
+
+VM steps fall sharply on both references because input-reference `Add` on
+VM nodes no longer auto-inserts a `ReadInput` instruction (the removed
+auto-wiring), so the goal-horizon evolved population carries far fewer VM
+instructions per creature; this is the intended effect of this feature's
+`InputRef.Add` change, not a per-opcode runtime change. The flagged
+plasticity delta is a goal-population difference (see lineage note below),
+not a work-counter definition change; it is not severe and is within the
+predeclared "populations differ, so every counter may move" allowance.
+
+Founder neighborhood rows (silent/changed/dead; applied/skipped), current
+vs the T11.F02 gate reference — every VM, topology, and other graph/input-ref
+row not listed below is byte-identical to T11.F02:
+| operator | T11.F02 | current |
+|---|---|---|
+| graph:AddInternalGraphNode | 0.020000/0.980000/0.000000 (50/0) | 1.000000/0.000000/0.000000 (50/0) |
+| graph:CopyInternalNode | 0.580000/0.420000/0.000000 (50/0) | 1.000000/0.000000/0.000000 (50/0) |
+| graph:CopySubgraph | 1.000000/0.000000/0.000000 (50/0) | 1.000000/0.000000/0.000000 (50/0) |
+| graph:GraphRawFieldMutation | 0.100000/0.900000/0.000000 (50/0) | 0.080000/0.920000/0.000000 (50/0) |
+| graph:AddGraphEdge | 0.900000/0.100000/0.000000 (50/0) | 0.880000/0.120000/0.000000 (50/0) |
+| graph:RetargetGraphEdge | 0.020000/0.980000/0.000000 (50/0) | 0.020000/0.980000/0.000000 (50/0) |
+| input_ref:Add | 0.660000/0.340000/0.000000 (50/0) | 1.000000/0.000000/0.000000 (50/0) |
+
+`AddInternalGraphNode`, `CopyInternalNode`, `CopySubgraph`, and
+`input_ref:Add` land exactly on the predeclared "about 1.00" target.
+`AddGraphEdge` and `RetargetGraphEdge` moved within the "either way, report
+without adjustment" allowance (-0.02 and unchanged respectively).
+`GraphRawFieldMutation` moved **against** the predeclared direction: silent
+fell from 0.10 to 0.08 (changed rose to 0.92) instead of rising toward 0.74;
+the one-field-one-unit step is evidently *more* likely to produce an
+observable change than the prior implementation on this founder, not less.
+This is reported as measured, not adjusted toward the prediction; no floor
+is asserted here (floor (c) is T11.F10's).
+
+Founder mutated-birth outcomes (silent/changed/dead; trials), current vs
+T11.F02 gate reference:
+| bucket | T11.F02 | current |
+|---|---|---|
+| any events | 0.068182/0.727273/0.204545 (44) | 0.068182/0.704545/0.227273 (44) |
+| 1 event | 0.500000/0.500000/0.000000 (4) | 0.500000/0.500000/0.000000 (4) |
+
+Silence is flat (not risen) and dead rose slightly (9→10 of 44), against
+the predeclared "silence should rise and dead fall" — the opposite of the
+predicted direction on the dead fraction, within the stated 44-birth
+coarseness (one birth's outcome bucket). The 1-event bucket (4 births) is
+unchanged, as T11.F01 warned its coarseness would likely show.
+
+Goal-profile founder rows reproduce the same gate-row movements exactly
+(same 50-trial founder battery, run under the goal profile); no additional
+divergence. Evolved-sample, lineage, and persistence readings moved in both
+directions across seeds (e.g. seed 11 lineage entropy 3.296956→3.148096,
+clade count 118→147; seed 33 entropy 2.698148→2.844166, clade count
+96→123; final populations moved -1.7% to -21.9% across seeds with no
+extinction) — these are population-composition differences from the
+inherited mutation map, not cognition claims, consistent with the
+predeclared "may shift either way" allowance. No operator family was
+disabled or down-weighted.
+
 ## Success Criteria
 
-- [ ] Every growth operator is neutral at fire time under the stated
+- [x] Every growth operator is neutral at fire time under the stated
       definition, proven by property tests and reflected in the founder
-      reading.
-- [ ] New graph edges can reach every input sub-value, and the graph raw-field
+      reading (`AddInternalGraphNode`, `CopyInternalNode`, `CopySubgraph`,
+      and input-reference `Add` all read silent 1.00 on the T11.F03 gate
+      report).
+- [x] New graph edges can reach every input sub-value, and the graph raw-field
       operator changes one field by one step.
 - [ ] The taxonomy and changed semantics are recorded in the reference specs;
       mutation triage, benchmark reports, progress row, and review are
-      complete; the checked row and Complete spec land on clean `main`.
+      complete; the checked row and Complete spec land on clean `main`. Not
+      done: review and the roadmap row/Complete status are the
+      orchestrator's to close.
 
 ## Notes for AI Agents
 
