@@ -1,6 +1,6 @@
 # T11.F14 — Mesh Execution Observability
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-06
 **Feature**: T11.F14
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -169,9 +169,10 @@ stays in the existing neighborhood/final-observation `environment` timings.
 - [x] A second goal run is not applicable: the 2026-09-05 user decision in
       `docs/workflow.md` uses the single closure reading and the reproducibility
       tests in `make check`. The gate's two-run check remains required.
-- [ ] `make roadmap-check` passes on document edits; final review findings and
-      resolutions are recorded; the orchestrator runs `make check` on final
-      feature content and records the tested commit in the closure conversation.
+- [x] `make roadmap-check` passes on document edits; final review findings and
+      resolutions and the reviewed-feature `make check` result are recorded.
+      Final closure-content verification and its tested commit are recorded
+      by the orchestrator in the closure conversation before integration.
 
 Verification evidence, 2026-09-06 (all commands from the feature worktree with
 `~/.local/share/petri-tools/bin` and `~/.local/share/aquaproj-aqua/bin` on PATH):
@@ -216,8 +217,11 @@ Verification evidence, 2026-09-06 (all commands from the feature worktree with
   metadata, operator rows, birth buckets, structural companions, population
   samples, and other indicators are unchanged, not merely their headlines.
 - `make roadmap-check`: exit 0 after document edits,
-  `/tmp/t11-f14-roadmap-check.log`. Final review and the orchestrator's
-  `make check` on closure content remain pending.
+  `/tmp/t11-f14-roadmap-check.log`. Final review is complete and its sole P1
+  is resolved by the explicit user decision. The orchestrator's reviewed-
+  feature `make check` exited 0; it will run `make check` again immediately
+  after this documentation release and record final closure evidence and the
+  tested commit in the closure conversation before integration.
 
 ## Performance and Goal Impact
 
@@ -230,11 +234,13 @@ simulation cost or epoch re-pin is justified by this observation feature.
 Extra work is one observed baseline battery plus one ordinary battery per
 executed node, for one founder and at most 36 evolved genomes; generation
 aggregation scans the already available final population. Measure this within
-existing observation timers outside simulation phases. The small bounded
-sample should keep the existing 10-second release founder and 90-second
-evolved-neighborhood budgets; investigate an excess without reducing samples,
-skipping knockouts, or changing goal parameters. No claim about the theoretical
-compute cost of a new biological mechanism applies.
+existing observation timers outside simulation phases. The plan expected the
+small bounded sample to keep the 10-second release founder and then-current
+90-second evolved-neighborhood budgets; the original failed reading and the
+subsequent user-authorized permanent cap adjustment are recorded below.
+Investigate an excess without reducing samples, skipping knockouts, or changing
+goal parameters. No claim about the theoretical compute cost of a new
+biological mechanism applies.
 
 At closure, record dated founder mesh counts and, per goal seed, whole-
 population median/maximum generation, sample generation range, total/reachable/
@@ -260,7 +266,8 @@ the T11.F04 epoch remain unchanged.
 | Goal six work counters | unchanged | all 0.000000% | mesh +13.470830% (flag), VM -48.989220%, graph -60.595625% across definitions, plasticity +8.030172%, actions -2.107840%, births -1.079622% |
 
 Neither report has a severe comparison. The existing epoch mesh flag and
-graph-definition qualification are retained; no threshold was weakened.
+graph-definition qualification are retained; no normalized compute threshold
+was weakened.
 Gate founder observation is 0.251187 seconds (T11.F07 0.465682); goal founder
 is 0.484453 seconds, both below 10 seconds. Goal simulation is 709.646496
 seconds and final-state observation is 3.664995 seconds. Summed simulation
@@ -268,7 +275,7 @@ and observation timers are 852.274173 seconds (14m12.274s), against T11.F07
 851.609682 seconds. This exceeds the rough eleven-minute workflow estimate,
 not the single-run requirement.
 
-The **90-second evolved-neighborhood budget remains exceeded**: 138.478229
+The **original 90-second evolved-neighborhood budget was exceeded**: 138.478229
 seconds versus T11.F07's already-over-budget 138.421668 (+0.040862%). Per seed,
 current/prior seconds are 6.316832/6.796962, 2.182635/2.420632, and
 129.978763/129.204074. Investigation identifies the same seed33 concentration
@@ -280,16 +287,28 @@ neighborhood and does not isolate their cost. The inherited budget excess is
 recorded, not claimed to pass or used to justify smaller samples, skipped
 knockouts, new profiling runs, or a longer evolution run.
 
-**Unresolved closure blocker, 2026-09-06:** 138.478229 seconds exceeds the
-unchanged 90-second evolved-neighborhood cap by 48.478229 seconds. The
+**Original closure blocker, 2026-09-06:** 138.478229 seconds exceeded the
+then-binding 90-second evolved-neighborhood cap by 48.478229 seconds. The
 [T11.F07 budget resolution](t11-f07-reward-trace-clock.md#performance-and-goal-impact)
 explicitly limits its 180-second allowance to F07; later features do not
 inherit it. Matching that prior workload and staying below the overall
-profile investigation threshold do not satisfy this separate component cap.
-T11.F14 remains In Progress and cannot close until the unchanged cap is met
-or the user explicitly authorizes a scoped adjustment. The existing guarded
-report remains the measured evidence; no allowance or verification waiver has
-been applied.
+profile investigation threshold did not satisfy that separate component cap.
+This was the independent review's sole P1 finding and blocked closure.
+
+**Authorized permanent resolution, 2026-09-06:** in response to the proposed
+180-second allowance, the user said, "You can permanantly adjust the cap and
+merge". This authorizes a permanent evolved-neighborhood cap of **180 seconds
+per goal-profile run, summed across seeds**, for T11.F14 and future closures.
+The live rule is recorded in [the shared workflow](../../workflow.md#review).
+The existing guarded measurement of 138.478229 seconds meets the new cap;
+its original 90-second failure remains recorded. This is an explicit
+operational budget adjustment after measurement, not a predeclared cost or a
+claim that the old cap passed. The 10-second founder cap, 15-minute total
+profile investigation threshold, profile parameters, sample/trial counts,
+mutation floors, normalized compute thresholds, and historical reports and
+baselines remain unchanged. No new runtime measurement is needed for this
+documentation-only adjustment. The budget blocker is resolved; the spec stays
+In Progress until closure updates and required final checks are complete.
 
 Founder depth is 0: total/reachable/executed/knockout = **2/2/2/0**,
 route-variable genomes **0/1**, cap hits **0/80** executions. Goal sample
@@ -337,8 +356,10 @@ integration, and reciprocal interaction all remain `Undefined`.
       have explicit undefined distributions.
 - [x] Tests demonstrate applied execution, input variation, and the precise
       knockout intervention; observations never mutate simulation subjects.
-- [ ] Required mutation, benchmark, review, and `make check` evidence is
-      recorded; T11.F14 is checked and this spec is Complete at integration.
+- [x] Required mutation, benchmark, review, and reviewed-feature `make check`
+      evidence is recorded; T11.F14 is checked and this spec is Complete for
+      integration. The final closure-content check remains the orchestrator's
+      required integration gate, with its result recorded in the conversation.
 
 ## Notes for AI Agents
 
@@ -356,9 +377,9 @@ integration, and reciprocal interaction all remain `Undefined`.
   Planning/readiness self-review is not an advisor consultation or independent
   validation. Consultation count, decisive guidance, final finding counts,
   remediation passes, requirement corrections, user interventions, and usage
-  will be recorded before closure; task usage currently unavailable.
+  are recorded below; exact aggregate closure usage remains unavailable.
 
-- Implementation consultations: 5. (1) Accepted the private compact
+- Implementation consultations: 6. (1) Accepted the private compact
   execution mode reusing the untraced backend dispatcher with `RECORDS_HOPS`
   false; exact shared battery bookkeeping, isolated static bypass, and whole-
   population `u64` generation aggregation. (2) Accepted removing an unused
@@ -367,7 +388,7 @@ integration, and reciprocal interaction all remain `Undefined`.
   `lamarckian: false` for the required plasticity initializer; no inheritance
   occurs in the parity test. The repeated compile errors in consultations 2
   and 3 came from queued check/test batches; later commands stop on failure.
-  Consultations 4 and 5 are recorded below. No optional scope additions.
+  Consultations 4 through 6 are recorded below. No optional scope additions.
 - Diff self-review, 2026-09-06: checked reuse, simplicity, and efficiency.
   Production dispatch/routing loop is unchanged; the compact mode delegates
   backend execution and adds no normal-mode allocations. Battery scenario
@@ -386,18 +407,24 @@ integration, and reciprocal interaction all remain `Undefined`.
   after these test-only edits; no additional simplification needed.
 - Consultation 5 found implementation and mutation evidence sufficient for
   independent review, including the equivalent survivor, but identified the
-  unresolved observation-cap blocker above. No code remediation or additional
+  then-unresolved observation-cap blocker above. No code remediation or additional
   goal run is recommended from the available evidence; independent final
   review and the orchestrator's `make check` remain required.
 - Requirement correction 1, 2026-09-06: the prior inference that an inherited,
   materially unchanged observation cost could carry F07's allowance forward
   was invalid. F07 explicitly scoped its adjustment to that closure. The
-  unchanged F14 90-second requirement remains binding; this correction records
-  its unresolved failure and does not change the cap or acceptance criteria.
-- User intervention pending, 2026-09-06: the orchestrator asked whether to
-  authorize an F14-only 180-second allowance or preserve the blocked worktree.
-  No answer is recorded, and no adjustment is authorized by that unanswered
-  question. Preserve the worktree and In Progress status pending resolution.
+  90-second requirement remained binding until the explicit authorization
+  below; the correction itself changed no cap or acceptance criterion.
+- Consultation 6 / authorized requirement adjustment, 2026-09-06: apply the
+  user's permanent 180-second evolved-neighborhood cap in the shared live
+  workflow, preserving original measurements and all other limits. The
+  existing report satisfies the new cap and resolves the budget P1; no code
+  remediation or further benchmark run is needed for this adjustment.
+- User intervention, 2026-09-06: after the orchestrator offered an F14-only
+  180-second allowance or preserving the blocked worktree, the user explicitly
+  authorized permanently adjusting the cap and merging. The permanent scope
+  applies to F14 and future closures, as recorded in the resolution above;
+  final closure checks and the authorized local integration remain pending.
 - TDD evidence: initial runtime and battery/CLI red compilation logs are
   `/tmp/t11-f14-red-runtime.log`, `/tmp/t11-f14-red-battery.log`, and
   `/tmp/t11-f14-red-cli.log`. Fixture development exposed empty-graph sink
@@ -416,16 +443,24 @@ integration, and reciprocal interaction all remain `Undefined`.
 
 - Independent final review, 2026-09-06: **1 P1, 0 P2, 0 P3**. The sole P1
   is the measured evolved-observation cost of 138.478229 seconds exceeding
-  the binding 90-second cap. Resolution requires an explicit F14-only user
-  adjustment or evidence meeting that cap; the finding remains unresolved.
+  the then-binding 90-second cap. **Resolved** by the explicit user-authorized
+  permanent 180-second cap above, which the existing guarded report meets.
+  The original finding count and original failed measurement are retained.
   The reviewer found no code correctness or maintainability issues and
   independently confirmed full prior-field deterministic equality and the
   mutation survivor's equivalence. Post-review code remediation passes: **0**.
-- Current workflow record: **5 advisor consultations**, **1 requirement
-  correction**, budget user intervention pending, and **usage unavailable**.
-  No cap adjustment is assumed. The spec remains In Progress and closure
-  remains unchecked. The orchestrator ran `make check` on the reviewed feature
+- Current workflow record: **6 advisor consultations**, **1 requirement
+  correction**, **1 user-authorized requirement adjustment**, **1 user
+  intervention**, and **exact aggregate closure usage unavailable**. The spec
+  is Complete and the feature row is checked for integration. The orchestrator
+  ran `make check` on the reviewed feature
   content on 2026-09-06: **exit 0**, log `/tmp/t11-f14-make-check.log`.
-  This verifies the implementation but does not resolve the observation-budget
-  blocker or authorize integration. Closure content must pass its required
-  checks after the pending budget decision.
+  This verifies the implementation before the authorized budget-document
+  change. The orchestrator will run the final closure-content `make check`
+  immediately after this documentation release; its result and tested commit
+  must be shown in the closure conversation before integration. No result for
+  that forthcoming run is claimed here.
+- Available usage checkpoint: the orchestrator reported the native goal's
+  blocked-checkpoint snapshot as **617,721 tokens** and **3,623 elapsed
+  seconds**. That snapshot remained frozen while resumed work continued;
+  it is a checkpoint reading, not total closure usage.
