@@ -1,7 +1,7 @@
 {
   "gate": {
     "series": "gate-v1",
-    "epoch_baseline": "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
+    "epoch_baseline": "docs/progress/features/t11-f04-mutation-supply-and-neutral-scaffold.json",
     "closed": [
       "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
       "docs/progress/features/t01-f11-baseline-persistence-characterization.json",
@@ -11,7 +11,8 @@
       "docs/progress/features/t11-f05-temporal-controller-fixtures.json",
       "docs/progress/features/t11-f01-mutational-neighborhood-indicator.json",
       "docs/progress/features/t11-f02-vm-structural-mutation-semantics.json",
-      "docs/progress/features/t11-f03-function-preserving-graph-growth.json"
+      "docs/progress/features/t11-f03-function-preserving-graph-growth.json",
+      "docs/progress/features/t11-f04-mutation-supply-and-neutral-scaffold.json"
     ]
   },
   "goal": {

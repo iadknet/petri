@@ -30,6 +30,8 @@ pub const BIRTH_SEED_BASE: u64 = 9_000;
 pub struct BirthResult {
     pub births_total: u32,
     pub zero_event_births: u32,
+    /// Birth counts by requested (attempted) events, including zero.
+    pub by_requested_events: BTreeMap<u32, u32>,
     pub any_events: Tally,
     pub by_events: BTreeMap<u32, Tally>,
 }
@@ -49,7 +51,7 @@ pub fn per_birth_result(
 ) -> BirthResult {
     let reachable = mesh_reachable_nodes(subject);
 
-    let outcomes: Vec<Option<(u32, Tally)>> = (0..births)
+    let outcomes: Vec<(u32, u32, Tally)> = (0..births)
         .into_par_iter()
         .map(|birth_index| {
             let mut genome = subject.clone();
@@ -63,35 +65,36 @@ pub fn per_birth_result(
                 context.food_type_count,
             );
             if summary.applied_events == 0 {
-                return None;
+                return (summary.attempted_events, 0, Tally::default());
             }
             let signature =
                 battery.signature(&genome, context.runtime, context.shared_memory_decay_rate);
             let tally = Tally::default().record(classify(base, &signature));
-            Some((summary.applied_events, tally))
+            (summary.attempted_events, summary.applied_events, tally)
         })
         .collect();
 
     fold_outcomes(births, outcomes)
 }
 
-/// Fold one birth per entry (`None` for a zero-applied-event birth,
-/// `Some((applied_events, tally))` otherwise) into a [`BirthResult`]: pure
-/// integer accounting, independent of how the outcomes were produced, so it
-/// is directly proptestable without a genome, battery, or mutation engine.
-fn fold_outcomes(births_total: u32, outcomes: Vec<Option<(u32, Tally)>>) -> BirthResult {
+/// Fold `(requested_events, applied_events, tally)` per birth into pure integer
+/// accounting. Zero-applied births carry an empty tally and need no evaluation.
+fn fold_outcomes(births_total: u32, outcomes: Vec<(u32, u32, Tally)>) -> BirthResult {
     let mut result = BirthResult {
         births_total,
         ..BirthResult::default()
     };
-    for outcome in outcomes {
-        match outcome {
-            None => result.zero_event_births += 1,
-            Some((applied_events, tally)) => {
-                result.any_events = result.any_events.merge(tally);
-                let bucket = result.by_events.entry(applied_events).or_default();
-                *bucket = bucket.merge(tally);
-            }
+    for (requested_events, applied_events, tally) in outcomes {
+        *result
+            .by_requested_events
+            .entry(requested_events)
+            .or_default() += 1;
+        if applied_events == 0 {
+            result.zero_event_births += 1;
+        } else {
+            result.any_events = result.any_events.merge(tally);
+            let bucket = result.by_events.entry(applied_events).or_default();
+            *bucket = bucket.merge(tally);
         }
     }
     result
@@ -117,11 +120,11 @@ mod tests {
         let result = fold_outcomes(
             5,
             vec![
-                None,
-                None,
-                Some((2, tally_of_one(Class::Changed))),
-                None,
-                None,
+                (0, 0, Tally::default()),
+                (0, 0, Tally::default()),
+                (3, 2, tally_of_one(Class::Changed)),
+                (0, 0, Tally::default()),
+                (0, 0, Tally::default()),
             ],
         );
         assert_eq!(result.births_total, 5);
@@ -129,6 +132,7 @@ mod tests {
         assert_eq!(result.any_events.trials, 1);
         assert_eq!(result.by_events.len(), 1);
         assert_eq!(result.by_events[&2].trials, 1);
+        assert_eq!(result.by_requested_events, BTreeMap::from([(0, 4), (3, 1)]));
     }
 
     /// `per_birth_result` seeds birth `i` by
@@ -152,11 +156,8 @@ mod tests {
         let context = EvalContext::from_config(&config);
         let base = battery.signature(&subject, context.runtime, context.shared_memory_decay_rate);
         let reachable = mesh_reachable_nodes(&subject);
-        // At the production ~8.8% mutated rate, a handful of births leaves a
-        // real chance every birth in the sample is zero-event under both the
-        // correct and a mutated seed formula (the two `BirthResult`s would
-        // then coincidentally match). 120 births drives that chance to
-        // effectively zero while staying well under a second.
+        // Keep the established 120-birth seed-arithmetic fixture; its request
+        // histogram now also distinguishes triggered-but-skipped births.
         let births = 120u32;
         let seed_offset = 555u64;
 
@@ -185,6 +186,10 @@ mod tests {
                 &mut rng,
                 context.food_type_count,
             );
+            *expected
+                .by_requested_events
+                .entry(summary.attempted_events)
+                .or_default() += 1;
             if summary.applied_events == 0 {
                 expected.zero_event_births += 1;
                 continue;
@@ -212,21 +217,28 @@ mod tests {
         #[test]
         fn bucket_totals_equal_the_overall_any_events_tally(
             outcomes in prop::collection::vec(
-                prop::option::of((1u32..5, prop_oneof![
+                (0u32..4, prop::option::of((1u32..5, prop_oneof![
                     Just(Class::Silent), Just(Class::Changed), Just(Class::Dead),
-                ])),
+                ]))),
                 0..40,
             ),
         ) {
             let births_total = outcomes.len() as u32;
-            let expanded: Vec<Option<(u32, Tally)>> = outcomes
+            let expanded: Vec<(u32, u32, Tally)> = outcomes
                 .into_iter()
-                .map(|entry| entry.map(|(applied_events, class)| (applied_events, tally_of_one(class))))
+                .map(|(skipped, entry)| match entry {
+                    Some((applied, class)) => (applied + skipped, applied, tally_of_one(class)),
+                    None => (skipped, 0, Tally::default()),
+                })
                 .collect();
-            let zero_events_expected = expanded.iter().filter(|o| o.is_none()).count() as u32;
-            let mutated_expected = expanded.iter().filter(|o| o.is_some()).count() as u32;
-
+            let zero_events_expected = expanded.iter().filter(|o| o.1 == 0).count() as u32;
+            let mutated_expected = births_total - zero_events_expected;
+            let requested_total: u32 = expanded.iter().map(|o| o.0).sum();
+            let skipped_total: u32 = expanded.iter().map(|o| o.0 - o.1).sum();
             let result = fold_outcomes(births_total, expanded);
+            prop_assert_eq!(result.by_requested_events.values().sum::<u32>(), births_total);
+            prop_assert_eq!(result.by_requested_events.iter().map(|(events, births)| events * births).sum::<u32>(), requested_total);
+            prop_assert_eq!(result.by_events.iter().map(|(events, tally)| events * tally.trials).sum::<u32>() + skipped_total, requested_total);
 
             prop_assert_eq!(result.zero_event_births, zero_events_expected);
             prop_assert_eq!(result.any_events.trials, mutated_expected);

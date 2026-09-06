@@ -15,6 +15,20 @@ use crate::mutation::types::{
 };
 use crate::mutation::vm::{VmMutator, VmOperator};
 
+/// Draw requested supply from normalized config, independently of operator success.
+fn requested_event_count(config: &MutationConfig, rng: &mut impl Rng) -> u32 {
+    if !rng.gen_bool(config.mutation_probability) {
+        return 0;
+    }
+    let mut count = config.per_birth_mutation_events_min;
+    while count < config.per_birth_mutation_events_max
+        && rng.gen_bool(config.per_birth_mutation_event_continuation_probability)
+    {
+        count += 1;
+    }
+    count
+}
+
 /// Orchestrates genome mutation events for offspring.
 pub struct MutationEngine;
 
@@ -49,14 +63,10 @@ impl MutationEngine {
         rng: &mut impl Rng,
         food_type_count: usize,
     ) -> MutationSummary {
-        // Probability gate.
-        if !rng.gen_bool(config.mutation_probability) {
+        let event_count = requested_event_count(config, rng);
+        if event_count == 0 {
             return MutationSummary::zero();
         }
-
-        // Determine number of mutation events this birth.
-        let event_count = rng
-            .gen_range(config.per_birth_mutation_events_min..=config.per_birth_mutation_events_max);
 
         // Genome size pressure: compute once before the event loop.
         let restricted = config.genome_size_pressure_enabled
