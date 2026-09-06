@@ -412,7 +412,7 @@ fn complexity_effect_consistent_with_types() {
     }
 }
 
-// ── InputRef::Add auto-wiring tests ─────────────────────────────────────────
+// ── InputRef::Add wires nothing (T11.F03) ───────────────────────────────────
 
 fn graph_node_genome_zero_refs() -> CreatureGenome {
     CreatureGenome {
@@ -490,40 +490,42 @@ fn count_input_leaf_edges_for_ref(genome: &CreatureGenome, node_idx: usize, ref_
     count
 }
 
+/// `InputRef::Add` is a growth operator: it must be neutral at fire time
+/// (`docs/reference/v3-mutation-spec.md`'s node-type contract), so it wires
+/// the new reference into nothing on the graph backend, no matter how many
+/// sub-values the sampled reference has.
 #[test]
-fn add_input_ref_to_graph_node_creates_input_leaf_edge() {
-    let mut genome = graph_node_genome_zero_refs();
-    let mut r = rng(42);
-    InputRefMutator::apply(
-        &mut genome,
-        InputRefOperator::Add,
-        &[],
-        0.0,
-        &mut r,
-        &default_config(),
-    )
-    .unwrap();
-    assert_eq!(genome.nodes[0].input_refs.len(), 1);
-    assert!(
-        count_input_leaf_edges_for_ref(&genome, 0, 0) > 0,
-        "adding an input ref to a graph node must create at least one InputLeaf edge"
-    );
+fn add_input_ref_to_graph_node_wires_nothing() {
+    for seed in 0u64..200 {
+        let mut genome = graph_node_genome_zero_refs();
+        let mut r = rng(seed);
+        InputRefMutator::apply(
+            &mut genome,
+            InputRefOperator::Add,
+            &[],
+            0.0,
+            &mut r,
+            &default_config(),
+        )
+        .unwrap();
+        assert_eq!(genome.nodes[0].input_refs.len(), 1, "seed {seed}");
+        assert_eq!(
+            count_input_leaf_edges_for_ref(&genome, 0, 0),
+            0,
+            "seed {seed}: InputRef::Add must not wire the new reference into any edge"
+        );
+    }
 }
 
 #[test]
-fn add_input_ref_to_graph_node_wires_correct_ref_idx() {
+fn add_input_ref_to_graph_node_leaves_existing_edges_untouched() {
     let mut genome = graph_node_genome_zero_refs();
-    // Pre-populate with 2 existing input refs
     genome.nodes[0]
         .input_refs
         .push(InputReference::World(WorldInputKey::food_here(
             OrdinaryFoodTypeId::default(),
         )));
-    genome.nodes[0]
-        .input_refs
-        .push(InputReference::World(WorldInputKey::food_here(
-            OrdinaryFoodTypeId::default(),
-        )));
+    let before = genome.clone();
     let mut r = rng(99);
     InputRefMutator::apply(
         &mut genome,
@@ -534,102 +536,29 @@ fn add_input_ref_to_graph_node_wires_correct_ref_idx() {
         &default_config(),
     )
     .unwrap();
-    assert_eq!(genome.nodes[0].input_refs.len(), 3);
-    assert!(
-        count_input_leaf_edges_for_ref(&genome, 0, 2) > 0,
-        "new input ref at index 2 must have at least one InputLeaf edge with ref_idx=2"
+    assert_eq!(genome.nodes[0].input_refs.len(), 2);
+    let BackendDef::Graph(ref before_def) = before.nodes[0].backend_def else {
+        panic!("expected graph backend");
+    };
+    let BackendDef::Graph(ref after_def) = genome.nodes[0].backend_def else {
+        panic!("expected graph backend");
+    };
+    assert_eq!(
+        before_def, after_def,
+        "InputRef::Add must not touch any existing edge"
     );
 }
 
+/// The VM `ReadInput` auto-insertion is removed: `InputRef::Add` on a VM
+/// node leaves the program byte-identical.
 #[test]
-fn add_input_ref_compound_wires_all_sub_indices() {
-    let config = default_config();
-    // Try many seeds to find one that generates a compound ref (width > 1)
-    for seed in 0u64..10_000 {
-        let mut genome = graph_node_genome_zero_refs();
-        let mut r = rng(seed);
-        InputRefMutator::apply(
-            &mut genome,
-            InputRefOperator::Add,
-            &[],
-            0.0,
-            &mut r,
-            &config,
-        )
-        .unwrap();
-        let width = sub_value_count(&genome.nodes[0].input_refs[0], &config);
-        if width <= 1 {
-            continue;
-        }
-        // Found a compound ref — verify all sub_idx values are wired
-        let BackendDef::Graph(ref def) = genome.nodes[0].backend_def else {
-            panic!("expected graph backend");
-        };
-        let mut seen_sub_indices: std::collections::HashSet<u16> = std::collections::HashSet::new();
-        for node in &def.compute_nodes {
-            for e in &node.inputs {
-                if let GraphSource::InputLeaf {
-                    ref_idx: 0,
-                    sub_idx,
-                } = e.source
-                {
-                    seen_sub_indices.insert(sub_idx);
-                }
-            }
-        }
-        for sink in &def.output_sinks {
-            for e in &sink.inputs {
-                if let GraphSource::InputLeaf {
-                    ref_idx: 0,
-                    sub_idx,
-                } = e.source
-                {
-                    seen_sub_indices.insert(sub_idx);
-                }
-            }
-        }
-        for slot in &def.action_bank {
-            for e in slot.gate_inputs.iter().chain(slot.param_inputs.iter()) {
-                if let GraphSource::InputLeaf {
-                    ref_idx: 0,
-                    sub_idx,
-                } = e.source
-                {
-                    seen_sub_indices.insert(sub_idx);
-                }
-            }
-        }
-        for e in &def.execute_gate.inputs {
-            if let GraphSource::InputLeaf {
-                ref_idx: 0,
-                sub_idx,
-            } = e.source
-            {
-                seen_sub_indices.insert(sub_idx);
-            }
-        }
-        for sub_idx in 0..width {
-            assert!(
-                seen_sub_indices.contains(&sub_idx),
-                "compound ref (width={}) missing sub_idx={} in graph edges at seed {}",
-                width,
-                sub_idx,
-                seed
-            );
-        }
-        return; // Test passed
-    }
-    panic!("did not generate a compound input ref in 10000 seeds");
-}
-
-#[test]
-fn add_input_ref_to_vm_node_inserts_read_input_instruction() {
+fn add_input_ref_to_vm_node_leaves_program_unchanged() {
     let mut genome = single_node_genome_with_input_ref(InputReference::World(
         WorldInputKey::food_here(OrdinaryFoodTypeId::default()),
     ));
     genome.nodes[0].input_refs.clear(); // start with 0 refs
-    let program_len_before = match &genome.nodes[0].backend_def {
-        BackendDef::Vm(vm) => vm.program.len(),
+    let program_before = match &genome.nodes[0].backend_def {
+        BackendDef::Vm(vm) => vm.program.clone(),
         _ => panic!("expected VM backend"),
     };
     let mut r = rng(42);
@@ -646,53 +575,9 @@ fn add_input_ref_to_vm_node_inserts_read_input_instruction() {
     let BackendDef::Vm(ref vm) = genome.nodes[0].backend_def else {
         panic!("expected VM backend");
     };
-    // A ReadInput instruction referencing the new ref_idx=0 must have been inserted
-    let has_read = vm
-        .program
-        .iter()
-        .any(|instr| matches!(instr, VmInstruction::ReadInput { ref_idx: 0, .. }));
-    assert!(
-        has_read,
-        "InputRef.Add on VM node must insert a ReadInput for the new ref; program: {:?}",
-        vm.program
-    );
-    assert!(
-        vm.program.len() > program_len_before,
-        "VM program must grow after InputRef.Add"
-    );
-}
-
-#[test]
-fn add_input_ref_to_vm_node_with_existing_refs_uses_correct_ref_idx() {
-    let mut genome = single_node_genome_with_input_ref(InputReference::World(
-        WorldInputKey::food_here(OrdinaryFoodTypeId::default()),
-    ));
-    // Add a second ref so the new one will be at index 2
-    genome.nodes[0]
-        .input_refs
-        .push(InputReference::UpstreamSlot(0));
-    let mut r = rng(99);
-    InputRefMutator::apply(
-        &mut genome,
-        InputRefOperator::Add,
-        &[],
-        0.0,
-        &mut r,
-        &default_config(),
-    )
-    .unwrap();
-    assert_eq!(genome.nodes[0].input_refs.len(), 3);
-    let BackendDef::Vm(ref vm) = genome.nodes[0].backend_def else {
-        panic!("expected VM backend");
-    };
-    let has_read_2 = vm
-        .program
-        .iter()
-        .any(|instr| matches!(instr, VmInstruction::ReadInput { ref_idx: 2, .. }));
-    assert!(
-        has_read_2,
-        "new ref at index 2 must have a ReadInput with ref_idx=2; program: {:?}",
-        vm.program
+    assert_eq!(
+        vm.program, program_before,
+        "InputRef::Add must not insert or otherwise change any VM instruction"
     );
 }
 

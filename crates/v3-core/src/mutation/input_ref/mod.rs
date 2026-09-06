@@ -2,7 +2,7 @@ use rand::Rng;
 
 use crate::config::{MutationConfig, OrdinaryFoodTypeId};
 use crate::contracts::{InputReference, WorldInputKey};
-use crate::creature::genome::{CreatureGenome, VmInstruction};
+use crate::creature::genome::CreatureGenome;
 use crate::mutation::compound::sub_value_count;
 use crate::mutation::reachability::biased_select_from;
 use crate::mutation::sampling;
@@ -104,9 +104,7 @@ impl InputRefMutator {
         }
 
         match op {
-            InputRefOperator::Add => {
-                apply_add(genome, reachable_nodes, bias, rng, config, food_type_count)
-            }
+            InputRefOperator::Add => apply_add(genome, reachable_nodes, bias, rng, food_type_count),
             InputRefOperator::Remove => apply_remove(genome, reachable_nodes, bias, rng),
             InputRefOperator::Swap => {
                 apply_swap(genome, reachable_nodes, bias, rng, config, food_type_count)
@@ -118,18 +116,20 @@ impl InputRefMutator {
     }
 }
 
+/// Push a new input reference onto the target node. It is wired into
+/// nothing on either backend: a fresh `InputReference` is a growth step, not
+/// a connection, so it must be neutral at the moment it fires
+/// (`docs/reference/v3-mutation-spec.md`'s node-type contract). The
+/// reference becomes addressable by later connection operators
+/// (`AddGraphEdge`, `RetargetGraphEdge` on the graph backend; VM operators
+/// that reference `input_refs` on the VM backend).
 fn apply_add(
     genome: &mut CreatureGenome,
     reachable_nodes: &[usize],
     bias: f64,
     rng: &mut impl Rng,
-    config: &MutationConfig,
     food_type_count: usize,
 ) -> Result<TargetReachability, MutationSkipReason> {
-    use crate::creature::genome::cgp::{GraphEdge, GraphSource};
-    use crate::creature::genome::BackendDef;
-    use crate::mutation::graph::operators::{get_edge_vec_mut, pick_random_surface};
-
     let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
     let (node_idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
@@ -139,56 +139,6 @@ fn apply_add(
         sampling::random_input_reference_for_food_types(rng, food_type_count)
     };
     genome.nodes[node_idx].input_refs.push(new_ref);
-
-    // Compute width before mutable borrow of backend_def (own-borrow-over-clone)
-    let new_ref_idx = (genome.nodes[node_idx].input_refs.len() - 1) as u16;
-    let width = sub_value_count(
-        &genome.nodes[node_idx].input_refs[new_ref_idx as usize],
-        config,
-    );
-
-    // Auto-wire into the backend so the new input is immediately connected.
-    match genome.nodes[node_idx].backend_def {
-        BackendDef::Graph(ref mut def) => {
-            // Wire all sub-indices into random graph surfaces.
-            for sub_idx in 0..width {
-                if let Some(surface) = pick_random_surface(def, rng) {
-                    let edges = get_edge_vec_mut(def, surface);
-                    edges.push(GraphEdge {
-                        source: GraphSource::InputLeaf {
-                            ref_idx: new_ref_idx,
-                            sub_idx,
-                        },
-                        weight: rng.gen_range(-1.0f32..=1.0),
-                    });
-                }
-            }
-        }
-        BackendDef::Vm(ref mut vm) => {
-            // Insert a ReadInput instruction so the new ref is actually read.
-            // Without this, the ref sits disconnected — no VM instruction
-            // references it — creating junk DNA that wastes complexity budget.
-            let rc = vm.register_count.max(1);
-            let dst = rng.gen_range(0..rc);
-            let sub_idx = if width > 1 {
-                rng.gen_range(0..width)
-            } else {
-                0
-            };
-            let read = VmInstruction::ReadInput {
-                dst,
-                ref_idx: new_ref_idx,
-                sub_idx,
-            };
-            let pos = rng.gen_range(0..=vm.program.len());
-            crate::mutation::vm::insert_new_instruction_with_reference_repair(
-                &mut vm.program,
-                pos,
-                read,
-            )?;
-        }
-    }
-
     Ok(reachability)
 }
 

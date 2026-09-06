@@ -1,4 +1,5 @@
 use super::*;
+use crate::config::MutationConfig;
 use crate::contracts::NodeId;
 use crate::creature::genome::cgp::{
     ActionSlot, ActionSlotBehavior, CgpGraphBackendDef, ExecuteGate, WorldActionKind,
@@ -78,6 +79,7 @@ fn mutate_action_slot_behavior_operator_changes_slot_behavior() {
             &[],
             0.0,
             &mut r,
+            &MutationConfig::default(),
         )
         .unwrap();
 
@@ -108,6 +110,7 @@ fn mutate_action_slot_behavior_operator_skips_when_action_bank_empty() {
         &[],
         0.0,
         &mut r,
+        &MutationConfig::default(),
     );
 
     assert_eq!(result, Err(MutationSkipReason::NoApplicableTarget));

@@ -97,7 +97,9 @@ impl OperatorKind {
         let rb = &mutation_config.reachable_bias;
         match self {
             Self::Vm(op) => VmMutator::apply(genome, op, reachable, rb.vm, rng, mutation_config),
-            Self::Graph(op) => GraphMutator::apply(genome, op, reachable, rb.graph, rng),
+            Self::Graph(op) => {
+                GraphMutator::apply(genome, op, reachable, rb.graph, rng, mutation_config)
+            }
             Self::Topology(op) => TopologyMutator::apply_with_food_type_count(
                 genome,
                 op,
@@ -389,7 +391,8 @@ mod tests {
 
         for op in GraphOperator::ALL {
             let tally = fixture.tally(trials, seed_offset, GRAPH_SEED_BASE, |genome, rng| {
-                GraphMutator::apply(genome, op, &reachable, rb.graph, rng).map(|_| ())
+                GraphMutator::apply(genome, op, &reachable, rb.graph, rng, &config.mutation)
+                    .map(|_| ())
             });
             expected.push(("graph", format!("{op:?}"), tally));
         }

@@ -182,6 +182,7 @@ impl MutationEngine {
                                 parent_reachable_nodes,
                                 pressure_adjusted_bias(rb.graph, restricted),
                                 rng,
+                                config,
                             );
                             if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
                                 available.swap_remove(idx);
@@ -478,9 +479,10 @@ fn apply_graph_event(
     reachable_nodes: &[usize],
     bias: f64,
     rng: &mut impl Rng,
+    config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let snapshot = genome.clone();
-    match GraphMutator::apply(genome, op, reachable_nodes, bias, rng) {
+    match GraphMutator::apply(genome, op, reachable_nodes, bias, rng, config) {
         Ok(reachability) => {
             if ParseabilityGate::validate(genome).is_ok() {
                 Ok(reachability)

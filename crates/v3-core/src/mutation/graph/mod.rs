@@ -3,6 +3,7 @@ pub(crate) mod operators;
 
 use rand::Rng;
 
+use crate::config::MutationConfig;
 use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::mutation::reachability::biased_select_from;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
@@ -162,6 +163,7 @@ impl GraphMutator {
         reachable_nodes: &[usize],
         bias: f64,
         rng: &mut impl Rng,
+        config: &MutationConfig,
     ) -> Result<TargetReachability, MutationSkipReason> {
         // Pre-guard: must have at least one Graph-backend node.
         let graph_indices: Vec<usize> = genome
@@ -190,18 +192,20 @@ impl GraphMutator {
                 operators::mutate_action_slot_behavior(genome, node_idx, rng)
             }
             GraphOperator::AddInternalGraphNode => {
-                operators::add_internal_node(genome, node_idx, rng)
+                operators::add_internal_node(genome, node_idx, rng, config)
             }
             GraphOperator::RemoveInternalGraphNode => {
                 operators::remove_internal_node(genome, node_idx, rng)
             }
-            GraphOperator::AddGraphEdge => operators::add_graph_edge(genome, node_idx, rng),
+            GraphOperator::AddGraphEdge => {
+                operators::add_graph_edge(genome, node_idx, rng, config)
+            }
             GraphOperator::RetargetGraphEdge => {
-                operators::retarget_graph_edge(genome, node_idx, rng)
+                operators::retarget_graph_edge(genome, node_idx, rng, config)
             }
             GraphOperator::RemoveGraphEdge => operators::remove_graph_edge(genome, node_idx, rng),
             GraphOperator::GraphRawFieldMutation => {
-                operators::apply_graph_raw_field_mutation(genome, node_idx, rng)
+                operators::apply_graph_raw_field_mutation(genome, node_idx, rng, config)
             }
             GraphOperator::CopyInternalNode => {
                 operators::apply_copy_internal_node(genome, node_idx, rng)
