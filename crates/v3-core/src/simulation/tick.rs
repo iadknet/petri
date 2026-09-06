@@ -149,7 +149,7 @@ pub fn run_phase_0(sim: &mut Simulation) {
         creature.lifetime_energy_sum += f64::from(creature.energy.max(0.0));
         creature.lifetime_energy_sample_count += 1;
 
-        creature.graph_runtime.begin_tick();
+        creature.graph_runtime.begin_tick(&creature.genome.nodes);
         advance_shared_memory(
             &mut creature.shared_memory,
             &mut creature.prev_shared_memory,
@@ -303,7 +303,7 @@ pub fn observe_temporal_actions(sim: &Simulation) -> Vec<TemporalActionObservati
     for (id, sensors) in assemble_sensor_inputs(sim, &ids) {
         let creature = &sim.creatures[id];
         let mut prepared = creature.graph_runtime.clone();
-        prepared.begin_tick();
+        prepared.begin_tick(&creature.genome.nodes);
         let evaluate = |graph: &mut crate::creature::state::GraphRuntimeState,
                         previous: &[f32; 16]| {
             execute_creature_mesh_with_reserve(
@@ -371,7 +371,7 @@ fn observe_action_queue(
 ) -> Vec<WorldAction> {
     let mut energy = creature.energy;
     let mut graph_runtime = creature.graph_runtime.clone();
-    graph_runtime.begin_tick();
+    graph_runtime.begin_tick(&creature.genome.nodes);
     execute_creature_mesh_with_reserve(
         &creature.genome,
         sensors,
@@ -1233,6 +1233,7 @@ mod final_action_observation_tests {
         creature.graph_runtime.node_state = vec![vec![0.5]];
         creature.graph_runtime.plasticity_weights = vec![vec![Box::new([0.25])]];
         creature.graph_runtime.eligibility_traces = vec![vec![Box::new([0.125])]];
+        creature.graph_runtime.tick_start_eligibility_traces = vec![vec![Box::new([0.0625])]];
         creature.graph_runtime.scratch_prev = vec![1.0];
         creature.graph_runtime.scratch_curr = vec![2.0];
         creature.graph_runtime.scratch_backup = vec![3.0];
@@ -1245,6 +1246,7 @@ mod final_action_observation_tests {
         let mut rng_before = sim.rng.clone();
 
         let observations = observe_final_actions(&sim);
+        let _ = observe_temporal_actions(&sim);
 
         assert_eq!(observations.len(), 1);
         let observation = &observations[0];
@@ -1272,6 +1274,12 @@ mod final_action_observation_tests {
         assert_eq!(
             sim.creatures[id].graph_runtime.eligibility_traces,
             graph_state_before.eligibility_traces
+        );
+        assert_eq!(
+            sim.creatures[id]
+                .graph_runtime
+                .tick_start_eligibility_traces,
+            graph_state_before.tick_start_eligibility_traces
         );
         assert_eq!(
             sim.creatures[id].graph_runtime.scratch_prev,
@@ -1362,7 +1370,21 @@ mod final_action_observation_tests {
                     plasticity: None,
                 },
             ];
+            def.compute_nodes[0].plasticity = Some(crate::creature::genome::PlasticityConfig {
+                rule: crate::creature::genome::HebbianRule::Classic,
+                learning_rate: 0.5,
+                weight_clamp: 2.0,
+                lamarckian: false,
+                modulation: Some(crate::creature::genome::RewardModulationConfig {
+                    reward_source: crate::creature::genome::OutcomeChannel::EnergyDelta,
+                    trace_decay: 0.5,
+                }),
+            });
             creature.genome = genome;
+            creature.graph_runtime.eligibility_traces = vec![vec![Box::new([0.5]), Box::new([])]];
+            creature.graph_runtime.tick_start_eligibility_traces =
+                vec![vec![Box::new([0.125]), Box::new([])]];
+            creature.graph_runtime.plasticity_weights = vec![vec![Box::new([1.0]), Box::new([])]];
             creature.prev_shared_memory[0] = 1.0;
             creature.graph_runtime.node_state = vec![vec![1.0, 0.0]];
             creature.graph_runtime.node_outputs = vec![vec![1.0, 0.0]];
@@ -1374,6 +1396,7 @@ mod final_action_observation_tests {
             let previous_before = creature.prev_shared_memory;
             let energy_before = creature.energy;
             let mut rng = sim.rng.clone();
+            let _ = observe_final_actions(&sim);
             let observations = observe_temporal_actions(&sim);
             assert_eq!(observations.len(), 3);
             for observation in observations {
@@ -1386,6 +1409,18 @@ mod final_action_observation_tests {
                 }
             }
             let creature = &sim.creatures[id];
+            assert_eq!(
+                creature.graph_runtime.eligibility_traces,
+                graph_before.eligibility_traces
+            );
+            assert_eq!(
+                creature.graph_runtime.tick_start_eligibility_traces,
+                graph_before.tick_start_eligibility_traces
+            );
+            assert_eq!(
+                creature.graph_runtime.plasticity_weights,
+                graph_before.plasticity_weights
+            );
             assert_eq!(creature.graph_runtime.node_state, graph_before.node_state);
             assert_eq!(
                 creature.graph_runtime.node_outputs,

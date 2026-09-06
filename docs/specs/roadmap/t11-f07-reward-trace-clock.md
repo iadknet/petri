@@ -114,15 +114,15 @@ demonstrate immediate credit, delayed credit, and adaptation after reward revers
 
 ## Implementation Tasks
 
-- [ ] First flip E1–E3 assertions to this clock/gain contract and record red
+- [x] First flip E1–E3 assertions to this clock/gain contract and record red
       results before production edits. Add focused failing cases for repeated
       visits, actual recurrent/energy inputs, and failed visits.
-- [ ] Implement once-per-world-tick trace decay and replacement activity using
+- [x] Implement once-per-world-tick trace decay and replacement activity using
       existing clock/storage/evaluator seams; apply eta once at reward time.
       Keep reward channels, pure Hebbian behavior, and configured costs intact.
-- [ ] Add exact-update and clock properties plus the constructed live/frozen
+- [x] Add exact-update and clock properties plus the constructed live/frozen
       reversal fixture described below, using production runtime/learning code.
-- [ ] Update `v3-graph-backend-spec.md`, `v3-tick-orchestration-spec.md`, and
+- [x] Update `v3-graph-backend-spec.md`, `v3-tick-orchestration-spec.md`, and
       the mutation node-type contract; correct the graph reference's existing
       weight-initialization claim to genome weights. Update affected API/config
       comments and F05's current capability record, retaining its historical
@@ -135,35 +135,35 @@ demonstrate immediate credit, delayed credit, and adaptation after reward revers
 
 ## Verification
 
-- [ ] Record TDD red/green evidence. After changing production tick semantics,
+- [x] Record TDD red/green evidence. After changing production tick semantics,
       run `cargo test -p v3-core --test viability` first, then
       `cargo check --workspace --all-targets` after coherent Rust edits.
-- [ ] `cargo test -p v3-core --test temporal_fixtures` passes with E1's exact
+- [x] `cargo test -p v3-core --test temporal_fixtures` passes with E1's exact
       unit update, E2's visited-every-tick recurrence, and E3's nonzero measured
       skipped-tick signals updating weights from traces 1, 0.5, 0.25 at
       lambda 0.5. Preserve F05's distinctions between timing and gain.
-- [ ] Focused runtime tests cover all four rules with nontrivial finite
+- [x] Focused runtime tests cover all four rules with nontrivial finite
       pre/post/weight values; positive, negative, and zero reward; eta 0,
       intermediate eta, and eta 1; both weight-clamp bounds; lambda 0 and 1;
       a never-visited module and newborn reset; and unit-reward/lambda-zero
       equivalence to pure Hebbian learning on a matched feed-forward edge.
-- [ ] An isolated activity pulse followed by d in {1,2,4,8,16} skipped ticks
+- [x] An isolated activity pulse followed by d in {1,2,4,8,16} skipped ticks
       yields `lambda^d * h` and the exact subsequent weight change. Compare
       no-visit and zero-activity visits for a rule with h=0; repeated identical
       visits and changed-input revisits use one frozen base. Include trace
       results before reward to rule out compensating arithmetic bugs.
-- [ ] Actual-input tests distinguish current-visit lower-index sources from
+- [x] Actual-input tests distinguish current-visit lower-index sources from
       tick-start self/backward sources, and distinguish evaluation-time energy
       from energy after a co-resident pure-Hebbian cost. Evaluation-cost and
       plasticity-cost exhaustion preserve the declared trace transaction.
       Ordinary/traced parity includes actions, weights, traces, cost, and work.
-- [ ] Proptest checks pure invariants for finite bounded inputs: decay across
+- [x] Proptest checks pure invariants for finite bounded inputs: decay across
       n skipped ticks equals `lambda^n * e`, changing identical visit count
       cannot change credit at identical applied activity values, disconnected
       computation cannot change trace timing at matched inputs, and normalized
       reward updates stay inside their weight bounds.
       Assertions hold for every drawn case; commit generated regressions.
-- [ ] A test-local two-action reversal task uses constructed existing graph
+- [x] A test-local two-action reversal task uses constructed existing graph
       nodes, production mesh execution and reward-update functions, and a
       fixed observation stream that reveals no reward phase. After 32
       acquisition ticks with one rewarded action, clone the acquired state
@@ -185,9 +185,9 @@ demonstrate immediate credit, delayed credit, and adaptation after reward revers
       off in production; no new public assay API is needed. The bounded
       fixture must run in under 60 seconds and proves learning capability,
       not ecological usefulness.
-- [ ] Run relevant runtime, tick, observation, and reproduction tests;
+- [x] Run relevant runtime, tick, observation, and reproduction tests;
       `make roadmap-check` after document edits and before reporting done.
-- [ ] Run fresh `MUTANTS_ITERATE=0 make rust-mutants` after self-review;
+- [x] Run fresh `MUTANTS_ITERATE=0 make rust-mutants` after self-review;
       record summary, output path, and full missed/timeout list with every
       survivor killed by tests, equivalent with reason, or explicitly deferred.
 - [ ] Store `make bench PROFILE=gate FEATURE=t11-f07-reward-trace-clock`
@@ -201,6 +201,83 @@ demonstrate immediate credit, delayed credit, and adaptation after reward revers
 - [ ] Independent orchestrator `make roadmap-check`, fresh final review,
       and `make check` exit 0 on final feature content; the parent records
       the exact tested commit, integration, and cleanup evidence.
+
+### Implementation evidence
+
+- TDD before production edits: `cargo test -p v3-core --test temporal_fixtures e -- --nocapture`
+  exited 101, E1/E2/E3 failed expected single-eta traces (10 other tests passed),
+  `/private/tmp/t11-f07-e-red.log`. Focused runtime tests for repeated visits,
+  recurrent sources, evaluation energy and exhaustion then all failed (4/4),
+  `/private/tmp/t11-f07-focused-red.log`; an initial test array-width typo was
+  corrected before these behavioral failures were recorded.
+- First production verification `cargo test -p v3-core --test viability`
+  passed 25 tests, `/private/tmp/t11-f07-viability-first.log`. Explicit
+  `cargo check --workspace --all-targets` passed after coherent edits
+  (`/private/tmp/t11-f07-check-first.log`, `t11-f07-check-tests.log`,
+  `t11-f07-check-self-review.log`).
+- Green `cargo test -p v3-core --test temporal_fixtures`: 13 passed,
+  `/private/tmp/t11-f07-temporal-green.log`. Focused plasticity suite initially
+  12 passed, `/private/tmp/t11-f07-focused-green.log`, including exact four-rule
+  updates, eta/signals, delayed pulses, lazy initialization, parity, properties,
+  and reversal. Additional explicit clamp, reproduction-reset and observation
+  coverage is being verified. `cargo clippy --workspace --all-targets -- -D warnings`
+  passed, `/private/tmp/t11-f07-clippy.log`.
+- Reversal acquisition first/second action counts 32/0; weights after updates
+  are 1, 1.5, then 2 for the remaining 30 ticks (genome starts 0.5). Live
+  reversal counts 4/28; weights 1.5, 1, 0.5, then 0 for 29 ticks. Frozen
+  reversal counts 32/0 and weights remain 2 throughout. Final-eight correct
+  counts are acquisition 8/8, live reversal 8/8, frozen reversal 0/8; the
+  bounded fixture completes within the 0.03-second focused suite. No phase
+  observation, RNG, direct trial weight assignment or extra memory is used.
+- Diff self-review for reuse/simplification/efficiency: reused ordered source
+  resolution and frozen runtime storage with `clone_from`; hoisted module/node
+  base lookup outside the edge loop and named the eta-free term `activity`.
+  Tests compare actual action vectors rather than formatted debug strings.
+  No dependency, generic framework, future extension point, mutation exclusion
+  or new tariff was added. Viability passed again after this review.
+- Advisor consultation 1 accepted: replay is exact before effects if it uses
+  current node index, frozen outputs, evaluation-time energy and reward-node
+  effective weights (pure Hebbian updates skip these). Missing first-tick
+  bases remain zero. Use `begin_tick(&[NodeGenome])`, lazy initialized-only
+  decay and `clone_from`. No spec conflict or scope expansion.
+- Advisor consultation 2 requested after the same new observation-test fixture
+  assumption failed in overlapping lib/core runs: the existing fixture is VM,
+  not Graph. Accepted advice: preserve that VM test and augment the existing
+  actual-edge Graph temporal probe with real modulation, live/frozen credit,
+  learned weights and both observer calls. Focused observation tests passed
+  4/4 after correction (`/private/tmp/t11-f07-observation.log`); self-review
+  repeated and reused existing fixtures. This was test setup, not a runtime
+  failure. No production change or requirements correction resulted.
+
+### Mutation survivor audit
+
+Fresh `MUTANTS_ITERATE=0 make rust-mutants` exited 0 after self-review:
+`36 mutants tested in 4m: 1 missed, 31 caught, 4 unviable`. No timeouts.
+Log: `/private/tmp/t11-f07-mutants.log`. Output:
+`/Users/istefanek/.local/share/petri-tools/mutants/t11-f07/mutants.out`;
+its parent `run-mode.txt` records `fresh`. The unmutated full-package baseline
+passed in 35s build + 9s test; automatic caps were 282s build and 120s test.
+
+Full survivor list:
+
+- **Equivalent**: `crates/v3-core/src/runtime/plasticity/traces.rs:110:25`,
+  replace `<` with `<=` in `update_eligibility_traces` for
+  `i < final_outputs.len()`. The only production caller resizes outputs to
+  `def.compute_nodes.len()` and calls only after evaluating that whole vector;
+  `i` enumerates those same compute nodes, so equality is unreachable and
+  both conditions always select the actual output. No observable valid-runtime
+  behavior changes.
+
+No deferred mutation finding, skipped mutation attribute or exclusion was added.
+No production edit was made to kill a mutant. After test-only observation
+remediation, self-review reused the existing actual-edge Graph fixture.
+The final full `cargo test -p v3-core` exited 0: 1,155 unit tests, all
+integration tests (including 25 viability, 13 temporal fixtures and seeded
+cross-process reproducibility), and doctests; `/private/tmp/t11-f07-core-all.log`.
+Final observation-specific compiler feedback passed in
+`/private/tmp/t11-f07-check-observation.log`. `make roadmap-check` passed
+in `/private/tmp/t11-f07-roadmap.log`. The host process guard required
+sandbox escalation for process inspection; it remained enabled unchanged.
 
 ## Performance and Goal Impact
 
