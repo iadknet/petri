@@ -58,12 +58,18 @@ describe("NodeExecutionTrace", () => {
 			backend_trace: {
 				Graph: {
 					passes: [],
-					converged: true,
-					stable_passes_count: 1,
+					converged: false,
+					temporal_committed: true,
+					stable_passes_count: 0,
 					final_outputs: [0.8],
 					output_sinks: [],
 					action_slots: [],
-					execute_gate: { wired: false, weighted_sum: 0, queue_non_empty: false, fired: false },
+					execute_gate: {
+						wired: false,
+						weighted_sum: 0,
+						queue_non_empty: false,
+						fired: false,
+					},
 				},
 			},
 		};

@@ -20,6 +20,11 @@ pub const SHARED_MEMORY_SLOTS: usize = 16;
 pub struct GraphRuntimeState {
     /// Per-node stateful operator state. Indexed as `[mesh_node_idx][internal_node_idx]`.
     pub node_state: Vec<Vec<f32>>,
+    /// Last successful compute outputs, held when a module is unvisited.
+    pub node_outputs: Vec<Vec<f32>>,
+    /// Frozen temporal read bases for the current world tick.
+    pub(crate) tick_start_state: Vec<Vec<f32>>,
+    pub(crate) tick_start_outputs: Vec<Vec<f32>>,
     /// Per-edge learned plasticity weights. Indexed as
     /// `[mesh_node_idx][internal_node_idx][edge_idx]`.
     /// Empty inner vec = use genome weights. Lazily initialized on first plasticity evaluation.
@@ -36,17 +41,26 @@ pub struct GraphRuntimeState {
     pub(crate) scratch_prev: Vec<f32>,
     /// Scratch: curr_outputs buffer reused across graph evaluations.
     pub(crate) scratch_curr: Vec<f32>,
-    /// Scratch: state backup for energy-exhaustion rollback.
+    /// Scratch: candidate operator state, committed only after affordability checks.
     pub(crate) scratch_backup: Vec<f32>,
     /// Scratch: weighted-inputs buffer reused across graph evaluations.
     pub(crate) scratch_w_inputs: Vec<f32>,
 }
 
 impl GraphRuntimeState {
+    /// Begin one world tick before any mesh visits. Unvisited modules hold state.
+    pub fn begin_tick(&mut self) {
+        self.tick_start_state.clone_from(&self.node_state);
+        self.tick_start_outputs.clone_from(&self.node_outputs);
+    }
+
     /// Create a new empty graph runtime state.
     pub fn new() -> Self {
         Self {
             node_state: Vec::new(),
+            node_outputs: Vec::new(),
+            tick_start_state: Vec::new(),
+            tick_start_outputs: Vec::new(),
             plasticity_weights: Vec::new(),
             eligibility_traces: Vec::new(),
             scratch_prev: Vec::new(),
@@ -306,6 +320,9 @@ mod tests {
         assert_eq!(state.shared_memory, [0.0; SHARED_MEMORY_SLOTS]);
         assert_eq!(state.prev_shared_memory, [0.0; SHARED_MEMORY_SLOTS]);
         assert!(state.graph_runtime.node_state.is_empty());
+        assert!(state.graph_runtime.node_outputs.is_empty());
+        assert!(state.graph_runtime.tick_start_state.is_empty());
+        assert!(state.graph_runtime.tick_start_outputs.is_empty());
         assert!(state.graph_runtime.plasticity_weights.is_empty());
         assert!(state.graph_runtime.eligibility_traces.is_empty());
         assert_eq!(state.generation, 0);

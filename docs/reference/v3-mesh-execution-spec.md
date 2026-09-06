@@ -120,11 +120,12 @@ Safety rules:
 - the cap cannot be disabled
 
 Graph internal recurrence rule:
-- Within one graph node evaluation, runtime iterates internal relaxation passes
-  until convergence or `max_graph_relax_iters`, whichever comes first.
-- `max_graph_relax_iters` must be `>= 1` and cannot be disabled.
-- Canonical owner for graph convergence config defaults/validation:
-  `v3-runtime-config-spec.md`.
+- Phase 0 snapshots committed graph temporal state once per world tick.
+- Each visit evaluates once in index order; self/higher-index edges read the
+  tick-start outputs, lower-index edges read current-visit outputs.
+- Repeated visits recompute from that frozen base; skipped modules hold state.
+- Legacy convergence settings are accepted but ignored. Canonical semantics:
+  `v3-graph-backend-spec.md`; config disposition: `v3-runtime-config-spec.md`.
 
 ---
 
@@ -148,7 +149,7 @@ behavior.
 | `UpstreamSlot` slot out of range | Yield `0.0` |
 | Node backend does not write an output slot | Preserve incoming `upstream_slots[slot]` |
 | Graph edge source out of bounds | Input contributes `0.0` |
-| Graph convergence not reached before `max_graph_relax_iters` | Use last computed pass outputs and continue |
+| Repeated graph visit | Recompute from tick-start temporal state |
 | Graph state for `NodeId` missing | Allocate zero-initialized state and continue |
 
 This policy intentionally allows junk DNA. Invalid offspring are culled by
@@ -159,10 +160,11 @@ selection pressure rather than strict genome repair.
 ## 5. Energy Metering
 
 - VM nodes: energy deducted per opcode from VM cost table.
-- Graph nodes: energy deducted per internal-node-per-pass evaluation.
+- Graph nodes: energy deducted per internal-node-per-visit evaluation.
 - If energy is exhausted mid-node, evaluation halts and returns `NoOp`.
-  No partial state mutations (graph_state writes, memory writes) from the
-  interrupted node persist. The mesh returns `WorldAction::NoOp` immediately.
+  No candidate graph temporal state/output or graph effects from the
+  interrupted visit persist, including plasticity-cost exhaustion. Actual
+  charges and entered work remain recorded; learned weights are not rolled back. The mesh returns `WorldAction::NoOp` immediately.
 
 Dynamic introspection values (for example `EnergyCurrent`) are read live from
 mutating `energy` during execution.
@@ -183,8 +185,7 @@ For deterministic tests, use a fixed mode that pins:
   binning to `0..targets.len()-1`) for graph route decisions.
 - Float sanitation rules from VM/graph specs before routing decisions.
 - Node iteration order (`nodes` order and internal graph order).
-- Graph convergence loop order and stop criteria
-  (`max_graph_relax_iters`, epsilon threshold, stable-pass rule).
+- Graph index order and frozen tick-start temporal read bases.
 - Soft-default fallback constants (`0.0`, `NoOp`).
 
 Tick-order/action-arbitration reproducibility controls are specified separately

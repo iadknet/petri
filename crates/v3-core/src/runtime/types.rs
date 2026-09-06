@@ -102,7 +102,8 @@ pub struct WorkCounters {
     pub mesh_hops: u32,
     /// VM opcodes successfully executed across all VM node dispatches.
     pub vm_steps: u32,
-    /// Graph relaxation passes entered across all Graph node dispatches.
+    /// Entered nonempty single-evaluation graph visits, including unaffordable visits.
+    /// Wire name retained; before T11.F06 this counted relaxation passes.
     pub graph_relax_iters: u32,
     /// Hebbian weight updates applied (reward-modulated updates are counted
     /// separately in `SimStats`, since they run after the mesh phase).

@@ -417,3 +417,9 @@ both inside the 25 percent flag threshold. Report:
   `.PHONY` and `rust-test-all` lines and do not overlap the `bench` recipe),
   then `git worktree remove .claude/worktrees/t11-f05` and
   `git branch -d worktree-t11-f05`.
+
+- Current capability update (T11.F06, 2026-09-06): D1 and D2 now both record
+  one evaluation per tick and states 0.5, 0.75, 0.875, 0.9375; D3 records
+  outputs 1, 2, 3. Their executable assertions now pin the repaired clock.
+  Earlier measurements above remain historical evidence; reward fixtures
+  E1–E3 and their T11.F07 ownership are unchanged.

@@ -31,12 +31,9 @@
 //!    tick-loop setting.
 //! 2. Fixture C2 sets `shared_memory.decay_rate = 0.1` to characterize
 //!    retention under decay (contrasted with C1's production decay of 0.0).
-//! 3. The proptest sets `max_graph_relax_iters = 1` to force exactly one
-//!    relaxation pass per `execute_creature_mesh` call, isolating a single
-//!    stateful-node step (the invariant under test) from the pass-count gap
-//!    D1/D2 record.
-//!
-//! No production source file is edited by this feature.
+//! 3. The original proptest selected one legacy relaxation pass; T11.F06
+//!    makes those settings inactive and explicitly begins the graph tick.
+//!    D1–D3 now assert the repaired clock; historical readings remain in the spec.
 
 mod common;
 
@@ -679,7 +676,7 @@ fn a1_reactive_control() {
 /// ticks later), while the matched reactive control (A1) — which shares the
 /// same current-tick observation at the decision tick — emits `NoOp` in both
 /// trials. Status: meets. Shared-memory latching is not one of the flagged
-/// clocks (graph relaxation, eligibility trace); it is a plain memory write
+/// clocks (graph temporal state, eligibility trace); it is a plain memory write
 /// read back unconditionally, so this fixture shows no gap.
 #[test]
 fn b1_shared_memory_delayed_cue() {
@@ -886,33 +883,10 @@ fn c3_graph_slot_write_and_previous_read() {
 
 // ── D helpers and literals ───────────────────────────────────────────────────
 //
-// D1_STATES/D1_PASSES and D2_STATES/D2_PASSES are measured from the
-// production tick path (recorded in the spec catalogue's Observed column);
-// the fixtures assert against these literals directly rather than against a
-// duplicate of the production relaxation recurrence, so a repair to that
-// recurrence (T11.F06) needs only one line flipped per fixture instead of
-// two divergent implementations kept in sync.
-//
-// Why the values land where they do (mechanism, not a re-derivable
-// formula): each tick's relaxation loop compares the persisted `node_state`
-// against `prev_outputs`, which resets to zero at the start of every tick;
-// it runs at least one pass and at most `max_graph_relax_iters` (15),
-// stopping once `graph_convergence_stable_passes` (2) consecutive passes
-// have `delta <= graph_convergence_epsilon` (1e-3). D1's lone
-// `DecayIntegrator(0.5)` fed a constant input of 1.0 races toward its fixed
-// point during tick 1's artificial zero-baseline comparison (11 passes),
-// then settles quickly in later ticks (3, 3, 3) once `node_state` already
-// sits near the fixed point. D2 adds a companion `Oscillator` node with no
-// inputs and no consumers; its own output cycles 1, 0, -1, 0, ... every
-// pass and never satisfies the epsilon, so the stable-pass counter never
-// reaches 2 and every tick instead runs the full 15-pass cap.
-const D1_PASSES: [u32; 4] = [11, 3, 3, 3];
-const D1_STATES: [f32; 4] = [0.9995117, 0.99993896, 0.9999924, 0.99999905];
-const D2_PASSES: [u32; 4] = [15, 15, 15, 15];
-const D2_STATES: [f32; 4] = [0.9999695, 1.0, 1.0, 1.0];
+// Historical pass-dependent measurements remain in the T11.F05 spec.
 
 /// Run `ticks` traced ticks against the entry node's single graph hop,
-/// recording the number of relaxation passes and the persisted
+/// recording the number of ordered evaluations and the persisted
 /// `DecayIntegrator` state (`node_state[0][1]`) after each tick. Shared by
 /// D1 and D2, whose only difference is the genome under test.
 fn run_and_observe_integrator_clock(
@@ -932,128 +906,40 @@ fn run_and_observe_integrator_clock(
     (observed_states, observed_passes)
 }
 
-// ── D1: integrator clock ────────────────────────────────────────────────────
+// ── D1–D3: world-tick graph memory ──────────────────────────────────────────
 
-/// D1 integrator clock: at production settings (`max_graph_relax_iters = 15`,
-/// `graph_convergence_epsilon = 1e-3`, `graph_convergence_stable_passes =
-/// 2`), a `DecayIntegrator` advances on every relaxation *pass*, not once per
-/// world tick. Status: gap, assigned to T11.F06. The idealized one-pass-per-
-/// tick clock would give states 0.5, 0.75, 0.875, 0.9375; the observed
-/// per-tick pass counts and states are the `D1_PASSES`/`D1_STATES` literals
-/// (see the D helpers comment for their derivation).
 #[test]
 fn d1_integrator_clock() {
-    let pos = Position::new(1, 1);
-    let (mut sim, target) = one_creature_sim(decay_integrator_graph_genome(), pos, 100.0);
-
-    let (observed_states, observed_passes) = run_and_observe_integrator_clock(&mut sim, target, 4);
-
-    assert_eq!(
-        observed_passes, D1_PASSES,
-        "passes per tick should match the catalogue's recorded observation"
-    );
-    for (i, (&obs, &exp)) in observed_states.iter().zip(D1_STATES.iter()).enumerate() {
-        assert!(
-            (obs - exp).abs() < 1e-5,
-            "tick {}: integrator state {obs} should match the catalogue's recorded {exp}",
-            i + 1
-        );
-    }
-    // Gap against the idealized one-pass-per-tick clock: tick 1 alone
-    // already advances far past the idealized 0.5.
-    assert!(
-        observed_states[0] > 0.9,
-        "tick1 state {} should already be far past the idealized single-pass value 0.5, \
-         evidencing the per-pass (not per-tick) advance",
-        observed_states[0]
-    );
+    let (mut sim, target) =
+        one_creature_sim(decay_integrator_graph_genome(), Position::new(1, 1), 100.0);
+    let (states, passes) = run_and_observe_integrator_clock(&mut sim, target, 4);
+    assert_eq!(passes, [1; 4]);
+    assert_eq!(states, [0.5, 0.75, 0.875, 0.9375]);
 }
 
-// ── D2: disconnected-node perturbation ──────────────────────────────────────
-
-/// D2 disconnected-node perturbation: adding an `Oscillator` node with no
-/// inputs and no consumers should leave the integrator's trajectory and pass
-/// count identical to D1 (node-type contract property 3). Status: gap,
-/// assigned to T11.F06. The oscillator's own output never satisfies the
-/// convergence epsilon (it moves by a fixed nonzero step every pass), which
-/// forces every tick to run the full `max_graph_relax_iters = 15` passes and
-/// gives the integrator a different trajectory than D1's — the observed
-/// per-tick pass counts and states are the `D2_PASSES`/`D2_STATES` literals
-/// (see the D helpers comment for their derivation).
 #[test]
 fn d2_disconnected_node_perturbation() {
-    let pos = Position::new(1, 1);
     let (mut sim, target) = one_creature_sim(
         decay_integrator_with_disconnected_oscillator_graph_genome(),
-        pos,
+        Position::new(1, 1),
         100.0,
     );
-
-    let (observed_states, observed_passes) = run_and_observe_integrator_clock(&mut sim, target, 4);
-
-    assert_eq!(
-        observed_passes, D2_PASSES,
-        "every tick should hit the max_graph_relax_iters cap because the disconnected \
-         oscillator never lets the graph converge"
-    );
-    for (i, (&obs, &exp)) in observed_states.iter().zip(D2_STATES.iter()).enumerate() {
-        assert!(
-            (obs - exp).abs() < 1e-4,
-            "tick {}: integrator state {obs} should match the catalogue's recorded {exp}",
-            i + 1
-        );
-    }
-
-    // Contract violation: the disconnected, unconsumed oscillator changed
-    // both the pass count and the integrator's trajectory relative to D1.
-    assert_ne!(
-        observed_passes, D1_PASSES,
-        "gap: a disconnected, unconsumed node changed the pass count per tick"
-    );
-    assert!(
-        (observed_states[0] - D1_STATES[0]).abs() > 1e-6,
-        "gap: a disconnected, unconsumed node changed the integrator's tick-1 trajectory"
-    );
+    let (states, passes) = run_and_observe_integrator_clock(&mut sim, target, 4);
+    assert_eq!(passes, [1; 4]);
+    assert_eq!(states, [0.5, 0.75, 0.875, 0.9375]);
 }
 
-// ── D3: backward-edge recurrence ────────────────────────────────────────────
-
-/// D3 backward-edge recurrence: a self-referential `Add` node (edges from a
-/// `Constant(1.0)` node and from itself) is read out through `WriteSlot(0)`
-/// every tick. The node-type contract's idealized one-tick memory element
-/// would give slot0 = 1, 2, 3 across three ticks (each tick's self-edge
-/// reading the previous *tick's* output). Status: gap, assigned to T11.F06.
-/// Because `prev_outputs` resets to zero at the start of every tick and the
-/// self-edge only ever reads within-tick `prev_outputs` (never the previous
-/// tick's converged value, since `Add` has no persistent `state`), the
-/// self-loop instead accumulates once per relaxation pass and is capped by
-/// `max_graph_relax_iters`, giving the same value (15.0) every tick.
 #[test]
 fn d3_backward_edge_recurrence() {
-    let pos = Position::new(1, 1);
-    let (mut sim, target) = one_creature_sim(backward_edge_recurrence_graph_genome(), pos, 100.0);
-
-    let mut observed = Vec::with_capacity(3);
-    for _ in 0..3 {
-        run_one_traced_tick(&mut sim, target);
-        let creature = sim.creatures.get(target).expect("creature alive");
-        observed.push(creature.shared_memory[0]);
-    }
-
-    for (i, &v) in observed.iter().enumerate() {
-        assert!(
-            (v - 15.0).abs() < 1e-4,
-            "tick {}: slot0 should be capped at max_graph_relax_iters (15.0), got {v}",
-            i + 1
-        );
-    }
-    // Gap: the idealized one-tick memory element (1, 2, 3) does not appear;
-    // the value is identical every tick instead of incrementing.
-    assert!(
-        (observed[0] - observed[2]).abs() < 1e-6,
-        "gap: the backward edge should read a genuinely advancing one-tick memory (1,2,3), \
-         but observed the same pass-capped value every tick: {observed:?}"
+    let (mut sim, target) = one_creature_sim(
+        backward_edge_recurrence_graph_genome(),
+        Position::new(1, 1),
+        100.0,
     );
+    for expected in [1.0, 2.0, 3.0] {
+        run_one_traced_tick(&mut sim, target);
+        assert_eq!(sim.creatures[target].shared_memory[0], expected);
+    }
 }
 
 // ── E1: exact one-edge update, immediate reward ─────────────────────────────
@@ -1353,7 +1239,7 @@ proptest! {
     /// `[-1e6, 1e6]`, return a value between `state` and `input` inclusive —
     /// both are convex combinations of the prior state and the current
     /// input. Exercised through the fully public `execute_creature_mesh`
-    /// path (`max_graph_relax_iters` forced to 1 so exactly one pass runs),
+    /// path with an explicit tick-start snapshot,
     /// with the prior state seeded directly into the public
     /// `GraphRuntimeState::node_state` field. Assertions do not depend on
     /// which cases are drawn.
@@ -1368,7 +1254,7 @@ proptest! {
             let genome = one_step_stateful_genome(kind, input);
             let sensors = empty_sensor_snapshot();
             let cfg = v3_core::config::RuntimeConfig {
-                max_graph_relax_iters: 1, // force exactly one relaxation pass
+                max_graph_relax_iters: 1, // legacy setting is ignored
                 ..v3_core::config::RuntimeConfig::default()
             };
             let mut energy = 1.0e9f32;
@@ -1376,6 +1262,7 @@ proptest! {
             let prev_shared_memory = [0.0f32; 16];
             let mut graph_runtime = GraphRuntimeState::new();
             graph_runtime.node_state.push(vec![0.0, state]);
+            graph_runtime.begin_tick();
 
             let _ = execute_creature_mesh(
                 &genome,

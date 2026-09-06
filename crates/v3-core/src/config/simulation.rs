@@ -619,8 +619,11 @@ impl Default for PerceptionRuntimeConfig {
 pub struct RuntimeConfig {
     pub max_mesh_hops: u32,
     pub max_vm_steps: u32,
+    /// Retained and validated, but inactive since the T11.F06 world-tick clock.
     pub max_graph_relax_iters: u32,
+    /// Retained inactive convergence setting.
     pub graph_convergence_epsilon: f32,
+    /// Retained inactive convergence setting.
     pub graph_convergence_stable_passes: u32,
     pub graph_node_base_cost: f32,
     /// Energy cost per plasticity weight update. Default 0.0 (free during initial rollout).

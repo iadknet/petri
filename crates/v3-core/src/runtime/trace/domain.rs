@@ -158,10 +158,13 @@ pub struct SlotWrite {
     pub new_value: f32,
 }
 
-/// Trace of a graph node's relaxation loop.
+/// Trace of one ordered graph visit.
 #[derive(Debug, Clone, Serialize)]
 pub struct GraphTrace {
     pub passes: Vec<GraphPassTrace>,
+    /// Whether candidate operator state and outputs were committed.
+    pub temporal_committed: bool,
+    /// Legacy convergence metadata; always false/zero after T11.F06.
     pub converged: bool,
     pub stable_passes_count: u32,
     pub final_outputs: Vec<f32>,
@@ -200,7 +203,7 @@ pub struct GraphExecuteGateTrace {
     pub fired: bool,
 }
 
-/// Trace of a single relaxation pass.
+/// One entered evaluation; node records are candidates when temporal_committed is false.
 #[derive(Debug, Clone, Serialize)]
 pub struct GraphPassTrace {
     pub pass_index: u32,

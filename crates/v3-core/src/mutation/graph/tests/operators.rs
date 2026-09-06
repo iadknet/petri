@@ -570,7 +570,7 @@ impl GraphTracer for RecordingTracer {
         self.records.push((self.pass, node_index, output));
     }
     fn on_pass_end(&mut self, _delta: f32) {}
-    fn on_finish(&mut self, _curr_outputs: &[f32], _stable_passes: u32, _converged: bool) {}
+    fn on_finish(&mut self, _curr_outputs: &[f32], _temporal_committed: bool) {}
     fn on_effects(&mut self, _effects: CgpEffectsTrace) {}
 }
 

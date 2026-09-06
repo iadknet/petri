@@ -8,4 +8,7 @@ pub mod tick;
 pub use seeding::seed_simulation;
 pub use simulation::Simulation;
 pub use stats::SimStats;
-pub use tick::{advance_shared_memory, observe_final_actions, run_tick, FinalActionObservation};
+pub use tick::{
+    advance_shared_memory, observe_final_actions, observe_temporal_actions, run_tick,
+    FinalActionObservation, TemporalActionObservation, TemporalMemorySubstrate,
+};

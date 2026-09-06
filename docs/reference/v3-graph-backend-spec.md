@@ -31,7 +31,7 @@ The graph backend uses a three-layer CGP (Cartesian Genetic Programming) model:
 1. **Implicit inputs** — sensor data and shared memory reads are addressable
    sources (`GraphSource`), not physical nodes.
 2. **Compute nodes** — mutable computation layer with free topology mutations.
-   Supports recurrence via Gauss-Seidel relaxation.
+   Supports recurrence through frozen world-tick outputs.
 3. **Fixed structural outputs** — value sinks, action bank, and execute gate.
    Structurally immutable (always present); only edges TO them are evolvable.
 
@@ -241,85 +241,38 @@ evolvable only through edge mutations on the execute gate.
 
 ---
 
-## 8. Evaluation Order, Recurrence, and Convergence
+## 8. Evaluation Order and World-Tick Clock
 
-Graph evaluation uses bounded relaxation passes over `compute_nodes` only.
-Fixed structural outputs are evaluated in a separate post-convergence pass.
+Phase 0 calls `GraphRuntimeState::begin_tick`, also used by neighborhood
+sequences. It snapshots committed operator state and outputs. Mesh entry and
+module visits do not advance this clock. Each nonempty graph visit evaluates
+all compute nodes once in index order, including disconnected nodes.
 
-```text
-node_count = compute_nodes.len()
-prev_outputs = [0.0; node_count]
-curr_outputs = [0.0; node_count]
+- Lower-index compute sources read the current visit's computed outputs.
+- Self and higher-index sources read frozen tick-start outputs.
+- Stateful operators start from frozen tick-start operator state.
+- A successful visit commits candidate state and outputs. Repeated visits
+  recompute from the same base using current inputs; the last successful visit
+  supplies next tick's temporal state. Effects and learning still run per visit.
+- Unvisited modules hold values without catch-up, fabricated inputs, or charge.
+- Newborn temporal state is zero. Empty graphs do no work.
 
-max_graph_relax_iters =
-  validated(config.max_graph_relax_iters, default=4, min=1)
-graph_convergence_epsilon =
-  validated(config.graph_convergence_epsilon, default=1e-3, min=0.0)
-graph_convergence_stable_passes =
-  validated(config.graph_convergence_stable_passes, default=1, min=1)
-
-stable_passes = 0
-passes_executed = 0
-
-for pass in 0..max_graph_relax_iters:
-  for current_idx in 0..node_count:
-    weighted_input_sum = 0.0
-    for edge in compute_nodes[current_idx].inputs:
-      source_value = resolve_source(edge.source, ctx)
-      weighted_input_sum += source_value * edge.weight
-
-    curr_outputs[current_idx] =
-      evaluate_compute_kind(compute_nodes[current_idx].kind,
-                            weighted_input_sum)
-
-  passes_executed += 1
-  delta = max_abs(curr_outputs[i] - prev_outputs[i]) over i in 0..node_count
-  prev_outputs = curr_outputs
-
-  if delta <= graph_convergence_epsilon:
-    stable_passes += 1
-  else:
-    stable_passes = 0
-
-  if stable_passes >= graph_convergence_stable_passes:
-    break
-```
-
-### Source resolution
-
-```text
-resolve_source(source, ctx):
-  match source:
-    InputLeaf { ref_idx, sub_idx } =>
-      resolve_input(input_refs[ref_idx], sub_idx, ctx)
-    SharedMemory { slot, previous: false } =>
-      shared_memory[slot % 16]
-    SharedMemory { slot, previous: true } =>
-      prev_shared_memory[slot % 16]
-    ComputeNode(idx) =>
-      if idx >= node_count: 0.0
-      else if idx < current_idx: curr_outputs[idx]
-      else: prev_outputs[idx]
-```
-
-This is Gauss-Seidel iteration — forward references see current-pass values,
-backward/self references see previous-pass values.
-
-Canonical owner for graph convergence budget/config defaults:
-`v3-runtime-config-spec.md`.
+The former relaxation and convergence config fields remain accepted and
+validated but are ignored by evaluation and allocation; see
+`v3-runtime-config-spec.md`. There is no convergence loop.
 
 ---
 
-## 9. Post-Convergence Effects
+## 9. Post-Evaluation Effects
 
-After compute node relaxation converges (or budget exhausts), a three-phase
-effects pass processes all fixed structural outputs.
+After the ordered evaluation and its plasticity cost are affordable, a
+three-phase effects pass processes all fixed structural outputs.
 
 ### Phase 1: Value outputs
 
 Iterate `output_sinks`. For each sink with non-empty `inputs`:
 - Gather `wsum = sum(resolve_source(edge.source) * edge.weight)` using
-  converged `curr_outputs` for `ComputeNode` sources.
+  current-visit `curr_outputs` for `ComputeNode` sources.
 - Write to target:
   - `CustomOutput(slot)`: `output_slots[slot] = wsum` (slot < 12).
   - `RouterOutput`: emit `RouteDecision::CgpNormalized { raw_value: wsum }`.
@@ -351,8 +304,8 @@ If `execute_gate.inputs` is empty: `gate_wsum = 0.0`, hop doesn't terminate.
 
 ### Effect-phase trace visibility (Execution Sampler)
 
-Graph sampler traces include post-convergence structural-layer records in
-addition to compute relaxation passes:
+Graph sampler traces include post-evaluation structural-layer records in
+addition to the single entered evaluation:
 - `output_sinks: Vec<GraphOutputSinkTrace>` (1:1 with `output_sinks`)
   - fields: `wired`, `weighted_sum`, `applied`, `applied_value`
 - `action_slots: Vec<GraphActionSlotTrace>` (1:1 with `action_bank`)
@@ -381,27 +334,23 @@ The final `min` clamp prevents OOB when `route_value == 1.0`. Replaces
 
 ## 11. Stateful Operators and `graph_state`
 
-Graph state is keyed by mesh `NodeId`:
+`GraphRuntimeState` stores committed `node_state` and `node_outputs`, indexed
+by `[mesh_node_idx][compute_node_idx]`, and frozen tick-start copies of both.
+Missing slots read zero and storage is initialized lazily. Offspring receives
+fresh empty temporal vectors, regardless of learned-weight inheritance.
 
-```rust
-HashMap<NodeId, Vec<f32>>
-```
-
-Stateful operators use fixed slot mapping by compute node index.
-Example: compute node `i` uses state slot `i` in the owning mesh node state
-vector.
-
-Rules:
-- If state vector for `NodeId` is missing: allocate zeroed vector.
-- If vector is shorter than needed index: extend with zeros.
-- State persists across ticks for a living creature.
-- Offspring starts with fresh zeroed graph state.
+Trace `passes` contains one entered evaluation, including an unaffordable
+attempt. `node_evaluations` describe candidate computation; `temporal_committed`
+marks whether that candidate was applied. `final_outputs` always reports the
+last successful committed outputs. Legacy `converged` and
+`stable_passes_count` are always false and zero. `max_delta` compares the
+candidate outputs with the frozen tick-start outputs, not a convergence test.
 
 ---
 
 ## 12. Energy Cost
 
-Graph node cost is charged per compute-node-per-pass evaluation
+Graph node cost is charged per compute-node-per-visit evaluation
 (`graph_node_base_cost` or equivalent config-driven scalar).
 Canonical owner for graph runtime cost config:
 `v3-runtime-config-spec.md`.
@@ -410,14 +359,17 @@ Equivalent requested energy:
 
 ```text
 graph_energy_requested =
-  graph_node_base_cost * compute_nodes.len() * passes_executed
+  graph_node_base_cost * compute_nodes.len() * entered_visits
 ```
 
 If energy is exhausted during graph evaluation, node evaluation halts and mesh
-execution returns `WorldAction::NoOp`.
+execution returns `WorldAction::NoOp`. Evaluation-cost and plasticity-cost
+exhaustion preserve the prior successful temporal state and outputs and emit
+no graph effects. Actual charge and entered work remain recorded; learned
+weight and reward rollback are outside this temporal transaction.
 
 Note: fixed structural outputs (sinks, action bank, execute gate) are not
-counted in the per-pass energy cost. They are evaluated once post-convergence.
+counted in the per-visit energy cost. They are evaluated once post-evaluation.
 
 ---
 
@@ -443,7 +395,7 @@ pub struct RewardModulationConfig {
 ```
 
 When `modulation` is `None`: pure Hebbian learning (weight updates applied
-during Phase 1 post-convergence pass).
+during Phase 1 post-evaluation pass).
 
 When `modulation` is `Some`: reward-modulated three-factor learning (eligibility
 traces updated during Phase 1; weight updates deferred to Phase 2.5).
@@ -460,9 +412,9 @@ per compute node, one `f32` per input edge.
 - Offspring start with empty traces. Plasticity weights are inherited only
   if `lamarckian` is true.
 
-### Eligibility trace update (Phase 1, post-convergence)
+### Eligibility trace update (Phase 1, post-evaluation)
 
-After graph convergence, for each reward-modulated compute node:
+After successful graph evaluation, for each reward-modulated compute node:
 
 ```text
 trace[edge] = decay * old_trace + hebbian_delta(pre, post, weight)
@@ -549,7 +501,7 @@ Two-layer validation: mutation-time (bound values at creation) and runtime
 | Edge with NaN/Inf weight | `sanitize_f32()` to 0.0 |
 | Sink with empty `inputs` | Inert — does not write |
 | `Emit(NoOp)` that fires | Enqueues `WorldAction::NoOp` (real action with costs) |
-| Non-converged graph at iteration cap | Uses last computed pass output |
+| Repeated visit in one tick | Recompute from frozen tick-start temporal state |
 | Missing graph state | Lazily initialized to zeros |
 
 Cross-runtime fallback outcomes are canonical in

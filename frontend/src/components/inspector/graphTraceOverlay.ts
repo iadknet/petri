@@ -44,7 +44,7 @@ export function buildComputeTraceOverlay(
 			initialValue: initialByIndex.get(evalNode.node_index),
 			outputValue: evalNode.output,
 			stateChange: stateChanged
-				? `${evalNode.state_before.toFixed(2)}\u2192${evalNode.state_after.toFixed(2)}`
+				? `${evalNode.state_before.toFixed(2)}\u2192${evalNode.state_after.toFixed(2)}${trace.temporal_committed ? "" : " (not committed)"}`
 				: undefined,
 		});
 	}

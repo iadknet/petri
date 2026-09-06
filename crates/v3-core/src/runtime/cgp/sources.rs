@@ -2,11 +2,11 @@ use crate::contracts::InputReference;
 use crate::creature::genome::cgp::{GraphEdge, GraphSource};
 use crate::runtime::inputs::{resolve_input, ResolveCtx};
 
-/// Resolve a `GraphSource` to its scalar value during graph relaxation.
+/// Resolve a `GraphSource` to its scalar value during ordered graph evaluation.
 ///
-/// For `ComputeNode` sources, uses Gauss-Seidel order: sources already
-/// evaluated this pass (`idx < current_idx`) read from `curr_outputs`;
-/// not-yet-evaluated sources (including self-loops) read from `prev_outputs`.
+/// For `ComputeNode` sources, uses index order: sources already
+/// evaluated this visit (`idx < current_idx`) read from `curr_outputs`;
+/// self/higher-index sources read frozen tick-start `prev_outputs`.
 #[inline]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn resolve_source(
@@ -53,7 +53,7 @@ pub(crate) fn resolve_source(
     }
 }
 
-/// Resolve a source post-convergence where all compute outputs are finalized.
+/// Resolve a source after evaluation where all compute outputs are finalized.
 #[inline]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn resolve_source_post_convergence(
@@ -81,7 +81,7 @@ pub(crate) fn resolve_source_post_convergence(
 /// Collect weighted input values for a compute node into `buf`.
 ///
 /// Clears `buf` and fills it with one entry per edge: `resolve(source) * weight`.
-/// The caller allocates `buf` once and reuses it across nodes/passes.
+/// The caller allocates `buf` once and reuses it across nodes/visits.
 #[inline]
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn collect_cgp_weighted_inputs(
