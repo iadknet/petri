@@ -1,6 +1,6 @@
 # T11.F07 — Reward Trace Clock
 
-**Status**: Blocked
+**Status**: Complete
 **Last updated**: 2026-09-06
 **Feature**: T11.F07
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -18,8 +18,9 @@ demonstrate immediate credit, delayed credit, and adaptation after reward revers
   ecological reward redesign, founder or mutation-policy change, or new dependency.
 - No pure Hebbian learning redesign, learned-state inheritance repair (T11.F09),
   evolution/discovery task (T11.F10), or ecological usefulness claim (T09.F03).
-- No general assay framework, new goal indicator, threshold change, historical
-  report replacement, or persistence sweep campaign.
+- No general assay framework, new goal indicator, normalized compute-threshold
+  change, historical report replacement, or persistence sweep campaign. The
+  user-authorized F07 observation-budget adjustment is recorded below.
 
 ## Inputs and Invariants
 
@@ -198,13 +199,17 @@ demonstrate immediate credit, delayed credit, and adaptation after reward revers
 - [x] Second goal run: Not applicable by the 2026-09-05 workflow decision;
       cross-process reproducibility is covered by `make check`. The gate's
       two-run byte-identical check remains required.
-- [ ] Resolve the inherited evolved-neighborhood observation limit of at most
-      90 seconds without reducing the fixed battery, weakening the limit, or
-      silently repeating the goal run. The stored closure run took 138.422
-      seconds; the spec-owner investigation and blocker are recorded below.
-- [ ] Independent orchestrator `make roadmap-check`, fresh final review,
-      and `make check` exit 0 on final feature content; the parent records
-      the exact tested commit, integration, and cleanup evidence.
+- [x] Resolve the evolved-neighborhood observation budget: the stored 138.422
+      seconds exceeded the original 90-second limit and meets the explicitly
+      user-authorized F07-only 180-second allowance recorded below. The same
+      report's total is about 14m12s, below the unchanged 15-minute total
+      investigation threshold. Samples, baselines and normalized compute
+      thresholds are unchanged; no additional goal run was needed.
+- [x] Independent orchestrator `make roadmap-check` and `make check` exit 0
+      on the reviewed rebased implementation; fresh final review has no
+      findings. The parent runs `make check` again after these closure-only
+      document updates and records the exact tested commit, integration,
+      and cleanup evidence in the task before reporting the goal complete.
 
 ### Implementation evidence
 
@@ -385,7 +390,7 @@ at +11.652212% versus F06 (+13.470830% versus F04), and VM work at
 trajectory work changes, not an added VM tariff or a per-opcode timing claim.
 The gate's exact work/behavior match isolates the unchanged founder workload;
 the goal includes different evolved controllers and ecological trajectories.
-No threshold or baseline is adjusted to remove the flags.
+No normalized compute threshold or baseline is adjusted to remove the flags.
 
 Timing scopes remain separate. The goal process ran approximately 14m12s
 (start 15:45:28 UTC, report generated 15:59:40 UTC), within the existing
@@ -408,9 +413,10 @@ Read-only assessment, 2026-09-06: no normalized severe-compute threshold was
 crossed, but [T11.F01's compute limits](t11-f01-mutational-neighborhood-indicator.md#inputs-and-invariants)
 also require the evolved half to add at most 90 seconds. The stored 138.422
 seconds exceeds that separate limit by 48.422 seconds (+53.802%). The
-15-minute total-profile investigation threshold does not replace it. Closure
-is blocked on this unresolved component limit; neither a baseline re-pin nor
-an unpaired-cohort explanation makes the timing pass.
+15-minute total-profile investigation threshold did not replace it. Closure
+was blocked on this component limit; neither a baseline re-pin nor an
+unpaired-cohort explanation made the original timing pass. The explicit
+user-authorized resolution below preserves that failed original reading.
 
 The bounded investigation confirmed identical `neighborhood-v1` battery
 metadata across F07/F06/F04: 12 genomes per seed, 20 operator trials, 200
@@ -428,12 +434,39 @@ Advisor consultation 4 completed the read-only cost investigation: no
 evidence-supported narrow F07 defect or repair was identified. The exact
 sampled genomes were discarded, so an observation-only replay is unavailable;
 aggregate seed-33 timing cannot distinguish mutation, evaluation, runtime,
-and host contributions. Explicit user direction is required for an additional
-instrumented diagnostic measurement that retains exact inputs before any
-dependent remediation or closure. Do not make speculative optimizations,
-implement F15 routing, reduce samples, or replay the world under another
-command to bypass the single-run rule. The 90-second cap, fixed battery,
-single-goal rule, and original measured reports remain unchanged.
+and host contributions. The investigation therefore requested explicit user
+direction for additional instrumented diagnostic measurement retaining exact
+inputs, rather than speculative optimization or a smaller battery.
+
+**Authorized budget resolution, 2026-09-06.** In response to that request,
+the user said, "Yes, you can also adjust caps as needed," authorizing the
+additional diagnostic/post-fix measurement if needed and a scoped cap change.
+This overrides the earlier prohibition on adjusting the observation cap and
+permits necessary extra measurements; it does not waive normalized compute
+checks or require an otherwise unnecessary repeat.
+
+The spec owner sets an **F07-only evolved-neighborhood allowance of 180
+seconds** for the unchanged goal-v1 battery. The 15-minute overall
+investigation threshold remains. The measured 138.422 seconds fits this
+bounded allowance; all other reported timing components sum to 713.188
+seconds, so allocating the full 180 seconds would total 893.188 seconds,
+still below 900 seconds at this measured workload. This is an operational
+budget decision after measurement, not a predeclared cost or evidence that
+the original 90-second cap passed. It changes no T11.F01 historical evidence,
+stored baseline, profile parameter, sample/trial count, mutation floor,
+normalized work threshold, or epoch baseline. Later features do not inherit
+the 180-second allowance automatically; its ownership and scope are this
+F07 closure.
+
+No further diagnostic or goal run is needed to close this budget question:
+the guarded measurement completed, its normalized comparisons have no severe
+regression, the fixed founder readings match, the total remains within its
+budget, and the bounded inspection found no concrete runtime defect to repair.
+The cause of the observation increase remains unproven and is not credited
+to beneficial cognition. The original report is sufficient evidence for this
+authorized allowance. F07 resumed for fresh final review and the required
+checks; their successful results are recorded below. The parent still verifies
+the final closure-document content before integration; no check is waived.
 
 #### Persistence and goal indicators
 
@@ -797,9 +830,10 @@ Complete individual-genome operator/birth rows remain in the linked goal reports
 - [x] Exact immediate/delayed updates obey the calibrated single-eta rule;
       the constructed live controller adapts to reversal while frozen weights
       cannot, under the declared matched observations and budget.
-- [ ] Reference semantics, F05 capability correction, reports, progress,
-      mutation record, review, and required checks are complete, with no
-      weakened floor or waived check.
+- [x] Reference semantics, F05 capability correction, reports, progress,
+      mutation record, review, and required implementation checks are complete,
+      with no weakened floor or waived check. Final closure-content verification
+      and integration remain the parent's completion steps recorded in the task.
 
 ## Notes for AI Agents
 
@@ -818,34 +852,42 @@ Complete individual-genome operator/birth rows remain in the linked goal reports
   module is skipped; keep later reward access to its correctly decayed
   eligibility. Suppressing all skipped-tick weight changes would defeat
   delayed credit. F05's historical measurements remain accurate.
-- Trial requirement correction 2 / current blocker (spec owner, 2026-09-06):
+- Trial requirement correction 2 / resolved budget blocker (spec owner,
+  2026-09-06):
   the F07 plan cited F01's fixed measurement battery but failed to carry its
   separate 90-second evolved-observation cap into the performance checklist.
-  Restated that existing requirement after the measured 138.422-second result;
-  the broader 15-minute budget is not an exception. F07 is Blocked
-  and its feature row remains unchecked. This is a planning omission exposed
-  by measurement, not a new threshold or a successful cost check.
+  Restated that existing requirement after the measured 138.422-second result
+  and blocked closure; the broader 15-minute budget was not an exception.
+  The subsequent explicit user authorization and F07-only 180-second allowance
+  resolve the blocker as recorded above. The planning omission and original
+  failed 90-second reading remain recorded. The feature row is checked at
+  closure after fresh review and the parent's passing implementation checks.
 - Trial settings: orchestrator Astra `medium`; persistent spec owner Astra
   `xhigh`; persistent implementer Astra `low`; advisor Astra `high`; fresh
-  final reviewer configured for Astra `high`, not yet run.
+  final reviewer Astra `high`, completed with no findings.
 - Starting main: `43d966c18d4ac68ad549d4482382b88b760de6f6`; feature worktree
   `/Users/istefanek/projects/petri/.worktrees/t11-f07`, branch `codex/t11-f07`.
   User authorized continuing with the unrelated untracked main-checkout
   `crates/v3-core/tests/zz_probe_mesh_function.rs`; preserve it. No concrete
   feature blocker is known at planning time.
 
-- Blocked-run cost record, 2026-09-06: 4 advisor consultations (approach,
+- Closure cost record, 2026-09-06: 4 advisor consultations (approach,
   repeated test-fixture error, final sufficiency, read-only cost investigation);
   one test-fixture remediation round; zero post-final-review remediation
   rounds. Requirement corrections: 2, the F05 skipped-credit clarification
-  and the F01 observation-cap planning omission above. Fresh final reviewer
-  not run, so no severity findings counts exist. Final rebased `make check`
-  and integration are pending. The user authorized continuation despite
-  unrelated main-checkout changes; they were preserved. Usage unavailable.
+  and the F01 observation-cap planning omission above. Fresh final review:
+  0 P1, 0 P2, 0 P3. The parent's rebased implementation `make check` passed;
+  final closure-content verification and integration are pending parent steps.
+  User interventions: 2 — authorization to
+  continue despite unrelated main-checkout changes, and authorization for
+  additional diagnostic/post-fix measurements and cap adjustments. The latter
+  resolved the budget blocker without another run; it is a user-authorized
+  budget change, separate from the two requirement corrections. Unrelated
+  work was preserved. Usage unavailable.
 - Rebase evidence, 2026-09-06: the parent rebased the feature from starting
   main `43d966c18d4ac68ad549d4482382b88b760de6f6` onto main
   `22031ec3b724cb1e01941a393d77a11d1d3675a5`; all three feature commits
-  applied without conflict. Rebased HEAD before this blocker-only edit is
+  applied without conflict. Rebased HEAD before the blocker record was
   `d4c5ab0ed4860106f8795397c2c328f55a4a99e5`. The parent verified runtime,
   tests, scripts and frontend are identical to measured implementation
   `f5730cf760bd5ce29e749cba84847f92fb8980f0`. The incoming F14/F15
@@ -855,11 +897,21 @@ Complete individual-genome operator/birth rows remain in the linked goal reports
   has not been waived.
 - Final implementer document verification: `make roadmap-check` and
   `git diff --check` exited 0; `/private/tmp/t11-f07-roadmap-final.log`.
-  Completion status, checked feature/track row, fresh independent review and
-  final rebased `make check` remain owned by the parent.
+- Independent closure evidence, 2026-09-06: the fresh reviewer reported
+  0 P1, 0 P2, 0 P3 after checking source, mutation inputs, TDD/core logs,
+  benchmark tree identity, and accounting. Historical host isolation and the
+  observation-cost cause cannot be verified from aggregate reports; those
+  limits remain recorded rather than treated as proven explanations. The
+  parent's `make check` exited 0 on rebased HEAD
+  `f561c95d2df3c994aecfec9fdbbfae0dd8099e5e` plus the authorized budget-spec
+  edit, including its independent roadmap check; execution session 17809,
+  `/private/tmp/t11-f07-orchestrator-check.log`. The parent will run the final
+  closure-content `make check` and identify its exact tested commit in the task
+  before fast-forward integration and cleanup. This spec's Complete status
+  records feature closure; it does not claim those integration steps occurred.
 - Track-clock criterion assessment: T11.F06 fixtures preserve graph temporal
   behavior; T11.F07 fixtures and properties now cover eligibility across
   relaxation settings, disconnected nodes, skipped/repeated/failed visits.
-  The combined explicit-clock criterion is satisfied by implementation evidence;
-  parent marks its checkbox with feature closure after independent review/checks.
+  The combined explicit-clock criterion is checked with F07 closure after
+  independent review and the parent's passing implementation checks.
   Other track floors and success criteria are not claimed complete.
