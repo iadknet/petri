@@ -200,17 +200,21 @@ track and master rollups only if their own criteria are now satisfied, run
    checkout. While inside a worktree, Claude Code blocks every git command
    aimed at the main checkout, so the merge cannot happen before this step.
 2. `git merge --ff-only worktree-<tnn-fnn>`. If it fails because `main` moved,
-   stop and report; do not merge or rebase without asking.
+   rebase `worktree-<tnn-fnn>` onto `main` without asking, resolve the
+   conflicts, rerun `make check` on the rebased content, record the new tested
+   commit, and then fast-forward. Report the rebase and its re-verification.
+   Stop and report only when the conflicts cannot be resolved on the feature's
+   own terms or the rebased content fails `make check`.
 3. `git worktree remove .claude/worktrees/<tnn-fnn>` and
    `git branch -d worktree-<tnn-fnn>`.
 4. Show `git status`, `git worktree list`, and the `make check` result in your
    own message so the goal evaluator can see them.
 
 Executing a user-pasted goal authorizes local branch, worktree, and commit
-creation, the fast-forward of `main`, and removal of the completed feature's
-worktree and branch. Merely reading or editing this workflow grants no such
-authorization. It does **not** authorize pushing, opening or updating a pull
-request, or any other remote mutation.
+creation, rebasing the feature branch onto `main`, the fast-forward of `main`,
+and removal of the completed feature's worktree and branch. Merely reading or
+editing this workflow grants no such authorization. It does **not** authorize
+pushing, opening or updating a pull request, or any other remote mutation.
 
 ### Cost record
 
@@ -255,7 +259,7 @@ sandbox; this adapter does not claim a separate permission boundary.
    token budget. Use the native tool's rules for goal status and blockers.
 
 ```text
-Set a goal: roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md and follow its shared per-feature contract and Codex adapter. Use Astra (gpt-6-astra, high) as orchestrator, one persistent Terra (gpt-5.6-terra, high) subagent for all implementation and remediation, Sol (gpt-5.6-sol, high) as advisor, and a fresh Astra subagent for final review. Start in the main checkout on clean main. I authorize creating .worktrees/<tnn-fnn> on codex/<tnn-fnn>, local planning and implementation commits, fast-forwarding main after all required checks pass, and removing that completed worktree and branch. Do not push or mutate remotes. Done means the feature row is checked and its spec is Complete on main; make check exited 0 for the final feature content and its tested commit is now main; the feature worktree and branch are removed; and main is clean. Show the evidence in this task. If a concrete blocker prevents completion, record it in the spec when one exists, report it, and preserve the worktree; never report the goal complete with required work remaining.
+Set a goal: roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md and follow its shared per-feature contract and Codex adapter. Use Astra (gpt-6-astra, high) as orchestrator, one persistent Terra (gpt-5.6-terra, high) subagent for all implementation and remediation, Sol (gpt-5.6-sol, high) as advisor, and a fresh Astra subagent for final review. Start in the main checkout on clean main. I authorize creating .worktrees/<tnn-fnn> on codex/<tnn-fnn>, local planning and implementation commits, rebasing codex/<tnn-fnn> onto main and rerunning the required checks when main moves, fast-forwarding main after all required checks pass, and removing that completed worktree and branch. Do not push or mutate remotes. Done means the feature row is checked and its spec is Complete on main; make check exited 0 for the final feature content and its tested commit (the rebased one when a rebase was needed) is now main; the feature worktree and branch are removed; and main is clean. Show the evidence in this task. If a concrete blocker prevents completion, record it in the spec when one exists, report it, and preserve the worktree; never report the goal complete with required work remaining.
 ```
 
 ### Start and worktree
@@ -355,9 +359,10 @@ and rerun checks if the committed content differs from what passed. Record
 the tested commit hash. Wait for all agents to finish writing before merging.
 
 From the main checkout, recheck that main is clean, still on `main`, and still
-at its recorded starting commit. If it moved, stop and report as in the shared
-contract. Verify the exact feature worktree is clean and on the recorded
-feature branch, then run:
+at its recorded starting commit. If it moved, rebase `codex/<tnn-fnn>` onto
+`main` and re-verify as in the shared contract, then continue; the recorded
+tested commit becomes the rebased, rechecked one. Verify the exact feature
+worktree is clean and on the recorded feature branch, then run:
 
 ```sh
 git merge --ff-only codex/<tnn-fnn>
