@@ -124,7 +124,7 @@ relies on.
 
 ## Implementation Tasks
 
-- [ ] Write failing tests first: property tests over arbitrary graph defs and
+- [x] Write failing tests first: property tests over arbitrary graph defs and
       battery inputs that each growth operator (three add-node forms, copy
       node, copy subgraph, input-reference add on graph and VM nodes) yields
       identical execute outputs, actions, and shared-memory writes with ample
@@ -133,11 +133,11 @@ relies on.
       compound reference is drawn by `random_graph_source`; a property that
       raw-field mutation changes exactly one field by one unit and never the
       variant; example tests for the skip cases and index remapping.
-- [ ] Implement the add-node forms with insert-with-remap, the faithful copy,
+- [x] Implement the add-node forms with insert-with-remap, the faithful copy,
       unwired input-reference add on both backends, config-driven sub-index
       sampling, and the one-field raw step; delete the obsolete tests that
       pinned spraying, backlinks, and auto-wiring.
-- [ ] Update `v3-mutation-spec.md` (taxonomy, graph and InputRef domain
+- [x] Update `v3-mutation-spec.md` (taxonomy, graph and InputRef domain
       entries, node-type contract owner text) and `v3-graph-backend-spec.md`.
 - [ ] Self-review the diff (`simplify`), then fresh `make rust-mutants`; record
       evidence below.
@@ -148,13 +148,32 @@ relies on.
 
 ## Verification
 
-- [ ] TDD evidence: the initial failing commands and what they exposed;
-      property tests as listed, with any `proptest-regressions/` committed.
-- [ ] `cargo test -p v3-core --test viability` ran before the first
-      production edit and again at closure; `cargo check --workspace
-      --all-targets` after every coherent Rust edit; focused
-      `mutation::graph`, `mutation::input_ref`, `mutation::engine`,
-      `mutational_neighborhood`, and `reproducibility` tests pass.
+- [x] TDD evidence: wrote `crates/v3-core/src/mutation/graph/tests/operators.rs`
+      (10 property/example tests: neutrality of the three add-node forms,
+      `CopyComputeNode`, `CopySubgraph`, unwired `InputRef.Add` on graph and
+      VM nodes, split per-pass preservation, `random_graph_source` sub_idx
+      reach, raw-field one-step) against the old operator signatures first;
+      `cargo check` failed until the operators were rewritten. During
+      implementation two real defects surfaced only once the property tests
+      ran against production code paths (not caught by the unit-level
+      example tests alone): `insert_compute_node_at`'s remap overflowed on
+      `u16::MAX` dangling sentinels (`mutation::engine::tests::stress_parseability_10000_chained_mutations`),
+      and `valid_edge_field_moves`'s `InputLeaf.ref_idx` bounds check
+      indexed `input_refs` without checking the candidate index was in
+      range. Both fixed; no `proptest-regressions/` files were produced (no
+      regression failures survived the fixes). Deleted the five auto-wiring
+      pins in `mutation/input_ref/tests.rs` and the two spraying pins in
+      `mutation/graph/operators.rs`'s inline tests, replacing each with its
+      inverse (zero edges wired, VM program byte-identical).
+- [x] `cargo test -p v3-core --test viability` ran before the first
+      production edit (25 passed) and again at closure (25 passed);
+      `cargo check --workspace --all-targets` after every coherent Rust edit
+      (enforced by the implementer-compile-check hook); focused
+      `mutation::graph` (48 passed), `mutation::input_ref` (23 passed),
+      `mutation::engine` (all passed, including the two stress tests fixed
+      above), `mutational_neighborhood` (4 passed), and `reproducibility` (1
+      passed) tests pass; full `cargo test -p v3-core --lib` (1119 passed)
+      and `cargo test -p v3-core` (all integration suites) pass.
 - [ ] `make rust-mutants` (fresh, `MUTANTS_ITERATE=0`): summary line, output
       path, full survivor list, each killed, equivalent, or deferred.
 - [ ] `make bench PROFILE=gate FEATURE=t11-f03-function-preserving-graph-growth`
