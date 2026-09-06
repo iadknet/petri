@@ -250,18 +250,18 @@ Use the shared Plan, Implement, Review, and Close contract above with these
 substitutions. This adapter uses native subagents and Git; it adds no runner,
 plugin, separate roadmap, or global model settings.
 
-The project default in [`.codex/config.toml`](../.codex/config.toml) is
-`gpt-6-astra` with `high` reasoning effort. Explicit session selections can
-override that default, so verify the model and effort when launching a feature.
+Select `gpt-6-astra` with `xhigh` reasoning effort when launching a feature.
+Verify the active session model and effort; this workflow does not set them.
+The implementer uses `low` reasoning effort ("Astra light").
 
 | Role | Model | Effort | Responsibility |
 | --- | --- | --- | --- |
-| Orchestrator | `gpt-6-astra` | `high` | Plan, delegate, verify, integrate |
-| Implementer | `gpt-5.6-terra` | `high` | All feature code and remediation; same agent across passes |
-| Advisor | `gpt-5.6-sol` | `high` | Read-only implementation advice |
+| Orchestrator | `gpt-6-astra` | `xhigh` | Plan, delegate, verify, integrate |
+| Implementer | `gpt-6-astra` | `low` | All feature code and remediation; same agent across passes |
+| Advisor | `gpt-6-astra` | `high` | Read-only implementation advice |
 | Reviewer | `gpt-6-astra` | `high` | Fresh-context final review |
 
-The reviewer preserves Claude's use of its orchestrator model for independent
+The reviewer uses a fresh Astra context at `high` effort for independent
 review. The advisor is a separate subagent, not an attached Claude advisor.
 Read-only here is an instruction: native subagents inherit the session's
 sandbox; this adapter does not claim a separate permission boundary.
@@ -271,7 +271,7 @@ sandbox; this adapter does not claim a separate permission boundary.
 1. Ask **"give me the Codex goal prompt for the next roadmap feature."** Apply
    the shared next-feature rule using the current roadmap, not its dated example.
 2. Start a new **Local** Codex task in the main checkout on clean `main`.
-   Select **Astra**, effort **high**. The task stays rooted there while all
+   Select **Astra**, effort **extra high** (`xhigh`). The task stays rooted there while all
    feature edits and checks use the feature worktree's absolute path.
 3. Paste the substituted prompt below. The requested goal is explicit; use
    Codex's native goal tool if exposed. Do not assume Claude's `/goal` syntax,
@@ -279,7 +279,7 @@ sandbox; this adapter does not claim a separate permission boundary.
    token budget. Use the native tool's rules for goal status and blockers.
 
 ```text
-Set a goal: roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md and follow its shared per-feature contract and Codex adapter. Use Astra (gpt-6-astra, high) as orchestrator, one persistent Terra (gpt-5.6-terra, high) subagent for all implementation and remediation, Sol (gpt-5.6-sol, high) as advisor, and a fresh Astra subagent for final review. Start in the main checkout on clean main. I authorize creating .worktrees/<tnn-fnn> on codex/<tnn-fnn>, local planning and implementation commits, rebasing codex/<tnn-fnn> onto main and rerunning the required checks when main moves, fast-forwarding main after all required checks pass, and removing that completed worktree and branch. Do not push or mutate remotes. Done means the feature row is checked and its spec is Complete on main; make check exited 0 for the final feature content and its tested commit (the rebased one when a rebase was needed) is now main; the feature worktree and branch are removed; and main is clean. Show the evidence in this task. If a concrete blocker prevents completion, record it in the spec when one exists, report it, and preserve the worktree; never report the goal complete with required work remaining.
+Set a goal: roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md and follow its shared per-feature contract and Codex adapter. Use Astra (gpt-6-astra, xhigh) as orchestrator, one persistent Astra (gpt-6-astra, low) subagent for all implementation and remediation, Astra (gpt-6-astra, high) as advisor, and a fresh Astra (gpt-6-astra, high) subagent for final review. Start in the main checkout on clean main. I authorize creating .worktrees/<tnn-fnn> on codex/<tnn-fnn>, local planning and implementation commits, rebasing codex/<tnn-fnn> onto main and rerunning the required checks when main moves, fast-forwarding main after all required checks pass, and removing that completed worktree and branch. Do not push or mutate remotes. Done means the feature row is checked and its spec is Complete on main; make check exited 0 for the final feature content and its tested commit (the rebased one when a rebase was needed) is now main; the feature worktree and branch are removed; and main is clean. Show the evidence in this task. If a concrete blocker prevents completion, record it in the spec when one exists, report it, and preserve the worktree; never report the goal complete with required work remaining.
 ```
 
 ### Start and worktree
@@ -308,8 +308,8 @@ app Handoff, or separate user-owned task is needed.
 
 ### Delegation and advice
 
-The orchestrator spawns `roadmap_implementer` with `model: gpt-5.6-terra`,
-`reasoning_effort: high`, and `fork_turns: none`. Supply a self-contained brief:
+The orchestrator spawns `roadmap_implementer` with `model: gpt-6-astra`,
+`reasoning_effort: low`, and `fork_turns: none`. Supply a self-contained brief:
 absolute repository and worktree paths, feature ID, spec path, assigned role,
 and instructions to read `AGENTS.md` and this entire workflow. A full-history
 fork cannot accept model overrides in the current desktop tools.
@@ -317,20 +317,20 @@ fork cannot accept model overrides in the current desktop tools.
 Keep that agent for every pass: use `followup_task` to resume an idle agent and
 `send_message` to steer a running one. Do not replace it to discard context.
 The orchestrator can inspect requirements and verification evidence while
-Terra owns code edits; avoid simultaneous writes to the same documents.
+the implementer owns code edits; avoid simultaneous writes to the same documents.
 
-Terra requests Sol advice through the orchestrator at the three existing
+The implementer requests advice through the orchestrator at the three existing
 advisor checkpoints: before choosing an approach, after the same failure
 recurs twice, and before reporting done. The orchestrator spawns one
-`roadmap_advisor` using `gpt-5.6-sol`, `high`, and `fork_turns: none`, then
-resumes it for subsequent consultations. Supply Terra's question, current
-evidence, and worktree/spec paths; relay each answer back to Terra. Sol reads
-and advises, never edits, runs builds, changes scope, or integrates. Terra
+`roadmap_advisor` using `gpt-6-astra`, `high`, and `fork_turns: none`, then
+resumes it for subsequent consultations. Supply the implementer's question, current
+evidence, and worktree/spec paths; relay each answer back to the implementer. The advisor reads
+and advises, never edits, runs builds, changes scope, or integrates. The implementer
 must receive the relevant answer before proceeding with the dependent
 decision; independent inspection can continue in the meantime. Record the
-consult count and decisive guidance. Terra spawns no additional agents.
+consult count and decisive guidance. The implementer spawns no additional agents.
 
-Include this constraint in Sol's brief at every consultation: recommend the
+Include this constraint in the advisor's brief at every consultation: recommend the
 smallest change that satisfies the spec, preferring existing code and
 dependencies. Do not propose abstractions, configuration, extension points,
 or adjacent refactors for hypothetical future needs. Tie each recommendation
@@ -338,13 +338,13 @@ to a concrete spec requirement or observed failure, and distinguish correctness
 blockers from optional improvements. If the current approach is sufficient,
 say so; a consultation need not produce changes.
 
-Sol's advice is input, not an instruction to implement. Terra evaluates it
+The advisor's advice is input, not an instruction to implement. The implementer evaluates it
 against the spec and code, reports which recommendations it accepts or rejects
-and why, and does not implement optional improvements merely because Sol
-suggested them. Astra rejects advice that expands feature scope; required
+and why, and does not implement optional improvements merely because the advisor
+suggested them. The orchestrator rejects advice that expands feature scope; required
 verification and the shared review severity rules still apply.
 
-Terra follows all shared implementation rules, including Rust skills, TDD,
+The implementer follows all shared implementation rules, including Rust skills, TDD,
 property tests, viability first, truthful spec updates, and mutation survivor
 triage. Replace the Claude-only `simplify` skill requirement with an explicit
 self-review of the feature diff for reuse, simplification, and efficiency,
@@ -352,19 +352,19 @@ using the same enum/framework/existing-dependency criteria in the Claude
 implementer instructions. Apply fixes and rerun affected verification; report
 what changed. Repeat after remediation that adds code.
 
-Claude's hooks are not installed for Codex. After a coherent Rust edit, Terra
+Claude's hooks are not installed for Codex. After a coherent Rust edit, the implementer
 runs `cargo check --workspace --all-targets` explicitly; when the viability
 rule applies, run that gate first. Run `make roadmap-check` on document edits
-and before reporting done. Astra independently runs `make roadmap-check`
-before accepting Terra's report and `make check` before integration. These
+and before reporting done. The orchestrator independently runs `make roadmap-check`
+before accepting the implementer's report and `make check` before integration. These
 are required workflow checks, not an automatic SubagentStop gate.
 
 For final review, spawn `roadmap_reviewer` using `gpt-6-astra`, `high`, and
 `fork_turns: none`. Provide the worktree/spec paths and feature ID; instruct it
 to read the shared Review contract and `.claude/agents/roadmap-reviewer.md`
 as a checklist, ignoring its Claude model/tool front matter. It must not edit,
-run tests/builds, or consult the advisor. Do not reuse Sol as reviewer. Apply
-the existing severity rules and route remediation to the same Terra agent.
+run tests/builds, or consult the advisor. Do not reuse the advisor as reviewer. Apply
+the existing severity rules and route remediation to the same implementer agent.
 
 ### Close and integrate in Codex
 
