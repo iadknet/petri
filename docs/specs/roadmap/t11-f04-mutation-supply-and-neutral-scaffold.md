@@ -1,11 +1,14 @@
 # T11.F04 — Mutation Supply and Neutral Scaffold
 
-**Status**: In Progress
+**Status**: Blocked
 **Last updated**: 2026-09-05
 **Feature**: T11.F04
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
 
 ## Goal
+
+Implementation is paused pending the user's mutation-rate decision. The
+0.55 target below records the existing roadmap contract, not a settled optimum.
 
 Point mutations arrive mostly one at a time, retaining the current expected
 0.55 requested events per birth. Eligible inactive structure is as likely to
@@ -33,7 +36,7 @@ neighborhood reports show the effect of these production defaults.
   0.303 is stale. Requested, applied, and skipped events remain distinct;
   `attempted_events = applied_events + skipped_events` stays true. Do not
   retry skipped events merely to inflate applied supply.
-- Selected supply: trigger probability 0.44, then a bounded geometric count
+- Provisional supply, on hold: trigger probability 0.44, then a bounded geometric count
   starting at the configured minimum (default 1), continuing with probability
   0.2 up to the configured maximum (default 10). Its conditional mean is
   `(1 - 0.2^10) / (1 - 0.2)` and unconditional mean is 0.54999994368;
@@ -151,9 +154,42 @@ Report the remaining T11.F10 floor gaps and make no cognition claim.
 - Planning readiness review (orchestrator, 2026-09-05): the template, dependency
   outputs, supply arithmetic, target semantics, and four-sweep contract agree.
   One revision distinguished requested supply from applied events, and uniform
-  eligible-node opportunity from a fixed inactive-event quota. Ready.
+  eligible-node opportunity from a fixed inactive-event quota. Initially ready;
+  the subsequent user pause below supersedes readiness to implement.
+- Blocker (2026-09-05): the user questioned retaining 0.55 events per birth
+  before implementation began, then asked whether rate exploration should be
+  a separate feature or the rate should evolve. Await their decision whether
+  T11.F04 retains 0.55 as a provisional baseline with calibration later, or
+  changes its current rate scope. No feature code, tests, builds, or benchmarks
+  have started; preserve this worktree.
+- Rate research (2026-09-05): no local experiment establishes an optimum.
+  [Avida's documentation](https://github.com/devosoft/avida/wiki/Mutation-settings)
+  distinguishes its 0.0075 per-copy display default from the 0.0025 commonly
+  used experimentally. [Clune et al. 2008](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1000187)
+  measured a long-term optimum near 4.64 point mutations per genome per
+  generation in one configuration, with the preferred rate changing over
+  time. [Kumawat et al. 2025](https://pubmed.ncbi.nlm.nih.gov/39739809/)
+  found that environmental change shapes both mutation rates and the
+  accessibility of useful phenotypes. These results support testing supply,
+  but do not numerically transfer to Petri's heterogeneous structural events.
+  Preserving 0.55 controls requested exposure; it does not hold applied
+  supply or behavioral effects constant. Compare absolute outcomes per all
+  births as well as conditional fractions, and do not infer adaptation from
+  persistence or silence alone.
+- Proposed scope split, not yet adopted: keep distribution repair in T11.F04;
+  characterize rates separately after the remaining brain repairs and
+  T11.F10's discovery/retention tests; retain the existing T08.F05 for inherited
+  mutation rates. A characterization could compare 0.25, 0.55, and 1.0 requested
+  events per birth with identical distribution shape and targeting. Its
+  deliverable would be useful ranges under named conditions, not a universal
+  optimum. T08.F05's current note inherits a minimum bound from T11.F04;
+  under the proposed split that wording would need to assign bounds to later
+  calibration, without treating the provisional 0.55 default as a minimum.
+  Lifetime responses to stress are a separate policy from an inherited scalar
+  and are not included in this proposal. No roadmap rows or dependencies have
+  been changed while this decision is pending.
 - Starting main: `e70fabc45fccc955b3c23b4bf99c07e6c6c48e76`; worktree:
   `/Users/istefanek/projects/petri/.worktrees/t11-f04`, branch `codex/t11-f04`.
 - Session metadata verifies orchestrator `gpt-6-astra` / `xhigh`.
-- Cost record: usage unavailable; advisor consult count and review finding
-  counts pending closure.
+- Cost record: usage unavailable; advisor consultations 1 so far (rate
+  interpretation and provisional implementation seam); review pending.
