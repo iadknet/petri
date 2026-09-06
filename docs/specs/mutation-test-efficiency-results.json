@@ -1,0 +1,1613 @@
+{
+  "schema_version": 1,
+  "workload": {
+    "source_revision": "eb3c56987905483b82ff53e8e285423171823c68",
+    "crates_tree": "406bb4ca664f8d1c7e6f829471ab2297db1abc60",
+    "rustc": "rustc 1.93.0 (254b59607 2026-01-19)\nbinary: rustc\ncommit-hash: 254b59607d4417e9dffbc307138ae5c86280fe4c\ncommit-date: 2026-01-19\nhost: aarch64-apple-darwin\nrelease: 1.93.0\nLLVM version: 21.1.8\n",
+    "diff_sha256": "3d909e269e4ebe0e289372b7fc85c2bea589b830ead49552bc61ae2322ef6eab",
+    "test_count": 1173,
+    "test_inventory_sha256": "b6ea796ef49a7845b4df13e7935669e267269d34e574c360d80dba36b67ff80a",
+    "test_environment": {
+      "PROPTEST_CASES": null,
+      "PROPTEST_RNG_SEED": null,
+      "RUST_TEST_THREADS": null,
+      "RAYON_NUM_THREADS": null
+    }
+  },
+  "candidate": {
+    "profile": "mutants",
+    "opt_level": 1,
+    "debug_assertions": true,
+    "overflow_checks": true,
+    "lto": false,
+    "debug_symbols": false,
+    "test_tool": "cargo",
+    "workers": 2
+  },
+  "candidate_file_sha256": {
+    "Cargo.toml": "ec025b5fd0133c8ceb84ef58242296dfc4768bceee3ed624d0b79d65786bfb07",
+    ".cargo/mutants.toml": "397225b7a600979392b4bf63658cba5bbe272b486483be0c7b43ebe78a6ba66c",
+    "Makefile": "0ebf40fedc99971cf2ce2b02962fe9e5288f94abf01e86fcb7cf5c0d2743619e",
+    "scripts/rust-mutants": "feef0d57911830226eb41423ad9386b11e3adb891598cff5f701b5c3afc81823",
+    "scripts/rust-mutants-test": "14308dbd7e8ccfd1e30038cf598777a5fc60511ff0896bdd183c1e65f630b11e"
+  },
+  "experiments": [
+    {
+      "name": "baseline-full",
+      "started": "2026-09-06T01:10:57.307542+00:00",
+      "elapsed_seconds": 1860.611558542,
+      "exit_code": 2,
+      "command": [
+        "/Users/istefanek/.local/share/aquaproj-aqua/pkgs/cargo/crates.io/cargo-mutants/27.1.0/bin/cargo-mutants",
+        "mutants",
+        "--in-diff",
+        "/private/tmp/petri-mutation-efficiency/feature.patch",
+        "--output",
+        "/private/tmp/petri-mutation-efficiency/baseline-full",
+        "--jobs",
+        "2",
+        "--copy-target",
+        "false",
+        "--colors",
+        "never",
+        "--caught",
+        "--unviable",
+        "--profile",
+        "test"
+      ],
+      "source_revision": "eb3c56987905483b82ff53e8e285423171823c68",
+      "profile_opt_override": null,
+      "counts": {
+        "total_mutants": 187,
+        "caught": 146,
+        "missed": 2,
+        "timeout": 0,
+        "unviable": 39
+      },
+      "median_mutant_seconds": {
+        "build": 2.760650083,
+        "test": 21.947249479
+      },
+      "baseline_phases": [
+        {
+          "phase": "Build",
+          "duration": 21.789598333,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--profile=test",
+            "--verbose",
+            "--package=v3-cli@0.1.0",
+            "--package=v3-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 64.879093834,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--profile=test",
+            "--verbose",
+            "--package=v3-cli@0.1.0",
+            "--package=v3-core@0.1.0"
+          ]
+        }
+      ],
+      "raw_results": "/private/tmp/petri-mutation-efficiency/baseline-full",
+      "elapsed_seconds_clock": "Python time.monotonic stopwatch",
+      "native_start_time_utc": "2026-09-06T01:10:57.809403Z",
+      "native_end_time_utc": "2026-09-06T01:41:57.947173Z",
+      "native_utc_elapsed_seconds": 1860.13777
+    },
+    {
+      "name": "pilot-baseline",
+      "started": "2026-09-06T01:42:00.798896+00:00",
+      "elapsed_seconds": 282.344844792,
+      "exit_code": 2,
+      "command": [
+        "/Users/istefanek/.local/share/aquaproj-aqua/pkgs/cargo/crates.io/cargo-mutants/27.1.0/bin/cargo-mutants",
+        "mutants",
+        "--in-diff",
+        "/private/tmp/petri-mutation-efficiency/feature.patch",
+        "--output",
+        "/private/tmp/petri-mutation-efficiency/pilot-baseline",
+        "--jobs",
+        "2",
+        "--copy-target",
+        "false",
+        "--colors",
+        "never",
+        "--caught",
+        "--unviable",
+        "--profile",
+        "test",
+        "--re",
+        "^(?:crates/v3\\-cli/src/bench\\.rs:696:5:\\ replace\\ fraction_or_undefined\\ \\->\\ String\\ with\\ String::new\\(\\)|crates/v3\\-core/src/neighborhood/battery\\.rs:57:5:\\ replace\\ nonzero_or_zero\\ \\->\\ f32\\ with\\ 0\\.0|crates/v3\\-core/src/neighborhood/births\\.rs:50:5:\\ replace\\ per_birth_result\\ \\->\\ BirthResult\\ with\\ Default::default\\(\\)|crates/v3\\-core/src/neighborhood/classify\\.rs:26:5:\\ replace\\ is_all_noop\\ \\->\\ bool\\ with\\ true|crates/v3\\-core/src/neighborhood/companions\\.rs:49:25:\\ delete\\ match\\ arm\\ VmInstruction::LoadSlot\\{\\.\\.\\}\\ \\|\\ VmInstruction::LoadSlotImm\\{\\.\\.\\}\\ \\|\\ VmInstruction::LoadSlotPrev\\{\\.\\.\\}\\ in\\ structural_companions|crates/v3\\-core/src/neighborhood/operators\\.rs:53:9:\\ replace\\ OperatorKind::all\\ \\->\\ Vec<Self>\\ with\\ vec!\\[\\]|crates/v3\\-core/src/neighborhood/sample\\.rs:14:5:\\ replace\\ evolved_sample_ranks\\ \\->\\ Vec<usize>\\ with\\ vec!\\[\\]|crates/v3\\-core/src/simulation/tick\\.rs:123:5:\\ replace\\ advance_shared_memory\\ with\\ \\(\\)|crates/v3\\-core/src/neighborhood/sample\\.rs:17:24:\\ replace\\ <\\ with\\ <=\\ in\\ evolved_sample_ranks|crates/v3\\-core/src/simulation/tick\\.rs:124:19:\\ replace\\ >\\ with\\ >=\\ in\\ advance_shared_memory|crates/v3\\-cli/src/main\\.rs:153:5:\\ replace\\ resolve_profile_params\\ \\->\\ Result<\\(ProfileParams,\\ String\\),\\ String>\\ with\\ Ok\\(\\(Default::default\\(\\),\\ String::new\\(\\)\\)\\)|crates/v3\\-cli/src/bench\\.rs:127:5:\\ replace\\ gate_profile_params\\ \\->\\ ProfileParams\\ with\\ Default::default\\(\\))$"
+      ],
+      "source_revision": "eb3c56987905483b82ff53e8e285423171823c68",
+      "profile_opt_override": null,
+      "counts": {
+        "total_mutants": 13,
+        "caught": 9,
+        "missed": 2,
+        "timeout": 0,
+        "unviable": 2
+      },
+      "median_mutant_seconds": {
+        "build": 3.749210792,
+        "test": 22.627248875
+      },
+      "baseline_phases": [
+        {
+          "phase": "Build",
+          "duration": 18.875232542,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--profile=test",
+            "--verbose",
+            "--package=v3-cli@0.1.0",
+            "--package=v3-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 64.658351375,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--profile=test",
+            "--verbose",
+            "--package=v3-cli@0.1.0",
+            "--package=v3-core@0.1.0"
+          ]
+        }
+      ],
+      "raw_results": "/private/tmp/petri-mutation-efficiency/pilot-baseline",
+      "elapsed_seconds_clock": "Python time.monotonic stopwatch",
+      "native_start_time_utc": "2026-09-06T01:42:01.312086Z",
+      "native_end_time_utc": "2026-09-06T01:46:43.130186Z",
+      "native_utc_elapsed_seconds": 281.8181
+    },
+    {
+      "name": "pilot-opt1",
+      "started": "2026-09-06T01:46:43.278698+00:00",
+      "elapsed_seconds": 177.969490958,
+      "exit_code": 2,
+      "command": [
+        "/Users/istefanek/.local/share/aquaproj-aqua/pkgs/cargo/crates.io/cargo-mutants/27.1.0/bin/cargo-mutants",
+        "mutants",
+        "--in-diff",
+        "/private/tmp/petri-mutation-efficiency/feature.patch",
+        "--output",
+        "/private/tmp/petri-mutation-efficiency/pilot-opt1",
+        "--jobs",
+        "2",
+        "--copy-target",
+        "false",
+        "--colors",
+        "never",
+        "--caught",
+        "--unviable",
+        "--profile",
+        "mutants",
+        "--re",
+        "^(?:crates/v3\\-cli/src/bench\\.rs:696:5:\\ replace\\ fraction_or_undefined\\ \\->\\ String\\ with\\ String::new\\(\\)|crates/v3\\-core/src/neighborhood/battery\\.rs:57:5:\\ replace\\ nonzero_or_zero\\ \\->\\ f32\\ with\\ 0\\.0|crates/v3\\-core/src/neighborhood/births\\.rs:50:5:\\ replace\\ per_birth_result\\ \\->\\ BirthResult\\ with\\ Default::default\\(\\)|crates/v3\\-core/src/neighborhood/classify\\.rs:26:5:\\ replace\\ is_all_noop\\ \\->\\ bool\\ with\\ true|crates/v3\\-core/src/neighborhood/companions\\.rs:49:25:\\ delete\\ match\\ arm\\ VmInstruction::LoadSlot\\{\\.\\.\\}\\ \\|\\ VmInstruction::LoadSlotImm\\{\\.\\.\\}\\ \\|\\ VmInstruction::LoadSlotPrev\\{\\.\\.\\}\\ in\\ structural_companions|crates/v3\\-core/src/neighborhood/operators\\.rs:53:9:\\ replace\\ OperatorKind::all\\ \\->\\ Vec<Self>\\ with\\ vec!\\[\\]|crates/v3\\-core/src/neighborhood/sample\\.rs:14:5:\\ replace\\ evolved_sample_ranks\\ \\->\\ Vec<usize>\\ with\\ vec!\\[\\]|crates/v3\\-core/src/simulation/tick\\.rs:123:5:\\ replace\\ advance_shared_memory\\ with\\ \\(\\)|crates/v3\\-core/src/neighborhood/sample\\.rs:17:24:\\ replace\\ <\\ with\\ <=\\ in\\ evolved_sample_ranks|crates/v3\\-core/src/simulation/tick\\.rs:124:19:\\ replace\\ >\\ with\\ >=\\ in\\ advance_shared_memory|crates/v3\\-cli/src/main\\.rs:153:5:\\ replace\\ resolve_profile_params\\ \\->\\ Result<\\(ProfileParams,\\ String\\),\\ String>\\ with\\ Ok\\(\\(Default::default\\(\\),\\ String::new\\(\\)\\)\\)|crates/v3\\-cli/src/bench\\.rs:127:5:\\ replace\\ gate_profile_params\\ \\->\\ ProfileParams\\ with\\ Default::default\\(\\))$"
+      ],
+      "source_revision": "eb3c56987905483b82ff53e8e285423171823c68",
+      "profile_opt_override": "1",
+      "counts": {
+        "total_mutants": 13,
+        "caught": 9,
+        "missed": 2,
+        "timeout": 0,
+        "unviable": 2
+      },
+      "median_mutant_seconds": {
+        "build": 10.719871041,
+        "test": 7.64972675
+      },
+      "baseline_phases": [
+        {
+          "phase": "Build",
+          "duration": 30.330290375,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--profile=mutants",
+            "--verbose",
+            "--package=v3-cli@0.1.0",
+            "--package=v3-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 12.335923375,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--profile=mutants",
+            "--verbose",
+            "--package=v3-cli@0.1.0",
+            "--package=v3-core@0.1.0"
+          ]
+        }
+      ],
+      "raw_results": "/private/tmp/petri-mutation-efficiency/pilot-opt1",
+      "elapsed_seconds_clock": "Python time.monotonic stopwatch",
+      "native_start_time_utc": "2026-09-06T01:46:43.786749Z",
+      "native_end_time_utc": "2026-09-06T01:59:31.780404Z",
+      "native_utc_elapsed_seconds": 767.993655
+    },
+    {
+      "name": "pilot-opt2",
+      "started": "2026-09-06T01:59:31.920662+00:00",
+      "elapsed_seconds": 206.399779625,
+      "exit_code": 2,
+      "command": [
+        "/Users/istefanek/.local/share/aquaproj-aqua/pkgs/cargo/crates.io/cargo-mutants/27.1.0/bin/cargo-mutants",
+        "mutants",
+        "--in-diff",
+        "/private/tmp/petri-mutation-efficiency/feature.patch",
+        "--output",
+        "/private/tmp/petri-mutation-efficiency/pilot-opt2",
+        "--jobs",
+        "2",
+        "--copy-target",
+        "false",
+        "--colors",
+        "never",
+        "--caught",
+        "--unviable",
+        "--profile",
+        "mutants",
+        "--re",
+        "^(?:crates/v3\\-cli/src/bench\\.rs:696:5:\\ replace\\ fraction_or_undefined\\ \\->\\ String\\ with\\ String::new\\(\\)|crates/v3\\-core/src/neighborhood/battery\\.rs:57:5:\\ replace\\ nonzero_or_zero\\ \\->\\ f32\\ with\\ 0\\.0|crates/v3\\-core/src/neighborhood/births\\.rs:50:5:\\ replace\\ per_birth_result\\ \\->\\ BirthResult\\ with\\ Default::default\\(\\)|crates/v3\\-core/src/neighborhood/classify\\.rs:26:5:\\ replace\\ is_all_noop\\ \\->\\ bool\\ with\\ true|crates/v3\\-core/src/neighborhood/companions\\.rs:49:25:\\ delete\\ match\\ arm\\ VmInstruction::LoadSlot\\{\\.\\.\\}\\ \\|\\ VmInstruction::LoadSlotImm\\{\\.\\.\\}\\ \\|\\ VmInstruction::LoadSlotPrev\\{\\.\\.\\}\\ in\\ structural_companions|crates/v3\\-core/src/neighborhood/operators\\.rs:53:9:\\ replace\\ OperatorKind::all\\ \\->\\ Vec<Self>\\ with\\ vec!\\[\\]|crates/v3\\-core/src/neighborhood/sample\\.rs:14:5:\\ replace\\ evolved_sample_ranks\\ \\->\\ Vec<usize>\\ with\\ vec!\\[\\]|crates/v3\\-core/src/simulation/tick\\.rs:123:5:\\ replace\\ advance_shared_memory\\ with\\ \\(\\)|crates/v3\\-core/src/neighborhood/sample\\.rs:17:24:\\ replace\\ <\\ with\\ <=\\ in\\ evolved_sample_ranks|crates/v3\\-core/src/simulation/tick\\.rs:124:19:\\ replace\\ >\\ with\\ >=\\ in\\ advance_shared_memory|crates/v3\\-cli/src/main\\.rs:153:5:\\ replace\\ resolve_profile_params\\ \\->\\ Result<\\(ProfileParams,\\ String\\),\\ String>\\ with\\ Ok\\(\\(Default::default\\(\\),\\ String::new\\(\\)\\)\\)|crates/v3\\-cli/src/bench\\.rs:127:5:\\ replace\\ gate_profile_params\\ \\->\\ ProfileParams\\ with\\ Default::default\\(\\))$"
+      ],
+      "source_revision": "eb3c56987905483b82ff53e8e285423171823c68",
+      "profile_opt_override": "2",
+      "counts": {
+        "total_mutants": 13,
+        "caught": 9,
+        "missed": 2,
+        "timeout": 0,
+        "unviable": 2
+      },
+      "median_mutant_seconds": {
+        "build": 12.282083709,
+        "test": 6.102888583
+      },
+      "baseline_phases": [
+        {
+          "phase": "Build",
+          "duration": 38.094408541,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--profile=mutants",
+            "--verbose",
+            "--package=v3-cli@0.1.0",
+            "--package=v3-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 12.216819959,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--profile=mutants",
+            "--verbose",
+            "--package=v3-cli@0.1.0",
+            "--package=v3-core@0.1.0"
+          ]
+        }
+      ],
+      "raw_results": "/private/tmp/petri-mutation-efficiency/pilot-opt2",
+      "elapsed_seconds_clock": "Python time.monotonic stopwatch",
+      "native_start_time_utc": "2026-09-06T01:59:32.423051Z",
+      "native_end_time_utc": "2026-09-06T02:02:58.31556Z",
+      "native_utc_elapsed_seconds": 205.892509
+    },
+    {
+      "name": "pilot-nextest",
+      "started": "2026-09-06T02:02:58.451885+00:00",
+      "elapsed_seconds": 184.13373512500002,
+      "exit_code": 2,
+      "command": [
+        "/Users/istefanek/.local/share/aquaproj-aqua/pkgs/cargo/crates.io/cargo-mutants/27.1.0/bin/cargo-mutants",
+        "mutants",
+        "--in-diff",
+        "/private/tmp/petri-mutation-efficiency/feature.patch",
+        "--output",
+        "/private/tmp/petri-mutation-efficiency/pilot-nextest",
+        "--jobs",
+        "2",
+        "--copy-target",
+        "false",
+        "--colors",
+        "never",
+        "--caught",
+        "--unviable",
+        "--profile",
+        "mutants",
+        "--re",
+        "^(?:crates/v3\\-cli/src/bench\\.rs:696:5:\\ replace\\ fraction_or_undefined\\ \\->\\ String\\ with\\ String::new\\(\\)|crates/v3\\-core/src/neighborhood/battery\\.rs:57:5:\\ replace\\ nonzero_or_zero\\ \\->\\ f32\\ with\\ 0\\.0|crates/v3\\-core/src/neighborhood/births\\.rs:50:5:\\ replace\\ per_birth_result\\ \\->\\ BirthResult\\ with\\ Default::default\\(\\)|crates/v3\\-core/src/neighborhood/classify\\.rs:26:5:\\ replace\\ is_all_noop\\ \\->\\ bool\\ with\\ true|crates/v3\\-core/src/neighborhood/companions\\.rs:49:25:\\ delete\\ match\\ arm\\ VmInstruction::LoadSlot\\{\\.\\.\\}\\ \\|\\ VmInstruction::LoadSlotImm\\{\\.\\.\\}\\ \\|\\ VmInstruction::LoadSlotPrev\\{\\.\\.\\}\\ in\\ structural_companions|crates/v3\\-core/src/neighborhood/operators\\.rs:53:9:\\ replace\\ OperatorKind::all\\ \\->\\ Vec<Self>\\ with\\ vec!\\[\\]|crates/v3\\-core/src/neighborhood/sample\\.rs:14:5:\\ replace\\ evolved_sample_ranks\\ \\->\\ Vec<usize>\\ with\\ vec!\\[\\]|crates/v3\\-core/src/simulation/tick\\.rs:123:5:\\ replace\\ advance_shared_memory\\ with\\ \\(\\)|crates/v3\\-core/src/neighborhood/sample\\.rs:17:24:\\ replace\\ <\\ with\\ <=\\ in\\ evolved_sample_ranks|crates/v3\\-core/src/simulation/tick\\.rs:124:19:\\ replace\\ >\\ with\\ >=\\ in\\ advance_shared_memory|crates/v3\\-cli/src/main\\.rs:153:5:\\ replace\\ resolve_profile_params\\ \\->\\ Result<\\(ProfileParams,\\ String\\),\\ String>\\ with\\ Ok\\(\\(Default::default\\(\\),\\ String::new\\(\\)\\)\\)|crates/v3\\-cli/src/bench\\.rs:127:5:\\ replace\\ gate_profile_params\\ \\->\\ ProfileParams\\ with\\ Default::default\\(\\))$",
+        "--test-tool",
+        "nextest"
+      ],
+      "source_revision": "eb3c56987905483b82ff53e8e285423171823c68",
+      "profile_opt_override": "1",
+      "counts": {
+        "total_mutants": 13,
+        "caught": 9,
+        "missed": 2,
+        "timeout": 0,
+        "unviable": 2
+      },
+      "median_mutant_seconds": {
+        "build": 12.821970833,
+        "test": 7.08835375
+      },
+      "baseline_phases": [
+        {
+          "phase": "Build",
+          "duration": 33.425327917,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--no-run",
+            "--cargo-profile=mutants",
+            "--verbose",
+            "--package=v3-cli@0.1.0",
+            "--package=v3-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 6.585156166,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "nextest",
+            "run",
+            "--cargo-profile=mutants",
+            "--verbose",
+            "--package=v3-cli@0.1.0",
+            "--package=v3-core@0.1.0"
+          ]
+        }
+      ],
+      "raw_results": "/private/tmp/petri-mutation-efficiency/pilot-nextest",
+      "elapsed_seconds_clock": "Python time.monotonic stopwatch",
+      "native_start_time_utc": "2026-09-06T02:02:58.959728Z",
+      "native_end_time_utc": "2026-09-06T02:06:02.580861Z",
+      "native_utc_elapsed_seconds": 183.621133
+    },
+    {
+      "name": "iteration",
+      "started": "2026-09-06T02:07:34.640555+00:00",
+      "elapsed_seconds": 78.004005667,
+      "exit_code": 2,
+      "command": [
+        "/Users/istefanek/.local/share/aquaproj-aqua/pkgs/cargo/crates.io/cargo-mutants/27.1.0/bin/cargo-mutants",
+        "mutants",
+        "--in-diff",
+        "/private/tmp/petri-mutation-efficiency/feature.patch",
+        "--output",
+        "/private/tmp/petri-mutation-efficiency/iteration-cache",
+        "--jobs",
+        "2",
+        "--copy-target",
+        "false",
+        "--colors",
+        "never",
+        "--caught",
+        "--unviable",
+        "--profile",
+        "mutants",
+        "--re",
+        "^(?:crates/v3\\-cli/src/bench\\.rs:696:5:\\ replace\\ fraction_or_undefined\\ \\->\\ String\\ with\\ String::new\\(\\)|crates/v3\\-core/src/neighborhood/battery\\.rs:57:5:\\ replace\\ nonzero_or_zero\\ \\->\\ f32\\ with\\ 0\\.0|crates/v3\\-core/src/neighborhood/births\\.rs:50:5:\\ replace\\ per_birth_result\\ \\->\\ BirthResult\\ with\\ Default::default\\(\\)|crates/v3\\-core/src/neighborhood/classify\\.rs:26:5:\\ replace\\ is_all_noop\\ \\->\\ bool\\ with\\ true|crates/v3\\-core/src/neighborhood/companions\\.rs:49:25:\\ delete\\ match\\ arm\\ VmInstruction::LoadSlot\\{\\.\\.\\}\\ \\|\\ VmInstruction::LoadSlotImm\\{\\.\\.\\}\\ \\|\\ VmInstruction::LoadSlotPrev\\{\\.\\.\\}\\ in\\ structural_companions|crates/v3\\-core/src/neighborhood/operators\\.rs:53:9:\\ replace\\ OperatorKind::all\\ \\->\\ Vec<Self>\\ with\\ vec!\\[\\]|crates/v3\\-core/src/neighborhood/sample\\.rs:14:5:\\ replace\\ evolved_sample_ranks\\ \\->\\ Vec<usize>\\ with\\ vec!\\[\\]|crates/v3\\-core/src/simulation/tick\\.rs:123:5:\\ replace\\ advance_shared_memory\\ with\\ \\(\\)|crates/v3\\-core/src/neighborhood/sample\\.rs:17:24:\\ replace\\ <\\ with\\ <=\\ in\\ evolved_sample_ranks|crates/v3\\-core/src/simulation/tick\\.rs:124:19:\\ replace\\ >\\ with\\ >=\\ in\\ advance_shared_memory|crates/v3\\-cli/src/main\\.rs:153:5:\\ replace\\ resolve_profile_params\\ \\->\\ Result<\\(ProfileParams,\\ String\\),\\ String>\\ with\\ Ok\\(\\(Default::default\\(\\),\\ String::new\\(\\)\\)\\)|crates/v3\\-cli/src/bench\\.rs:127:5:\\ replace\\ gate_profile_params\\ \\->\\ ProfileParams\\ with\\ Default::default\\(\\))$",
+        "--iterate"
+      ],
+      "source_revision": "eb3c56987905483b82ff53e8e285423171823c68",
+      "profile_opt_override": "1",
+      "counts": {
+        "total_mutants": 2,
+        "caught": 0,
+        "missed": 2,
+        "timeout": 0,
+        "unviable": 0
+      },
+      "median_mutant_seconds": {
+        "build": 19.9135095205,
+        "test": 10.505415542
+      },
+      "baseline_phases": [
+        {
+          "phase": "Build",
+          "duration": 28.890299249999998,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--profile=mutants",
+            "--verbose",
+            "--package=v3-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 8.77470825,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--profile=mutants",
+            "--verbose",
+            "--package=v3-core@0.1.0"
+          ]
+        }
+      ],
+      "raw_results": "/private/tmp/petri-mutation-efficiency/iteration",
+      "elapsed_seconds_clock": "Python time.monotonic stopwatch",
+      "native_start_time_utc": "2026-09-06T02:07:35.228047Z",
+      "native_end_time_utc": "2026-09-06T02:08:52.642061Z",
+      "native_utc_elapsed_seconds": 77.414014
+    },
+    {
+      "name": "fresh-after-iteration",
+      "started": "2026-09-06T02:08:52.764492+00:00",
+      "elapsed_seconds": 179.334418667,
+      "exit_code": 2,
+      "command": [
+        "/Users/istefanek/.local/share/aquaproj-aqua/pkgs/cargo/crates.io/cargo-mutants/27.1.0/bin/cargo-mutants",
+        "mutants",
+        "--in-diff",
+        "/private/tmp/petri-mutation-efficiency/feature.patch",
+        "--output",
+        "/private/tmp/petri-mutation-efficiency/iteration-cache",
+        "--jobs",
+        "2",
+        "--copy-target",
+        "false",
+        "--colors",
+        "never",
+        "--caught",
+        "--unviable",
+        "--profile",
+        "mutants",
+        "--re",
+        "^(?:crates/v3\\-cli/src/bench\\.rs:696:5:\\ replace\\ fraction_or_undefined\\ \\->\\ String\\ with\\ String::new\\(\\)|crates/v3\\-core/src/neighborhood/battery\\.rs:57:5:\\ replace\\ nonzero_or_zero\\ \\->\\ f32\\ with\\ 0\\.0|crates/v3\\-core/src/neighborhood/births\\.rs:50:5:\\ replace\\ per_birth_result\\ \\->\\ BirthResult\\ with\\ Default::default\\(\\)|crates/v3\\-core/src/neighborhood/classify\\.rs:26:5:\\ replace\\ is_all_noop\\ \\->\\ bool\\ with\\ true|crates/v3\\-core/src/neighborhood/companions\\.rs:49:25:\\ delete\\ match\\ arm\\ VmInstruction::LoadSlot\\{\\.\\.\\}\\ \\|\\ VmInstruction::LoadSlotImm\\{\\.\\.\\}\\ \\|\\ VmInstruction::LoadSlotPrev\\{\\.\\.\\}\\ in\\ structural_companions|crates/v3\\-core/src/neighborhood/operators\\.rs:53:9:\\ replace\\ OperatorKind::all\\ \\->\\ Vec<Self>\\ with\\ vec!\\[\\]|crates/v3\\-core/src/neighborhood/sample\\.rs:14:5:\\ replace\\ evolved_sample_ranks\\ \\->\\ Vec<usize>\\ with\\ vec!\\[\\]|crates/v3\\-core/src/simulation/tick\\.rs:123:5:\\ replace\\ advance_shared_memory\\ with\\ \\(\\)|crates/v3\\-core/src/neighborhood/sample\\.rs:17:24:\\ replace\\ <\\ with\\ <=\\ in\\ evolved_sample_ranks|crates/v3\\-core/src/simulation/tick\\.rs:124:19:\\ replace\\ >\\ with\\ >=\\ in\\ advance_shared_memory|crates/v3\\-cli/src/main\\.rs:153:5:\\ replace\\ resolve_profile_params\\ \\->\\ Result<\\(ProfileParams,\\ String\\),\\ String>\\ with\\ Ok\\(\\(Default::default\\(\\),\\ String::new\\(\\)\\)\\)|crates/v3\\-cli/src/bench\\.rs:127:5:\\ replace\\ gate_profile_params\\ \\->\\ ProfileParams\\ with\\ Default::default\\(\\))$"
+      ],
+      "source_revision": "eb3c56987905483b82ff53e8e285423171823c68",
+      "profile_opt_override": "1",
+      "counts": {
+        "total_mutants": 13,
+        "caught": 9,
+        "missed": 2,
+        "timeout": 0,
+        "unviable": 2
+      },
+      "median_mutant_seconds": {
+        "build": 10.479421583,
+        "test": 5.829678875
+      },
+      "baseline_phases": [
+        {
+          "phase": "Build",
+          "duration": 30.34975975,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--profile=mutants",
+            "--verbose",
+            "--package=v3-cli@0.1.0",
+            "--package=v3-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 12.799397417,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--profile=mutants",
+            "--verbose",
+            "--package=v3-cli@0.1.0",
+            "--package=v3-core@0.1.0"
+          ]
+        }
+      ],
+      "raw_results": "/private/tmp/petri-mutation-efficiency/fresh-after-iteration",
+      "elapsed_seconds_clock": "Python time.monotonic stopwatch",
+      "native_start_time_utc": "2026-09-06T02:08:53.269578Z",
+      "native_end_time_utc": "2026-09-06T02:11:52.094175Z",
+      "native_utc_elapsed_seconds": 178.824597
+    },
+    {
+      "name": "candidate-full",
+      "started": "2026-09-06T02:11:56.475815+00:00",
+      "elapsed_seconds": 833.227724959,
+      "exit_code": 2,
+      "command": [
+        "/Users/istefanek/.local/share/aquaproj-aqua/pkgs/cargo/crates.io/cargo-mutants/27.1.0/bin/cargo-mutants",
+        "mutants",
+        "--in-diff",
+        "/private/tmp/petri-mutation-efficiency/feature.patch",
+        "--output",
+        "/private/tmp/petri-mutation-efficiency/candidate-full",
+        "--jobs",
+        "2",
+        "--copy-target",
+        "false",
+        "--colors",
+        "never",
+        "--caught",
+        "--unviable"
+      ],
+      "source_revision": "eb3c56987905483b82ff53e8e285423171823c68",
+      "profile_opt_override": null,
+      "counts": {
+        "total_mutants": 187,
+        "caught": 146,
+        "missed": 2,
+        "timeout": 0,
+        "unviable": 39
+      },
+      "median_mutant_seconds": {
+        "build": 3.191678959,
+        "test": 5.420756875
+      },
+      "baseline_phases": [
+        {
+          "phase": "Build",
+          "duration": 31.096571083,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--no-run",
+            "--profile=mutants",
+            "--verbose",
+            "--package=v3-cli@0.1.0",
+            "--package=v3-core@0.1.0"
+          ]
+        },
+        {
+          "phase": "Test",
+          "duration": 11.34606625,
+          "process_status": "Success",
+          "argv": [
+            "cargo",
+            "test",
+            "--profile=mutants",
+            "--verbose",
+            "--package=v3-cli@0.1.0",
+            "--package=v3-core@0.1.0"
+          ]
+        }
+      ],
+      "raw_results": "/private/tmp/petri-mutation-efficiency/candidate-full",
+      "elapsed_seconds_clock": "Python time.monotonic stopwatch",
+      "native_start_time_utc": "2026-09-06T02:11:56.939851Z",
+      "native_end_time_utc": "2026-09-06T02:35:34.710426Z",
+      "native_utc_elapsed_seconds": 1417.770575
+    }
+  ],
+  "validation": {
+    "full_mutant_outcome_parity": true,
+    "pilot_outcome_parity": true,
+    "fresh_after_iteration_parity": true,
+    "incremental_candidates": 2,
+    "fresh_pilot_candidates": 13,
+    "test_inventory_parity": true,
+    "cargo_invocations_match_except_profile": true,
+    "test_count": 1173,
+    "test_inventory_sha256": "b6ea796ef49a7845b4df13e7935669e267269d34e574c360d80dba36b67ff80a",
+    "test_targets": {
+      "bench": 17,
+      "cli": 7,
+      "creature_workflow_e2e": 7,
+      "mutational_neighborhood": 4,
+      "priority_bid_reachability": 2,
+      "reproducibility": 1,
+      "temporal_fixtures": 13,
+      "v3_cli": 35,
+      "v3_core": 1061,
+      "viability": 25,
+      "vm_all_opcodes_e2e": 1
+    },
+    "production_and_rust_test_sources_unchanged": true,
+    "make_check": {
+      "exit_code": 0,
+      "elapsed_seconds": 169.06657225000004,
+      "source_base_revision": "eb3c56987905483b82ff53e8e285423171823c68"
+    },
+    "full_run_stopwatch_reduction_percent": 55.217534732938645,
+    "full_run_utc_reduction_percent": 23.78142103958246
+  },
+  "full_mutant_outcomes": [
+    {
+      "name": "crates/v3-cli/src/bench.rs:1024:5: replace neighborhood_battery_execution_count -> u32 with 0",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1024:5: replace neighborhood_battery_execution_count -> u32 with 1",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1025:49: replace * with + in neighborhood_battery_execution_count",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1025:49: replace * with / in neighborhood_battery_execution_count",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1025:9: replace + with * in neighborhood_battery_execution_count",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1025:9: replace + with - in neighborhood_battery_execution_count",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1029:5: replace to_neighborhood_tally -> NeighborhoodTally with Default::default()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1046:5: replace to_neighborhood_operator_rows -> Vec<NeighborhoodOperatorRow> with vec![Default::default()]",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1046:5: replace to_neighborhood_operator_rows -> Vec<NeighborhoodOperatorRow> with vec![]",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1056:5: replace to_neighborhood_births -> NeighborhoodBirths with Default::default()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1072:5: replace to_neighborhood_companions -> NeighborhoodCompanions with Default::default()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1085:25: replace += with *= in merge_birth_results",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1085:25: replace += with -= in merge_birth_results",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1085:5: replace merge_birth_results -> BirthResult with Default::default()",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1086:30: replace += with *= in merge_birth_results",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1086:30: replace += with -= in merge_birth_results",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1104:5: replace compute_founder_neighborhood -> NeighborhoodFounderHalf with Default::default()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1134:5: replace evolved_neighborhood_for_seed -> NeighborhoodEvolvedSeed with Default::default()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1148:60: replace * with + in evolved_neighborhood_for_seed",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1148:60: replace * with / in evolved_neighborhood_for_seed",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1148:83: replace + with * in evolved_neighborhood_for_seed",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1148:83: replace + with - in evolved_neighborhood_for_seed",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1239:5: replace build_mutational_neighborhood_indicator -> Indicator<MutationalNeighborhood> with Indicator::from(Default::default())",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1239:5: replace build_mutational_neighborhood_indicator -> Indicator<MutationalNeighborhood> with Indicator::from_iter([Default::default()])",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1239:5: replace build_mutational_neighborhood_indicator -> Indicator<MutationalNeighborhood> with Indicator::new()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1239:5: replace build_mutational_neighborhood_indicator -> Indicator<MutationalNeighborhood> with Indicator::new(Default::default())",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1272:5: replace run_deterministic -> (Deterministic, RunTimings) with (Default::default(), Default::default())",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:127:5: replace gate_profile_params -> ProfileParams with Default::default()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1294:40: replace == with != in run_deterministic",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1294:50: replace || with && in run_deterministic",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:141:5: replace goal_profile_params -> ProfileParams with Default::default()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:1531:5: replace build_environment -> Environment with Default::default()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:320:5: replace undefined_mutational_neighborhood -> Indicator<MutationalNeighborhood> with Indicator::from(Default::default())",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:320:5: replace undefined_mutational_neighborhood -> Indicator<MutationalNeighborhood> with Indicator::from_iter([Default::default()])",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:320:5: replace undefined_mutational_neighborhood -> Indicator<MutationalNeighborhood> with Indicator::new()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:320:5: replace undefined_mutational_neighborhood -> Indicator<MutationalNeighborhood> with Indicator::new(Default::default())",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:324:5: replace undefined_evolved_neighborhood -> Indicator<EvolvedNeighborhoodHalf> with Indicator::from(Default::default())",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:324:5: replace undefined_evolved_neighborhood -> Indicator<EvolvedNeighborhoodHalf> with Indicator::from_iter([Default::default()])",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:324:5: replace undefined_evolved_neighborhood -> Indicator<EvolvedNeighborhoodHalf> with Indicator::new()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:324:5: replace undefined_evolved_neighborhood -> Indicator<EvolvedNeighborhoodHalf> with Indicator::new(Default::default())",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:696:20: replace == with != in fraction_or_undefined",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:696:5: replace fraction_or_undefined -> String with \"xyzzy\".into()",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:696:5: replace fraction_or_undefined -> String with String::new()",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:699:26: replace / with % in fraction_or_undefined",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:699:26: replace / with * in fraction_or_undefined",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:853:5: replace run_one_seed -> SeedRun with Default::default()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/bench.rs:987:5: replace memory_sensitivity -> MemorySensitivitySeed with Default::default()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/main.rs:153:5: replace resolve_profile_params -> Result<(ProfileParams, String), String> with Ok((Default::default(), \"xyzzy\".into()))",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-cli/src/main.rs:153:5: replace resolve_profile_params -> Result<(ProfileParams, String), String> with Ok((Default::default(), String::new()))",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:102:5: replace draw_scenarios -> Vec<Scenario> with vec![Default::default()]",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:102:5: replace draw_scenarios -> Vec<Scenario> with vec![]",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:123:9: replace Battery::generate -> Self with Default::default()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:126:28: replace * with + in Battery::generate",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:126:28: replace * with / in Battery::generate",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:150:9: replace Battery::signature -> Signature with Default::default()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:174:9: replace Battery::execute_single_tick -> Vec<WorldAction> with vec![Default::default()]",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:174:9: replace Battery::execute_single_tick -> Vec<WorldAction> with vec![]",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:203:9: replace Battery::execute_sequence -> Vec<Vec<WorldAction>> with vec![]",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:203:9: replace Battery::execute_sequence -> Vec<Vec<WorldAction>> with vec![vec![Default::default()]]",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:203:9: replace Battery::execute_sequence -> Vec<Vec<WorldAction>> with vec![vec![]]",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:240:30: replace + with * in Signature::execution_count",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:240:30: replace + with - in Signature::execution_count",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:240:9: replace Signature::execution_count -> usize with 0",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:240:9: replace Signature::execution_count -> usize with 1",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:57:5: replace nonzero_or_zero -> f32 with -1.0",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:57:5: replace nonzero_or_zero -> f32 with 0.0",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:57:5: replace nonzero_or_zero -> f32 with 1.0",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:65:5: replace draw_scenario -> Scenario with Default::default()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/battery.rs:66:58: replace == with != in draw_scenario",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/births.rs:50:5: replace per_birth_result -> BirthResult with Default::default()",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/births.rs:57:53: replace + with * in per_birth_result",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/births.rs:57:53: replace + with - in per_birth_result",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/births.rs:57:71: replace + with * in per_birth_result",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/births.rs:57:71: replace + with - in per_birth_result",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/births.rs:65:39: replace == with != in per_birth_result",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/births.rs:83:5: replace fold_outcomes -> BirthResult with Default::default()",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/births.rs:84:9: delete field births_total from struct BirthResult expression in fold_outcomes",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/births.rs:89:46: replace += with *= in fold_outcomes",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/births.rs:89:46: replace += with -= in fold_outcomes",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:114:21: replace += with *= in Tally::skip",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:114:21: replace += with -= in Tally::skip",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:114:9: replace Tally::skip -> Self with Default::default()",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:115:22: replace += with *= in Tally::skip",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:115:22: replace += with -= in Tally::skip",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:122:21: replace += with *= in Tally::record",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:122:21: replace += with -= in Tally::record",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:122:9: replace Tally::record -> Self with Default::default()",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:124:42: replace += with *= in Tally::record",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:124:42: replace += with -= in Tally::record",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:125:44: replace += with *= in Tally::record",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:125:44: replace += with -= in Tally::record",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:126:38: replace += with *= in Tally::record",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:126:38: replace += with -= in Tally::record",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:128:12: delete ! in Tally::record",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:129:45: replace += with *= in Tally::record",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:129:45: replace += with -= in Tally::record",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:130:41: replace += with *= in Tally::record",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:130:41: replace += with -= in Tally::record",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:133:44: replace += with *= in Tally::record",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:133:44: replace += with -= in Tally::record",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:143:21: replace += with *= in Tally::merge",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:143:21: replace += with -= in Tally::merge",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:143:9: replace Tally::merge -> Self with Default::default()",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:144:22: replace += with *= in Tally::merge",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:144:22: replace += with -= in Tally::merge",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:145:21: replace += with *= in Tally::merge",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:145:21: replace += with -= in Tally::merge",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:146:22: replace += with *= in Tally::merge",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:146:22: replace += with -= in Tally::merge",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:147:19: replace += with *= in Tally::merge",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:147:19: replace += with -= in Tally::merge",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:148:40: replace += with *= in Tally::merge",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:148:40: replace += with -= in Tally::merge",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:149:41: replace += with *= in Tally::merge",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:149:41: replace += with -= in Tally::merge",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:150:37: replace += with *= in Tally::merge",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:150:37: replace += with -= in Tally::merge",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:156:21: replace - with + in Tally::applied",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:156:21: replace - with / in Tally::applied",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:156:9: replace Tally::applied -> u32 with 0",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:156:9: replace Tally::applied -> u32 with 1",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:168:40: replace == with != in Tally::mean_fraction_differing",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:168:9: replace Tally::mean_fraction_differing -> f64 with -1.0",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:168:9: replace Tally::mean_fraction_differing -> f64 with 0.0",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:168:9: replace Tally::mean_fraction_differing -> f64 with 1.0",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:171:48: replace / with % in Tally::mean_fraction_differing",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:171:48: replace / with * in Tally::mean_fraction_differing",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:26:5: replace is_all_noop -> bool with false",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:26:5: replace is_all_noop -> bool with true",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:46:5: replace classify -> Classification with Default::default()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:50:28: replace != with == in classify",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:57:28: replace != with == in classify",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:59:46: replace + with * in classify",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:59:46: replace + with - in classify",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:62:41: replace == with != in classify",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:69:13: replace && with || in classify",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:82:50: replace == with != in classify",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:82:55: replace && with || in classify",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:82:72: replace > with < in classify",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:82:72: replace > with == in classify",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/classify.rs:82:72: replace > with >= in classify",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/companions.rs:35:5: replace structural_companions -> StructuralCompanions with Default::default()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/companions.rs:49:25: delete match arm VmInstruction::LoadSlot{..} | VmInstruction::LoadSlotImm{..} | VmInstruction::LoadSlotPrev{..} in structural_companions",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/companions.rs:52:25: delete match arm VmInstruction::StoreSlot{..} | VmInstruction::StoreSlotImm{..} | VmInstruction::ClearSlot{..} in structural_companions",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/companions.rs:64:50: replace == with != in structural_companions",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/mod.rs:57:9: replace EvalContext<'a>::from_config -> Self with Default::default()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/mod.rs:89:5: replace evaluate_genome -> GenomeEvaluation with Default::default()",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:129:5: replace operator_catalog -> Vec<(&'static str, String)> with vec![(\"\", \"xyzzy\".into())]",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:129:5: replace operator_catalog -> Vec<(&'static str, String)> with vec![(\"\", String::new())]",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:129:5: replace operator_catalog -> Vec<(&'static str, String)> with vec![(\"xyzzy\", \"xyzzy\".into())]",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:129:5: replace operator_catalog -> Vec<(&'static str, String)> with vec![(\"xyzzy\", String::new())]",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:129:5: replace operator_catalog -> Vec<(&'static str, String)> with vec![]",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:155:5: replace per_operator_rows -> Vec<OperatorRow> with vec![Default::default()]",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:155:5: replace per_operator_rows -> Vec<OperatorRow> with vec![]",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:168:40: replace + with * in per_operator_rows",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:168:40: replace + with - in per_operator_rows",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:168:57: replace + with * in per_operator_rows",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:168:57: replace + with - in per_operator_rows",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:53:9: replace OperatorKind::all -> Vec<Self> with vec![Default::default()]",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:53:9: replace OperatorKind::all -> Vec<Self> with vec![]",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:63:9: replace OperatorKind::family -> &'static str with \"\"",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:63:9: replace OperatorKind::family -> &'static str with \"xyzzy\"",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:72:9: replace OperatorKind::name -> String with \"xyzzy\".into()",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:72:9: replace OperatorKind::name -> String with String::new()",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:81:9: replace OperatorKind::seed_base -> u64 with 0",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:81:9: replace OperatorKind::seed_base -> u64 with 1",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/operators.rs:97:9: replace OperatorKind::apply -> Result<TargetReachability, MutationSkipReason> with Ok(Default::default())",
+      "baseline": "Unviable",
+      "candidate": "Unviable"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/sample.rs:14:24: replace == with != in evolved_sample_ranks",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/sample.rs:14:5: replace evolved_sample_ranks -> Vec<usize> with vec![0]",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/sample.rs:14:5: replace evolved_sample_ranks -> Vec<usize> with vec![1]",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/sample.rs:14:5: replace evolved_sample_ranks -> Vec<usize> with vec![]",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/sample.rs:17:24: replace < with <= in evolved_sample_ranks",
+      "baseline": "MissedMutant",
+      "candidate": "MissedMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/sample.rs:17:24: replace < with == in evolved_sample_ranks",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/sample.rs:17:24: replace < with > in evolved_sample_ranks",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/sample.rs:21:20: replace * with + in evolved_sample_ranks",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/sample.rs:21:20: replace * with / in evolved_sample_ranks",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/sample.rs:21:38: replace / with % in evolved_sample_ranks",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/neighborhood/sample.rs:21:38: replace / with * in evolved_sample_ranks",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/simulation/tick.rs:123:5: replace advance_shared_memory with ()",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/simulation/tick.rs:124:19: replace > with < in advance_shared_memory",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/simulation/tick.rs:124:19: replace > with == in advance_shared_memory",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/simulation/tick.rs:124:19: replace > with >= in advance_shared_memory",
+      "baseline": "MissedMutant",
+      "candidate": "MissedMutant"
+    },
+    {
+      "name": "crates/v3-core/src/simulation/tick.rs:125:26: replace - with + in advance_shared_memory",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/simulation/tick.rs:125:26: replace - with / in advance_shared_memory",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/simulation/tick.rs:127:19: replace *= with += in advance_shared_memory",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/simulation/tick.rs:127:19: replace *= with /= in advance_shared_memory",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    },
+    {
+      "name": "crates/v3-core/src/simulation/tick.rs:141:5: replace run_phase_0 with ()",
+      "baseline": "CaughtMutant",
+      "candidate": "CaughtMutant"
+    }
+  ],
+  "pilot_candidates": [
+    "crates/v3-cli/src/main.rs:153:5: replace resolve_profile_params -> Result<(ProfileParams, String), String> with Ok((Default::default(), String::new()))",
+    "crates/v3-cli/src/bench.rs:127:5: replace gate_profile_params -> ProfileParams with Default::default()",
+    "crates/v3-cli/src/bench.rs:696:5: replace fraction_or_undefined -> String with String::new()",
+    "crates/v3-core/src/neighborhood/battery.rs:57:5: replace nonzero_or_zero -> f32 with 0.0",
+    "crates/v3-core/src/neighborhood/births.rs:50:5: replace per_birth_result -> BirthResult with Default::default()",
+    "crates/v3-core/src/neighborhood/births.rs:84:9: delete field births_total from struct BirthResult expression in fold_outcomes",
+    "crates/v3-core/src/neighborhood/classify.rs:26:5: replace is_all_noop -> bool with true",
+    "crates/v3-core/src/neighborhood/companions.rs:49:25: delete match arm VmInstruction::LoadSlot{..} | VmInstruction::LoadSlotImm{..} | VmInstruction::LoadSlotPrev{..} in structural_companions",
+    "crates/v3-core/src/neighborhood/operators.rs:53:9: replace OperatorKind::all -> Vec<Self> with vec![]",
+    "crates/v3-core/src/neighborhood/sample.rs:14:5: replace evolved_sample_ranks -> Vec<usize> with vec![]",
+    "crates/v3-core/src/neighborhood/sample.rs:17:24: replace < with <= in evolved_sample_ranks",
+    "crates/v3-core/src/simulation/tick.rs:123:5: replace advance_shared_memory with ()",
+    "crates/v3-core/src/simulation/tick.rs:124:19: replace > with >= in advance_shared_memory"
+  ],
+  "runner_decision": "Keep cargo: nextest 0.9.143 did not improve the pilot and does not automatically run doctests.",
+  "limitations": "Single Apple Silicon host and one complete feature diff; pilot opt-level 1 repeated with fresh results. No universal speedup claimed.",
+  "timing_caveat": "UTC spans and monotonic stopwatch times diverge by approximately 585 seconds for candidate-full and 590 seconds for pilot-opt1. Cause unverified. Use the conservative full-run UTC reduction for the 20% acceptance threshold; preserve both measurements.",
+  "integration": {
+    "base_revision": "9c9942b774fbaa9b7fc2039eb6b3db7b824301c4",
+    "implementation_unchanged_after_fast_forward": true,
+    "viability": "25 passed before user waiver",
+    "repeat_mutation_run": "Stopped on user request; incomplete, not acceptance evidence",
+    "repeat_make_check": "Not run; waived by user",
+    "user_authorized_merge_without_further_tests": true,
+    "commit_hooks": "Skipped for this commit only under the user waiver of further validation"
+  }
+}
