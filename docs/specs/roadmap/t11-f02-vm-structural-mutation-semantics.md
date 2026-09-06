@@ -1,6 +1,6 @@
 # T11.F02 — VM Structural Mutation Semantics
 
-**Status**: Blocked
+**Status**: Complete
 **Last updated**: 2026-09-05
 **Feature**: T11.F02
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -119,7 +119,7 @@ registers on which later mutations can operate without overwriting live values.
 - [x] Store gate and single-run goal reports at
       `docs/progress/features/t11-f02-vm-structural-mutation-semantics.json`
       and `...-goal.json`.
-- [ ] Append held closure-series entries and update `docs/progress.md` after
+- [x] Append closure-series entries and update `docs/progress.md` after
       reconciliation/integration authorization.
 
 ## Verification
@@ -146,7 +146,7 @@ registers on which later mutations can operate without overwriting live values.
       uses the existing host-contention preflight and unchanged profile sizes.
 - [x] Second goal-profile determinism run: Not applicable per the 2026-09-05
       workflow decision; cross-process reproducibility remains in `make check`.
-- [ ] `make roadmap-check` on document edits, independently by the orchestrator
+- [x] `make roadmap-check` on document edits, independently by the orchestrator
       before accepting implementation; final `make check` exits 0 for the
       content committed and integrated into `main`.
 
@@ -335,7 +335,7 @@ Evolved outcomes use 12 sampled genomes, 255 pooled mutated births and 16 event-
       and register-count events preserve effective register identities.
 - [x] Founder slack preserves unmutated behavior; neutral edit properties,
       applied-cost fixtures, viability, and reproducibility pass.
-- [ ] Reference contracts, mutation triage, benchmark/progress evidence, and
+- [x] Reference contracts, mutation triage, benchmark/progress evidence, and
       final review are complete; the checked feature and Complete spec land on
       clean `main` at the tested commit, with worktree and branch removed.
 
@@ -427,23 +427,5 @@ Evolved outcomes use 12 sampled genomes, 255 pooled mutated births and 16 event-
   because a surviving conditional jump's offset may be reencoded; it also
   required one Cargo positional filter per command. Seven consultations total;
   no guidance rejected.
-- Integration blocker (2026-09-05): while this feature was at implementation
-  commit `e63248591faa7eb51f79014068a6920cc305ecb1`, `main` at
-  `/Users/istefanek/projects/petri` advanced from the recorded base
-  `c1e3b406ddd82b6bc42b431411011326d634af5e` to
-  `eddfacae43cc5e32a3748b9e2a589e14acba1172` (`test: fix rust-mutants guard
-  case against a shallow checkout`). The main change is limited to
-  `scripts/bench-wait-test`, which does not overlap this feature's paths, but
-  workflow requires explicit reconciliation authority before rebasing or
-  merging. No reconciliation has been performed. Completed validation is the
-  debug/release VM, viability, neighborhood, reproducibility, VM E2E, docs,
-  and gate evidence above; the gate report is present at
-  `docs/progress/features/t11-f02-vm-structural-mutation-semantics.json` but
-  has not been appended to the series because closure-series append remains held for reconciliation authorization.
-  The original mutation run has since reached the terminal summary recorded
-  above. Implementation, mutation testing, and both benchmarks are complete. A fresh
-  feature-branch review may proceed; reconciliation, integration, and closure
-  updates remain blocked on explicit authority; no rebase or merge has been
-  performed.
-
+- Reconciliation record: user approved rebase onto `eddfacae43cc5e32a3748b9e2a589e14acba1172`; it produced `4af034c0883f45e57ca44109a2a7fb8cb89698f7`. Only `scripts/bench-wait-test` differed from pre-rebase `7abb3b5d`; feature source was unchanged. Reports retain producer `cb471ac9` intentionally: release content was unchanged, later work restored one test and updated docs, and the single goal run remains valid.
 - Final benchmarks: replacement gate and the single goal run both exited 0. Goal report has no severe regression; plasticity updates are +23.452613% (flagged) while VM steps are -51.407250%. This follows altered mutation application/neighborhood behavior, not a work-counter or per-opcode runtime change; source review found only mutation-time splice repair and paired-slot arithmetic changes.
