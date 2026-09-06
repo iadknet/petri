@@ -138,6 +138,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
         return NodeResult::exhausted();
     }
 
+    let evaluation_energy = *energy;
     let resolve_ctx = ResolveCtx {
         sensors,
         upstream_slots,
@@ -271,7 +272,7 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
         let post_ctx = ResolveCtx {
             sensors,
             upstream_slots,
-            energy: *energy,
+            energy: evaluation_energy,
             energy_consumed,
             reproductive_reserve,
             action_queue: &queue_snapshot,
@@ -280,7 +281,9 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
             def,
             node_idx,
             &mut graph_runtime.eligibility_traces,
+            &graph_runtime.tick_start_eligibility_traces,
             &graph_runtime.plasticity_weights,
+            &prev_outputs,
             &curr_outputs,
             input_refs,
             &post_ctx,
@@ -602,12 +605,12 @@ mod clock_tests {
             ..RuntimeConfig::default()
         };
         let mut energy = 100.0;
-        state.begin_tick();
+        state.begin_tick(&[]);
         assert_eq!(visit(&def, &mut state, 1.0, &mut energy, &config).0, 0.5);
         assert_eq!(visit(&def, &mut state, 2.0, &mut energy, &config).0, 1.0);
         assert_eq!(energy, 99.5);
-        state.begin_tick();
-        state.begin_tick(); // no visit: sample and hold, no catch-up
+        state.begin_tick(&[]);
+        state.begin_tick(&[]); // no visit: sample and hold, no catch-up
         assert_eq!(state.node_outputs[0], [1.0]);
         assert_eq!(energy, 99.5);
         assert_eq!(visit(&def, &mut state, 1.0, &mut energy, &config).0, 1.0);
@@ -629,7 +632,7 @@ mod clock_tests {
             ..RuntimeConfig::default()
         };
         let mut state = GraphRuntimeState::new();
-        state.begin_tick();
+        state.begin_tick(&[]);
         visit(&def, &mut state, 1.0, &mut 100.0, &config);
         let committed_state = state.node_state.clone();
         let committed_outputs = state.node_outputs.clone();
@@ -706,8 +709,8 @@ mod clock_tests {
         let mut ordinary = GraphRuntimeState::new();
         let mut traced = ordinary.clone();
         for expected_delta in [1.0, 0.5, 0.25] {
-            ordinary.begin_tick();
-            traced.begin_tick();
+            ordinary.begin_tick(&[]);
+            traced.begin_tick(&[]);
             let mut energy = 100.0;
             let config = RuntimeConfig {
                 graph_node_base_cost: 0.25,
@@ -764,7 +767,7 @@ mod clock_tests {
                 _ => (old + 0.01 * input).clamp(0.1, 2.0),
             };
             let mut state = GraphRuntimeState::new(); state.node_state = vec![vec![old]];
-            state.begin_tick();
+            state.begin_tick(&[]);
             let config = RuntimeConfig { max_graph_relax_iters: pass_cap, graph_convergence_stable_passes: stable, graph_convergence_epsilon: 99.0, ..RuntimeConfig::default() };
             let def = graph(kind, extra);
             let (_, side) = visit(&def, &mut state, input, &mut 100.0, &config);

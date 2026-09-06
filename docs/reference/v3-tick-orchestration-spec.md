@@ -160,8 +160,15 @@ nodes receive weight updates based on tick outcomes. For each such creature:
    `dw = learning_rate * outcome_signal[channel] * eligibility_trace[edge]`.
 3. Clamp updated weight to `[-weight_clamp, weight_clamp]`.
 
-Eligibility traces are updated during Phase 1 graph evaluation
-(post-convergence) and persist across ticks with configurable decay.
+Phase 0 calls `graph_runtime.begin_tick(&genome.nodes)` to decay initialized
+eligibility once and freeze its base. Each successful Phase 1 graph visit
+replaces activity from that base, using actual evaluation inputs; activity
+contains no learning-rate factor. Skipped modules retain decayed credit,
+and failed visits preserve the last successful contribution (or base).
+Phase 2.5 applies rewards once per initialized edge even on skipped ticks,
+without clearing credit. Zero-delta updates retain their configured charge
+and work count. Clock decay initializes no weights and adds no charge.
+See the graph backend reference for the exact four activity rules.
 
 Creatures without reward-modulated nodes skip Phase 2.5 entirely.
 Newborns spawned during Phase 2 have no outcome accumulator entry and

@@ -24,3 +24,6 @@ pub(crate) use crate::creature::genome::OutcomeChannel;
 pub(crate) struct OutcomeSignalBank {
     pub signals: [f32; OUTCOME_CHANNEL_COUNT],
 }
+
+#[cfg(test)]
+mod tests;

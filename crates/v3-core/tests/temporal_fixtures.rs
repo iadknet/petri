@@ -4,14 +4,9 @@
 //! the production tick path (`Simulation` + `run_tick`) at production runtime
 //! settings, that records what the brain's temporal building blocks are
 //! expected to do and what they observably do. Every fixture is `#[test]`
-//! green on the current code: it pins the *observed* behavior, not an
-//! aspirational one. Where the observed behavior is a gap against the
-//! node-type contract (every piece of persistent state advances once per
-//! world tick — `docs/roadmaps/t11-brain-genotype-phenotype-map.md`), the
-//! fixture's doc comment and the spec catalogue at
-//! `docs/specs/roadmap/t11-f05-temporal-controller-fixtures.md` name the
-//! repair feature (T11.F06 graph memory clock, T11.F07 reward trace clock)
-//! that is expected to flip the assertion.
+//! green on the current code. Historical T11.F05 gaps are preserved in its
+//! spec catalogue; T11.F06 graph memory and T11.F07 reward-trace repairs now
+//! pin the explicit world-tick contract in D1–D3 and E1–E3.
 //!
 //! Fixture IDs: A1 (reactive control), B1 (shared-memory delayed cue), B2
 //! (previous-slot one-tick cue), C1 (retention), C2 (retention under decay),
@@ -944,16 +939,8 @@ fn d3_backward_edge_recurrence() {
 
 // ── E1: exact one-edge update, immediate reward ─────────────────────────────
 
-/// E1 exact one-edge update, immediate reward: a single reward-modulated
-/// Hebbian edge (`Classic`, `learning_rate = eta = 0.5`, `trace_decay =
-/// decay = 0.5`) fed by a `Constant(1.0)` pre-synaptic node. The node fires
-/// `Eat` and the execute gate every tick; food is present, so `ActionSuccess
-/// == 1.0` exactly (the only action attempted, and it succeeds). Status:
-/// gap, assigned to T11.F07. The documented rule applies the learning rate
-/// twice — once folded into the eligibility trace (`trace = decay * trace +
-/// eta * pre * post`) and again at the reward update (`dw = eta * signal *
-/// trace`) — so the effective one-tick gain is `eta^2 * signal * pre * post`
-/// rather than a single `eta` application.
+/// E1: unit activity and immediate unit reward give trace 1 and a single
+/// eta=0.5 weight update. T11.F05 retains the historical eta-squared reading.
 #[test]
 fn e1_exact_one_edge_update_immediate_reward() {
     let pos = Position::new(5, 5);
@@ -980,36 +967,27 @@ fn e1_exact_one_edge_update_immediate_reward() {
     let post = 1.0f32; // node1's own output: wsum = weight(1.0) * pre(1.0)
     let signal = 1.0f32; // ActionSuccess: the only attempted action succeeded
 
-    let expected_trace = decay * 0.0 + eta * pre * post; // 0.5
-    let expected_gain = eta * eta * signal * pre * post; // eta^2 * signal * pre * post = 0.25
+    let expected_trace = decay * 0.0 + pre * post; // 1.0
+    let expected_gain = eta * signal * pre * post; // 0.5
     let expected_weight = 1.0 + expected_gain; // genome weight 1.0 + gain
 
     let trace = creature.graph_runtime.eligibility_traces[0][1][0];
     let weight = creature.graph_runtime.plasticity_weights[0][1][0];
     assert!(
         (trace - expected_trace).abs() < 1e-6,
-        "eligibility trace after tick1 should be eta*pre*post = {expected_trace}, got {trace}"
+        "eligibility trace after tick1 should be pre*post = {expected_trace}, got {trace}"
     );
     assert!(
         (weight - expected_weight).abs() < 1e-6,
-        "plasticity weight after tick1 should show the double learning-rate application \
-         (eta^2 * signal * pre * post = {expected_gain} added to the genome weight), got {weight}"
+        "plasticity weight after tick1 should show the single learning-rate application \
+         (eta * signal * pre * post = {expected_gain} added to the genome weight), got {weight}"
     );
 }
 
 // ── E2: delayed reward, visited every tick ──────────────────────────────────
 
-/// E2 delayed reward, visited every tick: E1's genome with the reward signal
-/// held at zero (no food, so `Eat` fails) until tick `d + 1`, for `d` in {1,
-/// 2, 4}. Because the module runs every tick, the eligibility trace
-/// correctly accumulates decayed credit across the elapsed ticks
-/// (`trace_n = eta * sum_{k=0}^{n-1} decay^k`), and the credit delivered at
-/// the reward tick is discounted by exactly that elapsed-tick trace. Status:
-/// meets on elapsed-time discounting — this is the well-behaved contrast
-/// case against E3's skipped visits — but the weight update still carries
-/// E1's `eta^2` double learning-rate application (`expected_weight` below
-/// folds `eta` into `expected_trace` and again into the reward update), so
-/// this fixture inherits E1's gap (assigned to T11.F07) on gain, not timing.
+/// E2: visits on every tick accumulate activity-only credit with elapsed-tick
+/// retention; eta enters once when the delayed reward arrives.
 #[test]
 fn e2_delayed_reward_visited_every_tick() {
     for delay in [1u64, 2, 4] {
@@ -1031,7 +1009,7 @@ fn e2_delayed_reward_visited_every_tick() {
         let decay = 0.5f32;
         let mut expected_trace = 0.0f32;
         for _ in 0..reward_tick {
-            expected_trace = decay * expected_trace + eta * 1.0 * 1.0;
+            expected_trace = decay * expected_trace + 1.0 * 1.0;
         }
         let expected_weight = 1.0 + eta * 1.0 * expected_trace; // signal == 1.0 at the reward tick
 
@@ -1053,33 +1031,10 @@ fn e2_delayed_reward_visited_every_tick() {
 
 // ── E3: skipped module visits ────────────────────────────────────────────────
 
-/// E3 skipped module visits: the entry VM node routes to the reward-modulated
-/// graph node only on ticks with `FoodHere > 0` (tick 1); ticks 2 and 3 skip
-/// the module entirely (`NoOp` + `ExecuteActionQueue` terminates the mesh
-/// before any routing decision). The reward-source channel is `EnergyDelta`
-/// (nonzero and independent of whether the module ran) rather than
-/// `ActionSuccess`, so a nonzero signal is available on skipped ticks too:
-/// on the visit tick, the graph node has no route targets of its own, so the
-/// mesh soft-default terminates with `NoOp`; on a skipped tick, the entry VM
-/// explicitly pushes `NoOp`. Both paths land on the same Phase 2 charge,
-/// `noop_cost` (0.05), which dominates the VM/graph opcode costs it sits on
-/// top of (1e-6 to 1e-5 scale) and gives a measured signal of about -0.05 per
-/// tick (signal_1 ≈ -0.050079, skipped ≈ -0.050018). Status:
-/// gap, assigned to T11.F07. The eligibility trace is frozen at its tick-1
-/// value on skipped ticks (the module never re-evaluates it), but the
-/// reward-learning pass still applies `dw = eta * signal * trace` every tick
-/// to every creature with a reward-modulated node — using that stale,
-/// frozen trace, so the weight still moves by about -0.0125 per skipped
-/// tick — because it does not check whether the node's mesh hop executed
-/// this tick.
-///
-/// The test measures the `EnergyDelta` signal itself by reading
-/// `creature.energy` around each `run_tick` call, rather than hand-deriving
-/// VM/graph opcode costs; this equivalence to production's own signal holds
-/// only because `test_config()` sets `energy_decay_per_tick == 0.0` and
-/// production's `reward_learning_cost` defaults to `0.0` — if either
-/// defaults away from zero, this fixture's arithmetic (not just its
-/// assertions) needs revisiting.
+/// E3: a conditional VM skips the graph on ticks 2 and 3. Measured nonzero
+/// EnergyDelta still updates its weights, using elapsed-tick decayed credit.
+/// Energy decay and reward-learning cost are zero in this fixture, so the
+/// observed energy difference equals the production reward signal.
 #[test]
 fn e3_skipped_module_visits() {
     let pos = Position::new(5, 5);
@@ -1132,10 +1087,10 @@ fn e3_skipped_module_visits() {
     let creature = sim.creatures.get(target).expect("alive");
     let trace_1 = creature.graph_runtime.eligibility_traces[1][1][0];
     let eta = 0.5f32;
-    let expected_trace_1 = eta; // decay*0 + eta*pre(1.0)*post(1.0)
+    let expected_trace_1 = 1.0; // decay*0 + pre(1.0)*post(1.0)
     assert!(
         (trace_1 - expected_trace_1).abs() < 1e-5,
-        "tick1 trace should be eta*pre*post = {expected_trace_1}, got {trace_1}"
+        "tick1 trace should be pre*post = {expected_trace_1}, got {trace_1}"
     );
     let mut expected_weight = 1.0 + eta * signal_1 * trace_1;
     let weight_1 = creature.graph_runtime.plasticity_weights[1][1][0];
@@ -1168,21 +1123,20 @@ fn e3_skipped_module_visits() {
 
         let creature = sim.creatures.get(target).expect("alive");
         let trace_now = creature.graph_runtime.eligibility_traces[1][1][0];
+        let expected_trace = trace_1 * 0.5f32.powi((skipped_tick - 1) as i32);
         assert!(
-            (trace_now - trace_1).abs() < 1e-9,
-            "gap: eligibility trace should stay frozen across a skipped tick \
-             (module never re-evaluated it); tick {skipped_tick} trace {trace_now} \
-             should equal tick1 trace {trace_1}"
+            (trace_now - expected_trace).abs() < 1e-9,
+            "skipped tick {skipped_tick}: expected trace {expected_trace}, got {trace_now}"
         );
 
-        expected_weight += eta * signal * trace_1;
+        expected_weight += eta * signal * expected_trace;
         let weight_now = creature.graph_runtime.plasticity_weights[1][1][0];
         assert!(
             (weight_now - expected_weight).abs() < 1e-4,
-            "gap: reward learning should still move the weight on a skipped tick \
-             using the stale, frozen trace (eta*signal*trace_1 = {}), \
+            "reward learning should move the weight on a skipped tick \
+             using decayed credit (eta*signal*trace = {}), \
              expected cumulative weight {expected_weight}, got {weight_now}",
-            eta * signal * trace_1
+            eta * signal * expected_trace
         );
     }
 }
@@ -1262,7 +1216,7 @@ proptest! {
             let prev_shared_memory = [0.0f32; 16];
             let mut graph_runtime = GraphRuntimeState::new();
             graph_runtime.node_state.push(vec![0.0, state]);
-            graph_runtime.begin_tick();
+            graph_runtime.begin_tick(&genome.nodes);
 
             let _ = execute_creature_mesh(
                 &genome,
