@@ -1587,11 +1587,11 @@ mod tests {
                     // Either the slot moved by one unit (wrapping to 15
                     // going down from 0) with `previous` untouched, or the
                     // slot stayed put and `previous` flipped to true.
-                    assert!(
-                        (slot == 1 && !previous)
-                            || (slot == 15 && !previous)
-                            || (slot == 0 && previous)
-                    );
+                    assert!(if previous {
+                        slot == 0
+                    } else {
+                        slot == 1 || slot == 15
+                    });
                 }
                 other => panic!("variant must not change, got {other:?}"),
             }
