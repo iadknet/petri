@@ -25,5 +25,14 @@
       "docs/progress/features/t11-f03-function-preserving-graph-growth-goal.json",
       "docs/progress/features/t11-f04-mutation-supply-and-neutral-scaffold-goal.json"
     ]
-  }
+  },
+  "counter_definition_changes": [
+    {
+      "feature": "T11.F06",
+      "counter": "graph_relax_iters",
+      "before": "entered relaxation passes",
+      "after": "entered nonempty single-evaluation graph visits including unaffordable attempts",
+      "comparison": "raw deltas retained; cross-definition deltas are not like-for-like work efficiency"
+    }
+  ]
 }

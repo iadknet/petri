@@ -327,6 +327,7 @@ mod tests {
                         selected_target_id: v3_core::contracts::NodeId::new(5),
                     }),
                     backend_trace: BackendTrace::Graph(GraphTrace {
+                        temporal_committed: true,
                         passes: vec![],
                         converged: true,
                         stable_passes_count: 2,

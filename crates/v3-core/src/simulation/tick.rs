@@ -149,6 +149,7 @@ pub fn run_phase_0(sim: &mut Simulation) {
         creature.lifetime_energy_sum += f64::from(creature.energy.max(0.0));
         creature.lifetime_energy_sample_count += 1;
 
+        creature.graph_runtime.begin_tick();
         advance_shared_memory(
             &mut creature.shared_memory,
             &mut creature.prev_shared_memory,
@@ -270,6 +271,98 @@ pub fn observe_final_actions(sim: &Simulation) -> Vec<FinalActionObservation> {
         .collect()
 }
 
+/// Named temporal substrates, each intervened on separately.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TemporalMemorySubstrate {
+    PreviousSlots,
+    PersistedOutputs,
+    OperatorState,
+}
+
+/// Full action comparisons at a synthetic next graph-cognition boundary.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TemporalActionObservation {
+    pub substrate: TemporalMemorySubstrate,
+    pub actions: FinalActionObservation,
+}
+
+#[derive(Clone, Copy)]
+enum MemoryIntervention {
+    Zero,
+    Rotate,
+}
+
+/// Prepare the graph clock on cloned state, without advancing shared-memory
+/// snapshot/decay, age, energy, world, or RNG. Then perturb only the named read
+/// substrate; no further tick snapshot occurs before evaluating each clone.
+/// Rotations are one position left within each individual slot vector.
+pub fn observe_temporal_actions(sim: &Simulation) -> Vec<TemporalActionObservation> {
+    let mut ids: Vec<_> = sim.creatures.keys().collect();
+    ids.sort();
+    let mut observations = Vec::with_capacity(ids.len() * 3);
+    for (id, sensors) in assemble_sensor_inputs(sim, &ids) {
+        let creature = &sim.creatures[id];
+        let mut prepared = creature.graph_runtime.clone();
+        prepared.begin_tick();
+        let evaluate = |graph: &mut crate::creature::state::GraphRuntimeState,
+                        previous: &[f32; 16]| {
+            execute_creature_mesh_with_reserve(
+                &creature.genome,
+                &sensors,
+                &mut { creature.energy },
+                creature.reproductive_reserve,
+                &mut { creature.shared_memory },
+                previous,
+                graph,
+                &sim.config.runtime,
+            )
+            .actions
+        };
+        let intact = evaluate(&mut prepared.clone(), &creature.prev_shared_memory);
+        for substrate in [
+            TemporalMemorySubstrate::PreviousSlots,
+            TemporalMemorySubstrate::PersistedOutputs,
+            TemporalMemorySubstrate::OperatorState,
+        ] {
+            let [zeroed, scrambled] =
+                [MemoryIntervention::Zero, MemoryIntervention::Rotate].map(|intervention| {
+                    let mut graph = prepared.clone();
+                    let mut previous = creature.prev_shared_memory;
+                    let perturb = |slots: &mut [f32]| match intervention {
+                        MemoryIntervention::Zero => slots.fill(0.0),
+                        MemoryIntervention::Rotate => {
+                            if !slots.is_empty() {
+                                slots.rotate_left(1);
+                            }
+                        }
+                    };
+                    match substrate {
+                        TemporalMemorySubstrate::PreviousSlots => perturb(&mut previous),
+                        TemporalMemorySubstrate::PersistedOutputs => graph
+                            .tick_start_outputs
+                            .iter_mut()
+                            .for_each(|slots| perturb(slots)),
+                        TemporalMemorySubstrate::OperatorState => graph
+                            .tick_start_state
+                            .iter_mut()
+                            .for_each(|slots| perturb(slots)),
+                    }
+                    evaluate(&mut graph, &previous)
+                });
+            observations.push(TemporalActionObservation {
+                substrate,
+                actions: FinalActionObservation {
+                    creature_id: id,
+                    intact: intact.clone(),
+                    zeroed,
+                    scrambled,
+                },
+            });
+        }
+    }
+    observations
+}
+
 fn observe_action_queue(
     creature: &CreatureState,
     sensors: &SensorSnapshot,
@@ -278,6 +371,7 @@ fn observe_action_queue(
 ) -> Vec<WorldAction> {
     let mut energy = creature.energy;
     let mut graph_runtime = creature.graph_runtime.clone();
+    graph_runtime.begin_tick();
     execute_creature_mesh_with_reserve(
         &creature.genome,
         sensors,
@@ -1222,6 +1316,94 @@ mod final_action_observation_tests {
         assert_eq!(observation.zeroed, expected);
         assert_eq!(observation.scrambled, expected);
         assert_eq!(sim.creatures[id].graph_runtime.node_state, vec![vec![1.0]]);
+    }
+
+    #[test]
+    fn temporal_probe_detects_each_substrate_and_preserves_live_state() {
+        for substrate in [
+            TemporalMemorySubstrate::PreviousSlots,
+            TemporalMemorySubstrate::PersistedOutputs,
+            TemporalMemorySubstrate::OperatorState,
+        ] {
+            let mut config = SimulationConfig::default();
+            config.population.initial_creatures = 1;
+            let mut sim = seed_simulation(config, 11);
+            let id = sim.creatures.keys().next().unwrap();
+            let creature = &mut sim.creatures[id];
+            let source = match substrate {
+                TemporalMemorySubstrate::PreviousSlots => GraphSource::SharedMemory {
+                    slot: 0,
+                    previous: true,
+                },
+                _ => GraphSource::ComputeNode(0),
+            };
+            let edge = GraphEdge {
+                source,
+                weight: 1.0,
+            };
+            let kind = if substrate == TemporalMemorySubstrate::OperatorState {
+                ComputeNodeKind::DecayIntegrator(0.0)
+            } else {
+                ComputeNodeKind::Add
+            };
+            let mut genome = runtime_state_action_genome();
+            let BackendDef::Graph(def) = &mut genome.nodes[0].backend_def else {
+                unreachable!()
+            };
+            def.compute_nodes = vec![
+                ComputeNode {
+                    kind,
+                    inputs: vec![edge],
+                    plasticity: None,
+                },
+                ComputeNode {
+                    kind: ComputeNodeKind::Constant(0.0),
+                    inputs: vec![],
+                    plasticity: None,
+                },
+            ];
+            creature.genome = genome;
+            creature.prev_shared_memory[0] = 1.0;
+            creature.graph_runtime.node_state = vec![vec![1.0, 0.0]];
+            creature.graph_runtime.node_outputs = vec![vec![1.0, 0.0]];
+            // Stale snapshots must be refreshed from committed state before intervention.
+            creature.graph_runtime.tick_start_state = vec![vec![0.0, 0.0]];
+            creature.graph_runtime.tick_start_outputs = vec![vec![0.0, 0.0]];
+            let graph_before = creature.graph_runtime.clone();
+            let memory_before = creature.shared_memory;
+            let previous_before = creature.prev_shared_memory;
+            let energy_before = creature.energy;
+            let mut rng = sim.rng.clone();
+            let observations = observe_temporal_actions(&sim);
+            assert_eq!(observations.len(), 3);
+            for observation in observations {
+                if observation.substrate == substrate {
+                    assert_ne!(observation.actions.intact, observation.actions.zeroed);
+                    assert_ne!(observation.actions.intact, observation.actions.scrambled);
+                } else {
+                    assert_eq!(observation.actions.intact, observation.actions.zeroed);
+                    assert_eq!(observation.actions.intact, observation.actions.scrambled);
+                }
+            }
+            let creature = &sim.creatures[id];
+            assert_eq!(creature.graph_runtime.node_state, graph_before.node_state);
+            assert_eq!(
+                creature.graph_runtime.node_outputs,
+                graph_before.node_outputs
+            );
+            assert_eq!(
+                creature.graph_runtime.tick_start_state,
+                graph_before.tick_start_state
+            );
+            assert_eq!(
+                creature.graph_runtime.tick_start_outputs,
+                graph_before.tick_start_outputs
+            );
+            assert_eq!(creature.shared_memory, memory_before);
+            assert_eq!(creature.prev_shared_memory, previous_before);
+            assert_eq!(creature.energy, energy_before);
+            assert_eq!(sim.rng.next_u64(), rng.next_u64());
+        }
     }
 
     proptest! {

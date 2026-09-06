@@ -74,12 +74,18 @@ function buildSample(tickCount = 2): ExecutionSample {
 								max_delta: 0,
 							},
 						],
-						converged: true,
-						stable_passes_count: 1,
+						converged: false,
+						temporal_committed: true,
+						stable_passes_count: 0,
 						final_outputs: [],
 						output_sinks: [],
 						action_slots: [],
-						execute_gate: { wired: false, weighted_sum: 0, queue_non_empty: false, fired: false },
+						execute_gate: {
+							wired: false,
+							weighted_sum: 0,
+							queue_non_empty: false,
+							fired: false,
+						},
 					},
 				},
 			},
@@ -93,7 +99,11 @@ function buildSample(tickCount = 2): ExecutionSample {
 	return { creature_id: 1, ticks };
 }
 
-const defaultPosition: SamplerPosition = { tickIndex: 0, hopIndex: 0, detailIndex: 0 };
+const defaultPosition: SamplerPosition = {
+	tickIndex: 0,
+	hopIndex: 0,
+	detailIndex: 0,
+};
 
 const defaultProps = {
 	sample: null as ExecutionSample | null,

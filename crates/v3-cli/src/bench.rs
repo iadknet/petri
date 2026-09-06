@@ -180,8 +180,14 @@ pub struct Report {
     pub comparison: Comparison,
 }
 
+fn legacy_graph_work_definition() -> String {
+    "graph_relax_iters: entered relaxation passes (before T11.F06)".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Deterministic {
+    #[serde(default = "legacy_graph_work_definition")]
+    pub graph_work_definition: String,
     pub profile: ProfileBlock,
     pub per_seed: Vec<PerSeed>,
     pub totals: Totals,
@@ -252,6 +258,8 @@ pub struct GoalIndicators {
     pub lineage_diversity: Indicator<LineageDiversity>,
     #[serde(default = "undefined_memory_sensitivity")]
     pub memory_sensitivity: Indicator<MemorySensitivity>,
+    #[serde(default = "undefined_temporal_memory_sensitivity")]
+    pub temporal_memory_sensitivity: Indicator<TemporalMemorySensitivity>,
     #[serde(default = "undefined_mutational_neighborhood")]
     pub mutational_neighborhood: Indicator<MutationalNeighborhood>,
     pub strategy_count: String,
@@ -302,6 +310,26 @@ pub struct MemorySensitivity {
     pub snapshot_timing: String,
     pub scramble_algorithm: String,
     pub per_seed: Vec<MemorySensitivitySeed>,
+}
+
+fn undefined_temporal_memory_sensitivity() -> Indicator<TemporalMemorySensitivity> {
+    Indicator::Undefined(UNDEFINED.to_string())
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemporalMemorySensitivity {
+    pub version: String,
+    pub snapshot_timing: String,
+    pub scramble_algorithm: String,
+    pub per_seed: Vec<TemporalMemorySensitivitySeed>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TemporalMemorySensitivitySeed {
+    pub seed: u64,
+    pub previous_slots: MemorySensitivitySeed,
+    pub persisted_outputs: MemorySensitivitySeed,
+    pub operator_state: MemorySensitivitySeed,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -824,6 +852,7 @@ struct SeedRun {
 struct GoalObservation {
     lineage_diversity: LineageDiversitySeed,
     memory_sensitivity: MemorySensitivitySeed,
+    temporal_memory_sensitivity: TemporalMemorySensitivitySeed,
     wall_clock_ms: f64,
     /// `Some` only in the goal profile, where the evolved-genome half of the
     /// mutational-neighborhood indicator runs.
@@ -900,6 +929,7 @@ fn run_one_seed(
                 .map(|creature| creature.identity.lineage_id),
         );
         let memory_sensitivity_seed = memory_sensitivity(seed, &actions);
+        let temporal_memory_sensitivity = temporal_memory_sensitivity(seed, &sim);
         let wall_clock_ms = millis(observation_started.elapsed());
 
         let evolved_neighborhood_started = Instant::now();
@@ -919,6 +949,7 @@ fn run_one_seed(
         GoalObservation {
             lineage_diversity: lineage_diversity_seed,
             memory_sensitivity: memory_sensitivity_seed,
+            temporal_memory_sensitivity,
             wall_clock_ms,
             evolved_neighborhood,
             evolved_neighborhood_wall_clock_ms,
@@ -1023,6 +1054,28 @@ fn memory_sensitivity(seed: u64, observations: &[FinalActionObservation]) -> Mem
             different_from_either_count,
             final_creature_count,
         ),
+    }
+}
+
+fn temporal_memory_sensitivity(
+    seed: u64,
+    sim: &v3_core::simulation::Simulation,
+) -> TemporalMemorySensitivitySeed {
+    use v3_core::simulation::{observe_temporal_actions, TemporalMemorySubstrate};
+    let observations = observe_temporal_actions(sim);
+    let component = |substrate| {
+        let actions: Vec<_> = observations
+            .iter()
+            .filter(|observation| observation.substrate == substrate)
+            .map(|observation| observation.actions.clone())
+            .collect();
+        memory_sensitivity(seed, &actions)
+    };
+    TemporalMemorySensitivitySeed {
+        seed,
+        previous_slots: component(TemporalMemorySubstrate::PreviousSlots),
+        persisted_outputs: component(TemporalMemorySubstrate::PersistedOutputs),
+        operator_state: component(TemporalMemorySubstrate::OperatorState),
     }
 }
 
@@ -1303,6 +1356,7 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
     let mut population_persistence_per_seed = Vec::with_capacity(params.seeds.len());
     let mut lineage_diversity_per_seed = Vec::with_capacity(params.seeds.len());
     let mut memory_sensitivity_per_seed = Vec::with_capacity(params.seeds.len());
+    let mut temporal_memory_sensitivity_per_seed = Vec::with_capacity(params.seeds.len());
     let mut final_state_observation_ms_per_seed = Vec::with_capacity(params.seeds.len());
     let mut evolved_neighborhood_per_seed = Vec::with_capacity(params.seeds.len());
     let mut neighborhood_evolved_wall_clock_ms_per_seed = Vec::with_capacity(params.seeds.len());
@@ -1355,6 +1409,7 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
         if let Some(observation) = run.goal_observation {
             lineage_diversity_per_seed.push(observation.lineage_diversity);
             memory_sensitivity_per_seed.push(observation.memory_sensitivity);
+            temporal_memory_sensitivity_per_seed.push(observation.temporal_memory_sensitivity);
             final_state_observation_ms_per_seed.push(SeedFinalStateObservation {
                 seed,
                 wall_clock_ms: observation.wall_clock_ms,
@@ -1410,6 +1465,16 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
         } else {
             undefined_memory_sensitivity()
         },
+        temporal_memory_sensitivity: if observe_goal_indicators {
+            Indicator::Defined(TemporalMemorySensitivity {
+                version: "temporal-memory-v1".to_string(),
+                snapshot_timing: "hypothetical cognition from final committed graph state, with final sensors and current/previous shared-memory slots held fixed; no world tick or shared-memory snapshot/decay".to_string(),
+                scramble_algorithm: "rotate_left(1) independently within each named slot vector, after graph tick preparation".to_string(),
+                per_seed: temporal_memory_sensitivity_per_seed,
+            })
+        } else {
+            undefined_temporal_memory_sensitivity()
+        },
         mutational_neighborhood: build_mutational_neighborhood_indicator(
             neighborhood_founder,
             params,
@@ -1428,6 +1493,7 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
     };
 
     let deterministic = Deterministic {
+        graph_work_definition: "graph_relax_iters: entered nonempty single-evaluation visits, including unaffordable visits (T11.F06); historical deltas cross definitions".to_string(),
         profile: ProfileBlock {
             name: params.name.clone(),
             world_width: params.width,
@@ -2156,6 +2222,77 @@ mod tests {
         assert_eq!(
             lineage_diversity(11, [3, 3, 3, 9]).shannon_entropy_nats,
             "0.562335"
+        );
+    }
+
+    #[test]
+    fn temporal_report_keeps_substrate_counts_separate() {
+        use v3_core::contracts::NodeId;
+        use v3_core::creature::genome::cgp::{
+            ActionSlot, ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind,
+            ExecuteGate, GraphEdge, GraphSource, WorldActionKind,
+        };
+        use v3_core::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
+        let mut config = SimulationConfig::default();
+        config.population.initial_creatures = 1;
+        let mut sim = seed_simulation(config, 11);
+        let id = sim.creatures.keys().next().unwrap();
+        let edge = GraphEdge {
+            source: GraphSource::SharedMemory {
+                slot: 0,
+                previous: true,
+            },
+            weight: 1.0,
+        };
+        sim.creatures[id].genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![NodeGenome {
+                node_id: NodeId::new(0),
+                input_refs: vec![],
+                targets: vec![],
+                backend_def: BackendDef::Graph(CgpGraphBackendDef {
+                    compute_nodes: vec![ComputeNode {
+                        kind: ComputeNodeKind::Constant(0.0),
+                        inputs: vec![],
+                        plasticity: None,
+                    }],
+                    output_sinks: vec![],
+                    action_bank: vec![ActionSlot {
+                        behavior: ActionSlotBehavior::Emit(WorldActionKind::Eat),
+                        gate_inputs: vec![edge],
+                        param_inputs: vec![],
+                    }],
+                    execute_gate: ExecuteGate { inputs: vec![edge] },
+                }),
+            }],
+        };
+        sim.creatures[id].prev_shared_memory[0] = 1.0;
+        let report = temporal_memory_sensitivity(11, &sim);
+        assert_eq!(report.previous_slots.final_creature_count, 1);
+        assert_eq!(report.previous_slots.different_from_zeroed_count, 1);
+        assert_eq!(report.previous_slots.different_from_scrambled_count, 1);
+        for component in [report.persisted_outputs, report.operator_state] {
+            assert_eq!(component.final_creature_count, 1);
+            assert_eq!(component.different_from_either_count, 0);
+        }
+    }
+
+    #[test]
+    fn historical_goal_indicators_default_temporal_memory_to_undefined() {
+        let report: Report = serde_json::from_str(include_str!(
+            "../../../docs/progress/features/t11-f04-mutation-supply-and-neutral-scaffold.json"
+        ))
+        .unwrap();
+        assert_eq!(
+            report
+                .deterministic
+                .goal_indicators
+                .temporal_memory_sensitivity,
+            undefined_temporal_memory_sensitivity()
+        );
+        assert_eq!(
+            report.deterministic.graph_work_definition,
+            "graph_relax_iters: entered relaxation passes (before T11.F06)"
         );
     }
 

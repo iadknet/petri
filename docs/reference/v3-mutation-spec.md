@@ -472,3 +472,11 @@ outcomes among births with applied events. Divide its silent, changed, and dead
 counts by `births_total` for absolute mutated outcomes per all births; add
 `zero_event_births` to silent counts when reporting all behavior-identical births.
 Lower conditional harm alone does not establish fewer dead births overall.
+
+### Applied graph temporal clock (T11.F06)
+
+The node-type persistent-state contract now uses frozen world-tick operator
+state and compute outputs. Ordered combinational paths compute within one
+visit; self/higher-index edges cross the tick boundary. Repeated visits cannot
+accelerate temporal state and unvisited modules hold it. Disconnected node
+growth cannot change an existing node's clock. See `v3-graph-backend-spec.md`.

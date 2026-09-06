@@ -82,8 +82,9 @@ function makeSample(): ExecutionSample {
 										max_delta: 0.01,
 									},
 								],
-								converged: true,
-								stable_passes_count: 1,
+								converged: false,
+								temporal_committed: true,
+								stable_passes_count: 0,
 								final_outputs: [],
 								output_sinks: [],
 								action_slots: [],
@@ -166,7 +167,11 @@ describe("samplePlaybackStore", () => {
 
 		expect(state.sample?.creature_id).toBe(7);
 		expect(state.playbackState).toBe("loaded");
-		expect(state.position).toEqual({ tickIndex: 0, hopIndex: 0, detailIndex: 0 });
+		expect(state.position).toEqual({
+			tickIndex: 0,
+			hopIndex: 0,
+			detailIndex: 0,
+		});
 	});
 
 	it("steps forward across details, hops, and ticks", () => {

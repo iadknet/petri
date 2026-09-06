@@ -206,6 +206,7 @@ impl Battery {
         sequence
             .iter()
             .map(|scenario| {
+                graph_runtime.begin_tick();
                 advance_shared_memory(&mut shared_memory, &mut prev_shared_memory, decay_rate);
                 let mut energy = scenario.energy;
                 execute_creature_mesh_with_reserve(
