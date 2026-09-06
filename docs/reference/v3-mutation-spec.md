@@ -179,16 +179,25 @@ only their edges are evolvable.
   split, a NEAT-style insertion into one existing edge (any of the five
   surfaces, source any `GraphSource`) with an identity `Add` node whose
   single input (weight 1.0) reproduces the split edge's prior source exactly
-  in f32, and the old edge retargeted to the new node at its old weight.
-  When the split edge's consumer is a compute node at index `c`, the new node
-  is inserted at index `c` and every `ComputeNode(i >= c)` reference is
-  remapped to `i + 1` across all five surfaces
+  in f32 (the new node's output passes through `sanitize_output` like every
+  compute node's, so exact reproduction holds for values already within its
+  NaN→0/±1e9-clamp range), and the old edge retargeted to the new node at its
+  old weight. When the split edge's consumer is a compute node at index `c`,
+  the new node is inserted at index `c` and every `ComputeNode(i >= c)`
+  reference is remapped to `i + 1` across all five surfaces
   (`CgpGraphBackendDef::insert_compute_node_at`, the insert-with-remap
   inverse of `remove_compute_node_at`), preserving Gauss-Seidel pass order; a
   sink/action/execute-gate consumer appends instead. A split of a backward or
   self edge may extend convergence by at most one pass. Skips with
   `NoApplicableTarget` when the graph has no edge, or when the picked edge's
   source is an out-of-range `ComputeNode` (a prior removal's sentinel).
+  **Documented exception**: an append-branch split retargeting an
+  `InputLeaf(DynamicIntrospection(EnergyCurrent))` edge, on a graph carrying
+  plasticity, is not neutral — the new node's cached value is read at effects
+  time before the post-convergence plasticity-cost deduction, while a direct
+  edge on the same non-compute surface reads energy after it, differing by
+  `plasticity_cost * weight`. No observable effect under the production
+  default `plasticity_update_cost = 0.0`; see the T11.F03 spec.
 - `RemoveComputeNode` (removes from `compute_nodes`, remaps
   `GraphSource::ComputeNode` indices across all edge containers)
 - `AddGraphEdge` (all 5 edge-bearing surfaces; source sampled by

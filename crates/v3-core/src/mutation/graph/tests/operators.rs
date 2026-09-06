@@ -218,6 +218,126 @@ fn base_input_refs() -> Vec<InputReference> {
     ]
 }
 
+/// A second fixture carrying a Hebbian-plasticity compute node and a
+/// `DynamicIntrospection(EnergyCurrent)` input reference wired directly onto
+/// a non-compute surface (the action slot's param input), on top of the
+/// same forward/backward/self-loop shape as `base_def`. Exercises the
+/// growth-neutrality properties against plasticity's post-convergence
+/// energy deduction and against the introspection reference kind, neither
+/// of which `base_def` carries. See the documented exception in the spec's
+/// Inputs and Invariants: a split's append branch on this action-param edge
+/// is *not* neutral under this fixture (see `is_documented_split_exception`
+/// below).
+fn plasticity_def() -> CgpGraphBackendDef {
+    CgpGraphBackendDef {
+        compute_nodes: vec![
+            ComputeNode {
+                kind: ComputeNodeKind::WeightedSum,
+                inputs: vec![GraphEdge {
+                    source: GraphSource::InputLeaf {
+                        ref_idx: 0,
+                        sub_idx: 3,
+                    },
+                    weight: 0.5,
+                }],
+                plasticity: Some(crate::creature::genome::PlasticityConfig {
+                    rule: crate::creature::genome::HebbianRule::Classic,
+                    learning_rate: 0.1,
+                    weight_clamp: 5.0,
+                    lamarckian: false,
+                    modulation: None,
+                }),
+            },
+            ComputeNode {
+                kind: ComputeNodeKind::Sigmoid,
+                inputs: vec![GraphEdge {
+                    source: GraphSource::ComputeNode(0),
+                    weight: 0.7,
+                }],
+                plasticity: None,
+            },
+        ],
+        output_sinks: vec![OutputSink {
+            kind: OutputSinkKind::CustomOutput(0),
+            inputs: vec![GraphEdge {
+                source: GraphSource::ComputeNode(1),
+                weight: 1.0,
+            }],
+        }],
+        action_bank: vec![ActionSlot {
+            behavior: ActionSlotBehavior::Emit(WorldActionKind::Move),
+            gate_inputs: vec![GraphEdge {
+                source: GraphSource::ComputeNode(1),
+                weight: 1.0,
+            }],
+            param_inputs: vec![GraphEdge {
+                // Directly on a non-compute surface: a split's append
+                // branch on this edge hits the documented
+                // pre/post-plasticity-cost exception.
+                source: GraphSource::InputLeaf {
+                    ref_idx: 2,
+                    sub_idx: 0,
+                },
+                weight: 1.0,
+            }],
+        }],
+        execute_gate: ExecuteGate {
+            inputs: vec![GraphEdge {
+                source: GraphSource::ComputeNode(1),
+                weight: 1.0,
+            }],
+        },
+    }
+}
+
+fn plasticity_input_refs() -> Vec<InputReference> {
+    vec![
+        InputReference::World(WorldInputKey::NeighborBarrierRing), // width 8, ref_idx 0
+        InputReference::ActionQueue,                               // ref_idx 1
+        InputReference::DynamicIntrospection(
+            crate::contracts::DynamicIntrospectionKey::EnergyCurrent,
+        ), // ref_idx 2
+    ]
+}
+
+/// Both neutrality fixtures the growth properties run over: the plain
+/// `base_def` and the plasticity/introspection `plasticity_def`. Not the
+/// full arbitrary-graph-def space; see the spec's TDD note on fixture scope.
+fn fixtures() -> [(&'static str, CgpGraphBackendDef, Vec<InputReference>); 2] {
+    [
+        ("base", base_def(), base_input_refs()),
+        ("plasticity", plasticity_def(), plasticity_input_refs()),
+    ]
+}
+
+/// True when `source` is the documented split exception: an append-branch
+/// split whose retargeted edge's old source was an `InputLeaf` resolving to
+/// `DynamicIntrospection(EnergyCurrent)`, on a graph carrying plasticity.
+/// Such a split is not neutral (see the spec's Inputs and Invariants): the
+/// new identity node's cached value is read before the post-convergence
+/// plasticity-cost deduction, while a direct edge on the same surface would
+/// have read it after, so the surface value differs by
+/// `plasticity_cost * weight`. This is a fixed property of the runtime's
+/// energy-accounting order, not something a growth operator should work
+/// around; a code fix is deferred to T11.F08 (see Notes for AI Agents).
+fn is_documented_split_exception(
+    def: &CgpGraphBackendDef,
+    refs: &[InputReference],
+    source: GraphSource,
+) -> bool {
+    let has_plasticity = def.compute_nodes.iter().any(|n| n.plasticity.is_some());
+    let GraphSource::InputLeaf { ref_idx, .. } = source else {
+        return false;
+    };
+    has_plasticity
+        && matches!(
+            refs.get(ref_idx as usize),
+            Some(InputReference::DynamicIntrospection(
+                crate::contracts::DynamicIntrospectionKey::EnergyCurrent
+            ))
+        )
+}
+
 // ─── Fire-time neutrality: the three add-node forms ────────────────────────
 
 proptest! {
@@ -225,90 +345,102 @@ proptest! {
 
     #[test]
     fn add_disconnected_node_is_neutral_at_fire_time(seed in any::<u64>()) {
-        let parent = base_def();
-        let refs = base_input_refs();
-        let mut child = parent.clone();
-        let mut rng = SmallRng::seed_from_u64(seed);
-        add_disconnected_node(&mut child, &mut rng).unwrap();
-        assert_neutral(
-            "add_disconnected_node",
-            &parent,
-            &refs,
-            &child,
-            &refs,
-            &ample_runtime_config(),
-        );
+        for (label, parent, refs) in fixtures() {
+            let mut child = parent.clone();
+            let mut rng = SmallRng::seed_from_u64(seed);
+            add_disconnected_node(&mut child, &mut rng).unwrap();
+            assert_neutral(
+                &format!("add_disconnected_node[{label}]"),
+                &parent,
+                &refs,
+                &child,
+                &refs,
+                &ample_runtime_config(),
+            );
+        }
     }
 
     #[test]
     fn add_bootstrap_node_is_neutral_at_fire_time(seed in any::<u64>()) {
-        let parent = base_def();
-        let refs = base_input_refs();
-        let config = MutationConfig::default();
-        let mut child = parent.clone();
-        let mut rng = SmallRng::seed_from_u64(seed);
-        add_bootstrap_node(&mut child, &refs, &config, &mut rng).unwrap();
-        assert_neutral(
-            "add_bootstrap_node",
-            &parent,
-            &refs,
-            &child,
-            &refs,
-            &ample_runtime_config(),
-        );
+        for (label, parent, refs) in fixtures() {
+            let config = MutationConfig::default();
+            let mut child = parent.clone();
+            let mut rng = SmallRng::seed_from_u64(seed);
+            add_bootstrap_node(&mut child, &refs, &config, &mut rng).unwrap();
+            assert_neutral(
+                &format!("add_bootstrap_node[{label}]"),
+                &parent,
+                &refs,
+                &child,
+                &refs,
+                &ample_runtime_config(),
+            );
+        }
     }
 
     #[test]
     fn split_existing_edge_is_neutral_at_fire_time(seed in any::<u64>()) {
-        let parent = base_def();
-        let refs = base_input_refs();
-        let mut child = parent.clone();
-        let mut rng = SmallRng::seed_from_u64(seed);
-        if split_existing_edge(&mut child, &mut rng).is_err() {
-            return Ok(());
+        for (label, parent, refs) in fixtures() {
+            let mut child = parent.clone();
+            let mut rng = SmallRng::seed_from_u64(seed);
+            if split_existing_edge(&mut child, &mut rng).is_err() {
+                continue;
+            }
+            // Documented exception (see `is_documented_split_exception`
+            // and the spec's Inputs and Invariants): an append-branch
+            // split retargeting an `InputLeaf(EnergyCurrent)` edge on a
+            // plasticity-carrying graph is not neutral. Exclude it rather
+            // than weaken the assertion.
+            if child.compute_nodes.len() == parent.compute_nodes.len() + 1 {
+                if let Some(edge) = child.compute_nodes.last().and_then(|n| n.inputs.first()) {
+                    if is_documented_split_exception(&parent, &refs, edge.source) {
+                        continue;
+                    }
+                }
+            }
+            assert_neutral(
+                &format!("split_existing_edge[{label}]"),
+                &parent,
+                &refs,
+                &child,
+                &refs,
+                &ample_runtime_config(),
+            );
         }
-        assert_neutral(
-            "split_existing_edge",
-            &parent,
-            &refs,
-            &child,
-            &refs,
-            &ample_runtime_config(),
-        );
     }
 
     #[test]
     fn copy_compute_node_is_neutral_at_fire_time(seed in any::<u64>()) {
-        let parent = base_def();
-        let refs = base_input_refs();
-        let mut child = parent.clone();
-        let mut rng = SmallRng::seed_from_u64(seed);
-        copy_compute_node(&mut child, &mut rng).unwrap();
-        assert_neutral(
-            "copy_compute_node",
-            &parent,
-            &refs,
-            &child,
-            &refs,
-            &ample_runtime_config(),
-        );
+        for (label, parent, refs) in fixtures() {
+            let mut child = parent.clone();
+            let mut rng = SmallRng::seed_from_u64(seed);
+            copy_compute_node(&mut child, &mut rng).unwrap();
+            assert_neutral(
+                &format!("copy_compute_node[{label}]"),
+                &parent,
+                &refs,
+                &child,
+                &refs,
+                &ample_runtime_config(),
+            );
+        }
     }
 
     #[test]
     fn copy_cgp_subgraph_is_neutral_at_fire_time(seed in any::<u64>()) {
-        let parent = base_def();
-        let refs = base_input_refs();
-        let mut child = parent.clone();
-        let mut rng = SmallRng::seed_from_u64(seed);
-        copy_cgp_subgraph(&mut child, &mut rng).unwrap();
-        assert_neutral(
-            "copy_cgp_subgraph",
-            &parent,
-            &refs,
-            &child,
-            &refs,
-            &ample_runtime_config(),
-        );
+        for (label, parent, refs) in fixtures() {
+            let mut child = parent.clone();
+            let mut rng = SmallRng::seed_from_u64(seed);
+            copy_cgp_subgraph(&mut child, &mut rng).unwrap();
+            assert_neutral(
+                &format!("copy_cgp_subgraph[{label}]"),
+                &parent,
+                &refs,
+                &child,
+                &refs,
+                &ample_runtime_config(),
+            );
+        }
     }
 
     /// Pushing a new input reference (unwired) never changes graph-backend
@@ -320,19 +452,19 @@ proptest! {
     fn unwired_input_ref_add_is_neutral_on_graph_node(seed in any::<u64>()) {
         use crate::mutation::sampling::random_input_reference;
 
-        let parent = base_def();
-        let parent_refs = base_input_refs();
-        let mut rng = SmallRng::seed_from_u64(seed);
-        let mut child_refs = parent_refs.clone();
-        child_refs.push(random_input_reference(&mut rng));
-        assert_neutral(
-            "unwired_input_ref_add_graph",
-            &parent,
-            &parent_refs,
-            &parent, // def itself is untouched by InputRef::Add
-            &child_refs,
-            &ample_runtime_config(),
-        );
+        for (label, parent, parent_refs) in fixtures() {
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let mut child_refs = parent_refs.clone();
+            child_refs.push(random_input_reference(&mut rng));
+            assert_neutral(
+                &format!("unwired_input_ref_add_graph[{label}]"),
+                &parent,
+                &parent_refs,
+                &parent, // def itself is untouched by InputRef::Add
+                &child_refs,
+                &ample_runtime_config(),
+            );
+        }
     }
 }
 
@@ -566,8 +698,13 @@ proptest! {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(200))]
 
-    /// Over enough seeds, `random_graph_source` draws every `sub_idx` of a
-    /// compound input reference, not just index 0 (the pre-T11.F03 defect).
+    /// Over every seed, a drawn `InputLeaf.sub_idx` stays within its
+    /// reference's actual width (never the pre-T11.F03 defect of only ever
+    /// drawing index 0). This asserts range only; the reach claim — that
+    /// every `sub_idx` in that range is actually drawn over enough seeds —
+    /// is the seeded example test
+    /// `random_graph_source_reaches_every_sub_value_of_a_compound_reference`
+    /// in `operators.rs`.
     #[test]
     fn random_graph_source_sub_idx_is_within_reference_width(seed in any::<u64>()) {
         use crate::mutation::compound::sub_value_count;
@@ -599,8 +736,14 @@ proptest! {
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(200))]
 
-    /// `GraphRawFieldMutation` never replaces a `GraphSource` variant; when
-    /// it does change an edge, exactly one of its fields moves.
+    /// Over `base_def`'s compute-node input edges (not the sink/action/
+    /// execute-gate surfaces), `GraphRawFieldMutation` never replaces a
+    /// `GraphSource` variant, and at most one edge changes at all. This
+    /// covers "at most one edge, same variant" only; that the changed
+    /// field moves by exactly one unit is example-tested separately in
+    /// `operators.rs` (`raw_field_mutation_compute_node_index_moves_by_one_unit_inward`,
+    /// `raw_field_mutation_shared_memory_slot_wraps_modulo_16`, and
+    /// `raw_field_mutation_never_changes_more_than_one_field`).
     #[test]
     fn raw_field_mutation_edge_never_changes_variant(seed in any::<u64>()) {
         let refs = base_input_refs();
