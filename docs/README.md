@@ -5,6 +5,7 @@
 - [Roadmap templates](roadmaps/)
 - [Strategy](strategy/)
 - [Brain evolvability audit, 2026-09-04](strategy/brain-evolvability-audit-2026-09-04.md) (companion to the T11 track)
+- [Mesh evolvability research, 2026-09-06](strategy/mesh-evolvability-research-2026-09-06.md) (companion to the T11 track; mesh-layer follow-up to the audit)
 - [Reference specifications](reference/)
 
 Historical, non-executable material:
