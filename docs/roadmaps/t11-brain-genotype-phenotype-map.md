@@ -41,7 +41,7 @@ representation only where the neighborhood reading still shows a gap.
   - Goal: Point mutations one at a time. Mutation arrives mostly as single events at a provisional mean of about 0.55 requested events per birth, inactive structure receives the same target opportunity as live code, and persistence is re-read after the change.
 - [x] **T11.F05 — Temporal Controller Fixtures** — Depends on: None
   - Goal: Check the brain's building blocks with small delayed-cue, memory-retention, and delayed-reward fixtures on constructed controllers, recording capability and measured gaps before interpreting evolution.
-- [ ] **T11.F06 — Graph Memory Clock** — Depends on: T11.F01, T11.F05
+- [x] **T11.F06 — Graph Memory Clock** — Depends on: T11.F01, T11.F05
   - Goal: Neural timescales. Remembered graph state, including what a backward edge reads, advances once per world tick, so extra settling passes or disconnected computation cannot speed up forgetting.
 - [ ] **T11.F07 — Reward Trace Clock** — Depends on: T11.F05
   - Goal: Synaptic eligibility. Recent activity fades with elapsed world time and influences later learning through one explicit, calibrated reward-update rule.
