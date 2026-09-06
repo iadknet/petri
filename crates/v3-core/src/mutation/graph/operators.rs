@@ -1960,6 +1960,39 @@ mod tests {
             ),
             vec![]
         );
+        // Exact boundary: sub_idx equals a narrower neighbor's width on both
+        // sides at once (sub_idx == 1 == the width-1 neighbors' width).
+        // `sub_idx < width` must reject this, not `sub_idx <= width`.
+        assert_eq!(
+            valid_edge_field_moves(
+                GraphSource::InputLeaf { ref_idx: 1, sub_idx: 1 },
+                0,
+                &mixed_refs,
+                &config
+            ),
+            vec![EdgeFieldMove::SubIdx(-1), EdgeFieldMove::SubIdx(1)],
+            "sub_idx == width exactly must exclude both RefIdx moves"
+        );
+    }
+
+    /// `SharedMemory` always offers both slot directions (they wrap modulo
+    /// 16) plus the previous-tick flip, in that fixed order.
+    #[test]
+    fn valid_edge_field_moves_shared_memory_always_offers_three_moves() {
+        let config = MutationConfig::default();
+        assert_eq!(
+            valid_edge_field_moves(
+                GraphSource::SharedMemory { slot: 5, previous: false },
+                0,
+                &[],
+                &config
+            ),
+            vec![
+                EdgeFieldMove::SharedSlot(-1),
+                EdgeFieldMove::SharedSlot(1),
+                EdgeFieldMove::FlipPrevious,
+            ]
+        );
     }
 
     /// `apply_edge_field_move` must move each numeric field by exactly the
