@@ -152,43 +152,44 @@ registers on which later mutations can operate without overwriting live values.
 
 ## Performance and Goal Impact
 
-Natural analog: gene insertion, deletion, and duplication. Reproduction applies
-small changes to inherited VM programs; stable references allow descendants to
-retain behavior while acquiring structure.
+Predeclared expectations above remain historical. Stored reports show no severe
+compute regression. Gate current / delta versus both T10.F10 and T11.F01:
 
-Predeclared cost: remapping scans the edited program at mutation time, and four
-spare founder registers enlarge dispatch initialization slightly; no per-opcode
-cost or work-counter definition changes. No severe compute regression is
-budgeted, and no baseline re-pin is authorized. Gate simulation counters should
-stay close to T11.F01 and the T10.F10 epoch, but changed offspring behavior can
-change them. Record all six normalized work and wall-clock deltas against both
-references and investigate any threshold crossing without weakening a gate.
+| counter | current | delta |
+|---|---:|---:|
+| mesh hops | 1.998951 | +0.029474% |
+| VM steps | 28.043884 | +0.055847% |
+| graph relax | 2.998624 | 0.000000% |
+| plasticity | 0.000000 | n/a (both zero) |
+| actions | 1.000000 | 0.000000% |
+| births | 0.001196 | -1.320132% |
+| wall ms/tick | 0.004221 | -22.515619% / -12.646248% |
 
-Neighborhood expectations before implementation: founder VM field-mutation and
-register-capacity silence should increase; repaired insertion/motif silence
-should generally increase and dead fractions should decrease. Reference repair
-does not promise neutrality for live macro copies/replacements: their silent
-fractions may fall when correctly retained control flow makes a formerly inert
-edit execute. Such movement is predeclared only for the affected VM structural
-operators and must be attributed to their corrected targets. Founder slack
-changes which registers VM operand/motif/copy mutations sample, so those rows
-may move in either direction from register interference; report that separately.
-Founder non-VM operator rows should remain unchanged because founder execution
-is preserved and their mutation rules are untouched, except input-reference
-addition on VM nodes, whose auto-wired insertion now has repaired jump
-targeting. Mutated-birth silence is expected to rise and dead fractions fall;
-report every bucket and investigate any reversal, mindful of T11.F01's
-four-sample single-event bucket.
+Goal current / delta versus T01.F12 and T11.F01 (the two references have the
+same counter baselines):
 
-The evolved sample, lineage diversity, persistence, and memory sensitivity may
-shift in either direction because the inherited mutation map changes the
-population, not merely the measurement. Record the actual shifts against
-T11.F01 and T01.F12, distinguishing changed subjects from operator regressions;
-do not assert a cognition gain. All T11.F01 floors remain fixed and are due by
-T11.F10. No operator family is disabled/down-weighted to improve a reading.
-Closure readings and comparison conclusions remain to be recorded here.
-Record that input-reference-addition effect separately from its unchanged
-input-reference policy.
+| counter | current | delta |
+|---|---:|---:|
+| mesh hops | 3.044647 | -3.652241% |
+| VM steps | 530.752745 | -51.407250% |
+| graph relax | 5.388535 | -5.283106% |
+| plasticity | 0.124060 | +23.452613% (flagged) |
+| actions | 1.157620 | +6.608783% |
+| births | 0.008218 | +1.007866% |
+| wall ms/tick | 0.008461 | -14.561153% / -22.336763% |
+
+The flagged plasticity value reflects changed trajectories and applied-update
+counts: seed 11 moved .0981469563 to .1217268032, seed 22 .0763916402 to
+.1687418021, and seed 33 .1286415215 to .0838937116. Founder blocks are
+byte-identical and final sampled genomes have plasticity 3 to 1, so this is
+not evidence of more plasticity or a cognition gain. Evolved seed 22 dead
+fraction rose .121569 to .184314; seed 33 single-event silence fell .5625 to
+.375. These are changed sampled subjects, not universal operator regressions.
+Nine goal indicators (adaptive novelty, evolutionary activity, information
+integration, learning/prediction/memory dependence, lineage diversity, memory
+sensitivity, persistence, and reciprocal/strategy measures) are Undefined;
+births per 100 ticks is 32.444444. Closure-series append and progress.md stay
+held for reconciliation/integration authorization.
 
 ## Success Criteria
 
