@@ -21,7 +21,7 @@ representation only where the neighborhood reading still shows a gap.
 
 - [ ] A mutational-neighborhood indicator reports the silent, changed, and dead fractions per operator and per birth on single-tick and short multi-tick batteries: the founder half inside the gate profile at every closure program-wide, the evolved-genome half in the goal profile.
 - [ ] Structural VM edits (insert, delete, replace, motif insertion, block and slice copies) preserve every surviving control-flow reference outside the edited span, verified by property tests, and no single operand-level VM event redraws more than one field (opcode replacement stays a separate macro operator).
-- [ ] Adding or copying a graph compute node, or adding an input reference, is silent on the founder battery at least 95% of the time, and new edges can reach every sensor sub-value.
+- [x] Adding or copying a graph compute node, or adding an input reference, is silent on the founder battery at least 95% of the time, and new edges can reach every sensor sub-value. (T11.F03 closure, 2026-09-05: `AddInternalGraphNode`, `CopyInternalNode`, and input-reference `Add` each read 1.00 silent on the stored gate report, and `random_graph_source` draws every sub-index; the no-regression rule keeps this true at later closures.)
 - [ ] At production defaults, mutated births are behaviorally dead at most 5% of the time and single-event births are silent at least 60% of the time, with every behavior-changing operator family still enabled.
 - [ ] Persistent graph state and eligibility traces advance on an explicit world-tick clock, verified by fixtures across relaxation-pass limits, disconnected-node additions, and skipped module visits.
 - [ ] Copying a working module keeps it working, and learned weights follow surviving homologous nodes and edges through structural mutation.
@@ -35,7 +35,7 @@ representation only where the neighborhood reading still shows a gap.
   - Goal: One step away. At every closure, read how often a single mutation leaves a brain acting like its parent, acting differently, or not acting at all, on the founder and on evolved genomes, with floors predeclared before any repair; observation only.
 - [x] **T11.F02 — VM Structural Mutation Semantics** — Depends on: T11.F01
   - Goal: Gene insertion, deletion, and duplication. Adding, removing, replacing, or copying instructions keeps every surviving jump pointing where it did, an operand mutation changes one field by a small step, terminals stay terminals, and a register count never aliases registers.
-- [ ] **T11.F03 — Function-Preserving Graph Growth** — Depends on: T11.F01
+- [x] **T11.F03 — Function-Preserving Graph Growth** — Depends on: T11.F01
   - Goal: New neural connections. A compute node joins the circuit disconnected or by splitting an existing edge with its function preserved, copies never rewire live nodes, and new edges can reach every sensor sub-value.
 - [ ] **T11.F04 — Mutation Supply and Neutral Scaffold** — Depends on: T11.F02, T11.F03
   - Goal: Point mutations one at a time. The same expected mutation supply arrives as mostly single events instead of ten-event bursts, mutation lands on inactive structure as readily as on live code, and persistence is re-read after the change.
