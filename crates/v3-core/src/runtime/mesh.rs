@@ -200,6 +200,87 @@ impl MeshExecutionMode for UntracedMeshExecution {
     }
 }
 
+/// Compact observations of actual dispatches and applied routing, without backend traces.
+#[derive(Debug, Clone)]
+pub(crate) struct MeshObservation {
+    pub hops: Vec<(NodeId, Option<usize>)>,
+    pub termination_reason: TerminationReason,
+}
+
+#[derive(Default)]
+pub(crate) struct ObservedMeshExecution {
+    hops: Vec<(NodeId, Option<usize>)>,
+}
+
+impl MeshExecutionMode for ObservedMeshExecution {
+    type BackendTrace = ();
+    type Output = (MeshOutput, MeshObservation);
+    // Diagnostic route winners on terminal/exhausted nodes are not applied routes.
+    const RECORDS_HOPS: bool = false;
+
+    #[inline]
+    #[allow(clippy::too_many_arguments)]
+    fn execute_node(
+        &mut self,
+        node: &NodeGenome,
+        node_idx: usize,
+        upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
+        energy: &mut f32,
+        energy_consumed: f32,
+        reproductive_reserve: f32,
+        shared_memory: &mut [f32; 16],
+        prev_shared_memory: &[f32; 16],
+        graph_runtime: &mut GraphRuntimeState,
+        sensors: &SensorSnapshot,
+        config: &RuntimeConfig,
+        side_outputs: &mut MeshSideOutputs,
+    ) -> (crate::runtime::types::NodeResult, ()) {
+        UntracedMeshExecution.execute_node(
+            node,
+            node_idx,
+            upstream_slots,
+            energy,
+            energy_consumed,
+            reproductive_reserve,
+            shared_memory,
+            prev_shared_memory,
+            graph_runtime,
+            sensors,
+            config,
+            side_outputs,
+        )
+    }
+
+    fn record_hop(
+        &mut self,
+        _hop_index: usize,
+        node: &NodeGenome,
+        _upstream_slots: [f32; OUTPUT_SLOT_COUNT],
+        _energy_before: f32,
+        _energy_after: f32,
+        result: &crate::runtime::types::NodeResult,
+        route_result: Option<(usize, NodeId)>,
+        _backend_trace: (),
+    ) {
+        let route = if result.terminal || result.energy_exhausted {
+            None
+        } else {
+            route_result.map(|(position, _)| position)
+        };
+        self.hops.push((node.node_id, route));
+    }
+
+    fn finish(self, output: MeshOutput, termination_reason: TerminationReason) -> Self::Output {
+        (
+            output,
+            MeshObservation {
+                hops: self.hops,
+                termination_reason,
+            },
+        )
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
     genome: &CreatureGenome,
@@ -374,6 +455,169 @@ mod tests {
                 gate_bias: 0.0,
             })
             .collect()
+    }
+
+    #[test]
+    fn compact_observation_records_only_applied_routes_and_real_cap_termination() {
+        let id = NodeId::new(0);
+        let mut genome = CreatureGenome {
+            entry_node_id: id,
+            nodes: vec![vm_halt_with_route(id, 1.0, vec![id])],
+        };
+        let config = RuntimeConfig {
+            max_mesh_hops: 2,
+            ..default_config()
+        };
+        let observe = |genome: &CreatureGenome, mut energy| {
+            execute_creature_mesh_impl(
+                genome,
+                &empty_sensor_snapshot(),
+                &mut energy,
+                0.0,
+                &mut [0.0; 16],
+                &[0.0; 16],
+                &mut GraphRuntimeState::new(),
+                &config,
+                ObservedMeshExecution::default(),
+            )
+        };
+        let (_, observed) = observe(&genome, 100.0);
+        assert_eq!(observed.hops, vec![(id, Some(0)), (id, Some(0))]);
+        assert!(matches!(
+            observed.termination_reason,
+            TerminationReason::MaxHopsReached
+        ));
+        genome.nodes[0] = vm_emit_node(id, 0, vec![id]);
+        let (_, observed) = observe(&genome, 100.0);
+        assert_eq!(observed.hops, vec![(id, None)]);
+        assert!(matches!(
+            observed.termination_reason,
+            TerminationReason::ActionEmitted
+        ));
+        let (_, observed) = observe(&genome, 0.0);
+        assert_eq!(observed.hops, vec![(id, None)]);
+        assert!(matches!(
+            observed.termination_reason,
+            TerminationReason::EnergyExhausted
+        ));
+    }
+
+    #[test]
+    fn compact_observation_preserves_complete_applied_outcomes_and_graph_state() {
+        use crate::creature::genome::cgp::{
+            CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
+        };
+        let mut graph =
+            CgpGraphBackendDef::new_with_fixed_outputs(&crate::config::MutationConfig::default());
+        graph.compute_nodes.push(ComputeNode {
+            kind: ComputeNodeKind::DecayIntegrator(0.5),
+            inputs: vec![GraphEdge {
+                source: GraphSource::SharedMemory {
+                    slot: 0,
+                    previous: false,
+                },
+                weight: 1.0,
+            }],
+            plasticity: Some(crate::creature::genome::PlasticityConfig {
+                rule: crate::creature::genome::HebbianRule::Classic,
+                learning_rate: 0.1,
+                weight_clamp: 2.0,
+                lamarckian: false,
+                modulation: Some(crate::creature::genome::RewardModulationConfig {
+                    reward_source: crate::creature::genome::OutcomeChannel::EnergyDelta,
+                    trace_decay: 0.9,
+                }),
+            }),
+        });
+        let mut vm = vm_halt_with_route(NodeId::new(0), 1.0, vec![NodeId::new(1)]);
+        if let BackendDef::Vm(def) = &mut vm.backend_def {
+            def.program.splice(
+                2..2,
+                [
+                    VmInstruction::StoreSlotImm {
+                        slot_idx: 0,
+                        src: 0,
+                    },
+                    VmInstruction::SetPriorityBid { src: 0 },
+                    VmInstruction::PushAction { action_type: 1 },
+                ],
+            );
+        }
+        let genome = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                vm,
+                NodeGenome {
+                    node_id: NodeId::new(1),
+                    input_refs: vec![],
+                    backend_def: BackendDef::Graph(graph),
+                    targets: wrap_targets(vec![NodeId::new(1)]),
+                },
+            ],
+        };
+        for starting_energy in [0.0, 0.01, 2.0, 100.0] {
+            let mut energy = starting_energy;
+            let mut observed_energy = energy;
+            let mut memory = [0.5; 16];
+            let mut observed_memory = memory;
+            let previous = [0.25; 16];
+            let mut state = GraphRuntimeState::new();
+            let mut observed_state = state.clone();
+            let config = RuntimeConfig {
+                max_mesh_hops: 4,
+                ..default_config()
+            };
+            for _ in 0..2 {
+                state.begin_tick(&genome.nodes);
+                observed_state.begin_tick(&genome.nodes);
+                let plain = execute_creature_mesh_impl(
+                    &genome,
+                    &empty_sensor_snapshot(),
+                    &mut energy,
+                    3.0,
+                    &mut memory,
+                    &previous,
+                    &mut state,
+                    &config,
+                    UntracedMeshExecution,
+                );
+                let (observed, _) = execute_creature_mesh_impl(
+                    &genome,
+                    &empty_sensor_snapshot(),
+                    &mut observed_energy,
+                    3.0,
+                    &mut observed_memory,
+                    &previous,
+                    &mut observed_state,
+                    &config,
+                    ObservedMeshExecution::default(),
+                );
+                assert_eq!(plain.actions, observed.actions);
+                assert_eq!(plain.priority_bid, observed.priority_bid);
+                assert_eq!(plain.cost_report.vm_cost, observed.cost_report.vm_cost);
+                assert_eq!(
+                    plain.cost_report.graph_cost,
+                    observed.cost_report.graph_cost
+                );
+                assert_eq!(plain.work_counters, observed.work_counters);
+                assert_eq!(energy, observed_energy);
+                assert_eq!(memory, observed_memory);
+                assert_eq!(state.node_state, observed_state.node_state);
+                assert_eq!(state.node_outputs, observed_state.node_outputs);
+                assert_eq!(state.tick_start_state, observed_state.tick_start_state);
+                assert_eq!(state.tick_start_outputs, observed_state.tick_start_outputs);
+                assert_eq!(state.plasticity_weights, observed_state.plasticity_weights);
+                assert_eq!(state.eligibility_traces, observed_state.eligibility_traces);
+                assert_eq!(
+                    state.tick_start_eligibility_traces,
+                    observed_state.tick_start_eligibility_traces
+                );
+                assert_eq!(state.scratch_prev, observed_state.scratch_prev);
+                assert_eq!(state.scratch_curr, observed_state.scratch_curr);
+                assert_eq!(state.scratch_backup, observed_state.scratch_backup);
+                assert_eq!(state.scratch_w_inputs, observed_state.scratch_w_inputs);
+            }
+        }
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────────

@@ -121,15 +121,15 @@ stays in the existing neighborhood/final-observation `environment` timings.
 
 ## Implementation Tasks
 
-- [ ] Add compact applied mesh observations through the existing executor
+- [x] Add compact applied mesh observations through the existing executor
       seam and core tests proving observation preserves production behavior.
-- [ ] Extend the neighborhood battery with the defined mesh measurements and
+- [x] Extend the neighborhood battery with the defined mesh measurements and
       isolated structural knockouts, sharing scenario/sequence bookkeeping;
       add constructed fixtures and property tests before implementing results.
-- [ ] Wire founder, sampled-genome, sampled-generation, and whole-final-
+- [x] Wire founder, sampled-genome, sampled-generation, and whole-final-
       population depth readings into the existing bench report, with historical
       defaults and profile/serialization tests.
-- [ ] Store fresh gate and single goal reports at
+- [x] Store fresh gate and single goal reports at
       `docs/progress/features/t11-f14-mesh-execution-observability.json` and
       `...-goal.json`; append them to `docs/progress/benchmark-series.json`.
       Add the closure row and concise measurement definitions to
@@ -138,32 +138,32 @@ stays in the existing neighborhood/final-observation `environment` timings.
 
 ## Verification
 
-- [ ] TDD fixtures cover static and sensor-conditional routes, multiple target
+- [x] TDD fixtures cover static and sensor-conditional routes, multiple target
       positions sharing a destination, an unreachable node, a reachable losing
       branch, repeated visits, missing entry/target, an actual hop-cap loop,
       terminal completion at the cap, and unused terminal/exhaustion route
       scores. A node selecting the same multi-position set in every snapshot
       does not establish input variation.
-- [ ] Knockout fixtures cover a silent pass-through, a contributing action or
+- [x] Knockout fixtures cover a silent pass-through, a contributing action or
       upstream/memory producer, a contributing conditional router, entry
       bypass, bias/position winner selection, no/missing/self successor, and
       sequence-only effects. Assert source genome isolation and complete
       signature comparison; independently exercise VM and graph nodes.
-- [ ] Property tests in `v3-core` establish the pure count/subset bounds and
+- [x] Property tests in `v3-core` establish the pure count/subset bounds and
       source-preserving bypass behavior on generated well-formed genomes;
       assertions do not depend on which cases proptest drew. A production-
       versus-observed parity fixture compares complete applied outcomes and
       runtime state, including repeated graph visits and exhaustion.
-- [ ] Bench tests cover known odd/even and empty population depths, generations
+- [x] Bench tests cover known odd/even and empty population depths, generations
       above `u32::MAX`, actual sample generation, whole-population rather than
       sample-only aggregation, defaulted historical fields, profile presence,
       and byte-identical deterministic output across runs/thread counts at
       existing reduced test trial sizes. Run focused core/CLI tests and
       `cargo check --workspace --all-targets` after coherent Rust edits.
-- [ ] Run the explicit diff self-review for reuse, simplification, and
+- [x] Run the explicit diff self-review for reuse, simplification, and
       efficiency, then fresh `MUTANTS_ITERATE=0 make rust-mutants`; record its
       summary, output path, full missed/timeout list and each resolution.
-- [ ] Run `make bench` for the gate and once for the goal, using the stored
+- [x] Run `make bench` for the gate and once for the goal, using the stored
       paths above; record compute comparisons, observation cost, full prior-
       field deterministic equality with T11.F07, and readings below.
 - [x] A second goal run is not applicable: the 2026-09-05 user decision in
@@ -172,6 +172,52 @@ stays in the existing neighborhood/final-observation `environment` timings.
 - [ ] `make roadmap-check` passes on document edits; final review findings and
       resolutions are recorded; the orchestrator runs `make check` on final
       feature content and records the tested commit in the closure conversation.
+
+Verification evidence, 2026-09-06 (all commands from the feature worktree with
+`~/.local/share/petri-tools/bin` and `~/.local/share/aquaproj-aqua/bin` on PATH):
+
+- `cargo check --workspace --all-targets`: exit 0 after final Rust edits,
+  `/tmp/t11-f14-check-complete.log`.
+- `cargo test -p v3-core --lib neighborhood`: exit 0, 51 passed,
+  `/tmp/t11-f14-test-neighborhood.log`.
+- `cargo test -p v3-core --lib compact_observation`: exit 0, 2 passed,
+  `/tmp/t11-f14-test-runtime.log`.
+- `cargo test -p v3-cli --lib bench::tests`: exit 0, 34 passed,
+  `/tmp/t11-f14-test-cli.log`; includes reduced gate/goal deterministic
+  byte equality across thread counts. Production/default/founder/tick-loop
+  mechanics did not change, so the viability-first rule is not applicable.
+- `cargo clippy --workspace --all-targets -- -D warnings`: exit 0,
+  `/tmp/t11-f14-clippy.log`; `cargo fmt --all` and `git diff --check` passed.
+- Final `MUTANTS_ITERATE=0 make rust-mutants`: exit 0,
+  **49 mutants tested in 4m: 1 missed, 19 caught, 29 unviable**.
+  `/tmp/t11-f14-mutants-final.log`; output
+  `/Users/istefanek/.local/share/petri-tools/mutants/t11-f14/mutants.out`;
+  adjacent `run-mode.txt` reads `fresh`. Full survivor list (no timeouts):
+  `crates/v3-core/src/runtime/mesh.rs:265:40: replace || with && in
+  <impl MeshExecutionMode for ObservedMeshExecution>::record_hop` —
+  **equivalent**: `RECORDS_HOPS=false` already makes the executor pass `None`
+  for terminal/exhausted routes; ordinary dispatches have both flags false
+  and preserve the same position. No skips, exclusions, or production
+  changes were introduced to kill mutants. The first fresh run had the same
+  list; final evidence followed the test strengthening and repeated self-review.
+- `make bench PROFILE=gate FEATURE=t11-f14-mesh-execution-observability
+  OUT=docs/progress/features/t11-f14-mesh-execution-observability.json` and
+  `make bench PROFILE=goal FEATURE=t11-f14-mesh-execution-observability
+  OUT=docs/progress/features/t11-f14-mesh-execution-observability-goal.json`:
+  both exit 0, serialized after mutations with no competing work. Logs:
+  `/tmp/t11-f14-bench-gate.log`, `/tmp/t11-f14-bench-goal.log`. Exactly one
+  goal run. Host-process inspection required authorized sandbox escalation;
+  no guard was bypassed.
+- Full recursive equality of every pre-existing gate and goal `deterministic`
+  field against T11.F07 passed. Only added founder/sample `mesh_execution`
+  and `generation`, and per-seed `generation_distribution`, were removed;
+  the feature label is outside `deterministic`. Comparison script/log:
+  `/tmp/t11-f14-compare.py`, `/tmp/t11-f14-comparison.log`. All old battery
+  metadata, operator rows, birth buckets, structural companions, population
+  samples, and other indicators are unchanged, not merely their headlines.
+- `make roadmap-check`: exit 0 after document edits,
+  `/tmp/t11-f14-roadmap-check.log`. Final review and the orchestrator's
+  `make check` on closure content remain pending.
 
 ## Performance and Goal Impact
 
@@ -201,14 +247,95 @@ compare them numerically to the research note's whole-population 48-snapshot
 census without disclosing the changed sample and battery. Insufficient depth
 is a finding for T01, not permission to extend this goal run.
 
+Measured 2026-09-06: [gate report](../../progress/features/t11-f14-mesh-execution-observability.json)
+and [single goal report](../../progress/features/t11-f14-mesh-execution-observability-goal.json).
+Both are appended to the existing benchmark series; historical reports and
+the T11.F04 epoch remain unchanged.
+
+| Measurement | T11.F14 | Against T11.F07 | Against T11.F04 epoch |
+| --- | ---: | --- | --- |
+| Gate ms/creature-tick | 0.004426850 | +5.933561%, ok | +5.415966%, ok |
+| Goal ms/creature-tick | 0.007140584 | +0.079017%, ok | -0.205263%, ok |
+| Gate six work counters | unchanged | all 0.000000% | all unchanged except graph -66.666133% across definitions |
+| Goal six work counters | unchanged | all 0.000000% | mesh +13.470830% (flag), VM -48.989220%, graph -60.595625% across definitions, plasticity +8.030172%, actions -2.107840%, births -1.079622% |
+
+Neither report has a severe comparison. The existing epoch mesh flag and
+graph-definition qualification are retained; no threshold was weakened.
+Gate founder observation is 0.251187 seconds (T11.F07 0.465682); goal founder
+is 0.484453 seconds, both below 10 seconds. Goal simulation is 709.646496
+seconds and final-state observation is 3.664995 seconds. Summed simulation
+and observation timers are 852.274173 seconds (14m12.274s), against T11.F07
+851.609682 seconds. This exceeds the rough eleven-minute workflow estimate,
+not the single-run requirement.
+
+The **90-second evolved-neighborhood budget remains exceeded**: 138.478229
+seconds versus T11.F07's already-over-budget 138.421668 (+0.040862%). Per seed,
+current/prior seconds are 6.316832/6.796962, 2.182635/2.420632, and
+129.978763/129.204074. Investigation identifies the same seed33 concentration
+as the existing report, now 93.9% of the total; all genomes' old structural
+companions, trial counts, outcomes and deterministic fields are identical.
+The additional baseline/knockout readings add no material measured total
+regression (56.562 ms net difference), but this timer covers the complete
+neighborhood and does not isolate their cost. The inherited budget excess is
+recorded, not claimed to pass or used to justify smaller samples, skipped
+knockouts, new profiling runs, or a longer evolution run.
+
+**Unresolved closure blocker, 2026-09-06:** 138.478229 seconds exceeds the
+unchanged 90-second evolved-neighborhood cap by 48.478229 seconds. The
+[T11.F07 budget resolution](t11-f07-reward-trace-clock.md#performance-and-goal-impact)
+explicitly limits its 180-second allowance to F07; later features do not
+inherit it. Matching that prior workload and staying below the overall
+profile investigation threshold do not satisfy this separate component cap.
+T11.F14 remains In Progress and cannot close until the unchanged cap is met
+or the user explicitly authorizes a scoped adjustment. The existing guarded
+report remains the measured evidence; no allowance or verification waiver has
+been applied.
+
+Founder depth is 0: total/reachable/executed/knockout = **2/2/2/0**,
+route-variable genomes **0/1**, cap hits **0/80** executions. Goal sample
+counts below are sums across each seed's 12 genomes; individual readings and
+actual generations remain in the report.
+
+| Seed | Final population | Whole-population median/max generation | Sample generation range | Total/reachable/executed/knockout | Route-variable genomes | Cap hits/executions |
+| --- | ---: | --- | --- | --- | --- | --- |
+| 11 | 10350 | 23/43 | 8–31 | 31/30/26/2 | 0/12 | 34/960 |
+| 22 | 11646 | 22/44 | 13–36 | 27/27/25/1 | 0/12 | 0/960 |
+| 33 | 10464 | 22/44 | 15–29 | 34/34/27/4 | 0/12 | 23/960 |
+
+This is the first `mesh-execution-v1` reading, at tens of generations, not
+2000 generations merely because the profile ran 2000 ticks. The three
+samples span only 8–36 generations; depth beyond this remains unmeasured.
+No sampled genome varies its route on the 48 independent snapshot probes.
+The executed-count union and cap/knockout measurements use all 80 executions,
+including sequences. These finite observations do not establish cognition,
+ecological neutrality, or useful redundancy. The research note used a
+whole-population 48-snapshot census, a different sample and battery, so no
+numerical improvement over that census is claimed. Broader depth evidence
+belongs to T01; this goal was not extended.
+
+Existing goal readings (all exactly equal to T11.F07): births/100 ticks
+13354.716667; final populations 10350/11646/10464 and births
+267777/266319/267187, no extinction; clades 214/170/195 and entropy
+4.335792/4.233764/4.015665. Structure min/p25/median/p75/max/mean is
+1/96/101/119/489/117.196334. Current-memory either counts are 0/1/0;
+temporal persisted-output either counts 25/11/7, operator-state 14/25/9,
+previous-slot 0/2/0, with all component counts/fractions unchanged in the
+report. Founder any-event silent/changed/dead counts are 83/116/9 of 208;
+evolved pooled counts are 605/452/43, 589/471/40, and 670/391/39 of 1100,
+including unchanged sequence-only changes 9/7/6. Every per-operator and
+per-event bucket remains in the report and passed full equality. Strategy
+count, strategy causal distinctness, evolutionary activity, adaptive novelty,
+memory dependence, learning dependence, prediction dependence, information
+integration, and reciprocal interaction all remain `Undefined`.
+
 ## Success Criteria
 
-- [ ] Fresh gate/goal reports carry all six defined mesh quantities; historical
+- [x] Fresh gate/goal reports carry all six defined mesh quantities; historical
       fields default truthfully and existing deterministic content is unchanged.
-- [ ] Each evolved reading carries actual sampled generation and its goal
+- [x] Each evolved reading carries actual sampled generation and its goal
       seed's whole-final-population median/maximum generation; extinct seeds
       have explicit undefined distributions.
-- [ ] Tests demonstrate applied execution, input variation, and the precise
+- [x] Tests demonstrate applied execution, input variation, and the precise
       knockout intervention; observations never mutate simulation subjects.
 - [ ] Required mutation, benchmark, review, and `make check` evidence is
       recorded; T11.F14 is checked and this spec is Complete at integration.
@@ -230,3 +357,75 @@ is a finding for T01, not permission to extend this goal run.
   validation. Consultation count, decisive guidance, final finding counts,
   remediation passes, requirement corrections, user interventions, and usage
   will be recorded before closure; task usage currently unavailable.
+
+- Implementation consultations: 5. (1) Accepted the private compact
+  execution mode reusing the untraced backend dispatcher with `RECORDS_HOPS`
+  false; exact shared battery bookkeeping, isolated static bypass, and whole-
+  population `u64` generation aggregation. (2) Accepted removing an unused
+  observation equality derive and using exact termination-variant matches,
+  retaining the existing trace enum. (3) Accepted fixture-only
+  `lamarckian: false` for the required plasticity initializer; no inheritance
+  occurs in the parity test. The repeated compile errors in consultations 2
+  and 3 came from queued check/test batches; later commands stop on failure.
+  Consultations 4 and 5 are recorded below. No optional scope additions.
+- Diff self-review, 2026-09-06: checked reuse, simplicity, and efficiency.
+  Production dispatch/routing loop is unchanged; the compact mode delegates
+  backend execution and adds no normal-mode allocations. Battery scenario
+  drawing and tick bookkeeping remain shared and unchanged. Existing
+  `Indicator`, resolver, signature, reachability, rank sampler, ordered
+  standard collections, and serde defaults suffice; no dependencies,
+  configuration, observer framework, or production cleanup were added.
+  No further simplification was warranted. Focused verification and fresh
+  mutation evidence are recorded below when complete.
+
+- Consultation 4 accepted two pre-review test strengthenings: assert the
+  generated observed-ID set is a subset of structurally reachable IDs, and
+  include a sampled generation above `u32::MAX` while retaining distinct
+  unsampled depths. These close explicit verification coverage, not production
+  defects. No spec revision or scope change. Repeated the diff self-review
+  after these test-only edits; no additional simplification needed.
+- Consultation 5 found implementation and mutation evidence sufficient for
+  independent review, including the equivalent survivor, but identified the
+  unresolved observation-cap blocker above. No code remediation or additional
+  goal run is recommended from the available evidence; independent final
+  review and the orchestrator's `make check` remain required.
+- Requirement correction 1, 2026-09-06: the prior inference that an inherited,
+  materially unchanged observation cost could carry F07's allowance forward
+  was invalid. F07 explicitly scoped its adjustment to that closure. The
+  unchanged F14 90-second requirement remains binding; this correction records
+  its unresolved failure and does not change the cap or acceptance criteria.
+- User intervention pending, 2026-09-06: the orchestrator asked whether to
+  authorize an F14-only 180-second allowance or preserve the blocked worktree.
+  No answer is recorded, and no adjustment is authorized by that unanswered
+  question. Preserve the worktree and In Progress status pending resolution.
+- TDD evidence: initial runtime and battery/CLI red compilation logs are
+  `/tmp/t11-f14-red-runtime.log`, `/tmp/t11-f14-red-battery.log`, and
+  `/tmp/t11-f14-red-cli.log`. Fixture development exposed empty-graph sink
+  nonexecution and the action-type discriminator; fixtures now include a
+  compute node and explicitly emit Move for direction comparison.
+- Initial fresh mutation run: `MUTANTS_ITERATE=0 make rust-mutants`, exit 0;
+  `49 mutants tested in 4m: 1 missed, 19 caught, 29 unviable`; no timeouts.
+  Log `/tmp/t11-f14-mutants-fresh.log`. Full survivor list: only
+  `crates/v3-core/src/runtime/mesh.rs:265:40: replace || with && in
+  <impl MeshExecutionMode for ObservedMeshExecution>::record_hop` —
+  **equivalent**: this mode sets `RECORDS_HOPS=false`, so the executor already
+  passes no route on terminal/exhausted dispatches; ordinary dispatches have
+  both flags false and retain the same selected position. No production code
+  was changed to kill a mutant, no skips/exclusions added. Final fresh evidence
+  follows the pre-review test strengthening; incremental evidence is not used.
+
+- Independent final review, 2026-09-06: **1 P1, 0 P2, 0 P3**. The sole P1
+  is the measured evolved-observation cost of 138.478229 seconds exceeding
+  the binding 90-second cap. Resolution requires an explicit F14-only user
+  adjustment or evidence meeting that cap; the finding remains unresolved.
+  The reviewer found no code correctness or maintainability issues and
+  independently confirmed full prior-field deterministic equality and the
+  mutation survivor's equivalence. Post-review code remediation passes: **0**.
+- Current workflow record: **5 advisor consultations**, **1 requirement
+  correction**, budget user intervention pending, and **usage unavailable**.
+  No cap adjustment is assumed. The spec remains In Progress and closure
+  remains unchecked. The orchestrator ran `make check` on the reviewed feature
+  content on 2026-09-06: **exit 0**, log `/tmp/t11-f14-make-check.log`.
+  This verifies the implementation but does not resolve the observation-budget
+  blocker or authorize integration. Closure content must pass its required
+  checks after the pending budget decision.
