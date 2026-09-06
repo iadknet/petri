@@ -1,6 +1,6 @@
 # T11.F07 — Reward Trace Clock
 
-**Status**: In Progress
+**Status**: Blocked
 **Last updated**: 2026-09-06
 **Feature**: T11.F07
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -198,6 +198,10 @@ demonstrate immediate credit, delayed credit, and adaptation after reward revers
 - [x] Second goal run: Not applicable by the 2026-09-05 workflow decision;
       cross-process reproducibility is covered by `make check`. The gate's
       two-run byte-identical check remains required.
+- [ ] Resolve the inherited evolved-neighborhood observation limit of at most
+      90 seconds without reducing the fixed battery, weakening the limit, or
+      silently repeating the goal run. The stored closure run took 138.422
+      seconds; the spec-owner investigation and blocker are recorded below.
 - [ ] Independent orchestrator `make roadmap-check`, fresh final review,
       and `make check` exit 0 on final feature content; the parent records
       the exact tested commit, integration, and cleanup evidence.
@@ -399,10 +403,37 @@ are unpaired across closures, so this reading does not identify a per-edge
 bookkeeping slowdown or establish ecological benefit; the sample structural
 companions and unchanged battery are recorded below. No second run was used
 to diagnose it and no observation budget, sample count or floor was reduced.
-The parent escalated this substantial observation-cost increase to the trial's
-spec owner under the broader severe-compute rule. Its interpretation and any
-minimal additional evidence remain pending; passing the normalized simulation
-comparison alone does not resolve that assessment or waive a required check.
+The parent escalated this observation-cost increase to the trial's spec owner.
+Read-only assessment, 2026-09-06: no normalized severe-compute threshold was
+crossed, but [T11.F01's compute limits](t11-f01-mutational-neighborhood-indicator.md#inputs-and-invariants)
+also require the evolved half to add at most 90 seconds. The stored 138.422
+seconds exceeds that separate limit by 48.422 seconds (+53.802%). The
+15-minute total-profile investigation threshold does not replace it. Closure
+is blocked on this unresolved component limit; neither a baseline re-pin nor
+an unpaired-cohort explanation makes the timing pass.
+
+The bounded investigation confirmed identical `neighborhood-v1` battery
+metadata across F07/F06/F04: 12 genomes per seed, 20 operator trials, 200
+births, 48 snapshots and eight four-tick sequences (80 executions per genome).
+Seed 33 accounts for 129.204 of the 138.422 seconds. The benchmark evaluator
+and sampling loops are unchanged; the sequence call now supplies genome nodes
+to the common tick boundary. Added runtime work is decay and a retained base
+over initialized eligibility plus changed source replay, not additional
+trials or rewards in the battery. These facts do not establish which sampled
+genome or operation caused the time increase. The stored sampled records
+contain IDs, ranks, companions and outcomes, not genome payloads or per-genome
+timings/work, so they cannot alone support an exact observation-only replay.
+
+Advisor consultation 4 completed the read-only cost investigation: no
+evidence-supported narrow F07 defect or repair was identified. The exact
+sampled genomes were discarded, so an observation-only replay is unavailable;
+aggregate seed-33 timing cannot distinguish mutation, evaluation, runtime,
+and host contributions. Explicit user direction is required for an additional
+instrumented diagnostic measurement that retains exact inputs before any
+dependent remediation or closure. Do not make speculative optimizations,
+implement F15 routing, reduce samples, or replay the world under another
+command to bypass the single-run rule. The 90-second cap, fixed battery,
+single-goal rule, and original measured reports remain unchanged.
 
 #### Persistence and goal indicators
 
@@ -780,33 +811,48 @@ Complete individual-genome operator/birth rows remain in the linked goal reports
   preserve existing update charges. Template, status, ownership, bounded
   acceptance tests, gain alternatives, reference updates, and closure
   requirements were checked. This author self-review is not independent
-  validation; implementation and the fresh final review remain pending.
+  validation.
 - Trial requirement correction 1 (spec owner, 2026-09-06): F05's E3 prose
   describes withholding skipped-visit rewards, but the T11.F07 roadmap asks
   for eligibility that bridges elapsed time. Withhold new activity when a
   module is skipped; keep later reward access to its correctly decayed
   eligibility. Suppressing all skipped-tick weight changes would defeat
   delayed credit. F05's historical measurements remain accurate.
+- Trial requirement correction 2 / current blocker (spec owner, 2026-09-06):
+  the F07 plan cited F01's fixed measurement battery but failed to carry its
+  separate 90-second evolved-observation cap into the performance checklist.
+  Restated that existing requirement after the measured 138.422-second result;
+  the broader 15-minute budget is not an exception. F07 is Blocked
+  and its feature row remains unchecked. This is a planning omission exposed
+  by measurement, not a new threshold or a successful cost check.
 - Trial settings: orchestrator Astra `medium`; persistent spec owner Astra
-  `xhigh`; persistent implementer Astra `low`; advisor and fresh final reviewer
-  Astra `high`. Closure cost record will add actual advisor count, reviewer
-  severity counts, remediation passes, requirement corrections, user
-  interventions, and total task/subagent usage if available, otherwise
-  `usage unavailable`.
+  `xhigh`; persistent implementer Astra `low`; advisor Astra `high`; fresh
+  final reviewer configured for Astra `high`, not yet run.
 - Starting main: `43d966c18d4ac68ad549d4482382b88b760de6f6`; feature worktree
   `/Users/istefanek/projects/petri/.worktrees/t11-f07`, branch `codex/t11-f07`.
   User authorized continuing with the unrelated untracked main-checkout
   `crates/v3-core/tests/zz_probe_mesh_function.rs`; preserve it. No concrete
   feature blocker is known at planning time.
 
-- Trial implementation telemetry: 3 advisor consultations (approach, repeated
-  test-fixture error, final sufficiency); one test-fixture correction round;
-  zero post-final-review remediation rounds so far (review pending). Plan
-  requirement correction 1 is recorded above: skipped activity does not
-  suppress later reward access. The user authorized continuation despite
-  unrelated main-checkout changes; they were preserved. Parent records final
-  reviewer severity/remediation counts and user-intervention totals at closure.
-  Task/subagent usage unavailable.
+- Blocked-run cost record, 2026-09-06: 4 advisor consultations (approach,
+  repeated test-fixture error, final sufficiency, read-only cost investigation);
+  one test-fixture remediation round; zero post-final-review remediation
+  rounds. Requirement corrections: 2, the F05 skipped-credit clarification
+  and the F01 observation-cap planning omission above. Fresh final reviewer
+  not run, so no severity findings counts exist. Final rebased `make check`
+  and integration are pending. The user authorized continuation despite
+  unrelated main-checkout changes; they were preserved. Usage unavailable.
+- Rebase evidence, 2026-09-06: the parent rebased the feature from starting
+  main `43d966c18d4ac68ad549d4482382b88b760de6f6` onto main
+  `22031ec3b724cb1e01941a393d77a11d1d3675a5`; all three feature commits
+  applied without conflict. Rebased HEAD before this blocker-only edit is
+  `d4c5ab0ed4860106f8795397c2c328f55a4a99e5`. The parent verified runtime,
+  tests, scripts and frontend are identical to measured implementation
+  `f5730cf760bd5ce29e749cba84847f92fb8980f0`. The incoming F14/F15
+  documentation does not change F07 acceptance: future execution indicators
+  belong to F14 and single-visit routing belongs to F15. Existing measured
+  reports are retained; required verification of the rebased closure content
+  has not been waived.
 - Final implementer document verification: `make roadmap-check` and
   `git diff --check` exited 0; `/private/tmp/t11-f07-roadmap-final.log`.
   Completion status, checked feature/track row, fresh independent review and
