@@ -762,7 +762,6 @@ pub(crate) fn mutate_action_slot_behavior_in_def(
 
 // ─── Raw field mutation ─────────────────────────────────────────────────────
 
-/// Raw field mutation: randomly retarget an edge source or mutate a compute param.
 /// One field-level move available on a picked edge's `GraphSource`. Each
 /// variant changes exactly one field by one unit; the source variant itself
 /// is never replaced.
@@ -1731,9 +1730,7 @@ mod tests {
     /// (80%) vs SharedMemory (20%). Flipping it to `>` swaps the majority to
     /// SharedMemory; a wide margin over many fixed draws catches that
     /// inversion without depending on which cases were drawn. The `<=`
-    /// variant is equivalent: `rng.gen::<f32>()` draws from a 2^-24 grid and
-    /// the literal `0.8f32` sample value is not reachable within the test
-    /// budget, so `<` and `<=` observe the same outcomes in practice.
+    /// variant is deferred; see the spec's mutation record.
     #[test]
     fn random_graph_source_input_leaf_is_the_majority_when_compute_is_empty() {
         let input_refs = vec![InputReference::World(WorldInputKey::NeighborBarrierRing)];

@@ -71,7 +71,12 @@ relies on.
   identity kind: `evaluate_compute_kind` returns the weighted sum, so one
   input of weight 1.0 reproduces the source exactly in f32) whose single input
   is the old source with weight 1.0, and retarget the old edge to the new node
-  keeping its old weight. When the consumer is a compute node at index `c`,
+  keeping its old weight. The new node's output passes through
+  `sanitize_output` (NaN → 0, clamp to ±1e9) like every compute node's
+  output, so exact reproduction of the old source holds for values already
+  inside that range; a source value outside it (already sanitized identically
+  whether read directly or through the new node) is unaffected. When the
+  consumer is a compute node at index `c`,
   insert the split node at index `c` and remap every `ComputeNode(i >= c)`
   reference across all five surfaces to `i + 1`, so Gauss-Seidel pass order is
   preserved: the new node reads its source in the same pass phase the consumer
@@ -79,7 +84,19 @@ relies on.
   consumer is a sink, action slot, or execute gate, append. Final outputs are
   identical either way; a split of a backward or self edge may extend
   convergence by at most one pass because the new node's delta lags its
-  source's by one pass. A split never targets an edge whose source is
+  source's by one pass. **Documented exception**: an append-branch split
+  whose retargeted edge's old source was an `InputLeaf` resolving to
+  `DynamicIntrospection(EnergyCurrent)`, on a graph carrying plasticity, is
+  not neutral. The new identity node's cached value is read from
+  `curr_outputs` at effects time (the value it computed during the last
+  relaxation pass, before the post-convergence plasticity-cost deduction),
+  whereas a direct edge on the same non-compute surface is resolved fresh at
+  effects time (after that deduction). The two differ by
+  `plasticity_cost * weight`. Under the production default
+  (`plasticity_update_cost = 0.0`) this has no observable effect; it applies
+  once that cost is configured nonzero. A code fix (skip that source for
+  post-convergence consumers) is deferred to T11.F08 (see Notes for AI
+  Agents). A split never targets an edge whose source is
   `ComputeNode(u16::MAX)` or otherwise out of range; skip with
   `NoApplicableTarget` when the graph has no edge. Remove the per-sub-value
   spraying loop and the duplicate `input_ref_width`. Insert-with-remap shifts
@@ -124,15 +141,22 @@ relies on.
 
 ## Implementation Tasks
 
-- [x] Write failing tests first: property tests over arbitrary graph defs and
-      battery inputs that each growth operator (three add-node forms, copy
-      node, copy subgraph, input-reference add on graph and VM nodes) yields
-      identical execute outputs, actions, and shared-memory writes with ample
-      energy and passes, and that a compute-consumer split preserves every
-      node's per-pass value; a property that over seeds every `sub_idx` of a
-      compound reference is drawn by `random_graph_source`; a property that
-      raw-field mutation changes exactly one field by one unit and never the
-      variant; example tests for the skip cases and index remapping.
+- [x] Write failing tests first: property tests, seeded by an RNG drawn over
+      `any::<u64>()`, applied to two fixed hand-built fixtures (`base_def`,
+      forward/backward/self-loop edges and no plasticity; `plasticity_def`,
+      added post-review for a Hebbian-plasticity compute node and a
+      `DynamicIntrospection(EnergyCurrent)` reference) and three fixed
+      scenarios, not arbitrary generated graph defs, that each growth
+      operator (three add-node forms, copy node, copy subgraph,
+      input-reference add on graph and VM nodes) yields identical execute
+      outputs, actions, and shared-memory writes with ample energy and
+      passes on both fixtures; that a compute-consumer split preserves every
+      node's per-pass value (on `base_def`); a property that over seeds
+      every drawn `InputLeaf.sub_idx` stays within its reference's width
+      (the reach claim itself is a separate seeded example test); a property
+      that raw-field mutation changes at most one compute-node edge and
+      never its variant (the one-unit-step magnitude is example-tested
+      separately); example tests for the skip cases and index remapping.
 - [x] Implement the add-node forms with insert-with-remap, the faithful copy,
       unwired input-reference add on both backends, config-driven sub-index
       sampling, and the one-field raw step; delete the obsolete tests that
@@ -151,9 +175,14 @@ relies on.
 - [x] TDD evidence: wrote `crates/v3-core/src/mutation/graph/tests/operators.rs`
       (10 property/example tests: neutrality of the three add-node forms,
       `CopyComputeNode`, `CopySubgraph`, unwired `InputRef.Add` on graph and
-      VM nodes, split per-pass preservation, `random_graph_source` sub_idx
-      reach, raw-field one-step) against the old operator signatures first;
-      `cargo check` failed until the operators were rewritten. During
+      VM nodes — each a seeded-RNG property run over two fixed fixtures,
+      `base_def` and, post-review, `plasticity_def` — split per-pass
+      preservation on `base_def`, an `InputLeaf.sub_idx`-range property (the
+      reach claim is a separate seeded example test), and a raw-field
+      at-most-one-compute-edge-changed/variant-preserved property (the
+      one-unit-step magnitude is example-tested separately)) against the old
+      operator signatures first; `cargo check` failed until the operators
+      were rewritten. During
       implementation two real defects surfaced only once the property tests
       ran against production code paths (not caught by the unit-level
       example tests alone): `insert_compute_node_at`'s remap overflowed on
@@ -347,8 +376,12 @@ clade count 118→147; seed 33 entropy 2.698148→2.844166, clade count
 96→123; final populations moved -1.7% to -21.9% across seeds with no
 extinction) — these are population-composition differences from the
 inherited mutation map, not cognition claims, consistent with the
-predeclared "may shift either way" allowance. No operator family was
-disabled or down-weighted.
+predeclared "may shift either way" allowance. Goal memory-sensitivity
+(different-from-either fraction, T11.F02→current): seed 11 0.001107→
+0.000000, seed 22 0.000211→0.002685 (zeroed fraction also newly nonzero at
+0.001718, vs. 0.000000 in every prior closure), seed 33 0.000000→0.000000 —
+also a changed-population reading, not a cognition claim. No operator family
+was disabled or down-weighted.
 
 ## Success Criteria
 
@@ -373,3 +406,24 @@ disabled or down-weighted.
   the split insert shares with node removal (T11.F09 owns learned-weight
   correspondence), corrected the pass-count claim for backward-edge splits,
   and simplified the raw-field `ref_idx` rule. Ready.
+- Post-review remediation (2026-09-05, reviewer counts P1=0, P2=2, P3=7): all
+  7 items addressed except one deferred finding recorded here.
+  - Deferred (P2-2): the split append-branch `InputLeaf(EnergyCurrent)` +
+    plasticity exception (see Inputs and Invariants and the
+    `AddComputeNode` reference entry) has a code fix — skip that source for
+    post-convergence consumers, or resolve it fresh at effects time instead
+    of caching it mid-relaxation — deferred to T11.F08. No observable effect
+    exists today because production's `plasticity_update_cost` default is
+    0.0; the fix matters once that cost is configured nonzero.
+  - Deferred (P3-7): `graph_def_mut_with_input_refs` clones `input_refs`
+    (`crates/v3-core/src/mutation/graph/operators.rs`) where a disjoint
+    field borrow (splitting `&mut NodeGenome` into its `backend_def` and
+    `input_refs` fields separately) could avoid the allocation. Deferred: a
+    production edit here would invalidate this closure's mutation-testing
+    run and stored benchmark reports, both already recorded as this
+    feature's evidence.
+  - The deferred mutation-testing survivor at
+    `crates/v3-core/src/mutation/graph/operators.rs:191` (`random_graph_source`,
+    `<` → `<=`) is unchanged by this remediation pass (test-only comment
+    reword, no test or production semantics changed); see the `make
+    rust-mutants` Verification bullet for its full disposition.
