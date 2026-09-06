@@ -29,6 +29,17 @@ describe("ConfigPanel", () => {
 		});
 	});
 
+	it("edits mutation event continuation probability in the runtime draft", () => {
+		render(<ConfigPanel />);
+		const field = screen.getByTestId("config-field-mutation-event-continuation-probability");
+		expect(field).toHaveValue(0.2);
+		fireEvent.change(field, { target: { value: "0.35" } });
+		expect(
+			useConfigStore.getState().localDraft?.mutation
+				.per_birth_mutation_event_continuation_probability,
+		).toBe(0.35);
+	});
+
 	it("renders startup and runtime top-level sections with food subgroup", () => {
 		render(<ConfigPanel />);
 

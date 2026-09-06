@@ -176,6 +176,38 @@ mod tests {
     }
 
     #[test]
+    fn production_bias_gives_each_eligible_live_or_inactive_node_equal_opportunity() {
+        let bias = crate::config::SimulationConfig::default()
+            .mutation
+            .reachable_bias;
+        for value in [bias.topology, bias.vm, bias.graph, bias.input_ref] {
+            let mut random = seeded_rng(42);
+            let mut counts = [0u32; 5];
+            for _ in 0..20_000 {
+                let (index, class) =
+                    biased_select_from(&[0, 1, 2, 3, 4], &[0, 1], value, &mut random).unwrap();
+                counts[index] += 1;
+                assert_eq!(
+                    class,
+                    if index < 2 {
+                        TargetReachability::Reachable
+                    } else {
+                        TargetReachability::Unreachable
+                    }
+                );
+            }
+            // Each node expects 4,000 draws; 300 is over five standard deviations.
+            // Three inactive nodes therefore receive 60%, not a class quota of 50%.
+            assert!(
+                counts
+                    .into_iter()
+                    .all(|count| (3700..=4300).contains(&count)),
+                "{counts:?}"
+            );
+        }
+    }
+
+    #[test]
     fn bias_one_always_selects_reachable_when_available() {
         let eligible = vec![0, 1, 2, 3, 4];
         let reachable = vec![1, 3]; // only 1, 3 reachable

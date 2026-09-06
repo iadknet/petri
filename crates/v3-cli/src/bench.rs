@@ -358,6 +358,13 @@ pub struct NeighborhoodBirthBucket {
     pub tally: NeighborhoodTally,
 }
 
+/// One requested-event-count bucket, ordered by count in reports.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct NeighborhoodRequestedBirthBucket {
+    pub requested_events: u32,
+    pub births: u32,
+}
+
 /// The per-birth reading: total births attempted, how many drew zero applied
 /// events (counted, not evaluated, since they are identical to the base by
 /// construction), the pooled "any events" tally, and the same trials
@@ -365,6 +372,9 @@ pub struct NeighborhoodBirthBucket {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NeighborhoodBirths {
     pub births_total: u32,
+    /// Requested-event histogram; absent in reports before T11.F04.
+    #[serde(default)]
+    pub by_requested_events: Vec<NeighborhoodRequestedBirthBucket>,
     pub zero_event_births: u32,
     pub any_events: NeighborhoodTally,
     pub by_events: Vec<NeighborhoodBirthBucket>,
@@ -1055,6 +1065,16 @@ fn to_neighborhood_operator_rows(rows: &[OperatorRow]) -> Vec<NeighborhoodOperat
 fn to_neighborhood_births(result: &BirthResult) -> NeighborhoodBirths {
     NeighborhoodBirths {
         births_total: result.births_total,
+        by_requested_events: result
+            .by_requested_events
+            .iter()
+            .map(
+                |(&requested_events, &births)| NeighborhoodRequestedBirthBucket {
+                    requested_events,
+                    births,
+                },
+            )
+            .collect(),
         zero_event_births: result.zero_event_births,
         any_events: to_neighborhood_tally(&result.any_events),
         by_events: result
@@ -1085,6 +1105,9 @@ fn merge_birth_results(mut pooled: BirthResult, genome: &BirthResult) -> BirthRe
     pooled.births_total += genome.births_total;
     pooled.zero_event_births += genome.zero_event_births;
     pooled.any_events = pooled.any_events.merge(genome.any_events);
+    for (&events, &births) in &genome.by_requested_events {
+        *pooled.by_requested_events.entry(events).or_default() += births;
+    }
     for (&applied_events, tally) in &genome.by_events {
         let entry = pooled.by_events.entry(applied_events).or_default();
         *entry = entry.merge(*tally);
@@ -2387,6 +2410,42 @@ mod tests {
     }
 
     #[test]
+    fn generated_report_with_requested_births_roundtrips_through_outer_indicator() {
+        let report = build_report(&small_profile("gate"), "t11-f04-report-roundtrip");
+        let encoded = serde_json::to_string(&report).unwrap();
+        let decoded: Report = serde_json::from_str(&encoded).unwrap();
+        assert_eq!(
+            deterministic_block_json(&decoded),
+            deterministic_block_json(&report)
+        );
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn requested_birth_histogram_roundtrips(
+            histogram in proptest::collection::btree_map(0u32..10, 1u32..100, 0..10),
+        ) {
+            let result = BirthResult {
+                births_total: histogram.values().sum(),
+                by_requested_events: histogram,
+                ..BirthResult::default()
+            };
+            let report = to_neighborhood_births(&result);
+            let encoded = serde_json::to_value(&report).unwrap();
+            let decoded: NeighborhoodBirths = serde_json::from_value(encoded.clone()).unwrap();
+            proptest::prop_assert_eq!(&decoded, &report);
+            let wrapped = Indicator::Defined(report.clone());
+            let wrapped_encoded = serde_json::to_string(&wrapped).unwrap();
+            let decoded: Indicator<NeighborhoodBirths> = serde_json::from_str(&wrapped_encoded).unwrap();
+            proptest::prop_assert_eq!(decoded, wrapped);
+            let mut historical = encoded;
+            historical.as_object_mut().unwrap().remove("by_requested_events");
+            let decoded: NeighborhoodBirths = serde_json::from_value(historical).unwrap();
+            proptest::prop_assert!(decoded.by_requested_events.is_empty());
+        }
+    }
+
+    #[test]
     fn merge_birth_results_sums_totals_and_merges_matching_buckets() {
         let mut a = BirthResult {
             births_total: 10,
@@ -2401,6 +2460,8 @@ mod tests {
             ..Tally::default()
         };
         a.by_events.insert(1, a.any_events);
+        a.by_requested_events.insert(0, 4);
+        a.by_requested_events.insert(2, 6);
 
         let mut b = BirthResult {
             births_total: 5,
@@ -2414,12 +2475,31 @@ mod tests {
             ..Tally::default()
         };
         b.by_events.insert(1, b.any_events);
+        b.by_requested_events.insert(0, 1);
+        b.by_requested_events.insert(2, 4);
 
         let merged = merge_birth_results(a, &b);
         assert_eq!(merged.births_total, 15);
         assert_eq!(merged.zero_event_births, 5);
         assert_eq!(merged.any_events.trials, 10);
         assert_eq!(merged.by_events[&1].trials, 10);
+        assert_eq!(
+            merged.by_requested_events,
+            BTreeMap::from([(0, 5), (2, 10)])
+        );
+        assert_eq!(
+            to_neighborhood_births(&merged).by_requested_events,
+            vec![
+                NeighborhoodRequestedBirthBucket {
+                    requested_events: 0,
+                    births: 5
+                },
+                NeighborhoodRequestedBirthBucket {
+                    requested_events: 2,
+                    births: 10
+                },
+            ]
+        );
     }
 
     #[test]

@@ -76,6 +76,15 @@ This document does not define:
 
 ---
 
+Mutation supply is owned by `v3-mutation-spec.md` and configured by
+`v3-runtime-config-spec.md`. The production engine triggers with probability
+0.44 and requests a bounded geometric count (minimum 1, maximum 10,
+continuation probability 0.2). The approximately 0.55 requested events per
+birth is a provisional comparison baseline. Requested events become attempts;
+skipped events are not extra requests, and applied count governs downstream
+mutation effects. Compare both conditional mutated-birth outcomes and absolute
+outcomes per all births when interpreting this supply.
+
 ## 3. OffspringDraft Contract
 
 `OffspringDraft` minimum fields:

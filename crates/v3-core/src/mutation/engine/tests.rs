@@ -1064,3 +1064,88 @@ fn engine_pressure_restricted_deletions_bias_toward_unreachable_nodes() {
         unreachable_targets
     );
 }
+
+#[test]
+fn provisional_supply_mean_and_single_event_share() {
+    let config = MutationConfig::default();
+    let mut random = rng(20_260_905);
+    let mut events = 0u64;
+    let mut triggered = 0u32;
+    let mut singles = 0u32;
+    let births = 200_000u32;
+    for _ in 0..births {
+        let count = requested_event_count(&config, &mut random);
+        events += u64::from(count);
+        triggered += u32::from(count > 0);
+        singles += u32::from(count == 1);
+    }
+    // Fixed seed and tolerances wider than six standard errors at this sample size.
+    assert!((f64::from(triggered) / f64::from(births) - 0.44).abs() < 0.01);
+    assert!((events as f64 / f64::from(births) - 0.54999994368).abs() < 0.015);
+    assert!((f64::from(singles) / f64::from(triggered) - 0.8).abs() < 0.015);
+}
+
+proptest::proptest! {
+    #[test]
+    fn bounded_supply_and_engine_accounting(
+        seed in proptest::prelude::any::<u64>(), min in 1u32..8, extra in 0u32..8,
+        continuation in 0.0f64..=1.0, trigger in 0.0f64..=1.0,
+    ) {
+        let config = MutationConfig {
+            mutation_probability: trigger,
+            per_birth_mutation_events_min: min,
+            per_birth_mutation_events_max: min + extra,
+            per_birth_mutation_event_continuation_probability: continuation,
+            ..MutationConfig::default()
+        };
+        let requested = requested_event_count(&config, &mut rng(seed));
+        proptest::prop_assert!(requested == 0 || (min..=min + extra).contains(&requested));
+        let summary = MutationEngine::apply_mutations(&mut v3alpha1_founder_genome(), &config, &[], &mut rng(seed));
+        proptest::prop_assert_eq!(summary.attempted_events, requested);
+        proptest::prop_assert_eq!(summary.attempted_events, summary.applied_events + summary.skipped_events);
+    }
+
+    #[test]
+    fn supply_probability_endpoints_and_equal_bounds(
+        seed in proptest::prelude::any::<u64>(), min in 1u32..100, extra in 0u32..100,
+    ) {
+        let mut config = MutationConfig {
+            mutation_probability: 1.0,
+            per_birth_mutation_events_min: min,
+            per_birth_mutation_events_max: min + extra,
+            per_birth_mutation_event_continuation_probability: 0.0,
+            ..MutationConfig::default()
+        };
+        proptest::prop_assert_eq!(requested_event_count(&config, &mut rng(seed)), min);
+        config.per_birth_mutation_event_continuation_probability = 1.0;
+        proptest::prop_assert_eq!(requested_event_count(&config, &mut rng(seed)), min + extra);
+        config.per_birth_mutation_events_min = min + extra;
+        config.per_birth_mutation_event_continuation_probability = 0.2;
+        proptest::prop_assert_eq!(requested_event_count(&config, &mut rng(seed)), min + extra);
+        config.mutation_probability = 0.0;
+        proptest::prop_assert_eq!(requested_event_count(&config, &mut rng(seed)), 0);
+    }
+}
+
+#[test]
+fn supply_upper_bound_does_not_overflow() {
+    let config = MutationConfig {
+        mutation_probability: 1.0,
+        per_birth_mutation_events_min: u32::MAX - 1,
+        per_birth_mutation_events_max: u32::MAX,
+        per_birth_mutation_event_continuation_probability: 1.0,
+        ..MutationConfig::default()
+    };
+    assert_eq!(requested_event_count(&config, &mut rng(1)), u32::MAX);
+}
+
+#[test]
+fn production_supply_keeps_all_operator_families_enabled() {
+    let config = MutationConfig::default();
+    assert!(config.mesh_layer_probability > 0.0 && config.mesh_layer_probability < 1.0);
+    assert!(!config.genome_size_pressure_enabled);
+    assert!(TopologyOperator::ALL.iter().all(|op| op.weight() > 0));
+    assert!(VmOperator::ALL.iter().all(|op| op.weight() > 0));
+    assert!(GraphOperator::ALL.iter().all(|op| op.weight() > 0));
+    assert!(InputRefOperator::ALL.iter().all(|op| op.weight() > 0));
+}

@@ -42,7 +42,7 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		max: 1,
 		step: 0.001,
 		testId: "config-field-mutation-mutation-probability",
-		defaultValue: 0.1,
+		defaultValue: 0.44,
 		tooltip: "Probability that a newborn genome undergoes mutation",
 	},
 	{
@@ -64,6 +64,16 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		testId: "config-field-mutation-events-max",
 		defaultValue: 10,
 		tooltip: "Maximum number of mutation events per birth when mutation triggers",
+	},
+	{
+		path: "mutation.per_birth_mutation_event_continuation_probability",
+		label: "Continue Events Prob.",
+		min: 0,
+		max: 1,
+		step: 0.01,
+		testId: "config-field-mutation-event-continuation-probability",
+		defaultValue: 0.2,
+		tooltip: "After the minimum, chance to request another mutation event up to the maximum",
 	},
 	{
 		path: "mutation.mesh_layer_probability",
@@ -133,8 +143,9 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		max: 1,
 		step: 0.01,
 		testId: "config-field-mutation-reachable-bias-topology",
-		defaultValue: 0.7,
-		tooltip: "Probability of targeting reachable nodes for topology mutations",
+		defaultValue: 0,
+		tooltip:
+			"Chance to prefer reachable nodes; zero selects uniformly among eligible nodes for topology mutations",
 	},
 	{
 		path: "mutation.reachable_bias.vm",
@@ -143,8 +154,9 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		max: 1,
 		step: 0.01,
 		testId: "config-field-mutation-reachable-bias-vm",
-		defaultValue: 0.7,
-		tooltip: "Probability of targeting reachable nodes for VM mutations",
+		defaultValue: 0,
+		tooltip:
+			"Chance to prefer reachable nodes; zero selects uniformly among eligible nodes for VM mutations",
 	},
 	{
 		path: "mutation.reachable_bias.graph",
@@ -153,8 +165,9 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		max: 1,
 		step: 0.01,
 		testId: "config-field-mutation-reachable-bias-graph",
-		defaultValue: 0.7,
-		tooltip: "Probability of targeting reachable nodes for graph mutations",
+		defaultValue: 0,
+		tooltip:
+			"Chance to prefer reachable nodes; zero selects uniformly among eligible nodes for graph mutations",
 	},
 	{
 		path: "mutation.reachable_bias.input_ref",
@@ -163,8 +176,9 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		max: 1,
 		step: 0.01,
 		testId: "config-field-mutation-reachable-bias-input-ref",
-		defaultValue: 0.5,
-		tooltip: "Probability of targeting reachable nodes for input reference mutations",
+		defaultValue: 0,
+		tooltip:
+			"Chance to prefer reachable nodes; zero selects uniformly among eligible nodes for input reference mutations",
 	},
 ];
 

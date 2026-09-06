@@ -180,6 +180,7 @@ export interface MutationConfig {
 	mutation_probability: number;
 	per_birth_mutation_events_min: number;
 	per_birth_mutation_events_max: number;
+	per_birth_mutation_event_continuation_probability: number;
 	mesh_layer_probability: number;
 	genome_size_cap: number;
 	genome_size_pressure_enabled: boolean;

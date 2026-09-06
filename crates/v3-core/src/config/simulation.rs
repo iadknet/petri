@@ -702,10 +702,10 @@ pub struct ReachableBiasConfig {
 impl Default for ReachableBiasConfig {
     fn default() -> Self {
         Self {
-            topology: 0.7,
-            vm: 0.7,
-            graph: 0.7,
-            input_ref: 0.5,
+            topology: 0.0,
+            vm: 0.0,
+            graph: 0.0,
+            input_ref: 0.0,
         }
     }
 }
@@ -736,6 +736,9 @@ pub struct MutationConfig {
     pub mutation_probability: f64,
     pub per_birth_mutation_events_min: u32,
     pub per_birth_mutation_events_max: u32,
+    /// Chance to request another event after the minimum, up to the maximum.
+    #[serde(default = "default_mutation_event_continuation_probability")]
+    pub per_birth_mutation_event_continuation_probability: f64,
     /// Probability of selecting the mesh (Topology) layer per mutation event.
     /// Complement (1 - this) selects the node-internal layer (VM/Graph/InputRef).
     pub mesh_layer_probability: f64,
@@ -755,12 +758,18 @@ pub struct MutationConfig {
     pub topology_new_node_birth: TopologyNewNodeBirthConfig,
 }
 
+fn default_mutation_event_continuation_probability() -> f64 {
+    0.2
+}
+
 impl Default for MutationConfig {
     fn default() -> Self {
         Self {
-            mutation_probability: 0.1,
+            mutation_probability: 0.44,
             per_birth_mutation_events_min: 1,
             per_birth_mutation_events_max: 10,
+            per_birth_mutation_event_continuation_probability:
+                default_mutation_event_continuation_probability(),
             mesh_layer_probability: 0.2,
             genome_size_cap: 1200,
             genome_size_pressure_enabled: false,
@@ -963,6 +972,12 @@ impl SimulationConfig {
         let m = &mut self.mutation;
         m.mutation_probability = m.mutation_probability.clamp(0.0, 1.0);
         m.mesh_layer_probability = m.mesh_layer_probability.clamp(0.0, 1.0);
+        let continuation = m.per_birth_mutation_event_continuation_probability;
+        m.per_birth_mutation_event_continuation_probability = if continuation.is_finite() {
+            continuation.clamp(0.0, 1.0)
+        } else {
+            default_mutation_event_continuation_probability()
+        };
         if m.per_birth_mutation_events_min < 1 {
             m.per_birth_mutation_events_min = 1;
         }
@@ -1160,6 +1175,58 @@ fn normalize_f32_finite_positive(v: f32, fallback: f32) -> f32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
+
+    #[test]
+    fn continuation_probability_defaults_when_missing() {
+        let mut json = serde_json::to_value(MutationConfig::default()).unwrap();
+        json.as_object_mut()
+            .unwrap()
+            .remove("per_birth_mutation_event_continuation_probability");
+        let config: MutationConfig = serde_json::from_value(json).unwrap();
+        assert_eq!(
+            config.per_birth_mutation_event_continuation_probability,
+            0.2
+        );
+    }
+
+    #[test]
+    fn continuation_probability_nonfinite_uses_default() {
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            let mut config = SimulationConfig::default();
+            config
+                .mutation
+                .per_birth_mutation_event_continuation_probability = value;
+            config.normalize();
+            assert_eq!(
+                config
+                    .mutation
+                    .per_birth_mutation_event_continuation_probability,
+                0.2
+            );
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn mutation_supply_normalizes_and_roundtrips(
+            min in any::<u32>(), max in any::<u32>(), continuation in -2.0f64..3.0,
+        ) {
+            let mut config = SimulationConfig::default();
+            config.mutation.per_birth_mutation_events_min = min;
+            config.mutation.per_birth_mutation_events_max = max;
+            config.mutation.per_birth_mutation_event_continuation_probability = continuation;
+            config.normalize();
+            let m = &config.mutation;
+            prop_assert_eq!(m.per_birth_mutation_events_min, min.max(1));
+            prop_assert_eq!(m.per_birth_mutation_events_max, max.max(min.max(1)));
+            prop_assert_eq!(m.per_birth_mutation_event_continuation_probability, continuation.clamp(0.0, 1.0));
+            let decoded: MutationConfig = serde_json::from_str(&serde_json::to_string(m).unwrap()).unwrap();
+            prop_assert_eq!(decoded.per_birth_mutation_events_min, m.per_birth_mutation_events_min);
+            prop_assert_eq!(decoded.per_birth_mutation_events_max, m.per_birth_mutation_events_max);
+            prop_assert!((decoded.per_birth_mutation_event_continuation_probability - m.per_birth_mutation_event_continuation_probability).abs() < 1e-15);
+        }
+    }
 
     #[test]
     fn default_config_matches_spec() {
@@ -1244,7 +1311,7 @@ mod tests {
         // Perception
         assert_eq!(cfg.runtime.perception.vision_radius, 5);
         // Mutation
-        assert!((cfg.mutation.mutation_probability - 0.1).abs() < 1e-9);
+        assert!((cfg.mutation.mutation_probability - 0.44).abs() < 1e-9);
         assert_eq!(cfg.mutation.per_birth_mutation_events_min, 1);
         assert_eq!(cfg.mutation.per_birth_mutation_events_max, 10);
         assert!((cfg.mutation.mesh_layer_probability - 0.2).abs() < 1e-9);
@@ -1257,10 +1324,10 @@ mod tests {
         assert!((cfg.mutation.phenotype.channel_change_chance - 0.001).abs() < 1e-6);
         assert!((cfg.mutation.phenotype.polarity_flip_chance - 0.0002).abs() < 1e-6);
         // Reachable bias
-        assert!((cfg.mutation.reachable_bias.topology - 0.7).abs() < 1e-9);
-        assert!((cfg.mutation.reachable_bias.vm - 0.7).abs() < 1e-9);
-        assert!((cfg.mutation.reachable_bias.graph - 0.7).abs() < 1e-9);
-        assert!((cfg.mutation.reachable_bias.input_ref - 0.5).abs() < 1e-9);
+        assert!((cfg.mutation.reachable_bias.topology - 0.0).abs() < 1e-9);
+        assert!((cfg.mutation.reachable_bias.vm - 0.0).abs() < 1e-9);
+        assert!((cfg.mutation.reachable_bias.graph - 0.0).abs() < 1e-9);
+        assert!((cfg.mutation.reachable_bias.input_ref - 0.0).abs() < 1e-9);
         // Shared memory
         assert!((cfg.shared_memory.decay_rate - 0.0).abs() < f32::EPSILON);
         // Predation
@@ -1918,19 +1985,19 @@ mod tests {
     #[test]
     fn reachable_bias_config_defaults() {
         let rb = ReachableBiasConfig::default();
-        assert!((rb.topology - 0.7).abs() < 1e-9);
-        assert!((rb.vm - 0.7).abs() < 1e-9);
-        assert!((rb.graph - 0.7).abs() < 1e-9);
-        assert!((rb.input_ref - 0.5).abs() < 1e-9);
+        assert!((rb.topology - 0.0).abs() < 1e-9);
+        assert!((rb.vm - 0.0).abs() < 1e-9);
+        assert!((rb.graph - 0.0).abs() < 1e-9);
+        assert!((rb.input_ref - 0.0).abs() < 1e-9);
     }
 
     #[test]
     fn reachable_bias_config_on_mutation_config_defaults() {
         let cfg = SimulationConfig::default();
-        assert!((cfg.mutation.reachable_bias.topology - 0.7).abs() < 1e-9);
-        assert!((cfg.mutation.reachable_bias.vm - 0.7).abs() < 1e-9);
-        assert!((cfg.mutation.reachable_bias.graph - 0.7).abs() < 1e-9);
-        assert!((cfg.mutation.reachable_bias.input_ref - 0.5).abs() < 1e-9);
+        assert!((cfg.mutation.reachable_bias.topology - 0.0).abs() < 1e-9);
+        assert!((cfg.mutation.reachable_bias.vm - 0.0).abs() < 1e-9);
+        assert!((cfg.mutation.reachable_bias.graph - 0.0).abs() < 1e-9);
+        assert!((cfg.mutation.reachable_bias.input_ref - 0.0).abs() < 1e-9);
     }
 
     #[test]
@@ -1938,8 +2005,8 @@ mod tests {
         let cfg = SimulationConfig::default();
         let json = serde_json::to_string(&cfg).unwrap();
         let cfg2: SimulationConfig = serde_json::from_str(&json).unwrap();
-        assert!((cfg2.mutation.reachable_bias.topology - 0.7).abs() < 1e-9);
-        assert!((cfg2.mutation.reachable_bias.input_ref - 0.5).abs() < 1e-9);
+        assert!((cfg2.mutation.reachable_bias.topology - 0.0).abs() < 1e-9);
+        assert!((cfg2.mutation.reachable_bias.input_ref - 0.0).abs() < 1e-9);
     }
 
     #[test]
@@ -1952,7 +2019,7 @@ mod tests {
         obj.remove("reachable_bias");
         let stripped = serde_json::to_string(&obj).unwrap();
         let mc: MutationConfig = serde_json::from_str(&stripped).unwrap();
-        assert!((mc.reachable_bias.topology - 0.7).abs() < 1e-9);
+        assert!((mc.reachable_bias.topology - 0.0).abs() < 1e-9);
     }
 
     #[test]

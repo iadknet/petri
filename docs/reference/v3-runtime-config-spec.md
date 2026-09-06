@@ -87,19 +87,20 @@ Type posture:
 
 | Key | Type | Default | Constraint / normalization |
 | --- | --- | --- | --- |
-| `mutation.mutation_probability` | `f64` | `0.303` | Clamp to `[0.0, 1.0]`. Uses `f64` (not `f32`) to preserve precision for very small probability values used in low-mutation-rate experiments. |
+| `mutation.mutation_probability` | `f64` | `0.44` | Clamp to `[0.0, 1.0]`. Uses `f64` (not `f32`) to preserve precision for very small probability values used in low-mutation-rate experiments. |
 | `mutation.per_birth_mutation_events_min` | `u32` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
 | `mutation.per_birth_mutation_events_max` | `u32` | `10` | Must be `>= per_birth_mutation_events_min`; lower values normalize to min. |
+| `mutation.per_birth_mutation_event_continuation_probability` | `f64` | `0.2` | After the minimum, probability of requesting another event up to the maximum. Missing field defaults to `0.2`; finite values clamp to `[0.0, 1.0]`, NaN/infinite normalize to `0.2`. |
 | `mutation.action_queue_cap` | `usize` | `4` | Must be clamped to `1..=min(21845, runtime.max_actions_per_turn)`. `21845` preserves `InputReference::ActionQueue` width (`cap * 3`) within `u16`. |
 | `mutation.phenotype.channel_step` | `u8` | `1` | Must be `>= 1`; invalid values fall back to `1`. |
 | `mutation.phenotype.channel_change_chance` | `f32` | `0.001` | Clamp to `[0.0, 1.0]`. |
 | `mutation.phenotype.polarity_flip_chance` | `f32` | `0.0002` | Clamp to `[0.0, 1.0]`. |
 | `mutation.genome_size_cap` | `u32` | `1200` | Must be `>= 1`; invalid values fall back to `1200`. Maximum total genome size before size pressure suppresses growth mutations. Uses `genome_size()` (total structural size including junk DNA), not `complexity()` (functional reachability-aware). Serde alias: `complexity_cap`. |
-| `mutation.genome_size_pressure_enabled` | `bool` | `true` | When `true`, genomes near the size cap are less likely to gain growth mutations. Serde alias: `complexity_pressure_enabled`. |
-| `mutation.reachable_bias.topology` | `f64` | `0.7` | Probability that topology operators prefer reachable nodes. Clamp NaN/infinite to `0.0`, otherwise clamp to `[0.0, 1.0]`. |
-| `mutation.reachable_bias.vm` | `f64` | `0.7` | Probability that VM operators prefer reachable nodes. Same normalization. |
-| `mutation.reachable_bias.graph` | `f64` | `0.7` | Probability that graph operators prefer reachable nodes. Same normalization. |
-| `mutation.reachable_bias.input_ref` | `f64` | `0.5` | Probability that input-ref operators prefer reachable nodes. Same normalization. |
+| `mutation.genome_size_pressure_enabled` | `bool` | `false` | When `true`, genomes near the size cap are less likely to gain growth mutations. Serde alias: `complexity_pressure_enabled`. |
+| `mutation.reachable_bias.topology` | `f64` | `0.0` | Probability that topology operators prefer reachable nodes. Clamp NaN/infinite to `0.0`, otherwise clamp to `[0.0, 1.0]`. |
+| `mutation.reachable_bias.vm` | `f64` | `0.0` | Probability that VM operators prefer reachable nodes. Same normalization. |
+| `mutation.reachable_bias.graph` | `f64` | `0.0` | Probability that graph operators prefer reachable nodes. Same normalization. |
+| `mutation.reachable_bias.input_ref` | `f64` | `0.0` | Probability that input-ref operators prefer reachable nodes. Same normalization. |
 | `mutation.topology_new_node_birth.graph_backend_chance` | `f32` | `0.5` | Probability that topology newborns (`AddNode`, `SpliceNode`) are graph-backed instead of minimal VM. Clamp to `[0.0, 1.0]`; NaN/infinite falls back to `0.5`. |
 | `mutation.topology_new_node_birth.graph_initialized_chance` | `f32` | `0.8` | Given graph-backed newborn, probability that it starts with one `input_ref` and one custom-output wire. Clamp to `[0.0, 1.0]`; NaN/infinite falls back to `0.8`. |
 | `mutation.topology_new_node_birth.graph_compute_gate_chance` | `f32` | `0.5` | Given initialized graph newborn, probability that initial sink wiring routes through one newborn compute node instead of direct `InputLeaf` -> sink wiring. Clamp to `[0.0, 1.0]`; NaN/infinite falls back to `0.5`. |
@@ -110,13 +111,22 @@ canonical in `v3-phenotype-spec.md`.
 
 Mutation randomization semantics:
 1. Roll mutation trigger from `mutation_probability`.
-2. If triggered, sample event count in
-   `[per_birth_mutation_events_min, per_birth_mutation_events_max]` (inclusive).
-3. For each event, sample mutation domain uniformly across enabled domains.
-4. For each event, sample mutation operator uniformly across the selected
-   domain's enabled operators.
+2. If triggered, start at `per_birth_mutation_events_min`. While below
+   `per_birth_mutation_events_max`, add one event when a Bernoulli draw with
+   `per_birth_mutation_event_continuation_probability` succeeds; stop on its
+   first failure. Continuation 0 requests the minimum, 1 the maximum; equal
+   bounds request that count. The provisional defaults request approximately
+   0.55 events per all births, with 80% of triggered births requesting one.
+3. For each event, select topology with `mesh_layer_probability`; otherwise
+   select VM, graph, or input-reference mutation with equal probability.
+4. Select among eligible operators using their existing operator weights.
 5. Sample operator-specific numeric fields according to each mutator's local
    randomization rules.
+
+Zero reachable bias selects uniformly over eligible nodes, giving live and
+inactive nodes equal opportunity per eligible node. This is not a quota per
+reachability class. Requested events may skip; applied supply and behavioral
+outcomes are not held constant by the provisional requested mean.
 
 Mutation behavior semantics remain canonical in `v3-mutation-spec.md`; this
 section only owns config contract shape/defaults.

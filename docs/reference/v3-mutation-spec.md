@@ -136,7 +136,9 @@ Every current or future mesh backend must meet these four requirements:
 1. references are stable by identity or remapped on every structural edit;
 2. every growth operation preserves function at the moment it fires;
 3. persistent state advances once per world tick; and
-4. mutation supply arrives as small steps.
+4. mutation supply arrives as small steps: at provisional production defaults,
+   80% of triggered births request one event, with a bounded configurable tail
+   and uniform opportunity across eligible live and inactive mesh nodes.
 
 T11.F02 establishes the VM reference and operand portions. T11.F03 owns graph
 growth, T11.F04 mutation supply, T11.F06 the graph state clock, T11.F07 the
@@ -318,11 +320,18 @@ Selection randomization rules (internal to `MutationEngine`):
 - Mutation trigger rolls global `mutation_probability` internally. If the roll
   fails, `MutationEngine` returns `MutationSummary { attempted_events: 0,
   applied_events: 0, skipped_events: 0, ... }` immediately.
-- If triggered, event count is sampled from configured inclusive min/max bounds.
-- For each event, domain is sampled uniformly across enabled domains
-  (`Topology`, `Vm`, `Graph`, `InputRef`).
-- For each event, operator is sampled uniformly across the selected domain's
-  operators.
+- If triggered, request the configured minimum, then continue with the configured
+  `per_birth_mutation_event_continuation_probability` until the first failed
+  draw or the maximum count. Defaults are trigger 0.44, continuation 0.2,
+  bounds 1–10: approximately 0.55 requested events per birth, with 80% of
+  triggered births requesting exactly one. This is a provisional comparison
+  baseline, not an optimum or an inherited-policy minimum (T11.F13, T08.F05).
+- Every requested event becomes one attempted event; a skip does not cause an
+  extra requested event. `attempted_events = applied_events + skipped_events`.
+- For each event, select topology with `mesh_layer_probability`; otherwise
+  select VM, graph, or input-reference mutation with equal probability.
+- Select operators with their existing weights, preserving eligibility and
+  pressure handling.
 - Operator-specific mutation fields are randomized per event according to that
   operator's mutator implementation.
 - Canonical owner for mutation config keys/defaults: `v3-runtime-config-spec.md`.
@@ -351,7 +360,10 @@ Algorithm (`biased_select_from`):
    picked index via binary search in reachable set → `Reachable` or
    `Unreachable`.
 
-Per-domain bias defaults: topology=0.7, vm=0.7, graph=0.7, input_ref=0.5.
+Per-domain bias defaults: topology=0.0, vm=0.0, graph=0.0, input_ref=0.0.
+Selection is uniform over eligible mesh nodes, including inactive scaffold;
+there is no fixed quota for the reachable and unreachable classes. Existing
+neutral growth operators supply scaffold without artificial founder bloat.
 See `v3-runtime-config-spec.md` for config fields.
 
 Exempt operators:
@@ -449,3 +461,14 @@ Semantic category rule:
 - V3 tick ordering/arbitration reproducibility controls are canonical in
   `v3-tick-orchestration-spec.md` (`Test-Mode Reproducibility Notes (Tick
   Arbitration)`).
+
+## 9. Mutation Supply Observations
+
+The neighborhood report records birth counts by requested (`attempted_events`)
+count in `by_requested_events`, including zero, separately from `by_events`
+bucketed by applied count. Their weighted sums give requested and applied
+supply; the difference is skipped supply. `any_events` contains conditional
+outcomes among births with applied events. Divide its silent, changed, and dead
+counts by `births_total` for absolute mutated outcomes per all births; add
+`zero_event_births` to silent counts when reporting all behavior-identical births.
+Lower conditional harm alone does not establish fewer dead births overall.
