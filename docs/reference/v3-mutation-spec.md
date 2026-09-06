@@ -142,8 +142,12 @@ Every current or future mesh backend must meet these four requirements:
 
 T11.F02 establishes the VM reference and operand portions. T11.F03 owns graph
 growth, T11.F04 mutation supply, T11.F06 the graph state clock, T11.F07 the
-trace/reward clock, T11.F08 duplication, and T11.F09 learned-state
-correspondence. Those later guarantees remain pending.
+trace/reward clock, T11.F08 duplication, T11.F09 learned-state
+correspondence, and T11.F15 the topology connection operators
+(`AddRouteTarget`, `MutateGateBias`, `RetargetNodeTarget`,
+`RemoveRouteTarget`, `RemoveNode`, `SwapNodeBackend`, `ChangeEntryNode`,
+`SwapRouteTargets`), which the taxonomy below leaves unplaced until that
+feature lands. Those later guarantees remain pending.
 
 Growth-versus-connection taxonomy (requirement 2, established for the graph
 and InputRef domains by T11.F03; the VM insert/copy families are T11.F02's
