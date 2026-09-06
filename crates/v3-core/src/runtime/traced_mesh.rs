@@ -14,6 +14,11 @@ use crate::runtime::types::{MeshOutput, MeshSideOutputs, NodeResult, OUTPUT_SLOT
 use crate::sensors::perception::SensorSnapshot;
 
 /// Execute the creature's mesh chain with trace recording.
+///
+/// Before the first mesh execution of each new world tick, the caller must call
+/// [`GraphRuntimeState::begin_tick`] on `graph_runtime`. Mesh execution does not
+/// advance the graph clock. Repeated mesh visits in the same tick must reuse the
+/// existing snapshots without calling `begin_tick` again.
 #[allow(clippy::too_many_arguments)]
 pub fn execute_creature_mesh_traced(
     genome: &CreatureGenome,
@@ -38,6 +43,11 @@ pub fn execute_creature_mesh_traced(
 }
 
 /// Execute a traced mesh while resolving live reproductive reserve inputs.
+///
+/// Before the first mesh execution of each new world tick, the caller must call
+/// [`GraphRuntimeState::begin_tick`] on `graph_runtime`. Mesh execution does not
+/// advance the graph clock. Repeated mesh visits in the same tick must reuse the
+/// existing snapshots without calling `begin_tick` again.
 #[allow(clippy::too_many_arguments)]
 pub fn execute_creature_mesh_traced_with_reserve(
     genome: &CreatureGenome,

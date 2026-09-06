@@ -16,8 +16,13 @@ use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs, OUTP
 use crate::runtime::vm::execute_vm_node_with_reserve;
 use crate::sensors::perception::SensorSnapshot;
 
-/// Execute the creature's mesh chain for one tick, returning a [`MeshOutput`]
+/// Execute the creature's mesh chain within the current tick, returning a [`MeshOutput`]
 /// containing the queued actions, a [`ComputeCostReport`], and the priority bid.
+///
+/// Before the first mesh execution of each new world tick, the caller must call
+/// [`GraphRuntimeState::begin_tick`] on `graph_runtime`. Mesh execution does not
+/// advance the graph clock. Repeated mesh visits in the same tick must reuse the
+/// existing snapshots without calling `begin_tick` again.
 ///
 /// The function walks the genome's node chain starting at `entry_node_id`,
 /// dispatching each node to its VM or Graph backend, routing to subsequent
@@ -60,6 +65,11 @@ pub fn execute_creature_mesh(
 }
 
 /// Execute a creature mesh while exposing its live reproductive reserve.
+///
+/// Before the first mesh execution of each new world tick, the caller must call
+/// [`GraphRuntimeState::begin_tick`] on `graph_runtime`. Mesh execution does not
+/// advance the graph clock. Repeated mesh visits in the same tick must reuse the
+/// existing snapshots without calling `begin_tick` again.
 #[allow(clippy::too_many_arguments)]
 pub fn execute_creature_mesh_with_reserve(
     genome: &CreatureGenome,
