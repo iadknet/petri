@@ -23,7 +23,7 @@ representation only where the neighborhood reading still shows a gap.
 - [ ] Structural VM edits (insert, delete, replace, motif insertion, block and slice copies) preserve every surviving control-flow reference outside the edited span, verified by property tests, and no single operand-level VM event redraws more than one field (opcode replacement stays a separate macro operator).
 - [x] Adding or copying a graph compute node, or adding an input reference, is silent on the founder battery at least 95% of the time, and new edges can reach every sensor sub-value. (T11.F03 closure, 2026-09-05: `AddInternalGraphNode`, `CopyInternalNode`, and input-reference `Add` each read 1.00 silent on the stored gate report, and `random_graph_source` draws every sub-index; the no-regression rule keeps this true at later closures.)
 - [ ] At production defaults, mutated births are behaviorally dead at most 5% of the time and single-event births are silent at least 60% of the time, with every behavior-changing operator family still enabled.
-- [ ] Persistent graph state and eligibility traces advance on an explicit world-tick clock, verified by fixtures across relaxation-pass limits, disconnected-node additions, and skipped module visits.
+- [x] Persistent graph state and eligibility traces advance on an explicit world-tick clock, verified by fixtures across relaxation-pass limits, disconnected-node additions, and skipped module visits.
 - [ ] Copying a working module keeps it working, and learned weights follow surviving homologous nodes and edges through structural mutation.
 - [ ] Founders reach and retain a useful remembered decision through viable mutations in a bounded delayed-cue task.
 - [ ] The node-type contract (references stable by id or remapped on every edit, growth that preserves function when it fires, persistent state that advances once per world tick, mutation delivered in small steps) is recorded in the reference specs, and every backend, existing or added, is checked against it by property tests and the neighborhood indicator.
@@ -45,7 +45,7 @@ representation only where the neighborhood reading still shows a gap.
   - Goal: Check the brain's building blocks with small delayed-cue, memory-retention, and delayed-reward fixtures on constructed controllers, recording capability and measured gaps before interpreting evolution.
 - [x] **T11.F06 — Graph Memory Clock** — Depends on: T11.F01, T11.F05
   - Goal: Neural timescales. Remembered graph state, including what a backward edge reads, advances once per world tick, so extra settling passes or disconnected computation cannot speed up forgetting.
-- [ ] **T11.F07 — Reward Trace Clock** — Depends on: T11.F05
+- [x] **T11.F07 — Reward Trace Clock** — Depends on: T11.F05
   - Goal: Synaptic eligibility. Recent activity fades with elapsed world time and influences later learning through one explicit, calibrated reward-update rule.
 - [ ] **T11.F08 — Function-Preserving Duplication and Module Growth** — Depends on: T11.F02, T11.F03, T11.F06
   - Goal: Gene duplication. Copying a working module keeps it working, so complexity can grow by copy and divergence as in real genomes.
