@@ -1,17 +1,15 @@
 # T11.F04 — Mutation Supply and Neutral Scaffold
 
-**Status**: Blocked
+**Status**: In Progress
 **Last updated**: 2026-09-05
 **Feature**: T11.F04
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
 
 ## Goal
 
-Implementation is paused pending the user's mutation-rate decision. The
-0.55 target below records the existing roadmap contract, not a settled optimum.
-
 Point mutations arrive mostly one at a time, retaining the current expected
-0.55 requested events per birth. Eligible inactive structure is as likely to
+0.55 requested events per birth as a provisional comparison baseline. Eligible
+inactive structure is as likely to
 receive a mutation as eligible live structure, and stored persistence and
 neighborhood reports show the effect of these production defaults.
 
@@ -21,6 +19,8 @@ neighborhood reports show the effect of these production defaults.
   execution-clock repair, inherited mutation policy, or new scaffold operator.
 - No threshold weakening, historical report replacement, or second goal run.
 - No cognition claim or tuning defaults against the observed indicator.
+  T11.F13 owns rate characterization; T08.F05 owns inherited rates. This
+  feature establishes no minimum rate for inherited policy.
 
 ## Inputs and Invariants
 
@@ -34,9 +34,11 @@ neighborhood reports show the effect of these production defaults.
   Production code currently uses probability 0.1 and uniform inclusive 1–10
   events: 0.1 × 5.5 = 0.55 requested events per birth. The runtime reference's
   0.303 is stale. Requested, applied, and skipped events remain distinct;
-  `attempted_events = applied_events + skipped_events` stays true. Do not
-  retry skipped events merely to inflate applied supply.
-- Provisional supply, on hold: trigger probability 0.44, then a bounded geometric count
+  `attempted_events = applied_events + skipped_events` stays true. Report
+  absolute behavioral outcomes per all births as well as conditional mutated-
+  birth fractions; a lower conditional dead fraction need not mean fewer
+  dead births overall. Do not retry skipped events merely to inflate supply.
+- Provisional production supply: trigger probability 0.44, then a bounded geometric count
   starting at the configured minimum (default 1), continuing with probability
   0.2 up to the configured maximum (default 10). Its conditional mean is
   `(1 - 0.2^10) / (1 - 0.2)` and unconditional mean is 0.54999994368;
@@ -151,17 +153,16 @@ Report the remaining T11.F10 floor gaps and make no cognition claim.
 
 ## Notes for AI Agents
 
-- Planning readiness review (orchestrator, 2026-09-05): the template, dependency
+- Planning readiness review (orchestrator, 2026-09-05): template, dependency
   outputs, supply arithmetic, target semantics, and four-sweep contract agree.
-  One revision distinguished requested supply from applied events, and uniform
-  eligible-node opportunity from a fixed inactive-event quota. Initially ready;
-  the subsequent user pause below supersedes readiness to implement.
-- Blocker (2026-09-05): the user questioned retaining 0.55 events per birth
-  before implementation began, then asked whether rate exploration should be
-  a separate feature or the rate should evolve. Await their decision whether
-  T11.F04 retains 0.55 as a provisional baseline with calibration later, or
-  changes its current rate scope. No feature code, tests, builds, or benchmarks
-  have started; preserve this worktree.
+  Distinguished requested supply from applied events, and uniform eligible-node
+  opportunity from a fixed inactive-event quota. Ready after the user's scope
+  decision below; no implementation began during the discussion.
+- User decision (2026-09-05): separate delivery repair, rate characterization,
+  and inherited policy. The authorized roadmap update adds T11.F13 after
+  T11.F10 and makes it inform T08.F05's bounds. T11.F04 keeps approximately
+  0.55 requested events per birth as a provisional baseline, not an optimum
+  or an inherited-rate minimum. The implementation hold is resolved.
 - Rate research (2026-09-05): no local experiment establishes an optimum.
   [Avida's documentation](https://github.com/devosoft/avida/wiki/Mutation-settings)
   distinguishes its 0.0075 per-copy display default from the 0.0025 commonly
@@ -176,18 +177,6 @@ Report the remaining T11.F10 floor gaps and make no cognition claim.
   supply or behavioral effects constant. Compare absolute outcomes per all
   births as well as conditional fractions, and do not infer adaptation from
   persistence or silence alone.
-- Proposed scope split, not yet adopted: keep distribution repair in T11.F04;
-  characterize rates separately after the remaining brain repairs and
-  T11.F10's discovery/retention tests; retain the existing T08.F05 for inherited
-  mutation rates. A characterization could compare 0.25, 0.55, and 1.0 requested
-  events per birth with identical distribution shape and targeting. Its
-  deliverable would be useful ranges under named conditions, not a universal
-  optimum. T08.F05's current note inherits a minimum bound from T11.F04;
-  under the proposed split that wording would need to assign bounds to later
-  calibration, without treating the provisional 0.55 default as a minimum.
-  Lifetime responses to stress are a separate policy from an inherited scalar
-  and are not included in this proposal. No roadmap rows or dependencies have
-  been changed while this decision is pending.
 - Starting main: `e70fabc45fccc955b3c23b4bf99c07e6c6c48e76`; worktree:
   `/Users/istefanek/projects/petri/.worktrees/t11-f04`, branch `codex/t11-f04`.
 - Session metadata verifies orchestrator `gpt-6-astra` / `xhigh`.

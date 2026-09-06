@@ -1,7 +1,7 @@
 # T08 — Heredity and Recombination
 
 **Status**: Planned
-**Last updated**: 2026-09-04
+**Last updated**: 2026-09-05
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -22,8 +22,8 @@ homologous recombination, with asexual reproduction as the control.
 
 - [ ] **T08.F02 — Lineage Mutation-Effect Attribution** — Depends on: T11.F01
   - Goal: Which mutations mattered. Along a surviving lineage, which heritable changes altered behavior and which were silent.
-- [ ] **T08.F05 — Heritable Mutation Policy** — Depends on: T08.F02, T11.F12
-  - Goal: Mutation rate evolves. Lineages inherit how much they mutate, bounded so it cannot collapse to zero.
+- [ ] **T08.F05 — Heritable Mutation Policy** — Depends on: T08.F02, T11.F12, T11.F13
+  - Goal: Mutation rate evolves. Lineages inherit how much they mutate within bounds informed by rate characterization, preserving mutation supply and measured against fixed-rate controls.
 - [ ] **T08.F06 — Homology and Mating Compatibility** — Depends on: T04.F05, T11.F08, T08.F05, T09.F08
   - Goal: Deferred until the T11 foundation and T08 heredity evidence are reviewed. Which genomes are similar enough to exchange parts, measured before any mating exists.
 - [ ] **T08.F07 — Dormant Dual-Parent Mating Contract** — Depends on: T03.F07, T08.F06
@@ -37,7 +37,7 @@ homologous recombination, with asexual reproduction as the control.
 
 - Restructured 2026-09-04 after the [brain evolvability audit](../strategy/brain-evolvability-audit-2026-09-04.md): the mutation map moved to T11. T08.F01 became T11.F01, T08.F03 became T11.F12, T08.F04 became T11.F08, T08.F10 became T11.F02, T08.F11 became T11.F03, and T08.F12 became T11.F09. Those IDs are retired here and never reused. T08 adds no mutation operators of its own and builds on the corrected T11 map; the track was renamed from Evolvability and Heredity to match.
 - T08.F02 attributes behavioral change along surviving lineages using the T11.F01 battery and its silent, changed, and dead classes, so that lineage readings and neighborhood readings share one definition of "changed".
-- T08.F05 lets lineages inherit their mutation policy within the bounds T11.F04 sets for production supply. [Clune et al. (2008)](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1000187) found that evolved mutation rates in digital organisms land far below the rate that maximizes long-term adaptation, so the bounds protect supply, not the evolved value; T08.F05 may not lower the floor T11.F04 establishes.
+- T08.F05 begins with an inherited scalar mutation rate, with bounds informed and justified by T11.F13 and fixed-rate controls from that characterization (user decision, 2026-09-05). T11.F04's approximately 0.55 requested events per birth is a provisional default, not a minimum or a claimed optimum. Resolve insufficient evidence for bounds explicitly before enabling inherited policy; never invent a floor from the existing default. [Clune et al. (2008)](https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1000187) found that evolved rates could fall below the long-term adaptation optimum, while [Kumawat et al. (2025)](https://pubmed.ncbi.nlm.nih.gov/39739809/) found that environmental change could support elevated rates and useful alternate phenotypes. Evolved rates therefore need measured discovery/retention and supply outcomes, not an assumption of self-optimization. Lifetime responses to stress are a separate, unscheduled policy, and T08.F05 adds no new mutation operators.
 - Sexual reproduction is committed as an opt-in experimental treatment, not as the production default and not as an assumed improvement. Asexual reproduction remains the control, and T08.F09 may truthfully find no benefit.
 - T08.F06 through T08.F09 remain later work: do not plan their specs until T09.F08's diagnostic outcomes have been reviewed and T11.F01, T11.F08, T11.F12, T08.F02, and T08.F05 have produced the required evidence. A positive shared-memory sensitivity reading alone is not clearance for mating work.
 - T08.F07 may add deterministic mate intent, pairing, contention, contribution, target, and draft semantics, but the creature-facing sexual mode remains unavailable by default. T08.F08 enables it only after recombination, viability, and inheritance tests pass.
