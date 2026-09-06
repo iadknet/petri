@@ -14,8 +14,13 @@ Related references:
 - `v3-runtime-config-spec.md`
 
 The graph backend is subject to the mesh-wide node-type evolvability contract
-in `v3-mutation-spec.md`. T11.F03 owns its neutral-growth/reference repair and
-T11.F06 owns its one-world-tick persistent-state clock.
+in `v3-mutation-spec.md`. T11.F03 implements its growth-versus-connection
+taxonomy and neutral-growth semantics (`AddComputeNode`'s three forms,
+`CopyComputeNode`'s faithful-copy rule, `InputRef.Add`'s unwired push, and the
+`insert_compute_node_at`/`remove_compute_node_at` index-remap pair); the
+taxonomy and per-operator contract text live in `v3-mutation-spec.md` rather
+than being duplicated here. T11.F06 owns its one-world-tick persistent-state
+clock.
 
 ---
 

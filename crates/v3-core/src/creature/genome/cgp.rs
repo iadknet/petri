@@ -278,6 +278,33 @@ impl CgpGraphBackendDef {
         });
     }
 
+    /// Insert `node` at compute index `idx`, the inverse of
+    /// [`Self::remove_compute_node_at`]. Every `GraphSource::ComputeNode(i)`
+    /// reference at or above `idx`, across all five edge-bearing surfaces
+    /// (including edges belonging to `node` itself, resolved by the caller
+    /// before insertion), is incremented by one so every surviving edge keeps
+    /// pointing at the same logical node after the shift.
+    pub fn insert_compute_node_at(&mut self, idx: usize, node: ComputeNode) {
+        debug_assert!(
+            idx <= self.compute_nodes.len(),
+            "insert_compute_node_at: idx {} out of bounds (len {})",
+            idx,
+            self.compute_nodes.len()
+        );
+        let at = idx as u16;
+        self.remap_compute_sources(|src_idx| {
+            // `u16::MAX` is `remove_compute_node_at`'s dangling-reference
+            // sentinel, never a real index; leave it alone rather than
+            // overflow.
+            if src_idx != u16::MAX && src_idx >= at {
+                src_idx + 1
+            } else {
+                src_idx
+            }
+        });
+        self.compute_nodes.insert(idx, node);
+    }
+
     /// After an input_ref is removed at `removed_ref_idx`, update all
     /// `GraphSource::InputLeaf { ref_idx }` across all edge containers.
     /// Matching ref_idx edges are removed. Higher ref_idx values are decremented.
@@ -678,6 +705,133 @@ mod tests {
                 previous: false,
             }
         );
+    }
+
+    // ── Structural insertion tests (T11.F03 split insert) ───────────────────
+
+    #[test]
+    fn insert_compute_node_at_remaps_edges_across_all_containers() {
+        let config = MutationConfig::default();
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+
+        // Two compute nodes: 0 (Sigmoid), 1 (Relu), Relu reads Sigmoid.
+        def.compute_nodes.push(ComputeNode {
+            kind: ComputeNodeKind::Sigmoid,
+            inputs: Vec::new(),
+            plasticity: None,
+        });
+        def.compute_nodes.push(ComputeNode {
+            kind: ComputeNodeKind::Relu,
+            inputs: vec![GraphEdge {
+                source: GraphSource::ComputeNode(0),
+                weight: 1.0,
+            }],
+            plasticity: None,
+        });
+        def.output_sinks[0].inputs.push(GraphEdge {
+            source: GraphSource::ComputeNode(1),
+            weight: 0.5,
+        });
+        def.action_bank[0].gate_inputs.push(GraphEdge {
+            source: GraphSource::ComputeNode(0),
+            weight: 1.0,
+        });
+        def.execute_gate.inputs.push(GraphEdge {
+            source: GraphSource::ComputeNode(1),
+            weight: 1.0,
+        });
+
+        // Insert a new node at index 1 (between Sigmoid and Relu).
+        def.insert_compute_node_at(
+            1,
+            ComputeNode {
+                kind: ComputeNodeKind::Add,
+                inputs: Vec::new(),
+                plasticity: None,
+            },
+        );
+
+        assert_eq!(def.compute_nodes.len(), 3);
+        assert_eq!(def.compute_nodes[0].kind, ComputeNodeKind::Sigmoid);
+        assert_eq!(def.compute_nodes[1].kind, ComputeNodeKind::Add);
+        assert_eq!(def.compute_nodes[2].kind, ComputeNodeKind::Relu);
+
+        // Relu's edge to Sigmoid: was CN(0), unaffected (below insertion point).
+        assert_eq!(
+            def.compute_nodes[2].inputs[0].source,
+            GraphSource::ComputeNode(0)
+        );
+        // Sink edge to Relu: was CN(1), now CN(2).
+        assert_eq!(
+            def.output_sinks[0].inputs[0].source,
+            GraphSource::ComputeNode(2)
+        );
+        // Action gate edge to Sigmoid: was CN(0), unaffected.
+        assert_eq!(
+            def.action_bank[0].gate_inputs[0].source,
+            GraphSource::ComputeNode(0)
+        );
+        // Execute gate edge to Relu: was CN(1), now CN(2).
+        assert_eq!(
+            def.execute_gate.inputs[0].source,
+            GraphSource::ComputeNode(2)
+        );
+    }
+
+    #[test]
+    fn insert_compute_node_at_shifts_self_referencing_edge() {
+        let config = MutationConfig::default();
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        def.compute_nodes.push(ComputeNode {
+            kind: ComputeNodeKind::DecayIntegrator(0.5),
+            inputs: vec![GraphEdge {
+                source: GraphSource::ComputeNode(0),
+                weight: 1.0,
+            }],
+            plasticity: None,
+        });
+
+        def.insert_compute_node_at(
+            0,
+            ComputeNode {
+                kind: ComputeNodeKind::Add,
+                inputs: Vec::new(),
+                plasticity: None,
+            },
+        );
+
+        assert_eq!(def.compute_nodes.len(), 2);
+        // The self-loop now refers to the shifted node's own new index (1).
+        assert_eq!(
+            def.compute_nodes[1].inputs[0].source,
+            GraphSource::ComputeNode(1)
+        );
+    }
+
+    #[test]
+    fn insert_compute_node_at_and_remove_compute_node_at_are_inverse_on_indices() {
+        let config = MutationConfig::default();
+        let mut def = CgpGraphBackendDef::new_with_fixed_outputs(&config);
+        for kind in [ComputeNodeKind::Add, ComputeNodeKind::Sigmoid] {
+            def.compute_nodes.push(ComputeNode {
+                kind,
+                inputs: Vec::new(),
+                plasticity: None,
+            });
+        }
+        let before = def.clone();
+
+        def.insert_compute_node_at(
+            1,
+            ComputeNode {
+                kind: ComputeNodeKind::Relu,
+                inputs: Vec::new(),
+                plasticity: None,
+            },
+        );
+        def.remove_compute_node_at(1);
+
+        assert_eq!(def, before);
     }
 
     // ── Input ref reindexing tests ──────────────────────────────────────────

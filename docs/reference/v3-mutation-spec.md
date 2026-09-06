@@ -143,6 +143,22 @@ growth, T11.F04 mutation supply, T11.F06 the graph state clock, T11.F07 the
 trace/reward clock, T11.F08 duplication, and T11.F09 learned-state
 correspondence. Those later guarantees remain pending.
 
+Growth-versus-connection taxonomy (requirement 2, established for the graph
+and InputRef domains by T11.F03; the VM insert/copy families are T11.F02's
+and T11.F08's): a growth operator adds structure and must be neutral at the
+moment it fires — identical action, output-slot, and shared-memory behavior
+when both executions have enough energy and relaxation passes. Growth
+operators: `AddComputeNode` (all three forms below), `CopyComputeNode`,
+`CopySubgraph`, `InputRef.Add`, and the topology `AddNode`, `CopyNode`, mesh
+slices, and `SpliceNode`. A connection or parameter operator may change
+behavior, and must do so in one small step: `AddGraphEdge`,
+`RetargetGraphEdge`, `RemoveGraphEdge`, `CopyEdgeBundle`, `SwapGraphOperator`,
+`MutateGraphOperatorParam`, `GraphRawFieldMutation`, `InputRef.Swap`, and
+`InputRef.RawFieldMutation` are all in this class. `CopyEdgeBundle` remains an
+explicit multi-edge macro, as the VM's paired-slot-address operator is. A
+grown node still costs `graph_node_base_cost` per relaxation pass; growth
+neutrality does not extend to energy exhaustion.
+
 ### Graph domain
 
 Topology mutations operate on `compute_nodes` only. Fixed structural outputs
@@ -156,16 +172,48 @@ only their edges are evolvable.
   DecayIntegrator, Momentum, Oscillator)
 - `MutateActionSlotBehavior` (mutates `action_bank[i].behavior` between `Pop`
   and `Emit(WorldActionKind)` variants)
-- `AddComputeNode(kind)` (appends to `compute_nodes`)
+- `AddComputeNode(kind)` — a growth operator; draws one of three
+  function-preserving forms with equal probability: (a) disconnected, a
+  random kind appended with no inputs; (b) bootstrap, a random kind appended
+  with one input edge from `random_graph_source`, read by no surface; (c)
+  split, a NEAT-style insertion into one existing edge (any of the five
+  surfaces, source any `GraphSource`) with an identity `Add` node whose
+  single input (weight 1.0) reproduces the split edge's prior source exactly
+  in f32, and the old edge retargeted to the new node at its old weight.
+  When the split edge's consumer is a compute node at index `c`, the new node
+  is inserted at index `c` and every `ComputeNode(i >= c)` reference is
+  remapped to `i + 1` across all five surfaces
+  (`CgpGraphBackendDef::insert_compute_node_at`, the insert-with-remap
+  inverse of `remove_compute_node_at`), preserving Gauss-Seidel pass order; a
+  sink/action/execute-gate consumer appends instead. A split of a backward or
+  self edge may extend convergence by at most one pass. Skips with
+  `NoApplicableTarget` when the graph has no edge, or when the picked edge's
+  source is an out-of-range `ComputeNode` (a prior removal's sentinel).
 - `RemoveComputeNode` (removes from `compute_nodes`, remaps
   `GraphSource::ComputeNode` indices across all edge containers)
-- `AddGraphEdge` (all 5 edge-bearing surfaces)
-- `RetargetGraphEdge` (all 5 edge-bearing surfaces)
+- `AddGraphEdge` (all 5 edge-bearing surfaces; source sampled by
+  `random_graph_source`, which draws a compound `InputLeaf` source's
+  `sub_idx` uniformly across the reference's full width via
+  `mutation::compound::sub_value_count`, so new edges can reach every
+  sub-value, not just index 0)
+- `RetargetGraphEdge` (all 5 edge-bearing surfaces; same `sub_idx` sampling
+  as `AddGraphEdge`)
 - `RemoveGraphEdge` (all 5 edge-bearing surfaces)
-- `GraphRawFieldMutation` (raw representable-field mutation for compute node
-  params and `GraphSource` fields in edges — `ComputeNode(idx)`,
-  `InputLeaf { ref_idx, sub_idx }`, `SharedMemory { slot, previous }`)
-- `CopyComputeNode` (copies a single compute node)
+- `GraphRawFieldMutation` — selects one parameterized compute node or one
+  edge uniformly, then changes exactly one field by one unit and never
+  replaces the `GraphSource` variant: a parameter by the existing
+  `MutateGraphOperatorParam` step; `ComputeNode(idx)` by ±1 inward at the
+  bounds `0..compute_count`; `InputLeaf.ref_idx` by ±1 inward within
+  `0..input_refs.len()`, offered only when the current `sub_idx` stays within
+  the candidate reference's width; `InputLeaf.sub_idx` by ±1 inward within the
+  reference's width; `SharedMemory.slot` by ±1 modulo 16; `SharedMemory.previous`
+  flipped. Skips with `NoApplicableTarget` when the picked target has no valid
+  unit move.
+- `CopyComputeNode` — a growth operator; pushes a faithful copy (kind,
+  inputs, plasticity) of one random compute node and nothing else. The copy
+  reads whatever its source read and is read by nothing; no backlink is
+  added, and inputs are never coin-flip cleared (a copy that should start
+  disconnected is `AddComputeNode`'s disconnected form).
 - `CopySubgraph` (copies compute node cluster; internal edges remapped,
   external edges preserved; copied nodes start as dead genes)
 - `CopyEdgeBundle` (copies edge set between surfaces)
@@ -181,8 +229,12 @@ only their edges are evolvable.
 
 ### InputRef domain
 
-- `Add` (pushes to `input_refs` — new `GraphSource::InputLeaf` sources become
-  available; no physical leaf nodes created)
+- `Add` — a growth operator; pushes to `input_refs` and wires nothing on
+  either backend (no VM `ReadInput` auto-insertion, no graph edge). The new
+  `GraphSource::InputLeaf` source, or VM `ReadInput { ref_idx }` reference,
+  becomes addressable only by a later connection operator (`AddGraphEdge` or
+  `RetargetGraphEdge` on the graph backend; the VM operators that construct
+  `ReadInput` on the VM backend).
 - `Remove` (removes from `input_refs`; walks all edge containers to remove
   edges where `ref_idx == removed` and decrements `ref_idx` for edges where
   `ref_idx > removed`)
