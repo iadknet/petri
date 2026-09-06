@@ -250,7 +250,8 @@ Use the shared Plan, Implement, Review, and Close contract above with these
 substitutions. This adapter uses native subagents and Git; it adds no runner,
 plugin, separate roadmap, or global model settings.
 
-Select `gpt-6-astra` with `xhigh` reasoning effort when launching a feature.
+Select `gpt-6-astra` with `xhigh` reasoning effort when launching a feature,
+except T11.F07, which uses `medium` under the trial below.
 Verify the active session model and effort; this workflow does not set them.
 The implementer uses `low` reasoning effort ("Astra light").
 
@@ -266,17 +267,59 @@ review. The advisor is a separate subagent, not an attached Claude advisor.
 Read-only here is an instruction: native subagents inherit the session's
 sandbox; this adapter does not claim a separate permission boundary.
 
+### T11.F07 orchestration trial
+
+For T11.F07 only, use an Astra `medium` orchestrator and a separate Astra
+`xhigh` spec owner. Keep the implementer, advisor, and fresh final reviewer
+at the settings above. This trial changes role allocation, not required
+checks, review severity rules, or integration conditions.
+
+After worktree setup, delegate the shared Plan step to `roadmap_spec_owner`
+with `model: gpt-6-astra`, `reasoning_effort: xhigh`, and `fork_turns: none`.
+Give it the original user requirements, absolute repository/worktree paths,
+feature ID, and instructions to read `AGENTS.md`, this workflow, the roadmap
+contract and template, owning track, dependency specs, and relevant code
+directly. It uses the research-first-planning, spec-writing, and spec-review
+skills to write the flat spec, perform one readiness review, and allow one
+revision. Its self-review is not independent validation. It handles the
+shared Plan status updates and runs `make roadmap-check`; the orchestrator
+verifies the result and commits the plan before implementation starts.
+
+Keep the spec owner available through follow-up messages for contradictions
+or mistaken assumptions discovered during implementation. Route proposed
+changes to requirements or acceptance criteria, conflicting technical advice,
+requests for verification exceptions, and integration conflicts that change
+behavior to it before proceeding with the dependent work. It resolves these
+against the original feature contract and records necessary spec revisions;
+it cannot expand user scope or waive required checks. Unresolvable decisions
+follow the existing blocker rule. All code remediation remains with the same
+implementer. Serialize document edits between agents.
+
+The fresh final reviewer checks the original roadmap intent as well as the
+spec and diff; do not reuse the spec owner or advisor for that review.
+At closure, add the trial model/effort settings, remediation-pass count,
+requirement corrections, and user interventions to the existing cost record.
+Record total usage across the orchestrator and subagents only when available,
+otherwise `usage unavailable`. Savings and quality remain unproven until
+compared with completed feature runs; do not extend the trial automatically.
+
 ### Launch and goal prompt
 
 1. Ask **"give me the Codex goal prompt for the next roadmap feature."** Apply
    the shared next-feature rule using the current roadmap, not its dated example.
 2. Start a new **Local** Codex task in the main checkout on clean `main`.
-   Select **Astra**, effort **extra high** (`xhigh`). The task stays rooted there while all
+   Select **Astra**, effort **extra high** (`xhigh`), or **medium** for T11.F07.
+   The task stays rooted there while all
    feature edits and checks use the feature worktree's absolute path.
 3. Paste the substituted prompt below. The requested goal is explicit; use
    Codex's native goal tool if exposed. Do not assume Claude's `/goal` syntax,
    transcript evaluator, or 80-turn limit exists in Codex. Do not invent a
    token budget. Use the native tool's rules for goal status and blockers.
+
+For T11.F07, substitute `medium` for the orchestrator's `xhigh` in the prompt
+and add: "Follow the T11.F07 trial: delegate spec writing and readiness review
+to a separate persistent Astra (gpt-6-astra, xhigh) spec owner, and return to it
+for the trial's escalation decisions."
 
 ```text
 Set a goal: roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md and follow its shared per-feature contract and Codex adapter. Use Astra (gpt-6-astra, xhigh) as orchestrator, one persistent Astra (gpt-6-astra, low) subagent for all implementation and remediation, Astra (gpt-6-astra, high) as advisor, and a fresh Astra (gpt-6-astra, high) subagent for final review. Start in the main checkout on clean main. I authorize creating .worktrees/<tnn-fnn> on codex/<tnn-fnn>, local planning and implementation commits, rebasing codex/<tnn-fnn> onto main and rerunning the required checks when main moves, fast-forwarding main after all required checks pass, and removing that completed worktree and branch. Do not push or mutate remotes. Done means the feature row is checked and its spec is Complete on main; make check exited 0 for the final feature content and its tested commit (the rebased one when a rebase was needed) is now main; the feature worktree and branch are removed; and main is clean. Show the evidence in this task. If a concrete blocker prevents completion, record it in the spec when one exists, report it, and preserve the worktree; never report the goal complete with required work remaining.
