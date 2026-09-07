@@ -305,6 +305,31 @@ impl CgpGraphBackendDef {
         self.compute_nodes.insert(idx, node);
     }
 
+    /// Duplicate the compute nodes at `sources`, appending each copy and
+    /// remapping edges between duplicated nodes onto the corresponding copies.
+    /// External sources are preserved as they were.
+    ///
+    /// `sources` must be strictly ascending and in range; callers must keep
+    /// `compute_nodes.len() + sources.len()` within `u16::MAX`.
+    pub fn duplicate_compute_nodes_in_place(&mut self, sources: &[usize]) {
+        let base = self.compute_nodes.len();
+        let copies: Vec<ComputeNode> = sources
+            .iter()
+            .map(|&idx| {
+                let mut copy = self.compute_nodes[idx].clone();
+                for edge in &mut copy.inputs {
+                    if let GraphSource::ComputeNode(ref mut src_idx) = edge.source {
+                        if let Ok(position) = sources.binary_search(&(*src_idx as usize)) {
+                            *src_idx = (base + position) as u16;
+                        }
+                    }
+                }
+                copy
+            })
+            .collect();
+        self.compute_nodes.extend(copies);
+    }
+
     /// After an input_ref is removed at `removed_ref_idx`, update all
     /// `GraphSource::InputLeaf { ref_idx }` across all edge containers.
     /// Matching ref_idx edges are removed. Higher ref_idx values are decremented.
