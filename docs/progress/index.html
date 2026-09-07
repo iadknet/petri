@@ -1,0 +1,1042 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Petri Progress</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7;
+    --surface: #fcfcfb;
+    --ink: #0b0b0b;
+    --ink-2: #52514e;
+    --muted: #898781;
+    --grid: #e1e0d9;
+    --axis: #c3c2b7;
+    --border: rgba(11, 11, 11, 0.10);
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+    --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+    --seq-100: #cde2fb; --seq-150: #b7d3f6; --seq-200: #9ec5f4; --seq-250: #86b6ef; --seq-300: #6da7ec; --seq-350: #5598e7;
+    --seq-400: #3987e5; --seq-450: #2a78d6; --seq-500: #256abf; --seq-550: #1c5cab;
+    --seq-600: #184f95; --seq-650: #104281; --seq-700: #0d366b;
+    --warning: #fab219; --critical: #d03b3b; --good: #0ca30c;
+    --focus: #2a78d6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --page: #0d0d0d;
+      --surface: #1a1a19;
+      --ink: #ffffff;
+      --ink-2: #c3c2b7;
+      --muted: #898781;
+      --grid: #2c2c2a;
+      --axis: #383835;
+      --border: rgba(255, 255, 255, 0.10);
+      --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+      --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    }
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    background: var(--page);
+    color: var(--ink);
+    font: 14px/1.45 system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  a { color: var(--s1); }
+  header {
+    padding: 28px 28px 8px;
+    max-width: 1440px;
+    margin: 0 auto;
+  }
+  header h1 { margin: 0 0 4px; font-size: 22px; font-weight: 600; }
+  header p { margin: 0; color: var(--ink-2); max-width: 78ch; }
+  .filters {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 12px 28px 4px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 20px;
+  }
+  .seg {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    background: var(--surface);
+  }
+  .seg button {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--ink-2);
+    padding: 6px 14px;
+    font: inherit;
+    cursor: pointer;
+  }
+  .seg button[aria-pressed="true"] {
+    background: var(--s1);
+    color: #fff;
+  }
+  .seg button:focus-visible { outline: 2px solid var(--focus); outline-offset: -2px; }
+  .filters .hint { color: var(--muted); }
+  main {
+    max-width: 1440px;
+    margin: 0 auto;
+    padding: 12px 28px 48px;
+  }
+  section.group { margin-top: 28px; }
+  section.group > h2 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0 0 4px;
+  }
+  section.group > p.lede { margin: 0 0 12px; color: var(--ink-2); max-width: 90ch; }
+  .cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+    gap: 16px;
+  }
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 16px 12px;
+    min-width: 0;
+  }
+  .card.wide { grid-column: 1 / -1; }
+  .card-head { display: flex; align-items: flex-start; gap: 8px; }
+  .card-head > div { min-width: 0; }
+  .card-head h3 { margin: 0; font-size: 14px; font-weight: 600; }
+  .card-head .sub { color: var(--muted); font-size: 12px; margin: 2px 0 0; overflow-wrap: anywhere; }
+  .card-head button {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: transparent;
+    color: var(--ink-2);
+    border-radius: 6px;
+    padding: 2px 8px;
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  .card-head button[aria-pressed="true"] { background: var(--grid); color: var(--ink); }
+  .plot { position: relative; margin-top: 8px; }
+  .plot svg { display: block; width: 100%; height: auto; overflow: visible; }
+  .plot svg text { font: 11px system-ui, -apple-system, "Segoe UI", sans-serif; fill: var(--muted); }
+  .plot svg text.tick { font-variant-numeric: tabular-nums; }
+  .plot svg .grid line { stroke: var(--grid); stroke-width: 1; }
+  .plot svg .axis { stroke: var(--axis); stroke-width: 1; }
+  .plot svg .line { fill: none; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+  .plot svg .line.emph { stroke-width: 3; }
+  .plot svg .dot { stroke: var(--surface); stroke-width: 2; }
+  .plot svg .band { opacity: 0.12; }
+  .plot svg .ref { stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 4 4; }
+  .plot svg .ref-label { fill: var(--ink-2); }
+  .plot svg .ann { stroke: var(--ink-2); stroke-width: 1; stroke-dasharray: 2 3; }
+  .plot svg .ann-label { fill: var(--ink-2); }
+  .plot svg .xhair { stroke: var(--ink-2); stroke-width: 1; pointer-events: none; }
+  .plot svg .end-label { fill: var(--ink-2); }
+  .plot svg .cell:hover, .plot svg .col:hover { opacity: 0.8; }
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin-top: 8px;
+    color: var(--ink-2);
+    font-size: 12px;
+  }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .legend i { display: inline-block; width: 16px; height: 2px; border-radius: 1px; }
+  .legend i.rect { width: 12px; height: 12px; border-radius: 3px; }
+  .tip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--border);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12px;
+    min-width: 150px;
+    max-width: 320px;
+    z-index: 5;
+    display: none;
+  }
+  .tip .t { font-weight: 600; margin-bottom: 4px; }
+  .tip .m { color: var(--muted); }
+  .tip .row { display: flex; align-items: center; gap: 6px; }
+  .tip .row i { display: inline-block; width: 12px; height: 2px; }
+  .tip .row b { font-variant-numeric: tabular-nums; }
+  .tip .row span { color: var(--ink-2); }
+  .tbl { overflow-x: auto; margin-top: 8px; }
+  table { border-collapse: collapse; font-size: 12px; width: 100%; }
+  th, td { text-align: right; padding: 4px 8px; border-bottom: 1px solid var(--grid); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--ink-2); font-weight: 600; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
+  .tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; }
+  .tile .l { color: var(--ink-2); font-size: 12px; }
+  .tile .v { font-size: 26px; font-weight: 600; margin-top: 2px; }
+  .tile .d { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .tile .d.up { color: var(--ink-2); }
+  .empty { color: var(--muted); padding: 24px 0; text-align: center; }
+  .notice {
+    max-width: 1440px;
+    margin: 12px auto;
+    padding: 0 28px;
+  }
+  .notice .box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 4px solid var(--warning);
+    border-radius: 10px;
+    padding: 14px 16px;
+  }
+  .notice code, pre { font: 12px ui-monospace, SFMono-Regular, Menlo, monospace; }
+  pre { background: var(--page); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px; overflow-x: auto; }
+  .heat-wrap { overflow-x: auto; }
+  .scale { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; margin-top: 8px; }
+  .scale .bar { width: 140px; height: 10px; border-radius: 3px; background: linear-gradient(90deg, var(--seq-100), var(--seq-700)); }
+  footer { max-width: 1440px; margin: 0 auto; padding: 0 28px 40px; color: var(--muted); font-size: 12px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Petri progress</h1>
+  <p>Benchmark work counters and goal indicators per closed roadmap feature, read from the stored reports listed in <code>benchmark-series.json</code>. The x-axis is closure order. Hover any chart for the exact readings at that closure, or switch a card to its table.</p>
+</header>
+<div class="filters">
+  <div class="seg" role="group" aria-label="Benchmark profile">
+    <button type="button" data-profile="goal" aria-pressed="true">Goal profile</button>
+    <button type="button" data-profile="gate" aria-pressed="false">Gate profile</button>
+  </div>
+  <span class="hint" id="status">Loading reports…</span>
+</div>
+<div class="notice" id="notice" hidden></div>
+<main id="app"></main>
+<footer id="foot"></footer>
+<script>
+(function () {
+  'use strict';
+
+  // ── Palette roles ────────────────────────────────────────────────────────
+  const SEED_COLORS = { 11: 'var(--s1)', 22: 'var(--s2)', 33: 'var(--s3)' };
+  const CLASS_COLORS = { silent: 'var(--s1)', changed: 'var(--s2)', dead: 'var(--s3)' };
+  const ORDINAL_RAMP = ['var(--seq-250)', 'var(--seq-300)', 'var(--seq-350)', 'var(--seq-400)',
+    'var(--seq-450)', 'var(--seq-500)', 'var(--seq-550)', 'var(--seq-600)', 'var(--seq-650)'];
+  const SEQ_RAMP = ['var(--seq-100)', 'var(--seq-150)', 'var(--seq-200)', 'var(--seq-250)',
+    'var(--seq-300)', 'var(--seq-350)', 'var(--seq-400)', 'var(--seq-450)', 'var(--seq-500)',
+    'var(--seq-550)', 'var(--seq-600)', 'var(--seq-650)', 'var(--seq-700)'];
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+  const num = (v) => {
+    if (v === null || v === undefined) return NaN;
+    if (typeof v === 'number') return v;
+    if (typeof v === 'string') { const n = parseFloat(v); return Number.isFinite(n) ? n : NaN; }
+    return NaN;
+  };
+  const isObj = (v) => v && typeof v === 'object' && !Array.isArray(v);
+  const get = (o, path) => path.split('.').reduce((a, k) => (a && a[k] !== undefined ? a[k] : undefined), o);
+  const mean = (xs) => { const v = xs.filter(Number.isFinite); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : NaN; };
+  const sum = (xs) => xs.filter(Number.isFinite).reduce((a, b) => a + b, 0);
+  const fmt = (v, digits) => {
+    if (!Number.isFinite(v)) return '—';
+    if (digits !== undefined) return v.toLocaleString(undefined, { maximumFractionDigits: digits, minimumFractionDigits: 0 });
+    const a = Math.abs(v);
+    if (a >= 1000) return v.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    if (a >= 10) return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    if (a >= 0.01 || a === 0) return v.toLocaleString(undefined, { maximumFractionDigits: 4 });
+    return v.toExponential(2);
+  };
+  const fmtTick = (v) => {
+    if (!Number.isFinite(v)) return '';
+    const a = Math.abs(v);
+    if (a >= 1e6) return (v / 1e6).toLocaleString(undefined, { maximumFractionDigits: 1 }) + 'M';
+    if (a >= 1e4) return (v / 1e3).toLocaleString(undefined, { maximumFractionDigits: 0 }) + 'k';
+    if (a >= 1000) return v.toLocaleString(undefined, { maximumFractionDigits: 0 });
+    if (a >= 1) return v.toLocaleString(undefined, { maximumFractionDigits: 2 });
+    if (a === 0) return '0';
+    if (a >= 0.001) return v.toLocaleString(undefined, { maximumFractionDigits: 4 });
+    return v.toExponential(1);
+  };
+  const pct = (v) => Number.isFinite(v) ? (v * 100).toLocaleString(undefined, { maximumFractionDigits: 3 }) + '%' : '—';
+  const el = (tag, cls, text) => { const e = document.createElement(tag); if (cls) e.className = cls; if (text !== undefined) e.textContent = text; return e; };
+  const svgEl = (tag, attrs) => { const e = document.createElementNS('http://www.w3.org/2000/svg', tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+  const featureId = (slug) => {
+    const m = /^t(\d\d)-f(\d\d)/.exec(slug);
+    return m ? `T${m[1]}.F${m[2]}` : slug;
+  };
+  const niceTicks = (lo, hi, count) => {
+    if (!(hi > lo)) { hi = lo + 1; }
+    const span = hi - lo;
+    const step0 = span / Math.max(1, count);
+    const mag = Math.pow(10, Math.floor(Math.log10(step0)));
+    const norm = step0 / mag;
+    const step = (norm >= 5 ? 10 : norm >= 2 ? 5 : norm >= 1 ? 2 : 1) * mag;
+    const start = Math.ceil(lo / step) * step;
+    const out = [];
+    for (let v = start; v <= hi + step * 1e-9; v += step) out.push(+v.toFixed(12));
+    return out;
+  };
+
+  // ── Data loading ─────────────────────────────────────────────────────────
+  async function fetchJson(path) {
+    const r = await fetch(path, { cache: 'no-store' });
+    if (!r.ok) throw new Error(`${path}: HTTP ${r.status}`);
+    return r.json();
+  }
+
+  async function loadAll() {
+    const index = await fetchJson('benchmark-series.json');
+    const rel = (p) => p.replace(/^docs\/progress\//, '');
+    const order = [];
+    const seen = new Set();
+    const add = (p, profile) => { if (!seen.has(p)) { seen.add(p); order.push({ path: p, profile }); } };
+    (get(index, 'gate.closed') || []).forEach((p) => add(p, 'gate'));
+    (get(index, 'goal.closed') || []).forEach((p) => add(p, 'goal'));
+    const reports = await Promise.all(order.map(async (o) => ({ ...o, report: await fetchJson(rel(o.path)) })));
+
+    // Group by feature slug, preserving gate closure order, then any goal-only features.
+    const bySlug = new Map();
+    for (const r of reports) {
+      const slug = r.report.feature || rel(r.path).replace(/^features\//, '').replace(/(-goal)?\.json$/, '');
+      const prof = get(r.report, 'deterministic.profile.name') || r.profile;
+      if (!bySlug.has(slug)) bySlug.set(slug, { slug, id: featureId(slug), gate: null, goal: null, paths: {} });
+      const f = bySlug.get(slug);
+      f[prof] = r.report;
+      f.paths[prof] = r.path;
+    }
+    const features = [...bySlug.values()];
+    for (const f of features) {
+      const rep = f.gate || f.goal;
+      f.date = (get(rep, 'environment.generated_at') || '').slice(0, 10);
+      f.label = f.id;
+    }
+    return { index, features, reportCount: reports.length };
+  }
+
+  // ── Chart primitives ─────────────────────────────────────────────────────
+  function card(title, sub, opts) {
+    const c = el('div', 'card' + (opts && opts.wide ? ' wide' : ''));
+    const head = el('div', 'card-head');
+    const tw = el('div'); tw.style.flex = '1';
+    tw.appendChild(el('h3', null, title));
+    if (sub) tw.appendChild(el('p', 'sub', sub));
+    head.appendChild(tw);
+    c.appendChild(head);
+    return { card: c, head };
+  }
+
+  function addTableToggle(c, plotEl, tableEl) {
+    const b = el('button', null, 'Table');
+    b.type = 'button';
+    b.setAttribute('aria-pressed', 'false');
+    b.addEventListener('click', () => {
+      const on = b.getAttribute('aria-pressed') !== 'true';
+      b.setAttribute('aria-pressed', on ? 'true' : 'false');
+      plotEl.hidden = on;
+      tableEl.hidden = !on;
+    });
+    c.head.appendChild(b);
+    tableEl.hidden = true;
+    c.card.appendChild(tableEl);
+  }
+
+  function table(headers, rows) {
+    const wrap = el('div', 'tbl');
+    const t = el('table');
+    const thead = el('thead'); const tr = el('tr');
+    headers.forEach((h) => tr.appendChild(el('th', null, h)));
+    thead.appendChild(tr); t.appendChild(thead);
+    const tb = el('tbody');
+    rows.forEach((r) => { const tr2 = el('tr'); r.forEach((v) => tr2.appendChild(el('td', null, v))); tb.appendChild(tr2); });
+    t.appendChild(tb);
+    wrap.appendChild(t);
+    return wrap;
+  }
+
+  function legend(items, rect) {
+    const l = el('div', 'legend');
+    items.forEach((it) => {
+      const s = el('span');
+      const i = el('i', rect ? 'rect' : null);
+      i.style.background = it.color;
+      s.appendChild(i);
+      s.appendChild(document.createTextNode(it.name));
+      l.appendChild(s);
+    });
+    return l;
+  }
+
+  // Redraw a plot at its real pixel width whenever the width changes.
+  const observeWidth = (plot, draw) => {
+    if (typeof ResizeObserver === 'undefined') { requestAnimationFrame(draw); return; }
+    let last = -1;
+    new ResizeObserver(() => {
+      const w = Math.round(plot.clientWidth);
+      if (w > 0 && w !== last) { last = w; draw(); }
+    }).observe(plot);
+  };
+
+  function tooltip() {
+    const t = el('div', 'tip');
+    return t;
+  }
+
+  function showTip(tip, plot, x, y, titleText, rows, meta) {
+    tip.replaceChildren();
+    tip.appendChild(el('div', 't', titleText));
+    if (meta) tip.appendChild(el('div', 'm', meta));
+    rows.forEach((r) => {
+      const d = el('div', 'row');
+      const i = el('i'); i.style.background = r.color || 'transparent'; d.appendChild(i);
+      d.appendChild(el('b', null, r.value));
+      d.appendChild(el('span', null, r.name));
+      tip.appendChild(d);
+    });
+    tip.style.display = 'block';
+    const pw = plot.clientWidth;
+    const tw = tip.offsetWidth;
+    let left = x + 14;
+    if (left + tw > pw) left = Math.max(0, x - tw - 14);
+    tip.style.left = left + 'px';
+    tip.style.top = Math.max(0, y - 10) + 'px';
+  }
+
+  // Line chart over closure order (or any categorical x).
+  // series: [{ name, color, values: number[] (NaN = gap), emph?: bool, endLabel?: bool }]
+  function lineChart(opts) {
+    const { title, sub, xLabels, series, band, refLines = [], annotations = [], yMin, yMax, yFmt = fmtTick, tipFmt = fmt, wide, xTitle, hideLegend, xTipMeta } = opts;
+    const c = card(title, sub, { wide });
+    const plot = el('div', 'plot');
+    const n = xLabels.length;
+    const draw = () => {
+    const W = Math.max(320, Math.round(plot.clientWidth) || 640), H = wide ? 320 : 240;
+    plot.replaceChildren();
+    const m = { t: 16, r: 16, b: xTitle ? 52 : 40, l: 54 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'img', 'aria-label': title });
+    const xAt = (i) => m.l + (n <= 1 ? iw / 2 : (i * iw) / (n - 1));
+
+    let lo = Infinity, hi = -Infinity;
+    const consider = (v) => { if (Number.isFinite(v)) { lo = Math.min(lo, v); hi = Math.max(hi, v); } };
+    series.forEach((s) => s.values.forEach(consider));
+    if (band) { band.lo.forEach(consider); band.hi.forEach(consider); }
+    refLines.forEach((r) => consider(r.y));
+    const hasData = Number.isFinite(lo);
+    if (!hasData) { lo = 0; hi = 1; }
+    if (yMin !== undefined) lo = Math.min(lo, yMin);
+    if (yMax !== undefined) hi = Math.max(hi, yMax);
+    if (lo > 0 && lo / hi < 0.35) lo = 0;
+    if (hi === lo) { hi = lo + (Math.abs(lo) || 1) * 0.5; lo = lo - (Math.abs(lo) || 1) * 0.5; if (yMin !== undefined) lo = Math.max(lo, yMin); }
+    const ticks = niceTicks(lo, hi, 4);
+    if (ticks.length) { lo = Math.min(lo, ticks[0]); hi = Math.max(hi, ticks[ticks.length - 1]); }
+    const yAt = (v) => m.t + ih - ((v - lo) / (hi - lo)) * ih;
+
+    const grid = svgEl('g', { class: 'grid' });
+    ticks.forEach((t) => {
+      grid.appendChild(svgEl('line', { x1: m.l, x2: m.l + iw, y1: yAt(t), y2: yAt(t) }));
+      const lab = svgEl('text', { x: m.l - 8, y: yAt(t) + 4, 'text-anchor': 'end', class: 'tick' });
+      lab.textContent = yFmt(t);
+      grid.appendChild(lab);
+    });
+    svg.appendChild(grid);
+    svg.appendChild(svgEl('line', { class: 'axis', x1: m.l, x2: m.l + iw, y1: m.t + ih, y2: m.t + ih }));
+
+    // x labels: thin out if crowded
+    const every = Math.max(1, Math.ceil(n / Math.floor(iw / 52)));
+    xLabels.forEach((lab, i) => {
+      if ((n - 1 - i) % every !== 0) return;
+      const t = svgEl('text', { x: xAt(i), y: m.t + ih + 16, 'text-anchor': 'middle', class: 'tick' });
+      t.textContent = lab;
+      svg.appendChild(t);
+    });
+    if (xTitle) {
+      const t = svgEl('text', { x: m.l + iw / 2, y: H - 6, 'text-anchor': 'middle' });
+      t.textContent = xTitle;
+      svg.appendChild(t);
+    }
+
+    if (band && hasData) {
+      let d = '';
+      const pts = [];
+      for (let i = 0; i < n; i++) if (Number.isFinite(band.lo[i]) && Number.isFinite(band.hi[i])) pts.push(i);
+      if (pts.length) {
+        d = 'M' + pts.map((i) => `${xAt(i)},${yAt(band.hi[i])}`).join('L');
+        d += 'L' + pts.slice().reverse().map((i) => `${xAt(i)},${yAt(band.lo[i])}`).join('L') + 'Z';
+        svg.appendChild(svgEl('path', { d, class: 'band', fill: band.color }));
+      }
+    }
+
+    annotations.forEach((a) => {
+      if (a.x < 0 || a.x >= n) return;
+      svg.appendChild(svgEl('line', { class: 'ann', x1: xAt(a.x), x2: xAt(a.x), y1: m.t, y2: m.t + ih }));
+      const right = xAt(a.x) > m.l + iw / 2;
+      const t = svgEl('text', { class: 'ann-label', x: xAt(a.x) + (right ? -4 : 4), y: m.t + ih - 6, 'text-anchor': right ? 'end' : 'start' });
+      t.textContent = a.label;
+      svg.appendChild(t);
+    });
+
+    refLines.forEach((r) => {
+      svg.appendChild(svgEl('line', { class: 'ref', x1: m.l, x2: m.l + iw, y1: yAt(r.y), y2: yAt(r.y) }));
+      const t = svgEl('text', { class: 'ref-label', x: m.l + iw, y: yAt(r.y) - 4, 'text-anchor': 'end' });
+      t.textContent = r.label;
+      svg.appendChild(t);
+    });
+
+    series.forEach((s) => {
+      let d = '', pen = false;
+      s.values.forEach((v, i) => {
+        if (!Number.isFinite(v)) { pen = false; return; }
+        d += (pen ? 'L' : 'M') + xAt(i) + ',' + yAt(v);
+        pen = true;
+      });
+      if (d) svg.appendChild(svgEl('path', { d, class: 'line' + (s.emph ? ' emph' : ''), stroke: s.color }));
+      s.values.forEach((v, i) => {
+        if (!Number.isFinite(v)) return;
+        const isolated = !Number.isFinite(s.values[i - 1]) && !Number.isFinite(s.values[i + 1]);
+        if (s.dots !== false || isolated) svg.appendChild(svgEl('circle', { class: 'dot', cx: xAt(i), cy: yAt(v), r: s.emph ? 4.5 : 4, fill: s.color }));
+      });
+      if (s.endLabel) {
+        let last = -1;
+        s.values.forEach((v, i) => { if (Number.isFinite(v)) last = i; });
+        if (last >= 0) {
+          const t = svgEl('text', { class: 'end-label', x: xAt(last) + 7, y: yAt(s.values[last]) + 4 });
+          t.textContent = s.name;
+          svg.appendChild(t);
+        }
+      }
+    });
+
+    if (!hasData) {
+      const t = svgEl('text', { x: m.l + iw / 2, y: m.t + ih / 2, 'text-anchor': 'middle' });
+      t.textContent = opts.emptyText || 'Not measured in these reports';
+      svg.appendChild(t);
+    }
+
+    // Hover layer: crosshair snapping to the nearest x.
+    const xhair = svgEl('line', { class: 'xhair', y1: m.t, y2: m.t + ih, visibility: 'hidden' });
+    svg.appendChild(xhair);
+    const hit = svgEl('rect', { x: m.l, y: m.t, width: iw, height: ih, fill: 'transparent' });
+    svg.appendChild(hit);
+    const tip = tooltip();
+    plot.appendChild(svg);
+    plot.appendChild(tip);
+    const onMove = (ev) => {
+      const r = svg.getBoundingClientRect();
+      const sx = (ev.clientX - r.left) * (W / r.width);
+      let best = 0, bd = Infinity;
+      for (let i = 0; i < n; i++) { const d = Math.abs(xAt(i) - sx); if (d < bd) { bd = d; best = i; } }
+      xhair.setAttribute('x1', xAt(best)); xhair.setAttribute('x2', xAt(best));
+      xhair.setAttribute('visibility', 'visible');
+      const rows = series.map((s) => ({ color: s.color, name: s.name, value: tipFmt(s.values[best]) }));
+      if (band) rows.push({ color: band.color, name: band.name || 'band', value: `${tipFmt(band.lo[best])} – ${tipFmt(band.hi[best])}` });
+      showTip(tip, plot, (xAt(best) / W) * r.width, ev.clientY - r.top, xLabels[best], rows, xTipMeta ? xTipMeta[best] : undefined);
+    };
+    const onLeave = () => { xhair.setAttribute('visibility', 'hidden'); tip.style.display = 'none'; };
+    hit.addEventListener('pointermove', onMove);
+    hit.addEventListener('pointerleave', onLeave);
+    };
+    observeWidth(plot, draw);
+
+    c.card.appendChild(plot);
+    if (series.length > 1 && !hideLegend) c.card.appendChild(legend(series.map((s) => ({ name: s.name, color: s.color }))));
+    const hdr = ['Closure', ...series.map((s) => s.name)];
+    if (band) hdr.push((band.name || 'band') + ' low', (band.name || 'band') + ' high');
+    const rows = xLabels.map((lab, i) => {
+      const r = [lab, ...series.map((s) => fmt(s.values[i]))];
+      if (band) r.push(fmt(band.lo[i]), fmt(band.hi[i]));
+      return r;
+    });
+    addTableToggle(c, plot, table(hdr, rows));
+    return c.card;
+  }
+
+  // Stacked columns: categories share one baseline; values sum to <= 1 typically.
+  function stackedColumns(opts) {
+    const { title, sub, xLabels, categories, data, yFmt = pct, wide } = opts;
+    const c = card(title, sub, { wide });
+    const plot = el('div', 'plot');
+    const n = xLabels.length;
+    const draw = () => {
+    const W = Math.max(320, Math.round(plot.clientWidth) || 640), H = 240;
+    plot.replaceChildren();
+    const m = { t: 16, r: 16, b: 40, l: 54 };
+    const iw = W - m.l - m.r, ih = H - m.t - m.b;
+    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'img', 'aria-label': title });
+    const slot = iw / Math.max(1, n);
+    const bw = Math.min(24, slot * 0.6);
+    let hi = 0;
+    data.forEach((row) => { const s = sum(row); if (s > hi) hi = s; });
+    if (!(hi > 0)) hi = 1;
+    const ticks = niceTicks(0, hi, 4);
+    hi = Math.max(hi, ticks[ticks.length - 1] || hi);
+    const yAt = (v) => m.t + ih - (v / hi) * ih;
+    const grid = svgEl('g', { class: 'grid' });
+    ticks.forEach((t) => {
+      grid.appendChild(svgEl('line', { x1: m.l, x2: m.l + iw, y1: yAt(t), y2: yAt(t) }));
+      const lab = svgEl('text', { x: m.l - 8, y: yAt(t) + 4, 'text-anchor': 'end', class: 'tick' });
+      lab.textContent = yFmt(t);
+      grid.appendChild(lab);
+    });
+    svg.appendChild(grid);
+    svg.appendChild(svgEl('line', { class: 'axis', x1: m.l, x2: m.l + iw, y1: m.t + ih, y2: m.t + ih }));
+    const tip = tooltip();
+    const every = Math.max(1, Math.ceil(n / Math.floor(iw / 52)));
+    let any = false;
+    xLabels.forEach((lab, i) => {
+      const cx = m.l + slot * i + slot / 2;
+      if ((n - 1 - i) % every === 0) {
+        const t = svgEl('text', { x: cx, y: m.t + ih + 16, 'text-anchor': 'middle', class: 'tick' });
+        t.textContent = lab;
+        svg.appendChild(t);
+      }
+      const row = data[i];
+      if (!row || !row.some(Number.isFinite)) return;
+      any = true;
+      let acc = 0;
+      const g = svgEl('g', { class: 'col' });
+      row.forEach((v, k) => {
+        if (!Number.isFinite(v) || v <= 0) return;
+        const y0 = yAt(acc + v), y1 = yAt(acc);
+        const h = Math.max(0, y1 - y0 - 2);
+        g.appendChild(svgEl('rect', { x: cx - bw / 2, y: y0, width: bw, height: h, rx: 2, fill: categories[k].color }));
+        acc += v;
+      });
+      const hit = svgEl('rect', { x: m.l + slot * i, y: m.t, width: slot, height: ih, fill: 'transparent' });
+      hit.addEventListener('pointermove', (ev) => {
+        const r = svg.getBoundingClientRect();
+        showTip(tip, plot, (cx / W) * r.width, ev.clientY - r.top, lab,
+          categories.map((cat, k) => ({ color: cat.color, name: cat.name, value: yFmt(row[k]) })));
+      });
+      hit.addEventListener('pointerleave', () => { tip.style.display = 'none'; });
+      svg.appendChild(g);
+      svg.appendChild(hit);
+    });
+    if (!any) {
+      const t = svgEl('text', { x: m.l + iw / 2, y: m.t + ih / 2, 'text-anchor': 'middle' });
+      t.textContent = 'Not measured in these reports';
+      svg.appendChild(t);
+    }
+    plot.appendChild(svg); plot.appendChild(tip);
+    };
+    observeWidth(plot, draw);
+    c.card.appendChild(plot);
+    c.card.appendChild(legend(categories, true));
+    addTableToggle(c, plot, table(['Closure', ...categories.map((x) => x.name)], xLabels.map((lab, i) => [lab, ...(data[i] || []).map((v) => fmt(v))])));
+    return c.card;
+  }
+
+  // Heatmap: rows × columns, sequential single-hue ramp, or a two-state grid.
+  function heatmap(opts) {
+    const { title, sub, rows, cols, values, colorOf, cellFmt = (v) => fmt(v), wide = true, rowGroups, scaleLabel, tipRows } = opts;
+    const c = card(title, sub, { wide });
+    const plot = el('div', 'plot heat-wrap');
+    const cw = 52, ch = 16, labW = 230, top = 40, gap = 2;
+    const groupRows = rowGroups ? rowGroups.length : 0;
+    const W = labW + cols.length * cw + 16;
+    const H = top + (rows.length + groupRows) * ch + 8;
+    const svg = svgEl('svg', { viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': title });
+    svg.style.minWidth = W + 'px';
+    svg.style.width = W + 'px';
+    cols.forEach((col, j) => {
+      const t = svgEl('text', { x: labW + j * cw + cw / 2, y: top - 8, 'text-anchor': 'middle', class: 'tick' });
+      t.textContent = col;
+      svg.appendChild(t);
+    });
+    const tip = tooltip();
+    let y = top;
+    let lastGroup = null;
+    rows.forEach((row, i) => {
+      if (rowGroups && row.group !== lastGroup) {
+        lastGroup = row.group;
+        const t = svgEl('text', { x: 0, y: y + 12 });
+        t.textContent = row.group;
+        t.style.fill = 'var(--ink-2)';
+        t.style.fontWeight = '600';
+        svg.appendChild(t);
+        y += ch;
+      }
+      const lab = svgEl('text', { x: labW - 8, y: y + 12, 'text-anchor': 'end' });
+      lab.textContent = row.label;
+      svg.appendChild(lab);
+      cols.forEach((col, j) => {
+        const v = values[i][j];
+        const rect = svgEl('rect', { class: 'cell', x: labW + j * cw + gap / 2, y: y + gap / 2, width: cw - gap, height: ch - gap, rx: 2, fill: colorOf(v) });
+        rect.addEventListener('pointermove', (ev) => {
+          const r = svg.getBoundingClientRect();
+          const extra = tipRows ? tipRows(i, j) : [];
+          showTip(tip, plot, ev.clientX - r.left, ev.clientY - r.top, `${row.label} · ${col}`, [{ color: colorOf(v), name: opts.valueName || 'value', value: cellFmt(v) }, ...extra]);
+        });
+        rect.addEventListener('pointerleave', () => { tip.style.display = 'none'; });
+        svg.appendChild(rect);
+      });
+      y += ch;
+    });
+    plot.appendChild(svg); plot.appendChild(tip);
+    c.card.appendChild(plot);
+    if (scaleLabel) {
+      const s = el('div', 'scale');
+      s.appendChild(el('span', null, scaleLabel[0]));
+      s.appendChild(el('span', 'bar'));
+      s.appendChild(el('span', null, scaleLabel[1]));
+      c.card.appendChild(s);
+    }
+    addTableToggle(c, plot, table(['Row', ...cols], rows.map((row, i) => [row.label, ...cols.map((_, j) => cellFmt(values[i][j]))])));
+    return c.card;
+  }
+
+  function statTile(label, value, delta) {
+    const t = el('div', 'tile');
+    t.appendChild(el('div', 'l', label));
+    t.appendChild(el('div', 'v', value));
+    if (delta) t.appendChild(el('div', 'd', delta));
+    return t;
+  }
+
+  function group(title, lede) {
+    const s = el('section', 'group');
+    s.appendChild(el('h2', null, title));
+    if (lede) s.appendChild(el('p', 'lede', lede));
+    const cards = el('div', 'cards');
+    s.appendChild(cards);
+    return { section: s, cards };
+  }
+
+  // ── Extractors ───────────────────────────────────────────────────────────
+  const COUNTERS = [
+    ['mesh_hops', 'Mesh hops'], ['vm_steps', 'VM steps'], ['graph_relax_iters', 'Graph relaxation'],
+    ['plasticity_updates', 'Plasticity updates'], ['actions_applied', 'Actions applied'], ['births', 'Births'],
+  ];
+  const SEEDS = [11, 22, 33];
+  const seedRow = (rep, path, seed) => {
+    const arr = get(rep, path);
+    if (!Array.isArray(arr)) return undefined;
+    return arr.find((r) => r && r.seed === seed);
+  };
+  const seedSeries = (feats, profile, path, field, name) => SEEDS.map((seed) => ({
+    name: `${name || 'Seed'} ${seed}`, color: SEED_COLORS[seed],
+    values: feats.map((f) => { const r = seedRow(f[profile], path, seed); return r ? num(r[field]) : NaN; }),
+  }));
+  const founderClass = (rep, cls) => num(get(rep, `deterministic.goal_indicators.mutational_neighborhood.founder.births.any_events.${cls}_fraction`));
+  const founderSingle = (rep, cls) => {
+    const by = get(rep, 'deterministic.goal_indicators.mutational_neighborhood.founder.births.by_events');
+    if (!Array.isArray(by)) return NaN;
+    const one = by.find((b) => b.applied_events === 1);
+    return one ? num(get(one, `tally.${cls}_fraction`)) : NaN;
+  };
+  const evolvedPooled = (rep, seed, cls) => {
+    const r = seedRow(rep, 'deterministic.goal_indicators.mutational_neighborhood.evolved.per_seed', seed);
+    return r ? num(get(r, `pooled_births.any_events.${cls}_fraction`)) : NaN;
+  };
+  const meshSums = (rep) => {
+    const per = get(rep, 'deterministic.goal_indicators.mutational_neighborhood.evolved.per_seed');
+    if (!Array.isArray(per)) return null;
+    const out = { genomes: 0, total: 0, reachable: 0, executed: 0, knockout: 0, routeVaries: 0, capHits: 0, execs: 0 };
+    let any = false;
+    per.forEach((s) => (s.sampled_genomes || []).forEach((g) => {
+      const me = g.mesh_execution; if (!isObj(me)) return;
+      any = true; out.genomes += 1;
+      out.total += num(me.total_node_count) || 0; out.reachable += num(me.reachable_node_count) || 0;
+      out.executed += num(me.executed_node_count) || 0; out.knockout += num(me.knockout_count) || 0;
+      out.routeVaries += me.route_varies_with_input ? 1 : 0; out.capHits += num(me.hop_cap_hits) || 0;
+      out.execs += num(me.executions_per_genome) || 0;
+    }));
+    return any ? out : null;
+  };
+
+  // ── Rendering ────────────────────────────────────────────────────────────
+  function render(data, profile) {
+    const app = document.getElementById('app');
+    app.replaceChildren();
+    const all = data.features;
+    const feats = all.filter((f) => f[profile]);
+    const xLabels = feats.map((f) => f.label);
+    const xMeta = feats.map((f) => `${f.date} · ${get(f[profile], 'environment.git_revision', '').slice(0, 8)} · ${get(f[profile], 'environment.host.cpu_model') || ''}`);
+    const rep = (f) => f[profile];
+    const latest = feats[feats.length - 1];
+    const prev = feats[feats.length - 2];
+    const profileDesc = latest ? `${get(rep(latest), 'deterministic.profile.world_width')}×${get(rep(latest), 'deterministic.profile.world_height')} world, ${fmt(num(get(rep(latest), 'deterministic.profile.founders')))} founders, ${fmt(num(get(rep(latest), 'deterministic.profile.ticks')))} ticks, seeds ${(get(rep(latest), 'deterministic.profile.seeds') || []).join('/')}` : '';
+
+    document.getElementById('status').textContent = `${data.reportCount} reports · ${feats.length} ${profile} closures (${feats[0] ? feats[0].date : ''} → ${latest ? latest.date : ''}) · ${profileDesc}`;
+
+    if (!feats.length) { app.appendChild(el('div', 'empty', 'No reports for this profile.')); return; }
+
+    // Headline tiles ──
+    {
+      const g = group('Latest closure', `${latest.id} (${latest.date}). Deltas are against the previous ${profile} closure${prev ? `, ${prev.id}` : ''}.`);
+      const tiles = el('div', 'tiles');
+      const tile = (label, getter, fmtV, opts = {}) => {
+        const v = getter(rep(latest));
+        const p = prev ? getter(rep(prev)) : NaN;
+        let d;
+        if (Number.isFinite(v) && Number.isFinite(p) && opts.points) {
+          const ch = Math.round((v - p) * 1000) / 10 || 0;
+          d = `${ch > 0 ? '+' : ''}${ch.toLocaleString(undefined, { maximumFractionDigits: 1 })} pts vs ${prev.id}`;
+        } else if (Number.isFinite(v) && Number.isFinite(p) && p !== 0) {
+          const ch = Math.round(((v - p) / Math.abs(p)) * 1000) / 10 || 0;
+          d = `${ch > 0 ? '+' : ''}${ch.toLocaleString(undefined, { maximumFractionDigits: 1 })}% vs ${prev.id}`;
+        } else if (prev && Number.isFinite(v) && !Number.isFinite(p)) d = `not measured in ${prev.id}`;
+        tiles.appendChild(statTile(label, fmtV(v), d));
+      };
+      tile('Final population, seed mean', (r) => mean(SEEDS.map((s) => { const x = seedRow(r, 'deterministic.goal_indicators.population_persistence.per_seed', s); return x ? num(x.final_population) : NaN; })), (v) => fmt(v, 0));
+      tile('Births per 100 ticks', (r) => num(get(r, 'deterministic.goal_indicators.births_per_100_ticks')), (v) => fmt(v, 1));
+      tile('VM steps per creature-tick', (r) => num(get(r, 'deterministic.per_creature_tick.vm_steps')), (v) => fmt(v, 2));
+      tile('Wall-clock ms per creature-tick', (r) => num(get(r, 'environment.wall_clock_ms_per_creature_tick')), (v) => Number.isFinite(v) ? v.toFixed(6) : '—');
+      tile('Lineage entropy, seed mean (nats)', (r) => mean(SEEDS.map((s) => { const x = seedRow(r, 'deterministic.goal_indicators.lineage_diversity.per_seed', s); return x ? num(x.shannon_entropy_nats) : NaN; })), (v) => fmt(v, 3));
+      tile('Founder single-event silence', (r) => founderSingle(r, 'silent'), pct, { points: true });
+      g.cards.replaceWith(tiles);
+      app.appendChild(g.section);
+    }
+
+    // Work counters ──
+    {
+      const g = group('Work per creature-tick', 'The six normalized benchmark counters from each report’s deterministic block. Reference dates and hosts are in the hover readout.');
+      const changes = get(data.index, 'counter_definition_changes') || [];
+      COUNTERS.forEach(([key, name]) => {
+        const ann = changes.filter((c) => c.counter === key).map((c) => {
+          const idx = feats.findIndex((f) => f.id === c.feature);
+          return { x: idx, label: `definition change (${c.feature})` };
+        }).filter((a) => a.x >= 0);
+        g.cards.appendChild(lineChart({
+          title: name, sub: key, xLabels, xTipMeta: xMeta, yMin: 0,
+          series: [{ name, color: 'var(--s1)', values: feats.map((f) => num(get(rep(f), `deterministic.per_creature_tick.${key}`))) }],
+          annotations: ann,
+        }));
+      });
+      app.appendChild(g.section);
+    }
+
+    // Wall clock and throughput ──
+    {
+      const g = group('Wall clock', 'Secondary signal. Comparable only between runs on the same host; the hover readout names the CPU for each closure.');
+      g.cards.appendChild(lineChart({
+        title: 'Wall-clock ms per creature-tick', sub: 'environment.wall_clock_ms_per_creature_tick', xLabels, xTipMeta: xMeta, yMin: 0,
+        series: [{ name: 'ms per creature-tick', color: 'var(--s1)', values: feats.map((f) => num(get(rep(f), 'environment.wall_clock_ms_per_creature_tick'))) }],
+        tipFmt: (v) => Number.isFinite(v) ? v.toFixed(6) : '—',
+      }));
+      g.cards.appendChild(lineChart({
+        title: 'Creature-ticks per second', sub: 'environment.throughput.total.creature_ticks_per_second', xLabels, xTipMeta: xMeta, yMin: 0,
+        series: [{ name: 'creature-ticks/s', color: 'var(--s1)', values: feats.map((f) => num(get(rep(f), 'environment.throughput.total.creature_ticks_per_second'))) }],
+      }));
+      g.cards.appendChild(lineChart({
+        title: 'Total wall-clock per closure run', sub: 'environment.wall_clock_ms_total, all seeds', xLabels, xTipMeta: xMeta, yMin: 0,
+        series: [{ name: 'seconds', color: 'var(--s1)', values: feats.map((f) => num(get(rep(f), 'environment.wall_clock_ms_total')) / 1000) }],
+      }));
+      app.appendChild(g.section);
+    }
+
+    // Ecology ──
+    {
+      const g = group('Population and ecology', 'Population persistence, birth rate, and lineage diversity from goal_indicators. Lineage is founder-clade identity, a collapse tripwire rather than a strategy count.');
+      // Trajectories: one line per feature on an ordinal ramp.
+      const withSamples = feats.filter((f) => SEEDS.some((s) => { const r = seedRow(rep(f), 'deterministic.goal_indicators.population_persistence.per_seed', s); return r && Array.isArray(r.samples) && r.samples.length > 1; }));
+      if (withSamples.length) {
+        const tickSet = new Set();
+        withSamples.forEach((f) => SEEDS.forEach((s) => { const r = seedRow(rep(f), 'deterministic.goal_indicators.population_persistence.per_seed', s); (r && r.samples || []).forEach((p) => tickSet.add(num(p.tick))); }));
+        const ticksX = [...tickSet].filter(Number.isFinite).sort((a, b) => a - b);
+        const series = withSamples.map((f, i) => {
+          const perSeed = SEEDS.map((s) => { const r = seedRow(rep(f), 'deterministic.goal_indicators.population_persistence.per_seed', s); const mp = new Map(); (r && r.samples || []).forEach((p) => mp.set(num(p.tick), num(p.population))); return mp; });
+          const last = i === withSamples.length - 1;
+          return {
+            name: f.id, color: ORDINAL_RAMP[Math.round((i * (ORDINAL_RAMP.length - 1)) / Math.max(1, withSamples.length - 1))],
+            emph: last, dots: last, endLabel: last,
+            values: ticksX.map((t) => mean(perSeed.map((mp) => mp.has(t) ? mp.get(t) : NaN))),
+          };
+        });
+        g.cards.appendChild(lineChart({
+          title: 'Population trajectory by closure', sub: 'Seed-mean population at each sampled tick; darker is a later closure, the latest is emphasized', xLabels: ticksX.map((t) => String(t)), series, yMin: 0, wide: true, xTitle: 'tick',
+        }));
+      }
+      g.cards.appendChild(lineChart({
+        title: 'Final population per seed', sub: 'population_persistence.per_seed[].final_population', xLabels, xTipMeta: xMeta, yMin: 0,
+        series: seedSeries(feats, profile, 'deterministic.goal_indicators.population_persistence.per_seed', 'final_population'),
+      }));
+      g.cards.appendChild(lineChart({
+        title: 'Minimum population per seed', sub: 'population_persistence.per_seed[].minimum_population', xLabels, xTipMeta: xMeta, yMin: 0,
+        series: seedSeries(feats, profile, 'deterministic.goal_indicators.population_persistence.per_seed', 'minimum_population'),
+      }));
+      g.cards.appendChild(lineChart({
+        title: 'Births per 100 ticks', sub: 'goal_indicators.births_per_100_ticks', xLabels, xTipMeta: xMeta, yMin: 0,
+        series: [{ name: 'births / 100 ticks', color: 'var(--s1)', values: feats.map((f) => num(get(rep(f), 'deterministic.goal_indicators.births_per_100_ticks'))) }],
+      }));
+      g.cards.appendChild(lineChart({
+        title: 'Mean energy per seed at the final tick', sub: 'population_persistence.per_seed[].mean_energy', xLabels, xTipMeta: xMeta, yMin: 0,
+        series: seedSeries(feats, profile, 'deterministic.goal_indicators.population_persistence.per_seed', 'mean_energy'),
+      }));
+      g.cards.appendChild(lineChart({
+        title: 'Surviving founder clades per seed', sub: 'lineage_diversity.per_seed[].surviving_founder_clade_count', xLabels, xTipMeta: xMeta, yMin: 0,
+        series: seedSeries(feats, profile, 'deterministic.goal_indicators.lineage_diversity.per_seed', 'surviving_founder_clade_count'),
+      }));
+      g.cards.appendChild(lineChart({
+        title: 'Lineage Shannon entropy per seed', sub: 'lineage_diversity.per_seed[].shannon_entropy_nats', xLabels, xTipMeta: xMeta, yMin: 0,
+        series: seedSeries(feats, profile, 'deterministic.goal_indicators.lineage_diversity.per_seed', 'shannon_entropy_nats'),
+      }));
+      app.appendChild(g.section);
+    }
+
+    // Structure ──
+    {
+      const g = group('Reachable structure size', 'Distribution of reachable brain-structure size over the final population. The shaded band is the interquartile range; extremes are on the second chart.');
+      const rs = (f, k) => num(get(rep(f), `deterministic.goal_indicators.reachable_structure_size_distribution.${k}`));
+      g.cards.appendChild(lineChart({
+        title: 'Structure size: median with p25–p75', sub: 'reachable_structure_size_distribution', xLabels, xTipMeta: xMeta, yMin: 0,
+        series: [
+          { name: 'median', color: 'var(--s1)', values: feats.map((f) => rs(f, 'median')) },
+          { name: 'mean', color: 'var(--s2)', values: feats.map((f) => rs(f, 'mean')) },
+        ],
+        band: { name: 'p25–p75', color: 'var(--s1)', lo: feats.map((f) => rs(f, 'p25')), hi: feats.map((f) => rs(f, 'p75')) },
+      }));
+      g.cards.appendChild(lineChart({
+        title: 'Structure size: extremes', sub: 'min and max reachable structure size', xLabels, xTipMeta: xMeta, yMin: 0,
+        series: [
+          { name: 'max', color: 'var(--s1)', values: feats.map((f) => rs(f, 'max')) },
+          { name: 'min', color: 'var(--s2)', values: feats.map((f) => rs(f, 'min')) },
+        ],
+      }));
+      app.appendChild(g.section);
+    }
+
+    // Memory ──
+    {
+      const g = group('Memory sensitivity', 'Fraction of final creatures whose chosen action changes when shared memory is zeroed or scrambled (memory_sensitivity), and, from T11.F06, when each temporal component is perturbed (temporal_memory_sensitivity). Near zero is expected for founders; a rise is the signal.');
+      g.cards.appendChild(lineChart({
+        title: 'Action changes under memory perturbation', sub: 'memory_sensitivity.per_seed[].different_from_either_fraction', xLabels, xTipMeta: xMeta, yMin: 0,
+        series: seedSeries(feats, profile, 'deterministic.goal_indicators.memory_sensitivity.per_seed', 'different_from_either_fraction'),
+        tipFmt: pct, yFmt: pct,
+      }));
+      const comps = [['persisted_outputs', 'Persisted outputs'], ['operator_state', 'Operator state'], ['previous_slots', 'Previous slots']];
+      comps.forEach(([k, name]) => {
+        g.cards.appendChild(lineChart({
+          title: `Temporal memory: ${name.toLowerCase()}`, sub: `temporal_memory_sensitivity.per_seed[].${k}.different_from_either_fraction`, xLabels, xTipMeta: xMeta, yMin: 0,
+          series: SEEDS.map((seed) => ({ name: `Seed ${seed}`, color: SEED_COLORS[seed], values: feats.map((f) => { const r = seedRow(rep(f), 'deterministic.goal_indicators.temporal_memory_sensitivity.per_seed', seed); return r ? num(get(r, `${k}.different_from_either_fraction`)) : NaN; }) })),
+          tipFmt: pct, yFmt: pct,
+        }));
+      });
+      app.appendChild(g.section);
+    }
+
+    // Mutational neighborhood ──
+    {
+      const g = group('Mutational neighborhood', 'Silent, changed, and dead fractions from the neighborhood battery (T11.F01 onward). Founder rows probe the generation-zero genome; evolved rows pool sampled final-population genomes per seed.');
+      const classes = ['silent', 'changed', 'dead'].map((c) => ({ name: c, color: CLASS_COLORS[c] }));
+      g.cards.appendChild(stackedColumns({
+        title: 'Founder mutated births by outcome', sub: 'mutational_neighborhood.founder.births.any_events fractions', xLabels, categories: classes,
+        data: feats.map((f) => classes.map((c) => founderClass(rep(f), c.name))),
+      }));
+      g.cards.appendChild(lineChart({
+        title: 'Founder single-event silence vs the track floor', sub: 'founder.births.by_events[applied_events = 1].silent_fraction', xLabels, xTipMeta: xMeta, yMin: 0, yMax: 1,
+        series: [{ name: 'single-event silent fraction', color: 'var(--s1)', values: feats.map((f) => founderSingle(rep(f), 'silent')) }],
+        refLines: [{ y: 0.6, label: 'T11 floor 60%' }], tipFmt: pct, yFmt: pct,
+      }));
+      g.cards.appendChild(lineChart({
+        title: 'Evolved pooled silence per seed', sub: 'evolved.per_seed[].pooled_births.any_events.silent_fraction', xLabels, xTipMeta: xMeta, yMin: 0, yMax: 1,
+        series: SEEDS.map((seed) => ({ name: `Seed ${seed}`, color: SEED_COLORS[seed], values: feats.map((f) => evolvedPooled(rep(f), seed, 'silent')) })),
+        tipFmt: pct, yFmt: pct,
+      }));
+      g.cards.appendChild(lineChart({
+        title: 'Evolved pooled dead fraction per seed', sub: 'evolved.per_seed[].pooled_births.any_events.dead_fraction', xLabels, xTipMeta: xMeta, yMin: 0,
+        series: SEEDS.map((seed) => ({ name: `Seed ${seed}`, color: SEED_COLORS[seed], values: feats.map((f) => evolvedPooled(rep(f), seed, 'dead')) })),
+        tipFmt: pct, yFmt: pct,
+      }));
+      g.cards.appendChild(lineChart({
+        title: 'Founder dead fraction', sub: 'founder.births.any_events.dead_fraction', xLabels, xTipMeta: xMeta, yMin: 0,
+        series: [{ name: 'dead fraction', color: 'var(--s1)', values: feats.map((f) => founderClass(rep(f), 'dead')) }],
+        tipFmt: pct, yFmt: pct,
+      }));
+
+      // Operator heatmap
+      const opFeats = feats.filter((f) => Array.isArray(get(rep(f), 'deterministic.goal_indicators.mutational_neighborhood.founder.operator_rows')));
+      if (opFeats.length) {
+        const rowsMap = new Map();
+        opFeats.forEach((f) => get(rep(f), 'deterministic.goal_indicators.mutational_neighborhood.founder.operator_rows').forEach((r) => { if (!rowsMap.has(r.operator)) rowsMap.set(r.operator, r.family || ''); }));
+        const rows = [...rowsMap.entries()].map(([label, fam]) => ({ label, group: fam }));
+        rows.sort((a, b) => a.group.localeCompare(b.group) || 0);
+        const lookup = opFeats.map((f) => { const mp = new Map(); get(rep(f), 'deterministic.goal_indicators.mutational_neighborhood.founder.operator_rows').forEach((r) => mp.set(r.operator, r.tally)); return mp; });
+        const values = rows.map((row) => lookup.map((mp) => { const t = mp.get(row.label); return t ? num(t.silent_fraction) : NaN; }));
+        const colorOf = (v) => Number.isFinite(v) ? SEQ_RAMP[Math.min(SEQ_RAMP.length - 1, Math.floor(v * SEQ_RAMP.length))] : 'var(--grid)';
+        g.cards.appendChild(heatmap({
+          title: 'Founder operator silence by closure', sub: 'founder.operator_rows[].tally.silent_fraction, grouped by operator family; gray means the operator was not in that report',
+          rows, cols: opFeats.map((f) => f.id), values, colorOf, cellFmt: pct, valueName: 'silent', rowGroups: [...new Set(rows.map((r) => r.group))], scaleLabel: ['0%', '100% silent'],
+          tipRows: (i, j) => { const t = lookup[j].get(rows[i].label); return t ? [{ name: 'changed', value: pct(num(t.changed_fraction)) }, { name: 'dead', value: pct(num(t.dead_fraction)) }, { name: 'applied / trials', value: `${t.applied} / ${t.trials}` }] : []; },
+        }));
+      }
+
+      // Mesh execution table
+      const meshFeats = feats.map((f) => ({ f, m: meshSums(rep(f)) })).filter((x) => x.m);
+      if (meshFeats.length) {
+        const c = card('Mesh execution over sampled evolved genomes', 'mesh-execution-v1 sums over sampled_genomes per closure; route variation counts genomes whose selected targets vary across the 48 snapshots');
+        c.card.classList.add('wide');
+        c.card.appendChild(table(
+          ['Closure', 'Genomes', 'Total nodes', 'Reachable', 'Executed', 'Knockouts', 'Route varies', 'Hop-cap hits', 'Executions'],
+          meshFeats.map(({ f, m }) => [f.id, fmt(m.genomes), fmt(m.total), fmt(m.reachable), fmt(m.executed), fmt(m.knockout), `${m.routeVaries} / ${m.genomes}`, `${fmt(m.capHits)} / ${fmt(m.execs)}`, fmt(m.execs)]),
+        ));
+        g.cards.appendChild(c.card);
+      }
+      app.appendChild(g.section);
+    }
+
+    // Coverage grid ──
+    {
+      const g = group('Indicator coverage', 'Which goal indicators each closure actually measured. Gray cells are Undefined in that report; deferred indicators stay Undefined until their comparator protocol lands.');
+      const keys = [];
+      feats.forEach((f) => Object.keys(get(rep(f), 'deterministic.goal_indicators') || {}).forEach((k) => { if (!keys.includes(k)) keys.push(k); }));
+      const rows = keys.map((k) => ({ label: k }));
+      const values = keys.map((k) => feats.map((f) => { const v = get(rep(f), `deterministic.goal_indicators.${k}`); return v === undefined || v === 'Undefined' ? 0 : 1; }));
+      g.cards.appendChild(heatmap({
+        title: 'Measured indicators by closure', sub: 'deterministic.goal_indicators keys', rows, cols: xLabels, values,
+        colorOf: (v) => v ? 'var(--seq-450)' : 'var(--grid)', cellFmt: (v) => v ? 'measured' : 'Undefined', valueName: 'status',
+      }));
+      app.appendChild(g.section);
+    }
+
+    document.getElementById('foot').textContent = `Reports discovered through benchmark-series.json (${data.index.gate ? data.index.gate.series : ''}, ${data.index.goal ? data.index.goal.series : ''}). Epoch baselines: gate ${featureId((get(data.index, 'gate.epoch_baseline') || '').split('/').pop() || '')}, goal ${featureId((get(data.index, 'goal.epoch_baseline') || '').split('/').pop() || '')}.`;
+  }
+
+  function showNotice(err) {
+    const n = document.getElementById('notice');
+    n.hidden = false;
+    const box = el('div', 'box');
+    box.appendChild(el('strong', null, 'The reports could not be loaded.'));
+    const p = el('p');
+    p.textContent = location.protocol === 'file:'
+      ? 'Browsers block fetch() from file:// pages, so this page has to be served over HTTP. From the repository root, run:'
+      : `Fetching the reports failed (${err && err.message ? err.message : err}). Serve this directory over HTTP from the repository root:`;
+    box.appendChild(p);
+    const pre = el('pre', null, 'python3 -m http.server 8000 --directory docs/progress');
+    box.appendChild(pre);
+    const p2 = el('p');
+    p2.append('then open ');
+    const a = el('a', null, 'http://localhost:8000/');
+    a.href = 'http://localhost:8000/';
+    p2.appendChild(a);
+    p2.append('.');
+    box.appendChild(p2);
+    n.replaceChildren(box);
+    document.getElementById('status').textContent = 'Reports not loaded';
+  }
+
+  // ── Boot ─────────────────────────────────────────────────────────────────
+  let DATA = null;
+  let PROFILE = 'goal';
+  try { const saved = localStorage.getItem('petri-progress-profile'); if (saved === 'gate' || saved === 'goal') PROFILE = saved; } catch (e) { /* ignore */ }
+  document.querySelectorAll('.seg button').forEach((b) => {
+    b.setAttribute('aria-pressed', b.dataset.profile === PROFILE ? 'true' : 'false');
+    b.addEventListener('click', () => {
+      PROFILE = b.dataset.profile;
+      document.querySelectorAll('.seg button').forEach((x) => x.setAttribute('aria-pressed', x === b ? 'true' : 'false'));
+      try { localStorage.setItem('petri-progress-profile', PROFILE); } catch (e) { /* ignore */ }
+      if (DATA) render(DATA, PROFILE);
+    });
+  });
+  loadAll().then((d) => { DATA = d; render(d, PROFILE); }).catch((e) => { console.error(e); showNotice(e); });
+})();
+</script>
+</body>
+</html>
