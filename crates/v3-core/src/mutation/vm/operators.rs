@@ -737,24 +737,24 @@ fn copy_span_to_dormant_tail(
     source_indices: impl IntoIterator<Item = usize>,
 ) -> Result<(), MutationSkipReason> {
     let tail = program.len();
-    let mut inserted: Vec<SpliceInstruction> = program
+    let mut inserted: Vec<SpliceInstruction> = Vec::new();
+    if program
         .last()
         .is_some_and(|last| !is_terminal_instruction(last))
-        .then_some(SpliceInstruction {
+    {
+        inserted.push(SpliceInstruction {
             instruction: VmInstruction::Halt,
             source_index: None,
-        })
-        .into_iter()
-        .collect();
-    for source_index in source_indices {
-        inserted.push(SpliceInstruction {
-            instruction: program
-                .get(source_index)
-                .ok_or(MutationSkipReason::NoApplicableTarget)?
-                .clone(),
-            source_index: Some(source_index),
         });
     }
+    inserted.extend(
+        source_indices
+            .into_iter()
+            .map(|source_index| SpliceInstruction {
+                instruction: program[source_index].clone(),
+                source_index: Some(source_index),
+            }),
+    );
     splice_program_with_reference_repair(program, tail..tail, inserted)
 }
 
@@ -933,12 +933,7 @@ pub(super) fn apply_insert_read_bid_motif(
             .program
             .iter()
             .enumerate()
-            .filter(|(_, instr)| {
-                matches!(
-                    instr,
-                    VmInstruction::ExecuteActionQueue | VmInstruction::Halt
-                )
-            })
+            .filter(|(_, instr)| is_terminal_instruction(instr))
             .map(|(idx, _)| idx)
             .collect();
 
