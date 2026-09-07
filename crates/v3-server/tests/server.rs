@@ -195,7 +195,7 @@ async fn startup_unknown_field_returns_422() {
     let (status, body) = do_request(app(), startup_req(r#"{"seed":42,"bogus_field":1}"#)).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
     assert_eq!(
-        body["error"].as_str(),
+        body["error"]["code"].as_str(),
         Some("validation_rejected"),
         "body: {body}"
     );
@@ -208,7 +208,7 @@ async fn startup_missing_seed_returns_400() {
     let (status, body) = do_request(app(), startup_req(r#"{}"#)).await;
     assert_eq!(status, StatusCode::BAD_REQUEST, "body: {body}");
     assert_eq!(
-        body["error"].as_str(),
+        body["error"]["code"].as_str(),
         Some("invalid_request"),
         "body: {body}"
     );
@@ -240,7 +240,7 @@ async fn pause_on_idle_returns_409() {
     let (status, body) = do_request(app(), post_req("/v3/simulation/pause")).await;
     assert_eq!(status, StatusCode::CONFLICT, "body: {body}");
     assert_eq!(
-        body["error"].as_str(),
+        body["error"]["code"].as_str(),
         Some("invalid_state_transition"),
         "body: {body}"
     );
@@ -290,7 +290,7 @@ async fn step_with_zero_steps_returns_422() {
     let (status, body) = do_request(a, post_json("/v3/simulation/step", r#"{"steps":0}"#)).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
     assert_eq!(
-        body["error"].as_str(),
+        body["error"]["code"].as_str(),
         Some("validation_rejected"),
         "body: {body}"
     );
@@ -317,7 +317,7 @@ async fn step_with_too_many_steps_returns_422() {
     let (status, body) = do_request(a, post_json("/v3/simulation/step", r#"{"steps":1001}"#)).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
     assert_eq!(
-        body["error"].as_str(),
+        body["error"]["code"].as_str(),
         Some("validation_rejected"),
         "body: {body}"
     );
@@ -713,7 +713,7 @@ async fn patch_config_world_topology_fields_are_restart_only() {
     .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
     assert_eq!(
-        body["error"].as_str(),
+        body["error"]["code"].as_str(),
         Some("validation_rejected"),
         "body: {body}"
     );
@@ -903,7 +903,7 @@ async fn patch_config_rejects_invalid_food_occupancy_depletion_values() {
     let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
     assert_eq!(
-        body["error"].as_str(),
+        body["error"]["code"].as_str(),
         Some("validation_rejected"),
         "body: {body}"
     );
@@ -991,7 +991,7 @@ async fn patch_config_rejects_startup_fields() {
     let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
     assert_eq!(
-        body["error"].as_str(),
+        body["error"]["code"].as_str(),
         Some("validation_rejected"),
         "body: {body}"
     );
@@ -1015,7 +1015,7 @@ async fn patch_config_rejects_removed_nutrition_fields() {
     let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
     assert_eq!(
-        body["error"].as_str(),
+        body["error"]["code"].as_str(),
         Some("validation_rejected"),
         "body: {body}"
     );
@@ -1051,7 +1051,7 @@ async fn patch_config_rejects_fertility_layer_generation_fields() {
     let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
     assert_eq!(
-        body["error"].as_str(),
+        body["error"]["code"].as_str(),
         Some("validation_rejected"),
         "body: {body}"
     );
@@ -1088,7 +1088,7 @@ async fn patch_config_rejects_food_types_runtime_patch() {
     let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
     assert_eq!(
-        body["error"].as_str(),
+        body["error"]["code"].as_str(),
         Some("validation_rejected"),
         "body: {body}"
     );
@@ -1120,7 +1120,7 @@ async fn patch_config_rejects_food_annealing_runtime_patch() {
     let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
     assert_eq!(
-        body["error"].as_str(),
+        body["error"]["code"].as_str(),
         Some("validation_rejected"),
         "body: {body}"
     );
@@ -1150,7 +1150,7 @@ async fn patch_config_rejects_legacy_food_occupancy_path() {
     let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
     assert_eq!(
-        body["error"].as_str(),
+        body["error"]["code"].as_str(),
         Some("validation_rejected"),
         "body: {body}"
     );
@@ -1177,7 +1177,7 @@ async fn patch_config_rejects_non_object_food_shared_patch() {
     let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
     assert_eq!(
-        body["error"].as_str(),
+        body["error"]["code"].as_str(),
         Some("validation_rejected"),
         "body: {body}"
     );
@@ -1208,7 +1208,7 @@ async fn patch_config_blocks_failed_penalty_while_ramp_active() {
     let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
     assert_eq!(
-        body["error"].as_str(),
+        body["error"]["code"].as_str(),
         Some("validation_rejected"),
         "body: {body}"
     );
@@ -1604,7 +1604,7 @@ async fn paint_on_running_returns_409() {
     .await;
     assert_eq!(status, StatusCode::CONFLICT, "body: {body}");
     assert_eq!(
-        body["error"].as_str(),
+        body["error"]["code"].as_str(),
         Some("invalid_state_transition"),
         "body: {body}"
     );
@@ -1630,7 +1630,7 @@ async fn paint_empty_points_returns_422() {
     .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
     assert_eq!(
-        body["error"].as_str(),
+        body["error"]["code"].as_str(),
         Some("validation_rejected"),
         "body: {body}"
     );
@@ -1656,7 +1656,7 @@ async fn paint_invalid_brush_returns_422() {
     .await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
     assert_eq!(
-        body["error"].as_str(),
+        body["error"]["code"].as_str(),
         Some("validation_rejected"),
         "body: {body}"
     );
@@ -1684,7 +1684,7 @@ async fn paint_too_many_points_returns_422() {
     let (status, body) = do_request(a, post_json("/v3/simulation/paint", &body_str)).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
     assert_eq!(
-        body["error"].as_str(),
+        body["error"]["code"].as_str(),
         Some("validation_rejected"),
         "body: {body}"
     );
@@ -1938,7 +1938,11 @@ async fn get_creature_invalid_id_returns_404() {
     // Use an ID that doesn't correspond to any creature
     let (status, body) = do_request(a, get_req("/v3/simulation/creature/999999999")).await;
     assert_eq!(status, StatusCode::NOT_FOUND, "body: {body}");
-    assert_eq!(body["error"].as_str(), Some("not_found"), "body: {body}");
+    assert_eq!(
+        body["error"]["code"].as_str(),
+        Some("not_found"),
+        "body: {body}"
+    );
 }
 
 #[tokio::test]
@@ -1966,7 +1970,11 @@ async fn get_creature_noncanonical_ffi_id_returns_404() {
     let uri = format!("/v3/simulation/creature/{noncanonical_id}");
     let (status, body) = do_request(a, get_req(&uri)).await;
     assert_eq!(status, StatusCode::NOT_FOUND, "body: {body}");
-    assert_eq!(body["error"].as_str(), Some("not_found"), "body: {body}");
+    assert_eq!(
+        body["error"]["code"].as_str(),
+        Some("not_found"),
+        "body: {body}"
+    );
 }
 
 // ── 28. get_creature_on_idle_state_works ─────────────────────────────────────
@@ -3242,4 +3250,284 @@ async fn energy_only_shared_reward_can_be_changed_live() {
     let (_, snapshot) = do_request(a, get_req("/v3/simulation/snapshot?zoom_tier=detail")).await;
     assert!(!snapshot.to_string().contains("reproductive_reserve"));
     assert!(!snapshot.to_string().contains("metabolic_energy_yield"));
+}
+
+// ── Runtime config apply fixes: nested error envelope ─────────────────────
+
+fn error_field_errors(body: &serde_json::Value) -> &Vec<serde_json::Value> {
+    body["error"]["details"]["field_errors"]
+        .as_array()
+        .unwrap_or_else(|| panic!("expected details.field_errors array, got {body}"))
+}
+
+fn error_field_paths(body: &serde_json::Value) -> Vec<&str> {
+    error_field_errors(body)
+        .iter()
+        .map(|entry| {
+            entry["field"]
+                .as_str()
+                .unwrap_or_else(|| panic!("expected string field, got {entry}"))
+        })
+        .collect()
+}
+
+#[tokio::test]
+async fn error_envelope_nests_code_message_and_details() {
+    let (status, body) = do_request(app(), startup_req(r#"{"seed":42,"bogus_field":1}"#)).await;
+
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
+    assert_eq!(
+        body["error"]["code"].as_str(),
+        Some("validation_rejected"),
+        "body: {body}"
+    );
+    assert!(
+        !body["error"]["message"].as_str().unwrap_or("").is_empty(),
+        "body: {body}"
+    );
+    assert_eq!(
+        body["error"]["details"]["endpoint"].as_str(),
+        Some("startup"),
+        "body: {body}"
+    );
+    assert!(!error_field_errors(&body).is_empty(), "body: {body}");
+    assert!(body.get("field_errors").is_none(), "body: {body}");
+    assert!(body.get("message").is_none(), "body: {body}");
+}
+
+#[tokio::test]
+async fn error_envelope_reports_state_transition_details() {
+    let (status, body) = do_request(app(), post_req("/v3/simulation/pause")).await;
+
+    assert_eq!(status, StatusCode::CONFLICT, "body: {body}");
+    assert_eq!(
+        body["error"]["code"].as_str(),
+        Some("invalid_state_transition"),
+        "body: {body}"
+    );
+    assert_eq!(
+        body["error"]["details"]["current_state"].as_str(),
+        Some("idle"),
+        "body: {body}"
+    );
+    // `pause` on idle declares no single expected state, so the key is omitted.
+    assert!(
+        body["error"]["details"].get("expected_state").is_none(),
+        "body: {body}"
+    );
+
+    let (step_status, step_body) =
+        do_request(app(), post_json("/v3/simulation/step", r#"{"steps":1}"#)).await;
+    assert_eq!(step_status, StatusCode::CONFLICT, "body: {step_body}");
+    assert_eq!(
+        step_body["error"]["details"]["expected_state"].as_str(),
+        Some("paused"),
+        "body: {step_body}"
+    );
+    assert_eq!(
+        step_body["error"]["details"]["current_state"].as_str(),
+        Some("idle"),
+        "body: {step_body}"
+    );
+}
+
+#[tokio::test]
+async fn error_envelope_omits_details_when_there_are_none() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":42}"#))
+        .await
+        .unwrap();
+
+    let (status, body) = do_request(a, get_req("/v3/simulation/creature/999999999")).await;
+
+    assert_eq!(status, StatusCode::NOT_FOUND, "body: {body}");
+    assert_eq!(
+        body["error"]["code"].as_str(),
+        Some("not_found"),
+        "body: {body}"
+    );
+    assert!(body["error"].get("details").is_none(), "body: {body}");
+}
+
+// ── Runtime config apply fixes: construction-time normalization ───────────
+
+#[tokio::test]
+async fn fresh_default_server_accepts_an_empty_config_patch() {
+    let a = router(AppState::new());
+
+    let (before_status, before) = do_request(a.clone(), get_req("/v3/simulation/config")).await;
+    assert_eq!(before_status, StatusCode::OK, "body: {before}");
+
+    let (status, body) = do_request(a, patch_req("/v3/simulation/config", "{}")).await;
+
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert_eq!(body["config"], before["config"], "body: {body}");
+}
+
+#[tokio::test]
+async fn from_config_normalizes_before_storing_and_seeding() {
+    let mut config = test_config();
+    config.action_log.capacity = 0;
+    config.population.max_creatures = 1;
+    let a = router(AppState::from_config(config, 0));
+
+    let (status, body) = do_request(a.clone(), get_req("/v3/simulation/config")).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert_eq!(
+        body["config"]["action_log"]["capacity"], 500,
+        "body: {body}"
+    );
+    assert_eq!(
+        body["config"]["population"]["max_creatures"], 100000,
+        "body: {body}"
+    );
+
+    let (patch_status, patch_body) = do_request(a, patch_req("/v3/simulation/config", "{}")).await;
+    assert_eq!(patch_status, StatusCode::OK, "body: {patch_body}");
+}
+
+// ── Runtime config apply fixes: per-field rejection attribution ───────────
+
+/// Each bound-constrained runtime control, patched alone at a value the panel
+/// used to offer, must name its own path (2026-09-07 apply audit, item 4).
+#[tokio::test]
+async fn patch_config_names_each_bound_constrained_field_patched_alone() {
+    let cases: [(&str, &str); 7] = [
+        (
+            "population.max_creatures",
+            r#"{"population":{"max_creatures":32}}"#,
+        ),
+        (
+            "world.food.shared.max_density",
+            r#"{"world":{"food":{"shared":{"max_density":0.5}}}}"#,
+        ),
+        (
+            "runtime.max_actions_per_turn",
+            r#"{"runtime":{"max_actions_per_turn":2}}"#,
+        ),
+        (
+            "mutation.action_queue_cap",
+            r#"{"mutation":{"action_queue_cap":12}}"#,
+        ),
+        (
+            "mutation.per_birth_mutation_events_min",
+            r#"{"mutation":{"per_birth_mutation_events_min":15}}"#,
+        ),
+        (
+            "mutation.per_birth_mutation_events_max",
+            r#"{"mutation":{"per_birth_mutation_events_max":0}}"#,
+        ),
+        ("action_log.capacity", r#"{"action_log":{"capacity":0}}"#),
+    ];
+
+    for (field, patch) in cases {
+        let a = app();
+        a.clone()
+            .oneshot(startup_req(r#"{"seed":1}"#))
+            .await
+            .unwrap();
+
+        let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
+
+        assert_eq!(
+            status,
+            StatusCode::UNPROCESSABLE_ENTITY,
+            "{field} body: {body}"
+        );
+        assert_eq!(
+            body["error"]["code"].as_str(),
+            Some("validation_rejected"),
+            "{field} body: {body}"
+        );
+        assert_eq!(
+            error_field_paths(&body),
+            vec![field],
+            "{field} body: {body}"
+        );
+        let reason = error_field_errors(&body)[0]["reason"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{field} expected string reason: {body}"));
+        assert!(!reason.is_empty(), "{field} body: {body}");
+    }
+}
+
+#[tokio::test]
+async fn patch_config_reason_names_the_cross_field_path_it_would_move() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let patch = r#"{"mutation":{"per_birth_mutation_events_min":15}}"#;
+    let (status, body) = do_request(a, patch_req("/v3/simulation/config", patch)).await;
+
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
+    let reason = error_field_errors(&body)[0]["reason"]
+        .as_str()
+        .expect("string reason");
+    assert!(reason.contains("15"), "reason: {reason}");
+    assert!(
+        reason.contains("mutation.per_birth_mutation_events_max"),
+        "reason: {reason}"
+    );
+}
+
+/// The audit's mixed patch: three acceptable edits plus one refused edit are
+/// rejected as a unit, naming only the offending path and storing nothing.
+#[tokio::test]
+async fn patch_config_rejects_mixed_patch_atomically_naming_only_the_offender() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let (_, before) = do_request(a.clone(), get_req("/v3/simulation/config")).await;
+
+    let patch = r#"{
+        "energy": { "costs": { "move_cost": 0.35 } },
+        "mutation": { "mutation_probability": 0.6 },
+        "world": { "food": { "shared": { "growth_rate": 0.12 } } },
+        "population": { "max_creatures": 32 }
+    }"#;
+    let (status, body) = do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
+
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
+    assert_eq!(
+        error_field_paths(&body),
+        vec!["population.max_creatures"],
+        "body: {body}"
+    );
+
+    let (_, after) = do_request(a, get_req("/v3/simulation/config")).await;
+    assert_eq!(after["config"], before["config"], "after: {after}");
+}
+
+/// A patch that only changes acceptable values must still apply in full, so
+/// the atomicity rule cannot be satisfied by rejecting everything.
+#[tokio::test]
+async fn patch_config_applies_a_fully_valid_mixed_patch() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let patch = r#"{
+        "energy": { "costs": { "move_cost": 0.35 } },
+        "mutation": { "mutation_probability": 0.6 },
+        "world": { "food": { "shared": { "growth_rate": 0.12 } } }
+    }"#;
+    let (status, body) = do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+
+    let (_, after) = do_request(a, get_req("/v3/simulation/config")).await;
+    assert_json_f64_close(&after["config"]["energy"]["costs"]["move_cost"], 0.35);
+    assert_json_f64_close(&after["config"]["mutation"]["mutation_probability"], 0.6);
+    assert_json_f64_close(
+        &after["config"]["world"]["food"]["shared"]["growth_rate"],
+        0.12,
+    );
 }
