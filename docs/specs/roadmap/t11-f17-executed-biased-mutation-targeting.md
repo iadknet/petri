@@ -1,6 +1,6 @@
 # T11.F17 — Executed-Biased Mutation Targeting
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-07
 **Feature**: T11.F17
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -67,7 +67,7 @@ Fixed design, decided before implementation:
 | Short-circuit | When every eligible node is executed (the founder; deep genomes whose eligible set sits inside the core), no bias roll is consumed and the existing draw runs unchanged, so founder RNG streams and founder rows are byte-identical. |
 | Size pressure | While `is_restricted` holds, the executed bias is disabled (0.0) so the inverted reachable bias keeps pruning junk first; the core is never targeted for removal by this feature. |
 | Normalization | `executed_bias`: finite values clamp to `[0, 1]`, non-finite normalize to 0.9. `executed_window_ticks`: 0 normalizes to 100. Panel `min`/`max` match these rules (bias 0–1 step 0.01; window 1–10,000 step 1). |
-| Telemetry | `MutationSummary` and `SimulationStats` gain an executed-target draw count beside `mutation_reachable_target_total`, and the server status block that already carries reachable/unreachable (`state.rs`) carries it too; no frontend display. Classification by reachable set is unchanged. |
+| Telemetry | `MutationSummary` and `SimulationStats` gain an executed-target count (events whose chosen target was in the parent's executed set, however drawn) beside `mutation_reachable_target_total`, and the server status block that already carries reachable/unreachable (`state.rs`) carries it too; no frontend display. Classification by reachable set is unchanged. |
 | Per-birth cost | The parent's executed index set is derived at most once per mutated birth, O(node count); zero-event births derive nothing. |
 | Observation stand-in | The neighborhood founder and evolved halves, operator rows, and the drift walk pass the executed set derived from `Battery` hop records (T11.F14's `mesh-execution-v1` executions, no knockouts needed), keyed by `NodeId` and mapped to the current genome's sorted indices at each engine call. The drift walk refreshes each lineage's `NodeId` set at depth 0 and every 10 generations, and at every checkpoint before its births; between refreshes removed nodes drop out and added nodes wait for the next refresh. The reading is versioned `drift-depth-v2`, with the source and cadence recorded in its metadata; v1 rows remain the baseline. |
 
@@ -104,16 +104,13 @@ Predeclared directions, read against the T11.F16 closure reports:
 - [x] Give the neighborhood and drift harnesses the battery-derived executed
       set with the predeclared refresh cadence; bump to `drift-depth-v2` with
       source and cadence metadata, serde-defaulted for historical reports.
-- [ ] Update `v3-mutation-spec.md` requirement 4 and Section 4.3 (replace the
+- [x] Update `v3-mutation-spec.md` requirement 4 and Section 4.3 (replace the
       pending sentence), the runtime config spec, `docs/progress.md`, and
       `docs/progress/benchmark-series.json`; store the gate and goal reports.
 
-The last task is partly done and deliberately unchecked: the reference specs
-are updated, both reports are stored, and `docs/progress.md` carries the
-`drift-depth-v2` instrument paragraph, but the `docs/progress.md` closure row
-and the `benchmark-series.json` appends are held pending the orchestrator's
-decision on the severe goal-profile `vm_steps` reading, so that no unresolved
-severe report becomes the next feature's reference.
+The last task's closure row and series appends were held until the user's
+acceptance of the severe goal-profile `vm_steps` reading (recorded in
+Performance and Goal Impact), then completed as closure bookkeeping.
 
 ## Verification
 
@@ -420,6 +417,29 @@ Also recorded: `reachable_structure_size_distribution` mean 118.863266
 against 85.491919, median 114 against 81, p75 135 against 84, max 428
 against 283, min 1 against 44.
 
+### Post-observation goal-cost acceptance and re-pin (2026-09-07)
+
+After the diagnostic probe, the evolution-side assessment, and the same-day
+roadmap additions of T03.F10 (activity-ramped compute cost, making VM loops
+lethal) and T03.F08 brought forward as the junk bound, the user directed:
+"Let's finish merging this feature." This is a post-observation acceptance
+of the stored goal report's measured readings as they stand: `vm_steps`
+146.184594 per creature-tick (+132.76%, severe) and `actions_applied`
+1.400927 (+11.07%, flag) against both references. It does not accept future
+regressions, does not touch the gate (`severe=false`, no gate re-pin), and
+is not an assertion that the original predeclaration authorized this cost;
+the predeclaration, thresholds, and the stored report's severe comparison
+stand unchanged. Under the existing series mechanism the goal
+`epoch_baseline` in `docs/progress/benchmark-series.json` now points to
+this feature's goal report, and both reports are appended to their closed
+lists; no report is regenerated against itself. The user also directed
+that the rebase onto `main` (0c8b7c42, three documentation-only roadmap
+commits) needs no further verification rounds, so the closure content is
+checked once with `make check` at its final commit and no benchmark or
+mutation run is repeated. The paired long run recommended in Notes for AI
+Agents is not a closure condition; it is recorded there as the reading
+T11.F13 should take when it characterizes rates on this substrate.
+
 ## Success Criteria
 
 - [x] At production defaults, node-internal targets are drawn from the
@@ -427,9 +447,10 @@ against 283, min 1 against 44.
       and single-event founder births are byte-identical to before (the
       per-draw guarantee the fixed design gives; the per-birth wording it
       replaced is recorded as a miss in Performance and Goal Impact).
-- [ ] The stored goal report meets every drift predeclaration above, and the
-      gate report shows no severe unbudgeted compute regression.
-- [ ] Required checks, fresh mutation evidence, independent review, reference
+- [x] The stored goal report meets every drift predeclaration above, and the
+      gate report shows no severe unbudgeted compute regression (the goal
+      profile's severe `vm_steps` reading is accepted post-observation above).
+- [x] Required checks, fresh mutation evidence, independent review, reference
       spec updates, and closure records are complete; the feature row is
       checked and this spec is Complete on main.
 
@@ -499,11 +520,14 @@ against 283, min 1 against 44.
   with the depth note's census, before deciding between closing as measured
   and moving the T11.F13 per-node-supply and junk-cost pair forward with
   the bias kept at 0.0 as an experimental arm.
-- Held pending that decision, so the next feature does not silently inherit a
-  severe reference: neither report is appended to
-  `docs/progress/benchmark-series.json`, and `docs/progress.md` carries the
+- Held pending that decision, so the next feature did not silently inherit a
+  severe reference: neither report was appended to
+  `docs/progress/benchmark-series.json`, and `docs/progress.md` carried the
   `drift-depth-v2` instrument paragraph but no closure row. No baseline,
-  threshold, default, or counter definition was edited.
+  threshold, default, or counter definition was edited. Resolved 2026-09-07
+  by the user's acceptance recorded in Performance and Goal Impact; the
+  series appends, goal epoch re-pin, and progress row were then made by the
+  orchestrator as closure bookkeeping.
 - The two identity misses (gate founder block, drift depth-0 row) share the
   multi-event mechanism described in Performance and Goal Impact. The
   orchestrator revised the predeclaration rows and Success Criterion 1 to
@@ -512,9 +536,26 @@ against 283, min 1 against 44.
 - Workflow deviation: this desktop session has no `SendMessage` tool, so the
   diagnostic pass ran on a fresh `roadmap-implementer` rather than the first
   one continued. Implementer advisor consults: 3 (first pass) + 3
-  (diagnostic pass). Independent review has not run yet; it follows the
-  user's decision on the blocker so that a bias or lever change, if chosen,
-  is reviewed once.
+  (diagnostic pass). Independent review ran once after the user's decision.
+- Independent final review, 2026-09-07 (fresh `roadmap-reviewer`, Fable 5.1):
+  0 P1, 1 P2, 5 P3. The P2 (the reference spec's Section 4.3 claimed
+  byte-identical founder births, which this spec had retracted) was fixed by
+  the orchestrator as a wording change in `v3-mutation-spec.md`, together with
+  three P3s: the stale held-task paragraph under Implementation Tasks, the
+  telemetry row's "draw count" wording, and a Section 4.3 sentence recording
+  that the executed and reachable index sets go stale by one after a
+  mid-birth `RemoveNode` (about 0.2% of births; the drift harness maps by
+  `NodeId`). Deferred P3: the four engine arms repeat the selector and tally
+  plumbing, so a further per-target tally (a T11.F13 arm) edits four arms
+  and the result tuple; break out with the selector itself when that arm
+  lands. The reviewer confirmed the survivor record against `missed.txt`,
+  `timeout.txt`, and `run-mode.txt`, the in-diff patch identical to the
+  rebased code diff, and the spec tables against both stored reports. Its
+  stated limit: the user's acceptance rests on authority it could not see.
+- Cost record: `/usage` totals at closure not collected (the session's
+  usage limit was reached mid-closure and reset); implementer advisor
+  consults 3 + 3 + 0 (closure bookkeeping by the orchestrator); reviewer
+  findings 0 P1, 1 P2, 5 P3; orchestrator advisor consults 1 (planning).
 - `executed_target_events` counts events whose chosen target was a member of
   the parent's executed set, however it was drawn, exactly parallel to
   `reachable_target_events`. It is therefore nonzero at `executed_bias` 0.0

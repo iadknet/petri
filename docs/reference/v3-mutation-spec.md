@@ -495,8 +495,13 @@ Executed layer (`TargetSelector::select`), applied in all four domains:
 1. An empty eligible set selects nothing.
 2. When `executed_bias` is `0.0`, or when every eligible node is executed, the
    layer cannot change the outcome: it consumes no RNG and the draw is exactly
-   the reachability layer's. Founder births are therefore byte-identical to
-   births before this feature.
+   the reachability layer's. A draw whose eligible set is entirely executed is
+   therefore byte-identical to the pre-feature draw, so single-event founder
+   births are identical, while a multi-event founder birth whose earlier event
+   adds a node diverges from that draw on. Both the executed and reachable
+   sets are fixed once per birth in the parent's node indices; after a
+   mid-birth `RemoveNode`, later indices in both sets are stale by one for the
+   rest of that birth (the drift harness maps by `NodeId` and is not affected).
 3. Otherwise roll RNG once against `executed_bias`. On success, and when
    `eligible ∩ executed` is non-empty, pick uniformly from that intersection.
    On a failed roll or an empty intersection, fall through to the
