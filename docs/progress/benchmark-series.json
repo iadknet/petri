@@ -16,7 +16,8 @@
       "docs/progress/features/t11-f06-graph-memory-clock.json",
       "docs/progress/features/t11-f07-reward-trace-clock.json",
       "docs/progress/features/t11-f14-mesh-execution-observability.json",
-      "docs/progress/features/t11-f15-mesh-routing-connection-semantics.json"
+      "docs/progress/features/t11-f15-mesh-routing-connection-semantics.json",
+      "docs/progress/features/t11-f08-function-preserving-duplication-and-module-growth.json"
     ]
   },
   "goal": {
@@ -31,7 +32,8 @@
       "docs/progress/features/t11-f06-graph-memory-clock-goal.json",
       "docs/progress/features/t11-f07-reward-trace-clock-goal.json",
       "docs/progress/features/t11-f14-mesh-execution-observability-goal.json",
-      "docs/progress/features/t11-f15-mesh-routing-connection-semantics-goal.json"
+      "docs/progress/features/t11-f15-mesh-routing-connection-semantics-goal.json",
+      "docs/progress/features/t11-f08-function-preserving-duplication-and-module-growth-goal.json"
     ]
   },
   "counter_definition_changes": [
