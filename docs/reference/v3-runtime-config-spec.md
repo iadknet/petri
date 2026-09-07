@@ -106,6 +106,8 @@ Type posture:
 | `mutation.reachable_bias.vm` | `f64` | `0.0` | Probability that VM operators prefer reachable nodes. Same normalization. |
 | `mutation.reachable_bias.graph` | `f64` | `0.0` | Probability that graph operators prefer reachable nodes. Same normalization. |
 | `mutation.reachable_bias.input_ref` | `f64` | `0.0` | Probability that input-ref operators prefer reachable nodes. Same normalization. |
+| `mutation.executed_bias` | `f64` | `0.9` | Probability that a mutation target is drawn from the nodes the parent's brain dispatched within `executed_window_ticks`, in all four domains. Clamp finite values to `[0.0, 1.0]`; NaN/infinite normalize to `0.9`. Disabled (treated as `0.0`) while genome-size pressure restricts a birth. |
+| `mutation.executed_window_ticks` | `u64` | `100` | How many ticks back a node dispatch still counts as recently executed. `0` normalizes to `100`. |
 
 Phenotype mutation is not a mutation engine domain; it is a separate pathway
 triggered by genome mutation. Phenotype algorithm and trigger semantics are

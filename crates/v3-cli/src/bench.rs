@@ -375,6 +375,12 @@ pub struct DriftDepth {
     pub battery_version: String,
     pub mesh_version: String,
     pub knockout_method: String,
+    /// Where the walk's executed node sets come from, and how often they are
+    /// refreshed (T11.F17). Serde-defaulted so historical v1 reports load.
+    #[serde(default)]
+    pub executed_source: String,
+    #[serde(default)]
+    pub executed_refresh: String,
     pub executions_per_genome: u32,
     pub snapshot_count: u32,
     pub sequence_count: u32,
@@ -489,6 +495,8 @@ fn compute_drift_depth(
         battery_version: BATTERY_VERSION.to_string(),
         mesh_version: mesh_execution::MESH_EXECUTION_VERSION.to_string(),
         knockout_method: mesh_execution::KNOCKOUT_METHOD.to_string(),
+        executed_source: drift::EXECUTED_SOURCE.to_string(),
+        executed_refresh: drift::EXECUTED_REFRESH.to_string(),
         executions_per_genome: neighborhood_battery_execution_count(),
         snapshot_count: fixed_battery::SNAPSHOT_COUNT as u32,
         sequence_count: fixed_battery::SEQUENCE_COUNT as u32,
@@ -2252,7 +2260,7 @@ mod tests {
         let Indicator::Defined(drift) = &goal.deterministic.goal_indicators.drift_depth else {
             panic!("goal drift missing")
         };
-        assert_eq!(drift.version, "drift-depth-v1");
+        assert_eq!(drift.version, "drift-depth-v2");
         assert_eq!(drift.founder, "V3Alpha1");
         assert_eq!(
             drift.birth_subset,
@@ -2266,6 +2274,14 @@ mod tests {
         assert_eq!(drift.battery_version, "neighborhood-v1");
         assert_eq!(drift.mesh_version, "mesh-execution-v1");
         assert_eq!(drift.knockout_method, "static-successor-bypass-v1");
+        assert_eq!(
+            drift.executed_source,
+            "battery hop records (mesh-execution-v1), node ids"
+        );
+        assert_eq!(
+            drift.executed_refresh,
+            "walk: depth 0 and every 10 generations; births: derived at each checkpoint"
+        );
         assert_eq!(
             (
                 drift.executions_per_genome,

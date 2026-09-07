@@ -54,7 +54,7 @@ fn run_tick_sequences(
                     let prev_shared_memory = shared_memory;
                     let mut energy = 1.0e6f32;
                     let mut side_outputs = MeshSideOutputs::new(8);
-                    graph_runtime.begin_tick(&[]);
+                    graph_runtime.begin_tick(&[], 0);
                     let result = execute_graph_node(
                         def,
                         input_refs,

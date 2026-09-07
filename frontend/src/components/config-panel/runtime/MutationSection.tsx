@@ -102,6 +102,27 @@ export const MUTATION_FIELDS: FieldDef[] = [
 		tooltip: "Maximum number of actions in the creature action queue",
 	},
 	{
+		path: "mutation.executed_bias",
+		label: "Bias: Executed",
+		min: 0,
+		max: 1,
+		step: 0.01,
+		testId: "config-field-mutation-executed-bias",
+		defaultValue: 0.9,
+		tooltip:
+			"Chance to target a node the parent's brain ran recently; the remainder draws from every eligible node",
+	},
+	{
+		path: "mutation.executed_window_ticks",
+		label: "Executed Window",
+		min: 1,
+		max: 10000,
+		step: 1,
+		testId: "config-field-mutation-executed-window-ticks",
+		defaultValue: 100,
+		tooltip: "How many ticks back a node dispatch still counts as recently executed",
+	},
+	{
 		path: "mutation.reachable_bias.topology",
 		label: "Bias: Topology",
 		min: 0,

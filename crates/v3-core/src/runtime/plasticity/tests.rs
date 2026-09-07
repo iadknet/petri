@@ -74,7 +74,7 @@ fn genome(def: &CgpGraphBackendDef) -> CreatureGenome {
 }
 
 fn begin(state: &mut GraphRuntimeState, def: &CgpGraphBackendDef) {
-    state.begin_tick(&genome(def).nodes);
+    state.begin_tick(&genome(def).nodes, 0);
 }
 
 fn visit(
@@ -460,8 +460,8 @@ fn constructed_controller_adapts_to_reversal_while_frozen_weights_do_not() {
         let mut correct = Vec::new();
         let mut weights = Vec::new();
         let mut counts = [0usize; 2];
-        for _ in 0..32 {
-            state.begin_tick(&genome.nodes);
+        for tick in 0..32 {
+            state.begin_tick(&genome.nodes, tick);
             let result = execute_creature_mesh(
                 &genome,
                 &sensors(),

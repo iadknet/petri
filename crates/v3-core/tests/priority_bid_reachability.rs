@@ -7,6 +7,7 @@ use v3_core::creature::founder::v3alpha1_founder_genome;
 use v3_core::creature::genome::analysis::mesh_reachable_nodes;
 use v3_core::creature::genome::{BackendDef, CreatureGenome, VmInstruction};
 use v3_core::creature::state::GraphRuntimeState;
+use v3_core::mutation::reachability::ParentExecuted;
 use v3_core::mutation::MutationEngine;
 use v3_core::runtime::execute_creature_mesh;
 use v3_core::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
@@ -172,6 +173,7 @@ fn lineage_match_exists(predicate: impl Fn(&CreatureGenome) -> bool) -> bool {
                 &mut genome,
                 &config,
                 &reachable_nodes,
+                ParentExecuted::NONE,
                 &mut rng,
                 1,
             );

@@ -5,6 +5,6 @@ pub use simulation::{
     AnnealingConfig, EnergyConfig, EnergyCostsConfig, EnergyLifecycleConfig, FertilityAlgorithm,
     FertilityConfig, FertilityLayer, FertilityLayerTarget, FoodConfig, FoodResourceConfig,
     FoodTypeConfig, FounderProfile, MutationConfig, OccupancyDepletionConfig, PhenotypeConfig,
-    PopulationConfig, PredationConfig, RuntimeConfig, SimulationConfig, VmRuntimeConfig,
-    WorldConfig, WorldEdgeMode,
+    PopulationConfig, PredationConfig, ReachableBiasConfig, RuntimeConfig, SimulationConfig,
+    VmRuntimeConfig, WorldConfig, WorldEdgeMode,
 };

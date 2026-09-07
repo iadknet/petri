@@ -35,8 +35,7 @@ fn vm_constant_mutation_changes_constant_value() {
         VmMutator::apply(
             &mut g,
             VmOperator::VmConstantMutation,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         )
@@ -65,8 +64,7 @@ fn vm_constant_mutation_on_node_with_empty_constants_adds_constant() {
     VmMutator::apply(
         &mut genome,
         VmOperator::VmConstantMutation,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     )
@@ -91,8 +89,7 @@ fn vm_instruction_mutation_changes_program() {
         VmMutator::apply(
             &mut g,
             VmOperator::VmInstructionMutation,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         )
@@ -114,8 +111,7 @@ fn vm_instruction_mutation_changes_program() {
     let result = VmMutator::apply(
         &mut genome,
         VmOperator::VmInstructionMutation,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     );
@@ -141,8 +137,7 @@ fn vm_instruction_mutation_reaches_insert_replace_and_delete() {
         VmMutator::apply(
             &mut mutated,
             VmOperator::VmInstructionMutation,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut rng(seed),
             &MutationConfig::default(),
         )
@@ -182,8 +177,7 @@ fn vm_delete_instruction_removes_one_instruction() {
     let result = VmMutator::apply(
         &mut genome,
         VmOperator::VmDeleteInstruction,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     );
@@ -208,8 +202,7 @@ fn vm_delete_instruction_skips_single_instruction_program() {
     let result = VmMutator::apply(
         &mut genome,
         VmOperator::VmDeleteInstruction,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     );
@@ -234,8 +227,7 @@ fn vm_mutator_on_graph_only_genome_returns_no_applicable_target() {
     let result = VmMutator::apply(
         &mut genome,
         VmOperator::VmConstantMutation,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     );
@@ -262,8 +254,7 @@ fn vm_after_mutation_passes_parseability_gate() {
         let _ = VmMutator::apply(
             &mut genome,
             op,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         );
@@ -287,8 +278,7 @@ fn vm_insert_produces_non_noop() {
         VmMutator::apply(
             &mut genome,
             VmOperator::VmInstructionMutation,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         )
@@ -320,8 +310,7 @@ fn vm_replace_produces_non_noop() {
         VmMutator::apply(
             &mut genome,
             VmOperator::VmInstructionMutation,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         )
@@ -416,8 +405,7 @@ fn raw_field_mutation_nudges_action_type_by_one() {
         VmMutator::apply(
             &mut g,
             VmOperator::VmInstructionRawFieldMutation,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         )
@@ -448,8 +436,7 @@ fn raw_field_mutation_can_change_slot_idx() {
         VmMutator::apply(
             &mut g,
             VmOperator::VmInstructionRawFieldMutation,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         )
@@ -483,8 +470,7 @@ fn vm_instruction_mutation_program_never_empty() {
         VmMutator::apply(
             &mut g,
             VmOperator::VmInstructionMutation,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         )
@@ -507,8 +493,7 @@ fn vm_register_count_increments_and_decrements() {
         if VmMutator::apply(
             &mut g,
             VmOperator::VmRegisterCountMutation,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         )
@@ -547,8 +532,7 @@ fn vm_register_count_clamps_to_bounds() {
         let _ = VmMutator::apply(
             &mut g,
             VmOperator::VmRegisterCountMutation,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         );
@@ -566,8 +550,7 @@ fn vm_register_count_clamps_to_bounds() {
         let _ = VmMutator::apply(
             &mut g,
             VmOperator::VmRegisterCountMutation,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         );
@@ -591,8 +574,7 @@ fn copy_instruction_block_increases_program_length() {
     let result = VmMutator::apply(
         &mut genome,
         VmOperator::VmCopyInstructionBlock,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     );
@@ -615,8 +597,7 @@ fn copy_instruction_block_on_empty_returns_no_applicable_target() {
     let result = VmMutator::apply(
         &mut genome,
         VmOperator::VmCopyInstructionBlock,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     );
@@ -636,8 +617,7 @@ fn copy_instruction_block_preserves_content() {
     VmMutator::apply(
         &mut genome,
         VmOperator::VmCopyInstructionBlock,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     )
@@ -678,8 +658,7 @@ fn copy_instruction_block_respects_max_32() {
     VmMutator::apply(
         &mut genome,
         VmOperator::VmCopyInstructionBlock,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     )
@@ -715,8 +694,7 @@ fn copy_instruction_block_remapped_shifts_registers() {
     VmMutator::apply(
         &mut genome,
         VmOperator::VmCopyInstructionBlockRemapped,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     )
@@ -743,8 +721,7 @@ fn copy_instruction_block_remapped_wraps_registers() {
         let _ = VmMutator::apply(
             &mut g,
             VmOperator::VmCopyInstructionBlockRemapped,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         );
@@ -774,8 +751,7 @@ fn copy_instruction_block_remapped_cyclically_shifts_every_register_field() {
                 VmMutator::apply(
                     &mut mutated,
                     VmOperator::VmCopyInstructionBlockRemapped,
-                    &[],
-                    0.0,
+                    &mut TargetSelector::reachable_only(&[], 0.0),
                     &mut rng(seed),
                     &MutationConfig::default(),
                 )
@@ -821,8 +797,7 @@ fn copy_instruction_block_remapped_preserves_non_register_fields() {
     let _ = VmMutator::apply(
         &mut genome,
         VmOperator::VmCopyInstructionBlockRemapped,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     );
@@ -851,8 +826,7 @@ fn copy_instruction_block_remapped_adjusts_jump_offsets() {
         let _ = VmMutator::apply(
             &mut g,
             VmOperator::VmCopyInstructionBlockRemapped,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         );
@@ -886,8 +860,7 @@ fn copy_instruction_block_remapped_on_empty_returns_no_applicable_target() {
     let result = VmMutator::apply(
         &mut genome,
         VmOperator::VmCopyInstructionBlockRemapped,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     );
@@ -908,8 +881,7 @@ fn copy_constant_block_increases_length() {
     VmMutator::apply(
         &mut genome,
         VmOperator::VmCopyConstantBlock,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     )
@@ -932,8 +904,7 @@ fn copy_constant_block_on_empty_returns_no_applicable_target() {
     let result = VmMutator::apply(
         &mut genome,
         VmOperator::VmCopyConstantBlock,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     );
@@ -952,8 +923,7 @@ fn copy_constant_block_preserves_original() {
     VmMutator::apply(
         &mut genome,
         VmOperator::VmCopyConstantBlock,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     )
@@ -977,8 +947,7 @@ fn copy_constant_block_copies_correct_values() {
     VmMutator::apply(
         &mut genome,
         VmOperator::VmCopyConstantBlock,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     )
@@ -1024,8 +993,7 @@ fn copy_gene_backward_slice_increases_program_length() {
     VmMutator::apply(
         &mut genome,
         VmOperator::VmCopyGeneBackwardSlice,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     )
@@ -1055,8 +1023,7 @@ fn copy_gene_backward_slice_no_output_returns_no_applicable_target() {
     let result = VmMutator::apply(
         &mut genome,
         VmOperator::VmCopyGeneBackwardSlice,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     );
@@ -1085,8 +1052,7 @@ fn copy_gene_backward_slice_captures_dependency_chain() {
     VmMutator::apply(
         &mut genome,
         VmOperator::VmCopyGeneBackwardSlice,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     )
@@ -1130,8 +1096,7 @@ fn copy_gene_forward_slice_increases_program_length() {
     VmMutator::apply(
         &mut genome,
         VmOperator::VmCopyGeneForwardSlice,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     )
@@ -1159,8 +1124,7 @@ fn copy_gene_forward_slice_no_dst_returns_no_applicable_target() {
     let result = VmMutator::apply(
         &mut genome,
         VmOperator::VmCopyGeneForwardSlice,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     );
@@ -1189,8 +1153,7 @@ fn copy_gene_forward_slice_captures_dependency_chain() {
         VmMutator::apply(
             &mut genome,
             VmOperator::VmCopyGeneForwardSlice,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         )
@@ -1285,8 +1248,7 @@ fn vm_insert_read_store_motif_inserts_read_input_and_store_slot_pair() {
         if VmMutator::apply(
             &mut g,
             VmOperator::VmInsertReadStoreMotif,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         )
@@ -1333,8 +1295,7 @@ fn vm_insert_read_store_motif_keeps_the_generated_pair_adjacent_for_each_seed() 
         VmMutator::apply(
             &mut mutated,
             VmOperator::VmInsertReadStoreMotif,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut rng(seed),
             &MutationConfig::default(),
         )
@@ -1364,8 +1325,7 @@ fn vm_insert_read_bid_motif_inserts_read_input_and_priority_bid_pair() {
         if VmMutator::apply(
             &mut g,
             VmOperator::VmInsertReadBidMotif,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         )
@@ -1413,8 +1373,7 @@ fn vm_insert_read_store_motif_skips_on_empty_input_refs() {
     let result = VmMutator::apply(
         &mut genome,
         VmOperator::VmInsertReadStoreMotif,
-        &[0],
-        0.5,
+        &mut TargetSelector::reachable_only(&[0], 0.5),
         &mut r,
         &MutationConfig::default(),
     );
@@ -1435,8 +1394,7 @@ fn vm_insert_load_compare_motif_inserts_load_slot_and_cmp_gt_pair() {
         if VmMutator::apply(
             &mut g,
             VmOperator::VmInsertLoadCompareMotif,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         )
@@ -1479,8 +1437,7 @@ fn vm_insert_load_compare_motif_keeps_the_generated_pair_adjacent_for_each_seed(
         VmMutator::apply(
             &mut mutated,
             VmOperator::VmInsertLoadCompareMotif,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut rng(seed),
             &MutationConfig::default(),
         )
@@ -1521,8 +1478,7 @@ fn vm_mutate_slot_address_changes_slot_idx() {
         if VmMutator::apply(
             &mut g,
             VmOperator::VmMutateSlotAddress,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         )
@@ -1564,8 +1520,7 @@ fn vm_mutate_slot_address_nudges_register_indirect_slot_fields() {
         VmMutator::apply(
             &mut mutated,
             VmOperator::VmMutateSlotAddress,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut rng(seed),
             &MutationConfig::default(),
         )
@@ -1603,8 +1558,7 @@ fn vm_mutate_paired_slot_address_co_mutates_load_and_store() {
         if VmMutator::apply(
             &mut g,
             VmOperator::VmMutatePairedSlotAddress,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         )
@@ -1657,8 +1611,7 @@ fn paired_slot_address_handles_maximum_encoded_slot_after_single_field_nudge() {
     VmMutator::apply(
         &mut genome,
         VmOperator::VmMutatePairedSlotAddress,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     )
@@ -1689,8 +1642,7 @@ fn vm_mutate_paired_slot_address_skips_when_no_paired_group() {
         if VmMutator::apply(
             &mut g,
             VmOperator::VmMutatePairedSlotAddress,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         )
@@ -1734,8 +1686,7 @@ fn vm_raw_field_mutation_ref_idx_bounded() {
         let _ = VmMutator::apply(
             &mut g,
             VmOperator::VmInstructionRawFieldMutation,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &config,
         );
@@ -1783,8 +1734,7 @@ fn vm_raw_field_mutation_sub_idx_bounded() {
         let _ = VmMutator::apply(
             &mut g,
             VmOperator::VmInstructionRawFieldMutation,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &config,
         );
@@ -1855,8 +1805,7 @@ fn apply_paired_slot_address(genome: &CreatureGenome, seed: u64) -> CreatureGeno
     VmMutator::apply(
         &mut mutated,
         VmOperator::VmMutatePairedSlotAddress,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     )
@@ -1894,8 +1843,7 @@ fn raw_field_mutation_keeps_terminal_instruction_unchanged() {
     let result = VmMutator::apply(
         &mut genome,
         VmOperator::VmInstructionRawFieldMutation,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     );
@@ -1918,8 +1866,7 @@ fn raw_field_mutation_changes_exactly_one_encoded_field() {
     VmMutator::apply(
         &mut genome,
         VmOperator::VmInstructionRawFieldMutation,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     )
@@ -2383,8 +2330,7 @@ fn raw_field_mutation_skips_programs_without_operands() {
     let result = VmMutator::apply(
         &mut genome,
         VmOperator::VmInstructionRawFieldMutation,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     );
@@ -2410,8 +2356,7 @@ fn register_count_mutation_skips_runtime_out_of_range_widths() {
         let result = VmMutator::apply(
             &mut genome,
             VmOperator::VmRegisterCountMutation,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         );
@@ -2717,8 +2662,7 @@ fn register_count_shrink_preserves_or_skips_effective_register_identity() {
         let result = VmMutator::apply(
             &mut genome,
             VmOperator::VmRegisterCountMutation,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         );
@@ -2742,8 +2686,7 @@ fn register_count_shrink_preserves_or_skips_effective_register_identity() {
         VmMutator::apply(
             &mut genome,
             VmOperator::VmRegisterCountMutation,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         )
@@ -2783,8 +2726,7 @@ fn motif_insertion_keeps_old_jump_target_identity() {
         VmMutator::apply(
             &mut genome,
             VmOperator::VmInsertLoadCompareMotif,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         )
@@ -3171,8 +3113,7 @@ proptest! {
         VmMutator::apply(
             &mut genome,
             VmOperator::VmMutatePairedSlotAddress,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         )

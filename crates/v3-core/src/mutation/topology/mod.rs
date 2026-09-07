@@ -2,6 +2,7 @@ use rand::Rng;
 
 use crate::config::MutationConfig;
 use crate::creature::genome::CreatureGenome;
+use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
 // Re-exported for use via `use super::*` in tests.
@@ -134,64 +135,54 @@ impl TopologyMutator {
     pub fn apply(
         genome: &mut CreatureGenome,
         op: TopologyOperator,
-        reachable_nodes: &[usize],
-        bias: f64,
+        targets: &mut TargetSelector<'_>,
         rng: &mut impl Rng,
         config: &MutationConfig,
     ) -> Result<TargetReachability, MutationSkipReason> {
-        Self::apply_with_food_type_count(genome, op, reachable_nodes, bias, rng, config, 1)
+        Self::apply_with_food_type_count(genome, op, targets, rng, config, 1)
     }
 
     /// Apply a topology operator with typed-food mutation context.
     pub fn apply_with_food_type_count(
         genome: &mut CreatureGenome,
         op: TopologyOperator,
-        reachable_nodes: &[usize],
-        bias: f64,
+        targets: &mut TargetSelector<'_>,
         rng: &mut impl Rng,
         config: &MutationConfig,
         _food_type_count: usize,
     ) -> Result<TargetReachability, MutationSkipReason> {
         match op {
-            TopologyOperator::AddNode => {
-                structural::apply_splice_node(genome, reachable_nodes, bias, rng)
-            }
+            TopologyOperator::AddNode => structural::apply_splice_node(genome, targets, rng),
             TopologyOperator::ChangeEntryNode => structural::apply_change_entry_node(genome, rng)
                 .map(|()| TargetReachability::NotApplicable),
             // Biased structural operators:
-            TopologyOperator::RemoveNode => {
-                structural::apply_remove_node(genome, reachable_nodes, bias, rng)
-            }
+            TopologyOperator::RemoveNode => structural::apply_remove_node(genome, targets, rng),
             TopologyOperator::SwapNodeBackend => {
-                structural::apply_swap_node_backend(genome, reachable_nodes, bias, rng, config)
+                structural::apply_swap_node_backend(genome, targets, rng, config)
             }
-            TopologyOperator::CopyNode => {
-                structural::apply_copy_node(genome, reachable_nodes, bias, rng)
-            }
+            TopologyOperator::CopyNode => structural::apply_copy_node(genome, targets, rng),
             TopologyOperator::CopyMeshBackwardSlice => {
-                structural::apply_copy_mesh_backward_slice(genome, reachable_nodes, bias, rng)
+                structural::apply_copy_mesh_backward_slice(genome, targets, rng)
             }
             TopologyOperator::CopyMeshForwardSlice => {
-                structural::apply_copy_mesh_forward_slice(genome, reachable_nodes, bias, rng)
+                structural::apply_copy_mesh_forward_slice(genome, targets, rng)
             }
-            TopologyOperator::SpliceNode => {
-                structural::apply_splice_node(genome, reachable_nodes, bias, rng)
-            }
+            TopologyOperator::SpliceNode => structural::apply_splice_node(genome, targets, rng),
             // Biased routing operators:
             TopologyOperator::RetargetNodeTarget => {
-                routing::apply_retarget_node_target(genome, reachable_nodes, bias, rng)
+                routing::apply_retarget_node_target(genome, targets, rng)
             }
             TopologyOperator::AddRouteTarget => {
-                routing::apply_add_route_target(genome, reachable_nodes, bias, rng, config)
+                routing::apply_add_route_target(genome, targets, rng, config)
             }
             TopologyOperator::RemoveRouteTarget => {
-                routing::apply_remove_route_target(genome, reachable_nodes, bias, rng)
+                routing::apply_remove_route_target(genome, targets, rng)
             }
             TopologyOperator::SwapRouteTargets => {
-                routing::apply_swap_route_targets(genome, reachable_nodes, bias, rng)
+                routing::apply_swap_route_targets(genome, targets, rng)
             }
             TopologyOperator::MutateGateBias => {
-                routing::apply_mutate_gate_bias(genome, reachable_nodes, bias, rng)
+                routing::apply_mutate_gate_bias(genome, targets, rng)
             }
         }
     }

@@ -72,6 +72,8 @@ export interface PerfPayload {
 export interface MutationTargetReachabilityTotalPayload {
 	reachable: number;
 	unreachable: number;
+	/** Targets on nodes the parent executed recently (T11.F17); not displayed. */
+	executed: number;
 	not_applicable: number;
 }
 

@@ -14,6 +14,7 @@ use crate::contracts::{NodeId, WorldAction};
 use crate::creature::genome::{
     BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
 };
+use crate::mutation::reachability::TargetSelector;
 use crate::neighborhood::battery::{Battery, Signature};
 use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::runtime::vm::execute_vm_node;
@@ -77,8 +78,7 @@ fn apply(
     VmMutator::apply(
         genome,
         op,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut SmallRng::seed_from_u64(seed),
         &MutationConfig::default(),
     )

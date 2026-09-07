@@ -2,7 +2,7 @@ use rand::Rng;
 
 use crate::config::MutationConfig;
 use crate::creature::genome::{BackendDef, CreatureGenome};
-use crate::mutation::reachability::biased_select_from;
+use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
 pub(crate) mod operators;
@@ -137,8 +137,7 @@ impl VmMutator {
     pub fn apply(
         genome: &mut CreatureGenome,
         op: VmOperator,
-        reachable_nodes: &[usize],
-        bias: f64,
+        targets: &mut TargetSelector<'_>,
         rng: &mut impl Rng,
         config: &MutationConfig,
     ) -> Result<TargetReachability, MutationSkipReason> {
@@ -154,7 +153,8 @@ impl VmMutator {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
 
-        let (node_idx, reachability) = biased_select_from(&vm_indices, reachable_nodes, bias, rng)
+        let (node_idx, reachability) = targets
+            .select(&vm_indices, rng)
             .ok_or(MutationSkipReason::NoApplicableTarget)?;
         let result = match op {
             VmOperator::VmConstantMutation => apply_constant_mutation(genome, node_idx, rng),

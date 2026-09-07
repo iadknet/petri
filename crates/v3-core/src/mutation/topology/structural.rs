@@ -6,7 +6,7 @@ use crate::config::MutationConfig;
 use crate::contracts::{NodeId, RouteTarget};
 use crate::creature::genome::analysis::{mesh_backward_slice, mesh_forward_slice};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
-use crate::mutation::reachability::biased_select_from;
+use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
 use super::birth;
@@ -46,8 +46,7 @@ fn bypass_successor(genome: &CreatureGenome, idx: usize) -> Option<NodeId> {
 
 pub(super) fn apply_remove_node(
     genome: &mut CreatureGenome,
-    reachable_nodes: &[usize],
-    bias: f64,
+    targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
 ) -> Result<TargetReachability, MutationSkipReason> {
     if genome.nodes.len() <= 1 {
@@ -70,7 +69,8 @@ pub(super) fn apply_remove_node(
     } else {
         unreachable
     };
-    let (idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
+    let (idx, reachability) = targets
+        .select(&eligible, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let removed = genome.nodes[idx].node_id;
     let successor = bypass_successor(genome, idx);
@@ -142,15 +142,15 @@ fn safe_predecessors(genome: &CreatureGenome, source: usize) -> Vec<(usize, u8, 
 
 fn copy_attached(
     genome: &mut CreatureGenome,
-    reachable_nodes: &[usize],
-    bias: f64,
+    targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
     alternate: Option<&MutationConfig>,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let eligible: Vec<_> = (0..genome.nodes.len())
         .filter(|&i| !safe_predecessors(genome, i).is_empty())
         .collect();
-    let (source, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
+    let (source, reachability) = targets
+        .select(&eligible, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let predecessors = safe_predecessors(genome, source);
     let (predecessor, slot, gate_bias) = predecessors[rng.gen_range(0..predecessors.len())];
@@ -180,21 +180,19 @@ fn copy_attached(
 
 pub(super) fn apply_swap_node_backend(
     genome: &mut CreatureGenome,
-    reachable_nodes: &[usize],
-    bias: f64,
+    targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
     config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
-    copy_attached(genome, reachable_nodes, bias, rng, Some(config))
+    copy_attached(genome, targets, rng, Some(config))
 }
 
 pub(super) fn apply_copy_node(
     genome: &mut CreatureGenome,
-    reachable_nodes: &[usize],
-    bias: f64,
+    targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
 ) -> Result<TargetReachability, MutationSkipReason> {
-    copy_attached(genome, reachable_nodes, bias, rng, None)
+    copy_attached(genome, targets, rng, None)
 }
 
 /// Maximum number of nodes in a mesh slice for copy operators.
@@ -280,15 +278,15 @@ fn clone_and_remap_slice(
 
 pub(super) fn apply_copy_mesh_backward_slice(
     genome: &mut CreatureGenome,
-    reachable_nodes: &[usize],
-    bias: f64,
+    targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
 ) -> Result<TargetReachability, MutationSkipReason> {
     if genome.nodes.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
     let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
-    let (anchor_idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
+    let (anchor_idx, reachability) = targets
+        .select(&all_indices, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let gene = mesh_backward_slice(genome, anchor_idx, MESH_SLICE_MAX_SIZE)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
@@ -298,15 +296,15 @@ pub(super) fn apply_copy_mesh_backward_slice(
 
 pub(super) fn apply_copy_mesh_forward_slice(
     genome: &mut CreatureGenome,
-    reachable_nodes: &[usize],
-    bias: f64,
+    targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
 ) -> Result<TargetReachability, MutationSkipReason> {
     if genome.nodes.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
     let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
-    let (seed_idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
+    let (seed_idx, reachability) = targets
+        .select(&all_indices, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let gene = mesh_forward_slice(genome, seed_idx, MESH_SLICE_MAX_SIZE)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
@@ -316,8 +314,7 @@ pub(super) fn apply_copy_mesh_forward_slice(
 
 pub(super) fn apply_splice_node(
     genome: &mut CreatureGenome,
-    reachable_nodes: &[usize],
-    bias: f64,
+    targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let valid_targets = |idx: usize| -> Vec<usize> {
@@ -332,7 +329,8 @@ pub(super) fn apply_splice_node(
     let eligible: Vec<_> = (0..genome.nodes.len())
         .filter(|&i| !valid_targets(i).is_empty())
         .collect();
-    let (idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
+    let (idx, reachability) = targets
+        .select(&eligible, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let targets = valid_targets(idx);
     let position = targets[rng.gen_range(0..targets.len())];

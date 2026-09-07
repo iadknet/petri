@@ -77,8 +77,7 @@ fn mutate_action_slot_behavior_operator_changes_slot_behavior() {
         GraphMutator::apply(
             &mut genome,
             GraphOperator::MutateActionSlotBehavior,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &MutationConfig::default(),
         )
@@ -108,8 +107,7 @@ fn mutate_action_slot_behavior_operator_skips_when_action_bank_empty() {
     let result = GraphMutator::apply(
         &mut genome,
         GraphOperator::MutateActionSlotBehavior,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &MutationConfig::default(),
     );

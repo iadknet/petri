@@ -14,6 +14,56 @@ use crate::mutation::MutationOperator;
 /// Number of f32 slots in shared memory, accessible by both VM and Graph backends.
 pub const SHARED_MEMORY_SLOTS: usize = 16;
 
+/// Which mesh nodes a creature's brain dispatched, and how recently.
+///
+/// One entry per mesh node index, holding the creature age at which that node
+/// last dispatched (`None` until it dispatches at all). The mesh executor
+/// writes one entry per hop; the mutation engine reads the recent window at a
+/// birth to bias the offspring's mutation targets toward executed structure
+/// (T11.F17). Indices belong to the creature's own genome, so a newborn always
+/// starts empty rather than inheriting its parent's record.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct DispatchRecord {
+    last_dispatch_age: Vec<Option<u64>>,
+    /// Age of the tick currently being executed, set by `begin_tick`.
+    age: u64,
+}
+
+impl DispatchRecord {
+    /// Adopt the creature's current age for the dispatches of this tick.
+    fn begin_tick(&mut self, age: u64) {
+        self.age = age;
+    }
+
+    /// Record that mesh node `node_idx` dispatched in the current tick.
+    pub fn record_dispatch(&mut self, node_idx: usize) {
+        if node_idx >= self.last_dispatch_age.len() {
+            self.last_dispatch_age.resize(node_idx + 1, None);
+        }
+        self.last_dispatch_age[node_idx] = Some(self.age);
+    }
+
+    /// Sorted ascending mesh node indices dispatched less than `window` ticks
+    /// before `age`. An empty record yields an empty set.
+    #[must_use]
+    pub fn executed_indices(&self, age: u64, window: u64) -> Vec<usize> {
+        self.last_dispatch_age
+            .iter()
+            .enumerate()
+            .filter(|(_, last)| {
+                last.is_some_and(|last| age.saturating_sub(last) < window && last <= age)
+            })
+            .map(|(index, _)| index)
+            .collect()
+    }
+
+    /// Whether any dispatch has ever been recorded.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.last_dispatch_age.iter().all(Option::is_none)
+    }
+}
+
 /// Per-creature runtime state for Graph backends.
 /// Groups all mutable state that graph evaluation reads/writes.
 #[derive(Clone)]
@@ -47,12 +97,18 @@ pub struct GraphRuntimeState {
     pub(crate) scratch_backup: Vec<f32>,
     /// Scratch: weighted-inputs buffer reused across graph evaluations.
     pub(crate) scratch_w_inputs: Vec<f32>,
+    /// Which mesh nodes this creature dispatched, and at what age (T11.F17).
+    /// Lives here because it is the per-creature state the mesh loop already
+    /// borrows mutably; observation clones therefore never touch the live one.
+    pub dispatch_record: DispatchRecord,
 }
 
 impl GraphRuntimeState {
-    /// Begin one world tick before any mesh visits, using the creature genome nodes.
+    /// Begin one world tick before any mesh visits, using the creature genome
+    /// nodes and the creature's current age.
     /// Unvisited graph outputs hold; initialized eligibility decays with elapsed time.
-    pub fn begin_tick(&mut self, nodes: &[NodeGenome]) {
+    pub fn begin_tick(&mut self, nodes: &[NodeGenome], age: u64) {
+        self.dispatch_record.begin_tick(age);
         self.tick_start_state.clone_from(&self.node_state);
         self.tick_start_outputs.clone_from(&self.node_outputs);
         crate::runtime::plasticity::traces::decay_eligibility_traces(
@@ -77,6 +133,7 @@ impl GraphRuntimeState {
             scratch_curr: Vec::new(),
             scratch_backup: Vec::new(),
             scratch_w_inputs: Vec::new(),
+            dispatch_record: DispatchRecord::default(),
         }
     }
 }
@@ -362,6 +419,91 @@ mod tests {
         assert!((state.shared_memory[7] - -2.0).abs() < f32::EPSILON);
         // prev is always zeroed for new creatures
         assert_eq!(state.prev_shared_memory, [0.0; SHARED_MEMORY_SLOTS]);
+    }
+
+    #[test]
+    fn new_creature_starts_with_an_empty_dispatch_record() {
+        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
+        let id = sm.insert(());
+        let state = CreatureState::new(
+            id,
+            minimal_genome(),
+            Position::new(0, 0),
+            20.0,
+            0,
+            [0; 6],
+            0,
+            [true; 6],
+            CreatureIdentityState::default(),
+            [0.0; SHARED_MEMORY_SLOTS],
+        );
+        assert!(state.graph_runtime.dispatch_record.is_empty());
+        assert!(state
+            .graph_runtime
+            .dispatch_record
+            .executed_indices(0, 100)
+            .is_empty());
+    }
+
+    #[test]
+    fn dispatch_record_keeps_the_latest_age_per_node_within_the_window() {
+        let mut record = DispatchRecord::default();
+        record.begin_tick(10);
+        record.record_dispatch(2);
+        record.begin_tick(40);
+        record.record_dispatch(0);
+        // Node 2 last ran at age 10, node 0 at age 40.
+        assert_eq!(record.executed_indices(40, 100), vec![0, 2]);
+        assert_eq!(record.executed_indices(40, 31), vec![0, 2]);
+        assert_eq!(record.executed_indices(40, 30), vec![0]);
+        assert_eq!(record.executed_indices(140, 100), Vec::<usize>::new());
+        assert!(!record.is_empty());
+    }
+
+    proptest::proptest! {
+        /// The window is sorted, monotone in the window length, and, from the
+        /// last recorded dispatch on, only ever loses nodes as the creature ages.
+        #[test]
+        fn dispatch_window_membership_is_monotone_in_age_and_window(
+            dispatches in proptest::collection::vec((0usize..8, 0u64..200), 0..12),
+            elapsed in 0u64..400,
+            window in 1u64..150,
+            growth in 0u64..400,
+        ) {
+            let mut record = DispatchRecord::default();
+            let mut newest = 0;
+            for (node, at) in dispatches {
+                record.begin_tick(at);
+                record.record_dispatch(node);
+                newest = newest.max(at);
+            }
+            let age = newest + elapsed;
+            let now = record.executed_indices(age, window);
+            let later = record.executed_indices(age + growth, window);
+            let wider = record.executed_indices(age, window + growth);
+            proptest::prop_assert!(now.windows(2).all(|pair| pair[0] < pair[1]));
+            for index in &later {
+                proptest::prop_assert!(
+                    now.contains(index),
+                    "ageing past a dispatch never brings it back into the window"
+                );
+            }
+            for index in &now {
+                proptest::prop_assert!(
+                    wider.contains(index),
+                    "a wider window keeps every member of a narrower one"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn dispatch_record_ignores_dispatches_recorded_after_the_queried_age() {
+        let mut record = DispatchRecord::default();
+        record.begin_tick(50);
+        record.record_dispatch(1);
+        assert_eq!(record.executed_indices(50, 100), vec![1]);
+        assert_eq!(record.executed_indices(49, 100), Vec::<usize>::new());
     }
 
     #[test]

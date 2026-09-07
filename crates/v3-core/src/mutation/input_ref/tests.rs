@@ -49,8 +49,7 @@ fn add_input_ref_increases_count() {
     InputRefMutator::apply(
         &mut genome,
         InputRefOperator::Add,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &default_config(),
     )
@@ -68,8 +67,7 @@ fn remove_input_ref_decreases_count() {
     InputRefMutator::apply(
         &mut genome,
         InputRefOperator::Remove,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &default_config(),
     )
@@ -88,8 +86,7 @@ fn remove_input_ref_on_empty_returns_no_applicable_target() {
     let result = InputRefMutator::apply(
         &mut genome,
         InputRefOperator::Remove,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &default_config(),
     );
@@ -111,8 +108,7 @@ fn swap_input_ref_changes_value() {
         if InputRefMutator::apply(
             &mut g,
             InputRefOperator::Swap,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &default_config(),
         )
@@ -209,8 +205,7 @@ fn swap_graph_input_ref_clamps_out_of_range_sub_indices() {
         InputRefMutator::apply(
             &mut genome,
             InputRefOperator::Swap,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &config,
         )
@@ -328,8 +323,7 @@ fn raw_field_mutation_upstream_slot_bounded() {
         InputRefMutator::apply(
             &mut genome,
             InputRefOperator::RawFieldMutation,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &default_config(),
         )
@@ -354,7 +348,13 @@ fn input_ref_after_mutation_passes_parseability_gate() {
     for (i, &op) in operators.iter().enumerate() {
         let mut genome = v3alpha1_founder_genome();
         let mut r = rng(i as u64 + 400);
-        let _ = InputRefMutator::apply(&mut genome, op, &[], 0.0, &mut r, &default_config());
+        let _ = InputRefMutator::apply(
+            &mut genome,
+            op,
+            &mut TargetSelector::reachable_only(&[], 0.0),
+            &mut r,
+            &default_config(),
+        );
         assert!(
             ParseabilityGate::validate(&genome).is_ok(),
             "parseability failed after {:?}",
@@ -502,8 +502,7 @@ fn add_input_ref_to_graph_node_wires_nothing() {
         InputRefMutator::apply(
             &mut genome,
             InputRefOperator::Add,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &default_config(),
         )
@@ -530,8 +529,7 @@ fn add_input_ref_to_graph_node_leaves_existing_edges_untouched() {
     InputRefMutator::apply(
         &mut genome,
         InputRefOperator::Add,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &default_config(),
     )
@@ -565,8 +563,7 @@ fn add_input_ref_to_vm_node_leaves_program_unchanged() {
     InputRefMutator::apply(
         &mut genome,
         InputRefOperator::Add,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &default_config(),
     )
@@ -760,8 +757,7 @@ fn input_ref_add_can_introduce_non_default_food_type() {
         let _ = InputRefMutator::apply_with_food_type_count(
             &mut genome,
             InputRefOperator::Add,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &default_config(),
             3,
@@ -791,8 +787,7 @@ fn input_ref_swap_can_introduce_non_default_food_type() {
         let _ = InputRefMutator::apply_with_food_type_count(
             &mut genome,
             InputRefOperator::Swap,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut r,
             &default_config(),
             4,
@@ -822,8 +817,7 @@ fn input_ref_raw_field_mutation_can_mutate_food_type_idx() {
     let result = InputRefMutator::apply_with_food_type_count(
         &mut genome,
         InputRefOperator::RawFieldMutation,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &default_config(),
         3,

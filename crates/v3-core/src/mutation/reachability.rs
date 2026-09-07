@@ -8,9 +8,39 @@
 //! intentional — mutations are biased toward what was functional in the parent.
 //! The offspring gets a fresh BFS via `CreatureState::new()`.
 
+use std::borrow::Cow;
+
 use rand::Rng;
 
 use super::types::TargetReachability;
+use crate::creature::state::DispatchRecord;
+
+/// Where a birth's executed node set comes from.
+///
+/// The set is resolved only once the birth draws at least one mutation event,
+/// so zero-event births derive nothing (T11.F17).
+#[derive(Debug, Clone, Copy)]
+pub enum ParentExecuted<'a> {
+    /// An explicit sorted ascending index set, as the observation harnesses
+    /// derive it from battery hop records.
+    Indices(&'a [usize]),
+    /// The live parent's dispatch record, read at the parent's current age.
+    Record(&'a DispatchRecord, u64),
+}
+
+impl ParentExecuted<'_> {
+    /// No dispatch information: the executed layer never fires.
+    pub const NONE: Self = Self::Indices(&[]);
+
+    /// Resolve to the sorted indices executed within `window` ticks.
+    #[must_use]
+    pub fn resolve(&self, window: u64) -> Cow<'_, [usize]> {
+        match *self {
+            Self::Indices(indices) => Cow::Borrowed(indices),
+            Self::Record(record, age) => Cow::Owned(record.executed_indices(age, window)),
+        }
+    }
+}
 
 /// Select a node index from `eligible` with probabilistic bias toward reachable nodes.
 ///
@@ -68,6 +98,120 @@ pub fn biased_select_from(
     let picked = eligible[rng.gen_range(0..eligible.len())];
     let classification = classify_target(picked, reachable);
     Some((picked, classification))
+}
+
+/// A parent's reachable and recently executed node sets, from which one
+/// [`TargetSelector`] is built per mutation event.
+#[derive(Debug, Clone, Copy)]
+pub struct TargetSets<'a> {
+    reachable: &'a [usize],
+    executed: &'a [usize],
+}
+
+impl<'a> TargetSets<'a> {
+    /// Both sets are sorted ascending mesh node indices in the same genome.
+    #[must_use]
+    pub const fn new(reachable: &'a [usize], executed: &'a [usize]) -> Self {
+        Self {
+            reachable,
+            executed,
+        }
+    }
+
+    /// A selector over these sets at the given domain biases.
+    #[must_use]
+    pub fn selector(&self, reachable_bias: f64, executed_bias: f64) -> TargetSelector<'a> {
+        TargetSelector::new(self.reachable, self.executed, reachable_bias, executed_bias)
+    }
+}
+
+/// The parent-derived inputs to one mutation event's target draws, and the
+/// tally of picks that landed on a node the parent recently executed.
+///
+/// Both node sets are sorted ascending mesh node indices in the parent's
+/// genome: `reachable` from the entry-node BFS, `executed` from the parent's
+/// dispatch record within the configured window (T11.F17). One selector is
+/// built per mutation event and passed to the domain mutator, which draws
+/// every target of that event through [`TargetSelector::select`].
+#[derive(Debug)]
+pub struct TargetSelector<'a> {
+    reachable: &'a [usize],
+    executed: &'a [usize],
+    reachable_bias: f64,
+    executed_bias: f64,
+    executed_hits: u32,
+}
+
+impl<'a> TargetSelector<'a> {
+    /// Build a selector over the parent's node sets and the domain's biases.
+    const fn new(
+        reachable: &'a [usize],
+        executed: &'a [usize],
+        reachable_bias: f64,
+        executed_bias: f64,
+    ) -> Self {
+        Self {
+            reachable,
+            executed,
+            reachable_bias,
+            executed_bias,
+            executed_hits: 0,
+        }
+    }
+
+    /// A selector with no executed layer, for fixtures that hold no dispatch
+    /// information.
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn reachable_only(reachable: &'a [usize], reachable_bias: f64) -> Self {
+        Self::new(reachable, &[], reachable_bias, 0.0)
+    }
+
+    /// How many targets this selector picked from the executed set.
+    #[must_use]
+    pub const fn executed_hits(&self) -> u32 {
+        self.executed_hits
+    }
+
+    /// Select a node index from `eligible`, preferring nodes the parent
+    /// executed recently and falling back to the reachability-biased draw.
+    ///
+    /// `eligible` must be sorted ascending. When every eligible node is
+    /// executed the executed layer cannot change the outcome, so it is skipped
+    /// entirely and no RNG is consumed; a zero executed bias behaves the same.
+    /// Otherwise one roll decides whether to draw uniformly from
+    /// `eligible ∩ executed`, falling through to [`biased_select_from`] on a
+    /// failed roll or an empty intersection.
+    pub fn select(
+        &mut self,
+        eligible: &[usize],
+        rng: &mut impl Rng,
+    ) -> Option<(usize, TargetReachability)> {
+        if eligible.is_empty() {
+            return None;
+        }
+        if self.executed_bias > 0.0 {
+            let executed_count = intersection_count(eligible, self.executed);
+            // The roll sits between the two guards deliberately: an eligible
+            // set that is entirely executed consumes no RNG (short-circuit),
+            // while an empty intersection still spends the one roll before
+            // falling through.
+            if executed_count < eligible.len()
+                && rng.gen_bool(self.executed_bias)
+                && executed_count > 0
+            {
+                let pick = rng.gen_range(0..executed_count);
+                let index = nth_intersection(eligible, self.executed, pick);
+                self.executed_hits += 1;
+                return Some((index, classify_target(index, self.reachable)));
+            }
+        }
+        let picked = biased_select_from(eligible, self.reachable, self.reachable_bias, rng)?;
+        if self.executed.binary_search(&picked.0).is_ok() {
+            self.executed_hits += 1;
+        }
+        Some(picked)
+    }
 }
 
 /// Classify whether a node index is reachable.
@@ -143,11 +287,127 @@ fn nth_difference(a: &[usize], b: &[usize], k: usize) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use proptest::prelude::*;
     use rand::rngs::SmallRng;
     use rand::SeedableRng;
 
     fn seeded_rng(seed: u64) -> SmallRng {
         SmallRng::seed_from_u64(seed)
+    }
+
+    /// Sorted ascending indices selected by `flags` from `0..flags.len()`.
+    fn subset(flags: &[bool]) -> Vec<usize> {
+        flags
+            .iter()
+            .enumerate()
+            .filter(|(_, &keep)| keep)
+            .map(|(index, _)| index)
+            .collect()
+    }
+
+    /// The draw and the RNG stream after it, for equality against the
+    /// pre-T11.F17 draw.
+    fn draw_and_rng_tail(
+        mut selector: TargetSelector<'_>,
+        eligible: &[usize],
+        rng: &mut SmallRng,
+    ) -> (Option<(usize, TargetReachability)>, u64, u32) {
+        let picked = selector.select(eligible, rng);
+        (picked, rng.gen::<u64>(), selector.executed_hits())
+    }
+
+    proptest! {
+        /// With the executed layer fully on, every pick lands on an executed
+        /// node whenever the eligible set contains one.
+        #[test]
+        fn executed_bias_one_always_picks_an_executed_eligible_node(
+            flags in prop::collection::vec((any::<bool>(), any::<bool>(), any::<bool>()), 1..12),
+            seed in any::<u64>(),
+            reachable_bias in 0.0f64..=1.0,
+        ) {
+            let eligible = subset(&flags.iter().map(|f| f.0).collect::<Vec<_>>());
+            let reachable = subset(&flags.iter().map(|f| f.1).collect::<Vec<_>>());
+            let executed = subset(&flags.iter().map(|f| f.2).collect::<Vec<_>>());
+            let mut rng = seeded_rng(seed);
+            let mut selector =
+                TargetSelector::new(&reachable, &executed, reachable_bias, 1.0);
+            let picked = selector.select(&eligible, &mut rng);
+            match picked {
+                None => prop_assert!(eligible.is_empty()),
+                Some((index, class)) => {
+                    prop_assert!(eligible.contains(&index));
+                    prop_assert_eq!(class, classify_target(index, &reachable));
+                    if eligible.iter().any(|node| executed.contains(node)) {
+                        prop_assert!(executed.contains(&index));
+                    }
+                    prop_assert_eq!(
+                        selector.executed_hits(),
+                        u32::from(executed.contains(&index))
+                    );
+                }
+            }
+        }
+
+        /// A zero executed bias, and an eligible set entirely inside the
+        /// executed set, both leave the existing draw and its RNG untouched.
+        #[test]
+        fn executed_layer_is_transparent_at_zero_bias_and_under_the_short_circuit(
+            flags in prop::collection::vec((any::<bool>(), any::<bool>()), 1..12),
+            seed in any::<u64>(),
+            reachable_bias in 0.0f64..=1.0,
+            executed_bias in 0.0f64..=1.0,
+        ) {
+            let eligible = subset(&flags.iter().map(|f| f.0).collect::<Vec<_>>());
+            let reachable = subset(&flags.iter().map(|f| f.1).collect::<Vec<_>>());
+            let mut expected_rng = seeded_rng(seed);
+            let expected = (
+                biased_select_from(&eligible, &reachable, reachable_bias, &mut expected_rng),
+                expected_rng.gen::<u64>(),
+            );
+
+            // Zero bias: the executed set is irrelevant and no roll happens.
+            let mut zero_rng = seeded_rng(seed);
+            let (picked, tail, hits) = draw_and_rng_tail(
+                TargetSelector::new(&reachable, &eligible, reachable_bias, 0.0),
+                &eligible,
+                &mut zero_rng,
+            );
+            prop_assert_eq!(picked, expected.0);
+            prop_assert_eq!(tail, expected.1);
+            prop_assert_eq!(hits, u32::from(picked.is_some()));
+
+            // Short-circuit: every eligible node is executed.
+            let mut short_rng = seeded_rng(seed);
+            let (picked, tail, _) = draw_and_rng_tail(
+                TargetSelector::new(&reachable, &eligible, reachable_bias, executed_bias),
+                &eligible,
+                &mut short_rng,
+            );
+            prop_assert_eq!(picked, expected.0);
+            prop_assert_eq!(tail, expected.1);
+        }
+
+        /// An empty intersection consumes one roll and then draws exactly as
+        /// the reachable-bias layer would.
+        #[test]
+        fn an_empty_executed_intersection_falls_through_after_one_roll(
+            flags in prop::collection::vec((any::<bool>(), any::<bool>()), 1..12),
+            seed in any::<u64>(),
+            reachable_bias in 0.0f64..=1.0,
+        ) {
+            let eligible = subset(&flags.iter().map(|f| f.0).collect::<Vec<_>>());
+            prop_assume!(!eligible.is_empty());
+            let reachable = subset(&flags.iter().map(|f| f.1).collect::<Vec<_>>());
+            let mut expected_rng = seeded_rng(seed);
+            let _rolled = expected_rng.gen_bool(0.75);
+            let expected = biased_select_from(&eligible, &reachable, reachable_bias, &mut expected_rng);
+
+            let mut rng = seeded_rng(seed);
+            let mut selector = TargetSelector::new(&reachable, &[], reachable_bias, 0.75);
+            prop_assert_eq!(selector.select(&eligible, &mut rng), expected);
+            prop_assert_eq!(selector.executed_hits(), 0);
+            prop_assert_eq!(rng.gen::<u64>(), expected_rng.gen::<u64>());
+        }
     }
 
     #[test]

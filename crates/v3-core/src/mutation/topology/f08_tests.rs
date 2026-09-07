@@ -71,8 +71,7 @@ fn apply(
     TopologyMutator::apply(
         genome,
         op,
-        &reachable,
-        0.0,
+        &mut TargetSelector::reachable_only(&reachable, 0.0),
         &mut SmallRng::seed_from_u64(seed),
         &MutationConfig::default(),
     )

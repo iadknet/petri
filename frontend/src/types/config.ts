@@ -175,6 +175,8 @@ export interface MutationConfig {
 	action_queue_cap: number;
 	phenotype: PhenotypeConfig;
 	reachable_bias: ReachableBiasConfig;
+	executed_bias: number;
+	executed_window_ticks: number;
 }
 
 export interface PerceptionRuntimeConfig {

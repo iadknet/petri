@@ -27,6 +27,7 @@ use v3_core::config::SimulationConfig;
 use v3_core::contracts::{CreatureId, Position};
 use v3_core::creature::action_log::{ActionResult, ActionType};
 use v3_core::creature::identity::CreatureIdentityState;
+use v3_core::mutation::reachability::ParentExecuted;
 use v3_core::mutation::MutationEngine;
 use v3_core::simulation::{run_tick, seed_simulation, Simulation};
 
@@ -615,6 +616,7 @@ fn mutation_accounting_invariant_in_viability() {
             &mut genome,
             &cfg,
             &[],
+            ParentExecuted::NONE,
             &mut rng,
             1,
         );
@@ -655,7 +657,12 @@ fn mutation_reachability_telemetry_accumulates() {
         let mut g = genome.clone();
         let mut rng = SmallRng::seed_from_u64(seed);
         let summary = MutationEngine::apply_mutations_with_food_type_count(
-            &mut g, &cfg, &reachable, &mut rng, 1,
+            &mut g,
+            &cfg,
+            &reachable,
+            ParentExecuted::NONE,
+            &mut rng,
+            1,
         );
         total_reachable += summary.reachable_target_events;
         total_unreachable += summary.unreachable_target_events;

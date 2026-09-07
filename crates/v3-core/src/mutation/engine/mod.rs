@@ -8,6 +8,7 @@ use crate::creature::parseability::ParseabilityGate;
 use crate::mutation::graph::{GraphMutator, GraphOperator};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
 use crate::mutation::pressure;
+use crate::mutation::reachability::{ParentExecuted, TargetSelector, TargetSets};
 use crate::mutation::topology::{TopologyMutator, TopologyOperator};
 use crate::mutation::types::{
     MutationAddedNodeInputClass, MutationDomain, MutationOperator, MutationSkipReason,
@@ -37,6 +38,7 @@ impl MutationEngine {
     ///
     /// `parent_reachable_nodes` is the parent's cached reachable set (sorted ascending),
     /// used to bias mutation target selection toward functional structure.
+    /// The parent carries no executed set here, so the executed layer never fires.
     ///
     /// Accounting invariant: `summary.attempted_events == summary.applied_events + summary.skipped_events`.
     #[cfg(test)]
@@ -46,7 +48,14 @@ impl MutationEngine {
         parent_reachable_nodes: &[usize],
         rng: &mut impl Rng,
     ) -> MutationSummary {
-        Self::apply_mutations_with_food_type_count(genome, config, parent_reachable_nodes, rng, 1)
+        Self::apply_mutations_with_food_type_count(
+            genome,
+            config,
+            parent_reachable_nodes,
+            ParentExecuted::NONE,
+            rng,
+            1,
+        )
     }
 
     /// Apply mutation events to a child genome using the configured number of
@@ -60,6 +69,7 @@ impl MutationEngine {
         genome: &mut CreatureGenome,
         config: &MutationConfig,
         parent_reachable_nodes: &[usize],
+        parent_executed: ParentExecuted<'_>,
         rng: &mut impl Rng,
         food_type_count: usize,
     ) -> MutationSummary {
@@ -72,11 +82,29 @@ impl MutationEngine {
         let restricted = config.genome_size_pressure_enabled
             && pressure::is_restricted(genome.genome_size(), config.genome_size_cap, rng);
 
+        // The parent's recently executed nodes, derived once for a birth that
+        // draws events. Under size-pressure restriction the executed layer is
+        // off, so the inverted reachable bias prunes unreachable structure
+        // first and the executed core is never targeted for removal.
+        let executed = parent_executed.resolve(config.executed_window_ticks);
+        let executed_bias = if restricted {
+            0.0
+        } else {
+            config.executed_bias
+        };
+        let sets = TargetSets::new(parent_reachable_nodes, executed.as_ref());
+        let selector = |domain_bias: f64| {
+            sets.selector(
+                pressure_adjusted_bias(domain_bias, restricted),
+                executed_bias,
+            )
+        };
+
         let mut summary = MutationSummary::zero();
         for _ in 0..event_count {
             // Two-layer dispatch: mesh (Topology) vs node-internal (VM/Graph/InputRef).
             let rb = &config.reachable_bias;
-            let (domain, operator, tracked_before, result) = if rng
+            let (domain, operator, tracked_before, result, executed_hits) = if rng
                 .gen_bool(config.mesh_layer_probability)
             {
                 // Layer 1: Mesh (Topology)
@@ -97,11 +125,11 @@ impl MutationEngine {
                     } else {
                         None
                     };
+                    let mut targets = selector(rb.topology);
                     let result = apply_topology_event(
                         genome,
                         op,
-                        parent_reachable_nodes,
-                        pressure_adjusted_bias(rb.topology, restricted),
+                        &mut targets,
                         rng,
                         config,
                         food_type_count,
@@ -110,16 +138,22 @@ impl MutationEngine {
                         available.swap_remove(idx);
                         continue;
                     }
-                    break Some((operator, tracked_before, result));
+                    break Some((operator, tracked_before, result, targets.executed_hits()));
                 };
-                let Some((operator, tracked_before, result)) = selected else {
+                let Some((operator, tracked_before, result, executed_hits)) = selected else {
                     summary.record_domain_skip(
                         MutationDomain::Topology,
                         MutationSkipReason::NoApplicableTarget,
                     );
                     continue;
                 };
-                (MutationDomain::Topology, operator, tracked_before, result)
+                (
+                    MutationDomain::Topology,
+                    operator,
+                    tracked_before,
+                    result,
+                    executed_hits,
+                )
             } else {
                 // Layer 2: Node-internal (VM, Graph, InputRef — equal probability)
                 match rng.gen_range(0u8..3) {
@@ -143,28 +177,34 @@ impl MutationEngine {
                                 } else {
                                     None
                                 };
-                            let result = apply_vm_event(
-                                genome,
-                                op,
-                                parent_reachable_nodes,
-                                pressure_adjusted_bias(rb.vm, restricted),
-                                rng,
-                                config,
-                            );
+                            let mut targets = selector(rb.vm);
+                            let result = apply_vm_event(genome, op, &mut targets, rng, config);
                             if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
                                 available.swap_remove(idx);
                                 continue;
                             }
-                            break Some((operator, tracked_before, result));
+                            break Some((
+                                operator,
+                                tracked_before,
+                                result,
+                                targets.executed_hits(),
+                            ));
                         };
-                        let Some((operator, tracked_before, result)) = selected else {
+                        let Some((operator, tracked_before, result, executed_hits)) = selected
+                        else {
                             summary.record_domain_skip(
                                 MutationDomain::Vm,
                                 MutationSkipReason::NoApplicableTarget,
                             );
                             continue;
                         };
-                        (MutationDomain::Vm, operator, tracked_before, result)
+                        (
+                            MutationDomain::Vm,
+                            operator,
+                            tracked_before,
+                            result,
+                            executed_hits,
+                        )
                     }
                     1 => {
                         let mut available: Vec<GraphOperator> = GraphOperator::ALL
@@ -186,28 +226,34 @@ impl MutationEngine {
                                 } else {
                                     None
                                 };
-                            let result = apply_graph_event(
-                                genome,
-                                op,
-                                parent_reachable_nodes,
-                                pressure_adjusted_bias(rb.graph, restricted),
-                                rng,
-                                config,
-                            );
+                            let mut targets = selector(rb.graph);
+                            let result = apply_graph_event(genome, op, &mut targets, rng, config);
                             if matches!(result, Err(MutationSkipReason::NoApplicableTarget)) {
                                 available.swap_remove(idx);
                                 continue;
                             }
-                            break Some((operator, tracked_before, result));
+                            break Some((
+                                operator,
+                                tracked_before,
+                                result,
+                                targets.executed_hits(),
+                            ));
                         };
-                        let Some((operator, tracked_before, result)) = selected else {
+                        let Some((operator, tracked_before, result, executed_hits)) = selected
+                        else {
                             summary.record_domain_skip(
                                 MutationDomain::Graph,
                                 MutationSkipReason::NoApplicableTarget,
                             );
                             continue;
                         };
-                        (MutationDomain::Graph, operator, tracked_before, result)
+                        (
+                            MutationDomain::Graph,
+                            operator,
+                            tracked_before,
+                            result,
+                            executed_hits,
+                        )
                     }
                     _ => {
                         let mut available: Vec<InputRefOperator> = InputRefOperator::ALL
@@ -229,11 +275,11 @@ impl MutationEngine {
                                 } else {
                                     None
                                 };
+                            let mut targets = selector(rb.input_ref);
                             let result = apply_input_ref_event(
                                 genome,
                                 op,
-                                parent_reachable_nodes,
-                                pressure_adjusted_bias(rb.input_ref, restricted),
+                                &mut targets,
                                 rng,
                                 config,
                                 food_type_count,
@@ -242,16 +288,28 @@ impl MutationEngine {
                                 available.swap_remove(idx);
                                 continue;
                             }
-                            break Some((operator, tracked_before, result));
+                            break Some((
+                                operator,
+                                tracked_before,
+                                result,
+                                targets.executed_hits(),
+                            ));
                         };
-                        let Some((operator, tracked_before, result)) = selected else {
+                        let Some((operator, tracked_before, result, executed_hits)) = selected
+                        else {
                             summary.record_domain_skip(
                                 MutationDomain::InputRef,
                                 MutationSkipReason::NoApplicableTarget,
                             );
                             continue;
                         };
-                        (MutationDomain::InputRef, operator, tracked_before, result)
+                        (
+                            MutationDomain::InputRef,
+                            operator,
+                            tracked_before,
+                            result,
+                            executed_hits,
+                        )
                     }
                 }
             };
@@ -273,6 +331,7 @@ impl MutationEngine {
                         }
                     }
                     summary.record_reachability(reachability);
+                    summary.record_executed_targets(executed_hits);
                 }
                 Err(reason) => summary.record_skipped(operator, reason),
             }
@@ -425,8 +484,7 @@ fn select_weighted_index<T: Copy>(
 fn apply_topology_event(
     genome: &mut CreatureGenome,
     op: TopologyOperator,
-    reachable_nodes: &[usize],
-    bias: f64,
+    targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
     config: &MutationConfig,
     food_type_count: usize,
@@ -435,8 +493,7 @@ fn apply_topology_event(
     match TopologyMutator::apply_with_food_type_count(
         genome,
         op,
-        reachable_nodes,
-        bias,
+        targets,
         rng,
         config,
         food_type_count,
@@ -460,13 +517,12 @@ fn apply_topology_event(
 fn apply_vm_event(
     genome: &mut CreatureGenome,
     op: VmOperator,
-    reachable_nodes: &[usize],
-    bias: f64,
+    targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
     config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let snapshot = genome.clone();
-    match VmMutator::apply(genome, op, reachable_nodes, bias, rng, config) {
+    match VmMutator::apply(genome, op, targets, rng, config) {
         Ok(reachability) => {
             if ParseabilityGate::validate(genome).is_ok() {
                 Ok(reachability)
@@ -486,13 +542,12 @@ fn apply_vm_event(
 fn apply_graph_event(
     genome: &mut CreatureGenome,
     op: GraphOperator,
-    reachable_nodes: &[usize],
-    bias: f64,
+    targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
     config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let snapshot = genome.clone();
-    match GraphMutator::apply(genome, op, reachable_nodes, bias, rng, config) {
+    match GraphMutator::apply(genome, op, targets, rng, config) {
         Ok(reachability) => {
             if ParseabilityGate::validate(genome).is_ok() {
                 Ok(reachability)
@@ -512,8 +567,7 @@ fn apply_graph_event(
 fn apply_input_ref_event(
     genome: &mut CreatureGenome,
     op: InputRefOperator,
-    reachable_nodes: &[usize],
-    bias: f64,
+    targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
     config: &MutationConfig,
     food_type_count: usize,
@@ -522,8 +576,7 @@ fn apply_input_ref_event(
     match InputRefMutator::apply_with_food_type_count(
         genome,
         op,
-        reachable_nodes,
-        bias,
+        targets,
         rng,
         config,
         food_type_count,
