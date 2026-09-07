@@ -272,6 +272,53 @@ mod tests {
         assert_eq!(g, before);
     }
 
+    /// The executed set the harnesses feed the mutation engine as a stand-in
+    /// for a live parent's dispatch record (T11.F17): exactly the nodes the
+    /// battery dispatches, by id and as this genome's node indices.
+    #[test]
+    fn executed_node_ids_and_indices_name_only_the_dispatched_nodes() {
+        // Node 0 routes to 1; node 2 is unreachable and node 3 is dangling.
+        let g = genome(vec![
+            node(0, &[1], false),
+            node(1, &[], true),
+            node(2, &[], true),
+            node(3, &[], false),
+        ]);
+        let battery = Battery::generate(2);
+        let runtime = RuntimeConfig::default();
+        assert_eq!(
+            battery.executed_node_ids(&g, &runtime, 0.0),
+            BTreeSet::from([NodeId::new(0), NodeId::new(1)])
+        );
+        assert_eq!(battery.executed_indices(&g, &runtime, 0.0), vec![0, 1]);
+
+        // Index mapping follows node order, not node id.
+        let reordered = CreatureGenome {
+            entry_node_id: NodeId::new(0),
+            nodes: vec![
+                node(3, &[], false),
+                node(2, &[], true),
+                node(1, &[], true),
+                node(0, &[1], false),
+            ],
+        };
+        assert_eq!(
+            battery.executed_indices(&reordered, &runtime, 0.0),
+            vec![2, 3]
+        );
+        assert_eq!(
+            indices_for_node_ids(&reordered, &BTreeSet::from([NodeId::new(3)])),
+            vec![0]
+        );
+        assert!(indices_for_node_ids(&reordered, &BTreeSet::new()).is_empty());
+        assert!(indices_for_node_ids(&reordered, &BTreeSet::from([NodeId::new(77)])).is_empty());
+
+        // A genome whose entry node is missing dispatches nothing at all.
+        let dead = genome(vec![node(9, &[], true)]);
+        assert!(battery.executed_node_ids(&dead, &runtime, 0.0).is_empty());
+        assert!(battery.executed_indices(&dead, &runtime, 0.0).is_empty());
+    }
+
     #[test]
     fn bypass_preserves_incoming_metadata_and_uses_bias_then_position() {
         let mut g = genome(vec![
