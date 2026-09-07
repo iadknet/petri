@@ -96,6 +96,12 @@ not claim otherwise.
   uses that same neutral detour construction. Eligible inactive pathways
   remain selectable under T11.F04; structural attachment does not imply every
   new node executes on the finite battery.
+- Fixed pass-through births retire `mutation.topology_new_node_birth` and
+  its three backend/initialization probabilities. Remove the unused birth
+  sampler, Rust config/default/normalization fields, UI controls, API-facing
+  TypeScript types, and obsolete tests/reference rows. Keep remaining mutation
+  settings unchanged. Do not expose inert controls or add a compatibility
+  adapter; graph alternatives remain available through `SwapNodeBackend`.
 - `CopyNode` faithfully copies the source's inputs, backend, and outgoing
   targets and attaches the new paralog as a losing alternative on an existing
   predecessor of the original, never as a backlink from the original to its
@@ -182,13 +188,15 @@ the visited set resets every tick and is not heritable state.
 
 ## Implementation Tasks
 
-- [ ] Write failing routing/growth/removal fixtures and pure-invariant
+- [x] Write failing routing/growth/removal fixtures and pure-invariant
       property tests, then implement the paired-bid detour, inline growth,
       safe predecessor copies, backend split, local edits, and catalog change.
-- [ ] Add failing single-visit fixtures/properties and implement visit-filtered
+- [x] Add failing single-visit fixtures/properties and implement visit-filtered
       production routing with trace/observation parity and real cap coverage.
-- [ ] Update owning references and topology taxonomy. Add a bounded ignored
-      release drift characterization using existing mutator/battery seams.
+- [ ] Remove the obsolete newborn configuration and its UI/API surface;
+      adapt affected core, server and frontend tests. Update owning references
+      and topology taxonomy. Add a bounded ignored release drift
+      characterization using existing mutator/battery seams.
 - [ ] Self-review the diff for reuse, simplicity, and efficiency; complete a
       fresh mutation run and all survivor dispositions.
 - [ ] Store gate and one goal report as
@@ -221,6 +229,16 @@ the visited set resets every tick and is not heritable state.
       production/tick behavior; `cargo check --workspace --all-targets`
       follows coherent Rust edits. Focused tests and cross-process
       reproducibility pass, with generated proptest regressions retained.
+- [ ] The existing seed-20260904, 250-tick reproducibility stress fixture
+      retains its economics, mutation rates and paired-slot/mesh-slice
+      exposure requirements. Compare independently seeded simulations after
+      every tick, including the final tick, using the existing population
+      fingerprint fields, population size and six work counters. Require a
+      compared nonempty checkpoint with a living descendant after both
+      required operator categories have applied. Final extinction is recorded
+      rather than making the trajectory comparison vacuous; this test adds
+      no persistence floor and does not replace production viability or the
+      predeclared goal-profile persistence/dead-birth checks.
 - [ ] Bounded drift characterization: 200 independent lineages, initial RNG
       seeds 90000 through 90199, production mutation config and founder,
       readings at generations 50/250/1000 on the research note's 48 snapshot
@@ -243,6 +261,63 @@ the visited set resets every tick and is not heritable state.
 - [ ] `make roadmap-check` on document edits and independently before
       accepting implementation; final `make check` exits 0 on final feature
       content, with the tested commit reported before integration.
+
+Implementation verification, 2026-09-06 (all commands in the feature worktree,
+with the workflow tool PATH):
+
+- TDD: `cargo test -p v3-core f15_` failed all five new behavioral fixtures
+  before production changes (unattached growth, erased backend, absent paired
+  branch, destructive founder removals, repeated self-dispatch), recorded in
+  `/tmp/t11-f15-red-initial.log`. The retired-config absence fixture failed
+  before removal (`cargo test -p v3-server get_config_omits_retired_topology_new_node_birth`,
+  `/tmp/t11-f15-red-config.log`). `cargo test -p v3-core removal_uses_current_topology`
+  failed the new stale-cache fixture before the fresh-traversal fix
+  (`/tmp/t11-f15-red-stale-cache.log`).
+- Viability ran first before other verification after each production change.
+  `cargo test -p v3-core --test viability`: 25 passed on initial inspection,
+  topology changes, config removal, current-reachability repair and self-review.
+  Latest `/tmp/t11-f15-viability-self-review.log`: 25 passed in 0.31 seconds.
+- `cargo check --workspace --all-targets` passed after coherent Rust edits;
+  `/tmp/t11-f15-check-pre-mutation.log` and `/tmp/t11-f15-check-repro.log`.
+  `cargo clippy --workspace --all-targets -- -D warnings` passed
+  (`/tmp/t11-f15-clippy-final.log`). `cargo test -p v3-core --lib`: 1177 passed,
+  zero failed, one intentionally ignored drift characterization, 5.50 seconds
+  (`/tmp/t11-f15-lib-verified.log`).
+- `cargo test -p v3-server`: all suites passed, including 80 integration tests
+  (`/tmp/t11-f15-server-verified.log`). The initial sandbox run could not bind
+  localhost for seven existing WebSocket tests; approved execution outside
+  that restriction passed. The API rejects retired config with its established
+  422 validation status. `cargo test -p v3-cli` passed all suites
+  (`/tmp/t11-f15-cli.log`).
+- Frontend focused config/control tests passed 26/26 (orchestrator command
+  `npm test -- ConfigPanel.test.tsx ControlBar.test.tsx`), and after removing
+  the obsolete `waitFor` import, `./node_modules/.bin/tsc -b` passed. Focused
+  `biome check --write` formatted only the edited ConfigPanel test.
+- Explicit diff self-review reused the production gate resolver and VM
+  reference repair, graph source sampling, traversal and enum catalogs;
+  `AddNode` and `SpliceNode` now share one implementation, safe copy/backend
+  growth shares attachment logic, and impossible predecessor candidates avoid
+  needless downstream traversal. Sorted traversal membership uses binary
+  search. Removed the obsolete sampler/config/controls and stale test helpers.
+  No new dependencies, framework, settings, mutation exclusions or unsafe code.
+  Added graph state parity across production, full trace and compact modes.
+  Repeated the review after the trajectory-test correction; all comparisons
+  borrow current fingerprints rather than retaining cloned trajectories.
+- Paired conditional examples use the production mutation seed 7: the VM
+  writes its single sensor register and the nonempty graph samples its existing
+  sensor-fed compute node. Zero input keeps the incumbent; positive input
+  selects the identical detour. A bounded fixed-seed ordinary instruction
+  mutation differentiates only the selected detour. Separate sampling fixtures
+  retain constant/memory/compute choices and cover all eight ring sub-values.
+  Default-work assertions retain production settings. Charge/exhaustion
+  fixtures use only a test-local VM cost multiplier of 1.0: default 1e-6
+  charges can round away in f32 subtraction at energy 1000. Matching base and
+  grown fixtures with representable charges demonstrate both neutral actions
+  at sufficient energy and the explicit exhaustion/live-energy-read boundary.
+- `make roadmap-check` passed after reference edits
+  (`/tmp/t11-f15-roadmap-references.log`); `git diff --check` passed.
+  Mutation, guarded measurements, independent review and final closure checks
+  remain pending.
 
 ## Performance and Goal Impact
 
@@ -367,5 +442,57 @@ Measured results: pending implementation and the single closure run.
   executed-detour intent; the backend swap split reuses existing destination
   swap; F08/F09 keep broader copy/inheritance qualification. Record later
   requirement corrections explicitly instead of weakening acceptance silently.
-- Advisor consultations: 0 at planning. Final findings, remediation passes,
-  requirement corrections and user interventions: pending. Usage unavailable.
+- Consultation 1, 2026-09-06, before choosing the approach: the implementer
+  accepted the existing resolver wrapper plus predicate-filtered resolver in
+  the shared mesh executor, bounded visited state, shared detour/ID helpers,
+  safe predecessor attachment, and temporary backend cloning for atomic
+  paired writes. Exactly one target entry is the safe branch case. For
+  `AddRouteTarget`, a topology-free slot may already have an orphan backend
+  write: preserve that code and add the bid, with its potentially nonvarying
+  outcome reported. Dormant copy/backend alternatives instead choose the
+  first slot unused by both topology and backend. Other dynamic winning
+  routes are allowed when the finite unwritten incumbent, tied later slot,
+  and no-return-path requirements hold. Existing family-based trial seeds
+  already survive catalog changes; no index machinery is needed.
+- Requirement correction 1, 2026-09-06: fixed `AddNode`/`SpliceNode` births
+  make `topology_new_node_birth` obsolete, including its visible controls.
+  The accepted correction removes that dead configuration surface and its
+  implementation plumbing, as specified above, rather than reporting knobs
+  that no longer affect applied behavior. No acceptance criterion, mutation
+  rate, family probability, observation budget, or threshold is relaxed.
+  Revision verification: `make roadmap-check` exited 0 on 2026-09-06 with
+  `roadmap-check: validation passed`.
+- Consultations 2–4, 2026-09-06: advice addressed obsolete removal sampling
+  and wrapped-jump test expectations; actual child reachability for removal
+  eligibility because the supplied selection cache belongs to the parent;
+  fixture-only representable energy charges while retaining default behavior;
+  and the fixed-seed graph bid's sensor-fed `ComputeNode(0)` source. No
+  production VM charging change, source resampling, or acceptance exception
+  was recommended. The implementer records command and test evidence.
+- Consultation 5 / requirement correction 2, 2026-09-06: the unchanged
+  aggressive reproducibility fixture went extinct at 250 ticks with 40
+  births, 38 applied operator kinds, paired-slot count 9, and backward/forward
+  slice counts 6/5 (`/tmp/t11-f15-reproducibility.log`). Final counters and
+  population size agreed, but the old final-nonempty guard failed. The
+  [T10.F11 contract](t10-f11-cross-process-reproducibility-of-seeded-runs.md)
+  explicitly excludes a persistence gate; its nonempty guard prevents an
+  empty fingerprint from claiming reproducibility. Preserve that protection
+  through the stronger per-tick comparison and post-mutation living-descendant
+  checkpoint above, retaining all original exposure parameters and final
+  comparison. Immediate borrowed fingerprint comparisons suffice; no stored
+  trajectory or new harness is needed. This changes the verification method,
+  not the feature's biological or numerical acceptance targets. Extinction
+  under this stress configuration is not evidence of production persistence.
+  Verification of the amended test remains pending implementation.
+- Current record: 5 advisor consultations; 2 requirement corrections;
+  0 acceptance exceptions. Final findings, remediation passes and user
+  interventions: pending. Usage unavailable.
+
+- Implementation advisor record: consultations 2–4 accepted the fresh
+  current-topology removal eligibility (parent cache retained for classification),
+  actual resolved VM jump targets rather than noncanonical offset encodings,
+  test-only representable costs, and the known sensor-fed graph source fixture.
+  Consultation 5 accepted the stronger unchanged-parameter trajectory
+  reproducibility harness recorded above. All advice was evaluated against
+  the spec; no optional expansion was adopted. Current count: 5 consultations,
+  2 explicit requirement corrections, 0 acceptance exceptions.

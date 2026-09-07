@@ -158,14 +158,14 @@ kinds — no input/output/shared-memory kinds.
 ```rust
 pub enum OutputSinkKind {
     CustomOutput(u8),   // 12 slots, indices 0-11
-    RouterOutput,       // single normalized routing scalar
+    RouterGate(u8),     // eight routing gate scores, indices 0-7
     WriteSlot(u8),      // 16 slots, indices 0-15: shared memory write
     ClearSlot(u8),      // 16 slots, indices 0-15: shared memory clear
 }
 ```
 
-The full sink catalog is fixed at genome construction: 12 CustomOutput + 1
-RouterOutput + 16 WriteSlot + 16 ClearSlot = 45 sinks. Mutations can only
+The full sink catalog is fixed at genome construction: 12 CustomOutput + 8
+RouterGate + 16 WriteSlot + 16 ClearSlot = 52 sinks. Mutations can only
 modify edges TO sinks, not add/remove/change sink kinds.
 
 ### Inert-when-unwired rule
@@ -175,8 +175,7 @@ upstream/default value:
 - CustomOutput with no edges: `output_slots[slot]` retains incoming
   `upstream_slots[slot]`.
 - WriteSlot/ClearSlot with no edges: `shared_memory[slot]` is unchanged.
-- RouterOutput with no edges: default route decision applies
-  (`RouteDecision::CgpNormalized { raw_value: 0.0 }`).
+- RouterGate with no edges: that slot retains its zero gate score.
 
 Only sinks with at least one edge compute their weighted-sum and write
 the result.
@@ -252,9 +251,10 @@ all compute nodes once in index order, including disconnected nodes.
 - Lower-index compute sources read the current visit's computed outputs.
 - Self and higher-index sources read frozen tick-start outputs.
 - Stateful operators start from frozen tick-start operator state.
-- A successful visit commits candidate state and outputs. Repeated visits
-  recompute from the same base using current inputs; the last successful visit
-  supplies next tick's temporal state. Effects and learning still run per visit.
+- A successful visit commits candidate state and outputs. Production mesh
+  dispatch visits each node at most once per tick. Direct backend harness
+  re-entry still recomputes from the frozen base; its last successful call
+  supplies next tick's state. Effects and learning remain per backend call.
 - Unvisited modules hold values without catch-up, fabricated inputs, or charge.
 - Newborn temporal state is zero. Empty graphs do no work.
 
@@ -321,15 +321,14 @@ behavior directly.
 
 ---
 
-## 10. Router Normalization
+## 10. Routing Gates
 
-Single router output, value normalized to target index:
-```text
-idx = min(floor(clamp01(route_value) * target_count), target_count - 1)
-```
-
-The final `min` clamp prevents OOB when `route_value == 1.0`. Replaces
-`rem_euclid` wrapping with bounded binning.
+Each `RouterGate(slot)` sink writes its weighted sum to one of eight gate
+slots. The mesh chooses the earliest maximum `gate_bias + gate_score` among
+unvisited destination IDs, with the shared soft-float policy. A visited top
+choice falls through; missing winners terminate softly. T11.F15 route addition
+pairs a tied branch through a pass-through detour with one weight-1 gate edge
+sampled by `random_graph_source`, including full input sub-value support.
 
 ---
 
@@ -529,7 +528,7 @@ Two-layer validation: mutation-time (bound values at creation) and runtime
 | Edge with NaN/Inf weight | `sanitize_f32()` to 0.0 |
 | Sink with empty `inputs` | Inert — does not write |
 | `Emit(NoOp)` that fires | Enqueues `WorldAction::NoOp` (real action with costs) |
-| Repeated visit in one tick | Recompute from frozen tick-start temporal state |
+| Direct backend re-entry in one tick | Recompute from frozen tick-start state; production mesh disallows redispatch |
 | Missing graph state | Lazily initialized to zeros |
 
 Cross-runtime fallback outcomes are canonical in
