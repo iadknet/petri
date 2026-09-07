@@ -477,6 +477,28 @@ against 283, min 1 against 44.
   cap lever forward (T03.F08 or a lower `max_vm_steps`) as a separate
   decision before closure. The worktree and branch are preserved; the
   implementation, tests, mutation evidence, and both stored reports stand.
+- **User direction, 2026-09-07 (after the blocker report)**: the VM-loop
+  compute cost is not the concern; the concern is the mechanism's effect on
+  evolution and cognition and its naturalness. Orchestrator assessment from
+  the two goal reports: lineage diversity improved on seeds 11 and 22
+  (clades 161 / 146 against 137 / 137; entropy 2.585 / 2.798 against
+  2.602 / 1.087 nats) and collapsed on seed 33 (54 clades, 0.159 nats,
+  against 134 and 2.159, with the population at 11,379), far outside the
+  prior series; whether the bloom clade is the cap-looping clade was not
+  read. The drift executed-node gain is hollow: knockouts rose with it
+  (3.64 / 4.20 at depths 1,000 / 2,000 against 2.36 / 2.30), so contributing
+  nodes fell slightly (0.62 / 0.56 against 0.76 / 0.70). Cognition proxies
+  moved up at generation 40 to 60 (route-varying samples 4 / 36 against
+  1 / 36; memory-reading cores 19 / 36 against 5 / 36) but are confounded
+  by population change. Naturalness: transcription-associated mutagenesis
+  is a weak natural effect; a 0.9 draw toward the executed set is a
+  genetic-programming rule, and it reverses T11.F04's equal-opportunity
+  decision for inactive structure. Recommended next step, not taken: a
+  paired long run under selection (`executed_bias` 0.9 against 0.0, which
+  reproduces the old draw byte for byte) to generation 500 or more, read
+  with the depth note's census, before deciding between closing as measured
+  and moving the T11.F13 per-node-supply and junk-cost pair forward with
+  the bias kept at 0.0 as an experimental arm.
 - Held pending that decision, so the next feature does not silently inherit a
   severe reference: neither report is appended to
   `docs/progress/benchmark-series.json`, and `docs/progress.md` carries the
