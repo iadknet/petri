@@ -3,8 +3,9 @@
 //! The copy is spliced at the program tail behind a `Halt` guard authored
 //! only when the program's last instruction is not already a terminal, so no
 //! surviving control-flow reference and no fall-through reaches it. A later
-//! jump mutation is the only way in; then the copy runs in its original's
-//! place unless a dormant mutation diverged it first.
+//! jump mutation is the only way in, short of a mutation removing or
+//! replacing the guard or the program's final terminal; then the copy runs in
+//! its original's place unless a dormant mutation diverged it first.
 
 use super::operators::mutate_one_instruction_field;
 use super::{VmMutator, VmOperator};
@@ -192,11 +193,10 @@ proptest! {
         prop_assume!(before.steps + 1 < config.max_vm_steps);
 
         let mut genome = vm_genome(original.clone());
-        if apply(&mut genome, TAIL_COPY_OPERATORS[op_index], op_seed).is_err() {
-            return Ok(());
-        }
+        // A skipped operator is not evidence of neutrality: reject the case
+        // rather than pass it.
+        prop_assume!(apply(&mut genome, TAIL_COPY_OPERATORS[op_index], op_seed).is_ok());
         let copied = program_of(&genome);
-        prop_assume!(copied.len() > original.len());
 
         let after = run(&copied, &config);
         prop_assert_eq!(&after.result, &before.result);
