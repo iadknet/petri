@@ -407,6 +407,73 @@ mod tests {
             .all(|r| r.births.births_total == 8 && r.mesh.lineages == 3));
     }
 
+    /// The walk refreshes each lineage's executed node ids every
+    /// `EXECUTED_REFRESH_INTERVAL` generations, not only at depth 0: a replay
+    /// that keeps the founder's set for the whole walk diverges from
+    /// [`observe`], while the replay on the real cadence reproduces it.
+    #[test]
+    fn the_walk_refreshes_executed_sets_along_the_way_not_only_at_depth_zero() {
+        let config = SimulationConfig::default();
+        let founder = founder_genome(FounderProfile::V3Alpha1);
+        let battery = Battery::generate(2);
+        let context = EvalContext::from_config(&config);
+        const DEPTH: u64 = 30;
+        let sizes = DriftSizes {
+            lineages: 8,
+            birth_lineages: 0,
+            births: 0,
+            checkpoints: &[DEPTH],
+        };
+        let actual = observe(&founder, &battery, &config.mutation, &context, sizes);
+
+        let replay = |refresh: bool| {
+            (0..sizes.lineages)
+                .map(|index| {
+                    let mut genome = founder.clone();
+                    let mut rng = SmallRng::seed_from_u64(WALK_SEED_BASE + u64::from(index));
+                    let mut ids = BTreeSet::new();
+                    for step in 0..DEPTH {
+                        let executed = if refresh || step == 0 {
+                            replay_executed(step, &genome, &battery, &context, &mut ids)
+                        } else {
+                            indices_for_node_ids(&genome, &ids)
+                        };
+                        let reachable = mesh_reachable_nodes(&genome);
+                        MutationEngine::apply_mutations_with_food_type_count(
+                            &mut genome,
+                            &config.mutation,
+                            &reachable,
+                            ParentExecuted::Indices(&executed),
+                            &mut rng,
+                            context.food_type_count,
+                        );
+                    }
+                    genome
+                })
+                .collect::<Vec<_>>()
+        };
+
+        let mut on_cadence = MeshTotals::default();
+        let mut stale = MeshTotals::default();
+        for (totals, genomes) in [(&mut on_cadence, replay(true)), (&mut stale, replay(false))] {
+            for genome in &genomes {
+                totals.record(battery.mesh_execution(
+                    genome,
+                    context.runtime,
+                    context.shared_memory_decay_rate,
+                ));
+            }
+        }
+        assert_eq!(
+            actual[0].mesh, on_cadence,
+            "the walk follows the predeclared refresh cadence"
+        );
+        assert_ne!(
+            on_cadence, stale,
+            "refreshing mid-walk changes which nodes later births target"
+        );
+    }
+
     #[test]
     fn zero_mutation_and_observation_changes_leave_walk_readings_unchanged() {
         let mut config = SimulationConfig::default();

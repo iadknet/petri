@@ -365,9 +365,21 @@ mod tests {
     /// per trial; reconstructing the full catalog (not just one operator per
     /// family) rules out a near-deterministic operator coincidentally
     /// matching under the wrong seed.
+    ///
+    /// The four reachable biases are deliberately distinct and nonzero here:
+    /// each family's rows are reconstructed at its own configured bias, so a
+    /// family mapping that collapsed to one constant would draw differently
+    /// for at least three families.
     #[test]
     fn per_operator_rows_seeds_trials_by_offset_plus_family_base_plus_trial() {
-        let config = crate::config::SimulationConfig::default();
+        let mut config = crate::config::SimulationConfig::default();
+        config.mutation.reachable_bias = ReachableBiasConfig {
+            topology: 0.7,
+            vm: 0.1,
+            graph: 0.3,
+            input_ref: 0.9,
+        };
+        let config = config;
         let subject = founder_genome(FounderProfile::V3Alpha1);
         let battery = Battery::generate(config.world.food.types.len());
         let context = EvalContext::from_config(&config);
