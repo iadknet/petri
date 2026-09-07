@@ -434,15 +434,15 @@ pub(crate) fn add_bootstrap_node(
 /// index and every `ComputeNode(i >= consumer)` reference is remapped to
 /// `i + 1` (`CgpGraphBackendDef::insert_compute_node_at`), so Gauss-Seidel
 /// pass order is preserved. When the consumer is a sink, action slot, or
-/// execute gate, the new node is appended instead.
+/// execute gate, the new node is appended instead. The one edge shape a
+/// split cannot preserve is skipped rather than split: see
+/// [`is_excluded_introspection_split`].
 pub(crate) fn split_existing_edge(
     def: &mut CgpGraphBackendDef,
     input_refs: &[InputReference],
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
-    if def.compute_nodes.len() >= u16::MAX as usize {
-        return Err(MutationSkipReason::NoApplicableTarget);
-    }
+    check_compute_node_capacity(def, 1)?;
     let (surface, edge_idx) =
         pick_random_edge(def, rng).ok_or(MutationSkipReason::NoApplicableTarget)?;
     let old_source = get_edge_vec_mut(def, surface)[edge_idx].source;
@@ -557,15 +557,18 @@ pub(crate) fn copy_compute_node(
     if def.compute_nodes.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-    check_copy_capacity(def, 1)?;
+    check_compute_node_capacity(def, 1)?;
     let source_idx = rng.gen_range(0..def.compute_nodes.len());
     def.duplicate_compute_nodes_in_place(&[source_idx]);
     Ok(())
 }
 
-/// A copy is only representable while every resulting index stays below the
-/// `u16::MAX` dangling-reference sentinel `remove_compute_node_at` uses.
-fn check_copy_capacity(def: &CgpGraphBackendDef, added: usize) -> Result<(), MutationSkipReason> {
+/// Added nodes are only addressable while every resulting index stays below
+/// the `u16::MAX` dangling-reference sentinel `remove_compute_node_at` uses.
+fn check_compute_node_capacity(
+    def: &CgpGraphBackendDef,
+    added: usize,
+) -> Result<(), MutationSkipReason> {
     if def.compute_nodes.len() + added > u16::MAX as usize {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
@@ -626,7 +629,7 @@ pub(crate) fn copy_cgp_subgraph(
     }
 
     cluster.sort_unstable();
-    check_copy_capacity(def, cluster.len())?;
+    check_compute_node_capacity(def, cluster.len())?;
     def.duplicate_compute_nodes_in_place(&cluster);
     Ok(())
 }
