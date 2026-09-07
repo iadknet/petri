@@ -100,6 +100,18 @@ Notes:
 - A visited top-scoring target falls through to the next eligible target.
   Ties keep the earliest eligible vector position. Missing winners still
   terminate softly without falling through. The cap bounds long acyclic chains.
+- **Copy interference** (T11.F08). A node copy (`CopyNode`, or a mesh slice
+  copy) is a faithful clone: it keeps its original's input references, output
+  slots, and shared-memory addresses, so activating it in the original's chain
+  position reproduces the original's behavior. Those addresses are not
+  remapped, and nothing here makes them unique. When a copy and its original
+  both run in one chain — a mesh slice copy can place them on the same path —
+  they write the same output slots and the same shared-memory slots, and the
+  node evaluated later in the chain wins: output slots are overwritten in
+  place as the bus is handed downstream, and shared memory is committed per
+  node evaluation. This is accounted for, not designed around; a lineage that
+  wants two independent modules must move one copy's addresses by ordinary
+  mutation.
 - Canonical owner for `runtime.max_mesh_hops` defaults/validation:
   `v3-runtime-config-spec.md`.
 
