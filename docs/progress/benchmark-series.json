@@ -19,12 +19,13 @@
       "docs/progress/features/t11-f15-mesh-routing-connection-semantics.json",
       "docs/progress/features/t11-f08-function-preserving-duplication-and-module-growth.json",
       "docs/progress/features/remove-complementary-nutrition.json",
-      "docs/progress/features/t11-f16-drift-depth-indicator.json"
+      "docs/progress/features/t11-f16-drift-depth-indicator.json",
+      "docs/progress/features/t11-f17-executed-biased-mutation-targeting.json"
     ]
   },
   "goal": {
     "series": "goal-v1",
-    "epoch_baseline": "docs/progress/features/remove-complementary-nutrition-goal.json",
+    "epoch_baseline": "docs/progress/features/t11-f17-executed-biased-mutation-targeting-goal.json",
     "closed": [
       "docs/progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table-goal.json",
       "docs/progress/features/t11-f01-mutational-neighborhood-indicator-goal.json",
@@ -37,7 +38,8 @@
       "docs/progress/features/t11-f15-mesh-routing-connection-semantics-goal.json",
       "docs/progress/features/t11-f08-function-preserving-duplication-and-module-growth-goal.json",
       "docs/progress/features/remove-complementary-nutrition-goal.json",
-      "docs/progress/features/t11-f16-drift-depth-indicator-goal.json"
+      "docs/progress/features/t11-f16-drift-depth-indicator-goal.json",
+      "docs/progress/features/t11-f17-executed-biased-mutation-targeting-goal.json"
     ]
   },
   "counter_definition_changes": [
