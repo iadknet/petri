@@ -61,7 +61,7 @@ representation only where the neighborhood reading still shows a gap.
   - Goal: Mutation–selection balance. Measure which mutation rates support discovery and retention under named environments and time horizons, and use those readings to inform production defaults and inherited-rate bounds.
 - [x] **T11.F14 — Mesh Execution Observability** — Depends on: T11.F01
   - Goal: Generations, not ticks; executed, not reachable. Record what a lineage's mesh actually runs, whether its route ever varies with the input, how often it loops to the hop cap, and how many generations the goal profile reaches, so mesh-layer claims are read at a depth and in a unit that can support them; observation only.
-- [ ] **T11.F15 — Mesh Routing Connection Semantics** — Depends on: T11.F02, T11.F03, T11.F04, T11.F14
+- [x] **T11.F15 — Mesh Routing Connection Semantics** — Depends on: T11.F02, T11.F03, T11.F04, T11.F14
   - Goal: A synapse forms with its own trigger. A new route branch is born pointing at something that already works and carrying its own bid, so it is silent at birth and conditional from its first win; retargeting lands near, removing a node or branch is not usually lethal, and a node runs at most once per tick.
 
 ## Notes for AI Agents

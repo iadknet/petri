@@ -1,6 +1,6 @@
 # T11.F15 — Mesh Routing Connection Semantics
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-06
 **Feature**: T11.F15
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -193,43 +193,43 @@ the visited set resets every tick and is not heritable state.
       safe predecessor copies, backend split, local edits, and catalog change.
 - [x] Add failing single-visit fixtures/properties and implement visit-filtered
       production routing with trace/observation parity and real cap coverage.
-- [ ] Remove the obsolete newborn configuration and its UI/API surface;
+- [x] Remove the obsolete newborn configuration and its UI/API surface;
       adapt affected core, server and frontend tests. Update owning references
       and topology taxonomy. Add a bounded ignored release drift
       characterization using existing mutator/battery seams.
-- [ ] Self-review the diff for reuse, simplicity, and efficiency; complete a
+- [x] Self-review the diff for reuse, simplicity, and efficiency; complete a
       fresh mutation run and all survivor dispositions.
-- [ ] Store gate and one goal report as
+- [x] Store gate and one goal report as
       `docs/progress/features/t11-f15-mesh-routing-connection-semantics.json`
       and `...-goal.json`, append the existing series and progress row, and
       record the exact comparisons and drift readings below.
-- [ ] Complete independent review, closure metadata, final checks, and local
+- [x] Complete independent review, closure metadata, final checks, and local
       integration through the orchestrator.
 
 ## Verification
 
-- [ ] Record TDD red commands/results. Properties cover unique IDs, atomic
+- [x] Record TDD red commands/results. Properties cover unique IDs, atomic
       skips, preserved route fields/references, local target membership,
       removal bypass, and unique dispatch IDs bounded by node count and cap.
       Assert each drawn case's invariants; use fixed-seed example fixtures,
       not random-case coverage assumptions, for reaching each mutation form.
-- [ ] Paired-bid fixtures exercise VM and graph conditional wins, equal-score
+- [x] Paired-bid fixtures exercise VM and graph conditional wins, equal-score
       old-branch wins, silent activation and later divergence, no eligible
       continuation, exhausted gate slots, existing orphan gate writes, VM
       jump repair, graph sensor sub-values, and nonzero bus/memory/queue state.
       Dormant-copy/backend tests distinguish static losers from runtime
       winners and prove originals are untouched; growth skips full attachments.
-- [ ] Runtime fixtures cover self-loop, two-node cycle, visited top choice
+- [x] Runtime fixtures cover self-loop, two-node cycle, visited top choice
       with an unvisited lower choice, ties, exhausted alternatives, missing
       entry/target, terminal/exhaustion precedence, per-tick reset, an actual
       acyclic hop-cap hit, and completion on the final allowed dispatch.
       Compare all three modes' actions, cost, energy, priority, memory, graph
       state, counters, and applied routes where available.
-- [ ] `cargo test -p v3-core --test viability` runs first after changed
+- [x] `cargo test -p v3-core --test viability` runs first after changed
       production/tick behavior; `cargo check --workspace --all-targets`
       follows coherent Rust edits. Focused tests and cross-process
       reproducibility pass, with generated proptest regressions retained.
-- [ ] The existing seed-20260904, 250-tick reproducibility stress fixture
+- [x] The existing seed-20260904, 250-tick reproducibility stress fixture
       retains its economics, mutation rates and paired-slot/mesh-slice
       exposure requirements. Compare independently seeded simulations after
       every tick, including the final tick, using the existing population
@@ -239,7 +239,7 @@ the visited set resets every tick and is not heritable state.
       rather than making the trajectory comparison vacuous; this test adds
       no persistence floor and does not replace production viability or the
       predeclared goal-profile persistence/dead-birth checks.
-- [ ] Bounded drift characterization: 200 independent lineages, initial RNG
+- [x] Bounded drift characterization: 200 independent lineages, initial RNG
       seeds 90000 through 90199, production mutation config and founder,
       readings at generations 50/250/1000 on the research note's 48 snapshot
       scenarios (seed 7). Reuse maintained scenario generation and compact
@@ -249,16 +249,16 @@ the visited set resets every tick and is not heritable state.
       excluding compilation, no competing measurement. Store command, elapsed
       time and all readings here, with differences from the research probe
       stated. This is characterization, not a new ordinary timing test.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants` after self-review; record
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` after self-review; record
       summary, output directory, and full missed/timeout list, each killed by
       strengthened tests and a fresh rerun, equivalent with reason, or deferred.
-- [ ] `make bench PROFILE=gate FEATURE=t11-f15-mesh-routing-connection-semantics`
+- [x] `make bench PROFILE=gate FEATURE=t11-f15-mesh-routing-connection-semantics`
       and one corresponding `PROFILE=goal` run use existing guarded profiles
       and store the reports. Complete the impact comparisons below.
 - [x] Second goal determinism run: Not applicable by the 2026-09-05 workflow
       decision; `make check` retains cross-process reproducibility and gate
       two-run equality. No goal rerun is added for this feature.
-- [ ] `make roadmap-check` on document edits and independently before
+- [x] `make roadmap-check` on document edits and independently before
       accepting implementation; final `make check` exits 0 on final feature
       content, with the tested commit reported before integration.
 
@@ -316,8 +316,41 @@ with the workflow tool PATH):
   at sufficient energy and the explicit exhaustion/live-energy-read boundary.
 - `make roadmap-check` passed after reference edits
   (`/tmp/t11-f15-roadmap-references.log`); `git diff --check` passed.
-  Mutation, guarded measurements, independent review and final closure checks
-  remain pending.
+  Guarded measurements passed as recorded below. Independent review and final
+  closure checks passed; final integration evidence is recorded by the orchestrator below and in the parent task.
+- Fresh mutation runs used `MUTANTS_ITERATE=0 make rust-mutants`, without
+  result reuse or altered settings. First run: 108 tested in 7 minutes,
+  71 caught, 27 unviable, 10 missed, zero timeouts
+  (`/tmp/t11-f15-mutants-fresh.log`). Full initial missed list:
+  `config/simulation.rs:1003` normalization `<` to `>`, `<=`, `==`;
+  `mutation/types/mod.rs:197` operator key to `""` and `"xyzzy"`;
+  `runtime/mesh.rs:360` `&&` to `||`;
+  `mutation/topology/routing.rs:28` static incumbent to `Some(0)`;
+  `mutation/topology/structural.rs:44` bypass `&&` to `||` and `==` to `!=`;
+  `mutation/topology/structural.rs:328` valid splice successor `==` to `!=`.
+  Paths are relative to `crates/v3-core/src/`. Initial machine outcomes are
+  retained in `/tmp/t11-f15-mutants-first-outcomes.json`.
+- Test-only remediation added configuration zero/one/positive-capacity
+  properties, exhaustive unique qualified operator keys, earliest nonzero
+  static-winner properties, and atomic skips for self/missing removal
+  successors and missing splice successors. Existing applied examples remain.
+  Repeated self-review found no production changes: 55 lines in three test
+  files reuse fixtures and proptest, with no new dependencies or exclusions.
+  `cargo check --workspace --all-targets` passed
+  (`/tmp/t11-f15-check-mutant-tests.log`); core library tests passed
+  1182/1182, one intentionally ignored, 4.87 seconds
+  (`/tmp/t11-f15-lib-mutant-tests.log`); `git diff --check` passed.
+- Final fresh mutation run: 108 tested in 7 minutes, 80 caught, 27 unviable,
+  one missed, zero timeouts (`/tmp/t11-f15-mutants-final.log`). Output directory:
+  `/Users/istefanek/.local/share/petri-tools/mutants/t11-f15/mutants.out`.
+  All nine non-equivalent initial survivors were killed by the strengthened
+  tests. Full final missed list: `crates/v3-core/src/runtime/mesh.rs:360:76`,
+  replace `&&` with `||` in `execute_creature_mesh_impl`. Equivalent: recording
+  modes already compute the route unconditionally; other modes return for
+  exhaustion or terminal before consuming the extra pure route calculation.
+  No timeouts, deferred mutants, production edits to kill mutants, or setting
+  changes. Production checkpoint is `41d9a78b4383269170d1545cd89d81cfde913e01`.
+
 
 ## Performance and Goal Impact
 
@@ -401,18 +434,230 @@ population and cognition-adjacent quantities may shift in either direction;
 none gains an unmeasured success claim. Measures already `Undefined` remain
 so. No second goal run or whole-population battery census is required.
 
-Measured results: pending implementation and the single closure run.
+Bounded drift measurement, 2026-09-06: release compilation used
+`cargo test --release -p v3-core --lib t11_f15_drift --no-run` (1m46s,
+excluded from runtime budget; `/tmp/t11-f15-drift-compile.log`). The single
+measured command was `scripts/bench-wait target/release/deps/v3_core-be591d3a9d8f5a9f t11_f15_drift --ignored --nocapture`.
+Host-process visibility was authorized; the guard started without blockers,
+and no builds or tests competed. Runtime was 1.607 seconds, below 180 seconds
+(`/tmp/t11-f15-drift.log`). All counts aggregate the same 200 lineages.
+
+| Generation | Total nodes | Reachable nodes | Executed nodes | Conditional genomes | Cap-hit genomes |
+| --- | --- | --- | --- | --- | --- |
+| 50 | 975 | 671 | 450 | 18/200 | 0/200 |
+| 250 | 3243 | 990 | 472 | 7/200 | 0/200 |
+| 1000 | 13259 | 1862 | 602 | 6/200 | 0/200 |
+
+The nonzero route-variation and zero-cap targets pass. Generation-1000 mean
+executed nodes is 602/200 = 3.01, down 0.18 (5.64%) from the research CF3
+mean 3.19. This is a fixed 48-snapshot-only mutation-lineage characterization
+without selection or spatial simulation, using maintained production operators
+and compact observations; it is not the goal profile's evolved-subject battery
+or a persistence test. The research counterfactual had different implementation
+and snapshot-only semantics; the direction is descriptive, not equivalence.
+
+Measured gate and goal results, 2026-09-06, production commit
+`41d9a78b4383269170d1545cd89d81cfde913e01`: both commands exited 0.
+`make bench PROFILE=gate FEATURE=t11-f15-mesh-routing-connection-semantics`
+and exactly one `make bench PROFILE=goal FEATURE=t11-f15-mesh-routing-connection-semantics`
+ran through the unchanged guard, with no competing builds/tests or profile
+overrides. Reports are [gate](../../progress/features/t11-f15-mesh-routing-connection-semantics.json)
+and [goal](../../progress/features/t11-f15-mesh-routing-connection-semantics-goal.json); logs are
+`/tmp/t11-f15-bench-gate.log` and `/tmp/t11-f15-bench-goal.log`.
+Host: Apple M1 Pro, aarch64 macOS, 8 logical cores; matching historical host.
+Goal retains 1600×1600, 10000 founders, 2000 ticks, seeds 11/22/33.
+
+| Gate work / creature-tick | F15 | Delta vs F14 | Delta vs F04 |
+| --- | --- | --- | --- |
+| mesh_hops | 2.000000 | 0.022955% | 0.022955% |
+| vm_steps | 28.044355 | -0.001248% | -0.001248% |
+| graph_relax_iters | 1.000000 | 0.045921% | -66.650826% |
+| plasticity_updates | 0.000899 | -0.221976% | -0.221976% |
+| actions_applied | 1.000000 | 0.000000% | 0.000000% |
+| births | 0.001225 | 5.331040% | 5.331040% |
+
+Every gate/goal comparison level is `ok`; neither reference is severe.
+Gate wall time is 0.004163844472 ms/creature-tick (-5.941147% vs F14,
+-0.846951% vs F04). Goal wall is 0.006473525477 (-9.341787% vs F14,
+-9.527875% vs F04). Goal work deltas vs F14 in table order above are
+-41.428230%, -90.403063%, -57.527055%, -57.853464%, -1.599930%,
+-1.909959%. F04 graph counts precede the graph-clock definition change;
+their raw graph deltas are retained but are not like-for-like efficiency.
+Goal simulation time is 636.657190s, founder observation 0.056999s,
+evolved observation 0.632119s, and final-state observation 0.783511s;
+their sum 638.129819s is below 15 minutes. Both neighborhood budgets pass.
+
+| Binding reading | F15 | F14 | Result |
+| --- | --- | --- | --- |
+| Route-variable genomes | 3/36 | 0/36 | Pass |
+| Mean executed nodes | 83/36 = 2.305556 | 78/36 = 2.166667 | Pass |
+| Cap-hit executions | 0/2880 | 57/2880 | Pass |
+| Retarget dead/applied | 23/420 = 0.054762 | 238/720 = 0.330556 | Pass |
+| RemoveNode dead/applied | 0/320 | 588/720 | Pass |
+| RemoveRouteTarget dead/applied | 0/400 | 473/720 | Pass |
+| Evolved dead births overall / mutated | 21/7200; 21/3300 | 122/7200; 122/3300 | Pass |
+| Founder dead births overall / mutated | 0/500; 0/208 | 9/500; 9/208 | Pass |
+
+All five founder growth operators (AddNode, AddRouteTarget, CopyNode,
+SpliceNode, SwapNodeBackend) applied 50/50 trials with 50/50 silent.
+All untouched VM/graph/input-reference founder rows equal F14. The complete
+differing founder rows are RemoveNode and RemoveRouteTarget (50 dead applied
+to 50 skipped), RetargetNodeTarget (28 silent/22 dead to 50 skipped),
+SwapNodeBackend (27 changed/23 dead to 50 silent attached alternatives),
+and SpliceNode (48 silent/2 changed to 50 silent fixed Halt detours).
+Skipped fractions are Undefined, not silence. RewriteNodeId is absent.
+Founder birth silence rose 83/208→92/208. Evolved silence rose
+1864/3300→2069/3300, contrary to the expected decrease but not a binding
+failure; new evolved subjects and altered seeded topology composition prevent
+an operator-equivalence interpretation. Three variable routes do not establish
+useful cognition or ecological neutrality.
+
+Every per-seed operator silence decrease or dead increase is recorded below.
+Entries are exact silent/applied and dead/applied fractions, F14→F15;
+these compare newly sampled evolved subjects, not identical genomes.
+
+| Seed | Operator | Silent/applied F14→F15 | Dead/applied F14→F15 |
+| --- | --- | --- | --- |
+| 11 | VmInstructionMutation | 137/240→184/240 | 1/240→2/240 |
+| 11 | VmCopyGeneBackwardSlice | 101/220→116/186 | 7/220→9/186 |
+| 11 | AlterGraphEdgeWeight | 185/224→190/232 | 0/224→0/232 |
+| 11 | RetargetGraphEdge | 68/224→61/232 | 0/224→0/232 |
+| 11 | RemoveGraphEdge | 61/224→60/232 | 0/224→0/232 |
+| 11 | GraphRawFieldMutation | 71/217→72/230 | 0/217→0/230 |
+| 11 | ChangeEntryNode | 13/240→3/240 | 22/240→3/240 |
+| 11 | MutateGateBias | 240/240→228/240 | 0/240→0/240 |
+| 22 | VmInstructionMutation | 122/240→148/240 | 1/240→2/240 |
+| 22 | VmDeleteInstruction | 98/240→75/192 | 0/240→0/192 |
+| 22 | VmInstructionRawFieldMutation | 106/240→84/192 | 0/240→0/192 |
+| 22 | VmCopyGeneBackwardSlice | 132/240→101/192 | 4/240→8/192 |
+| 22 | VmInsertReadStoreMotif | 199/231→175/204 | 0/231→0/204 |
+| 22 | AlterGraphEdgeWeight | 203/240→198/240 | 0/240→0/240 |
+| 22 | SwapGraphOperator | 84/240→41/240 | 0/240→0/240 |
+| 22 | MutateGraphOperatorParam | 203/240→199/240 | 0/240→0/240 |
+| 22 | RemoveInternalGraphNode | 51/240→5/240 | 0/240→0/240 |
+| 22 | RetargetGraphEdge | 65/240→31/240 | 0/240→0/240 |
+| 22 | RemoveGraphEdge | 64/240→42/240 | 0/240→0/240 |
+| 22 | GraphRawFieldMutation | 60/231→49/240 | 0/231→0/240 |
+| 22 | CopyEdgeBundle | 110/228→97/240 | 0/228→0/240 |
+| 22 | EnableHebbian | 158/228→159/240 | 0/228→0/240 |
+| 22 | RawFieldMutation | 43/240→42/240 | 0/240→0/240 |
+| 33 | VmCopyInstructionBlock | 146/240→159/240 | 0/240→2/240 |
+| 33 | VmCopyInstructionBlockRemapped | 139/240→159/240 | 0/240→1/240 |
+| 33 | SwapGraphOperator | 82/240→71/217 | 0/240→0/217 |
+| 33 | AddGraphEdge | 222/240→220/240 | 0/240→0/240 |
+| 33 | RemoveGraphEdge | 82/240→61/217 | 0/240→0/217 |
+| 33 | ChangeEntryNode | 4/240→11/240 | 8/240→19/240 |
+| 33 | MutateGateBias | 230/240→210/240 | 2/240→20/240 |
+
+Incomparable zero-applied rows (fractions remain Undefined): 11 VmMutatePairedSlotAddress (0→0 applied); 11 DisableHebbian (20→0 applied); 11 MutateHebbianRule (20→0 applied); 11 MutateHebbianRate (20→0 applied); 11 ToggleHebbianLamarckian (20→0 applied); 11 EnableRewardModulation (20→0 applied); 11 DisableRewardModulation (0→0 applied); 11 MutateRewardSource (0→0 applied); 11 MutateTraceDecay (0→0 applied); 22 VmMutatePairedSlotAddress (0→0 applied); 22 DisableHebbian (0→20 applied); 22 MutateHebbianRule (0→20 applied); 22 MutateHebbianRate (0→20 applied); 22 ToggleHebbianLamarckian (0→20 applied); 22 EnableRewardModulation (0→20 applied); 22 DisableRewardModulation (0→0 applied); 22 MutateRewardSource (0→0 applied); 22 MutateTraceDecay (0→0 applied); 33 VmMutatePairedSlotAddress (0→0 applied); 33 DisableRewardModulation (0→0 applied); 33 MutateRewardSource (0→0 applied); 33 MutateTraceDecay (0→0 applied).
+
+All birth event buckets follow. Each cell is `silent / changed / dead` over
+the applied-birth denominator, F14→F15; requested-event counts are separately
+listed so zero-event exposure is not confused with silence.
+
+| Subject | Applied events | F14 silent/changed/dead / denominator | F15 silent/changed/dead / denominator |
+| --- | --- | --- | --- |
+| founder | any | 83/116/9 / 208 | 92/116/0 / 208 |
+| founder | 1 | 72/86/6 / 164 | 80/84/0 / 164 |
+| founder | 2 | 10/21/2 / 33 | 10/23/0 / 33 |
+| founder | 3 | 1/8/1 / 10 | 2/8/0 / 10 |
+| founder | 4 | 0/1/0 / 1 | 0/1/0 / 1 |
+| 11 | any | 605/452/43 / 1100 | 722/375/3 / 1100 |
+| 11 | 1 | 543/341/28 / 912 | 644/267/1 / 912 |
+| 11 | 2 | 55/85/13 / 153 | 66/85/2 / 153 |
+| 11 | 3 | 7/20/2 / 29 | 8/21/0 / 29 |
+| 11 | 4 | 0/4/0 / 4 | 3/1/0 / 4 |
+| 11 | 5 | 0/2/0 / 2 | 1/1/0 / 2 |
+| 22 | any | 589/471/40 / 1100 | 628/471/1 / 1100 |
+| 22 | 1 | 528/358/26 / 912 | 551/361/0 / 912 |
+| 22 | 2 | 54/88/11 / 153 | 66/86/1 / 153 |
+| 22 | 3 | 4/22/3 / 29 | 9/20/0 / 29 |
+| 22 | 4 | 2/2/0 / 4 | 1/3/0 / 4 |
+| 22 | 5 | 1/1/0 / 2 | 1/1/0 / 2 |
+| 33 | any | 670/391/39 / 1100 | 719/364/17 / 1100 |
+| 33 | 1 | 599/287/26 / 912 | 628/271/13 / 912 |
+| 33 | 2 | 61/81/11 / 153 | 76/73/4 / 153 |
+| 33 | 3 | 8/19/2 / 29 | 12/17/0 / 29 |
+| 33 | 4 | 1/3/0 / 4 | 2/2/0 / 4 |
+| 33 | 5 | 1/1/0 / 2 | 1/1/0 / 2 |
+
+Requested events:births counts: founder: F14 0:292, 1:164, 2:33, 3:10, 4:1; F15 0:292, 1:164, 2:33, 3:10, 4:1; 11: F14 0:1300, 1:912, 2:153, 3:29, 4:4, 5:2; F15 0:1300, 1:912, 2:153, 3:29, 4:4, 5:2; 22: F14 0:1300, 1:912, 2:153, 3:29, 4:4, 5:2; F15 0:1300, 1:912, 2:153, 3:29, 4:4, 5:2; 33: F14 0:1300, 1:912, 2:153, 3:29, 4:4, 5:2; F15 0:1300, 1:912, 2:153, 3:29, 4:4, 5:2.
+
+Goal indicators, dated 2026-09-06. All three seeds persist through 2000
+ticks with no extinction, as do F14 and the original [T01.F11 1600 baseline](../../progress/sweeps/t01-f11/w1600.json).
+Births total 777809 versus F14 801283 (-2.93%); births/100 ticks are
+12963.483333 versus 13354.716667. Persistence shifts are descriptive:
+
+| Report | Seed | Final population | Minimum | Peak @ tick | Plateau | Births | Mean energy |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| T01.F11 | 11 | 5291 | 3243 | 35279 @ 141 | 4682.102000 | 134117 | 39.941636 |
+| T01.F11 | 22 | 10997 | 5830 | 36369 @ 146 | 9737.116000 | 179125 | 36.785455 |
+| T01.F11 | 33 | 8130 | 5031 | 35433 @ 144 | 7631.720000 | 166410 | 45.012392 |
+| F14 | 11 | 10350 | 10000 | 32751 @ 140 | 11439.410000 | 267777 | 66.012374 |
+| F14 | 22 | 11646 | 10000 | 32957 @ 146 | 12276.262000 | 266319 | 66.433808 |
+| F14 | 33 | 10464 | 10000 | 32557 @ 132 | 11146.880000 | 267187 | 68.841066 |
+| F15 | 11 | 10786 | 10000 | 34246 @ 140 | 10596.510000 | 264508 | 64.769102 |
+| F15 | 22 | 11669 | 10000 | 34689 @ 144 | 12308.016000 | 260708 | 61.160928 |
+| F15 | 33 | 11714 | 10000 | 34251 @ 145 | 12191.246000 | 252593 | 60.370774 |
+
+Founder depth0 retains total/reachable/executed/knockout 2/2/2/0,
+route variation 0/1 and cap hits 0/80. Evolved readings aggregate 12 genomes
+per seed, each with 48 reset route probes and the complete 80-execution
+battery. Knockouts are silent static-successor bypasses over that battery,
+not ecological neutrality. All sampled meshes are below the unchanged cap.
+
+| Seed | Whole-population median/max depth F14→F15 | Sample generations F15 | Total/reachable/executed/knockout F15 | Variable routes | Cap hits |
+| --- | --- | --- | --- | --- | --- |
+| 11 | 23/43→23/45 | 19,33,27,13,19,26,21,13,36,11,24,20 | 46/37/29/6 | 1/12 | 0/960 |
+| 22 | 22/44→21/52 | 17,17,25,20,11,9,24,12,18,22,19,27 | 30/30/29/5 | 1/12 | 0/960 |
+| 33 | 22/44→22/44 | 19,16,24,27,19,24,33,16,24,16,20,27 | 37/36/25/1 | 1/12 | 0/960 |
+
+Pooled mesh totals are 113/103/83/12 across 36 genomes; the mean total,
+reachable, executed and knockout counts are 3.138889, 2.861111, 2.305556
+and 0.333333. These are bounded evolved samples, not a whole-population
+battery census.
+
+| Seed | Shared-memory sensitivity F14→F15 | Operator-state sensitivity F14→F15 | Persisted-output sensitivity F14→F15 | Previous-slot sensitivity F14→F15 |
+| --- | --- | --- | --- | --- |
+| 11 | 0/10350→3/10786 | 14/10350→37/10786 | 25/10350→8/10786 | 0/10350→0/10786 |
+| 22 | 1/11646→2/11669 | 25/11646→11/11669 | 11/11646→13/11669 | 2/11646→0/11669 |
+| 33 | 0/10464→0/11714 | 9/10464→17/11714 | 7/10464→25/11714 | 0/10464→0/11714 |
+
+Shared-memory differences all come from scrambling, with zero differences
+under zeroing. Sensitivity is an action-difference probe, not demonstrated
+memory dependence. Structure distribution F14→F15: min 1→3, p25 96→97,
+median 101→104, p75 119→153, max 489→723, mean 117.196334→125.564576.
+Clades by seed F14→F15 are 214→173, 170→212, 195→225; entropy (nats)
+4.335792→4.038022, 4.233764→4.284456, 4.015665→4.251236.
+
+Structural exposure among each 12-genome sample (reads shared memory, writes
+shared memory, stateful compute, plasticity) is:
+- Seed 11: 3/12, 4/12, 0/12, 0/12.
+- Seed 22: 3/12, 2/12, 0/12, 1/12.
+- Seed 33: 3/12, 3/12, 0/12, 1/12.
+
+Adaptive novelty, evolutionary activity, information integration, learning
+dependence, memory dependence, prediction dependence, reciprocal interaction,
+strategy count and strategy causal distinctness remain `Undefined`.
+No absent measure is promoted to a success claim.
+
+Track floors remain distinct from F15 acceptance: founder single-event
+silence 80/164 = 48.78% remains below 60%; mutated dead births 0/208 meet
+5%. Founder read/store, read/bid and load/compare motifs are 90%, 88%, 84%
+silent, meeting 80%; graph add/copy and input addition retain 100%, meeting
+95%. Existing property tests remain the control-flow reference evidence.
+T11.F10 still owns complete track-floor closure and useful remembered decisions.
 
 ## Success Criteria
 
-- [ ] One addition can produce a conditional but behavior-preserving branch
+- [x] One addition can produce a conditional but behavior-preserving branch
       on both backends; growth is attached, copy/backend alternatives preserve
       the original, and later ordinary mutation can differentiate behavior.
-- [ ] Local retarget/removal semantics and a once-per-tick node visit are
+- [x] Local retarget/removal semantics and a once-per-tick node visit are
       implemented in production with truthful observations and owning references.
-- [ ] All predeclared mesh, dead-birth, drift, and compute targets are met;
+- [x] All predeclared mesh, dead-birth, drift, and compute targets are met;
       remaining T11.F10 floors and exposure limits are reported honestly.
-- [ ] Fresh mutation evidence, independent review, final checks and closure
+- [x] Fresh mutation evidence, independent review, final checks and closure
       records are complete; T11.F15 is checked and this spec is Complete on main.
 
 ## Notes for AI Agents
@@ -430,8 +675,8 @@ Measured results: pending implementation and the single closure run.
   revision clarifies the unchanged-founder comparison, retained graph-backend
   growth path, and nonvacuous founder growth trials. Template, scope, source
   evidence, quantitative targets and tests were reviewed. This is author
-  self-review, not runtime or independent validation. Implementation and
-  closure verification remain pending.
+  self-review, not runtime or independent validation. Subsequent implementation,
+  independent review and closure verification are recorded below.
 - Planning verification, 2026-09-06: `make roadmap-check` exited 0 with
   `roadmap-check: validation passed`; `git diff --check` exited 0. Aqua
   emitted cache/timestamp permission warnings but the validator ran and
@@ -483,10 +728,14 @@ Measured results: pending implementation and the single closure run.
   trajectory or new harness is needed. This changes the verification method,
   not the feature's biological or numerical acceptance targets. Extinction
   under this stress configuration is not evidence of production persistence.
-  Verification of the amended test remains pending implementation.
-- Current record: 5 advisor consultations; 2 requirement corrections;
-  0 acceptance exceptions. Final findings, remediation passes and user
-  interventions: pending. Usage unavailable.
+  Amended verification passed: one reproducibility test, 7.79 seconds,
+  `/tmp/t11-f15-reproducibility-verified.log`; compared every tick and retained
+  the nonempty post-mutation descendant checkpoint despite final extinction.
+- Final record: 6 advisor consultations; 2 requirement corrections;
+  0 acceptance exceptions; independent review 0 P1 / 0 P2 / 0 P3;
+  1 test-only mutation remediation pass and 0 post-review remediation passes.
+  No user interventions beyond the original launch authorization. Usage is
+  recorded in the dated task-specific snapshot below.
 
 - Implementation advisor record: consultations 2–4 accepted the fresh
   current-topology removal eligibility (parent cache retained for classification),
@@ -494,5 +743,61 @@ Measured results: pending implementation and the single closure run.
   test-only representable costs, and the known sensor-fed graph source fixture.
   Consultation 5 accepted the stronger unchanged-parameter trajectory
   reproducibility harness recorded above. All advice was evaluated against
-  the spec; no optional expansion was adopted. Current count: 5 consultations,
+  the spec; no optional expansion was adopted. Current count: 6 consultations,
   2 explicit requirement corrections, 0 acceptance exceptions.
+
+- Before-done advisor checkpoint 6 accepted the complete implementation and
+  measurement evidence without a new blocker. The advisor inspected the 55
+  test-only remediation lines and confirmed the sole remaining mutant's
+  equivalence. Accepted recommendations: retain the single goal run and
+  unchanged production checkpoint, record lower drift execution and higher
+  evolved silence honestly, complete evidence/status text, and proceed to
+  independent review. No recommendation was rejected; no further production
+  change or measurement rerun was requested. Counts: 6 consultations,
+  2 requirement corrections, 0 acceptance exceptions; one test-only mutation
+  remediation pass. Independent review, final checks and integration belong
+  to the orchestrator. The closing state is Complete with the feature row checked;
+  the parent task records the tested commit and sequential integration evidence.
+
+## Closure Evidence
+
+- Fresh independent `gpt-6-astra` high review: **0 P1, 0 P2, 0 P3**.
+  The reviewer read the original roadmap intent, full diff, test-only remediation,
+  reports and mutation artifacts without running builds/tests or consulting the
+  spec owner. No remediation was requested.
+- Orchestrator independently ran `make roadmap-check` after planning and
+  implementation; both passed. `make check` exited **0** on the reviewed
+  implementation and reports (`/tmp/t11-f15-make-check-preclosure.log`).
+  The Complete-state documents are checked again before the closing commit;
+  the exact tested commit, fast-forward, cleanup and clean-main evidence are
+  recorded in the parent task, avoiding a self-referential commit hash here.
+- The T11 track remains In Progress and the master Active because other
+  features remain open. Historical reports and the pinned epoch are unchanged.
+- Task-specific usage snapshot at **2026-09-07T02:54:08.900347+00:00**, from the latest
+  native session `total_token_usage` events for this parent and its three
+  agents: **58,479,343 total tokens**, comprising 58,354,604
+  input tokens (including 57,478,656 cached input tokens) and
+  124,739 output tokens. Reasoning output is 19,925,
+  already included in output, not added again. These are native usage token
+  counts including repeated cached context, not unique text. Dollar cost is
+  unavailable; the snapshot excludes remaining parent closure activity.
+
+  | Role | Model / effort | Total tokens at snapshot |
+  | --- | --- | ---: |
+  | /root | `gpt-6-astra` / `medium` | 23,625,480 |
+  | /root/roadmap_implementer | `gpt-6-astra` / `low` | 24,313,504 |
+  | /root/roadmap_reviewer | `gpt-6-astra` / `high` | 1,456,325 |
+  | /root/roadmap_spec_owner | `gpt-6-astra` / `xhigh` | 9,084,034 |
+
+- Integration reconciliation: the first verified closing commit was
+  `65c39c898ee5a866576d152ff7f365102a63d2ac` (tested tree
+  `dfc623314982f8bf29447bd3b93d38e597fcb1d1`). Integration temporarily
+  waited for unrelated staged Claude workflow edits in the main checkout;
+  those edits were preserved and committed by their session as
+  `2dd803982ec3a6042f9ceb55881139124ecae5c8`. Main then became clean.
+  Under the original authorization, the feature branch was rebased onto that
+  commit without conflicts. The incoming change affects Claude role settings
+  and documentation, not Petri simulation behavior or this Codex adapter.
+  The orchestrator reruns `make check` on the rebased closing content and
+  records its resulting tested commit in the parent task before fast-forward.
+  No user intervention or requirement change was needed for reconciliation.
