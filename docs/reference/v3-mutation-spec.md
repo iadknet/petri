@@ -224,6 +224,10 @@ trace/reward clock, T11.F09 learned-state correspondence, and T11.F15 the
 topology connection operators (`AddRouteTarget`, `MutateGateBias`,
 `RetargetNodeTarget`, `RemoveRouteTarget`, `RemoveNode`, `SwapNodeBackend`,
 `ChangeEntryNode`, `SwapRouteTargets`) and mesh attachment semantics above.
+T11.F17 (pending, 2026-09-07) owns the target draw of requirement 4: it will
+restate "uniform opportunity across eligible live and inactive mesh nodes" as
+a draw biased toward the nodes the parent's brain executed in recent ticks,
+with a uniform residual, leaving the per-birth event count unchanged.
 
 T11.F08 owns duplication on all three backends: VM dormant-tail placement and
 its terminal guard, graph copy placement and the copy self-edge rule, the
