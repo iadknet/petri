@@ -18,7 +18,8 @@
       "docs/progress/features/t11-f14-mesh-execution-observability.json",
       "docs/progress/features/t11-f15-mesh-routing-connection-semantics.json",
       "docs/progress/features/t11-f08-function-preserving-duplication-and-module-growth.json",
-      "docs/progress/features/remove-complementary-nutrition.json"
+      "docs/progress/features/remove-complementary-nutrition.json",
+      "docs/progress/features/t11-f16-drift-depth-indicator.json"
     ]
   },
   "goal": {
@@ -35,7 +36,8 @@
       "docs/progress/features/t11-f14-mesh-execution-observability-goal.json",
       "docs/progress/features/t11-f15-mesh-routing-connection-semantics-goal.json",
       "docs/progress/features/t11-f08-function-preserving-duplication-and-module-growth-goal.json",
-      "docs/progress/features/remove-complementary-nutrition-goal.json"
+      "docs/progress/features/remove-complementary-nutrition-goal.json",
+      "docs/progress/features/t11-f16-drift-depth-indicator-goal.json"
     ]
   },
   "counter_definition_changes": [
