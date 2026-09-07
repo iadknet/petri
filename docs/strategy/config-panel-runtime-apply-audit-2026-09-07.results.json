@@ -1,0 +1,1357 @@
+[
+ {
+  "path": "world.food.shared.occupancy_depletion.enabled",
+  "label": "Occupancy Depletion Enabled",
+  "original": true,
+  "probes": [
+   {
+    "probe": "toggle",
+    "sent": false,
+    "status": 200,
+    "stored": false,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "world.food.shared.occupancy_depletion.deposit_per_occupied_tick",
+  "label": "Occupancy Depletion Rate",
+  "original": 0.07999999821186066,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.0829999982119,
+    "status": 200,
+    "stored": 0.08299999684095383,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "world.food.shared.growth_rate",
+  "label": "Food Growth Rate",
+  "original": 0.09000000357627869,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.0930000035763,
+    "status": 200,
+    "stored": 0.09300000220537186,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "world.food.shared.spread_threshold_ratio",
+  "label": "Spread Threshold Ratio",
+  "original": 0.800000011920929,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.830000011921,
+    "status": 200,
+    "stored": 0.8299999833106995,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "world.food.shared.spread_density_ratio",
+  "label": "Spread Density Ratio",
+  "original": 0.25,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.28,
+    "status": 200,
+    "stored": 0.2800000011920929,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "world.food.shared.recovery_spawn_rate",
+  "label": "Recovery Spawn Rate",
+  "original": 0.009999999776482582,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.0399999997765,
+    "status": 200,
+    "stored": 0.03999999910593033,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "world.food.shared.recovery_floor_ratio",
+  "label": "Recovery Floor Ratio",
+  "original": 0.009999999776482582,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.0399999997765,
+    "status": 200,
+    "stored": 0.03999999910593033,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "world.food.shared.max_density",
+  "label": "Food Max Density",
+  "original": 1,
+  "probes": [
+   {
+    "probe": "min",
+    "sent": 0.1,
+    "status": 422,
+    "stored": 1,
+    "saved": false,
+    "reason": "runtime config patch contains values outside canonical constraints"
+   }
+  ]
+ },
+ {
+  "path": "population.max_creatures",
+  "label": "Max Creatures",
+  "original": 100000,
+  "probes": [
+   {
+    "probe": "min",
+    "sent": 1,
+    "status": 422,
+    "stored": 100000,
+    "saved": false,
+    "reason": "runtime config patch contains values outside canonical constraints"
+   }
+  ]
+ },
+ {
+  "path": "energy.lifecycle.max_energy",
+  "label": "Max Energy",
+  "original": 200,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 203,
+    "status": 200,
+    "stored": 203,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1000,
+    "status": 200,
+    "stored": 1000,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "energy.lifecycle.energy_decay_per_tick",
+  "label": "Decay / Tick",
+  "original": 0.5,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.53,
+    "status": 200,
+    "stored": 0.5299999713897705,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 10,
+    "status": 200,
+    "stored": 10,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "energy.lifecycle.min_reproduce_energy",
+  "label": "Min Reproduce Energy",
+  "original": 30,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 31.5,
+    "status": 200,
+    "stored": 31.5,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 500,
+    "status": 200,
+    "stored": 500,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "energy.lifecycle.default_offspring_energy",
+  "label": "Offspring Energy",
+  "original": 100,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 101.5,
+    "status": 200,
+    "stored": 101.5,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 500,
+    "status": 200,
+    "stored": 500,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "energy.costs.eat_reward_per_food",
+  "label": "Eat Reward",
+  "original": 5,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 5.3,
+    "status": 200,
+    "stored": 5.300000190734863,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 100,
+    "status": 200,
+    "stored": 100,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "energy.costs.move_cost",
+  "label": "Move Cost",
+  "original": 0.20000000298023224,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.23000000298,
+    "status": 200,
+    "stored": 0.23000000417232513,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 10,
+    "status": 200,
+    "stored": 10,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "energy.costs.eat_cost",
+  "label": "Eat Cost",
+  "original": 0,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.03,
+    "status": 200,
+    "stored": 0.029999999329447746,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 10,
+    "status": 200,
+    "stored": 10,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "energy.costs.noop_cost",
+  "label": "Noop Cost",
+  "original": 0.05000000074505806,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.0800000007451,
+    "status": 200,
+    "stored": 0.07999999821186066,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 10,
+    "status": 200,
+    "stored": 10,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "energy.costs.reproduce_cost",
+  "label": "Reproduce Cost",
+  "original": 0.10000000149011612,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.40000000149,
+    "status": 200,
+    "stored": 0.4000000059604645,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 50,
+    "status": 200,
+    "stored": 50,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "energy.costs.failed_action_penalty",
+  "label": "Failed Action Penalty",
+  "original": 1,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 1.3,
+    "status": 422,
+    "stored": 1,
+    "saved": false,
+    "reason": "startup failed-action-penalty ramp is still active"
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 422,
+    "stored": 1,
+    "saved": false,
+    "reason": "startup failed-action-penalty ramp is still active"
+   },
+   {
+    "probe": "max",
+    "sent": 20,
+    "status": 422,
+    "stored": 1,
+    "saved": false,
+    "reason": "startup failed-action-penalty ramp is still active"
+   }
+  ]
+ },
+ {
+  "path": "energy.complexity_cost.threshold",
+  "label": "Threshold",
+  "original": 50,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 80,
+    "status": 200,
+    "stored": 80,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 500,
+    "status": 200,
+    "stored": 500,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "energy.complexity_cost.scaling_factor",
+  "label": "Scaling Factor",
+  "original": 0.0020000000949949026,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.00500000009499,
+    "status": 200,
+    "stored": 0.004999999888241291,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 0.02,
+    "status": 200,
+    "stored": 0.019999999552965164,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "energy.complexity_cost.enabled",
+  "label": "Complexity Cost",
+  "original": false,
+  "probes": [
+   {
+    "probe": "toggle",
+    "sent": true,
+    "status": 200,
+    "stored": true,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "energy.age_cost.age_cap",
+  "label": "Age Cap",
+  "original": 500,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 530,
+    "status": 200,
+    "stored": 530,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 5000,
+    "status": 200,
+    "stored": 5000,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "energy.age_cost.max_multiplier",
+  "label": "Max Multiplier",
+  "original": 10,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 11.5,
+    "status": 200,
+    "stored": 11.5,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 50,
+    "status": 200,
+    "stored": 50,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "energy.age_cost.enabled",
+  "label": "Age Cost",
+  "original": true,
+  "probes": [
+   {
+    "probe": "toggle",
+    "sent": false,
+    "status": 200,
+    "stored": false,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "runtime.max_mesh_hops",
+  "label": "Max Mesh Hops",
+  "original": 1024,
+  "probes": [
+   {
+    "probe": "min",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "runtime.max_vm_steps",
+  "label": "Max VM Steps",
+  "original": 10000,
+  "probes": [
+   {
+    "probe": "min",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "runtime.max_graph_relax_iters",
+  "label": "Graph Relax Iters (inactive)",
+  "original": 15,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 18,
+    "status": 200,
+    "stored": 18,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 100,
+    "status": 200,
+    "stored": 100,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "runtime.graph_convergence_epsilon",
+  "label": "Convergence Epsilon (inactive)",
+  "original": 0.0010000000474974513,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.0013000000475,
+    "status": 200,
+    "stored": 0.0013000000035390258,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0.0001,
+    "status": 200,
+    "stored": 0.00009999999747378752,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "runtime.graph_convergence_stable_passes",
+  "label": "Stable Passes (inactive)",
+  "original": 2,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 5,
+    "status": 200,
+    "stored": 5,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 10,
+    "status": 200,
+    "stored": 10,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "runtime.graph_node_base_cost",
+  "label": "Node Base Cost",
+  "original": 0.000009999999747378752,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.30001,
+    "status": 200,
+    "stored": 0.30000999569892883,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 100,
+    "status": 200,
+    "stored": 100,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "runtime.vm.opcode_cost_multiplier",
+  "label": "Opcode Cost Mult.",
+  "original": 9.999999974752427e-7,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.300001,
+    "status": 200,
+    "stored": 0.30000099539756775,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 10,
+    "status": 200,
+    "stored": 10,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "runtime.plasticity_update_cost",
+  "label": "Plasticity Update Cost",
+  "original": 0,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.003,
+    "status": 200,
+    "stored": 0.003000000026077032,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 10,
+    "status": 200,
+    "stored": 10,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "runtime.reward_learning_cost",
+  "label": "Reward Learning Cost",
+  "original": 0,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.003,
+    "status": 200,
+    "stored": 0.003000000026077032,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 10,
+    "status": 200,
+    "stored": 10,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "runtime.max_actions_per_turn",
+  "label": "Max Actions/Turn",
+  "original": 10,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 13,
+    "status": 200,
+    "stored": 13,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 1,
+    "status": 422,
+    "stored": 10,
+    "saved": false,
+    "reason": "runtime config patch contains values outside canonical constraints"
+   },
+   {
+    "probe": "max",
+    "sent": 20,
+    "status": 200,
+    "stored": 20,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "runtime.perception.vision_radius",
+  "label": "Vision Radius",
+  "original": 5,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 8,
+    "status": 200,
+    "stored": 8,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "mutation.mutation_probability",
+  "label": "Mutation Prob.",
+  "original": 0.44,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.443,
+    "status": 200,
+    "stored": 0.443,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "mutation.per_birth_mutation_events_min",
+  "label": "Min Events/Birth",
+  "original": 1,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 4,
+    "status": 200,
+    "stored": 4,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 422,
+    "stored": 1,
+    "saved": false,
+    "reason": "runtime config patch contains values outside canonical constraints"
+   },
+   {
+    "probe": "max",
+    "sent": 20,
+    "status": 422,
+    "stored": 1,
+    "saved": false,
+    "reason": "runtime config patch contains values outside canonical constraints"
+   }
+  ]
+ },
+ {
+  "path": "mutation.per_birth_mutation_events_max",
+  "label": "Max Events/Birth",
+  "original": 10,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 13,
+    "status": 200,
+    "stored": 13,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 422,
+    "stored": 10,
+    "saved": false,
+    "reason": "runtime config patch contains values outside canonical constraints"
+   },
+   {
+    "probe": "max",
+    "sent": 20,
+    "status": 200,
+    "stored": 20,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "mutation.per_birth_mutation_event_continuation_probability",
+  "label": "Continue Events Prob.",
+  "original": 0.2,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.23,
+    "status": 200,
+    "stored": 0.23,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "mutation.mesh_layer_probability",
+  "label": "Mesh Layer Prob.",
+  "original": 0.2,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.23,
+    "status": 200,
+    "stored": 0.23,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "mutation.genome_size_cap",
+  "label": "Genome Size Cap",
+  "original": 1200,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 1203,
+    "status": 200,
+    "stored": 1203,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 5000,
+    "status": 200,
+    "stored": 5000,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "mutation.phenotype.channel_step",
+  "label": "Channel Step",
+  "original": 1,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 4,
+    "status": 200,
+    "stored": 4,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 50,
+    "status": 200,
+    "stored": 50,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "mutation.phenotype.polarity_flip_chance",
+  "label": "Polarity Flip",
+  "original": 0.00019999999494757503,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.00319999999495,
+    "status": 200,
+    "stored": 0.0031999999191612005,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "mutation.phenotype.channel_change_chance",
+  "label": "Channel Switch",
+  "original": 0.0010000000474974513,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.0040000000475,
+    "status": 200,
+    "stored": 0.004000000189989805,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "mutation.action_queue_cap",
+  "label": "Action Queue Cap",
+  "original": 4,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 7,
+    "status": 200,
+    "stored": 7,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 16,
+    "status": 422,
+    "stored": 4,
+    "saved": false,
+    "reason": "runtime config patch contains values outside canonical constraints"
+   }
+  ]
+ },
+ {
+  "path": "mutation.reachable_bias.topology",
+  "label": "Bias: Topology",
+  "original": 0,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.03,
+    "status": 200,
+    "stored": 0.03,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "mutation.reachable_bias.vm",
+  "label": "Bias: VM",
+  "original": 0,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.03,
+    "status": 200,
+    "stored": 0.03,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "mutation.reachable_bias.graph",
+  "label": "Bias: Graph",
+  "original": 0,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.03,
+    "status": 200,
+    "stored": 0.03,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "mutation.reachable_bias.input_ref",
+  "label": "Bias: Input Ref",
+  "original": 0,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.03,
+    "status": 200,
+    "stored": 0.03,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "mutation.genome_size_pressure_enabled",
+  "label": "Genome Size Pressure",
+  "original": false,
+  "probes": [
+   {
+    "probe": "toggle",
+    "sent": true,
+    "status": 200,
+    "stored": true,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "predation.steal_cost_rate",
+  "label": "Steal Cost Rate",
+  "original": 0.05000000074505806,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.0800000007451,
+    "status": 200,
+    "stored": 0.07999999821186066,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 200,
+    "stored": 0,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "predation.kill_complexity_bonus_multiplier",
+  "label": "Kill Complexity Bonus",
+  "original": 0,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.03,
+    "status": 200,
+    "stored": 0.029999999329447746,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "action_log.capacity",
+  "label": "Log Capacity",
+  "original": 500,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 650,
+    "status": 200,
+    "stored": 650,
+    "saved": true
+   },
+   {
+    "probe": "min",
+    "sent": 0,
+    "status": 422,
+    "stored": 500,
+    "saved": false,
+    "reason": "runtime config patch contains values outside canonical constraints"
+   },
+   {
+    "probe": "max",
+    "sent": 5000,
+    "status": 200,
+    "stored": 5000,
+    "saved": true
+   }
+  ]
+ },
+ {
+  "path": "shared_memory.decay_rate",
+  "label": "Decay Rate",
+  "original": 0,
+  "probes": [
+   {
+    "probe": "nudge",
+    "sent": 0.03,
+    "status": 200,
+    "stored": 0.029999999329447746,
+    "saved": true
+   },
+   {
+    "probe": "max",
+    "sent": 1,
+    "status": 200,
+    "stored": 1,
+    "saved": true
+   }
+  ]
+ }
+]
