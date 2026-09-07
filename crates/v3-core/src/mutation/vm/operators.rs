@@ -278,7 +278,7 @@ fn nudge_one_u8(fields: &mut [&mut u8], rng: &mut impl Rng) {
     nudge_u8(fields[selected], rng);
 }
 
-pub(super) fn mutate_one_instruction_field(
+pub(crate) fn mutate_one_instruction_field(
     instruction: &mut VmInstruction,
     rng: &mut impl Rng,
 ) -> bool {
@@ -714,6 +714,50 @@ pub(crate) fn splice_program_with_reference_repair(
 
 // ── VM Copy Operators ──
 
+/// The instructions that end a dispatch when control flow reaches them.
+pub(crate) fn is_terminal_instruction(instruction: &VmInstruction) -> bool {
+    matches!(
+        instruction,
+        VmInstruction::ExecuteActionQueue | VmInstruction::Halt
+    )
+}
+
+/// Splice a copy of `source_indices` into a dormant span at the program tail
+/// (T11.F08).
+///
+/// Every surviving jump keeps its old resolved target through T11.F02 repair,
+/// so nothing outside the span jumps into it; when the program's last
+/// instruction is not already a terminal, a newly authored `Halt` guard is
+/// spliced immediately before the copied span in the same event, so
+/// fall-through halts where running past the old program's end used to halt.
+/// The span becomes reachable only through a later jump mutation. Executing
+/// the guard costs its own `Halt` step.
+fn copy_span_to_dormant_tail(
+    program: &mut Vec<VmInstruction>,
+    source_indices: impl IntoIterator<Item = usize>,
+) -> Result<(), MutationSkipReason> {
+    let tail = program.len();
+    let mut inserted: Vec<SpliceInstruction> = program
+        .last()
+        .is_some_and(|last| !is_terminal_instruction(last))
+        .then_some(SpliceInstruction {
+            instruction: VmInstruction::Halt,
+            source_index: None,
+        })
+        .into_iter()
+        .collect();
+    for source_index in source_indices {
+        inserted.push(SpliceInstruction {
+            instruction: program
+                .get(source_index)
+                .ok_or(MutationSkipReason::NoApplicableTarget)?
+                .clone(),
+            source_index: Some(source_index),
+        });
+    }
+    splice_program_with_reference_repair(program, tail..tail, inserted)
+}
+
 pub(super) fn apply_copy_instruction_block(
     genome: &mut CreatureGenome,
     node_idx: usize,
@@ -726,16 +770,7 @@ pub(super) fn apply_copy_instruction_block(
         }
         let block_size = rng.gen_range(2..=32).min(vm.program.len());
         let source_start = rng.gen_range(0..=vm.program.len() - block_size);
-        let block = vm.program[source_start..source_start + block_size]
-            .iter()
-            .enumerate()
-            .map(|(offset, instruction)| SpliceInstruction {
-                instruction: instruction.clone(),
-                source_index: Some(source_start + offset),
-            })
-            .collect();
-        let insert_at = rng.gen_range(0..=vm.program.len());
-        splice_program_with_reference_repair(&mut vm.program, insert_at..insert_at, block)?;
+        copy_span_to_dormant_tail(&mut vm.program, source_start..source_start + block_size)?;
     }
     Ok(())
 }
@@ -806,16 +841,7 @@ pub(super) fn apply_copy_gene_backward_slice(
             return Err(MutationSkipReason::NoApplicableTarget);
         }
         if let Some(gene) = vm_backward_slice_random(&vm.program, rng) {
-            let extracted = gene
-                .indices
-                .iter()
-                .map(|&source_index| SpliceInstruction {
-                    instruction: vm.program[source_index].clone(),
-                    source_index: Some(source_index),
-                })
-                .collect();
-            let insert_at = rng.gen_range(0..=vm.program.len());
-            splice_program_with_reference_repair(&mut vm.program, insert_at..insert_at, extracted)?;
+            copy_span_to_dormant_tail(&mut vm.program, gene.indices)?;
         } else {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
@@ -834,16 +860,7 @@ pub(super) fn apply_copy_gene_forward_slice(
             return Err(MutationSkipReason::NoApplicableTarget);
         }
         if let Some(gene) = vm_forward_slice_random(&vm.program, rng) {
-            let extracted = gene
-                .indices
-                .iter()
-                .map(|&source_index| SpliceInstruction {
-                    instruction: vm.program[source_index].clone(),
-                    source_index: Some(source_index),
-                })
-                .collect();
-            let insert_at = rng.gen_range(0..=vm.program.len());
-            splice_program_with_reference_repair(&mut vm.program, insert_at..insert_at, extracted)?;
+            copy_span_to_dormant_tail(&mut vm.program, gene.indices)?;
         } else {
             return Err(MutationSkipReason::NoApplicableTarget);
         }

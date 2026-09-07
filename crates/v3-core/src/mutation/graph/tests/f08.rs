@@ -20,7 +20,9 @@ use crate::creature::genome::cgp::{
 };
 use crate::creature::genome::PlasticityConfig;
 use crate::creature::state::GraphRuntimeState;
-use crate::mutation::graph::operators::{copy_cgp_subgraph, copy_compute_node, split_existing_edge};
+use crate::mutation::graph::operators::{
+    copy_cgp_subgraph, copy_compute_node, split_existing_edge,
+};
 use crate::mutation::types::MutationSkipReason;
 use crate::runtime::cgp::execute_graph_node_with_reserve;
 use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
@@ -240,8 +242,9 @@ fn activation_fixtures() -> [(&'static str, CgpGraphBackendDef, Vec<InputReferen
 
 #[test]
 fn copy_internal_node_inserts_the_copy_directly_after_its_source() {
-    // The two nodes carry different kinds, so the copy identifies its source.
-    let parent = phase_def();
+    // `base_def`'s three nodes carry distinct kinds, so the copy's position
+    // identifies the source it was taken from.
+    let parent = base_def();
     let mut seen = [false; 3];
     for seed in 0u64..48 {
         let mut child = parent.clone();
@@ -442,11 +445,11 @@ fn introspection_edge_def(plasticity: bool, on_compute_input: bool) -> CgpGraphB
         compute_nodes: vec![ComputeNode {
             kind: ComputeNodeKind::WeightedSum,
             inputs: if on_compute_input {
-                vec![edge.clone()]
+                vec![edge]
             } else {
                 Vec::new()
             },
-            plasticity: plasticity.then(|| PlasticityConfig {
+            plasticity: plasticity.then_some(PlasticityConfig {
                 rule: crate::creature::genome::HebbianRule::Classic,
                 learning_rate: 0.1,
                 weight_clamp: 5.0,
