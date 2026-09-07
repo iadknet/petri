@@ -6,6 +6,7 @@
 - [Strategy](strategy/)
 - [Brain evolvability audit, 2026-09-04](strategy/brain-evolvability-audit-2026-09-04.md) (companion to the T11 track)
 - [Mesh evolvability research, 2026-09-06](strategy/mesh-evolvability-research-2026-09-06.md) (companion to the T11 track; mesh-layer follow-up to the audit)
+- [Depth research, 2026-09-07](strategy/mesh-depth-research-2026-09-07.md) (companion to the T11 track; why a 281,405-tick run stalled, and the evidence for T11.F16 and T11.F17)
 - [Reference specifications](reference/)
 
 Historical, non-executable material:
