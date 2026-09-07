@@ -282,7 +282,9 @@ disabled or down-weighted; the remapped inline copy keeps its weight.
 
 - [x] `cargo test -p v3-core --test viability` ran after the mutation
       semantics changed; result recorded: **ok, 25 passed / 0 failed**, run
-      twice (after the semantics change and again after the simplify pass).
+      three times (after the semantics change, after the first simplify pass,
+      and first in the remediation pass immediately after the split-exclusion
+      narrowing, before any other suite).
       Deviation from the brief, recorded rather than glossed: the actual order
       was the focused `mutation::` suite (which surfaced two test updates),
       then the topology fixtures, then viability, then the full lib suite and
@@ -311,18 +313,39 @@ disabled or down-weighted; the remapped inline copy keeps its weight.
 
   and `rust-mutants: no survivors`.
 
-- [ ] `make bench PROFILE=gate FEATURE=t11-f08-function-preserving-duplication-and-module-growth`
+  Third fresh run, in the remediation pass after the narrowed split exclusion,
+  the tightened neutrality property, and the `simplify` pass
+  (`MUTANTS_ITERATE=0 make rust-mutants`, mode `fresh`, diff against
+  `de35c058`), same output path
+  `/Users/istefanek/.local/share/petri-tools/mutants/t11-f08/mutants.out`:
+
+  > `41 mutants tested in 6m: 41 caught`
+
+  and `rust-mutants: no survivors`. `missed.txt` and `timeout.txt` are empty,
+  so there is no survivor to resolve. No `#[mutants::skip]` attribute and no
+  `exclude_re` entry was added at any point in this feature.
+
+- [x] `make bench PROFILE=gate FEATURE=t11-f08-function-preserving-duplication-and-module-growth`
       and `make bench PROFILE=goal FEATURE=...` each exited 0 with reports
       stored as above; neighborhood readings recorded in Performance below.
 
-  Gate: **exit 0**, `severe=false` against both references, report stored.
-  Goal: the run completed and the report was written, but `compare_against`
-  reported `severe=true` for `plasticity_updates` versus the previous closure
-  and `make bench` therefore **exited 3**. The crossing, its cause, and the
-  epoch comparison are recorded in Performance below; no threshold was
-  weakened and no stored baseline was edited. Accepting or rejecting the
-  crossing is the orchestrator's and reviewer's decision, so this item stays
-  unchecked.
+  Both profiles were rerun once in the remediation pass, after the split
+  exclusion was narrowed, and both stored reports were overwritten with the
+  rerun. Gate: **exit 0**, `severe=false` against both references. Goal:
+  **exit 0**, `severe=false` against both references; `plasticity_updates` is
+  a `flag` at +43.861190% versus T11.F15 and -34.498596% versus the T11.F04
+  epoch. The first pass's goal run exited 3 on a `severe=true`
+  `plasticity_updates` comparison (0.104370); that reading is superseded and
+  the crossing no longer occurs. No threshold was weakened and no stored
+  baseline was edited. One predeclared neighborhood expectation is missed —
+  evolved pooled dead births 28/3300 against a predeclared ceiling of
+  21/3300 — and is recorded with its breakdown in Performance below.
+
+  Before the reruns, `docs/progress/benchmark-series.json` was reset to its
+  merge-base contents so the comparison references resolved to T11.F15 and the
+  T11.F04 epoch rather than to this feature's own superseded reports, then the
+  two entries were re-appended; the committed file is byte-identical to the
+  first pass's.
 
 - [x] Second goal-profile determinism run: Not applicable per the 2026-09-05
       workflow decision; `crates/v3-core/tests/reproducibility.rs` in
@@ -330,9 +353,11 @@ disabled or down-weighted; the remapped inline copy keeps its weight.
 - [x] `make roadmap-check` on document edits and independently by the
       orchestrator; `make check` exited 0 at the tested commit.
 
-  `make roadmap-check` — `roadmap-check: validation passed`.
-  `make check` — **exit 0** at `3672367a` and again after the simplify pass at
-  `005b0778`.
+  `make roadmap-check` — `roadmap-check: validation passed`, run again after
+  every document edit in the remediation pass.
+  `make check` — **exit 0** at `3672367a`, again after the first simplify pass
+  at `005b0778`, and again in the remediation pass with the narrowed split
+  exclusion in place.
 
 ## Performance and Goal Impact
 
@@ -355,10 +380,14 @@ without a cognition claim, and any threshold crossing with its cause.
 Reports: [gate](../../progress/features/t11-f08-function-preserving-duplication-and-module-growth.json),
 [goal](../../progress/features/t11-f08-function-preserving-duplication-and-module-growth-goal.json).
 The tables below name the readings the predeclaration asked for; the reports
-are the source for everything else.
+are the source for everything else. **Every number below is from the
+post-remediation reruns** (both reports overwritten at `df6b444f`, after the
+split exclusion was narrowed to `EnergyCurrent`). The first pass's readings
+are superseded and are quoted only where they are needed for comparison,
+labelled as such.
 
 **Gate counters** (per creature-tick; previous T11.F15 / epoch T11.F04),
-`severe=false` against both:
+`make bench PROFILE=gate` **exit 0**, `severe=false` against both:
 
 | counter | current | vs T11.F15 | vs T11.F04 |
 | --- | --- | --- | --- |
@@ -369,68 +398,88 @@ are the source for everything else.
 | `actions_applied` | 1.000000 | 0.000000% | 0.000000% |
 | `births` | 0.001225 | 0.000000% | +5.331040% |
 
-Gate wall 0.004238436 ms/creature-tick: +1.791398% versus T11.F15,
-+0.929275% versus T11.F04, both `ok`. Every gate counter is byte-identical to
-T11.F15: the gate profile is 225 ticks with 75 births, and a dormant tail copy
-costs no VM step and changes no action, so the simulation trajectory it
-produces is the same one.
+Gate wall 0.005006945 ms/creature-tick: +20.248117% versus T11.F15,
++19.229673% versus T11.F04, both `ok` (the +25% flag is not reached). This is
+a host-load reading, not a work change: the whole `deterministic` block of the
+rerun is byte-identical to the superseded first-pass gate report, which
+measured 0.004238436 ms/creature-tick (+1.791398% / +0.929275%) on a quieter
+machine. Every gate counter is byte-identical to T11.F15 as well: the gate
+profile is 225 ticks with 75 births, a dormant tail copy costs no VM step, and
+no founder edge is affected by the narrowed split exclusion, so the simulation
+trajectory is the same one.
 
-**Goal counters** (per creature-tick), `severe=true` for one counter versus
-the previous closure:
+**Goal counters** (per creature-tick), `make bench PROFILE=goal` **exit 0**,
+`severe=false` against both references:
 
 | counter | current | vs T11.F15 | vs T11.F04 (epoch) |
 | --- | --- | --- | --- |
-| `mesh_hops` | 2.181179 | +0.034718% | -33.515052% |
-| `vm_steps` | 41.169837 | -32.044401% | -96.673252% |
-| `graph_relax_iters` | 1.005334 | +0.073462% | -83.251507% |
-| `plasticity_updates` | 0.104370 | **+63.738195% (severe)** | -25.448402% |
-| `actions_applied` | 1.020685 | -6.190920% | -9.637509% |
-| `births` | 0.007635 | -3.464408% | -6.330512% |
+| `mesh_hops` | 2.188660 | +0.377817% | -33.287022% |
+| `vm_steps` | 42.819961 | -29.320679% | -96.539913% |
+| `graph_relax_iters` | 1.005620 | +0.101932% | -83.246742% |
+| `plasticity_updates` | 0.091700 | **+43.861190% (flag)** | -34.498596% |
+| `actions_applied` | 1.021652 | -6.102045% | -9.551899% |
+| `births` | 0.007653 | -3.236819% | -6.109680% |
 
-Goal wall 0.006062250 ms/creature-tick: **-6.353186%** versus T11.F15 and
-**-15.275737%** versus T11.F04, both `ok`; total world wall time fell from
-636,657 ms to 603,463 ms over 1.2% more creature-ticks.
+Goal wall 0.007124457 ms/creature-tick: +10.055289% versus T11.F15 and
+-0.430642% versus T11.F04, both `ok`; total world wall time 708,666 ms
+(11.8 minutes, under the 15-minute goal-profile investigation threshold).
 
-**The `plasticity_updates` crossing.** Cause, stated as measured rather than
-excused.
+**The `plasticity_updates` reading.** The first pass measured 0.104370 here
+and `compare_against` returned `severe=true` versus T11.F15, so
+`make bench PROFILE=goal` exited 3 and the crossing was escalated as the
+review's single P1. That reading is **superseded**. Narrowing the split
+exclusion to `EnergyCurrent` (review finding P2-2) restores every
+`EnergyConsumedThisTick` and `ReproductiveReserveCurrent` split the first pass
+was declining, which changes the evolved trajectory; the rerun reads 0.091700,
++43.861190% versus T11.F15, a `flag` and not a `severe` crossing, and the goal
+run exits 0.
 
 *Series context.* This counter has ranged 0.100–0.154 per creature-tick across
-every goal report from T01.F12 through T11.F14 (0.100492, 0.100492, 0.124060,
-0.115330, 0.139997, 0.153630, 0.151239, 0.151239); T11.F15's 0.063742 is the
-one low outlier in the series, and this feature's 0.104370 is back inside the
-historical band and 25.4% *below* the T11.F04 epoch.
+the goal reports from T01.F12 through T11.F14 (0.100492, 0.100492, 0.124060,
+0.115330, 0.139997, 0.153630, 0.151239, 0.151239). T11.F15's 0.063742 is the
+one low outlier in that series; 0.091700 sits between the two and 34.5% below
+the T11.F04 epoch.
 
-*Measured composition change, not an inference.* `graph_relax_iters` is flat
-(+0.073462%), so the rise is updates per graph visit, and the evolved
-neighborhood shows why: every plasticity-only operator doubled its applied
-trials against T11.F15 — `DisableHebbian` 40/40 applied with 680 skipped →
-80/80 with 640, and the same 40 → 80 shift for `EnableRewardModulation`,
-`MutateHebbianRate`, `MutateHebbianRule`, and `ToggleHebbianLamarckian`. At 20
-trials per genome that is 2 of 36 sampled evolved genomes carrying plasticity
-under T11.F15 versus 4 under this feature. Mean reachable structure also rose
-(128.824696 versus 125.564576, p75 157 versus 153) while VM work fell 32%.
+*Direct mechanism, before any hypothesis about why.*
+`apply_hebbian_updates` (`runtime/plasticity/hebbian.rs`) counts one update per
+input edge of every non-reward-modulated plasticity node that has inputs and an
+initialized weight vector, whether or not anything reads that node. A dormant
+plasticity copy therefore raises `plasticity_updates` without ever being
+activated, before and after this diff. The counter measures how much plasticity
+structure the surviving population carries — population composition — not how
+much learning any behavior depends on.
 
-*Direct mechanism: the feature working.* Before this change a copied plasticity
-node was appended, so it read its inputs in the wrong evaluation phase; a
-mutation that wired something to it produced a different signal, and selection
-removed it. The copy is now phase-faithful, so a duplicated plasticity module
-reproduces its original when something reads it and can then diverge —
-retained duplicated plasticity structure is exactly what this feature's Goal
-asks for ("complexity can grow by copy and divergence"), and more retained
-plasticity structure means more Hebbian updates per visit. Nothing in the diff
-adds an update to a fixed genome: the split exclusion in fact *removes* split
-opportunities on plasticity-carrying graphs.
+*Hypothesis, not a measurement.* The most likely reason composition moved is
+the feature working as intended: a phase-faithful copy of a plasticity module
+reproduces its original when something reads it and can then diverge, so
+duplicated plasticity structure survives where an appended copy used to read
+its inputs in the wrong evaluation phase and be selected away. Nothing in the
+diff adds an update to a fixed genome, and the split exclusion still *removes*
+split opportunities on plasticity-carrying graphs. This paragraph is an
+inference from the mechanism above and from `graph_relax_iters` being flat
+(+0.101932%, so the rise is updates per graph visit); it is **not** measured
+here.
+
+*What the neighborhood sample cannot show.* In this rerun every plasticity-only
+operator skipped all 720 trials (`DisableHebbian`, `EnableRewardModulation`,
+`MutateHebbianRate`, `MutateHebbianRule`, `MutateRewardSource`,
+`MutateTraceDecay`, `ToggleHebbianLamarckian`, `DisableRewardModulation` all
+0/0 applied, 720 skipped), i.e. none of the 36 sampled evolved genomes carries
+plasticity, while the population-level counter is 0.091700. The 12-genomes-
+per-seed sample is far too small to measure the population's plasticity share,
+so it neither supports nor refutes the hypothesis above. The first pass's
+"2 of 36 versus 4 of 36 sampled genomes carry plasticity" composition argument
+is withdrawn for that reason.
 
 *Status.* The spec predeclared that populations differ and every counter may
-move, but did not predeclare a severe allowance, so this is an unpredeclared
-cost of the intended effect. The run is deterministic, so re-running produces
-the same flag; the decision is acceptance or rejection of the observed cost,
-as with T11.F04, not remediation. No threshold was weakened and no baseline
-was re-pinned; an epoch re-pin is not recommended, since the counter sits 25%
-below the T11.F04 epoch and inside the historical band.
+move, but did not predeclare a severe allowance. No severe allowance is needed:
+the rerun is a `flag`, not a `severe` crossing. No threshold was weakened and
+no baseline was re-pinned; an epoch re-pin is not recommended, since the
+counter sits 34.5% below the T11.F04 epoch.
 
 **Founder neighborhood versus the predeclaration** (gate report, silent /
-applied, T11.F15 → T11.F08):
+applied, T11.F15 → T11.F08). The rerun's founder rows are byte-identical to
+the superseded first-pass gate report:
 
 | operator | predeclared | T11.F15 | T11.F08 | met |
 | --- | --- | --- | --- | --- |
@@ -444,36 +493,55 @@ applied, T11.F15 → T11.F08):
 
 Every other founder operator row is byte-identical to T11.F15. Single-event
 silent births 84/164 (predeclared floor: not below 80/164; T11.F15 read
-80/164). Founder dead births 0/208, unchanged. Founder observation 63.415 ms,
+80/164). Founder dead births 0/208, unchanged. Founder observation 57.197 ms,
 far under the 10-second cap.
 
 **Evolved neighborhood** (goal report, pooled over 36 genomes, T11.F15 →
-T11.F08): `VmCopyInstructionBlock` 483/720 with 2 dead → **720/720, 0 dead**;
-`VmCopyGeneBackwardSlice` 370/610 with 24 dead → **604/604, 0 dead**;
-`VmCopyGeneForwardSlice` 402/608 → **622/622, 0 dead** — silent on every
-applied trial, as predeclared. `VmCopyInstructionBlockRemapped` stays a
-behavior-changing macro (446/720 → 449/720). `CopyInternalNode` 689/689,
-`CopySubgraph` 680/680, `CopyNode` 720/720; the two mesh slices rose from
-717/720 and 718/720 to 720/720. `AddInternalGraphNode` reads 701/701 silent
-with 19 skips (T11.F15: 707/707 with 13 skips) — the six extra skips are the
-split exclusion declining edges it must decline; the silent fraction stays
-1.00. Evolved pooled dead births **19/3300** (predeclared: not above
-21/3300); evolved single-event silence 1862/2736 versus 1823/2736. Evolved
-observation 632.437 ms total (200.6 / 243.9 / 187.9 ms per seed), far under
-the 180-second cap; whole-run goal wall 603,463 ms.
+T11.F08 rerun): `VmCopyInstructionBlock` 483/720 with 2 dead →
+**720/720, 0 dead, 0 skips**; `VmCopyGeneBackwardSlice` 370/610 with 24 dead →
+**556/556, 0 dead** (164 skips); `VmCopyGeneForwardSlice` 402/608 →
+**582/582, 0 dead** (138 skips) — silent on every applied trial, as
+predeclared. `VmCopyInstructionBlockRemapped` stays a behavior-changing macro
+(446/720 → 460/720 with 5 dead). `CopyInternalNode` 643/643 and `CopySubgraph`
+643/643 (77 skips each, on sampled genomes whose graph backends have no
+compute node), `CopyNode` 720/720; the two mesh slices read 716/720 with 2
+dead and 712/720 with 3 dead against T11.F15's 717/720 and 718/720 — mesh
+topology code is untouched by this feature, so those are sampling differences
+between two evolved populations. `AddInternalGraphNode` reads 689/689 silent
+with 31 skips (T11.F15: 707/707 with 13); the silent fraction stays 1.00.
+`VmCopyConstantBlock` 586/586 silent with 134 skips.
+
+Evolved single-event silence 1890/2736 (T11.F15: 1823/2736; superseded first
+pass: 1862/2736). Evolved observation 779.589 ms total
+(321.203 / 233.788 / 224.598 ms per seed), far under the 180-second cap.
+
+**One predeclared expectation is missed, recorded rather than glossed.**
+Evolved pooled dead births read **28/3300** against the predeclaration
+"should not rise above 21/3300" (T11.F15 read 21/3300; the superseded first
+pass read 19/3300). Seven extra dead births out of 3300 trials, 0.85% versus
+0.64%. None of them comes from the three converted VM copy operators or from
+either graph copy operator: every one of those rows reads 0 dead on every
+applied trial. The dead births in this run come from the unchanged
+behavior-changing operators (`ChangeEntryNode` 53, `SwapRouteTargets` 63,
+`MutateGateBias` 33, `RetargetNodeTarget` 28, `RemoveNode` 9, the two mesh
+slices 5, `VmCopyInstructionBlockRemapped` 5, `VmInstructionMutation` 3 dead
+operator trials), applied to a different evolved population. The goal profile
+runs once and the populations are unpaired, so this is a one-run difference on
+operators this feature does not touch, not a measured regression in copy
+safety; it is stated here because the predeclaration named the number.
 
 **Persistence and lineage versus T11.F15** (no cognition claim). Final
-populations 12,298 / 11,704 / 11,405 (T11.F15: 10,786 / 11,669 / 11,714), no
-extinction on any seed, plateau 12,431.702 / 12,398.210 / 12,402.022 versus
-10,596.510 / 12,308.016 / 12,191.246, mean energy 67.121 / 66.347 / 61.506
-versus 64.769 / 61.161 / 60.371. Births per 100 ticks 12,667.366667 versus
+populations 11,627 / 12,402 / 12,171 (T11.F15: 10,786 / 11,669 / 11,714), no
+extinction on any seed, plateau 12,171.430 / 12,406.938 / 12,607.104 versus
+10,596.510 / 12,308.016 / 12,191.246, mean energy 66.931 / 63.387 / 59.862
+versus 64.769 / 61.161 / 60.371. Births per 100 ticks 12,687.166667 versus
 12,963.483333. Reachable structure min/p25/median/p75/max/mean
-1/97/107/157/519/128.824696 versus 3/97/104/153/723/125.564576. Lineage
-clades/entropy 208/4.329333, 189/4.112589, 194/4.326013 versus 173/4.038022,
-212/4.284456, 225/4.251236. Current-memory either counts 2/2/0 versus 3/2/0;
-temporal operator-state either counts 79/24/120 versus 37/11/17, persisted
-outputs 7/10/16 versus 8/13/25, previous slots 0/3/0 versus 0/0/0. Generation
-median/max 21/45, 23/42, 21/46 versus 23/45, 21/52, 22/44. These are one run
+1/97/106/155/482/126.924144 versus 3/97/104/153/723/125.564576. Lineage
+clades/entropy 211/4.374506, 191/4.027032, 207/4.365327 versus 173/4.038022,
+212/4.284456, 225/4.251236. Current-memory either counts 0/1/1 versus 3/2/0;
+temporal operator-state either counts 91/18/118 versus 37/11/17, persisted
+outputs 8/12/17 versus 8/13/25, previous slots 0/0/0 versus 0/0/0. Generation
+median/max 22/46, 22/42, 22/46 versus 23/45, 21/52, 22/44. These are one run
 per side on unpaired populations; nothing here is a claim about cognition.
 
 ## Success Criteria
@@ -491,13 +559,16 @@ per side on unpaired populations; nothing here is a claim about cognition.
       `mesh_copy_diverge_and_activate_trajectory`; the graph half is the
       activation property above, whose dormant-divergence step is the copy's
       own independent state and wiring.)
-- [ ] The split exclusion replaces the documented T11.F03 exception, the
+- [x] The split exclusion replaces the documented T11.F03 exception, the
       references record the changed placement and interference rules, and the
       stored reports meet the predeclared neighborhood expectations or record
-      why not. (Exclusion and reference updates landed; every predeclared
-      neighborhood expectation is met; the goal profile's
-      `plasticity_updates` crossing is recorded with its cause above and is
-      the one open decision.)
+      why not. (Exclusion and reference updates landed, with the exclusion
+      narrowed to `EnergyCurrent` in the remediation pass. Every predeclared
+      operator-row expectation is met. One predeclared expectation is missed
+      and recorded with its breakdown rather than met: evolved pooled dead
+      births 28/3300 against a ceiling of 21/3300, none of them from a copy
+      operator this feature changed. The goal profile's `plasticity_updates`
+      comparison is no longer severe.)
 
 ## Notes for AI Agents
 
@@ -523,11 +594,15 @@ per side on unpaired populations; nothing here is a claim about cognition.
   copy operators use. Learned-weight correspondence through either is
   T11.F09's: the duplication primitive shifts genome indices without touching
   `GraphRuntimeState::plasticity_weights`, exactly as T11.F03's split does.
-- Deferred findings: none from the mutation run (no survivors on the second
-  fresh run). One measurement item is open rather than deferred: the goal
-  profile's `plasticity_updates` severe flag versus T11.F15, recorded with
-  its cause in Performance and Goal Impact. `make bench PROFILE=goal` exited
-  3 because of it; the report itself was written and stored.
+- Deferred findings: none from the mutation run (no survivors on any of the
+  three fresh runs, the last of them in the remediation pass). The goal
+  profile's `plasticity_updates` severe flag versus T11.F15 was open after the
+  first pass and is **resolved**: the post-remediation rerun reads a `flag`,
+  not a `severe` crossing, and `make bench PROFILE=goal` exits 0. One
+  measurement item remains open for the orchestrator rather than deferred:
+  evolved pooled dead births 28/3300 exceed the predeclared 21/3300 ceiling.
+  Its breakdown is in Performance and Goal Impact; no operator this feature
+  changed contributes a dead birth.
 - Judgment call, **resolved** in the remediation pass (review finding P2-3):
   the first pass placed `VmCopyConstantBlock` in the growth class of the
   `v3-mutation-spec.md` taxonomy. That was wrong as a class claim —
