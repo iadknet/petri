@@ -126,6 +126,19 @@ These were replaced by unified `ReadInput` + `InputReference` dataflow and
 
 - PC starts at `0`; normal step increments by `+1`.
 - Per-opcode energy metering applies; exhausted energy halts node execution.
+- Activity ramp (T03.F10): within one node dispatch the instructions past a free
+  allowance also pay a charge that rises linearly with the step index, so a
+  dispatch that runs to `max_vm_steps` costs a lethal share of a creature's
+  energy while ordinary programs and short bounded loops stay nearly free. The
+  ramp index resets at every node dispatch; the mesh hop cap and the single-visit
+  rule bound the chain. Formula and constants: Section 6.
+- A dispatch accumulates its opcode and ramp charges locally and subtracts the
+  sum from the creature's energy exactly once, on whichever exit path ends it.
+  Mid-dispatch, the creature's effective energy is its energy minus that
+  accumulator: `ReadInput` of `EnergyCurrent` resolves to the effective energy,
+  `EnergyConsumedThisTick` includes the accumulator, `SetPriorityBid` caps the
+  bid at the effective energy, and exhaustion triggers when the effective energy
+  reaches zero or below.
 - `ExecuteActionQueue` is terminal: halts VM and returns accumulated actions.
 - `Halt` halts VM without returning actions (mesh uses action queue state).
 - VM runtime enforces a configurable step cap `max_vm_steps` per node
@@ -279,13 +292,27 @@ Defined numeric rules:
 | ClearSlot | 0.12 |
 
 v3 energy uses continuous scalar units (`f32`).
-Opcode spend is:
+The k-th instruction executed within one node dispatch (k from 1) spends:
 
 ```text
-opcode_energy_cost = opcode_base_cost * runtime.vm.opcode_cost_multiplier
+step_energy_cost = opcode_base_cost * runtime.vm.opcode_cost_multiplier
+                 + runtime.vm.step_ramp_cost
+                   * max(0, k - runtime.vm.step_ramp_allowance)
 ```
 
-Canonical owner for `runtime.vm.opcode_cost_multiplier`:
+The first term is the base opcode spend; the second is the T03.F10 activity
+ramp. For a dispatch of n steps with `m = max(0, n - step_ramp_allowance)` the
+ramp total has the closed form `step_ramp_cost * m * (m + 1) / 2`. At the
+defaults (`step_ramp_allowance` 100, `step_ramp_cost` 1e-6) 200 steps cost about
+0.005 energy, 1,000 steps about 0.405, and a dispatch that runs to the default
+`max_vm_steps` of 10,000 costs about 49.
+
+The dispatch accumulates these charges and settles the sum against the
+creature's energy once (Section 3), so charges below the ulp of an `f32` energy
+are not lost. `SetPriorityBid` adds its bid to the same step's spend.
+
+Canonical owner for `runtime.vm.opcode_cost_multiplier`,
+`runtime.vm.step_ramp_allowance`, and `runtime.vm.step_ramp_cost`:
 `v3-runtime-config-spec.md`.
 
 ---
@@ -374,9 +401,11 @@ contested resources like food.
 
 Semantics:
 - Reads `regs[src]`, clamps to non-negative (`max(0.0, value)`).
-- Deducts bid amount from creature energy (on top of the 0.20 opcode cost).
-- If energy drops to zero or below after deduction, the creature is exhausted
-  (`NodeResult::exhausted()`).
+- Caps the bid at the dispatch's effective energy (Section 3) and deducts it
+  from creature energy (on top of the 0.20 opcode cost and the step's ramp
+  charge).
+- If the bid is capped, or the effective energy drops to zero or below after
+  deduction, the creature is exhausted (`NodeResult::exhausted()`).
 - Sets the creature's priority bid for this tick. Last-write-wins if called
   multiple times (consistent with `WriteRouteTarget`).
 
@@ -386,6 +415,7 @@ Turn ordering:
   with equal bids (including the default 0.0).
 - Creatures that never call `SetPriorityBid` have bid 0.0 (no cost, no priority).
 
-There is no cap on bid amount — creatures can bid up to their remaining energy.
-Natural selection handles the economics: overbidding wastes energy and leads to
-extinction.
+There is no cap on bid amount beyond the energy the creature actually has left:
+creatures can bid up to their effective energy, what remains after the charges
+the dispatch already owes. Natural selection handles the economics: overbidding
+wastes energy and leads to extinction.
