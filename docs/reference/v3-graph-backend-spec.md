@@ -22,8 +22,9 @@ taxonomy and per-operator contract text live in `v3-mutation-spec.md` rather
 than being duplicated here. T11.F08 adds duplication placement
 (`duplicate_compute_nodes_in_place`: each copy directly after its original, an
 edge between duplicated nodes following the copies, the split exclusion for a
-live introspection reference read directly by a non-compute surface on a
-plasticity-carrying graph), which is what keeps a copied edge on the
+live `DynamicIntrospection(EnergyCurrent)` reference read directly by a
+non-compute surface on a plasticity-carrying graph, the only key whose value
+differs between the evaluation and effects contexts), which is what keeps a copied edge on the
 evaluation phase Section 8's ordered pass gives it. T11.F06 owns its
 one-world-tick persistent-state clock.
 

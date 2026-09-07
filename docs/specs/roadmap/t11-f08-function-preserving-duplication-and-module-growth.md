@@ -31,7 +31,8 @@ can grow by copy and divergence.
   and is proven by execution, never by reachability analysis alone.
 - No change to `VmCopyInstructionBlockRemapped` (the inline register-renamed
   copy stays an ordinary behavior-changing macro and is measured as such),
-  `VmCopyConstantBlock` (already append-only and silent), or `CopyEdgeBundle`.
+  `VmCopyConstantBlock` (append-only, and silent unless a `const_idx` wraps
+  the constant pool), or `CopyEdgeBundle`.
 - No founder change, benchmark threshold change, baseline re-pin, or second
   goal run. The T11.F03 spare-register `ReadInput` alternative for input
   references stays deferred: no reading yet shows references never go live.
@@ -98,7 +99,8 @@ instruction reaches the span; the guard makes fall-through halt where the old
 program halted by running past its end. Copied jumps follow T11.F02's rule (a
 copied selected target, else the surviving original). A later jump mutation
 (a jump offset stepped by one unit, or an inserted or replaced jump) is the
-only way the span becomes reachable. Property, over programs drawn by the
+only way the span becomes reachable, short of a mutation removing or
+replacing the guard or the program's final terminal. Property, over programs drawn by the
 existing VM instruction generator with any offsets: when the original run
 neither reaches the step cap nor exhausts energy (ample budget), the
 `NodeResult`, action queue, output slots, and shared memory are identical
@@ -136,9 +138,15 @@ correspondence rule is T11.F09's.
 **Split exclusion (T11.F03 deferred P2-2).** `split_existing_edge` skips with
 `NoApplicableTarget` when the graph carries plasticity, the picked edge's
 consumer is a sink, action slot, or execute gate, and its source is an
-`InputLeaf` that resolves to a `DynamicIntrospection` reference, because
+`InputLeaf` that resolves to `DynamicIntrospection(EnergyCurrent)`, because
 that value can differ between evaluation and the post-plasticity effects
-context; this is exactly the documented exception's scope. The documented exception and
+context; this is exactly the documented exception's scope. `EnergyCurrent` is
+the only excluded key: in `runtime/cgp/execute.rs` the effects `ResolveCtx`
+differs from the evaluation `ResolveCtx` only in `energy` (the
+plasticity-cost deduction sits between them), while `energy_consumed` and
+`reproductive_reserve` hold the same values in both, so
+`EnergyConsumedThisTick` and `ReproductiveReserveCurrent` edges still split.
+The documented exception and
 `is_documented_split_exception` are removed; the split property holds
 unconditionally, with the skip asserted for exactly those edges.
 
@@ -224,6 +232,28 @@ disabled or down-weighted; the remapped inline copy keeps its weight.
   - Two `proptest-regressions` files were created by those failures and are
     committed: `crates/v3-core/proptest-regressions/mutation/vm/f08_tests.txt`
     and `.../mutation/graph/tests/f08.txt`.
+
+  Red again in the remediation pass, for review finding P2-2 (narrowing the
+  split exclusion to `EnergyCurrent`). A fourth case,
+  `"another dynamic introspection key"` with
+  `DynamicIntrospection(ReproductiveReserveCurrent)`, was added to
+  `split_exclusion_is_scoped_to_each_of_its_conditions` (renamed from
+  `..._to_all_three_of_its_conditions`, which stopped being true at four
+  cases) before the predicate changed:
+
+  - `cargo test -p v3-core --lib mutation::graph::tests::f08` — **FAILED**, 7
+    passed / 1 failed:
+    `split_exclusion_is_scoped_to_each_of_its_conditions`, "another dynamic
+    introspection key: outside the exclusion, the split still applies",
+    `left: Err(NoApplicableTarget)`, `right: Ok(())`.
+
+  Green after narrowing `is_excluded_introspection_split` to
+  `DynamicIntrospection(EnergyCurrent)`: `cargo test -p v3-core --lib
+  mutation::` — **ok, 341 passed / 0 failed**. The same pass replaced the
+  neutrality property's early `return Ok(())` on a skipped operator with
+  `prop_assume!(apply(...).is_ok())` and dropped the redundant
+  `prop_assume!(copied.len() > original.len())` (P3-5); the property still
+  runs its 96 cases without a global-reject failure.
 
   Green, at `3672367a` and after: `cargo test -p v3-core --lib mutation::` —
   **ok, 339 passed / 0 failed** (one pre-existing assertion updated for the
@@ -498,11 +528,15 @@ per side on unpaired populations; nothing here is a claim about cognition.
   profile's `plasticity_updates` severe flag versus T11.F15, recorded with
   its cause in Performance and Goal Impact. `make bench PROFILE=goal` exited
   3 because of it; the report itself was written and stored.
-- Judgment call beyond the literal brief, flagged for the reviewer: the
-  reference update also places `VmCopyConstantBlock` in the growth class of
-  the `v3-mutation-spec.md` taxonomy. It is factually silent when it fires
-  (founder 50/50, evolved 617/617) and append-only, but the brief named only
-  the three tail copies, so strike it if unwanted. Two crate-internal
+- Judgment call, **resolved** in the remediation pass (review finding P2-3):
+  the first pass placed `VmCopyConstantBlock` in the growth class of the
+  `v3-mutation-spec.md` taxonomy. That was wrong as a class claim —
+  `LoadConst` resolves `const_idx.rem_euclid(constants.len())`
+  (`runtime/vm.rs`), so a `const_idx` at or above the old pool length resolves
+  to a different constant once the pool grows. It is struck from the growth
+  list and now described as append-only and silent unless a `const_idx` wraps
+  the pool, outside the class. Its measured silence (founder 50/50, evolved
+  617/617) is unaffected. Two crate-internal
   signature changes support the tests: `mutate_one_instruction_field` widened
   from `pub(super)` to `pub(crate)` so the mesh fixture can apply the
   production single-field step to a clone, and `split_existing_edge` gained an
@@ -512,3 +546,30 @@ per side on unpaired populations; nothing here is a claim about cognition.
   Non-Goals require: `crates/v3-core/src/mutation/topology/f08_tests.rs`
   passed on its first run against unchanged T11.F15 topology code, and no
   topology file is in the diff.
+- Review outcome and remediation pass (2026-09-06). The reviewer raised
+  **P1 = 1, P2 = 3, P3 = 6**. The single P1 is the goal-profile
+  `plasticity_updates` severe crossing, escalated to the user as a decision
+  rather than a code defect; it is recorded in Performance and Goal Impact
+  and in the unchecked bench verification item. One remediation pass followed,
+  carrying P2-2 (narrow the split exclusion to `EnergyCurrent`), P2-3
+  (`VmCopyConstantBlock` taxonomy), P2-4 (the `plasticity_updates` mechanism
+  paragraph), P3-5, P3-7, P3-8, and P3-9. That pass ran on a **fresh
+  implementer agent**, a recorded deviation from `docs/workflow.md`'s
+  "continue the same implementer with `SendMessage`": `SendMessage` is
+  unavailable in this environment, so the first pass's context could not be
+  continued and the brief was re-supplied in full.
+- Deferred review findings, recorded rather than fixed in this feature:
+  - **P3-6.** `tail_copy_is_neutral_under_ample_budget` fixes energy at
+    `1.0e6`, so the `!energy_exhausted` half of its ample-budget precondition
+    never bites and the guard-step exhaustion edge (a copy pushing a run over
+    its energy budget) is unexercised. The spec's Non-Goals already exclude
+    any neutrality claim at exhaustion, so this is a coverage gap against a
+    property the feature does not assert; closing it needs a low-energy arm
+    that is a behavior claim of its own.
+  - **P3-10.** Two visibility/reuse cleanups. `activate_copies` in
+    `crates/v3-core/src/mutation/graph/tests/f08.rs` re-walks the five
+    edge-bearing surfaces by hand where `CgpGraphBackendDef::for_each_edge_mut`
+    could be widened from private to `pub(crate)` and reused, and
+    `is_terminal_instruction` in `mutation/vm/operators.rs` is `pub(crate)`
+    but used only inside its own module. Neither changes behavior; both are
+    left for the next feature that touches those files.
