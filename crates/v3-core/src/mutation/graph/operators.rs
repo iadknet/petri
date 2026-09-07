@@ -387,7 +387,7 @@ pub(crate) fn add_compute_node(
     match rng.gen_range(0u8..3) {
         0 => add_disconnected_node(def, rng),
         1 => add_bootstrap_node(def, input_refs, config, rng),
-        _ => split_existing_edge(def, rng),
+        _ => split_existing_edge(def, input_refs, rng),
     }
 }
 
@@ -437,6 +437,7 @@ pub(crate) fn add_bootstrap_node(
 /// execute gate, the new node is appended instead.
 pub(crate) fn split_existing_edge(
     def: &mut CgpGraphBackendDef,
+    _input_refs: &[InputReference],
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     if def.compute_nodes.len() >= u16::MAX as usize {
@@ -527,9 +528,21 @@ pub(crate) fn copy_compute_node(
     if def.compute_nodes.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
+    check_copy_capacity(def, 1)?;
     let source_idx = rng.gen_range(0..def.compute_nodes.len());
-    let copy = def.compute_nodes[source_idx].clone();
-    def.compute_nodes.push(copy);
+    def.duplicate_compute_nodes_in_place(&[source_idx]);
+    Ok(())
+}
+
+/// A copy is only representable while every resulting index stays below the
+/// `u16::MAX` dangling-reference sentinel `remove_compute_node_at` uses.
+fn check_copy_capacity(
+    def: &CgpGraphBackendDef,
+    added: usize,
+) -> Result<(), MutationSkipReason> {
+    if def.compute_nodes.len() + added > u16::MAX as usize {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
     Ok(())
 }
 
@@ -587,31 +600,8 @@ pub(crate) fn copy_cgp_subgraph(
     }
 
     cluster.sort_unstable();
-    let base = def.compute_nodes.len();
-    let old_to_new: std::collections::HashMap<usize, u16> = cluster
-        .iter()
-        .enumerate()
-        .map(|(i, &old)| (old, (base + i) as u16))
-        .collect();
-
-    // Clone nodes and remap intra-cluster ComputeNode edges.
-    let cloned_nodes: Vec<ComputeNode> = cluster
-        .iter()
-        .map(|&idx| {
-            let mut node = def.compute_nodes[idx].clone();
-            for edge in &mut node.inputs {
-                if let GraphSource::ComputeNode(ref mut src_idx) = edge.source {
-                    if let Some(&new_idx) = old_to_new.get(&(*src_idx as usize)) {
-                        *src_idx = new_idx;
-                    }
-                    // External ComputeNode edges keep original source.
-                }
-                // InputLeaf/SharedMemory edges preserved as-is.
-            }
-            node
-        })
-        .collect();
-    def.compute_nodes.extend(cloned_nodes);
+    check_copy_capacity(def, cluster.len())?;
+    def.duplicate_compute_nodes_in_place(&cluster);
     Ok(())
 }
 
@@ -1045,7 +1035,7 @@ mod tests {
         };
         let mut rng = test_rng();
         assert_eq!(
-            split_existing_edge(&mut def, &mut rng),
+            split_existing_edge(&mut def, &[], &mut rng),
             Err(MutationSkipReason::NoApplicableTarget)
         );
     }
@@ -1070,7 +1060,7 @@ mod tests {
         };
         let mut rng = test_rng();
         assert_eq!(
-            split_existing_edge(&mut def, &mut rng),
+            split_existing_edge(&mut def, &[], &mut rng),
             Err(MutationSkipReason::NoApplicableTarget)
         );
     }
@@ -1109,7 +1099,7 @@ mod tests {
         };
         // Force selection of the only edge (ComputeInput(1), edge 0).
         let mut rng = test_rng();
-        split_existing_edge(&mut def, &mut rng).unwrap();
+        split_existing_edge(&mut def, &[], &mut rng).unwrap();
 
         assert_eq!(def.compute_nodes.len(), 3);
         // New Add node inserted at index 1, reading the old source (CN(0)).
@@ -1155,7 +1145,7 @@ mod tests {
             execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let mut rng = test_rng();
-        split_existing_edge(&mut def, &mut rng).unwrap();
+        split_existing_edge(&mut def, &[], &mut rng).unwrap();
 
         assert_eq!(def.compute_nodes.len(), 2);
         assert_eq!(def.compute_nodes[0].kind, ComputeNodeKind::Add);
@@ -1192,7 +1182,7 @@ mod tests {
             execute_gate: ExecuteGate { inputs: Vec::new() },
         };
         let mut rng = test_rng();
-        split_existing_edge(&mut def, &mut rng).unwrap();
+        split_existing_edge(&mut def, &[], &mut rng).unwrap();
 
         assert_eq!(def.compute_nodes.len(), 2);
         assert_eq!(def.compute_nodes[1].kind, ComputeNodeKind::Add);
