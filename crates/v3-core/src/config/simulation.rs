@@ -543,12 +543,30 @@ pub struct StartupConfig {
 #[serde(deny_unknown_fields)]
 pub struct VmRuntimeConfig {
     pub opcode_cost_multiplier: f32,
+    /// Free instructions per VM node dispatch before the activity ramp applies.
+    /// Default 100. Any value is valid; 0 ramps from the first instruction.
+    #[serde(default = "default_step_ramp_allowance")]
+    pub step_ramp_allowance: u32,
+    /// Extra energy charged per excess step, per step past the allowance, within
+    /// one VM node dispatch. Default 1e-6; 0.0 disables the ramp.
+    #[serde(default = "default_step_ramp_cost")]
+    pub step_ramp_cost: f32,
+}
+
+fn default_step_ramp_allowance() -> u32 {
+    100
+}
+
+fn default_step_ramp_cost() -> f32 {
+    1e-6
 }
 
 impl Default for VmRuntimeConfig {
     fn default() -> Self {
         Self {
             opcode_cost_multiplier: 1e-6,
+            step_ramp_allowance: default_step_ramp_allowance(),
+            step_ramp_cost: default_step_ramp_cost(),
         }
     }
 }
@@ -916,6 +934,8 @@ impl SimulationConfig {
         }
         rt.vm.opcode_cost_multiplier =
             normalize_f32_finite_nonneg(rt.vm.opcode_cost_multiplier, 1e-6);
+        rt.vm.step_ramp_cost =
+            normalize_f32_finite_nonneg(rt.vm.step_ramp_cost, default_step_ramp_cost());
         rt.perception.vision_radius = rt.perception.vision_radius.clamp(1, 8);
 
         let m = &mut self.mutation;
@@ -1297,6 +1317,8 @@ mod tests {
         assert_eq!(cfg.runtime.graph_convergence_stable_passes, 2);
         assert!((cfg.runtime.graph_node_base_cost - 1e-5).abs() < 1e-9);
         assert!((cfg.runtime.vm.opcode_cost_multiplier - 1e-6).abs() < 1e-12);
+        assert_eq!(cfg.runtime.vm.step_ramp_allowance, 100);
+        assert!((cfg.runtime.vm.step_ramp_cost - 1e-6).abs() < 1e-12);
         assert_eq!(cfg.runtime.max_actions_per_turn, 10);
         assert!((cfg.runtime.reward_learning_cost - 0.0).abs() < f32::EPSILON);
         // Perception
@@ -1459,6 +1481,34 @@ mod tests {
         cfg.runtime.vm.opcode_cost_multiplier = f32::NAN;
         cfg.normalize();
         assert!((cfg.runtime.vm.opcode_cost_multiplier - 1e-6).abs() < 1e-12);
+    }
+
+    #[test]
+    fn normalize_invalid_vm_step_ramp_cost_falls_back() {
+        for invalid in [f32::NAN, f32::INFINITY, f32::NEG_INFINITY, -1.0] {
+            let mut cfg = SimulationConfig::default();
+            cfg.runtime.vm.step_ramp_cost = invalid;
+            cfg.normalize();
+            assert!((cfg.runtime.vm.step_ramp_cost - 1e-6).abs() < 1e-12);
+        }
+    }
+
+    #[test]
+    fn normalize_keeps_valid_vm_step_ramp_settings() {
+        let mut cfg = SimulationConfig::default();
+        cfg.runtime.vm.step_ramp_cost = 0.0;
+        cfg.runtime.vm.step_ramp_allowance = 0;
+        cfg.normalize();
+        assert_eq!(cfg.runtime.vm.step_ramp_cost, 0.0);
+        assert_eq!(cfg.runtime.vm.step_ramp_allowance, 0);
+    }
+
+    #[test]
+    fn vm_step_ramp_fields_default_when_absent_from_json() {
+        let vm: VmRuntimeConfig =
+            serde_json::from_str(r#"{"opcode_cost_multiplier": 0.5}"#).expect("vm config parses");
+        assert_eq!(vm.step_ramp_allowance, 100);
+        assert!((vm.step_ramp_cost - 1e-6).abs() < 1e-12);
     }
 
     #[test]

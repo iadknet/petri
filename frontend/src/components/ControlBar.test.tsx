@@ -102,7 +102,7 @@ const MOCK_CONFIG: SimulationConfig = {
 		plasticity_update_cost: 0.0,
 		reward_learning_cost: 0.0,
 		max_actions_per_turn: 10,
-		vm: { opcode_cost_multiplier: 0.5 },
+		vm: { opcode_cost_multiplier: 0.5, step_ramp_allowance: 100, step_ramp_cost: 0.000001 },
 		perception: { vision_radius: 5 },
 	},
 	mutation: {

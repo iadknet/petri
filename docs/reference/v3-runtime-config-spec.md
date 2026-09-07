@@ -69,6 +69,8 @@ Transport posture note:
 | `runtime.graph_convergence_stable_passes` | `u32` | `2` | Must be `>= 1`; invalid values fall back to `2`. | `v3-graph-backend-spec.md` |
 | `runtime.graph_node_base_cost` | `f32` | `1e-5` | Must be `>= 0.0`; invalid values fall back to `1e-5`. | `v3-graph-backend-spec.md` |
 | `runtime.vm.opcode_cost_multiplier` | `f32` | `1e-6` | Must be finite and `>= 0.0`; invalid values fall back to `1e-6`. `0.0` is allowed and means zero opcode energy spend. | `v3-vm-isa-spec.md` |
+| `runtime.vm.step_ramp_allowance` | `u32` | `100` | Any value is valid; a missing field defaults to `100`. Free instructions per VM node dispatch before the activity ramp charges; `0` ramps from the first instruction. | `v3-vm-isa-spec.md` |
+| `runtime.vm.step_ramp_cost` | `f32` | `1e-6` | Must be finite and `>= 0.0`; invalid values fall back to `1e-6`. A missing field defaults to `1e-6`. `0.0` is allowed and disables the ramp. Energy charged per excess step, per step past `step_ramp_allowance`, within one VM node dispatch. | `v3-vm-isa-spec.md` |
 | `runtime.perception.vision_radius` | `u8` | `5` | Must be in `1..=8`; out-of-range values are clamped to the nearest valid bound. | `v3-sensor-spec.md` |
 | `runtime.reward_learning_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; NaN/negative values fall back to `0.0`. Energy cost per reward-modulated weight update in Phase 2.5. | `v3-tick-orchestration-spec.md` |
 

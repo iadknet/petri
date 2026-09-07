@@ -149,6 +149,8 @@ export interface EnergyConfig {
 
 export interface VmConfig {
 	opcode_cost_multiplier: number;
+	step_ramp_allowance: number;
+	step_ramp_cost: number;
 }
 
 export interface PhenotypeConfig {
