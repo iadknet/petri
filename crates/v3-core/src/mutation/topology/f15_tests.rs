@@ -742,3 +742,35 @@ proptest! {
         }
     }
 }
+
+proptest! {
+    #[test]
+    fn static_incumbent_uses_highest_bias_and_earliest_tie(bias in -1000f32..1000f32) {
+        let mut n = node(0, &[1, 2, 3]);
+        n.targets[0].gate_bias = bias - 1.0;
+        n.targets[1].gate_bias = bias;
+        n.targets[2].gate_bias = bias;
+        prop_assert_eq!(routing::static_incumbent(&n.targets), Some(1));
+        prop_assert_eq!(routing::static_incumbent(&[]), None);
+    }
+
+    #[test]
+    fn removal_rejects_reachable_self_or_missing_successor(seed in any::<u64>()) {
+        for successor in [1, 99] {
+            let mut g = genome(vec![node(0, &[1]), node(1, &[successor])]);
+            let before = g.clone();
+            prop_assert_eq!(apply(&mut g, TopologyOperator::RemoveNode, seed), Err(MutationSkipReason::NoApplicableTarget));
+            prop_assert_eq!(g, before);
+        }
+    }
+
+    #[test]
+    fn splice_rejects_missing_successor_without_partial_growth(seed in any::<u64>()) {
+        for op in [TopologyOperator::AddNode, TopologyOperator::SpliceNode] {
+            let mut g = genome(vec![node(0, &[99]), node(1, &[])]);
+            let before = g.clone();
+            prop_assert_eq!(apply(&mut g, op, seed), Err(MutationSkipReason::NoApplicableTarget));
+            prop_assert_eq!(g, before);
+        }
+    }
+}

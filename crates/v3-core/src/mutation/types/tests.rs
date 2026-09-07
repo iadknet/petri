@@ -452,3 +452,14 @@ fn operator_funnel_tracks_stage_counts_and_skip_reason_breakdown() {
         Some(&1)
     );
 }
+
+#[test]
+fn operator_keys_are_unique_and_domain_qualified() {
+    let operators = MutationOperator::all();
+    let keys: std::collections::HashSet<_> =
+        operators.iter().map(|operator| operator.as_key()).collect();
+    assert_eq!(keys.len(), operators.len());
+    for operator in operators {
+        assert!(operator.as_key().contains('.'));
+    }
+}
