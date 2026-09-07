@@ -147,6 +147,19 @@ Topology connection semantics (T11.F15):
   immediate memory addresses)
 - `VmInsertReadStoreMotif` (insert ReadInput + StoreSlotImm instruction pair)
 - `VmInsertLoadCompareMotif` (insert LoadSlotImm + CmpGt instruction pair)
+- `VmCopyInstructionBlock` — a growth operator; copies a contiguous block of
+  2 to 32 instructions, clamped to the program, into the dormant tail span
+  below
+- `VmCopyGeneBackwardSlice` — a growth operator; copies the backward
+  dependency slice of one instruction into the dormant tail span
+- `VmCopyGeneForwardSlice` — a growth operator; copies the forward
+  dependency slice of one instruction into the dormant tail span
+- `VmCopyInstructionBlockRemapped` — an explicit macro, not a growth
+  operator: it copies a block inline at a random position with every register
+  field cyclically shifted, so it changes behavior at the moment it fires and
+  is measured as a behavior-changing operator
+- `VmCopyConstantBlock` (append-only copy of a constant-pool block; existing
+  `const_idx` references stay valid, so it is silent when it fires)
 - `VmMutateSlotAddress` (mutate slot_idx on an existing shared-memory slot
   opcode)
 - `VmMutatePairedSlotAddress` (co-mutate all LoadSlotImm/StoreSlotImm
@@ -163,6 +176,19 @@ VM structural-edit contract:
   surviving original target. This is based on source indices, never instruction
   equality, so repeated identical instructions remain distinct. Newly authored
   instructions retain their authored offsets.
+- `VmCopyInstructionBlock`, `VmCopyGeneBackwardSlice`, and
+  `VmCopyGeneForwardSlice` place their copy in a dormant span at the program
+  tail (T11.F08). Every surviving jump keeps its old resolved target through
+  the repair above, so nothing outside the span jumps into it; when the
+  program's last instruction is neither `Halt` nor `ExecuteActionQueue`, a
+  newly authored `Halt` guard is spliced immediately before the copied span in
+  the same event, so fall-through halts exactly where running past the old
+  program's end used to halt. A later jump mutation — an offset stepped by one
+  unit, or an inserted or replaced jump — is the only way the span becomes
+  reachable, and it then runs in its original's place. Neutrality here is
+  behavioral and holds under ample budget: executing the guard costs one
+  `Halt` step, and the longer program can reach the step cap or exhaust energy
+  where the original did not.
 - `VmInstructionRawFieldMutation` changes one encoded operand by one bounded
   unit and never replaces the opcode. Fieldless instructions skip. The paired
   slot-address operator remains a linked-address macro; the standalone slot
@@ -190,12 +216,17 @@ Every current or future mesh backend must meet these four requirements:
 
 T11.F02 establishes the VM reference and operand portions. T11.F03 owns graph
 growth, T11.F04 mutation supply, T11.F06 the graph state clock, T11.F07 the
-trace/reward clock, T11.F08 duplication, T11.F09 learned-state
-correspondence, and T11.F15 the topology connection operators
-(`AddRouteTarget`, `MutateGateBias`, `RetargetNodeTarget`,
-`RemoveRouteTarget`, `RemoveNode`, `SwapNodeBackend`, `ChangeEntryNode`,
-`SwapRouteTargets`) and mesh attachment semantics above. Broader T11.F08/F09
-guarantees remain pending.
+trace/reward clock, T11.F09 learned-state correspondence, and T11.F15 the
+topology connection operators (`AddRouteTarget`, `MutateGateBias`,
+`RetargetNodeTarget`, `RemoveRouteTarget`, `RemoveNode`, `SwapNodeBackend`,
+`ChangeEntryNode`, `SwapRouteTargets`) and mesh attachment semantics above.
+
+T11.F08 owns duplication on all three backends: VM dormant-tail placement and
+its terminal guard, graph copy placement and the copy self-edge rule, the
+split exclusion, and the mesh post-activation qualification. A copy is
+required to be neutral when it fires *and* to reproduce its original when a
+later mutation runs it in the original's place. Learned-weight correspondence
+through such a copy remains T11.F09's.
 
 Growth-versus-connection taxonomy (requirement 2, established for the graph
 and InputRef domains by T11.F03; the VM insert/copy families are T11.F02's
@@ -203,10 +234,15 @@ and T11.F08's): a growth operator adds structure and must be neutral at the
 moment it fires — identical action, output-slot, and shared-memory behavior
 when both executions have enough energy and relaxation passes. Growth
 operators: `AddComputeNode` (all three forms below), `CopyComputeNode`,
-`CopySubgraph`, `InputRef.Add`, and the topology `AddNode`, `CopyNode`, mesh
-slices, `SpliceNode`, `AddRouteTarget`, and `SwapNodeBackend`. T11.F15 owns
-the topology attachment and paired-routing guarantees; F08 retains general
-copy qualification. A connection or parameter operator may change
+`CopySubgraph`, `InputRef.Add`, the VM `VmCopyInstructionBlock`,
+`VmCopyGeneBackwardSlice`, `VmCopyGeneForwardSlice`, and `VmCopyConstantBlock`,
+and the topology `AddNode`, `CopyNode`, mesh slices, `SpliceNode`,
+`AddRouteTarget`, and `SwapNodeBackend`. `VmCopyInstructionBlockRemapped` is
+not in this class: the register-renamed inline copy is an explicit
+behavior-changing macro, as `CopyEdgeBundle` and the paired slot-address
+operator are. T11.F15 owns the topology attachment and paired-routing
+guarantees; F08 owns copy placement and post-activation qualification on
+every backend. A connection or parameter operator may change
 behavior, and must do so in one small step: `AddGraphEdge`,
 `RetargetGraphEdge`, `RemoveGraphEdge`, `CopyEdgeBundle`, `SwapGraphOperator`,
 `MutateGraphOperatorParam`, `GraphRawFieldMutation`, `InputRef.Swap`, and
@@ -250,13 +286,17 @@ only their edges are evolvable.
   self edge may extend convergence by at most one pass. Skips with
   `NoApplicableTarget` when the graph has no edge, or when the picked edge's
   source is an out-of-range `ComputeNode` (a prior removal's sentinel).
-  **Documented exception**: an append-branch split retargeting an
-  `InputLeaf(DynamicIntrospection(EnergyCurrent))` edge, on a graph carrying
-  plasticity, is not neutral — the new node's cached value is read at effects
-  time before the post-convergence plasticity-cost deduction, while a direct
-  edge on the same non-compute surface reads energy after it, differing by
-  `plasticity_cost * weight`. No observable effect under the production
-  default `plasticity_update_cost = 0.0`; see the T11.F03 spec.
+  **Split exclusion** (T11.F08, replacing T11.F03's documented exception): it
+  also skips with `NoApplicableTarget` when the graph carries plasticity, the
+  picked edge's consumer is a sink, action slot, or execute gate, and its
+  source is an `InputLeaf` resolving to a `DynamicIntrospection` reference.
+  An identity node between them caches the value during evaluation, while the
+  direct edge resolves it in the post-convergence effects context after the
+  plasticity-cost deduction, so the two can differ by
+  `plasticity_cost * weight` (no observable effect under the production
+  default `plasticity_update_cost = 0.0`, but the split is not
+  function-preserving in general). With the exclusion in place, the split's
+  neutrality property holds unconditionally.
 - `RemoveComputeNode` (removes from `compute_nodes`, remaps
   `GraphSource::ComputeNode` indices across all edge containers)
 - `AddGraphEdge` (all 5 edge-bearing surfaces; source sampled by
@@ -277,13 +317,29 @@ only their edges are evolvable.
   reference's width; `SharedMemory.slot` by ±1 modulo 16; `SharedMemory.previous`
   flipped. Skips with `NoApplicableTarget` when the picked target has no valid
   unit move.
-- `CopyComputeNode` — a growth operator; pushes a faithful copy (kind,
-  inputs, plasticity) of one random compute node and nothing else. The copy
-  reads whatever its source read and is read by nothing; no backlink is
-  added, and inputs are never coin-flip cleared (a copy that should start
-  disconnected is `AddComputeNode`'s disconnected form).
-- `CopySubgraph` (copies compute node cluster; internal edges remapped,
-  external edges preserved; copied nodes start as dead genes)
+- `CopyComputeNode` — a growth operator; inserts a faithful copy (kind,
+  inputs, plasticity) of one random compute node directly after its source
+  and nothing else. The copy reads whatever its source read and is read by
+  nothing; no backlink is added, and inputs are never coin-flip cleared (a
+  copy that should start disconnected is `AddComputeNode`'s disconnected
+  form). Placing the copy at `source + 1` rather than at the end is what
+  keeps every copied edge on its original's evaluation phase (T11.F08): under
+  the T11.F06 clock a lower-index source is read from the current visit and a
+  self or higher-index source from the frozen tick-start outputs, so a source
+  below the original must stay below the copy and a source above must stay
+  above. The copy's own inputs take the same index shift as every other
+  surviving reference, and a self-edge on the copy reads the copy, so the
+  copy's persistent state is its own.
+- `CopySubgraph` — a growth operator; copies a random-walk cluster of 2 to 4
+  compute nodes, inserting the `i`-th sorted member's copy at final index
+  `c_i + i + 1` with all final indices computed before any insertion. Edges
+  between cluster members, including self-edges, are remapped onto the
+  copies; external sources keep their logical target at its shifted index.
+  Copied nodes start as dead genes: nothing reads them until a connection
+  operator does, and when every edge that read a member from outside the
+  cluster is retargeted to that member's copy, the copies reproduce the
+  originals. Both copy operators skip with `NoApplicableTarget` rather than
+  produce an index at or above the `u16::MAX` dangling-reference sentinel.
 - `CopyEdgeBundle` (copies edge set between surfaces)
 - `EnableHebbian` (add `PlasticityConfig` to a non-plasticity compute node)
 - `DisableHebbian` (remove `PlasticityConfig` from a plasticity compute node)
