@@ -305,29 +305,55 @@ impl CgpGraphBackendDef {
         self.compute_nodes.insert(idx, node);
     }
 
-    /// Duplicate the compute nodes at `sources`, appending each copy and
-    /// remapping edges between duplicated nodes onto the corresponding copies.
-    /// External sources are preserved as they were.
+    /// Duplicate the compute nodes at `sources`, inserting each copy directly
+    /// after its original so the copy reads every source in the same
+    /// evaluation phase its original reads: a source below the original stays
+    /// below the copy and is read from this visit, a source at or above it
+    /// stays above and is read from the frozen tick-start outputs
+    /// (`runtime/cgp/sources.rs`, T11.F06). The `i`-th source ends at index
+    /// `sources[i] + i` and its copy at `sources[i] + i + 1`.
+    ///
+    /// An edge from one duplicated node to another, including a self-edge,
+    /// points at the corresponding copy, so the duplicated set's internal
+    /// wiring and per-node state are its own. Every other reference, in the
+    /// copies and across all five edge-bearing surfaces, is remapped to its
+    /// shifted index, so no surviving edge changes what it reads.
     ///
     /// `sources` must be strictly ascending and in range; callers must keep
     /// `compute_nodes.len() + sources.len()` within `u16::MAX`.
     pub fn duplicate_compute_nodes_in_place(&mut self, sources: &[usize]) {
-        let base = self.compute_nodes.len();
-        let copies: Vec<ComputeNode> = sources
+        let old_len = self.compute_nodes.len();
+        debug_assert!(
+            sources.windows(2).all(|pair| pair[0] < pair[1])
+                && sources.last().is_none_or(|&last| last < old_len),
+            "duplicate_compute_nodes_in_place: sources must be strictly ascending and in range"
+        );
+        let originals: Vec<ComputeNode> = sources
             .iter()
-            .map(|&idx| {
-                let mut copy = self.compute_nodes[idx].clone();
-                for edge in &mut copy.inputs {
-                    if let GraphSource::ComputeNode(ref mut src_idx) = edge.source {
-                        if let Ok(position) = sources.binary_search(&(*src_idx as usize)) {
-                            *src_idx = (base + position) as u16;
-                        }
-                    }
-                }
-                copy
-            })
+            .map(|&idx| self.compute_nodes[idx].clone())
             .collect();
-        self.compute_nodes.extend(copies);
+        // A surviving reference moves up by the number of duplicated nodes
+        // below it. Out-of-range indices, including `remove_compute_node_at`'s
+        // `u16::MAX` sentinel, are left alone.
+        let shift = |src_idx: u16| {
+            if (src_idx as usize) >= old_len {
+                src_idx
+            } else {
+                src_idx + sources.partition_point(|&c| c < src_idx as usize) as u16
+            }
+        };
+        self.remap_compute_sources(shift);
+        for (i, mut copy) in originals.into_iter().enumerate().rev() {
+            for edge in &mut copy.inputs {
+                if let GraphSource::ComputeNode(ref mut src_idx) = edge.source {
+                    *src_idx = match sources.binary_search(&(*src_idx as usize)) {
+                        Ok(position) => (sources[position] + position + 1) as u16,
+                        Err(_) => shift(*src_idx),
+                    };
+                }
+            }
+            self.compute_nodes.insert(sources[i] + 1, copy);
+        }
     }
 
     /// After an input_ref is removed at `removed_ref_idx`, update all

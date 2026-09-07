@@ -10,7 +10,9 @@ use super::operators::mutate_one_instruction_field;
 use super::{VmMutator, VmOperator};
 use crate::config::{MutationConfig, RuntimeConfig};
 use crate::contracts::{NodeId, WorldAction};
-use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction};
+use crate::creature::genome::{
+    BackendDef, CreatureGenome, NodeGenome, VmBackendDef, VmInstruction,
+};
 use crate::neighborhood::battery::{Battery, Signature};
 use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::runtime::vm::execute_vm_node_with_reserve;
@@ -339,10 +341,7 @@ fn vm_copy_diverge_and_activate_trajectory() {
     );
 
     // Activation: one newly authored jump at pc 0 into the copied span.
-    for (label, genome, expect_equal) in [
-        ("exact", copied, true),
-        ("diverged", diverged, false),
-    ] {
+    for (label, genome, expect_equal) in [("exact", copied, true), ("diverged", diverged, false)] {
         let mut activated = genome;
         let mut program = program_of(&activated);
         crate::mutation::vm::insert_new_instruction_with_reference_repair(

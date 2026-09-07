@@ -9,8 +9,8 @@ pub(crate) mod operators;
 use operators::*;
 #[cfg(test)]
 pub(crate) use operators::{
-    insert_new_instruction_with_reference_repair, splice_program_with_reference_repair,
-    SpliceInstruction,
+    insert_new_instruction_with_reference_repair, mutate_one_instruction_field,
+    splice_program_with_reference_repair, SpliceInstruction,
 };
 
 /// VM mutation operator variants.

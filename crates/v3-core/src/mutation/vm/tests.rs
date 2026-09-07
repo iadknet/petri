@@ -689,8 +689,9 @@ fn copy_instruction_block_respects_max_32() {
     } else {
         panic!()
     };
-    // Original 3 + at most 3 copied = max 6.
-    assert!(after_len <= 6, "block copy clamped to program len");
+    // Original 3 + the T11.F08 guard Halt (the program ends in a Noop) + at
+    // most 3 copied = max 7.
+    assert!(after_len <= 7, "block copy clamped to program len");
 }
 
 // ── VmCopyInstructionBlockRemapped tests ──

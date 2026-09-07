@@ -202,3 +202,6 @@ mod tests;
 
 #[cfg(test)]
 mod f15_tests;
+
+#[cfg(test)]
+mod f08_tests;
