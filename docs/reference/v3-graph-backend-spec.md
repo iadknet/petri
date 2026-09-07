@@ -19,8 +19,13 @@ taxonomy and neutral-growth semantics (`AddComputeNode`'s three forms,
 `CopyComputeNode`'s faithful-copy rule, `InputRef.Add`'s unwired push, and the
 `insert_compute_node_at`/`remove_compute_node_at` index-remap pair); the
 taxonomy and per-operator contract text live in `v3-mutation-spec.md` rather
-than being duplicated here. T11.F06 owns its one-world-tick persistent-state
-clock.
+than being duplicated here. T11.F08 adds duplication placement
+(`duplicate_compute_nodes_in_place`: each copy directly after its original, an
+edge between duplicated nodes following the copies, the split exclusion for a
+live introspection reference read directly by a non-compute surface on a
+plasticity-carrying graph), which is what keeps a copied edge on the
+evaluation phase Section 8's ordered pass gives it. T11.F06 owns its
+one-world-tick persistent-state clock.
 
 ---
 
