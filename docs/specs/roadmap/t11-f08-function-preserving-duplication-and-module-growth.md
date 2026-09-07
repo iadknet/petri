@@ -187,7 +187,7 @@ disabled or down-weighted; the remapped inline copy keeps its weight.
       (`8ca76bb0`.)
 - [x] Self-review the diff (`simplify`), then fresh `make rust-mutants`;
       record the survivor triage below. (`005b0778`, `eebacbbf`.)
-- [ ] Store gate and single goal reports at
+- [x] Store gate and single goal reports at
       `docs/progress/features/t11-f08-function-preserving-duplication-and-module-growth.json`
       and `...-goal.json`; append both to `docs/progress/benchmark-series.json`;
       add the `docs/progress.md` row.
@@ -250,9 +250,14 @@ disabled or down-weighted; the remapped inline copy keeps its weight.
   branch, and `split_skips_...` / `split_exclusion_is_scoped_to_all_three_of_its_conditions`
   pin the skip to exactly the excluded edges.
 
-- [x] `cargo test -p v3-core --test viability` ran first after the mutation
-      semantics changed; result recorded: **ok, 25 passed / 0 failed**, both
-      immediately after the semantics change and again after the simplify pass.
+- [x] `cargo test -p v3-core --test viability` ran after the mutation
+      semantics changed; result recorded: **ok, 25 passed / 0 failed**, run
+      twice (after the semantics change and again after the simplify pass).
+      Deviation from the brief, recorded rather than glossed: the actual order
+      was the focused `mutation::` suite (which surfaced two test updates),
+      then the topology fixtures, then viability, then the full lib suite and
+      `make check`. Viability ran before the full suite and `make check` but
+      not before the focused suite, so it was not literally first.
 - [x] `make rust-mutants` (fresh, `MUTANTS_ITERATE=0`): summary line, output
       path, and every survivor resolved as killed, equivalent, or deferred.
 
@@ -357,23 +362,42 @@ Goal wall 0.006062250 ms/creature-tick: **-6.353186%** versus T11.F15 and
 636,657 ms to 603,463 ms over 1.2% more creature-ticks.
 
 **The `plasticity_updates` crossing.** Cause, stated as measured rather than
-excused: this counter has ranged 0.100–0.154 per creature-tick across every
-goal report from T01.F12 through T11.F14 (0.100492, 0.100492, 0.124060,
+excused.
+
+*Series context.* This counter has ranged 0.100–0.154 per creature-tick across
+every goal report from T01.F12 through T11.F14 (0.100492, 0.100492, 0.124060,
 0.115330, 0.139997, 0.153630, 0.151239, 0.151239); T11.F15's 0.063742 is the
 one low outlier in the series, and this feature's 0.104370 is back inside the
-historical band and 25.4% *below* the T11.F04 epoch. No mechanism in this diff
-adds a Hebbian update: the number of updates is the number of plasticity-node
-edges evaluated, the copy operators duplicate a plasticity node exactly as
-they did before, and the new split exclusion *removes* split opportunities on
-plasticity-carrying graphs. What changed is the population: with the three VM
-copy operators now silent instead of behavior-changing (evolved
-`VmCopyInstructionBlock` 483/720 → 720/720 silent), selection over 6,000 ticks
-produced graphs with more plasticity structure (mean reachable structure
-128.824696 versus 125.564576, p75 157 versus 153) while VM work fell 32%. The
-spec predeclared that populations differ and every counter may move, but did
-not predeclare a severe allowance, so this is recorded as a crossing with its
-cause and left for the orchestrator and reviewer; no threshold was weakened
-and no baseline was re-pinned.
+historical band and 25.4% *below* the T11.F04 epoch.
+
+*Measured composition change, not an inference.* `graph_relax_iters` is flat
+(+0.073462%), so the rise is updates per graph visit, and the evolved
+neighborhood shows why: every plasticity-only operator doubled its applied
+trials against T11.F15 — `DisableHebbian` 40/40 applied with 680 skipped →
+80/80 with 640, and the same 40 → 80 shift for `EnableRewardModulation`,
+`MutateHebbianRate`, `MutateHebbianRule`, and `ToggleHebbianLamarckian`. At 20
+trials per genome that is 2 of 36 sampled evolved genomes carrying plasticity
+under T11.F15 versus 4 under this feature. Mean reachable structure also rose
+(128.824696 versus 125.564576, p75 157 versus 153) while VM work fell 32%.
+
+*Direct mechanism: the feature working.* Before this change a copied plasticity
+node was appended, so it read its inputs in the wrong evaluation phase; a
+mutation that wired something to it produced a different signal, and selection
+removed it. The copy is now phase-faithful, so a duplicated plasticity module
+reproduces its original when something reads it and can then diverge —
+retained duplicated plasticity structure is exactly what this feature's Goal
+asks for ("complexity can grow by copy and divergence"), and more retained
+plasticity structure means more Hebbian updates per visit. Nothing in the diff
+adds an update to a fixed genome: the split exclusion in fact *removes* split
+opportunities on plasticity-carrying graphs.
+
+*Status.* The spec predeclared that populations differ and every counter may
+move, but did not predeclare a severe allowance, so this is an unpredeclared
+cost of the intended effect. The run is deterministic, so re-running produces
+the same flag; the decision is acceptance or rejection of the observed cost,
+as with T11.F04, not remediation. No threshold was weakened and no baseline
+was re-pinned; an epoch re-pin is not recommended, since the counter sits 25%
+below the T11.F04 epoch and inside the historical band.
 
 **Founder neighborhood versus the predeclaration** (gate report, silent /
 applied, T11.F15 → T11.F08):
@@ -474,6 +498,16 @@ per side on unpaired populations; nothing here is a claim about cognition.
   profile's `plasticity_updates` severe flag versus T11.F15, recorded with
   its cause in Performance and Goal Impact. `make bench PROFILE=goal` exited
   3 because of it; the report itself was written and stored.
+- Judgment call beyond the literal brief, flagged for the reviewer: the
+  reference update also places `VmCopyConstantBlock` in the growth class of
+  the `v3-mutation-spec.md` taxonomy. It is factually silent when it fires
+  (founder 50/50, evolved 617/617) and append-only, but the brief named only
+  the three tail copies, so strike it if unwanted. Two crate-internal
+  signature changes support the tests: `mutate_one_instruction_field` widened
+  from `pub(super)` to `pub(crate)` so the mesh fixture can apply the
+  production single-field step to a clone, and `split_existing_edge` gained an
+  `input_refs` parameter (all call sites updated) because the exclusion has to
+  resolve an `InputLeaf` to its reference kind.
 - The mesh half of this feature is qualification only, as the spec's
   Non-Goals require: `crates/v3-core/src/mutation/topology/f08_tests.rs`
   passed on its first run against unchanged T11.F15 topology code, and no
