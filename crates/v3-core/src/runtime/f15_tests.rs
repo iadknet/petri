@@ -148,9 +148,9 @@ fn all_three_modes_match_cycle_fallback_energy_memory_priority_and_cost() {
                 GraphRuntimeState::new(),
                 GraphRuntimeState::new(),
             ];
-            for _ in 0..2 {
+            for tick in 0..2 {
                 for state in &mut states {
-                    state.begin_tick(&g.nodes);
+                    state.begin_tick(&g.nodes, tick);
                 }
                 let plain = execute_creature_mesh_impl(
                     &g,

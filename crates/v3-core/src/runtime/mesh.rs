@@ -20,7 +20,7 @@ use crate::sensors::perception::SensorSnapshot;
 /// containing the queued actions, a [`ComputeCostReport`], and the priority bid.
 ///
 /// Before the first mesh execution of each new world tick, the caller must call
-/// `graph_runtime.begin_tick(&genome.nodes)`. Mesh execution does not
+/// `graph_runtime.begin_tick(&genome.nodes, age)`. Mesh execution does not
 /// advance the graph clock. Each mesh node dispatches at most once per tick.
 ///
 /// The function walks the genome's node chain starting at `entry_node_id`,
@@ -295,6 +295,9 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
 
         // One mesh hop is one node dispatch, counted regardless of outcome.
         side_outputs.work_counters.mesh_hops += 1;
+        // Same event, recorded for the offspring's mutation targeting (T11.F17).
+        // Written from the shared loop, so every execution mode agrees.
+        graph_runtime.dispatch_record.record_dispatch(current_idx);
 
         // Snapshot energy before node dispatch to attribute cost to the correct backend.
         let node_energy_before = *energy;
@@ -533,10 +536,10 @@ mod tests {
                 max_mesh_hops: 4,
                 ..default_config()
             };
-            for _ in 0..2 {
-                state.begin_tick(&genome.nodes);
-                observed_state.begin_tick(&genome.nodes);
-                traced_state.begin_tick(&genome.nodes);
+            for tick in 0..2 {
+                state.begin_tick(&genome.nodes, tick);
+                observed_state.begin_tick(&genome.nodes, tick);
+                traced_state.begin_tick(&genome.nodes, tick);
                 let plain = execute_creature_mesh_impl(
                     &genome,
                     &empty_sensor_snapshot(),
@@ -592,6 +595,27 @@ mod tests {
                 assert_eq!(
                     state.tick_start_eligibility_traces,
                     observed_state.tick_start_eligibility_traces
+                );
+                // T11.F17: the dispatch record is mode-independent, and a
+                // second tick at a later age refreshes the same entries.
+                let executed = state.dispatch_record.executed_indices(tick, 1);
+                assert_eq!(
+                    executed.first(),
+                    Some(&0),
+                    "the entry node dispatches every tick at every energy level"
+                );
+                assert_eq!(
+                    executed,
+                    observed_state.dispatch_record.executed_indices(tick, 1)
+                );
+                assert_eq!(
+                    executed,
+                    traced_state.dispatch_record.executed_indices(tick, 1)
+                );
+                assert_eq!(
+                    executed.len(),
+                    (plain.work_counters.mesh_hops as usize).min(genome.nodes.len()),
+                    "one record entry per dispatched node"
                 );
                 assert_eq!(state.scratch_prev, observed_state.scratch_prev);
                 assert_eq!(state.scratch_curr, observed_state.scratch_curr);

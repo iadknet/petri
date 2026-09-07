@@ -7,6 +7,7 @@ use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::CreatureState;
 use crate::mutation::phenotype::mutate_phenotype;
+use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
 use crate::simulation::simulation::Simulation;
 
@@ -206,6 +207,10 @@ pub fn apply_reproduce(
         .plasticity_weights
         .clone();
     let parent_cached_reachable = sim.creatures[parent_id].cached_reachable_nodes.clone();
+    // T11.F17: the parent's own recent dispatches bias the offspring's targets.
+    // Passed unresolved, so a zero-event birth derives nothing.
+    let parent = &sim.creatures[parent_id];
+    let parent_executed = ParentExecuted::Record(&parent.graph_runtime.dispatch_record, parent.age);
 
     // Step 10: Apply genome mutations.
     let mut child_genome = child_genome;
@@ -213,6 +218,7 @@ pub fn apply_reproduce(
         &mut child_genome,
         &sim.config.mutation,
         &parent_cached_reachable,
+        parent_executed,
         rng,
         sim.config.world.food.types.len(),
     );
@@ -305,6 +311,7 @@ pub fn apply_reproduce(
         }
     }
     sim.stats.mutation_reachable_target_total += summary.reachable_target_events as u64;
+    sim.stats.mutation_executed_target_total += summary.executed_target_events as u64;
     sim.stats.mutation_unreachable_target_total += summary.unreachable_target_events as u64;
     sim.stats.mutation_not_applicable_target_total += summary.not_applicable_events as u64;
     let mut child_birth_mutation_operators: Vec<_> =

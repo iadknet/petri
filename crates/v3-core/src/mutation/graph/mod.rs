@@ -5,7 +5,7 @@ use rand::Rng;
 
 use crate::config::MutationConfig;
 use crate::creature::genome::{BackendDef, CreatureGenome};
-use crate::mutation::reachability::biased_select_from;
+use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
 /// Graph mutation operator variants.
@@ -160,8 +160,7 @@ impl GraphMutator {
     pub fn apply(
         genome: &mut CreatureGenome,
         op: GraphOperator,
-        reachable_nodes: &[usize],
-        bias: f64,
+        targets: &mut TargetSelector<'_>,
         rng: &mut impl Rng,
         config: &MutationConfig,
     ) -> Result<TargetReachability, MutationSkipReason> {
@@ -177,9 +176,9 @@ impl GraphMutator {
             return Err(MutationSkipReason::NoApplicableTarget);
         }
 
-        let (node_idx, reachability) =
-            biased_select_from(&graph_indices, reachable_nodes, bias, rng)
-                .ok_or(MutationSkipReason::NoApplicableTarget)?;
+        let (node_idx, reachability) = targets
+            .select(&graph_indices, rng)
+            .ok_or(MutationSkipReason::NoApplicableTarget)?;
         let result = match op {
             GraphOperator::AlterGraphEdgeWeight => {
                 operators::alter_edge_weight(genome, node_idx, rng)

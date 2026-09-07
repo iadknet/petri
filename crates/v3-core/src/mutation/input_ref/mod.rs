@@ -4,7 +4,7 @@ use crate::config::{MutationConfig, OrdinaryFoodTypeId};
 use crate::contracts::{InputReference, WorldInputKey};
 use crate::creature::genome::CreatureGenome;
 use crate::mutation::compound::sub_value_count;
-use crate::mutation::reachability::biased_select_from;
+use crate::mutation::reachability::TargetSelector;
 use crate::mutation::sampling;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 use crate::runtime::OUTPUT_SLOT_COUNT;
@@ -81,20 +81,18 @@ impl InputRefMutator {
     pub fn apply(
         genome: &mut CreatureGenome,
         op: InputRefOperator,
-        reachable_nodes: &[usize],
-        bias: f64,
+        targets: &mut TargetSelector<'_>,
         rng: &mut impl Rng,
         config: &MutationConfig,
     ) -> Result<TargetReachability, MutationSkipReason> {
-        Self::apply_with_food_type_count(genome, op, reachable_nodes, bias, rng, config, 1)
+        Self::apply_with_food_type_count(genome, op, targets, rng, config, 1)
     }
 
     /// Apply an input ref operator with typed-food mutation context.
     pub fn apply_with_food_type_count(
         genome: &mut CreatureGenome,
         op: InputRefOperator,
-        reachable_nodes: &[usize],
-        bias: f64,
+        targets: &mut TargetSelector<'_>,
         rng: &mut impl Rng,
         config: &MutationConfig,
         food_type_count: usize,
@@ -104,11 +102,9 @@ impl InputRefMutator {
         }
 
         match op {
-            InputRefOperator::Add => apply_add(genome, reachable_nodes, bias, rng, food_type_count),
-            InputRefOperator::Remove => apply_remove(genome, reachable_nodes, bias, rng),
-            InputRefOperator::Swap => {
-                apply_swap(genome, reachable_nodes, bias, rng, config, food_type_count)
-            }
+            InputRefOperator::Add => apply_add(genome, targets, rng, food_type_count),
+            InputRefOperator::Remove => apply_remove(genome, targets, rng),
+            InputRefOperator::Swap => apply_swap(genome, targets, rng, config, food_type_count),
             InputRefOperator::RawFieldMutation => {
                 apply_raw_field_mutation(genome, rng, config, food_type_count)
             }
@@ -125,13 +121,13 @@ impl InputRefMutator {
 /// that reference `input_refs` on the VM backend).
 fn apply_add(
     genome: &mut CreatureGenome,
-    reachable_nodes: &[usize],
-    bias: f64,
+    targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
     food_type_count: usize,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
-    let (node_idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
+    let (node_idx, reachability) = targets
+        .select(&all_indices, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let new_ref = if food_type_count <= 1 {
         sampling::random_input_reference(rng)
@@ -144,8 +140,7 @@ fn apply_add(
 
 fn apply_remove(
     genome: &mut CreatureGenome,
-    reachable_nodes: &[usize],
-    bias: f64,
+    targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let eligible: Vec<usize> = genome
@@ -158,7 +153,8 @@ fn apply_remove(
     if eligible.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-    let (node_idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
+    let (node_idx, reachability) = targets
+        .select(&eligible, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let ref_idx = rng.gen_range(0..genome.nodes[node_idx].input_refs.len());
     genome.nodes[node_idx].input_refs.remove(ref_idx);
@@ -171,8 +167,7 @@ fn apply_remove(
 
 fn apply_swap(
     genome: &mut CreatureGenome,
-    reachable_nodes: &[usize],
-    bias: f64,
+    targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
     config: &MutationConfig,
     food_type_count: usize,
@@ -187,7 +182,8 @@ fn apply_swap(
     if eligible.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-    let (node_idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
+    let (node_idx, reachability) = targets
+        .select(&eligible, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let ref_idx = rng.gen_range(0..genome.nodes[node_idx].input_refs.len());
     let new_ref = if food_type_count <= 1 {

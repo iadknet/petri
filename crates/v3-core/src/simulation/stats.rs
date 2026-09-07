@@ -254,6 +254,9 @@ pub struct SimStats {
     pub mutation_reachable_target_total: u64,
     /// Mutation events where the selected target was an unreachable node.
     pub mutation_unreachable_target_total: u64,
+    /// Mutation events whose target was a node the parent executed recently
+    /// (T11.F17). A subset of the reachable total in production.
+    pub mutation_executed_target_total: u64,
     /// Mutation events where target reachability was not applicable (exempt operators).
     pub mutation_not_applicable_target_total: u64,
     /// Lifecycle value aggregates keyed by mutation operator on carrier creatures.

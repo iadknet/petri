@@ -71,6 +71,19 @@ describe("ConfigPanel", () => {
 		).toBe(0.35);
 	});
 
+	it("edits the executed-target bias and window in the runtime draft", () => {
+		render(<ConfigPanel />);
+		const bias = screen.getByTestId("config-field-mutation-executed-bias");
+		expect(bias).toHaveValue(0.9);
+		fireEvent.change(bias, { target: { value: "0.5" } });
+		expect(useConfigStore.getState().localDraft?.mutation.executed_bias).toBe(0.5);
+
+		const window = screen.getByTestId("config-field-mutation-executed-window-ticks");
+		expect(window).toHaveValue(100);
+		fireEvent.change(window, { target: { value: "250" } });
+		expect(useConfigStore.getState().localDraft?.mutation.executed_window_ticks).toBe(250);
+	});
+
 	it("renders startup and runtime top-level sections with food subgroup", () => {
 		render(<ConfigPanel />);
 

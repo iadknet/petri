@@ -188,6 +188,8 @@ pub struct HealthPayload {
 pub struct MutationTargetReachabilityTotalPayload {
     pub reachable: u64,
     pub unreachable: u64,
+    /// Targets that were nodes the parent executed recently (T11.F17).
+    pub executed: u64,
     pub not_applicable: u64,
 }
 
@@ -503,6 +505,7 @@ pub fn build_ws_frame(handle: &SimHandle) -> WsFrame {
         mutation_target_reachability_total: MutationTargetReachabilityTotalPayload {
             reachable: stats.mutation_reachable_target_total,
             unreachable: stats.mutation_unreachable_target_total,
+            executed: stats.mutation_executed_target_total,
             not_applicable: stats.mutation_not_applicable_target_total,
         },
         mutation_value_totals_by_operator: stats

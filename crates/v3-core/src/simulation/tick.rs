@@ -149,7 +149,9 @@ pub fn run_phase_0(sim: &mut Simulation) {
         creature.lifetime_energy_sum += f64::from(creature.energy.max(0.0));
         creature.lifetime_energy_sample_count += 1;
 
-        creature.graph_runtime.begin_tick(&creature.genome.nodes);
+        creature
+            .graph_runtime
+            .begin_tick(&creature.genome.nodes, creature.age);
         advance_shared_memory(
             &mut creature.shared_memory,
             &mut creature.prev_shared_memory,
@@ -303,7 +305,7 @@ pub fn observe_temporal_actions(sim: &Simulation) -> Vec<TemporalActionObservati
     for (id, sensors) in assemble_sensor_inputs(sim, &ids) {
         let creature = &sim.creatures[id];
         let mut prepared = creature.graph_runtime.clone();
-        prepared.begin_tick(&creature.genome.nodes);
+        prepared.begin_tick(&creature.genome.nodes, creature.age);
         let evaluate = |graph: &mut crate::creature::state::GraphRuntimeState,
                         previous: &[f32; 16]| {
             execute_creature_mesh(
@@ -370,7 +372,7 @@ fn observe_action_queue(
 ) -> Vec<WorldAction> {
     let mut energy = creature.energy;
     let mut graph_runtime = creature.graph_runtime.clone();
-    graph_runtime.begin_tick(&creature.genome.nodes);
+    graph_runtime.begin_tick(&creature.genome.nodes, creature.age);
     execute_creature_mesh(
         &creature.genome,
         sensors,
