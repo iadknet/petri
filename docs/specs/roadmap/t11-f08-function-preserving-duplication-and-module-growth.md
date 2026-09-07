@@ -1,6 +1,6 @@
 # T11.F08 — Function-Preserving Duplication and Module Growth
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-06
 **Feature**: T11.F08
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -675,3 +675,25 @@ per side on unpaired populations; nothing here is a claim about cognition.
     but used only inside its own module and can be narrowed to `fn`. Neither
     changes behavior; both are left for the next feature that touches those
     files.
+- Orchestrator closure decisions (2026-09-06). The P1 escalation is
+  withdrawn without a user decision: the stored goal report is the
+  post-remediation rerun, `severe=false` against both references, so no cost
+  acceptance or re-pin is needed. The missed evolved dead-birth ceiling
+  (28/3300 against 21/3300, 0.85% against 0.64%) is accepted as recorded, not
+  as a regression: the track's no-regression rule reads the founder half,
+  which is unchanged at 0/208 dead with 84/164 single-event silence; the
+  evolved halves are unpaired populations one run apart, and every copy
+  operator this feature changed reads 0 dead on every applied trial. Track
+  criterion 2 is checked at this closure on T11.F02's splice properties
+  (`insertion_preserves_old_jump_target_for_every_offset_and_boundary`,
+  `deletion_preserves_or_redirects_old_jump_targets`,
+  `replacement_keeps_incoming_targets_and_new_offsets_for_every_old_offset`,
+  `raw_field_mutation_is_a_one_step_opcode_preserving_property`, with motif,
+  block, and slice edits routed through the same provenance-aware splice) plus
+  this feature's `tail_copy_is_neutral_under_ample_budget`. `make check`
+  exited 0 at `1c866c2e` and again at the remediated head before closure; the
+  closing commit's own run is recorded in the goal conversation.
+- Cost record: `/usage` totals unavailable at closure (autonomous goal run,
+  not requested from the user); implementer advisor consults 4 (2 in the
+  first pass, 2 in the remediation pass); reviewer findings P1=1, P2=3, P3=6.
+  Telemetry only.

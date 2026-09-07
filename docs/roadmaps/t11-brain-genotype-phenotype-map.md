@@ -20,7 +20,7 @@ representation only where the neighborhood reading still shows a gap.
 ## Track Success Criteria
 
 - [ ] A mutational-neighborhood indicator reports the silent, changed, and dead fractions per operator and per birth on single-tick and short multi-tick batteries: the founder half inside the gate profile at every closure program-wide, the evolved-genome half in the goal profile.
-- [ ] Structural VM edits (insert, delete, replace, motif insertion, block and slice copies) preserve every surviving control-flow reference outside the edited span, verified by property tests, and no single operand-level VM event redraws more than one field (opcode replacement stays a separate macro operator).
+- [x] Structural VM edits (insert, delete, replace, motif insertion, block and slice copies) preserve every surviving control-flow reference outside the edited span, verified by property tests, and no single operand-level VM event redraws more than one field (opcode replacement stays a separate macro operator). (T11.F08 closure, 2026-09-06: T11.F02's insertion, deletion, replacement, and one-field operand properties, with motif, block, and slice edits routed through the same provenance-aware splice, plus T11.F08's tail-copy neutrality property over generated programs; the three neutral VM copies now read 50/50 silent on the founder.)
 - [x] Adding or copying a graph compute node, or adding an input reference, is silent on the founder battery at least 95% of the time, and new edges can reach every sensor sub-value. (T11.F03 closure, 2026-09-05: `AddInternalGraphNode`, `CopyInternalNode`, and input-reference `Add` each read 1.00 silent on the stored gate report, and `random_graph_source` draws every sub-index; the no-regression rule keeps this true at later closures.)
 - [ ] At production defaults, mutated births are behaviorally dead at most 5% of the time and single-event births are silent at least 60% of the time, with every behavior-changing operator family still enabled.
 - [x] Persistent graph state and eligibility traces advance on an explicit world-tick clock, verified by fixtures across relaxation-pass limits, disconnected-node additions, and skipped module visits.
@@ -47,7 +47,7 @@ representation only where the neighborhood reading still shows a gap.
   - Goal: Neural timescales. Remembered graph state, including what a backward edge reads, advances once per world tick, so extra settling passes or disconnected computation cannot speed up forgetting.
 - [x] **T11.F07 — Reward Trace Clock** — Depends on: T11.F05
   - Goal: Synaptic eligibility. Recent activity fades with elapsed world time and influences later learning through one explicit, calibrated reward-update rule.
-- [ ] **T11.F08 — Function-Preserving Duplication and Module Growth** — Depends on: T11.F02, T11.F03, T11.F06
+- [x] **T11.F08 — Function-Preserving Duplication and Module Growth** — Depends on: T11.F02, T11.F03, T11.F06
   - Goal: Gene duplication. Copying a working module keeps it working, so complexity can grow by copy and divergence as in real genomes.
 - [ ] **T11.F09 — Learned-State Inheritance Integrity** — Depends on: T11.F07, T11.F08
   - Goal: Inherited neural adaptation. When learned weights are heritable, structural mutation preserves their association with surviving connections and initializes new connections explicitly.
