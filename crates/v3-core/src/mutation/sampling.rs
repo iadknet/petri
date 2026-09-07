@@ -1,10 +1,9 @@
 use rand::Rng;
 
-use crate::config::{MutationConfig, OrdinaryFoodTypeId};
+use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::{
     DynamicIntrospectionKey, InputReference, StaticIntrospectionKey, WorldInputKey,
 };
-use crate::mutation::compound::sub_value_count;
 use crate::runtime::OUTPUT_SLOT_COUNT;
 
 /// Generate a random input reference from the full set of 24 possible values.
@@ -60,19 +59,6 @@ fn sample_food_type_id(food_type_count: usize, rng: &mut impl Rng) -> OrdinaryFo
         return OrdinaryFoodTypeId::default();
     }
     OrdinaryFoodTypeId::new(rng.gen_range(0..capped) as u16)
-}
-
-/// Sample a valid sub-index for an input reference based on its compound width.
-pub(crate) fn sample_sub_idx_for_input_ref(
-    reference: &InputReference,
-    config: &MutationConfig,
-    rng: &mut impl Rng,
-) -> u16 {
-    let width = sub_value_count(reference, config);
-    if width <= 1 {
-        return 0;
-    }
-    rng.gen_range(0..width)
 }
 
 #[cfg(test)]

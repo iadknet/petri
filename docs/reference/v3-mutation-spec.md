@@ -65,7 +65,7 @@ This document does not define:
 
 Core rule:
 - `MutationEngine` orchestrates mutation events.
-- Domain mutators only mutate their own domain-specific payloads.
+- Domain mutators own their payloads; paired topology growth also writes its source backend gate.
 - `ParseabilityGate` evaluates structural validity after each event.
 
 ---
@@ -81,18 +81,61 @@ Core rule:
 - `RemoveRouteTarget`
 - `ChangeEntryNode`
 - `SwapNodeBackend`
-- `RewriteNodeId`
 - `CopyNode`
 - `CopyMeshBackwardSlice`
 - `CopyMeshForwardSlice`
 - `SpliceNode`
 - `SwapRouteTargets`
+- `MutateGateBias`
 
-Topology newborn policy note:
-- `AddNode` and `SpliceNode` newborn backend/initialization behavior is
-  configured by `mutation.topology_new_node_birth.*` fields.
-- Canonical defaults/normalization for those fields are owned by
-  `v3-runtime-config-spec.md`.
+Topology connection semantics (T11.F15):
+
+- `AddNode` and `SpliceNode` split a valid existing edge through a minimal VM
+  `Halt` detour, preserving that edge's slot and bias. The detour forwards to
+  the old successor and preserves incoming output slots, queued actions,
+  priority and shared memory. Attachment is atomic; no valid edge means skip.
+- `AddRouteTarget` selects a node with exactly one valid non-self successor,
+  appends a tied-bias branch to a fresh Halt detour forwarding to that successor,
+  and writes the branch's free gate slot in the same event. Graphs gain one
+  weight-1 edge from `random_graph_source` (including full sensor sub-values).
+  VMs gain a `WriteRouteGate` from a uniformly sampled existing register before
+  the first Halt/ExecuteActionQueue or at the end, with reference repair.
+  Missing gate sinks, zero-register VMs and failed insertion skip atomically.
+  Existing orphan gate writes remain. Equal bids retain the old earlier target;
+  a varying new bid can immediately select the equivalent detour.
+- `CopyNode` faithfully copies inputs, backend and outgoing targets. Self IDs
+  follow the copy; external destinations, memory and output addresses stay.
+  Attach as a tied later alternative at an existing predecessor whose static
+  incumbent points to the original. Incumbent and new slots must have no gate
+  writes, the incumbent bias must be finite, and no original-to-predecessor
+  path may exist. Select the first slot unused by both targets and backend
+  writes. These conditions prove dormancy even with single-visit filtering.
+- `SwapNodeBackend` uses the same attachment proof to grow an alternate copy
+  with the other blank backend, preserving the original. `SwapRouteTargets`
+  exchanges only destination IDs to activate an alternative; slots, biases
+  and vector positions remain. Activation may change behavior.
+- Mesh-slice copies retain their copy semantics but preflight an attachment
+  before appending anything. Every growth operator allocates unused IDs,
+  including at integer wrap. General copy and inheritance qualification remain
+  T11.F08/F09's scope.
+- `RetargetNodeTarget` samples uniformly from the deduplicated union of the
+  old successor's successors and the source's other destinations, excluding
+  source, current and missing IDs. No global fallback; empty local choices skip.
+- `RemoveRouteTarget` requires two targets and preserves the earliest
+  highest-bias static incumbent and all surviving slots/biases. A removed
+  branch may still have been a runtime winner.
+- `RemoveNode` protects entry and last node, prefers currently unreachable
+  nodes, otherwise requires a valid non-self static successor. Redirect every
+  incoming ID through that successor, preserving route fields/order. For an
+  unreachable node without a bypass, delete its incoming entries. Eligibility
+  uses fresh traversal, while selection/classification retain the parent cache.
+- `RewriteNodeId` is retired from the live catalog. `ChangeEntryNode` remains
+  an explicit whole-brain macro with weight 1. Other weights remain unchanged;
+  topology total weight is 22 across 13 operators. Eligibility skips are
+  reported as skips, never counted as applied silent mutations.
+- The former `topology_new_node_birth` configuration is removed: inline
+  detours have fixed Halt births. Both backend kinds remain available through
+  alternate growth. No other supply or pressure setting changes.
 
 ### VM domain
 
@@ -151,8 +194,8 @@ trace/reward clock, T11.F08 duplication, T11.F09 learned-state
 correspondence, and T11.F15 the topology connection operators
 (`AddRouteTarget`, `MutateGateBias`, `RetargetNodeTarget`,
 `RemoveRouteTarget`, `RemoveNode`, `SwapNodeBackend`, `ChangeEntryNode`,
-`SwapRouteTargets`), which the taxonomy below leaves unplaced until that
-feature lands. Those later guarantees remain pending.
+`SwapRouteTargets`) and mesh attachment semantics above. Broader T11.F08/F09
+guarantees remain pending.
 
 Growth-versus-connection taxonomy (requirement 2, established for the graph
 and InputRef domains by T11.F03; the VM insert/copy families are T11.F02's
@@ -161,11 +204,16 @@ moment it fires — identical action, output-slot, and shared-memory behavior
 when both executions have enough energy and relaxation passes. Growth
 operators: `AddComputeNode` (all three forms below), `CopyComputeNode`,
 `CopySubgraph`, `InputRef.Add`, and the topology `AddNode`, `CopyNode`, mesh
-slices, and `SpliceNode`. A connection or parameter operator may change
+slices, `SpliceNode`, `AddRouteTarget`, and `SwapNodeBackend`. T11.F15 owns
+the topology attachment and paired-routing guarantees; F08 retains general
+copy qualification. A connection or parameter operator may change
 behavior, and must do so in one small step: `AddGraphEdge`,
 `RetargetGraphEdge`, `RemoveGraphEdge`, `CopyEdgeBundle`, `SwapGraphOperator`,
 `MutateGraphOperatorParam`, `GraphRawFieldMutation`, `InputRef.Swap`, and
-`InputRef.RawFieldMutation` are all in this class. `CopyEdgeBundle` remains an
+`InputRef.RawFieldMutation` are all in this class. Topology connection operators
+are `RetargetNodeTarget`, `RemoveRouteTarget`, `RemoveNode`, `MutateGateBias`,
+`SwapRouteTargets`, and the explicit macro `ChangeEntryNode`, all owned by
+T11.F15. The retired identity rename is outside this live taxonomy. `CopyEdgeBundle` remains an
 explicit multi-edge macro, as the VM's paired-slot-address operator is. A
 grown node still costs `graph_node_base_cost` per relaxation pass; growth
 neutrality does not extend to energy exhaustion.
@@ -376,8 +424,8 @@ neutral growth operators supply scaffold without artificial founder bloat.
 See `v3-runtime-config-spec.md` for config fields.
 
 Exempt operators:
-- Topology `AddNode` and `ChangeEntryNode` do not select a target node. They
-  return `NotApplicable` for reachability classification.
+- Topology `ChangeEntryNode` does not select a target node and returns
+  `NotApplicable`. `AddNode` now selects an edge source and is classified.
 
 `TargetReachability` classification:
 - `Reachable`: selected target was in the parent's reachable set.
@@ -455,8 +503,9 @@ At minimum:
   applied event.
 
 Semantic category rule:
-- `Topology.RewriteNodeId` is semantic-noop-capable and must be counted under
-  `SemanticNoop` when applied.
+- All live operators are `SemanticChange` families after identity rename
+  retirement. This label does not imply a changed phenotype: the neighborhood
+  battery separately measures actual silent/changed/dead outcomes.
 - Applied semantic-noop events still count as applied mutation events and remain
   eligible to trigger phenotype mutation through reproduction policy.
 

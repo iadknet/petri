@@ -188,7 +188,6 @@ fn operator_domain_mapping_is_consistent() {
             | MutationOperator::TopologyRemoveRouteTarget
             | MutationOperator::TopologyChangeEntryNode
             | MutationOperator::TopologySwapNodeBackend
-            | MutationOperator::TopologyRewriteNodeId
             | MutationOperator::TopologyCopyNode
             | MutationOperator::TopologyCopyMeshBackwardSlice
             | MutationOperator::TopologyCopyMeshForwardSlice
@@ -264,7 +263,6 @@ fn complexity_effect_cross_consistency_with_domain_operators() {
             TopologyOperator::RemoveRouteTarget => MutationOperator::TopologyRemoveRouteTarget,
             TopologyOperator::ChangeEntryNode => MutationOperator::TopologyChangeEntryNode,
             TopologyOperator::SwapNodeBackend => MutationOperator::TopologySwapNodeBackend,
-            TopologyOperator::RewriteNodeId => MutationOperator::TopologyRewriteNodeId,
             TopologyOperator::CopyNode => MutationOperator::TopologyCopyNode,
             TopologyOperator::CopyMeshBackwardSlice => {
                 MutationOperator::TopologyCopyMeshBackwardSlice

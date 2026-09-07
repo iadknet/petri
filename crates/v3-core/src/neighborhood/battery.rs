@@ -380,3 +380,72 @@ mod tests {
         );
     }
 }
+
+/// Bounded snapshot-only drift characterization, deliberately excluded from ordinary checks.
+#[cfg(test)]
+mod drift_characterization {
+    use super::*;
+    use crate::creature::genome::analysis::mesh_reachable_nodes;
+    use crate::mutation::engine::MutationEngine;
+    use crate::runtime::mesh::ObservedMeshExecution;
+    use crate::runtime::trace::domain::TerminationReason;
+    use std::collections::{BTreeMap, BTreeSet};
+
+    #[test]
+    #[ignore = "T11.F15 bounded release characterization; run through scripts/bench-wait"]
+    fn t11_f15_drift() {
+        let started = std::time::Instant::now();
+        let config = crate::config::SimulationConfig::default();
+        let battery = Battery::generate(config.world.food.types.len());
+        let founder = crate::creature::founder::v3alpha1_founder_genome();
+        let mut totals = [[0usize; 5]; 3];
+        for seed in 90_000..90_200 {
+            let mut genome = founder.clone();
+            let mut rng = SmallRng::seed_from_u64(seed);
+            for generation in 1..=1000 {
+                let reachable = mesh_reachable_nodes(&genome);
+                MutationEngine::apply_mutations_with_food_type_count(
+                    &mut genome,
+                    &config.mutation,
+                    &reachable,
+                    &mut rng,
+                    config.world.food.types.len(),
+                );
+                if let Some(index) = [50, 250, 1000].iter().position(|&g| g == generation) {
+                    let mut executed = BTreeSet::new();
+                    let mut routes: BTreeMap<crate::contracts::NodeId, BTreeSet<usize>> =
+                        BTreeMap::new();
+                    let mut cap = false;
+                    for scenario in &battery.snapshots {
+                        let (_, observation) = battery.execute_single_tick_with_mode(
+                            &genome,
+                            scenario,
+                            &config.runtime,
+                            ObservedMeshExecution::default(),
+                        );
+                        for (id, route) in observation.hops {
+                            executed.insert(id);
+                            if let Some(position) = route {
+                                routes.entry(id).or_default().insert(position);
+                            }
+                        }
+                        cap |= matches!(
+                            observation.termination_reason,
+                            TerminationReason::MaxHopsReached
+                        );
+                    }
+                    let row = &mut totals[index];
+                    row[0] += genome.nodes.len();
+                    row[1] += mesh_reachable_nodes(&genome).len();
+                    row[2] += executed.len();
+                    row[3] += usize::from(routes.values().any(|positions| positions.len() > 1));
+                    row[4] += usize::from(cap);
+                }
+            }
+        }
+        for (generation, row) in [50, 250, 1000].into_iter().zip(totals) {
+            println!("generation={generation} lineages=200 total_nodes={} reachable_nodes={} executed_nodes={} conditional_genomes={} cap_hit_genomes={}",row[0],row[1],row[2],row[3],row[4]);
+        }
+        println!("elapsed_seconds={:.3}", started.elapsed().as_secs_f64());
+    }
+}

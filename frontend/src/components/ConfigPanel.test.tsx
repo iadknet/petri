@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/rest.ts";
 import { useConfigStore } from "../stores/config.ts";
@@ -104,38 +104,11 @@ describe("ConfigPanel", () => {
 		).toBeInTheDocument();
 	});
 
-	it("includes newborn mutation field deltas in runtime patch payload", async () => {
-		const updatedConfig = {
-			...MOCK_CONFIG,
-			mutation: {
-				...MOCK_CONFIG.mutation,
-				topology_new_node_birth: {
-					...MOCK_CONFIG.mutation.topology_new_node_birth,
-					graph_backend_chance: 0.9,
-				},
-			},
-		};
-		vi.mocked(api.patchConfig).mockResolvedValueOnce({
-			protocol_version: "v3alpha1",
-			state: "paused",
-			config: updatedConfig,
-		});
-
+	it("omits retired newborn backend controls", () => {
 		render(<ConfigPanel />);
-		fireEvent.change(screen.getByTestId("config-field-mutation-birth-graph-backend-chance"), {
-			target: { value: "0.9" },
-		});
-		fireEvent.click(screen.getByTestId("config-apply"));
-
-		await waitFor(() => {
-			expect(api.patchConfig).toHaveBeenCalledWith({
-				mutation: {
-					topology_new_node_birth: {
-						graph_backend_chance: 0.9,
-					},
-				},
-			});
-		});
+		expect(
+			screen.queryByTestId("config-field-mutation-birth-graph-backend-chance"),
+		).not.toBeInTheDocument();
 	});
 
 	it("supports occupancy depletion runtime controls", () => {
