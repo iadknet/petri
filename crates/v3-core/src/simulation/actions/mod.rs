@@ -670,6 +670,51 @@ mod tests {
         );
     }
 
+    /// T11.F17: each birth adds its executed-target events to the cumulative
+    /// simulation total, so the counter grows across successive births.
+    #[test]
+    fn reproduce_accumulates_executed_target_totals_across_births() {
+        let pos = Position::new(5, 5);
+        let (mut sim, parent_id) = make_sim_one_creature(pos, 400.0);
+        sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
+        sim.config.mutation.mutation_probability = 1.0;
+        sim.config.mutation.per_birth_mutation_events_min = 6;
+        sim.config.mutation.per_birth_mutation_events_max = 6;
+        // Stand in for lived ticks: the parent dispatched both mesh nodes.
+        for index in 0..sim.creatures[parent_id].genome.nodes.len() {
+            sim.creatures[parent_id]
+                .graph_runtime
+                .dispatch_record
+                .record_dispatch(index);
+        }
+
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(100);
+        assert_eq!(
+            apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng),
+            ReproductionActionResult::Spawned
+        );
+        let after_first = sim.stats.mutation_executed_target_total;
+        assert!(
+            after_first > 0,
+            "a parent with a live dispatch record contributes executed targets"
+        );
+
+        assert_eq!(
+            apply_reproduce(parent_id, &mut sim, Direction::S, 20.0, &mut rng),
+            ReproductionActionResult::Spawned
+        );
+        assert!(
+            sim.stats.mutation_executed_target_total > after_first,
+            "the second birth adds to the running total ({} then {})",
+            after_first,
+            sim.stats.mutation_executed_target_total
+        );
+        assert!(
+            sim.stats.mutation_executed_target_total <= sim.stats.mutation_reachable_target_total,
+            "executed targets are a subset of reachable targets on this genome"
+        );
+    }
+
     #[test]
     fn reproduce_updates_domain_and_operator_mutation_stats() {
         let pos = Position::new(5, 5);
