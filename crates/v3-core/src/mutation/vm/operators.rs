@@ -730,8 +730,9 @@ pub(crate) fn is_terminal_instruction(instruction: &VmInstruction) -> bool {
 /// instruction is not already a terminal, a newly authored `Halt` guard is
 /// spliced immediately before the copied span in the same event, so
 /// fall-through halts where running past the old program's end used to halt.
-/// The span becomes reachable only through a later jump mutation. Executing
-/// the guard costs its own `Halt` step.
+/// The span becomes reachable only through a later jump mutation, short of a
+/// mutation removing or replacing the guard or the program's final terminal.
+/// Executing the guard costs its own `Halt` step.
 fn copy_span_to_dormant_tail(
     program: &mut Vec<VmInstruction>,
     source_indices: impl IntoIterator<Item = usize>,

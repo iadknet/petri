@@ -158,8 +158,11 @@ Topology connection semantics (T11.F15):
   operator: it copies a block inline at a random position with every register
   field cyclically shifted, so it changes behavior at the moment it fires and
   is measured as a behavior-changing operator
-- `VmCopyConstantBlock` (append-only copy of a constant-pool block; existing
-  `const_idx` references stay valid, so it is silent when it fires)
+- `VmCopyConstantBlock` — an append-only copy of a constant-pool block, and
+  outside the growth class: `LoadConst` resolves
+  `const_idx.rem_euclid(constants.len())` (`runtime/vm.rs`), so a `const_idx`
+  at or above the old pool length resolves to a different constant after the
+  append. It is silent when it fires unless a `const_idx` wraps the pool
 - `VmMutateSlotAddress` (mutate slot_idx on an existing shared-memory slot
   opcode)
 - `VmMutatePairedSlotAddress` (co-mutate all LoadSlotImm/StoreSlotImm
@@ -185,7 +188,8 @@ VM structural-edit contract:
   the same event, so fall-through halts exactly where running past the old
   program's end used to halt. A later jump mutation — an offset stepped by one
   unit, or an inserted or replaced jump — is the only way the span becomes
-  reachable, and it then runs in its original's place. Neutrality here is
+  reachable, short of a mutation removing or replacing the guard or the
+  program's final terminal, and it then runs in its original's place. Neutrality here is
   behavioral and holds under ample budget: executing the guard costs one
   `Halt` step, and the longer program can reach the step cap or exhaust energy
   where the original did not.
@@ -235,12 +239,15 @@ moment it fires — identical action, output-slot, and shared-memory behavior
 when both executions have enough energy and relaxation passes. Growth
 operators: `AddComputeNode` (all three forms below), `CopyComputeNode`,
 `CopySubgraph`, `InputRef.Add`, the VM `VmCopyInstructionBlock`,
-`VmCopyGeneBackwardSlice`, `VmCopyGeneForwardSlice`, and `VmCopyConstantBlock`,
+`VmCopyGeneBackwardSlice`, and `VmCopyGeneForwardSlice`,
 and the topology `AddNode`, `CopyNode`, mesh slices, `SpliceNode`,
 `AddRouteTarget`, and `SwapNodeBackend`. `VmCopyInstructionBlockRemapped` is
 not in this class: the register-renamed inline copy is an explicit
 behavior-changing macro, as `CopyEdgeBundle` and the paired slot-address
-operator are. T11.F15 owns the topology attachment and paired-routing
+operator are. `VmCopyConstantBlock` is not in this class either: it is
+append-only and silent in practice, but a `const_idx` that wraps the constant
+pool resolves differently after the append, so it is not neutral by
+construction. T11.F15 owns the topology attachment and paired-routing
 guarantees; F08 owns copy placement and post-activation qualification on
 every backend. A connection or parameter operator may change
 behavior, and must do so in one small step: `AddGraphEdge`,
@@ -289,14 +296,18 @@ only their edges are evolvable.
   **Split exclusion** (T11.F08, replacing T11.F03's documented exception): it
   also skips with `NoApplicableTarget` when the graph carries plasticity, the
   picked edge's consumer is a sink, action slot, or execute gate, and its
-  source is an `InputLeaf` resolving to a `DynamicIntrospection` reference.
-  An identity node between them caches the value during evaluation, while the
-  direct edge resolves it in the post-convergence effects context after the
-  plasticity-cost deduction, so the two can differ by
-  `plasticity_cost * weight` (no observable effect under the production
-  default `plasticity_update_cost = 0.0`, but the split is not
-  function-preserving in general). With the exclusion in place, the split's
-  neutrality property holds unconditionally.
+  source is an `InputLeaf` resolving to
+  `DynamicIntrospection(EnergyCurrent)`. An identity node between them caches
+  the value during evaluation, while the direct edge resolves it in the
+  post-convergence effects context after the plasticity-cost deduction, so the
+  two can differ by `plasticity_cost * weight` (no observable effect under the
+  production default `plasticity_update_cost = 0.0`, but the split is not
+  function-preserving in general). `EnergyCurrent` is the only excluded key:
+  in `runtime/cgp/execute.rs` the effects `ResolveCtx` differs from the
+  evaluation `ResolveCtx` only in `energy`, so `EnergyConsumedThisTick` and
+  `ReproductiveReserveCurrent` resolve identically either side of the
+  deduction and their edges split normally. With the exclusion in place, the
+  split's neutrality property holds unconditionally.
 - `RemoveComputeNode` (removes from `compute_nodes`, remaps
   `GraphSource::ComputeNode` indices across all edge containers)
 - `AddGraphEdge` (all 5 edge-bearing surfaces; source sampled by
@@ -330,8 +341,10 @@ only their edges are evolvable.
   above. The copy's own inputs take the same index shift as every other
   surviving reference, and a self-edge on the copy reads the copy, so the
   copy's persistent state is its own.
-- `CopySubgraph` — a growth operator; copies a random-walk cluster of 2 to 4
-  compute nodes, inserting the `i`-th sorted member's copy at final index
+- `CopySubgraph` — a growth operator; copies a random-walk cluster of target
+  size 2 to 4 compute nodes, which may be a single node when the seed has no
+  compute neighbours, inserting the `i`-th sorted member's copy at final
+  index
   `c_i + i + 1` with all final indices computed before any insertion. Edges
   between cluster members, including self-edges, are remapped onto the
   copies; external sources keep their logical target at its shifted index.
