@@ -1,5 +1,13 @@
 # Benchmark Progress
 
+[progress/index.html](progress/index.html) charts every closure below over
+time: work counters, wall clock, population, lineage, memory sensitivity,
+mutational neighborhood, and indicator coverage, read from the same reports.
+Browsers block `fetch()` under `file://`, so serve the directory first:
+`python3 -m http.server 8000 --directory docs/progress`, then open
+`http://localhost:8000/`. New closures appear automatically once
+`benchmark-series.json` lists their reports.
+
 Each row preserves the comparison references stored when that closure ran:
 the epoch baseline and, where one existed, the immediately previous closure.
 The six normalized counters are mesh hops, VM steps, graph relaxation,
