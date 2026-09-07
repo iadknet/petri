@@ -225,8 +225,9 @@ impl Battery {
         let mut graph_runtime = GraphRuntimeState::new();
         sequence
             .iter()
-            .map(|scenario| {
-                graph_runtime.begin_tick(&genome.nodes);
+            .enumerate()
+            .map(|(tick, scenario)| {
+                graph_runtime.begin_tick(&genome.nodes, tick as u64);
                 advance_shared_memory(&mut shared_memory, &mut prev_shared_memory, decay_rate);
                 let mut energy = scenario.energy;
                 execute_creature_mesh_impl(
@@ -378,6 +379,7 @@ mod drift_characterization {
     use super::*;
     use crate::creature::genome::analysis::mesh_reachable_nodes;
     use crate::mutation::engine::MutationEngine;
+    use crate::mutation::reachability::ParentExecuted;
     use crate::runtime::mesh::ObservedMeshExecution;
     use crate::runtime::trace::domain::TerminationReason;
     use std::collections::{BTreeMap, BTreeSet};
@@ -399,6 +401,8 @@ mod drift_characterization {
                     &mut genome,
                     &config.mutation,
                     &reachable,
+                    // Historical pre-T11.F17 characterization: no executed layer.
+                    ParentExecuted::NONE,
                     &mut rng,
                     config.world.food.types.len(),
                 );

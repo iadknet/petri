@@ -1,12 +1,23 @@
 //! Mutation-only lineage depth observations, isolated from ecological state.
 
+use super::mesh_execution::indices_for_node_ids;
 use super::{births, mesh_execution::MeshExecutionReading, Battery, BirthResult, EvalContext};
 use crate::config::MutationConfig;
+use crate::contracts::NodeId;
 use crate::creature::genome::{analysis::mesh_reachable_nodes, CreatureGenome};
+use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
 use rand::{rngs::SmallRng, SeedableRng};
+use rayon::prelude::*;
+use std::collections::BTreeSet;
 
-pub const VERSION: &str = "drift-depth-v1";
+pub const VERSION: &str = "drift-depth-v2";
+/// How the walk keeps each lineage's executed node set current (T11.F17).
+pub const EXECUTED_SOURCE: &str = "battery hop records (mesh-execution-v1), node ids";
+pub const EXECUTED_REFRESH: &str =
+    "walk: depth 0 and every 10 generations; births: derived at each checkpoint";
+/// Generations between executed-set refreshes along the walk.
+pub const EXECUTED_REFRESH_INTERVAL: u64 = 10;
 pub const WALK_SEED_BASE: u64 = 90_000;
 pub const BIRTH_OFFSET_BASE: u64 = 7_000_000;
 pub const BIRTH_LINEAGE_MULTIPLIER: u64 = 1_000;
@@ -84,26 +95,53 @@ pub fn observe(
         .map(|index| SmallRng::seed_from_u64(WALK_SEED_BASE + u64::from(index)))
         .collect();
     let mut depth = 0;
+    // Each lineage's executed nodes, by node id so the set survives the index
+    // shuffling of intervening births. Refreshed on the predeclared cadence:
+    // between refreshes removed nodes drop out and added nodes wait.
+    let mut executed_ids = refresh_executed_ids(&genomes, battery, context);
     let mut readings = Vec::with_capacity(sizes.checkpoints.len());
     for &checkpoint in sizes.checkpoints {
         while depth < checkpoint {
-            for (genome, rng) in genomes.iter_mut().zip(&mut rngs) {
+            if depth > 0 && depth.is_multiple_of(EXECUTED_REFRESH_INTERVAL) {
+                executed_ids = refresh_executed_ids(&genomes, battery, context);
+            }
+            for ((genome, rng), ids) in genomes.iter_mut().zip(&mut rngs).zip(&executed_ids) {
                 let reachable = mesh_reachable_nodes(genome);
+                let executed = indices_for_node_ids(genome, ids);
                 MutationEngine::apply_mutations_with_food_type_count(
                     genome,
                     mutation,
                     &reachable,
+                    ParentExecuted::Indices(&executed),
                     rng,
                     context.food_type_count,
                 );
             }
             depth += 1;
         }
+        // A checkpoint's births derive their own executed set from the battery
+        // inside `births::per_birth_result`. The walk's own sets stay on the
+        // fixed interval, so checkpoint placement never changes the walk.
         readings.push(observe_checkpoint(
             &genomes, battery, mutation, context, sizes, depth,
         ));
     }
     readings
+}
+
+/// Re-read every lineage's executed node ids from the fixed battery. Pure per
+/// lineage, so the parallel walk is deterministic.
+fn refresh_executed_ids(
+    genomes: &[CreatureGenome],
+    battery: &Battery,
+    context: &EvalContext,
+) -> Vec<BTreeSet<NodeId>> {
+    genomes
+        .par_iter()
+        .map(|genome| {
+            battery.executed_node_ids(genome, context.runtime, context.shared_memory_decay_rate)
+        })
+        .collect()
 }
 
 fn observe_checkpoint(
@@ -147,6 +185,26 @@ mod tests {
     use crate::creature::founder::founder_genome;
 
     use proptest::prelude::*;
+
+    /// Mirror [`observe`]'s executed-set cadence for a single-lineage replay:
+    /// refresh at depth 0 and at every positive multiple of the interval,
+    /// otherwise reuse the cached node ids mapped to the current genome.
+    fn replay_executed(
+        depth: u64,
+        genome: &CreatureGenome,
+        battery: &Battery,
+        context: &EvalContext,
+        ids: &mut BTreeSet<NodeId>,
+    ) -> Vec<usize> {
+        if depth.is_multiple_of(EXECUTED_REFRESH_INTERVAL) {
+            *ids = battery.executed_node_ids(
+                genome,
+                context.runtime,
+                context.shared_memory_decay_rate,
+            );
+        }
+        indices_for_node_ids(genome, ids)
+    }
 
     proptest! {
         #[test]
@@ -201,12 +259,15 @@ mod tests {
         let mut rng = SmallRng::seed_from_u64(90_000);
         let mut zero_births = 0;
         let mut applied_dead_births = 0;
+        let mut ids = BTreeSet::new();
         for depth in 1..=22 {
             let reachable = mesh_reachable_nodes(&genomes[0]);
+            let executed = replay_executed(depth - 1, &genomes[0], &battery, &context, &mut ids);
             let summary = MutationEngine::apply_mutations_with_food_type_count(
                 &mut genomes[0],
                 &config.mutation,
                 &reachable,
+                ParentExecuted::Indices(&executed),
                 &mut rng,
                 context.food_type_count,
             );
@@ -248,10 +309,12 @@ mod tests {
                 // The next production offspring is identical with or without the observations.
                 let mut without = before[0].clone();
                 let mut with = genomes[0].clone();
+                let next_executed = indices_for_node_ids(&genomes[0], &ids);
                 MutationEngine::apply_mutations_with_food_type_count(
                     &mut without,
                     &config.mutation,
                     &mesh_reachable_nodes(&before[0]),
+                    ParentExecuted::Indices(&next_executed),
                     &mut rng_before.clone(),
                     context.food_type_count,
                 );
@@ -259,6 +322,7 @@ mod tests {
                     &mut with,
                     &config.mutation,
                     &mesh_reachable_nodes(&genomes[0]),
+                    ParentExecuted::Indices(&next_executed),
                     &mut rng.clone(),
                     context.food_type_count,
                 );
@@ -292,13 +356,17 @@ mod tests {
         for index in 0..3 {
             let mut genome = founder.clone();
             let mut rng = SmallRng::seed_from_u64(90_000 + index);
+            let mut ids = BTreeSet::new();
             for depth in 0..=22 {
                 if depth > 0 {
                     let reachable = mesh_reachable_nodes(&genome);
+                    let executed =
+                        replay_executed(depth - 1, &genome, &battery, &context, &mut ids);
                     applied += MutationEngine::apply_mutations_with_food_type_count(
                         &mut genome,
                         &config.mutation,
                         &reachable,
+                        ParentExecuted::Indices(&executed),
                         &mut rng,
                         context.food_type_count,
                     )

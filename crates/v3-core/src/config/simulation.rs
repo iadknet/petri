@@ -699,10 +699,26 @@ pub struct MutationConfig {
     pub phenotype: PhenotypeConfig,
     #[serde(default)]
     pub reachable_bias: ReachableBiasConfig,
+    /// Probability that a mutation target is drawn from the nodes the parent's
+    /// brain dispatched within `executed_window_ticks` of its last tick, in
+    /// every domain. The residual keeps drawing from the whole eligible set.
+    #[serde(default = "default_executed_bias")]
+    pub executed_bias: f64,
+    /// How many ticks back a dispatch still counts as "recently executed".
+    #[serde(default = "default_executed_window_ticks")]
+    pub executed_window_ticks: u64,
 }
 
 fn default_mutation_event_continuation_probability() -> f64 {
     0.2
+}
+
+fn default_executed_bias() -> f64 {
+    0.9
+}
+
+fn default_executed_window_ticks() -> u64 {
+    100
 }
 
 impl Default for MutationConfig {
@@ -719,6 +735,8 @@ impl Default for MutationConfig {
             action_queue_cap: 4,
             phenotype: PhenotypeConfig::default(),
             reachable_bias: ReachableBiasConfig::default(),
+            executed_bias: default_executed_bias(),
+            executed_window_ticks: default_executed_window_ticks(),
         }
     }
 }
@@ -949,6 +967,15 @@ impl SimulationConfig {
         } else {
             0.0
         };
+
+        m.executed_bias = if m.executed_bias.is_finite() {
+            m.executed_bias.clamp(0.0, 1.0)
+        } else {
+            default_executed_bias()
+        };
+        if m.executed_window_ticks == 0 {
+            m.executed_window_ticks = default_executed_window_ticks();
+        }
 
         if self.action_log.capacity < 1 {
             self.action_log.capacity = 500;
@@ -2002,6 +2029,55 @@ mod tests {
         assert!((cfg.mutation.reachable_bias.vm - 0.0).abs() < 1e-9);
         assert!((cfg.mutation.reachable_bias.graph - 0.0).abs() < 1e-9);
         assert!((cfg.mutation.reachable_bias.input_ref - 0.0).abs() < 1e-9);
+    }
+
+    // ── Executed-bias targeting tests (T11.F17) ──────────────────────────
+
+    #[test]
+    fn executed_targeting_defaults() {
+        let cfg = SimulationConfig::default();
+        assert!((cfg.mutation.executed_bias - 0.9).abs() < 1e-9);
+        assert_eq!(cfg.mutation.executed_window_ticks, 100);
+    }
+
+    #[test]
+    fn executed_targeting_serde_defaults_when_missing() {
+        let json = serde_json::to_string(&MutationConfig::default()).unwrap();
+        let value: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let mut obj = value.as_object().unwrap().clone();
+        obj.remove("executed_bias");
+        obj.remove("executed_window_ticks");
+        let stripped = serde_json::to_string(&obj).unwrap();
+        let mc: MutationConfig = serde_json::from_str(&stripped).unwrap();
+        assert!((mc.executed_bias - 0.9).abs() < 1e-9);
+        assert_eq!(mc.executed_window_ticks, 100);
+    }
+
+    #[test]
+    fn normalize_executed_bias_clamps_and_replaces_non_finite() {
+        let mut cfg = SimulationConfig::default();
+        cfg.mutation.executed_bias = 1.5;
+        cfg.normalize();
+        assert!((cfg.mutation.executed_bias - 1.0).abs() < 1e-9);
+        cfg.mutation.executed_bias = -0.5;
+        cfg.normalize();
+        assert!((cfg.mutation.executed_bias - 0.0).abs() < 1e-9);
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+            cfg.mutation.executed_bias = value;
+            cfg.normalize();
+            assert!((cfg.mutation.executed_bias - 0.9).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn normalize_executed_window_zero_falls_back_to_the_default() {
+        let mut cfg = SimulationConfig::default();
+        cfg.mutation.executed_window_ticks = 0;
+        cfg.normalize();
+        assert_eq!(cfg.mutation.executed_window_ticks, 100);
+        cfg.mutation.executed_window_ticks = 7;
+        cfg.normalize();
+        assert_eq!(cfg.mutation.executed_window_ticks, 7);
     }
 
     #[test]

@@ -7,7 +7,7 @@ use crate::creature::genome::cgp::{GraphEdge, OutputSinkKind};
 use crate::creature::genome::CreatureGenome;
 use crate::creature::genome::{BackendDef, VmInstruction};
 use crate::mutation::graph::operators::random_graph_source;
-use crate::mutation::reachability::biased_select_from;
+use crate::mutation::reachability::TargetSelector;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 use crate::mutation::vm::operators::insert_new_instruction_with_reference_repair;
 use crate::runtime::routing::{resolve_gated_route, RouteGateMap};
@@ -57,8 +57,7 @@ fn local_destinations(genome: &CreatureGenome, node_idx: usize, target_idx: usiz
 
 pub(super) fn apply_retarget_node_target(
     genome: &mut CreatureGenome,
-    reachable_nodes: &[usize],
-    bias: f64,
+    targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let eligible: Vec<_> = (0..genome.nodes.len())
@@ -66,7 +65,8 @@ pub(super) fn apply_retarget_node_target(
             (0..genome.nodes[i].targets.len()).any(|j| !local_destinations(genome, i, j).is_empty())
         })
         .collect();
-    let (idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
+    let (idx, reachability) = targets
+        .select(&eligible, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let targets: Vec<_> = (0..genome.nodes[idx].targets.len())
         .filter(|&j| !local_destinations(genome, idx, j).is_empty())
@@ -79,8 +79,7 @@ pub(super) fn apply_retarget_node_target(
 
 pub(super) fn apply_add_route_target(
     genome: &mut CreatureGenome,
-    reachable_nodes: &[usize],
-    bias: f64,
+    targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
     config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
@@ -99,7 +98,8 @@ pub(super) fn apply_add_route_target(
         })
         .map(|(i, _)| i)
         .collect();
-    let (idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
+    let (idx, reachability) = targets
+        .select(&eligible, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let slot = lowest_unused_slot(&genome.nodes[idx].targets)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
@@ -152,8 +152,7 @@ pub(super) fn apply_add_route_target(
 
 pub(super) fn apply_remove_route_target(
     genome: &mut CreatureGenome,
-    reachable_nodes: &[usize],
-    bias: f64,
+    targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let eligible: Vec<_> = genome
@@ -163,7 +162,8 @@ pub(super) fn apply_remove_route_target(
         .filter(|(_, n)| n.targets.len() >= 2)
         .map(|(i, _)| i)
         .collect();
-    let (idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
+    let (idx, reachability) = targets
+        .select(&eligible, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let incumbent = static_incumbent(&genome.nodes[idx].targets).expect("nonempty targets");
     let mut target = rng.gen_range(0..genome.nodes[idx].targets.len() - 1);
@@ -176,8 +176,7 @@ pub(super) fn apply_remove_route_target(
 
 pub(super) fn apply_swap_route_targets(
     genome: &mut CreatureGenome,
-    reachable_nodes: &[usize],
-    bias: f64,
+    targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let eligible: Vec<usize> = genome
@@ -190,7 +189,8 @@ pub(super) fn apply_swap_route_targets(
     if eligible.is_empty() {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-    let (node_idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
+    let (node_idx, reachability) = targets
+        .select(&eligible, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let len = genome.nodes[node_idx].targets.len();
     let a = rng.gen_range(0..len);
@@ -209,8 +209,7 @@ pub(super) fn apply_swap_route_targets(
 
 pub(super) fn apply_mutate_gate_bias(
     genome: &mut CreatureGenome,
-    reachable_nodes: &[usize],
-    bias: f64,
+    targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let eligible: Vec<usize> = genome
@@ -220,7 +219,8 @@ pub(super) fn apply_mutate_gate_bias(
         .filter(|(_, n)| !n.targets.is_empty())
         .map(|(i, _)| i)
         .collect();
-    let (node_idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
+    let (node_idx, reachability) = targets
+        .select(&eligible, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let target_slot = rng.gen_range(0..genome.nodes[node_idx].targets.len());
     let target = &mut genome.nodes[node_idx].targets[target_slot];
@@ -303,8 +303,7 @@ mod tests {
         let mut r = rng(42);
         let result = apply_add_route_target(
             &mut genome,
-            &reachable,
-            1.0,
+            &mut TargetSelector::reachable_only(&reachable, 1.0),
             &mut r,
             &MutationConfig::default(),
         );
@@ -344,8 +343,7 @@ mod tests {
         let mut r = rng(7);
         let result = apply_add_route_target(
             &mut genome,
-            &[0, 1],
-            1.0,
+            &mut TargetSelector::reachable_only(&[0, 1], 1.0),
             &mut r,
             &MutationConfig::default(),
         );
@@ -371,7 +369,11 @@ mod tests {
 
         let reachable = vec![0];
         let mut r = rng(0);
-        let result = apply_remove_route_target(&mut genome, &reachable, 1.0, &mut r);
+        let result = apply_remove_route_target(
+            &mut genome,
+            &mut TargetSelector::reachable_only(&reachable, 1.0),
+            &mut r,
+        );
         assert!(result.is_ok());
         assert_eq!(genome.nodes[0].targets.len(), 1);
     }
@@ -397,7 +399,12 @@ mod tests {
         });
         let reachable = vec![0];
         let mut r = rng(1);
-        apply_retarget_node_target(&mut genome, &reachable, 1.0, &mut r).unwrap();
+        apply_retarget_node_target(
+            &mut genome,
+            &mut TargetSelector::reachable_only(&reachable, 1.0),
+            &mut r,
+        )
+        .unwrap();
 
         // slot and gate_bias must be untouched; only target_id may change.
         assert_eq!(genome.nodes[0].targets[0].slot, original_slot);
@@ -426,7 +433,12 @@ mod tests {
 
         let reachable = vec![0];
         let mut r = rng(99);
-        apply_swap_route_targets(&mut genome, &reachable, 1.0, &mut r).unwrap();
+        apply_swap_route_targets(
+            &mut genome,
+            &mut TargetSelector::reachable_only(&reachable, 1.0),
+            &mut r,
+        )
+        .unwrap();
 
         let targets = &genome.nodes[0].targets;
         // slot and gate_bias must remain at their original Vec positions.

@@ -7,11 +7,12 @@ use rand::rngs::SmallRng;
 use rand::SeedableRng;
 use rayon::prelude::*;
 
-use crate::config::MutationConfig;
+use crate::config::{MutationConfig, ReachableBiasConfig};
 use crate::creature::genome::analysis::mesh_reachable_nodes;
 use crate::creature::genome::CreatureGenome;
 use crate::mutation::graph::{GraphMutator, GraphOperator};
 use crate::mutation::input_ref::{InputRefMutator, InputRefOperator};
+use crate::mutation::reachability::TargetSets;
 use crate::mutation::topology::{TopologyMutator, TopologyOperator};
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 use crate::mutation::vm::{VmMutator, VmOperator};
@@ -86,25 +87,34 @@ impl OperatorKind {
         }
     }
 
+    const fn reachable_bias(self, config: &ReachableBiasConfig) -> f64 {
+        match self {
+            Self::Vm(_) => config.vm,
+            Self::Graph(_) => config.graph,
+            Self::Topology(_) => config.topology,
+            Self::InputRef(_) => config.input_ref,
+        }
+    }
+
     fn apply(
         self,
         genome: &mut CreatureGenome,
-        reachable: &[usize],
+        targets: &TargetSets<'_>,
         mutation_config: &MutationConfig,
         food_type_count: usize,
         rng: &mut SmallRng,
     ) -> Result<TargetReachability, MutationSkipReason> {
-        let rb = &mutation_config.reachable_bias;
+        let mut targets = targets.selector(
+            self.reachable_bias(&mutation_config.reachable_bias),
+            mutation_config.executed_bias,
+        );
         match self {
-            Self::Vm(op) => VmMutator::apply(genome, op, reachable, rb.vm, rng, mutation_config),
-            Self::Graph(op) => {
-                GraphMutator::apply(genome, op, reachable, rb.graph, rng, mutation_config)
-            }
+            Self::Vm(op) => VmMutator::apply(genome, op, &mut targets, rng, mutation_config),
+            Self::Graph(op) => GraphMutator::apply(genome, op, &mut targets, rng, mutation_config),
             Self::Topology(op) => TopologyMutator::apply_with_food_type_count(
                 genome,
                 op,
-                reachable,
-                rb.topology,
+                &mut targets,
                 rng,
                 mutation_config,
                 food_type_count,
@@ -112,8 +122,7 @@ impl OperatorKind {
             Self::InputRef(op) => InputRefMutator::apply_with_food_type_count(
                 genome,
                 op,
-                reachable,
-                rb.input_ref,
+                &mut targets,
                 rng,
                 mutation_config,
                 food_type_count,
@@ -155,6 +164,10 @@ pub fn per_operator_rows(
     seed_offset: u64,
 ) -> Vec<OperatorRow> {
     let reachable = mesh_reachable_nodes(subject);
+    // Observation stand-in for a live parent's dispatch record (T11.F17).
+    let executed =
+        battery.executed_indices(subject, context.runtime, context.shared_memory_decay_rate);
+    let targets = TargetSets::new(&reachable, &executed);
     let ops = OperatorKind::all();
 
     let jobs: Vec<(usize, u32)> = (0..ops.len())
@@ -173,7 +186,7 @@ pub fn per_operator_rows(
                 let outcome = op
                     .apply(
                         &mut genome,
-                        &reachable,
+                        &targets,
                         mutation_config,
                         context.food_type_count,
                         &mut rng,
@@ -360,6 +373,10 @@ mod tests {
         let context = EvalContext::from_config(&config);
         let base = battery.signature(&subject, context.runtime, context.shared_memory_decay_rate);
         let reachable = mesh_reachable_nodes(&subject);
+        let executed =
+            battery.executed_indices(&subject, context.runtime, context.shared_memory_decay_rate);
+        let sets = TargetSets::new(&reachable, &executed);
+        let executed_bias = config.mutation.executed_bias;
         let rb = &config.mutation.reachable_bias;
         let trials = 3u32;
         let seed_offset = 777u64;
@@ -384,15 +401,28 @@ mod tests {
 
         for op in VmOperator::ALL {
             let tally = fixture.tally(trials, seed_offset, VM_SEED_BASE, |genome, rng| {
-                VmMutator::apply(genome, op, &reachable, rb.vm, rng, &config.mutation).map(|_| ())
+                VmMutator::apply(
+                    genome,
+                    op,
+                    &mut sets.selector(rb.vm, executed_bias),
+                    rng,
+                    &config.mutation,
+                )
+                .map(|_| ())
             });
             expected.push(("vm", format!("{op:?}"), tally));
         }
 
         for op in GraphOperator::ALL {
             let tally = fixture.tally(trials, seed_offset, GRAPH_SEED_BASE, |genome, rng| {
-                GraphMutator::apply(genome, op, &reachable, rb.graph, rng, &config.mutation)
-                    .map(|_| ())
+                GraphMutator::apply(
+                    genome,
+                    op,
+                    &mut sets.selector(rb.graph, executed_bias),
+                    rng,
+                    &config.mutation,
+                )
+                .map(|_| ())
             });
             expected.push(("graph", format!("{op:?}"), tally));
         }
@@ -402,8 +432,7 @@ mod tests {
                 TopologyMutator::apply_with_food_type_count(
                     genome,
                     op,
-                    &reachable,
-                    rb.topology,
+                    &mut sets.selector(rb.topology, executed_bias),
                     rng,
                     &config.mutation,
                     context.food_type_count,
@@ -418,8 +447,7 @@ mod tests {
                 InputRefMutator::apply_with_food_type_count(
                     genome,
                     op,
-                    &reachable,
-                    rb.input_ref,
+                    &mut sets.selector(rb.input_ref, executed_bias),
                     rng,
                     &config.mutation,
                     context.food_type_count,

@@ -14,6 +14,7 @@ use rayon::prelude::*;
 use crate::config::MutationConfig;
 use crate::creature::genome::analysis::mesh_reachable_nodes;
 use crate::creature::genome::CreatureGenome;
+use crate::mutation::reachability::ParentExecuted;
 use crate::mutation::MutationEngine;
 use crate::neighborhood::battery::{Battery, Signature};
 use crate::neighborhood::classify::{classify, Tally};
@@ -68,6 +69,10 @@ pub fn per_birth_result(
     seed_offset: u64,
 ) -> BirthResult {
     let reachable = mesh_reachable_nodes(subject);
+    // Observation stand-in for a live parent's dispatch record (T11.F17):
+    // the nodes this subject dispatches anywhere in the battery.
+    let executed =
+        battery.executed_indices(subject, context.runtime, context.shared_memory_decay_rate);
 
     let outcomes: Vec<(u32, u32, Tally)> = (0..births)
         .into_par_iter()
@@ -79,6 +84,7 @@ pub fn per_birth_result(
                 &mut genome,
                 mutation_config,
                 &reachable,
+                ParentExecuted::Indices(&executed),
                 &mut rng,
                 context.food_type_count,
             );
@@ -174,6 +180,8 @@ mod tests {
         let context = EvalContext::from_config(&config);
         let base = battery.signature(&subject, context.runtime, context.shared_memory_decay_rate);
         let reachable = mesh_reachable_nodes(&subject);
+        let executed =
+            battery.executed_indices(&subject, context.runtime, context.shared_memory_decay_rate);
         // Keep the established 120-birth seed-arithmetic fixture; its request
         // histogram now also distinguishes triggered-but-skipped births.
         let births = 120u32;
@@ -201,6 +209,7 @@ mod tests {
                 &mut genome,
                 &config.mutation,
                 &reachable,
+                ParentExecuted::Indices(&executed),
                 &mut rng,
                 context.food_type_count,
             );

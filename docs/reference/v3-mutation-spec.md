@@ -215,8 +215,11 @@ Every current or future mesh backend must meet these four requirements:
    to activity-only credit; failed visits never overwrite successful activity;
    and
 4. mutation supply arrives as small steps: at provisional production defaults,
-   80% of triggered births request one event, with a bounded configurable tail
-   and uniform opportunity across eligible live and inactive mesh nodes.
+   80% of triggered births request one event, with a bounded configurable tail,
+   and each event's target is drawn with `mutation.executed_bias` toward the
+   mesh nodes the parent's brain dispatched within `executed_window_ticks`,
+   leaving a uniform residual across every other eligible live and inactive
+   node.
 
 T11.F02 establishes the VM reference and operand portions. T11.F03 owns graph
 growth, T11.F04 mutation supply, T11.F06 the graph state clock, T11.F07 the
@@ -224,10 +227,11 @@ trace/reward clock, T11.F09 learned-state correspondence, and T11.F15 the
 topology connection operators (`AddRouteTarget`, `MutateGateBias`,
 `RetargetNodeTarget`, `RemoveRouteTarget`, `RemoveNode`, `SwapNodeBackend`,
 `ChangeEntryNode`, `SwapRouteTargets`) and mesh attachment semantics above.
-T11.F17 (pending, 2026-09-07) owns the target draw of requirement 4: it will
-restate "uniform opportunity across eligible live and inactive mesh nodes" as
-a draw biased toward the nodes the parent's brain executed in recent ticks,
-with a uniform residual, leaving the per-birth event count unchanged.
+T11.F17 owns the target draw of requirement 4: the former "uniform opportunity
+across eligible live and inactive mesh nodes" is now a draw biased toward the
+nodes the parent's brain executed in recent ticks, with a uniform residual
+(Section 4.3). The per-birth event count, operator weights, and operator
+semantics are unchanged.
 
 T11.F08 owns duplication on all three backends: VM dormant-tail placement and
 its terminal guard, graph copy placement and the copy self-edge rule, the
@@ -396,7 +400,8 @@ parseability or be rolled back/skipped under policy below.
 ### 4.1 Engine contract
 
 ```text
-apply_mutations(genome, mutation_config, parent_reachable_nodes, rng_ctx) -> MutationSummary
+apply_mutations(genome, mutation_config, parent_reachable_nodes,
+                parent_executed, rng_ctx) -> MutationSummary
 ```
 
 Call semantics:
@@ -407,6 +412,11 @@ Call semantics:
 - `parent_reachable_nodes` is a sorted ascending slice of node indices that
   were reachable in the parent's genome (computed via BFS from entry node).
   Used for reachability-biased target selection (see Section 4.3).
+- `parent_executed` names the parent's recently executed nodes: either an
+  explicit sorted index slice (observation harnesses) or the live parent's
+  dispatch record read at its current age. It is resolved to indices only
+  after the probability gate draws at least one event, so a zero-event birth
+  derives nothing.
 
 `MutationSummary` minimum fields:
 - `attempted_events: u32`
@@ -421,6 +431,7 @@ Call semantics:
 - `applied_semantic_change_events: u32`
 - `reachable_target_events: u32`
 - `unreachable_target_events: u32`
+- `executed_target_events: u32`
 - `not_applicable_events: u32`
 
 Accounting invariant:
@@ -433,7 +444,7 @@ for each selected event:
   1) choose mutation domain
   2) choose operator (may fail under complexity restriction if the
      domain has no eligible operators — skip with NoApplicableTarget)
-  2b) select mutation target with reachability bias (see Section 4.3)
+  2b) select mutation target with executed and reachability bias (Section 4.3)
   3) run domain pre-guards (construction constraints)
   4) snapshot local mutation target (or full genome)
   5) apply candidate mutation
@@ -474,30 +485,61 @@ Complexity pressure gate:
   This prevents runaway structural bloat even when junk DNA does not affect
   action energy costs.
 
-### 4.3 Reachability bias
+### 4.3 Executed and reachability bias
 
-Mutation target selection is biased toward reachable (functional) mesh nodes
-using per-domain probability thresholds from `ReachableBiasConfig`.
+Mutation target selection runs two layers over the operator's eligible set:
+an executed layer (T11.F17) at `mutation.executed_bias`, then the established
+reachability layer at the domain's `ReachableBiasConfig` threshold.
 
-Algorithm (`biased_select_from`):
-1. Build eligible set for the operator (domain-specific filtering).
-2. Roll RNG against the domain's bias probability.
-3. On success: compute intersection of eligible and reachable sets via sorted
+Executed layer (`TargetSelector::select`), applied in all four domains:
+1. An empty eligible set selects nothing.
+2. When `executed_bias` is `0.0`, or when every eligible node is executed, the
+   layer cannot change the outcome: it consumes no RNG and the draw is exactly
+   the reachability layer's. Founder births are therefore byte-identical to
+   births before this feature.
+3. Otherwise roll RNG once against `executed_bias`. On success, and when
+   `eligible ∩ executed` is non-empty, pick uniformly from that intersection.
+   On a failed roll or an empty intersection, fall through to the
+   reachability layer with no further executed-layer draws.
+4. While genome-size pressure restricts a birth the executed bias is `0.0`,
+   so the inverted reachability bias keeps pruning unreachable structure and
+   the executed core is never targeted for removal.
+
+A node counts as executed when the parent's dispatch record holds a dispatch
+for that mesh node index less than `mutation.executed_window_ticks` ticks
+before the parent's current age. The record is written once per mesh hop from
+the shared mesh executor, so traced and untraced execution agree and
+observation clones (which run on cloned per-creature state) never write it. A
+newborn starts with an empty record: indices belong to its own genome.
+Observation harnesses (`neighborhood`) substitute the node ids the subject
+dispatches across the fixed battery.
+
+Reachability layer (`biased_select_from`), unchanged:
+1. Roll RNG against the domain's bias probability.
+2. On success: compute intersection of eligible and reachable sets via sorted
    two-pointer merge. If intersection is non-empty, pick uniformly from it
    (target is `Reachable`). If empty, fall through to uniform selection.
-4. On failure (or fallthrough): pick uniformly from eligible set. Classify
+3. On failure (or fallthrough): pick uniformly from eligible set. Classify
    picked index via binary search in reachable set → `Reachable` or
    `Unreachable`.
 
-Per-domain bias defaults: topology=0.0, vm=0.0, graph=0.0, input_ref=0.0.
-Selection is uniform over eligible mesh nodes, including inactive scaffold;
-there is no fixed quota for the reachable and unreachable classes. Existing
-neutral growth operators supply scaffold without artificial founder bloat.
-See `v3-runtime-config-spec.md` for config fields.
+Defaults: `executed_bias` 0.9; per-domain reachable bias topology=0.0,
+vm=0.0, graph=0.0, input_ref=0.0. The 0.1 residual keeps drawing uniformly
+over every eligible mesh node, including inactive scaffold, so neutral
+scaffold keeps drifting; there is no fixed quota for any class. See
+`v3-runtime-config-spec.md` for config fields.
+
+Every picked target is classified against the reachable set, whichever layer
+picked it, and a picked index that is in the executed set also increments
+`executed_target_events` — a membership count parallel to the reachable
+classification, not a count of layer firings.
 
 Exempt operators:
 - Topology `ChangeEntryNode` does not select a target node and returns
   `NotApplicable`. `AddNode` now selects an edge source and is classified.
+- InputRef `RawFieldMutation` draws uniformly across every node's input
+  references rather than selecting a mesh node, and returns `NotApplicable`.
+  Neither layer covers it.
 
 `TargetReachability` classification:
 - `Reachable`: selected target was in the parent's reachable set.

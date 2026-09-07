@@ -506,6 +506,10 @@ pub struct MutationSummary {
     pub added_node_world_inputs_by_operator: HashMap<MutationOperator, HashMap<WorldInputKey, u32>>,
     pub reachable_target_events: u32,
     pub unreachable_target_events: u32,
+    /// Applied events whose target was a node the parent executed recently
+    /// (T11.F17). Counted by membership, like the reachable classification,
+    /// so short-circuited draws on an all-executed eligible set count too.
+    pub executed_target_events: u32,
     pub not_applicable_events: u32,
 }
 
@@ -530,6 +534,7 @@ impl MutationSummary {
             added_node_world_inputs_by_operator: HashMap::new(),
             reachable_target_events: 0,
             unreachable_target_events: 0,
+            executed_target_events: 0,
             not_applicable_events: 0,
         }
     }
@@ -634,6 +639,11 @@ impl MutationSummary {
             TargetReachability::Unreachable => self.unreachable_target_events += 1,
             TargetReachability::NotApplicable => self.not_applicable_events += 1,
         }
+    }
+
+    /// Record how many of an applied event's targets were recently executed.
+    pub fn record_executed_targets(&mut self, count: u32) {
+        self.executed_target_events += count;
     }
 }
 

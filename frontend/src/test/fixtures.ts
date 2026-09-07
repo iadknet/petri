@@ -105,6 +105,8 @@ export const MOCK_CONFIG: SimulationConfig = {
 			graph: 0.7,
 			input_ref: 0.5,
 		},
+		executed_bias: 0.9,
+		executed_window_ticks: 100,
 	},
 	predation: {
 		steal_cost_rate: 0.2,

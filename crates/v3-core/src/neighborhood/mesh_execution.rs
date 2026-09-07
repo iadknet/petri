@@ -76,15 +76,34 @@ fn static_successor_bypass(genome: &CreatureGenome, removed: NodeId) -> Creature
     bypass
 }
 
+/// Everything one observed battery pass yields about a genome's execution.
+struct BatteryObservation {
+    executed: BTreeSet<NodeId>,
+    hop_cap_hits: usize,
+    routes: Vec<Routes>,
+    baseline: Signature,
+}
+
+/// Sorted ascending indices of the genome's nodes carrying one of `ids`.
+#[must_use]
+pub fn indices_for_node_ids(genome: &CreatureGenome, ids: &BTreeSet<NodeId>) -> Vec<usize> {
+    genome
+        .nodes
+        .iter()
+        .enumerate()
+        .filter(|(_, node)| ids.contains(&node.node_id))
+        .map(|(index, _)| index)
+        .collect()
+}
+
 impl Battery {
-    /// Observe an unmutated subject, then separately bypass each executed node from fresh state.
-    #[must_use]
-    pub fn mesh_execution(
+    /// Run the complete battery under hop observation once.
+    fn observe(
         &self,
         genome: &CreatureGenome,
         runtime: &RuntimeConfig,
         decay_rate: f32,
-    ) -> MeshExecutionReading {
+    ) -> BatteryObservation {
         let (snapshots, sequences) =
             self.execute_with_mode(genome, runtime, decay_rate, ObservedMeshExecution::default);
         let routes: Vec<_> = snapshots
@@ -117,6 +136,52 @@ impl Battery {
                 })
                 .collect(),
         };
+        BatteryObservation {
+            executed,
+            hop_cap_hits,
+            routes,
+            baseline,
+        }
+    }
+
+    /// The node ids this genome dispatches anywhere in the battery. Used as
+    /// the observation stand-in for a live creature's dispatch record when a
+    /// harness mutates genomes that never lived in the world (T11.F17).
+    #[must_use]
+    pub fn executed_node_ids(
+        &self,
+        genome: &CreatureGenome,
+        runtime: &RuntimeConfig,
+        decay_rate: f32,
+    ) -> BTreeSet<NodeId> {
+        self.observe(genome, runtime, decay_rate).executed
+    }
+
+    /// The same set as this genome's sorted mesh node indices.
+    #[must_use]
+    pub fn executed_indices(
+        &self,
+        genome: &CreatureGenome,
+        runtime: &RuntimeConfig,
+        decay_rate: f32,
+    ) -> Vec<usize> {
+        indices_for_node_ids(genome, &self.executed_node_ids(genome, runtime, decay_rate))
+    }
+
+    /// Observe an unmutated subject, then separately bypass each executed node from fresh state.
+    #[must_use]
+    pub fn mesh_execution(
+        &self,
+        genome: &CreatureGenome,
+        runtime: &RuntimeConfig,
+        decay_rate: f32,
+    ) -> MeshExecutionReading {
+        let BatteryObservation {
+            executed,
+            hop_cap_hits,
+            routes,
+            baseline,
+        } = self.observe(genome, runtime, decay_rate);
         let knockout_count = executed
             .iter()
             .filter(|&&node| {

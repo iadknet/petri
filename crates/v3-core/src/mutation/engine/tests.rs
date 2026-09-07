@@ -144,6 +144,7 @@ fn engine_with_food_type_count_can_introduce_non_default_food_input_refs() {
             &mut genome,
             &config,
             &[],
+            ParentExecuted::NONE,
             &mut r,
             3,
         );
@@ -633,8 +634,7 @@ fn apply_topology_event_adds_pass_through_detour() {
     let reachability = apply_topology_event(
         &mut genome,
         TopologyOperator::AddNode,
-        &[],
-        0.0,
+        &mut TargetSelector::reachable_only(&[], 0.0),
         &mut r,
         &config,
         1,
@@ -1079,6 +1079,255 @@ fn supply_upper_bound_does_not_overflow() {
         ..MutationConfig::default()
     };
     assert_eq!(requested_event_count(&config, &mut rng(1)), u32::MAX);
+}
+
+// ── T11.F17: executed-biased targeting ───────────────────────────────────
+
+/// A two-node executed core (entry chained to one successor) plus three
+/// disconnected junk nodes carrying distinct VM constants.
+fn core_and_junk_genome() -> CreatureGenome {
+    let vm_node = |id: u32, constant: f32, target: Option<u32>| NodeGenome {
+        node_id: NodeId::new(id),
+        input_refs: vec![InputReference::World(WorldInputKey::FoodHere {
+            type_idx: crate::config::OrdinaryFoodTypeId::default(),
+        })],
+        backend_def: BackendDef::Vm(crate::creature::genome::VmBackendDef {
+            register_count: 4,
+            constants: vec![constant],
+            program: vec![
+                crate::creature::genome::VmInstruction::LoadConst {
+                    dst: 0,
+                    const_idx: 0,
+                },
+                crate::creature::genome::VmInstruction::Halt,
+            ],
+        }),
+        targets: target.map_or_else(Vec::new, |id| {
+            vec![RouteTarget {
+                target_id: NodeId::new(id),
+                slot: 0,
+                gate_bias: 0.0,
+            }]
+        }),
+    };
+    CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![
+            vm_node(0, 1.0, Some(1)),
+            vm_node(1, 2.0, None),
+            vm_node(2, 3.0, None),
+            vm_node(3, 4.0, None),
+            vm_node(4, 5.0, None),
+        ],
+    }
+}
+
+fn node_internal_config(executed_bias: f64) -> MutationConfig {
+    MutationConfig {
+        mutation_probability: 1.0,
+        per_birth_mutation_events_min: 4,
+        per_birth_mutation_events_max: 4,
+        mesh_layer_probability: 0.0,
+        executed_bias,
+        ..SimulationConfig::default().mutation
+    }
+}
+
+#[test]
+fn full_executed_bias_leaves_junk_nodes_untouched_and_counts_every_target() {
+    let subject = core_and_junk_genome();
+    let config = node_internal_config(1.0);
+    let mut mutated_core = 0;
+    for seed in 0..60 {
+        let mut genome = subject.clone();
+        let summary = MutationEngine::apply_mutations_with_food_type_count(
+            &mut genome,
+            &config,
+            &[0, 1],
+            ParentExecuted::Indices(&[0, 1]),
+            &mut rng(seed),
+            1,
+        );
+        assert_eq!(
+            genome.nodes[2..],
+            subject.nodes[2..],
+            "seed {seed}: junk nodes are never targeted at executed bias 1.0"
+        );
+        assert_eq!(
+            summary.executed_target_events,
+            summary.applied_events - summary.not_applicable_events,
+            "seed {seed}: every applied targeted event landed on an executed node"
+        );
+        mutated_core += u32::from(genome.nodes[..2] != subject.nodes[..2]);
+    }
+    assert!(
+        mutated_core > 0,
+        "the core must actually receive mutations in this fixture"
+    );
+}
+
+#[test]
+fn zero_executed_bias_reaches_junk_nodes_in_the_same_fixture() {
+    let subject = core_and_junk_genome();
+    let config = node_internal_config(0.0);
+    let mut junk_hits = 0;
+    let mut off_core_targets = 0;
+    for seed in 0..60 {
+        let mut genome = subject.clone();
+        let summary = MutationEngine::apply_mutations_with_food_type_count(
+            &mut genome,
+            &config,
+            &[0, 1],
+            ParentExecuted::Indices(&[0, 1]),
+            &mut rng(seed),
+            1,
+        );
+        junk_hits += u32::from(genome.nodes[2..] != subject.nodes[2..]);
+        // The counter reports membership, so without the layer some targeted
+        // events still land on the core and some land off it.
+        off_core_targets +=
+            summary.applied_events - summary.not_applicable_events - summary.executed_target_events;
+    }
+    assert!(
+        junk_hits > 0,
+        "without the executed layer, junk nodes are ordinary targets"
+    );
+    assert!(
+        off_core_targets > 0,
+        "without the executed layer, targets land outside the executed core"
+    );
+}
+
+#[test]
+fn an_all_executed_eligible_set_reproduces_the_pre_feature_draw_byte_for_byte() {
+    let founder = v3alpha1_founder_genome();
+    let reachable = crate::creature::genome::analysis::mesh_reachable_nodes(&founder);
+    let all_nodes: Vec<usize> = (0..founder.nodes.len()).collect();
+    assert_eq!(
+        reachable, all_nodes,
+        "the founder's whole mesh is reachable"
+    );
+    let config = SimulationConfig::default().mutation;
+    let plain = MutationConfig {
+        executed_bias: 0.0,
+        ..config.clone()
+    };
+    for seed in 0..200 {
+        let mut with_layer = founder.clone();
+        let mut layer_rng = rng(seed);
+        let summary = MutationEngine::apply_mutations_with_food_type_count(
+            &mut with_layer,
+            &config,
+            &reachable,
+            ParentExecuted::Indices(&all_nodes),
+            &mut layer_rng,
+            1,
+        );
+
+        let mut without_layer = founder.clone();
+        let mut plain_rng = rng(seed);
+        MutationEngine::apply_mutations_with_food_type_count(
+            &mut without_layer,
+            &plain,
+            &reachable,
+            ParentExecuted::NONE,
+            &mut plain_rng,
+            1,
+        );
+        assert_eq!(with_layer, without_layer, "seed {seed}: same offspring");
+        assert_eq!(
+            layer_rng.gen::<u64>(),
+            plain_rng.gen::<u64>(),
+            "seed {seed}: same RNG stream position"
+        );
+        assert_eq!(
+            summary.executed_target_events,
+            summary.reachable_target_events
+        );
+    }
+}
+
+#[test]
+fn size_pressure_restriction_disables_the_executed_layer() {
+    let subject = core_and_junk_genome();
+    let restricted = MutationConfig {
+        genome_size_pressure_enabled: true,
+        genome_size_cap: 1,
+        ..node_internal_config(1.0)
+    };
+    let reference = MutationConfig {
+        executed_bias: 0.0,
+        ..restricted.clone()
+    };
+    let mut differed_without_pressure = 0;
+    for seed in 0..40 {
+        let mut restricted_child = subject.clone();
+        let mut restricted_rng = rng(seed);
+        let summary = MutationEngine::apply_mutations_with_food_type_count(
+            &mut restricted_child,
+            &restricted,
+            &[0, 1],
+            ParentExecuted::Indices(&[0, 1]),
+            &mut restricted_rng,
+            1,
+        );
+        let mut reference_child = subject.clone();
+        let mut reference_rng = rng(seed);
+        let reference_summary = MutationEngine::apply_mutations_with_food_type_count(
+            &mut reference_child,
+            &reference,
+            &[0, 1],
+            ParentExecuted::Indices(&[0, 1]),
+            &mut reference_rng,
+            1,
+        );
+        assert_eq!(
+            restricted_child, reference_child,
+            "seed {seed}: under restriction the executed bias is 0.0"
+        );
+        assert_eq!(restricted_rng.gen::<u64>(), reference_rng.gen::<u64>());
+        assert_eq!(
+            summary.executed_target_events,
+            reference_summary.executed_target_events
+        );
+
+        // Without size pressure the same seed does take the executed layer.
+        let mut unpressured = subject.clone();
+        MutationEngine::apply_mutations_with_food_type_count(
+            &mut unpressured,
+            &node_internal_config(1.0),
+            &[0, 1],
+            ParentExecuted::Indices(&[0, 1]),
+            &mut rng(seed),
+            1,
+        );
+        differed_without_pressure += u32::from(unpressured != restricted_child);
+    }
+    assert!(
+        differed_without_pressure > 0,
+        "the fixture must distinguish restricted from unrestricted targeting"
+    );
+}
+
+#[test]
+fn a_zero_event_birth_never_resolves_the_parent_dispatch_record() {
+    let mut record = crate::creature::state::DispatchRecord::default();
+    record.record_dispatch(0);
+    let config = MutationConfig {
+        mutation_probability: 0.0,
+        ..SimulationConfig::default().mutation
+    };
+    let mut genome = v3alpha1_founder_genome();
+    let summary = MutationEngine::apply_mutations_with_food_type_count(
+        &mut genome,
+        &config,
+        &[0],
+        ParentExecuted::Record(&record, 10),
+        &mut rng(1),
+        1,
+    );
+    assert_eq!(summary.attempted_events, 0);
+    assert_eq!(summary.executed_target_events, 0);
 }
 
 #[test]

@@ -38,8 +38,7 @@ fn apply(
     TopologyMutator::apply(
         g,
         op,
-        &reachable,
-        0.0,
+        &mut TargetSelector::reachable_only(&reachable, 0.0),
         &mut SmallRng::seed_from_u64(seed),
         &MutationConfig::default(),
     )
@@ -284,8 +283,7 @@ fn removal_uses_current_topology_when_parent_reachability_cache_is_stale() {
         TopologyMutator::apply(
             &mut g,
             TopologyOperator::RemoveNode,
-            &[],
-            0.0,
+            &mut TargetSelector::reachable_only(&[], 0.0),
             &mut SmallRng::seed_from_u64(7),
             &MutationConfig::default()
         ),
@@ -298,8 +296,7 @@ fn removal_uses_current_topology_when_parent_reachability_cache_is_stale() {
     TopologyMutator::apply(
         &mut g,
         TopologyOperator::RemoveNode,
-        &[0, 1],
-        1.0,
+        &mut TargetSelector::reachable_only(&[0, 1], 1.0),
         &mut SmallRng::seed_from_u64(7),
         &MutationConfig::default(),
     )
@@ -529,8 +526,7 @@ fn one_production_addition_is_conditional_silent_and_can_diverge_on_both_backend
             VmMutator::apply(
                 &mut candidate,
                 VmOperator::VmInstructionMutation,
-                &[2],
-                1.0,
+                &mut TargetSelector::reachable_only(&[2], 1.0),
                 &mut SmallRng::seed_from_u64(seed),
                 &MutationConfig::default(),
             )
