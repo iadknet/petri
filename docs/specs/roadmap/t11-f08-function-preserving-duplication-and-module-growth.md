@@ -253,7 +253,11 @@ disabled or down-weighted; the remapped inline copy keeps its weight.
   neutrality property's early `return Ok(())` on a skipped operator with
   `prop_assume!(apply(...).is_ok())` and dropped the redundant
   `prop_assume!(copied.len() > original.len())` (P3-5); the property still
-  runs its 96 cases without a global-reject failure.
+  runs its 96 cases without a global-reject failure. P2-2 also named
+  `creature/genome/cgp.rs` as carrying a doc comment to correct; it does not —
+  `duplicate_compute_nodes_in_place`'s documentation covers placement and
+  index shifting only, and no file under `creature/genome/` mentions the split
+  exclusion. Nothing was changed there.
 
   Green, at `3672367a` and after: `cargo test -p v3-core --lib mutation::` —
   **ok, 339 passed / 0 failed** (one pre-existing assertion updated for the
@@ -277,7 +281,7 @@ disabled or down-weighted; the remapped inline copy keeps its weight.
   activation equivalence across a four-tick sequence per scenario from fresh
   state with `GraphRuntimeState::begin_tick` at each boundary.
   `split_existing_edge_is_neutral_at_fire_time` now holds with no exception
-  branch, and `split_skips_...` / `split_exclusion_is_scoped_to_all_three_of_its_conditions`
+  branch, and `split_skips_...` / `split_exclusion_is_scoped_to_each_of_its_conditions`
   pin the skip to exactly the excluded edges.
 
 - [x] `cargo test -p v3-core --test viability` ran after the mutation
@@ -402,8 +406,8 @@ Gate wall 0.005006945 ms/creature-tick: +20.248117% versus T11.F15,
 +19.229673% versus T11.F04, both `ok` (the +25% flag is not reached). This is
 a host-load reading, not a work change: the whole `deterministic` block of the
 rerun is byte-identical to the superseded first-pass gate report, which
-measured 0.004238436 ms/creature-tick (+1.791398% / +0.929275%) on a quieter
-machine. Every gate counter is byte-identical to T11.F15 as well: the gate
+measured 0.004238436 ms/creature-tick (+1.791398% / +0.929275%). The rerun
+started immediately after a six-minute `cargo-mutants` run on the same host. Every gate counter is byte-identical to T11.F15 as well: the gate
 profile is 225 ticks with 75 births, a dormant tail copy costs no VM step, and
 no founder edge is affected by the narrowed split exclusion, so the simulation
 trajectory is the same one.
@@ -519,16 +523,24 @@ pass: 1862/2736). Evolved observation 779.589 ms total
 Evolved pooled dead births read **28/3300** against the predeclaration
 "should not rise above 21/3300" (T11.F15 read 21/3300; the superseded first
 pass read 19/3300). Seven extra dead births out of 3300 trials, 0.85% versus
-0.64%. None of them comes from the three converted VM copy operators or from
-either graph copy operator: every one of those rows reads 0 dead on every
-applied trial. The dead births in this run come from the unchanged
-behavior-changing operators (`ChangeEntryNode` 53, `SwapRouteTargets` 63,
-`MutateGateBias` 33, `RetargetNodeTarget` 28, `RemoveNode` 9, the two mesh
-slices 5, `VmCopyInstructionBlockRemapped` 5, `VmInstructionMutation` 3 dead
-operator trials), applied to a different evolved population. The goal profile
-runs once and the populations are unpaired, so this is a one-run difference on
-operators this feature does not touch, not a measured regression in copy
-safety; it is stated here because the predeclaration named the number.
+0.64%. By applied-event count they are 18 of 2736 single-event births, 7 of
+459 two-event, 1 of 87 three-event, and 2 of 12 four-event.
+
+What can and cannot be attributed. A birth trial replays a real mutation-event
+sequence, and the pooled birth tally records no per-operator attribution, so
+**no dead birth here can be assigned to an individual operator** — a
+multi-event birth may pair a tail copy with an unrelated event that kills the
+creature. What the report does show is that all five copy operators this
+feature changed (`VmCopyInstructionBlock`, `VmCopyGeneBackwardSlice`,
+`VmCopyGeneForwardSlice`, `CopyInternalNode`, `CopySubgraph`) read 0 dead on
+every applied operator trial, and that every operator row that does carry dead
+trials is an operator this feature leaves untouched (`SwapRouteTargets` 63,
+`ChangeEntryNode` 53, `MutateGateBias` 33, `RetargetNodeTarget` 28,
+`RemoveNode` 9, the two mesh slices 5, `VmCopyInstructionBlockRemapped` 5,
+`VmInstructionMutation` 3). The goal profile runs once and the two populations
+are unpaired, so this is a one-run difference of seven births; it is stated
+here because the predeclaration named the number, and closing it would need a
+paired or repeated run this feature does not perform.
 
 **Persistence and lineage versus T11.F15** (no cognition claim). Final
 populations 11,627 / 12,402 / 12,171 (T11.F15: 10,786 / 11,669 / 11,714), no
@@ -566,9 +578,12 @@ per side on unpaired populations; nothing here is a claim about cognition.
       narrowed to `EnergyCurrent` in the remediation pass. Every predeclared
       operator-row expectation is met. One predeclared expectation is missed
       and recorded with its breakdown rather than met: evolved pooled dead
-      births 28/3300 against a ceiling of 21/3300, none of them from a copy
-      operator this feature changed. The goal profile's `plasticity_updates`
-      comparison is no longer severe.)
+      births 28/3300 against a ceiling of 21/3300. Dead births are not
+      attributable per operator, but every copy operator this feature changed
+      reads 0 dead on every applied trial. The goal profile's
+      `plasticity_updates` comparison is no longer severe. This box is checked
+      on the criterion's "or record why not" clause, not because the ceiling
+      was met.)
 
 ## Notes for AI Agents
 
@@ -601,8 +616,11 @@ per side on unpaired populations; nothing here is a claim about cognition.
   not a `severe` crossing, and `make bench PROFILE=goal` exits 0. One
   measurement item remains open for the orchestrator rather than deferred:
   evolved pooled dead births 28/3300 exceed the predeclared 21/3300 ceiling.
-  Its breakdown is in Performance and Goal Impact; no operator this feature
-  changed contributes a dead birth.
+  Its breakdown is in Performance and Goal Impact. Dead births carry no
+  per-operator attribution in the report, so none of the 28 can be assigned to
+  or cleared from a specific operator; what is measured is that every copy
+  operator this feature changed reads 0 dead on every applied trial and that
+  every row carrying dead trials is an unchanged operator.
 - Judgment call, **resolved** in the remediation pass (review finding P2-3):
   the first pass placed `VmCopyConstantBlock` in the growth class of the
   `v3-mutation-spec.md` taxonomy. That was wrong as a class claim —
@@ -622,10 +640,13 @@ per side on unpaired populations; nothing here is a claim about cognition.
   passed on its first run against unchanged T11.F15 topology code, and no
   topology file is in the diff.
 - Review outcome and remediation pass (2026-09-06). The reviewer raised
-  **P1 = 1, P2 = 3, P3 = 6**. The single P1 is the goal-profile
+  **P1 = 1, P2 = 3, P3 = 6**. The single P1 was the goal-profile
   `plasticity_updates` severe crossing, escalated to the user as a decision
-  rather than a code defect; it is recorded in Performance and Goal Impact
-  and in the unchecked bench verification item. One remediation pass followed,
+  rather than a code defect. It no longer has a basis: the post-remediation
+  goal rerun reads a `flag`, not a `severe` crossing, `make bench
+  PROFILE=goal` exits 0, and the bench verification item is checked on that
+  rerun. Whether the escalation is withdrawn is the orchestrator's call.
+  One remediation pass followed,
   carrying P2-2 (narrow the split exclusion to `EnergyCurrent`), P2-3
   (`VmCopyConstantBlock` taxonomy), P2-4 (the `plasticity_updates` mechanism
   paragraph), P3-5, P3-7, P3-8, and P3-9. That pass ran on a **fresh
