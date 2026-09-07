@@ -85,8 +85,8 @@ Predeclared directions, read against the T11.F16 closure reports:
 | Drift: dead/all births pooled at 1,000 and 2,000 | 3 / 4,000 = 0.000750 | Not above 10 / 4,000 = 0.002500 (the note's baseline arm read 0.0020 at 2,000; a count allowance predeclared before measurement, and any reading above 3 is reported as a count) |
 | Drift: hop-cap hits at every checkpoint | 0 / 4,000 | Zero |
 | Drift: mean total nodes at 2,000 | 136.180000 | Unbounded by this feature; reported, no direction |
-| Drift: depth-0 row | F16 row | Identical counts and fractions (founder short-circuit); only the v2 metadata differs |
-| Gate founder neighborhood block | F16 gate report | Byte-identical |
+| Drift: depth-0 row | F16 row | Identical counts and fractions (founder short-circuit); only the v2 metadata differs. Revised after measurement (orchestrator, 2026-09-07): the short-circuit is per draw, so only births whose every draw sees an all-executed eligible set are identical; a multi-event founder birth whose earlier event adds a node diverges from that draw on. The original wording stands as a recorded miss. |
+| Gate founder neighborhood block | F16 gate report | Byte-identical. Same revision: single-event founder births identical (3,000 / 3,000 seeds pinned by test); multi-event births may diverge; founder outcome unchanged within one birth. |
 | Goal evolved half: changed / mutated births pooled over 36 samples | 951 / 3,300 = 0.288182 | Up (secondary; see Performance and Goal Impact for the confound) |
 | Goal evolved half: dead / mutated | 43 / 3,300 = 0.013030 | Not up (same caveat) |
 
@@ -352,7 +352,9 @@ too, not a cause measured here. Options for the orchestrator, all scope
 decisions and none taken here: accept the reading with an explicit allowance
 or epoch re-pin recorded; lower the `executed_bias` default and re-measure;
 pull a T11.F13 program-length lever forward; or add a temporary VM cap-hit
-counter and re-run the goal profile to settle (a) against (b).
+counter and re-run the goal profile to settle (a) against (b). The probe
+below took the fourth option without a production counter and settled it
+as (b); the orchestrator's decision is in Notes for AI Agents.
 
 #### Diagnostic probe, 2026-09-07 (uncommitted)
 
@@ -420,9 +422,11 @@ against 283, min 1 against 44.
 
 ## Success Criteria
 
-- [ ] At production defaults, node-internal targets are drawn from the
+- [x] At production defaults, node-internal targets are drawn from the
       parent's recently executed nodes with the predeclared bias and residual,
-      and the founder's births are byte-identical to before.
+      and single-event founder births are byte-identical to before (the
+      per-draw guarantee the fixed design gives; the per-birth wording it
+      replaced is recorded as a miss in Performance and Goal Impact).
 - [ ] The stored goal report meets every drift predeclaration above, and the
       gate report shows no severe unbudgeted compute regression.
 - [ ] Required checks, fresh mutation evidence, independent review, reference
@@ -455,21 +459,40 @@ against 283, min 1 against 44.
   writing its report. The investigation is in Performance and Goal Impact:
   89.6% of the run's VM steps come from one of three seeds, whose population
   bloomed to 11,379; the other two seeds are below their T11.F16 values, and
-  the wall-time comparison sits inside host noise. Whether the excess is
-  broadly longer executed programs or one lineage's VM loop is not settled by
-  the stored report. The options are an explicit
-  allowance or epoch re-pin recorded by the orchestrator, a lower
-  `executed_bias` default re-measured, or pulling a T11.F13 program-length
-  lever forward. All three are scope decisions and none was taken here.
+  the wall-time comparison sits inside host noise. The diagnostic probe in
+  Performance and Goal Impact settled the mechanism: executed programs are
+  no longer than the control seed's, and 12.05% of seed 33's final creatures
+  run to the 10,000-step `max_vm_steps` cap, holding 97.76% of the tick's VM
+  steps, at `opcode_cost_multiplier` 1e-6 energy per step, so a capped loop
+  costs 0.01 energy and is nearly unselected against. The feature delivers
+  mutations to executed programs by design; the uncosted loop is the
+  existing VM-cost lever (T03.F08's question), not a defect in targeting.
+  **Orchestrator decision, 2026-09-07: stop and ask the user.** The two
+  earlier severe goal-profile costs (T11.F04, the nutrition removal) were
+  each accepted post-observation by the user explicitly; the orchestrator
+  does not waive a required check. Options for the user, none taken: (1)
+  accept the measured goal cost and re-pin the goal epoch to this report
+  under the existing mechanism, closing as measured; (2) lower the
+  `executed_bias` default and re-measure once; (3) pull a VM step-cost or
+  cap lever forward (T03.F08 or a lower `max_vm_steps`) as a separate
+  decision before closure. The worktree and branch are preserved; the
+  implementation, tests, mutation evidence, and both stored reports stand.
 - Held pending that decision, so the next feature does not silently inherit a
   severe reference: neither report is appended to
   `docs/progress/benchmark-series.json`, and `docs/progress.md` carries the
   `drift-depth-v2` instrument paragraph but no closure row. No baseline,
   threshold, default, or counter definition was edited.
 - The two identity misses (gate founder block, drift depth-0 row) share the
-  multi-event mechanism described in Performance and Goal Impact. Success
-  Criterion 1's "byte-identical" wording describes a per-birth guarantee the
-  fixed design gives per draw; only the orchestrator should reword it.
+  multi-event mechanism described in Performance and Goal Impact. The
+  orchestrator revised the predeclaration rows and Success Criterion 1 to
+  the per-draw guarantee on 2026-09-07, keeping the original wording as a
+  recorded miss; no production code was changed for it.
+- Workflow deviation: this desktop session has no `SendMessage` tool, so the
+  diagnostic pass ran on a fresh `roadmap-implementer` rather than the first
+  one continued. Implementer advisor consults: 3 (first pass) + 3
+  (diagnostic pass). Independent review has not run yet; it follows the
+  user's decision on the blocker so that a bias or lever change, if chosen,
+  is reviewed once.
 - `executed_target_events` counts events whose chosen target was a member of
   the parent's executed set, however it was drawn, exactly parallel to
   `reachable_target_events`. It is therefore nonzero at `executed_bias` 0.0
