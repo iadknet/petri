@@ -1198,6 +1198,13 @@ fn zero_executed_bias_reaches_junk_nodes_in_the_same_fixture() {
     );
 }
 
+/// While every eligible node is one the parent executed, the draw and its RNG
+/// consumption are exactly the pre-T11.F17 ones. A single-event birth from an
+/// all-executed parent therefore always matches; a multi-event birth can
+/// diverge, because an earlier event that adds a mesh node leaves the later
+/// events with an eligible node the parent never executed. That is the
+/// intended behavior and the reason a founder's births are not *all*
+/// byte-identical to before this feature.
 #[test]
 fn an_all_executed_eligible_set_reproduces_the_pre_feature_draw_byte_for_byte() {
     let founder = v3alpha1_founder_genome();
@@ -1207,43 +1214,70 @@ fn an_all_executed_eligible_set_reproduces_the_pre_feature_draw_byte_for_byte() 
         reachable, all_nodes,
         "the founder's whole mesh is reachable"
     );
-    let config = SimulationConfig::default().mutation;
-    let plain = MutationConfig {
-        executed_bias: 0.0,
-        ..config.clone()
+    let production = SimulationConfig::default().mutation;
+    let single_event = MutationConfig {
+        mutation_probability: 1.0,
+        per_birth_mutation_events_min: 1,
+        per_birth_mutation_events_max: 1,
+        ..production.clone()
     };
-    for seed in 0..200 {
-        let mut with_layer = founder.clone();
-        let mut layer_rng = rng(seed);
-        let summary = MutationEngine::apply_mutations_with_food_type_count(
-            &mut with_layer,
-            &config,
-            &reachable,
-            ParentExecuted::Indices(&all_nodes),
-            &mut layer_rng,
-            1,
-        );
 
-        let mut without_layer = founder.clone();
-        let mut plain_rng = rng(seed);
-        MutationEngine::apply_mutations_with_food_type_count(
-            &mut without_layer,
-            &plain,
-            &reachable,
-            ParentExecuted::NONE,
-            &mut plain_rng,
-            1,
-        );
-        assert_eq!(with_layer, without_layer, "seed {seed}: same offspring");
-        assert_eq!(
-            layer_rng.gen::<u64>(),
-            plain_rng.gen::<u64>(),
-            "seed {seed}: same RNG stream position"
-        );
-        assert_eq!(
-            summary.executed_target_events,
-            summary.reachable_target_events
-        );
+    for config in [&single_event, &production] {
+        let plain = MutationConfig {
+            executed_bias: 0.0,
+            ..config.clone()
+        };
+        let mut divergent = 0;
+        for seed in 0..3_000 {
+            let mut with_layer = founder.clone();
+            let mut layer_rng = rng(seed);
+            let summary = MutationEngine::apply_mutations_with_food_type_count(
+                &mut with_layer,
+                config,
+                &reachable,
+                ParentExecuted::Indices(&all_nodes),
+                &mut layer_rng,
+                1,
+            );
+
+            let mut without_layer = founder.clone();
+            let mut plain_rng = rng(seed);
+            MutationEngine::apply_mutations_with_food_type_count(
+                &mut without_layer,
+                &plain,
+                &reachable,
+                ParentExecuted::NONE,
+                &mut plain_rng,
+                1,
+            );
+            // Same offspring *and* the same position in the RNG stream.
+            let identical =
+                with_layer == without_layer && layer_rng.gen::<u64>() == plain_rng.gen::<u64>();
+            if identical {
+                assert_eq!(
+                    summary.executed_target_events, summary.reachable_target_events,
+                    "seed {seed}: every target of an all-executed parent is executed"
+                );
+                continue;
+            }
+            divergent += 1;
+            assert!(
+                summary.applied_events >= 2,
+                "seed {seed}: only a later event in a multi-event birth can diverge"
+            );
+        }
+        if config.per_birth_mutation_events_max == 1 {
+            assert_eq!(divergent, 0, "single-event births never diverge");
+        } else {
+            assert!(
+                divergent > 0,
+                "the production sweep must exercise mid-birth mesh growth"
+            );
+            assert!(
+                divergent < 60,
+                "divergence is confined to mesh-growing multi-event births, got {divergent}/3000"
+            );
+        }
     }
 }
 
