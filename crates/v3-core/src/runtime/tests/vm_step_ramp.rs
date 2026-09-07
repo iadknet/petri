@@ -66,10 +66,15 @@ fn charge_for_capped_jump_loop(energy: f32, cfg: &RuntimeConfig) -> f32 {
 }
 
 /// Runs the traced executor and returns each step's `(energy_cost, energy_after)`.
-fn traced_steps(program: Vec<VmInstruction>, energy: f32, cfg: &RuntimeConfig) -> Vec<(f32, f32)> {
+fn traced_steps(
+    program: Vec<VmInstruction>,
+    constants: Vec<f32>,
+    energy: f32,
+    cfg: &RuntimeConfig,
+) -> Vec<(f32, f32)> {
     let def = VmBackendDef {
         register_count: 1,
-        constants: vec![],
+        constants,
         program,
     };
     let ss = empty_sensor_snapshot();
@@ -104,7 +109,7 @@ fn the_mth_step_past_the_allowance_charges_base_plus_m() {
     // whether the allowance is a few steps or none at all.
     for allowance in [3u32, 0] {
         let cfg = ramp_config(allowance, 1.0, 1.0, 10_000);
-        let costs: Vec<f32> = traced_steps(vec![VmInstruction::Noop; 6], 1_000.0, &cfg)
+        let costs: Vec<f32> = traced_steps(vec![VmInstruction::Noop; 6], vec![], 1_000.0, &cfg)
             .iter()
             .map(|(cost, _)| *cost)
             .collect();
@@ -310,9 +315,62 @@ fn a_bid_below_the_effective_energy_is_paid_in_full() {
 }
 
 #[test]
+fn the_traced_bid_step_reports_the_bid_inside_its_energy_cost() {
+    // Allowance 0, ramp 1.0: LoadConst pays 0.08 + 1, the bid step pays
+    // 0.20 + 2 plus the 4.0 it bids, and Halt pays 0.05 + 3.
+    let cfg = ramp_config(0, 1.0, 1.0, 1_000);
+    let costs: Vec<f32> = traced_steps(bid_program(), vec![4.0], 100.0, &cfg)
+        .iter()
+        .map(|(cost, _)| *cost)
+        .collect();
+
+    assert_eq!(costs.len(), 3);
+    for (index, expected) in [1.08f32, 6.20, 3.05].iter().enumerate() {
+        assert!(
+            (costs[index] - expected).abs() < 1e-4,
+            "step {index} charged {}, expected {expected}",
+            costs[index],
+        );
+    }
+}
+
+#[test]
+fn a_mid_dispatch_consumption_read_includes_what_the_dispatch_owes() {
+    // ReadInput of EnergyConsumedThisTick must add the dispatch's accumulator to
+    // the tick's consumption so far.
+    let cfg = ramp_config(0, 1.0, 1.0, 1_000);
+    let program = vec![
+        VmInstruction::Noop,
+        VmInstruction::ReadInput {
+            dst: 0,
+            ref_idx: 0,
+            sub_idx: 0,
+        },
+        VmInstruction::WriteInternalPayload {
+            slot_idx: 0,
+            src: 0,
+        },
+        VmInstruction::Halt,
+    ];
+    let refs = vec![InputReference::DynamicIntrospection(
+        DynamicIntrospectionKey::EnergyConsumedThisTick,
+    )];
+    let (result, _energy, _side) =
+        run_vm_with_config(program, 1, vec![], &refs, zeroed_upstream(), 50.0, cfg);
+
+    // Noop owes 1.05 and the ReadInput step itself 2.12, against a tick
+    // consumption of 0.0 before the dispatch.
+    let seen = result.output_slots[0];
+    assert!(
+        (seen - 3.17).abs() < 0.01,
+        "the brain read {seen} consumed, expected about 3.17",
+    );
+}
+
+#[test]
 fn the_traced_executor_reports_the_effective_energy_per_step() {
     let cfg = ramp_config(2, 1.0, 1.0, 10_000);
-    let steps = traced_steps(vec![VmInstruction::Noop; 5], 50.0, &cfg);
+    let steps = traced_steps(vec![VmInstruction::Noop; 5], vec![], 50.0, &cfg);
 
     let mut running = 50.0f64;
     for (index, (cost, after)) in steps.iter().enumerate() {
