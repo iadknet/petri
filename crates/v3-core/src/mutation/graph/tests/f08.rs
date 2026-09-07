@@ -338,6 +338,9 @@ fn copy_subgraph_inserts_every_copy_directly_after_its_member() {
 
 #[test]
 fn copy_operators_skip_when_the_copy_would_exceed_the_index_space() {
+    // One below the limit: the copy lands at index `u16::MAX - 1`, the
+    // highest index that is not `remove_compute_node_at`'s sentinel, so it
+    // still applies.
     let mut def = CgpGraphBackendDef {
         compute_nodes: vec![
             ComputeNode {
@@ -345,12 +348,18 @@ fn copy_operators_skip_when_the_copy_would_exceed_the_index_space() {
                 inputs: Vec::new(),
                 plasticity: None,
             };
-            u16::MAX as usize
+            u16::MAX as usize - 1
         ],
         output_sinks: Vec::new(),
         action_bank: Vec::new(),
         execute_gate: ExecuteGate { inputs: Vec::new() },
     };
+    assert_eq!(
+        copy_compute_node(&mut def, &mut SmallRng::seed_from_u64(1)),
+        Ok(())
+    );
+    assert_eq!(def.compute_nodes.len(), u16::MAX as usize);
+    // At the limit, both copy operators skip rather than address the sentinel.
     assert_eq!(
         copy_compute_node(&mut def, &mut SmallRng::seed_from_u64(1)),
         Err(MutationSkipReason::NoApplicableTarget)
