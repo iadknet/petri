@@ -68,6 +68,26 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		tooltip: "Multiplier applied to each VM opcode's compute cost",
 	},
 	{
+		path: "runtime.vm.step_ramp_allowance",
+		label: "Step Ramp Allowance",
+		min: 0,
+		max: 10000,
+		step: 1,
+		defaultValue: 100,
+		tooltip:
+			"Free VM instructions per node dispatch before the activity ramp starts charging",
+	},
+	{
+		path: "runtime.vm.step_ramp_cost",
+		label: "Step Ramp Cost",
+		min: 0,
+		max: 1,
+		step: 0.000001,
+		defaultValue: 0.000001,
+		tooltip:
+			"Extra energy per excess step, per step past the allowance, within one VM node dispatch",
+	},
+	{
 		path: "runtime.plasticity_update_cost",
 		label: "Plasticity Update Cost",
 		min: 0,
