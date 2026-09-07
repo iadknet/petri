@@ -1,6 +1,6 @@
 import { act, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../api/rest.ts";
+import { ApiRequestError, api } from "../api/rest.ts";
 import { useConfigStore } from "../stores/config.ts";
 import { PanelLayoutProvider } from "../stores/layout.tsx";
 import { useSimulationStore } from "../stores/simulation.ts";
@@ -9,7 +9,8 @@ import { useStatsHistoryStore } from "../stores/stats.ts";
 import type { SimulationConfig } from "../types/api.ts";
 import { ControlBar } from "./ControlBar.tsx";
 
-vi.mock("../api/rest.ts", () => ({
+vi.mock("../api/rest.ts", async (importOriginal) => ({
+	...(await importOriginal<typeof import("../api/rest.ts")>()),
 	api: {
 		startup: vi.fn(),
 		start: vi.fn(),
@@ -633,5 +634,85 @@ describe("ControlBar", () => {
 				}),
 			);
 		});
+	});
+
+	it("surfaces a rejected restart re-apply and still refreshes the config store", async () => {
+		useConfigStore.getState().setServerConfig(MOCK_CONFIG, "paused");
+		vi.mocked(api.startup).mockResolvedValue({
+			protocol_version: "v3alpha2",
+			state: "idle",
+			tick: 0,
+			config_digest: "sha256:deadbeef",
+			seeded_creatures: 64,
+		});
+		vi.mocked(api.patchConfig).mockRejectedValue(
+			new ApiRequestError(422, {
+				protocol_version: "v3alpha2",
+				error: {
+					code: "validation_rejected",
+					message: "validation failed for patch_config",
+					details: {
+						endpoint: "patch_config",
+						field_errors: [{ field: "population.max_creatures", reason: "requested 1000" }],
+					},
+				},
+			}),
+		);
+		vi.mocked(api.getConfig).mockResolvedValue({
+			protocol_version: "v3alpha2",
+			state: "idle",
+			config: MOCK_CONFIG,
+		});
+
+		render(
+			<PanelLayoutProvider>
+				<ControlBar />
+			</PanelLayoutProvider>,
+		);
+
+		fireEvent.click(screen.getByTestId("control-restart"));
+
+		const restartError = await screen.findByTestId("control-restart-error");
+		expect(restartError).toHaveTextContent("validation failed for patch_config");
+		expect(restartError).toHaveTextContent("population.max_creatures: requested 1000");
+		await waitFor(() => expect(api.getConfig).toHaveBeenCalledTimes(1));
+		expect(useConfigStore.getState().serverConfig).toEqual(MOCK_CONFIG);
+	});
+
+	it("clears the restart error on the next restart attempt", async () => {
+		useConfigStore.getState().setServerConfig(MOCK_CONFIG, "paused");
+		vi.mocked(api.startup).mockResolvedValue({
+			protocol_version: "v3alpha2",
+			state: "idle",
+			tick: 0,
+			config_digest: "sha256:deadbeef",
+			seeded_creatures: 64,
+		});
+		vi.mocked(api.getConfig).mockResolvedValue({
+			protocol_version: "v3alpha2",
+			state: "idle",
+			config: MOCK_CONFIG,
+		});
+		vi.mocked(api.patchConfig).mockRejectedValueOnce(new Error("boom"));
+
+		render(
+			<PanelLayoutProvider>
+				<ControlBar />
+			</PanelLayoutProvider>,
+		);
+
+		fireEvent.click(screen.getByTestId("control-restart"));
+		expect(await screen.findByTestId("control-restart-error")).toHaveTextContent("boom");
+
+		vi.mocked(api.patchConfig).mockResolvedValue({
+			protocol_version: "v3alpha2",
+			state: "idle",
+			config: MOCK_CONFIG,
+		});
+		fireEvent.click(screen.getByTestId("control-restart"));
+
+		await waitFor(() =>
+			expect(screen.queryByTestId("control-restart-error")).not.toBeInTheDocument(),
+		);
 	});
 });

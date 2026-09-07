@@ -4,10 +4,29 @@ use axum::Json;
 use v3_core::config::SimulationConfig;
 
 use crate::error::{AppError, FieldError};
+use crate::http::config_patch::{attribute_patch_rejection, CanonicalizedPatch};
 use crate::state::TransportPerfSnapshot;
 use crate::transport::protocol::build_status_event_payload;
 use crate::types::{deep_merge, PROTOCOL_VERSION};
 use crate::{query::projection::ProjectionSnapshot, state::AppState};
+
+/// Applies `patch` over the canonical `current` config and reports the merged
+/// and normalized serializations it produces, or `None` when the patch does not
+/// deserialize into a config on its own.
+fn canonicalize_patch(
+    current: &serde_json::Value,
+    patch: &serde_json::Value,
+) -> CanonicalizedPatch {
+    let mut merged = current.clone();
+    deep_merge(&mut merged, patch.clone());
+    let merged_config: SimulationConfig = serde_json::from_value(merged).ok()?;
+    let mut normalized_config = merged_config.clone();
+    normalized_config.normalize();
+    Some((
+        serde_json::to_value(&merged_config).ok()?,
+        serde_json::to_value(&normalized_config).ok()?,
+    ))
+}
 
 fn patch_touches_startup(patch: &serde_json::Value) -> bool {
     patch.get("startup").is_some()
@@ -146,10 +165,12 @@ pub async fn patch_config(
         });
     }
 
-    // Merge patch into current config.
-    let mut base = serde_json::to_value(&handle.sim.config)
+    // Merge patch into current config. The stored config is already canonical,
+    // so a difference after normalization is attributable to the patch.
+    let current = serde_json::to_value(&handle.sim.config)
         .map_err(|e| AppError::Internal(format!("config serialization error: {e}")))?;
-    deep_merge(&mut base, patch);
+    let mut base = current.clone();
+    deep_merge(&mut base, patch.clone());
 
     let merged_config: SimulationConfig =
         serde_json::from_value(base).map_err(|e| AppError::ValidationRejected {
@@ -165,12 +186,16 @@ pub async fn patch_config(
         .map_err(|e| AppError::Internal(format!("config serialization error: {e}")))?;
     let normalized_value = serde_json::to_value(&normalized_config)
         .map_err(|e| AppError::Internal(format!("config serialization error: {e}")))?;
+    // Reject, never clamp, and never apply part of a patch: nothing below this
+    // point runs unless the merged config is already canonical.
     if normalized_value != merged_value {
         return Err(AppError::ValidationRejected {
-            field_errors: vec![FieldError {
-                field: "config".into(),
-                reason: "runtime config patch contains values outside canonical constraints".into(),
-            }],
+            field_errors: attribute_patch_rejection(
+                &patch,
+                &merged_value,
+                &normalized_value,
+                |leaf_patch| canonicalize_patch(&current, leaf_patch),
+            ),
             endpoint: "patch_config",
         });
     }

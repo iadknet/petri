@@ -1,5 +1,6 @@
 //! Axum request handlers.
 
+pub(crate) mod config_patch;
 pub(crate) mod creature;
 pub(crate) mod lifecycle;
 pub(crate) mod paint;

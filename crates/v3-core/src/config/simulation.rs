@@ -2252,4 +2252,82 @@ mod tests {
         assert!((config.types[0].initial_density - shared.initial_density).abs() < 1e-6);
         assert!((config.types[0].initial_coverage - shared.initial_coverage).abs() < 1e-6);
     }
+
+    /// Guards the failure mode recorded in the 2026-09-07 config panel apply
+    /// audit: when the shipped default is not a fixed point of `normalize`,
+    /// every runtime config PATCH is rejected against a freshly started server.
+    #[test]
+    fn normalize_leaves_the_default_config_unchanged() {
+        let expected = serde_json::to_value(SimulationConfig::default()).unwrap();
+        let mut config = SimulationConfig::default();
+
+        config.normalize();
+
+        assert_eq!(serde_json::to_value(&config).unwrap(), expected);
+    }
+
+    /// Draws every field with a cross-field normalization rule plus a sample of
+    /// the clamped floats, including non-finite values.
+    fn perturbed_config_strategy() -> impl Strategy<Value = SimulationConfig> {
+        let clamped_float = prop_oneof![
+            Just(f32::NAN),
+            Just(f32::INFINITY),
+            Just(f32::NEG_INFINITY),
+            -5.0f32..5.0f32,
+        ];
+        (
+            (0u32..20_000, 0u32..20_000),
+            (0usize..24, 0usize..24),
+            (0u32..24, 0u32..24),
+            0usize..8,
+            (clamped_float.clone(), clamped_float.clone(), clamped_float),
+            prop_oneof![Just(f64::NAN), -0.5f64..1.5f64],
+        )
+            .prop_map(
+                |(
+                    (initial_creatures, max_creatures),
+                    (max_actions_per_turn, action_queue_cap),
+                    (events_min, events_max),
+                    action_log_capacity,
+                    (max_density, initial_density, initial_coverage),
+                    mutation_probability,
+                )| {
+                    let mut config = SimulationConfig::default();
+                    config.population.initial_creatures = initial_creatures;
+                    config.population.max_creatures = max_creatures;
+                    config.runtime.max_actions_per_turn = max_actions_per_turn;
+                    config.mutation.action_queue_cap = action_queue_cap;
+                    config.mutation.per_birth_mutation_events_min = events_min;
+                    config.mutation.per_birth_mutation_events_max = events_max;
+                    config.action_log.capacity = action_log_capacity;
+                    config.mutation.mutation_probability = mutation_probability;
+                    config.world.food.shared.max_density = max_density;
+                    config.world.food.shared.initial_density = initial_density;
+                    config.world.food.shared.initial_coverage = initial_coverage;
+                    for food_type in &mut config.world.food.types {
+                        food_type.initial_density = initial_density;
+                        food_type.initial_coverage = initial_coverage;
+                    }
+                    config
+                },
+            )
+    }
+
+    proptest! {
+        /// `normalize` must reach a fixed point in one pass: the PATCH endpoint
+        /// compares a merged config against its single normalization, so a
+        /// second pass that still moves values would reject canonical configs.
+        #[test]
+        fn normalize_is_idempotent(config in perturbed_config_strategy()) {
+            let mut once = config;
+            once.normalize();
+            let mut twice = once.clone();
+            twice.normalize();
+
+            prop_assert_eq!(
+                serde_json::to_value(&twice).unwrap(),
+                serde_json::to_value(&once).unwrap()
+            );
+        }
+    }
 }

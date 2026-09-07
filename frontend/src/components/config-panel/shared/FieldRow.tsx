@@ -1,3 +1,4 @@
+import { type FieldBounds, clampToBounds } from "../runtime/bounds.ts";
 import { Tooltip } from "./Tooltip.tsx";
 import type { FieldDef } from "./types.ts";
 
@@ -10,6 +11,14 @@ interface FieldRowProps {
 	disabledReason?: string;
 	onChange: (path: string, value: number) => void;
 	testId?: string;
+	/**
+	 * Draft-derived bounds to offer and clamp committed edits against. When
+	 * omitted the row offers the field's static pair and passes typed values
+	 * through unclamped.
+	 */
+	bounds?: FieldBounds;
+	/** Reason the server refused this field on the last Apply. */
+	error?: string;
 }
 
 export function FieldRow({
@@ -21,11 +30,23 @@ export function FieldRow({
 	disabledReason,
 	onChange,
 	testId,
+	bounds,
+	error,
 }: FieldRowProps) {
 	const isDirty = serverValue !== undefined ? value !== serverValue : false;
 	const inputId = `${id}-input`;
 	const sliderAccentClass = id.startsWith("runtime-") ? "accent-sky-500" : "accent-emerald-500";
 	const showReset = field.defaultValue !== undefined && value !== field.defaultValue;
+	const resolvedBounds = bounds ?? { min: field.min, max: field.max };
+	// Rows given draft-derived bounds accept a raw edit so multi-digit values can
+	// be typed, then clamp when the edit is committed (blur or Enter). Rows
+	// without them keep their pass-through behavior.
+	const commit = bounds
+		? (input: HTMLInputElement) => {
+				const clamped = clampToBounds(Number(input.value), bounds);
+				if (clamped !== value) onChange(field.path, clamped);
+			}
+		: undefined;
 
 	return (
 		<div
@@ -65,10 +86,17 @@ export function FieldRow({
 					type="number"
 					disabled={disabled}
 					value={value}
-					min={field.min}
-					max={field.max}
+					min={resolvedBounds.min}
+					max={resolvedBounds.max}
 					step={field.step}
 					onChange={(e) => onChange(field.path, Number(e.target.value))}
+					onBlur={commit && ((e) => commit(e.target))}
+					onKeyDown={
+						commit &&
+						((e) => {
+							if (e.key === "Enter") commit(e.currentTarget);
+						})
+					}
 					className="w-24 px-1.5 py-0.5 text-xs font-mono text-right bg-slate-800 border border-slate-700 rounded text-slate-200 disabled:opacity-40"
 				/>
 				<input
@@ -76,13 +104,23 @@ export function FieldRow({
 					type="range"
 					disabled={disabled}
 					value={value}
-					min={field.min}
-					max={field.max}
+					min={resolvedBounds.min}
+					max={resolvedBounds.max}
 					step={field.step}
-					onChange={(e) => onChange(field.path, Number(e.target.value))}
+					onChange={(e) =>
+						onChange(field.path, clampToBounds(Number(e.target.value), resolvedBounds))
+					}
 					className={`w-full h-1 ${sliderAccentClass} disabled:opacity-40`}
 				/>
 			</div>
+			{error && (
+				<p
+					data-testid={`field-error-${field.path.replaceAll(".", "-")}`}
+					className="text-[10px] text-red-400"
+				>
+					{error}
+				</p>
+			)}
 		</div>
 	);
 }

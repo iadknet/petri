@@ -1,17 +1,30 @@
 import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { api } from "../api/rest.ts";
+import { ApiRequestError, api } from "../api/rest.ts";
 import { useConfigStore } from "../stores/config.ts";
 import { useSimulationStore } from "../stores/simulation.ts";
 import { useStartupConfigStore } from "../stores/startupConfig.ts";
 import { MOCK_CONFIG } from "../test/fixtures.ts";
+import type { FieldError } from "../types/errors.ts";
 import { ConfigPanel } from "./ConfigPanel.tsx";
 
-vi.mock("../api/rest.ts", () => ({
+vi.mock("../api/rest.ts", async (importOriginal) => ({
+	...(await importOriginal<typeof import("../api/rest.ts")>()),
 	api: {
 		patchConfig: vi.fn(),
 	},
 }));
+
+function rejection(fieldErrors: FieldError[]): ApiRequestError {
+	return new ApiRequestError(422, {
+		protocol_version: "v3alpha2",
+		error: {
+			code: "validation_rejected",
+			message: "validation failed for patch_config",
+			details: { endpoint: "patch_config", field_errors: fieldErrors },
+		},
+	});
+}
 
 describe("ConfigPanel", () => {
 	beforeEach(() => {
@@ -372,6 +385,146 @@ describe("ConfigPanel", () => {
 		).toBeGreaterThan(0);
 		expect(screen.getAllByText(/same seed gives the same island layout/i).length).toBeGreaterThan(
 			0,
+		);
+	});
+
+	it("renders a rejected field under its own row and clears it on the next Apply", async () => {
+		vi.mocked(api.patchConfig).mockRejectedValueOnce(
+			rejection([
+				{
+					field: "population.max_creatures",
+					reason: "requested 5000; canonical value is 100000",
+				},
+			]),
+		);
+		render(<ConfigPanel />);
+		fireEvent.change(screen.getByTestId("config-field-energy-costs-eat-reward-per-food"), {
+			target: { value: "7.5" },
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Apply Changes" }));
+
+		const rowError = await screen.findByTestId("field-error-population-max_creatures");
+		expect(rowError).toHaveTextContent("requested 5000; canonical value is 100000");
+		expect(screen.getByTestId("config-error")).toHaveTextContent(
+			"validation failed for patch_config",
+		);
+
+		vi.mocked(api.patchConfig).mockResolvedValueOnce({
+			protocol_version: "v3alpha2",
+			state: "paused",
+			config: MOCK_CONFIG,
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Apply Changes" }));
+
+		await waitFor(() => {
+			expect(screen.queryByTestId("field-error-population-max_creatures")).not.toBeInTheDocument();
+		});
+		expect(screen.queryByTestId("config-error")).not.toBeInTheDocument();
+	});
+
+	it("renders field errors that match no runtime row in the panel message", async () => {
+		vi.mocked(api.patchConfig).mockRejectedValueOnce(
+			rejection([{ field: "config", reason: "unknown field `bogus`" }]),
+		);
+		render(<ConfigPanel />);
+		fireEvent.change(screen.getByTestId("config-field-energy-costs-eat-reward-per-food"), {
+			target: { value: "7.5" },
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Apply Changes" }));
+
+		const panelError = await screen.findByTestId("config-error");
+		expect(panelError).toHaveTextContent("config: unknown field `bogus`");
+		expect(screen.queryByTestId("field-error-config")).not.toBeInTheDocument();
+	});
+
+	it("falls back to a panel message when the failure is not an API error", async () => {
+		vi.mocked(api.patchConfig).mockRejectedValueOnce("network down");
+		render(<ConfigPanel />);
+		fireEvent.change(screen.getByTestId("config-field-energy-costs-eat-reward-per-food"), {
+			target: { value: "7.5" },
+		});
+
+		fireEvent.click(screen.getByRole("button", { name: "Apply Changes" }));
+
+		expect(await screen.findByTestId("config-error")).toHaveTextContent("Config update failed");
+	});
+
+	it("clears field errors when the draft is reset", async () => {
+		vi.mocked(api.patchConfig).mockRejectedValueOnce(
+			rejection([{ field: "action_log.capacity", reason: "requested 0; canonical value is 500" }]),
+		);
+		render(<ConfigPanel />);
+		fireEvent.change(screen.getByTestId("config-field-energy-costs-eat-reward-per-food"), {
+			target: { value: "7.5" },
+		});
+		fireEvent.click(screen.getByRole("button", { name: "Apply Changes" }));
+		await screen.findByTestId("field-error-action_log-capacity");
+
+		fireEvent.click(screen.getByTestId("config-reset"));
+
+		expect(screen.queryByTestId("field-error-action_log-capacity")).not.toBeInTheDocument();
+		expect(screen.queryByTestId("config-error")).not.toBeInTheDocument();
+	});
+
+	it("keeps a typed startup value above the static max after commit", () => {
+		render(<ConfigPanel />);
+		const input = screen.getByTestId("startup-field-population-initial-creatures");
+
+		fireEvent.change(input, { target: { value: "20000" } });
+		fireEvent.blur(input);
+
+		expect(useStartupConfigStore.getState().preset.population.initial_creatures).toBe(20000);
+	});
+
+	it("clamps the slider to the draft-derived bound on every change", () => {
+		render(<ConfigPanel />);
+
+		fireEvent.change(screen.getByLabelText("Max Creatures slider"), { target: { value: "10" } });
+
+		expect(useConfigStore.getState().localDraft?.population.max_creatures).toBe(
+			MOCK_CONFIG.population.initial_creatures,
+		);
+	});
+
+	it("clamps the number input to the draft-derived bound only once the edit is committed", () => {
+		render(<ConfigPanel />);
+		const input = screen.getByRole("spinbutton", { name: /Max Creatures/ });
+
+		fireEvent.change(input, { target: { value: "10" } });
+		expect(useConfigStore.getState().localDraft?.population.max_creatures).toBe(10);
+
+		fireEvent.blur(input);
+		expect(useConfigStore.getState().localDraft?.population.max_creatures).toBe(
+			MOCK_CONFIG.population.initial_creatures,
+		);
+	});
+
+	it("commits a number edit on Enter", () => {
+		render(<ConfigPanel />);
+		const input = screen.getByRole("spinbutton", { name: /Log Capacity/ });
+
+		fireEvent.change(input, { target: { value: "0" } });
+		fireEvent.keyDown(input, { key: "Enter" });
+
+		expect(useConfigStore.getState().localDraft?.action_log.capacity).toBe(1);
+	});
+
+	it("blurs the focused number input before applying so the sent value is in bounds", async () => {
+		render(<ConfigPanel />);
+		const input = screen.getByRole<HTMLInputElement>("spinbutton", { name: /Max Creatures/ });
+		input.focus();
+		fireEvent.change(input, { target: { value: "10" } });
+
+		fireEvent.click(screen.getByRole("button", { name: "Apply Changes" }));
+
+		await waitFor(() =>
+			expect(api.patchConfig).toHaveBeenCalledWith(
+				expect.objectContaining({
+					population: { max_creatures: MOCK_CONFIG.population.initial_creatures },
+				}),
+			),
 		);
 	});
 });

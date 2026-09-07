@@ -1,5 +1,5 @@
 import { useCallback, useState } from "react";
-import { type DeepPartial, api } from "../api/rest.ts";
+import { ApiRequestError, type DeepPartial, api } from "../api/rest.ts";
 import { useConfigStore } from "../stores/config.ts";
 import { usePanelLayout } from "../stores/layout.tsx";
 import { useSimulationStore } from "../stores/simulation.ts";
@@ -7,6 +7,7 @@ import { buildStartupRequest, useStartupConfigStore } from "../stores/startupCon
 import { useStatsHistoryStore } from "../stores/stats.ts";
 import { useViewportStore } from "../stores/viewport.ts";
 import type { SimState, SimulationConfig } from "../types/api.ts";
+import { describeApiFailure } from "../types/errors.ts";
 import { RUNTIME_PATCH_FIELDS } from "./config-panel/runtime/RuntimeConfigPanel.tsx";
 import { buildPatch, getByPath, mergePatch } from "./config-panel/shared/pathUtils.ts";
 
@@ -88,6 +89,12 @@ function buttonEnabled(state: SimState) {
 	};
 }
 
+/** Renders a failed restart, including any per-field reasons, as one line. */
+function describeRestartFailure(e: unknown): string {
+	if (e instanceof ApiRequestError) return describeApiFailure(e.message, e.fieldErrors);
+	return e instanceof Error ? e.message : "Restart failed";
+}
+
 export function ControlBar() {
 	const simState = useSimulationStore((s) => s.simState);
 	const tick = useSimulationStore((s) => s.tick);
@@ -98,6 +105,7 @@ export function ControlBar() {
 	const showFertilityOverlay = useViewportStore((s) => s.showFertilityOverlay);
 	const toggleFertilityOverlay = useViewportStore((s) => s.toggleFertilityOverlay);
 	const [restarting, setRestarting] = useState(false);
+	const [restartError, setRestartError] = useState<string | null>(null);
 
 	const enabled = buttonEnabled(simState);
 
@@ -140,6 +148,7 @@ export function ControlBar() {
 		}
 
 		setRestarting(true);
+		setRestartError(null);
 		try {
 			// Capture current runtime config before startup resets it
 			const prevConfig = useConfigStore.getState().serverConfig;
@@ -151,7 +160,10 @@ export function ControlBar() {
 			useSimulationStore.getState().setTick(res.tick);
 			useStatsHistoryStore.getState().reset();
 
-			// Re-apply current runtime config values so they survive restart
+			// Re-apply current runtime config values so they survive restart. A
+			// rejection here loses those values, so it is surfaced rather than
+			// logged, and the config store is still refreshed from the server so
+			// the panel shows what actually applied.
 			if (prevConfig) {
 				const patch: Record<string, unknown> = {};
 				const failedPenaltyRampEnabled = startup.startup.ramps.failed_action_penalty.enabled;
@@ -161,13 +173,17 @@ export function ControlBar() {
 					}
 					mergePatch(patch, buildPatch(field.path, getByPath(prevConfig, field.path) as number));
 				}
-				await api.patchConfig(patch as DeepPartial<SimulationConfig>);
+				try {
+					await api.patchConfig(patch as DeepPartial<SimulationConfig>);
+				} catch (e) {
+					setRestartError(describeRestartFailure(e));
+				}
 			}
 
 			const configRes = await api.getConfig();
 			useConfigStore.getState().commitServerConfig(configRes.config, configRes.state);
 		} catch (e) {
-			console.error("Restart failed:", e);
+			setRestartError(describeRestartFailure(e));
 		} finally {
 			setRestarting(false);
 		}
@@ -217,6 +233,15 @@ export function ControlBar() {
 			<output aria-live="polite" aria-atomic="true" className="sr-only">
 				{restarting ? "Restarting simulation" : ""}
 			</output>
+			{restartError && (
+				<p
+					data-testid="control-restart-error"
+					className="min-w-0 truncate text-xs text-red-400"
+					title={restartError}
+				>
+					{restartError}
+				</p>
+			)}
 
 			{/* Divider */}
 			<div className="w-px h-6 bg-petri-border" />

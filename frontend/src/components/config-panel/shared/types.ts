@@ -47,4 +47,6 @@ export interface RuntimePanelProps {
 	simState: SimState;
 	tick: number;
 	updateDraft: RuntimeUpdater;
+	/** Server reasons from the last rejected Apply, keyed by config path. */
+	fieldErrors: Record<string, string>;
 }
