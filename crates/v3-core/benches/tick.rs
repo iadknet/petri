@@ -94,7 +94,6 @@ fn bench_mesh_execution_only(c: &mut Criterion) {
                         &creature.genome,
                         &ss,
                         &mut creature.energy,
-                        creature.reproductive_reserve,
                         &mut creature.shared_memory,
                         &creature.prev_shared_memory,
                         &mut creature.graph_runtime,

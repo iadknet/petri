@@ -124,16 +124,15 @@ This file is the canonical owner for world/grid config keys/defaults.
 | `world.food.shared.max_density` | `f32` | `1.0` | Must be finite and `> 0.0`; invalid falls back to `1.0`. |
 | `world.food.shared.occupancy_depletion.enabled` | `bool` | `true` | Enables the occupancy depletion mask that dampens food regrowth on occupied cells. |
 | `world.food.shared.occupancy_depletion.deposit_per_occupied_tick` | `f32` | `0.08` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.08`. Amount of depletion deposited into each occupied passable cell per Phase 0 update. |
-| `world.food.types` | `FoodTypeConfig[]` | `[Maintenance Food, Reproductive Food]` | Ordered list of configured ordinary-food types. List position is the stable per-run `OrdinaryFoodTypeId`; each entry carries display metadata, typed yields, and startup seeding knobs. Empty lists normalize to the two complementary defaults. |
+| `world.food.types` | `FoodTypeConfig[]` | `[Primary Food]` | Ordered list of configured ordinary-food types. List position is the stable per-run `OrdinaryFoodTypeId`; each entry carries display metadata and startup seeding knobs. Empty lists normalize to one green Primary Food with density `1.0` and coverage `0.54`. |
 | `world.food.fertility.layers[].target` | `enum{AllFoods,SingleType{type_idx}}` | `AllFoods` | Fertility layer selector. Invalid/unknown targeted type indices normalize to `AllFoods` during config normalization. |
 
 Food-type catalog posture:
 - `world.food.types` is ordered, and the list index defines the stable per-run
   `OrdinaryFoodTypeId`.
 - `FoodTypeConfig` carries display metadata (`name`, `color`), startup seeding fields
-  (`initial_density`, `initial_coverage`), and nonnegative typed yields
-  (`metabolic_energy_yield`, `reproductive_reserve_yield`). Yields are applied only
-  from the actual amount consumed by a typed Eat action.
+  (`initial_density`, `initial_coverage`), and `growth_inhibitor`. Typed Eat uses
+  the shared `energy.costs.eat_reward_per_food` for the actual amount consumed.
 - The primary type (`types[0]`) is mirrored into
   `world.food.shared.initial_density` and
   `world.food.shared.initial_coverage` during config normalization.

@@ -6,6 +6,14 @@
 - Review Status: APPROVED
 - Review Count: 2
 
+> **Design decision reversed (2026-09-07).** The user reconsidered complementary
+> nutrition and decided it was not a good fit for Petri. The requested removal
+> and restoration of energy-only feeding and reproduction are tracked in
+> [Remove Complementary Nutrition](../../../specs/remove-complementary-nutrition.md).
+> See that spec for implementation and integration status.
+> The Complete status and original record below describe the historical
+> implementation; they do not endorse retaining this mechanism.
+
 ## Goal
 
 Create one bounded, applied ecological pressure that makes a single-resource reflex

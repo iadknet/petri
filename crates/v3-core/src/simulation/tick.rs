@@ -12,12 +12,12 @@ use crate::creature::action_log::{ActionLogEntry, ActionResult, ActionType, NO_D
 use crate::creature::genome::BackendDef;
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
-use crate::runtime::mesh::execute_creature_mesh_with_reserve;
+use crate::runtime::mesh::execute_creature_mesh;
 use crate::runtime::plasticity::reward::apply_reward_modulated_updates;
 use crate::runtime::plasticity::traces::has_any_reward_modulated;
 use crate::runtime::trace::domain::{PerceptionDebugSnapshot, StaticInputsSnapshot, TickTrace};
 use crate::runtime::trace::recording::ActiveTrace;
-use crate::runtime::traced_mesh::execute_creature_mesh_traced_with_reserve;
+use crate::runtime::traced_mesh::execute_creature_mesh_traced;
 use crate::runtime::types::MeshOutput;
 use crate::sensors::perception::{
     genome_uses_extended_perception, PerceptionConfig, PerceptionSnapshot, SensorSnapshot,
@@ -306,11 +306,10 @@ pub fn observe_temporal_actions(sim: &Simulation) -> Vec<TemporalActionObservati
         prepared.begin_tick(&creature.genome.nodes);
         let evaluate = |graph: &mut crate::creature::state::GraphRuntimeState,
                         previous: &[f32; 16]| {
-            execute_creature_mesh_with_reserve(
+            execute_creature_mesh(
                 &creature.genome,
                 &sensors,
                 &mut { creature.energy },
-                creature.reproductive_reserve,
                 &mut { creature.shared_memory },
                 previous,
                 graph,
@@ -372,11 +371,10 @@ fn observe_action_queue(
     let mut energy = creature.energy;
     let mut graph_runtime = creature.graph_runtime.clone();
     graph_runtime.begin_tick(&creature.genome.nodes);
-    execute_creature_mesh_with_reserve(
+    execute_creature_mesh(
         &creature.genome,
         sensors,
         &mut energy,
-        creature.reproductive_reserve,
         &mut shared_memory,
         &creature.prev_shared_memory,
         &mut graph_runtime,
@@ -412,11 +410,10 @@ fn run_cognition(
     let mut parallel_decisions: Vec<_> = work
         .par_iter_mut()
         .map(|(id, ss, creature)| {
-            let output = execute_creature_mesh_with_reserve(
+            let output = execute_creature_mesh(
                 &creature.genome,
                 ss,
                 &mut creature.energy,
-                creature.reproductive_reserve,
                 &mut creature.shared_memory,
                 &creature.prev_shared_memory,
                 &mut creature.graph_runtime,
@@ -432,11 +429,10 @@ fn run_cognition(
             let energy_before = creature.energy;
             let si_snapshot = StaticInputsSnapshot::from(&ss.local);
 
-            let (output, hops, termination_reason) = execute_creature_mesh_traced_with_reserve(
+            let (output, hops, termination_reason) = execute_creature_mesh_traced(
                 &creature.genome,
                 ss,
                 &mut creature.energy,
-                creature.reproductive_reserve,
                 &mut creature.shared_memory,
                 &creature.prev_shared_memory,
                 &mut creature.graph_runtime,
@@ -843,9 +839,6 @@ fn execute_reproduce(
         ReproductionActionResult::RejectedInvalidTarget => ActionResult::InvalidTarget,
         ReproductionActionResult::RejectedAgeConstraints => ActionResult::AgeConstraints,
         ReproductionActionResult::RejectedEnergyConstraints => ActionResult::EnergyConstraints,
-        ReproductionActionResult::RejectedNutritionConstraints => {
-            ActionResult::NutritionConstraints
-        }
         ReproductionActionResult::RejectedPopulationCap => ActionResult::PopulationCap,
     };
     if !succeeded {

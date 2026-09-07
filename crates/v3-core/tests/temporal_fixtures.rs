@@ -1222,7 +1222,6 @@ proptest! {
                 &genome,
                 &sensors,
                 &mut energy,
-                0.0,
                 &mut shared_memory,
                 &prev_shared_memory,
                 &mut graph_runtime,

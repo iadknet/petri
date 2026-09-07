@@ -5,7 +5,6 @@ import type {
 	FoodFertilityLayerTarget,
 	FoodSharedConfig,
 	FoodTypeConfig,
-	NutritionConfig,
 	StartupFoodConfig,
 	StartupFoodRequest,
 	WorldEdgeMode,
@@ -27,7 +26,6 @@ export interface StartupPreset {
 	energy: {
 		initial_energy: number;
 	};
-	nutrition: NutritionConfig;
 	startup: {
 		ramps: {
 			failed_action_penalty: {
@@ -64,20 +62,12 @@ function randomSeed(): number {
 const FOOD_TYPE_COLORS = ["#22c55e", "#38bdf8", "#f97316", "#e879f9", "#facc15", "#2dd4bf"];
 
 function createFoodType(index: number): FoodTypeConfig {
-	const isMaintenance = index === 0;
-	const isReproductive = index === 1;
 	return {
-		name: isMaintenance
-			? "Maintenance Food"
-			: isReproductive
-				? "Reproductive Food"
-				: `Food ${index + 1}`,
+		name: index === 0 ? "Primary Food" : `Food ${index + 1}`,
 		color: FOOD_TYPE_COLORS[index % FOOD_TYPE_COLORS.length] ?? "#22c55e",
 		initial_density: 1.0,
-		initial_coverage: 0.27,
+		initial_coverage: 0.54,
 		growth_inhibitor: 0.2,
-		metabolic_energy_yield: isMaintenance ? 10.0 : 0.0,
-		reproductive_reserve_yield: isReproductive ? 1.0 : 0.0,
 	};
 }
 
@@ -141,18 +131,6 @@ function normalizeFoodType(
 		initial_density: clampFinite(type.initial_density, 0, maxDensity, defaults.initial_density),
 		initial_coverage: clampFinite(type.initial_coverage, 0, 1, defaults.initial_coverage),
 		growth_inhibitor: clampFinite(type.growth_inhibitor, 0, 1, defaults.growth_inhibitor),
-		metabolic_energy_yield: clampFinite(
-			type.metabolic_energy_yield,
-			0,
-			Number.MAX_VALUE,
-			defaults.metabolic_energy_yield,
-		),
-		reproductive_reserve_yield: clampFinite(
-			type.reproductive_reserve_yield,
-			0,
-			Number.MAX_VALUE,
-			defaults.reproductive_reserve_yield,
-		),
 	};
 }
 
@@ -200,7 +178,7 @@ function normalizeFoodConfig(food: StartupFoodConfig): StartupFoodConfig {
 			? food.types.map((type, index) =>
 					normalizeFoodType(cloneFoodType(type), index, shared.max_density),
 				)
-			: [createFoodType(0), createFoodType(1)];
+			: [createFoodType(0)];
 	const primaryType = types[0]!;
 
 	return {
@@ -235,7 +213,7 @@ function normalizeFoodConfig(food: StartupFoodConfig): StartupFoodConfig {
 function buildDefaultFoodConfig(): StartupFoodConfig {
 	return normalizeFoodConfig({
 		shared: defaultFoodShared(),
-		types: [createFoodType(0), createFoodType(1)],
+		types: [createFoodType(0)],
 		fertility: {
 			enabled: true,
 			min_fertility: 0.0,
@@ -267,10 +245,7 @@ function fromServerFoodConfig(config: SimulationConfig["world"]["food"]): Startu
 				deposit_per_occupied_tick: config.shared.occupancy_depletion.deposit_per_occupied_tick,
 			},
 		},
-		types:
-			config.types.length > 0
-				? config.types.map(cloneFoodType)
-				: [createFoodType(0), createFoodType(1)],
+		types: config.types.length > 0 ? config.types.map(cloneFoodType) : [createFoodType(0)],
 		fertility: {
 			enabled: config.fertility.enabled,
 			min_fertility: config.fertility.min_fertility,
@@ -336,7 +311,6 @@ function buildDefaultPreset(): StartupPreset {
 			food: buildDefaultFoodConfig(),
 		},
 		energy: { initial_energy: 20.0 },
-		nutrition: { reproductive_reserve_capacity: 8.0, reproductive_reserve_cost: 4.0 },
 		startup: {
 			ramps: {
 				failed_action_penalty: {
@@ -361,7 +335,6 @@ function fromServerConfig(config: SimulationConfig): StartupPreset {
 			food: fromServerFoodConfig(config.world.food),
 		},
 		energy: { initial_energy: config.energy.lifecycle.initial_energy },
-		nutrition: { ...config.nutrition },
 		startup: {
 			ramps: {
 				failed_action_penalty: {
@@ -583,7 +556,6 @@ export function buildStartupRequest(preset: StartupPreset): StartupRequest {
 		energy: {
 			lifecycle: { initial_energy: preset.energy.initial_energy },
 		},
-		nutrition: { ...preset.nutrition },
 		startup: {
 			ramps: {
 				failed_action_penalty: {

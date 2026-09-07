@@ -93,8 +93,6 @@ pub struct CreatureState {
     pub genome: CreatureGenome,
     pub position: Position,
     pub energy: f32,
-    /// Live reproductive reserve acquired from typed food.
-    pub reproductive_reserve: f32,
     pub age: u64,
     pub generation: u64,
     /// Shared f32 memory slots, accessible by both VM and Graph backends.
@@ -165,7 +163,6 @@ impl CreatureState {
             genome,
             position,
             energy,
-            reproductive_reserve: 0.0,
             age: 0,
             generation,
             shared_memory,
@@ -216,7 +213,6 @@ impl CreatureState {
             genome,
             position,
             energy,
-            reproductive_reserve: 0.0,
             age: 0,
             generation,
             shared_memory,
@@ -338,7 +334,6 @@ mod tests {
         assert!(state.graph_runtime.tick_start_eligibility_traces.is_empty());
         assert_eq!(state.generation, 0);
         assert!((state.energy - 20.0).abs() < f32::EPSILON);
-        assert!(state.reproductive_reserve.abs() < f32::EPSILON);
         assert_eq!(state.phenotype_channels, [128, 64, 32, 10, 20, 30]);
         assert_eq!(state.phenotype_active_channel, 0);
         assert_eq!(state.phenotype_channel_polarity, [true; 6]);

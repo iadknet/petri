@@ -496,10 +496,8 @@ pub(crate) fn split_existing_edge(
 ///
 /// `EnergyCurrent` is the only excluded key. In `runtime/cgp/execute.rs` the
 /// effects `ResolveCtx` differs from the evaluation `ResolveCtx` only in
-/// `energy`: `energy_consumed` and `reproductive_reserve` are the same values
-/// in both, so `EnergyConsumedThisTick` and `ReproductiveReserveCurrent`
-/// resolve identically either side of the deduction and their edges split
-/// normally.
+/// `energy`: `energy_consumed` is unchanged, so `EnergyConsumedThisTick`
+/// resolves identically either side of the deduction and its edges split normally.
 fn is_excluded_introspection_split(
     def: &CgpGraphBackendDef,
     input_refs: &[InputReference],

@@ -17,7 +17,7 @@ with construction for capacity and incurs loaded movement cost.
 - Additional inventory capacity, evolving capacity, containers, private caches,
   ownership enforcement, direct gifts, or automatic cache-seeking behavior.
 - Internal fat/reserve traits, digestion specialization, new food types, or
-  byproduct conversion. Existing typed nutrition remains authoritative.
+  byproduct conversion. Existing ordinary typed food and the shared energy reward remain authoritative.
 - Merging conflicting deposited food, resetting freshness on pickup, or growing
   harvested food while it is carried or cached.
 - Confirmatory evidence that hoarding or cognition evolves from this mechanism.
@@ -32,7 +32,8 @@ Use the [world food contract](../../reference/v3-world-grid-spec.md),
 [tick order](../../reference/v3-tick-orchestration-spec.md), and existing ordinary
 food implementation in `crates/v3-core/src/kernel/ordinary_food/` and typed
 sensors in `crates/v3-core/src/sensors/typed_food.rs`. Current food is stored in
-per-type density planes, with per-run stable type IDs and typed nutrition.
+per-type density planes, with per-run stable type IDs. Feeding uses the shared
+`energy.costs.eat_reward_per_food` setting.
 Internal energy storage in T03.F05 is not a prerequisite for carrying uneaten food.
 
 Research considered contextual pickup/drop and separate operations (the
@@ -54,8 +55,8 @@ Food and slot contract:
   Partially filled slots cannot be topped up or merged in this version.
 - Every nonempty food slot incurs exactly the F01 per-slot surcharge regardless
   of quantity or type. Four shared slots allow mixed food/barrier loads.
-- Pickup and placement transfer actual food, never metabolic energy or
-  reproductive reserve. Type, quantity, intrinsic properties, and any existing
+- Pickup and placement transfer actual food, never energy. Type, quantity,
+  intrinsic properties, and any existing
   age/expiry survive transfer unchanged except for elapsed-time decay. Splitting
   a source preserves its properties on both portions. Cell fertility and position
   are environmental properties and do not travel with food.
@@ -63,19 +64,20 @@ Food and slot contract:
   than flattening them into a density value that loses identity or freshness.
   World sensors and existing Eat actions see the actual available quantity.
 
-Actions and nutrition:
+Actions and feeding:
 
 | Action | Parameters | Successful effect |
 | --- | --- | --- |
 | Pick up food | Food type, empty destination slot | Transfer up to one parcel capacity from the actor's current cell. |
 | Place food | Food source slot | Transfer the whole parcel to the actor's current cell, replacing conflicting food. |
-| Eat from storage | Food source slot | Consume that parcel through existing typed nutrition and energy caps, then empty the slot. |
+| Eat from storage | Food source slot | Consume that parcel using the shared energy reward and existing energy cap, then empty the slot. |
 
 - Retain current ground Eat behavior. Make stored-food consumption an explicit
   controller choice, not an automatic fallback when ground food is absent.
 - Pickup/placement use F01 handling cost conventions; their initial base costs
   equal barrier pickup/placement respectively. Eating from storage uses existing
-  Eat cost and nutrition semantics. Handling yields no nutrition.
+  Eat cost and shared `energy.costs.eat_reward_per_food` semantics. Handling yields
+  no energy.
 - Deliberate placement permits the acting creature's own occupancy. It still
   rejects barriers and other actual occupation blockers; no adjacent target is
   chosen. On failure the parcel stays in its slot and destination is unchanged.
@@ -111,14 +113,14 @@ Clock and world ecology:
   clock, first harvest creates an absolute expiry at `pickup_tick + lifetime`.
   Initial harvested-food lifetime is 256 ticks, configurable as a positive integer
   at run initialization. This is a balancing default, not a measured optimum.
-- For this fallback policy quantity and nutrition stay unchanged until expiry;
+- For this fallback policy quantity stays unchanged until expiry;
   at tick `>= expires_at` the parcel disappears. Re-pickup, placement, death drops,
   or changing carrier never restart the clock. Food with an existing intrinsic
   policy continues that policy rather than gaining a second freshness reset.
 - Process carried and cached expiry once in Phase 0 before cognition, growth,
   and death drops. Expired slots become empty and immediately stop adding carrying
   cost. Preserve the order of the other existing Phase 0 operations.
-- A cached parcel is harvested food, not a new reproductive food substrate. While
+- A cached parcel is harvested food, not a new growing food substrate. While
   it occupies a cell/type, exclude it from natural growth and spread as a source,
   and prevent natural growth/spread/recovery from adding to that same cell/type.
   Other food types continue normally. Consumption, pickup that empties it, expiry,
@@ -140,7 +142,7 @@ Clock and world ecology:
       food ecology with no freshness reset or duplicate expiry processing.
 - [ ] Expose quantities picked up, cached, consumed from storage, expired,
       overwritten, and destroyed on death from actual outcomes, distinguishing
-      transfers from nutrition gains and world growth.
+      transfers from energy gains and world growth.
 - [ ] Update canonical food, action, sensor, lifecycle, config, and transport
       references for implemented behavior.
 
@@ -151,7 +153,7 @@ Clock and world ecology:
       failure, with explicit consumption/expiry/overwrite/destruction sinks.
 - [ ] Verify mixed four-slot loads, partially filled occupied slots, no top-up,
       bounded pickup and remainder, insufficient storage, and invalid selections.
-- [ ] Verify pickup yields no energy; stored eating uses exact typed nutrition,
+- [ ] Verify pickup yields no energy; stored eating uses the shared energy reward,
       existing caps and costs; placing then eating cannot multiply food or energy.
 - [ ] Verify pickup/place/re-pickup and death drops preserve food properties and
       expiry; test just before, at, and after expiry while carried and cached.

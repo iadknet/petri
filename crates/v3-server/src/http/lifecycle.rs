@@ -256,8 +256,6 @@ mod tests {
                 initial_density: 0.0,
                 initial_coverage: 0.0,
                 growth_inhibitor: 0.2,
-                metabolic_energy_yield: 10.0,
-                reproductive_reserve_yield: 0.0,
             },
             FoodTypeConfig {
                 name: "Secondary Food".to_string(),
@@ -265,8 +263,6 @@ mod tests {
                 initial_density: 0.0,
                 initial_coverage: 0.0,
                 growth_inhibitor: 0.2,
-                metabolic_energy_yield: 0.0,
-                reproductive_reserve_yield: 1.0,
             },
         ];
 

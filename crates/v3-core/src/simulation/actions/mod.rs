@@ -70,14 +70,8 @@ pub fn apply_typed_eat(
 ) -> bool {
     let food = world.consume_food_type(creature.position, type_idx);
     if food > 0.0 {
-        let food_config = config.world.food.types.get(usize::from(type_idx.get()));
-        if let Some(food_config) = food_config {
-            creature.energy = (creature.energy + food * food_config.metabolic_energy_yield)
-                .clamp(0.0, config.energy.lifecycle.max_energy);
-            creature.reproductive_reserve = (creature.reproductive_reserve
-                + food * food_config.reproductive_reserve_yield)
-                .clamp(0.0, config.nutrition.reproductive_reserve_capacity);
-        }
+        creature.energy = (creature.energy + food * config.energy.costs.eat_reward_per_food)
+            .clamp(0.0, config.energy.lifecycle.max_energy);
     }
     creature.energy -= config.energy.adjusted_action_cost(
         config.energy.costs.eat_cost,
@@ -163,7 +157,7 @@ mod tests {
             )
         });
         world.place_creature(pos, id);
-        let mut sim = Simulation {
+        let sim = Simulation {
             world,
             creatures,
             action_logs: slotmap::SecondaryMap::new(),
@@ -172,8 +166,18 @@ mod tests {
             stats: crate::simulation::stats::SimStats::default(),
             rng: rand::rngs::SmallRng::seed_from_u64(42),
         };
-        sim.creatures[id].reproductive_reserve = sim.config.nutrition.reproductive_reserve_capacity;
         (sim, id)
+    }
+
+    #[test]
+    fn energy_only_reproduction_needs_no_reserve_preparation() {
+        let (mut sim, id) = make_sim_one_creature(Position::new(5, 5), 80.0);
+        sim.creatures[id].age = sim.config.energy.lifecycle.min_reproduce_age;
+        let mut rng = rand::rngs::SmallRng::seed_from_u64(1);
+        assert_eq!(
+            apply_reproduce(id, &mut sim, Direction::N, 20.0, &mut rng),
+            ReproductionActionResult::Spawned
+        );
     }
 
     // ── typed Eat ─────────────────────────────────────────────────────────────
@@ -204,8 +208,9 @@ mod tests {
     #[test]
     fn apply_typed_eat_caps_energy_at_max() {
         let pos = Position::new(3, 3);
-        let (mut sim, id) = make_sim_one_creature(pos, 95.0);
-        sim.config.world.food.types[0].metabolic_energy_yield = 20.0;
+        let (mut sim, id) = make_sim_one_creature(pos, 195.0);
+        sim.config.energy.costs.eat_reward_per_food = 20.0;
+        sim.config.energy.costs.eat_cost = 2.0;
         // Place max food to ensure energy would exceed max without cap.
         sim.world.set_food(pos, 1.0);
         let max = sim.config.energy.lifecycle.max_energy;
@@ -216,21 +221,19 @@ mod tests {
             &sim.config,
             OrdinaryFoodTypeId::default(),
         );
-        assert!(
-            sim.creatures[id].energy <= max,
-            "energy {} should be <= max {}",
+        assert_eq!(
             sim.creatures[id].energy,
-            max
+            max - 2.0,
+            "cap must precede the Eat cost"
         );
     }
 
     #[test]
-    fn typed_eat_applies_complementary_yields_from_actual_consumption() {
+    fn typed_eat_applies_shared_reward_from_actual_consumption() {
         let pos = Position::new(3, 3);
         let (mut sim, id) = make_sim_one_creature(pos, 10.0);
         sim.world
             .set_food_type(pos, OrdinaryFoodTypeId::new(0), 0.25);
-        sim.creatures[id].reproductive_reserve = 0.0;
         let before = sim.creatures[id].energy;
         let creature = sim.creatures.get_mut(id).expect("fixture creature");
 
@@ -242,30 +245,7 @@ mod tests {
         );
 
         assert!(succeeded);
-        assert!((sim.creatures[id].energy - (before + 0.25 * 10.0)).abs() < 1e-5);
-        assert!((sim.creatures[id].reproductive_reserve).abs() < 1e-6);
-    }
-
-    #[test]
-    fn typed_eat_applies_reserve_yield_and_clamps_capacity() {
-        let pos = Position::new(3, 3);
-        let (mut sim, id) = make_sim_one_creature(pos, 10.0);
-        sim.world.reconfigure_food(sim.config.world.food.clone());
-        sim.world
-            .set_food_type(pos, OrdinaryFoodTypeId::new(1), 1.0);
-        sim.creatures[id].reproductive_reserve = 7.75;
-        let creature = sim.creatures.get_mut(id).expect("fixture creature");
-
-        let succeeded = apply_typed_eat(
-            creature,
-            &mut sim.world,
-            &sim.config,
-            OrdinaryFoodTypeId::new(1),
-        );
-
-        assert!(succeeded);
-        assert!((sim.creatures[id].reproductive_reserve - 8.0).abs() < 1e-6);
-        assert!((sim.creatures[id].energy - 10.0).abs() < 1e-6);
+        assert!((sim.creatures[id].energy - (before + 0.25 * 5.0)).abs() < 1e-5);
     }
 
     // ── apply_move ─────────────────────────────────────────────────────────────
@@ -386,9 +366,8 @@ mod tests {
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
         assert_eq!(result, ReproductionActionResult::Spawned);
         assert_eq!(sim.creatures.len(), 2);
-        assert!((sim.creatures[parent_id].reproductive_reserve - 4.0).abs() < 1e-6);
         let child = sim.creatures.values().find(|c| c.id != parent_id).unwrap();
-        assert!(child.reproductive_reserve.abs() < 1e-6);
+        assert_eq!(child.generation, 1);
     }
 
     #[test]
@@ -459,11 +438,9 @@ mod tests {
             rng: rand::rngs::SmallRng::seed_from_u64(0),
         };
         let mut rng = rand::rngs::SmallRng::seed_from_u64(2);
-        sim.creatures[parent].reproductive_reserve = 7.0;
         let result = apply_reproduce(parent, &mut sim, Direction::N, 20.0, &mut rng);
         assert_eq!(result, ReproductionActionResult::RejectedInvalidTarget);
         assert_eq!(sim.creatures.len(), 2, "no new creature spawned");
-        assert_eq!(sim.creatures[parent].reproductive_reserve, 7.0);
     }
 
     #[test]
@@ -480,52 +457,9 @@ mod tests {
             - 0.1;
         let (mut sim, parent_id) = make_sim_one_creature(pos, low_energy);
         sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
-        sim.creatures[parent_id].reproductive_reserve = 7.0;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(3);
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
         assert_eq!(result, ReproductionActionResult::RejectedEnergyConstraints);
-        assert_eq!(sim.creatures[parent_id].reproductive_reserve, 7.0);
-    }
-
-    #[test]
-    fn apply_reproduce_rejects_insufficient_reserve_without_debit() {
-        let pos = Position::new(5, 5);
-        let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
-        sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
-        sim.creatures[parent_id].reproductive_reserve = 0.0;
-        let mut rng = rand::rngs::SmallRng::seed_from_u64(81);
-
-        let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
-
-        assert_eq!(
-            result,
-            ReproductionActionResult::RejectedNutritionConstraints
-        );
-        assert_eq!(sim.creatures.len(), 1);
-        assert_eq!(sim.creatures[parent_id].reproductive_reserve, 0.0);
-    }
-
-    #[test]
-    fn apply_reproduce_debits_reserve_once_per_successful_spawn() {
-        let pos = Position::new(5, 5);
-        let (mut sim, parent_id) = make_sim_one_creature(pos, 100.0);
-        sim.creatures[parent_id].age = sim.config.energy.lifecycle.min_reproduce_age;
-        sim.creatures[parent_id].reproductive_reserve =
-            sim.config.nutrition.reproductive_reserve_cost * 2.0;
-        let mut rng = rand::rngs::SmallRng::seed_from_u64(82);
-
-        assert_eq!(
-            apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng),
-            ReproductionActionResult::Spawned
-        );
-        let cost = sim.config.nutrition.reproductive_reserve_cost;
-        assert!((sim.creatures[parent_id].reproductive_reserve - cost).abs() < f32::EPSILON);
-
-        assert_eq!(
-            apply_reproduce(parent_id, &mut sim, Direction::S, 20.0, &mut rng),
-            ReproductionActionResult::Spawned
-        );
-        assert!(sim.creatures[parent_id].reproductive_reserve.abs() < f32::EPSILON);
     }
 
     #[test]
@@ -534,12 +468,10 @@ mod tests {
         let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
         sim.config.energy.lifecycle.min_reproduce_age = 20;
         sim.creatures[parent_id].age = 0;
-        sim.creatures[parent_id].reproductive_reserve = 7.0;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(31);
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
         assert_eq!(result, ReproductionActionResult::RejectedAgeConstraints);
         assert_eq!(sim.creatures.len(), 1, "no child should be spawned");
-        assert_eq!(sim.creatures[parent_id].reproductive_reserve, 7.0);
     }
 
     #[test]
@@ -548,7 +480,6 @@ mod tests {
         let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
         sim.config.energy.lifecycle.min_reproduce_age = 20;
         sim.creatures[parent_id].age = 0;
-        sim.creatures[parent_id].reproductive_reserve = 7.0;
         let energy_before = sim.creatures[parent_id].energy;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(32);
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
@@ -557,7 +488,6 @@ mod tests {
             (sim.creatures[parent_id].energy - energy_before).abs() < f32::EPSILON,
             "age rejection should happen before reproduce_cost is charged"
         );
-        assert_eq!(sim.creatures[parent_id].reproductive_reserve, 7.0);
     }
 
     #[test]
@@ -594,11 +524,9 @@ mod tests {
         let pos = Position::new(5, 5);
         let (mut sim, parent_id) = make_sim_one_creature(pos, 80.0);
         sim.config.population.max_creatures = 1; // cap at current count
-        sim.creatures[parent_id].reproductive_reserve = 7.0;
         let mut rng = rand::rngs::SmallRng::seed_from_u64(5);
         let result = apply_reproduce(parent_id, &mut sim, Direction::N, 20.0, &mut rng);
         assert_eq!(result, ReproductionActionResult::RejectedPopulationCap);
-        assert_eq!(sim.creatures[parent_id].reproductive_reserve, 7.0);
     }
 
     #[test]
@@ -911,7 +839,6 @@ mod tests {
         sim.world
             .set_food_type(pos, OrdinaryFoodTypeId::new(0), 0.5);
         let food_before = sim.world.food_at_type(pos, OrdinaryFoodTypeId::new(0));
-        let reserve_before = sim.creatures[id].reproductive_reserve;
         let creature = sim.creatures.get_mut(id).unwrap();
 
         let result = apply_typed_eat(
@@ -926,7 +853,6 @@ mod tests {
             sim.world.food_at_type(pos, OrdinaryFoodTypeId::new(0)),
             food_before
         );
-        assert_eq!(sim.creatures[id].reproductive_reserve, reserve_before);
     }
 
     // ── complexity energy cost integration tests ────────────────────────────
@@ -983,7 +909,7 @@ mod tests {
             )
         });
         world.place_creature(pos, id);
-        let mut sim = Simulation {
+        let sim = Simulation {
             world,
             creatures,
             action_logs: slotmap::SecondaryMap::new(),
@@ -992,7 +918,6 @@ mod tests {
             stats: crate::simulation::stats::SimStats::default(),
             rng: rand::rngs::SmallRng::seed_from_u64(42),
         };
-        sim.creatures[id].reproductive_reserve = sim.config.nutrition.reproductive_reserve_capacity;
         (sim, id)
     }
 
@@ -1383,5 +1308,138 @@ mod tests {
             cost_old > cost_young,
             "old attacker should have higher net cost: young={cost_young}, old={cost_old}"
         );
+    }
+    proptest::proptest! {
+        #[test]
+        fn typed_eat_shared_reward_is_independent_of_type(density in 0.001f32..1.0, reward in 0.0f32..20.0) {
+            let pos = Position::new(3, 3);
+            let (mut sim, id) = make_sim_one_creature(pos, 10.0);
+            sim.config.world.food.types.push(crate::config::FoodTypeConfig::default());
+            sim.config.energy.costs.eat_reward_per_food = reward;
+            sim.world.reconfigure_food(sim.config.world.food.clone());
+            for selected in 0..2 {
+                sim.creatures[id].energy = 10.0;
+                for index in 0..2 { sim.world.set_food_type(pos, OrdinaryFoodTypeId::new(index), density); }
+                let applied = apply_typed_eat(&mut sim.creatures[id], &mut sim.world, &sim.config, OrdinaryFoodTypeId::new(selected));
+                proptest::prop_assert!(applied);
+                proptest::prop_assert!((sim.creatures[id].energy - (10.0 + density * reward)).abs() < 1e-5);
+                proptest::prop_assert_eq!(sim.world.food_at_type(pos, OrdinaryFoodTypeId::new(selected)), 0.0);
+                proptest::prop_assert_eq!(sim.world.food_at_type(pos, OrdinaryFoodTypeId::new(1-selected)), density);
+            }
+        }
+    }
+
+    #[test]
+    fn reproduction_rejection_charging_order_and_transfer_accounting() {
+        // The three early gates must reject before charging, even when energy is also insufficient.
+        for gate in 0..3 {
+            let (mut sim, id) = make_sim_one_creature(Position::new(5, 5), 1.0);
+            sim.creatures[id].age = 20;
+            let expected = match gate {
+                0 => {
+                    sim.world.set_barrier(Position::new(5, 4), true);
+                    ReproductionActionResult::RejectedInvalidTarget
+                }
+                1 => {
+                    sim.config.population.max_creatures = 1;
+                    ReproductionActionResult::RejectedPopulationCap
+                }
+                _ => {
+                    sim.creatures[id].age = 19;
+                    ReproductionActionResult::RejectedAgeConstraints
+                }
+            };
+            assert_eq!(
+                apply_reproduce(
+                    id,
+                    &mut sim,
+                    Direction::N,
+                    20.0,
+                    &mut rand::rngs::SmallRng::seed_from_u64(1)
+                ),
+                expected
+            );
+            assert_eq!(sim.creatures[id].energy, 1.0);
+        }
+        for (energy, request) in [
+            (20.0, 10.0),
+            (80.0, 0.0),
+            (80.0, -1.0),
+            (80.0, f32::NAN),
+            (80.0, f32::INFINITY),
+            (40.0, 50.0),
+        ] {
+            let (mut sim, id) = make_sim_one_creature(Position::new(5, 5), energy);
+            sim.creatures[id].age = 20;
+            let cost = sim.config.energy.adjusted_action_cost(
+                sim.config.energy.costs.reproduce_cost,
+                sim.creatures[id].cached_complexity,
+                20,
+            );
+            assert_eq!(
+                apply_reproduce(
+                    id,
+                    &mut sim,
+                    Direction::N,
+                    request,
+                    &mut rand::rngs::SmallRng::seed_from_u64(1)
+                ),
+                ReproductionActionResult::RejectedEnergyConstraints
+            );
+            assert!((sim.creatures[id].energy - (energy - cost)).abs() < 1e-6);
+            assert_eq!(sim.creatures.len(), 1);
+        }
+        let (mut sim, id) = make_sim_one_creature(Position::new(5, 5), 180.0);
+        sim.creatures[id].age = 20;
+        let cost = sim.config.energy.adjusted_action_cost(
+            sim.config.energy.costs.reproduce_cost,
+            sim.creatures[id].cached_complexity,
+            20,
+        );
+        assert_eq!(
+            apply_reproduce(
+                id,
+                &mut sim,
+                Direction::N,
+                150.0,
+                &mut rand::rngs::SmallRng::seed_from_u64(1)
+            ),
+            ReproductionActionResult::Spawned
+        );
+        assert!((sim.creatures[id].energy - (180.0 - cost - 100.0)).abs() < 1e-5);
+        assert_eq!(
+            sim.creatures
+                .values()
+                .find(|child| child.id != id)
+                .unwrap()
+                .energy,
+            100.0
+        );
+    }
+    #[test]
+    fn empty_eat_does_not_clamp_energy_after_live_maximum_is_lowered() {
+        let (mut sim, id) = make_sim_one_creature(Position::new(3, 3), 50.0);
+        sim.config.energy.lifecycle.max_energy = 20.0;
+        sim.config.energy.costs.eat_cost = 2.0;
+        assert!(!apply_typed_eat(
+            &mut sim.creatures[id],
+            &mut sim.world,
+            &sim.config,
+            OrdinaryFoodTypeId::default()
+        ));
+        assert_eq!(sim.creatures[id].energy, 48.0);
+    }
+
+    proptest::proptest! {
+        #[test]
+        fn reproduction_result_keys_match_public_contract((result, key) in proptest::sample::select(vec![
+            (ReproductionActionResult::Spawned, "Spawned"),
+            (ReproductionActionResult::RejectedInvalidTarget, "RejectedInvalidTarget"),
+            (ReproductionActionResult::RejectedAgeConstraints, "RejectedAgeConstraints"),
+            (ReproductionActionResult::RejectedEnergyConstraints, "RejectedEnergyConstraints"),
+            (ReproductionActionResult::RejectedPopulationCap, "RejectedPopulationCap"),
+        ])) {
+            proptest::prop_assert_eq!(result.as_key(), key);
+        }
     }
 }

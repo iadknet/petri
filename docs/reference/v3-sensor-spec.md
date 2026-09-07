@@ -153,16 +153,12 @@ Resolved live during mesh evaluation:
 pub enum DynamicIntrospectionKey {
     EnergyCurrent,
     EnergyConsumedThisTick,
-    ReproductiveReserveCurrent,
 }
 ```
 
 Resolved values:
 - `EnergyCurrent`: raw current energy, bounded by lifecycle config
 - `EnergyConsumedThisTick`: raw energy consumed since turn start
-- `ReproductiveReserveCurrent`: raw live reproductive reserve, clamped to the
-  startup-configured `nutrition.reproductive_reserve_capacity`; it is resolved
-  from current creature state during node execution.
 
 ### 3.4 Upstream Output
 

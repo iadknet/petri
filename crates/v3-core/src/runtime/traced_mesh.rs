@@ -4,12 +4,12 @@ use crate::config::RuntimeConfig;
 use crate::contracts::NodeId;
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
-use crate::runtime::cgp::execute_graph_node_traced_with_reserve;
+use crate::runtime::cgp::execute_graph_node_traced;
 use crate::runtime::mesh::{execute_creature_mesh_impl, MeshExecutionMode};
 use crate::runtime::trace::domain::{
     BackendTrace, MeshHopTrace, TerminationReason, TraceGateScore, TraceRouteDecision,
 };
-use crate::runtime::traced_vm::execute_vm_node_traced_with_reserve;
+use crate::runtime::traced_vm::execute_vm_node_traced;
 use crate::runtime::types::{MeshOutput, MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::SensorSnapshot;
 
@@ -23,35 +23,6 @@ pub fn execute_creature_mesh_traced(
     genome: &CreatureGenome,
     sensors: &SensorSnapshot,
     energy: &mut f32,
-    reproductive_reserve: f32,
-    shared_memory: &mut [f32; 16],
-    prev_shared_memory: &[f32; 16],
-    graph_runtime: &mut GraphRuntimeState,
-    config: &RuntimeConfig,
-) -> (MeshOutput, Vec<MeshHopTrace>, TerminationReason) {
-    execute_creature_mesh_traced_with_reserve(
-        genome,
-        sensors,
-        energy,
-        reproductive_reserve,
-        shared_memory,
-        prev_shared_memory,
-        graph_runtime,
-        config,
-    )
-}
-
-/// Execute a traced mesh while resolving live reproductive reserve inputs.
-///
-/// Before the first mesh execution of each new world tick, the caller must call
-/// [`GraphRuntimeState::begin_tick`] on `graph_runtime`. Mesh execution does not
-/// advance the graph clock. Each mesh node dispatches at most once per tick.
-#[allow(clippy::too_many_arguments)]
-pub fn execute_creature_mesh_traced_with_reserve(
-    genome: &CreatureGenome,
-    sensors: &SensorSnapshot,
-    energy: &mut f32,
-    reproductive_reserve: f32,
     shared_memory: &mut [f32; 16],
     prev_shared_memory: &[f32; 16],
     graph_runtime: &mut GraphRuntimeState,
@@ -61,7 +32,6 @@ pub fn execute_creature_mesh_traced_with_reserve(
         genome,
         sensors,
         energy,
-        reproductive_reserve,
         shared_memory,
         prev_shared_memory,
         graph_runtime,
@@ -96,7 +66,6 @@ impl MeshExecutionMode for RecordingMeshExecution {
         upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
         energy: &mut f32,
         energy_consumed: f32,
-        reproductive_reserve: f32,
         shared_memory: &mut [f32; 16],
         prev_shared_memory: &[f32; 16],
         graph_runtime: &mut GraphRuntimeState,
@@ -106,13 +75,12 @@ impl MeshExecutionMode for RecordingMeshExecution {
     ) -> (NodeResult, BackendTrace) {
         match &node.backend_def {
             BackendDef::Vm(def) => {
-                let (result, trace) = execute_vm_node_traced_with_reserve(
+                let (result, trace) = execute_vm_node_traced(
                     def,
                     &node.input_refs,
                     upstream_slots,
                     energy,
                     energy_consumed,
-                    reproductive_reserve,
                     shared_memory,
                     prev_shared_memory,
                     sensors,
@@ -122,13 +90,12 @@ impl MeshExecutionMode for RecordingMeshExecution {
                 (result, BackendTrace::Vm(trace))
             }
             BackendDef::Graph(def) => {
-                let (result, trace) = execute_graph_node_traced_with_reserve(
+                let (result, trace) = execute_graph_node_traced(
                     def,
                     &node.input_refs,
                     upstream_slots,
                     energy,
                     energy_consumed,
-                    reproductive_reserve,
                     node_idx,
                     graph_runtime,
                     sensors,
@@ -309,7 +276,6 @@ mod tests {
             &genome,
             &ss,
             &mut energy_a,
-            0.0,
             &mut smem_a,
             &prev_a,
             &mut gr_a,
@@ -325,7 +291,6 @@ mod tests {
             &genome,
             &ss,
             &mut energy_b,
-            0.0,
             &mut smem_b,
             &prev_b,
             &mut gr_b,
@@ -425,7 +390,6 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
-            0.0,
             &mut smem,
             &prev_smem,
             &mut gr,
@@ -511,7 +475,6 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
-            0.0,
             &mut smem,
             &prev_smem,
             &mut gr,
@@ -602,7 +565,6 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
-            0.0,
             &mut smem,
             &prev_smem,
             &mut gr,
@@ -694,7 +656,6 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
-            0.0,
             &mut smem,
             &prev_smem,
             &mut gr,
@@ -746,7 +707,6 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
-            0.0,
             &mut smem,
             &prev_smem,
             &mut gr,
@@ -796,7 +756,6 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
-            0.0,
             &mut smem,
             &prev_smem,
             &mut gr,
@@ -871,7 +830,6 @@ mod tests {
             &genome,
             &ss,
             &mut energy,
-            0.0,
             &mut smem,
             &prev_smem,
             &mut gr,
@@ -926,7 +884,6 @@ mod tests {
             &genome,
             &ss,
             &mut energy_a,
-            0.0,
             &mut smem_a,
             &prev_a,
             &mut gr_a,
@@ -942,7 +899,6 @@ mod tests {
             &genome,
             &ss,
             &mut energy_b,
-            0.0,
             &mut smem_b,
             &prev_b,
             &mut gr_b,
@@ -972,14 +928,14 @@ mod tests {
     }
 
     #[test]
-    fn traced_and_untraced_meshes_receive_live_reproductive_reserve() {
+    fn traced_and_untraced_meshes_receive_live_energy() {
         let id0 = NodeId::new(0);
         let genome = CreatureGenome {
             entry_node_id: id0,
             nodes: vec![NodeGenome {
                 node_id: id0,
                 input_refs: vec![InputReference::DynamicIntrospection(
-                    DynamicIntrospectionKey::ReproductiveReserveCurrent,
+                    DynamicIntrospectionKey::EnergyCurrent,
                 )],
                 backend_def: BackendDef::Vm(VmBackendDef {
                     register_count: 1,
@@ -990,7 +946,10 @@ mod tests {
                             ref_idx: 0,
                             sub_idx: 0,
                         },
-                        VmInstruction::SetPriorityBid { src: 0 },
+                        VmInstruction::StoreSlotImm {
+                            slot_idx: 0,
+                            src: 0,
+                        },
                         VmInstruction::PushAction { action_type: 0 },
                         VmInstruction::ExecuteActionQueue,
                     ],
@@ -1007,7 +966,6 @@ mod tests {
             &genome,
             &ss,
             &mut energy_a,
-            3.25,
             &mut memory_a,
             &[0.0; 16],
             &mut runtime_a,
@@ -1020,7 +978,6 @@ mod tests {
             &genome,
             &ss,
             &mut energy_b,
-            3.25,
             &mut memory_b,
             &[0.0; 16],
             &mut runtime_b,
@@ -1028,8 +985,8 @@ mod tests {
         );
 
         assert_eq!(output_a.actions, output_b.actions);
-        assert_eq!(output_a.priority_bid, 3.25);
-        assert_eq!(output_b.priority_bid, 3.25);
+        assert!((memory_a[0] - 100.0).abs() < 0.01);
+        assert_eq!(memory_a, memory_b);
     }
 
     fn assert_mesh_equivalent_for_termination(
@@ -1049,7 +1006,6 @@ mod tests {
             genome,
             &sensors,
             &mut energy_a,
-            0.0,
             &mut memory_a,
             &previous_memory,
             &mut runtime_a,
@@ -1063,7 +1019,6 @@ mod tests {
             genome,
             &sensors,
             &mut energy_b,
-            0.0,
             &mut memory_b,
             &previous_memory,
             &mut runtime_b,

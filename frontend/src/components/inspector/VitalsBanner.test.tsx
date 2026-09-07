@@ -31,8 +31,6 @@ const defaultProps = {
 	age: 150,
 	energy: 62,
 	maxEnergy: 100,
-	reproductiveReserve: 3,
-	reproductiveReserveCapacity: 8,
 	position: { x: 10, y: 25 },
 	actionLog: null as ActionLogEntry[] | null,
 	isDead: false,
@@ -77,12 +75,10 @@ describe("VitalsBanner", () => {
 		expect(bar.className).toContain("bg-red-500");
 	});
 
-	it("renders the applied reproductive reserve against capacity", () => {
+	it("omits the removed reproductive reserve", () => {
 		const { container } = render(<VitalsBanner {...defaultProps} />);
-		expect(screen.getByText("Reserve 3.0/8.0")).toBeDefined();
-		const bar = container.querySelector("[data-testid='reserve-bar-fill']") as HTMLElement;
-		expect(bar).not.toBeNull();
-		expect(bar.style.width).toBe("37.5%");
+		expect(screen.queryByText(/Reserve/)).toBeNull();
+		expect(container.querySelector("[data-testid='reserve-bar-fill']")).toBeNull();
 	});
 
 	it("renders dead banner when isDead is true", () => {

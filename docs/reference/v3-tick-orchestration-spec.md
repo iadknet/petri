@@ -187,13 +187,11 @@ Each world action is applied at the acting creature's turn per Section 5.
 
 ### Eat
 
-- Consume food from creature's current cell using `consume_food` semantics
+- Consume food from creature's current cell using selected-type `consume_food_type` semantics
   from `v3-world-grid-spec.md`.
-- Gain typed nutrition from the configured food entry:
-  `energy += consumed_amount * metabolic_energy_yield` and
-  `reproductive_reserve += consumed_amount * reproductive_reserve_yield`.
-- Clamp energy to `energy.lifecycle.max_energy` and reserve to
-  `nutrition.reproductive_reserve_capacity`.
+- Gain energy using the shared reward for every ordinary type:
+  `energy += consumed_amount * energy.costs.eat_reward_per_food`.
+- Clamp energy to `energy.lifecycle.max_energy` before charging the action cost.
 - Deduct `energy.costs.eat_cost` from creature energy.
 
 ### Move
