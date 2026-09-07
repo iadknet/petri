@@ -74,7 +74,6 @@ fn run_vm_with_config(
         &upstream,
         &mut e,
         0.0,
-        0.0,
         &mut mem,
         &prev_mem,
         &ss,

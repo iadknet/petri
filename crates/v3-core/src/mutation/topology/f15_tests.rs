@@ -427,7 +427,6 @@ fn execute_with_config(
         g,
         &sensors,
         &mut energy,
-        0.0,
         &mut memory,
         &[1.0; 16],
         &mut crate::creature::state::GraphRuntimeState::new(),

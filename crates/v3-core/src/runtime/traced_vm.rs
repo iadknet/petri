@@ -17,36 +17,6 @@ pub(crate) fn execute_vm_node_traced(
     upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
     energy: &mut f32,
     energy_consumed: f32,
-    reproductive_reserve: f32,
-    shared_memory: &mut [f32; 16],
-    prev_shared_memory: &[f32; 16],
-    sensors: &SensorSnapshot,
-    config: &RuntimeConfig,
-    side_outputs: &mut MeshSideOutputs,
-) -> (NodeResult, VmTrace) {
-    execute_vm_node_traced_with_reserve(
-        def,
-        input_refs,
-        upstream_slots,
-        energy,
-        energy_consumed,
-        reproductive_reserve,
-        shared_memory,
-        prev_shared_memory,
-        sensors,
-        config,
-        side_outputs,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-pub(crate) fn execute_vm_node_traced_with_reserve(
-    def: &VmBackendDef,
-    input_refs: &[InputReference],
-    upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
-    energy: &mut f32,
-    energy_consumed: f32,
-    reproductive_reserve: f32,
     shared_memory: &mut [f32; 16],
     prev_shared_memory: &[f32; 16],
     sensors: &SensorSnapshot,
@@ -59,7 +29,6 @@ pub(crate) fn execute_vm_node_traced_with_reserve(
         upstream_slots,
         energy,
         energy_consumed,
-        reproductive_reserve,
         shared_memory,
         prev_shared_memory,
         sensors,

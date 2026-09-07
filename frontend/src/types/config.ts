@@ -52,8 +52,6 @@ export interface FoodTypeConfig {
 	initial_density: number;
 	initial_coverage: number;
 	growth_inhibitor: number;
-	metabolic_energy_yield: number;
-	reproductive_reserve_yield: number;
 }
 
 export interface StartupFoodRequestLayer {
@@ -124,6 +122,7 @@ export interface LifecycleEnergyConfig {
 export interface CostsConfig {
 	move_cost: number;
 	eat_cost: number;
+	eat_reward_per_food: number;
 	noop_cost: number;
 	reproduce_cost: number;
 	failed_action_penalty: number;
@@ -146,11 +145,6 @@ export interface EnergyConfig {
 	costs: CostsConfig;
 	complexity_cost: ComplexityEnergyCostConfig;
 	age_cost: AgeEnergyCostConfig;
-}
-
-export interface NutritionConfig {
-	reproductive_reserve_capacity: number;
-	reproductive_reserve_cost: number;
 }
 
 export interface VmConfig {
@@ -233,7 +227,6 @@ export interface SimulationConfig {
 	population: PopulationConfig;
 	world: WorldConfig;
 	energy: EnergyConfig;
-	nutrition: NutritionConfig;
 	startup: StartupConfig;
 	runtime: RuntimeConfig;
 	mutation: MutationConfig;

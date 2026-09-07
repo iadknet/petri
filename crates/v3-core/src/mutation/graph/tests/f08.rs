@@ -24,7 +24,7 @@ use crate::mutation::graph::operators::{
     copy_cgp_subgraph, copy_compute_node, split_existing_edge,
 };
 use crate::mutation::types::MutationSkipReason;
-use crate::runtime::cgp::execute_graph_node_with_reserve;
+use crate::runtime::cgp::execute_graph_node;
 use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 
 /// World ticks per scenario. Backward and self edges read frozen tick-start
@@ -55,12 +55,11 @@ fn run_tick_sequences(
                     let mut energy = 1.0e6f32;
                     let mut side_outputs = MeshSideOutputs::new(8);
                     graph_runtime.begin_tick(&[]);
-                    let result = execute_graph_node_with_reserve(
+                    let result = execute_graph_node(
                         def,
                         input_refs,
                         &[0.0f32; OUTPUT_SLOT_COUNT],
                         &mut energy,
-                        0.0,
                         0.0,
                         0,
                         &mut graph_runtime,
@@ -525,13 +524,13 @@ fn split_exclusion_is_scoped_to_each_of_its_conditions() {
         ),
         // Only `EnergyCurrent` differs between the evaluation and effects
         // contexts (`runtime/cgp/execute.rs`: the plasticity-cost deduction
-        // sits between them and touches nothing else), so the other two
-        // dynamic keys are outside the exclusion and still split.
+        // sits between them and touches nothing else), so the other
+        // dynamic key are outside the exclusion and still split.
         (
             "another dynamic introspection key",
             introspection_edge_def(true, false),
             vec![InputReference::DynamicIntrospection(
-                DynamicIntrospectionKey::ReproductiveReserveCurrent,
+                DynamicIntrospectionKey::EnergyConsumedThisTick,
             )],
         ),
     ] {

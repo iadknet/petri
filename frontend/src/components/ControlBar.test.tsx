@@ -48,8 +48,6 @@ const MOCK_CONFIG: SimulationConfig = {
 					initial_density: 1.0,
 					initial_coverage: 0.4,
 					growth_inhibitor: 0.2,
-					metabolic_energy_yield: 10,
-					reproductive_reserve_yield: 0,
 				},
 			],
 			fertility: {
@@ -77,6 +75,7 @@ const MOCK_CONFIG: SimulationConfig = {
 		costs: {
 			move_cost: 0.02,
 			eat_cost: 0,
+			eat_reward_per_food: 5,
 			noop_cost: 0,
 			reproduce_cost: 0.12,
 			failed_action_penalty: 5,
@@ -91,10 +90,6 @@ const MOCK_CONFIG: SimulationConfig = {
 			age_cap: 500,
 			max_multiplier: 10.0,
 		},
-	},
-	nutrition: {
-		reproductive_reserve_capacity: 8,
-		reproductive_reserve_cost: 4,
 	},
 	runtime: {
 		max_mesh_hops: 128,
@@ -281,8 +276,6 @@ describe("ControlBar", () => {
 							initial_density: 1.0,
 							initial_coverage: 0.4,
 							growth_inhibitor: 0.2,
-							metabolic_energy_yield: 10,
-							reproductive_reserve_yield: 0,
 						},
 					],
 					fertility: {
@@ -300,7 +293,6 @@ describe("ControlBar", () => {
 				},
 			},
 			energy: { initial_energy: 20 },
-			nutrition: { reproductive_reserve_capacity: 8, reproductive_reserve_cost: 4 },
 			startup: {
 				ramps: {
 					failed_action_penalty: {
@@ -358,8 +350,6 @@ describe("ControlBar", () => {
 									initial_density: 1.0,
 									initial_coverage: 0.4,
 									growth_inhibitor: 0.2,
-									metabolic_energy_yield: 10,
-									reproductive_reserve_yield: 0,
 								}),
 							]),
 							fertility: {
@@ -378,10 +368,6 @@ describe("ControlBar", () => {
 					}),
 					energy: {
 						lifecycle: { initial_energy: 20 },
-					},
-					nutrition: {
-						reproductive_reserve_capacity: 8,
-						reproductive_reserve_cost: 4,
 					},
 					startup: {
 						ramps: {
@@ -420,8 +406,6 @@ describe("ControlBar", () => {
 							initial_density: 1.0,
 							initial_coverage: 0.4,
 							growth_inhibitor: 0.2,
-							metabolic_energy_yield: 10,
-							reproductive_reserve_yield: 0,
 						},
 					],
 					fertility: {
@@ -439,7 +423,6 @@ describe("ControlBar", () => {
 				},
 			},
 			energy: { initial_energy: 20 },
-			nutrition: { reproductive_reserve_capacity: 8, reproductive_reserve_cost: 4 },
 			startup: {
 				ramps: {
 					failed_action_penalty: {
@@ -613,10 +596,10 @@ describe("ControlBar", () => {
 							}),
 							types: expect.arrayContaining([
 								expect.objectContaining({
-									name: "Maintenance Food",
+									name: "Primary Food",
 									color: "#22c55e",
 									initial_density: 1.0,
-									initial_coverage: 0.27,
+									initial_coverage: 0.54,
 								}),
 							]),
 							fertility: expect.objectContaining({

@@ -29,8 +29,6 @@ export const MOCK_CONFIG: SimulationConfig = {
 					initial_density: 1.0,
 					initial_coverage: 0.15,
 					growth_inhibitor: 0.2,
-					metabolic_energy_yield: 10,
-					reproductive_reserve_yield: 0,
 				},
 			],
 			fertility: {
@@ -58,6 +56,7 @@ export const MOCK_CONFIG: SimulationConfig = {
 		costs: {
 			move_cost: 0.02,
 			eat_cost: 0,
+			eat_reward_per_food: 5,
 			noop_cost: 0,
 			reproduce_cost: 0.12,
 			failed_action_penalty: 5,
@@ -72,10 +71,6 @@ export const MOCK_CONFIG: SimulationConfig = {
 			age_cap: 500,
 			max_multiplier: 10.0,
 		},
-	},
-	nutrition: {
-		reproductive_reserve_capacity: 8,
-		reproductive_reserve_cost: 4,
 	},
 	runtime: {
 		max_mesh_hops: 128,

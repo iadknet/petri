@@ -118,20 +118,11 @@ Request (conceptual v3alpha2 shape):
       },
       "types": [
         {
-          "name": "Maintenance Food",
+          "name": "Primary Food",
           "color": "#22c55e",
           "initial_density": 1.0,
-          "initial_coverage": 0.27,
-          "metabolic_energy_yield": 10.0,
-          "reproductive_reserve_yield": 0.0
-        },
-        {
-          "name": "Reproductive Food",
-          "color": "#f59e0b",
-          "initial_density": 1.0,
-          "initial_coverage": 0.27,
-          "metabolic_energy_yield": 0.0,
-          "reproductive_reserve_yield": 1.0
+          "initial_coverage": 0.54,
+          "growth_inhibitor": 0.2
         }
       ],
       "fertility": {
@@ -168,14 +159,11 @@ Request (conceptual v3alpha2 shape):
     "costs": {
       "move_cost": 0.2,
       "eat_cost": 0.0,
+      "eat_reward_per_food": 5.0,
       "noop_cost": 0.05,
       "reproduce_cost": 0.1,
       "failed_action_penalty": 1.0
     }
-  },
-  "nutrition": {
-    "reproductive_reserve_capacity": 8.0,
-    "reproductive_reserve_cost": 4.0
   },
   "startup": {
     "ramps": {
@@ -375,7 +363,6 @@ Response (full sparse frame):
       "x": 10,
       "y": 22,
       "energy": 41.0,
-      "reproductive_reserve": 3.0,
       "generation": 3,
       "phenotype_rgb": [204, 61, 61]
     }
@@ -428,20 +415,11 @@ Response:
         },
       "types": [
         {
-          "name": "Maintenance Food",
+          "name": "Primary Food",
           "color": "#22c55e",
           "initial_density": 1.0,
-          "initial_coverage": 0.27,
-          "metabolic_energy_yield": 10.0,
-          "reproductive_reserve_yield": 0.0
-        },
-        {
-          "name": "Reproductive Food",
-          "color": "#f59e0b",
-          "initial_density": 1.0,
-          "initial_coverage": 0.27,
-          "metabolic_energy_yield": 0.0,
-          "reproductive_reserve_yield": 1.0
+          "initial_coverage": 0.54,
+          "growth_inhibitor": 0.2
         }
       ],
         "fertility": {
@@ -478,14 +456,11 @@ Response:
       "costs": {
         "move_cost": 0.2,
         "eat_cost": 0.0,
+        "eat_reward_per_food": 5.0,
         "noop_cost": 0.05,
         "reproduce_cost": 0.1,
         "failed_action_penalty": 1.0
       }
-    },
-    "nutrition": {
-      "reproductive_reserve_capacity": 8.0,
-      "reproductive_reserve_cost": 4.0
     },
     "runtime": {
       "max_mesh_hops": 1024,
@@ -519,9 +494,7 @@ Request shape:
 
 Rules:
 - Unknown fields rejected.
-- `nutrition.reproductive_reserve_capacity` and
-  `nutrition.reproductive_reserve_cost` are startup-only and rejected by this
-  runtime patch endpoint; provide them in the startup request.
+- `energy.costs.eat_reward_per_food` is live-editable and applies to all ordinary food types.
 - PATCH supports the full canonical keyspace from `GET /config`, including all
   top-level `mutation.*` keys owned by `v3-runtime-config-spec.md`, plus the
   runtime-editable `world.food.shared.occupancy_depletion.*` keys
@@ -669,8 +642,6 @@ Response (full, no query parameters):
   "position": { "x": 10, "y": 22 },
   "energy": 41.0,
   "max_energy": 20.0,
-  "reproductive_reserve": 3.0,
-  "reproductive_reserve_capacity": 8.0,
   "age": 84,
   "generation": 3,
   "complexity": 12,
@@ -708,8 +679,6 @@ Field definitions:
 | `position` | `{x, y}` | Current grid position. |
 | `energy` | f32 | Current energy level. |
 | `max_energy` | f32 | Maximum energy (from config). |
-| `reproductive_reserve` | f32 | Current applied reproductive reserve. |
-| `reproductive_reserve_capacity` | f32 | Startup-configured reserve capacity. |
 | `age` | u64 | Ticks alive. |
 | `generation` | u64 | Reproduction generation (0 = founder). |
 | `complexity` | u32 | Genome complexity (node count). |
@@ -725,7 +694,7 @@ Field definitions:
 |-------|------|-------------|
 | `tick` | u64 | Simulation tick when the action was executed. |
 | `action_type` | string | One of `NoOp`, `Eat`, `Move`, `Reproduce`, `StealEnergy`. |
-| `result` | string | One of `Success`, `NoFood`, `Blocked`, `InvalidTarget`, `AgeConstraints`, `EnergyConstraints`, `NutritionConstraints`, `PopulationCap`, `TransferredAndKilled`, `NoVictim`. |
+| `result` | string | One of `Success`, `NoFood`, `Blocked`, `InvalidTarget`, `AgeConstraints`, `EnergyConstraints`, `PopulationCap`, `TransferredAndKilled`, `NoVictim`. |
 | `direction` | u8 | Direction parameter (0-7 cardinal+diagonal, 255 = N/A). |
 | `energy_before` | f32 | Creature energy before the action. |
 | `energy_after` | f32 | Creature energy after the action (includes costs). |

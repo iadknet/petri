@@ -538,21 +538,15 @@ async fn snapshot_bootstrap_returns_overview_and_revisions() {
     assert!(body["world_static"]["width"].is_number(), "body: {body}");
     assert!(body["world_static"]["height"].is_number(), "body: {body}");
     assert_eq!(
-        body["world_static"]["food_types"][0]["metabolic_energy_yield"], 10.0,
-        "maintenance food metadata must expose its configured energy yield: {body}"
+        body["world_static"]["food_types"].as_array().unwrap().len(),
+        1
     );
-    assert_eq!(
-        body["world_static"]["food_types"][0]["reproductive_reserve_yield"], 0.0,
-        "maintenance food metadata must expose its configured reserve yield: {body}"
-    );
-    assert_eq!(
-        body["world_static"]["food_types"][1]["metabolic_energy_yield"], 0.0,
-        "reproductive food metadata must expose its configured energy yield: {body}"
-    );
-    assert_eq!(
-        body["world_static"]["food_types"][1]["reproductive_reserve_yield"], 1.0,
-        "reproductive food metadata must expose its configured reserve yield: {body}"
-    );
+    assert!(body["world_static"]["food_types"][0]
+        .get("metabolic_energy_yield")
+        .is_none());
+    assert!(body["world_static"]["food_types"][0]
+        .get("reproductive_reserve_yield")
+        .is_none());
     assert!(
         body["world_static"]["barrier_mask"].is_array(),
         "body: {body}"
@@ -572,96 +566,6 @@ async fn snapshot_bootstrap_returns_overview_and_revisions() {
         body["view"]["creature_count_u16"].is_array(),
         "body: {body}"
     );
-}
-
-#[tokio::test]
-async fn projections_preserve_configured_food_yields_and_live_reserve() {
-    // Arrange
-    let state = test_state();
-    let a = router(state.clone());
-    let startup_body = r##"{
-        "seed": 7,
-        "population": { "initial_creatures": 1 },
-        "world": {
-            "food": {
-                "types": [
-                    {
-                        "name": "Configured Maintenance",
-                        "color": "#22c55e",
-                        "initial_density": 0.4,
-                        "initial_coverage": 0.2,
-                        "growth_inhibitor": 0.3,
-                        "metabolic_energy_yield": 6.25,
-                        "reproductive_reserve_yield": 0.125
-                    },
-                    {
-                        "name": "Configured Reproductive",
-                        "color": "#0ea5e9",
-                        "initial_density": 0.7,
-                        "initial_coverage": 0.1,
-                        "growth_inhibitor": 0.4,
-                        "metabolic_energy_yield": 1.75,
-                        "reproductive_reserve_yield": 2.5
-                    }
-                ]
-            }
-        },
-        "nutrition": {
-            "reproductive_reserve_capacity": 13.5,
-            "reproductive_reserve_cost": 5.25
-        }
-    }"##;
-    let (startup_status, startup_resp) = do_request(a.clone(), startup_req(startup_body)).await;
-    assert_eq!(startup_status, StatusCode::OK, "body: {startup_resp}");
-
-    let (creature_id, expected_yields, expected_reserve, expected_capacity) = {
-        let mut handle = state.sim.lock().await;
-        let (id, creature) = handle
-            .sim
-            .creatures
-            .iter_mut()
-            .next()
-            .expect("startup should seed one creature");
-        creature.reproductive_reserve = 7.25;
-        let expected_yields = handle
-            .sim
-            .config
-            .world
-            .food
-            .types
-            .iter()
-            .map(|food| (food.metabolic_energy_yield, food.reproductive_reserve_yield))
-            .collect::<Vec<_>>();
-        let expected_capacity = handle.sim.config.nutrition.reproductive_reserve_capacity;
-        let frame = build_ws_frame(&handle);
-        let creature_id = id.data().as_ffi();
-        drop(handle);
-        state.publish_ws_frame(frame);
-        (creature_id, expected_yields, 7.25, expected_capacity)
-    };
-
-    // Act
-    let (snapshot_status, snapshot) =
-        do_request(a.clone(), get_req("/v3/simulation/snapshot")).await;
-    let detail_uri = format!("/v3/simulation/creature/{creature_id}");
-    let (detail_status, detail) = do_request(a, get_req(&detail_uri)).await;
-
-    // Assert
-    assert_eq!(snapshot_status, StatusCode::OK, "body: {snapshot}");
-    for (index, (expected_metabolic, expected_reserve_yield)) in expected_yields.iter().enumerate()
-    {
-        assert_eq!(
-            snapshot["world_static"]["food_types"][index]["metabolic_energy_yield"],
-            *expected_metabolic
-        );
-        assert_eq!(
-            snapshot["world_static"]["food_types"][index]["reproductive_reserve_yield"],
-            *expected_reserve_yield
-        );
-    }
-    assert_eq!(detail_status, StatusCode::OK, "body: {detail}");
-    assert_eq!(detail["reproductive_reserve"], expected_reserve);
-    assert_eq!(detail["reproductive_reserve_capacity"], expected_capacity);
 }
 
 // ── 10c. projection_revision_increases_after_step ───────────────────────────
@@ -1094,7 +998,7 @@ async fn patch_config_rejects_startup_fields() {
 }
 
 #[tokio::test]
-async fn patch_config_rejects_nutrition_startup_fields() {
+async fn patch_config_rejects_removed_nutrition_fields() {
     let a = app();
     a.clone()
         .oneshot(startup_req(r#"{"seed":1}"#))
@@ -1978,14 +1882,8 @@ async fn get_creature_returns_full_detail() {
     assert!(body["position"]["y"].is_number(), "missing position.y");
     assert!(body["energy"].is_number(), "missing energy");
     assert!(body["max_energy"].is_number(), "missing max_energy");
-    assert_eq!(
-        body["reproductive_reserve"], 0.0,
-        "detail reserve must be copied from live core state: {body}"
-    );
-    assert_eq!(
-        body["reproductive_reserve_capacity"], 8.0,
-        "detail reserve capacity must be copied from active config: {body}"
-    );
+    assert!(body.get("reproductive_reserve").is_none());
+    assert!(body.get("reproductive_reserve_capacity").is_none());
     assert!(body["age"].is_number(), "missing age");
     assert!(body["generation"].is_number(), "missing generation");
     assert!(body["complexity"].is_number(), "missing complexity");
@@ -3299,4 +3197,49 @@ async fn pattern_preview_deterministic_same_seed() {
 
     assert_eq!(body1["bitmap"], body2["bitmap"]);
     assert_eq!(body1["cell_count"], body2["cell_count"]);
+}
+
+#[tokio::test]
+async fn energy_only_shared_reward_can_be_changed_live() {
+    use v3_core::config::{FoodTypeConfig, OrdinaryFoodTypeId};
+    use v3_core::simulation::actions::apply_typed_eat;
+    let mut config = test_config();
+    config.world.food.types.push(FoodTypeConfig::default());
+    let state = AppState::from_config(config, 1);
+    let a = router(state.clone());
+    let (status, body) = do_request(
+        a.clone(),
+        patch_req(
+            "/v3/simulation/config",
+            r#"{"energy":{"costs":{"eat_reward_per_food":7.5}}}"#,
+        ),
+    )
+    .await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let (_, body) = do_request(a.clone(), get_req("/v3/simulation/config")).await;
+    assert_eq!(
+        body["config"]["energy"]["costs"]["eat_reward_per_food"],
+        7.5
+    );
+    assert!(body["config"].get("nutrition").is_none());
+    {
+        let mut handle = state.sim.lock().await;
+        let sim = &mut handle.sim;
+        let id = sim.creatures.keys().next().unwrap();
+        let position = sim.creatures[id].position;
+        for type_idx in [OrdinaryFoodTypeId::new(0), OrdinaryFoodTypeId::new(1)] {
+            sim.creatures[id].energy = 10.0;
+            sim.world.set_food_type(position, type_idx, 0.5);
+            assert!(apply_typed_eat(
+                &mut sim.creatures[id],
+                &mut sim.world,
+                &sim.config,
+                type_idx
+            ));
+            assert!((sim.creatures[id].energy - 13.75).abs() < 1e-6);
+        }
+    }
+    let (_, snapshot) = do_request(a, get_req("/v3/simulation/snapshot?zoom_tier=detail")).await;
+    assert!(!snapshot.to_string().contains("reproductive_reserve"));
+    assert!(!snapshot.to_string().contains("metabolic_energy_yield"));
 }

@@ -23,7 +23,7 @@ pub(crate) fn random_input_reference_for_food_types(
     rng: &mut impl Rng,
     food_type_count: usize,
 ) -> InputReference {
-    let idx = rng.gen_range(0u8..24);
+    let idx = rng.gen_range(0u8..23);
     match idx {
         0 => InputReference::World(WorldInputKey::FoodHere {
             type_idx: sample_food_type_id(food_type_count, rng),
@@ -37,18 +37,15 @@ pub(crate) fn random_input_reference_for_food_types(
         5 => InputReference::StaticIntrospection(StaticIntrospectionKey::AgeTicks),
         6 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyCurrent),
         7 => InputReference::DynamicIntrospection(DynamicIntrospectionKey::EnergyConsumedThisTick),
-        8 => InputReference::DynamicIntrospection(
-            DynamicIntrospectionKey::ReproductiveReserveCurrent,
-        ),
-        9 => InputReference::ActionQueue,
-        10 => InputReference::World(WorldInputKey::AreaFoodSummary {
+        8 => InputReference::ActionQueue,
+        9 => InputReference::World(WorldInputKey::AreaFoodSummary {
             type_idx: sample_food_type_id(food_type_count, rng),
         }),
-        11 => InputReference::World(WorldInputKey::AreaBarrierSummary),
-        12 => InputReference::World(WorldInputKey::NearbyCreatureCore),
-        13 => InputReference::World(WorldInputKey::NearbyCreatureVitals),
-        14 => InputReference::World(WorldInputKey::NearbyCreatureIdentity),
-        15 => InputReference::World(WorldInputKey::AreaOccupancySummary),
+        10 => InputReference::World(WorldInputKey::AreaBarrierSummary),
+        11 => InputReference::World(WorldInputKey::NearbyCreatureCore),
+        12 => InputReference::World(WorldInputKey::NearbyCreatureVitals),
+        13 => InputReference::World(WorldInputKey::NearbyCreatureIdentity),
+        14 => InputReference::World(WorldInputKey::AreaOccupancySummary),
         _ => InputReference::UpstreamSlot(rng.gen_range(0..OUTPUT_SLOT_COUNT)),
     }
 }
@@ -64,7 +61,7 @@ fn sample_food_type_id(food_type_count: usize, rng: &mut impl Rng) -> OrdinaryFo
 #[cfg(test)]
 mod tests {
     use super::*;
-    use rand::{rngs::StdRng, RngCore, SeedableRng};
+    use rand::RngCore;
 
     #[derive(Default)]
     struct ZeroCountingRng {
@@ -124,15 +121,20 @@ mod tests {
             "multi-food mode should draw once for key selection and once for food type_idx"
         );
     }
-
     #[test]
-    fn typed_sampler_can_sample_live_reproductive_reserve() {
-        let reserve = InputReference::DynamicIntrospection(
-            DynamicIntrospectionKey::ReproductiveReserveCurrent,
-        );
-        assert!((0..256).any(|seed| {
-            let mut rng = StdRng::seed_from_u64(seed);
-            random_input_reference_for_food_types(&mut rng, 2) == reserve
-        }));
+    fn typed_sampler_retains_both_energy_introspection_keys() {
+        for (index, key) in [
+            (6_u64, DynamicIntrospectionKey::EnergyCurrent),
+            (7, DynamicIntrospectionKey::EnergyConsumedThisTick),
+        ] {
+            // The midpoint of this u32 bucket selects the exact catalog index
+            // under rand's multiply-high uniform sampler, with no rejection.
+            let draw = ((index << 32) + (1_u64 << 31)) / 23;
+            let mut rng = rand::rngs::mock::StepRng::new(draw, 0);
+            assert_eq!(
+                random_input_reference_for_food_types(&mut rng, 1),
+                InputReference::DynamicIntrospection(key)
+            );
+        }
     }
 }

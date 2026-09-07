@@ -52,7 +52,6 @@ pub enum ActionResult {
     TransferredAndKilled = 6,
     NoVictim = 7,
     AgeConstraints = 8,
-    NutritionConstraints = 9,
 }
 
 impl ActionResult {
@@ -71,7 +70,6 @@ impl ActionResult {
             Self::TransferredAndKilled => "TransferredAndKilled",
             Self::NoVictim => "NoVictim",
             Self::AgeConstraints => "AgeConstraints",
-            Self::NutritionConstraints => "NutritionConstraints",
         }
     }
 }
@@ -293,7 +291,6 @@ mod tests {
                 ActionResult::TransferredAndKilled,
                 ActionResult::NoVictim,
                 ActionResult::AgeConstraints,
-                ActionResult::NutritionConstraints,
             ],
             ActionResult::as_key,
         );

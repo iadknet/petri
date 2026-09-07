@@ -8,7 +8,7 @@ use crate::creature::genome::{
     RewardModulationConfig,
 };
 use crate::creature::state::GraphRuntimeState;
-use crate::runtime::cgp::execute::execute_graph_node_with_reserve;
+use crate::runtime::cgp::execute::execute_graph_node;
 use crate::runtime::types::{MeshSideOutputs, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;
@@ -87,14 +87,13 @@ fn visit(
     let mut memory = [0.0; 16];
     memory[0] = input;
     let mut side = MeshSideOutputs::new(10);
-    let _ = execute_graph_node_with_reserve(
+    let _ = execute_graph_node(
         def,
         &[InputReference::DynamicIntrospection(
             DynamicIntrospectionKey::EnergyCurrent,
         )],
         &[0.0; OUTPUT_SLOT_COUNT],
         energy,
-        0.0,
         0.0,
         0,
         state,
@@ -337,14 +336,13 @@ fn first_tick_repeated_visits_have_zero_base_and_ordinary_traced_parity() {
             let mut memory = [0.0; 16];
             memory[0] = input;
             let mut traced_side = MeshSideOutputs::new(10);
-            let (_, trace) = crate::runtime::cgp::traced::execute_graph_node_traced_with_reserve(
+            let (_, trace) = crate::runtime::cgp::traced::execute_graph_node_traced(
                 &def,
                 &[InputReference::DynamicIntrospection(
                     DynamicIntrospectionKey::EnergyCurrent,
                 )],
                 &[0.0; OUTPUT_SLOT_COUNT],
                 &mut traced_energy,
-                0.0,
                 0.0,
                 0,
                 &mut traced,
@@ -468,7 +466,6 @@ fn constructed_controller_adapts_to_reversal_while_frozen_weights_do_not() {
                 &genome,
                 &sensors(),
                 &mut 100.0,
-                0.0,
                 &mut [0.0; 16],
                 &[0.0; 16],
                 state,

@@ -16,7 +16,7 @@ use crate::creature::genome::{
 };
 use crate::neighborhood::battery::{Battery, Signature};
 use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
-use crate::runtime::vm::execute_vm_node_with_reserve;
+use crate::runtime::vm::execute_vm_node;
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;
 use crate::sensors::typed_food::TypedFoodLocalSnapshot;
@@ -119,12 +119,11 @@ fn run(program: &[VmInstruction], config: &RuntimeConfig) -> Run {
     let mut memory = [0.0f32; 16];
     let prev_memory = [0.0f32; 16];
     let mut side_outputs = MeshSideOutputs::new(config.max_actions_per_turn);
-    let result = execute_vm_node_with_reserve(
+    let result = execute_vm_node(
         &def,
         &[],
         &[0.0f32; OUTPUT_SLOT_COUNT],
         &mut energy,
-        0.0,
         0.0,
         &mut memory,
         &prev_memory,

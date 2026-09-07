@@ -52,7 +52,6 @@ pub enum ReproductionActionResult {
     RejectedAgeConstraints,
     RejectedEnergyConstraints,
     RejectedPopulationCap,
-    RejectedNutritionConstraints,
 }
 
 impl ReproductionActionResult {
@@ -65,7 +64,6 @@ impl ReproductionActionResult {
             Self::RejectedAgeConstraints => "RejectedAgeConstraints",
             Self::RejectedEnergyConstraints => "RejectedEnergyConstraints",
             Self::RejectedPopulationCap => "RejectedPopulationCap",
-            Self::RejectedNutritionConstraints => "RejectedNutritionConstraints",
         }
     }
 }
@@ -158,26 +156,14 @@ pub fn apply_reproduce(
         return ReproductionActionResult::RejectedAgeConstraints;
     }
 
-    // Step 5: Reserve must be available before charging any reproduction energy.
-    if sim.creatures[parent_id].reproductive_reserve
-        < sim.config.nutrition.reproductive_reserve_cost
-    {
-        sim.stats.reproduction_actions_rejected_total += 1;
-        *sim.stats
-            .reproduction_actions_rejected_by_reason
-            .entry(ReproductionActionResult::RejectedNutritionConstraints)
-            .or_insert(0) += 1;
-        return ReproductionActionResult::RejectedNutritionConstraints;
-    }
-
-    // Step 6: Deduct reproduce_cost from parent (scaled by genome complexity and age).
+    // Step 5: Deduct reproduce_cost from parent (scaled by genome complexity and age).
     sim.creatures[parent_id].energy -= sim.config.energy.adjusted_action_cost(
         sim.config.energy.costs.reproduce_cost,
         sim.creatures[parent_id].cached_complexity,
         sim.creatures[parent_id].age,
     );
 
-    // Step 7: Check parent has sufficient energy after cost deduction.
+    // Step 6: Check parent has sufficient energy after cost deduction.
     if sim.creatures[parent_id].energy < sim.config.energy.lifecycle.min_reproduce_energy {
         sim.stats.reproduction_actions_rejected_total += 1;
         *sim.stats
@@ -187,7 +173,7 @@ pub fn apply_reproduce(
         return ReproductionActionResult::RejectedEnergyConstraints;
     }
 
-    // Step 8: Compute energy transfer (clamped to [0, default_offspring_energy]).
+    // Step 7: Compute energy transfer (clamped to [0, default_offspring_energy]).
     let max_transfer = sim.config.energy.lifecycle.default_offspring_energy;
     let transfer = if energy_transfer_request.is_finite() && energy_transfer_request > 0.0 {
         energy_transfer_request.min(max_transfer)
@@ -204,11 +190,10 @@ pub fn apply_reproduce(
         return ReproductionActionResult::RejectedEnergyConstraints;
     }
 
-    // Step 9: Deduct transfer from parent.
+    // Step 8: Deduct transfer from parent.
     sim.creatures[parent_id].energy -= transfer;
-    sim.creatures[parent_id].reproductive_reserve -= sim.config.nutrition.reproductive_reserve_cost;
 
-    // Step 10: Build offspring draft (clone parent genome + state).
+    // Step 9: Build offspring draft (clone parent genome + state).
     let child_genome = sim.creatures[parent_id].genome.clone();
     let child_shared_memory = sim.creatures[parent_id].shared_memory;
     let child_generation = sim.creatures[parent_id].generation + 1;
