@@ -504,6 +504,8 @@ Rules:
   retain their existing values at every nesting level.
 - Invalid values rejected with `422 validation_rejected`; transport does not
   apply fallback/clamp normalization to invalid submitted values.
+- A rejected patch applies nothing and names every offending path in
+  `error.details.field_errors`.
 - World topology fields (`world.width`, `world.height`, `world.edge_mode`) are
   restart-only and rejected from PATCH.
 - Runtime and energy fields are editable in `idle` and `paused`.

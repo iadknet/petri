@@ -12,6 +12,11 @@ export interface ErrorDetails {
 	current_state?: SimState;
 }
 
+/** Renders a request failure and its per-field reasons as one visible line. */
+export function describeApiFailure(message: string, fieldErrors: FieldError[]): string {
+	return [message, ...fieldErrors.map(({ field, reason }) => `${field}: ${reason}`)].join(" — ");
+}
+
 export interface ApiError {
 	protocol_version: string;
 	error: {

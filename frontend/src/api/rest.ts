@@ -1,5 +1,4 @@
 import type {
-	ApiError,
 	ConfigResponse,
 	CreatureDetail,
 	LifecycleResponse,
@@ -19,6 +18,7 @@ import type {
 	StepResponse,
 	ZoomTier,
 } from "../types/api.ts";
+import type { ApiError, FieldError } from "../types/errors.ts";
 
 const BASE_URL = import.meta.env.VITE_API_URL ?? "";
 
@@ -149,15 +149,29 @@ class ApiClient {
 	}
 }
 
+/**
+ * Builds a non-empty message for a failed request. An empty message renders as
+ * no message at all, which is how config rejections used to go unnoticed.
+ */
+function errorMessage(status: number, body: ApiError): string {
+	const message = body?.error?.message;
+	if (message) return message;
+	const code = body?.error?.code;
+	return code ? `${code} (HTTP ${status})` : `Request failed (HTTP ${status})`;
+}
+
 export class ApiRequestError extends Error {
 	status: number;
 	body: ApiError;
+	/** Per-field reasons from `error.details.field_errors`; empty when absent. */
+	fieldErrors: FieldError[];
 
 	constructor(status: number, body: ApiError) {
-		super(body.error.message);
+		super(errorMessage(status, body));
 		this.name = "ApiRequestError";
 		this.status = status;
 		this.body = body;
+		this.fieldErrors = body?.error?.details?.field_errors ?? [];
 	}
 }
 

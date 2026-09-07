@@ -37,21 +37,36 @@ export const RUNTIME_PATCH_FIELDS: (FieldDef | BooleanFieldDef)[] = [
 	...SHARED_MEMORY_FIELDS,
 ];
 
-interface RuntimeConfigPanelProps {
+/** Groups rendered in panel order, each with its numeric fields and toggles. */
+const RUNTIME_GROUPS: { title: string; fields: FieldDef[]; toggles?: BooleanFieldDef[] }[] = [
+	{
+		title: "Food > Occupancy Depletion",
+		fields: FOOD_OCCUPANCY_DEPLETION_FIELDS,
+		toggles: FOOD_OCCUPANCY_DEPLETION_TOGGLES,
+	},
+	{ title: "Food Parameters", fields: FOOD_PARAMETERS_FIELDS },
+	{ title: "Population", fields: POPULATION_FIELDS },
+	{ title: "Energy > Lifecycle", fields: ENERGY_LIFECYCLE_FIELDS },
+	{ title: "Energy > Costs", fields: ENERGY_COSTS_FIELDS },
+	{
+		title: "Energy > Complexity Cost",
+		fields: COMPLEXITY_COST_FIELDS,
+		toggles: COMPLEXITY_COST_TOGGLES,
+	},
+	{ title: "Energy > Age Cost", fields: AGE_COST_FIELDS, toggles: AGE_COST_TOGGLES },
+	{ title: "Runtime", fields: RUNTIME_FIELDS },
+	{ title: "Mutation", fields: MUTATION_FIELDS, toggles: MUTATION_TOGGLES },
+	{ title: "Predation", fields: PREDATION_FIELDS },
+	{ title: "Action Log", fields: ACTION_LOG_FIELDS },
+	{ title: "Shared Memory", fields: SHARED_MEMORY_FIELDS },
+];
+
+interface RuntimeConfigPanelProps extends Omit<RuntimePanelProps, "localDraft" | "serverConfig"> {
 	localDraft: RuntimePanelProps["localDraft"] | null;
 	serverConfig: RuntimePanelProps["serverConfig"] | null;
-	simState: RuntimePanelProps["simState"];
-	tick: RuntimePanelProps["tick"];
-	updateDraft: RuntimePanelProps["updateDraft"];
 }
 
-export function RuntimeConfigPanel({
-	localDraft,
-	serverConfig,
-	simState,
-	tick,
-	updateDraft,
-}: RuntimeConfigPanelProps) {
+export function RuntimeConfigPanel({ localDraft, serverConfig, ...rest }: RuntimeConfigPanelProps) {
 	return (
 		<Section
 			title="Runtime (Live) Config"
@@ -64,120 +79,15 @@ export function RuntimeConfigPanel({
 					Runtime config unavailable. Restart to initialize the simulation.
 				</div>
 			) : (
-				<>
+				RUNTIME_GROUPS.map((group) => (
 					<RuntimeFieldGroup
-						title="Food > Occupancy Depletion"
-						fields={FOOD_OCCUPANCY_DEPLETION_FIELDS}
-						toggles={FOOD_OCCUPANCY_DEPLETION_TOGGLES}
+						key={group.title}
+						{...group}
+						{...rest}
 						localDraft={localDraft}
 						serverConfig={serverConfig}
-						simState={simState}
-						tick={tick}
-						updateDraft={updateDraft}
 					/>
-					<RuntimeFieldGroup
-						title="Food Parameters"
-						fields={FOOD_PARAMETERS_FIELDS}
-						localDraft={localDraft}
-						serverConfig={serverConfig}
-						simState={simState}
-						tick={tick}
-						updateDraft={updateDraft}
-					/>
-					<RuntimeFieldGroup
-						title="Population"
-						fields={POPULATION_FIELDS}
-						localDraft={localDraft}
-						serverConfig={serverConfig}
-						simState={simState}
-						tick={tick}
-						updateDraft={updateDraft}
-					/>
-					<RuntimeFieldGroup
-						title="Energy > Lifecycle"
-						fields={ENERGY_LIFECYCLE_FIELDS}
-						localDraft={localDraft}
-						serverConfig={serverConfig}
-						simState={simState}
-						tick={tick}
-						updateDraft={updateDraft}
-					/>
-					<RuntimeFieldGroup
-						title="Energy > Costs"
-						fields={ENERGY_COSTS_FIELDS}
-						localDraft={localDraft}
-						serverConfig={serverConfig}
-						simState={simState}
-						tick={tick}
-						updateDraft={updateDraft}
-					/>
-					<RuntimeFieldGroup
-						title="Energy > Complexity Cost"
-						fields={COMPLEXITY_COST_FIELDS}
-						toggles={COMPLEXITY_COST_TOGGLES}
-						localDraft={localDraft}
-						serverConfig={serverConfig}
-						simState={simState}
-						tick={tick}
-						updateDraft={updateDraft}
-					/>
-					<RuntimeFieldGroup
-						title="Energy > Age Cost"
-						fields={AGE_COST_FIELDS}
-						toggles={AGE_COST_TOGGLES}
-						localDraft={localDraft}
-						serverConfig={serverConfig}
-						simState={simState}
-						tick={tick}
-						updateDraft={updateDraft}
-					/>
-					<RuntimeFieldGroup
-						title="Runtime"
-						fields={RUNTIME_FIELDS}
-						localDraft={localDraft}
-						serverConfig={serverConfig}
-						simState={simState}
-						tick={tick}
-						updateDraft={updateDraft}
-					/>
-					<RuntimeFieldGroup
-						title="Mutation"
-						fields={MUTATION_FIELDS}
-						toggles={MUTATION_TOGGLES}
-						localDraft={localDraft}
-						serverConfig={serverConfig}
-						simState={simState}
-						tick={tick}
-						updateDraft={updateDraft}
-					/>
-					<RuntimeFieldGroup
-						title="Predation"
-						fields={PREDATION_FIELDS}
-						localDraft={localDraft}
-						serverConfig={serverConfig}
-						simState={simState}
-						tick={tick}
-						updateDraft={updateDraft}
-					/>
-					<RuntimeFieldGroup
-						title="Action Log"
-						fields={ACTION_LOG_FIELDS}
-						localDraft={localDraft}
-						serverConfig={serverConfig}
-						simState={simState}
-						tick={tick}
-						updateDraft={updateDraft}
-					/>
-					<RuntimeFieldGroup
-						title="Shared Memory"
-						fields={SHARED_MEMORY_FIELDS}
-						localDraft={localDraft}
-						serverConfig={serverConfig}
-						simState={simState}
-						tick={tick}
-						updateDraft={updateDraft}
-					/>
-				</>
+				))
 			)}
 		</Section>
 	);

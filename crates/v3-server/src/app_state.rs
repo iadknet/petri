@@ -19,7 +19,14 @@ impl AppState {
         Self::from_config(SimulationConfig::default(), 0)
     }
 
+    /// Normalizes `config` before it is stored or seeded, so a server can never
+    /// start from an un-normalized config. `PATCH /v3/simulation/config`
+    /// rejects any patch that normalization would rewrite; without this, an
+    /// un-normalized startup config makes every runtime patch fail, including
+    /// the empty one (2026-09-07 config panel apply audit).
     pub fn from_config(config: SimulationConfig, seed: u64) -> Self {
+        let mut config = config;
+        config.normalize();
         let startup_defaults = Arc::new(config.clone());
         let handle = SimHandle::new(config, seed);
         let (ws_tx, _) = broadcast::channel(16);
