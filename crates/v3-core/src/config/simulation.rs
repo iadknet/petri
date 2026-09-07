@@ -1141,6 +1141,18 @@ mod tests {
     use super::*;
     use proptest::prelude::*;
 
+    proptest! {
+        #[test]
+        fn action_log_capacity_preserves_positive_values(capacity in 1usize..usize::MAX) {
+            for value in [0, 1, capacity] {
+                let mut config = SimulationConfig::default();
+                config.action_log.capacity = value;
+                config.normalize();
+                prop_assert_eq!(config.action_log.capacity, if value == 0 { 500 } else { value });
+            }
+        }
+    }
+
     #[test]
     fn continuation_probability_defaults_when_missing() {
         let mut json = serde_json::to_value(MutationConfig::default()).unwrap();
