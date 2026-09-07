@@ -329,19 +329,30 @@ between-seed spread was already 27.32-85.89 (3.1x) at T11.F16 and is
 whose population blooms (F16 seed 22, plateau 1,997; F17 seed 33, plateau
 7,287 and 11,379 alive at the end, against a maximum of 4,517 in any F16
 seed). `mesh_hops` per creature-tick is flat everywhere, so the extra steps
-are VM work inside dispatched nodes, not extra dispatches, and wall time per
-creature-tick is unchanged because at `opcode_cost_multiplier` 1e-6 and
-`max_vm_steps` 10,000 a VM step is cheap relative to the rest of a tick. The
-mechanism that makes longer executed programs possible is the feature's
-intent: node-internal events now land on the executed core (about a fifth of
-the reachable set), and this feature deliberately adds no size, cost, or
-junk lever (they are T11.F13 arms), so executed program length has no
-counter-force. What the data does not support is a uniform per-creature
-compute inflation; what it shows is one seed's ecology diverging, which a
-policy change to mutation targeting is expected to produce and which three
-seeds cannot separate from a compute trend. Whether that is accepted, or
-`executed_bias` is lowered and re-measured, or a length lever is pulled
-forward, is a scope decision for the orchestrator.
+are VM work inside dispatched nodes rather than extra dispatches: seed 33
+runs 336.39 / 2.076 = 162 steps per dispatched node, against a T11.F16
+maximum of 85.89 / 2.115 = 40.6 at its own bloom seed. The stored report
+cannot separate the two mechanisms that produce such a figure. Either (a)
+node-internal inserts concentrating on the few executed nodes lengthened
+those programs broadly, which is what this feature is for and which nothing
+here opposes, since it deliberately adds no size, cost, or junk lever (they
+are T11.F13 arms); or (b) one lineage evolved a backward jump that runs to
+`max_vm_steps`, where at the 10,000-step cap 1.2% to 1.6% of seed 33's hops
+reaching the cap would supply the whole excess by itself. Neither the report
+nor the CLI's `run` output carries a cap-hit counter, so the question is
+open. `opcode_cost_multiplier` is 1e-6 energy per step, so a full
+10,000-step program costs 0.01 energy and a runaway loop is close to
+unselected against. Wall time is not evidence either way here: the gate
+profile moved -5.83% and +2.86% against its two references with identical
+code, so the goal profile's +0.73% is inside host noise. In both runs the
+heaviest seed is the one whose population blooms (F16 seed 22, plateau
+1,997; F17 seed 33, plateau 7,287 with 11,379 alive at the end, against a
+4,517 maximum in any F16 seed); that is a correlation present at baseline
+too, not a cause measured here. Options for the orchestrator, all scope
+decisions and none taken here: accept the reading with an explicit allowance
+or epoch re-pin recorded; lower the `executed_bias` default and re-measure;
+pull a T11.F13 program-length lever forward; or add a temporary VM cap-hit
+counter and re-run the goal profile to settle (a) against (b).
 
 Also recorded: `reachable_structure_size_distribution` mean 118.863266
 against 85.491919, median 114 against 81, p75 135 against 84, max 428
@@ -384,7 +395,9 @@ against 283, min 1 against 44.
   writing its report. The investigation is in Performance and Goal Impact:
   89.6% of the run's VM steps come from one of three seeds, whose population
   bloomed to 11,379; the other two seeds are below their T11.F16 values, and
-  wall time per creature-tick is unchanged. The options are an explicit
+  the wall-time comparison sits inside host noise. Whether the excess is
+  broadly longer executed programs or one lineage's VM loop is not settled by
+  the stored report. The options are an explicit
   allowance or epoch re-pin recorded by the orchestrator, a lower
   `executed_bias` default re-measured, or pulling a T11.F13 program-length
   lever forward. All three are scope decisions and none was taken here.
