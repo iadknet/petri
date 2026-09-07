@@ -42,23 +42,34 @@ pub(crate) fn resolve_gated_route(
     targets: &[RouteTarget],
     gates: &RouteGateMap,
 ) -> Option<(usize, NodeId)> {
-    if targets.is_empty() {
-        return None;
-    }
-    if targets.len() == 1 {
-        return Some((0, targets[0].target_id));
-    }
+    resolve_gated_route_where(targets, gates, |_| true)
+}
 
-    let mut best_idx = 0;
+/// Resolve among eligible destinations, preserving the original float and tie policy.
+#[inline]
+pub(crate) fn resolve_gated_route_where(
+    targets: &[RouteTarget],
+    gates: &RouteGateMap,
+    eligible: impl Fn(NodeId) -> bool,
+) -> Option<(usize, NodeId)> {
+    let mut best = None;
     let mut best_score = f32::NEG_INFINITY;
-    for (i, target) in targets.iter().enumerate() {
+    for (index, target) in targets
+        .iter()
+        .enumerate()
+        .filter(|(_, target)| eligible(target.target_id))
+    {
         let effective = target.gate_bias + gates.score_for_slot(target.slot);
+        // Even all-NaN/-infinity candidates retain the earliest eligible entry.
+        if best.is_none() {
+            best = Some((index, target.target_id));
+        }
         if effective > best_score {
             best_score = effective;
-            best_idx = i;
+            best = Some((index, target.target_id));
         }
     }
-    Some((best_idx, targets[best_idx].target_id))
+    best
 }
 
 #[cfg(test)]

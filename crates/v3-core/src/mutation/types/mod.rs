@@ -139,7 +139,6 @@ pub enum MutationOperator {
     TopologyRemoveRouteTarget,
     TopologyChangeEntryNode,
     TopologySwapNodeBackend,
-    TopologyRewriteNodeId,
     TopologyCopyNode,
     TopologyCopyMeshBackwardSlice,
     TopologyCopyMeshForwardSlice,
@@ -203,7 +202,6 @@ impl MutationOperator {
             Self::TopologyRemoveRouteTarget => "Topology.RemoveRouteTarget",
             Self::TopologyChangeEntryNode => "Topology.ChangeEntryNode",
             Self::TopologySwapNodeBackend => "Topology.SwapNodeBackend",
-            Self::TopologyRewriteNodeId => "Topology.RewriteNodeId",
             Self::TopologyCopyNode => "Topology.CopyNode",
             Self::TopologyCopyMeshBackwardSlice => "Topology.CopyMeshBackwardSlice",
             Self::TopologyCopyMeshForwardSlice => "Topology.CopyMeshForwardSlice",
@@ -264,7 +262,6 @@ impl MutationOperator {
             | Self::TopologyRemoveRouteTarget
             | Self::TopologyChangeEntryNode
             | Self::TopologySwapNodeBackend
-            | Self::TopologyRewriteNodeId
             | Self::TopologyCopyNode
             | Self::TopologyCopyMeshBackwardSlice
             | Self::TopologyCopyMeshForwardSlice
@@ -317,10 +314,7 @@ impl MutationOperator {
 
     #[must_use]
     pub const fn semantic_category(self) -> MutationSemanticCategory {
-        match self {
-            Self::TopologyRewriteNodeId => MutationSemanticCategory::SemanticNoop,
-            _ => MutationSemanticCategory::SemanticChange,
-        }
+        MutationSemanticCategory::SemanticChange
     }
 
     #[must_use]
@@ -332,6 +326,7 @@ impl MutationOperator {
             | Self::TopologyCopyMeshBackwardSlice
             | Self::TopologyCopyMeshForwardSlice
             | Self::TopologySpliceNode
+            | Self::TopologySwapNodeBackend
             | Self::TopologyAddRouteTarget => ComplexityEffect::Increasing,
             // Topology: structural removals
             Self::TopologyRemoveNode | Self::TopologyRemoveRouteTarget => {
@@ -340,8 +335,6 @@ impl MutationOperator {
             // Topology: rewiring / neutral
             Self::TopologyRetargetNodeTarget
             | Self::TopologyChangeEntryNode
-            | Self::TopologySwapNodeBackend
-            | Self::TopologyRewriteNodeId
             | Self::TopologySwapRouteTargets
             | Self::TopologyMutateGateBias => ComplexityEffect::Neutral,
             // VM: copy/motif-insert operators are increasing
@@ -394,7 +387,7 @@ impl MutationOperator {
     }
 
     #[must_use]
-    pub const fn all() -> [Self; 55] {
+    pub const fn all() -> [Self; 54] {
         [
             Self::TopologyAddNode,
             Self::TopologyRemoveNode,
@@ -403,7 +396,6 @@ impl MutationOperator {
             Self::TopologyRemoveRouteTarget,
             Self::TopologyChangeEntryNode,
             Self::TopologySwapNodeBackend,
-            Self::TopologyRewriteNodeId,
             Self::TopologyCopyNode,
             Self::TopologyCopyMeshBackwardSlice,
             Self::TopologyCopyMeshForwardSlice,

@@ -106,9 +106,6 @@ Type posture:
 | `mutation.reachable_bias.vm` | `f64` | `0.0` | Probability that VM operators prefer reachable nodes. Same normalization. |
 | `mutation.reachable_bias.graph` | `f64` | `0.0` | Probability that graph operators prefer reachable nodes. Same normalization. |
 | `mutation.reachable_bias.input_ref` | `f64` | `0.0` | Probability that input-ref operators prefer reachable nodes. Same normalization. |
-| `mutation.topology_new_node_birth.graph_backend_chance` | `f32` | `0.5` | Probability that topology newborns (`AddNode`, `SpliceNode`) are graph-backed instead of minimal VM. Clamp to `[0.0, 1.0]`; NaN/infinite falls back to `0.5`. |
-| `mutation.topology_new_node_birth.graph_initialized_chance` | `f32` | `0.8` | Given graph-backed newborn, probability that it starts with one `input_ref` and one custom-output wire. Clamp to `[0.0, 1.0]`; NaN/infinite falls back to `0.8`. |
-| `mutation.topology_new_node_birth.graph_compute_gate_chance` | `f32` | `0.5` | Given initialized graph newborn, probability that initial sink wiring routes through one newborn compute node instead of direct `InputLeaf` -> sink wiring. Clamp to `[0.0, 1.0]`; NaN/infinite falls back to `0.5`. |
 
 Phenotype mutation is not a mutation engine domain; it is a separate pathway
 triggered by genome mutation. Phenotype algorithm and trigger semantics are
@@ -305,3 +302,9 @@ Runtime config transport posture:
   `v3-tick-orchestration-spec.md`.
 - `world.food.shared.*` is runtime-editable; `world.food.types[]` and
   `world.food.fertility.layers` are restart-only startup config.
+
+T11.F15 removes the former `mutation.topology_new_node_birth` controls.
+`AddNode`/`SpliceNode` always create pass-through Halt detours; alternate
+backend growth uses `SwapNodeBackend`. Retired keys are rejected, not exposed
+as inert controls. Topology weights sum to 22 with identity rename retired
+and `ChangeEntryNode` at weight 1; mutation supply settings above are unchanged.

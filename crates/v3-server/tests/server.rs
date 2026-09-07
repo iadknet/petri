@@ -815,10 +815,10 @@ async fn patch_config_world_topology_fields_are_restart_only() {
     );
 }
 
-// ── 11b. get_config_includes_topology_new_node_birth_defaults ──────────────
+// ── 11b. get_config_omits_retired_topology_new_node_birth ──────────────
 
 #[tokio::test]
-async fn get_config_includes_topology_new_node_birth_defaults() {
+async fn get_config_omits_retired_topology_new_node_birth() {
     let a = app();
     a.clone()
         .oneshot(startup_req(r#"{"seed":1}"#))
@@ -827,15 +827,9 @@ async fn get_config_includes_topology_new_node_birth_defaults() {
 
     let (status, body) = do_request(a, get_req("/v3/simulation/config")).await;
     assert_eq!(status, StatusCode::OK, "body: {body}");
-    let birth = &body["config"]["mutation"]["topology_new_node_birth"];
-    assert!(birth.is_object(), "missing topology_new_node_birth: {body}");
-    assert_eq!(birth["graph_backend_chance"].as_f64(), Some(0.5));
-    assert!(
-        (birth["graph_initialized_chance"].as_f64().unwrap() - 0.8).abs() < 1e-6,
-        "graph_initialized_chance should be ~0.8, got {:?}",
-        birth["graph_initialized_chance"]
-    );
-    assert_eq!(birth["graph_compute_gate_chance"].as_f64(), Some(0.5));
+    assert!(body["config"]["mutation"]
+        .get("topology_new_node_birth")
+        .is_none());
 }
 
 // ── 11c. get_config_includes_food_occupancy_depletion_defaults ─────────────
@@ -856,10 +850,10 @@ async fn get_config_includes_food_occupancy_depletion_defaults() {
     assert_json_f64_close(&depletion["deposit_per_occupied_tick"], 0.08);
 }
 
-// ── 11d. patch_config_roundtrips_topology_new_node_birth_fields ────────────
+// ── 11d. patch_config_rejects_retired_topology_new_node_birth ────────────
 
 #[tokio::test]
-async fn patch_config_roundtrips_topology_new_node_birth_fields() {
+async fn patch_config_rejects_retired_topology_new_node_birth() {
     let a = app();
     a.clone()
         .oneshot(startup_req(r#"{"seed":1}"#))
@@ -878,18 +872,11 @@ async fn patch_config_roundtrips_topology_new_node_birth_fields() {
 
     let (patch_status, patch_body) =
         do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
-    assert_eq!(patch_status, StatusCode::OK, "body: {patch_body}");
-    let patched = &patch_body["config"]["mutation"]["topology_new_node_birth"];
-    assert_eq!(patched["graph_backend_chance"].as_f64(), Some(1.0));
-    assert_eq!(patched["graph_initialized_chance"].as_f64(), Some(0.0));
-    assert_eq!(patched["graph_compute_gate_chance"].as_f64(), Some(1.0));
-
-    let (get_status, get_body) = do_request(a, get_req("/v3/simulation/config")).await;
-    assert_eq!(get_status, StatusCode::OK, "body: {get_body}");
-    let fetched = &get_body["config"]["mutation"]["topology_new_node_birth"];
-    assert_eq!(fetched["graph_backend_chance"].as_f64(), Some(1.0));
-    assert_eq!(fetched["graph_initialized_chance"].as_f64(), Some(0.0));
-    assert_eq!(fetched["graph_compute_gate_chance"].as_f64(), Some(1.0));
+    assert_eq!(
+        patch_status,
+        StatusCode::UNPROCESSABLE_ENTITY,
+        "body: {patch_body}"
+    );
 }
 
 // ── 11e. patch_config_roundtrips_food_occupancy_depletion_fields ───────────

@@ -261,7 +261,16 @@ mod tests {
         let looping = genome(vec![node(0, &[0], false)]);
         let r = battery.mesh_execution(&looping, &config, 0.0);
         assert_eq!(r.executed_node_count, 1);
-        assert_eq!(r.hop_cap_hits, 80);
+        assert_eq!(r.hop_cap_hits, 0);
+        let chain = genome(vec![
+            node(0, &[1], false),
+            node(1, &[2], false),
+            node(2, &[], false),
+        ]);
+        assert_eq!(
+            battery.mesh_execution(&chain, &config, 0.0).hop_cap_hits,
+            80
+        );
         let terminal = genome(vec![node(0, &[1], false), node(1, &[0], true)]);
         assert_eq!(
             battery.mesh_execution(&terminal, &config, 0.0).hop_cap_hits,

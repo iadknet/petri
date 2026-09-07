@@ -10,7 +10,7 @@ use crate::contracts::{NodeId, WorldAction};
 use crate::creature::genome::{BackendDef, CreatureGenome, NodeGenome};
 use crate::creature::state::GraphRuntimeState;
 use crate::runtime::cgp::execute_graph_node_with_reserve;
-use crate::runtime::routing::resolve_gated_route;
+use crate::runtime::routing::resolve_gated_route_where;
 use crate::runtime::trace::domain::TerminationReason;
 use crate::runtime::types::{ComputeCostReport, MeshOutput, MeshSideOutputs, OUTPUT_SLOT_COUNT};
 use crate::runtime::vm::execute_vm_node_with_reserve;
@@ -21,8 +21,7 @@ use crate::sensors::perception::SensorSnapshot;
 ///
 /// Before the first mesh execution of each new world tick, the caller must call
 /// `graph_runtime.begin_tick(&genome.nodes)`. Mesh execution does not
-/// advance the graph clock. Repeated mesh visits in the same tick must reuse the
-/// existing snapshots without calling `begin_tick` again.
+/// advance the graph clock. Each mesh node dispatches at most once per tick.
 ///
 /// The function walks the genome's node chain starting at `entry_node_id`,
 /// dispatching each node to its VM or Graph backend, routing to subsequent
@@ -68,8 +67,7 @@ pub fn execute_creature_mesh(
 ///
 /// Before the first mesh execution of each new world tick, the caller must call
 /// `graph_runtime.begin_tick(&genome.nodes)`. Mesh execution does not
-/// advance the graph clock. Repeated mesh visits in the same tick must reuse the
-/// existing snapshots without calling `begin_tick` again.
+/// advance the graph clock. Each mesh node dispatches at most once per tick.
 #[allow(clippy::too_many_arguments)]
 pub fn execute_creature_mesh_with_reserve(
     genome: &CreatureGenome,
@@ -297,6 +295,7 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
     let mut upstream_slots = [0.0f32; OUTPUT_SLOT_COUNT];
     let mut hops: usize = 0;
     let max_hops = config.max_mesh_hops.max(1) as usize;
+    let mut visited = std::collections::HashSet::with_capacity(max_hops.min(genome.nodes.len()));
     let start_energy = *energy;
     let mut report = ComputeCostReport::default();
     let mut side_outputs = MeshSideOutputs::new(config.max_actions_per_turn);
@@ -327,6 +326,7 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
         let current_idx =
             find_node_index(&genome.nodes, current_node_id).expect("node must exist in genome");
         let node = &genome.nodes[current_idx];
+        visited.insert(node.node_id);
 
         let energy_consumed = (start_energy - *energy).max(0.0);
 
@@ -358,7 +358,9 @@ pub(crate) fn execute_creature_mesh_impl<M: MeshExecutionMode>(
         }
 
         let route_result = if M::RECORDS_HOPS || (!result.energy_exhausted && !result.terminal) {
-            resolve_gated_route(&node.targets, &result.route_gates)
+            resolve_gated_route_where(&node.targets, &result.route_gates, |id| {
+                !visited.contains(&id)
+            })
         } else {
             None
         };
@@ -482,10 +484,10 @@ mod tests {
             )
         };
         let (_, observed) = observe(&genome, 100.0);
-        assert_eq!(observed.hops, vec![(id, Some(0)), (id, Some(0))]);
+        assert_eq!(observed.hops, vec![(id, None)]);
         assert!(matches!(
             observed.termination_reason,
-            TerminationReason::MaxHopsReached
+            TerminationReason::NoTargets
         ));
         genome.nodes[0] = vm_emit_node(id, 0, vec![id]);
         let (_, observed) = observe(&genome, 100.0);
@@ -558,11 +560,14 @@ mod tests {
         for starting_energy in [0.0, 0.01, 2.0, 100.0] {
             let mut energy = starting_energy;
             let mut observed_energy = energy;
+            let mut traced_energy = energy;
             let mut memory = [0.5; 16];
             let mut observed_memory = memory;
+            let mut traced_memory = memory;
             let previous = [0.25; 16];
             let mut state = GraphRuntimeState::new();
             let mut observed_state = state.clone();
+            let mut traced_state = state.clone();
             let config = RuntimeConfig {
                 max_mesh_hops: 4,
                 ..default_config()
@@ -570,6 +575,7 @@ mod tests {
             for _ in 0..2 {
                 state.begin_tick(&genome.nodes);
                 observed_state.begin_tick(&genome.nodes);
+                traced_state.begin_tick(&genome.nodes);
                 let plain = execute_creature_mesh_impl(
                     &genome,
                     &empty_sensor_snapshot(),
@@ -592,6 +598,23 @@ mod tests {
                     &config,
                     ObservedMeshExecution::default(),
                 );
+                let (traced, _, _) = crate::runtime::traced_mesh::execute_creature_mesh_traced(
+                    &genome,
+                    &empty_sensor_snapshot(),
+                    &mut traced_energy,
+                    3.0,
+                    &mut traced_memory,
+                    &previous,
+                    &mut traced_state,
+                    &config,
+                );
+                assert_eq!(plain.actions, traced.actions);
+                assert_eq!(plain.priority_bid, traced.priority_bid);
+                assert_eq!(plain.cost_report.vm_cost, traced.cost_report.vm_cost);
+                assert_eq!(plain.cost_report.graph_cost, traced.cost_report.graph_cost);
+                assert_eq!(plain.work_counters, traced.work_counters);
+                assert_eq!(energy, traced_energy);
+                assert_eq!(memory, traced_memory);
                 assert_eq!(plain.actions, observed.actions);
                 assert_eq!(plain.priority_bid, observed.priority_bid);
                 assert_eq!(plain.cost_report.vm_cost, observed.cost_report.vm_cost);
@@ -616,6 +639,20 @@ mod tests {
                 assert_eq!(state.scratch_curr, observed_state.scratch_curr);
                 assert_eq!(state.scratch_backup, observed_state.scratch_backup);
                 assert_eq!(state.scratch_w_inputs, observed_state.scratch_w_inputs);
+                assert_eq!(state.node_state, traced_state.node_state);
+                assert_eq!(state.node_outputs, traced_state.node_outputs);
+                assert_eq!(state.tick_start_state, traced_state.tick_start_state);
+                assert_eq!(state.tick_start_outputs, traced_state.tick_start_outputs);
+                assert_eq!(state.plasticity_weights, traced_state.plasticity_weights);
+                assert_eq!(state.eligibility_traces, traced_state.eligibility_traces);
+                assert_eq!(
+                    state.tick_start_eligibility_traces,
+                    traced_state.tick_start_eligibility_traces
+                );
+                assert_eq!(state.scratch_prev, traced_state.scratch_prev);
+                assert_eq!(state.scratch_curr, traced_state.scratch_curr);
+                assert_eq!(state.scratch_backup, traced_state.scratch_backup);
+                assert_eq!(state.scratch_w_inputs, traced_state.scratch_w_inputs);
             }
         }
     }
@@ -715,7 +752,7 @@ mod tests {
     /// A VM node that halts (no action emitted) and routes to itself.
     /// With max_mesh_hops=3, after 3 hops the executor must return NoOp.
     #[test]
-    fn max_hops_exceeded_returns_noop() {
+    fn f15_self_loop_dispatches_once() {
         let id0 = NodeId::new(0);
         // Node routes to itself (self-loop); Halt emits no action.
         let node = NodeGenome {
@@ -753,6 +790,7 @@ mod tests {
             &config,
         );
         assert_eq!(output.actions, vec![WorldAction::NoOp]);
+        assert_eq!(output.work_counters.mesh_hops, 1);
     }
 
     // ── Test 3: empty_targets_returns_noop ───────────────────────────────────

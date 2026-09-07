@@ -85,7 +85,7 @@ The VM defines **41 opcodes**.
 |---|---|---|---|
 | 24 | `WriteInternalPayload` | slot_idx, src | overwrites payload slot value (payload buffer starts from incoming `upstream_slots`; invalid slot write ignored) |
 | 25 | `WriteWorldActionMeta` | slot_idx, src | writes world-action metadata slot (`slot_idx` in `0..7`; invalid slot write ignored) |
-| 26 | `WriteRouteTarget` | src_reg | write candidate route target value (`f32`) |
+| 26 | `WriteRouteGate` | slot, src_reg | write one routing gate score (`f32`) |
 
 ### Action Queue
 
@@ -185,11 +185,13 @@ Invalid `ref_idx` is a soft default and yields `0.0`.
 
 ### Routing Write Semantics
 
-`WriteRouteTarget(src_reg)` sets VM node's raw route value.
-- Multiple writes in one VM run use last-write-wins.
-- If never written, default raw route value is `0.0`.
-- Mesh executor applies routing conversion rules from
-  `v3-mesh-execution-spec.md`.
+`WriteRouteGate(slot, src_reg)` sets one of eight per-slot gate scores.
+- Scores reset to zero at every node dispatch; invalid slots are ignored.
+- Multiple writes to the same slot use last-write-wins and sanitize values.
+- Mesh routing selects the maximum bias-plus-score among unvisited targets,
+  retaining the earliest target on ties; see `v3-mesh-execution-spec.md`.
+- T11.F15 route addition inserts this write before the first terminal using
+  the existing structural reference repair and a uniformly sampled register.
 
 ---
 
@@ -293,12 +295,12 @@ Canonical owner for `runtime.vm.opcode_cost_multiplier`:
 VM node evaluation maintains:
 - internal payload buffer (12 slots)
 - world action metadata buffer (8 slots)
-- route target register
+- eight route gate scores
 
 Initialization at the start of each VM node evaluation:
 - internal payload buffer is copied from incoming `upstream_slots`
 - world action metadata buffer is zeroed
-- route target register starts at `0.0`
+- all eight route gate scores start at `0.0`
 
 All writes are last-write-wins per slot/register.
 If `WriteInternalPayload` targets an invalid slot (`>= 12`), the write is
@@ -339,8 +341,7 @@ At node end:
 - if `ExecuteActionQueue` was called: `NodeResult.terminal` is true, mesh
   returns accumulated action queue
 - otherwise internal payload buffer is emitted as `NodeResult.output_slots`
-- route value is returned in `NodeResult.route` as
-  `RouteDecision::VmWrap { raw_value }`
+- per-slot scores are returned in `NodeResult.route_gates`
 - payload/meta buffers are discarded after node dispatch
 
 This makes `WriteInternalPayload` the VM path for producing routed output slots.

@@ -12,15 +12,12 @@ fn rng(seed: u64) -> SmallRng {
     SmallRng::seed_from_u64(seed)
 }
 
-fn forced_initialized_graph_birth_config() -> crate::config::MutationConfig {
+fn forced_topology_config() -> crate::config::MutationConfig {
     let mut config = SimulationConfig::default().mutation;
     config.mutation_probability = 1.0;
     config.per_birth_mutation_events_min = 1;
     config.per_birth_mutation_events_max = 1;
     config.mesh_layer_probability = 1.0;
-    config.topology_new_node_birth.graph_backend_chance = 1.0;
-    config.topology_new_node_birth.graph_initialized_chance = 1.0;
-    config.topology_new_node_birth.graph_compute_gate_chance = 0.0;
     config
 }
 
@@ -56,16 +53,6 @@ fn single_graph_genome_with_inputs(input_refs: Vec<InputReference>) -> CreatureG
             targets: Vec::new(),
         }],
     }
-}
-
-fn collect_expected_world_inputs(input_refs: &[InputReference]) -> Vec<WorldInputKey> {
-    let mut keys = std::collections::BTreeSet::new();
-    for input_ref in input_refs {
-        if let InputReference::World(key) = input_ref {
-            keys.insert(*key);
-        }
-    }
-    keys.into_iter().collect()
 }
 
 fn genome_has_non_default_food_input_ref(genome: &CreatureGenome) -> bool {
@@ -115,7 +102,7 @@ fn engine_with_probability_zero_returns_zero_summary() {
 
 #[test]
 fn engine_records_added_input_classes_for_topology_add_node() {
-    let config = forced_initialized_graph_birth_config();
+    let config = forced_topology_config();
 
     for seed in 0u64..2_000 {
         let mut genome = v3alpha1_founder_genome();
@@ -181,7 +168,7 @@ fn engine_with_food_type_count_can_introduce_non_default_food_input_refs() {
 
 #[test]
 fn engine_records_added_input_classes_for_topology_splice_node() {
-    let config = forced_initialized_graph_birth_config();
+    let config = forced_topology_config();
     let base_genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![
@@ -283,37 +270,6 @@ fn engine_records_added_input_classes_for_graph_add_internal_graph_node() {
     }
 
     panic!("failed to observe Graph.AddInternalGraphNode within search budget");
-}
-
-#[test]
-fn engine_records_added_world_inputs_for_topology_add_node() {
-    let config = forced_initialized_graph_birth_config();
-
-    for seed in 0u64..10_000 {
-        let mut genome = v3alpha1_founder_genome();
-        let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
-        if summary
-            .applied_by_operator
-            .contains_key(&MutationOperator::TopologyAddNode)
-        {
-            let newborn = genome.nodes.last().expect("newborn node should exist");
-            let expected = collect_expected_world_inputs(&newborn.input_refs);
-            if expected.is_empty() {
-                continue;
-            }
-            let recorded = summary
-                .added_node_world_inputs_by_operator
-                .get(&MutationOperator::TopologyAddNode)
-                .expect("world inputs should be recorded");
-            for key in expected {
-                assert_eq!(recorded.get(&key), Some(&1));
-            }
-            return;
-        }
-    }
-
-    panic!("failed to observe Topology.AddNode with world inputs within search budget");
 }
 
 #[test]
@@ -563,30 +519,20 @@ fn engine_attempted_counters_cover_all_domains_and_hit_each_domain_operator_surf
 }
 
 #[test]
-fn engine_applied_semantic_categories_record_noop_and_change_events() {
+fn engine_live_operators_record_semantic_changes() {
     let mut config = SimulationConfig::default().mutation;
     config.mutation_probability = 1.0;
     config.per_birth_mutation_events_min = 1;
     config.per_birth_mutation_events_max = 1;
-
-    let mut noop_total: u64 = 0;
-    let mut change_total: u64 = 0;
-    let mut genome = v3alpha1_founder_genome();
-    for seed in 0u64..10_000 {
-        let mut r = rng(seed);
-        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut r);
-        noop_total += summary.applied_semantic_noop_events as u64;
-        change_total += summary.applied_semantic_change_events as u64;
+    for seed in 0..100 {
+        let mut genome = v3alpha1_founder_genome();
+        let summary = MutationEngine::apply_mutations(&mut genome, &config, &[], &mut rng(seed));
+        assert_eq!(summary.applied_semantic_noop_events, 0);
+        assert_eq!(
+            summary.applied_semantic_change_events,
+            summary.applied_events
+        );
     }
-
-    assert!(
-        noop_total > 0,
-        "expected at least one applied semantic-noop mutation across long run"
-    );
-    assert!(
-        change_total > 0,
-        "expected at least one applied semantic-change mutation across long run"
-    );
 }
 
 #[test]
@@ -674,15 +620,12 @@ fn engine_mesh_layer_probability_one_always_selects_topology() {
 }
 
 #[test]
-fn apply_topology_event_threads_config_into_add_node_birth_policy() {
+fn apply_topology_event_adds_pass_through_detour() {
     use crate::creature::genome::BackendDef;
     use crate::mutation::topology::TopologyOperator;
     use crate::mutation::types::TargetReachability;
 
-    let mut config = SimulationConfig::default().mutation;
-    config.topology_new_node_birth.graph_backend_chance = 1.0;
-    config.topology_new_node_birth.graph_initialized_chance = 0.0;
-    config.topology_new_node_birth.graph_compute_gate_chance = 0.0;
+    let config = SimulationConfig::default().mutation;
 
     let mut genome = v3alpha1_founder_genome();
     let before_nodes = genome.nodes.len();
@@ -698,15 +641,14 @@ fn apply_topology_event_threads_config_into_add_node_birth_policy() {
     )
     .expect("AddNode should apply");
 
-    assert_eq!(reachability, TargetReachability::NotApplicable);
+    assert_eq!(reachability, TargetReachability::Unreachable);
     assert_eq!(genome.nodes.len(), before_nodes + 1);
 
     let newborn = genome.nodes.last().expect("newborn node must exist");
-    let BackendDef::Graph(graph) = &newborn.backend_def else {
-        panic!("newborn backend must follow config and be Graph");
-    };
+    assert!(
+        matches!(&newborn.backend_def, BackendDef::Vm(vm) if vm.program == vec![crate::creature::genome::VmInstruction::Halt])
+    );
     assert!(newborn.input_refs.is_empty());
-    assert!(graph.compute_nodes.is_empty());
 }
 
 #[test]

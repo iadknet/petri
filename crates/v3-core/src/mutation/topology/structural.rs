@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use rand::Rng;
 
@@ -10,29 +10,38 @@ use crate::mutation::reachability::biased_select_from;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
 use super::birth;
-use super::routing::lowest_unused_slot;
+use super::routing::{lowest_unused_slot, static_incumbent, writes_gate};
+use crate::contracts::MAX_GATE_SLOTS;
 
-/// Allocate the next node ID: `max(existing node_ids) + 1` with wrapping u32 arithmetic.
+/// Find an unused identity even when the largest existing ID wraps.
 pub(super) fn next_node_id(genome: &CreatureGenome) -> NodeId {
-    let max_id = genome.nodes.iter().map(|n| n.node_id.0).max().unwrap_or(0);
-    NodeId::new(max_id.wrapping_add(1))
+    let used: HashSet<_> = genome.nodes.iter().map(|n| n.node_id).collect();
+    unused_id(
+        &used,
+        genome
+            .nodes
+            .iter()
+            .map(|n| n.node_id.0)
+            .max()
+            .unwrap_or(0)
+            .wrapping_add(1),
+    )
 }
 
-pub(super) fn apply_add_node(
-    genome: &mut CreatureGenome,
-    config: &MutationConfig,
-    food_type_count: usize,
-    rng: &mut impl Rng,
-) -> Result<(), MutationSkipReason> {
-    let new_id = next_node_id(genome);
-    genome.nodes.push(birth::new_topology_birth_node(
-        new_id,
-        Vec::new(),
-        config,
-        food_type_count,
-        rng,
-    ));
-    Ok(())
+fn unused_id(used: &HashSet<NodeId>, mut candidate: u32) -> NodeId {
+    while used.contains(&NodeId::new(candidate)) {
+        candidate = candidate.wrapping_add(1);
+    }
+    NodeId::new(candidate)
+}
+
+fn bypass_successor(genome: &CreatureGenome, idx: usize) -> Option<NodeId> {
+    let node = &genome.nodes[idx];
+    let target = node
+        .targets
+        .get(static_incumbent(&node.targets)?)?
+        .target_id;
+    (target != node.node_id && genome.nodes.iter().any(|n| n.node_id == target)).then_some(target)
 }
 
 pub(super) fn apply_remove_node(
@@ -44,18 +53,39 @@ pub(super) fn apply_remove_node(
     if genome.nodes.len() <= 1 {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
-    // Find non-entry nodes to avoid removing the entry.
-    let entry_id = genome.entry_node_id;
-    let removable: Vec<usize> = genome
-        .nodes
-        .iter()
-        .enumerate()
-        .filter(|(_, n)| n.node_id != entry_id)
-        .map(|(i, _)| i)
+    let currently_reachable = crate::creature::genome::analysis::mesh_reachable_nodes(genome);
+    let unreachable: Vec<_> = (0..genome.nodes.len())
+        .filter(|&i| {
+            genome.nodes[i].node_id != genome.entry_node_id
+                && currently_reachable.binary_search(&i).is_err()
+        })
         .collect();
-    let (idx, reachability) = biased_select_from(&removable, reachable_nodes, bias, rng)
+    let eligible = if unreachable.is_empty() {
+        (0..genome.nodes.len())
+            .filter(|&i| {
+                genome.nodes[i].node_id != genome.entry_node_id
+                    && bypass_successor(genome, i).is_some()
+            })
+            .collect()
+    } else {
+        unreachable
+    };
+    let (idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
+    let removed = genome.nodes[idx].node_id;
+    let successor = bypass_successor(genome, idx);
     genome.nodes.remove(idx);
+    for node in &mut genome.nodes {
+        if let Some(successor) = successor {
+            for target in &mut node.targets {
+                if target.target_id == removed {
+                    target.target_id = successor;
+                }
+            }
+        } else {
+            node.targets.retain(|target| target.target_id != removed);
+        }
+    }
     Ok(reachability)
 }
 
@@ -80,6 +110,74 @@ pub(super) fn apply_change_entry_node(
     Ok(())
 }
 
+/// A tied, unwritten alternative cannot beat the still-unvisited original.
+fn safe_predecessors(genome: &CreatureGenome, source: usize) -> Vec<(usize, u8, f32)> {
+    let source_id = genome.nodes[source].node_id;
+    let mut candidates: Vec<_> = genome
+        .nodes
+        .iter()
+        .enumerate()
+        .filter_map(|(idx, node)| {
+            let incumbent = node.targets.get(static_incumbent(&node.targets)?)?;
+            if incumbent.target_id != source_id
+                || !incumbent.gate_bias.is_finite()
+                || writes_gate(&node.backend_def, incumbent.slot)
+            {
+                return None;
+            }
+            let slot = (0..MAX_GATE_SLOTS as u8).find(|&slot| {
+                !node.targets.iter().any(|t| t.slot == slot)
+                    && !writes_gate(&node.backend_def, slot)
+            })?;
+            Some((idx, slot, incumbent.gate_bias))
+        })
+        .collect();
+    if !candidates.is_empty() {
+        let downstream =
+            mesh_forward_slice(genome, source, genome.nodes.len()).expect("existing source");
+        candidates.retain(|(idx, _, _)| downstream.indices.binary_search(idx).is_err());
+    }
+    candidates
+}
+
+fn copy_attached(
+    genome: &mut CreatureGenome,
+    reachable_nodes: &[usize],
+    bias: f64,
+    rng: &mut impl Rng,
+    alternate: Option<&MutationConfig>,
+) -> Result<TargetReachability, MutationSkipReason> {
+    let eligible: Vec<_> = (0..genome.nodes.len())
+        .filter(|&i| !safe_predecessors(genome, i).is_empty())
+        .collect();
+    let (source, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
+        .ok_or(MutationSkipReason::NoApplicableTarget)?;
+    let predecessors = safe_predecessors(genome, source);
+    let (predecessor, slot, gate_bias) = predecessors[rng.gen_range(0..predecessors.len())];
+    let old_id = genome.nodes[source].node_id;
+    let new_id = next_node_id(genome);
+    let mut clone = genome.nodes[source].clone();
+    clone.node_id = new_id;
+    for target in &mut clone.targets {
+        if target.target_id == old_id {
+            target.target_id = new_id;
+        }
+    }
+    if let Some(config) = alternate {
+        clone.backend_def = match clone.backend_def {
+            BackendDef::Vm(_) => birth::blank_graph_backend(config),
+            BackendDef::Graph(_) => birth::minimal_vm_backend(),
+        };
+    }
+    genome.nodes[predecessor].targets.push(RouteTarget {
+        target_id: new_id,
+        slot,
+        gate_bias,
+    });
+    genome.nodes.push(clone);
+    Ok(reachability)
+}
+
 pub(super) fn apply_swap_node_backend(
     genome: &mut CreatureGenome,
     reachable_nodes: &[usize],
@@ -87,43 +185,7 @@ pub(super) fn apply_swap_node_backend(
     rng: &mut impl Rng,
     config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
-    let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
-    let (idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
-        .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let node = &mut genome.nodes[idx];
-    node.backend_def = match &node.backend_def {
-        BackendDef::Vm(_) => birth::blank_graph_backend(config),
-        BackendDef::Graph(_) => birth::minimal_vm_backend(),
-    };
-    Ok(reachability)
-}
-
-pub(super) fn apply_rewrite_node_id(
-    genome: &mut CreatureGenome,
-    reachable_nodes: &[usize],
-    bias: f64,
-    rng: &mut impl Rng,
-) -> Result<TargetReachability, MutationSkipReason> {
-    let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
-    let (idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
-        .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let old_id = genome.nodes[idx].node_id;
-    let new_id = next_node_id(genome);
-    genome.nodes[idx].node_id = new_id;
-
-    if genome.entry_node_id == old_id {
-        genome.entry_node_id = new_id;
-    }
-
-    for node in &mut genome.nodes {
-        for target in &mut node.targets {
-            if target.target_id == old_id {
-                target.target_id = new_id;
-            }
-        }
-    }
-
-    Ok(reachability)
+    copy_attached(genome, reachable_nodes, bias, rng, Some(config))
 }
 
 pub(super) fn apply_copy_node(
@@ -132,39 +194,7 @@ pub(super) fn apply_copy_node(
     bias: f64,
     rng: &mut impl Rng,
 ) -> Result<TargetReachability, MutationSkipReason> {
-    let all_indices: Vec<usize> = (0..genome.nodes.len()).collect();
-    let (source_idx, reachability) = biased_select_from(&all_indices, reachable_nodes, bias, rng)
-        .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let backend_def = genome.nodes[source_idx].backend_def.clone();
-    let new_id = next_node_id(genome);
-
-    let targets = if rng.gen_bool(0.5) {
-        genome.nodes[source_idx].targets.clone()
-    } else {
-        vec![]
-    };
-    let input_refs = if rng.gen_bool(0.5) {
-        genome.nodes[source_idx].input_refs.clone()
-    } else {
-        vec![]
-    };
-    genome.nodes.push(NodeGenome {
-        node_id: new_id,
-        input_refs,
-        backend_def,
-        targets,
-    });
-
-    // Add backlink to ensure the copied node is reachable, using the lowest
-    // unused slot. Skip if all slots are already occupied.
-    if let Some(slot) = lowest_unused_slot(&genome.nodes[source_idx].targets) {
-        genome.nodes[source_idx].targets.push(RouteTarget {
-            target_id: new_id,
-            slot,
-            gate_bias: 0.0,
-        });
-    }
-    Ok(reachability)
+    copy_attached(genome, reachable_nodes, bias, rng, None)
 }
 
 /// Maximum number of nodes in a mesh slice for copy operators.
@@ -172,10 +202,23 @@ const MESH_SLICE_MAX_SIZE: usize = 8;
 
 /// Clone a set of nodes identified by `gene_indices`, remapping internal
 /// target references to fresh NodeIds. Appends cloned nodes to the genome.
-/// With 50% probability, offsets CustomOutput slots in cloned Graph backends
-/// to avoid clobbering the originals. Always adds a backlink from a random
-/// pre-existing node to a random cloned node to ensure reachability.
-fn clone_and_remap_slice(genome: &mut CreatureGenome, gene_indices: &[usize], rng: &mut impl Rng) {
+/// Attachment to a pre-existing node is required before any copy is appended.
+fn clone_and_remap_slice(
+    genome: &mut CreatureGenome,
+    gene_indices: &[usize],
+    rng: &mut impl Rng,
+) -> Result<(), MutationSkipReason> {
+    let attachable: Vec<_> = genome
+        .nodes
+        .iter()
+        .enumerate()
+        .filter_map(|(i, n)| lowest_unused_slot(&n.targets).map(|slot| (i, slot)))
+        .collect();
+    if attachable.is_empty() {
+        return Err(MutationSkipReason::NoApplicableTarget);
+    }
+    let (source_idx, slot) = attachable[rng.gen_range(0..attachable.len())];
+    let mut used: HashSet<_> = genome.nodes.iter().map(|n| n.node_id).collect();
     // Build old_id -> new_id mapping. `new_ids` records the fresh ids in
     // `gene_indices` order (ascending, since the slice functions return sorted
     // indices) so the backlink target the seeded draw picks below is a function
@@ -187,7 +230,8 @@ fn clone_and_remap_slice(genome: &mut CreatureGenome, gene_indices: &[usize], rn
         let old_id = genome.nodes[idx].node_id;
         id_map.insert(old_id, next_id);
         new_ids.push(next_id);
-        next_id = NodeId::new(next_id.0.wrapping_add(1));
+        used.insert(next_id);
+        next_id = unused_id(&used, next_id.0.wrapping_add(1));
     }
 
     let cloned: Vec<NodeGenome> = gene_indices
@@ -217,7 +261,6 @@ fn clone_and_remap_slice(genome: &mut CreatureGenome, gene_indices: &[usize], rn
         })
         .collect();
 
-    let pre_existing_count = genome.nodes.len();
     genome.nodes.extend(cloned);
 
     // Note: previously remapped CustomOutput slots in cloned Graph backends
@@ -225,18 +268,14 @@ fn clone_and_remap_slice(genome: &mut CreatureGenome, gene_indices: &[usize], rn
     // remappable), and VM backends don't have CustomOutput node kinds, so
     // this remapping step is now a no-op and has been removed.
 
-    // Add backlink from random pre-existing node to a random cloned node to
-    // ensure reachability. Use the lowest unused slot; skip if all slots are
-    // already occupied on the selected source node.
+    // Attach through the preflighted free slot, retaining ordered target draws.
     let link_target = new_ids[rng.gen_range(0..new_ids.len())];
-    let source_idx = rng.gen_range(0..pre_existing_count);
-    if let Some(slot) = lowest_unused_slot(&genome.nodes[source_idx].targets) {
-        genome.nodes[source_idx].targets.push(RouteTarget {
-            target_id: link_target,
-            slot,
-            gate_bias: 0.0,
-        });
-    }
+    genome.nodes[source_idx].targets.push(RouteTarget {
+        target_id: link_target,
+        slot,
+        gate_bias: 0.0,
+    });
+    Ok(())
 }
 
 pub(super) fn apply_copy_mesh_backward_slice(
@@ -253,7 +292,7 @@ pub(super) fn apply_copy_mesh_backward_slice(
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let gene = mesh_backward_slice(genome, anchor_idx, MESH_SLICE_MAX_SIZE)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    clone_and_remap_slice(genome, &gene.indices, rng);
+    clone_and_remap_slice(genome, &gene.indices, rng)?;
     Ok(reachability)
 }
 
@@ -271,7 +310,7 @@ pub(super) fn apply_copy_mesh_forward_slice(
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
     let gene = mesh_forward_slice(genome, seed_idx, MESH_SLICE_MAX_SIZE)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    clone_and_remap_slice(genome, &gene.indices, rng);
+    clone_and_remap_slice(genome, &gene.indices, rng)?;
     Ok(reachability)
 }
 
@@ -280,35 +319,26 @@ pub(super) fn apply_splice_node(
     reachable_nodes: &[usize],
     bias: f64,
     rng: &mut impl Rng,
-    config: &MutationConfig,
-    food_type_count: usize,
 ) -> Result<TargetReachability, MutationSkipReason> {
-    let eligible: Vec<usize> = genome
-        .nodes
-        .iter()
-        .enumerate()
-        .filter(|(_, n)| !n.targets.is_empty())
-        .map(|(i, _)| i)
+    let valid_targets = |idx: usize| -> Vec<usize> {
+        genome.nodes[idx]
+            .targets
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| genome.nodes.iter().any(|n| n.node_id == t.target_id))
+            .map(|(i, _)| i)
+            .collect()
+    };
+    let eligible: Vec<_> = (0..genome.nodes.len())
+        .filter(|&i| !valid_targets(i).is_empty())
         .collect();
-    if eligible.is_empty() {
-        return Err(MutationSkipReason::NoApplicableTarget);
-    }
-    let (a_idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
+    let (idx, reachability) = biased_select_from(&eligible, reachable_nodes, bias, rng)
         .ok_or(MutationSkipReason::NoApplicableTarget)?;
-    let target_slot = rng.gen_range(0..genome.nodes[a_idx].targets.len());
-    let b_id = genome.nodes[a_idx].targets[target_slot].target_id;
-    let c_id = next_node_id(genome);
-    genome.nodes.push(birth::new_topology_birth_node(
-        c_id,
-        vec![RouteTarget {
-            target_id: b_id,
-            slot: 0,
-            gate_bias: 0.0,
-        }],
-        config,
-        food_type_count,
-        rng,
-    ));
-    genome.nodes[a_idx].targets[target_slot].target_id = c_id;
+    let targets = valid_targets(idx);
+    let position = targets[rng.gen_range(0..targets.len())];
+    let successor = genome.nodes[idx].targets[position].target_id;
+    let new_id = next_node_id(genome);
+    genome.nodes.push(birth::detour(new_id, successor));
+    genome.nodes[idx].targets[position].target_id = new_id;
     Ok(reachability)
 }

@@ -5,7 +5,7 @@ use crate::creature::genome::{BackendDef, CreatureGenome};
 use crate::mutation::reachability::biased_select_from;
 use crate::mutation::types::{MutationSkipReason, TargetReachability};
 
-mod operators;
+pub(crate) mod operators;
 use operators::*;
 #[cfg(test)]
 pub(crate) use operators::{

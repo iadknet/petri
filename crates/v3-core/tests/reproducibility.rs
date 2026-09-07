@@ -1,7 +1,10 @@
 //! Cross-process reproducibility of a seeded run (T10.F11).
 //!
 //! Two `Simulation`s seeded with the same seed and config must produce
-//! byte-identical trajectories. Because std `HashMap`'s `RandomState` derives a
+//! byte-identical trajectories at every tick, including living descendants
+//! after the required operator categories have fired. Final persistence is
+//! not this stress fixture's gate: T11.F15 reaches extinction at tick 250,
+//! while default viability and goal-profile persistence are checked separately. Because std `HashMap`'s `RandomState` derives a
 //! fresh key pair per map — even inside one thread — a run whose RNG draws are
 //! indexed into a list built by iterating a `HashMap` diverges between the two
 //! simulations built here, exactly as it diverges between two processes. So
@@ -12,9 +15,7 @@
 //! 96-by-96 world, 150 founders, full initial food coverage and density, and
 //! `mutation_probability = 1.0`, 4 to 10 mutation events per birth, and
 //! `mesh_layer_probability = 0.5`, so the corrected operators are reached
-//! within the 250-tick horizon (measured: 65 births, `Vm.MutatePairedSlotAddress`
-//! applied 4 times, `Topology.CopyMeshBackwardSlice` 7, `Topology.CopyMeshForwardSlice`
-//! 13; about 8 seconds in a debug build). Every founder
+//! within the unchanged 250-tick horizon. Every founder
 //! genome gets four paired slot groups appended to its first VM program, which
 //! is what makes a `Vm.MutatePairedSlotAddress` candidate list exist at all
 //! (the v3alpha1 founder program has no slot instructions), so that operator is
@@ -46,8 +47,8 @@ fn reproducibility_config() -> SimulationConfig {
     cfg
 }
 
-/// Seed a simulation, inject the paired slot groups, and run `TICKS` ticks.
-fn run(seed: u64) -> Simulation {
+/// Seed a simulation and inject the paired slot groups.
+fn seeded_fixture(seed: u64) -> Simulation {
     let mut sim = seed_simulation(reproducibility_config(), seed);
     for (_, creature) in sim.creatures.iter_mut() {
         let vm = creature
@@ -66,9 +67,6 @@ fn run(seed: u64) -> Simulation {
                     VmInstruction::StoreSlotImm { slot_idx, src: 0 },
                 ]
             }));
-    }
-    for _ in 0..TICKS {
-        run_tick(&mut sim, &mut None);
     }
     sim
 }
@@ -116,8 +114,41 @@ fn applied(sim: &Simulation, op: MutationOperator) -> u64 {
 
 #[test]
 fn two_simulations_with_the_same_seed_are_byte_identical() {
-    let first = run(SEED);
-    let second = run(SEED);
+    let mut first = seeded_fixture(SEED);
+    let mut second = seeded_fixture(SEED);
+    let mut compared_mutated_descendant = false;
+    for tick in 0..=TICKS {
+        assert_eq!(
+            work_counters(&first),
+            work_counters(&second),
+            "work counters diverged at tick {tick}"
+        );
+        assert_eq!(
+            first.creature_count(),
+            second.creature_count(),
+            "population diverged at tick {tick}"
+        );
+        for (index, (a, b)) in population_fingerprint(&first)
+            .iter()
+            .zip(population_fingerprint(&second).iter())
+            .enumerate()
+        {
+            assert_eq!(a, b, "creature {index} diverged at tick {tick}");
+        }
+        compared_mutated_descendant |= applied(&first, MutationOperator::VmMutatePairedSlotAddress)
+            > 0
+            && applied(&first, MutationOperator::TopologyCopyMeshBackwardSlice)
+                + applied(&first, MutationOperator::TopologyCopyMeshForwardSlice)
+                > 0
+            && first
+                .creatures
+                .values()
+                .any(|creature| creature.generation > 0);
+        if tick < TICKS {
+            run_tick(&mut first, &mut None);
+            run_tick(&mut second, &mut None);
+        }
+    }
 
     let paired = applied(&first, MutationOperator::VmMutatePairedSlotAddress);
     let backward = applied(&first, MutationOperator::TopologyCopyMeshBackwardSlice);
@@ -141,28 +172,8 @@ fn two_simulations_with_the_same_seed_are_byte_identical() {
          the corrected backlink target"
     );
 
-    assert_eq!(
-        work_counters(&first),
-        work_counters(&second),
-        "work counters diverged between two runs of seed {SEED}"
-    );
-    assert_eq!(
-        first.creature_count(),
-        second.creature_count(),
-        "population size diverged between two runs of seed {SEED}"
-    );
     assert!(
-        first.creature_count() > 0,
-        "the run went extinct, so it proves nothing about reproducibility"
+        compared_mutated_descendant,
+        "must compare living descendants after paired-slot and mesh-slice mutations have applied"
     );
-    for (i, (a, b)) in population_fingerprint(&first)
-        .iter()
-        .zip(population_fingerprint(&second).iter())
-        .enumerate()
-    {
-        assert_eq!(
-            a, b,
-            "creature {i} diverged between two runs of seed {SEED}"
-        );
-    }
 }

@@ -9,7 +9,6 @@ import type {
 	RuntimeConfig,
 	SimulationConfig,
 	StartupFoodRequest,
-	TopologyNewNodeBirthConfig,
 	VmConfig,
 	WorldConfig,
 } from "./config.ts";
@@ -67,9 +66,8 @@ export interface StartupRequest {
 	runtime?: Partial<Omit<RuntimeConfig, "vm">> & {
 		vm?: Partial<VmConfig>;
 	};
-	mutation?: Partial<Omit<MutationConfig, "phenotype" | "topology_new_node_birth">> & {
+	mutation?: Partial<Omit<MutationConfig, "phenotype">> & {
 		phenotype?: Partial<PhenotypeConfig>;
-		topology_new_node_birth?: Partial<TopologyNewNodeBirthConfig>;
 	};
 	startup?: {
 		ramps?: {

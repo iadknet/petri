@@ -17,8 +17,7 @@ use crate::sensors::perception::SensorSnapshot;
 ///
 /// Before the first mesh execution of each new world tick, the caller must call
 /// [`GraphRuntimeState::begin_tick`] on `graph_runtime`. Mesh execution does not
-/// advance the graph clock. Repeated mesh visits in the same tick must reuse the
-/// existing snapshots without calling `begin_tick` again.
+/// advance the graph clock. Each mesh node dispatches at most once per tick.
 #[allow(clippy::too_many_arguments)]
 pub fn execute_creature_mesh_traced(
     genome: &CreatureGenome,
@@ -46,8 +45,7 @@ pub fn execute_creature_mesh_traced(
 ///
 /// Before the first mesh execution of each new world tick, the caller must call
 /// [`GraphRuntimeState::begin_tick`] on `graph_runtime`. Mesh execution does not
-/// advance the graph clock. Repeated mesh visits in the same tick must reuse the
-/// existing snapshots without calling `begin_tick` again.
+/// advance the graph clock. Each mesh node dispatches at most once per tick.
 #[allow(clippy::too_many_arguments)]
 pub fn execute_creature_mesh_traced_with_reserve(
     genome: &CreatureGenome,
@@ -1140,7 +1138,10 @@ mod tests {
             "maximum hops",
             &CreatureGenome {
                 entry_node_id: id,
-                nodes: vec![halt_node(wrap_targets(vec![id]))],
+                nodes: vec![
+                    halt_node(wrap_targets(vec![missing])),
+                    vm_emit_node(missing, 1, vec![]),
+                ],
             },
             &max_hops_config,
             100.0,

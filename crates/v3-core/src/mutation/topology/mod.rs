@@ -24,7 +24,6 @@ pub enum TopologyOperator {
     RemoveRouteTarget,
     ChangeEntryNode,
     SwapNodeBackend,
-    RewriteNodeId,
     CopyNode,
     CopyMeshBackwardSlice,
     CopyMeshForwardSlice,
@@ -34,7 +33,7 @@ pub enum TopologyOperator {
 }
 
 impl TopologyOperator {
-    pub const ALL: [Self; 14] = [
+    pub const ALL: [Self; 13] = [
         Self::AddNode,
         Self::RemoveNode,
         Self::RetargetNodeTarget,
@@ -42,7 +41,6 @@ impl TopologyOperator {
         Self::RemoveRouteTarget,
         Self::ChangeEntryNode,
         Self::SwapNodeBackend,
-        Self::RewriteNodeId,
         Self::CopyNode,
         Self::CopyMeshBackwardSlice,
         Self::CopyMeshForwardSlice,
@@ -61,9 +59,8 @@ impl TopologyOperator {
             Self::RetargetNodeTarget => 2,
             Self::AddRouteTarget => 2,
             Self::RemoveRouteTarget => 2,
-            Self::ChangeEntryNode => 2,
+            Self::ChangeEntryNode => 1,
             Self::SwapNodeBackend => 1,
-            Self::RewriteNodeId => 4,
             Self::CopyNode => 1,
             Self::CopyMeshBackwardSlice => 1,
             Self::CopyMeshForwardSlice => 1,
@@ -78,7 +75,7 @@ impl TopologyOperator {
         // weight() will still compile (exhaustive match), but ALL will be incomplete.
         // This assertion catches that at compile time.
         assert!(
-            Self::ALL.len() == 14,
+            Self::ALL.len() == 13,
             "ALL must cover every TopologyOperator variant"
         );
         let mut sum = 0u16;
@@ -100,12 +97,11 @@ impl TopologyOperator {
             | Self::CopyMeshBackwardSlice
             | Self::CopyMeshForwardSlice
             | Self::SpliceNode
+            | Self::SwapNodeBackend
             | Self::AddRouteTarget => ComplexityEffect::Increasing,
             Self::RemoveNode | Self::RemoveRouteTarget => ComplexityEffect::Decreasing,
             Self::RetargetNodeTarget
             | Self::ChangeEntryNode
-            | Self::SwapNodeBackend
-            | Self::RewriteNodeId
             | Self::SwapRouteTargets
             | Self::MutateGateBias => ComplexityEffect::Neutral,
         }
@@ -132,7 +128,7 @@ impl TopologyMutator {
     /// Apply a topology operator to the genome with reachability-biased target selection.
     ///
     /// Returns `Ok(TargetReachability)` on success, or `Err(MutationSkipReason)` if no
-    /// applicable target exists. Exempt operators (AddNode, ChangeEntryNode) return
+    /// applicable target exists. The exempt operator ChangeEntryNode returns
     /// `NotApplicable` since they don't select a target node.
     #[cfg(test)]
     pub fn apply(
@@ -154,13 +150,11 @@ impl TopologyMutator {
         bias: f64,
         rng: &mut impl Rng,
         config: &MutationConfig,
-        food_type_count: usize,
+        _food_type_count: usize,
     ) -> Result<TargetReachability, MutationSkipReason> {
         match op {
-            // Exempt: these don't select a target node for mutation.
             TopologyOperator::AddNode => {
-                structural::apply_add_node(genome, config, food_type_count, rng)
-                    .map(|()| TargetReachability::NotApplicable)
+                structural::apply_splice_node(genome, reachable_nodes, bias, rng)
             }
             TopologyOperator::ChangeEntryNode => structural::apply_change_entry_node(genome, rng)
                 .map(|()| TargetReachability::NotApplicable),
@@ -171,9 +165,6 @@ impl TopologyMutator {
             TopologyOperator::SwapNodeBackend => {
                 structural::apply_swap_node_backend(genome, reachable_nodes, bias, rng, config)
             }
-            TopologyOperator::RewriteNodeId => {
-                structural::apply_rewrite_node_id(genome, reachable_nodes, bias, rng)
-            }
             TopologyOperator::CopyNode => {
                 structural::apply_copy_node(genome, reachable_nodes, bias, rng)
             }
@@ -183,20 +174,15 @@ impl TopologyMutator {
             TopologyOperator::CopyMeshForwardSlice => {
                 structural::apply_copy_mesh_forward_slice(genome, reachable_nodes, bias, rng)
             }
-            TopologyOperator::SpliceNode => structural::apply_splice_node(
-                genome,
-                reachable_nodes,
-                bias,
-                rng,
-                config,
-                food_type_count,
-            ),
+            TopologyOperator::SpliceNode => {
+                structural::apply_splice_node(genome, reachable_nodes, bias, rng)
+            }
             // Biased routing operators:
             TopologyOperator::RetargetNodeTarget => {
                 routing::apply_retarget_node_target(genome, reachable_nodes, bias, rng)
             }
             TopologyOperator::AddRouteTarget => {
-                routing::apply_add_route_target(genome, reachable_nodes, bias, rng)
+                routing::apply_add_route_target(genome, reachable_nodes, bias, rng, config)
             }
             TopologyOperator::RemoveRouteTarget => {
                 routing::apply_remove_route_target(genome, reachable_nodes, bias, rng)
@@ -213,3 +199,6 @@ impl TopologyMutator {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod f15_tests;

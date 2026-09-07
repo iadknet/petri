@@ -56,6 +56,7 @@ Each tick evaluates a routing chain from `entry_node_id`.
 current_node_id = genome.entry_node_id
 upstream_slots = [0.0; 12]
 action_queue = []
+visited = {}  # reset each tick
 hops = 0
 max_mesh_hops = validated(config.max_mesh_hops, default=1024, min=1)
 
@@ -63,9 +64,10 @@ loop:
   if hops >= max_mesh_hops:
     return action_queue_or_noop()
 
+  mark current_node_id visited
   evaluate current node with upstream_slots -> NodeResult {
     output_slots: [f32; 12],
-    route: RouteDecision,
+    route_gates: [f32; 8],
     terminal: bool,
     energy_exhausted: bool,
   }
@@ -76,12 +78,11 @@ loop:
   if terminal:
     return action_queue_or_noop()
 
-  if node.targets is empty:
+  target = earliest argmax(gate_bias + route_gates[slot]) among unvisited IDs
+  if no target remains:
     return action_queue_or_noop()
 
-  target_idx = resolve_route_index(node.targets.len(), route)
-
-  target_id = node.targets[target_idx]
+  target_id = target.target_id
   if target_id is missing from genome node set:
     return action_queue_or_noop()
 
@@ -92,11 +93,13 @@ loop:
 
 Notes:
 - Entry upstream slots are zeroed only on the first hop.
-- If routing later returns to the entry node, routed upstream slots are used.
+- Each dispatched node is marked visited before execution and runs at most once.
 - For every node evaluation, `output_slots` starts as a copy of incoming
   `upstream_slots`; backend slot writes overwrite addressed slots only.
 - Slots not written during a node evaluation pass through unchanged.
-- No visited set is used; self-loops are legal.
+- A visited top-scoring target falls through to the next eligible target.
+  Ties keep the earliest eligible vector position. Missing winners still
+  terminate softly without falling through. The cap bounds long acyclic chains.
 - Canonical owner for `runtime.max_mesh_hops` defaults/validation:
   `v3-runtime-config-spec.md`.
 
@@ -106,8 +109,8 @@ Notes:
 
 A single chain evaluation terminates on the first matching condition:
 
-1. Node execution returns `terminal = true`.
-2. Energy reaches zero during node evaluation (`energy_exhausted = true`).
+1. Energy reaches zero during node evaluation (`energy_exhausted = true`).
+2. Node execution returns `terminal = true`.
 3. `max_mesh_hops` failsafe triggers.
 4. Runtime hits a broken routing state handled by soft default (preserve queue;
    return `NoOp` when queue is empty).
@@ -123,7 +126,8 @@ Graph internal recurrence rule:
 - Phase 0 snapshots committed graph temporal state once per world tick.
 - Each visit evaluates once in index order; self/higher-index edges read the
   tick-start outputs, lower-index edges read current-visit outputs.
-- Repeated visits recompute from that frozen base; skipped modules hold state.
+- Production mesh dispatch visits each node at most once; skipped modules hold state.
+  Direct backend harness calls retain the frozen-base clock contract.
 - Legacy convergence settings are accepted but ignored. Canonical semantics:
   `v3-graph-backend-spec.md`; config disposition: `v3-runtime-config-spec.md`.
 
@@ -139,17 +143,17 @@ behavior.
 | Condition | Runtime behavior |
 |---|---|
 | `entry_node_id` missing from node set | Return `WorldAction::NoOp` |
-| VM route decision (`RouteDecision::VmWrap`) with negative/out-of-range/non-finite raw value | Map to signed route index and wrap with `rem_euclid(targets.len())` |
-| Graph route decision (`RouteDecision::CgpNormalized`) with out-of-range/non-finite raw value | Sanitize + clamp to `[0.0, 1.0]`, then bin via `idx = min(floor(clamp01(raw) * targets.len()), targets.len()-1)` |
-| Routed target id missing | Return `WorldAction::NoOp` |
-| Routing requested but `targets` is empty | Return `WorldAction::NoOp` |
+| Routed target id missing | Preserve accumulated queue or return `NoOp` |
+| No unvisited target remains | Preserve accumulated queue or return `NoOp` |
+| Invalid gate slot | Runtime score is zero |
+| All eligible effective scores are NaN or negative infinity | Earliest eligible target wins |
 | `ReadInput` `ref_idx` out of range | Yield `0.0` |
 | `ReadInput` `sub_idx` out of range (compound) | Yield `0.0` |
 | Scalar input with `sub_idx > 0` | Yield `0.0` |
 | `UpstreamSlot` slot out of range | Yield `0.0` |
 | Node backend does not write an output slot | Preserve incoming `upstream_slots[slot]` |
 | Graph edge source out of bounds | Input contributes `0.0` |
-| Repeated graph visit | Recompute from tick-start temporal state |
+| Route points to a visited node | Filter that target before argmax |
 | Graph state for `NodeId` missing | Allocate zero-initialized state and continue |
 
 This policy intentionally allows junk DNA. Invalid offspring are culled by
@@ -179,10 +183,7 @@ runtime determinism is not a product requirement.
 This section defines V3-local harness controls for deterministic tests.
 
 For deterministic tests, use a fixed mode that pins:
-- Routing conversion (`NaN -> -1`, `+inf -> i64::MAX`, `-inf -> i64::MIN`) and
-  `rem_euclid` wrapping for VM route decisions.
-- CGP routing conversion (`sanitize_f32(raw)`, clamp to `[0.0, 1.0]`, bounded
-  binning to `0..targets.len()-1`) for graph route decisions.
+- Earliest eligible target wins score ties; NaN never beats an existing score.
 - Float sanitation rules from VM/graph specs before routing decisions.
 - Node iteration order (`nodes` order and internal graph order).
 - Graph index order and frozen tick-start temporal read bases.
@@ -191,3 +192,9 @@ For deterministic tests, use a fixed mode that pins:
 Tick-order/action-arbitration reproducibility controls are specified separately
 in `v3-tick-orchestration-spec.md` (`Test-Mode Reproducibility Notes (Tick
 Arbitration)`).
+
+T11.F15 pairs new branches with backend gates and pass-through detours; see
+`v3-mutation-spec.md`. Extra dispatches/instructions retain their normal
+work and energy accounting. Neutrality requires sufficient budgets and does
+not promise equal downstream live-energy introspection or exhaustion outcomes.
+Production, full trace and compact observations share the same dispatch loop.
