@@ -354,6 +354,66 @@ or epoch re-pin recorded; lower the `executed_bias` default and re-measure;
 pull a T11.F13 program-length lever forward; or add a temporary VM cap-hit
 counter and re-run the goal profile to settle (a) against (b).
 
+#### Diagnostic probe, 2026-09-07 (uncommitted)
+
+The open question above was settled with a temporary in-crate probe: a
+`#[test] #[ignore]` at `crates/v3-core/src/simulation/tick/tests/vm_steps_probe.rs`
+plus a one-line module registration, both deleted after the run and never
+committed. No production code, default, threshold, baseline, or report was
+touched. The probe rebuilt the goal-profile world from
+`SimulationConfig::default()` with `goal_profile_params`'s overrides
+(1600x1600, 10,000 founders, production food coverage), ran 2,000 ticks, then
+executed one further traced tick per living creature with real sensors
+(`assemble_sensor_inputs` and `execute_creature_mesh_traced`), reading per-hop
+VM step counts, executed program lengths, and executed pc sequences. Commands:
+`cargo test --release -p v3-core --lib vm_steps_probe --no-run`, then
+`scripts/bench-wait ./target/release/deps/v3_core-be591d3a9d8f5a9f
+vm_steps_probe --ignored --nocapture --test-threads=1` — exit 0, 223.98 s for both seeds.
+
+World identity check, run before reading anything else: the probe's seed-33 run
+reproduced the stored goal report exactly (final population 11,379, `vm_steps`
+336.39040 per creature-tick, `mesh_hops` 2.07589), and its seed-11 control
+reproduced 714, 24.35397, and 2.06668. Per-creature `work_counters.vm_steps`
+equalled the summed per-hop trace steps exactly in both seeds (gap 0).
+
+| Probe-tick reading (one traced tick after tick 2,000) | Seed 33 | Seed 11 (control) |
+| --- | --- | --- |
+| Creatures / VM hops / graph hops | 11,379 / 13,322 / 11,536 | 714 / 752 / 1,022 |
+| VM steps per creature: min / p50 / p90 / p99 / max | 0 / 39 / 10,000 / 10,021 / 20,002 | 0 / 25 / 27 / 28 / 30 |
+| VM steps per creature, mean | 1,297.630 | 24.234 |
+| VM steps per executed hop: p50 / p90 / max | 29 / 10,000 / 10,000 | 25 / 27 / 30 |
+| Executed program length: min / p50 / p90 / p99 / max (mean) | 1 / 85 / 99 / 122 / 153 (76.016) | 1 / 74 / 102 / 134 / 144 (79.779) |
+| Steps per instruction of the executed program: p50 / p90 / max | 0.458 / 89.285 / 10,000 | 0.315 / 0.375 / 1.000 |
+| Creatures reaching `max_vm_steps` (10,000) | 1,371 = 12.05%; 1,443 hops = 10.83% | 0; 0 |
+| Share of the tick's VM steps inside cap-reaching creatures | 97.76% (14,434,607 of 14,765,732) | 0% (0 of 17,303) |
+| Executed programs containing a backward jump (static) | 10,050 hops = 75.44%; 86.96% of creatures | 295 hops = 39.23%; 41.32% of creatures |
+| Executed hops whose pc sequence actually steps backward | 6,494 = 48.75%; 56.43% of creatures; those hops hold 99.13% of the tick's steps | 21 = 2.79%; 2.94% of creatures; 3.01% of steps |
+
+Reading: the data supports hypothesis (b), programs that loop toward
+`max_vm_steps`, and does not support (a). The executed programs are not broadly
+longer — their length distribution is essentially the same in both seeds (mean
+76.0 against 79.8; p90 99 against 102) — and the median seed-33 creature runs 39
+VM steps against the control's 25, which cannot produce a 4.6x counter. The
+whole excess sits in a tail that runs to the cap: 12.05% of seed 33's creatures
+have at least one node hitting exactly 10,000 steps, and those creatures carry
+97.76% of the tick's VM steps, while the control has none. The loop is real
+execution, not just opcode presence: static backward jumps are common in both
+seeds (75.44% against 39.23% of executed programs), so their presence is not
+what distinguishes the seeds, but hops whose pc sequence actually steps backward
+are 48.75% of seed 33's hops against 2.79% of the control's and hold 99.13% of
+seed 33's steps. Two scale caveats. First, this is the final tick, heavier than
+the run mean (1,297.63 against 336.39 steps per creature-tick), so the
+cap-reaching share grew across the run: a run mean of 336.39 over a non-cap
+baseline near 30 steps implies roughly 3% of creature-ticks at the cap on
+average against 12.05% at the end, and 3% of creature-ticks at 2.076 hops per
+creature-tick is about 1.4% of hops, inside the 1.2%-1.6%-of-hops estimate
+recorded above. Second, the cap-reaching tail is 12.05% of the population
+(1,371 creatures); the probe did not read `identity.lineage_id`, so whether
+they belong to one lineage or several is unmeasured. The probe also compares
+two F17 seeds only — no F16 world was probed, so it settles
+the mechanism of the excess and not whether this feature caused the looping
+lineages to spread.
+
 Also recorded: `reachable_structure_size_distribution` mean 118.863266
 against 85.491919, median 114 against 81, p75 135 against 84, max 428
 against 283, min 1 against 44.
