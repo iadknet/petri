@@ -487,7 +487,8 @@ T11.F13 should take when it characterizes rates on this substrate.
   steps, at `opcode_cost_multiplier` 1e-6 energy per step, so a capped loop
   costs 0.01 energy and is nearly unselected against. The feature delivers
   mutations to executed programs by design; the uncosted loop is the
-  existing VM-cost lever (T03.F08's question), not a defect in targeting.
+  existing VM-cost lever (now T03.F10's question; T03.F08 was later
+  scoped to genome size, not execution), not a defect in targeting.
   **Orchestrator decision, 2026-09-07: stop and ask the user.** The two
   earlier severe goal-profile costs (T11.F04, the nutrition removal) were
   each accepted post-observation by the user explicitly; the orchestrator
@@ -495,7 +496,7 @@ T11.F13 should take when it characterizes rates on this substrate.
   accept the measured goal cost and re-pin the goal epoch to this report
   under the existing mechanism, closing as measured; (2) lower the
   `executed_bias` default and re-measure once; (3) pull a VM step-cost or
-  cap lever forward (T03.F08 or a lower `max_vm_steps`) as a separate
+  cap lever forward (what became T03.F10, or a lower `max_vm_steps`) as a separate
   decision before closure. The worktree and branch are preserved; the
   implementation, tests, mutation evidence, and both stored reports stand.
 - **User direction, 2026-09-07 (after the blocker report)**: the VM-loop
