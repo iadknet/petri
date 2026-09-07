@@ -505,7 +505,7 @@ fn split_skips_a_live_introspection_edge_into_a_non_compute_consumer_under_plast
 }
 
 #[test]
-fn split_exclusion_is_scoped_to_all_three_of_its_conditions() {
+fn split_exclusion_is_scoped_to_each_of_its_conditions() {
     let world_refs = vec![InputReference::World(WorldInputKey::NeighborBarrierRing)];
     for (label, def, refs) in [
         (
@@ -522,6 +522,17 @@ fn split_exclusion_is_scoped_to_all_three_of_its_conditions() {
             "not introspection",
             introspection_edge_def(true, false),
             world_refs,
+        ),
+        // Only `EnergyCurrent` differs between the evaluation and effects
+        // contexts (`runtime/cgp/execute.rs`: the plasticity-cost deduction
+        // sits between them and touches nothing else), so the other two
+        // dynamic keys are outside the exclusion and still split.
+        (
+            "another dynamic introspection key",
+            introspection_edge_def(true, false),
+            vec![InputReference::DynamicIntrospection(
+                DynamicIntrospectionKey::ReproductiveReserveCurrent,
+            )],
         ),
     ] {
         let mut child = def.clone();
