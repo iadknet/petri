@@ -566,10 +566,16 @@ per side on unpaired populations; nothing here is a claim about cognition.
     any neutrality claim at exhaustion, so this is a coverage gap against a
     property the feature does not assert; closing it needs a low-energy arm
     that is a behavior claim of its own.
-  - **P3-10.** Two visibility/reuse cleanups. `activate_copies` in
+  - **P3-10.** Two visibility/reuse cleanups, both re-raised independently by
+    the remediation pass's `simplify` run and both left as the reviewer
+    recorded them. `activate_copies` in
     `crates/v3-core/src/mutation/graph/tests/f08.rs` re-walks the five
     edge-bearing surfaces by hand where `CgpGraphBackendDef::for_each_edge_mut`
-    could be widened from private to `pub(crate)` and reused, and
+    could be widened from private to `pub(crate)` and reused; note that it is
+    not a drop-in, because `for_each_edge_mut` also walks the duplicated
+    nodes' own inputs, which `activate_copies` must leave alone, so reuse
+    needs a per-node filter the helper does not offer today.
     `is_terminal_instruction` in `mutation/vm/operators.rs` is `pub(crate)`
-    but used only inside its own module. Neither changes behavior; both are
-    left for the next feature that touches those files.
+    but used only inside its own module and can be narrowed to `fn`. Neither
+    changes behavior; both are left for the next feature that touches those
+    files.
