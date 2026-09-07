@@ -27,42 +27,50 @@ fn ramp_config(allowance: u32, ramp: f32, cost_mult: f32, max_steps: u32) -> Run
     cfg
 }
 
-/// Runs `steps` Noops (control falls off the end of the program, so the step
-/// count is exactly the program length) and returns the energy actually spent.
+/// A `Jump { offset: -1 }` self-loop: it runs until the step cap or exhaustion.
+fn jump_loop() -> Vec<VmInstruction> {
+    vec![VmInstruction::Jump { offset: -1 }]
+}
+
+/// Energy spent by a dispatch of exactly `steps` Noops. Control falls off the
+/// end of the program, so the step count is the program length.
 fn charge_for_noops(steps: u32, energy: f32, cfg: &RuntimeConfig) -> f32 {
-    let def = VmBackendDef {
-        register_count: 1,
-        constants: vec![],
-        program: vec![VmInstruction::Noop; steps as usize],
-    };
-    let ss = empty_sensor_snapshot();
-    let mut e = energy;
-    let mut mem = [0.0f32; 16];
-    let prev_mem = [0.0f32; 16];
-    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
-    let result = execute_vm_node(
-        &def,
+    let (result, remaining, side_outputs) = run_vm_with_config(
+        vec![VmInstruction::Noop; steps as usize],
+        1,
+        vec![],
         &[],
-        &zeroed_upstream(),
-        &mut e,
-        0.0,
-        &mut mem,
-        &prev_mem,
-        &ss,
-        cfg,
-        &mut side_outputs,
+        zeroed_upstream(),
+        energy,
+        cfg.clone(),
     );
     assert!(!result.energy_exhausted, "dispatch must not exhaust");
     assert_eq!(side_outputs.work_counters.vm_steps, steps);
-    energy - e
+    energy - remaining
 }
 
-/// Per-step charges recorded by the traced executor for a Noop program.
-fn traced_noop_steps(steps: u32, energy: f32, cfg: &RuntimeConfig) -> Vec<(f32, f32)> {
+/// Energy spent by a `Jump` self-loop that runs to the configured step cap.
+fn charge_for_capped_jump_loop(energy: f32, cfg: &RuntimeConfig) -> f32 {
+    let (result, remaining, side_outputs) = run_vm_with_config(
+        jump_loop(),
+        1,
+        vec![],
+        &[],
+        zeroed_upstream(),
+        energy,
+        cfg.clone(),
+    );
+    assert!(!result.terminal && !result.energy_exhausted);
+    assert_eq!(side_outputs.work_counters.vm_steps, cfg.max_vm_steps);
+    energy - remaining
+}
+
+/// Runs the traced executor and returns each step's `(energy_cost, energy_after)`.
+fn traced_steps(program: Vec<VmInstruction>, energy: f32, cfg: &RuntimeConfig) -> Vec<(f32, f32)> {
     let def = VmBackendDef {
         register_count: 1,
         constants: vec![],
-        program: vec![VmInstruction::Noop; steps as usize],
+        program,
     };
     let ss = empty_sensor_snapshot();
     let mut e = energy;
@@ -91,179 +99,76 @@ fn traced_noop_steps(steps: u32, energy: f32, cfg: &RuntimeConfig) -> Vec<(f32, 
 // ── Charge shape ──────────────────────────────────────────────────────────
 
 #[test]
-fn a_dispatch_within_the_allowance_charges_base_costs_only() {
-    // 8 Noops, allowance 10, ramp 1.0: no step is past the allowance.
-    let cfg = ramp_config(10, 1.0, 1.0, 10_000);
-    let charged = charge_for_noops(8, 1_000.0, &cfg);
+fn the_mth_step_past_the_allowance_charges_base_plus_m() {
+    // At ramp 1.0 the m-th step past the allowance pays m on top of Noop's 0.05,
+    // whether the allowance is a few steps or none at all.
+    for allowance in [3u32, 0] {
+        let cfg = ramp_config(allowance, 1.0, 1.0, 10_000);
+        let costs: Vec<f32> = traced_steps(vec![VmInstruction::Noop; 6], 1_000.0, &cfg)
+            .iter()
+            .map(|(cost, _)| *cost)
+            .collect();
 
-    assert!(
-        (f64::from(charged) - 8.0 * 0.05).abs() < 1e-4,
-        "charged {charged} for 8 Noops within the allowance",
-    );
+        assert_eq!(costs.len(), 6);
+        for (index, cost) in costs.iter().enumerate() {
+            let k = index as u32 + 1;
+            let expected = 0.05 + k.saturating_sub(allowance) as f32;
+            assert!(
+                (cost - expected).abs() < 1e-5,
+                "at allowance {allowance}, step {k} charged {cost}, expected {expected}",
+            );
+        }
+    }
 }
 
 #[test]
-fn the_mth_step_past_the_allowance_charges_base_plus_m() {
-    // Allowance 3, ramp 1.0: steps 4, 5, 6 pay 1.0, 2.0, 3.0 on top of Noop's 0.05.
-    let cfg = ramp_config(3, 1.0, 1.0, 10_000);
-    let steps = traced_noop_steps(6, 1_000.0, &cfg);
+fn a_dispatch_the_ramp_does_not_reach_charges_base_costs_only() {
+    // Either because every step is inside the allowance, or because the ramp
+    // rate is zero.
+    for (steps, cfg) in [
+        (8u32, ramp_config(10, 1.0, 1.0, 10_000)),
+        (64, ramp_config(3, 0.0, 1.0, 10_000)),
+    ] {
+        let charged = charge_for_noops(steps, 1_000.0, &cfg);
+        let expected = f64::from(steps) * 0.05;
 
-    let costs: Vec<f32> = steps.iter().map(|(cost, _)| *cost).collect();
-    assert_eq!(costs.len(), 6);
-    for (index, cost) in costs.iter().enumerate() {
-        let k = index as u32 + 1;
-        let expected = 0.05 + f32::from(u8::try_from(k.saturating_sub(3)).unwrap());
         assert!(
-            (cost - expected).abs() < 1e-5,
-            "step {k} charged {cost}, expected {expected}",
+            (f64::from(charged) - expected).abs() < 1e-3,
+            "charged {charged} for {steps} Noops, expected {expected}",
         );
     }
 }
 
 #[test]
-fn zero_allowance_ramps_from_the_first_step() {
-    let cfg = ramp_config(0, 1.0, 1.0, 10_000);
-    let costs: Vec<f32> = traced_noop_steps(3, 1_000.0, &cfg)
-        .iter()
-        .map(|(cost, _)| *cost)
-        .collect();
-
-    assert!(
-        (costs[0] - 1.05).abs() < 1e-5,
-        "first step charged {}",
-        costs[0]
-    );
-    assert!(
-        (costs[1] - 2.05).abs() < 1e-5,
-        "second step charged {}",
-        costs[1]
-    );
-    assert!(
-        (costs[2] - 3.05).abs() < 1e-5,
-        "third step charged {}",
-        costs[2]
-    );
-}
-
-#[test]
-fn a_zero_ramp_cost_charges_base_costs_only() {
-    let cfg = ramp_config(3, 0.0, 1.0, 10_000);
-    let charged = charge_for_noops(64, 1_000.0, &cfg);
-
-    assert!(
-        (f64::from(charged) - 64.0 * 0.05).abs() < 1e-3,
-        "charged {charged} with the ramp disabled",
-    );
-}
-
-#[test]
 fn a_capped_dispatch_settles_the_closed_form_total_once() {
-    // The Jump loop runs to the step cap; the charge is the closed form.
     let cfg = ramp_config(4, 1.0, 1.0, 20);
-    let def = VmBackendDef {
-        register_count: 1,
-        constants: vec![],
-        program: vec![VmInstruction::Jump { offset: -1 }],
-    };
-    let ss = empty_sensor_snapshot();
-    let mut e = 100_000.0f32;
-    let mut mem = [0.0f32; 16];
-    let prev_mem = [0.0f32; 16];
-    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
-    let result = execute_vm_node(
-        &def,
-        &[],
-        &zeroed_upstream(),
-        &mut e,
-        0.0,
-        &mut mem,
-        &prev_mem,
-        &ss,
-        &cfg,
-        &mut side_outputs,
-    );
-
-    assert!(!result.terminal && !result.energy_exhausted);
-    assert_eq!(side_outputs.work_counters.vm_steps, 20);
     // Jump base 0.10 * 20 = 2.0, ramp 16 * 17 / 2 = 136.0.
     let expected = closed_form_total(20, 0.10, 1.0, 4, 1.0);
+    let charged = charge_for_capped_jump_loop(100_000.0, &cfg);
+
     assert!(
-        (f64::from(100_000.0f32 - e) - expected).abs() < 0.02,
-        "charged {} for a capped dispatch, expected {expected}",
-        100_000.0f32 - e,
+        (f64::from(charged) - expected).abs() < 0.02,
+        "charged {charged} for a capped dispatch, expected {expected}",
     );
 }
 
 // ── Production defaults ───────────────────────────────────────────────────
 
 #[test]
-fn at_production_defaults_a_capped_dispatch_costs_a_lethal_share_of_energy() {
-    // 10,000 steps, allowance 100, ramp 1e-6: 1e-6 * 9900 * 9901 / 2 ≈ 49.01.
-    let cfg = config();
-    assert_eq!(cfg.max_vm_steps, 10_000);
-    let def = VmBackendDef {
-        register_count: 1,
-        constants: vec![],
-        program: vec![VmInstruction::Jump { offset: -1 }],
-    };
-    let ss = empty_sensor_snapshot();
-    let mut e = 200.0f32;
-    let mut mem = [0.0f32; 16];
-    let prev_mem = [0.0f32; 16];
-    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
-    let result = execute_vm_node(
-        &def,
-        &[],
-        &zeroed_upstream(),
-        &mut e,
-        0.0,
-        &mut mem,
-        &prev_mem,
-        &ss,
-        &cfg,
-        &mut side_outputs,
-    );
+fn at_production_defaults_a_long_dispatch_costs_a_lethal_share_of_energy() {
+    // Allowance 100, ramp 1e-6: 10,000 steps cost 1e-6 * 9900 * 9901 / 2 ≈ 49
+    // against a maximum energy of 200, and 1,000 steps about one tick of decay.
+    assert_eq!(config().max_vm_steps, 10_000);
+    for (max_steps, low, high) in [(10_000u32, 48.9f32, 49.2f32), (1_000, 0.40, 0.41)] {
+        let mut cfg = config();
+        cfg.max_vm_steps = max_steps;
+        let charged = charge_for_capped_jump_loop(200.0, &cfg);
 
-    assert!(!result.energy_exhausted);
-    let charged = 200.0f32 - e;
-    assert!(
-        (48.9..49.2).contains(&charged),
-        "a capped dispatch charged {charged}, expected about 49",
-    );
-}
-
-#[test]
-fn at_production_defaults_a_thousand_step_dispatch_costs_about_one_tick_of_decay() {
-    let mut cfg = config();
-    cfg.max_vm_steps = 1_000;
-    let def = VmBackendDef {
-        register_count: 1,
-        constants: vec![],
-        program: vec![VmInstruction::Jump { offset: -1 }],
-    };
-    let ss = empty_sensor_snapshot();
-    let mut e = 200.0f32;
-    let mut mem = [0.0f32; 16];
-    let prev_mem = [0.0f32; 16];
-    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
-    let _ = execute_vm_node(
-        &def,
-        &[],
-        &zeroed_upstream(),
-        &mut e,
-        0.0,
-        &mut mem,
-        &prev_mem,
-        &ss,
-        &cfg,
-        &mut side_outputs,
-    );
-
-    let charged = 200.0f32 - e;
-    assert!(
-        (0.40..0.41).contains(&charged),
-        "a 1,000-step dispatch charged {charged}, expected about 0.405",
-    );
+        assert!(
+            (low..high).contains(&charged),
+            "a {max_steps}-step dispatch charged {charged}, expected {low}..{high}",
+        );
+    }
 }
 
 #[test]
@@ -342,50 +247,41 @@ fn a_dispatch_that_exhausts_mid_loop_leaves_energy_at_or_below_zero() {
     );
 }
 
+/// `LoadConst` the single constant, bid it, halt.
+fn bid_program() -> Vec<VmInstruction> {
+    vec![
+        VmInstruction::LoadConst {
+            dst: 0,
+            const_idx: 0,
+        },
+        VmInstruction::SetPriorityBid { src: 0 },
+        VmInstruction::Halt,
+    ]
+}
+
 #[test]
 fn a_priority_bid_is_capped_at_the_effective_energy() {
-    // Allowance 0, ramp 1.0: two steps owe about 1.05 + 2.05 before the bid,
+    // Allowance 0, ramp 1.0: the first two steps owe 1.08 + 2.20 before the bid,
     // so a bid of 100 can only take what is left of energy 10.
     let cfg = ramp_config(0, 1.0, 1.0, 1_000);
-    let def = VmBackendDef {
-        register_count: 1,
-        constants: vec![100.0],
-        program: vec![
-            VmInstruction::LoadConst {
-                dst: 0,
-                const_idx: 0,
-            },
-            VmInstruction::SetPriorityBid { src: 0 },
-            VmInstruction::Halt,
-        ],
-    };
-    let ss = empty_sensor_snapshot();
-    let mut e = 10.0f32;
-    let mut mem = [0.0f32; 16];
-    let prev_mem = [0.0f32; 16];
-    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
-    let result = execute_vm_node(
-        &def,
+    let (result, energy, side_outputs) = run_vm_with_config(
+        bid_program(),
+        1,
+        vec![100.0],
         &[],
-        &zeroed_upstream(),
-        &mut e,
-        0.0,
-        &mut mem,
-        &prev_mem,
-        &ss,
-        &cfg,
-        &mut side_outputs,
+        zeroed_upstream(),
+        10.0,
+        cfg,
     );
 
-    // LoadConst charges 0.08 + 1.0; the bid may take at most 10 - 1.08 - 2.10.
     assert!(result.energy_exhausted, "spending the remainder exhausts");
     assert!(
-        e.abs() < 1e-4,
-        "energy settled at {e}, expected zero within the settlement's rounding",
+        energy.abs() < 1e-4,
+        "energy settled at {energy}, expected zero within the settlement's rounding",
     );
     assert!(
-        side_outputs.priority_bid <= 10.0,
-        "bid {} exceeded the creature's energy",
+        side_outputs.priority_bid <= 10.0 - 3.28,
+        "bid {} reached energy the dispatch already owed",
         side_outputs.priority_bid,
     );
 }
@@ -393,34 +289,14 @@ fn a_priority_bid_is_capped_at_the_effective_energy() {
 #[test]
 fn a_bid_below_the_effective_energy_is_paid_in_full() {
     let cfg = ramp_config(0, 1.0, 1.0, 1_000);
-    let def = VmBackendDef {
-        register_count: 1,
-        constants: vec![4.0],
-        program: vec![
-            VmInstruction::LoadConst {
-                dst: 0,
-                const_idx: 0,
-            },
-            VmInstruction::SetPriorityBid { src: 0 },
-            VmInstruction::Halt,
-        ],
-    };
-    let ss = empty_sensor_snapshot();
-    let mut e = 100.0f32;
-    let mut mem = [0.0f32; 16];
-    let prev_mem = [0.0f32; 16];
-    let mut side_outputs = MeshSideOutputs::new(cfg.max_actions_per_turn);
-    let result = execute_vm_node(
-        &def,
+    let (result, energy, side_outputs) = run_vm_with_config(
+        bid_program(),
+        1,
+        vec![4.0],
         &[],
-        &zeroed_upstream(),
-        &mut e,
-        0.0,
-        &mut mem,
-        &prev_mem,
-        &ss,
-        &cfg,
-        &mut side_outputs,
+        zeroed_upstream(),
+        100.0,
+        cfg,
     );
 
     assert!(!result.energy_exhausted);
@@ -428,15 +304,15 @@ fn a_bid_below_the_effective_energy_is_paid_in_full() {
     // 3 steps at allowance 0 cost 1 + 2 + 3 in ramp plus 0.08 + 0.20 + 0.05.
     let expected = 100.0 - 4.0 - 6.0 - 0.33;
     assert!(
-        (e - expected).abs() < 1e-3,
-        "energy {e}, expected {expected}"
+        (energy - expected).abs() < 1e-3,
+        "energy {energy}, expected {expected}",
     );
 }
 
 #[test]
 fn the_traced_executor_reports_the_effective_energy_per_step() {
     let cfg = ramp_config(2, 1.0, 1.0, 10_000);
-    let steps = traced_noop_steps(5, 50.0, &cfg);
+    let steps = traced_steps(vec![VmInstruction::Noop; 5], 50.0, &cfg);
 
     let mut running = 50.0f64;
     for (index, (cost, after)) in steps.iter().enumerate() {
@@ -522,35 +398,24 @@ fn a_mid_dispatch_energy_read_sees_the_effective_energy() {
     // ReadInput of EnergyCurrent after two ramped steps must read energy minus
     // what the dispatch already owes, not the unsettled starting energy.
     let cfg = ramp_config(0, 1.0, 1.0, 1_000);
-    let def = VmBackendDef {
-        register_count: 1,
-        constants: vec![],
-        program: vec![
-            VmInstruction::Noop,
-            VmInstruction::ReadInput {
-                dst: 0,
-                ref_idx: 0,
-                sub_idx: 0,
-            },
-            VmInstruction::WriteInternalPayload {
-                slot_idx: 0,
-                src: 0,
-            },
-            VmInstruction::Halt,
-        ],
-    };
+    let program = vec![
+        VmInstruction::Noop,
+        VmInstruction::ReadInput {
+            dst: 0,
+            ref_idx: 0,
+            sub_idx: 0,
+        },
+        VmInstruction::WriteInternalPayload {
+            slot_idx: 0,
+            src: 0,
+        },
+        VmInstruction::Halt,
+    ];
     let refs = vec![InputReference::DynamicIntrospection(
         DynamicIntrospectionKey::EnergyCurrent,
     )];
-    let (result, _energy, _side) = run_vm_with_config(
-        def.program.clone(),
-        1,
-        vec![],
-        &refs,
-        zeroed_upstream(),
-        50.0,
-        cfg,
-    );
+    let (result, _energy, _side) =
+        run_vm_with_config(program, 1, vec![], &refs, zeroed_upstream(), 50.0, cfg);
 
     // Step 1 (Noop) owes 1.05, step 2 (ReadInput) owes 2.12: 50 - 3.17.
     let seen = result.output_slots[0];

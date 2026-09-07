@@ -212,13 +212,14 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
 
         // Charge before executing; exhaustion halts without side effects.
         debt += charge;
-        if effective_energy!() <= 0.0 {
+        let effective = effective_energy!();
+        if effective <= 0.0 {
             // Do NOT commit memory.
             trace_sink.after_instruction(
                 pc,
                 instr,
                 step_energy_cost,
-                effective_energy!() as f32,
+                effective as f32,
                 &regs[..reg_count],
             );
             break NodeResult::exhausted();
@@ -377,7 +378,7 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
                     let ctx = ResolveCtx {
                         sensors,
                         upstream_slots,
-                        energy: effective_energy!() as f32,
+                        energy: effective as f32,
                         energy_consumed: energy_consumed + debt as f32,
                         action_queue: &side_outputs.action_queue,
                     };
@@ -435,7 +436,6 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
                 // The bid is spent immediately (the mesh reads it this tick) and
                 // can never reach energy this dispatch already owes.
                 let raw = regs[nr(*src, reg_count)];
-                let effective = effective_energy!();
                 let bid = if raw > 0.0 {
                     f64::from(raw).min(effective)
                 } else {
@@ -445,12 +445,13 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
                 step_energy_cost += bid as f32;
                 // A bid the cap bit into is an all-in: it leaves nothing behind
                 // the dispatch's debt, whichever way the `f32` store rounded.
-                if bid >= effective || effective_energy!() <= 0.0 {
+                let after_bid = effective_energy!();
+                if bid >= effective || after_bid <= 0.0 {
                     trace_sink.after_instruction(
                         pc,
                         instr,
                         step_energy_cost,
-                        effective_energy!() as f32,
+                        after_bid as f32,
                         &regs[..reg_count],
                     );
                     break NodeResult::exhausted();
