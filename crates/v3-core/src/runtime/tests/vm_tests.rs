@@ -91,3 +91,6 @@ mod execution;
 
 #[path = "vm_io_memory.rs"]
 mod io_memory;
+
+#[path = "vm_step_ramp.rs"]
+mod step_ramp;
