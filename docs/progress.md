@@ -80,3 +80,15 @@ non-goal readings are `Undefined`; unrun timing is null. The complete
 the depth-1,000 and depth-2,000 no-regression components; T11.F17 owns their
 first floors. Mutation-only depth is not evidence of ecological persistence
 or cognition.
+
+`drift-depth-v2` adds only the executed-target stand-in that T11.F17's policy
+needs; sampling, checkpoints, battery, and every field of v1 are unchanged, so
+v1 rows remain the baseline. The executed set comes from the same battery hop
+records (`mesh-execution-v1`) as node ids, recorded in the reading's
+`executed_source`. Its cadence is recorded in `executed_refresh`: the walk
+refreshes each lineage's set at depth 0 and every 10 generations, so that a
+checkpoint's rows do not depend on which checkpoints precede it, while the
+fresh births at each checkpoint derive their own set from the parent they are
+drawn from. Between walk refreshes, removed nodes drop out of the set and
+added nodes wait for the next refresh. Reports written before this version
+read as v1 with both metadata fields empty.

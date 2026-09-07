@@ -92,54 +92,123 @@ Predeclared directions, read against the T11.F16 closure reports:
 
 ## Implementation Tasks
 
-- [ ] Add the two config fields with defaults, serde defaults, normalization,
+- [x] Add the two config fields with defaults, serde defaults, normalization,
       the runtime config spec rows, and the frontend types, fixtures, panel
       controls, and tests, failing tests first.
-- [ ] Add the per-creature dispatch record written from the shared mesh loop,
+- [x] Add the per-creature dispatch record written from the shared mesh loop,
       the age clock, and the newborn reset; tests first, including the
       traced-versus-untraced identity.
-- [ ] Extend the target draw with the executed layer, short-circuit, and
+- [x] Extend the target draw with the executed layer, short-circuit, and
       size-pressure rule through one target-context struct; pass the parent's
       executed set at birth; add the executed-target counter.
-- [ ] Give the neighborhood and drift harnesses the battery-derived executed
+- [x] Give the neighborhood and drift harnesses the battery-derived executed
       set with the predeclared refresh cadence; bump to `drift-depth-v2` with
       source and cadence metadata, serde-defaulted for historical reports.
 - [ ] Update `v3-mutation-spec.md` requirement 4 and Section 4.3 (replace the
       pending sentence), the runtime config spec, `docs/progress.md`, and
       `docs/progress/benchmark-series.json`; store the gate and goal reports.
 
+The last task is partly done and deliberately unchecked: the reference specs
+are updated, both reports are stored, and `docs/progress.md` carries the
+`drift-depth-v2` instrument paragraph, but the `docs/progress.md` closure row
+and the `benchmark-series.json` appends are held pending the orchestrator's
+decision on the severe goal-profile `vm_steps` reading, so that no unresolved
+severe report becomes the next feature's reference.
+
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` first after the production
+- [x] `cargo test -p v3-core --test viability` first after the production
       targeting change; `cargo check --workspace --all-targets` after coherent
       Rust edits; focused suites `cargo test -p v3-core --lib mutation`,
       `cargo test -p v3-core --lib neighborhood`, `cargo test -p v3-cli --lib
       bench::tests`, and `npm --prefix frontend test -- --run` pass.
-- [ ] Property tests in `v3-core` for the pure draw: with bias 1.0 the pick is
+- [x] Property tests in `v3-core` for the pure draw: with bias 1.0 the pick is
       in `executed` whenever `eligible ∩ executed` is nonempty; with bias 0.0,
       and whenever every eligible node is executed, the pick and the RNG
       consumption equal the existing draw; classification always matches the
       reachable set; window membership is monotone in age. Assertions must
       not depend on the cases drawn.
-- [ ] Fixtures: a creature's record after N ticks is identical whether it ran
+- [x] Fixtures: a creature's record after N ticks is identical whether it ran
       traced or untraced; observation clones leave the live record unchanged;
       a newborn's record is empty; a founder birth consumes the same RNG
       stream as before this feature; under `is_restricted` the executed bias
       is 0.0; a deep genome with a two-node executed core and junk receives,
       at bias 1.0, only core targets for node-internal events.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants` after the simplify pass;
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` after the simplify pass;
       record the summary line, output path, and every survivor's resolution.
-- [ ] `make bench PROFILE=gate FEATURE=t11-f17-executed-biased-mutation-targeting`
+- [x] `make bench PROFILE=gate FEATURE=t11-f17-executed-biased-mutation-targeting`
       stores `docs/progress/features/t11-f17-executed-biased-mutation-targeting.json`;
       one `make bench PROFILE=goal FEATURE=t11-f17-executed-biased-mutation-targeting`
       stores the `-goal.json` report. Record every predeclared reading above,
       the founder-block and depth-0 identity checks, the observation budgets,
       and the compute comparisons.
-- [ ] Second goal run: Not applicable by the 2026-09-05 workflow decision;
+- [x] Second goal run: Not applicable by the 2026-09-05 workflow decision;
       `crates/v3-core/tests/reproducibility.rs` covers cross-process
       reproducibility inside `make check`.
-- [ ] `make roadmap-check` on document edits; final `make check` exits 0 on
+- [x] `make roadmap-check` on document edits; final `make check` exits 0 on
       the closure content, with the tested commit reported in the parent task.
+
+### Results, 2026-09-07
+
+Commands run in the worktree and their results:
+
+- `cargo test -p v3-core --test viability` — ok, 24 passed, 0 failed (run
+  first after the production targeting change).
+- `cargo check --workspace --all-targets` — clean, run after every coherent
+  Rust edit through the compile hook.
+- `cargo test -p v3-core --lib mutation` — ok, 360 passed, 0 failed.
+- `cargo test -p v3-core --lib neighborhood` — ok, 59 passed, 0 failed,
+  1 ignored (pre-existing).
+- `cargo test -p v3-cli --lib bench::tests` — ok, 37 passed, 0 failed.
+- `npm --prefix frontend test -- --run` — 57 files, 305 tests passed.
+- `make roadmap-check` — `validation passed`, exit 0.
+- `make check` — exit 0 (v3-core lib 1,207 passed / 1 ignored, viability 24,
+  reproducibility and every other workspace suite green, frontend included).
+- `make bench PROFILE=gate FEATURE=t11-f17-executed-biased-mutation-targeting`
+  — exit 0, report stored, `severe=false`.
+- `make bench PROFILE=goal FEATURE=t11-f17-executed-biased-mutation-targeting`
+  — report stored, then exit 2 on the severe `vm_steps` comparison recorded
+  in Performance and Goal Impact. Run once, per the 2026-09-05 decision.
+
+Property tests added for the pure draw, in
+`crates/v3-core/src/mutation/reachability.rs` and
+`crates/v3-core/src/creature/state.rs`: at bias 1.0 the pick is in `executed`
+whenever the intersection is nonempty; at bias 0.0 and whenever every
+eligible node is executed, both the pick and the RNG state after the draw
+equal the pre-feature draw's; an empty intersection falls through after
+exactly one roll; the returned classification always matches the reachable
+set; window membership is monotone in age and window. No assertion depends
+on the cases drawn, and no `proptest-regressions` file was produced.
+
+Fixtures added: the dispatch record after N ticks is identical across plain,
+observed, and traced mesh execution, with hop counts equal
+(`runtime/mesh.rs`); observation clones leave the live record unchanged and
+the window forgets, and a newborn's record is empty after `apply_reproduce`
+(`simulation/tick/tests/dispatch_record.rs`); `is_restricted` sets the
+executed bias to 0.0 and a zero-event birth never resolves the parent record
+(`mutation/engine/tests.rs`); a deep genome with a two-node executed core and
+junk receives only core targets at bias 1.0, and the same fixture reaches
+junk at bias 0.0. The pre-feature RNG fixture is
+`an_all_executed_eligible_set_reproduces_the_pre_feature_draw_byte_for_byte`,
+which pins the identity to births whose every eligible set is entirely
+executed: single-event founder births are identical over 3,000 / 3,000 seeds,
+and under the production event-count distribution every divergent birth has
+`applied_events >= 2`. The spec's broader "a founder birth" wording is not
+what the code guarantees; see the misses in Performance and Goal Impact.
+
+Mutation testing, fresh (`MUTANTS_ITERATE=0 make rust-mutants`, run after the
+simplify pass, diff against merge base `69f058a1`):
+
+- Summary line: `122 mutants tested in 10m: 1 missed, 80 caught, 41 unviable`.
+- Output path: `/Users/istefanek/.local/share/petri-tools/mutants/t11-f17/mutants.out`.
+- Survivors (missed by every test), one, resolved **equivalent**:
+  `crates/v3-core/src/neighborhood/drift.rs:105:22: replace > with >= in
+  observe`. The guard is `depth > 0 && depth.is_multiple_of(10)` inside the
+  walk; with `>=` the only added call is a refresh at depth 0, which runs
+  immediately after the identical unconditional refresh above the loop with
+  no birth in between, so it recomputes the same sets from the same genomes.
+- No mutant timed out, and no `#[mutants::skip]` or `exclude_re` entry was
+  added anywhere in this feature.
 
 ## Performance and Goal Impact
 
@@ -179,6 +248,105 @@ there is investigated. From this closure the depth-1,000 and depth-2,000
 changed/all-birth fractions carry the floors in the table above, and later
 closures read them under the strict not-below rule.
 
+### Measured, 2026-09-07
+
+Reports, both stored on this branch and produced with production code
+unchanged since `8351516c`: gate
+`docs/progress/features/t11-f17-executed-biased-mutation-targeting.json`
+(run at `c71a14b1`, `make bench PROFILE=gate` exit 0, `severe=false`) and goal
+`docs/progress/features/t11-f17-executed-biased-mutation-targeting-goal.json`
+(run at `dc09f3d9`, report written, then `make bench PROFILE=goal` exit 2 on
+the severe `vm_steps` comparison recorded below). T11.F16 changed no
+production behavior, so its goal counters equal the pinned epoch's and every
+counter delta below is the same against both references.
+
+Predeclared readings, read from the stored goal report:
+
+| Reading | T11.F16 baseline | Predeclaration | Measured | Result |
+| --- | --- | --- | --- | --- |
+| Drift changed/all pooled at 1,000 and 2,000 (primary) | 11 / 4,000 = 0.002750 | Up | 19 / 4,000 = 0.004750 | Met |
+| Drift mean executed nodes at 1,000 / 2,000 | 3.120000 / 3.000000 | Up at both | 4.260000 / 4.760000 | Met |
+| Drift changed/all at 1,000 / 2,000 (floors) | 0.001000 / 0.004500 | Not below | 0.001500 / 0.008000 | Met; the floors move to these values |
+| Drift dead/all pooled at 1,000 and 2,000 | 3 / 4,000 = 0.000750 | Not above 10 / 4,000 | 8 / 4,000 = 0.002000 | Met; reported as a count (8) per the allowance |
+| Drift hop-cap hits at every checkpoint | 0 | Zero | 0 at depths 0, 22, 250, 1,000, 2,000 | Met |
+| Drift mean total nodes at 2,000 | 136.180000 | Reported, no direction | 143.320000 | Reported |
+| Drift depth-0 row | F16 row | Identical counts and fractions | Mesh block identical (2.0 total / 2.0 reachable / 2.0 executed / 0 knockout / 0 caps); births 872 applied, changed 405 (F16 406), silent 466 (F16 465), dead 1 (F16 1) | **Miss** (see below) |
+| Gate founder neighborhood block | F16 gate report | Byte-identical | Operator rows identical; births 208 applied, changed 95 (F16 94), silent 113 (F16 114), dead 0 (F16 0) | **Miss** (see below) |
+| Goal evolved changed / mutated, 36 samples | 951 / 3,300 = 0.288182 | Up | 1,015 / 3,300 = 0.307576 | Met |
+| Goal evolved dead / mutated | 43 / 3,300 = 0.013030 | Not up | 40 / 3,300 = 0.012121 | Met |
+
+Both misses have one measured root cause, and the production behavior is the
+fixed design, not a defect: the parent's executed set is derived once per
+birth, and the short-circuit is evaluated per draw. In a multi-event birth an
+earlier event that adds a mesh node leaves later draws an eligible set
+containing a node the parent never executed, so the short-circuit no longer
+applies and one extra `gen_bool` shifts the stream. The pinned test
+`an_all_executed_eligible_set_reproduces_the_pre_feature_draw_byte_for_byte`
+measures exactly this: over 3,000 seeds, single-event founder births are
+3,000 / 3,000 byte-identical to the pre-feature draw, and under the
+production event-count distribution every divergent birth has
+`applied_events >= 2`. The predeclaration and Success Criterion 1 were
+written as if the short-circuit held for a whole founder birth; it holds per
+draw. The wording is left unchanged and the criterion unchecked for the
+orchestrator to decide.
+
+Observation budgets, from the goal report's `environment` block: founder
+neighborhood 0.048 s (budget 10 s), summed evolved neighborhood 1.85 s
+(budget 180 s), drift walk and readings 3.63 s including the executed-set
+refreshes (budget 30 s), whole goal run 346.0 s (investigation threshold
+900 s). All met; no samples, trials, checkpoints, or refresh cadence were
+reduced.
+
+Compute comparison, gate profile (`severe=false`; flag/severe +10%/+50%):
+`mesh_hops` 2.026888 (-0.02%), `vm_steps` 24.232908 (+6.51%),
+`graph_relax_iters` 0.995101 (-0.01%), `plasticity_updates` 0.007484
+(-33.01%, 0.0075 versus 0.0112 per creature-tick), `actions_applied`
+1.270958 (-0.36%), `births` 0.026813 (+0.12%); wall 0.0014688 ms per
+creature-tick, -5.83% against the epoch and +2.86% against T11.F16, both ok.
+
+Compute comparison, goal profile (`severe=true`): `mesh_hops` 2.071219
+(-0.29%), **`vm_steps` 146.184594 (+132.76%, severe)**, `graph_relax_iters`
+1.002628 (+0.48%), `plasticity_updates` 0.029247 (-21.27%),
+`actions_applied` 1.400927 (+11.07%, flag), `births` 0.016457 (-0.99%); wall
+0.0065091 ms per creature-tick, -0.81% against the epoch and +0.73% against
+T11.F16, both ok. No compute allowance was budgeted for this feature, so the
+crossing is recorded as unbudgeted and is not waived here.
+
+Investigation of the severe crossing, as the spec requires. The counter is a
+creature-tick-weighted mean over three seeds, and the rise is carried by one
+of them, not by a uniform per-creature cost:
+
+| Seed | `vm_steps` per creature-tick (F17 / F16) | `mesh_hops` per creature-tick (F17 / F16) | Final population (F17 / F16) | Share of F17 `vm_steps` |
+| --- | --- | --- | --- | --- |
+| 11 | 24.35 / 27.32 (0.89x) | 2.067 / 2.059 | 714 / 718 | 5.1% |
+| 22 | 25.44 / 85.89 (0.30x) | 2.070 / 2.115 | 669 / 4,517 | 5.3% |
+| 33 | 336.39 / 73.08 (4.60x) | 2.076 / 2.055 | 11,379 / 1,138 | 89.6% |
+
+Two of three seeds fall below their T11.F16 values; dropping the heaviest
+seed from each run gives 24.90 (F17) against 50.64 (F16). The indicator's
+between-seed spread was already 27.32-85.89 (3.1x) at T11.F16 and is
+24.35-336.39 (13.8x) here, and in both runs the heaviest seed is the one
+whose population blooms (F16 seed 22, plateau 1,997; F17 seed 33, plateau
+7,287 and 11,379 alive at the end, against a maximum of 4,517 in any F16
+seed). `mesh_hops` per creature-tick is flat everywhere, so the extra steps
+are VM work inside dispatched nodes, not extra dispatches, and wall time per
+creature-tick is unchanged because at `opcode_cost_multiplier` 1e-6 and
+`max_vm_steps` 10,000 a VM step is cheap relative to the rest of a tick. The
+mechanism that makes longer executed programs possible is the feature's
+intent: node-internal events now land on the executed core (about a fifth of
+the reachable set), and this feature deliberately adds no size, cost, or
+junk lever (they are T11.F13 arms), so executed program length has no
+counter-force. What the data does not support is a uniform per-creature
+compute inflation; what it shows is one seed's ecology diverging, which a
+policy change to mutation targeting is expected to produce and which three
+seeds cannot separate from a compute trend. Whether that is accepted, or
+`executed_bias` is lowered and re-measured, or a length lever is pulled
+forward, is a scope decision for the orchestrator.
+
+Also recorded: `reachable_structure_size_distribution` mean 118.863266
+against 85.491919, median 114 against 81, p75 135 against 84, max 428
+against 283, min 1 against 44.
+
 ## Success Criteria
 
 - [ ] At production defaults, node-internal targets are drawn from the
@@ -210,3 +378,38 @@ closures read them under the strict not-below rule.
   record, the exact short-circuit condition, the size-pressure interaction,
   explicit config exposure, and the pooled primary reading for the noisy
   depth-1,000 fraction.
+- **Blocker for closure, 2026-09-07**: the goal profile's `vm_steps` is
+  +132.76% against both stored references, severe, with no compute allowance
+  budgeted by this spec. `make bench PROFILE=goal` therefore exited 2 after
+  writing its report. The investigation is in Performance and Goal Impact:
+  89.6% of the run's VM steps come from one of three seeds, whose population
+  bloomed to 11,379; the other two seeds are below their T11.F16 values, and
+  wall time per creature-tick is unchanged. The options are an explicit
+  allowance or epoch re-pin recorded by the orchestrator, a lower
+  `executed_bias` default re-measured, or pulling a T11.F13 program-length
+  lever forward. All three are scope decisions and none was taken here.
+- Held pending that decision, so the next feature does not silently inherit a
+  severe reference: neither report is appended to
+  `docs/progress/benchmark-series.json`, and `docs/progress.md` carries the
+  `drift-depth-v2` instrument paragraph but no closure row. No baseline,
+  threshold, default, or counter definition was edited.
+- The two identity misses (gate founder block, drift depth-0 row) share the
+  multi-event mechanism described in Performance and Goal Impact. Success
+  Criterion 1's "byte-identical" wording describes a per-birth guarantee the
+  fixed design gives per draw; only the orchestrator should reword it.
+- `executed_target_events` counts events whose chosen target was a member of
+  the parent's executed set, however it was drawn, exactly parallel to
+  `reachable_target_events`. It is therefore nonzero at `executed_bias` 0.0
+  whenever a target happens to be executed.
+- Deferred findings, all real gaps not closed here:
+  - Mutation survivor `crates/v3-core/src/neighborhood/drift.rs:105:22:
+    replace > with >=` is equivalent (see Verification) and needs no test.
+  - `neighborhood::evaluate_genome` derives the battery-executed set twice
+    per genome on the drift path (once for the walk refresh, once for the
+    birth sweep); the simplify pass skipped the merge because it would change
+    the refresh cadence contract. Cost is about 1 ms per genome inside a
+    3.63-second walk.
+  - The input-ref domain's `RawFieldMutation` operator returns
+    `NotApplicable` rather than consuming a target draw, which predates this
+    feature. It is now documented in `v3-mutation-spec.md` Section 4.3 as an
+    exempt operator, but the asymmetry itself is untouched.
