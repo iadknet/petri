@@ -110,8 +110,6 @@ const defaultProps = {
 		id: 12345,
 		energy: 62,
 		maxEnergy: 100,
-		reproductiveReserve: 3,
-		reproductiveReserveCapacity: 8,
 		age: 47,
 		generation: 3,
 		complexity: 5,

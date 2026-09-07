@@ -66,15 +66,6 @@ fn high_coverage_economics_probe_config() -> SimulationConfig {
     cfg
 }
 
-fn nutrition_ablation_config(maintenance_food: bool) -> SimulationConfig {
-    let mut cfg = viability_config();
-    cfg.population.initial_creatures = 1;
-    cfg.world.food.growth_rate = 0.0;
-    cfg.world.food.types[0].initial_coverage = if maintenance_food { 1.0 } else { 0.0 };
-    cfg.world.food.types[1].initial_coverage = if maintenance_food { 0.0 } else { 1.0 };
-    cfg
-}
-
 #[derive(Debug, Clone, Copy)]
 struct TickMetrics {
     tick: u64,
@@ -217,71 +208,17 @@ fn high_coverage_economics_survive_and_reproduce_short_horizon() {
     }
 }
 
-/// Maintenance-only food can replenish energy but cannot satisfy the reserve gate.
+/// The canonical founder consumes ordinary primary food and reproduces.
 #[test]
-fn maintenance_only_ablation_never_spawns() {
-    let mut sim = seed_simulation(nutrition_ablation_config(true), 42);
-    let initial_energy = sim.creatures.values().next().expect("founder").energy;
-    run_tick(&mut sim, &mut None);
-    assert!(
-        sim.stats.last_tick_eat > 0,
-        "maintenance food should be acquired"
-    );
-    assert!(sim
-        .creatures
-        .values()
-        .all(|creature| creature.energy > initial_energy - 0.5));
-    run_ticks_with_metrics(&mut sim, 29);
-
-    assert_eq!(sim.creature_count(), 1);
-    assert!(sim
-        .creatures
-        .values()
-        .all(|creature| creature.reproductive_reserve == 0.0));
-}
-
-/// Reproductive-only food can build reserve but cannot replenish enough energy to spawn.
-#[test]
-fn reproductive_only_ablation_never_spawns() {
-    let mut sim = seed_simulation(nutrition_ablation_config(false), 42);
-    let mut max_reserve = 0.0;
-    let initial_energy = sim.creatures.values().next().expect("founder").energy;
-    run_tick(&mut sim, &mut None);
-    assert!(
-        sim.stats.last_tick_eat > 0,
-        "reproductive food should be acquired"
-    );
-    assert!(sim
-        .creatures
-        .values()
-        .all(|creature| creature.energy < initial_energy));
-    for _ in 0..29 {
-        run_tick(&mut sim, &mut None);
-        max_reserve = sim
-            .creatures
-            .values()
-            .map(|creature| creature.reproductive_reserve)
-            .fold(max_reserve, f32::max);
-    }
-
-    assert!(max_reserve > 0.0);
-    assert!(sim.stats.reproduction_actions_spawned_total == 0);
-}
-
-/// The canonical founder's aggregate gate can acquire both complementary food types.
-#[test]
-fn canonical_founder_consumes_both_food_types_and_reproduces() {
+fn canonical_founder_consumes_primary_food_and_reproduces() {
     let mut cfg = viability_config();
     cfg.population.initial_creatures = 20;
     cfg.world.food.growth_rate = 0.0;
     cfg.mutation.mutation_probability = 0.0;
     let mut sim = seed_simulation(cfg, 2026);
-    let maintenance_before = sim
+    let primary_before = sim
         .world
         .total_food_by_type(v3_core::config::OrdinaryFoodTypeId::new(0));
-    let reproductive_before = sim
-        .world
-        .total_food_by_type(v3_core::config::OrdinaryFoodTypeId::new(1));
 
     run_ticks_with_metrics(&mut sim, 30);
 
@@ -289,12 +226,7 @@ fn canonical_founder_consumes_both_food_types_and_reproduces() {
     assert!(
         sim.world
             .total_food_by_type(v3_core::config::OrdinaryFoodTypeId::new(0))
-            < maintenance_before
-    );
-    assert!(
-        sim.world
-            .total_food_by_type(v3_core::config::OrdinaryFoodTypeId::new(1))
-            < reproductive_before
+            < primary_before
     );
     assert_eq!(sim.stats.mutation_events_applied_total, 0);
     let successful_eats = sim
@@ -369,7 +301,6 @@ fn creatures_can_eat_food() {
         food_cfg.initial_coverage = 1.0;
         food_cfg.initial_density = 1.0;
         food_cfg.types[0].initial_coverage = 1.0;
-        food_cfg.types[1].initial_coverage = 0.0;
         world.reconfigure_food(food_cfg);
         let mut rng = SmallRng::seed_from_u64(0);
         world.seed_food(&mut rng);
@@ -413,10 +344,9 @@ fn creatures_can_eat_food() {
     );
 }
 
-/// A reserve-deficient founder must choose reproductive food when both typed
-/// resources are independently present on its cell.
+/// Founders consume the primary type while preserving another ordinary type.
 #[test]
-fn founder_eats_the_deficient_typed_resource() {
+fn founder_eats_primary_type_and_preserves_other_food() {
     use slotmap::SlotMap;
     use v3_core::config::OrdinaryFoodTypeId;
     use v3_core::creature::founder::v3alpha1_founder_genome;
@@ -424,6 +354,10 @@ fn founder_eats_the_deficient_typed_resource() {
     use v3_core::kernel::WorldState;
 
     let mut cfg = SimulationConfig::default();
+    cfg.world
+        .food
+        .types
+        .push(v3_core::config::FoodTypeConfig::default());
     cfg.world.width = 5;
     cfg.world.height = 5;
     cfg.world.food.initial_coverage = 0.0;
@@ -456,9 +390,9 @@ fn founder_eats_the_deficient_typed_resource() {
     let mut sim = Simulation::new(world, creatures, 0, cfg, 42);
     run_tick(&mut sim, &mut None);
 
-    assert_eq!(sim.world.food_at_type(pos, OrdinaryFoodTypeId::new(0)), 0.5);
-    assert_eq!(sim.world.food_at_type(pos, OrdinaryFoodTypeId::new(1)), 0.0);
-    assert!(sim.creatures[id].reproductive_reserve > 0.0);
+    assert_eq!(sim.world.food_at_type(pos, OrdinaryFoodTypeId::new(0)), 0.0);
+    assert_eq!(sim.world.food_at_type(pos, OrdinaryFoodTypeId::new(1)), 0.5);
+    assert!(sim.creatures[id].energy > 20.0);
 }
 
 /// With no food and sufficient energy, the founder should emit Reproduce and
@@ -502,7 +436,6 @@ fn founder_reproduces_when_energy_allows_and_target_is_open() {
     // Phase 0 increments age before action selection, so age=19 here means the
     // founder acts at age 20 on this tick.
     creatures[parent_id].age = 19;
-    creatures[parent_id].reproductive_reserve = cfg.nutrition.reproductive_reserve_cost;
     world.place_creature(pos, parent_id);
 
     let mut sim = Simulation::new(world, creatures, 0, cfg, 7);
@@ -1018,4 +951,22 @@ fn mutation_skip_reason_tracking_accumulates_correctly() {
         "sum of skip reasons ({reason_total}) must equal skipped_total ({})",
         stats.mutation_events_skipped_total
     );
+}
+
+#[test]
+fn ordinary_food_alone_replenishes_energy_and_reproduces() {
+    let mut config = viability_config();
+    config.world.food.types.truncate(1);
+    config.world.food.types[0].initial_coverage = 1.0;
+    let mut sim = seed_simulation(config, 42);
+    let initial_energy = sim.creatures.values().next().unwrap().energy;
+    run_tick(&mut sim, &mut None);
+    assert!(sim.stats.last_tick_eat > 0);
+    assert!(sim
+        .creatures
+        .values()
+        .any(|creature| creature.energy > initial_energy));
+    run_ticks_with_metrics(&mut sim, 29);
+    assert!(sim.creature_count() > 0);
+    assert!(sim.stats.reproduction_actions_spawned_total > 0);
 }

@@ -24,8 +24,6 @@ function makeDetail(overrides: Record<string, unknown> = {}) {
 		position: { x: 10, y: 20 },
 		energy: 100,
 		maxEnergy: 200,
-		reproductiveReserve: 3,
-		reproductiveReserveCapacity: 8,
 		age: 50,
 		generation: 3,
 		complexity: 5,

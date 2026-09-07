@@ -117,8 +117,6 @@ function makeDetail(id: number) {
 		position: { x: 4, y: 9 },
 		energy: 18,
 		maxEnergy: 24,
-		reproductiveReserve: 3,
-		reproductiveReserveCapacity: 8,
 		age: 12,
 		generation: 3,
 		complexity: 8,

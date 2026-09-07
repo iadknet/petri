@@ -2,6 +2,16 @@ import type { FieldDef } from "../shared/types.ts";
 
 export const ENERGY_COSTS_FIELDS: FieldDef[] = [
 	{
+		path: "energy.costs.eat_reward_per_food",
+		label: "Eat Reward",
+		min: 0,
+		max: 100,
+		step: 0.1,
+		defaultValue: 5.0,
+		testId: "config-field-energy-costs-eat-reward-per-food",
+		tooltip: "Energy gained per unit of any ordinary food consumed",
+	},
+	{
 		path: "energy.costs.move_cost",
 		label: "Move Cost",
 		min: 0,

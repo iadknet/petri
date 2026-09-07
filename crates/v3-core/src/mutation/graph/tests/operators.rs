@@ -24,7 +24,7 @@ use crate::mutation::graph::operators::{
 use crate::mutation::types::MutationSkipReason;
 use crate::runtime::cgp::effects::CgpEffectsTrace;
 use crate::runtime::cgp::execute::{execute_graph_impl, GraphTracer};
-use crate::runtime::cgp::execute_graph_node_with_reserve;
+use crate::runtime::cgp::execute_graph_node;
 use crate::runtime::types::{MeshSideOutputs, NodeResult, OUTPUT_SLOT_COUNT};
 use crate::sensors::perception::{PerceptionSnapshot, SensorSnapshot};
 use crate::sensors::static_inputs::StaticInputs;
@@ -82,12 +82,11 @@ pub(super) fn run_scenarios(
             let prev_shared_memory = [0.0f32; 16];
             let mut graph_runtime = GraphRuntimeState::new();
             let mut side_outputs = MeshSideOutputs::new(8);
-            let result = execute_graph_node_with_reserve(
+            let result = execute_graph_node(
                 def,
                 input_refs,
                 &[0.0f32; OUTPUT_SLOT_COUNT],
                 &mut energy,
-                0.0,
                 0.0,
                 0,
                 &mut graph_runtime,
@@ -435,7 +434,7 @@ proptest! {
 #[test]
 fn unwired_input_ref_add_is_neutral_on_vm_node() {
     use crate::creature::genome::{VmBackendDef, VmInstruction};
-    use crate::runtime::vm::execute_vm_node_with_reserve;
+    use crate::runtime::vm::execute_vm_node;
 
     let def = VmBackendDef {
         register_count: 2,
@@ -459,12 +458,11 @@ fn unwired_input_ref_add_is_neutral_on_vm_node() {
         let mut mem_before = [0.0f32; 16];
         let prev_mem = [0.0f32; 16];
         let mut side_before = MeshSideOutputs::new(8);
-        let result_before = execute_vm_node_with_reserve(
+        let result_before = execute_vm_node(
             &def,
             &parent_refs,
             &[0.0f32; OUTPUT_SLOT_COUNT],
             &mut energy_before,
-            0.0,
             0.0,
             &mut mem_before,
             &prev_mem,
@@ -476,12 +474,11 @@ fn unwired_input_ref_add_is_neutral_on_vm_node() {
         let mut energy_after = 1.0e6f32;
         let mut mem_after = [0.0f32; 16];
         let mut side_after = MeshSideOutputs::new(8);
-        let result_after = execute_vm_node_with_reserve(
+        let result_after = execute_vm_node(
             &def,
             &child_refs,
             &[0.0f32; OUTPUT_SLOT_COUNT],
             &mut energy_after,
-            0.0,
             0.0,
             &mut mem_after,
             &prev_mem,
@@ -572,7 +569,6 @@ fn record(
         input_refs,
         &[0.0f32; OUTPUT_SLOT_COUNT],
         &mut energy,
-        0.0,
         0.0,
         0,
         &mut graph_runtime,

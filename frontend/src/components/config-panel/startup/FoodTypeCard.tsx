@@ -65,8 +65,8 @@ export function FoodTypeCard({
 		max: 1,
 		step: 0.01,
 		// Keep the card reset value aligned with the production fallback in
-		// `createFoodType`: each configured type starts with 27% coverage.
-		defaultValue: 0.27,
+		// `createFoodType`: each configured type starts with 54% coverage.
+		defaultValue: 0.54,
 		tooltip: "Fraction of world cells seeded with this food type",
 	};
 	const inhibitorField: FieldDef = {
@@ -77,24 +77,6 @@ export function FoodTypeCard({
 		step: 0.01,
 		defaultValue: 0.2,
 		tooltip: "How strongly this type suppresses other food growth in occupied cells",
-	};
-	const metabolicYieldField: FieldDef = {
-		path: `world.food.types.${index}.metabolic_energy_yield`,
-		label: "Metabolic Yield",
-		min: 0,
-		max: 100,
-		step: 0.1,
-		defaultValue: index === 0 ? 10 : 0,
-		tooltip: "Energy gained per unit of this food consumed",
-	};
-	const reserveYieldField: FieldDef = {
-		path: `world.food.types.${index}.reproductive_reserve_yield`,
-		label: "Reserve Yield",
-		min: 0,
-		max: 100,
-		step: 0.1,
-		defaultValue: index === 1 ? 1 : 0,
-		tooltip: "Reproductive reserve gained per unit of this food consumed",
 	};
 
 	return (
@@ -142,23 +124,6 @@ export function FoodTypeCard({
 				disabled={false}
 				onChange={(_, value) => onChange({ initial_density: value })}
 				testId={`startup-field-food-type-${index}-initial-density`}
-			/>
-
-			<FieldRow
-				field={metabolicYieldField}
-				id={`startup-food-type-${index}-metabolic-yield`}
-				value={foodType.metabolic_energy_yield}
-				disabled={false}
-				onChange={(_, value) => onChange({ metabolic_energy_yield: value })}
-				testId={`startup-field-food-type-${index}-metabolic-yield`}
-			/>
-			<FieldRow
-				field={reserveYieldField}
-				id={`startup-food-type-${index}-reserve-yield`}
-				value={foodType.reproductive_reserve_yield}
-				disabled={false}
-				onChange={(_, value) => onChange({ reproductive_reserve_yield: value })}
-				testId={`startup-field-food-type-${index}-reserve-yield`}
 			/>
 
 			<FieldRow

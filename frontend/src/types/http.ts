@@ -3,7 +3,6 @@ import type {
 	FailedActionPenaltyRampConfig,
 	LifecycleEnergyConfig,
 	MutationConfig,
-	NutritionConfig,
 	PhenotypeConfig,
 	PopulationConfig,
 	RuntimeConfig,
@@ -62,7 +61,6 @@ export interface StartupRequest {
 	population?: Partial<PopulationConfig>;
 	world?: Partial<Omit<WorldConfig, "food">> & { food?: Partial<StartupFoodRequest> };
 	energy?: { lifecycle?: Partial<LifecycleEnergyConfig>; costs?: Partial<CostsConfig> };
-	nutrition?: Partial<NutritionConfig>;
 	runtime?: Partial<Omit<RuntimeConfig, "vm">> & {
 		vm?: Partial<VmConfig>;
 	};

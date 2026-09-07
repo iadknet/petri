@@ -37,7 +37,6 @@ pub const SEQUENCE_SEED: u64 = 8;
 
 const AGE_CHOICES: [f32; 6] = [0.0, 5.0, 19.0, 20.0, 50.0, 200.0];
 const ENERGY_CHOICES: [f32; 6] = [5.0, 15.0, 25.0, 31.0, 45.0, 80.0];
-const RESERVE_CHOICES: [f32; 4] = [0.0, 2.0, 4.0, 8.0];
 
 /// One battery scenario, drawn once at battery generation and immutable
 /// afterward: the assembled sensor snapshot (built once here rather than on
@@ -47,7 +46,6 @@ const RESERVE_CHOICES: [f32; 4] = [0.0, 2.0, 4.0, 8.0];
 struct Scenario {
     sensors: SensorSnapshot,
     energy: f32,
-    reserve: f32,
 }
 
 /// `Some(x)` with probability `1 - p_zero`, else `0.0`, matching Appendix A's
@@ -67,7 +65,6 @@ fn draw_scenario(rng: &mut SmallRng, food_type_count: usize) -> Scenario {
         .collect();
     let age = AGE_CHOICES[rng.gen_range(0..AGE_CHOICES.len())];
     let energy = ENERGY_CHOICES[rng.gen_range(0..ENERGY_CHOICES.len())];
-    let reserve = RESERVE_CHOICES[rng.gen_range(0..RESERVE_CHOICES.len())];
     let neighbor_food_by_type: Vec<[f32; 8]> = (0..food_type_count)
         .map(|_| std::array::from_fn(|_| nonzero_or_zero(rng, 0.6)))
         .collect();
@@ -91,11 +88,7 @@ fn draw_scenario(rng: &mut SmallRng, food_type_count: usize) -> Scenario {
         },
         perception: PerceptionSnapshot::zeroed(food_type_count),
     };
-    Scenario {
-        sensors,
-        energy,
-        reserve,
-    }
+    Scenario { sensors, energy }
 }
 
 fn draw_scenarios(seed: u64, count: usize, food_type_count: usize) -> Vec<Scenario> {
@@ -206,7 +199,6 @@ impl Battery {
             genome,
             &scenario.sensors,
             &mut energy,
-            scenario.reserve,
             &mut shared_memory,
             &prev_shared_memory,
             &mut graph_runtime,
@@ -218,7 +210,7 @@ impl Battery {
     /// Execute one sequence of ticks, applying the production shared-memory
     /// bookkeeping between ticks (a fresh snapshot-then-decay before each
     /// tick's cognition, mirroring `run_phase_0`'s order within a tick).
-    /// Energy and reserve reset to each tick's scenario values; shared memory
+    /// Energy resets to each tick's scenario value; shared memory
     /// and graph state persist across the sequence.
     fn execute_sequence<M: MeshExecutionMode>(
         &self,
@@ -241,7 +233,6 @@ impl Battery {
                     genome,
                     &scenario.sensors,
                     &mut energy,
-                    scenario.reserve,
                     &mut shared_memory,
                     &prev_shared_memory,
                     &mut graph_runtime,

@@ -2269,12 +2269,9 @@ mod tests {
             .collect();
 
         assert_eq!(coverages, default_coverages);
+        assert_eq!(coverages, vec![0.54]);
         assert!(
-            coverages.iter().all(|c| (c - 0.27).abs() < 1e-6),
-            "production coverage is 0.27 for every default food type, got {coverages:?}"
-        );
-        assert!(
-            (config.world.food.shared.initial_coverage - 0.27).abs() < 1e-6,
+            (config.world.food.shared.initial_coverage - 0.54).abs() < 1e-6,
             "normalize() makes the shared coverage follow the primary food type"
         );
     }

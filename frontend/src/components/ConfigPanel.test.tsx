@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen, within } from "@testing-library/react";
+import { act, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { api } from "../api/rest.ts";
 import { useConfigStore } from "../stores/config.ts";
@@ -29,6 +29,24 @@ describe("ConfigPanel", () => {
 		});
 	});
 
+	it("saves the shared live Eat Reward", async () => {
+		render(<ConfigPanel />);
+		fireEvent.change(screen.getByTestId("config-field-energy-costs-eat-reward-per-food"), {
+			target: { value: "7.5" },
+		});
+		expect(useConfigStore.getState().localDraft?.energy.costs.eat_reward_per_food).toBe(7.5);
+		fireEvent.click(screen.getByRole("button", { name: "Apply Changes" }));
+		await waitFor(() =>
+			expect(api.patchConfig).toHaveBeenCalledWith(
+				expect.objectContaining({
+					energy: expect.objectContaining({
+						costs: expect.objectContaining({ eat_reward_per_food: 7.5 }),
+					}),
+				}),
+			),
+		);
+	});
+
 	it("edits mutation event continuation probability in the runtime draft", () => {
 		render(<ConfigPanel />);
 		const field = screen.getByTestId("config-field-mutation-event-continuation-probability");
@@ -51,23 +69,23 @@ describe("ConfigPanel", () => {
 		expect(screen.getByTestId("startup-food-type-add")).toBeInTheDocument();
 		expect(screen.getByTestId("startup-field-food-type-0-initial-density")).toBeInTheDocument();
 		expect(screen.getByTestId("startup-field-food-type-0-initial-coverage")).toBeInTheDocument();
-		expect(screen.getByTestId("startup-field-food-type-0-metabolic-yield")).toBeInTheDocument();
-		expect(screen.getByTestId("startup-field-food-type-0-reserve-yield")).toBeInTheDocument();
-		expect(screen.getByTestId("startup-field-nutrition-reserve-capacity")).toBeInTheDocument();
-		expect(screen.getByTestId("startup-field-nutrition-reserve-cost")).toBeInTheDocument();
+		expect(
+			screen.queryByTestId("startup-field-food-type-0-metabolic-yield"),
+		).not.toBeInTheDocument();
+		expect(screen.queryByTestId("startup-field-food-type-0-reserve-yield")).not.toBeInTheDocument();
+		expect(
+			screen.queryByTestId("startup-field-nutrition-reserve-capacity"),
+		).not.toBeInTheDocument();
+		expect(screen.queryByTestId("startup-field-nutrition-reserve-cost")).not.toBeInTheDocument();
 		expect(screen.getByTestId("startup-field-energy-initial-energy")).toBeInTheDocument();
 	});
 
-	it("renders the core complementary defaults for food-card controls", () => {
+	it("renders the primary food defaults", () => {
 		act(() => useStartupConfigStore.getState().reset());
 		render(<ConfigPanel />);
-
-		expect(screen.getByTestId("startup-field-food-type-0-initial-coverage")).toHaveValue(0.27);
-		expect(screen.getByTestId("startup-field-food-type-0-metabolic-yield")).toHaveValue(10);
-		expect(screen.getByTestId("startup-field-food-type-0-reserve-yield")).toHaveValue(0);
-		expect(screen.getByTestId("startup-field-food-type-1-initial-coverage")).toHaveValue(0.27);
-		expect(screen.getByTestId("startup-field-food-type-1-metabolic-yield")).toHaveValue(0);
-		expect(screen.getByTestId("startup-field-food-type-1-reserve-yield")).toHaveValue(1);
+		expect(screen.getByTestId("startup-field-food-type-0-initial-coverage")).toHaveValue(0.54);
+		expect(screen.queryByTestId("startup-food-type-card-1")).not.toBeInTheDocument();
+		expect(screen.getByTestId("config-field-energy-costs-eat-reward-per-food")).toHaveValue(5);
 	});
 
 	it("startup edits do not modify runtime local draft for startup-only fields", () => {
@@ -242,9 +260,7 @@ describe("ConfigPanel", () => {
 
 		const target = screen.getByTestId("startup-field-fertility-layer-0-target");
 		expect(target).toHaveValue("all_foods");
-		expect(
-			within(target).getByRole("option", { name: "Type 2: Reproductive Food" }),
-		).toBeInTheDocument();
+		expect(within(target).getByRole("option", { name: "Type 2: Food 2" })).toBeInTheDocument();
 
 		fireEvent.change(target, { target: { value: "single_type:1" } });
 

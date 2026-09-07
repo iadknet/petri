@@ -6,6 +6,6 @@ script-maintained.
 
 - [aqua-execution-path-correction](aqua-execution-path-correction/master-prd.md) — Complete
 - [aqua-runtime-management](aqua-runtime-management/master-prd.md) — Complete
-- [complementary-nutrition-budget](complementary-nutrition-budget/master-prd.md) — Complete
+- [complementary-nutrition-budget](complementary-nutrition-budget/master-prd.md) — Complete historically; design decision reversed, [energy-only restoration](../../specs/remove-complementary-nutrition.md)
 - [simplify-aqua-integration](simplify-aqua-integration/master-prd.md) — Complete
 - [roadmap-workflow-simplification](roadmap-workflow-simplification/master-prd.md) — Complete (user accepted residual non-runtime P2/P3 findings)

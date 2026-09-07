@@ -34,8 +34,6 @@ function buildCreatureDetail() {
 		position: { x: 10, y: 12 },
 		energy: 42,
 		max_energy: 100,
-		reproductive_reserve: 3,
-		reproductive_reserve_capacity: 8,
 		age: 8,
 		generation: 2,
 		complexity: 5,

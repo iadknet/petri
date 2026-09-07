@@ -66,7 +66,6 @@ Conceptual override domains:
 - `world` (`width`, `height`, `edge_mode`, `food.shared`, `food.types`,
   `food.fertility`),
 - `energy` (lifecycle and action-cost controls),
-- `nutrition` (startup-only reproductive reserve capacity and reproduction cost),
 - `runtime` (mesh/vm/graph/mutation controls),
 - `startup` (startup-only controls such as early-run ramps).
 
@@ -77,10 +76,9 @@ v3alpha1 policy:
 Canonical wire-level field schemas for startup are owned by
 `v3-server-api-protocol-spec.md`.
 
-The normalized production food catalog contains two complementary roles:
-`Maintenance Food` (coverage `0.27`, metabolic yield `10.0`, reserve yield `0.0`)
-and `Reproductive Food` (coverage `0.27`, metabolic yield `0.0`, reserve yield
-`1.0`). Reserve capacity is `8.0` and a successful reproduction costs `4.0`.
+The normalized production food catalog contains one green (`#22c55e`)
+`Primary Food`, initial density `1.0`, coverage `0.54`. Every ordinary food type
+uses the shared live `energy.costs.eat_reward_per_food` reward, default `5.0`.
 
 ---
 
@@ -151,193 +149,36 @@ CreatureGenome {
 
 **Node 0 — Graph backend (sensor aggregator)**
 
-```text
-NodeGenome {
-  node_id: 0,
-  input_refs: [
-    0: World(FoodHere { type_idx: 0 }),
-    1: DynamicIntrospection(EnergyCurrent),
-    2: StaticIntrospection(AgeTicks),
-    3: World(NeighborFoodRing { type_idx: 0 }),      // compound: 8 directions
-    4: World(NeighborOccupiedRing),  // compound: 8 directions
-    5: World(FoodHere { type_idx: 1 }),
-    6: DynamicIntrospection(ReproductiveReserveCurrent),
-    7: World(NeighborFoodRing { type_idx: 1 }),      // compound: 8 directions
-  ],
-  backend_def: Graph(CgpGraphBackendDef {
-    compute_nodes: [
-      // idx 0: energy gate (energy > 30.0)
-      { kind: Threshold(30.0),
-        inputs: [{ source: InputLeaf { ref_idx: 1, sub_idx: 0 },
-                   weight: 1.0 }] },
-      // idx 1: age gate (age >= energy.lifecycle.min_reproduce_age), encoded
-      // as max(min_reproduce_age_ticks - 0.5, -0.5) because Threshold is strict >.
-      { kind: Threshold(max(min_reproduce_age_ticks - 0.5, -0.5)),
-        inputs: [{ source: InputLeaf { ref_idx: 2, sub_idx: 0 },
-                   weight: 1.0 }] },
-      // idx 2: can_reproduce gate = energy_gate * age_gate
-      { kind: Multiply,
-        inputs: [
-          { source: ComputeNode(0), weight: 1.0 },
-          { source: ComputeNode(1), weight: 1.0 }
-        ] },
-      // idx 3: reserve gate = reserve > immediate predecessor(reserve_cost)
-      { kind: Threshold(predecessor(reproductive_reserve_cost)),
-        inputs: [{ source: InputLeaf { ref_idx: 6, sub_idx: 0 },
-                   weight: 1.0 }] },
-      // idx 4: can_reproduce = energy/age gate * reserve gate
-      { kind: Multiply,
-        inputs: [
-          { source: ComputeNode(2), weight: 1.0 },
-          { source: ComputeNode(3), weight: 1.0 }
-        ] },
-      // idx 5: any typed food on the current cell (forage signal)
-      { kind: Max,
-        inputs: [
-          { source: InputLeaf { ref_idx: 0, sub_idx: 0 }, weight: 1.0 },
-          { source: InputLeaf { ref_idx: 5, sub_idx: 0 }, weight: 1.0 }
-        ] },
-    ],
+The five input references are primary FoodHere, live EnergyCurrent, AgeTicks,
+primary NeighborFoodRing, and NeighborOccupiedRing. Three compute nodes apply
+strict energy `Threshold`, age `Threshold(max(min_reproduce_age_ticks - 0.5,
+-0.5))`, and Multiply of those gates. Six custom outputs carry food here,
+can-reproduce, and N/E/S/W primary food. Other output sinks, action bank, and
+execute gate remain unwired. The graph routes to node 1 in slot 0.
 
-    output_sinks: [
-      // Full fixed catalog (64 sinks): 24 CustomOutput, 8 RouterGate,
-      // 16 WriteSlot, and 16 ClearSlot sinks. CustomOutput(0..12) are wired;
-      // all remaining fixed sinks are empty at founder time.
-      // CustomOutput(0): any typed food here (CN5) → slot 0
-      { kind: CustomOutput(0),
-        inputs: [{ source: ComputeNode(5),
-                   weight: 1.0 }] },
-      // CustomOutput(1): can_reproduce → slot 1
-      { kind: CustomOutput(1),
-        inputs: [{ source: ComputeNode(4), weight: 1.0 }] },
-      // CustomOutput(2): food_N → slot 2
-      { kind: CustomOutput(2),
-        inputs: [{ source: InputLeaf { ref_idx: 3, sub_idx: 0 },
-                   weight: 1.0 }] },
-      // CustomOutput(3): food_E → slot 3
-      { kind: CustomOutput(3),
-        inputs: [{ source: InputLeaf { ref_idx: 3, sub_idx: 2 },
-                   weight: 1.0 }] },
-      // CustomOutput(4): food_S → slot 4
-      { kind: CustomOutput(4),
-        inputs: [{ source: InputLeaf { ref_idx: 3, sub_idx: 4 },
-                   weight: 1.0 }] },
-      // CustomOutput(5): food_W → slot 5
-      { kind: CustomOutput(5),
-        inputs: [{ source: InputLeaf { ref_idx: 3, sub_idx: 6 },
-                   weight: 1.0 }] },
-      // CustomOutput(6): reproductive food here
-      { kind: CustomOutput(6),
-        inputs: [{ source: InputLeaf { ref_idx: 5, sub_idx: 0 },
-                   weight: 1.0 }] },
-      // CustomOutput(7): live reproductive reserve
-      { kind: CustomOutput(7),
-        inputs: [{ source: InputLeaf { ref_idx: 6, sub_idx: 0 },
-                   weight: 1.0 }] },
-      // CustomOutput(8): live energy
-      { kind: CustomOutput(8),
-        inputs: [{ source: InputLeaf { ref_idx: 1, sub_idx: 0 },
-                   weight: 1.0 }] },
-      // CustomOutput(9..12): reproductive-food neighbors N/E/S/W
-      { kind: CustomOutput(9),
-        inputs: [{ source: InputLeaf { ref_idx: 7, sub_idx: 0 },
-                   weight: 1.0 }] },
-      { kind: CustomOutput(10),
-        inputs: [{ source: InputLeaf { ref_idx: 7, sub_idx: 2 },
-                   weight: 1.0 }] },
-      { kind: CustomOutput(11),
-        inputs: [{ source: InputLeaf { ref_idx: 7, sub_idx: 4 },
-                   weight: 1.0 }] },
-      { kind: CustomOutput(12),
-        inputs: [{ source: InputLeaf { ref_idx: 7, sub_idx: 6 },
-                   weight: 1.0 }] },
-      // CustomOutput(13..23): empty (inert)
-      // RouterGate(0..7): empty (default routing)
-      // WriteSlot(0..15): empty (inert)
-      // ClearSlot(0..15): empty (inert)
-    ],
+**Node 1 — VM backend (decision and action emitter)**
 
-    action_bank: [
-      // action_queue_cap (default 4) empty ActionSlots
-      // All start disconnected — no graph-based action emission at founder.
-      { behavior: Emit(NoOp), gate_inputs: [], param_inputs: [] },
-      { behavior: Emit(NoOp), gate_inputs: [], param_inputs: [] },
-      { behavior: Emit(NoOp), gate_inputs: [], param_inputs: [] },
-      { behavior: Emit(NoOp), gate_inputs: [], param_inputs: [] },
-    ],
+The VM reads those six outputs. It uses the ordinary mutable program, metadata,
+PushAction, and ExecuteActionQueue; registers 16–19 remain unreferenced.
 
-    execute_gate: { inputs: [] },  // empty — no graph-based termination
-  }),
-  targets: [{ target_id: 1, slot: 0, gate_bias: 0.0 }],
-}
-```
+| Profile | Strict energy threshold | Transfer | Priority |
+| --- | ---: | ---: | --- |
+| V3Alpha1 | 30 | 20 | Reproduce, local forage, Move fallback |
+| ForageFirstSparse | 30 | 10 | Local forage, Reproduce, forage fallback |
+| ForageFirstSparseConservative | 60 | 10 | Local forage, Reproduce, forage fallback |
+| ForageFirstSparseRichOffspring | 40 | 20 | Local forage, Reproduce, forage fallback |
+| ForageFirstSparseBalanced | 50 | 15 | Local forage, Reproduce, forage fallback |
 
-**Node 1 — VM backend (typed nutrition decision + action emitter)**
+Local forage requires positive primary food and queues Eat(type 0), then Move.
+Forage-first fallback also queues Eat then Move on an empty cell, retaining
+normal failed-Eat accounting. Canonical fallback queues Move alone.
+Reproduction requires both graph gates and queues one Reproduce.
 
-```text
-NodeGenome {
-  node_id: 1,
-  input_refs: [
-    0: UpstreamSlot(0),   // any typed food here
-    1: UpstreamSlot(1),   // can_reproduce (CN4)
-    2: UpstreamSlot(2),   // maintenance-food neighbor N
-    3: UpstreamSlot(3),   // maintenance-food neighbor E
-    4: UpstreamSlot(4),   // maintenance-food neighbor S
-    5: UpstreamSlot(5),   // maintenance-food neighbor W
-    6: UpstreamSlot(6),   // reproductive food here
-    7: UpstreamSlot(7),   // live reproductive reserve
-    8: UpstreamSlot(8),   // live energy
-    9: UpstreamSlot(9),   // reproductive-food neighbor N
-    10: UpstreamSlot(10), // reproductive-food neighbor E
-    11: UpstreamSlot(11), // reproductive-food neighbor S
-    12: UpstreamSlot(12), // reproductive-food neighbor W
-  ],
-  backend_def: Vm(VmBackendDef {
-    registers: 20,
-    constants: [0.0, 1.0, 2.0, 4.0, 6.0, reserve_cost,
-                offspring_transfer, energy_threshold],
-    // The generated VM reads all upstream slots 0..12 and clears r15 to zero;
-    // r16 through r19 are spare capacity for later small mutations.
-    // Its profile-specific branch order is:
-    //   1. canonical profile: reproduce when can_reproduce (slot 1) is true;
-    //      forage-first profiles check this after their resource branches;
-    //   2. if reserve (slot 7) < reserve_cost, Eat(type 1) when local
-    //      reproductive food (slot 6) is present, otherwise seek its typed
-    //      neighbor ring (slots 9..12);
-    //   3. if energy (slot 8) < energy_threshold, Eat(type 0) when local
-    //      maintenance food (slot 0) is present, otherwise seek slots 2..5;
-    //   4. reproduce if the graph gate becomes ready, otherwise seek slots 2..5.
-    // Every emitted action writes its metadata, uses PushAction, and terminates
-    // the turn with ExecuteActionQueue.
-    program: [ /* generated instruction sequence */ ],
-  }),
-  targets: [],
-}
-```
-
-**Behavioral intent:**
-- The graph node aggregates typed local/neighbor food, live energy, age, and
-  reserve into fixed output slots using the CGP three-layer model.
-- The VM node handles decision-making and action emission using `PushAction` +
-  `ExecuteActionQueue`.
-- Founders choose the deficient nutrient: reproductive food is preferred while
-  reserve is below cost; maintenance food is preferred while energy is below
-  threshold. Typed local Eat and typed cardinal movement use the corresponding
-  food type only; one action is emitted per decision.
-- Each typed movement branch computes the maximum across all four cardinal
-  values before selecting a direction. It checks N, E, S, then uses W as the
-  final equal-maximum fallback, so ties prefer N, then E, then S, then W.
-  Direction metadata is the cardinal index `N=0`, `E=2`, `S=4`, `W=6`.
-- Founders reproduce only when graph energy, age, and reserve gates all pass.
-
-The age gate uses the half-tick threshold
-`max(min_reproduce_age_ticks - 0.5, -0.5)` for strict `Threshold` semantics.
-The reserve gate is separate: it uses the immediate representable `f32`
-predecessor of `reproductive_reserve_cost`, so strict `>` is equivalent to
-`reserve >= reproductive_reserve_cost`, including fractional costs.
-
-This gives natural selection immediate material to work with: creatures that
-find food and reproduce efficiently will out-compete those that do not.
+Every Move and Reproduce chooses the full primary-food cardinal maximum with
+N/E/S/W tie order and direction metadata 0/2/4/6. This retains the corrected
+selector instead of the historical adjacent-pair heuristic. PushAction captures
+Eat's type 0 before Move overwrites direction metadata. Each branch executes
+its queue once; capacity one retains Eat. No second food type is read.
 
 **Determinism note:** The founder genome structure above is canonical for
 v3alpha1 seeding. The exact bytewise encoding is an implementation detail, but

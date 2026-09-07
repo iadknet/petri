@@ -341,7 +341,6 @@ mod tests {
         food_cfg.initial_density = 1.0;
         food_cfg.types[0].initial_coverage = 0.4;
         food_cfg.types[0].initial_density = 1.0;
-        food_cfg.types[1].initial_coverage = 0.0;
         w.reconfigure_food(food_cfg);
         let mut rng = SmallRng::seed_from_u64(7);
         w.seed_food(&mut rng);
@@ -702,8 +701,6 @@ mod tests {
                 initial_density: 0.5,
                 initial_coverage: 0.5,
                 growth_inhibitor: 0.2,
-                metabolic_energy_yield: 5.0,
-                reproductive_reserve_yield: 0.0,
             },
             FoodTypeConfig {
                 name: "Type B".to_string(),
@@ -711,8 +708,6 @@ mod tests {
                 initial_density: 0.5,
                 initial_coverage: 0.5,
                 growth_inhibitor: 0.2,
-                metabolic_energy_yield: 5.0,
-                reproductive_reserve_yield: 0.0,
             },
         ];
         w.reconfigure_food(initial.clone());

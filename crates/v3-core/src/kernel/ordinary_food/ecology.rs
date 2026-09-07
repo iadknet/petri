@@ -599,6 +599,7 @@ mod tests {
     #[test]
     fn seed_density_shuffles_each_food_type_independently() {
         let mut config = FoodConfig::default();
+        config.types.push(crate::config::FoodTypeConfig::default());
         config.types[0].initial_coverage = 0.5;
         config.types[1].initial_coverage = 0.5;
 

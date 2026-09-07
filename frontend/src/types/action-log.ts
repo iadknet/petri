@@ -23,7 +23,6 @@ export const ActionResult = {
 	PopulationCap: "PopulationCap",
 	TransferredAndKilled: "TransferredAndKilled",
 	NoVictim: "NoVictim",
-	NutritionConstraints: "NutritionConstraints",
 } as const;
 
 export type ActionResult = (typeof ActionResult)[keyof typeof ActionResult];

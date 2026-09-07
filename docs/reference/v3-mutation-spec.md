@@ -308,9 +308,8 @@ only their edges are evolvable.
   production default `plasticity_update_cost = 0.0`, but the split is not
   function-preserving in general). `EnergyCurrent` is the only excluded key:
   in `runtime/cgp/execute.rs` the effects `ResolveCtx` differs from the
-  evaluation `ResolveCtx` only in `energy`, so `EnergyConsumedThisTick` and
-  `ReproductiveReserveCurrent` resolve identically either side of the
-  deduction and their edges split normally. With the exclusion in place, the
+  evaluation `ResolveCtx` only in `energy`, so `EnergyConsumedThisTick`
+  resolves identically either side of the deduction and its edges split normally. With the exclusion in place, the
   split's neutrality property holds unconditionally.
 - `RemoveComputeNode` (removes from `compute_nodes`, remaps
   `GraphSource::ComputeNode` indices across all edge containers)

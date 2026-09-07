@@ -1,7 +1,7 @@
 {
   "gate": {
     "series": "gate-v1",
-    "epoch_baseline": "docs/progress/features/t11-f04-mutation-supply-and-neutral-scaffold.json",
+    "epoch_baseline": "docs/progress/features/remove-complementary-nutrition.json",
     "closed": [
       "docs/progress/features/t10-f10-deterministic-benchmark-harness.json",
       "docs/progress/features/t01-f11-baseline-persistence-characterization.json",
@@ -17,12 +17,13 @@
       "docs/progress/features/t11-f07-reward-trace-clock.json",
       "docs/progress/features/t11-f14-mesh-execution-observability.json",
       "docs/progress/features/t11-f15-mesh-routing-connection-semantics.json",
-      "docs/progress/features/t11-f08-function-preserving-duplication-and-module-growth.json"
+      "docs/progress/features/t11-f08-function-preserving-duplication-and-module-growth.json",
+      "docs/progress/features/remove-complementary-nutrition.json"
     ]
   },
   "goal": {
     "series": "goal-v1",
-    "epoch_baseline": "docs/progress/features/t11-f04-mutation-supply-and-neutral-scaffold-goal.json",
+    "epoch_baseline": "docs/progress/features/remove-complementary-nutrition-goal.json",
     "closed": [
       "docs/progress/features/t01-f12-goal-profile-basic-indicators-and-progress-table-goal.json",
       "docs/progress/features/t11-f01-mutational-neighborhood-indicator-goal.json",
@@ -33,7 +34,8 @@
       "docs/progress/features/t11-f07-reward-trace-clock-goal.json",
       "docs/progress/features/t11-f14-mesh-execution-observability-goal.json",
       "docs/progress/features/t11-f15-mesh-routing-connection-semantics-goal.json",
-      "docs/progress/features/t11-f08-function-preserving-duplication-and-module-growth-goal.json"
+      "docs/progress/features/t11-f08-function-preserving-duplication-and-module-growth-goal.json",
+      "docs/progress/features/remove-complementary-nutrition-goal.json"
     ]
   },
   "counter_definition_changes": [

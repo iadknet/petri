@@ -246,7 +246,6 @@ mod tests {
                             energy: 10.0,
                             generation: 1,
                             phenotype_rgb: [1, 2, 3],
-                            reproductive_reserve: 0.0,
                         },
                         CreatureSnapshot {
                             id: 2,
@@ -255,7 +254,6 @@ mod tests {
                             energy: 20.0,
                             generation: 2,
                             phenotype_rgb: [4, 5, 6],
-                            reproductive_reserve: 0.0,
                         },
                     ],
                     food_types: vec![
@@ -264,16 +262,12 @@ mod tests {
                             name: "Primary Food".to_string(),
                             color: "#22c55e".to_string(),
                             growth_inhibitor: 0.2,
-                            metabolic_energy_yield: 10.0,
-                            reproductive_reserve_yield: 0.0,
                         },
                         FoodTypeSnapshot {
                             type_idx: 1,
                             name: "Secondary Food".to_string(),
                             color: "#0ea5e9".to_string(),
                             growth_inhibitor: 0.3,
-                            metabolic_energy_yield: 0.0,
-                            reproductive_reserve_yield: 1.0,
                         },
                     ],
                     food: vec![

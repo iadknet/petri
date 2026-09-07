@@ -49,8 +49,6 @@ struct CreatureDetailResponse<'a> {
     position: CreaturePositionResponse,
     energy: f32,
     max_energy: f32,
-    reproductive_reserve: f32,
-    reproductive_reserve_capacity: f32,
     age: u64,
     generation: u64,
     complexity: u32,
@@ -365,8 +363,6 @@ pub async fn get_creature(
         },
         energy: creature.energy,
         max_energy: sim.config.energy.lifecycle.max_energy,
-        reproductive_reserve: creature.reproductive_reserve,
-        reproductive_reserve_capacity: sim.config.nutrition.reproductive_reserve_capacity,
         age: creature.age,
         generation: creature.generation,
         complexity: creature.cached_complexity,
@@ -564,9 +560,5 @@ mod tests {
     fn action_log_keys_use_variant_names() {
         assert_eq!(ActionType::Move.as_key(), "Move");
         assert_eq!(ActionResult::AgeConstraints.as_key(), "AgeConstraints");
-        assert_eq!(
-            ActionResult::NutritionConstraints.as_key(),
-            "NutritionConstraints"
-        );
     }
 }

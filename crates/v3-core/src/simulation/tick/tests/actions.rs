@@ -104,14 +104,13 @@ fn queued_actions_stop_once_action_exhausts_creature_energy() {
 }
 
 #[test]
-fn rejected_reproduction_records_nutrition_constraint_in_action_log() {
+fn zero_transfer_reproduction_records_energy_constraint_in_action_log() {
     let genome = vm_program_genome(vec![
         VmInstruction::PushAction { action_type: 3 },
         VmInstruction::ExecuteActionQueue,
     ]);
     let (mut sim, id) = make_sim_with_custom_genome(80.0, genome);
     sim.config.energy.lifecycle.min_reproduce_age = 0;
-    sim.creatures[id].reproductive_reserve = 0.0;
     sim.action_logs
         .insert(id, crate::creature::action_log::ActionLog::new(8));
 
@@ -125,7 +124,7 @@ fn rejected_reproduction_records_nutrition_constraint_in_action_log() {
         .back()
         .expect("reproduce action log entry");
     assert_eq!(entry.action_type, ActionType::Reproduce);
-    assert_eq!(entry.result, ActionResult::NutritionConstraints);
+    assert_eq!(entry.result, ActionResult::EnergyConstraints);
     assert_eq!(sim.stats.last_tick_reproduce, 1);
 }
 
@@ -157,8 +156,13 @@ fn tick_action_log_records_applied_food_type_amount_and_result() {
         }],
     };
     let (mut sim, id) = make_sim_with_custom_genome(10.0, genome);
-    sim.config.world.food.types[1].metabolic_energy_yield = 3.0;
-    sim.config.world.food.types[1].reproductive_reserve_yield = 2.0;
+    sim.config
+        .world
+        .food
+        .types
+        .push(crate::config::FoodTypeConfig::default());
+    sim.config.energy.costs.eat_reward_per_food = 3.0;
+    sim.world.reconfigure_food(sim.config.world.food.clone());
     let pos = sim.creatures[id].position;
     sim.world
         .set_food_type(pos, crate::config::OrdinaryFoodTypeId::new(1), 0.35);
@@ -826,7 +830,6 @@ fn reproduction_resets_reward_credit_including_frozen_tick_base() {
         let (mut sim, parent) = make_sim_with_custom_genome(1000.0, genome);
         sim.config.mutation.mutation_probability = 0.0;
         sim.creatures[parent].age = sim.config.energy.lifecycle.min_reproduce_age;
-        sim.creatures[parent].reproductive_reserve = sim.config.nutrition.reproductive_reserve_cost;
         sim.creatures[parent].graph_runtime.eligibility_traces = vec![vec![Box::new([3.0])]];
         sim.creatures[parent]
             .graph_runtime

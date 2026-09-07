@@ -108,13 +108,12 @@ impl GraphTracer for RecordingTracer {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn execute_graph_node_traced_with_reserve(
+pub(crate) fn execute_graph_node_traced(
     def: &CgpGraphBackendDef,
     input_refs: &[InputReference],
     upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
     energy: &mut f32,
     energy_consumed: f32,
-    reproductive_reserve: f32,
     node_idx: usize,
     graph_runtime: &mut GraphRuntimeState,
     sensors: &SensorSnapshot,
@@ -159,7 +158,6 @@ pub(crate) fn execute_graph_node_traced_with_reserve(
         upstream_slots,
         energy,
         energy_consumed,
-        reproductive_reserve,
         node_idx,
         graph_runtime,
         sensors,

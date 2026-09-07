@@ -70,7 +70,6 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
     upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
     energy: &mut f32,
     energy_consumed: f32,
-    reproductive_reserve: f32,
     node_idx: usize,
     graph_runtime: &mut GraphRuntimeState,
     sensors: &SensorSnapshot,
@@ -144,7 +143,6 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
         upstream_slots,
         energy: *energy,
         energy_consumed,
-        reproductive_reserve,
         action_queue: &side_outputs.action_queue,
     };
 
@@ -220,7 +218,6 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
             upstream_slots,
             energy: *energy,
             energy_consumed,
-            reproductive_reserve,
             action_queue: &queue_snapshot,
         };
         let (plasticity_cost, plasticity_update_count) = hebbian::apply_hebbian_updates(
@@ -274,7 +271,6 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
             upstream_slots,
             energy: evaluation_energy,
             energy_consumed,
-            reproductive_reserve,
             action_queue: &queue_snapshot,
         };
         traces::update_eligibility_traces(
@@ -298,7 +294,6 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
         upstream_slots,
         energy: *energy,
         energy_consumed,
-        reproductive_reserve,
         action_queue: &queue_snapshot,
     };
     let (result, effects_trace) = apply_cgp_graph_effects(
@@ -325,13 +320,12 @@ pub(crate) fn execute_graph_impl<T: GraphTracer>(
 }
 
 #[allow(clippy::too_many_arguments)]
-pub(crate) fn execute_graph_node_with_reserve(
+pub(crate) fn execute_graph_node(
     def: &CgpGraphBackendDef,
     input_refs: &[InputReference],
     upstream_slots: &[f32; OUTPUT_SLOT_COUNT],
     energy: &mut f32,
     energy_consumed: f32,
-    reproductive_reserve: f32,
     node_idx: usize,
     graph_runtime: &mut GraphRuntimeState,
     sensors: &SensorSnapshot,
@@ -347,7 +341,6 @@ pub(crate) fn execute_graph_node_with_reserve(
         upstream_slots,
         energy,
         energy_consumed,
-        reproductive_reserve,
         node_idx,
         graph_runtime,
         sensors,
@@ -438,7 +431,6 @@ mod work_counter_tests {
             &genome,
             &ss,
             &mut energy,
-            0.0,
             &mut smem,
             &prev_smem,
             &mut gr,
@@ -514,7 +506,6 @@ mod work_counter_tests {
             &genome,
             &ss,
             &mut energy,
-            0.0,
             &mut smem,
             &prev_smem,
             &mut gr,
@@ -583,7 +574,6 @@ mod clock_tests {
             &[],
             &[0.0; OUTPUT_SLOT_COUNT],
             energy,
-            0.0,
             0.0,
             0,
             state,
@@ -669,12 +659,11 @@ mod clock_tests {
             let mut memory = [0.0; 16];
             memory[0] = 8.0;
             let mut side = MeshSideOutputs::new(10);
-            let (_, trace) = crate::runtime::cgp::traced::execute_graph_node_traced_with_reserve(
+            let (_, trace) = crate::runtime::cgp::traced::execute_graph_node_traced(
                 &def,
                 &[],
                 &[0.0; OUTPUT_SLOT_COUNT],
                 &mut energy,
-                0.0,
                 0.0,
                 0,
                 &mut state,
@@ -721,12 +710,11 @@ mod clock_tests {
             let mut memory = [0.0; 16];
             memory[0] = 1.0;
             let mut traced_side = MeshSideOutputs::new(10);
-            let (_, trace) = crate::runtime::cgp::traced::execute_graph_node_traced_with_reserve(
+            let (_, trace) = crate::runtime::cgp::traced::execute_graph_node_traced(
                 &def,
                 &[],
                 &[0.0; OUTPUT_SLOT_COUNT],
                 &mut 100.0,
-                0.0,
                 0.0,
                 0,
                 &mut traced,
