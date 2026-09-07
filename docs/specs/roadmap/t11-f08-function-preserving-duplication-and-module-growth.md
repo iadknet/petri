@@ -168,23 +168,25 @@ disabled or down-weighted; the remapped inline copy keeps its weight.
 
 ## Implementation Tasks
 
-- [ ] Write failing tests first: the VM tail-copy property over generated
+- [x] Write failing tests first: the VM tail-copy property over generated
       programs, the VM copy-and-divergence fixture, the graph activation
       property for `CopyInternalNode` and `CopySubgraph` (a backward external
       edge fixture must fail on appended copies), the split-exclusion skip,
       and the mesh `CopyNode` activation fixture; commit any
       `proptest-regressions/` file.
-- [ ] Implement tail placement with the terminal guard for the three VM copy
+      (`7dd8d7c3`; regressions committed for both new proptests.)
+- [x] Implement tail placement with the terminal guard for the three VM copy
       operators, phase-faithful insertion and self-edge rule for the two graph
       copy operators, and the split exclusion; remove the documented exception
-      from the graph tests.
-- [ ] Update `v3-mutation-spec.md` (VM copy placement and taxonomy: the three
+      from the graph tests. (`3672367a`.)
+- [x] Update `v3-mutation-spec.md` (VM copy placement and taxonomy: the three
       VM copies join the growth class, the remapped copy stays a macro; graph
       copy placement and self-edge rule; split exclusion replacing the
       documented exception; F08 ownership text), the graph backend spec's T11
       pointer, and the mesh execution spec's copy interference note.
-- [ ] Self-review the diff (`simplify`), then fresh `make rust-mutants`;
-      record the survivor triage below.
+      (`8ca76bb0`.)
+- [x] Self-review the diff (`simplify`), then fresh `make rust-mutants`;
+      record the survivor triage below. (`005b0778`, `eebacbbf`.)
 - [ ] Store gate and single goal reports at
       `docs/progress/features/t11-f08-function-preserving-duplication-and-module-growth.json`
       and `...-goal.json`; append both to `docs/progress/benchmark-series.json`;
@@ -192,23 +194,110 @@ disabled or down-weighted; the remapped inline copy keeps its weight.
 
 ## Verification
 
-- [ ] TDD evidence: record the initial failing commands and results for each
+- [x] TDD evidence: record the initial failing commands and results for each
       test above, then the passing commands.
-- [ ] Property tests: VM tail-copy neutrality over generated programs and any
+
+  Red, at `7dd8d7c3` (tests plus the extracted seams, placement and exclusion
+  semantics unchanged):
+
+  - `cargo test -p v3-core --lib mutation::vm::f08_tests` — **FAILED**, 1
+    passed / 4 failed: `tail_copy_is_neutral_under_ample_budget`
+    (`[NoOp, NoOp]` vs `[NoOp]`, minimal input `len = 1, op_index = 0`),
+    `tail_copy_preserves_the_program_prefix_and_guards_a_non_terminal_program`,
+    `tail_copy_authors_no_guard_when_the_program_already_ends_in_a_terminal`
+    (copy landed at index 1, not the tail),
+    `the_guard_stops_fall_through_into_the_copied_span` (no guard authored,
+    `[PushAction, PushAction]`).
+  - `cargo test -p v3-core --lib mutation::graph::tests::f08` — **FAILED**, 2
+    passed / 6 failed: `activating_a_copy_read_by_a_backward_edge_reproduces_the_original`,
+    `copy_activation_is_equivalent_over_fixtures_and_seeds` (minimal input
+    `seed = 13425958788970458832`, `activate[base][0, 1]` actions `Move(N)` vs
+    `Move(NE)`), `copy_internal_node_inserts_the_copy_directly_after_its_source`,
+    `copy_internal_node_shifts_the_copied_inputs_and_follows_a_self_edge`,
+    `copy_subgraph_inserts_every_copy_directly_after_its_member`,
+    `split_skips_a_live_introspection_edge_into_a_non_compute_consumer_under_plasticity`.
+  - `cargo test -p v3-core --lib mutation::topology::f08_tests` — **passed on
+    the first run**, and truthfully so: this feature changes no topology code,
+    and T11.F15's `CopyNode` already produces a clone that reproduces its
+    original once `SwapRouteTargets` runs it in the original's chain position.
+    Both fixtures are qualification, not red-then-green.
+  - Two `proptest-regressions` files were created by those failures and are
+    committed: `crates/v3-core/proptest-regressions/mutation/vm/f08_tests.txt`
+    and `.../mutation/graph/tests/f08.txt`.
+
+  Green, at `3672367a` and after: `cargo test -p v3-core --lib mutation::` —
+  **ok, 339 passed / 0 failed** (one pre-existing assertion updated for the
+  new semantics: `copy_instruction_block_respects_max_32`'s bound is 7, not 6,
+  because a three-`Noop` program now also gains the guard `Halt`).
+  `cargo test -p v3-core --lib` — **ok, 1197 passed / 0 failed / 1 ignored**.
+
+- [x] Property tests: VM tail-copy neutrality over generated programs and any
       offsets; graph copy activation equivalence over fixtures and seeds; the
       split property unconditional with the skip asserted for excluded edges.
-- [ ] `cargo test -p v3-core --test viability` ran first after the mutation
-      semantics changed; result recorded.
-- [ ] `make rust-mutants` (fresh, `MUTANTS_ITERATE=0`): summary line, output
+
+  `tail_copy_is_neutral_under_ample_budget` (96 cases) draws programs from the
+  production `random_vm_instruction` generator, optionally redrawing every jump
+  offset across the whole `i32` range, applies one of the three copy operators
+  through `VmMutator::apply`, and compares `NodeResult`, action queue, output
+  slots, and shared memory; the ample-budget precondition is
+  `!energy_exhausted && steps + 1 < max_vm_steps`.
+  `copy_activation_is_equivalent_over_fixtures_and_seeds` (48 cases) runs over
+  `base_def`, `plasticity_def`, and a new `phase_def`, duplicating one drawn
+  node and one drawn ascending cluster, asserting fire-time neutrality and then
+  activation equivalence across a four-tick sequence per scenario from fresh
+  state with `GraphRuntimeState::begin_tick` at each boundary.
+  `split_existing_edge_is_neutral_at_fire_time` now holds with no exception
+  branch, and `split_skips_...` / `split_exclusion_is_scoped_to_all_three_of_its_conditions`
+  pin the skip to exactly the excluded edges.
+
+- [x] `cargo test -p v3-core --test viability` ran first after the mutation
+      semantics changed; result recorded: **ok, 25 passed / 0 failed**, both
+      immediately after the semantics change and again after the simplify pass.
+- [x] `make rust-mutants` (fresh, `MUTANTS_ITERATE=0`): summary line, output
       path, and every survivor resolved as killed, equivalent, or deferred.
+
+  First fresh run (`MUTANTS_ITERATE=0 make rust-mutants`, mode `fresh`, diff
+  against `de35c058`), output
+  `/Users/istefanek/.local/share/petri-tools/mutants/t11-f08/mutants.out`:
+
+  > `41 mutants tested in 5m: 1 missed, 40 caught`
+
+  Survivor list (`missed.txt`), one entry:
+
+  - `crates/v3-core/src/mutation/graph/operators.rs:572:40: replace > with >= in check_compute_node_capacity`
+    — **killed** (`eebacbbf`): `copy_operators_skip_when_the_copy_would_exceed_the_index_space`
+    now starts one node below the limit and asserts the copy still applies at
+    the highest non-sentinel index before asserting the skip at the limit. No
+    production code changed.
+
+  Second fresh run after that test, same command and output path:
+
+  > `41 mutants tested in 4m: 41 caught`
+
+  and `rust-mutants: no survivors`.
+
 - [ ] `make bench PROFILE=gate FEATURE=t11-f08-function-preserving-duplication-and-module-growth`
       and `make bench PROFILE=goal FEATURE=...` each exited 0 with reports
       stored as above; neighborhood readings recorded in Performance below.
-- [ ] Second goal-profile determinism run: Not applicable per the 2026-09-05
+
+  Gate: **exit 0**, `severe=false` against both references, report stored.
+  Goal: the run completed and the report was written, but `compare_against`
+  reported `severe=true` for `plasticity_updates` versus the previous closure
+  and `make bench` therefore **exited 3**. The crossing, its cause, and the
+  epoch comparison are recorded in Performance below; no threshold was
+  weakened and no stored baseline was edited. Accepting or rejecting the
+  crossing is the orchestrator's and reviewer's decision, so this item stays
+  unchecked.
+
+- [x] Second goal-profile determinism run: Not applicable per the 2026-09-05
       workflow decision; `crates/v3-core/tests/reproducibility.rs` in
       `make check` covers cross-process reproducibility.
-- [ ] `make roadmap-check` on document edits and independently by the
+- [x] `make roadmap-check` on document edits and independently by the
       orchestrator; `make check` exited 0 at the tested commit.
+
+  `make roadmap-check` — `roadmap-check: validation passed`.
+  `make check` — **exit 0** at `3672367a` and again after the simplify pass at
+  `005b0778`.
 
 ## Performance and Goal Impact
 
@@ -228,17 +317,133 @@ goal run. Record the founder and evolved neighborhood rows against the
 predeclaration above, the persistence and lineage readings against T11.F15
 without a cognition claim, and any threshold crossing with its cause.
 
+Reports: [gate](../../progress/features/t11-f08-function-preserving-duplication-and-module-growth.json),
+[goal](../../progress/features/t11-f08-function-preserving-duplication-and-module-growth-goal.json).
+The tables below name the readings the predeclaration asked for; the reports
+are the source for everything else.
+
+**Gate counters** (per creature-tick; previous T11.F15 / epoch T11.F04),
+`severe=false` against both:
+
+| counter | current | vs T11.F15 | vs T11.F04 |
+| --- | --- | --- | --- |
+| `mesh_hops` | 2.000000 | 0.000000% | +0.022955% |
+| `vm_steps` | 28.044355 | 0.000000% | -0.001248% |
+| `graph_relax_iters` | 1.000000 | 0.000000% | -66.650826% (T11.F06 definition change) |
+| `plasticity_updates` | 0.000899 | 0.000000% | -0.221976% |
+| `actions_applied` | 1.000000 | 0.000000% | 0.000000% |
+| `births` | 0.001225 | 0.000000% | +5.331040% |
+
+Gate wall 0.004238436 ms/creature-tick: +1.791398% versus T11.F15,
++0.929275% versus T11.F04, both `ok`. Every gate counter is byte-identical to
+T11.F15: the gate profile is 225 ticks with 75 births, and a dormant tail copy
+costs no VM step and changes no action, so the simulation trajectory it
+produces is the same one.
+
+**Goal counters** (per creature-tick), `severe=true` for one counter versus
+the previous closure:
+
+| counter | current | vs T11.F15 | vs T11.F04 (epoch) |
+| --- | --- | --- | --- |
+| `mesh_hops` | 2.181179 | +0.034718% | -33.515052% |
+| `vm_steps` | 41.169837 | -32.044401% | -96.673252% |
+| `graph_relax_iters` | 1.005334 | +0.073462% | -83.251507% |
+| `plasticity_updates` | 0.104370 | **+63.738195% (severe)** | -25.448402% |
+| `actions_applied` | 1.020685 | -6.190920% | -9.637509% |
+| `births` | 0.007635 | -3.464408% | -6.330512% |
+
+Goal wall 0.006062250 ms/creature-tick: **-6.353186%** versus T11.F15 and
+**-15.275737%** versus T11.F04, both `ok`; total world wall time fell from
+636,657 ms to 603,463 ms over 1.2% more creature-ticks.
+
+**The `plasticity_updates` crossing.** Cause, stated as measured rather than
+excused: this counter has ranged 0.100–0.154 per creature-tick across every
+goal report from T01.F12 through T11.F14 (0.100492, 0.100492, 0.124060,
+0.115330, 0.139997, 0.153630, 0.151239, 0.151239); T11.F15's 0.063742 is the
+one low outlier in the series, and this feature's 0.104370 is back inside the
+historical band and 25.4% *below* the T11.F04 epoch. No mechanism in this diff
+adds a Hebbian update: the number of updates is the number of plasticity-node
+edges evaluated, the copy operators duplicate a plasticity node exactly as
+they did before, and the new split exclusion *removes* split opportunities on
+plasticity-carrying graphs. What changed is the population: with the three VM
+copy operators now silent instead of behavior-changing (evolved
+`VmCopyInstructionBlock` 483/720 → 720/720 silent), selection over 6,000 ticks
+produced graphs with more plasticity structure (mean reachable structure
+128.824696 versus 125.564576, p75 157 versus 153) while VM work fell 32%. The
+spec predeclared that populations differ and every counter may move, but did
+not predeclare a severe allowance, so this is recorded as a crossing with its
+cause and left for the orchestrator and reviewer; no threshold was weakened
+and no baseline was re-pinned.
+
+**Founder neighborhood versus the predeclaration** (gate report, silent /
+applied, T11.F15 → T11.F08):
+
+| operator | predeclared | T11.F15 | T11.F08 | met |
+| --- | --- | --- | --- | --- |
+| `VmCopyInstructionBlock` | 19/50 → 50/50 | 19/50 | 50/50 | yes |
+| `VmCopyGeneBackwardSlice` | 27/50, 6 dead → 50/50, 0 dead | 27/50, 6 dead | 50/50, 0 dead | yes |
+| `VmCopyGeneForwardSlice` | 22/50 → 50/50 | 22/50 | 50/50 | yes |
+| `VmCopyInstructionBlockRemapped` | unchanged | 15/50 | 15/50 | yes |
+| `CopyInternalNode` | stays 50/50 | 50/50 | 50/50 | yes |
+| `CopySubgraph` | stays 50/50 | 50/50 | 50/50 | yes |
+| `AddInternalGraphNode` | 50/50 or skips only on an excluded edge | 50/50, 0 skips | 50/50, 0 skips | yes |
+
+Every other founder operator row is byte-identical to T11.F15. Single-event
+silent births 84/164 (predeclared floor: not below 80/164; T11.F15 read
+80/164). Founder dead births 0/208, unchanged. Founder observation 63.415 ms,
+far under the 10-second cap.
+
+**Evolved neighborhood** (goal report, pooled over 36 genomes, T11.F15 →
+T11.F08): `VmCopyInstructionBlock` 483/720 with 2 dead → **720/720, 0 dead**;
+`VmCopyGeneBackwardSlice` 370/610 with 24 dead → **604/604, 0 dead**;
+`VmCopyGeneForwardSlice` 402/608 → **622/622, 0 dead** — silent on every
+applied trial, as predeclared. `VmCopyInstructionBlockRemapped` stays a
+behavior-changing macro (446/720 → 449/720). `CopyInternalNode` 689/689,
+`CopySubgraph` 680/680, `CopyNode` 720/720; the two mesh slices rose from
+717/720 and 718/720 to 720/720. `AddInternalGraphNode` reads 701/701 silent
+with 19 skips (T11.F15: 707/707 with 13 skips) — the six extra skips are the
+split exclusion declining edges it must decline; the silent fraction stays
+1.00. Evolved pooled dead births **19/3300** (predeclared: not above
+21/3300); evolved single-event silence 1862/2736 versus 1823/2736. Evolved
+observation 632.437 ms total (200.6 / 243.9 / 187.9 ms per seed), far under
+the 180-second cap; whole-run goal wall 603,463 ms.
+
+**Persistence and lineage versus T11.F15** (no cognition claim). Final
+populations 12,298 / 11,704 / 11,405 (T11.F15: 10,786 / 11,669 / 11,714), no
+extinction on any seed, plateau 12,431.702 / 12,398.210 / 12,402.022 versus
+10,596.510 / 12,308.016 / 12,191.246, mean energy 67.121 / 66.347 / 61.506
+versus 64.769 / 61.161 / 60.371. Births per 100 ticks 12,667.366667 versus
+12,963.483333. Reachable structure min/p25/median/p75/max/mean
+1/97/107/157/519/128.824696 versus 3/97/104/153/723/125.564576. Lineage
+clades/entropy 208/4.329333, 189/4.112589, 194/4.326013 versus 173/4.038022,
+212/4.284456, 225/4.251236. Current-memory either counts 2/2/0 versus 3/2/0;
+temporal operator-state either counts 79/24/120 versus 37/11/17, persisted
+outputs 7/10/16 versus 8/13/25, previous slots 0/3/0 versus 0/0/0. Generation
+median/max 21/45, 23/42, 21/46 versus 23/45, 21/52, 22/44. These are one run
+per side on unpaired populations; nothing here is a claim about cognition.
+
 ## Success Criteria
 
-- [ ] The three VM copy operators, the two graph copy operators, and the mesh
+- [x] The three VM copy operators, the two graph copy operators, and the mesh
       copy are each shown neutral when they fire and equivalent when
       activated unchanged, by property tests or fixtures on every backend.
-- [ ] Each backend's copy-and-divergence trajectory (silent copy, silent
+      (`tail_copy_is_neutral_under_ample_budget`,
+      `copy_activation_is_equivalent_over_fixtures_and_seeds`,
+      `activating_a_copy_read_by_a_backward_edge_reproduces_the_original`,
+      `copy_node_clone_shares_its_original_addresses_slots_and_references`.)
+- [x] Each backend's copy-and-divergence trajectory (silent copy, silent
       dormant divergence, activation) is a passing fixture.
+      (`vm_copy_diverge_and_activate_trajectory`,
+      `mesh_copy_diverge_and_activate_trajectory`; the graph half is the
+      activation property above, whose dormant-divergence step is the copy's
+      own independent state and wiring.)
 - [ ] The split exclusion replaces the documented T11.F03 exception, the
       references record the changed placement and interference rules, and the
       stored reports meet the predeclared neighborhood expectations or record
-      why not.
+      why not. (Exclusion and reference updates landed; every predeclared
+      neighborhood expectation is met; the goal profile's
+      `plasticity_updates` crossing is recorded with its cause above and is
+      the one open decision.)
 
 ## Notes for AI Agents
 
@@ -257,3 +462,19 @@ without a cognition claim, and any threshold crossing with its cause.
   against T11.F02's and this feature's property tests and check it only if
   satisfied; criterion 6 stays open until T11.F09 lands learned-weight
   correspondence.
+- Implementation seams, for the reviewer and for T11.F09:
+  `CgpGraphBackendDef::duplicate_compute_nodes_in_place` is the single
+  placement primitive both graph copy operators use, and
+  `copy_span_to_dormant_tail` is the single placement helper the three VM
+  copy operators use. Learned-weight correspondence through either is
+  T11.F09's: the duplication primitive shifts genome indices without touching
+  `GraphRuntimeState::plasticity_weights`, exactly as T11.F03's split does.
+- Deferred findings: none from the mutation run (no survivors on the second
+  fresh run). One measurement item is open rather than deferred: the goal
+  profile's `plasticity_updates` severe flag versus T11.F15, recorded with
+  its cause in Performance and Goal Impact. `make bench PROFILE=goal` exited
+  3 because of it; the report itself was written and stored.
+- The mesh half of this feature is qualification only, as the spec's
+  Non-Goals require: `crates/v3-core/src/mutation/topology/f08_tests.rs`
+  passed on its first run against unchanged T11.F15 topology code, and no
+  topology file is in the diff.
