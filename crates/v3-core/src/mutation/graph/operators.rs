@@ -437,7 +437,7 @@ pub(crate) fn add_bootstrap_node(
 /// execute gate, the new node is appended instead.
 pub(crate) fn split_existing_edge(
     def: &mut CgpGraphBackendDef,
-    _input_refs: &[InputReference],
+    input_refs: &[InputReference],
     rng: &mut impl Rng,
 ) -> Result<(), MutationSkipReason> {
     if def.compute_nodes.len() >= u16::MAX as usize {
@@ -452,6 +452,11 @@ pub(crate) fn split_existing_edge(
             // split target.
             return Err(MutationSkipReason::NoApplicableTarget);
         }
+    }
+    if !matches!(surface, EdgeSurface::ComputeInput(_))
+        && is_excluded_introspection_split(def, input_refs, old_source)
+    {
+        return Err(MutationSkipReason::NoApplicableTarget);
     }
 
     if let EdgeSurface::ComputeInput(consumer_idx) = surface {
@@ -478,6 +483,30 @@ pub(crate) fn split_existing_edge(
         get_edge_vec_mut(def, surface)[edge_idx].source = GraphSource::ComputeNode(new_idx);
     }
     Ok(())
+}
+
+/// True for the one edge shape a split cannot preserve (T11.F08, replacing
+/// T11.F03's documented exception): on a graph carrying plasticity, a sink,
+/// action slot, or execute gate reading a `DynamicIntrospection` reference
+/// directly. An identity node between them caches the value during
+/// evaluation, while the direct edge resolves it in the post-convergence
+/// effects context after the plasticity-cost deduction, so the two can
+/// differ. `split_existing_edge` skips such an edge instead of splitting it.
+fn is_excluded_introspection_split(
+    def: &CgpGraphBackendDef,
+    input_refs: &[InputReference],
+    source: GraphSource,
+) -> bool {
+    let GraphSource::InputLeaf { ref_idx, .. } = source else {
+        return false;
+    };
+    matches!(
+        input_refs.get(ref_idx as usize),
+        Some(InputReference::DynamicIntrospection(_))
+    ) && def
+        .compute_nodes
+        .iter()
+        .any(|node| node.plasticity.is_some())
 }
 
 /// An identity `Add` node (weighted sum reproduces a single input exactly)
@@ -536,10 +565,7 @@ pub(crate) fn copy_compute_node(
 
 /// A copy is only representable while every resulting index stays below the
 /// `u16::MAX` dangling-reference sentinel `remove_compute_node_at` uses.
-fn check_copy_capacity(
-    def: &CgpGraphBackendDef,
-    added: usize,
-) -> Result<(), MutationSkipReason> {
+fn check_copy_capacity(def: &CgpGraphBackendDef, added: usize) -> Result<(), MutationSkipReason> {
     if def.compute_nodes.len() + added > u16::MAX as usize {
         return Err(MutationSkipReason::NoApplicableTarget);
     }
