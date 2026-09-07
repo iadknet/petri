@@ -35,7 +35,7 @@ use crate::sensors::typed_food::TypedFoodLocalSnapshot;
 /// A handful of hand-picked scenarios, not the full 80-scenario
 /// `neighborhood::battery::Battery`: enough sensor variety to exercise every
 /// wired surface without the cost of the full battery per proptest case.
-fn scenarios() -> Vec<SensorSnapshot> {
+pub(super) fn scenarios() -> Vec<SensorSnapshot> {
     let base = |food_here: f32, neighbor_food: [f32; 8], age: f32| SensorSnapshot {
         local: StaticInputs {
             food_here,
@@ -60,7 +60,7 @@ fn scenarios() -> Vec<SensorSnapshot> {
 /// executions have enough energy and relaxation passes. The base
 /// `graph_node_base_cost` is left at production default so the cost is
 /// real, just affordable at this energy level.
-fn ample_runtime_config() -> RuntimeConfig {
+pub(super) fn ample_runtime_config() -> RuntimeConfig {
     RuntimeConfig {
         max_graph_relax_iters: 32,
         ..RuntimeConfig::default()
@@ -69,7 +69,7 @@ fn ample_runtime_config() -> RuntimeConfig {
 
 /// Execute `def` against every scenario with ample energy, returning each
 /// scenario's `(NodeResult, action_kinds, shared_memory_after)`.
-fn run_scenarios(
+pub(super) fn run_scenarios(
     def: &CgpGraphBackendDef,
     input_refs: &[InputReference],
     config: &RuntimeConfig,
@@ -106,7 +106,7 @@ fn run_scenarios(
 /// Assert that `child` behaves exactly as `parent` did across every
 /// scenario: identical actions, output slots, route gate scores, terminal
 /// and energy-exhausted flags, and shared-memory writes.
-fn assert_neutral(
+pub(super) fn assert_neutral(
     label: &str,
     parent: &CgpGraphBackendDef,
     parent_refs: &[InputReference],
@@ -144,7 +144,7 @@ fn assert_neutral(
 /// A moderately interesting base graph: forward edges, a backward
 /// self-reference, and every wired surface (sink, action gate and param,
 /// execute gate), so growth operators are exercised against real structure.
-fn base_def() -> CgpGraphBackendDef {
+pub(super) fn base_def() -> CgpGraphBackendDef {
     CgpGraphBackendDef {
         compute_nodes: vec![
             ComputeNode {
@@ -211,7 +211,7 @@ fn base_def() -> CgpGraphBackendDef {
     }
 }
 
-fn base_input_refs() -> Vec<InputReference> {
+pub(super) fn base_input_refs() -> Vec<InputReference> {
     vec![
         InputReference::World(WorldInputKey::NeighborBarrierRing), // width 8
         InputReference::ActionQueue,
@@ -224,11 +224,10 @@ fn base_input_refs() -> Vec<InputReference> {
 /// same forward/backward/self-loop shape as `base_def`. Exercises the
 /// growth-neutrality properties against plasticity's post-convergence
 /// energy deduction and against the introspection reference kind, neither
-/// of which `base_def` carries. See the documented exception in the spec's
-/// Inputs and Invariants: a split's append branch on this action-param edge
-/// is *not* neutral under this fixture (see `is_documented_split_exception`
-/// below).
-fn plasticity_def() -> CgpGraphBackendDef {
+/// of which `base_def` carries. T11.F08's split exclusion keeps the split
+/// operator away from this fixture's action-param edge, which reads a live
+/// introspection reference directly on a non-compute surface.
+pub(super) fn plasticity_def() -> CgpGraphBackendDef {
     CgpGraphBackendDef {
         compute_nodes: vec![
             ComputeNode {
@@ -271,9 +270,9 @@ fn plasticity_def() -> CgpGraphBackendDef {
                 weight: 1.0,
             }],
             param_inputs: vec![GraphEdge {
-                // Directly on a non-compute surface: a split's append
-                // branch on this edge hits the documented
-                // pre/post-plasticity-cost exception.
+                // Directly on a non-compute surface: T11.F08's split
+                // exclusion skips this edge instead of caching its value in
+                // an identity node ahead of the plasticity-cost deduction.
                 source: GraphSource::InputLeaf {
                     ref_idx: 2,
                     sub_idx: 0,
@@ -290,7 +289,7 @@ fn plasticity_def() -> CgpGraphBackendDef {
     }
 }
 
-fn plasticity_input_refs() -> Vec<InputReference> {
+pub(super) fn plasticity_input_refs() -> Vec<InputReference> {
     vec![
         InputReference::World(WorldInputKey::NeighborBarrierRing), // width 8, ref_idx 0
         InputReference::ActionQueue,                               // ref_idx 1
@@ -308,34 +307,6 @@ fn fixtures() -> [(&'static str, CgpGraphBackendDef, Vec<InputReference>); 2] {
         ("base", base_def(), base_input_refs()),
         ("plasticity", plasticity_def(), plasticity_input_refs()),
     ]
-}
-
-/// True when `source` is the documented split exception: an append-branch
-/// split whose retargeted edge's old source was an `InputLeaf` resolving to
-/// `DynamicIntrospection(EnergyCurrent)`, on a graph carrying plasticity.
-/// Such a split is not neutral (see the spec's Inputs and Invariants): the
-/// new identity node's cached value is read before the post-convergence
-/// plasticity-cost deduction, while a direct edge on the same surface would
-/// have read it after, so the surface value differs by
-/// `plasticity_cost * weight`. This is a fixed property of the runtime's
-/// energy-accounting order, not something a growth operator should work
-/// around; a code fix is deferred to T11.F08 (see Notes for AI Agents).
-fn is_documented_split_exception(
-    def: &CgpGraphBackendDef,
-    refs: &[InputReference],
-    source: GraphSource,
-) -> bool {
-    let has_plasticity = def.compute_nodes.iter().any(|n| n.plasticity.is_some());
-    let GraphSource::InputLeaf { ref_idx, .. } = source else {
-        return false;
-    };
-    has_plasticity
-        && matches!(
-            refs.get(ref_idx as usize),
-            Some(InputReference::DynamicIntrospection(
-                crate::contracts::DynamicIntrospectionKey::EnergyCurrent
-            ))
-        )
 }
 
 // ─── Fire-time neutrality: the three add-node forms ────────────────────────
@@ -383,20 +354,8 @@ proptest! {
         for (label, parent, refs) in fixtures() {
             let mut child = parent.clone();
             let mut rng = SmallRng::seed_from_u64(seed);
-            if split_existing_edge(&mut child, &mut rng).is_err() {
+            if split_existing_edge(&mut child, &refs, &mut rng).is_err() {
                 continue;
-            }
-            // Documented exception (see `is_documented_split_exception`
-            // and the spec's Inputs and Invariants): an append-branch
-            // split retargeting an `InputLeaf(EnergyCurrent)` edge on a
-            // plasticity-carrying graph is not neutral. Exclude it rather
-            // than weaken the assertion.
-            if child.compute_nodes.len() == parent.compute_nodes.len() + 1 {
-                if let Some(edge) = child.compute_nodes.last().and_then(|n| n.inputs.first()) {
-                    if is_documented_split_exception(&parent, &refs, edge.source) {
-                        continue;
-                    }
-                }
             }
             assert_neutral(
                 &format!("split_existing_edge[{label}]"),
@@ -647,7 +606,7 @@ proptest! {
         let refs = base_input_refs();
         let mut child = parent.clone();
         let mut rng = SmallRng::seed_from_u64(seed);
-        if split_existing_edge(&mut child, &mut rng).is_err() {
+        if split_existing_edge(&mut child, &refs, &mut rng).is_err() {
             return Ok(());
         }
         // Only compute-consumer splits insert-and-shift; sink/action/execute

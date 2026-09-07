@@ -11,6 +11,7 @@ use rand::SeedableRng;
 
 mod copy;
 mod extensions;
+mod f08;
 mod operators;
 
 fn rng(seed: u64) -> SmallRng {

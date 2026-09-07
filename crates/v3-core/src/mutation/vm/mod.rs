@@ -197,3 +197,6 @@ impl VmMutator {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod f08_tests;
