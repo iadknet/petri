@@ -44,6 +44,7 @@ fn tiny_report() -> bench::Report {
         ticks: 3,
         food_coverage: Some(1.0),
         neighborhood: bench::NeighborhoodSizes::default(),
+        drift: Default::default(),
     };
     bench::build_report(&params, "t10-f10-synthetic-check")
 }
@@ -61,6 +62,7 @@ fn tiny_sweep_params() -> bench::ProfileParams {
         ticks: 30,
         food_coverage: None,
         neighborhood: bench::NeighborhoodSizes::default(),
+        drift: Default::default(),
     }
 }
 
@@ -78,6 +80,7 @@ fn tiny_goal_params() -> bench::ProfileParams {
         ticks: 30,
         food_coverage: None,
         neighborhood: bench::NeighborhoodSizes::default(),
+        drift: Default::default(),
     }
 }
 
@@ -94,6 +97,7 @@ fn gate_profile_deterministic_block_is_byte_identical_across_two_runs() {
     // `make bench` alone produces the production reading.
     let params = bench::ProfileParams {
         neighborhood: bench::NeighborhoodSizes::default(),
+        drift: Default::default(),
         ..bench::gate_profile_params()
     };
 
@@ -140,6 +144,7 @@ fn gate_profile_has_no_severe_regression_against_series_references() {
     // exist once, produced by `make bench`.
     let params = bench::ProfileParams {
         neighborhood: bench::NeighborhoodSizes::default(),
+        drift: Default::default(),
         ..bench::gate_profile_params()
     };
     let mut report = bench::build_report(&params, "t10-f10-regression-check");

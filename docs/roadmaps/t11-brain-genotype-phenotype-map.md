@@ -64,7 +64,7 @@ representation only where the neighborhood reading still shows a gap.
   - Goal: Generations, not ticks; executed, not reachable. Record what a lineage's mesh actually runs, whether its route ever varies with the input, how often it loops to the hop cap, and how many generations the goal profile reaches, so mesh-layer claims are read at a depth and in a unit that can support them; observation only.
 - [x] **T11.F15 — Mesh Routing Connection Semantics** — Depends on: T11.F02, T11.F03, T11.F04, T11.F14
   - Goal: A synapse forms with its own trigger. A new route branch is born pointing at something that already works and carrying its own bid, so it is silent at birth and conditional from its first win; retargeting lands near, removing a node or branch is not usually lethal, and a node runs at most once per tick.
-- [ ] **T11.F16 — Drift-Depth Indicator** — Depends on: T11.F14
+- [x] **T11.F16 — Drift-Depth Indicator** — Depends on: T11.F14
   - Goal: Generations, not ticks, read at depth. Walk lineages from the founder under the production mutation engine to generations 250, 1,000, and 2,000 and read what their meshes execute and how often a birth still changes behavior, in seconds at every closure, so the program sees whether the substrate keeps evolving past the goal profile's 22 generations; observation only.
 - [ ] **T11.F17 — Executed-Biased Mutation Targeting** — Depends on: T11.F04, T11.F15, T11.F16
   - Goal: Expressed genes mutate more. Node-internal mutation events land mostly on the nodes a creature's brain actually ran in its recent ticks, so the functional core keeps receiving mutations however much silent scaffold surrounds it, while the number of events per birth and the scaffold's own drift stay as they are.

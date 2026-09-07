@@ -36,6 +36,24 @@ pub struct BirthResult {
     pub by_events: BTreeMap<u32, Tally>,
 }
 
+impl BirthResult {
+    /// Pool complete per-birth integer accounting without changing denominators.
+    #[must_use]
+    pub fn merge(mut self, other: &Self) -> Self {
+        self.births_total += other.births_total;
+        self.zero_event_births += other.zero_event_births;
+        self.any_events = self.any_events.merge(other.any_events);
+        for (&events, &births) in &other.by_requested_events {
+            *self.by_requested_events.entry(events).or_default() += births;
+        }
+        for (&applied_events, tally) in &other.by_events {
+            let entry = self.by_events.entry(applied_events).or_default();
+            *entry = entry.merge(*tally);
+        }
+        self
+    }
+}
+
 /// Run `births` seeded production births from `subject`, seeded by
 /// `seed_offset + BIRTH_SEED_BASE + birth_index`, and classify every
 /// mutated (nonzero-event) offspring against `base`.
@@ -209,6 +227,24 @@ mod tests {
     }
 
     proptest! {
+        #[test]
+        fn pooling_preserves_all_counts_and_buckets_under_regrouping(
+            outcomes in prop::collection::vec((0u32..4, 0u8..4), 0..50),
+            split in 0usize..50,
+        ) {
+            let expanded: Vec<_> = outcomes.iter().map(|&(requested, class)| {
+                if class == 0 { (requested, 0, Tally::default()) }
+                else { (requested + 2, requested + 1, tally_of_one(match class { 1 => Class::Silent, 2 => Class::Changed, _ => Class::Dead })) }
+            }).collect();
+            let split = split.min(expanded.len());
+            let a = fold_outcomes(split as u32, expanded[..split].to_vec());
+            let b = fold_outcomes((expanded.len() - split) as u32, expanded[split..].to_vec());
+            let whole = fold_outcomes(expanded.len() as u32, expanded);
+            prop_assert_eq!(a.clone().merge(&b), whole.clone());
+            prop_assert_eq!(b.merge(&a), whole.clone());
+            prop_assert_eq!(whole.clone().merge(&BirthResult::default()), whole);
+        }
+
         /// The pooled "any events" tally always equals the by-construction
         /// merge of every applied-event-count bucket, and every birth is
         /// accounted for exactly once (as a zero-event birth or in exactly

@@ -113,6 +113,7 @@ pub struct ProfileParams {
     /// `default`; `Some(x)` forces `x` onto every food type.
     pub food_coverage: Option<f32>,
     pub neighborhood: NeighborhoodSizes,
+    pub drift: neighborhood::drift::DriftSizes,
 }
 
 /// Predeclared gate profile constants (T10.F10 Inputs and Invariants).
@@ -133,6 +134,7 @@ pub fn gate_profile_params() -> ProfileParams {
         ticks: 75,
         food_coverage: Some(1.0),
         neighborhood: NeighborhoodSizes::PRODUCTION,
+        drift: neighborhood::drift::DriftSizes::PRODUCTION,
     }
 }
 
@@ -147,6 +149,7 @@ pub fn goal_profile_params() -> ProfileParams {
         ticks: 2_000,
         food_coverage: None,
         neighborhood: NeighborhoodSizes::PRODUCTION,
+        drift: neighborhood::drift::DriftSizes::PRODUCTION,
     }
 }
 
@@ -262,6 +265,8 @@ pub struct GoalIndicators {
     pub temporal_memory_sensitivity: Indicator<TemporalMemorySensitivity>,
     #[serde(default = "undefined_mutational_neighborhood")]
     pub mutational_neighborhood: Indicator<MutationalNeighborhood>,
+    #[serde(default = "undefined_drift_depth")]
+    pub drift_depth: Indicator<DriftDepth>,
     pub strategy_count: String,
     pub strategy_causal_distinctness: String,
     pub evolutionary_activity: String,
@@ -350,6 +355,146 @@ fn undefined_mutational_neighborhood() -> Indicator<MutationalNeighborhood> {
 
 fn undefined_evolved_neighborhood() -> Indicator<EvolvedNeighborhoodHalf> {
     Indicator::Undefined(UNDEFINED.to_string())
+}
+
+fn undefined_drift_depth() -> Indicator<DriftDepth> {
+    Indicator::Undefined(UNDEFINED.to_string())
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DriftDepth {
+    pub version: String,
+    pub founder: String,
+    pub lineages: u32,
+    pub birth_lineages: u32,
+    pub birth_subset: String,
+    pub birth_trials: u32,
+    pub checkpoints: Vec<u64>,
+    pub walk_seed_formula: String,
+    pub birth_seed_formula: String,
+    pub battery_version: String,
+    pub mesh_version: String,
+    pub knockout_method: String,
+    pub executions_per_genome: u32,
+    pub snapshot_count: u32,
+    pub sequence_count: u32,
+    pub sequence_len: u32,
+    pub readings: Vec<DriftDepthCheckpoint>,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DriftDepthCheckpoint {
+    pub depth: u64,
+    pub lineages: u32,
+    pub total_nodes: u64,
+    pub reachable_nodes: u64,
+    pub executed_nodes: u64,
+    pub knockout_nodes: u64,
+    pub mean_total_nodes: String,
+    pub mean_reachable_nodes: String,
+    pub mean_executed_nodes: String,
+    pub mean_knockout_nodes: String,
+    pub route_varying_lineages: u32,
+    pub route_varying_fraction: String,
+    pub hop_cap_hits: u64,
+    pub battery_executions: u64,
+    pub hop_cap_fraction: String,
+    pub births: NeighborhoodBirths,
+    pub silent_per_all_births: String,
+    pub changed_per_all_births: String,
+    pub dead_per_all_births: String,
+}
+
+fn drift_checkpoint(row: neighborhood::drift::Checkpoint) -> DriftDepthCheckpoint {
+    let mesh = row.mesh;
+    let denominator = u64::from(mesh.lineages);
+    let battery_executions = denominator * u64::from(neighborhood_battery_execution_count());
+    DriftDepthCheckpoint {
+        depth: row.depth,
+        lineages: mesh.lineages,
+        total_nodes: mesh.total_nodes,
+        reachable_nodes: mesh.reachable_nodes,
+        executed_nodes: mesh.executed_nodes,
+        knockout_nodes: mesh.knockout_nodes,
+        mean_total_nodes: fraction_or_undefined(mesh.total_nodes, denominator),
+        mean_reachable_nodes: fraction_or_undefined(mesh.reachable_nodes, denominator),
+        mean_executed_nodes: fraction_or_undefined(mesh.executed_nodes, denominator),
+        mean_knockout_nodes: fraction_or_undefined(mesh.knockout_nodes, denominator),
+        route_varying_lineages: mesh.route_varying_lineages,
+        route_varying_fraction: fraction_or_undefined(
+            u64::from(mesh.route_varying_lineages),
+            denominator,
+        ),
+        hop_cap_hits: mesh.hop_cap_hits,
+        battery_executions,
+        hop_cap_fraction: fraction_or_undefined(mesh.hop_cap_hits, battery_executions),
+        silent_per_all_births: fraction_or_undefined(
+            u64::from(row.births.any_events.silent),
+            u64::from(row.births.births_total),
+        ),
+        changed_per_all_births: fraction_or_undefined(
+            u64::from(row.births.any_events.changed),
+            u64::from(row.births.births_total),
+        ),
+        dead_per_all_births: fraction_or_undefined(
+            u64::from(row.births.any_events.dead),
+            u64::from(row.births.births_total),
+        ),
+        births: to_neighborhood_births(&row.births),
+    }
+}
+
+fn timed_drift_depth(
+    params: &ProfileParams,
+    config: &SimulationConfig,
+    battery: Option<&Battery>,
+) -> (Indicator<DriftDepth>, Option<f64>) {
+    if params.name != "goal" {
+        return (undefined_drift_depth(), None);
+    }
+    let started = Instant::now();
+    let reading = compute_drift_depth(config, battery.expect("goal battery"), params.drift);
+    (Indicator::Defined(reading), Some(millis(started.elapsed())))
+}
+
+fn compute_drift_depth(
+    config: &SimulationConfig,
+    battery: &Battery,
+    sizes: neighborhood::drift::DriftSizes,
+) -> DriftDepth {
+    use neighborhood::{battery as fixed_battery, drift, mesh_execution};
+    let founder = founder_genome(v3_core::config::FounderProfile::V3Alpha1);
+    let readings = drift::observe(
+        &founder,
+        battery,
+        &config.mutation,
+        &EvalContext::from_config(config),
+        sizes,
+    );
+    DriftDepth {
+        version: drift::VERSION.to_string(),
+        founder: "V3Alpha1".to_string(),
+        lineages: sizes.lineages,
+        birth_lineages: sizes.birth_lineages,
+        birth_subset: "first lineage indices in ascending order".to_string(),
+        birth_trials: sizes.births,
+        checkpoints: sizes.checkpoints.to_vec(),
+        walk_seed_formula: format!("{} + lineage_index", drift::WALK_SEED_BASE),
+        birth_seed_formula: format!(
+            "{} + {} * (lineage_index + 1) + checkpoint + {} + trial_index",
+            drift::BIRTH_OFFSET_BASE,
+            drift::BIRTH_LINEAGE_MULTIPLIER,
+            neighborhood::births::BIRTH_SEED_BASE
+        ),
+        battery_version: BATTERY_VERSION.to_string(),
+        mesh_version: mesh_execution::MESH_EXECUTION_VERSION.to_string(),
+        knockout_method: mesh_execution::KNOCKOUT_METHOD.to_string(),
+        executions_per_genome: neighborhood_battery_execution_count(),
+        snapshot_count: fixed_battery::SNAPSHOT_COUNT as u32,
+        sequence_count: fixed_battery::SEQUENCE_COUNT as u32,
+        sequence_len: fixed_battery::SEQUENCE_LEN as u32,
+        readings: readings.into_iter().map(drift_checkpoint).collect(),
+    }
 }
 
 /// One class's count and, against the applied count, its six-decimal
@@ -635,6 +780,9 @@ pub struct Environment {
     /// observation timing above. Zero for the sweep profile.
     #[serde(default)]
     pub neighborhood_founder_wall_clock_ms: f64,
+    /// Complete goal-only mutation walk and readings; absent when unrun.
+    #[serde(default)]
+    pub drift_depth_wall_clock_ms: Option<f64>,
     /// Evolved-half neighborhood wall time per seed (goal profile only).
     #[serde(default)]
     pub neighborhood_evolved_wall_clock_ms_per_seed: Vec<SeedFinalStateObservation>,
@@ -948,6 +1096,8 @@ pub struct RunTimings {
     /// Founder-half neighborhood wall time (T11.F01), computed once per
     /// report outside every per-seed timing above.
     pub neighborhood_founder_wall_clock_ms: f64,
+    /// Complete goal-only mutation walk and readings; absent when unrun.
+    pub drift_depth_wall_clock_ms: Option<f64>,
     /// Evolved-half neighborhood wall time per seed (goal profile only).
     pub neighborhood_evolved_wall_clock_ms_per_seed: Vec<SeedFinalStateObservation>,
 }
@@ -1223,22 +1373,6 @@ fn to_neighborhood_companions(companions: &StructuralCompanions) -> Neighborhood
     }
 }
 
-/// Merge one evolved genome's per-birth result into a running pool by
-/// integer addition (see [`Tally::merge`]).
-fn merge_birth_results(mut pooled: BirthResult, genome: &BirthResult) -> BirthResult {
-    pooled.births_total += genome.births_total;
-    pooled.zero_event_births += genome.zero_event_births;
-    pooled.any_events = pooled.any_events.merge(genome.any_events);
-    for (&events, &births) in &genome.by_requested_events {
-        *pooled.by_requested_events.entry(events).or_default() += births;
-    }
-    for (&applied_events, tally) in &genome.by_events {
-        let entry = pooled.by_events.entry(applied_events).or_default();
-        *entry = entry.merge(*tally);
-    }
-    pooled
-}
-
 /// The founder half: always computed when `mutational_neighborhood` is
 /// defined (gate and goal), once per report — outside the per-seed loop,
 /// since it depends only on the founder genome and the production mutation
@@ -1312,7 +1446,7 @@ fn evolved_neighborhood_for_seed(
         {
             *pooled = pooled.merge(row.tally);
         }
-        pooled_births = merge_birth_results(pooled_births, &evaluation.births);
+        pooled_births = pooled_births.merge(&evaluation.births);
 
         sampled_genomes.push(NeighborhoodSampledGenome {
             generation: Some(creature.generation),
@@ -1457,6 +1591,8 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
         .as_ref()
         .map(|battery| compute_founder_neighborhood(&config, battery, params.neighborhood));
     let neighborhood_founder_wall_clock_ms = millis(neighborhood_founder_start.elapsed());
+    let (drift_depth, drift_depth_wall_clock_ms) =
+        timed_drift_depth(params, &config, neighborhood_battery.as_ref());
 
     for &seed in &params.seeds {
         // `run_one_seed` only reads `neighborhood_battery` inside its own
@@ -1562,6 +1698,7 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
             observe_goal_indicators,
             evolved_neighborhood_per_seed,
         ),
+        drift_depth,
         strategy_count: UNDEFINED.to_string(),
         strategy_causal_distinctness: UNDEFINED.to_string(),
         evolutionary_activity: UNDEFINED.to_string(),
@@ -1599,6 +1736,7 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
         throughput_per_seed,
         final_state_observation_ms_per_seed,
         neighborhood_founder_wall_clock_ms,
+        drift_depth_wall_clock_ms,
         neighborhood_evolved_wall_clock_ms_per_seed,
     };
 
@@ -1704,6 +1842,7 @@ fn build_environment(timings: RunTimings, totals: &Totals, threads: usize) -> En
         throughput_per_seed,
         final_state_observation_ms_per_seed,
         neighborhood_founder_wall_clock_ms,
+        drift_depth_wall_clock_ms,
         neighborhood_evolved_wall_clock_ms_per_seed,
     } = timings;
     let wall_clock_ms_total: f64 = wall_clock_ms_per_seed.iter().map(|s| s.wall_clock_ms).sum();
@@ -1747,6 +1886,7 @@ fn build_environment(timings: RunTimings, totals: &Totals, threads: usize) -> En
         final_state_observation_ms_per_seed,
         final_state_observation_ms_total,
         neighborhood_founder_wall_clock_ms,
+        drift_depth_wall_clock_ms,
         neighborhood_evolved_wall_clock_ms_per_seed,
         neighborhood_evolved_wall_clock_ms_total,
     }
@@ -2036,6 +2176,148 @@ mod tests {
     use v3_core::contracts::{Direction, WorldAction};
     use v3_core::simulation::seed_simulation;
 
+    #[test]
+    fn drift_checkpoint_uses_pooled_lineage_execution_and_all_birth_denominators() {
+        let row = neighborhood::drift::Checkpoint {
+            depth: 250,
+            mesh: neighborhood::drift::MeshTotals {
+                lineages: 4,
+                total_nodes: 20,
+                reachable_nodes: 10,
+                executed_nodes: 7,
+                knockout_nodes: 3,
+                route_varying_lineages: 1,
+                hop_cap_hits: 8,
+            },
+            births: BirthResult {
+                births_total: 20,
+                zero_event_births: 10,
+                any_events: Tally {
+                    trials: 10,
+                    silent: 5,
+                    changed: 3,
+                    dead: 2,
+                    ..Tally::default()
+                },
+                ..BirthResult::default()
+            },
+        };
+        let report = drift_checkpoint(row);
+        assert_eq!(report.depth, 250);
+        assert_eq!(report.mean_total_nodes, "5.000000");
+        assert_eq!(report.mean_reachable_nodes, "2.500000");
+        assert_eq!(report.mean_executed_nodes, "1.750000");
+        assert_eq!(report.mean_knockout_nodes, "0.750000");
+        assert_eq!(report.route_varying_fraction, "0.250000");
+        assert_eq!(report.battery_executions, 320);
+        assert_eq!(report.hop_cap_fraction, "0.025000");
+        assert_eq!(report.silent_per_all_births, "0.250000");
+        assert_eq!(report.changed_per_all_births, "0.150000");
+        assert_eq!(report.dead_per_all_births, "0.100000");
+        assert_eq!(report.births.any_events.changed_fraction, "0.300000");
+        let empty = drift_checkpoint(neighborhood::drift::Checkpoint::default());
+        assert_eq!(empty.mean_total_nodes, UNDEFINED);
+        assert_eq!(empty.hop_cap_fraction, UNDEFINED);
+        assert_eq!(empty.changed_per_all_births, UNDEFINED);
+    }
+
+    #[test]
+    fn reduced_drift_deterministic_output_matches_across_thread_counts_and_seed_counts() {
+        let mut params = small_profile("goal");
+        let one = rayon::ThreadPoolBuilder::new()
+            .num_threads(1)
+            .build()
+            .unwrap()
+            .install(|| run_deterministic(&params).0);
+        let two = rayon::ThreadPoolBuilder::new()
+            .num_threads(2)
+            .build()
+            .unwrap()
+            .install(|| run_deterministic(&params).0);
+        assert_eq!(
+            serde_json::to_vec(&one).unwrap(),
+            serde_json::to_vec(&two).unwrap()
+        );
+        params.seeds.push(99);
+        let more = run_deterministic(&params).0;
+        assert_eq!(
+            one.goal_indicators.drift_depth,
+            more.goal_indicators.drift_depth
+        );
+    }
+
+    #[test]
+    fn drift_is_goal_only_once_and_historical_fields_are_unavailable() {
+        let goal = build_report(&small_profile("goal"), "test");
+        let Indicator::Defined(drift) = &goal.deterministic.goal_indicators.drift_depth else {
+            panic!("goal drift missing")
+        };
+        assert_eq!(drift.version, "drift-depth-v1");
+        assert_eq!(drift.founder, "V3Alpha1");
+        assert_eq!(
+            drift.birth_subset,
+            "first lineage indices in ascending order"
+        );
+        assert_eq!(drift.walk_seed_formula, "90000 + lineage_index");
+        assert_eq!(
+            drift.birth_seed_formula,
+            "7000000 + 1000 * (lineage_index + 1) + checkpoint + 9000 + trial_index"
+        );
+        assert_eq!(drift.battery_version, "neighborhood-v1");
+        assert_eq!(drift.mesh_version, "mesh-execution-v1");
+        assert_eq!(drift.knockout_method, "static-successor-bypass-v1");
+        assert_eq!(
+            (
+                drift.executions_per_genome,
+                drift.snapshot_count,
+                drift.sequence_count,
+                drift.sequence_len
+            ),
+            (80, 48, 8, 4)
+        );
+        let production = goal_profile_params().drift;
+        assert_eq!(
+            (
+                production.lineages,
+                production.birth_lineages,
+                production.births
+            ),
+            (50, 20, 100)
+        );
+        assert_eq!(production.checkpoints, &[0, 22, 250, 1000, 2000]);
+        assert_eq!(drift.lineages, 2);
+        assert_eq!(drift.birth_lineages, 1);
+        assert_eq!(drift.birth_trials, 2);
+        assert_eq!(drift.checkpoints, vec![0, 2]);
+        assert_eq!(drift.readings.len(), 2);
+        assert_eq!(drift.readings[0].births.births_total, 2);
+        assert_eq!(drift.readings[0].battery_executions, 160);
+        assert!(goal.environment.drift_depth_wall_clock_ms.is_some());
+        for name in ["gate", "sweep", "synthetic"] {
+            let report = build_report(&small_profile(name), "test");
+            assert!(matches!(
+                report.deterministic.goal_indicators.drift_depth,
+                Indicator::Undefined(_)
+            ));
+            assert_eq!(report.environment.drift_depth_wall_clock_ms, None);
+        }
+        let mut historical = serde_json::to_value(&goal).unwrap();
+        historical["deterministic"]["goal_indicators"]
+            .as_object_mut()
+            .unwrap()
+            .remove("drift_depth");
+        historical["environment"]
+            .as_object_mut()
+            .unwrap()
+            .remove("drift_depth_wall_clock_ms");
+        let historical: Report = serde_json::from_value(historical).unwrap();
+        assert!(matches!(
+            historical.deterministic.goal_indicators.drift_depth,
+            Indicator::Undefined(_)
+        ));
+        assert_eq!(historical.environment.drift_depth_wall_clock_ms, None);
+    }
+
     /// Feed the accumulator one observation per tick from a population
     /// series (index 0 is tick 1), with a constant mean creature energy and
     /// a cumulative birth count equal to the tick.
@@ -2078,6 +2360,7 @@ mod tests {
             throughput_per_seed: Vec::new(),
             final_state_observation_ms_per_seed: Vec::new(),
             neighborhood_founder_wall_clock_ms: 0.0,
+            drift_depth_wall_clock_ms: None,
             neighborhood_evolved_wall_clock_ms_per_seed: Vec::new(),
         }
     }
@@ -2249,6 +2532,7 @@ mod tests {
             ticks: 10,
             food_coverage: None,
             neighborhood: NeighborhoodSizes::default(),
+            drift: Default::default(),
         };
         let config = build_config(&params);
 
@@ -2497,6 +2781,7 @@ mod tests {
             ticks: 2,
             food_coverage: Some(1.0),
             neighborhood: NeighborhoodSizes::default(),
+            drift: Default::default(),
         }
     }
 
@@ -2693,7 +2978,7 @@ mod tests {
         b.by_requested_events.insert(0, 1);
         b.by_requested_events.insert(2, 4);
 
-        let merged = merge_birth_results(a, &b);
+        let merged = a.merge(&b);
         assert_eq!(merged.births_total, 15);
         assert_eq!(merged.zero_event_births, 5);
         assert_eq!(merged.any_events.trials, 10);
