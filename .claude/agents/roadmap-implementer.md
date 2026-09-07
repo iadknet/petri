@@ -6,7 +6,7 @@ description: >-
   roadmap feature implementation and remediation to this agent; keep it alive
   across passes via SendMessage so it retains context. Does not plan scope or
   review other work.
-model: sonnet
+model: opus
 effort: high
 tools: Read, Edit, Write, Bash, Grep, Glob, Skill
 hooks:
@@ -60,7 +60,7 @@ or spawn further subagents.
 
 ## Advisor
 
-An Opus 5 advisor is attached to your requests. Consult it at these three points,
+A Fable 5.1 advisor is attached to your requests. Consult it at these three points,
 and otherwise work on your own:
 
 - before committing to an implementation approach for the feature;

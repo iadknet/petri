@@ -15,10 +15,13 @@ Claude:
 | Role | Model | Where it is defined |
 | --- | --- | --- |
 | Orchestrator | Fable 5.1, effort `high` | the session you paste the goal into |
-| Implementer | Sonnet 5, effort `high`, Opus 5 advisor | `.claude/agents/roadmap-implementer.md` |
+| Implementer | Opus 5, effort `high`, Fable 5.1 advisor | `.claude/agents/roadmap-implementer.md` |
 | Reviewer | Fable 5.1, effort `high`, read-only | `.claude/agents/roadmap-reviewer.md` |
 
-`.claude/settings.json` sets `advisorModel: opus` and `worktree.baseRef: head`.
+`.claude/settings.json` sets `advisorModel: fable` and `worktree.baseRef: head`.
+The intended advisor effort is `medium`, but neither Claude Code nor the API
+exposes an advisor effort setting, so that intent is recorded here and not
+enforced.
 `scripts/implementer-gate` is a SubagentStop hook that blocks the implementer
 from reporting done while `make roadmap-check` fails in its worktree.
 `scripts/implementer-compile-check` is a PostToolUse hook on the implementer's
@@ -40,8 +43,9 @@ In Codex, use the [Codex launch instructions](#codex-adapter) instead.
    current `main`. Select Fable 5.1, effort `high`, and auto mode. Keep agent
    teams disabled (`CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` unset or `0`).
 3. Confirm the startup notice `Advisor Tool (experimental) is on`. If it is
-   missing, run `/advisor opus` once. Do not consult the advisor yourself;
-   its value is on the Sonnet implementer.
+   missing, run `/advisor fable` once (a Fable advisor bills to usage
+   credits on plans where Fable usage does). Do not consult the advisor
+   yourself; its value is on the Opus implementer.
 4. Paste the goal command. Nothing else to paste: the goal tells the
    orchestrator to read this file.
 
@@ -484,13 +488,14 @@ Research date 2026-09-04, Claude Code 2.1.260.
   rather than every turn.
   [Cost and intelligence](https://platform.claude.com/docs/en/about-claude/models/optimizing-for-cost-and-intelligence),
   [advisor](https://code.claude.com/docs/en/advisor).
-- Trial, 2026-09-04, at the user's direction: the role table above runs
-  Sonnet 5 as implementer with an Opus 5 advisor, a deliberate deviation from
-  the configuration the bullet above cites. The orchestrator and reviewer stay
-  on Fable 5.1. Judge the trial with the per-feature cost record already
-  collected at closure (advisor consult count, reviewer finding counts by
-  severity) plus whether remediation passes were needed, and restore the
-  Opus-implementer row if it does not hold up.
+- Trial, 2026-09-04 to 2026-09-06, at the user's direction: the implementer
+  ran Sonnet 5 with an Opus 5 advisor, a deliberate deviation from the
+  configuration the bullet above cites. On 2026-09-06 the user ended the trial
+  and set the role table above to the cited configuration: Fable 5.1 `high`
+  orchestrator, Opus 5 implementer, Fable 5.1 advisor with `medium` effort
+  intended. The advisor tool exposes no effort setting, so the advisor runs at
+  its default; the `medium` intent is documentation only. Feature specs closed
+  during the trial keep their cost records for comparison.
 - The same page says an orchestrator pays off only for fan-out or work beyond
   one context window, and a feature is one dependent chain. The orchestrator
   here is not a cost play: it buys context isolation, an implementer that
