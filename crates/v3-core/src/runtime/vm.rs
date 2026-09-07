@@ -13,12 +13,15 @@ use crate::sensors::perception::SensorSnapshot;
 /// - `def`: the VM backend genome definition
 /// - `input_refs`: the node's InputReference list (from NodeGenome.input_refs)
 /// - `upstream_slots`: incoming output slots from the previous node (or zeroed for entry)
-/// - `energy`: creature's current energy; decremented by opcode costs; NOT restored on exhaustion
+/// - `energy`: creature's current energy; the dispatch's opcode and activity-ramp
+///   charges are accumulated locally and subtracted once on the way out; NOT
+///   restored on exhaustion
 /// - `energy_consumed`: total energy consumed this tick so far (for dynamic introspection)
 /// - `shared_memory`: creature's persistent shared memory (16 f32 slots); NOT modified on energy exhaustion
 /// - `prev_shared_memory`: snapshot of shared memory from previous tick (read-only)
 /// - `sensors`: pre-assembled sensor snapshot (local + extended perception)
-/// - `config`: runtime config (max_vm_steps, vm.opcode_cost_multiplier)
+/// - `config`: runtime config (max_vm_steps, vm.opcode_cost_multiplier,
+///   vm.step_ramp_allowance, vm.step_ramp_cost)
 /// - `side_outputs`: mesh-scoped side outputs (action queue, priority bid) that persist across hops
 ///
 /// # Returns
@@ -147,6 +150,8 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
 
     let max_steps = config.max_vm_steps.max(1) as usize;
     let cost_mult = config.vm.opcode_cost_multiplier;
+    let ramp_allowance = config.vm.step_ramp_allowance;
+    let ramp_cost = config.vm.step_ramp_cost;
 
     // Stack-allocated registers covering the full u8 range (256 * 4 = 1KB).
     const MAX_REGS: usize = 256;
@@ -160,6 +165,12 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
     // Working copy of shared memory slots (64 bytes — unconditional copy).
     let mut slot_copy: [f32; 16] = *shared_memory;
 
+    // What this dispatch owes so far (T03.F10). Held in `f64` and settled once
+    // on the way out: summed into `f32` energy step by step, every charge below
+    // the energy's ulp — which is every ordinary step at production defaults —
+    // would round away.
+    let mut debt: f64 = 0.0;
+
     /// Commit the working slot copy back to the creature's shared memory.
     macro_rules! commit_slots {
         () => {
@@ -167,35 +178,50 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
         };
     }
 
-    loop {
+    /// Energy the creature still has once this dispatch's debt is settled.
+    macro_rules! effective_energy {
+        () => {
+            f64::from(*energy) - debt
+        };
+    }
+
+    let result = loop {
         if steps >= max_steps {
             commit_slots!();
-            let result = NodeResult::halted(payload, route_gates);
-            let trace = trace_sink.finish(def, &regs[..reg_count], payload, meta);
-            return (result, trace);
+            break NodeResult::halted(payload, route_gates);
         }
 
         // Soft default: if control flow lands outside the program, halt cleanly.
         if pc >= program_len {
             commit_slots!();
-            let result = NodeResult::halted(payload, route_gates);
-            let trace = trace_sink.finish(def, &regs[..reg_count], payload, meta);
-            return (result, trace);
+            break NodeResult::halted(payload, route_gates);
         }
 
         let instr = &def.program[pc];
-        let opcode_cost = opcode_base_cost(instr) * cost_mult;
-        let mut step_energy_cost = opcode_cost;
+        // `steps` counts instructions already executed, so this is the k-th.
+        let charge = step_charge(
+            opcode_base_cost(instr),
+            cost_mult,
+            steps + 1,
+            ramp_allowance,
+            ramp_cost,
+        );
+        let mut step_energy_cost = charge as f32;
 
         trace_sink.before_instruction(pc, instr, &regs[..reg_count]);
 
-        // Deduct energy before executing; exhaustion halts without side effects.
-        *energy -= opcode_cost;
-        if *energy <= 0.0 {
+        // Charge before executing; exhaustion halts without side effects.
+        debt += charge;
+        if effective_energy!() <= 0.0 {
             // Do NOT commit memory.
-            trace_sink.after_instruction(pc, instr, step_energy_cost, *energy, &regs[..reg_count]);
-            let trace = trace_sink.finish(def, &regs[..reg_count], payload, meta);
-            return (NodeResult::exhausted(), trace);
+            trace_sink.after_instruction(
+                pc,
+                instr,
+                step_energy_cost,
+                effective_energy!() as f32,
+                &regs[..reg_count],
+            );
+            break NodeResult::exhausted();
         }
 
         steps += 1;
@@ -345,11 +371,14 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
                 sub_idx,
             } => {
                 let val = if (*ref_idx as usize) < input_refs.len() {
+                    // A brain introspecting mid-dispatch sees what it has left
+                    // after the charges it already owes, and counts them as
+                    // consumed this tick.
                     let ctx = ResolveCtx {
                         sensors,
                         upstream_slots,
-                        energy: *energy,
-                        energy_consumed,
+                        energy: effective_energy!() as f32,
+                        energy_consumed: energy_consumed + debt as f32,
                         action_queue: &side_outputs.action_queue,
                     };
                     resolve_input(&input_refs[*ref_idx as usize], *sub_idx, &ctx)
@@ -403,22 +432,30 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
             }
 
             VmInstruction::SetPriorityBid { src } => {
+                // The bid is spent immediately (the mesh reads it this tick) and
+                // can never reach energy this dispatch already owes.
                 let raw = regs[nr(*src, reg_count)];
-                let bid = if raw > 0.0 { raw.min(*energy) } else { 0.0 };
-                *energy -= bid;
-                step_energy_cost += bid;
-                if *energy <= 0.0 {
+                let effective = effective_energy!();
+                let bid = if raw > 0.0 {
+                    f64::from(raw).min(effective)
+                } else {
+                    0.0
+                };
+                *energy -= bid as f32;
+                step_energy_cost += bid as f32;
+                // A bid the cap bit into is an all-in: it leaves nothing behind
+                // the dispatch's debt, whichever way the `f32` store rounded.
+                if bid >= effective || effective_energy!() <= 0.0 {
                     trace_sink.after_instruction(
                         pc,
                         instr,
                         step_energy_cost,
-                        *energy,
+                        effective_energy!() as f32,
                         &regs[..reg_count],
                     );
-                    let trace = trace_sink.finish(def, &regs[..reg_count], payload, meta);
-                    return (NodeResult::exhausted(), trace);
+                    break NodeResult::exhausted();
                 }
-                side_outputs.priority_bid = bid;
+                side_outputs.priority_bid = bid as f32;
             }
 
             VmInstruction::ExecuteActionQueue => {
@@ -427,12 +464,10 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
                     pc,
                     instr,
                     step_energy_cost,
-                    *energy,
+                    effective_energy!() as f32,
                     &regs[..reg_count],
                 );
-                let result = NodeResult::terminal(payload, route_gates);
-                let trace = trace_sink.finish(def, &regs[..reg_count], payload, meta);
-                return (result, trace);
+                break NodeResult::terminal(payload, route_gates);
             }
 
             VmInstruction::WriteRouteGate { slot, src } => {
@@ -448,12 +483,10 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
                     pc,
                     instr,
                     step_energy_cost,
-                    *energy,
+                    effective_energy!() as f32,
                     &regs[..reg_count],
                 );
-                let result = NodeResult::halted(payload, route_gates);
-                let trace = trace_sink.finish(def, &regs[..reg_count], payload, meta);
-                return (result, trace);
+                break NodeResult::halted(payload, route_gates);
             }
 
             VmInstruction::LoadSlot { dst, slot_reg } => {
@@ -495,10 +528,40 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
             }
         }
 
-        trace_sink.after_instruction(pc, instr, step_energy_cost, *energy, &regs[..reg_count]);
+        trace_sink.after_instruction(
+            pc,
+            instr,
+            step_energy_cost,
+            effective_energy!() as f32,
+            &regs[..reg_count],
+        );
 
         pc = next_pc;
-    }
+    };
+
+    // Single settlement: every exit path leaves the loop here, so the dispatch's
+    // accumulated charge rounds against the creature's energy exactly once.
+    *energy -= debt as f32;
+    let trace = trace_sink.finish(def, &regs[..reg_count], payload, meta);
+    (result, trace)
+}
+
+/// Energy charged for the `k`-th instruction executed within one node dispatch
+/// (`k` from 1): the unchanged base opcode term plus the activity ramp, which
+/// rises linearly with the step index once `allowance` steps have run.
+///
+/// Returned in `f64` because the caller sums these into one settlement; the
+/// individual charges are routinely below the ulp of an `f32` energy.
+#[inline]
+pub(crate) fn step_charge(
+    base_cost: f32,
+    cost_mult: f32,
+    k: usize,
+    allowance: u32,
+    ramp_cost: f32,
+) -> f64 {
+    let excess = k.saturating_sub(allowance as usize);
+    f64::from(base_cost) * f64::from(cost_mult) + f64::from(ramp_cost) * excess as f64
 }
 
 /// Normalize a register index via rem_euclid wrapping.
