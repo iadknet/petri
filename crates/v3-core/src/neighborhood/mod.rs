@@ -19,6 +19,7 @@ pub mod battery;
 pub mod births;
 pub mod classify;
 pub mod companions;
+pub mod drift;
 pub mod mesh_execution;
 pub mod operators;
 pub mod sample;

@@ -222,6 +222,7 @@ fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), S
                 ticks,
                 food_coverage: args.food_coverage,
                 neighborhood: NeighborhoodSizes::default(),
+                drift: Default::default(),
             };
             let feature = args.feature.clone().unwrap_or_else(|| "sweep".to_string());
             Ok((params, feature))
