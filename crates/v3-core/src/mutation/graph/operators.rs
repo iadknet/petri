@@ -7,7 +7,7 @@
 use rand::Rng;
 
 use crate::config::MutationConfig;
-use crate::contracts::InputReference;
+use crate::contracts::{DynamicIntrospectionKey, InputReference};
 use crate::creature::genome::cgp::{
     ActionSlotBehavior, CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
     WorldActionKind,
@@ -487,11 +487,19 @@ pub(crate) fn split_existing_edge(
 
 /// True for the one edge shape a split cannot preserve (T11.F08, replacing
 /// T11.F03's documented exception): on a graph carrying plasticity, a sink,
-/// action slot, or execute gate reading a `DynamicIntrospection` reference
-/// directly. An identity node between them caches the value during
-/// evaluation, while the direct edge resolves it in the post-convergence
-/// effects context after the plasticity-cost deduction, so the two can
-/// differ. `split_existing_edge` skips such an edge instead of splitting it.
+/// action slot, or execute gate reading a
+/// `DynamicIntrospection(EnergyCurrent)` reference directly. An identity node
+/// between them caches the value during evaluation, while the direct edge
+/// resolves it in the post-convergence effects context after the
+/// plasticity-cost deduction, so the two can differ.
+/// `split_existing_edge` skips such an edge instead of splitting it.
+///
+/// `EnergyCurrent` is the only excluded key. In `runtime/cgp/execute.rs` the
+/// effects `ResolveCtx` differs from the evaluation `ResolveCtx` only in
+/// `energy`: `energy_consumed` and `reproductive_reserve` are the same values
+/// in both, so `EnergyConsumedThisTick` and `ReproductiveReserveCurrent`
+/// resolve identically either side of the deduction and their edges split
+/// normally.
 fn is_excluded_introspection_split(
     def: &CgpGraphBackendDef,
     input_refs: &[InputReference],
@@ -502,7 +510,9 @@ fn is_excluded_introspection_split(
     };
     matches!(
         input_refs.get(ref_idx as usize),
-        Some(InputReference::DynamicIntrospection(_))
+        Some(InputReference::DynamicIntrospection(
+            DynamicIntrospectionKey::EnergyCurrent
+        ))
     ) && def
         .compute_nodes
         .iter()
