@@ -317,6 +317,19 @@ Implementation verification (2026-09-07):
   will record the final closure-content check and exact committed-content
   evidence in its task; no future pass or commit hash is asserted here.
 
+- Parent closure-content `make check` exited 0
+  (`/tmp/remove-nutrition-orchestrator-check-final.log`); commit
+  `02e90f29010eabb2c65949dd3522f2531b14c9a9` matched tested tree
+  `15f2887a2b27365c1b2cad8642864650c445f4aa`. After the user advanced main with
+  documentation-only effort settings, the parent cleanly rebased onto
+  `daeabf60659c2c73cfe84696a1bd0cf45a7bb39c`, producing branch head
+  `ae96957fbac0c9a211c814f47ad9a4e036e02cc5` before this telemetry update.
+  No behavior changed. The user explicitly waived another full check for this documentation-only
+  rebase (intervention 6). The earlier pass remains the evidence for the tested
+  implementation tree; it is not a claim that the full rebased final commit
+  was tested. The parent records the final commit and integration in its task. Historical benchmark revision fields retain the
+  original planning commit and uncommitted-implementation context.
+
 ## Performance and Goal Impact
 
 This maintenance restores ordinary food as the single energy source used for
@@ -528,6 +541,17 @@ remain in force, with results reported in the parent task.
   files preserved, waiving only their clean-main condition. No additional
   permission is required; this is not authority to alter unrelated work or
   waive tests, review, exact-commit verification, or cleanup.
+- User intervention 5 / integration update, 2026-09-07: the user stated,
+  "I just snuck in a small commit on main, but it should still be safe to just
+  merge our changes." The parent completed the clean rebase described above.
+  The original requested model/effort settings remain authoritative for this
+  already-launched task; the new workflow defaults apply to future launches.
+  No behavior conflict required another advisor consultation.
+- User intervention 6 / verification override, 2026-09-07: the user stated,
+  "We don't need to recheck eveything, just merge" and explicitly waived a
+  further full check after the documentation-only rebase. The original final
+  `make check` exit 0 remains recorded; no full rebased-commit test is claimed.
+  Total user interventions: **6**; advisor consultations remain **7**.
 - Advisor consultations: **7**. (1) Accepted owned PushAction
   metadata capture, one ExecuteActionQueue after Eat/Move, shared full-cardinal
   selection for reproduction, dedicated zero register, age-zero half-tick gate,
