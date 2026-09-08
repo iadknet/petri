@@ -79,7 +79,9 @@ Substitute `<TNN.FNN>` and the lowercase `<tnn-fnn>` worktree name.
 
 The `/goal` evaluator reads only this conversation and runs no commands, so
 surface command output and the checked roadmap rows in your own messages, not
-only inside subagent results.
+only inside subagent results. Run a heavyweight check once, redirect its output
+to a log file, and read the log; never re-invoke `make check`, a benchmark, or
+a mutation run just to filter its output differently.
 
 ## Per-feature contract
 
@@ -228,9 +230,11 @@ loop rather than catching anything.
 
 ### Close and integrate
 
-In the worktree: set the spec to `Complete`, check the feature row, update the
-track and master rollups only if their own criteria are now satisfied, run
-`make check`, and commit. Then:
+In the worktree: run `make check` once on the final feature code and record
+that commit as the tested commit. Then set the spec to `Complete`, check the
+feature row, update the track and master rollups only if their own criteria are
+now satisfied, run `make check-docs` (the closure edits are documentation, and
+the full suite was just run on the same code), and commit. Then:
 
 1. `ExitWorktree` with `action: "keep"` — the session returns to the main
    checkout. While inside a worktree, Claude Code blocks every git command
