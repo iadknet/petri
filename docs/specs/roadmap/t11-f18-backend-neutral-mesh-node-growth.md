@@ -64,8 +64,12 @@ mode for tests or observations.
 
 **Neutrality and its boundary.** For each backend choice, an inserted detour
 preserves the upstream bus, accumulated action queue including payloads,
-pending action metadata, priority bid, shared memory, and the downstream
-successor's actions and state effects. Cover inline execution and a newly
+each surviving node's action metadata behavior, priority bid, shared memory,
+and the downstream successor's actions and state effects. VM metadata is
+local to one dispatch: it starts at zero and is decoded into an action when
+that node pushes it. Compare source/successor metadata in their traces and
+the resulting queued payloads; do not introduce cross-node metadata transfer.
+Cover inline execution and a newly
 added branch's first winning execution, with both VM and Graph sources and
 the incumbent tie case. Preserve existing nodes and their temporal state;
 compare surviving state by node identity, not raw vector length.
@@ -117,11 +121,11 @@ command or report pipeline is needed.
 
 ## Implementation Tasks
 
-- [ ] Add failing explicit-backend growth/activation fixtures and property
+- [x] Add failing explicit-backend growth/activation fixtures and property
       tests, then extend the shared constructor and its three callers.
-- [ ] Add the backend count breakdown using existing observations, with
+- [x] Add the backend count breakdown using existing observations, with
       mixed-backend fixtures, aggregation properties, and report tests.
-- [ ] Update `v3-mutation-spec.md` and affected mesh/backend reference prose
+- [x] Update `v3-mutation-spec.md` and affected mesh/backend reference prose
       to replace VM-only detour claims; keep historical feature specs intact.
 - [ ] Run and record the paired characterization, focused verification,
       diff self-review for reuse/simplicity/efficiency, and fresh mutation run.
@@ -140,7 +144,7 @@ command or report pipeline is needed.
       retained successor and route metadata, alias behavior,
       atomic skips, and pass-through state. Loop explicitly over both backend
       choices within relevant properties. Keep proptest regression files.
-- [ ] Nonzero bus, queue/payload, pending metadata, bid and shared-memory
+- [ ] Nonzero bus, queue/payload, node-local metadata, bid and shared-memory
       fixtures prove inline and first-branch-win neutrality and downstream
       effects, including a short stateful sequence. Exercise tie retention,
       real dispatch/compute cost, hop exhaustion and live-energy boundaries.
@@ -169,6 +173,31 @@ command or report pipeline is needed.
       `make check-docs` for closure edits; final `make check` exits 0 on the
       exact final committed content that becomes main, with commit and log
       reported in the parent task. Feature worktree/branch removed; main clean.
+
+Implementation verification, 2026-09-08 (logs under `/tmp/t11-f18-*.log`):
+
+- TDD red: `cargo test -p v3-core f18_growth_backend_choice -- --nocapture`
+  failed the explicit Graph assertion for AddNode / VM source / draw zero
+  (`red.log`). Observation test first failed compilation because `backends`
+  was absent (`observation-red.log`).
+- After the production constructor edit, first verification was
+  `cargo test -p v3-core --test viability`: 24 passed (`viability.log`).
+  Explicit `cargo check --workspace --all-targets` ran after coherent edits;
+  latest passing build before final fixture extraction is `check-10.log`.
+- `cargo test -p v3-core --lib`: 1,257 passed, two maintained characterization
+  tests ignored (`core-lib-3.log`), including topology and neighborhood tests.
+  `cargo test -p v3-cli bench`: 37 unit tests and one benchmark integration
+  test passed (`cli.log`). `cargo test -p v3-core --test reproducibility`:
+  one passed (`reproducibility.log`). Later focused checks pending below.
+- Diff self-review for reuse, simplicity and efficiency: retained the shared
+  detour constructor and existing RNG; reused one knockout decision per
+  executed node with no additional battery pass; reused concrete count types
+  across core/CLI and optional report fields for historical absence. Extracted
+  sensor and stateful-fixture setup rather than duplicating it or suppressing
+  Clippy's function-length warning. No dependency, runtime execution, or
+  optional abstraction added. Strengthened the pooled JSON fixture with
+  distinct nonzero Graph/VM totals and the attachment property with an exact
+  restored-source comparison after removing only its paired gate write.
 
 ## Performance and Goal Impact
 
@@ -250,3 +279,21 @@ trials, checkpoints, and cadence unchanged. Measurement results pending.
 - Advisor consultations, reviewer findings, remediation passes, requirement
   corrections and user interventions will be recorded before closure;
   usage unavailable.
+- Requirement correction 1, 2026-09-08, during implementation: the original
+  phrase "pending action metadata" could imply that metadata crosses node
+  boundaries. `runtime/vm.rs` initializes its metadata array per dispatch
+  and decodes it into queued actions; `MeshSideOutputs` carries the queue,
+  priority and work counters, with no metadata array. The neutrality contract
+  now explicitly preserves surviving nodes' local metadata traces and queued
+  payloads, including the successor's existing local initialization. This
+  corrects the spec's assumption without changing runtime semantics or
+  weakening the roadmap's metadata-preservation requirement.
+
+- Implementation advisor consultations so far: 3. (1) Accepted the smallest
+  shared-constructor/one-pass observation approach, draw placement, explicit
+  probability boundary tests, separate real costs and nonempty Graph source
+  fixtures; all match the feature contract. (2) Accepted requirement correction
+  1 after verifying node-local metadata. (3) Accepted restoring a missing use
+  terminator after its compiler diagnostic recurred; corrected fixture names
+  from actual configuration/termination types. No optional advice adopted or
+  required advice rejected. Final consultation and reviewer findings pending.
