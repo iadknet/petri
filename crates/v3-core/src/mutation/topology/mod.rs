@@ -152,7 +152,9 @@ impl TopologyMutator {
         _food_type_count: usize,
     ) -> Result<TargetReachability, MutationSkipReason> {
         match op {
-            TopologyOperator::AddNode => structural::apply_splice_node(genome, targets, rng),
+            TopologyOperator::AddNode => {
+                structural::apply_splice_node(genome, targets, rng, config)
+            }
             TopologyOperator::ChangeEntryNode => structural::apply_change_entry_node(genome, rng)
                 .map(|()| TargetReachability::NotApplicable),
             // Biased structural operators:
@@ -167,7 +169,9 @@ impl TopologyMutator {
             TopologyOperator::CopyMeshForwardSlice => {
                 structural::apply_copy_mesh_forward_slice(genome, targets, rng)
             }
-            TopologyOperator::SpliceNode => structural::apply_splice_node(genome, targets, rng),
+            TopologyOperator::SpliceNode => {
+                structural::apply_splice_node(genome, targets, rng, config)
+            }
             // Biased routing operators:
             TopologyOperator::RetargetNodeTarget => {
                 routing::apply_retarget_node_target(genome, targets, rng)
