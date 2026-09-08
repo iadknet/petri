@@ -74,8 +74,7 @@ export const RUNTIME_FIELDS: FieldDef[] = [
 		max: 10000,
 		step: 1,
 		defaultValue: 100,
-		tooltip:
-			"Free VM instructions per node dispatch before the activity ramp starts charging",
+		tooltip: "Free VM instructions per node dispatch before the activity ramp starts charging",
 	},
 	{
 		path: "runtime.vm.step_ramp_cost",
