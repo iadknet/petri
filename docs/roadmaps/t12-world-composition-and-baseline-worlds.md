@@ -23,7 +23,7 @@ is what later environmental features are read against.
 
 ## Executable Features
 
-- [ ] **T12.F01 — Seeded Terrain in the World Config** — Depends on: None
+- [x] **T12.F01 — Seeded Terrain in the World Config** — Depends on: None
   - Goal: Bedrock and water. The land has a shape before anything lives on it: barrier terrain is generated from the world config and seed at startup, before food and founders are placed, so where a creature can walk and see is set from tick zero and the same recipe and seed regenerate the same world in any process.
 - [ ] **T12.F02 — World Recipe Save and Load** — Depends on: T12.F01
   - Goal: A world is a file. The effective world config, terrain and seeds included, saves from the app or the CLI and loads back to regenerate the same world, so a baseline is a small recipe in Git rather than a stored map.
