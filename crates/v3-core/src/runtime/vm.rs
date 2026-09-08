@@ -441,22 +441,25 @@ pub(crate) fn execute_vm_node_impl<T: VmTraceSink>(
                 } else {
                     0.0
                 };
-                *energy -= bid as f32;
-                step_energy_cost += bid as f32;
+                let paid = bid as f32;
+                *energy -= paid;
+                step_energy_cost += paid;
                 // A bid the cap bit into is an all-in: it leaves nothing behind
                 // the dispatch's debt, whichever way the `f32` store rounded.
-                let after_bid = effective_energy!();
-                if bid >= effective || after_bid <= 0.0 {
+                // Pin energy to the debt so the single settlement below lands on
+                // exactly 0.0 and death at `energy <= 0.0` stays deterministic.
+                if bid >= effective || effective_energy!() <= 0.0 {
+                    *energy = debt as f32;
                     trace_sink.after_instruction(
                         pc,
                         instr,
                         step_energy_cost,
-                        after_bid as f32,
+                        0.0,
                         &regs[..reg_count],
                     );
                     break NodeResult::exhausted();
                 }
-                side_outputs.priority_bid = bid as f32;
+                side_outputs.priority_bid = paid;
             }
 
             VmInstruction::ExecuteActionQueue => {

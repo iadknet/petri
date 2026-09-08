@@ -18,6 +18,20 @@ fn closed_form_total(steps: u32, base_cost: f32, cost_mult: f32, allowance: u32,
         + f64::from(ramp) * m * (m + 1.0) / 2.0
 }
 
+/// Total charged by summing the production per-step charge over a dispatch of
+/// `steps` instructions, in the order the VM charges them.
+fn summed_step_charges(
+    steps: u32,
+    base_cost: f32,
+    cost_mult: f32,
+    allowance: u32,
+    ramp: f32,
+) -> f64 {
+    (1..=steps as usize)
+        .map(|k| step_charge(base_cost, cost_mult, k, allowance, ramp))
+        .sum()
+}
+
 fn ramp_config(allowance: u32, ramp: f32, cost_mult: f32, max_steps: u32) -> RuntimeConfig {
     let mut cfg = config();
     cfg.max_vm_steps = max_steps;
@@ -496,9 +510,7 @@ proptest! {
         cost_mult in 0.0f32..2.0,
     ) {
         let base = 0.12f32;
-        let summed: f64 = (1..=steps as usize)
-            .map(|k| step_charge(base, cost_mult, k, allowance, ramp))
-            .sum();
+        let summed = summed_step_charges(steps, base, cost_mult, allowance, ramp);
         let expected = closed_form_total(steps, base, cost_mult, allowance, ramp);
 
         prop_assert!(
@@ -516,10 +528,12 @@ proptest! {
         ramp in 0.0f32..2.0,
         extra in 0.0f32..2.0,
     ) {
+        // Summed from the production charge, not the closed form, so the
+        // property constrains the code the VM runs.
         let base = 0.12f32;
-        let total = closed_form_total(steps, base, 1.0, allowance, ramp);
-        let one_more = closed_form_total(steps + 1, base, 1.0, allowance, ramp);
-        let steeper = closed_form_total(steps, base, 1.0, allowance, ramp + extra);
+        let total = summed_step_charges(steps, base, 1.0, allowance, ramp);
+        let one_more = summed_step_charges(steps + 1, base, 1.0, allowance, ramp);
+        let steeper = summed_step_charges(steps, base, 1.0, allowance, ramp + extra);
 
         prop_assert!(one_more >= total, "{one_more} < {total} for one more step");
         prop_assert!(steeper >= total, "{steeper} < {total} for a steeper ramp");
