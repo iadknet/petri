@@ -1,0 +1,4985 @@
+{
+  "date": "2026-09-08",
+  "analysis_commit": "beee4c05",
+  "server_tick": 73035,
+  "population": 49545,
+  "sample_size": 200,
+  "sample_seed": 20260908,
+  "sample_method": "Python random.Random sample without replacement from detail snapshot order",
+  "genomes_sha256": "e81dba29e993cc929ba75920d765871eaf71bcde40aa9ff6f1ec27078d06ebff",
+  "applied_config": {
+    "action_log": {
+      "capacity": 500
+    },
+    "energy": {
+      "age_cost": {
+        "age_cap": 500,
+        "enabled": true,
+        "max_multiplier": 10.0
+      },
+      "complexity_cost": {
+        "enabled": false,
+        "scaling_factor": 0.0020000000949949026,
+        "threshold": 50
+      },
+      "costs": {
+        "eat_cost": 0.0,
+        "eat_reward_per_food": 5.0,
+        "failed_action_penalty": 1.0,
+        "move_cost": 0.10000000149011612,
+        "noop_cost": 0.05000000074505806,
+        "reproduce_cost": 0.10000000149011612
+      },
+      "lifecycle": {
+        "default_offspring_energy": 100.0,
+        "energy_decay_per_tick": 0.10000000149011612,
+        "genome_carry_cost_per_unit": 9.999999747378752e-05,
+        "initial_energy": 20.0,
+        "max_energy": 200.0,
+        "min_reproduce_age": 20,
+        "min_reproduce_energy": 30.0
+      }
+    },
+    "mutation": {
+      "action_queue_cap": 4,
+      "executed_bias": 0.9,
+      "executed_window_ticks": 100,
+      "genome_size_cap": 1200,
+      "genome_size_pressure_enabled": false,
+      "mesh_layer_probability": 0.2,
+      "mutation_probability": 0.1,
+      "per_birth_mutation_event_continuation_probability": 0.2,
+      "per_birth_mutation_events_max": 2,
+      "per_birth_mutation_events_min": 1,
+      "phenotype": {
+        "channel_change_chance": 0.0010000000474974513,
+        "channel_step": 1,
+        "polarity_flip_chance": 0.00019999999494757503
+      },
+      "reachable_bias": {
+        "graph": 0.0,
+        "input_ref": 0.0,
+        "topology": 0.0,
+        "vm": 0.0
+      }
+    },
+    "population": {
+      "founder_profile": "v3_alpha1",
+      "initial_creatures": 10000,
+      "max_creatures": 100000
+    },
+    "predation": {
+      "kill_complexity_bonus_multiplier": 0.0,
+      "steal_cost_rate": 0.05000000074505806
+    },
+    "runtime": {
+      "graph_convergence_epsilon": 0.0010000000474974513,
+      "graph_convergence_stable_passes": 2,
+      "graph_node_base_cost": 9.999999747378752e-06,
+      "max_actions_per_turn": 10,
+      "max_graph_relax_iters": 15,
+      "max_mesh_hops": 1024,
+      "max_vm_steps": 10000,
+      "perception": {
+        "vision_radius": 5
+      },
+      "plasticity_update_cost": 0.0,
+      "reward_learning_cost": 0.0,
+      "vm": {
+        "opcode_cost_multiplier": 9.999999974752427e-07,
+        "step_ramp_allowance": 100,
+        "step_ramp_cost": 9.999999974752427e-07
+      }
+    },
+    "shared_memory": {
+      "decay_rate": 0.0
+    },
+    "startup": {
+      "ramps": {
+        "failed_action_penalty": {
+          "enabled": true,
+          "end": 1.0,
+          "start": 0.0,
+          "target_tick": 62680
+        }
+      }
+    },
+    "world": {
+      "edge_mode": "Wrap",
+      "food": {
+        "annealing": {
+          "enabled": false,
+          "initial_max_fertility": 1.5,
+          "initial_min_fertility": 0.30000001192092896,
+          "ramp_ticks": 5000
+        },
+        "fertility": {
+          "enabled": true,
+          "layers": [
+            {
+              "algorithm": {
+                "PoissonBlobs": {
+                  "blob_count": 1200,
+                  "falloff": 0.5,
+                  "max_radius": 25.0,
+                  "min_radius": 5.0,
+                  "seed": null
+                }
+              },
+              "target": {
+                "SingleType": {
+                  "type_idx": 0
+                }
+              },
+              "weight": 1.0
+            },
+            {
+              "algorithm": {
+                "PoissonBlobs": {
+                  "blob_count": 2800,
+                  "falloff": 0.5,
+                  "max_radius": 5.0,
+                  "min_radius": 2.0,
+                  "seed": null
+                }
+              },
+              "target": {
+                "SingleType": {
+                  "type_idx": 1
+                }
+              },
+              "weight": 1.0
+            }
+          ],
+          "max_fertility": 2.0,
+          "min_fertility": 0.0
+        },
+        "shared": {
+          "annealing": {
+            "enabled": false,
+            "initial_max_fertility": 1.5,
+            "initial_min_fertility": 0.30000001192092896,
+            "ramp_ticks": 5000
+          },
+          "fertility": {
+            "enabled": true,
+            "layers": [
+              {
+                "algorithm": {
+                  "PoissonBlobs": {
+                    "blob_count": 1200,
+                    "falloff": 0.5,
+                    "max_radius": 25.0,
+                    "min_radius": 5.0,
+                    "seed": null
+                  }
+                },
+                "target": {
+                  "SingleType": {
+                    "type_idx": 0
+                  }
+                },
+                "weight": 1.0
+              },
+              {
+                "algorithm": {
+                  "PoissonBlobs": {
+                    "blob_count": 2800,
+                    "falloff": 0.5,
+                    "max_radius": 5.0,
+                    "min_radius": 2.0,
+                    "seed": null
+                  }
+                },
+                "target": {
+                  "SingleType": {
+                    "type_idx": 1
+                  }
+                },
+                "weight": 1.0
+              }
+            ],
+            "max_fertility": 2.0,
+            "min_fertility": 0.0
+          },
+          "growth_rate": 0.09000000357627869,
+          "initial_coverage": 0.5400000214576721,
+          "initial_density": 1.0,
+          "max_density": 1.0,
+          "occupancy_depletion": {
+            "deposit_per_occupied_tick": 0.30000001192092896,
+            "enabled": true
+          },
+          "recovery_floor_ratio": 0.009999999776482582,
+          "recovery_spawn_rate": 0.009999999776482582,
+          "spread_density_ratio": 0.25,
+          "spread_threshold_ratio": 0.800000011920929
+        },
+        "types": [
+          {
+            "color": "#22c55e",
+            "growth_inhibitor": 0.20000000298023224,
+            "initial_coverage": 0.5400000214576721,
+            "initial_density": 1.0,
+            "name": "Primary Food"
+          },
+          {
+            "color": "#38bdf8",
+            "growth_inhibitor": 0.20000000298023224,
+            "initial_coverage": 0.5400000214576721,
+            "initial_density": 1.0,
+            "name": "Food 2"
+          }
+        ]
+      },
+      "height": 1600,
+      "width": 1600
+    }
+  },
+  "method": "neighborhood-v1; backend counts ordered [Graph, Vm]; contributing uses static-successor action-signature bypass, checked against production knockout totals",
+  "census": [
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        9
+      ],
+      "generation": 785,
+      "genome_size": 522,
+      "hop_cap_hits": 0,
+      "id": 13103945278747,
+      "reachable": [
+        1,
+        13
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        18
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 769,
+      "genome_size": 514,
+      "hop_cap_hits": 0,
+      "id": 14031658209724,
+      "reachable": [
+        1,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        8
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 736,
+      "genome_size": 647,
+      "hop_cap_hits": 0,
+      "id": 13232794307107,
+      "reachable": [
+        4,
+        11
+      ],
+      "route_varies": true,
+      "total": [
+        9,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 778,
+      "genome_size": 606,
+      "hop_cap_hits": 0,
+      "id": 13928578987988,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 764,
+      "genome_size": 576,
+      "hop_cap_hits": 0,
+      "id": 12768937824631,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        9
+      ],
+      "generation": 768,
+      "genome_size": 916,
+      "hop_cap_hits": 0,
+      "id": 12021613551625,
+      "reachable": [
+        4,
+        12
+      ],
+      "route_varies": true,
+      "total": [
+        8,
+        18
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        9
+      ],
+      "generation": 719,
+      "genome_size": 478,
+      "hop_cap_hits": 0,
+      "id": 12983686213321,
+      "reachable": [
+        1,
+        12
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        15
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        2,
+        4
+      ],
+      "generation": 764,
+      "genome_size": 576,
+      "hop_cap_hits": 0,
+      "id": 12683038493105,
+      "reachable": [
+        2,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 778,
+      "genome_size": 586,
+      "hop_cap_hits": 0,
+      "id": 13576391681944,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        12
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 760,
+      "genome_size": 588,
+      "hop_cap_hits": 0,
+      "id": 10733123300842,
+      "reachable": [
+        1,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        8
+      ],
+      "generation": 721,
+      "genome_size": 668,
+      "hop_cap_hits": 0,
+      "id": 13791140040657,
+      "reachable": [
+        3,
+        10
+      ],
+      "route_varies": true,
+      "total": [
+        6,
+        19
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 777,
+      "genome_size": 592,
+      "hop_cap_hits": 0,
+      "id": 12983686214743,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 762,
+      "genome_size": 611,
+      "hop_cap_hits": 0,
+      "id": 13232794284368,
+      "reachable": [
+        1,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 795,
+      "genome_size": 608,
+      "hop_cap_hits": 0,
+      "id": 13198434581226,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 753,
+      "genome_size": 627,
+      "hop_cap_hits": 0,
+      "id": 12545599527299,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 788,
+      "genome_size": 608,
+      "hop_cap_hits": 0,
+      "id": 12949326470465,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 801,
+      "genome_size": 706,
+      "hop_cap_hits": 0,
+      "id": 12846247257140,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        16
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 757,
+      "genome_size": 642,
+      "hop_cap_hits": 0,
+      "id": 12614319036693,
+      "reachable": [
+        2,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        4,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 764,
+      "genome_size": 467,
+      "hop_cap_hits": 0,
+      "id": 13267154031506,
+      "reachable": [
+        1,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        8
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 754,
+      "genome_size": 646,
+      "hop_cap_hits": 0,
+      "id": 13499082268096,
+      "reachable": [
+        2,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        5,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        9
+      ],
+      "generation": 769,
+      "genome_size": 914,
+      "hop_cap_hits": 0,
+      "id": 10054518539857,
+      "reachable": [
+        4,
+        12
+      ],
+      "route_varies": true,
+      "total": [
+        8,
+        18
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        8
+      ],
+      "generation": 717,
+      "genome_size": 539,
+      "hop_cap_hits": 0,
+      "id": 13679470910466,
+      "reachable": [
+        2,
+        9
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 777,
+      "genome_size": 446,
+      "hop_cap_hits": 0,
+      "id": 12253541791810,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        6,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        8
+      ],
+      "generation": 732,
+      "genome_size": 521,
+      "hop_cap_hits": 0,
+      "id": 13396003069686,
+      "reachable": [
+        3,
+        9
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        8
+      ],
+      "generation": 729,
+      "genome_size": 521,
+      "hop_cap_hits": 0,
+      "id": 13344463449544,
+      "reachable": [
+        3,
+        9
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        7
+      ],
+      "generation": 779,
+      "genome_size": 605,
+      "hop_cap_hits": 0,
+      "id": 13189844637686,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 787,
+      "genome_size": 584,
+      "hop_cap_hits": 0,
+      "id": 13069585523290,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 779,
+      "genome_size": 607,
+      "hop_cap_hits": 0,
+      "id": 12176232319840,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 769,
+      "genome_size": 609,
+      "hop_cap_hits": 0,
+      "id": 11171210035073,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        9
+      ],
+      "generation": 782,
+      "genome_size": 438,
+      "hop_cap_hits": 0,
+      "id": 13275743985477,
+      "reachable": [
+        1,
+        13
+      ],
+      "route_varies": true,
+      "total": [
+        4,
+        16
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        9
+      ],
+      "generation": 763,
+      "genome_size": 596,
+      "hop_cap_hits": 0,
+      "id": 10784662979221,
+      "reachable": [
+        2,
+        17
+      ],
+      "route_varies": true,
+      "total": [
+        5,
+        20
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 772,
+      "genome_size": 641,
+      "hop_cap_hits": 0,
+      "id": 13009455980237,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 757,
+      "genome_size": 630,
+      "hop_cap_hits": 0,
+      "id": 13533442011259,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        9
+      ],
+      "generation": 783,
+      "genome_size": 438,
+      "hop_cap_hits": 0,
+      "id": 13241384253386,
+      "reachable": [
+        1,
+        13
+      ],
+      "route_varies": true,
+      "total": [
+        4,
+        16
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 785,
+      "genome_size": 576,
+      "hop_cap_hits": 0,
+      "id": 13284333898620,
+      "reachable": [
+        2,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        8
+      ],
+      "generation": 775,
+      "genome_size": 513,
+      "hop_cap_hits": 0,
+      "id": 13069585562202,
+      "reachable": [
+        1,
+        13
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        16
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 760,
+      "genome_size": 576,
+      "hop_cap_hits": 0,
+      "id": 13361643318470,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 748,
+      "genome_size": 730,
+      "hop_cap_hits": 0,
+      "id": 14194866950558,
+      "reachable": [
+        2,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        4,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 760,
+      "genome_size": 527,
+      "hop_cap_hits": 0,
+      "id": 14160507216286,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 768,
+      "genome_size": 618,
+      "hop_cap_hits": 0,
+      "id": 13499082257536,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 782,
+      "genome_size": 601,
+      "hop_cap_hits": 0,
+      "id": 12949326451181,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        9
+      ],
+      "generation": 780,
+      "genome_size": 522,
+      "hop_cap_hits": 0,
+      "id": 13567801757224,
+      "reachable": [
+        1,
+        13
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        18
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 786,
+      "genome_size": 608,
+      "hop_cap_hits": 0,
+      "id": 13026635871143,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        2,
+        8
+      ],
+      "generation": 773,
+      "genome_size": 598,
+      "hop_cap_hits": 0,
+      "id": 13670880972350,
+      "reachable": [
+        2,
+        17
+      ],
+      "route_varies": true,
+      "total": [
+        5,
+        20
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 789,
+      "genome_size": 608,
+      "hop_cap_hits": 0,
+      "id": 13284333904836,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 785,
+      "genome_size": 794,
+      "hop_cap_hits": 0,
+      "id": 12975096243669,
+      "reachable": [
+        2,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        12
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 774,
+      "genome_size": 572,
+      "hop_cap_hits": 0,
+      "id": 13224204372563,
+      "reachable": [
+        1,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 760,
+      "genome_size": 624,
+      "hop_cap_hits": 0,
+      "id": 10492605203765,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 762,
+      "genome_size": 588,
+      "hop_cap_hits": 0,
+      "id": 12717398246136,
+      "reachable": [
+        1,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 757,
+      "genome_size": 621,
+      "hop_cap_hits": 0,
+      "id": 13662291035853,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        9
+      ],
+      "generation": 779,
+      "genome_size": 522,
+      "hop_cap_hits": 0,
+      "id": 13421772867140,
+      "reachable": [
+        1,
+        13
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        18
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        2,
+        8
+      ],
+      "generation": 771,
+      "genome_size": 597,
+      "hop_cap_hits": 0,
+      "id": 12648678754368,
+      "reachable": [
+        2,
+        17
+      ],
+      "route_varies": true,
+      "total": [
+        5,
+        20
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 764,
+      "genome_size": 626,
+      "hop_cap_hits": 0,
+      "id": 12751757933167,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        12
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 769,
+      "genome_size": 603,
+      "hop_cap_hits": 0,
+      "id": 14100377678328,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 757,
+      "genome_size": 582,
+      "hop_cap_hits": 0,
+      "id": 13524852069481,
+      "reachable": [
+        1,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 779,
+      "genome_size": 583,
+      "hop_cap_hits": 0,
+      "id": 13232794289734,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 757,
+      "genome_size": 582,
+      "hop_cap_hits": 0,
+      "id": 13584981614335,
+      "reachable": [
+        1,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        8
+      ],
+      "generation": 727,
+      "genome_size": 521,
+      "hop_cap_hits": 0,
+      "id": 13679470899127,
+      "reachable": [
+        3,
+        9
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        10
+      ],
+      "generation": 770,
+      "genome_size": 691,
+      "hop_cap_hits": 0,
+      "id": 13258564106278,
+      "reachable": [
+        5,
+        16
+      ],
+      "route_varies": true,
+      "total": [
+        5,
+        19
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 765,
+      "genome_size": 643,
+      "hop_cap_hits": 0,
+      "id": 11729555782790,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 758,
+      "genome_size": 622,
+      "hop_cap_hits": 0,
+      "id": 13653701068744,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        2,
+        7
+      ],
+      "generation": 721,
+      "genome_size": 891,
+      "hop_cap_hits": 0,
+      "id": 12545599548922,
+      "reachable": [
+        3,
+        10
+      ],
+      "route_varies": true,
+      "total": [
+        7,
+        21
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        7
+      ],
+      "generation": 747,
+      "genome_size": 673,
+      "hop_cap_hits": 0,
+      "id": 14212046847757,
+      "reachable": [
+        1,
+        10
+      ],
+      "route_varies": true,
+      "total": [
+        5,
+        14
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 735,
+      "genome_size": 635,
+      "hop_cap_hits": 0,
+      "id": 13086765433529,
+      "reachable": [
+        4,
+        11
+      ],
+      "route_varies": true,
+      "total": [
+        8,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 762,
+      "genome_size": 647,
+      "hop_cap_hits": 0,
+      "id": 12837657324742,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        7
+      ],
+      "generation": 781,
+      "genome_size": 403,
+      "hop_cap_hits": 0,
+      "id": 14194866976730,
+      "reachable": [
+        1,
+        8
+      ],
+      "route_varies": true,
+      "total": [
+        5,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 764,
+      "genome_size": 604,
+      "hop_cap_hits": 0,
+      "id": 12648678774692,
+      "reachable": [
+        2,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 775,
+      "genome_size": 604,
+      "hop_cap_hits": 0,
+      "id": 12683038503230,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 738,
+      "genome_size": 645,
+      "hop_cap_hits": 0,
+      "id": 12820477468864,
+      "reachable": [
+        5,
+        11
+      ],
+      "route_varies": true,
+      "total": [
+        8,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 768,
+      "genome_size": 583,
+      "hop_cap_hits": 0,
+      "id": 11866994734896,
+      "reachable": [
+        2,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 768,
+      "genome_size": 512,
+      "hop_cap_hits": 0,
+      "id": 13524852084288,
+      "reachable": [
+        1,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        8
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 766,
+      "genome_size": 575,
+      "hop_cap_hits": 0,
+      "id": 13026635894748,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 760,
+      "genome_size": 606,
+      "hop_cap_hits": 0,
+      "id": 12494059953271,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 757,
+      "genome_size": 712,
+      "hop_cap_hits": 0,
+      "id": 13258564127390,
+      "reachable": [
+        1,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        1
+      ],
+      "executed": [
+        1,
+        7
+      ],
+      "generation": 774,
+      "genome_size": 871,
+      "hop_cap_hits": 0,
+      "id": 10045928604996,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        13
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 723,
+      "genome_size": 706,
+      "hop_cap_hits": 0,
+      "id": 12768937852446,
+      "reachable": [
+        1,
+        10
+      ],
+      "route_varies": true,
+      "total": [
+        5,
+        15
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 760,
+      "genome_size": 591,
+      "hop_cap_hits": 0,
+      "id": 13851269619188,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        9
+      ],
+      "generation": 782,
+      "genome_size": 438,
+      "hop_cap_hits": 0,
+      "id": 13009456026726,
+      "reachable": [
+        1,
+        13
+      ],
+      "route_varies": true,
+      "total": [
+        4,
+        16
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 773,
+      "genome_size": 689,
+      "hop_cap_hits": 0,
+      "id": 12854837189835,
+      "reachable": [
+        2,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 763,
+      "genome_size": 580,
+      "hop_cap_hits": 0,
+      "id": 12932146582557,
+      "reachable": [
+        2,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 760,
+      "genome_size": 610,
+      "hop_cap_hits": 0,
+      "id": 13447542651234,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 770,
+      "genome_size": 432,
+      "hop_cap_hits": 0,
+      "id": 12914966724967,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        4,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        2,
+        7
+      ],
+      "generation": 717,
+      "genome_size": 899,
+      "hop_cap_hits": 0,
+      "id": 12665858590697,
+      "reachable": [
+        4,
+        10
+      ],
+      "route_varies": true,
+      "total": [
+        8,
+        22
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        9
+      ],
+      "generation": 785,
+      "genome_size": 438,
+      "hop_cap_hits": 0,
+      "id": 12562779415277,
+      "reachable": [
+        1,
+        13
+      ],
+      "route_varies": true,
+      "total": [
+        4,
+        16
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 751,
+      "genome_size": 620,
+      "hop_cap_hits": 0,
+      "id": 14821932191566,
+      "reachable": [
+        2,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 772,
+      "genome_size": 758,
+      "hop_cap_hits": 0,
+      "id": 11738145656217,
+      "reachable": [
+        1,
+        10
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        16
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 745,
+      "genome_size": 504,
+      "hop_cap_hits": 0,
+      "id": 13215614448764,
+      "reachable": [
+        2,
+        8
+      ],
+      "route_varies": true,
+      "total": [
+        4,
+        12
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 770,
+      "genome_size": 628,
+      "hop_cap_hits": 0,
+      "id": 13791140042688,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 772,
+      "genome_size": 571,
+      "hop_cap_hits": 0,
+      "id": 12322261218519,
+      "reachable": [
+        1,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 766,
+      "genome_size": 576,
+      "hop_cap_hits": 0,
+      "id": 12348031067098,
+      "reachable": [
+        2,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 763,
+      "genome_size": 692,
+      "hop_cap_hits": 0,
+      "id": 13146894961679,
+      "reachable": [
+        1,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 778,
+      "genome_size": 675,
+      "hop_cap_hits": 0,
+      "id": 12124692765673,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 770,
+      "genome_size": 466,
+      "hop_cap_hits": 0,
+      "id": 13507672220310,
+      "reachable": [
+        1,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        8
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        7
+      ],
+      "generation": 833,
+      "genome_size": 1239,
+      "hop_cap_hits": 0,
+      "id": 11196979839527,
+      "reachable": [
+        3,
+        14
+      ],
+      "route_varies": true,
+      "total": [
+        9,
+        21
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        9
+      ],
+      "generation": 717,
+      "genome_size": 478,
+      "hop_cap_hits": 0,
+      "id": 13335873513593,
+      "reachable": [
+        1,
+        12
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        15
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 764,
+      "genome_size": 615,
+      "hop_cap_hits": 0,
+      "id": 13550621891423,
+      "reachable": [
+        1,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 765,
+      "genome_size": 580,
+      "hop_cap_hits": 0,
+      "id": 13576391669128,
+      "reachable": [
+        2,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 769,
+      "genome_size": 612,
+      "hop_cap_hits": 0,
+      "id": 13533442040398,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 762,
+      "genome_size": 622,
+      "hop_cap_hits": 0,
+      "id": 12674448584029,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 766,
+      "genome_size": 561,
+      "hop_cap_hits": 0,
+      "id": 12511239818701,
+      "reachable": [
+        1,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        8
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 792,
+      "genome_size": 608,
+      "hop_cap_hits": 0,
+      "id": 13773960203800,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        10
+      ],
+      "generation": 790,
+      "genome_size": 747,
+      "hop_cap_hits": 0,
+      "id": 12485470028002,
+      "reachable": [
+        5,
+        16
+      ],
+      "route_varies": true,
+      "total": [
+        6,
+        19
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        9
+      ],
+      "generation": 723,
+      "genome_size": 477,
+      "hop_cap_hits": 0,
+      "id": 11789685323425,
+      "reachable": [
+        1,
+        12
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        15
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 763,
+      "genome_size": 573,
+      "hop_cap_hits": 0,
+      "id": 13542031947892,
+      "reachable": [
+        1,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 759,
+      "genome_size": 582,
+      "hop_cap_hits": 0,
+      "id": 12966506313688,
+      "reachable": [
+        1,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 769,
+      "genome_size": 624,
+      "hop_cap_hits": 0,
+      "id": 12897786865437,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 759,
+      "genome_size": 637,
+      "hop_cap_hits": 0,
+      "id": 13404593012187,
+      "reachable": [
+        2,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        12
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        9
+      ],
+      "generation": 784,
+      "genome_size": 443,
+      "hop_cap_hits": 0,
+      "id": 13731010493131,
+      "reachable": [
+        2,
+        13
+      ],
+      "route_varies": true,
+      "total": [
+        5,
+        16
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        10
+      ],
+      "generation": 771,
+      "genome_size": 691,
+      "hop_cap_hits": 0,
+      "id": 13421772855160,
+      "reachable": [
+        5,
+        16
+      ],
+      "route_varies": true,
+      "total": [
+        5,
+        19
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 793,
+      "genome_size": 608,
+      "hop_cap_hits": 0,
+      "id": 13404592965644,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 777,
+      "genome_size": 672,
+      "hop_cap_hits": 0,
+      "id": 13782550100044,
+      "reachable": [
+        2,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        9
+      ],
+      "generation": 721,
+      "genome_size": 476,
+      "hop_cap_hits": 0,
+      "id": 12141872577422,
+      "reachable": [
+        1,
+        11
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        14
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 769,
+      "genome_size": 624,
+      "hop_cap_hits": 0,
+      "id": 13499082275132,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 783,
+      "genome_size": 673,
+      "hop_cap_hits": 0,
+      "id": 13799729996431,
+      "reachable": [
+        2,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 779,
+      "genome_size": 569,
+      "hop_cap_hits": 0,
+      "id": 13404593013619,
+      "reachable": [
+        1,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 778,
+      "genome_size": 580,
+      "hop_cap_hits": 0,
+      "id": 13662291030346,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 803,
+      "genome_size": 785,
+      "hop_cap_hits": 0,
+      "id": 12983686179610,
+      "reachable": [
+        3,
+        11
+      ],
+      "route_varies": true,
+      "total": [
+        5,
+        15
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        2,
+        6
+      ],
+      "generation": 725,
+      "genome_size": 916,
+      "hop_cap_hits": 0,
+      "id": 13035225828950,
+      "reachable": [
+        3,
+        11
+      ],
+      "route_varies": true,
+      "total": [
+        7,
+        24
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 771,
+      "genome_size": 605,
+      "hop_cap_hits": 0,
+      "id": 10174777623936,
+      "reachable": [
+        1,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 772,
+      "genome_size": 617,
+      "hop_cap_hits": 0,
+      "id": 13610751449740,
+      "reachable": [
+        1,
+        8
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        12
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 775,
+      "genome_size": 573,
+      "hop_cap_hits": 0,
+      "id": 11935714202704,
+      "reachable": [
+        1,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 771,
+      "genome_size": 609,
+      "hop_cap_hits": 0,
+      "id": 12399570675615,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 756,
+      "genome_size": 627,
+      "hop_cap_hits": 0,
+      "id": 12966506298544,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 765,
+      "genome_size": 692,
+      "hop_cap_hits": 0,
+      "id": 13078175500950,
+      "reachable": [
+        1,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        7
+      ],
+      "generation": 861,
+      "genome_size": 844,
+      "hop_cap_hits": 0,
+      "id": 13507672201423,
+      "reachable": [
+        1,
+        10
+      ],
+      "route_varies": true,
+      "total": [
+        4,
+        16
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 723,
+      "genome_size": 518,
+      "hop_cap_hits": 0,
+      "id": 12889196925231,
+      "reachable": [
+        1,
+        10
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 775,
+      "genome_size": 620,
+      "hop_cap_hits": 0,
+      "id": 13327283564348,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        13
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 778,
+      "genome_size": 483,
+      "hop_cap_hits": 0,
+      "id": 13232794322926,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        9
+      ],
+      "generation": 775,
+      "genome_size": 531,
+      "hop_cap_hits": 0,
+      "id": 12519829686114,
+      "reachable": [
+        1,
+        13
+      ],
+      "route_varies": true,
+      "total": [
+        4,
+        17
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 775,
+      "genome_size": 602,
+      "hop_cap_hits": 0,
+      "id": 13653701072099,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 769,
+      "genome_size": 615,
+      "hop_cap_hits": 0,
+      "id": 12846247230551,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 779,
+      "genome_size": 611,
+      "hop_cap_hits": 0,
+      "id": 13808319932349,
+      "reachable": [
+        1,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        11
+      ],
+      "generation": 712,
+      "genome_size": 525,
+      "hop_cap_hits": 0,
+      "id": 13567801774579,
+      "reachable": [
+        2,
+        12
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        13
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 761,
+      "genome_size": 649,
+      "hop_cap_hits": 0,
+      "id": 13593571561736,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 765,
+      "genome_size": 515,
+      "hop_cap_hits": 0,
+      "id": 12863427125223,
+      "reachable": [
+        1,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        8
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        7
+      ],
+      "generation": 779,
+      "genome_size": 531,
+      "hop_cap_hits": 0,
+      "id": 12124692770808,
+      "reachable": [
+        1,
+        8
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 769,
+      "genome_size": 617,
+      "hop_cap_hits": 0,
+      "id": 14151917316018,
+      "reachable": [
+        1,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 761,
+      "genome_size": 649,
+      "hop_cap_hits": 0,
+      "id": 12820477471597,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 769,
+      "genome_size": 598,
+      "hop_cap_hits": 0,
+      "id": 12863427121805,
+      "reachable": [
+        1,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 781,
+      "genome_size": 640,
+      "hop_cap_hits": 0,
+      "id": 14375255614361,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        11
+      ],
+      "generation": 801,
+      "genome_size": 746,
+      "hop_cap_hits": 0,
+      "id": 13782550106104,
+      "reachable": [
+        5,
+        15
+      ],
+      "route_varies": true,
+      "total": [
+        5,
+        18
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 763,
+      "genome_size": 567,
+      "hop_cap_hits": 0,
+      "id": 12253541730092,
+      "reachable": [
+        1,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 731,
+      "genome_size": 533,
+      "hop_cap_hits": 0,
+      "id": 13911399139915,
+      "reachable": [
+        3,
+        10
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 770,
+      "genome_size": 567,
+      "hop_cap_hits": 0,
+      "id": 13052405670658,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 754,
+      "genome_size": 568,
+      "hop_cap_hits": 0,
+      "id": 14126147473061,
+      "reachable": [
+        1,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        8
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        8
+      ],
+      "generation": 717,
+      "genome_size": 668,
+      "hop_cap_hits": 0,
+      "id": 12777527761759,
+      "reachable": [
+        3,
+        10
+      ],
+      "route_varies": true,
+      "total": [
+        6,
+        19
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 779,
+      "genome_size": 611,
+      "hop_cap_hits": 0,
+      "id": 13310103736010,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 770,
+      "genome_size": 608,
+      "hop_cap_hits": 0,
+      "id": 12579959277545,
+      "reachable": [
+        1,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 779,
+      "genome_size": 603,
+      "hop_cap_hits": 0,
+      "id": 12820477465843,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        7
+      ],
+      "generation": 760,
+      "genome_size": 439,
+      "hop_cap_hits": 0,
+      "id": 13430362782754,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        5,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 779,
+      "genome_size": 748,
+      "hop_cap_hits": 0,
+      "id": 12528419645588,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        12
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        8
+      ],
+      "generation": 771,
+      "genome_size": 512,
+      "hop_cap_hits": 0,
+      "id": 13954348816178,
+      "reachable": [
+        1,
+        13
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        16
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 766,
+      "genome_size": 578,
+      "hop_cap_hits": 0,
+      "id": 13464722527486,
+      "reachable": [
+        2,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        10
+      ],
+      "generation": 770,
+      "genome_size": 823,
+      "hop_cap_hits": 0,
+      "id": 13198434579691,
+      "reachable": [
+        7,
+        19
+      ],
+      "route_varies": true,
+      "total": [
+        9,
+        24
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 764,
+      "genome_size": 628,
+      "hop_cap_hits": 0,
+      "id": 13902809189883,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 771,
+      "genome_size": 616,
+      "hop_cap_hits": 0,
+      "id": 12253541780920,
+      "reachable": [
+        1,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 765,
+      "genome_size": 615,
+      "hop_cap_hits": 0,
+      "id": 13292923866336,
+      "reachable": [
+        1,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 759,
+      "genome_size": 583,
+      "hop_cap_hits": 0,
+      "id": 13902809203411,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 729,
+      "genome_size": 519,
+      "hop_cap_hits": 0,
+      "id": 14014478355724,
+      "reachable": [
+        3,
+        10
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 762,
+      "genome_size": 617,
+      "hop_cap_hits": 0,
+      "id": 13971528668921,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 763,
+      "genome_size": 624,
+      "hop_cap_hits": 0,
+      "id": 12992276132091,
+      "reachable": [
+        2,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        4,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 792,
+      "genome_size": 608,
+      "hop_cap_hits": 0,
+      "id": 13456132591423,
+      "reachable": [
+        1,
+        7
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 763,
+      "genome_size": 617,
+      "hop_cap_hits": 0,
+      "id": 13584981600410,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        1
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 782,
+      "genome_size": 815,
+      "hop_cap_hits": 0,
+      "id": 12846247277625,
+      "reachable": [
+        2,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        12
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 774,
+      "genome_size": 615,
+      "hop_cap_hits": 0,
+      "id": 13129715100852,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        12
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 759,
+      "genome_size": 582,
+      "hop_cap_hits": 0,
+      "id": 11265699315932,
+      "reachable": [
+        1,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 751,
+      "genome_size": 625,
+      "hop_cap_hits": 0,
+      "id": 13696650765424,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        4,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 763,
+      "genome_size": 619,
+      "hop_cap_hits": 0,
+      "id": 13335873527591,
+      "reachable": [
+        2,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        4,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 769,
+      "genome_size": 645,
+      "hop_cap_hits": 0,
+      "id": 14177687089975,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        10
+      ],
+      "generation": 771,
+      "genome_size": 688,
+      "hop_cap_hits": 0,
+      "id": 13301513779627,
+      "reachable": [
+        5,
+        14
+      ],
+      "route_varies": true,
+      "total": [
+        5,
+        19
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        7
+      ],
+      "generation": 709,
+      "genome_size": 493,
+      "hop_cap_hits": 0,
+      "id": 12090333032413,
+      "reachable": [
+        3,
+        8
+      ],
+      "route_varies": true,
+      "total": [
+        5,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 765,
+      "genome_size": 575,
+      "hop_cap_hits": 0,
+      "id": 13155484867191,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        1
+      ],
+      "executed": [
+        1,
+        1
+      ],
+      "generation": 781,
+      "genome_size": 575,
+      "hop_cap_hits": 0,
+      "id": 13584981635294,
+      "reachable": [
+        1,
+        1
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 758,
+      "genome_size": 615,
+      "hop_cap_hits": 0,
+      "id": 13215614414811,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 757,
+      "genome_size": 622,
+      "hop_cap_hits": 0,
+      "id": 11025181147449,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 772,
+      "genome_size": 629,
+      "hop_cap_hits": 0,
+      "id": 12674448580681,
+      "reachable": [
+        1,
+        8
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        13
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        2,
+        7
+      ],
+      "generation": 721,
+      "genome_size": 894,
+      "hop_cap_hits": 0,
+      "id": 14323715979816,
+      "reachable": [
+        3,
+        10
+      ],
+      "route_varies": true,
+      "total": [
+        7,
+        22
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 779,
+      "genome_size": 679,
+      "hop_cap_hits": 0,
+      "id": 13481902394094,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 767,
+      "genome_size": 646,
+      "hop_cap_hits": 0,
+      "id": 13567801770914,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 726,
+      "genome_size": 736,
+      "hop_cap_hits": 0,
+      "id": 13095355333054,
+      "reachable": [
+        1,
+        10
+      ],
+      "route_varies": true,
+      "total": [
+        5,
+        14
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 771,
+      "genome_size": 618,
+      "hop_cap_hits": 0,
+      "id": 12949326443264,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 851,
+      "genome_size": 813,
+      "hop_cap_hits": 0,
+      "id": 12330851162416,
+      "reachable": [
+        2,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        6,
+        19
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        1
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 824,
+      "genome_size": 864,
+      "hop_cap_hits": 0,
+      "id": 12717398235953,
+      "reachable": [
+        6,
+        9
+      ],
+      "route_varies": true,
+      "total": [
+        9,
+        13
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        6
+      ],
+      "generation": 777,
+      "genome_size": 580,
+      "hop_cap_hits": 0,
+      "id": 12837657312423,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        9
+      ],
+      "generation": 714,
+      "genome_size": 478,
+      "hop_cap_hits": 0,
+      "id": 13103945256037,
+      "reachable": [
+        1,
+        12
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        15
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        10
+      ],
+      "generation": 773,
+      "genome_size": 525,
+      "hop_cap_hits": 0,
+      "id": 12614319014149,
+      "reachable": [
+        1,
+        13
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        18
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 762,
+      "genome_size": 617,
+      "hop_cap_hits": 0,
+      "id": 13473312469611,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 772,
+      "genome_size": 584,
+      "hop_cap_hits": 0,
+      "id": 13396003083538,
+      "reachable": [
+        1,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        9
+      ],
+      "generation": 777,
+      "genome_size": 529,
+      "hop_cap_hits": 0,
+      "id": 12133282704109,
+      "reachable": [
+        2,
+        13
+      ],
+      "route_varies": true,
+      "total": [
+        4,
+        17
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 760,
+      "genome_size": 573,
+      "hop_cap_hits": 0,
+      "id": 12279311587480,
+      "reachable": [
+        1,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 762,
+      "genome_size": 587,
+      "hop_cap_hits": 0,
+      "id": 13962938716367,
+      "reachable": [
+        1,
+        3
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        9
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 767,
+      "genome_size": 512,
+      "hop_cap_hits": 0,
+      "id": 11772505391838,
+      "reachable": [
+        1,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        8
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 775,
+      "genome_size": 965,
+      "hop_cap_hits": 0,
+      "id": 13524852103827,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        13
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        4
+      ],
+      "generation": 760,
+      "genome_size": 623,
+      "hop_cap_hits": 0,
+      "id": 12107512837464,
+      "reachable": [
+        1,
+        6
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 747,
+      "genome_size": 504,
+      "hop_cap_hits": 0,
+      "id": 12236361918196,
+      "reachable": [
+        2,
+        8
+      ],
+      "route_varies": true,
+      "total": [
+        4,
+        12
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        3
+      ],
+      "generation": 770,
+      "genome_size": 621,
+      "hop_cap_hits": 0,
+      "id": 13164074833632,
+      "reachable": [
+        1,
+        4
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        10
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 764,
+      "genome_size": 576,
+      "hop_cap_hits": 0,
+      "id": 13232794304641,
+      "reachable": [
+        1,
+        5
+      ],
+      "route_varies": true,
+      "total": [
+        1,
+        11
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        5
+      ],
+      "generation": 764,
+      "genome_size": 686,
+      "hop_cap_hits": 0,
+      "id": 13335873520173,
+      "reachable": [
+        1,
+        8
+      ],
+      "route_varies": true,
+      "total": [
+        2,
+        13
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        10
+      ],
+      "generation": 787,
+      "genome_size": 689,
+      "hop_cap_hits": 0,
+      "id": 12262131660536,
+      "reachable": [
+        5,
+        16
+      ],
+      "route_varies": true,
+      "total": [
+        5,
+        19
+      ]
+    },
+    {
+      "contributing": [
+        1,
+        2
+      ],
+      "executed": [
+        1,
+        8
+      ],
+      "generation": 770,
+      "genome_size": 519,
+      "hop_cap_hits": 0,
+      "id": 13542031946948,
+      "reachable": [
+        1,
+        14
+      ],
+      "route_varies": true,
+      "total": [
+        3,
+        17
+      ]
+    }
+  ],
+  "probes": {
+    "battery_executions": 80,
+    "live_paired_insertions": {
+      "graph_Silent": 200,
+      "vm_Silent": 200
+    },
+    "operators": [
+      {
+        "added_graph_vm": [
+          0,
+          200
+        ],
+        "applied": 200,
+        "classes": {
+          "Silent": 200
+        },
+        "forced_alternative_activation": {},
+        "graph_detour_counterfactual": {
+          "Silent": 200
+        },
+        "new_executed_graph_vm": [
+          0,
+          200
+        ],
+        "operator": "AddNode",
+        "trials": 200
+      },
+      {
+        "added_graph_vm": [
+          0,
+          200
+        ],
+        "applied": 200,
+        "classes": {
+          "Silent": 200
+        },
+        "forced_alternative_activation": {},
+        "graph_detour_counterfactual": {
+          "Silent": 200
+        },
+        "new_executed_graph_vm": [
+          0,
+          200
+        ],
+        "operator": "SpliceNode",
+        "trials": 200
+      },
+      {
+        "added_graph_vm": [
+          0,
+          200
+        ],
+        "applied": 200,
+        "classes": {
+          "Silent": 200
+        },
+        "forced_alternative_activation": {},
+        "graph_detour_counterfactual": {
+          "Silent": 200
+        },
+        "new_executed_graph_vm": [
+          0,
+          163
+        ],
+        "operator": "AddRouteTarget",
+        "trials": 200
+      },
+      {
+        "added_graph_vm": [
+          0,
+          200
+        ],
+        "applied": 200,
+        "classes": {
+          "Silent": 200
+        },
+        "forced_alternative_activation": {},
+        "graph_detour_counterfactual": {},
+        "new_executed_graph_vm": [
+          0,
+          0
+        ],
+        "operator": "CopyNode",
+        "trials": 200
+      },
+      {
+        "added_graph_vm": [
+          200,
+          0
+        ],
+        "applied": 200,
+        "classes": {
+          "Silent": 200
+        },
+        "forced_alternative_activation": {
+          "Dead": 200
+        },
+        "graph_detour_counterfactual": {},
+        "new_executed_graph_vm": [
+          0,
+          0
+        ],
+        "operator": "SwapNodeBackend",
+        "trials": 200
+      },
+      {
+        "added_graph_vm": [
+          200,
+          97
+        ],
+        "applied": 200,
+        "classes": {
+          "Silent": 200
+        },
+        "forced_alternative_activation": {},
+        "graph_detour_counterfactual": {},
+        "new_executed_graph_vm": [
+          0,
+          0
+        ],
+        "operator": "CopyMeshBackwardSlice",
+        "trials": 200
+      },
+      {
+        "added_graph_vm": [
+          103,
+          200
+        ],
+        "applied": 200,
+        "classes": {
+          "Silent": 200
+        },
+        "forced_alternative_activation": {},
+        "graph_detour_counterfactual": {},
+        "new_executed_graph_vm": [
+          0,
+          0
+        ],
+        "operator": "CopyMeshForwardSlice",
+        "trials": 200
+      }
+    ]
+  }
+}

@@ -1,7 +1,7 @@
 # T11 — Brain Genotype-Phenotype Map
 
 **Status**: In Progress
-**Last updated**: 2026-09-07
+**Last updated**: 2026-09-08
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -32,6 +32,8 @@ representation only where the neighborhood reading still shows a gap.
 - [ ] The functional core's mutational exposure does not decay as neutral scaffold accumulates: on the drift walk to depth, the fraction of births that change behavior at generation 1,000 stays above the floor T11.F17 predeclares against the T11.F16 baseline, and every closure reads it.
 - [ ] Every floor above is met by the close of T11.F10, and from T11.F01 onward no closed feature anywhere in the program lowers an indicator component below the previous closed feature's reading unless its spec predeclared and justified the change.
 
+- [ ] New mesh detours can be either Graph or VM with equal creation probability, preserve the existing decision path and state effects at insertion, and are measured separately by backend for creation, execution, and behavioral contribution. (T11.F18)
+
 ## Executable Features
 
 - [x] **T11.F01 — Mutational Neighborhood Indicator** — Depends on: T01.F12
@@ -52,7 +54,7 @@ representation only where the neighborhood reading still shows a gap.
   - Goal: Gene duplication. Copying a working module keeps it working, so complexity can grow by copy and divergence as in real genomes.
 - [ ] **T11.F09 — Learned-State Inheritance Integrity** — Depends on: T11.F07, T11.F08
   - Goal: Inherited neural adaptation. When learned weights are heritable, structural mutation preserves their association with surviving connections and initializes new connections explicitly.
-- [ ] **T11.F10 — Memory-Motif Evolvability from Founders** — Depends on: T11.F04, T11.F09
+- [ ] **T11.F10 — Memory-Motif Evolvability from Founders** — Depends on: T11.F04, T11.F09, T11.F18
   - Goal: Can memory be found? In small temporal tasks, measure whether founders reach and retain useful remembered decisions through viable mutations before testing seasonal ecology.
 - [ ] **T11.F11 — Label-Addressed Control Flow** — Depends on: T11.F02, T11.F08
   - Goal: Conditional on the T11.F01 reading after T11.F02 and T11.F08. Promoter sequences, not positions: a jump finds its target by an evolvable label with nearest-match resolution, so duplicated or shifted code keeps working without per-operator reference repair.
@@ -69,7 +71,13 @@ representation only where the neighborhood reading still shows a gap.
 - [x] **T11.F17 — Executed-Biased Mutation Targeting** — Depends on: T11.F04, T11.F15, T11.F16
   - Goal: Expressed genes mutate more. Node-internal mutation events land mostly on the nodes a creature's brain actually ran in its recent ticks, so the functional core keeps receiving mutations however much silent scaffold surrounds it, while the number of events per birth and the scaffold's own drift stay as they are.
 
+- [ ] **T11.F18 — Backend-Neutral Mesh Node Growth** — Depends on: T11.F15, T11.F17
+  - Goal: Developmental variation in new neural tissue. A creature can grow either kind of brain module along a working decision path without losing its current behavior, so graph computation has the same direct opportunity as VM computation to enter an evolving controller.
+
 ## Notes for AI Agents
+
+- T11.F18 is the next new start by user decision on 2026-09-08; its dependencies are closed. The [backend-bias research note](../strategy/mesh-backend-bias-research-2026-09-08.md) separates backend creation from ecological selection: `AddNode`, `SpliceNode`, and `AddRouteTarget` all call the same VM-only detour constructor, while Graph alternatives enter through copies or backend swaps with different activation requirements. Extend that constructor and those three callers to choose Graph or VM with equal probability, independent of the source backend, using the existing empty Graph and Halt-only VM backends and retaining the successor. Reuse existing enums and mutation RNG; no new dependency, configuration knob, operator family, founder, or runtime routing rule is needed. Copy operators retain the copied backend and `SwapNodeBackend` retains its alternate-backend purpose; changing their activation semantics is outside this feature.
+- T11.F18 verification distinguishes opportunity from outcome. Exercise both backend choices explicitly in unit/property tests; verify bus, queued actions, metadata, priority bid, shared memory, and successor behavior across insertion and first branch activation, allowing the additional dispatch and its real compute charge and stating hop/energy budget preconditions. Do not make invariant tests depend on randomly drawing both backend kinds. Read the existing founder/evolved neighborhood and drift-depth indicators, separating created, executed, and contributing nodes by backend in bounded closure evidence; preserve existing floors and report compute cost. The just-in-time spec predeclares the paired backend comparisons and scope of any observation changes. The research's 200/200 action-signature equality for empty Graph insertions is a feasibility result, not proof of full state neutrality or improved ecological cognition. Equal creation odds do not require equal backend counts in surviving creatures. T11.F10 depends on this repair so its discovery reading uses the repaired substrate.
 
 - Companion documents: the [brain evolvability audit of 2026-09-04](../strategy/brain-evolvability-audit-2026-09-04.md) is this track's evidence base, and the [mesh evolvability research note of 2026-09-06](../strategy/mesh-evolvability-research-2026-09-06.md) is the mesh-layer follow-up that produced T11.F14 and T11.F15, and the [depth research note of 2026-09-07](../strategy/mesh-depth-research-2026-09-07.md) reads the user's 281,405-tick run at generation 1,990 and produced T11.F16 and T11.F17. At production defaults on the V3Alpha1 founder at commit 4b8650ef, 90.2% of births are clones; of mutated births, 5.9% are silent on a 48-scenario reactive battery, 75.4% changed, and 18.7% dead (NoOp on every scenario); single-event births are 32.4% silent and 4.1% dead; memory-motif inserts are 13 to 24% silent; `AddInternalGraphNode` is 1.0% silent and adds 29.5 edges per event; inserting one `Noop` is 28.8% silent today and 100% silent once the jumps that straddle it are recomputed. Cite the audit rather than re-deriving these numbers; re-run its probes (appendices of the document) when a later commit needs fresh ones. T01.F12's goal-v1 baseline (read 2026-09-04, verified 2026-09-05) corroborates the audit on evolved populations: zero of 24,418 final creatures across three seeds changed their action queue when shared memory was zeroed or rotated, while reachable structure grew to a median of 97, a p75 of 124, and a maximum of 798 against the founder's 96.
 - Ownership. T11 owns the brain's representation (VM ISA, graph encoding, mesh routing as a genome), the execution semantics that make the phenotype stable in time (graph state and trace clocks), the variation operators and the per-birth mutation supply, the learned-state inheritance rules, and the neighborhood indicator. T08 owns lineage attribution, heritable mutation policy, mating, and recombination. T09 owns cognition assays, learning qualification, and the diagnostic checkpoint. Features moved here on 2026-09-04 keep their scope: T11.F01 was T08.F01, T11.F02 was T08.F10, T11.F03 was T08.F11, T11.F05 was T09.F09, T11.F06 was T09.F10, T11.F07 was T09.F11, T11.F08 was T08.F04, T11.F09 was T08.F12, T11.F10 was T09.F02, and T11.F12 was T08.F03; T11.F04 and T11.F11 are new. Retired IDs are never reused.
