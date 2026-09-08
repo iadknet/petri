@@ -412,12 +412,12 @@ fn priority_bid_capped_at_available_energy() {
         &cfg,
         &mut side_outputs,
     );
-    // The bid is capped at the effective energy (T03.F10), and the dispatch's
-    // debt settles in one subtraction afterwards, so the pair lands within one
-    // ulp of zero rather than exactly on it.
-    assert!(
-        e.abs() <= f32::EPSILON * 100.0,
-        "a capped priority bid must land energy within one ulp of zero; got {e}",
+    // The bid is capped at the effective energy (T03.F10) and the dispatch pins
+    // energy to its own debt before settling, so the pair lands on exactly 0.0:
+    // death at `energy <= 0.0` stays bit-deterministic.
+    assert_eq!(
+        e, 0.0,
+        "a capped priority bid must land energy on exactly 0.0; got {e}",
     );
 }
 
@@ -459,12 +459,12 @@ fn oversized_bid_produces_exact_all_in_exhaustion() {
         &cfg,
         &mut side_outputs,
     );
-    // Capped bid drains all remaining energy. Since T03.F10 the dispatch's
-    // opcode debt settles in one subtraction after the bid, so the landing is
-    // within one ulp of zero rather than exactly zero.
-    assert!(
-        e.abs() <= f32::EPSILON * starting_energy,
-        "capped bid should drain energy to zero within one ulp; got {e}",
+    // Capped bid drains all remaining energy → exact zero, not negative. The
+    // T03.F10 dispatch pins energy to its own debt on this path, so the single
+    // settlement subtracts the debt from itself and lands on exactly 0.0.
+    assert_eq!(
+        e, 0.0,
+        "capped bid should drain energy to exactly 0.0; got {e}"
     );
     // All-in bid correctly triggers exhaustion.
     assert!(

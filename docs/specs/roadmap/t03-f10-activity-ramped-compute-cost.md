@@ -101,7 +101,7 @@ Fixed design, decided before implementation:
 | Ramp rate | `runtime.vm.step_ramp_cost`, `f32`, default 1e-6 energy per step per excess step. Finite and non-negative; invalid values fall back to 1e-6; 0.0 disables the ramp. Closed form for n executed steps with m = n − allowance > 0: ramp total = 1e-6 · m(m+1)/2. Defaults give 200 steps 0.00505, 1,000 steps 0.405 (about 0.8 ticks of the 0.5 per-tick decay), 10,000 steps 49.0 energy (initial energy 20, reproduction at 30, maximum 200). |
 | Accumulation | The dispatch keeps its opcode and ramp charges in a local accumulator and subtracts the sum from the creature's energy exactly once, at whichever exit path ends the dispatch. The accumulator preserves sub-ulp early steps, and settlement rounds once instead of once per step. The trace sink's `energy_after` reports the effective remaining energy (`energy - accumulator`) and `energy_cost` the step's own charge, so the inspector stays truthful. |
 | Exhaustion | Before executing the k-th instruction, add its charge to the accumulator; if `energy - accumulator <= 0.0`, subtract the accumulator (energy goes to zero or below), do not execute the instruction, do not commit shared memory, and return `NodeResult::exhausted()`. This is the existing rule with the accumulator in place of the running subtraction. |
-| `SetPriorityBid` | The bid is capped at the effective energy, `raw.min(energy - accumulator)`, and is still subtracted from energy immediately (the mesh reads it this tick); the post-bid exhaustion check uses the same effective-energy rule and the same debt settlement. A bid can never spend energy the dispatch already owes. |
+| `SetPriorityBid` | The bid is capped at the effective energy, `raw.min(energy - accumulator)`, and is still subtracted from energy immediately (the mesh reads it this tick); a bid can never spend energy the dispatch already owes. Implemented post-bid check (amended 2026-09-07, accepted by the orchestrator): `bid >= effective \|\| after_bid <= 0.0`, not the effective-energy clause alone — when the cap bites, the separate `f32` stores of `energy - bid` and the debt settlement can leave a residual of about one ulp either side of zero, so the first clause makes an all-in exhaust deterministically. On that path the dispatch pins `energy` to its own debt before settling, so the single settlement lands on exactly `0.0` and death at `energy <= 0.0` is bit-deterministic, as it was before the feature. |
 | Energy input | `ReadInput` of `EnergyCurrent` resolves to the effective energy (`energy - accumulator`), and `EnergyConsumedThisTick` to the tick's consumption so far plus the accumulator, so a brain reads its own starvation mid-dispatch through the existing introspection inputs; no new sensor. |
 | Empty dispatches | `register_count == 0` and empty programs execute no step and charge nothing, unchanged. |
 | Scope | VM backend only, per dispatch; `steps` is the ramp index. `max_vm_steps` remains the hard bound; at defaults a capped dispatch costs about 49 energy, so energy binds first for any creature below that and a creature at the 200 maximum survives at most four capped ticks. |
@@ -122,7 +122,7 @@ profile, the pinned epoch) and the gate epoch `remove-complementary-nutrition`:
 | Drift walk changed/all births at 1,000 / 2,000 (track floors) | 0.001500 / 0.008000 (T11.F17) | Not below (strict rule). The drift walk has no energy budget but its battery runs production code at energies 5–80, so a genome that loops to the cap now exhausts at five of the six battery energies (5, 15, 25, 31, 45; not 80) and a mutation that creates or breaks such a loop reads as changed or dead rather than silent; direction of the changed fraction is otherwise unpredicted. |
 | Drift walk dead/all births pooled at 1,000 and 2,000 | 8 / 4,000 (T11.F17) | Not above 20 / 4,000, a count allowance predeclared before measurement because loop-creating mutations now classify dead (all-`NoOp`); any reading above 8 is reported as a count with that attribution stated. |
 | Drift walk hop-cap hits, executed nodes, total nodes | T11.F17 | Hop-cap hits zero; executed and total nodes reported, no direction. |
-| Goal evolved half changed / dead per mutated birth | 0.288182 / 0.013030 (T11.F17) | Reported; no direction. The evolved population itself changes under the new cost, so the reading is confounded (T11.F17's caveat applies). |
+| Goal evolved half changed / dead per mutated birth | 0.307576 / 0.012121 (T11.F17 goal) | Reported; no direction. The evolved population itself changes under the new cost, so the reading is confounded (T11.F17's caveat applies). |
 | Observation budgets | Workflow caps | Founder neighborhood below 10 s; summed evolved neighborhood below 180 s; drift walk below 30 s; whole goal run below 15 minutes. |
 
 ## Implementation Tasks
@@ -142,8 +142,8 @@ profile, the pinned epoch) and the gate epoch `remove-complementary-nutrition`:
       0.0 the total equals the sum of base costs; the accumulator matches the closed form plus the summed base costs
       directly, and the mesh-attributed node cost equals the settled total
       within one ulp of the starting energy unless exhausted.
-      (`crates/v3-core/src/runtime/tests/vm_step_ramp.rs`; no
-      `proptest-regressions` file survived the final suite)
+      (`crates/v3-core/src/runtime/tests/vm_step_ramp.rs`; one
+      `proptest-regressions` entry committed; see Results)
 - [x] Update `v3-vm-isa-spec.md` Sections 3 and 6, `docs/progress.md`, and
       `docs/progress/benchmark-series.json`; store the gate and goal reports.
 
@@ -237,21 +237,26 @@ tripped the harness assertion that the dispatch does not exhaust rather than
 the invariant. The generator is now bounded to ramps the drawn energy can
 absorb and the seed replays green.
 
-Two pre-existing tests were loosened, both in
-`crates/v3-core/src/runtime/tests/vm_execution.rs`, with the reason recorded
-in place: `priority_bid_capped_at_available_energy` and
-`oversized_bid_produces_exact_all_in_exhaustion` asserted that a capped bid
-lands energy on exactly `0.0`. Under the single settlement the bid cap and the
-debt subtraction round separately, so an all-in lands within one ulp of zero
-(measured -1.2218952e-6 from a starting energy of 100, against an ulp of
-7.6e-6). Both now assert `e.abs() <= f32::EPSILON * starting_energy`;
-the exhaustion assertion is unchanged and still holds, because the code treats
-a bid the cap bit into as an all-in regardless of which way the `f32` store
-rounded. Reference doc `v3-vm-isa-spec.md` Section 9 was corrected by one
-clause to match (bids cap at the effective energy).
+Two pre-existing tests in
+`crates/v3-core/src/runtime/tests/vm_execution.rs` were first loosened and
+then, in the 2026-09-07 remediation below, restored to an exact-zero landing:
+`priority_bid_capped_at_available_energy` and
+`oversized_bid_produces_exact_all_in_exhaustion`. The first implementation
+settled the bid cap and the debt separately, so an all-in landed within one
+ulp of zero (measured -1.2218952e-6 from a starting energy of 100) and both
+tests were relaxed to `e.abs() <= f32::EPSILON * starting_energy`. The
+remediation pins `*energy` to the dispatch's debt on the all-in path, so the
+single settlement subtracts the debt from itself and lands on exactly `0.0`;
+both tests now assert `assert_eq!(e, 0.0)`. That is a strictly stronger
+assertion than the pre-feature `priority_bid_capped_at_available_energy`,
+which asserted only `e >= 0.0`; `oversized_bid_produces_exact_all_in_exhaustion`
+is back to its pre-feature `assert_eq!(e, 0.0)` and its exhaustion assertion
+was never loosened. Reference doc `v3-vm-isa-spec.md` Section 9 was corrected
+by one clause to match (bids cap at the effective energy).
 
-Mutation testing, fresh (`MUTANTS_ITERATE=0 make rust-mutants`, run after the
-simplify pass, diff against merge base `8b27c813`):
+Mutation testing, first implementation pass (`MUTANTS_ITERATE=0 make
+rust-mutants`, run after the simplify pass, diff against merge base
+`8b27c813`; superseded by the fresh run in the remediation record below):
 
 - First run summary line: `35 mutants tested in 4m: 4 missed, 30 caught,
   1 unviable`.
@@ -279,6 +284,57 @@ Survivors and their resolutions:
   subtraction, the all-in test, and the recorded `priority_bid` are all
   identical; a negative zero differs only in the sign of a zero, which no
   comparison, sum, or ordering downstream distinguishes.
+
+### Remediation results, 2026-09-07 (post-review pass)
+
+Changes: the all-in `SetPriorityBid` path pins `*energy` to the dispatch's
+debt so the single settlement lands on exactly `0.0` (and the trace sink
+reports `0.0` for that step); the two `vm_execution.rs` bid tests assert the
+exact zero again, written before the production change and observed failing at
+`-1.2218952e-6`; the monotonicity property test now sums the production
+`step_charge` over 1..=steps, 1..=steps+1, and the two ramp rates instead of
+comparing the closed-form helper with itself; and the spec corrections above.
+
+Commands run in the worktree, in this order:
+
+- `cargo test -p v3-core --lib runtime -- priority_bid_capped oversized_bid`
+  before the production change — FAILED, 2 failed of 209 run (both bid tests,
+  `left: -1.2218952e-6, right: 0.0`), which is the intended red step.
+- `cargo test -p v3-core --test viability` — ok, 24 passed, 0 failed (run
+  first after the production change, and again after the simplify pass).
+- `cargo test -p v3-core --lib runtime` — ok, 209 passed, 0 failed.
+- `cargo check --workspace --all-targets` — clean.
+- `cargo clippy -p v3-core --all-targets` — clean, no warnings.
+- `make roadmap-check` — `roadmap-check: validation passed`, exit 0.
+- `make check` — exit 0 (recorded with the commit in the parent task); the
+  same three pre-existing `noArrayIndexKey` frontend lint warnings appear.
+
+Simplification pass (`simplify` skill, single-pass inline review of the diff
+against `8b27c813`): one fix applied — the bid branch cast `bid as f32` three
+times, now bound once as `paid` and reused for the energy deduction, the
+step's traced cost, and the recorded `priority_bid`; and the property-test
+sum was extracted into a shared `summed_step_charges` helper reused by both
+the closed-form and the monotonicity properties. The config, frontend, and
+serde work was already using the repository's declarative helpers
+(`normalize_f32_finite_nonneg`, `FieldDef` rows, `#[serde(default = ...)]`),
+so nothing else was changed.
+
+Mutation testing, fresh (`MUTANTS_ITERATE=0 make rust-mutants`, run after this
+remediation's simplify pass, diff against merge base `8b27c813`):
+
+- Summary line: `35 mutants tested in 3m: 1 missed, 33 caught, 1 unviable`.
+- Output path:
+  `/Users/istefanek/.local/share/petri-tools/mutants/t03-f10/mutants.out`.
+- No mutant timed out, and no `#[mutants::skip]` or `exclude_re` entry exists
+  anywhere in this feature.
+- Survivor (the only one): `crates/v3-core/src/runtime/vm.rs:439:34: replace >
+  with >= in execute_vm_node_impl` (`if raw > 0.0` in the bid guard) —
+  **equivalent**, for the reason recorded above; the guard's only differing
+  input is a zero, and both signs of zero produce the same bid, the same
+  energy, the same all-in test, and a `priority_bid` no downstream comparison,
+  sum, or ordering distinguishes.
+- The two survivors killed in the first pass (`vm.rs:382:58` and
+  `vm.rs:445:34`) stayed killed; no new survivor appeared.
 
 ## Performance and Goal Impact
 
@@ -330,7 +386,7 @@ Predeclared readings:
 | Drift changed/all births at 1,000 / 2,000 (floors) | 0.001500 / 0.008000 | Not below (strict) | 0.001500 / 0.008000 (3 / 2,000 and 16 / 2,000) | Met, equal to the floors |
 | Drift dead/all births pooled at 1,000 and 2,000 | 8 / 4,000 | Not above 20 / 4,000 | 8 / 4,000 (4 and 4) | Met |
 | Drift hop-cap hits, executed nodes, total nodes | T11.F17 | Hop-cap hits zero; nodes reported, no direction | Hop-cap hits 0 at depths 0, 22, 250, 1,000, 2,000. Mean executed nodes 2.000000 / 2.260000 / 2.880000 / 4.280000 / 4.860000 (T11.F17 …/4.260000/4.760000); mean total nodes at 2,000 143.760000 (T11.F17 143.320000) | Met |
-| Goal evolved half changed / dead per mutated birth | 0.288182 / 0.013030 | Reported; no direction | 967 / 3,300 = 0.293030 and 57 / 3,300 = 0.017273 | Reported |
+| Goal evolved half changed / dead per mutated birth | 0.307576 / 0.012121 (T11.F17 goal) | Reported; no direction | 967 / 3,300 = 0.293030 and 57 / 3,300 = 0.017273 | Reported |
 | Observation budgets | Workflow caps | Founder below 10 s; summed evolved below 180 s; drift below 30 s; goal run below 15 min | Founder 0.061 s (gate 0.052 s); summed evolved 0.408 s; drift walk 3.382 s; whole goal run 296.2 s | Met |
 
 The drift walk moved in only one row against T11.F17: depth 250 changed
@@ -344,8 +400,10 @@ floors are met exactly rather than moved.
 The goal evolved half is read as the confound the spec predeclared, not as a
 regression: the populations behind the three samples are different populations
 (seed 33's cap-running bloom is gone, and the median sampled generation moved
-from 38/41/58 to 54/17/48). The dead fraction rose from 0.013030 to 0.017273,
-a difference of 14 births in 3,300; the drift walk, which holds founder,
+from 38/41/58 to 54/17/48). Against the T11.F17 goal report's own values the
+dead count moved 40 to 57 (0.012121 to 0.017273), a difference of 17 births in
+3,300, and the changed count fell 1,015 to 967 (0.307576 to 0.293030); the
+drift walk, which holds founder,
 seeds, battery, and birth subset fixed, shows the pooled dead count unchanged
 at 8 / 4,000, which is the controlled reading of the same question.
 
@@ -405,17 +463,37 @@ regression and no epoch re-pin is requested.
   T11.F17 and did not gate its closure; T03.F08 later reads this feature's
   realized execution cost beside the 2026-09-07 figure (0.000152 energy per
   creature-tick on the user's long run).
-- Deviation from the letter of the fixed-design table, for the orchestrator to
-  accept or amend (the table is left as decided): the post-bid exhaustion
-  check is `bid >= effective || effective_energy!() <= 0.0`, not the
-  effective-energy clause alone. Measured reason: when the cap bites, the bid
-  is `effective` and the separate `f32` stores of `energy - bid` and the debt
-  settlement leave a residual of about one ulp of the starting energy in
-  either direction (-1.2218952e-6 measured from 100 energy). Without the first
-  clause, whether an all-in bid exhausts would depend on which way that store
-  rounded. The clause makes an all-in bid exhaust deterministically, which is
-  the pre-feature behavior; `v3-vm-isa-spec.md` Section 9 documents the
+- Deviation from the letter of the fixed-design table, accepted by the
+  orchestrator 2026-09-07 and now carried by the table itself (the
+  `SetPriorityBid` row states the implemented rule, so the spec carries one
+  rule): the post-bid exhaustion check is
+  `bid >= effective || after_bid <= 0.0`, not the effective-energy clause
+  alone. Measured reason: when the cap bites, the bid is `effective` and the
+  separate `f32` stores of `energy - bid` and the debt settlement leave a
+  residual of about one ulp of the starting energy in either direction
+  (-1.2218952e-6 measured from 100 energy). Without the first clause, whether
+  an all-in bid exhausts would depend on which way that store rounded. The
+  clause makes an all-in bid exhaust deterministically, which is the
+  pre-feature behavior; `v3-vm-isa-spec.md` Section 9 documents the
   implemented rule.
+- Remediation, 2026-09-07: on that all-in path the dispatch now assigns
+  `*energy = debt as f32` before breaking, so the single settlement
+  (`*energy -= debt as f32`) lands on exactly `0.0` and the residual is gone.
+  Death at `energy <= 0.0` in the tick loop is therefore bit-deterministic
+  again, as it was before the feature, and the two `vm_execution.rs` bid tests
+  assert the exact zero rather than a one-ulp band. The traced sink reports
+  `0.0` for that step's `energy_after`, which is the true remainder.
+- The stored gate and goal benchmarks were not rerun for that remediation, by
+  the orchestrator's direction. The change touches one path — an all-in
+  `SetPriorityBid` — and moves only that path's residual energy, which was
+  already within one ulp of zero in either direction, onto exactly zero. The
+  dispatch's outcome there was already deterministic (`exhausted`: queue
+  discarded, `NoOp`, shared memory not committed), its step count, its charges
+  and its recorded bid are unchanged, so no work counter the profiles measure
+  can move. What the pin removes is the one remaining sign-dependent
+  consequence: whether the tick loop's `energy <= 0.0` death check fired on a
+  positive one-ulp residual. That is the pre-feature behavior restored, not a
+  new rule, and the stored reports remain the measurement of record.
 - Also outside the task's named scope, and reported rather than assumed:
   `v3-vm-isa-spec.md` Section 9 gained a one-clause truthfulness fix (bids cap
   at the effective energy), since the task named Sections 3 and 6 only. Section
