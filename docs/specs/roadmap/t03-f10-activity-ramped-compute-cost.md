@@ -1,6 +1,6 @@
 # T03.F10 — Activity-Ramped Compute Cost
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-07
 **Feature**: T03.F10
 **Track**: [T03 — Functional Traits and Metabolism](../../roadmaps/t03-functional-traits-and-metabolism.md)
@@ -437,7 +437,7 @@ regression and no epoch re-pin is requested.
 - [x] The stored goal report reads `vm_steps` below the pinned epoch, every
       seed persists, the drift floors hold, and neither profile shows a
       severe unbudgeted compute regression.
-- [ ] Required checks, fresh mutation evidence, independent review, reference
+- [x] Required checks, fresh mutation evidence, independent review, reference
       spec updates, and closure records are complete; the feature row is
       checked and this spec is Complete on main.
 
@@ -501,3 +501,19 @@ regression and no epoch re-pin is requested.
   a pre-existing error left untouched.
 - Deferred finding: none from the mutation run. The one survivor is argued
   equivalent above, not deferred.
+- Final review, 2026-09-07 (Fable 5.1 reviewer, fresh context): 0 P1, 2 P2,
+  4 P3. Both P2s (a mislabeled goal evolved-half reference and a stale
+  proptest-regressions parenthetical) and three P3s (the design row carrying
+  the superseded post-bid rule, the all-in bid leaving a one-ulp positive
+  residual, and a monotonicity property that exercised the test helper) were
+  remediated in one pass at `bb4dd2f7`; the fourth P3 (`make check` recorded
+  two commits before HEAD) is closed by the orchestrator's `make check` on the
+  closure commit reported in the parent task. No deferred review findings.
+- Workflow deviation: `SendMessage` is unavailable in the desktop Code tab,
+  so the remediation pass ran on a fresh implementer with a tight brief
+  rather than the original agent's context. Advisor consults: 2 by the
+  first implementer, 2 by the remediation implementer, 1 by the orchestrator
+  during planning.
+- Cost record: `/usage` totals not collected (user command; the session ran
+  unattended); implementer advisor consults 4; reviewer findings P1 0, P2 2,
+  P3 4.

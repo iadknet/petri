@@ -38,7 +38,7 @@ fitness bonuses.
   - Goal: Carrying tissue costs, even idle tissue. Every unit of brain structure a creature carries costs energy each tick whether or not it ever runs, so unused structure is shed by selection and genome size has to pay for itself; what running costs is T03.F10's, not this feature's.
 - [ ] **T03.F09 — Functional Specialization Confirmatory Campaign** — Depends on: T01.F06, T01.F09, T03.F02, T03.F03, T03.F04, T03.F05, T03.F07, T10.F08
   - Goal: Deferred proof phase. Replicated confirmatory runs that specialists coexist rather than one generalist winning.
-- [ ] **T03.F10 — Activity-Ramped Compute Cost** — Depends on: None
+- [x] **T03.F10 — Activity-Ramped Compute Cost** — Depends on: None
   - Goal: Thinking burns fuel and fatigue sets in. A brain pays for each instruction it runs, cheaply for ordinary programs and at a rising rate for sustained execution within one dispatch, so a runaway loop starves its creature instead of being silently cut off at the step cap.
 
 ## Notes for AI Agents
