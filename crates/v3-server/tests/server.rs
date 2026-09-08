@@ -3677,3 +3677,82 @@ async fn startup_terrain_partial_override_projects_applied_barriers() {
     let (status,_)=do_request(a,startup_req(r#"{"seed":42,"world":{"terrain":[{"params":{"pattern_type":"Noise","density":0.1,"cluster_size":1},"oops":1}]}}"#)).await;
     assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }
+
+#[tokio::test]
+async fn recipe_export_preserves_complete_config_and_large_seeds() {
+    let state = test_state();
+    let a = router(state.clone());
+    let recipe = serde_json::json!({"world":{"world_seed":u64::MAX,"terrain":[{"params":{"pattern_type":"Noise","density":0.2,"cluster_size":1},"seed":u64::MAX}],"food":{"fertility":{"layers":[{"weight":1.0,"algorithm":{"Fbm":{"octaves":2,"frequency":0.1,"lacunarity":2.0,"persistence":0.5,"seed":u64::MAX}}}]}}},"population":{"founder_profile":"forage_first_sparse"},"energy":{"costs":{"move_cost":0.25}}});
+    let mut request = recipe.clone();
+    request["seed"] = 42.into();
+    let (status, startup) = do_request(a.clone(), startup_req(&request.to_string())).await;
+    assert_eq!(status, StatusCode::OK, "{startup}");
+    let (status, exported) =
+        do_request(a.clone(), get_req("/v3/simulation/config?format=recipe")).await;
+    assert_eq!(status, StatusCode::OK);
+    assert_eq!(exported["world"]["world_seed"].as_u64(), Some(u64::MAX));
+    assert_eq!(
+        exported["world"]["terrain"][0]["seed"].as_u64(),
+        Some(u64::MAX)
+    );
+    assert_eq!(
+        exported["world"]["food"]["fertility"]["layers"][0]["algorithm"]["Fbm"]["seed"].as_u64(),
+        Some(u64::MAX)
+    );
+    let expected = v3_core::config::resolve_config(&test_config(), recipe).unwrap();
+    assert_eq!(exported, serde_json::to_value(&expected).unwrap());
+    assert_eq!(
+        startup["config_digest"],
+        v3_core::config::config_digest(&expected)
+    );
+    let fingerprint = |sim: &v3_core::simulation::Simulation| {
+        let cells = (0..sim.world.height)
+            .flat_map(|y| {
+                (0..sim.world.width).map(move |x| {
+                    let pos = v3_core::contracts::Position::new(x, y);
+                    (
+                        sim.world.is_barrier(pos),
+                        sim.world.food_at(pos),
+                        *sim.world.food().fertility().get(x, y),
+                    )
+                })
+            })
+            .collect::<Vec<_>>();
+        let founders = sim
+            .creatures
+            .values()
+            .map(|creature| {
+                (
+                    creature.position,
+                    creature.energy,
+                    serde_json::to_value(&creature.genome).unwrap(),
+                )
+            })
+            .collect::<Vec<_>>();
+        (cells, founders)
+    };
+    let before = fingerprint(&state.sim.lock().await.sim);
+    assert_eq!(
+        before,
+        fingerprint(&v3_core::simulation::seed_simulation(expected, 42))
+    );
+    let mut reload = exported.clone();
+    reload["seed"] = 42.into();
+    assert_eq!(
+        do_request(a.clone(), startup_req(&reload.to_string()))
+            .await
+            .0,
+        StatusCode::OK
+    );
+    let handle = state.sim.lock().await;
+    assert_eq!(fingerprint(&handle.sim), before);
+    drop(handle);
+    let (status, _) = do_request(a.clone(), startup_req(r#"{"seed":42,"stale":1}"#)).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    assert_eq!(
+        do_request(a, get_req("/v3/simulation/config?format=recipe"))
+            .await
+            .1,
+        exported
+    );
+}

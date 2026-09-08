@@ -416,3 +416,19 @@ it("hydrates ordered terrain layers and optional map/layer seeds without aliasin
 	config.world.terrain.reverse();
 	expect(request.world?.terrain?.[0]?.params.pattern_type).toBe("Noise");
 });
+
+it("rejects unsafe hydrated seeds before a normal restart", () => {
+	useStartupConfigStore.getState().reset();
+	const config = structuredClone(MOCK_CONFIG);
+	config.world.world_seed = Number.MAX_SAFE_INTEGER + 1;
+	useStartupConfigStore.getState().hydrateFromServerConfig(config);
+	expect(() => buildStartupRequest(useStartupConfigStore.getState().preset)).toThrow(
+		/safe integer/,
+	);
+});
+it("refreshes recipe startup controls without changing the selected run seed", () => {
+	useStartupConfigStore.getState().updatePreset("seed", 42);
+	useStartupConfigStore.getState().applyRecipeConfig(MOCK_CONFIG);
+	expect(useStartupConfigStore.getState().preset.seed).toBe(42);
+	expect(useStartupConfigStore.getState().preset.world.width).toBe(MOCK_CONFIG.world.width);
+});

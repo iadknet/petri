@@ -31,6 +31,7 @@ pub struct RunStartedEvent {
     pub seed: u64,
     pub ticks_requested: u64,
     pub sample_every: u16,
+    pub config_digest: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -93,6 +94,7 @@ pub fn run_simulation<W: std::io::Write>(
         seed,
         ticks_requested: ticks,
         sample_every,
+        config_digest: v3_core::config::config_digest(&sim.config),
     };
     emit(out, &started)?;
 

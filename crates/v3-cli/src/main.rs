@@ -39,6 +39,8 @@ struct BenchArgs {
     baseline: Vec<std::path::PathBuf>,
     // Sweep-only parameters.
     #[arg(long)]
+    config: Option<std::path::PathBuf>,
+    #[arg(long)]
     width: Option<u16>,
     #[arg(long)]
     height: Option<u16>,
@@ -69,6 +71,9 @@ struct RunArgs {
     seed: u64,
     #[arg(long)]
     config: Option<std::path::PathBuf>,
+    /// Save the full applied recipe before running. Run seed is supplied separately.
+    #[arg(long)]
+    save_config: Option<std::path::PathBuf>,
 }
 
 fn main() {
@@ -84,25 +89,19 @@ fn main() {
                 std::process::exit(1);
             }
 
-            let mut config = if let Some(path) = args.config {
-                let content = match std::fs::read_to_string(&path) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        eprintln!("error: failed to read config file: {e}");
-                        std::process::exit(1);
-                    }
-                };
-                match serde_json::from_str::<SimulationConfig>(&content) {
-                    Ok(c) => c,
-                    Err(e) => {
-                        eprintln!("error: invalid config: {e}");
-                        std::process::exit(1);
-                    }
+            let config = match load_config(args.config.as_deref()) {
+                Ok(config) => config,
+                Err(message) => {
+                    eprintln!("error: {message}");
+                    std::process::exit(1);
                 }
-            } else {
-                SimulationConfig::default()
             };
-            config.normalize();
+            if let Some(path) = args.save_config {
+                if let Err(message) = save_config(&config, &path) {
+                    eprintln!("error: {message}");
+                    std::process::exit(1);
+                }
+            }
 
             let mut out = std::io::stdout();
             match v3_cli::run_simulation(config, args.seed, args.ticks, args.sample_every, &mut out)
@@ -120,6 +119,26 @@ fn main() {
         }
         Commands::Bench(args) => run_bench(args),
     }
+}
+
+fn save_config(config: &SimulationConfig, path: &std::path::Path) -> Result<(), String> {
+    let json = serde_json::to_string_pretty(config).expect("config must be serializable");
+    std::fs::write(path, format!("{json}\n"))
+        .map_err(|error| format!("failed to save config {}: {error}", path.display()))
+}
+
+fn load_config(path: Option<&std::path::Path>) -> Result<SimulationConfig, String> {
+    let patch = match path {
+        Some(path) => {
+            let content = std::fs::read_to_string(path)
+                .map_err(|error| format!("failed to read config {}: {error}", path.display()))?;
+            serde_json::from_str(&content)
+                .map_err(|error| format!("invalid config {}: {error}", path.display()))?
+        }
+        None => serde_json::json!({}),
+    };
+    v3_core::config::resolve_config(&SimulationConfig::default(), patch)
+        .map_err(|error| format!("invalid config: {error}"))
 }
 
 /// The benchmark profile, feature name, and thread count a `bench` run needs.
@@ -150,6 +169,9 @@ fn resolve_bench_profile(args: &BenchArgs) -> Result<ResolvedBench, String> {
 }
 
 fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), String> {
+    if args.config.is_some() && args.profile != BenchProfile::Sweep {
+        return Err("--config is only accepted for --profile sweep".into());
+    }
     match args.profile {
         BenchProfile::Gate => {
             // clap cannot express "forbidden when --profile gate", and
@@ -190,14 +212,31 @@ fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), S
             Ok((bench::goal_profile_params(), feature))
         }
         BenchProfile::Sweep => {
+            let recipe = args
+                .config
+                .as_ref()
+                .map(|path| {
+                    load_config(Some(path)).map(|config| bench::Recipe {
+                        path: path.display().to_string(),
+                        config,
+                    })
+                })
+                .transpose()?;
             let width = args
                 .width
+                .or_else(|| recipe.as_ref().map(|r| r.config.world.width))
                 .ok_or("--width is required for --profile sweep")?;
             let height = args
                 .height
+                .or_else(|| recipe.as_ref().map(|r| r.config.world.height))
                 .ok_or("--height is required for --profile sweep")?;
             let founders = args
                 .founders
+                .or_else(|| {
+                    recipe
+                        .as_ref()
+                        .map(|r| r.config.population.initial_creatures)
+                })
                 .ok_or("--founders is required for --profile sweep")?;
             let ticks = args
                 .ticks
@@ -213,7 +252,8 @@ fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), S
                 .ok()
                 .filter(|s| !s.is_empty())
                 .ok_or("--seeds must be a non-empty comma-separated list of u64")?;
-            let params = ProfileParams {
+            let mut params = ProfileParams {
+                recipe,
                 name: "sweep".to_string(),
                 width,
                 height,
@@ -224,6 +264,15 @@ fn resolve_profile_params(args: &BenchArgs) -> Result<(ProfileParams, String), S
                 neighborhood: NeighborhoodSizes::default(),
                 drift: Default::default(),
             };
+            if params.recipe.is_some() {
+                let config = bench::build_config(&params);
+                params.width = config.world.width;
+                params.height = config.world.height;
+                params.founders = config.population.initial_creatures;
+                if let Some(recipe) = &mut params.recipe {
+                    recipe.config = config;
+                }
+            }
             let feature = args.feature.clone().unwrap_or_else(|| "sweep".to_string());
             Ok((params, feature))
         }
@@ -331,6 +380,7 @@ mod tests {
     fn bench_args(profile: BenchProfile) -> BenchArgs {
         BenchArgs {
             profile,
+            config: None,
             out: None,
             feature: Some("t01-f11-baseline-persistence-characterization".to_string()),
             compare: Vec::new(),
@@ -493,5 +543,69 @@ mod tests {
 
         let error = resolve_bench_profile(&args).expect_err("seeds must parse as u64");
         assert!(error.contains("--seeds"), "unexpected error: {error}");
+    }
+    #[test]
+    fn recipe_sweep_resolves_defaults_and_explicit_overrides() {
+        let path =
+            std::env::temp_dir().join(format!("petri-sweep-recipe-{}.json", std::process::id()));
+        std::fs::write(&path, r#"{"world":{"width":12,"height":9,"world_seed":18446744073709551615},"population":{"initial_creatures":3,"founder_profile":"forage_first_sparse"},"energy":{"costs":{"move_cost":0.25}}}"#).unwrap();
+        let mut args = BenchArgs {
+            config: Some(path.clone()),
+            seeds: Some("1,2".into()),
+            ticks: Some(1),
+            ..bench_args(BenchProfile::Sweep)
+        };
+        let resolved = resolve_bench_profile(&args).unwrap();
+        let config = bench::build_config(&resolved.params);
+        assert_eq!(
+            (
+                config.world.width,
+                config.world.height,
+                config.population.initial_creatures
+            ),
+            (12, 9, 3)
+        );
+        assert_eq!(config.world.world_seed, Some(u64::MAX));
+        assert_eq!(config.energy.costs.move_cost, 0.25);
+        args.width = Some(5);
+        args.founders = Some(2);
+        args.food_coverage = Some(0.25);
+        let overridden = bench::build_config(&resolve_bench_profile(&args).unwrap().params);
+        assert_eq!(
+            (
+                overridden.world.width,
+                overridden.world.height,
+                overridden.population.initial_creatures
+            ),
+            (5, 9, 2)
+        );
+        assert!(overridden
+            .world
+            .food
+            .types
+            .iter()
+            .all(|food| food.initial_coverage == 0.25));
+        for profile in [BenchProfile::Gate, BenchProfile::Goal] {
+            args.profile = profile;
+            assert!(resolve_bench_profile(&args)
+                .unwrap_err()
+                .contains("--config"));
+        }
+        std::fs::remove_file(path).unwrap();
+    }
+    #[test]
+    fn default_recipe_can_be_saved_without_running_a_world() {
+        let config = load_config(None).unwrap();
+        let path =
+            std::env::temp_dir().join(format!("petri-default-recipe-{}.json", std::process::id()));
+        save_config(&config, &path).unwrap();
+        let saved = std::fs::read_to_string(&path).unwrap();
+        assert!(saved.contains("\n  "));
+        let reloaded = load_config(Some(&path)).unwrap();
+        assert_eq!(
+            serde_json::to_value(config).unwrap(),
+            serde_json::to_value(reloaded).unwrap()
+        );
+        std::fs::remove_file(path).unwrap();
     }
 }

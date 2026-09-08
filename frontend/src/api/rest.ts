@@ -29,7 +29,7 @@ class ApiClient {
 		this.baseUrl = baseUrl;
 	}
 
-	private async request<T>(path: string, options?: RequestInit): Promise<T> {
+	private async response(path: string, options?: RequestInit): Promise<Response> {
 		const res = await fetch(`${this.baseUrl}${path}`, {
 			headers: { "Content-Type": "application/json" },
 			...options,
@@ -38,7 +38,32 @@ class ApiClient {
 			const body = (await res.json()) as ApiError;
 			throw new ApiRequestError(res.status, body);
 		}
-		return res.json() as Promise<T>;
+		return res;
+	}
+
+	private async request<T>(path: string, options?: RequestInit): Promise<T> {
+		return (await this.response(path, options)).json() as Promise<T>;
+	}
+
+	async getRecipe(): Promise<string> {
+		return (await this.response("/v3/simulation/config?format=recipe")).text();
+	}
+
+	async loadRecipe(text: string, seed: number): Promise<StartupResponse> {
+		const parsed: unknown = JSON.parse(text);
+		if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+			throw new Error("Recipe must be a JSON object.");
+		}
+		if (Object.hasOwn(parsed, "seed")) {
+			throw new Error("Recipe must not contain a run seed. Use the Run Seed field.");
+		}
+		if (!Number.isSafeInteger(seed) || seed < 0) {
+			throw new Error("Run seed must be a nonnegative safe integer.");
+		}
+		// Validate with JSON.parse, but transfer original bytes: Number would round u64 seeds.
+		const object = text.trim();
+		const body = `${object.slice(0, -1)}${Object.keys(parsed).length ? "," : ""}"seed":${seed}}`;
+		return this.request("/v3/simulation/startup", { method: "POST", body });
 	}
 
 	async startup(req: StartupRequest): Promise<StartupResponse> {

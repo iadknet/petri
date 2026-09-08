@@ -1,6 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { ApiError } from "../types/errors.ts";
-import { ApiRequestError } from "./rest.ts";
+import { ApiRequestError, api } from "./rest.ts";
 
 function envelope(error: Partial<ApiError["error"]>): ApiError {
 	return {
@@ -50,5 +50,32 @@ describe("ApiRequestError", () => {
 
 		expect(error.message).toBe("Request failed (HTTP 500)");
 		expect(error.fieldErrors).toEqual([]);
+	});
+});
+
+describe("recipe transport", () => {
+	afterEach(() => vi.unstubAllGlobals());
+	it("exports fresh raw config and preserves imported large seeds", async () => {
+		const recipe =
+			' {"world": {"world_seed": 18446744073709551615, "terrain": [{"seed": 18446744073709551615}], "food": {"fertility": {"layers": [{"algorithm": {"Fbm": {"seed": 18446744073709551615}}}]}}}} ';
+		const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response(recipe)));
+		vi.stubGlobal("fetch", fetchMock);
+		expect(await api.getRecipe()).toBe(recipe);
+		expect(fetchMock.mock.calls[0]?.[0]).toBe("/v3/simulation/config?format=recipe");
+		await api.loadRecipe(recipe, 42);
+		expect(String(fetchMock.mock.calls[1]?.[1]?.body).match(/18446744073709551615/g)).toHaveLength(
+			3,
+		);
+		expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body)).seed).toBe(42);
+	});
+	it("accepts empty objects and rejects nonobjects, malformed JSON and embedded run seeds", async () => {
+		const fetchMock = vi.fn().mockImplementation(() => Promise.resolve(new Response("{}")));
+		vi.stubGlobal("fetch", fetchMock);
+		await api.loadRecipe("  {  } \n", 7);
+		expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({ seed: 7 });
+		for (const bad of ["[]", "null", "1", "{", '{"seed":99}']) {
+			await expect(api.loadRecipe(bad, 7)).rejects.toThrow();
+		}
+		expect(fetchMock).toHaveBeenCalledTimes(1);
 	});
 });

@@ -281,3 +281,17 @@ posture.
 - Project-level determinism scope is canonical in root `AGENTS.md`.
 - Runtime truthfulness invariant is canonical in `docs/strategy/architecture.md`
   (`Runtime Truthfulness Invariant`).
+
+
+## Recipe Save and Load
+
+A procedural recipe is a partial or complete `SimulationConfig` JSON object,
+with no run seed. App Load and CLI `run --config` share the core startup resolver:
+recursive object merge over defaults, strict deserialization, startup ramp
+validation, normalization, then startup overrides. The server retains its
+injected baseline for tests. Arrays/nonobjects replace wholesale, including null.
+Save exports the full applied config, not a frontend subset or pending edits.
+With the same run seed and locked dependencies/platform, reloading regenerates
+tick-zero terrain, fertility, food and founders. Fixing `world.world_seed` alone
+does not fix food or founders. Runtime painting and living/evolved state are
+excluded; they require the separately scoped overlay/checkpoint features.

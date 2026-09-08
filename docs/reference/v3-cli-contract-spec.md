@@ -19,12 +19,13 @@ This document defines:
 - minimal v3alpha1 CLI mode and ownership posture;
 - canonical NDJSON event schemas for run output;
 - required protocol-version field for CLI events;
+- recipe save/load and recipe-backed sweep config metadata;
 - determinism/testing expectations for fixture-stable CLI output.
 
 This document does not define:
 - server endpoint semantics (owned by `v3-server-api-protocol-spec.md`);
 - internal runtime behavior contracts (owned by runtime/tick/reference specs);
-- rich analysis/export/reporting modes beyond the minimal run surface.
+- analysis/reporting algorithms beyond the recipe config contract.
 
 ---
 
@@ -52,7 +53,7 @@ Remote server-client mode is out of scope for this spec version.
 Canonical command:
 
 ```text
-v3-cli run --ticks <u64> --sample-every <u16> --seed <u64> [--config <path>]
+v3-cli run --ticks <u64> --sample-every <u16> --seed <u64> [--config <path>] [--save-config <path>]
 ```
 
 Rules:
@@ -64,7 +65,38 @@ Rules:
   the server startup request body (Section 4.1 of
   `v3-server-api-protocol-spec.md`), excluding the `seed` field (seed is
   provided via `--seed`). Malformed or missing config files are fatal errors.
-- Unknown/invalid fields in the config file are rejected.
+- Recipes are partial or complete `SimulationConfig` JSON objects. Recursively
+  merge objects over current defaults; arrays and all other values replace,
+  including null. `{}` is valid. Unknown fields and invalid shapes are rejected.
+  Startup ramp validation precedes normalization and startup overrides, using
+  the same core resolver as server startup.
+- `--save-config` writes the full effective config as readable JSON before the
+  run starts, with or without `--config`. It excludes the run seed and NDJSON.
+  Read, parse and write failures stop the run with a nonzero exit.
+- Save/load regenerates the same tick-zero world only with the same run seed
+  and locked code/dependencies/platform. A fixed world seed fixes terrain and
+  fertility; food, founders and runtime still use `--seed`. Manual paint and
+  evolved state are not part of a recipe.
+
+Example (use an existing recipe with small dimensions):
+
+```sh
+v3-cli run --config world.json --save-config applied.json --seed 42 --ticks 1
+v3-cli run --config applied.json --seed 42 --ticks 1
+```
+
+`bench --profile sweep --config world.json --seeds 11,22,33 --ticks 2000
+--out sweep.json` uses the same resolver. Omitted width, height and founders
+come from the recipe; explicit flags and `--food-coverage` override their
+respective fields, followed by normalization/startup overrides. Without a
+recipe, existing required sweep arguments and fixed-profile behavior remain.
+`--config` is rejected for gate and goal. The full config seeds every run.
+The report profile records `recipe_path` and effective `config_digest`;
+requested founder count and dimensions match the normalized config. Actual
+placement retains the passable-cell clamp. Omitted coverage is labeled
+`recipe`, while explicit coverage reports the normalized applied value.
+Different recipe digests cannot compare as the same profile. Recipe-free and
+historical reports omit these metadata fields and keep existing comparisons.
 
 Exit codes:
 - `0`: successful completion (run finished normally).
@@ -98,9 +130,13 @@ minimal contract.
   "event_type": "run_started",
   "seed": 42,
   "ticks_requested": 1000,
-  "sample_every": 25
+  "sample_every": 25,
+  "config_digest": "sha256:<lowercase hex>"
 }
 ```
+
+`config_digest` hashes the effective config actually seeded, using the server's
+compact recursively key-sorted JSON SHA-256 encoding, not the input file bytes.
 
 ### 5.2 `tick_sample`
 

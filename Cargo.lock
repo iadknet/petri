@@ -1704,12 +1704,14 @@ version = "0.1.0"
 dependencies = [
  "criterion",
  "dhat",
+ "hex",
  "noise",
  "proptest",
  "rand 0.8.6",
  "rayon",
  "serde",
  "serde_json",
+ "sha2",
  "slotmap",
 ]
 
@@ -1721,12 +1723,10 @@ dependencies = [
  "base64",
  "criterion",
  "futures-util",
- "hex",
  "http-body-util",
  "rmp-serde",
  "serde",
  "serde_json",
- "sha2",
  "slotmap",
  "tokio",
  "tokio-tungstenite",

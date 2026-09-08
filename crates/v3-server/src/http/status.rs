@@ -1,4 +1,4 @@
-use axum::extract::State;
+use axum::extract::{Query, State};
 use axum::response::IntoResponse;
 use axum::Json;
 use v3_core::config::SimulationConfig;
@@ -110,8 +110,27 @@ pub async fn get_status(State(app): State<AppState>) -> impl IntoResponse {
     Json(payload)
 }
 
-pub async fn get_config(State(app): State<AppState>) -> impl IntoResponse {
+#[derive(Default, serde::Deserialize)]
+pub struct ConfigQuery {
+    format: Option<ConfigFormat>,
+}
+
+#[derive(serde::Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum ConfigFormat {
+    Recipe,
+}
+
+pub async fn get_config(
+    State(app): State<AppState>,
+    Query(query): Query<ConfigQuery>,
+) -> impl IntoResponse {
     let handle = app.sim.lock().await;
+    if matches!(query.format, Some(ConfigFormat::Recipe)) {
+        return Json(
+            serde_json::to_value(&handle.sim.config).expect("config must be serializable"),
+        );
+    }
     Json(serde_json::json!({
         "protocol_version": PROTOCOL_VERSION,
         "state": handle.status,
