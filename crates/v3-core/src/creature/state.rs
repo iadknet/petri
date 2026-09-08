@@ -606,44 +606,23 @@ mod tests {
     }
 
     #[test]
-    fn new_creature_caches_the_genomes_own_size() {
-        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
-        let id = sm.insert(());
-        let genome = minimal_genome();
-        let expected = genome.genome_size();
-        assert!(expected > 0, "the fixture genome must have a nonzero size");
-        let state = CreatureState::new(
-            id,
-            genome,
-            Position::new(0, 0),
-            20.0,
-            0,
-            [0; 6],
-            0,
-            [true; 6],
-            CreatureIdentityState::default(),
-            [0.0; SHARED_MEMORY_SLOTS],
-        );
-        assert_eq!(state.cached_genome_size, expected);
-        assert_eq!(state.cached_genome_size, state.genome.genome_size());
-    }
-
-    #[test]
-    fn every_founder_profile_caches_its_own_genome_size() {
+    fn a_new_creature_caches_its_own_genome_size() {
         use crate::config::FounderProfile;
         use crate::creature::founder::founder_genome;
 
         let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
-        for profile in [
-            FounderProfile::V3Alpha1,
-            FounderProfile::ForageFirstSparse,
-            FounderProfile::ForageFirstSparseConservative,
-            FounderProfile::ForageFirstSparseRichOffspring,
-            FounderProfile::ForageFirstSparseBalanced,
-        ] {
+        let genomes = [
+            minimal_genome(),
+            founder_genome(FounderProfile::V3Alpha1),
+            founder_genome(FounderProfile::ForageFirstSparse),
+            founder_genome(FounderProfile::ForageFirstSparseConservative),
+            founder_genome(FounderProfile::ForageFirstSparseRichOffspring),
+            founder_genome(FounderProfile::ForageFirstSparseBalanced),
+        ];
+        for genome in genomes {
             let id = sm.insert(());
-            let genome = founder_genome(profile);
             let expected = genome.genome_size();
+            assert!(expected > 0, "every fixture genome has a nonzero size");
             let state = CreatureState::new(
                 id,
                 genome,
@@ -656,7 +635,8 @@ mod tests {
                 CreatureIdentityState::default(),
                 [0.0; SHARED_MEMORY_SLOTS],
             );
-            assert_eq!(state.cached_genome_size, expected, "profile {profile:?}");
+            assert_eq!(state.cached_genome_size, expected);
+            assert_eq!(state.cached_genome_size, state.genome.genome_size());
         }
     }
 

@@ -223,7 +223,10 @@ fn phase_0_at_rate_zero_reproduces_the_pre_feature_energy_bit_for_bit() {
 
     run_phase_0(&mut sim);
 
-    assert_eq!(sim.creatures[id].energy.to_bits(), (initial - decay).to_bits());
+    assert_eq!(
+        sim.creatures[id].energy.to_bits(),
+        (initial - decay).to_bits()
+    );
 }
 
 #[test]
