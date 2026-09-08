@@ -61,8 +61,8 @@ startup(seed, overrides?)
 ```
 
 Conceptual override domains:
-- `population` (initial counts and limits; canonical defaults in
-  `v3-runtime-config-spec.md` Section 5),
+- `population` (initial counts, limits, and the founder profile; canonical
+  defaults in `v3-runtime-config-spec.md` Section 5),
 - `world` (`width`, `height`, `edge_mode`, `food.shared`, `food.types`,
   `food.fertility`),
 - `energy` (lifecycle and action-cost controls),
@@ -70,8 +70,10 @@ Conceptual override domains:
 - `startup` (startup-only controls such as early-run ramps).
 
 v3alpha1 policy:
-- No `founder_profile` request field is part of the canonical startup contract.
-- Unknown/unsupported startup fields are request validation failures.
+- `population.founder_profile` selects one founder genome profile for the whole
+  seeded population (Section 5). It is optional; absent means `v3_alpha1`.
+- Unknown/unsupported startup fields and unrecognized profile names are request
+  validation failures.
 
 Canonical wire-level field schemas for startup are owned by
 `v3-server-api-protocol-spec.md`.
@@ -101,24 +103,30 @@ Seeding flow contract:
      `round(initial_coverage * eligible_cells)` unique cells.
    - Seeded density uses normalized `f32` food values in canonical `[0.0, 1.0]`
      scale (clamped by `world.food.shared.max_density`).
-3. Seed founders using the canonical founder baseline from Section 5.
+3. Seed founders from the founder profile selected per Section 5 (default:
+   the canonical v3alpha1 genome of Section 5.1).
 4. Commit simulation state at tick `0` in `idle` state.
 
 ---
 
 ## 5. Founder Baseline Policy (v3alpha1)
 
-v3alpha1 uses one canonical internal founder baseline for startup seeding.
+v3alpha1 seeds every founder in a run from one founder genome profile, selected
+by `population.founder_profile` (canonical key: `v3-runtime-config-spec.md`
+Section 5). The default `v3_alpha1` is the canonical founder genome of
+Section 5.1; the four `forage_first_sparse*` profiles are tuned variants of it
+tabulated there.
 
 Rules:
-- All startup-seeded founders derive from the same baseline founder genome
+- All startup-seeded founders in a run derive from the same founder genome
   profile.
 - Startup-seeded founders begin at `generation = 0`.
 - Startup-seeded founders receive deterministic identity state per
   `v3-creature-identity-spec.md`:
   - `lineage_id` is assigned from final founder placement order
   - `kin_tag` is derived deterministically from startup seed and `lineage_id`
-- Startup does not introduce per-founder profile selection via API.
+- Profile selection is a run-level startup input; the API offers no
+  per-founder profile selection.
 - Startup phenotype baseline is deterministic and uniform for seeded founders.
   Canonical founder phenotype baseline values (RGB, channel weights, polarity)
   are defined in `v3-phenotype-spec.md` Section 3.
@@ -161,13 +169,18 @@ execute gate remain unwired. The graph routes to node 1 in slot 0.
 The VM reads those six outputs. It uses the ordinary mutable program, metadata,
 PushAction, and ExecuteActionQueue; registers 16–19 remain unreferenced.
 
-| Profile | Strict energy threshold | Transfer | Priority |
-| --- | ---: | ---: | --- |
-| V3Alpha1 | 30 | 20 | Reproduce, local forage, Move fallback |
-| ForageFirstSparse | 30 | 10 | Local forage, Reproduce, forage fallback |
-| ForageFirstSparseConservative | 60 | 10 | Local forage, Reproduce, forage fallback |
-| ForageFirstSparseRichOffspring | 40 | 20 | Local forage, Reproduce, forage fallback |
-| ForageFirstSparseBalanced | 50 | 15 | Local forage, Reproduce, forage fallback |
+`population.founder_profile` selects one row below by wire name. A profile
+changes only the strict energy threshold in Node 0 and the priority and
+transfer constant in Node 1; the 2-node mesh, its input references, compute
+nodes, and output wiring are shared by every profile.
+
+| Profile | Wire name | Strict energy threshold | Transfer | Priority |
+| --- | --- | ---: | ---: | --- |
+| V3Alpha1 | `v3_alpha1` | 30 | 20 | Reproduce, local forage, Move fallback |
+| ForageFirstSparse | `forage_first_sparse` | 30 | 10 | Local forage, Reproduce, forage fallback |
+| ForageFirstSparseConservative | `forage_first_sparse_conservative` | 60 | 10 | Local forage, Reproduce, forage fallback |
+| ForageFirstSparseRichOffspring | `forage_first_sparse_rich_offspring` | 40 | 20 | Local forage, Reproduce, forage fallback |
+| ForageFirstSparseBalanced | `forage_first_sparse_balanced` | 50 | 15 | Local forage, Reproduce, forage fallback |
 
 Local forage requires positive primary food and queues Eat(type 0), then Move.
 Forage-first fallback also queues Eat then Move on an empty cell, retaining
