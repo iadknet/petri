@@ -138,21 +138,21 @@ fn structure_means(sim: &v3_core::simulation::Simulation) -> (f64, f64, f64) {
     if population == 0 {
         return (0.0, 0.0, 0.0);
     }
-    let (genome_size, mesh_nodes, generation) = sim.creatures.values().fold(
-        (0u64, 0u64, 0u64),
-        |(genome_size, mesh_nodes, generation), c| {
-            (
-                genome_size + u64::from(c.cached_genome_size),
-                mesh_nodes + c.genome.nodes.len() as u64,
-                generation + c.generation,
-            )
-        },
-    );
-    let population = population as f64;
+    let mean = |total: u64| total as f64 / population as f64;
     (
-        genome_size as f64 / population,
-        mesh_nodes as f64 / population,
-        generation as f64 / population,
+        mean(
+            sim.creatures
+                .values()
+                .map(|c| u64::from(c.cached_genome_size))
+                .sum(),
+        ),
+        mean(
+            sim.creatures
+                .values()
+                .map(|c| c.genome.nodes.len() as u64)
+                .sum(),
+        ),
+        mean(sim.creatures.values().map(|c| c.generation).sum()),
     )
 }
 

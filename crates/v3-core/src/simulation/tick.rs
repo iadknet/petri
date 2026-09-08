@@ -129,14 +129,6 @@ pub fn advance_shared_memory(
     }
 }
 
-/// Run Phase 0 of a tick: food growth, creature aging, energy decay, dead-creature removal.
-///
-/// Sub-step canonical order (v3-tick-orchestration-spec.md Section 3):
-/// 1. Food growth
-/// 2. Creature aging (+1 per creature)
-/// 3. Energy decay (subtract `energy_decay_per_tick` plus the genome carrying
-///    cost `genome_carry_cost_per_unit * cached_genome_size`, as one charge)
-/// 4. Death removal (remove creatures where energy <= 0 from slotmap + world occupancy)
 /// The energy one living creature is charged in the Phase 0 energy-decay
 /// sub-step: the world-level decay plus the per-tick maintenance cost of the
 /// structure it carries, junk included. Not scaled by the complexity or age
@@ -149,6 +141,14 @@ pub(crate) fn phase_0_energy_charge(
     energy_decay_per_tick + genome_carry_cost_per_unit * genome_size as f32
 }
 
+/// Run Phase 0 of a tick: food growth, creature aging, energy decay, dead-creature removal.
+///
+/// Sub-step canonical order (v3-tick-orchestration-spec.md Section 3):
+/// 1. Food growth
+/// 2. Creature aging (+1 per creature)
+/// 3. Energy decay (subtract `energy_decay_per_tick` plus the genome carrying
+///    cost `genome_carry_cost_per_unit * cached_genome_size`, as one charge)
+/// 4. Death removal (remove creatures where energy <= 0 from slotmap + world occupancy)
 pub fn run_phase_0(sim: &mut Simulation) {
     // Step 1: Food growth
     let food_growth = sim.world.grow_food(sim.tick, &mut sim.rng);
