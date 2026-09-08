@@ -345,9 +345,10 @@ pub fn apply_reproduce(
 
     // Step 13–14: Spawn child in slotmap + world.
     // No-mutation fast path: if no genome mutations were applied, the offspring's
-    // genome is identical to the parent's — copy cached_complexity to avoid
-    // expensive recomputation.
+    // genome is identical to the parent's — copy cached_complexity and
+    // cached_genome_size to avoid expensive recomputation.
     let parent_cached_complexity = sim.creatures[parent_id].cached_complexity;
+    let parent_cached_genome_size = sim.creatures[parent_id].cached_genome_size;
     let child_id = sim.creatures.insert_with_key(move |id| {
         let mut child = if summary.applied_events == 0 {
             CreatureState::new_with_cached_fields(
@@ -362,6 +363,7 @@ pub fn apply_reproduce(
                 child_identity,
                 child_shared_memory,
                 parent_cached_complexity,
+                parent_cached_genome_size,
                 parent_cached_reachable,
             )
         } else {

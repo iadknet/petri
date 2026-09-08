@@ -170,6 +170,10 @@ pub struct CreatureState {
     /// Functional complexity cached at birth. Genome is immutable after creation,
     /// so this value is always current.
     pub cached_complexity: u32,
+    /// Total genome size cached at birth, junk included. Genome is immutable
+    /// after creation, so this value is always current. Phase 0 charges the
+    /// per-unit carrying cost against it without walking the genome.
+    pub cached_genome_size: u32,
     /// Sorted indices of mesh nodes reachable from the entry node, cached at birth.
     /// Used by the mutation engine to bias target selection toward functional structure.
     pub cached_reachable_nodes: Box<[usize]>,
@@ -195,7 +199,7 @@ pub struct CreatureState {
 
 impl CreatureState {
     /// Create a new creature with empty graph runtime state and zeroed prev_shared_memory.
-    /// Computes `cached_complexity` from the genome.
+    /// Computes `cached_complexity` and `cached_genome_size` from the genome.
     #[allow(clippy::too_many_arguments)]
     pub fn new(
         id: CreatureId,
@@ -210,6 +214,7 @@ impl CreatureState {
         shared_memory: [f32; SHARED_MEMORY_SLOTS],
     ) -> Self {
         let cached_complexity = genome.complexity();
+        let cached_genome_size = genome.genome_size();
         let cached_reachable_nodes = mesh_reachable_nodes(&genome).into_boxed_slice();
         let cached_has_barrier_reader =
             compute_has_barrier_reader(&genome, cached_reachable_nodes.as_ref());
@@ -230,6 +235,7 @@ impl CreatureState {
             phenotype_active_channel,
             phenotype_channel_polarity,
             cached_complexity,
+            cached_genome_size,
             cached_reachable_nodes,
             cached_has_barrier_reader,
             cached_live_vm_world_inputs,
@@ -259,6 +265,7 @@ impl CreatureState {
         identity: CreatureIdentityState,
         shared_memory: [f32; SHARED_MEMORY_SLOTS],
         cached_complexity: u32,
+        cached_genome_size: u32,
         cached_reachable_nodes: Box<[usize]>,
     ) -> Self {
         let cached_has_barrier_reader =
@@ -280,6 +287,7 @@ impl CreatureState {
             phenotype_active_channel,
             phenotype_channel_polarity,
             cached_complexity,
+            cached_genome_size,
             cached_reachable_nodes,
             cached_has_barrier_reader,
             cached_live_vm_world_inputs,
@@ -589,10 +597,79 @@ mod tests {
             CreatureIdentityState::default(),
             [0.0; SHARED_MEMORY_SLOTS],
             42,
+            7,
             reachable.clone(),
         );
         assert_eq!(&*state.cached_reachable_nodes, &[0, 2, 5]);
         assert_eq!(state.cached_complexity, 42);
+        assert_eq!(state.cached_genome_size, 7);
+    }
+
+    #[test]
+    fn new_creature_caches_the_genomes_own_size() {
+        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
+        let id = sm.insert(());
+        let genome = minimal_genome();
+        let expected = genome.genome_size();
+        assert!(expected > 0, "the fixture genome must have a nonzero size");
+        let state = CreatureState::new(
+            id,
+            genome,
+            Position::new(0, 0),
+            20.0,
+            0,
+            [0; 6],
+            0,
+            [true; 6],
+            CreatureIdentityState::default(),
+            [0.0; SHARED_MEMORY_SLOTS],
+        );
+        assert_eq!(state.cached_genome_size, expected);
+        assert_eq!(state.cached_genome_size, state.genome.genome_size());
+    }
+
+    #[test]
+    fn every_founder_profile_caches_its_own_genome_size() {
+        use crate::config::FounderProfile;
+        use crate::creature::founder::founder_genome;
+
+        let mut sm: SlotMap<CreatureId, ()> = SlotMap::with_key();
+        for profile in [
+            FounderProfile::V3Alpha1,
+            FounderProfile::ForageFirstSparse,
+            FounderProfile::ForageFirstSparseConservative,
+            FounderProfile::ForageFirstSparseRichOffspring,
+            FounderProfile::ForageFirstSparseBalanced,
+        ] {
+            let id = sm.insert(());
+            let genome = founder_genome(profile);
+            let expected = genome.genome_size();
+            let state = CreatureState::new(
+                id,
+                genome,
+                Position::new(0, 0),
+                20.0,
+                0,
+                [0; 6],
+                0,
+                [true; 6],
+                CreatureIdentityState::default(),
+                [0.0; SHARED_MEMORY_SLOTS],
+            );
+            assert_eq!(state.cached_genome_size, expected, "profile {profile:?}");
+        }
+    }
+
+    /// The carrying charge's founder sizing is read from this number: the spec's
+    /// 96 is stale (it predates the founder's current program), so the founder
+    /// pays `111 * genome_carry_cost_per_unit` per tick.
+    #[test]
+    fn the_canonical_founder_genome_is_one_hundred_eleven_units() {
+        use crate::config::FounderProfile;
+        use crate::creature::founder::founder_genome;
+
+        let genome = founder_genome(FounderProfile::V3Alpha1);
+        assert_eq!(genome.genome_size(), 111);
     }
 
     #[test]
