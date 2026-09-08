@@ -22,8 +22,9 @@ burrows persist after their makers leave or die and affect movement and sight.
 
 ## Inputs and Invariants
 
-The owning roadmap row is authoritative for dependencies. T02.F02 supplies
-seeded barrier terrain and its visibility behavior. Use the existing applied
+The owning roadmap row is authoritative for dependencies. T12.F01 supplies
+seeded barrier terrain (moved from T02.F02 on 2026-09-08) and T02.F02 its
+visibility behavior. Use the existing applied
 world, action, energy, and lifecycle machinery:
 
 - [World geometry and occupancy](../../reference/v3-world-grid-spec.md).

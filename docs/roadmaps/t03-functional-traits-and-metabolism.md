@@ -1,7 +1,7 @@
 # T03 — Functional Traits and Metabolism
 
 **Status**: In Progress
-**Last updated**: 2026-09-07
+**Last updated**: 2026-09-08
 **Master**: [Program Roadmap](../roadmap.md)
 
 ## Goal
@@ -43,6 +43,7 @@ fitness bonuses.
 
 ## Notes for AI Agents
 
+- T12.F03 (added 2026-09-08 at the user's direction) gives food types world-side tradeoffs: energy per bite against coverage, regrowth, and recovery, so a rich rare food and a poor abundant one can share a world. T03.F04 adds the body side, digestion efficiency per type with a cost for breadth. Foraging theory (MacArthur and Pianka 1966, read in full for the [world seeding research note](../strategy/world-seeding-research-2026-09-08.md)) says specialists coexist against a jack-of-all-trades only when the generalist's efficiency loss outweighs its travel saving, so specialist coexistence needs T03.F04's cost for breadth; T12.F03's value differences alone select on where to go and what to eat.
 - The existing phenotype color walk is identity and visualization state, not functional morphology. Do not overload it as a causal trait system.
 - Keep energy conserved and behavior-backed: sensing, motion, storage, digestion, defense, reproduction, and computation must affect the same applied accounting used for survival and reproduction. T03.F01 is a set of heritable numbers with costs wired into that accounting, not a lookup table or a generic framework.
 - Introduce continuous or otherwise locally mutable trait spaces where practical so useful specializations have reachable stepping stones.
