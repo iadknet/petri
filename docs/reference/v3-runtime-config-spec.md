@@ -186,8 +186,8 @@ Genome carrying cost:
   action cost.
 - Is independent of `energy.complexity_cost`, which multiplies action costs by
   the reachability-aware `complexity()` and is disabled at canonical defaults.
-- At the default rate the canonical founder genome (96 units) pays 0.0096 per
-  tick, 1.92% of the default 0.5 decay.
+- At the default rate the canonical founder genome (111 units) pays 0.0111 per
+  tick, 2.22% of the default 0.5 decay.
 
 Complexity energy cost:
 - When enabled, all action energy costs (noop, eat, move, reproduce, steal, and
