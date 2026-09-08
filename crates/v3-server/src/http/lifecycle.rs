@@ -3,46 +3,14 @@ use std::time::{Duration, Instant};
 use axum::extract::State;
 use axum::response::IntoResponse;
 use axum::Json;
-use v3_core::config::SimulationConfig;
+use v3_core::config::resolve_config;
 use v3_core::simulation::{run_tick, seed_simulation};
 
 use crate::error::{AppError, FieldError};
 use crate::state::{build_ws_frame, AppState, SimHandle, SimulationStatus};
-use crate::types::{config_digest, deep_merge, StepRequest, PROTOCOL_VERSION};
+use crate::types::{config_digest, StepRequest, PROTOCOL_VERSION};
 
 const FRAME_INTERVAL: Duration = Duration::from_millis(100);
-
-fn validate_startup_ramps(config: &SimulationConfig) -> Result<(), AppError> {
-    let ramp = &config.startup.ramps.failed_action_penalty;
-    if ramp.target_tick < 1 {
-        return Err(AppError::ValidationRejected {
-            field_errors: vec![FieldError {
-                field: "startup.ramps.failed_action_penalty.target_tick".into(),
-                reason: "must be >= 1".into(),
-            }],
-            endpoint: "startup",
-        });
-    }
-    if !ramp.start.is_finite() || ramp.start < 0.0 {
-        return Err(AppError::ValidationRejected {
-            field_errors: vec![FieldError {
-                field: "startup.ramps.failed_action_penalty.start".into(),
-                reason: "must be finite and >= 0.0".into(),
-            }],
-            endpoint: "startup",
-        });
-    }
-    if !ramp.end.is_finite() || ramp.end < 0.0 {
-        return Err(AppError::ValidationRejected {
-            field_errors: vec![FieldError {
-                field: "startup.ramps.failed_action_penalty.end".into(),
-                reason: "must be finite and >= 0.0".into(),
-            }],
-            endpoint: "startup",
-        });
-    }
-    Ok(())
-}
 
 pub async fn startup(
     State(app): State<AppState>,
@@ -67,22 +35,15 @@ pub async fn startup(
 
     // Merge the request over this server instance's startup baseline. Production
     // state uses SimulationConfig::default(); tests can use a smaller baseline.
-    let mut base = serde_json::to_value(app.startup_defaults.as_ref())
-        .map_err(|e| AppError::Internal(format!("config serialization error: {e}")))?;
-    deep_merge(&mut base, patch);
-
-    // Deserialize merged value — deny_unknown_fields handles validation.
-    let mut config: SimulationConfig =
-        serde_json::from_value(base).map_err(|e| AppError::ValidationRejected {
+    let config = resolve_config(app.startup_defaults.as_ref(), patch).map_err(|error| {
+        AppError::ValidationRejected {
             field_errors: vec![FieldError {
-                field: "config".into(),
-                reason: e.to_string(),
+                field: error.field.into(),
+                reason: error.reason,
             }],
             endpoint: "startup",
-        })?;
-    validate_startup_ramps(&config)?;
-    config.normalize();
-    config.apply_startup_overrides();
+        }
+    })?;
 
     // Re-seed the simulation.
     let new_sim = seed_simulation(config.clone(), seed);

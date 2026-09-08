@@ -396,6 +396,20 @@ Sparse-frame rules:
 
 ### 4.7 `GET /v3/simulation/config`
 
+With `?format=recipe`, returns just the complete current effective config as
+JSON, without the protocol/state envelope or run seed. The app downloads the
+response text directly so u64 seeds are preserved exactly. The default
+response below remains unchanged. Save fetches current applied values rather
+than pending form edits.
+
+The app's Load Recipe action sends the original recipe JSON with its current
+Run Seed through startup, using the same restart confirmation for running or
+paused worlds. Recipes must be objects and exclude top-level `seed`. On success,
+the app refreshes applied config/startup controls and tick-zero state without
+reapplying the previous runtime config. Failures are visible; refresh failure
+after a successful restart is identified separately. Large file seeds retain
+u64 precision; ordinary numeric editing/restart requires safe integer seeds.
+
 Response:
 
 ```json

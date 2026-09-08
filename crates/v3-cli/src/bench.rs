@@ -100,8 +100,24 @@ impl Default for NeighborhoodSizes {
 
 // ── Profile parameters ──────────────────────────────────────────────────────
 
+/// A complete resolved recipe and its supplied source path.
+#[derive(Debug, Clone)]
+pub struct Recipe {
+    pub path: String,
+    pub config: SimulationConfig,
+}
+
+impl PartialEq for Recipe {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path
+            && serde_json::to_value(&self.config).expect("config serializes")
+                == serde_json::to_value(&other.config).expect("config serializes")
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct ProfileParams {
+    pub recipe: Option<Recipe>,
     pub name: String,
     pub width: u16,
     pub height: u16,
@@ -126,6 +142,7 @@ pub struct ProfileParams {
 /// predeclaration.
 pub fn gate_profile_params() -> ProfileParams {
     ProfileParams {
+        recipe: None,
         name: "gate".to_string(),
         width: 128,
         height: 128,
@@ -141,6 +158,7 @@ pub fn gate_profile_params() -> ProfileParams {
 /// Predeclared minutes-scale goal profile constants (T01.F12).
 pub fn goal_profile_params() -> ProfileParams {
     ProfileParams {
+        recipe: None,
         name: "goal".to_string(),
         width: 1600,
         height: 1600,
@@ -158,7 +176,10 @@ pub fn goal_profile_params() -> ProfileParams {
 const DEFAULT_FOOD_COVERAGE: &str = "default";
 
 pub fn build_config(params: &ProfileParams) -> SimulationConfig {
-    let mut config = SimulationConfig::default();
+    let mut config = params
+        .recipe
+        .as_ref()
+        .map_or_else(SimulationConfig::default, |recipe| recipe.config.clone());
     config.world.width = params.width;
     config.world.height = params.height;
     config.population.initial_creatures = params.founders;
@@ -169,7 +190,42 @@ pub fn build_config(params: &ProfileParams) -> SimulationConfig {
         }
     }
     config.normalize();
+    if params.recipe.is_some() {
+        config.apply_startup_overrides();
+    }
     config
+}
+
+fn profile_block(params: &ProfileParams, config: &SimulationConfig) -> ProfileBlock {
+    ProfileBlock {
+        recipe_path: params.recipe.as_ref().map(|recipe| recipe.path.clone()),
+        config_digest: params
+            .recipe
+            .as_ref()
+            .map(|_| v3_core::config::config_digest(config)),
+        name: params.name.clone(),
+        world_width: config.world.width,
+        world_height: config.world.height,
+        founders: config.population.initial_creatures,
+        seeds: params.seeds.clone(),
+        ticks: params.ticks,
+        food_coverage: params.food_coverage.map_or_else(
+            || {
+                if params.recipe.is_some() {
+                    "recipe".to_string()
+                } else {
+                    DEFAULT_FOOD_COVERAGE.to_string()
+                }
+            },
+            |coverage| {
+                six(f64::from(if params.recipe.is_some() {
+                    config.world.food.types[0].initial_coverage
+                } else {
+                    coverage
+                }))
+            },
+        ),
+    }
 }
 
 // ── Report schema ────────────────────────────────────────────────────────────
@@ -200,6 +256,10 @@ pub struct Deterministic {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProfileBlock {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recipe_path: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub config_digest: Option<String>,
     pub name: String,
     pub world_width: u16,
     pub world_height: u16,
@@ -1729,18 +1789,7 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
 
     let deterministic = Deterministic {
         graph_work_definition: "graph_relax_iters: entered nonempty single-evaluation visits, including unaffordable visits (T11.F06); historical deltas cross definitions".to_string(),
-        profile: ProfileBlock {
-            name: params.name.clone(),
-            world_width: params.width,
-            world_height: params.height,
-            founders: params.founders,
-            seeds: params.seeds.clone(),
-            ticks: params.ticks,
-            food_coverage: params.food_coverage.map_or_else(
-                || DEFAULT_FOOD_COVERAGE.to_string(),
-                |coverage| six(f64::from(coverage)),
-            ),
-        },
+        profile: profile_block(params, &config),
         per_seed,
         totals,
         per_creature_tick,
@@ -2650,6 +2699,7 @@ mod tests {
     #[test]
     fn omitting_food_coverage_leaves_production_coverage_untouched() {
         let params = ProfileParams {
+            recipe: None,
             name: "sweep".to_string(),
             width: 32,
             height: 32,
@@ -2899,6 +2949,7 @@ mod tests {
 
     fn small_profile(name: &str) -> ProfileParams {
         ProfileParams {
+            recipe: None,
             name: name.to_string(),
             width: 8,
             height: 8,
@@ -3326,5 +3377,63 @@ mod tests {
             sweep_det.goal_indicators.mutational_neighborhood,
             Indicator::Undefined(_)
         ));
+    }
+    #[test]
+    fn recipe_profile_identifies_final_config_without_fabricating_legacy_metadata() {
+        let mut params = small_profile("sweep");
+        let legacy = serde_json::to_value(profile_block(&params, &build_config(&params))).unwrap();
+        assert!(legacy.get("recipe_path").is_none());
+        assert!(legacy.get("config_digest").is_none());
+        let old: ProfileBlock = serde_json::from_value(legacy).unwrap();
+        assert!(old.config_digest.is_none());
+        let config = v3_core::config::resolve_config(&SimulationConfig::default(), serde_json::json!({"world":{"world_seed":18446744073709551615u64},"energy":{"costs":{"move_cost":0.75}}})).unwrap();
+        params.recipe = Some(Recipe {
+            path: "world.json".into(),
+            config,
+        });
+        params.food_coverage = None;
+        let applied = build_config(&params);
+        let profile = profile_block(&params, &applied);
+        assert_eq!(profile.recipe_path.as_deref(), Some("world.json"));
+        assert_eq!(
+            profile.config_digest,
+            Some(v3_core::config::config_digest(&applied))
+        );
+        assert_eq!(profile.food_coverage, "recipe");
+        assert_eq!(profile.world_width, applied.world.width);
+        assert_eq!(profile.founders, applied.population.initial_creatures);
+        let sim = seed_simulation(applied.clone(), 1);
+        assert_eq!(sim.config.world.world_seed, Some(u64::MAX));
+        assert_eq!(sim.config.energy.costs.move_cost, 0.75);
+        let (observed, _) = run_deterministic(&params);
+        assert_eq!(observed.profile, profile);
+        params
+            .recipe
+            .as_mut()
+            .unwrap()
+            .config
+            .energy
+            .costs
+            .move_cost = 0.5;
+        assert_ne!(profile_block(&params, &build_config(&params)), profile);
+        params.food_coverage = Some(2.0);
+        assert_eq!(
+            profile_block(&params, &build_config(&params)).food_coverage,
+            "1.000000"
+        );
+    }
+    #[test]
+    fn recipe_equality_requires_both_source_path_and_complete_config() {
+        let recipe = Recipe {
+            path: "world.json".into(),
+            config: SimulationConfig::default(),
+        };
+        assert_eq!(recipe, recipe.clone());
+        let mut changed = recipe.clone();
+        changed.path = "other.json".into();
+        assert_ne!(recipe, changed);
+        changed = recipe.clone();
+        changed.config.world.world_seed = Some(u64::MAX);
+        assert_ne!(recipe, changed);
     }
 }

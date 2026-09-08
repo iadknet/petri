@@ -36,6 +36,7 @@ fn docs_progress_dir() -> PathBuf {
 /// only need a well-formed `Report` shape to mutate — not gate-scale data.
 fn tiny_report() -> bench::Report {
     let params = bench::ProfileParams {
+        recipe: None,
         name: "synthetic".to_string(),
         width: 8,
         height: 8,
@@ -54,6 +55,7 @@ fn tiny_report() -> bench::Report {
 /// accumulator against a real simulation at production food coverage.
 fn tiny_sweep_params() -> bench::ProfileParams {
     bench::ProfileParams {
+        recipe: None,
         name: "sweep".to_string(),
         width: 32,
         height: 32,
@@ -72,6 +74,7 @@ fn tiny_sweep_params() -> bench::ProfileParams {
 /// without paying production cost in a debug-build test.
 fn tiny_goal_params() -> bench::ProfileParams {
     bench::ProfileParams {
+        recipe: None,
         name: "goal".to_string(),
         width: 32,
         height: 32,

@@ -4,6 +4,7 @@ import { EnergySection } from "./EnergySection.tsx";
 import { FertilitySection } from "./FertilitySection.tsx";
 import { FoodTypesSection } from "./FoodTypesSection.tsx";
 import { PopulationSection } from "./PopulationSection.tsx";
+import { RecipeControls } from "./RecipeControls.tsx";
 import { RunSettingsSection } from "./RunSettingsSection.tsx";
 import { StartupRampsSection } from "./StartupRampsSection.tsx";
 import { TerrainSection } from "./TerrainSection.tsx";
@@ -26,6 +27,7 @@ export function StartupConfigPanel({
 			collapsible
 			sectionClassName="bg-emerald-950/10 border-l-2 border-l-emerald-500"
 		>
+			<RecipeControls />
 			<RunSettingsSection
 				seed={startupPreset.seed}
 				updateSeed={(value) => updateStartupPreset("seed", value)}

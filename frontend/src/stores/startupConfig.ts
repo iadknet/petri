@@ -55,6 +55,7 @@ export interface StartupConfigState {
 	updateFertilityLayerTarget: (index: number, target: FoodFertilityLayerTarget) => void;
 	randomizeSeed: () => void;
 	hydrateFromServerConfig: (config: SimulationConfig) => void;
+	applyRecipeConfig: (config: SimulationConfig) => void;
 	reset: () => void;
 }
 
@@ -541,6 +542,13 @@ export const useStartupConfigStore = create<StartupConfigState>()((set) => ({
 			};
 		}),
 
+	applyRecipeConfig: (config) =>
+		set((s) => ({
+			preset: { ...fromServerConfig(config), seed: s.preset.seed },
+			hydrated: true,
+			touched: false,
+		})),
+
 	reset: () =>
 		set({
 			preset: buildDefaultPreset(),
@@ -551,6 +559,24 @@ export const useStartupConfigStore = create<StartupConfigState>()((set) => ({
 
 /** Build the startup API request from the current preset */
 export function buildStartupRequest(preset: StartupPreset): StartupRequest {
+	const seeds = [
+		preset.seed,
+		preset.world.world_seed,
+		...preset.world.terrain.map((layer) => layer.seed),
+		...preset.world.food.fertility.layers.map((layer) =>
+			"Fbm" in layer.algorithm
+				? layer.algorithm.Fbm.seed
+				: "PoissonBlobs" in layer.algorithm
+					? layer.algorithm.PoissonBlobs.seed
+					: null,
+		),
+	];
+	if (seeds.some((seed) => seed != null && (!Number.isSafeInteger(seed) || seed < 0))) {
+		throw new Error(
+			"The numeric editor requires safe integer seeds (0–9007199254740991). Load the recipe again to preserve larger seeds exactly.",
+		);
+	}
+
 	return {
 		seed: preset.seed,
 		population: { initial_creatures: preset.population.initial_creatures },

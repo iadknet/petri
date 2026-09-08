@@ -246,3 +246,64 @@ fn tick_sample_mean_generation_rises_once_the_population_reproduces() {
     assert!(sample["mean_genome_size"].as_f64().unwrap() > 0.0);
     assert!(sample["mean_mesh_nodes"].as_f64().unwrap() > 0.0);
 }
+
+#[test]
+fn run_started_identifies_applied_config() {
+    let config = default_config();
+    let expected = v3_core::config::config_digest(&config);
+    let mut out = Vec::new();
+    run_simulation(config, 42, 1, 1, &mut out).unwrap();
+    let first: serde_json::Value =
+        serde_json::from_str(String::from_utf8(out).unwrap().lines().next().unwrap()).unwrap();
+    assert_eq!(first["config_digest"], expected);
+}
+
+#[test]
+fn recipe_cli_save_reload_and_failures() {
+    let dir = std::env::temp_dir().join(format!("petri-recipe-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let input = dir.join("input.json");
+    let saved = dir.join("saved.json");
+    std::fs::write(&input, r#"{"world":{"width":8,"height":8,"world_seed":18446744073709551615,"terrain":[{"params":{"pattern_type":"Noise","density":0.2,"cluster_size":1},"seed":18446744073709551615}],"food":{"fertility":{"enabled":true,"layers":[{"weight":1.0,"algorithm":{"Fbm":{"octaves":2,"frequency":0.1,"lacunarity":2.0,"persistence":0.5,"seed":18446744073709551615}}}]}}},"population":{"initial_creatures":2,"founder_profile":"forage_first_sparse"},"runtime":{"max_actions_per_turn":2},"energy":{"costs":{"move_cost":0.25}}}"#).unwrap();
+    let run = |input: &std::path::Path, save: Option<&std::path::Path>| {
+        let mut cmd = std::process::Command::new(env!("CARGO_BIN_EXE_v3-cli"));
+        cmd.args(["run", "--ticks", "1", "--seed", "42", "--config"])
+            .arg(input);
+        if let Some(path) = save {
+            cmd.arg("--save-config").arg(path);
+        }
+        cmd.output().unwrap()
+    };
+    let first = run(&input, Some(&saved));
+    assert!(
+        first.status.success(),
+        "{}",
+        String::from_utf8_lossy(&first.stderr)
+    );
+    let json: serde_json::Value = serde_json::from_slice(&std::fs::read(&saved).unwrap()).unwrap();
+    assert_eq!(json["world"]["world_seed"].as_u64(), Some(u64::MAX));
+    assert!(json.get("seed").is_none());
+    assert!(json.get("mutation").is_some());
+    assert_eq!(json["world"]["terrain"][0]["seed"].as_u64(), Some(u64::MAX));
+    assert_eq!(
+        json["world"]["food"]["fertility"]["layers"][0]["algorithm"]["Fbm"]["seed"].as_u64(),
+        Some(u64::MAX)
+    );
+    assert_eq!(json["population"]["founder_profile"], "forage_first_sparse");
+    assert_eq!(json["runtime"]["max_actions_per_turn"], 2);
+    assert_eq!(json["energy"]["costs"]["move_cost"], 0.25);
+    let config: SimulationConfig = serde_json::from_value(json.clone()).unwrap();
+    let mut direct = Vec::new();
+    run_simulation(config, 42, 1, 1, &mut direct).unwrap();
+    assert_eq!(first.stdout, direct);
+
+    assert_eq!(first.stdout, run(&saved, None).stdout);
+    assert!(!run(&input, Some(&dir)).status.success());
+    for bad in ["{", "[]", "null", r#"{"seed":1}"#, r#"{"stale":1}"#] {
+        std::fs::write(&input, bad).unwrap();
+        let result = run(&input, None);
+        assert!(!result.status.success());
+        assert!(result.stdout.is_empty());
+    }
+    std::fs::remove_dir_all(dir).unwrap();
+}
