@@ -7,6 +7,8 @@ export const MOCK_CONFIG: SimulationConfig = {
 		width: 400,
 		height: 400,
 		edge_mode: "Wrap",
+		terrain: [],
+		world_seed: null,
 		food: {
 			shared: {
 				growth_rate: 0.25,

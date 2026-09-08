@@ -176,3 +176,101 @@ fn two_simulations_with_the_same_seed_are_byte_identical() {
         "must compare living descendants after paired-slot and mesh-slice mutations have applied"
     );
 }
+
+fn terrain_config() -> SimulationConfig {
+    let mut cfg = reproducibility_config();
+    cfg.world.world_seed = Some(817);
+    cfg.world.terrain = vec![v3_core::config::TerrainLayer {
+        params: v3_core::patterns::PatternParams::Noise {
+            density: 0.001,
+            cluster_size: 20,
+        },
+        bounds: Some(v3_core::patterns::PatternBounds {
+            x: 0,
+            y: 0,
+            width: 40,
+            height: 40,
+        }),
+        seed: None,
+    }];
+    cfg
+}
+
+fn world_fingerprint(sim: &Simulation) -> Vec<(bool, u32, u32)> {
+    (0..sim.world.height)
+        .flat_map(|y| {
+            (0..sim.world.width).map(move |x| {
+                let p = Position::new(x, y);
+                (
+                    sim.world.is_barrier(p),
+                    sim.world.food().fertility().get(x, y).to_bits(),
+                    sim.world.food_at(p).to_bits(),
+                )
+            })
+        })
+        .collect()
+}
+
+#[test]
+fn terrain_is_identical_across_independent_initialization_and_thread_counts() {
+    let one = rayon::ThreadPoolBuilder::new()
+        .num_threads(1)
+        .build()
+        .unwrap();
+    let four = rayon::ThreadPoolBuilder::new()
+        .num_threads(4)
+        .build()
+        .unwrap();
+    let mut first = one.install(|| seed_simulation(terrain_config(), SEED));
+    let mut second = four.install(|| seed_simulation(terrain_config(), SEED));
+    assert_eq!(
+        world_fingerprint(&first)
+            .iter()
+            .filter(|cell| cell.0)
+            .count(),
+        2
+    );
+    for tick in 0..=20 {
+        assert_eq!(
+            world_fingerprint(&first),
+            world_fingerprint(&second),
+            "world tick {tick}"
+        );
+        assert_eq!(
+            population_fingerprint(&first),
+            population_fingerprint(&second),
+            "founders/state tick {tick}"
+        );
+        assert_eq!(work_counters(&first), work_counters(&second));
+        if tick < 20 {
+            one.install(|| run_tick(&mut first, &mut None));
+            four.install(|| run_tick(&mut second, &mut None));
+        }
+    }
+}
+
+#[test]
+fn fixed_map_seed_isolates_maps_from_run_seeded_placement() {
+    let mut cfg = terrain_config();
+    cfg.world.food.types[0].initial_coverage = 0.5;
+    let first = seed_simulation(cfg.clone(), 11);
+    let second = seed_simulation(cfg, 22);
+    let a = world_fingerprint(&first);
+    let b = world_fingerprint(&second);
+    assert_eq!(
+        a.iter()
+            .map(|&(barrier, fertility, _)| (barrier, fertility))
+            .collect::<Vec<_>>(),
+        b.iter()
+            .map(|&(barrier, fertility, _)| (barrier, fertility))
+            .collect::<Vec<_>>()
+    );
+    assert_ne!(
+        a.iter().map(|cell| cell.2).collect::<Vec<_>>(),
+        b.iter().map(|cell| cell.2).collect::<Vec<_>>()
+    );
+    assert_ne!(
+        population_fingerprint(&first),
+        population_fingerprint(&second)
+    );
+}

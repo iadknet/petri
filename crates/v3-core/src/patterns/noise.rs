@@ -79,6 +79,8 @@ pub(super) fn generate(
 
         if cells.len() > target {
             let mut vec: Vec<(u16, u16)> = cells.into_iter().collect();
+            // Hash iteration order must not select the surviving barrier set.
+            vec.sort_unstable();
             vec.shuffle(rng);
             vec.truncate(target);
             cells = vec.into_iter().collect();

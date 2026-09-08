@@ -27,6 +27,8 @@ const MOCK_CONFIG: SimulationConfig = {
 		width: 512,
 		height: 384,
 		edge_mode: "Wrap",
+		terrain: [],
+		world_seed: null,
 		food: {
 			shared: {
 				growth_rate: 0.2,
@@ -271,6 +273,8 @@ describe("ControlBar", () => {
 				width: 512,
 				height: 384,
 				edge_mode: "Wrap",
+				terrain: [],
+				world_seed: null,
 				food: {
 					shared: { ...MOCK_CONFIG.world.food.shared },
 					types: [
@@ -340,6 +344,8 @@ describe("ControlBar", () => {
 						width: 512,
 						height: 384,
 						edge_mode: "Wrap",
+						terrain: [],
+						world_seed: null,
 						food: expect.objectContaining({
 							shared: expect.objectContaining({
 								occupancy_depletion: {
@@ -401,6 +407,8 @@ describe("ControlBar", () => {
 				width: 512,
 				height: 384,
 				edge_mode: "Wrap",
+				terrain: [],
+				world_seed: null,
 				food: {
 					shared: { ...MOCK_CONFIG.world.food.shared },
 					types: [
@@ -539,6 +547,14 @@ describe("ControlBar", () => {
 	});
 
 	it("restart sends fertility startup settings when configured in preset", async () => {
+		useStartupConfigStore.getState().updatePreset("world.world_seed", 444);
+		useStartupConfigStore.getState().updatePreset("world.terrain", [
+			{
+				params: { pattern_type: "Noise", density: 0.1, cluster_size: 2 },
+				seed: 555,
+				bounds: null,
+			},
+		]);
 		useStartupConfigStore.getState().updatePreset("seed", 987654321);
 		useStartupConfigStore.getState().updatePreset("world.food.fertility.enabled", true);
 		useStartupConfigStore.getState().updatePreset("world.food.fertility.min_fertility", 0.4);
@@ -636,6 +652,10 @@ describe("ControlBar", () => {
 					}),
 				}),
 			);
+		});
+		expect(vi.mocked(api.startup).mock.calls[0]?.[0].world).toMatchObject({
+			world_seed: 444,
+			terrain: [{ params: { pattern_type: "Noise" }, seed: 555, bounds: null }],
 		});
 	});
 

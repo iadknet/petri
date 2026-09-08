@@ -6,6 +6,7 @@ import { FoodTypesSection } from "./FoodTypesSection.tsx";
 import { PopulationSection } from "./PopulationSection.tsx";
 import { RunSettingsSection } from "./RunSettingsSection.tsx";
 import { StartupRampsSection } from "./StartupRampsSection.tsx";
+import { TerrainSection } from "./TerrainSection.tsx";
 import { WorldTopologySection } from "./WorldTopologySection.tsx";
 
 export function StartupConfigPanel({
@@ -35,6 +36,7 @@ export function StartupConfigPanel({
 				startupPreset={startupPreset}
 				updateStartupPreset={updateStartupPreset}
 			/>
+			<TerrainSection startupPreset={startupPreset} updateStartupPreset={updateStartupPreset} />
 			<EnergySection startupPreset={startupPreset} updateStartupPreset={updateStartupPreset} />
 			<FoodTypesSection
 				startupPreset={startupPreset}

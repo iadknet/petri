@@ -107,62 +107,174 @@ Required config and behavior:
 
 ## Implementation Tasks
 
-- [ ] Establish failing tests for terrain config, startup ordering/seed
+- [x] Establish failing tests for terrain config, startup ordering/seed
   isolation, clustered Noise trimming, and runtime patch rejection; execute
   and record the RNG compatibility probe before choosing its branch.
-- [ ] Add the core schema/seeding behavior and bounded reproducibility fix;
+- [x] Add the core schema/seeding behavior and bounded reproducibility fix;
   implement the selected RNG branch and its required report evidence.
-- [ ] Carry the fields through server startup/projections, frontend types,
+- [x] Carry the fields through server startup/projections, frontend types,
   preset hydration/request construction, and the Terrain controls; update
   canonical references and integration tests.
 - [ ] Review the diff for reuse, simplification, and efficiency; resolve fresh
-  mutation survivors through tests; store gate/goal evidence and update the
-  existing progress series. Complete closure records after required checks.
+  mutation survivors through tests; complete closure records after required
+  checks, recording the user-authorized measured-benchmark exemption below.
 
 ## Verification
 
-- [ ] Record TDD red and green commands. Core examples cover absent/default
+- [x] Record TDD red and green commands. Core examples cover absent/default
   fields, serialization, all five patterns, whole-world and explicit bounds,
   overlapping layers, empty/all-barrier maps, no food/founder on barriers,
   exact eligible-cell food coverage, and founder count clamping. Include a
   1600² startup terrain case proving the runtime endpoint cap is not reused.
-- [ ] Property tests establish bounded/idempotent barrier union and deterministic
+- [x] Property tests establish bounded/idempotent barrier union and deterministic
   generation for every drawn case, explicit seed precedence, wrapping seed
   addition, and clustered Noise exact target/set reproducibility. Explicitly
   exercise every pattern and the trimming path, rather than assuming a random
   draw reaches them. Keep any `proptest-regressions/` files.
-- [ ] Extend `crates/v3-core/tests/reproducibility.rs` with a terrain-bearing
+- [x] Extend `crates/v3-core/tests/reproducibility.rs` with a terrain-bearing
   fixture that includes clustered Noise trimming. Compare barriers, fertility,
   food, and founders at tick zero and applied short-run state under independently
   initialized simulations and different Rayon thread counts. Preserve the
   existing mutation stress fixture and its coverage. Fresh randomized hash
   states exercise the process-order failure as in T10.F11; do not add a second
   goal run or subprocess harness merely to duplicate it.
-- [ ] Fixed map seed plus distinct run seeds yields equal barrier/fertility
+- [x] Fixed map seed plus distinct run seeds yields equal barrier/fertility
   grids and distinct run-seeded placement on an explicit nondegenerate fixture;
-  absent map seed preserves the prior seeding behavior. Compare the default
-  gate/goal deterministic behavior to T11.F18, allowing only config identity
-  metadata caused by the new default fields.
-- [ ] Server tests cover partial startup terrain overrides, unknown fields,
+  absent map seed preserves the prior seeding behavior. Focused seeding and
+  reproducibility tests verify unchanged defaults; full trajectory comparison
+  to T11.F18 is unmeasured under the explicit benchmark exemption.
+- [x] Server tests cover partial startup terrain overrides, unknown fields,
   restart-only PATCH rejection with state/config unchanged, effective config,
   and applied tick-zero barrier projection. Frontend tests cover layer edits,
   hydration, bounds and optional seeds, pattern switches, safe integer input,
   and the actual startup request; inspect the rendered Terrain section.
-- [ ] Run `cargo test -p v3-core --test viability` first after seeding/RNG changes,
+- [x] Run `cargo test -p v3-core --test viability` first after seeding/RNG changes,
   then `cargo check --workspace --all-targets` after coherent Rust edits and
   focused core/server/frontend checks. Load relevant Rust and React skills.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants` after self-review: record
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` after self-review: record
   summary, output path, and complete missed/timeout list, with each killed by
   tests and a fresh rerun, equivalent with reason, or explicitly deferred.
-- [ ] `make bench PROFILE=gate FEATURE=t12-f01-seeded-terrain-in-the-world-config`
-  stores `docs/progress/features/t12-f01-seeded-terrain-in-the-world-config.json`;
-  run the corresponding `PROFILE=goal` once for `...-goal.json`. Fill the
-  performance section and append the existing benchmark series/progress row.
+- [x] Measured gate/goal reports: Not applicable for this closure by explicit
+  user direction on 2026-09-08, recorded below. Neither profile was started.
+  No F01 benchmark JSON or measured series row is produced; existing reports
+  and epoch baselines remain unchanged. `make check` and its ordinary gate
+  determinism tests remain required.
 - [x] Second goal determinism run: Not applicable by the workflow's 2026-09-05
   decision. Existing reproducibility and gate two-run checks remain mandatory.
 - [ ] `make roadmap-check` on document edits and at handoff; `make check` on
   final feature code; `make check-docs` on closure documents. Record command
   evidence and the tested commit before integration.
+
+### Implementation evidence (2026-09-08)
+
+- RNG probe: `cargo run --manifest-path /tmp/t12-f01-rng-probe/Cargo.toml`
+  exited 0, comparing 16 `next_u64` values for each seed with exact `rand`
+  0.8.6 and `rand_xoshiro` 0.6.0. First draws (SmallRng / named) were:
+  0: 8251690495967107212 / 5987356902031041503;
+  1: 13159342511175687856 / 14971601782005023387;
+  11: 9512672960468237878 / 15860195524371628672;
+  22: 2580056678536133757 / 4966237793422419871;
+  33: 14475685761841174007 / 17129061156981078465;
+  u64::MAX: 11345198270385851335 / 6254647548650071986.
+  Every stream differed. Retained SmallRng, no seed adapter or dependency
+  change. Its wrapper inherits PCG32 seed expansion whereas the named
+  generator overrides it with SplitMix64. New reports derive `rand_version`
+  from the compiled Cargo.lock; old reports deserialize missing metadata as
+  None/unmeasured. Probe log: `/tmp/t12-f01-logs/rng-probe.log`.
+- TDD red: `cargo test -p v3-core --test terrain` exited 101 with the expected
+  unknown `terrain` field and distinct clustered Noise trimmed sets for seed
+  42 (the observed set mismatch proves the trimming branch ran).
+  `cargo test -p v3-server --test server terrain_fields_are_restart_only`
+  exited 101 because the keys were generic unknown fields rather than
+  restart-only. Frontend TerrainSection test initially failed to import the
+  unimplemented component. Logs: `core-red.log`, `server-red.log`,
+  `frontend-red.log` under `/tmp/t12-f01-logs/`.
+- After production seeding edits, FIRST `cargo test -p v3-core --test viability`
+  exited 0, 24 passed (`viability.log`). Explicit coherent-burst
+  `cargo check --workspace --all-targets` checks passed; final log
+  `compile-final.log`. One server test compile error used the wrong frame
+  wrapper and was corrected to assert the actual published projection.
+- `cargo test -p v3-core --test terrain`: 10 passed (`core-final.log`).
+  Property cases explicitly iterate all five patterns and include clipping,
+  exact expected sets, idempotence, serde roundtrip, override precedence,
+  wrapping at u64::MAX, and clustered target reproducibility. No property
+  regression file appeared. An initial food coverage test used the shared
+  value instead of the authoritative type entry; correcting the fixture
+  to typed coverage made the 400/800 eligible-cell assertion pass.
+- `cargo test -p v3-core --test reproducibility`: 3 passed (`repro.log`),
+  preserving the mutation stress test and adding terrain initialization,
+  1/4-thread applied short-run comparisons, and fixed-map/run-seed isolation.
+- `cargo test -p v3-server --test server terrain`: 2 passed (`server-green.log`),
+  including effective GET config, partial startup merge, unknown layer fields,
+  actual tick-zero projection, and atomic null/empty runtime rejection.
+- `cargo test -p v3-cli build_environment`: passed (`metadata.log`), including
+  actual locked version and historical missing-field loading.
+- `npm test -- --run src/components/config-panel/startup/TerrainSection.test.tsx
+  src/stores/startupConfig.test.ts src/components/ControlBar.test.tsx
+  src/components/ConfigPanel.test.tsx`: 58 passed (`frontend-green-2.log`).
+  `npm run build`: passed (`frontend-build-2.log`); existing chunk-size warning.
+  `npm run lint:fix`: completed with existing index-key warnings plus the
+  stateless ordered terrain layer's index key; no schema IDs were invented.
+- Browser skill inspection at localhost:5312 verified Terrain adjacent to
+  World Topology, adding a layer, and switching Maze to Noise with correct
+  controls, labels and seeds. Screenshot inspected:
+  `/tmp/t12-f01-logs/terrain-ui.png`; browser and development stack stopped.
+- Self-review for reuse/simplification/efficiency: extracted the existing
+  pattern panel for shared use; reused all five existing parameter editors
+  and defaults; used React useId for parameter labels so multiple layers
+  have unique input IDs. Kept clipping/seeding local, no framework or new
+  dependency. Property-only fixtures omit unnecessary founders. Affected
+  checks reran successfully. `git diff --check` passed.
+- `make roadmap-check`: passed on reference/spec changes (`roadmap-1.log`).
+  Mutation evidence pending. Full measured benchmarks are exempted by the
+  user's later direction below; other required checks remain in force.
+
+- Full frontend completion checks: `npm run test` exited 0, 59 files / 311
+  tests (`frontend-all.log`); `npm run build` exited 0
+  (`frontend-build-final.log`); `npm run lint` exited 0
+  (`frontend-lint-final-2.log`, four index-key warnings). The initial final lint
+  found only a test formatting issue; formatting that file and rerunning lint
+  passed. No behavior changed. Logs remain under `/tmp/t12-f01-logs/`.
+
+### Mutation evidence
+
+- First fresh `MUTANTS_ITERATE=0 make rust-mutants` exited 0:
+  `18 mutants tested in 5m: 2 missed, 13 caught, 3 unviable`.
+  Log `/tmp/t12-f01-logs/mutants.log`; output
+  `/Users/istefanek/.local/share/petri-tools/mutants/t12-f01/mutants.out`.
+  Full missed list, no timeouts:
+  - `crates/v3-core/src/simulation/seeding.rs:54:30: replace || with && in seed_simulation`
+    — **equivalent**: when exactly one clipped dimension is zero, the
+    shared `generate_pattern` returns an empty list before consuming RNG;
+    the changed early-return condition cannot alter the world or run stream.
+  - `crates/v3-server/src/http/status.rs:87:13: replace || with && in patch_touches_world_topology`
+    — **killed** in the final fresh run: expanded the existing
+    topology test to independently reject width, height, and edge_mode
+    PATCHes with restart-only reasons. Production code was not changed.
+- Test remediation self-review found no additional changes needed.
+  `cargo check --workspace --all-targets` exited 0 (`compile-remediation.log`);
+  `cargo test -p v3-server --test server patch_config_world_topology_fields_are_restart_only`
+  exited 0, 1 passed (`server-remediation.log`).
+- Second fresh `MUTANTS_ITERATE=0 make rust-mutants` exited 0:
+  `18 mutants tested in 5m: 1 missed, 14 caught, 3 unviable`.
+  Log `/tmp/t12-f01-logs/mutants-final.log`; same output directory above,
+  `run-mode.txt` reads `fresh`. Complete second-run survivor list:
+  - `crates/v3-core/src/simulation/seeding.rs:54:30: replace || with && in seed_simulation`
+    — **equivalent**, for the empty-generator reason above.
+  `timeout.txt` is empty. No unresolved/deferred mutation finding remains.
+  No mutation skip or exclusion was added.
+
+- Final registered-test fresh `MUTANTS_ITERATE=0 make rust-mutants` exited 0:
+  `18 mutants tested in 4m: 1 missed, 14 caught, 3 unviable`.
+  Log `/tmp/t12-f01-logs/mutants-registered.log`; standard output directory
+  above, `run-mode.txt` is `fresh`. Complete final survivor list:
+  - `crates/v3-core/src/simulation/seeding.rs:54:30: replace || with && in seed_simulation`
+    — **equivalent** for the empty-generator reason above.
+  No timeouts. The server topology mutant remains killed.
+- `make rust-test-terrain` exited 0, 10 passed (`terrain-target.log`).
+  `make roadmap-check quality-check` exited 0 (`registration-check.log`),
+  including actionlint, shell checks, benchmark-wait and mutation-wrapper
+  regression checks. Final `git diff --check` passed.
 
 ## Performance and Goal Impact
 
@@ -175,31 +287,38 @@ startup only. Empty terrain and absent world seed preserve all production
 draws and trajectories. No severe compute allowance, new epoch, baseline edit,
 threshold reduction, or extra goal-profile run is authorized.
 
-Compare all six normalized gate counters and wall time per creature-tick to
-previous closure T11.F18 and pinned gate epoch `remove-complementary-nutrition`;
-compare goal evidence to T11.F18 and pinned goal epoch T11.F17. Preserve the
-existing +10%/+50% work and +25%/+100% matching-host wall flag/severe thresholds.
-Record host mismatch and raw wall deltas honestly. Default deterministic work
-and existing goal indicators must equal T11.F18; report identity metadata
-changes separately. Record dated persistence/population, births, lineage
-diversity, structure, memory sensitivity, founder/evolved neighborhoods,
-drift rows, and observation times. No improvement claim is required.
+**User-authorized verification exception, 2026-09-08.** The user stated:
+"I don't think we need to do a full benchmark test for this feature, since it
+doesn't change evolution/behavior. We will have to once we change the baseline
+benchmark maps." This overrides the planned measured gate and goal runs for
+T12.F01, whose opt-in terrain leaves production defaults unchanged. Neither
+profile was started. Focused behavior/reproducibility tests, fresh mutation
+triage, independent review, `make check` (including ordinary gate determinism
+tests), and closure documentation checks remain required.
 
-The T11 track explicitly makes floors track-level, due by T11.F10; the
-program-wide per-feature rule is no regression versus the preceding closure.
-T11.F18 records drift changed/all births of 0.010000 at generation 1,000 and
-0.005000 at 2,000; the latter is below the standing 0.008000 target (its
-feature-specific exception does not lower that target). Preserving these
-readings meets T12.F01's no-regression rule, without claiming the outstanding
-track target is met or importing F18's exception. Escalate any new decrease,
-failed required check, or conflicting floor requirement before closure.
+F01 normalized compute deltas, wall-clock deltas, goal indicators, and
+observation timings are **unmeasured**. There is no new report, no copied
+historical reading presented as current evidence, and no measured-series
+entry. Unchanged default trajectories remain an implementation invariant,
+supported by the focused tests and diff; full benchmark identity is not
+claimed as measured. Existing thresholds and epoch baselines are unchanged.
+Full benchmark readings are required when baseline benchmark maps change;
+this exemption does not edit the global workflow or authorize later skips.
 
-Caps remain founder neighborhood 10 seconds, evolved neighborhood 180 seconds
-summed across goal seeds, drift observation 30 seconds, and total goal-profile
-investigation 900 seconds. Keep profile parameters, seeds, samples/trials, and
-mutation floors unchanged. No world-set sweep is due before that set exists.
-
-Measured reports and acceptance: pending implementation.
+Preserve the program-wide no-regression rule and the specific standing drift
+floors. T11.F17 applies strict not-below floors to later closures; T11.F18's
+feature-specific exception explicitly retains the generation-2,000 floor of
+0.008000 for later features. These specific drift requirements govern over the
+earlier general T11 paragraph about track floors due by T11.F10. Historical
+T11.F18 changed/all births were 0.010000 at generation 1,000 and 0.005000 at
+2,000; the latter remains below the standing 0.008000 floor. The
+generation-1,000 floor remains 0.001500. These are historical findings, not
+new F01 measurements or a newly waived measured floor failure. Under the
+explicit exemption F01 has no fresh drift-floor evaluation; closure relies on
+the remaining authorized checks and does not require an unrelated evolution
+repair. No floor is lowered or claimed satisfied, and F18's exception is not
+transferred. Any failure of a remaining required check still blocks closure.
+No world-set sweep is due before that set exists.
 
 ## Success Criteria
 
@@ -208,7 +327,8 @@ Measured reports and acceptance: pending implementation.
 - [ ] The startup UI and API expose the complete terrain config; runtime
   mutation is rejected; canonical documentation describes applied behavior.
 - [ ] Production defaults and deterministic trajectory are unchanged; required
-  checks, fresh mutation triage, and gate/goal reports are complete.
+  checks and fresh mutation triage are complete, with full trajectory
+  measurement explicitly exempted and its limits recorded above.
 
 ## Notes for AI Agents
 
@@ -224,8 +344,48 @@ Measured reports and acceptance: pending implementation.
   Review limits: no implementation, RNG probe, or runtime validation yet;
   this self-review is not the independent final diff review. The research
   seed-expansion assumption is explicitly corrected above; the mandatory
-  executed probe remains. The standing drift target and per-feature
-  no-regression distinction remain explicit, with no new exception granted.
-- Closure record: advisor consultations, decisive guidance, reviewer counts,
-  remediation passes, requirement corrections, user interventions, tested
-  commit, and task-specific usage pending; record `usage unavailable` if absent.
+  executed probe remains. The initial drift-floor interpretation was corrected
+  by advisor consultation 2 below; readiness did not waive a required check.
+- Advisor consultation 1, before-approach checkpoint (2026-09-08): accepted
+  localized schema/seeding and existing UI reuse. Accepted all decisive
+  guidance because it matched the spec: clip before generation and skip empty
+  intersections; derive seeds independently without run draws; execute the
+  stream probe before fallback; test trimming and applied projections;
+  reject runtime fields by presence, including null/empty. No optional scope.
+- Advisor consultation 2, requirement correction (2026-09-08): the orchestrator
+  identified T11.F18's explicit statement retaining the 0.008000 floor for
+  later features. Re-reading that decision and T11.F17's strict not-below rule
+  showed the planning interpretation was wrong: matching F18's 0.005000 is
+  insufficient for closure even though it meets no regression. The spec owner
+  corrected the acceptance wording in this serialized document edit. Decisive
+  guidance: finish independent implementation and the single required goal
+  reading, report an inherited floor failure, and obtain explicit user
+  direction before dependent closure work. No code repair, extra goal run,
+  threshold change, or new exception was authorized at that consultation.
+  The later user-directed benchmark exemption supersedes the proposed reading
+  and measured-failure escalation for this closure only.
+- Advisor consultation 3, user intervention and verification exception
+  (2026-09-08): the user explicitly declined full benchmarks for this unchanged
+  default feature and required them when baseline benchmark maps change.
+  Decisive guidance: omit measured gate/goal runs and new report/series entries;
+  mark their readings unmeasured; retain focused/reproducibility tests, fresh
+  mutation triage, review, `make check`, and documentation checks. Preserve
+  the historical drift shortfall and standing floor without pretending to
+  measure or repair either. This serialized correction grants no global
+  workflow change and no production-behavior change.
+- Advisor consultation 4, before-done checkpoint (2026-09-08): accepted the
+  implementation and equivalent survivor reasoning, but found that the
+  Makefile enumerates integration suites and omitted the new terrain suite.
+  Accepted as a correctness blocker: registered `rust-test-terrain` in the
+  existing `rust-test-all` aggregation and CI target matrix. No parallel
+  workflow or unrelated CI repair. Test-selection change triggers another
+  fresh mutation run; remaining parent review/completion checks are pending.
+  Self-review of this remediation found the minimal existing-target approach
+  sufficient; registration checks and the final fresh mutation run passed. Total advisor consultations so far: 4 (two implementer
+  checkpoints and two orchestrator requirement/exception consultations).
+- Implementer handoff: 4 advisor consultations; 2 pre-review remediation
+  passes (mutation coverage and advisor-requested test registration), no
+  post-review remediation yet. Requirement corrections and user intervention
+  are recorded above. Independent reviewer counts, full `make check`, tested
+  commit and closure documents remain orchestrator-owned and pending.
+  Task-specific usage unavailable.

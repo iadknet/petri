@@ -1,3 +1,5 @@
+import { useId } from "react";
+
 interface ParamFieldProps {
 	label: string;
 	value: number;
@@ -9,7 +11,7 @@ interface ParamFieldProps {
 }
 
 export function ParamField({ label, value, min, max, step, onChange, testId }: ParamFieldProps) {
-	const id = `pattern-param-${label.toLowerCase().replace(/\s+/g, "-")}`;
+	const id = useId();
 	const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
 		const v = Number(e.target.value);
 		if (!Number.isNaN(v)) onChange(Math.min(max, Math.max(min, v)));

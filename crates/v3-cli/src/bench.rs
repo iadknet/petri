@@ -765,6 +765,9 @@ pub struct StructureSizeDistribution {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Environment {
+    /// Locked SmallRng dependency version; absent in historical reports means unmeasured.
+    #[serde(default)]
+    pub rand_version: Option<String>,
     pub generated_at: String,
     pub host: Host,
     pub build_profile: String,
@@ -1883,6 +1886,7 @@ fn build_environment(timings: RunTimings, totals: &Totals, threads: usize) -> En
         .map(|observation| observation.wall_clock_ms)
         .sum();
     Environment {
+        rand_version: Some(locked_rand_version().to_string()),
         generated_at: rfc3339_now(),
         host: detect_host(),
         build_profile: if cfg!(debug_assertions) {
@@ -2438,6 +2442,15 @@ mod tests {
         assert_eq!(environment.wall_clock_ms_total, 800.0);
         assert_eq!(environment.wall_clock_ms_per_creature_tick, 0.2);
         assert_eq!(environment.threads, Some(4));
+        assert_eq!(environment.rand_version.as_deref(), Some("0.8.6"));
+        let mut historical = serde_json::to_value(&environment).unwrap();
+        historical.as_object_mut().unwrap().remove("rand_version");
+        assert_eq!(
+            serde_json::from_value::<Environment>(historical)
+                .unwrap()
+                .rand_version,
+            None
+        );
         assert_eq!(
             environment.throughput.total,
             throughput_rates(200, 4_000, 50, 800.0)
@@ -3257,4 +3270,18 @@ mod tests {
             Indicator::Undefined(_)
         ));
     }
+}
+
+/// Read the build's lockfile rather than attributing a guessed version to a report.
+fn locked_rand_version() -> &'static str {
+    include_str!("../../../Cargo.lock")
+        .split("[[package]]")
+        .find(|package| package.lines().any(|line| line == "name = \"rand\""))
+        .and_then(|package| {
+            package
+                .lines()
+                .find_map(|line| line.strip_prefix("version = \""))
+        })
+        .and_then(|version| version.strip_suffix('"'))
+        .expect("workspace lockfile contains rand version")
 }

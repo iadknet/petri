@@ -48,6 +48,7 @@ jobs:
           - rust-test-core-unit
           - rust-test-creature-workflow
           - rust-test-priority-bid
+          - rust-test-terrain
           - rust-test-vm-all-opcodes
           - rust-test-cli
           - rust-test-server

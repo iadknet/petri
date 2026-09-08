@@ -1,11 +1,7 @@
 import { usePaintStore } from "../stores/paint.ts";
 import { usePatternStore } from "../stores/pattern.ts";
-import type { PatternParams, PatternType } from "../types/api.ts";
-import { LinesParams } from "./pattern-params/LinesParams.tsx";
-import { MazeParams } from "./pattern-params/MazeParams.tsx";
-import { NoiseParams } from "./pattern-params/NoiseParams.tsx";
-import { SpiralParams } from "./pattern-params/SpiralParams.tsx";
-import { StarParams } from "./pattern-params/StarParams.tsx";
+import type { PatternType } from "../types/api.ts";
+import { PatternParamsPanel } from "./pattern-params/PatternParamsPanel.tsx";
 
 const PATTERNS: { id: PatternType; label: string }[] = [
 	{ id: "Maze", label: "Maze" },
@@ -14,27 +10,6 @@ const PATTERNS: { id: PatternType; label: string }[] = [
 	{ id: "ParallelLines", label: "Lines" },
 	{ id: "Star", label: "Star" },
 ];
-
-function PatternParamsPanel({
-	params,
-	onChange,
-}: {
-	params: PatternParams;
-	onChange: (params: PatternParams) => void;
-}) {
-	switch (params.pattern_type) {
-		case "Maze":
-			return <MazeParams params={params} onChange={(p) => onChange(p)} />;
-		case "Spiral":
-			return <SpiralParams params={params} onChange={(p) => onChange(p)} />;
-		case "Noise":
-			return <NoiseParams params={params} onChange={(p) => onChange(p)} />;
-		case "ParallelLines":
-			return <LinesParams params={params} onChange={(p) => onChange(p)} />;
-		case "Star":
-			return <StarParams params={params} onChange={(p) => onChange(p)} />;
-	}
-}
 
 interface PatternToolbarProps {
 	onApply: () => void;

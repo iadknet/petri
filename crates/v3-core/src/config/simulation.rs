@@ -280,6 +280,15 @@ impl Default for AnnealingConfig {
     }
 }
 
+/// One additive startup barrier layer, using the existing pattern schema.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct TerrainLayer {
+    pub params: crate::patterns::PatternParams,
+    pub bounds: Option<crate::patterns::PatternBounds>,
+    pub seed: Option<u64>,
+}
+
 /// World/grid config. Canonical owner: v3-world-grid-spec.md Section 4.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -287,6 +296,10 @@ pub struct WorldConfig {
     pub width: u16,
     pub height: u16,
     pub edge_mode: WorldEdgeMode,
+    #[serde(default)]
+    pub terrain: Vec<TerrainLayer>,
+    #[serde(default)]
+    pub world_seed: Option<u64>,
     pub food: FoodConfig,
 }
 
@@ -296,6 +309,8 @@ impl Default for WorldConfig {
             width: 1600,
             height: 1600,
             edge_mode: WorldEdgeMode::default(),
+            terrain: Vec::new(),
+            world_seed: None,
             food: FoodConfig::default(),
         }
     }
