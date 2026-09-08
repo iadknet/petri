@@ -7,6 +7,7 @@ import type {
 	FoodTypeConfig,
 	StartupFoodConfig,
 	StartupFoodRequest,
+	TerrainLayer,
 	WorldEdgeMode,
 } from "../types/config.ts";
 import type { StartupRequest } from "../types/http.ts";
@@ -21,6 +22,8 @@ export interface StartupPreset {
 		width: number;
 		height: number;
 		edge_mode: WorldEdgeMode;
+		terrain: TerrainLayer[];
+		world_seed: number | null;
 		food: StartupFoodConfig;
 	};
 	energy: {
@@ -308,6 +311,8 @@ function buildDefaultPreset(): StartupPreset {
 			width: 1600,
 			height: 1600,
 			edge_mode: "Wrap",
+			terrain: [],
+			world_seed: null,
 			food: buildDefaultFoodConfig(),
 		},
 		energy: { initial_energy: 20.0 },
@@ -332,6 +337,8 @@ function fromServerConfig(config: SimulationConfig): StartupPreset {
 			width: config.world.width,
 			height: config.world.height,
 			edge_mode: config.world.edge_mode,
+			terrain: structuredClone(config.world.terrain),
+			world_seed: config.world.world_seed,
 			food: fromServerFoodConfig(config.world.food),
 		},
 		energy: { initial_energy: config.energy.lifecycle.initial_energy },
@@ -551,6 +558,8 @@ export function buildStartupRequest(preset: StartupPreset): StartupRequest {
 			width: preset.world.width,
 			height: preset.world.height,
 			edge_mode: preset.world.edge_mode,
+			terrain: structuredClone(preset.world.terrain),
+			world_seed: preset.world.world_seed,
 			food: buildStartupFoodRequest(preset.world.food),
 		},
 		energy: {

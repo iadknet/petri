@@ -92,7 +92,11 @@ fn patch_has_invalid_food_shared_shape(patch: &serde_json::Value) -> bool {
 
 fn patch_touches_world_topology(patch: &serde_json::Value) -> bool {
     patch.get("world").is_some_and(|w| {
-        w.get("width").is_some() || w.get("height").is_some() || w.get("edge_mode").is_some()
+        w.get("width").is_some()
+            || w.get("height").is_some()
+            || w.get("edge_mode").is_some()
+            || w.get("terrain").is_some()
+            || w.get("world_seed").is_some()
     })
 }
 

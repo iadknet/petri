@@ -22,7 +22,7 @@ Related references:
 
 This document defines:
 - startup ownership boundaries for initial world and creature seeding;
-- deterministic startup seeding contract for world food and founder placement;
+- deterministic startup seeding contract for terrain, fertility, food, and founder placement;
 - canonical baseline founder-profile policy for v3alpha1;
 - startup viability rejection semantics;
 - startup invariants for first state/frame outputs.
@@ -63,7 +63,7 @@ startup(seed, overrides?)
 Conceptual override domains:
 - `population` (initial counts, limits, and the founder profile; canonical
   defaults in `v3-runtime-config-spec.md` Section 5),
-- `world` (`width`, `height`, `edge_mode`, `food.shared`, `food.types`,
+- `world` (`width`, `height`, `edge_mode`, `terrain`, `world_seed`, `food.shared`, `food.types`,
   `food.fertility`),
 - `energy` (lifecycle and action-cost controls),
 - `runtime` (mesh/vm/graph/mutation controls),
@@ -87,7 +87,7 @@ uses the shared live `energy.costs.eat_reward_per_food` reward, default `5.0`.
 ## 4. Deterministic Startup Seeding Contract
 
 For identical startup inputs and seed:
-- seeded food distribution is deterministic,
+- applied terrain, fertility, and seeded food distribution are deterministic,
 - founder spawn attempt ordering is deterministic,
 - resulting initial world state and initial creature set are deterministic.
 
@@ -97,17 +97,32 @@ policy in `AGENTS.md`).
 
 Seeding flow contract:
 1. Build effective startup config from defaults plus accepted overrides.
-2. Seed world food using world food initialization semantics from
+2. Create the empty world and apply configured terrain layers in order, before
+   fertility, food, or founders. Bounds and union rules are owned by
+   `v3-world-grid-spec.md` Section 4. Derive each independent layer seed from its
+   explicit seed or `world.world_seed.unwrap_or(run_seed).wrapping_add(index)`.
+3. Seed fertility using that effective map seed and its existing layer overrides.
+   Terrain consumes no run-RNG draws. Clustered Noise sorts candidate cells
+   before seeded shuffle/truncation so hash iteration cannot select barriers.
+4. Seed world food using world food initialization semantics from
    `v3-world-grid-spec.md`.
    - v3alpha1 seeds exact coverage over non-barrier cells:
      `round(initial_coverage * eligible_cells)` unique cells.
    - Seeded density uses normalized `f32` food values in canonical `[0.0, 1.0]`
      scale (clamped by `world.food.shared.max_density`).
-3. Seed founders from the founder profile selected per Section 5 (default:
+5. Seed founders from the founder profile selected per Section 5 (default:
    the canonical v3alpha1 genome of Section 5.1).
-4. Commit simulation state at tick `0` in `idle` state.
+6. Commit simulation state at tick `0` in `idle` state.
 
 ---
+
+`SmallRng` remains the world-generation and run generator: the locked `rand`
+0.8.6 wrapper and `rand_xoshiro` 0.6.0 `Xoshiro256PlusPlus` have different
+`seed_from_u64` expansion and streams. Reproducibility is for the locked
+versions/platform, not a cross-version/platform guarantee. New benchmark
+reports record the actual locked `rand_version`; historical absence is
+unmeasured. `noise` remains lockfile-pinned. Empty terrain and an absent map seed
+preserve production run draws and trajectories.
 
 ## 5. Founder Baseline Policy (v3alpha1)
 

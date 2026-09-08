@@ -1,3 +1,5 @@
+import type { PatternBounds, PatternParams } from "./pattern.ts";
+
 export type FertilityAlgorithm =
 	| { Uniform: { value: number } }
 	| {
@@ -99,10 +101,18 @@ export interface FoodConfig {
 
 export type WorldEdgeMode = "Wrap" | "Bounded";
 
+export interface TerrainLayer {
+	params: PatternParams;
+	bounds?: PatternBounds | null;
+	seed?: number | null;
+}
+
 export interface WorldConfig {
 	width: number;
 	height: number;
 	edge_mode: WorldEdgeMode;
+	terrain: TerrainLayer[];
+	world_seed: number | null;
 	food: FoodConfig;
 }
 

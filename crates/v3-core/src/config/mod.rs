@@ -6,5 +6,5 @@ pub use simulation::{
     FertilityConfig, FertilityLayer, FertilityLayerTarget, FoodConfig, FoodResourceConfig,
     FoodTypeConfig, FounderProfile, MutationConfig, OccupancyDepletionConfig, PhenotypeConfig,
     PopulationConfig, PredationConfig, ReachableBiasConfig, RuntimeConfig, SimulationConfig,
-    VmRuntimeConfig, WorldConfig, WorldEdgeMode,
+    TerrainLayer, VmRuntimeConfig, WorldConfig, WorldEdgeMode,
 };

@@ -203,6 +203,11 @@ Request (conceptual v3alpha2 shape):
 Request rules:
 - `seed` is required.
 - Other domains are optional structured overrides.
+- `world.terrain` and `world.world_seed` are accepted through the same partial
+  config deep merge. Terrain is an ordered list of existing tagged
+  `PatternParams` layers with optional/null bounds and seeds; the map seed is
+  optional/null. GET config returns these effective fields and tick-zero
+  projections contain their applied barriers before food/founders.
 - Unspecified fields fall back to canonical defaults from world/runtime config
   specs.
 - Startup/config keyspace is canonical from `v3-world-grid-spec.md` and
@@ -515,8 +520,9 @@ Rules:
   apply fallback/clamp normalization to invalid submitted values.
 - A rejected patch applies nothing and names every offending path in
   `error.details.field_errors`.
-- World topology fields (`world.width`, `world.height`, `world.edge_mode`) are
-  restart-only and rejected from PATCH.
+- World topology fields (`world.width`, `world.height`, `world.edge_mode`,
+  `world.terrain`, `world.world_seed`) are restart-only and rejected from PATCH
+  by key presence, including null/empty values, atomically without state changes.
 - Runtime and energy fields are editable in `idle` and `paused`.
 - `startup.*` fields are restart-only and rejected from PATCH.
 - `population.initial_creatures` is restart-only and rejected from PATCH:

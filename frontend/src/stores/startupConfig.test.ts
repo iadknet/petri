@@ -392,3 +392,27 @@ it("energy-only startup defaults serialize one primary food", () => {
 	expect(request).not.toHaveProperty("nutrition");
 	expect(request.world?.food?.types?.[0]).not.toHaveProperty("metabolic_energy_yield");
 });
+
+it("hydrates ordered terrain layers and optional map/layer seeds without aliasing", () => {
+	useStartupConfigStore.getState().reset();
+	const config = structuredClone(MOCK_CONFIG);
+	config.world.world_seed = 123;
+	config.world.terrain = [
+		{
+			params: { pattern_type: "Noise", density: 0.2, cluster_size: 3 },
+			seed: 456,
+			bounds: { x: 2, y: 3, width: 20, height: 30 },
+		},
+		{
+			params: { pattern_type: "Maze", corridor_width: 2, wall_thickness: 1, open_center_radius: 0 },
+			seed: null,
+			bounds: null,
+		},
+	];
+	useStartupConfigStore.getState().hydrateFromServerConfig(config);
+	const request = buildStartupRequest(useStartupConfigStore.getState().preset);
+	expect(request.world?.terrain).toEqual(config.world.terrain);
+	expect(request.world?.world_seed).toBe(123);
+	config.world.terrain.reverse();
+	expect(request.world?.terrain?.[0]?.params.pattern_type).toBe("Noise");
+});

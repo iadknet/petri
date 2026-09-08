@@ -705,18 +705,25 @@ async fn patch_config_world_topology_fields_are_restart_only() {
         .oneshot(startup_req(r#"{"seed":1}"#))
         .await
         .unwrap();
-
-    let (status, body) = do_request(
-        a,
-        patch_req("/v3/simulation/config", r#"{"world":{"width":200}}"#),
-    )
-    .await;
-    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
-    assert_eq!(
-        body["error"]["code"].as_str(),
-        Some("validation_rejected"),
-        "body: {body}"
-    );
+    for patch in [
+        r#"{"world":{"width":200}}"#,
+        r#"{"world":{"height":200}}"#,
+        r#"{"world":{"edge_mode":"Bounded"}}"#,
+    ] {
+        let (status, body) = do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
+        assert_eq!(
+            body["error"]["code"].as_str(),
+            Some("validation_rejected"),
+            "body: {body}"
+        );
+        assert!(
+            body["error"]["details"]["field_errors"]
+                .to_string()
+                .contains("restart-only"),
+            "{body}"
+        );
+    }
 }
 
 // ── 11b. get_config_omits_retired_topology_new_node_birth ──────────────
@@ -3623,4 +3630,50 @@ async fn patch_config_applies_a_fully_valid_mixed_patch() {
         &after["config"]["world"]["food"]["shared"]["growth_rate"],
         0.12,
     );
+}
+
+#[tokio::test]
+async fn terrain_fields_are_restart_only_even_when_empty_or_null() {
+    let a = app();
+    let (_, before) = do_request(a.clone(), get_req("/v3/simulation/config")).await;
+    for patch in [
+        r#"{"world":{"terrain":[]}}"#,
+        r#"{"world":{"terrain":null}}"#,
+        r#"{"world":{"world_seed":null}}"#,
+        r#"{"world":{"world_seed":42},"runtime":{"ticks_per_second":1}}"#,
+    ] {
+        let (status, body) = do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+        assert!(
+            body["error"]["details"]["field_errors"]
+                .to_string()
+                .contains("restart-only"),
+            "{body}"
+        );
+        let (_, after) = do_request(a.clone(), get_req("/v3/simulation/config")).await;
+        assert_eq!(before, after);
+    }
+}
+
+#[tokio::test]
+async fn startup_terrain_partial_override_projects_applied_barriers() {
+    let state = test_state();
+    let a = router(state.clone());
+    let (status,body)=do_request(a.clone(),startup_req(r#"{"seed":42,"world":{"world_seed":7,"terrain":[{"params":{"pattern_type":"Noise","density":1.0,"cluster_size":1},"bounds":{"x":1,"y":2,"width":3,"height":4},"seed":null}]}}"#)).await;
+    assert_eq!(status, StatusCode::OK, "{body}");
+    let (_, body) = do_request(a.clone(), get_req("/v3/simulation/config")).await;
+    assert_eq!(body["config"]["world"]["world_seed"], 7);
+    assert_eq!(body["config"]["world"]["terrain"][0]["bounds"]["width"], 3);
+    assert_eq!(body["config"]["world"]["height"], 64);
+    {
+        let projection = state.projection.read().unwrap();
+        let frame = &projection.current().ws_frame.frame;
+        assert_eq!(frame.barriers.len(), 12);
+        assert!(frame
+            .barriers
+            .iter()
+            .all(|p| p.x >= 1 && p.x < 4 && p.y >= 2 && p.y < 6));
+    }
+    let (status,_)=do_request(a,startup_req(r#"{"seed":42,"world":{"terrain":[{"params":{"pattern_type":"Noise","density":0.1,"cluster_size":1},"oops":1}]}}"#)).await;
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
 }

@@ -11,6 +11,7 @@ use crate::creature::genome::CreatureGenome;
 use crate::creature::identity::CreatureIdentityState;
 use crate::creature::state::CreatureState;
 use crate::kernel::WorldState;
+use crate::patterns::{generate_pattern_seeded, PatternBounds};
 use crate::simulation::simulation::Simulation;
 
 /// Founder phenotype baseline — 6 HSL-mapped channels that produce RGB [204, 61, 61].
@@ -23,10 +24,11 @@ const FOUNDER_POLARITY: [bool; 6] = [true; 6];
 /// Steps per v3-startup-seeding-spec.md Section 4:
 /// 1. Seed RNG from `seed`.
 /// 2. Create an empty world with dimensions and edge mode from config.
-/// 3. Seed food into the world.
-/// 4. Collect all non-barrier cells, shuffle, take the first `initial_creatures` positions.
-/// 5. Place a founder creature at each selected position.
-/// 6. Return the assembled `Simulation`.
+/// 3. Apply terrain and seed fertility from independent map/layer seeds.
+/// 4. Seed food from the run RNG.
+/// 5. Collect all non-barrier cells, shuffle, take the first `initial_creatures` positions.
+/// 6. Place a founder creature at each selected position.
+/// 7. Return the assembled `Simulation`.
 pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
     let mut rng = SmallRng::seed_from_u64(seed);
 
@@ -35,8 +37,32 @@ pub fn seed_simulation(config: SimulationConfig, seed: u64) -> Simulation {
         config.world.height,
         config.world.edge_mode,
     );
+    let map_seed = config.world.world_seed.unwrap_or(seed);
+    for (index, layer) in config.world.terrain.iter().enumerate() {
+        let bounds = layer.bounds.unwrap_or(PatternBounds {
+            x: 0,
+            y: 0,
+            width: world.width,
+            height: world.height,
+        });
+        // Intersect without wrapping or adding potentially overflowing u16 endpoints.
+        let bounds = PatternBounds {
+            width: bounds.width.min(world.width.saturating_sub(bounds.x)),
+            height: bounds.height.min(world.height.saturating_sub(bounds.y)),
+            ..bounds
+        };
+        if bounds.width == 0 || bounds.height == 0 {
+            continue;
+        }
+        let layer_seed = layer
+            .seed
+            .unwrap_or_else(|| map_seed.wrapping_add(index as u64));
+        for point in generate_pattern_seeded(bounds, &layer.params, layer_seed) {
+            world.set_barrier(Position::new(point.x, point.y), true);
+        }
+    }
     world.reconfigure_food(config.world.food.clone());
-    world.seed_fertility(seed);
+    world.seed_fertility(map_seed);
     world.seed_food(&mut rng);
 
     // Collect all non-barrier, in-bounds positions.

@@ -19,7 +19,7 @@ Related references:
 ## 1. Purpose and Scope
 
 This document defines:
-- canonical world/grid configuration keys, defaults, and normalization;
+- canonical world/grid configuration keys, defaults, normalization, and startup terrain;
 - world coordinate and direction mapping;
 - edge-mode behavior (`wrap` and `bounded`);
 - arbitrary local-offset resolution primitives consumed by perception and action
@@ -114,6 +114,8 @@ This file is the canonical owner for world/grid config keys/defaults.
 | `world.width` | `u16` | `1600` | Must be `>= 1`; invalid values fall back to `1600`. |
 | `world.height` | `u16` | `1600` | Must be `>= 1`; invalid values fall back to `1600`. |
 | `world.edge_mode` | `enum{wrap,bounded}` | `wrap` | Unknown/invalid values fall back to `wrap`. |
+| `world.terrain` | `TerrainLayer[]` | `[]` | Ordered additive barrier layers; absent defaults to empty. |
+| `world.world_seed` | `Option<u64>` | absent/null | Effective terrain/fertility seed is this value or the run seed. |
 | `world.food.shared.growth_rate` | `f32` | `0.09` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.09`. |
 | `world.food.shared.initial_density` | `f32` | `1.0` | Clamp to `[0.0, max_density]`; invalid falls back to `max_density`. |
 | `world.food.shared.initial_coverage` | `f32` | `0.54` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.54`. The two default typed entries seed independently at `0.27` each. |
@@ -126,6 +128,20 @@ This file is the canonical owner for world/grid config keys/defaults.
 | `world.food.shared.occupancy_depletion.deposit_per_occupied_tick` | `f32` | `0.08` | Must be finite; clamp to `[0.0, 1.0]`; invalid falls back to `0.08`. Amount of depletion deposited into each occupied passable cell per Phase 0 update. |
 | `world.food.types` | `FoodTypeConfig[]` | `[Primary Food]` | Ordered list of configured ordinary-food types. List position is the stable per-run `OrdinaryFoodTypeId`; each entry carries display metadata and startup seeding knobs. Empty lists normalize to one green Primary Food with density `1.0` and coverage `0.54`. |
 | `world.food.fertility.layers[].target` | `enum{AllFoods,SingleType{type_idx}}` | `AllFoods` | Fertility layer selector. Invalid/unknown targeted type indices normalize to `AllFoods` during config normalization. |
+
+Terrain layers contain required `params: PatternParams` and optional/null `bounds:
+PatternBounds` and `seed: u64`; unknown layer fields are rejected. The existing
+`Maze`, `Spiral`, `Noise`, `ParallelLines`, and `Star` tagged parameter variants
+and their normalization are reused. Absent bounds cover the whole world;
+explicit `u16` rectangles intersect the world without wrapping, with saturating
+subtraction from their origin before clipping width/height. Empty intersections
+produce no barriers. Layers union through `set_barrier`; they never erase.
+Startup terrain is not subject to the runtime HTTP pattern area's 1,000,000-cell
+cap. Layer index `i` uses its explicit seed or effective map seed plus `i`,
+wrapping in `u64`. Terrain and fertility derive independently and consume no
+run-RNG draws. The map seed fixes barriers/fertility, while food placement,
+founders, and runtime draws still depend on the run seed. Both new world fields
+are restart-only, including null/empty PATCH values.
 
 Food-type catalog posture:
 - `world.food.types` is ordered, and the list index defines the stable per-run
