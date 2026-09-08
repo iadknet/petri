@@ -40,6 +40,12 @@ pub struct TickSampleEvent {
     pub tick: u64,
     pub population: usize,
     pub mean_energy: f32,
+    /// Mean total genome size (junk included) over the living population.
+    pub mean_genome_size: f64,
+    /// Mean mesh node count over the living population.
+    pub mean_mesh_nodes: f64,
+    /// Mean lineage depth over the living population.
+    pub mean_generation: f64,
     pub reproduction_actions_attempted_total: u64,
     pub reproduction_actions_spawned_total: u64,
     pub reproduction_actions_rejected_total: u64,
@@ -124,13 +130,43 @@ pub fn run_simulation<W: std::io::Write>(
     Ok(())
 }
 
+/// Means of the living population's structure and lineage depth, in one pass:
+/// total genome size (junk included), mesh node count, and generation. All
+/// `0.0` for an empty population, like `Simulation::mean_energy`.
+fn structure_means(sim: &v3_core::simulation::Simulation) -> (f64, f64, f64) {
+    let population = sim.creatures.len();
+    if population == 0 {
+        return (0.0, 0.0, 0.0);
+    }
+    let (genome_size, mesh_nodes, generation) = sim.creatures.values().fold(
+        (0u64, 0u64, 0u64),
+        |(genome_size, mesh_nodes, generation), c| {
+            (
+                genome_size + u64::from(c.cached_genome_size),
+                mesh_nodes + c.genome.nodes.len() as u64,
+                generation + c.generation,
+            )
+        },
+    );
+    let population = population as f64;
+    (
+        genome_size as f64 / population,
+        mesh_nodes as f64 / population,
+        generation as f64 / population,
+    )
+}
+
 fn build_tick_sample(sim: &v3_core::simulation::Simulation, tick: u64) -> TickSampleEvent {
+    let (mean_genome_size, mean_mesh_nodes, mean_generation) = structure_means(sim);
     TickSampleEvent {
         protocol_version: PROTOCOL_VERSION,
         event_type: "tick_sample",
         tick,
         population: sim.creatures.len(),
         mean_energy: sim.mean_energy(),
+        mean_genome_size,
+        mean_mesh_nodes,
+        mean_generation,
         reproduction_actions_attempted_total: sim.stats.reproduction_actions_attempted_total,
         reproduction_actions_spawned_total: sim.stats.reproduction_actions_spawned_total,
         reproduction_actions_rejected_total: sim.stats.reproduction_actions_rejected_total,
@@ -177,3 +213,41 @@ fn emit<W: std::io::Write, T: Serialize>(out: &mut W, event: &T) -> Result<(), R
 }
 
 pub mod bench;
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn structure_means_are_zero_for_an_empty_population() {
+        let mut cfg = SimulationConfig::default();
+        cfg.world.width = 32;
+        cfg.world.height = 32;
+        cfg.population.initial_creatures = 0;
+        let sim = seed_simulation(cfg, 42);
+        assert_eq!(sim.creatures.len(), 0);
+        assert_eq!(structure_means(&sim), (0.0, 0.0, 0.0));
+    }
+
+    #[test]
+    fn structure_means_average_the_living_population() {
+        let mut cfg = SimulationConfig::default();
+        cfg.world.width = 32;
+        cfg.world.height = 32;
+        cfg.population.initial_creatures = 4;
+        let sim = seed_simulation(cfg, 42);
+        assert_eq!(sim.creatures.len(), 4);
+
+        let expected_genome_size = f64::from(
+            sim.creatures
+                .values()
+                .map(|c| c.cached_genome_size)
+                .sum::<u32>(),
+        ) / 4.0;
+        assert_eq!(
+            structure_means(&sim),
+            (expected_genome_size, 2.0, 0.0),
+            "founders carry two mesh nodes and generation zero"
+        );
+    }
+}

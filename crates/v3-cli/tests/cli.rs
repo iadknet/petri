@@ -210,3 +210,39 @@ fn run_completed_has_final_mean_energy() {
         "final_mean_energy must be non-negative"
     );
 }
+
+// ── Structure means on tick_sample (T03.F08) ────────────────────────────────
+
+fn first_tick_sample(events: &[serde_json::Value]) -> &serde_json::Value {
+    events
+        .iter()
+        .find(|e| e["event_type"] == "tick_sample")
+        .expect("a tick_sample must be emitted")
+}
+
+#[test]
+fn tick_sample_reports_the_founder_structure_means_before_any_birth() {
+    // min_reproduce_age is 20 ticks, so at tick 1 every creature is a founder.
+    let events = run_and_collect(1, 1);
+    let sample = first_tick_sample(&events);
+    assert_eq!(sample["population"].as_u64().unwrap(), 10);
+    assert_eq!(sample["mean_genome_size"].as_f64().unwrap(), 111.0);
+    assert_eq!(sample["mean_mesh_nodes"].as_f64().unwrap(), 2.0);
+    assert_eq!(sample["mean_generation"].as_f64().unwrap(), 0.0);
+}
+
+#[test]
+fn tick_sample_mean_generation_rises_once_the_population_reproduces() {
+    let events = run_and_collect(60, 60);
+    let sample = first_tick_sample(&events);
+    assert!(
+        sample["population"].as_u64().unwrap() > 10,
+        "the fixture must reproduce for this reading to mean anything"
+    );
+    assert!(
+        sample["mean_generation"].as_f64().unwrap() > 0.0,
+        "descendants must lift the mean generation above the founders' zero"
+    );
+    assert!(sample["mean_genome_size"].as_f64().unwrap() > 0.0);
+    assert!(sample["mean_mesh_nodes"].as_f64().unwrap() > 0.0);
+}
