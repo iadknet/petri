@@ -1,0 +1,2 @@
+cost wall_seconds=754
+control wall_seconds=1575
