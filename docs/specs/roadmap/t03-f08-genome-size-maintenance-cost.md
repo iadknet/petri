@@ -97,10 +97,10 @@ Fixed design, decided before implementation:
 | Decision | Value |
 | --- | --- |
 | Unit | `genome_size()` units, not mesh nodes. Junk lives inside nodes as well as between them: the live executed VM programs are 159 instructions long with 72 live (depth note Section 3.3), and a 500-instruction node carries more than a 19-instruction detour. Per-node pricing would leave intra-node introns free and reward packing junk into fewer, larger nodes. `genome_size()` already exists, counts everything with equal weights, and is what the size-pressure lever reads, so the two levers are comparable in T11.F13. |
-| Rate | `energy.lifecycle.genome_carry_cost_per_unit`, `f32`, default `1e-4` energy per unit per tick. Finite and non-negative; invalid values fall back to `1e-4`; `0.0` disables the charge. Sizing from the evidence (corrected 2026-09-07 after implementation: the canonical founder is 111 `genome_size()` units at this revision, not the 96 the depth note and the track note carry from an earlier revision; the rate was not changed): the founder's 111 units pay 0.0111 per tick, 2.2% of the 0.5 decay; a live median executed core (`complexity()` 532) would pay 0.053 (10.6% of decay); the deep run's median genome (6,246) would pay 0.625, 1.25 times decay, so a creature carrying that much junk pays 2.25 times the founder's maintenance; a typical junk mesh node (about 55 units) pays 0.0055 per tick, about 1% of decay, which at goal populations of 1,000 to 4,000 is a selection coefficient the population can see. At the goal profile's depth (about 3 units of growth per generation, so about 250 units by generation 50) the charge is about 5% of decay, so persistence is not expected to move much. |
+| Rate | `energy.lifecycle.genome_carry_cost_per_unit`, `f32`, default `1e-4` energy per unit per tick. Finite and non-negative; invalid values fall back to `1e-4`; `0.0` disables the charge. Sizing from the evidence (corrected 2026-09-07 after implementation: the canonical founder is 111 `genome_size()` units at this revision, not the 96 the depth note and the track note carry from an earlier revision; the rate was not changed): the founder's 111 units pay 0.0111 per tick, 2.22% of the 0.5 decay; a live median executed core (`complexity()` 532) would pay 0.053 (10.6% of decay); the deep run's median genome (6,246) would pay 0.625, 1.25 times decay, so a creature carrying that much junk pays 2.25 times the founder's maintenance; a typical junk mesh node (about 55 units) pays 0.0055 per tick, about 1% of decay, which at goal populations of 1,000 to 4,000 is a selection coefficient the population can see. At the goal profile's depth the population carries about 180 genome units by generation 50, so the charge is about 3.5% of decay and persistence is not expected to move much. (That generation-50 figure was reconciled 2026-09-07 after implementation: this row estimated "about 250 units, about 5%" and the reading table below estimated "100 units, 2%"; the paired long run measures 183.191 units at generation 48.289, 3.66% of decay, in the cost arm and 172.294 units at generation 48.372, 3.45%, in the control. The single reconciled figure is used everywhere in this spec; the rate was not changed.) |
 | Core versus junk | Same rate for every unit. Recorded as a design choice, not an assumption: the analog (maintenance is charged on tissue kept alive, whether or not it fires) says yes; a discount for executed structure would require the reachability analysis that already exists in `complexity()` and would recreate its blind spot on unreachable junk; and T11.F17 already aims variation at the executed core, so the core's exposure does not depend on a price break here. |
 | Composition with `complexity_cost` | Independent. The carrying charge is a Phase 0 lifecycle cost beside `energy_decay_per_tick`; `complexity_cost` and `age_cost` multiply action costs only and are not applied to it, exactly as they are not applied to decay. Neither lever is edited. |
-| Charge site | The Phase 0 energy-decay sub-step (numbered 3 in `run_phase_0`'s comment and 4 in the orchestration spec) becomes `energy -= energy_decay_per_tick + genome_carry_cost_per_unit * cached_genome_size as f32`, computed as one `f32` sum and one subtraction per creature per tick, immediately before the existing `lifetime_energy_sum` sample and step 4's `energy <= 0.0` removal. A creature whose charge takes it to or below zero dies in the same tick by the existing rule. The ulp of an `f32` at 200 is about 1.5e-5, so the founder's 0.0096 lands. |
+| Charge site | The Phase 0 energy-decay sub-step (numbered 3 in `run_phase_0`'s comment and 4 in the orchestration spec) becomes `energy -= energy_decay_per_tick + genome_carry_cost_per_unit * cached_genome_size as f32`, computed as one `f32` sum and one subtraction per creature per tick, immediately before the existing `lifetime_energy_sum` sample and step 4's `energy <= 0.0` removal. A creature whose charge takes it to or below zero dies in the same tick by the existing rule. The ulp of an `f32` at 200 is about 1.5e-5, so the founder's 0.0111 lands. |
 | Cache | `CreatureState` gains `cached_genome_size: u32`, computed from the genome in `new`, passed through `new_with_cached_fields` from the parent on the no-mutation fast path beside `cached_complexity`, so the per-tick cost is one multiply-add and Phase 0 never walks a genome. |
 | Determinism | Production behavior changes for every creature (every energy trajectory shifts by the charge), so no gate or goal `deterministic` block is predeclared identical to any prior report except the neighborhood and drift-walk blocks, which do not run Phase 0 and are predeclared identical to T03.F10's. Cross-process reproducibility is unchanged in kind and remains covered by `crates/v3-core/tests/reproducibility.rs`. |
 | CLI instrument | `TickSampleEvent` in `v3-cli` gains `mean_genome_size`, `mean_mesh_nodes`, and `mean_generation` (`f64`, means over the living population at the sample tick, computed only at sample ticks from `cached_genome_size`, `genome.nodes.len()`, and `generation`; `0.0` when the population is empty). This is the long-run reading's instrument and the only telemetry added. |
@@ -113,12 +113,12 @@ the T03.F10 gate and goal reports (previous closure), the pinned goal epoch
 
 | Reading | Reference | Predeclaration |
 | --- | --- | --- |
-| Goal persistence (1600², 10,000 founders, seeds 11/22/33, 2,000 ticks) | T03.F10 goal: final 1,786 / 3,712 / 1,306, minimum 959 / 1,366 / 536; T11.F04 `w1600` final 11,610 / 10,398 / 11,093 | No seed goes extinct; final, minimum, and plateau reported beside both references, no direction (the charge is about 5% of decay at this depth). |
-| Goal `reachable_structure_size_distribution` | T03.F10 goal: mean 88.249706, median 74, p25 66, p75 106, max 367 | Reported; no direction. At generation 50 the charge on a 100-unit genome is 2% of decay, too small to read here; the long run below is the instrument for structure. |
+| Goal persistence (1600², 10,000 founders, seeds 11/22/33, 2,000 ticks) | T03.F10 goal: final 1,786 / 3,712 / 1,306, minimum 959 / 1,366 / 536; T11.F04 `w1600` final 11,610 / 10,398 / 11,093 | No seed goes extinct; final, minimum, and plateau reported beside both references, no direction (the charge is about 3.5% of decay at this depth). |
+| Goal `reachable_structure_size_distribution` | T03.F10 goal: mean 88.249706, median 74, p25 66, p75 106, max 367 | Reported; no direction. At generation 50 the charge is about 3.5% of decay (about 180 genome units, the reconciled figure in the Rate row above), too small to read here; the long run below is the instrument for structure. |
 | Goal `vm_steps`, `mesh_hops`, `graph_relax_iters`, `plasticity_updates`, `actions_applied`, `births` | T03.F10 goal and the pinned epoch | Reported under the usual thresholds (work flag +10%, severe +50%); no severe budgeted. Ecology moves, so ok/flag readings are read as ecology, not compute. |
 | Gate counters and wall time | T03.F10 gate and the gate epoch | No severe; wall flags/severe at +25%/+100% on a matching host. No epoch re-pin budgeted. |
 | Founder and evolved neighborhood rows; drift walk rows (changed/all 0.001500 / 0.008000 floors at 1,000 / 2,000; dead pooled 8 / 4,000; hop-cap hits 0; executed and total nodes) | T03.F10 goal | Founder neighborhood and every drift-walk row byte-identical to T03.F10 (neither runs Phase 0). Evolved rows are reported; they are confounded by the changed population as before. Floors not below (strict). |
-| Long run under selection, paired | Depth note: 0.0595 nodes per generation by drift; founder 2 nodes, 96 units | Two `v3-cli run` arms at the default config (1600², 10,000 founders), seed 11, 12,000 ticks, `--sample-every 500`, each wrapped in `scripts/bench-wait`: the cost arm at the default rate and a control arm from a config file identical to the defaults except `genome_carry_cost_per_unit` 0.0. Read at the final sample: `mean_mesh_nodes` and `mean_genome_size` in the cost arm strictly below the control arm's; neither arm extinct; both arms' `mean_generation`, and the slope `(mean_mesh_nodes - 2) / mean_generation`, reported beside 0.0595. Budget: 40 minutes wall time for the pair (about 20 ticks per second at this world size); a pair that exceeds it is reported and stops there. |
+| Long run under selection, paired | Depth note: 0.0595 nodes per generation by drift; founder 2 nodes, 111 units at this revision (the depth note says 96, a reading from an earlier revision) | Two `v3-cli run` arms at the default config (1600², 10,000 founders), seed 11, 12,000 ticks, `--sample-every 500`, each wrapped in `scripts/bench-wait`: the cost arm at the default rate and a control arm from a config file identical to the defaults except `genome_carry_cost_per_unit` 0.0. Read at the final sample: `mean_mesh_nodes` and `mean_genome_size` in the cost arm strictly below the control arm's; neither arm extinct; both arms' `mean_generation`, and the slope `(mean_mesh_nodes - 2) / mean_generation`, reported beside 0.0595. Budget: 40 minutes wall time for the pair (about 20 ticks per second at this world size); a pair that exceeds it is reported and stops there. Artifacts stored under `docs/progress/sweeps/t03-f08/` (`cost.ndjson`, `control.ndjson`, `control-config.json`, `timing.txt`, `run.sh`). |
 | Observation budgets | Workflow caps | Founder neighborhood below 10 s; summed evolved below 180 s; drift walk below 30 s; whole goal run below 15 minutes. |
 
 ## Implementation Tasks
@@ -172,7 +172,9 @@ the T03.F10 gate and goal reports (previous closure), the pinned goal epoch
       the observation budgets, and the compute comparisons.
 - [x] Paired long run, once, as predeclared: the two `v3-cli run` command
       lines, the control config's diff from the defaults, the final-sample
-      readings of both arms, and the wall time of each arm, recorded below.
+      readings of both arms, and the wall time of each arm, recorded below,
+      with both arms' NDJSON, the control config, the timing file, and the
+      runner stored under `docs/progress/sweeps/t03-f08/`.
 - [x] Second goal run: Not applicable by the 2026-09-05 workflow decision;
       `crates/v3-core/tests/reproducibility.rs` covers cross-process
       reproducibility inside `make check`.
@@ -191,8 +193,10 @@ the Fixed design table changes: the rate stays `1e-4`, decided before
 implementation and not adjusted after measurement. The consequence is that the
 founder pays `0.0111` per tick, **2.22%** of the `0.5` decay rather than the
 1.9% the sizing paragraph predicted, so the first clause of the second success
-criterion ("the founder pays under 2% of decay") is not met as written. This
-is recorded, not waived; the orchestrator owns the decision.
+criterion as originally written ("the founder pays under 2% of decay") is not
+met. This is recorded, not waived: the orchestrator amended that clause on
+2026-09-07 to the testable bound "no more than 2.5% of decay", with the rate
+left at `1e-4`.
 
 ### Results, 2026-09-07
 
@@ -231,6 +235,32 @@ Commands run in the worktree, in this order, and their results:
 - `make bench PROFILE=goal FEATURE=t03-f08-genome-size-maintenance-cost` —
   exit 0, report stored, `severe=false`. Run once, per the 2026-09-05
   decision.
+
+Remediation pass, 2026-09-07, documentation only (no production code, no
+benchmark or long-run rerun; the source tree is unchanged since `fdf2ecef`).
+Commands run in the worktree and their results:
+
+- Verification of the stored long-run artifacts against the readings recorded
+  below, re-read from `docs/progress/sweeps/t03-f08/cost.ndjson` and
+  `control.ndjson` with `python3`: 24 `tick_sample` events per arm at ticks
+  500–12,000 between one `run_started` and one `run_completed`; final sample
+  `mean_genome_size` 386.535913 / 1,093.835901, `mean_mesh_nodes` 10.126750 /
+  18.402314, `mean_generation` 177.345373 / 301.349388, `population` 12,071 /
+  19,537, `mean_energy` 31.412428 / 20.201092, node slopes 0.045824 / 0.054430,
+  units per generation 1.553668 / 3.261450, no zero-population sample, minimum
+  sampled populations 1,674 at tick 1,000 and 1,047 at tick 1,500 — every
+  figure equal to the record except the `population` delta, corrected from
+  -38.22% to -38.21%. `shasum -a 256` equal between each stored file and its
+  scratchpad original.
+- `docs/progress/sweeps/t03-f08/control-config.json` compared field by field
+  over flattened JSON against the `default-config.json` dump the implementing
+  pass captured from `config_serde_roundtrip_preserves_defaults` (not a freshly
+  serialized `SimulationConfig::default()`): exactly one value difference,
+  `energy.lifecycle.genome_carry_cost_per_unit` `0.0001` to `0.0`. The cost
+  arm's config file has zero value differences against that same dump.
+- `make roadmap-check` — `roadmap-check: validation passed`, exit 0.
+- `make check-docs` — exit 0 (documentation-only edits: this spec plus the five
+  stored artifacts).
 
 Two pre-existing tests changed, both because the new charge is a world-level
 Phase 0 cost their fixtures deliberately zero out:
@@ -340,7 +370,7 @@ creature's energy now moves by the charge; the founder neighborhood and
 drift-walk blocks are predeclared identical to T03.F10's.
 
 The paired long run is the feature's structural reading: the goal profile at
-generation 50 cannot see a 2% charge, and the drift walk has no energy. Its
+generation 50 cannot see a 3.5% charge, and the drift walk has no energy. Its
 predeclared direction is that carried structure is smaller under the cost
 than without it at the same tick, with no extinction. A reading that is not
 below is investigated before closure, since it would mean the rate is under
@@ -373,14 +403,25 @@ Predeclared readings:
 
 #### Paired long run, seed 11, 12,000 ticks
 
-Run once. The two arms, each wrapped in `scripts/bench-wait` and invoking the
-already-built release binary directly so the wall times exclude compilation:
+Run once. Artifacts stored under
+[`docs/progress/sweeps/t03-f08/`](../../progress/sweeps/t03-f08/):
+
+| File | Contents |
+| --- | --- |
+| [`cost.ndjson`](../../progress/sweeps/t03-f08/cost.ndjson) | Cost arm's full NDJSON stream: `run_started`, 24 `tick_sample` events at ticks 500–12,000, `run_completed` |
+| [`control.ndjson`](../../progress/sweeps/t03-f08/control.ndjson) | Control arm's full NDJSON stream, same shape |
+| [`control-config.json`](../../progress/sweeps/t03-f08/control-config.json) | The control arm's config file |
+| [`timing.txt`](../../progress/sweeps/t03-f08/timing.txt) | `cost wall_seconds=754`, `control wall_seconds=1575`, written by the runner |
+| [`run.sh`](../../progress/sweeps/t03-f08/run.sh) | The runner, verbatim: the exact command lines both arms executed |
+
+Both arms were wrapped in `scripts/bench-wait` and invoked the already-built
+release binary directly so the wall times exclude compilation. The command
+line, from `run.sh`:
 
 ```
 scripts/bench-wait target/release/v3-cli run \
-  --ticks 12000 --sample-every 500 --seed 11 --config <cost-config.json>
-scripts/bench-wait target/release/v3-cli run \
-  --ticks 12000 --sample-every 500 --seed 11 --config <control-config.json>
+  --ticks 12000 --sample-every 500 --seed 11 --config <arm config> \
+  > longrun-<arm>.ndjson
 ```
 
 Both config files came from one source: `SimulationConfig::default()`
@@ -388,8 +429,18 @@ serialized with `serde_json::to_string_pretty` by a temporary `println!` added
 to the existing `config_serde_roundtrip_preserves_defaults` test, captured with
 `cargo test -p v3-core --lib config_serde_roundtrip_preserves_defaults --
 --nocapture`, with the marker reverted by `git checkout` before the runs (the
-worktree was clean at `fdf2ecef` when both arms started). Their entire diff is
-one line:
+worktree was clean at `fdf2ecef` when both arms started). `run.sh` names the
+scratchpad paths the two config files had while the pair ran; the stored
+`control-config.json` is that control file byte for byte. The cost arm's file
+is not stored separately because it compares equal in every value to the
+`default-config.json` dump captured from
+`config_serde_roundtrip_preserves_defaults` below (checked field by field over
+the flattened JSON: zero value differences), which is what running with no
+`--config` uses.
+
+The control config's diff from that same default dump, checked the same way,
+is exactly one value — `energy.lifecycle.genome_carry_cost_per_unit` `0.0001` to `0.0` —
+and nothing else, which as text is one line:
 
 ```
      "lifecycle": {
@@ -411,7 +462,7 @@ Final sample, tick 12,000:
 | `mean_genome_size` | 386.535913 | 1,093.835901 | **-64.66%** |
 | `mean_mesh_nodes` | 10.126750 | 18.402314 | **-44.97%** |
 | `mean_generation` | 177.345373 | 301.349388 | -41.15% |
-| `population` | 12,071 | 19,537 | -38.22% |
+| `population` | 12,071 | 19,537 | -38.21% |
 | `mean_energy` | 31.412428 | 20.201092 | +55.50% |
 | node slope `(nodes - 2) / generation` | 0.045824 | 0.054430 | drift reference 0.0595 |
 | genome units per generation `(size - 111) / generation` | 1.553668 | 3.261450 | -52.36% |
@@ -420,6 +471,11 @@ Final sample, tick 12,000:
 Neither arm went extinct at any of its 24 samples; the cost arm's minimum
 sampled population is 1,674 at tick 1,000 and the control's is 1,047 at tick
 1,500.
+
+Every figure in this table was re-read from the two stored NDJSON files on
+2026-09-07 and matches, except the `population` delta, which was recorded as
+-38.22% and is -38.21% (`(12,071 - 19,537) / 19,537 = -38.2148%`); the cell is
+corrected above.
 
 The predeclared direction holds at the final sample on both structural
 readings, and it survives the obvious confound. The control arm is 124
@@ -448,21 +504,25 @@ energy. No cognition claim.
 - [x] Every creature pays `genome_carry_cost_per_unit * genome_size()` energy
       per tick in Phase 0, through the existing energy accounting and death
       rule, with the rate at 0.0 reproducing the pre-feature trajectories.
-- [x] The founder pays about 2% of decay at the default rate (amended
-      2026-09-07 by the orchestrator from "under 2%": that figure was
-      arithmetic on a stale founder size of 96 units; the design intent,
-      a founder budget barely touched, is what the criterion states, and the
-      rate is unchanged), and the paired long run reads less carried
-      structure under the cost than without it.
-      **Both clauses met under the amended wording; the original first clause was not met as written.** The paired long
-      run reads -64.66% genome size and -44.97% mesh nodes under the cost. The
-      founder pays 2.22% of decay, not under 2%, because its genome is 111
-      units and not the 96 the spec's sizing paragraph assumed (see the
-      "Founder size correction"). The rate is left at the `1e-4` the Fixed
-      design table decided before implementation; lowering it to meet a
-      criterion derived from a stale founder size would be tuning after
-      measurement. The orchestrator owns whether to amend the criterion or the
-      rate.
+- [x] The founder pays no more than 2.5% of decay at the default rate, and the
+      paired long run reads less carried structure under the cost than without
+      it.
+      **Both clauses met.** The founder's per-tick charge is
+      `111 * 1e-4 = 0.0111` against the `0.5` decay, **2.22%**, with the
+      founder's 111 `genome_size()` units pinned by
+      `the_canonical_founder_genome_is_one_hundred_eleven_units` in
+      `crates/v3-core/src/creature/state.rs` and the charge itself pinned by
+      the `0.5 + 111e-4` assertion in
+      `crates/v3-core/src/simulation/tick/tests/phase0.rs`. The paired long run
+      reads -64.66% genome size and -44.97% mesh nodes under the cost.
+      This criterion originally read "the founder pays under 2% of decay",
+      which is arithmetic on a stale founder size of 96 units and is **not met
+      as written** (2.22% > 2%). The orchestrator amended it to the 2.5% bound
+      above on 2026-09-07, with the rate unchanged at the `1e-4` the Fixed
+      design table decided before implementation: the design intent is a
+      founder budget barely touched, and lowering the rate to meet a threshold
+      derived from a stale founder size would be tuning after measurement. See
+      the "Founder size correction" above.
 - [x] Gate and goal reports stored with no severe regression; no seed
       extinct; neighborhood and drift rows identical to T03.F10's.
 
@@ -471,8 +531,9 @@ energy. No cognition claim.
 - Founder size: the canonical V3Alpha1 founder is 111 `genome_size()` units
   (complexity 63) at this revision. The roadmap's T03 note and the depth
   research note say 96, a reading from an earlier revision; do not size
-  anything from it. The "under 2%" success clause was amended to "about 2%"
-  for that reason on 2026-09-07, with the rate left at `1e-4`.
+  anything from it. The "under 2%" success clause was amended for that reason
+  on 2026-09-07 to the testable bound "no more than 2.5% of decay" (measured
+  2.22%), with the rate left at `1e-4`.
 - The genome is immutable after birth; do not recompute `genome_size()` in
   the tick loop. Charge the cached value.
 - Do not touch `energy.complexity_cost` or `mutation.genome_size_pressure_enabled`
@@ -481,3 +542,33 @@ energy. No cognition claim.
   with only the rate changed; record how it was produced and its diff.
 - Wrap both long-run arms in `scripts/bench-wait` and do not start competing
   builds, tests, or servers while they run.
+- Bench wall-clock comparison is gated on hostname equality: `Host` in
+  `crates/v3-cli/src/bench.rs` derives `PartialEq` over `hostname`, `os`,
+  `arch`, `cpu_model`, and `logical_cores`, and the comparison only emits a
+  `wall_clock` block when `current.environment.host == reference.environment.host`,
+  so after this machine's rename every wall comparison against the stored
+  references reads `null` until an epoch is re-pinned on the new hostname.
+  Matching on `os`, `arch`, `cpu_model`, and `logical_cores` while excluding
+  `hostname` would be the fix; it is out of this feature's scope.
+- Deferred review findings from the 2026-09-07 review, both P3, neither closed
+  by this feature:
+  - `structure_means` in `crates/v3-cli/src/lib.rs` returns an anonymous
+    three-tuple (`(f64, f64, f64)`). A named struct would be the smallest
+    hardening if a fourth mean is added.
+  - The property test `the_charge_is_the_decay_plus_the_rate_times_the_size`
+    in `crates/v3-core/src/simulation/tick/tests/phase0.rs` pins the
+    implementation's own expression (`decay + rate * size as f32`) rather than
+    an invariant, and could be folded into the example test.
+- Review outcome, 2026-09-07: 0 P1, 1 P2, 7 P3. The P2 (the paired long run's
+  artifacts existed only in a scratchpad) is resolved in this remediation pass
+  by storing them under `docs/progress/sweeps/t03-f08/`. Three P3s are fixed
+  here (the stale `0.0096` and `96 units` figures, the two inconsistent
+  generation-50 estimates, and the untestable "about 2%" success clause); the
+  track note's "founder's 96" is appended at close by the orchestrator; the
+  remaining three are the deferred findings above and the hostname gate.
+- This remediation pass ran on a fresh implementer, not the one that
+  implemented and measured the feature, because `SendMessage` is unavailable
+  in the desktop session. The artifact readings and source citations in this
+  pass were re-derived from the stored NDJSON, the config dumps, and the source
+  files rather than carried over from that context; the review-outcome counts
+  above are the orchestrator's.
