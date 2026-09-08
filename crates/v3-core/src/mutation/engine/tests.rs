@@ -645,9 +645,16 @@ fn apply_topology_event_adds_pass_through_detour() {
     assert_eq!(genome.nodes.len(), before_nodes + 1);
 
     let newborn = genome.nodes.last().expect("newborn node must exist");
-    assert!(
-        matches!(&newborn.backend_def, BackendDef::Vm(vm) if vm.program == vec![crate::creature::genome::VmInstruction::Halt])
-    );
+    match &newborn.backend_def {
+        BackendDef::Vm(vm) => assert_eq!(
+            vm.program,
+            vec![crate::creature::genome::VmInstruction::Halt]
+        ),
+        BackendDef::Graph(graph) => assert_eq!(
+            graph,
+            &crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs(&config)
+        ),
+    }
     assert!(newborn.input_refs.is_empty());
 }
 

@@ -3,7 +3,7 @@
 use super::{Battery, Signature};
 use crate::config::RuntimeConfig;
 use crate::contracts::NodeId;
-use crate::creature::genome::{analysis::mesh_reachable_nodes, CreatureGenome};
+use crate::creature::genome::{analysis::mesh_reachable_nodes, BackendDef, CreatureGenome};
 use crate::runtime::mesh::{MeshObservation, ObservedMeshExecution};
 use crate::runtime::routing::{resolve_gated_route, RouteGateMap};
 use crate::runtime::trace::domain::TerminationReason;
@@ -15,12 +15,27 @@ pub const KNOCKOUT_METHOD: &str = "static-successor-bypass-v1";
 /// Counts from the complete fixed battery; knockout equality concerns action queues only.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MeshExecutionReading {
+    pub backends: MeshBackendCounts,
     pub total_node_count: usize,
     pub reachable_node_count: usize,
     pub executed_node_count: usize,
     pub knockout_count: usize,
     pub route_varies_with_input: bool,
     pub hop_cap_hits: usize,
+}
+
+/// Additive battery-specific node counts, not mutation creation counts.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct BackendNodeCounts {
+    pub total: u64,
+    pub executed: u64,
+    pub contributing: u64,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct MeshBackendCounts {
+    pub graph: BackendNodeCounts,
+    pub vm: BackendNodeCounts,
 }
 
 type Routes = BTreeMap<NodeId, BTreeSet<usize>>;
@@ -54,7 +69,7 @@ fn route_varies_with_input(snapshots: &[Routes]) -> bool {
 }
 
 /// Remove only the chosen node and redirect references through its static winner.
-fn static_successor_bypass(genome: &CreatureGenome, removed: NodeId) -> CreatureGenome {
+pub(crate) fn static_successor_bypass(genome: &CreatureGenome, removed: NodeId) -> CreatureGenome {
     let successor = genome
         .nodes
         .iter()
@@ -182,14 +197,30 @@ impl Battery {
             routes,
             baseline,
         } = self.observe(genome, runtime, decay_rate);
-        let knockout_count = executed
-            .iter()
-            .filter(|&&node| {
-                self.signature(&static_successor_bypass(genome, node), runtime, decay_rate)
-                    == baseline
-            })
-            .count();
+        let mut backends = MeshBackendCounts::default();
+        let mut knockout_count = 0;
+        for node in &genome.nodes {
+            let counts = match node.backend_def {
+                BackendDef::Graph(_) => &mut backends.graph,
+                BackendDef::Vm(_) => &mut backends.vm,
+            };
+            counts.total += 1;
+            if executed.contains(&node.node_id) {
+                counts.executed += 1;
+                if self.signature(
+                    &static_successor_bypass(genome, node.node_id),
+                    runtime,
+                    decay_rate,
+                ) == baseline
+                {
+                    knockout_count += 1;
+                } else {
+                    counts.contributing += 1;
+                }
+            }
+        }
         MeshExecutionReading {
+            backends,
             total_node_count: genome.nodes.len(),
             reachable_node_count: mesh_reachable_nodes(genome).len(),
             executed_node_count: executed.len(),
@@ -246,6 +277,95 @@ mod tests {
     }
     fn reading(g: &CreatureGenome) -> MeshExecutionReading {
         Battery::generate(2).mesh_execution(g, &RuntimeConfig::default(), 0.0)
+    }
+
+    #[test]
+    fn f18_backend_counts_partition_silent_contributing_and_unreachable_nodes() {
+        for graph in [false, true] {
+            let mut silent = node(0, &[1], false);
+            let mut unreachable = node(2, &[], false);
+            if graph {
+                let blank =
+                    crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs(
+                        &crate::config::MutationConfig::default(),
+                    );
+                silent.backend_def = BackendDef::Graph(blank.clone());
+                unreachable.backend_def = BackendDef::Graph(blank);
+            }
+            let r = reading(&genome(vec![silent, node(1, &[], true), unreachable]));
+            assert_eq!(r.backends.graph.total, if graph { 2 } else { 0 });
+            assert_eq!(r.backends.graph.executed, u64::from(graph));
+            assert_eq!(r.backends.graph.contributing, 0);
+            assert_eq!(r.backends.vm.total, if graph { 1 } else { 3 });
+            assert_eq!(r.backends.vm.executed, if graph { 1 } else { 2 });
+            assert_eq!(r.backends.vm.contributing, 1);
+        }
+    }
+
+    #[test]
+    fn graph_bus_producer_contributes_to_snapshot_actions() {
+        use crate::contracts::{InputReference, WorldInputKey};
+        use crate::creature::genome::cgp::{
+            CgpGraphBackendDef, ComputeNode, ComputeNodeKind, GraphEdge, GraphSource,
+            OutputSinkKind,
+        };
+        let mut producer = node(0, &[1], false);
+        producer.input_refs = vec![InputReference::World(WorldInputKey::FoodHere {
+            type_idx: Default::default(),
+        })];
+        let mut graph =
+            CgpGraphBackendDef::new_with_fixed_outputs(&crate::config::MutationConfig::default());
+        graph.compute_nodes.push(ComputeNode {
+            kind: ComputeNodeKind::WeightedSum,
+            inputs: vec![GraphEdge {
+                source: GraphSource::InputLeaf {
+                    ref_idx: 0,
+                    sub_idx: 0,
+                },
+                weight: 7.0,
+            }],
+            plasticity: None,
+        });
+        graph
+            .output_sinks
+            .iter_mut()
+            .find(|s| s.kind == OutputSinkKind::CustomOutput(0))
+            .unwrap()
+            .inputs
+            .push(GraphEdge {
+                source: GraphSource::ComputeNode(0),
+                weight: 1.0,
+            });
+        producer.backend_def = BackendDef::Graph(graph);
+        let mut consumer = node(1, &[], false);
+        consumer.input_refs = vec![InputReference::UpstreamSlot(0)];
+        if let BackendDef::Vm(vm) = &mut consumer.backend_def {
+            vm.program = vec![
+                VmInstruction::ReadInput {
+                    dst: 0,
+                    ref_idx: 0,
+                    sub_idx: 0,
+                },
+                VmInstruction::WriteWorldActionMeta {
+                    slot_idx: 0,
+                    src: 0,
+                },
+                VmInstruction::PushAction { action_type: 1 },
+                VmInstruction::ExecuteActionQueue,
+            ];
+        }
+        let g = genome(vec![producer, consumer]);
+        let battery = Battery::generate(2);
+        let runtime = RuntimeConfig::default();
+        assert_ne!(
+            battery.signature(&g, &runtime, 0.0).snapshots,
+            battery
+                .signature(&static_successor_bypass(&g, NodeId::new(0)), &runtime, 0.0)
+                .snapshots
+        );
+        let r = reading(&g);
+        assert_eq!(r.backends.graph.contributing, 1);
+        assert_eq!(r.backends.vm.contributing, 1);
     }
 
     #[test]
@@ -486,6 +606,7 @@ mod tests {
         assert_eq!(baseline.snapshots, bypass.snapshots);
         assert_ne!(baseline.sequences, bypass.sequences);
         assert_eq!(reading(&g).knockout_count, 0);
+        assert_eq!(reading(&g).backends.vm.contributing, 2);
         let mut graph =
             CgpGraphBackendDef::new_with_fixed_outputs(&crate::config::MutationConfig::default());
         graph.compute_nodes.push(ComputeNode {
@@ -512,7 +633,18 @@ mod tests {
             targets: vec![],
         };
         let graph_genome = genome(vec![reader, graph_writer]);
-        assert_eq!(reading(&graph_genome).knockout_count, 0);
+        let r = reading(&graph_genome);
+        assert_eq!(r.knockout_count, 0);
+        assert_eq!(r.backends.graph.contributing, 1);
+        assert_eq!(r.backends.vm.contributing, 1);
+        let baseline = battery.signature(&graph_genome, &runtime, 0.0);
+        let bypass = battery.signature(
+            &static_successor_bypass(&graph_genome, NodeId::new(1)),
+            &runtime,
+            0.0,
+        );
+        assert_eq!(baseline.snapshots, bypass.snapshots);
+        assert_ne!(baseline.sequences, bypass.sequences);
     }
 
     #[test]
@@ -579,9 +711,18 @@ mod tests {
     proptest! {
         #[test]
         fn counts_and_bypass_preserve_bounds_and_source(targets in prop::collection::vec(prop::collection::vec(0u32..8, 0..3), 1..8), removed in 0u32..8) {
-            let g = genome(targets.iter().enumerate().map(|(i,t)| node(i as u32,t,false)).collect());
+            for graph_parity in [0, 1] {
+            let g = genome(targets.iter().enumerate().map(|(i,t)| {
+                let mut n = node(i as u32,t,false);
+                if i % 2 == graph_parity { n.backend_def = BackendDef::Graph(crate::creature::genome::cgp::CgpGraphBackendDef::new_with_fixed_outputs(&crate::config::MutationConfig::default())); }
+                n
+            }).collect());
             let before = g.clone();
             let r = reading(&g);
+            prop_assert_eq!(r.backends.graph.total + r.backends.vm.total, r.total_node_count as u64);
+            prop_assert_eq!(r.backends.graph.executed + r.backends.vm.executed, r.executed_node_count as u64);
+            prop_assert_eq!(r.backends.graph.contributing + r.backends.vm.contributing, (r.executed_node_count - r.knockout_count) as u64);
+            for counts in [r.backends.graph, r.backends.vm] { prop_assert!(counts.contributing <= counts.executed && counts.executed <= counts.total); }
             prop_assert!(r.knockout_count <= r.executed_node_count);
             prop_assert!(r.executed_node_count <= r.reachable_node_count);
             prop_assert!(r.reachable_node_count <= r.total_node_count);
@@ -606,6 +747,7 @@ mod tests {
                 }
             }
             prop_assert_eq!(g,before);
+            }
         }
     }
 }

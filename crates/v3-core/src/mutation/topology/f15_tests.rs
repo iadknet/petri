@@ -398,26 +398,7 @@ fn execute_with_config(
     crate::runtime::mesh::MeshObservation,
     [f32; 16],
 ) {
-    use crate::sensors::{
-        perception::{PerceptionSnapshot, SensorSnapshot},
-        static_inputs::StaticInputs,
-        typed_food::TypedFoodLocalSnapshot,
-    };
-    let sensors = SensorSnapshot {
-        local: StaticInputs {
-            food_here: input,
-            neighbor_food: [0.0; 8],
-            neighbor_barrier: [0.0; 8],
-            neighbor_occupied: [0.0; 8],
-            age_ticks: 0.0,
-            generation: 0.0,
-        },
-        typed_local_food: TypedFoodLocalSnapshot {
-            food_here_by_type: vec![input],
-            neighbor_food_by_type: vec![[0.0; 8]],
-        },
-        perception: PerceptionSnapshot::zeroed(1),
-    };
+    let sensors = sensors(input);
     let mut energy = energy;
     let mut memory = [3.0; 16];
     let (output, observation) = crate::runtime::mesh::execute_creature_mesh_impl(
@@ -452,6 +433,7 @@ fn added_work_retains_default_behavior_but_can_exhaust_at_the_boundary() {
     let base = conditional_fixture(false);
     let mut grown = base.clone();
     apply(&mut grown, TopologyOperator::AddRouteTarget, 7).unwrap();
+    grown.nodes.last_mut().unwrap().backend_def = birth::minimal_vm_backend();
     let config = crate::config::RuntimeConfig::default();
     for input in [0.0, 1.0] {
         let before = execute_with_config(&base, input, 80.0, &config);
@@ -490,6 +472,7 @@ fn one_production_addition_is_conditional_silent_and_can_diverge_on_both_backend
         let base = conditional_fixture(graph);
         let mut grown = base.clone();
         apply(&mut grown, TopologyOperator::AddRouteTarget, 7).unwrap();
+        grown.nodes.last_mut().unwrap().backend_def = birth::minimal_vm_backend();
         if let BackendDef::Graph(g) = &grown.nodes[0].backend_def {
             let sink = g
                 .output_sinks
@@ -712,6 +695,7 @@ fn inline_growth_preserves_bus_queue_priority_memory_and_exposes_real_energy_cos
     });
     let mut grown = base.clone();
     apply(&mut grown, TopologyOperator::AddNode, 7).unwrap();
+    grown.nodes.last_mut().unwrap().backend_def = birth::minimal_vm_backend();
     let before = execute(&base, 0.0, 1000.0);
     let after = execute(&grown, 0.0, 1000.0);
     assert!(
@@ -769,3 +753,108 @@ proptest! {
         }
     }
 }
+
+#[test]
+fn f18_growth_backend_choice_is_equal_and_source_independent() {
+    for source_graph in [false, true] {
+        for op in [
+            TopologyOperator::AddNode,
+            TopologyOperator::SpliceNode,
+            TopologyOperator::AddRouteTarget,
+        ] {
+            let mut probe = conditional_fixture(source_graph);
+            let mut count = BackendDraw {
+                draw: 0,
+                calls: 0,
+                at: usize::MAX,
+            };
+            TopologyMutator::apply(
+                &mut probe,
+                op,
+                &mut TargetSelector::reachable_only(&[0, 1], 0.0),
+                &mut count,
+                &MutationConfig::default(),
+            )
+            .unwrap();
+            // Replay the zero-valued preceding draws, varying only the final
+            // backend Bernoulli draw at and immediately below its half boundary.
+            for (draw, graph) in [
+                (0, true),
+                ((1u64 << 63) - 1, true),
+                (1u64 << 63, false),
+                (u64::MAX, false),
+            ] {
+                let mut g = conditional_fixture(source_graph);
+                let mut rng = BackendDraw {
+                    draw,
+                    calls: 0,
+                    at: count.calls - 1,
+                };
+                TopologyMutator::apply(
+                    &mut g,
+                    op,
+                    &mut TargetSelector::reachable_only(&[0, 1], 0.0),
+                    &mut rng,
+                    &MutationConfig::default(),
+                )
+                .unwrap();
+                assert_eq!(
+                    matches!(g.nodes[2].backend_def, BackendDef::Graph(_)),
+                    graph,
+                    "{op:?} source_graph={source_graph} draw={draw}"
+                );
+            }
+        }
+    }
+}
+
+// Keep all range sampling at zero and control only the final u64 draw.
+struct BackendDraw {
+    draw: u64,
+    calls: usize,
+    at: usize,
+}
+impl rand::RngCore for BackendDraw {
+    fn next_u32(&mut self) -> u32 {
+        0
+    }
+    fn next_u64(&mut self) -> u64 {
+        let value = if self.calls == self.at { self.draw } else { 0 };
+        self.calls += 1;
+        assert!(self.calls <= 32, "unexpected RNG rejection loop");
+        value
+    }
+    fn fill_bytes(&mut self, dest: &mut [u8]) {
+        dest.fill(0);
+    }
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), rand::Error> {
+        self.fill_bytes(dest);
+        Ok(())
+    }
+}
+
+fn sensors(input: f32) -> crate::sensors::perception::SensorSnapshot {
+    use crate::sensors::{
+        perception::{PerceptionSnapshot, SensorSnapshot},
+        static_inputs::StaticInputs,
+        typed_food::TypedFoodLocalSnapshot,
+    };
+    SensorSnapshot {
+        local: StaticInputs {
+            food_here: input,
+            neighbor_food: [0.0; 8],
+            neighbor_barrier: [0.0; 8],
+            neighbor_occupied: [0.0; 8],
+            age_ticks: 0.0,
+            generation: 0.0,
+        },
+        typed_local_food: TypedFoodLocalSnapshot {
+            food_here_by_type: vec![input],
+            neighbor_food_by_type: vec![[0.0; 8]],
+        },
+        perception: PerceptionSnapshot::zeroed(1),
+    }
+}
+
+#[path = "f18_tests.rs"]
+mod f18_tests;

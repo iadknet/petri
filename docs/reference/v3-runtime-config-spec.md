@@ -327,7 +327,8 @@ Runtime config transport posture:
   `world.food.fertility.layers` are restart-only startup config.
 
 T11.F15 removes the former `mutation.topology_new_node_birth` controls.
-`AddNode`/`SpliceNode` always create pass-through Halt detours; alternate
-backend growth uses `SwapNodeBackend`. Retired keys are rejected, not exposed
+`AddNode`, `SpliceNode`, and `AddRouteTarget` choose pass-through blank Graph
+or Halt-only VM detours with equal probability (T11.F18); this is not a
+configuration option. `SwapNodeBackend` retains its alternate-backend purpose. Retired keys are rejected, not exposed
 as inert controls. Topology weights sum to 22 with identity rename retired
 and `ChangeEntryNode` at weight 1; mutation supply settings above are unchanged.
