@@ -316,6 +316,7 @@ pub(super) fn apply_splice_node(
     genome: &mut CreatureGenome,
     targets: &mut TargetSelector<'_>,
     rng: &mut impl Rng,
+    config: &MutationConfig,
 ) -> Result<TargetReachability, MutationSkipReason> {
     let valid_targets = |idx: usize| -> Vec<usize> {
         genome.nodes[idx]
@@ -336,7 +337,9 @@ pub(super) fn apply_splice_node(
     let position = targets[rng.gen_range(0..targets.len())];
     let successor = genome.nodes[idx].targets[position].target_id;
     let new_id = next_node_id(genome);
-    genome.nodes.push(birth::detour(new_id, successor));
+    genome
+        .nodes
+        .push(birth::detour(new_id, successor, config, rng));
     genome.nodes[idx].targets[position].target_id = new_id;
     Ok(reachability)
 }

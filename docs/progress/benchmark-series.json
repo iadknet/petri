@@ -22,7 +22,8 @@
       "docs/progress/features/t11-f16-drift-depth-indicator.json",
       "docs/progress/features/t11-f17-executed-biased-mutation-targeting.json",
       "docs/progress/features/t03-f10-activity-ramped-compute-cost.json",
-      "docs/progress/features/t03-f08-genome-size-maintenance-cost.json"
+      "docs/progress/features/t03-f08-genome-size-maintenance-cost.json",
+      "docs/progress/features/t11-f18-backend-neutral-mesh-node-growth.json"
     ]
   },
   "goal": {
@@ -43,7 +44,8 @@
       "docs/progress/features/t11-f16-drift-depth-indicator-goal.json",
       "docs/progress/features/t11-f17-executed-biased-mutation-targeting-goal.json",
       "docs/progress/features/t03-f10-activity-ramped-compute-cost-goal.json",
-      "docs/progress/features/t03-f08-genome-size-maintenance-cost-goal.json"
+      "docs/progress/features/t03-f08-genome-size-maintenance-cost-goal.json",
+      "docs/progress/features/t11-f18-backend-neutral-mesh-node-growth-goal.json"
     ]
   },
   "counter_definition_changes": [

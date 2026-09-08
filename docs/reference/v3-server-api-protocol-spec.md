@@ -94,7 +94,7 @@ Request (conceptual v3alpha2 shape):
 {
   "seed": 42,
   "population": {
-    "initial_creatures": 2000,
+    "initial_creatures": 10000,
     "max_creatures": 100000,
     "founder_profile": "v3_alpha1"
   },
@@ -209,7 +209,8 @@ Request rules:
   `v3-runtime-config-spec.md`.
 - Mutation tuning lives at top-level `mutation.*` in the startup/config keyspace
   (not under `runtime.*`).
-- Startup-only controls live under `startup.*` and are restart-only.
+- Startup-only controls live under `startup.*` and are restart-only, as is
+  `population.initial_creatures` (Section 4.8).
 - `population.founder_profile` is optional and selects the founder genome
   profile applied uniformly to every seeded founder. Wire values are the
   `snake_case` profile names tabulated in `v3-startup-seeding-spec.md`
@@ -228,7 +229,7 @@ Response:
   "state": "idle",
   "tick": 0,
   "config_digest": "sha256:<hex>",
-  "seeded_creatures": 2000
+  "seeded_creatures": 10000
 }
 ```
 
@@ -397,7 +398,7 @@ Response:
   "state": "paused",
   "config": {
     "population": {
-      "initial_creatures": 2000,
+      "initial_creatures": 10000,
       "max_creatures": 100000,
       "founder_profile": "v3_alpha1"
     },
@@ -517,6 +518,10 @@ Rules:
   restart-only and rejected from PATCH.
 - Runtime and energy fields are editable in `idle` and `paused`.
 - `startup.*` fields are restart-only and rejected from PATCH.
+- `population.initial_creatures` is restart-only and rejected from PATCH:
+  founders are seeded only by `POST /v3/simulation/startup`, so a patched value
+  would never take effect. `population.max_creatures` is a live reproduction
+  cap and stays editable.
 - `world.food.types[]` and `world.food.fertility.layers` are restart-only and
   rejected from PATCH.
 - `energy.costs.failed_action_penalty` is rejected while an active startup

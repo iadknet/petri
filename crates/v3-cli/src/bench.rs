@@ -390,6 +390,8 @@ pub struct DriftDepth {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct DriftDepthCheckpoint {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backends: Option<neighborhood::mesh_execution::MeshBackendCounts>,
     pub depth: u64,
     pub lineages: u32,
     pub total_nodes: u64,
@@ -416,6 +418,7 @@ fn drift_checkpoint(row: neighborhood::drift::Checkpoint) -> DriftDepthCheckpoin
     let denominator = u64::from(mesh.lineages);
     let battery_executions = denominator * u64::from(neighborhood_battery_execution_count());
     DriftDepthCheckpoint {
+        backends: Some(mesh.backends),
         depth: row.depth,
         lineages: mesh.lineages,
         total_nodes: mesh.total_nodes,
@@ -596,6 +599,8 @@ pub struct NeighborhoodBattery {
 /// Mesh measurements on the existing neighborhood battery, never a fitness signal.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MeshExecution {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backends: Option<neighborhood::mesh_execution::MeshBackendCounts>,
     pub version: String,
     pub executions_per_genome: u32,
     pub snapshot_route_probes: u32,
@@ -641,6 +646,7 @@ fn mesh_execution(
     use v3_core::neighborhood::mesh_execution::{KNOCKOUT_METHOD, MESH_EXECUTION_VERSION};
     let reading = battery.mesh_execution(genome, context.runtime, context.shared_memory_decay_rate);
     Indicator::Defined(MeshExecution {
+        backends: Some(reading.backends),
         version: MESH_EXECUTION_VERSION.to_string(),
         executions_per_genome: neighborhood_battery_execution_count(),
         snapshot_route_probes: neighborhood::battery::SNAPSHOT_COUNT as u32,
@@ -2189,6 +2195,18 @@ mod tests {
         let row = neighborhood::drift::Checkpoint {
             depth: 250,
             mesh: neighborhood::drift::MeshTotals {
+                backends: neighborhood::mesh_execution::MeshBackendCounts {
+                    graph: neighborhood::mesh_execution::BackendNodeCounts {
+                        total: 8,
+                        executed: 3,
+                        contributing: 1,
+                    },
+                    vm: neighborhood::mesh_execution::BackendNodeCounts {
+                        total: 12,
+                        executed: 4,
+                        contributing: 3,
+                    },
+                },
                 lineages: 4,
                 total_nodes: 20,
                 reachable_nodes: 10,
@@ -2211,6 +2229,28 @@ mod tests {
             },
         };
         let report = drift_checkpoint(row);
+        let backends = report.backends.expect("measured backend totals");
+        assert_eq!(
+            (
+                backends.graph.total,
+                backends.graph.executed,
+                backends.graph.contributing
+            ),
+            (8, 3, 1)
+        );
+        assert_eq!(
+            (
+                backends.vm.total,
+                backends.vm.executed,
+                backends.vm.contributing
+            ),
+            (12, 4, 3)
+        );
+        let mut historical = serde_json::to_value(&report).unwrap();
+        historical.as_object_mut().unwrap().remove("backends");
+        let historical: DriftDepthCheckpoint = serde_json::from_value(historical).unwrap();
+        assert_eq!(historical.backends, None);
+        assert_eq!(historical.total_nodes, 20);
         assert_eq!(report.depth, 250);
         assert_eq!(report.mean_total_nodes, "5.000000");
         assert_eq!(report.mean_reachable_nodes, "2.500000");
@@ -3170,6 +3210,21 @@ mod tests {
         let Indicator::Defined(mesh) = &gate_neighborhood.founder.mesh_execution else {
             panic!("founder mesh reading");
         };
+        let counts = mesh.backends.expect("present backend measurement");
+        assert_eq!(counts.graph.total + counts.vm.total, mesh.total_node_count);
+        assert_eq!(
+            counts.graph.executed + counts.vm.executed,
+            mesh.executed_node_count
+        );
+        assert_eq!(
+            counts.graph.contributing + counts.vm.contributing,
+            mesh.executed_node_count - mesh.knockout_count
+        );
+        let mut historical = serde_json::to_value(mesh).unwrap();
+        historical.as_object_mut().unwrap().remove("backends");
+        let historical: MeshExecution = serde_json::from_value(historical).unwrap();
+        assert_eq!(historical.backends, None);
+        assert_eq!(historical.total_node_count, mesh.total_node_count);
         assert_eq!(mesh.version, "mesh-execution-v1");
         assert_eq!(mesh.executions_per_genome, 80);
         assert_eq!(mesh.snapshot_route_probes, 48);
