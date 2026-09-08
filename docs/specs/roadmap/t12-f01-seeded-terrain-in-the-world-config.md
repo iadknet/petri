@@ -383,10 +383,11 @@ No world-set sweep is due before that set exists.
   Self-review of this remediation found the minimal existing-target approach
   sufficient; registration checks and the final fresh mutation run passed. Total advisor consultations so far: 4 (two implementer
   checkpoints and two orchestrator requirement/exception consultations).
-- Implementer handoff: 4 advisor consultations; 2 pre-review remediation
-  passes (mutation coverage and advisor-requested test registration), no
-  post-review remediation yet. Requirement corrections and user intervention
-  are recorded above. Independent reviewer counts, full `make check`, tested
+- Implementer handoff: 5 advisor consultations; 2 pre-review remediation
+  passes (mutation coverage and advisor-requested test registration), and one
+  post-review remediation pass (Clippy, metadata and test coverage).
+  Requirement corrections and user intervention
+  are recorded above. Reviewer findings are recorded below; full `make check`, tested
   commit and closure documents remain orchestrator-owned and pending.
   Task-specific usage unavailable.
 
@@ -421,4 +422,48 @@ No world-set sweep is due before that set exists.
 - Self-review of the post-review pass: unchanged generator/default behavior;
   dependency-specific metadata resolution, no lint allowance or new dependency;
   no other changes needed. One post-review remediation pass. Fresh mutation
-  evidence after the authorized rebase is pending; no benchmark runs authorized.
+  evidence after the authorized rebase is recorded below; no benchmarks ran.
+
+- Rebased onto main `720dc7e22d2dc0e8f656df6c10a27f2404206fff`, producing
+  source commit `2380a11ed9d25613cd21c2965bb7ac2178227054`. The only conflicts
+  were startup reference override domains and founder-step wording. Resolution
+  preserves run-level selected founder profiles, terrain/world seed fields,
+  and founder step 5 after terrain/fertility/food. Main's founder-profile
+  PATCH rejection/test, retired experiments, and roadmap additions remain.
+  Logs: `/tmp/t12-f01-logs/rebase.log` and `rebase-continue.log`.
+- Rebased checks passed: viability FIRST (24), workspace/all-target Cargo
+  check, v3-cli all-target Clippy with `-D warnings`, server `restart_only`
+  tests (4), CLI `lockfile_identity` (1), and `make roadmap-check`.
+  Logs `/tmp/t12-f01-logs/rebased-{viability,check,clippy,server,metadata,roadmap}.log`.
+- Rebased fresh mutation run exited 0:
+  `24 mutants tested in 4m: 3 missed, 18 caught, 3 unviable`, log
+  `/tmp/t12-f01-logs/mutants-rebased.log`, standard output directory above.
+  Complete survivor list, no timeouts:
+  - `crates/v3-cli/src/bench.rs:2207:45: replace == with != in rand_version_from_lock`
+    — strengthened fixture verifies a core without a rand dependency returns
+    None; **killed** by the strengthened test in the final fresh run.
+  - `crates/v3-cli/src/bench.rs:2211:59: replace == with != in rand_version_from_lock`
+    — fixture now includes v3-core's own version, proving non-rand package
+    versions are excluded from the unversioned fallback; **killed** by the
+    strengthened test in the final fresh run.
+  - `crates/v3-core/src/simulation/seeding.rs:54:30: replace || with && in seed_simulation`
+    — **equivalent**, unchanged empty-generator reasoning.
+  Only tests changed to address the new metadata survivors. Self-review kept
+  the same bounded fixture approach. Workspace/all-target Cargo check and
+  `cargo test -p v3-cli lockfile_identity` passed (`metadata-survivor-check.log`,
+  `metadata-survivor-test.log`). Final fresh confirmation passed below.
+
+- Final rebased fresh `MUTANTS_ITERATE=0 make rust-mutants` exited 0:
+  `24 mutants tested in 4m: 1 missed, 20 caught, 3 unviable`.
+  Log `/tmp/t12-f01-logs/mutants-rebased-final.log`, output
+  `/Users/istefanek/.local/share/petri-tools/mutants/t12-f01/mutants.out`;
+  `run-mode.txt` is fresh. Complete final survivor list:
+  - `crates/v3-core/src/simulation/seeding.rs:54:30: replace || with && in seed_simulation`
+    — **equivalent**: the generator returns an empty set before RNG use when
+    either dimension is zero, so skipping that early return changes no
+    applied barriers or run stream. No timeouts, exclusions, or deferred
+    survivors. Metadata survivors were killed exclusively by tests.
+- Review remediation complete: P1 0; P2 1 resolved; P3 1 resolved. Five
+  advisor consultations, one post-review remediation pass. Parent owns the
+  fresh full `make check`, closure status, and tested-commit record after this
+  clean rebased handoff. No benchmark or performance claim was added.

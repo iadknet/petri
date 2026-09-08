@@ -2230,7 +2230,7 @@ mod tests {
 
     #[test]
     fn lockfile_identity_selects_core_dependency_among_reordered_versions() {
-        let core = "[[package]]\nname = \"v3-core\"\ndependencies = [\n \"rand 0.8.6\",\n]\n";
+        let core = "[[package]]\nname = \"v3-core\"\nversion = \"0.1.0\"\ndependencies = [\n \"rand 0.8.6\",\n]\n";
         let old = "[[package]]\nname = \"rand\"\nversion = \"0.8.6\"\n";
         let new = "[[package]]\nname = \"rand\"\nversion = \"0.9.5\"\n";
         for lock in [format!("{new}{old}{core}"), format!("{core}{old}{new}")] {
@@ -2238,6 +2238,8 @@ mod tests {
         }
         let upgraded = format!("{old}{new}{}", core.replace("rand 0.8.6", "rand 0.9.5"));
         assert_eq!(rand_version_from_lock(&upgraded), Some("0.9.5"));
+        let no_rand = core.replace("rand 0.8.6", "serde");
+        assert_eq!(rand_version_from_lock(&format!("{old}{no_rand}")), None);
         let unversioned = core.replace("rand 0.8.6", "rand");
         assert_eq!(
             rand_version_from_lock(&format!("{old}{unversioned}")),
