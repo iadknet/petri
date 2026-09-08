@@ -127,30 +127,34 @@ profile, the pinned epoch) and the gate epoch `remove-complementary-nutrition`:
 
 ## Implementation Tasks
 
-- [ ] Add `step_ramp_allowance` and `step_ramp_cost` to `VmRuntimeConfig`
+- [x] Add `step_ramp_allowance` and `step_ramp_cost` to `VmRuntimeConfig`
       with serde defaults, normalization, config-spec rows, and the frontend
       types, fixtures, panel rows, and tests, failing tests first.
-- [ ] Rewrite the charge in `execute_vm_node_impl` as the per-dispatch
+      (`f205092e`)
+- [x] Rewrite the charge in `execute_vm_node_impl` as the per-dispatch
       accumulator with the ramp term, settled once on every exit path, with
       the exhaustion and `SetPriorityBid` rules above; tests first, including
-      the trace sink's effective-energy reporting.
-- [ ] Property tests for the pure charge: the ramp total equals the closed
+      the trace sink's effective-energy reporting. (`2323831a`, simplified in
+      `7debaaa7`, trace and consumption coverage in `e8ca7523`)
+- [x] Property tests for the pure charge: the ramp total equals the closed
       form within tolerance for any allowance and step count; total charge is
       monotone non-decreasing in executed steps and in ramp rate; with ramp
       0.0 the total equals the sum of base costs; the accumulator matches the closed form plus the summed base costs
       directly, and the mesh-attributed node cost equals the settled total
       within one ulp of the starting energy unless exhausted.
-- [ ] Update `v3-vm-isa-spec.md` Sections 3 and 6, `docs/progress.md`, and
+      (`crates/v3-core/src/runtime/tests/vm_step_ramp.rs`; no
+      `proptest-regressions` file survived the final suite)
+- [x] Update `v3-vm-isa-spec.md` Sections 3 and 6, `docs/progress.md`, and
       `docs/progress/benchmark-series.json`; store the gate and goal reports.
 
 ## Verification
 
-- [ ] `cargo test -p v3-core --test viability` first after the charge lands;
+- [x] `cargo test -p v3-core --test viability` first after the charge lands;
       `cargo check --workspace --all-targets` after coherent Rust edits;
       focused suites `cargo test -p v3-core --lib runtime`,
       `cargo test -p v3-core --lib config`, `cargo test -p v3-cli --lib
       bench::tests`, and `npm --prefix frontend test -- --run` pass.
-- [ ] Unit tests at `opcode_cost_multiplier` 1.0 and `step_ramp_cost` 1.0:
+- [x] Unit tests at `opcode_cost_multiplier` 1.0 and `step_ramp_cost` 1.0:
       a dispatch below the allowance charges base costs only; the first step
       past the allowance charges base plus 1.0 and the m-th excess step base
       plus m; a capped dispatch settles the closed-form total once; a
@@ -158,18 +162,109 @@ profile, the pinned epoch) and the gate epoch `remove-complementary-nutrition`:
       not commit shared memory, and returns exhausted; a `SetPriorityBid`
       bid is capped at effective energy; the traced executor reports the
       same charges and effective energy as the untraced one.
-- [ ] Fresh `MUTANTS_ITERATE=0 make rust-mutants` after the simplify pass;
+- [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` after the simplify pass;
       record the summary line, output path, and every survivor's resolution.
-- [ ] `make bench PROFILE=gate FEATURE=t03-f10-activity-ramped-compute-cost`
+- [x] `make bench PROFILE=gate FEATURE=t03-f10-activity-ramped-compute-cost`
       stores `docs/progress/features/t03-f10-activity-ramped-compute-cost.json`;
       one `make bench PROFILE=goal FEATURE=t03-f10-activity-ramped-compute-cost`
       stores the `-goal.json` report. Record every predeclared reading above,
       the observation budgets, and the compute comparisons.
-- [ ] Second goal run: Not applicable by the 2026-09-05 workflow decision;
+- [x] Second goal run: Not applicable by the 2026-09-05 workflow decision;
       `crates/v3-core/tests/reproducibility.rs` covers cross-process
       reproducibility inside `make check`.
 - [ ] `make roadmap-check` on document edits; final `make check` exits 0 on
       the closure content, with the tested commit reported in the parent task.
+
+### Results, 2026-09-07
+
+Commands run in the worktree and their results:
+
+- `cargo test -p v3-core --test viability` — ok, 24 passed, 0 failed, run
+  first after the charge landed and again after the simplify pass.
+- `cargo check --workspace --all-targets` — clean, run after every coherent
+  Rust edit through the compile hook.
+- `cargo test -p v3-core --lib runtime` — ok, 209 passed, 0 failed.
+- `cargo test -p v3-core --lib config` — ok, 129 passed, 0 failed.
+- `cargo test -p v3-core --lib` — ok, 1,228 passed, 0 failed, 1 ignored
+  (pre-existing).
+- `cargo test -p v3-cli --lib bench::tests` — ok, 37 passed, 0 failed.
+- `npm --prefix frontend test -- --run` — 58 files, 308 tests passed.
+- `cargo clippy -p v3-core --all-targets` — clean, no warnings.
+- `make roadmap-check` — `roadmap-check: validation passed`, exit 0.
+- `make bench PROFILE=gate FEATURE=t03-f10-activity-ramped-compute-cost` —
+  exit 0, report stored, `severe=false` against both references.
+- `make bench PROFILE=goal FEATURE=t03-f10-activity-ramped-compute-cost` —
+  exit 0, report stored, `severe=false`. Run once, per the 2026-09-05
+  decision.
+
+Unit tests, in `crates/v3-core/src/runtime/tests/vm_step_ramp.rs`: the m-th
+step past the allowance charges base plus m at allowance 3 and at allowance 0;
+a dispatch the ramp does not reach (inside the allowance, or ramp 0.0) charges
+base costs only; a capped dispatch settles the closed-form total once; at
+production defaults a 10,000-step dispatch charges 48.9–49.2, a 1,000-step
+dispatch 0.40–0.41, 200 Noops from energy 20 charge the closed form to within
+1e-6 (per-step subtraction would charge nothing), and 20 steps charge under
+1e-5; a mid-loop exhaustion leaves energy at or below zero, arrives before the
+step cap, does not commit shared memory, and returns exhausted; an oversized
+`SetPriorityBid` is capped at the effective energy and exhausts, while a bid
+inside it is paid in full; the traced executor reports each step's effective
+energy and the bid inside its own step cost, and settles the same energy,
+memory, and step count as the untraced one; `ReadInput` of `EnergyCurrent` and
+`EnergyConsumedThisTick` read the effective energy and the accumulator
+mid-dispatch.
+
+Property tests for the pure charge (`step_charge`): summing per-step charges
+reproduces the closed form for any step count, allowance, ramp rate, and cost
+multiplier; the total is monotone non-decreasing in steps and in ramp rate and
+never negative; a step inside the allowance carries the base charge exactly;
+and a whole settled dispatch charges the closed form within one ulp of the
+starting energy plus one of the settled debt. No assertion depends on which
+cases were drawn, and no `proptest-regressions` file survives (one appeared
+from a first draft whose generator drew unaffordable ramps; the generator was
+bounded and the file removed).
+
+Two pre-existing tests were loosened, both in
+`crates/v3-core/src/runtime/tests/vm_execution.rs`, with the reason recorded
+in place: `priority_bid_capped_at_available_energy` and
+`oversized_bid_produces_exact_all_in_exhaustion` asserted that a capped bid
+lands energy on exactly `0.0`. Under the single settlement the bid cap and the
+debt subtraction round separately, so an all-in lands within one ulp of zero
+(measured -1.2218952e-6 from a starting energy of 100, against an ulp of
+7.6e-6). Both now assert `e.abs() <= f32::EPSILON * starting_energy`;
+the exhaustion assertion is unchanged and still holds, because the code treats
+a bid the cap bit into as an all-in regardless of which way the `f32` store
+rounded. Reference doc `v3-vm-isa-spec.md` Section 9 was corrected by one
+clause to match (bids cap at the effective energy).
+
+Mutation testing, fresh (`MUTANTS_ITERATE=0 make rust-mutants`, run after the
+simplify pass, diff against merge base `8b27c813`):
+
+- First run summary line: `35 mutants tested in 4m: 4 missed, 30 caught,
+  1 unviable`.
+- Second run, after the two tests below were added: `35 mutants tested in 3m:
+  1 missed, 33 caught, 1 unviable`.
+- Output path (both runs):
+  `/Users/istefanek/.local/share/petri-tools/mutants/t03-f10/mutants.out`.
+- No mutant timed out, and no `#[mutants::skip]` or `exclude_re` entry was
+  added anywhere in this feature.
+
+Survivors and their resolutions:
+
+- `crates/v3-core/src/runtime/vm.rs:382:58: replace + with * in
+  execute_vm_node_impl` (`energy_consumed + debt as f32`) — **killed** by
+  `a_mid_dispatch_consumption_read_includes_what_the_dispatch_owes`.
+- `crates/v3-core/src/runtime/vm.rs:445:34: replace += with -= in
+  execute_vm_node_impl` and the `*=` variant at the same site
+  (`step_energy_cost += bid as f32`, the trace sink's per-step cost) —
+  **killed** by `the_traced_bid_step_reports_the_bid_inside_its_energy_cost`.
+- `crates/v3-core/src/runtime/vm.rs:439:34: replace > with >= in
+  execute_vm_node_impl` (`if raw > 0.0` in the bid guard) — **equivalent**.
+  The only register value the two guards treat differently is a zero: at
+  `raw == 0.0` the `>=` branch computes `0.0f64.min(effective)`, which is
+  `0.0` because `effective > 0.0` is already checked, so the bid, the energy
+  subtraction, the all-in test, and the recorded `priority_bid` are all
+  identical; a negative zero differs only in the sign of a zero, which no
+  comparison, sum, or ordering downstream distinguishes.
 
 ## Performance and Goal Impact
 
@@ -198,14 +293,76 @@ change, and the indicator should say so. The drift floors are read under the
 strict not-below rule; a miss is investigated and resolved before closure,
 never waived.
 
+### Measured, 2026-09-07
+
+Reports, both stored on this branch and produced with production code
+unchanged since `e8ca7523`: gate
+`docs/progress/features/t03-f10-activity-ramped-compute-cost.json`
+(`make bench PROFILE=gate` exit 0, `severe=false`) and goal
+`docs/progress/features/t03-f10-activity-ramped-compute-cost-goal.json`
+(`make bench PROFILE=goal` exit 0, `severe=false`). Both carry
+`git_revision` `e8ca7523ce39b46852f93925b8707d53aede0ef0`. T11.F17's goal
+report is both the previous closure and the pinned epoch, so every goal delta
+below is against one reference.
+
+Predeclared readings:
+
+| Reading | Reference | Predeclaration | Measured | Result |
+| --- | --- | --- | --- | --- |
+| Goal `vm_steps` per creature-tick | 146.184594 (pinned epoch) | Down | 22.566373 (-84.563098%) | Met |
+| Goal `mesh_hops` / `graph_relax_iters` / `plasticity_updates` / `actions_applied` / `births` | T11.F17 goal | No severe; ok or flag read as ecology | 2.072588 (+0.066096%, ok); 0.999001 (-0.361749%, ok); 0.033524 (+14.623722%, flag); 1.234813 (-11.857434%, ok); 0.015597 (-5.225740%, ok) | Met; `severe=false` |
+| Gate counters and wall time | T11.F17 gate and the gate epoch | No severe; wall flags/severe at +25%/+100% | All six ok against both references (`vm_steps` 22.494483, -7.173819% vs T11.F17 and -1.128871% vs the epoch; `plasticity_updates` 0.007356, -34.150927% vs the epoch and -1.710315% vs T11.F17); wall 0.0013164589 ms/creature-tick, -10.374609% vs T11.F17 and -15.602470% vs the epoch, ok | Met; no epoch re-pin |
+| Persistence, goal profile, seeds 11/22/33 | T11.F17 final 714/669/11,379, minimum 602/605/1,371; T11.F04 `w1600` final 11,610/10,398/11,093 | No seed extinct; final, minimum, plateau reported | No extinction on any seed. Final 1,786 / 3,712 / 1,306; minimum 959 / 1,366 / 536; plateau 1,449.400000 / 2,830.522000 / 900.308000 (T11.F17 plateau 765.398000 / 704.260000 / 7,286.532000) | Met; seed 33 fell from 11,379 toward the other seeds as predicted, and seeds 11 and 22 rose |
+| Drift changed/all births at 1,000 / 2,000 (floors) | 0.001500 / 0.008000 | Not below (strict) | 0.001500 / 0.008000 (3 / 2,000 and 16 / 2,000) | Met, equal to the floors |
+| Drift dead/all births pooled at 1,000 and 2,000 | 8 / 4,000 | Not above 20 / 4,000 | 8 / 4,000 (4 and 4) | Met |
+| Drift hop-cap hits, executed nodes, total nodes | T11.F17 | Hop-cap hits zero; nodes reported, no direction | Hop-cap hits 0 at depths 0, 22, 250, 1,000, 2,000. Mean executed nodes 2.000000 / 2.260000 / 2.880000 / 4.280000 / 4.860000 (T11.F17 …/4.260000/4.760000); mean total nodes at 2,000 143.760000 (T11.F17 143.320000) | Met |
+| Goal evolved half changed / dead per mutated birth | 0.288182 / 0.013030 | Reported; no direction | 967 / 3,300 = 0.293030 and 57 / 3,300 = 0.017273 | Reported |
+| Observation budgets | Workflow caps | Founder below 10 s; summed evolved below 180 s; drift below 30 s; goal run below 15 min | Founder 0.061 s (gate 0.052 s); summed evolved 0.408 s; drift walk 3.382 s; whole goal run 296.2 s | Met |
+
+The drift walk moved in only one row against T11.F17: depth 250 changed
+17 / 2,000 (0.008500) against 13 / 2,000 (0.006500), with silent 877 against
+881. Depths 0, 22, 1,000, and 2,000 have identical birth classifications.
+The spec predicted the battery would reclassify loop-creating mutations,
+and one checkpoint did; the walk's genomes mostly execute programs far shorter
+than the 100-step allowance, so the ramp reaches almost none of them. The two
+floors are met exactly rather than moved.
+
+The goal evolved half is read as the confound the spec predeclared, not as a
+regression: the populations behind the three samples are different populations
+(seed 33's cap-running bloom is gone, and the median sampled generation moved
+from 38/41/58 to 54/17/48). The dead fraction rose from 0.013030 to 0.017273,
+a difference of 14 births in 3,300; the drift walk, which holds founder,
+seeds, battery, and birth subset fixed, shows the pooled dead count unchanged
+at 8 / 4,000, which is the controlled reading of the same question.
+
+Other goal indicators, reported without predeclaration: surviving founder
+clades 152 / 126 / 136 with Shannon entropy 1.692196 / 1.628665 / 1.649503
+(T11.F17 161 / 146 / 54 with 2.585000 / 2.798111 / 0.158688 — seed 33's
+near-monoculture is gone); reachable structure mean 88.249706, median 74,
+max 367 (T11.F17 118.863266 / 114 / 428); mean energy 37.870462 / 60.418919 /
+50.473631 (T11.F17 62.444766 / 63.259692 / 25.355656). No cognition claim.
+
+The `deterministic` blocks differ from every prior report for every seed, as
+predeclared, with one observed exception worth recording: the gate and goal
+founder neighborhood blocks are identical to T11.F17's (208 applied, 95
+changed, 113 silent, 0 dead), because the founder's programs run far inside
+the 100-step allowance and its battery never reaches the ramp. Nothing was
+predeclared identical, so this is a reported observation, not a criterion.
+
+Wall time per creature-tick fell on both profiles (gate -10.37% against
+T11.F17, -15.60% against the gate epoch; goal -11.51% against the pinned
+epoch), consistent with the predeclaration that removing the cap-running tail
+would leave wall time flat or lower. Neither profile shows a severe compute
+regression and no epoch re-pin is requested.
+
 ## Success Criteria
 
-- [ ] At production defaults a VM dispatch that runs to the step cap charges
+- [x] At production defaults a VM dispatch that runs to the step cap charges
       about 49 energy, a 1,000-step dispatch about 0.4, and a dispatch within
       the allowance only its base opcode costs, settled once per dispatch,
       with exhaustion mid-dispatch discarding the queue and shared-memory
       commit as before.
-- [ ] The stored goal report reads `vm_steps` below the pinned epoch, every
+- [x] The stored goal report reads `vm_steps` below the pinned epoch, every
       seed persists, the drift floors hold, and neither profile shows a
       severe unbudgeted compute regression.
 - [ ] Required checks, fresh mutation evidence, independent review, reference
