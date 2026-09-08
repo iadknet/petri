@@ -172,7 +172,7 @@ profile, the pinned epoch) and the gate epoch `remove-complementary-nutrition`:
 - [x] Second goal run: Not applicable by the 2026-09-05 workflow decision;
       `crates/v3-core/tests/reproducibility.rs` covers cross-process
       reproducibility inside `make check`.
-- [ ] `make roadmap-check` on document edits; final `make check` exits 0 on
+- [x] `make roadmap-check` on document edits; final `make check` exits 0 on
       the closure content, with the tested commit reported in the parent task.
 
 ### Results, 2026-09-07
@@ -191,6 +191,16 @@ Commands run in the worktree and their results:
 - `npm --prefix frontend test -- --run` — 58 files, 308 tests passed.
 - `cargo clippy -p v3-core --all-targets` — clean, no warnings.
 - `make roadmap-check` — `roadmap-check: validation passed`, exit 0.
+- `make check` — exit 0 at `9f1be0d2` on the closure content (Rust format,
+  viability, the whole workspace test suite including
+  `crates/v3-core/tests/reproducibility.rs`, Clippy, frontend lint, tests, and
+  build). The frontend lint step prints three pre-existing
+  `lint/suspicious/noArrayIndexKey` warnings in
+  `config-panel/startup/FoodTypesSection.tsx` and `FertilitySection.tsx`, files
+  this feature does not touch (last changed 2026-08-29); they are warnings and
+  do not fail the step. An earlier `make check` at `fca399d2` exited 2 on a
+  formatter error in this feature's own `RuntimeSection.tsx` rows, fixed in
+  `9f1be0d2`.
 - `make bench PROFILE=gate FEATURE=t03-f10-activity-ramped-compute-cost` —
   exit 0, report stored, `severe=false` against both references.
 - `make bench PROFILE=goal FEATURE=t03-f10-activity-ramped-compute-cost` —
