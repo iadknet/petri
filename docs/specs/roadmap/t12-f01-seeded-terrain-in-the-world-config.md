@@ -1,6 +1,6 @@
 # T12.F01 — Seeded Terrain in the World Config
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-08
 **Feature**: T12.F01
 **Track**: [T12 — World Composition and Baseline Worlds](../../roadmaps/t12-world-composition-and-baseline-worlds.md)
@@ -115,7 +115,7 @@ Required config and behavior:
 - [x] Carry the fields through server startup/projections, frontend types,
   preset hydration/request construction, and the Terrain controls; update
   canonical references and integration tests.
-- [ ] Review the diff for reuse, simplification, and efficiency; resolve fresh
+- [x] Review the diff for reuse, simplification, and efficiency; resolve fresh
   mutation survivors through tests; complete closure records after required
   checks, recording the user-authorized measured-benchmark exemption below.
 
@@ -161,7 +161,7 @@ Required config and behavior:
   determinism tests remain required.
 - [x] Second goal determinism run: Not applicable by the workflow's 2026-09-05
   decision. Existing reproducibility and gate two-run checks remain mandatory.
-- [ ] `make roadmap-check` on document edits and at handoff; `make check` on
+- [x] `make roadmap-check` on document edits and at handoff; `make check` on
   final feature code; `make check-docs` on closure documents. Record command
   evidence and the tested commit before integration.
 
@@ -322,11 +322,11 @@ No world-set sweep is due before that set exists.
 
 ## Success Criteria
 
-- [ ] Configured terrain and seed rules produce the specified applied world
+- [x] Configured terrain and seed rules produce the specified applied world
   before food/founders, with deterministic terrain-bearing tests passing.
-- [ ] The startup UI and API expose the complete terrain config; runtime
+- [x] The startup UI and API expose the complete terrain config; runtime
   mutation is rejected; canonical documentation describes applied behavior.
-- [ ] Production defaults and deterministic trajectory are unchanged; required
+- [x] Production defaults and deterministic trajectory are unchanged; required
   checks and fresh mutation triage are complete, with full trajectory
   measurement explicitly exempted and its limits recorded above.
 
@@ -379,17 +379,15 @@ No world-set sweep is due before that set exists.
   Accepted as a correctness blocker: registered `rust-test-terrain` in the
   existing `rust-test-all` aggregation and CI target matrix. No parallel
   workflow or unrelated CI repair. Test-selection change triggers another
-  fresh mutation run; remaining parent review/completion checks are pending.
+  fresh mutation run; subsequent review and completion evidence is recorded below.
   Self-review of this remediation found the minimal existing-target approach
-  sufficient; registration checks and the final fresh mutation run passed. Total advisor consultations so far: 4 (two implementer
-  checkpoints and two orchestrator requirement/exception consultations).
+  sufficient; registration checks and the final fresh mutation run passed. This was consultation 4 (two implementer checkpoints and two
+  orchestrator requirement/exception consultations at that point).
 - Implementer handoff: 5 advisor consultations; 2 pre-review remediation
   passes (mutation coverage and advisor-requested test registration), and one
   post-review remediation pass (Clippy, metadata and test coverage).
-  Requirement corrections and user intervention
-  are recorded above. Reviewer findings are recorded below; full `make check`, tested
-  commit and closure documents remain orchestrator-owned and pending.
-  Task-specific usage unavailable.
+  Requirement corrections and user intervention are recorded above; final
+  review, verification and available usage are recorded below.
 
 
 ### Post-review remediation
@@ -464,6 +462,32 @@ No world-set sweep is due before that set exists.
     applied barriers or run stream. No timeouts, exclusions, or deferred
     survivors. Metadata survivors were killed exclusively by tests.
 - Review remediation complete: P1 0; P2 1 resolved; P3 1 resolved. Five
-  advisor consultations, one post-review remediation pass. Parent owns the
-  fresh full `make check`, closure status, and tested-commit record after this
-  clean rebased handoff. No benchmark or performance claim was added.
+  advisor consultations, one post-review remediation pass. The reviewer
+  confirmed both findings resolved after remediation/rebase, with no new
+  P1/P2/P3 findings. No benchmark or performance claim was added.
+
+### Closure evidence (2026-09-08)
+
+- Parent `make roadmap-check` exited 0 on the clean rebased handoff.
+- Parent `make check` exited 0 at tested implementation commit
+  `50056f6a0fdd9e35157945ef07db8817c50e937f`; log
+  `/tmp/t12-f01-make-check-rebased.log`. This supersedes the earlier
+  pre-rebase Clippy failure. Closure changes after that commit are documentation
+  only. The exact closure commit is checked again before integration and its
+  hash/result are recorded in the parent task to avoid a self-referential hash.
+- Model/effort verified from local session metadata: `gpt-6-astra` for all
+  roles; orchestrator `low`, persistent spec owner/advisor `high`, persistent
+  implementer `low`, independent reviewer `medium`. Five advisor consultations;
+  two pre-review remediation passes and one post-review pass. Initial final
+  review P1/P2/P3 = 0/1/1, both advisory findings resolved; follow-up 0/0/0.
+- Requirement correction: consultation 2 corrected the planning interpretation
+  of the inherited drift floor. User intervention: the explicit F01 benchmark
+  exemption at consultation 3. No remote mutation or benchmark run occurred.
+- Task-specific usage snapshot at 2026-09-08T20:56:37+00:00,
+  summed from the four related sessions' cumulative token counters:
+  38,758,552 total tokens (38,678,493 input,
+  38,188,672 cached input included in input,
+  80,059 output). This is usage through closure preparation,
+  not currency, unique context size, or final billing; later verification and
+  integration add usage. Financial cost unavailable.
+- Closure `make check-docs` exited 0; log `/tmp/t12-f01-closure-docs.log`.
