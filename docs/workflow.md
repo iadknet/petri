@@ -27,7 +27,10 @@ from reporting done while `make roadmap-check` fails in its worktree.
 `scripts/implementer-compile-check` is a PostToolUse hook on the implementer's
 Edit and Write calls: after a `.rs` edit it runs
 `cargo check --workspace --all-targets` and returns the last 30 lines of output
-when the build fails or exceeds 900 seconds. It is feedback, not a gate.
+when the build fails or exceeds 900 seconds. A passing check suppresses further
+fires for `PETRI_COMPILE_CHECK_COOLDOWN` seconds (15); a failure never does. It
+is feedback, not a gate: a breaking edit that ends a burst inside the cooldown
+is caught by `make check`.
 `make rust-mutants` runs cargo-mutants (installed through aqua's local
 registry) on the feature diff; it is deliberately outside `make check` and the
 stop gate, because its output is a survivor list to triage, not a score.
@@ -74,7 +77,7 @@ completion conditions. Generating either template does not execute it.
 Substitute `<TNN.FNN>` and the lowercase `<tnn-fnn>` worktree name.
 
 ```
-/goal Roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Fable 5.1 in the main checkout on a clean main; create the feature worktree with EnterWorktree named <tnn-fnn>; plan and commit the flat spec there; delegate all implementation and remediation to the roadmap-implementer subagent and the final diff review to roadmap-reviewer; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the <TNN.FNN> row is checked in its track roadmap on main and its spec is Complete; make check exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
+/goal Roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md first and follow its per-feature contract exactly: confirm you are Fable 5.1 in the main checkout on a clean main; create the feature worktree with EnterWorktree named <tnn-fnn>; plan and commit the flat spec there; delegate all implementation and remediation to the roadmap-implementer subagent and the final diff review to roadmap-reviewer; run make check in the worktree; ExitWorktree with keep, fast-forward main to the feature branch, then remove the worktree and its branch. Done means all of these are shown in this conversation: the <TNN.FNN> row is checked in its track roadmap on main and its spec is Complete; make check exited 0 on the feature code now on main and make check-docs exited 0 at the commit now on main; git worktree list no longer lists the feature worktree; git status on main is clean. If a concrete blocker stops the feature, record it in the spec, report it, and stop. Stop after 80 turns.
 ```
 
 The `/goal` evaluator reads only this conversation and runs no commands, so
@@ -474,10 +477,11 @@ otherwise write `usage unavailable`. Account-wide rate limits are not task
 costs. This replaces the post-closure Claude `/usage` request and stays
 non-blocking.
 
-Complete the shared closure document updates and run `make check` in the
-feature worktree. Commit the final content, inspect any pre-commit changes,
-and rerun checks if the committed content differs from what passed. Record
-the tested commit hash. Wait for all agents to finish writing before merging.
+Run `make check` once on the final feature code and record that commit as
+the tested commit, then complete the shared closure document updates and run
+`make check-docs` in the feature worktree. Commit the final content, inspect
+any pre-commit changes, and rerun the relevant check if the committed content
+differs from what passed. Wait for all agents to finish writing before merging.
 
 From the main checkout, recheck that main is clean, still on `main`, and still
 at its recorded starting commit. If it moved, rebase `codex/<tnn-fnn>` onto

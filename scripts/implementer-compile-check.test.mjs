@@ -52,6 +52,8 @@ function run(repository, input, env = {}) {
       ...process.env,
       PATH: `${join(repository, 'bin')}:${process.env.PATH}`,
       CARGO_SHIM_LOG: shimLog,
+      // Cooldown markers land in the fixture and die with it.
+      TMPDIR: repository,
       ...env,
     },
   });
@@ -144,8 +146,7 @@ test('missing file_path, a file outside a Cargo repository, or a missing directo
 });
 
 // Cooldown: fires are sequential (the harness waits for each hook), so a
-// passing check suppresses re-runs for a short window. TMPDIR is pointed at
-// the fixture so the marker is cleaned up with it.
+// passing check suppresses re-runs for a short window.
 function marker(repository) {
   const hash = spawnSync('sh', ['-c', 'printf %s "$1" | cksum | cut -d" " -f1', '_', repository], { encoding: 'utf8' }).stdout.trim();
   return join(repository, `petri-compile-check-${hash}.ok`);
@@ -153,7 +154,7 @@ function marker(repository) {
 
 function cooled(repository, env = {}) {
   rmSync(join(repository, 'cargo-shim.log'), { force: true });
-  return run(repository, edit(repository, 'crates/core/src/lib.rs'), { TMPDIR: repository, ...env });
+  return run(repository, edit(repository, 'crates/core/src/lib.rs'), env);
 }
 
 test('a passing check suppresses the next fire inside the cooldown', () => {
