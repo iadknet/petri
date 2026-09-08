@@ -1,6 +1,6 @@
 # T11.F18 — Backend-Neutral Mesh Node Growth
 
-**Status**: Blocked
+**Status**: In Progress
 **Last updated**: 2026-09-08
 **Feature**: T11.F18
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -162,7 +162,7 @@ command or report pipeline is needed.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` after self-review: record
       summary, output path, and the complete missed/timeout list, each killed
       through tests and a fresh rerun, equivalent with reason, or deferred.
-- [ ] `make bench PROFILE=gate FEATURE=t11-f18-backend-neutral-mesh-node-growth`
+- [x] `make bench PROFILE=gate FEATURE=t11-f18-backend-neutral-mesh-node-growth`
       stores `docs/progress/features/t11-f18-backend-neutral-mesh-node-growth.json`;
       one corresponding `PROFILE=goal` run stores `...-goal.json`. Record all
       impact readings below and resolve any blocking crossing.
@@ -282,18 +282,32 @@ Unmeasured indicators remain `Undefined`.
 Founder observation stays within 10 seconds, summed evolved neighborhood
 within 180 seconds per goal run, drift within 30 seconds, and the whole
 goal-profile investigation threshold remains 900 seconds. Keep samples,
-trials, checkpoints, and cadence unchanged. Measurement results are recorded below; the generation-2,000 drift floor
-miss blocks closure pending the workflow escalation.
+trials, checkpoints, and cadence unchanged. Measurement results and the
+generation-2,000 floor miss are recorded below, followed by the user's
+feature-specific acceptance of that miss.
 
-**Blocking measured result.** At generation 2,000, changed/all births is
+**Measured blocker before user acceptance.** At generation 2,000, changed/all births is
 0.005000 (10/2,000), below the fixed 0.008000 floor (16/2,000 at T03.F08).
 Mean executed nodes also fell from 4.28 to 3.76 at generation 1,000 and
 4.86 to 4.76 at 2,000. The generation-1,000 changed/all reading is 0.010000,
-above 0.001500, and all hop-cap readings are zero. These outcomes are
+above 0.001500, and all hop-cap readings are zero. These outcomes were
 escalated to the persistent spec owner/advisor before any dependent closure
 work. No seed, threshold, battery, rate, or backend probability was changed
 to improve the measurement. Gate and goal compute/observation checks pass,
 which does not waive the independent drift floor.
+
+**Post-measurement acceptance, 2026-09-08.** In response to this measured
+blocker, the user stated: "I approve the exception for this". This explicitly
+accepts T11.F18's generation-2,000 changed/all-birth result of 0.005000
+(10/2,000) for this feature's closure. It is an exception to the original
+0.008000 requirement, not a passing measurement or a predeclared allowance.
+The standing generation-2,000 floor remains 0.008000 for later features;
+the generation-1,000 floor, all other thresholds, and both stored reports
+remain unchanged. The lower executed-node means remain reported observations:
+this spec predeclared no improvement direction for those means and grants
+no new exception for them. Final independent review, final `make check`,
+documentation checks, integration and cleanup remain required. No goal
+rerun is authorized or needed to seek a different result.
 
 **Gate report.** `make bench PROFILE=gate FEATURE=t11-f18-backend-neutral-mesh-node-growth` exited 0; `comparison.severe=false`. Stored `t11-f18-backend-neutral-mesh-node-growth.json`, measured code `b16f2820b15cf71d71e6d438a9b848bcfb9986dd`. Generated 2026-09-08T19:12:31Z; host `Isaacs-MacBook-Pro-2.local`, 8 threads.
 
@@ -481,7 +495,9 @@ Nine deferred cognition indicators remain `Undefined`; no cognition improvement 
       opportunity, preserving the stated decision/state contract and ordinary
       charges, verified explicitly for both backend choices.
 - [ ] Closure evidence separates backend creation, execution and contribution
-      at named depths; existing floors and compute/observation gates hold.
+      at named depths; existing floors and compute/observation gates hold,
+      subject only to the recorded user acceptance of this feature's
+      generation-2,000 floor miss.
 - [ ] Required verification, fresh mutation evidence, independent review,
       reference updates and cost records are complete; the roadmap row is
       checked and this spec is Complete on clean main after cleanup.
@@ -536,22 +552,31 @@ Nine deferred cognition indicators remain `Undefined`; no cognition improvement 
   The suggested `In Progress` label was not used: `scripts/roadmap-check.mjs`
   explicitly allows `Blocked` for specs, and the concrete measured blocker
   warrants that truthful status. This status choice changes no acceptance
-  criterion. A contract decision from the user is required before closure.
+  criterion. A contract decision from the user was required before closure;
+  consultation 6 below records the subsequent acceptance.
 
-- Blocked handoff preparation: fresh mutation verification has no survivors;
+- At the blocked handoff: fresh mutation verification had no survivors;
   no final independent review, `make check`, closure row/series update, main
-  integration or worktree cleanup is claimed. Those remain outstanding because
+  integration or worktree cleanup was claimed. Those were outstanding because
   of the measured acceptance blocker. Pre-report advisor consultation 5
   approved this blocked handoff.
 
-- Final advisor consultation 5, 2026-09-08: accepted blocked handoff only,
+- Pre-handoff advisor consultation 5, 2026-09-08: accepted blocked handoff only,
   independently verified fresh mutation mode and empty survivor files, and
   found no further justified code/spec correction. Accepted guidance to retain
   the measured reports at `b16f2820`, keep floor/closure boxes unmet, document
   pending independent review and final `make check`, and preserve the worktree
-  unmerged. **Advisor consult count: 5**. Requirement corrections: 1;
+  unmerged. At that handoff, advisor consult count: 5; requirement corrections: 1;
   post-review remediation passes: 0 (review not yet run); reviewer findings:
-  pending, not zero. No user acceptance exception was granted.
+  pending, not zero. No user acceptance exception had yet been granted.
+- Requirement correction 2 and advisor consultation 6, 2026-09-08: accepted
+  the user's feature-specific exception recorded in Performance and Goal
+  Impact, preserving the original requirement and measured miss. Status
+  returns to In Progress; this resolves the acceptance blocker without
+  changing code, reports, standing floors or remaining verification.
+  **Advisor consult count: 6**; requirement corrections: 2; user interventions:
+  1 (the acceptance exception); post-review remediation passes: 0; independent
+  reviewer findings and final `make check`: pending. No optional scope added.
 - Task-usage snapshot, 2026-09-08: native `get_goal` reported **579,240 tokens**
   (`tokensUsed`) and **2,779 seconds** (`timeUsedSeconds`) at the blocked
   handoff, before these final audit edits. This is the tool-reported task
@@ -565,3 +590,13 @@ Nine deferred cognition indicators remain `Undefined`; no cognition improvement 
   `/tmp/t11-f18-roadmap-6.log` and `/tmp/t11-f18-check-docs.log`. Documentation
   checks are repeated after this final record; the orchestrator owns the
   independent acceptance checks and any future closure decision.
+
+- Resumed implementation handoff, 2026-09-08: accepted advisor consultation 6
+  and the user's narrowly scoped current-feature exception. Appended the
+  existing gate/goal report paths to `benchmark-series.json` and added the
+  progress row, explicitly retaining the measured miss, its user acceptance,
+  the standing 0.008000 floor, and pending final review. No baseline, report,
+  production source or test was changed. Existing fresh mutation and measured
+  benchmark evidence remains applicable; no goal or mutation rerun occurred.
+  The spec remains In Progress and the feature row unchecked until the
+  orchestrator's independent review, final checks and integration gates.
