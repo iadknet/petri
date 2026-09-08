@@ -20,7 +20,8 @@
       "docs/progress/features/t11-f08-function-preserving-duplication-and-module-growth.json",
       "docs/progress/features/remove-complementary-nutrition.json",
       "docs/progress/features/t11-f16-drift-depth-indicator.json",
-      "docs/progress/features/t11-f17-executed-biased-mutation-targeting.json"
+      "docs/progress/features/t11-f17-executed-biased-mutation-targeting.json",
+      "docs/progress/features/t03-f10-activity-ramped-compute-cost.json"
     ]
   },
   "goal": {
@@ -39,7 +40,8 @@
       "docs/progress/features/t11-f08-function-preserving-duplication-and-module-growth-goal.json",
       "docs/progress/features/remove-complementary-nutrition-goal.json",
       "docs/progress/features/t11-f16-drift-depth-indicator-goal.json",
-      "docs/progress/features/t11-f17-executed-biased-mutation-targeting-goal.json"
+      "docs/progress/features/t11-f17-executed-biased-mutation-targeting-goal.json",
+      "docs/progress/features/t03-f10-activity-ramped-compute-cost-goal.json"
     ]
   },
   "counter_definition_changes": [
