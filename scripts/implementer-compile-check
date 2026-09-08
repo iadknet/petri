@@ -8,8 +8,15 @@
 # undo a completed edit, so this is feedback, not a gate. Anything the hook
 # cannot evaluate exits 0 so a broken hook never disturbs work.
 #
+# Fires are sequential (the harness waits for each hook), and edits arrive in
+# bursts, so a passing check records a marker and later fires inside the
+# cooldown skip cargo. A failure removes the marker: the implementer is fixing
+# something and needs every verdict.
+#
 # Environment:
-#   PETRI_COMPILE_CHECK_TIMEOUT  seconds before the check is abandoned (900)
+#   PETRI_COMPILE_CHECK_TIMEOUT   seconds before the check is abandoned (900)
+#   PETRI_COMPILE_CHECK_COOLDOWN  seconds a passing check suppresses reruns (15);
+#                                 0 or a non-number disables the cooldown
 set -eu
 
 input=$(cat)
@@ -24,6 +31,15 @@ dir=$(dirname "$file")
 [ -d "$dir" ] || exit 0
 root=$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null) || exit 0
 [ -f "$root/Cargo.toml" ] || exit 0
+
+cooldown=${PETRI_COMPILE_CHECK_COOLDOWN:-15}
+case $cooldown in ''|*[!0-9]*) cooldown=0 ;; esac
+marker=${TMPDIR:-/tmp}/petri-compile-check-$(printf '%s' "$root" | cksum | cut -d' ' -f1).ok
+if [ "$cooldown" -gt 0 ] && [ -f "$marker" ]; then
+  last=$(cat "$marker" 2>/dev/null || echo 0)
+  case $last in ''|*[!0-9]*) last=0 ;; esac
+  [ $(($(date +%s) - last)) -lt "$cooldown" ] && exit 0
+fi
 
 timeout_seconds=${PETRI_COMPILE_CHECK_TIMEOUT:-900}
 log=$(mktemp "${TMPDIR:-/tmp}/petri-compile-check.XXXXXX")
@@ -54,8 +70,10 @@ if [ -f "$expired" ]; then
 elif [ "$status" -ne 0 ]; then
   verdict="failed (exit $status)"
 else
+  date +%s >"$marker"
   exit 0
 fi
+rm -f "$marker"
 printf 'implementer-compile-check: cargo check --workspace --all-targets %s after editing %s. Last 30 lines:\n' "$verdict" "$file" >&2
 tail -n 30 "$log" >&2
 exit 2
