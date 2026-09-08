@@ -15,7 +15,7 @@ production defaults remain barrier-free with unchanged trajectories.
 ## Non-Goals
 
 - No recipe save/load or CLI partial-config merge (T12.F02), differentiated
-  food (T12.F03), baseline world set or `FbmThreshold` generator (T12.F04).
+  food (T12.F04), baseline world set or `FbmThreshold` generator (T12.F04).
 - No bitmap, erase layers, runtime terrain regeneration, new perception
   behavior, founder policy, terrain editor framework, or checkpoint format.
 - No production tuning, epoch re-pin, RNG redesign, or unrelated pattern
