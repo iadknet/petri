@@ -142,3 +142,55 @@ test('missing file_path, a file outside a Cargo repository, or a missing directo
     assert.equal(result.shim, null);
   } finally { rmSync(repository, { recursive: true, force: true }); }
 });
+
+// Cooldown: fires are sequential (the harness waits for each hook), so a
+// passing check suppresses re-runs for a short window. TMPDIR is pointed at
+// the fixture so the marker is cleaned up with it.
+function marker(repository) {
+  const hash = spawnSync('sh', ['-c', 'printf %s "$1" | cksum | cut -d" " -f1', '_', repository], { encoding: 'utf8' }).stdout.trim();
+  return join(repository, `petri-compile-check-${hash}.ok`);
+}
+
+function cooled(repository, env = {}) {
+  rmSync(join(repository, 'cargo-shim.log'), { force: true });
+  return run(repository, edit(repository, 'crates/core/src/lib.rs'), { TMPDIR: repository, ...env });
+}
+
+test('a passing check suppresses the next fire inside the cooldown', () => {
+  const repository = repo();
+  try {
+    let result = cooled(repository);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.shim[0], 'check --workspace --all-targets');
+    assert.ok(existsSync(marker(repository)), 'marker written after a pass');
+
+    result = cooled(repository, { CARGO_SHIM_MODE: 'fail' });
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.shim, null, 'cargo not run inside the cooldown');
+  } finally { rmSync(repository, { recursive: true, force: true }); }
+});
+
+test('a failing check clears the cooldown so the next fire runs', () => {
+  const repository = repo();
+  try {
+    writeFileSync(marker(repository), `${Math.floor(Date.now() / 1000) - 100}\n`);
+    let result = cooled(repository, { CARGO_SHIM_MODE: 'fail' });
+    assert.equal(result.status, 2);
+    assert.equal(result.shim[0], 'check --workspace --all-targets', 'an expired marker does not suppress');
+    assert.ok(!existsSync(marker(repository)), 'marker removed after a failure');
+
+    result = cooled(repository);
+    assert.equal(result.status, 0, result.stderr);
+    assert.equal(result.shim[0], 'check --workspace --all-targets', 'runs again right after a failure');
+  } finally { rmSync(repository, { recursive: true, force: true }); }
+});
+
+test('PETRI_COMPILE_CHECK_COOLDOWN=0 runs cargo on every fire', () => {
+  const repository = repo();
+  try {
+    assert.equal(cooled(repository, { PETRI_COMPILE_CHECK_COOLDOWN: '0' }).status, 0);
+    const result = cooled(repository, { PETRI_COMPILE_CHECK_COOLDOWN: '0', CARGO_SHIM_MODE: 'fail' });
+    assert.equal(result.status, 2);
+    assert.equal(result.shim[0], 'check --workspace --all-targets');
+  } finally { rmSync(repository, { recursive: true, force: true }); }
+});
