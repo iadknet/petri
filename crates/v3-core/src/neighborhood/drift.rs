@@ -52,6 +52,7 @@ impl Default for DriftSizes {
 /// Integer totals over whole lineages, never VM instructions or graph internals.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct MeshTotals {
+    pub backends: super::mesh_execution::MeshBackendCounts,
     pub lineages: u32,
     pub total_nodes: u64,
     pub reachable_nodes: u64,
@@ -62,6 +63,14 @@ pub struct MeshTotals {
 }
 impl MeshTotals {
     fn record(&mut self, reading: MeshExecutionReading) {
+        for (total, sample) in [
+            (&mut self.backends.graph, reading.backends.graph),
+            (&mut self.backends.vm, reading.backends.vm),
+        ] {
+            total.total += sample.total;
+            total.executed += sample.executed;
+            total.contributing += sample.contributing;
+        }
         self.lineages += 1;
         self.total_nodes += reading.total_node_count as u64;
         self.reachable_nodes += reading.reachable_node_count as u64;
@@ -212,7 +221,10 @@ mod tests {
             let readings: Vec<_> = rows.into_iter().map(|(total, reach, exec, knockout, varies, cap)| {
                 let reach = reach.min(total);
                 let exec = exec.min(reach);
-                MeshExecutionReading { total_node_count: total, reachable_node_count: reach, executed_node_count: exec, knockout_count: knockout.min(exec), route_varies_with_input: varies, hop_cap_hits: cap }
+                MeshExecutionReading { backends: super::super::mesh_execution::MeshBackendCounts {
+                    graph: super::super::mesh_execution::BackendNodeCounts {total: (total / 2) as u64, executed: (exec / 2) as u64, contributing: ((exec-knockout.min(exec))/2) as u64},
+                    vm: super::super::mesh_execution::BackendNodeCounts {total: (total-total/2) as u64, executed: (exec-exec/2) as u64, contributing: ((exec-knockout.min(exec))-(exec-knockout.min(exec))/2) as u64},
+                }, total_node_count: total, reachable_node_count: reach, executed_node_count: exec, knockout_count: knockout.min(exec), route_varies_with_input: varies, hop_cap_hits: cap }
             }).collect();
             let mut pooled = MeshTotals::default();
             for &reading in &readings { pooled.record(reading); }
@@ -220,6 +232,12 @@ mod tests {
             prop_assert_eq!(pooled.total_nodes, readings.iter().map(|r| r.total_node_count as u64).sum::<u64>());
             prop_assert_eq!(pooled.reachable_nodes, readings.iter().map(|r| r.reachable_node_count as u64).sum::<u64>());
             prop_assert_eq!(pooled.executed_nodes, readings.iter().map(|r| r.executed_node_count as u64).sum::<u64>());
+            for (actual, graph) in [(&pooled.backends.graph, true), (&pooled.backends.vm, false)] {
+                let samples: Vec<_> = readings.iter().map(|r| if graph { r.backends.graph } else { r.backends.vm }).collect();
+                prop_assert_eq!(actual.total, samples.iter().map(|s| s.total).sum::<u64>());
+                prop_assert_eq!(actual.executed, samples.iter().map(|s| s.executed).sum::<u64>());
+                prop_assert_eq!(actual.contributing, samples.iter().map(|s| s.contributing).sum::<u64>());
+            }
             prop_assert_eq!(pooled.knockout_nodes, readings.iter().map(|r| r.knockout_count as u64).sum::<u64>());
             prop_assert_eq!(pooled.route_varying_lineages as usize, readings.iter().filter(|r| r.route_varies_with_input).count());
             prop_assert_eq!(pooled.hop_cap_hits, readings.iter().map(|r| r.hop_cap_hits as u64).sum::<u64>());

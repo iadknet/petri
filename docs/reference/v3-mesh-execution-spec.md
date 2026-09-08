@@ -205,7 +205,9 @@ Tick-order/action-arbitration reproducibility controls are specified separately
 in `v3-tick-orchestration-spec.md` (`Test-Mode Reproducibility Notes (Tick
 Arbitration)`).
 
-T11.F15 pairs new branches with backend gates and pass-through detours; see
+T11.F15 pairs new branches with backend gates and pass-through detours. T11.F18
+chooses an empty Graph or Halt-only VM detour with equal probability independent
+of the source backend; both preserve the bus and queued actions within budget. See
 `v3-mutation-spec.md`. Extra dispatches/instructions retain their normal
 work and energy accounting. Neutrality requires sufficient budgets and does
 not promise equal downstream live-energy introspection or exhaustion outcomes.
