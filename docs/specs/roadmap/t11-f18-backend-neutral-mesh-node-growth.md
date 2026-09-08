@@ -188,7 +188,7 @@ Implementation verification, 2026-09-08 (logs under `/tmp/t11-f18-*.log`):
   tests ignored (`core-lib-3.log`), including topology and neighborhood tests.
   `cargo test -p v3-cli bench`: 37 unit tests and one benchmark integration
   test passed (`cli.log`). `cargo test -p v3-core --test reproducibility`:
-  one passed (`reproducibility.log`). Later focused checks pending below.
+  one passed (`reproducibility.log`). Final focused check results are recorded below.
 - Diff self-review for reuse, simplicity and efficiency: retained the shared
   detour constructor and existing RNG; reused one knockout decision per
   executed node with no additional battery pass; reused concrete count types
@@ -505,9 +505,8 @@ Nine deferred cognition indicators remain `Undefined`; no cognition improvement 
   `git diff --check` exited 0. Aqua emitted cache/timestamp permission
   warnings but the validator completed. Only this flat spec is added;
   the orchestrator independently verifies and commits the plan.
-- Advisor consultations, reviewer findings, remediation passes, requirement
-  corrections and user interventions will be recorded before closure;
-  usage unavailable.
+- Planning-stage telemetry was unavailable; the blocked-handoff consultation,
+  review status and task-usage snapshot are recorded below.
 - Requirement correction 1, 2026-09-08, during implementation: the original
   phrase "pending action metadata" could imply that metadata crosses node
   boundaries. `runtime/vm.rs` initializes its metadata array per dispatch
@@ -518,14 +517,14 @@ Nine deferred cognition indicators remain `Undefined`; no cognition improvement 
   corrects the spec's assumption without changing runtime semantics or
   weakening the roadmap's metadata-preservation requirement.
 
-- Implementation advisor consultations so far: 3. (1) Accepted the smallest
+- Interim implementation record, consultations 1–3: (1) Accepted the smallest
   shared-constructor/one-pass observation approach, draw placement, explicit
   probability boundary tests, separate real costs and nonempty Graph source
   fixtures; all match the feature contract. (2) Accepted requirement correction
   1 after verifying node-local metadata. (3) Accepted restoring a missing use
   terminator after its compiler diagnostic recurred; corrected fixture names
   from actual configuration/termination types. No optional advice adopted or
-  required advice rejected. Final consultation and reviewer findings pending.
+  required advice rejected. Consultations 4–5 and final review status follow.
 
 - Advisor consultation 4, 2026-09-08: accepted the binding generation-2,000
   floor failure (10/2,000 against required 16/2,000). The advisor found no
@@ -552,7 +551,15 @@ Nine deferred cognition indicators remain `Undefined`; no cognition improvement 
   pending independent review and final `make check`, and preserve the worktree
   unmerged. **Advisor consult count: 5**. Requirement corrections: 1;
   post-review remediation passes: 0 (review not yet run); reviewer findings:
-  pending, not zero. No user acceptance exception was granted. Usage unavailable.
+  pending, not zero. No user acceptance exception was granted.
+- Task-usage snapshot, 2026-09-08: native `get_goal` reported **579,240 tokens**
+  (`tokensUsed`) and **2,779 seconds** (`timeUsedSeconds`) at the blocked
+  handoff, before these final audit edits. This is the tool-reported task
+  usage snapshot, not account rate limits or a claim of the exact final total.
+- Orchestrator independent audit, 2026-09-08: `make roadmap-check` passed
+  (`/tmp/t11-f18-orchestrator-roadmap.log`); main remained clean and unchanged
+  at `d14136db99f677f210a5621d2eec3752d879d20e`. The feature worktree remains
+  unmerged. Final independent review and final `make check` remain pending.
 - Evidence checks: `make roadmap-check`, `make check-docs`, and
   `git diff --check` exited 0 before the evidence commit; logs
   `/tmp/t11-f18-roadmap-6.log` and `/tmp/t11-f18-check-docs.log`. Documentation
