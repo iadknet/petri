@@ -117,6 +117,7 @@ export interface LifecycleEnergyConfig {
 	energy_decay_per_tick: number;
 	min_reproduce_energy: number;
 	default_offspring_energy: number;
+	genome_carry_cost_per_unit: number;
 }
 
 export interface CostsConfig {

@@ -156,6 +156,7 @@ Queue-shape coupling invariant:
 | `energy.lifecycle.min_reproduce_energy` | `f32` | `30.0` | Must be finite and `>= 0.0`; invalid values fall back to `30.0`. |
 | `energy.lifecycle.min_reproduce_age` | `u64` | `20` | Minimum parent age (ticks) required before reproduce can be accepted. No normalization fallback; value is consumed as configured. |
 | `energy.lifecycle.default_offspring_energy` | `f32` | `100.0` | Must be finite and `>= 0.0`; invalid values fall back to `100.0`. |
+| `energy.lifecycle.genome_carry_cost_per_unit` | `f32` | `1e-4` | Must be finite and `>= 0.0`; invalid values fall back to `1e-4`. A missing field defaults to `1e-4`. `0.0` is allowed and disables the charge. Energy charged per tick per unit of total genome size. |
 | `energy.costs.move_cost` | `f32` | `0.2` | Must be finite and `>= 0.0`; invalid values fall back to `0.2`. |
 | `energy.costs.eat_cost` | `f32` | `0.0` | Must be finite and `>= 0.0`; invalid values fall back to `0.0`. |
 | `energy.costs.eat_reward_per_food` | `f32` | `5.0` | Live shared reward per consumed density for every ordinary food type. Must be finite and `>= 0.0`; invalid values fall back to `5.0`. |
@@ -168,6 +169,25 @@ Queue-shape coupling invariant:
 | `energy.age_cost.enabled` | `bool` | `true` | When `true`, creature age scales action energy costs via a quadratic multiplier. |
 | `energy.age_cost.age_cap` | `u64` | `500` | Age (in ticks) at which the maximum multiplier applies. Ages beyond this are clamped. `0` disables the multiplier (returns 1.0). |
 | `energy.age_cost.max_multiplier` | `f32` | `10.0` | Must be finite and `>= 1.0`; invalid values fall back to `10.0`. Maximum multiplier reached at or beyond `age_cap`. |
+
+Genome carrying cost:
+- Every living creature pays `genome_carry_cost_per_unit * genome_size()`
+  energy each tick, added to `energy_decay_per_tick` and settled as one
+  subtraction in the Phase 0 energy-decay sub-step, before death removal. A
+  creature the combined charge takes to or below zero is removed by the
+  existing `energy <= 0.0` rule in the same tick.
+- The unit is total genome size (`genome_size()`), which counts every node,
+  input reference, target, VM instruction, VM constant, compute node and its
+  edges, wired sink, wired action slot, and wired execute gate with equal
+  weight. It is not reachability-aware, so unreachable and dead structure is
+  charged exactly like the executed core.
+- Is NOT scaled by the complexity or age action multipliers, exactly as
+  `energy_decay_per_tick` is not; it is a world-level Phase 0 cost, not an
+  action cost.
+- Is independent of `energy.complexity_cost`, which multiplies action costs by
+  the reachability-aware `complexity()` and is disabled at canonical defaults.
+- At the default rate the canonical founder genome (96 units) pays 0.0096 per
+  tick, 1.92% of the default 0.5 decay.
 
 Complexity energy cost:
 - When enabled, all action energy costs (noop, eat, move, reproduce, steal, and

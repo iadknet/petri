@@ -20,6 +20,16 @@ export const ENERGY_LIFECYCLE_FIELDS: FieldDef[] = [
 		tooltip: "Energy lost by every creature each tick (maintenance cost)",
 	},
 	{
+		path: "energy.lifecycle.genome_carry_cost_per_unit",
+		label: "Carry Cost / Unit",
+		min: 0,
+		max: 0.01,
+		step: 0.00001,
+		defaultValue: 0.0001,
+		tooltip:
+			"Energy charged each tick per unit of genome_size() \u2014 maintenance on carried structure, junk included",
+	},
+	{
 		path: "energy.lifecycle.min_reproduce_energy",
 		label: "Min Reproduce Energy",
 		min: 0,
