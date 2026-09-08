@@ -423,6 +423,47 @@ mod tests {
         }
     }
 
+    /// Newborns on both reproduction paths carry a genome size equal to a
+    /// fresh `genome_size()`: the mutated path recomputes it, the no-mutation
+    /// fast path copies the parent's.
+    fn assert_every_creature_caches_its_own_genome_size(mutation_probability: f64) {
+        use crate::config::SimulationConfig;
+        use crate::simulation::{run_tick, seed_simulation};
+
+        let mut cfg = SimulationConfig::default();
+        cfg.world.width = 48;
+        cfg.world.height = 48;
+        cfg.population.initial_creatures = 200;
+        cfg.mutation.mutation_probability = mutation_probability;
+        let mut sim = seed_simulation(cfg, 2026);
+        for _ in 0..40 {
+            run_tick(&mut sim, &mut None);
+        }
+
+        assert!(
+            sim.stats.reproduction_actions_spawned_total > 0,
+            "the fixture must actually reproduce"
+        );
+        for (_, creature) in sim.creatures.iter() {
+            assert_eq!(
+                creature.cached_genome_size,
+                creature.genome.genome_size(),
+                "generation {} caches a stale genome size",
+                creature.generation
+            );
+        }
+    }
+
+    #[test]
+    fn mutated_newborns_cache_their_own_genome_size() {
+        assert_every_creature_caches_its_own_genome_size(1.0);
+    }
+
+    #[test]
+    fn fast_path_newborns_cache_the_parents_genome_size() {
+        assert_every_creature_caches_its_own_genome_size(0.0);
+    }
+
     #[test]
     fn lamarckian_copies_parent_learned_weights() {
         let genome = genome_with_cgp_compute_nodes(vec![

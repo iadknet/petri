@@ -134,8 +134,21 @@ pub fn advance_shared_memory(
 /// Sub-step canonical order (v3-tick-orchestration-spec.md Section 3):
 /// 1. Food growth
 /// 2. Creature aging (+1 per creature)
-/// 3. Energy decay (subtract `energy_decay_per_tick`)
+/// 3. Energy decay (subtract `energy_decay_per_tick` plus the genome carrying
+///    cost `genome_carry_cost_per_unit * cached_genome_size`, as one charge)
 /// 4. Death removal (remove creatures where energy <= 0 from slotmap + world occupancy)
+/// The energy one living creature is charged in the Phase 0 energy-decay
+/// sub-step: the world-level decay plus the per-tick maintenance cost of the
+/// structure it carries, junk included. Not scaled by the complexity or age
+/// action multipliers, exactly as `energy_decay_per_tick` is not.
+pub(crate) fn phase_0_energy_charge(
+    energy_decay_per_tick: f32,
+    genome_carry_cost_per_unit: f32,
+    genome_size: u32,
+) -> f32 {
+    energy_decay_per_tick + genome_carry_cost_per_unit * genome_size as f32
+}
+
 pub fn run_phase_0(sim: &mut Simulation) {
     // Step 1: Food growth
     let food_growth = sim.world.grow_food(sim.tick, &mut sim.rng);
@@ -143,9 +156,14 @@ pub fn run_phase_0(sim: &mut Simulation) {
 
     // Steps 2 & 3: Age, energy decay, and shared memory snapshot + decay
     let decay_rate = sim.config.shared_memory.decay_rate;
+    let lifecycle = &sim.config.energy.lifecycle;
     for (_, creature) in sim.creatures.iter_mut() {
         creature.age += 1;
-        creature.energy -= sim.config.energy.lifecycle.energy_decay_per_tick;
+        creature.energy -= phase_0_energy_charge(
+            lifecycle.energy_decay_per_tick,
+            lifecycle.genome_carry_cost_per_unit,
+            creature.cached_genome_size,
+        );
         creature.lifetime_energy_sum += f64::from(creature.energy.max(0.0));
         creature.lifetime_energy_sample_count += 1;
 

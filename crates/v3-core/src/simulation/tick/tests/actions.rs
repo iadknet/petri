@@ -329,6 +329,7 @@ fn failed_action_penalty_ramp_uses_effective_tick_value() {
     sim.world.set_barrier(Position::new(5, 4), true);
     sim.config.energy.costs.move_cost = 0.0;
     sim.config.energy.lifecycle.energy_decay_per_tick = 0.0;
+    sim.config.energy.lifecycle.genome_carry_cost_per_unit = 0.0;
     sim.config.energy.age_cost.enabled = false;
     sim.config.energy.complexity_cost.enabled = false;
 
