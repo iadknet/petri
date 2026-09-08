@@ -1,6 +1,6 @@
 # Petri repository instructions
 
-- Use verification proportionate to the changed files. Run `make check` before completing application or runtime source-code or build-configuration changes; documentation-only work uses its relevant focused checks.
+- Use verification proportionate to the changed files. Run `make check` before completing application or runtime source-code or build-configuration changes; documentation-only work uses `make check-docs`.
 - Commits, remotes, pull requests, and other external state require explicit user authorization.
 - Roadmap features are executed through the workflow in `docs/workflow.md`. Do not add parallel workflow machinery.
 - For every Codex roadmap feature, follow the Codex adapter in that workflow: Astra at `low` effort orchestrates with one separate persistent Astra `high` spec owner and advisor for spec writing, readiness review, implementation advice, and escalation decisions. Delegate implementation and remediation to one persistent Astra `low` subagent and use a fresh Astra `medium` subagent for final review; do not spawn a separate advisor. This delegation applies to feature execution, not requests to generate a goal prompt or edit the workflow.
