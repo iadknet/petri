@@ -298,6 +298,30 @@ normalization, frontend, and serde work already used the repository's
 declarative helpers (`normalize_f32_finite_nonneg`, `#[serde(default = ...)]`,
 `FieldDef` rows), so nothing else changed.
 
+Mutation testing, fresh (`MUTANTS_ITERATE=0 make rust-mutants`, run after the
+simplify pass and after the measurements, diff against merge base
+`8d43b0e1`):
+
+- Summary line: `49 mutants tested in 4m: 46 caught, 3 unviable`.
+- Output path: `/Users/istefanek/.local/share/petri-tools/mutants/t03-f08/mutants.out`,
+  with `run-mode.txt` recording `fresh`.
+- The target printed `rust-mutants: no survivors`. `missed.txt` and
+  `timeout.txt` are both empty: **no mutant was missed by every test and none
+  timed out**, so there is no survivor to resolve as killed, equivalent, or
+  deferred, and the target was run once.
+- No `#[mutants::skip]` attribute and no `exclude_re` entry was added anywhere
+  in this feature.
+- The three unviable mutants are `Default::default()` substitutions for
+  `build_tick_sample -> TickSampleEvent`,
+  `CreatureState::new_with_cached_fields -> Self`, and
+  `apply_reproduce -> ReproductionActionResult`; none of those types implements
+  `Default`, so the mutants do not compile and are not survivors.
+- Every mutant generated on this feature's own new code was caught: all 27
+  constant-tuple replacements of `structure_means`, its `population == 0` guard
+  (`== ` to `!=`), and both arithmetic mutations of its `/`; all three constant
+  replacements of `phase_0_energy_charge` and all four of its arithmetic
+  mutations (`+` to `-`, `+` to `*`, `*` to `+`, `*` to `/`).
+
 ## Performance and Goal Impact
 
 Natural analog: maintenance metabolism of tissue kept alive whether or not it
