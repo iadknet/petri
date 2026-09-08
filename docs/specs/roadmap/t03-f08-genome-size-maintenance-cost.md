@@ -1,6 +1,6 @@
 # T03.F08 — Genome Size Maintenance Cost
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-07
 **Feature**: T03.F08
 **Track**: [T03 — Functional Traits and Metabolism](../../roadmaps/t03-functional-traits-and-metabolism.md)
@@ -179,7 +179,8 @@ the T03.F10 gate and goal reports (previous closure), the pinned goal epoch
       `crates/v3-core/tests/reproducibility.rs` covers cross-process
       reproducibility inside `make check`.
 - [x] `make roadmap-check` on document edits; final `make check` exits 0 on
-      the closure content, with the tested commit reported in the parent task.
+      the closure content: tested commit `1587373d` (`make check` exit 0,
+      run once by the orchestrator in the worktree on 2026-09-07).
 
 ### Founder size correction
 
@@ -227,8 +228,8 @@ Commands run in the worktree, in this order, and their results:
 - `cargo clippy --workspace --all-targets` — clean, no warnings.
 - `cargo fmt --all` — applied.
 - `make roadmap-check` — `roadmap-check: validation passed`, exit 0.
-- `make check` — exit 0 before the measurements; rerun on the closure content
-  with the tested commit reported in the parent task. The same three
+- `make check` — exit 0 before the measurements; rerun once on the closure
+  content at tested commit `1587373d`, exit 0. The same three
   pre-existing frontend lint warnings appear and do not fail the step.
 - `make bench PROFILE=gate FEATURE=t03-f08-genome-size-maintenance-cost` —
   exit 0, report stored, `severe=false` against both references.
@@ -572,3 +573,8 @@ energy. No cognition claim.
   pass were re-derived from the stored NDJSON, the config dumps, and the source
   files rather than carried over from that context; the review-outcome counts
   above are the orchestrator's.
+- Cost record (closure, 2026-09-07): `/usage` totals not collected (the user
+  was away; a user command). Implementer advisor consults: 2 in the
+  implementation pass, 2 in the remediation pass. Reviewer findings: 0 P1,
+  1 P2, 7 P3. Track and master rollups unchanged: no T03 track criterion is
+  satisfied by this feature alone.
