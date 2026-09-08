@@ -1,0 +1,206 @@
+{
+  "action_log": {
+    "capacity": 500
+  },
+  "energy": {
+    "age_cost": {
+      "age_cap": 500,
+      "enabled": true,
+      "max_multiplier": 10.0
+    },
+    "complexity_cost": {
+      "enabled": false,
+      "scaling_factor": 0.002,
+      "threshold": 50
+    },
+    "costs": {
+      "eat_cost": 0.0,
+      "eat_reward_per_food": 5.0,
+      "failed_action_penalty": 1.0,
+      "move_cost": 0.2,
+      "noop_cost": 0.05,
+      "reproduce_cost": 0.1
+    },
+    "lifecycle": {
+      "default_offspring_energy": 100.0,
+      "energy_decay_per_tick": 0.5,
+      "genome_carry_cost_per_unit": 0.0,
+      "initial_energy": 20.0,
+      "max_energy": 200.0,
+      "min_reproduce_age": 20,
+      "min_reproduce_energy": 30.0
+    }
+  },
+  "mutation": {
+    "action_queue_cap": 4,
+    "executed_bias": 0.9,
+    "executed_window_ticks": 100,
+    "genome_size_cap": 1200,
+    "genome_size_pressure_enabled": false,
+    "mesh_layer_probability": 0.2,
+    "mutation_probability": 0.44,
+    "per_birth_mutation_event_continuation_probability": 0.2,
+    "per_birth_mutation_events_max": 10,
+    "per_birth_mutation_events_min": 1,
+    "phenotype": {
+      "channel_change_chance": 0.001,
+      "channel_step": 1,
+      "polarity_flip_chance": 0.0002
+    },
+    "reachable_bias": {
+      "graph": 0.0,
+      "input_ref": 0.0,
+      "topology": 0.0,
+      "vm": 0.0
+    }
+  },
+  "population": {
+    "founder_profile": "v3_alpha1",
+    "initial_creatures": 10000,
+    "max_creatures": 100000
+  },
+  "predation": {
+    "kill_complexity_bonus_multiplier": 0.0,
+    "steal_cost_rate": 0.05
+  },
+  "runtime": {
+    "graph_convergence_epsilon": 0.001,
+    "graph_convergence_stable_passes": 2,
+    "graph_node_base_cost": 1e-05,
+    "max_actions_per_turn": 10,
+    "max_graph_relax_iters": 15,
+    "max_mesh_hops": 1024,
+    "max_vm_steps": 10000,
+    "perception": {
+      "vision_radius": 5
+    },
+    "plasticity_update_cost": 0.0,
+    "reward_learning_cost": 0.0,
+    "vm": {
+      "opcode_cost_multiplier": 1e-06,
+      "step_ramp_allowance": 100,
+      "step_ramp_cost": 1e-06
+    }
+  },
+  "shared_memory": {
+    "decay_rate": 0.0
+  },
+  "startup": {
+    "ramps": {
+      "failed_action_penalty": {
+        "enabled": true,
+        "end": 1.0,
+        "start": 0.0,
+        "target_tick": 62680
+      }
+    }
+  },
+  "world": {
+    "edge_mode": "Wrap",
+    "food": {
+      "annealing": {
+        "enabled": false,
+        "initial_max_fertility": 1.5,
+        "initial_min_fertility": 0.3,
+        "ramp_ticks": 5000
+      },
+      "fertility": {
+        "enabled": true,
+        "layers": [
+          {
+            "algorithm": {
+              "PoissonBlobs": {
+                "blob_count": 900,
+                "falloff": 0.5,
+                "max_radius": 15.0,
+                "min_radius": 5.0,
+                "seed": null
+              }
+            },
+            "target": "AllFoods",
+            "weight": 1.0
+          },
+          {
+            "algorithm": {
+              "PoissonBlobs": {
+                "blob_count": 900,
+                "falloff": 0.5,
+                "max_radius": 15.0,
+                "min_radius": 5.0,
+                "seed": null
+              }
+            },
+            "target": "AllFoods",
+            "weight": 1.0
+          }
+        ],
+        "max_fertility": 2.0,
+        "min_fertility": 0.0
+      },
+      "shared": {
+        "annealing": {
+          "enabled": false,
+          "initial_max_fertility": 1.5,
+          "initial_min_fertility": 0.3,
+          "ramp_ticks": 5000
+        },
+        "fertility": {
+          "enabled": true,
+          "layers": [
+            {
+              "algorithm": {
+                "PoissonBlobs": {
+                  "blob_count": 900,
+                  "falloff": 0.5,
+                  "max_radius": 15.0,
+                  "min_radius": 5.0,
+                  "seed": null
+                }
+              },
+              "target": "AllFoods",
+              "weight": 1.0
+            },
+            {
+              "algorithm": {
+                "PoissonBlobs": {
+                  "blob_count": 900,
+                  "falloff": 0.5,
+                  "max_radius": 15.0,
+                  "min_radius": 5.0,
+                  "seed": null
+                }
+              },
+              "target": "AllFoods",
+              "weight": 1.0
+            }
+          ],
+          "max_fertility": 2.0,
+          "min_fertility": 0.0
+        },
+        "growth_rate": 0.09,
+        "initial_coverage": 0.54,
+        "initial_density": 1.0,
+        "max_density": 1.0,
+        "occupancy_depletion": {
+          "deposit_per_occupied_tick": 0.08,
+          "enabled": true
+        },
+        "recovery_floor_ratio": 0.01,
+        "recovery_spawn_rate": 0.01,
+        "spread_density_ratio": 0.25,
+        "spread_threshold_ratio": 0.8
+      },
+      "types": [
+        {
+          "color": "#22c55e",
+          "growth_inhibitor": 0.2,
+          "initial_coverage": 0.54,
+          "initial_density": 1.0,
+          "name": "Primary Food"
+        }
+      ]
+    },
+    "height": 1600,
+    "width": 1600
+  }
+}
