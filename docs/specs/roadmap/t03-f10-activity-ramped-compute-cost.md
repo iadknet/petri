@@ -229,9 +229,13 @@ multiplier; the total is monotone non-decreasing in steps and in ramp rate and
 never negative; a step inside the allowance carries the base charge exactly;
 and a whole settled dispatch charges the closed form within one ulp of the
 starting energy plus one of the settled debt. No assertion depends on which
-cases were drawn, and no `proptest-regressions` file survives (one appeared
-from a first draft whose generator drew unaffordable ramps; the generator was
-bounded and the file removed).
+cases were drawn. One `proptest-regressions` entry exists and is committed at
+`crates/v3-core/proptest-regressions/runtime/tests/vm_step_ramp.txt`; it
+records a first-draft generator that drew ramps a dispatch could not afford
+(`steps = 188, allowance = 0, ramp = 0.0094774915, energy = 20.0`), which
+tripped the harness assertion that the dispatch does not exhaust rather than
+the invariant. The generator is now bounded to ramps the drawn energy can
+absorb and the seed replays green.
 
 Two pre-existing tests were loosened, both in
 `crates/v3-core/src/runtime/tests/vm_execution.rs`, with the reason recorded
@@ -401,3 +405,21 @@ regression and no epoch re-pin is requested.
   T11.F17 and did not gate its closure; T03.F08 later reads this feature's
   realized execution cost beside the 2026-09-07 figure (0.000152 energy per
   creature-tick on the user's long run).
+- Deviation from the letter of the fixed-design table, for the orchestrator to
+  accept or amend (the table is left as decided): the post-bid exhaustion
+  check is `bid >= effective || effective_energy!() <= 0.0`, not the
+  effective-energy clause alone. Measured reason: when the cap bites, the bid
+  is `effective` and the separate `f32` stores of `energy - bid` and the debt
+  settlement leave a residual of about one ulp of the starting energy in
+  either direction (-1.2218952e-6 measured from 100 energy). Without the first
+  clause, whether an all-in bid exhausts would depend on which way that store
+  rounded. The clause makes an all-in bid exhaust deterministically, which is
+  the pre-feature behavior; `v3-vm-isa-spec.md` Section 9 documents the
+  implemented rule.
+- Also outside the task's named scope, and reported rather than assumed:
+  `v3-vm-isa-spec.md` Section 9 gained a one-clause truthfulness fix (bids cap
+  at the effective energy), since the task named Sections 3 and 6 only. Section
+  3's stale `max_vm_steps` default of `1024` (the config default is 10,000) is
+  a pre-existing error left untouched.
+- Deferred finding: none from the mutation run. The one survivor is argued
+  equivalent above, not deferred.
