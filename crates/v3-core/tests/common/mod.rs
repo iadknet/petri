@@ -32,7 +32,11 @@ pub(crate) fn test_config() -> SimulationConfig {
     cfg.world.height = 12;
     cfg.world.food.initial_coverage = 0.0;
     cfg.world.food.growth_rate = 0.0;
+    // Both world-level Phase 0 energy charges are off, so a fixture that reads
+    // a creature's energy difference across a tick reads only what the tick's
+    // own behavior cost it.
     cfg.energy.lifecycle.energy_decay_per_tick = 0.0;
+    cfg.energy.lifecycle.genome_carry_cost_per_unit = 0.0;
     cfg.mutation.mutation_probability = 0.0;
     cfg
 }

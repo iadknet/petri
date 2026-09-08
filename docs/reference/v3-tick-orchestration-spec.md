@@ -100,12 +100,19 @@ Phase 0 sub-steps (canonical order):
 1. Occupancy depletion update for food regrowth memory.
 2. Food growth (per-cell, world-level), using the updated depletion layer.
 3. Creature aging (`age_ticks += 1` for each living creature).
-4. Energy decay (`energy -= energy_decay_per_tick` for each living creature).
-5. Death removal: remove all creatures with `energy <= 0.0`.
+4. Energy decay and genome carrying cost, as one combined subtraction for each
+   living creature:
+   `energy -= energy_decay_per_tick + genome_carry_cost_per_unit * genome_size`,
+   where `genome_size` is the creature's total genome size cached at birth
+   (junk included). Neither term is scaled by the complexity or age action
+   multipliers.
+5. Death removal: remove all creatures with `energy <= 0.0`. A creature the
+   combined charge in sub-step 4 takes to or below zero is removed here, in
+   the same tick.
 
 Canonical food growth behavior is owned by `v3-world-grid-spec.md`.
-Canonical `energy_decay_per_tick` default is owned by
-`v3-runtime-config-spec.md`.
+Canonical `energy_decay_per_tick` and `genome_carry_cost_per_unit` defaults are
+owned by `v3-runtime-config-spec.md`.
 Canonical occupancy depletion behavior and defaults are owned by
 `v3-world-grid-spec.md`.
 
