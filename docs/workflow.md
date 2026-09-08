@@ -332,7 +332,7 @@ intent as well as the spec and diff; do not reuse the spec owner for that review
    token budget. Use the native tool's rules for goal status and blockers.
 
 ```text
-Set a goal: roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md and follow its shared per-feature contract and Codex adapter. Use Astra (gpt-6-astra, low) as orchestrator. Delegate spec writing, readiness review, and implementation advice to one separate persistent Astra (gpt-6-astra, high) spec owner and advisor. Return to that same agent at the workflow's advisor checkpoints and for requirement corrections, conflicting technical advice, verification exceptions, and integration decisions that change behavior; do not spawn a separate advisor. Use one persistent Astra (gpt-6-astra, low) subagent for all implementation and remediation and a fresh Astra (gpt-6-astra, medium) subagent for final review. Start in the main checkout on clean main. I authorize creating .worktrees/<tnn-fnn> on codex/<tnn-fnn>, local planning and implementation commits, rebasing codex/<tnn-fnn> onto main and rerunning the required checks when main moves, fast-forwarding main after all required checks pass, and removing that completed worktree and branch. Do not push or mutate remotes. Done means the feature row is checked and its spec is Complete on main; make check exited 0 for the final feature content and its tested commit (the rebased one when a rebase was needed) is now main; the feature worktree and branch are removed; and main is clean. Show the evidence in this task and record the workflow's required model/effort settings, advisor consultations, review findings, remediation passes, requirement corrections, user interventions, and total usage when available. If a concrete blocker prevents completion, record it in the spec when one exists, report it, and preserve the worktree; never report the goal complete with required work remaining.
+Set a goal: roadmap feature <TNN.FNN> is complete on main. Read docs/workflow.md and follow its shared per-feature contract and Codex adapter. Use Astra (gpt-6-astra, low) as orchestrator. Delegate spec writing, readiness review, and implementation advice to one separate persistent Astra (gpt-6-astra, high) spec owner and advisor. Return to that same agent at the workflow's advisor checkpoints and for requirement corrections, conflicting technical advice, verification exceptions, and integration decisions that change behavior; do not spawn a separate advisor. Use one persistent Astra (gpt-6-astra, low) subagent for all implementation and remediation and a fresh Astra (gpt-6-astra, medium) subagent for final review. Follow the adapter's waiting and context discipline: prefer 25-minute event-driven waits within tool and higher-priority session limits, do not duplicate healthy workers' work, and never interrupt or replace a worker solely because a wait timed out. Start in the main checkout on clean main. I authorize creating .worktrees/<tnn-fnn> on codex/<tnn-fnn>, local planning and implementation commits, rebasing codex/<tnn-fnn> onto main and rerunning the required checks when main moves, fast-forwarding main after all required checks pass, and removing that completed worktree and branch. Do not push or mutate remotes. Done means the feature row is checked and its spec is Complete on main; make check exited 0 for the final feature content and its tested commit (the rebased one when a rebase was needed) is now main; the feature worktree and branch are removed; and main is clean. Show the evidence in this task and record the workflow's required model/effort settings, advisor consultations, review findings, remediation passes, requirement corrections, user interventions, and total usage when available. If a concrete blocker prevents completion, record it in the spec when one exists, report it, and preserve the worktree; never report the goal complete with required work remaining.
 ```
 
 ### Start and worktree
@@ -421,6 +421,44 @@ to read the shared Review contract and `.claude/agents/roadmap-reviewer.md`
 as a checklist, ignoring its Claude model/tool front matter. It must not edit,
 run tests/builds, or consult the spec owner. Do not reuse the spec owner as reviewer. Apply
 the existing severity rules and route remediation to the same implementer agent.
+
+### Waiting and context discipline
+
+Apply these rules while the spec owner, implementer, or reviewer is running:
+
+- When there is no concrete independent orchestrator work, call `wait_agent`
+  with `timeout_ms: 1500000` (25 minutes), subject to the tool's supported
+  range and higher-priority session instructions. Events and user input can
+  end the wait early. If session instructions impose a shorter blocking-wait
+  or communication limit, use the longest permitted interval instead; for
+  example, a 60-second limit means `timeout_ms: 60000`. State that limitation
+  once. Do not silently fall back to the 30-second default or build a custom
+  polling runner to bypass the limit.
+- A timeout alone is not evidence of a stalled worker. With no actionable
+  update, wait again. Do not add status probes, reread transcripts or diffs,
+  request "still working?" reports, or interrupt, replace, or restart a worker
+  solely because time elapsed. Intervene for a concrete error, an explicit
+  blocker or advice request, evidence of incorrect work, or user steering.
+- Do independent work only when it advances a named workflow obligation.
+  Do not duplicate the worker's investigation, implementation, or checks to
+  fill waiting time. Required orchestrator verification still runs at the
+  acceptance and integration gates after the worker hands off its result.
+- Keep briefs and replies scoped to the decision: paths, requirements,
+  changed facts, relevant evidence, and the question or result. Reuse the
+  persistent agents and their retained context; do not resend unchanged
+  documents or full histories. Request updates at handoffs, required advice
+  checkpoints, and blockers rather than on a timer. Follow higher-priority
+  user-update requirements without launching extra inspections merely to
+  manufacture progress to report.
+
+This adopts the behavioral mitigations proposed in the user's linked
+[Reddit comment](https://www.reddit.com/r/codex/comments/1wa9c9d/comment/p8gggw9/).
+The 25-minute interval is an operational preference, not a verified Codex
+prompt-cache lifetime or quota guarantee. Official
+[Astra API guidance](https://developers.openai.com/api/docs/guides/latest-model)
+documents API cache settings; it does not establish this desktop session's
+cache policy or subscription accounting. Savings and the same failure mode
+in Petri remain unmeasured.
 
 ### Close and integrate in Codex
 
