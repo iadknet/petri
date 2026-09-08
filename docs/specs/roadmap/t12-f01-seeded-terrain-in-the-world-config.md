@@ -226,7 +226,7 @@ Required config and behavior:
   dependency. Property-only fixtures omit unnecessary founders. Affected
   checks reran successfully. `git diff --check` passed.
 - `make roadmap-check`: passed on reference/spec changes (`roadmap-1.log`).
-  Mutation evidence pending. Full measured benchmarks are exempted by the
+  Fresh mutation evidence is recorded below. Full measured benchmarks are exempted by the
   user's later direction below; other required checks remain in force.
 
 - Full frontend completion checks: `npm run test` exited 0, 59 files / 311
@@ -389,3 +389,36 @@ No world-set sweep is due before that set exists.
   are recorded above. Independent reviewer counts, full `make check`, tested
   commit and closure documents remain orchestrator-owned and pending.
   Task-specific usage unavailable.
+
+
+### Post-review remediation
+
+- Parent `make check` at implementation commit 5eb38dc4 exited 2
+  (`/tmp/t12-f01-make-check.log`): Clippy `items_after_test_module` found
+  `locked_rand_version` below the benchmark test module. Moved the unchanged
+  helper before the tests; no lint allowance. Self-review confirms a pure
+  ordering fix with no runtime behavior change.
+- Independent review: P1: 0, P2: 1 (lockfile metadata currently selects the first
+  rand package, correct for this lock but vulnerable to future dependency
+  ordering changes), P3: 1 (stale mutation-pending prose, corrected).
+  P2 resolved in the same bounded pass: select the version from v3-core's
+  dependency identity, with a unique-package fallback only when Cargo omits
+  its version. No dependency or general lockfile framework. Focused fixtures
+  cover multiple/reordered packages, dependency upgrade, and unversioned
+  unique/ambiguous cases; historical absent metadata remains None.
+- Advisor consultation 5 (2026-09-08): accepted bounded metadata correction
+  with the Clippy fix; accepted integration onto main 720dc7e2 preserving its
+  founder_profile PATCH rejection, selected-profile startup docs, deleted
+  experiments and roadmap additions. No overlays or behavior/default changes.
+  Guidance accepted because it resolves the specific review issue and keeps
+  independent main work. Total consultations: 5.
+- Metadata test TDD: `cargo test -p v3-cli lockfile_identity` initially exited
+  101 (unimplemented helper), then exited 0 after implementation. Logs
+  `metadata-identity-red.log` and `metadata-identity-green.log` under
+  `/tmp/t12-f01-logs/`. `cargo check --workspace --all-targets` and
+  `cargo clippy -p v3-cli --all-targets -- -D warnings` passed
+  (`metadata-identity-check.log`, `metadata-identity-clippy.log`).
+- Self-review of the post-review pass: unchanged generator/default behavior;
+  dependency-specific metadata resolution, no lint allowance or new dependency;
+  no other changes needed. One post-review remediation pass. Fresh mutation
+  evidence after the authorized rebase is pending; no benchmark runs authorized.

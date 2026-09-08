@@ -2185,6 +2185,40 @@ fn references_from_series(index: &SeriesIndex) -> Result<Vec<PathBuf>, String> {
     Ok(paths)
 }
 
+/// Read the simulation crate's dependency identity, not lockfile package order.
+fn locked_rand_version() -> &'static str {
+    rand_version_from_lock(include_str!("../../../Cargo.lock"))
+        .expect("workspace lockfile identifies v3-core's rand version")
+}
+
+fn rand_version_from_lock(lockfile: &str) -> Option<&str> {
+    let packages = lockfile.split("[[package]]");
+    let core = packages
+        .clone()
+        .find(|package| package.lines().any(|line| line == "name = \"v3-core\""))?;
+    if let Some(version) = core.lines().find_map(|line| {
+        line.trim()
+            .strip_prefix("\"rand ")
+            .and_then(|dependency| dependency.strip_suffix("\","))
+    }) {
+        return Some(version);
+    }
+    // Cargo omits the version in dependency identities when the name is unique.
+    if !core.lines().any(|line| line.trim() == "\"rand\",") {
+        return None;
+    }
+    let mut versions = packages
+        .filter(|package| package.lines().any(|line| line == "name = \"rand\""))
+        .filter_map(|package| {
+            package.lines().find_map(|line| {
+                line.strip_prefix("version = \"")
+                    .and_then(|version| version.strip_suffix('"'))
+            })
+        });
+    let version = versions.next()?;
+    versions.next().is_none().then_some(version)
+}
+
 // ── Persistence accumulator unit tests ──────────────────────────────────────
 
 #[cfg(test)]
@@ -2193,6 +2227,27 @@ mod tests {
     use proptest::prelude::*;
     use v3_core::contracts::{Direction, WorldAction};
     use v3_core::simulation::seed_simulation;
+
+    #[test]
+    fn lockfile_identity_selects_core_dependency_among_reordered_versions() {
+        let core = "[[package]]\nname = \"v3-core\"\ndependencies = [\n \"rand 0.8.6\",\n]\n";
+        let old = "[[package]]\nname = \"rand\"\nversion = \"0.8.6\"\n";
+        let new = "[[package]]\nname = \"rand\"\nversion = \"0.9.5\"\n";
+        for lock in [format!("{new}{old}{core}"), format!("{core}{old}{new}")] {
+            assert_eq!(rand_version_from_lock(&lock), Some("0.8.6"));
+        }
+        let upgraded = format!("{old}{new}{}", core.replace("rand 0.8.6", "rand 0.9.5"));
+        assert_eq!(rand_version_from_lock(&upgraded), Some("0.9.5"));
+        let unversioned = core.replace("rand 0.8.6", "rand");
+        assert_eq!(
+            rand_version_from_lock(&format!("{old}{unversioned}")),
+            Some("0.8.6")
+        );
+        assert_eq!(
+            rand_version_from_lock(&format!("{old}{new}{unversioned}")),
+            None
+        );
+    }
 
     #[test]
     fn drift_checkpoint_uses_pooled_lineage_execution_and_all_birth_denominators() {
@@ -3270,18 +3325,4 @@ mod tests {
             Indicator::Undefined(_)
         ));
     }
-}
-
-/// Read the build's lockfile rather than attributing a guessed version to a report.
-fn locked_rand_version() -> &'static str {
-    include_str!("../../../Cargo.lock")
-        .split("[[package]]")
-        .find(|package| package.lines().any(|line| line == "name = \"rand\""))
-        .and_then(|package| {
-            package
-                .lines()
-                .find_map(|line| line.strip_prefix("version = \""))
-        })
-        .and_then(|version| version.strip_suffix('"'))
-        .expect("workspace lockfile contains rand version")
 }
