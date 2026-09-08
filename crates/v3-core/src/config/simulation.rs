@@ -329,10 +329,18 @@ pub struct EnergyLifecycleConfig {
     #[serde(default = "default_min_reproduce_age")]
     pub min_reproduce_age: u64,
     pub default_offspring_energy: f32,
+    /// Per-tick maintenance charge on every unit of `genome_size()`, settled in
+    /// Phase 0 beside `energy_decay_per_tick`. `0.0` disables the charge.
+    #[serde(default = "default_genome_carry_cost_per_unit")]
+    pub genome_carry_cost_per_unit: f32,
 }
 
 fn default_min_reproduce_age() -> u64 {
     20
+}
+
+fn default_genome_carry_cost_per_unit() -> f32 {
+    1e-4
 }
 
 impl Default for EnergyLifecycleConfig {
@@ -344,6 +352,7 @@ impl Default for EnergyLifecycleConfig {
             min_reproduce_energy: 30.0,
             min_reproduce_age: default_min_reproduce_age(),
             default_offspring_energy: 100.0,
+            genome_carry_cost_per_unit: default_genome_carry_cost_per_unit(),
         }
     }
 }
@@ -889,6 +898,10 @@ impl SimulationConfig {
         el.min_reproduce_energy = normalize_f32_finite_nonneg(el.min_reproduce_energy, 30.0);
         el.default_offspring_energy =
             normalize_f32_finite_nonneg(el.default_offspring_energy, 100.0);
+        el.genome_carry_cost_per_unit = normalize_f32_finite_nonneg(
+            el.genome_carry_cost_per_unit,
+            default_genome_carry_cost_per_unit(),
+        );
 
         let ec = &mut self.energy.costs;
         ec.move_cost = normalize_f32_finite_nonneg(ec.move_cost, 0.2);
@@ -1290,6 +1303,7 @@ mod tests {
         assert!((cfg.energy.lifecycle.min_reproduce_energy - 30.0).abs() < 1e-6);
         assert_eq!(cfg.energy.lifecycle.min_reproduce_age, 20);
         assert!((cfg.energy.lifecycle.default_offspring_energy - 100.0).abs() < 1e-6);
+        assert_eq!(cfg.energy.lifecycle.genome_carry_cost_per_unit, 1e-4);
         // Complexity energy cost
         assert!(!cfg.energy.complexity_cost.enabled);
         assert_eq!(cfg.energy.complexity_cost.threshold, 50);
@@ -1897,16 +1911,58 @@ mod tests {
     #[test]
     fn energy_lifecycle_serde_roundtrip_preserves_min_reproduce_age() {
         let lifecycle = EnergyLifecycleConfig {
-            initial_energy: 20.0,
-            max_energy: 200.0,
-            energy_decay_per_tick: 0.5,
-            min_reproduce_energy: 30.0,
             min_reproduce_age: 42,
-            default_offspring_energy: 100.0,
+            ..EnergyLifecycleConfig::default()
         };
         let json = serde_json::to_string(&lifecycle).unwrap();
         let parsed: EnergyLifecycleConfig = serde_json::from_str(&json).unwrap();
         assert_eq!(parsed.min_reproduce_age, 42);
+    }
+
+    #[test]
+    fn energy_lifecycle_serde_defaults_genome_carry_cost_when_missing() {
+        let json = r#"{"initial_energy":20.0,"max_energy":200.0,"energy_decay_per_tick":0.5,"min_reproduce_energy":30.0,"default_offspring_energy":100.0}"#;
+        let lifecycle: EnergyLifecycleConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(lifecycle.genome_carry_cost_per_unit, 1e-4);
+    }
+
+    #[test]
+    fn energy_lifecycle_serde_roundtrip_preserves_genome_carry_cost() {
+        let lifecycle = EnergyLifecycleConfig {
+            genome_carry_cost_per_unit: 0.25,
+            ..EnergyLifecycleConfig::default()
+        };
+        let json = serde_json::to_string(&lifecycle).unwrap();
+        let parsed: EnergyLifecycleConfig = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.genome_carry_cost_per_unit, 0.25);
+    }
+
+    #[test]
+    fn normalize_nan_genome_carry_cost_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.lifecycle.genome_carry_cost_per_unit = f32::NAN;
+        cfg.normalize();
+        assert_eq!(cfg.energy.lifecycle.genome_carry_cost_per_unit, 1e-4);
+    }
+
+    #[test]
+    fn normalize_negative_genome_carry_cost_falls_back() {
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.lifecycle.genome_carry_cost_per_unit = -1.0;
+        cfg.normalize();
+        assert_eq!(cfg.energy.lifecycle.genome_carry_cost_per_unit, 1e-4);
+    }
+
+    #[test]
+    fn normalize_genome_carry_cost_preserves_zero_and_configured_values() {
+        let mut cfg = SimulationConfig::default();
+        cfg.energy.lifecycle.genome_carry_cost_per_unit = 0.0;
+        cfg.normalize();
+        assert_eq!(cfg.energy.lifecycle.genome_carry_cost_per_unit, 0.0);
+
+        cfg.energy.lifecycle.genome_carry_cost_per_unit = 0.5;
+        cfg.normalize();
+        assert_eq!(cfg.energy.lifecycle.genome_carry_cost_per_unit, 0.5);
     }
 
     #[test]
