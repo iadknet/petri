@@ -95,7 +95,8 @@ Request (conceptual v3alpha2 shape):
   "seed": 42,
   "population": {
     "initial_creatures": 2000,
-    "max_creatures": 100000
+    "max_creatures": 100000,
+    "founder_profile": "v3_alpha1"
   },
   "world": {
     "width": 1600,
@@ -209,7 +210,12 @@ Request rules:
 - Mutation tuning lives at top-level `mutation.*` in the startup/config keyspace
   (not under `runtime.*`).
 - Startup-only controls live under `startup.*` and are restart-only.
-- No `founder_profile` request field is supported in v3alpha2.
+- `population.founder_profile` is optional and selects the founder genome
+  profile applied uniformly to every seeded founder. Wire values are the
+  `snake_case` profile names tabulated in `v3-startup-seeding-spec.md`
+  Section 5.1; absent means `v3_alpha1`. An unrecognized name is rejected with
+  `422 validation_rejected`. The key is canonical in
+  `v3-runtime-config-spec.md` Section 5.
 - Unknown request fields are rejected.
 - Invalid/non-viable startup requests are rejected with
   `422 validation_rejected`; no auto-normalization behavior is canonical.
@@ -392,7 +398,8 @@ Response:
   "config": {
     "population": {
       "initial_creatures": 2000,
-      "max_creatures": 100000
+      "max_creatures": 100000,
+      "founder_profile": "v3_alpha1"
     },
     "world": {
       "width": 1600,

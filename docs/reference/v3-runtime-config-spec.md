@@ -263,14 +263,19 @@ field names/defaults and transfer-gate config semantics.
 | --- | --- | --- | --- |
 | `population.initial_creatures` | `u32` | `2000` | Must be `>= 1`; invalid values fall back to `2000`. |
 | `population.max_creatures` | `u32` | `100000` | Must be `>= population.initial_creatures`; invalid values fall back to `100000`. |
+| `population.founder_profile` | enum string | `v3_alpha1` | One of `v3_alpha1`, `forage_first_sparse`, `forage_first_sparse_conservative`, `forage_first_sparse_rich_offspring`, `forage_first_sparse_balanced`. An unrecognized name fails request validation (`422 validation_rejected`); there is no fallback. Absent means `v3_alpha1`. |
 
-Population config governs startup seeding targets and runtime population caps.
+Population config governs startup seeding targets, the founder profile, and
+runtime population caps.
 
 - `initial_creatures` is the target founder count at startup. Actual placement
   may be lower if spatial constraints prevent full placement (see
   `v3-startup-seeding-spec.md` Section 6).
 - `max_creatures` is the hard cap enforced during reproduction. When population
   reaches this limit, reproduce actions are rejected.
+- `founder_profile` selects the founder genome profile applied uniformly to
+  every seeded founder (`v3-startup-seeding-spec.md` Section 5). It is consumed
+  once at startup seeding and has no runtime effect after seeding.
 
 Transport posture: same as other config fields — server startup/config-patch
 transport MUST reject submitted values that violate canonical constraints
