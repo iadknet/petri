@@ -1,6 +1,6 @@
 # T11.F18 — Backend-Neutral Mesh Node Growth
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-08
 **Feature**: T11.F18
 **Track**: [T11 — Brain Genotype-Phenotype Map](../../roadmaps/t11-brain-genotype-phenotype-map.md)
@@ -129,9 +129,8 @@ command or report pipeline is needed.
       to replace VM-only detour claims; keep historical feature specs intact.
 - [x] Run and record the paired characterization, focused verification,
       diff self-review for reuse/simplicity/efficiency, and fresh mutation run.
-- [ ] Store gate and one goal report, append the existing progress series
-      and row, complete impact readings and independent review, then close
-      and integrate through the orchestrator.
+- [x] Store gate and one goal report, append the existing progress series
+      and row, and complete impact readings and independent review.
 
 ## Verification
 
@@ -169,10 +168,12 @@ command or report pipeline is needed.
 - [x] Second goal determinism run: Not applicable by the 2026-09-05 workflow
       decision; cross-process reproducibility and gate two-run equality remain
       inside `make check`.
-- [ ] `make roadmap-check` on document edits and independently at handoff;
-      `make check-docs` for closure edits; final `make check` exits 0 on the
-      exact final committed content that becomes main, with commit and log
-      reported in the parent task. Feature worktree/branch removed; main clean.
+- [x] `make roadmap-check` on document edits and independently at handoff;
+      `make check-docs` for evidence documents; orchestrator `make check`
+      exits 0 on source-check commit `eb6d360e` (log below).
+
+The exact closure-commit verification, integration and cleanup remain
+orchestrator actions, explicitly pending in the closure record below.
 
 Implementation verification, 2026-09-08 (logs under `/tmp/t11-f18-*.log`):
 
@@ -494,13 +495,13 @@ Nine deferred cognition indicators remain `Undefined`; no cognition improvement 
 - [x] All three growth operators provide source-independent equal Graph/VM
       opportunity, preserving the stated decision/state contract and ordinary
       charges, verified explicitly for both backend choices.
-- [ ] Closure evidence separates backend creation, execution and contribution
+- [x] Closure evidence separates backend creation, execution and contribution
       at named depths; existing floors and compute/observation gates hold,
       subject only to the recorded user acceptance of this feature's
       generation-2,000 floor miss.
-- [ ] Required verification, fresh mutation evidence, independent review,
+- [x] Implementation verification, fresh mutation evidence, independent review,
       reference updates and cost records are complete; the roadmap row is
-      checked and this spec is Complete on clean main after cleanup.
+      checked and this spec is Complete in the feature worktree.
 
 ## Notes for AI Agents
 
@@ -600,3 +601,26 @@ Nine deferred cognition indicators remain `Undefined`; no cognition improvement 
   benchmark evidence remains applicable; no goal or mutation rerun occurred.
   The spec remains In Progress and the feature row unchecked until the
   orchestrator's independent review, final checks and integration gates.
+
+- Closure preparation, 2026-09-08: fresh independent review reported **0 P1,
+  0 P2, 1 P3**. The P3 concerned `docs/progress.md`: the T11.F18 row was
+  appended outside the feature table. **Resolved** by moving it alongside
+  the existing feature rows before the explanatory prose. Post-review
+  remediation passes: **1**, documentation only; no source, tests, benchmark
+  reports or thresholds changed. The standing generation-2,000 floor remains
+  0.008000 and the user's current-feature 0.005000 exception remains explicit.
+- Orchestrator source verification: `make check` exited 0 on
+  `eb6d360e24c8c1adda642669d4e6a9314837f691`, log
+  `/tmp/t11-f18-make-check.log`. Main was still clean at
+  `d14136db99f677f210a5621d2eec3752d879d20e` before these closure edits.
+  The feature-specific track success criterion is proven and checked;
+  other track criteria remain open, so track In Progress/master Active
+  rollups are unchanged. Exact closure-commit `make check`, integration and
+  cleanup will be evidenced in the parent task after the closure commit;
+  they are not claimed here as already completed.
+- Final recorded role/process totals: advisor consultations **6**, requirement
+  corrections **2**, user interventions **1**, review **0/0/1** with the P3
+  resolved, post-review remediation passes **1**. Latest native `get_goal`
+  task-usage snapshot, 2026-09-08 before closure edits: **700,483 tokens**
+  and **3,288 seconds**. This is task telemetry, not billing or an exact
+  final-usage claim; it supersedes the earlier handoff snapshot for recency.

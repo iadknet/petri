@@ -32,7 +32,7 @@ representation only where the neighborhood reading still shows a gap.
 - [ ] The functional core's mutational exposure does not decay as neutral scaffold accumulates: on the drift walk to depth, the fraction of births that change behavior at generation 1,000 stays above the floor T11.F17 predeclares against the T11.F16 baseline, and every closure reads it.
 - [ ] Every floor above is met by the close of T11.F10, and from T11.F01 onward no closed feature anywhere in the program lowers an indicator component below the previous closed feature's reading unless its spec predeclared and justified the change.
 
-- [ ] New mesh detours can be either Graph or VM with equal creation probability, preserve the existing decision path and state effects at insertion, and are measured separately by backend for creation, execution, and behavioral contribution. (T11.F18)
+- [x] New mesh detours can be either Graph or VM with equal creation probability, preserve the existing decision path and state effects at insertion, and are measured separately by backend for creation, execution, and behavioral contribution. (T11.F18)
 
 ## Executable Features
 
@@ -71,7 +71,7 @@ representation only where the neighborhood reading still shows a gap.
 - [x] **T11.F17 — Executed-Biased Mutation Targeting** — Depends on: T11.F04, T11.F15, T11.F16
   - Goal: Expressed genes mutate more. Node-internal mutation events land mostly on the nodes a creature's brain actually ran in its recent ticks, so the functional core keeps receiving mutations however much silent scaffold surrounds it, while the number of events per birth and the scaffold's own drift stay as they are.
 
-- [ ] **T11.F18 — Backend-Neutral Mesh Node Growth** — Depends on: T11.F15, T11.F17
+- [x] **T11.F18 — Backend-Neutral Mesh Node Growth** — Depends on: T11.F15, T11.F17
   - Goal: Developmental variation in new neural tissue. A creature can grow either kind of brain module along a working decision path without losing its current behavior, so graph computation has the same direct opportunity as VM computation to enter an evolving controller.
 
 ## Notes for AI Agents
