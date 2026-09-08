@@ -261,21 +261,32 @@ field names/defaults and transfer-gate config semantics.
 
 | Key | Type | Default | Constraint / normalization |
 | --- | --- | --- | --- |
-| `population.initial_creatures` | `u32` | `2000` | Must be `>= 1`; invalid values fall back to `2000`. |
+| `population.initial_creatures` | `u32` | `10000` | Must be `>= 1`; invalid values fall back to `10000`. |
 | `population.max_creatures` | `u32` | `100000` | Must be `>= population.initial_creatures`; invalid values fall back to `100000`. |
 | `population.founder_profile` | enum string | `v3_alpha1` | One of `v3_alpha1`, `forage_first_sparse`, `forage_first_sparse_conservative`, `forage_first_sparse_rich_offspring`, `forage_first_sparse_balanced`. An unrecognized name fails request validation (`422 validation_rejected`); there is no fallback. Absent means `v3_alpha1`. |
 
-Population config governs startup seeding targets, the founder profile, and
-runtime population caps.
+Population config governs the startup seeding target, the founder profile, and
+the runtime population cap. `max_creatures` is the only field enforced at
+runtime; `initial_creatures` is rejected outright by `PATCH`, and
+`founder_profile` is accepted by `PATCH` but never takes effect after
+startup (see the bullets below).
 
 - `initial_creatures` is the target founder count at startup. Actual placement
   may be lower if spatial constraints prevent full placement (see
-  `v3-startup-seeding-spec.md` Section 6).
+  `v3-startup-seeding-spec.md` Section 6). It is restart-only: founders are
+  seeded only by `POST /v3/simulation/startup`, and
+  `PATCH /v3/simulation/config` rejects the key with `422 validation_rejected`
+  (`v3-server-api-protocol-spec.md` Section 4.8).
 - `max_creatures` is the hard cap enforced during reproduction. When population
-  reaches this limit, reproduce actions are rejected.
+  reaches this limit, reproduce actions are rejected. It is runtime-editable
+  through PATCH.
 - `founder_profile` selects the founder genome profile applied uniformly to
   every seeded founder (`v3-startup-seeding-spec.md` Section 5). It is consumed
-  once at startup seeding and has no runtime effect after seeding.
+  once at startup seeding and has no runtime effect after seeding. Unlike
+  `initial_creatures`, `PATCH /v3/simulation/config` currently accepts and
+  stores it without effect rather than rejecting it
+  (`v3-server-api-protocol-spec.md` Section 4.8) — an inconsistency left for a
+  follow-up decision.
 
 Transport posture: same as other config fields — server startup/config-patch
 transport MUST reject submitted values that violate canonical constraints
@@ -332,7 +343,8 @@ Runtime config transport posture:
   `world.food.fertility.layers` are restart-only startup config.
 
 T11.F15 removes the former `mutation.topology_new_node_birth` controls.
-`AddNode`/`SpliceNode` always create pass-through Halt detours; alternate
-backend growth uses `SwapNodeBackend`. Retired keys are rejected, not exposed
+`AddNode`, `SpliceNode`, and `AddRouteTarget` choose pass-through blank Graph
+or Halt-only VM detours with equal probability (T11.F18); this is not a
+configuration option. `SwapNodeBackend` retains its alternate-backend purpose. Retired keys are rejected, not exposed
 as inert controls. Topology weights sum to 22 with identity rename retired
 and `ChangeEntryNode` at weight 1; mutation supply settings above are unchanged.

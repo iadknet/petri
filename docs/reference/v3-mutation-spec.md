@@ -88,14 +88,22 @@ Core rule:
 - `SwapRouteTargets`
 - `MutateGateBias`
 
-Topology connection semantics (T11.F15):
+Topology connection semantics (T11.F15, T11.F18):
 
-- `AddNode` and `SpliceNode` split a valid existing edge through a minimal VM
-  `Halt` detour, preserving that edge's slot and bias. The detour forwards to
+- `AddNode` and `SpliceNode` split a valid existing edge through a blank
+  Graph or minimal VM `Halt` detour, preserving that edge's slot and bias. The detour forwards to
   the old successor and preserves incoming output slots, queued actions,
   priority and shared memory. Attachment is atomic; no valid edge means skip.
+  All three detour growth operators choose Graph or VM with probability 0.5,
+  independently of the source backend, using the existing mutation RNG after
+  eligibility and attachment preparation. Graph detours have configured unwired
+  fixed outputs and no compute nodes; VM detours have one register and `Halt`.
+  Both add a mesh hop when visited. Empty Graph dispatch has no compute charge;
+  VM dispatch retains its Halt charge. Their genome sizes add two and three
+  units respectively. State neutrality excludes exhausted budgets and downstream
+  live energy introspection; node-local metadata stays local.
 - `AddRouteTarget` selects a node with exactly one valid non-self successor,
-  appends a tied-bias branch to a fresh Halt detour forwarding to that successor,
+  appends a tied-bias branch to a fresh blank detour forwarding to that successor,
   and writes the branch's free gate slot in the same event. Graphs gain one
   weight-1 edge from `random_graph_source` (including full sensor sub-values).
   VMs gain a `WriteRouteGate` from a uniformly sampled existing register before

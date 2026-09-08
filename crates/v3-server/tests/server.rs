@@ -997,6 +997,68 @@ async fn patch_config_rejects_startup_fields() {
     );
 }
 
+// ── 11g. patch_config_rejects_initial_creatures_as_restart_only ───────────
+
+/// Founders are seeded only by `POST /v3/simulation/startup`, so a patched
+/// `population.initial_creatures` would be stored but never read. The value
+/// sits inside the harness bounds (1..=512) so canonical normalization alone
+/// would have accepted it.
+#[tokio::test]
+async fn patch_config_rejects_initial_creatures_as_restart_only() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+    let (_, before) = do_request(a.clone(), get_req("/v3/simulation/config")).await;
+
+    let patch = r#"{"population":{"initial_creatures":10}}"#;
+    let (status, body) = do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
+
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
+    assert_eq!(
+        body["error"]["code"].as_str(),
+        Some("validation_rejected"),
+        "body: {body}"
+    );
+    assert_eq!(
+        error_field_paths(&body),
+        vec!["population.initial_creatures"],
+        "body: {body}"
+    );
+    let (_, after) = do_request(a, get_req("/v3/simulation/config")).await;
+    assert_eq!(after["config"], before["config"], "after: {after}");
+}
+
+/// `population.max_creatures` is a live reproduction cap and stays patchable
+/// on its own, so the restart-only rule must not cover all of `population`.
+#[tokio::test]
+async fn patch_config_keeps_max_creatures_patchable() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+
+    let patch = r#"{"population":{"max_creatures":1024}}"#;
+    let (status, body) = do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
+
+    assert_eq!(status, StatusCode::OK, "body: {body}");
+    assert_eq!(
+        body["config"]["population"]["max_creatures"], 1024,
+        "body: {body}"
+    );
+    let (_, after) = do_request(a, get_req("/v3/simulation/config")).await;
+    assert_eq!(
+        after["config"]["population"]["max_creatures"], 1024,
+        "after: {after}"
+    );
+    assert_eq!(
+        after["config"]["population"]["initial_creatures"], 64,
+        "after: {after}"
+    );
+}
+
 #[tokio::test]
 async fn patch_config_rejects_removed_nutrition_fields() {
     let a = app();

@@ -710,7 +710,7 @@ fn splice_node_creates_a_to_c_to_b_chain() {
 }
 
 #[test]
-fn splice_node_new_node_is_blank_vm() {
+fn splice_node_new_node_is_blank() {
     let mut genome = CreatureGenome {
         entry_node_id: NodeId::new(0),
         nodes: vec![NodeGenome {
@@ -727,6 +727,8 @@ fn splice_node_new_node_is_blank_vm() {
     genome.nodes.push(crate::mutation::topology::birth::detour(
         NodeId::new(1),
         NodeId::new(0),
+        &MutationConfig::default(),
+        &mut rng(0),
     ));
     let config = MutationConfig::default();
     let mut r = rng(0);
@@ -748,7 +750,7 @@ fn splice_node_new_node_is_blank_vm() {
         assert!(vm.constants.is_empty());
         assert_eq!(vm.program, vec![VmInstruction::Halt]);
     } else {
-        panic!("spliced node must be VM backend");
+        assert_eq!(c.backend_def, super::birth::blank_graph_backend(&config));
     }
 }
 
@@ -1205,7 +1207,8 @@ fn f15_inline_growth_redirects_existing_edge_through_halt() {
         assert_eq!(genome.nodes[0].targets[0].gate_bias, old.gate_bias);
         assert_eq!(new.targets[0].target_id, old.target_id);
         assert!(
-            matches!(&new.backend_def, BackendDef::Vm(vm) if vm.program == vec![VmInstruction::Halt])
+            new.backend_def == super::birth::minimal_vm_backend()
+                || new.backend_def == super::birth::blank_graph_backend(&MutationConfig::default())
         );
     }
 }
