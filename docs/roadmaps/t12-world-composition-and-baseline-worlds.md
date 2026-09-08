@@ -1,6 +1,6 @@
 # T12 — World Composition and Baseline Worlds
 
-**Status**: Planned
+**Status**: In Progress
 **Last updated**: 2026-09-08
 **Master**: [Program Roadmap](../roadmap.md)
 
