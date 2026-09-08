@@ -1030,6 +1030,37 @@ async fn patch_config_rejects_initial_creatures_as_restart_only() {
     assert_eq!(after["config"], before["config"], "after: {after}");
 }
 
+// ── 11i. patch_config_rejects_founder_profile_as_restart_only ─────────────
+
+/// Founders are seeded only by `POST /v3/simulation/startup`, so a patched
+/// `population.founder_profile` would be stored but never read.
+#[tokio::test]
+async fn patch_config_rejects_founder_profile_as_restart_only() {
+    let a = app();
+    a.clone()
+        .oneshot(startup_req(r#"{"seed":1}"#))
+        .await
+        .unwrap();
+    let (_, before) = do_request(a.clone(), get_req("/v3/simulation/config")).await;
+
+    let patch = r#"{"population":{"founder_profile":"forage_first_sparse"}}"#;
+    let (status, body) = do_request(a.clone(), patch_req("/v3/simulation/config", patch)).await;
+
+    assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "body: {body}");
+    assert_eq!(
+        body["error"]["code"].as_str(),
+        Some("validation_rejected"),
+        "body: {body}"
+    );
+    assert_eq!(
+        error_field_paths(&body),
+        vec!["population.founder_profile"],
+        "body: {body}"
+    );
+    let (_, after) = do_request(a, get_req("/v3/simulation/config")).await;
+    assert_eq!(after["config"], before["config"], "after: {after}");
+}
+
 /// `population.max_creatures` is a live reproduction cap and stays patchable
 /// on its own, so the restart-only rule must not cover all of `population`.
 #[tokio::test]

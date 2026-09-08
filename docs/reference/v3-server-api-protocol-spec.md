@@ -209,8 +209,9 @@ Request rules:
   `v3-runtime-config-spec.md`.
 - Mutation tuning lives at top-level `mutation.*` in the startup/config keyspace
   (not under `runtime.*`).
-- Startup-only controls live under `startup.*` and are restart-only, as is
-  `population.initial_creatures` (Section 4.8).
+- Startup-only controls live under `startup.*` and are restart-only, as are
+  `population.initial_creatures` and `population.founder_profile` (Section
+  4.8).
 - `population.founder_profile` is optional and selects the founder genome
   profile applied uniformly to every seeded founder. Wire values are the
   `snake_case` profile names tabulated in `v3-startup-seeding-spec.md`
@@ -520,8 +521,10 @@ Rules:
 - `startup.*` fields are restart-only and rejected from PATCH.
 - `population.initial_creatures` is restart-only and rejected from PATCH:
   founders are seeded only by `POST /v3/simulation/startup`, so a patched value
-  would never take effect. `population.max_creatures` is a live reproduction
-  cap and stays editable.
+  would never take effect. `population.founder_profile` is restart-only and
+  rejected from PATCH for the same reason: it is consumed once at startup
+  seeding and never re-read afterward. `population.max_creatures` is a live
+  reproduction cap and stays editable.
 - `world.food.types[]` and `world.food.fertility.layers` are restart-only and
   rejected from PATCH.
 - `energy.costs.failed_action_penalty` is rejected while an active startup

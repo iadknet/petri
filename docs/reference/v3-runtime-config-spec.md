@@ -267,9 +267,8 @@ field names/defaults and transfer-gate config semantics.
 
 Population config governs the startup seeding target, the founder profile, and
 the runtime population cap. `max_creatures` is the only field enforced at
-runtime; `initial_creatures` is rejected outright by `PATCH`, and
-`founder_profile` is accepted by `PATCH` but never takes effect after
-startup (see the bullets below).
+runtime; `initial_creatures` and `founder_profile` are both rejected outright
+by `PATCH` (see the bullets below).
 
 - `initial_creatures` is the target founder count at startup. Actual placement
   may be lower if spatial constraints prevent full placement (see
@@ -282,11 +281,10 @@ startup (see the bullets below).
   through PATCH.
 - `founder_profile` selects the founder genome profile applied uniformly to
   every seeded founder (`v3-startup-seeding-spec.md` Section 5). It is consumed
-  once at startup seeding and has no runtime effect after seeding. Unlike
-  `initial_creatures`, `PATCH /v3/simulation/config` currently accepts and
-  stores it without effect rather than rejecting it
-  (`v3-server-api-protocol-spec.md` Section 4.8) — an inconsistency left for a
-  follow-up decision.
+  once at startup seeding and has no runtime effect after seeding. Like
+  `initial_creatures`, it is restart-only:
+  `PATCH /v3/simulation/config` rejects the key with `422 validation_rejected`
+  (`v3-server-api-protocol-spec.md` Section 4.8).
 
 Transport posture: same as other config fields — server startup/config-patch
 transport MUST reject submitted values that violate canonical constraints

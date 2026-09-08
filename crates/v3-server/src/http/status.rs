@@ -42,6 +42,16 @@ fn patch_touches_initial_creatures(patch: &serde_json::Value) -> bool {
         .is_some()
 }
 
+/// Founders are seeded only by `POST /v3/simulation/startup`, which merges the
+/// request over the server's startup baseline rather than the live config, so a
+/// patched founder profile would be stored but never read.
+fn patch_touches_founder_profile(patch: &serde_json::Value) -> bool {
+    patch
+        .get("population")
+        .and_then(|p| p.get("founder_profile"))
+        .is_some()
+}
+
 fn patch_touches_failed_action_penalty(patch: &serde_json::Value) -> bool {
     patch
         .get("energy")
@@ -126,6 +136,15 @@ pub async fn patch_config(
             field_errors: vec![FieldError {
                 field: "population.initial_creatures".into(),
                 reason: "initial creature count is restart-only and cannot be patched".into(),
+            }],
+            endpoint: "patch_config",
+        });
+    }
+    if patch_touches_founder_profile(&patch) {
+        return Err(AppError::ValidationRejected {
+            field_errors: vec![FieldError {
+                field: "population.founder_profile".into(),
+                reason: "founder profile is restart-only and cannot be patched".into(),
             }],
             endpoint: "patch_config",
         });
