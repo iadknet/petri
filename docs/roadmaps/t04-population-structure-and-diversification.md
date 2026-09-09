@@ -35,6 +35,8 @@ homogenizing everything.
 
 ## Notes for AI Agents
 
+- T04.F03/F04 must integrate habitat connectivity and changing migration/disturbance pressures into all three standard goal environments, preserving each habitat's identity, under the [shared baseline contract](../workflow.md#environmental-pressures-in-the-standard-baseline). T04.F01 remains observation-only.
+
 - Petri's founder `lineage_id` is stable clade identity, not a complete parent-child ancestry graph and not evidence of an ecotype. T04.F01 adds the ancestry graph; it is reachable after T01.F12 and can be pulled forward whenever the lineage-count indicator stops being informative enough.
 - On 2026-09-08 seeded terrain generation moved from T02.F02 to T12.F01, so T04.F03 now depends on T12.F01, which its goal line already named as its substrate; T12.F04's composite baseline is the first patch-and-corridor world and records the persistence and connectivity readings this feature needs; after the user fixed the set at three recipes on 2026-09-08 there is no standalone archipelago world, so fragmentation is read inside the composite against the plains.
 - Habitat patches are small worlds. T01.F11 measured on 2026-09-04 that persistence below the default 1600-by-1600 world is seed-dependent (128-by-128 went extinct on every seed; one 256-by-256 seed survived as a single creature; one 512-by-512 seed was still falling at tick 2,000), so T04.F03 must size patches, or the total passable area behind them, at or above what persists, or state the economics change that makes smaller patches viable.
