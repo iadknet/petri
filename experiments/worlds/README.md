@@ -85,11 +85,11 @@ low-frequency fertility gradient that leaves some regions scarce. Regions
 overlap rather than tile: meadows and orchards fall inside and outside the
 rock, and the ridge crosses both.
 
-## Applied readings at T12.F04 (2026-09-09, commit `e6757fa3`)
+## Applied readings at T12.F04 (2026-09-09, commit `9287048c`)
 
 From `world inspect` (tick zero) and the stored closure report
 (`docs/progress/features/t12-f04-baseline-world-set-goal.json`, one
-2,000-tick run per world, 512.69 s for the whole `make bench PROFILE=goal`
+2,000-tick run per world, 474.33 s for the whole `make bench PROFILE=goal`
 command). Regenerate the previews with `world inspect` after any recipe edit.
 
 | World | Passable | Largest component / passable | Type-0 fertile cells | Type-1 habitat cells | Final / minimum / plateau population | Type-1 share of applied eats | Moves blocked by barrier |
@@ -100,8 +100,10 @@ command). Regenerate the previews with `world inspect` after any recipe edit.
 
 Confluence's late rise (7,083 at tick 1,600 to 21,818 at 2,000) came with
 fruit reaching a 5% eat share and lineage entropy falling to 0.88 nats: one
-lineage found the rich food. The per-reader-state barrier-block rates for
-Canyon are recorded in the closure report's tracking block and the spec.
+lineage found the rich food. No barrier awareness has evolved yet: beside
+rock, genomes with a barrier reader are blocked on 58.5% of moves in Canyon
+against 51.7% for the rest (Confluence 52.7% against 54.8%); that per-state
+rate is the reading to watch.
 
 ![Orchards](previews/orchards-in-grassland.png)
 ![Canyon](previews/canyon-country.png)
