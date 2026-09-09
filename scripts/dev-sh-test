@@ -1,0 +1,106 @@
+#!/bin/sh
+set -eu
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+test_root=$(mktemp -d "${TMPDIR:-/tmp}/petri-dev-sh-test.XXXXXX")
+# A failing assertion must not leave the stub processes behind.
+cleanup_test() {
+  for marker in "$test_root/backend-pid" "$test_root/frontend-pid"; do
+    [ ! -s "$marker" ] || kill "$(cat "$marker")" 2>/dev/null || true
+  done
+  rm -rf "$test_root"
+}
+trap cleanup_test 0
+trap 'exit 130' INT
+trap 'exit 143' HUP TERM
+
+fail() { printf 'dev-sh-test: %s\n' "$*" >&2; exit 1; }
+
+fake_root=$test_root/root
+mkdir -p "$fake_root/scripts" "$fake_root/frontend/node_modules/.bin" \
+  "$fake_root/target/debug" "$fake_root/target/release" "$test_root/bin"
+cp "$script_dir/dev.sh" "$fake_root/scripts/dev.sh"
+
+# Every stub records the PID that will hold the port and then blocks, so the
+# test can assert the process itself died rather than only its launcher.
+write_blocker() {
+  cat >"$1" <<STUB
+#!/bin/sh
+printf '%s\n' "\$\$" >"$test_root/$2"
+exec sleep 300
+STUB
+  chmod +x "$1"
+}
+write_blocker "$fake_root/target/debug/v3-server" backend-pid
+write_blocker "$fake_root/target/release/v3-server" backend-pid
+write_blocker "$fake_root/frontend/node_modules/.bin/vite" frontend-pid
+
+# cargo must not be the process the script tracks: `cargo run` execs the
+# server, and `cargo build` leaves it to be started separately.
+cat >"$test_root/bin/cargo" <<STUB
+#!/bin/sh
+set -eu
+printf '%s\n' "\$*" >>"$test_root/cargo-args"
+case "\$1" in
+  run) profile=debug; [ "\$2" != --release ] || profile=release
+       exec "$fake_root/target/\$profile/v3-server" ;;
+  *) exit 0 ;;
+esac
+STUB
+# npm never execs its script: it forks a shell, which is exactly the extra
+# layer that lets a killed launcher orphan the real server.
+cat >"$test_root/bin/npm" <<STUB
+#!/bin/sh
+set -eu
+[ "\$1" = run ] || exit 0
+shift
+[ "\$1" != build ] || exit 0
+shift
+"$fake_root/frontend/node_modules/.bin/vite" "\$@" &
+wait \$!
+STUB
+cat >"$test_root/bin/tsc" <<'STUB'
+#!/bin/sh
+exit 0
+STUB
+chmod +x "$test_root/bin/cargo" "$test_root/bin/npm" "$test_root/bin/tsc"
+
+alive() { kill -0 "$1" 2>/dev/null; }
+
+await_file() {
+  waited=0
+  while [ ! -s "$1" ]; do
+    [ "$waited" -lt 30 ] || fail "$2 never started"
+    sleep 1
+    waited=$((waited + 1))
+  done
+}
+
+await_exit() {
+  waited=0
+  while alive "$1"; do
+    [ "$waited" -lt 30 ] || fail "$2 survived shutdown (pid $1)"
+    sleep 1
+    waited=$((waited + 1))
+  done
+}
+
+for mode in dev release; do
+  rm -f "$test_root/backend-pid" "$test_root/frontend-pid" "$test_root/cargo-args"
+  PATH="$test_root/bin:$PATH" MODE="$mode" BACKEND_PORT=39311 FRONTEND_PORT=39312 \
+    sh "$fake_root/scripts/dev.sh" >"$test_root/output" 2>&1 &
+  stack_pid=$!
+
+  await_file "$test_root/backend-pid" "$mode backend"
+  await_file "$test_root/frontend-pid" "$mode frontend"
+  backend_pid=$(cat "$test_root/backend-pid")
+  frontend_pid=$(cat "$test_root/frontend-pid")
+
+  kill -TERM "$stack_pid" 2>/dev/null || true
+  wait "$stack_pid" 2>/dev/null || true
+
+  await_exit "$backend_pid" "$mode backend"
+  await_exit "$frontend_pid" "$mode frontend"
+done
+
+printf 'Development stack shutdown tests passed.\n'
