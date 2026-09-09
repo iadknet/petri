@@ -108,6 +108,30 @@ case also reports `reachable_structure_size_distribution` over its complete
 final population; historical missing/null values are unavailable, not zero or a
 distribution inferred from the evolved sample. The top-level distribution is
 explicitly pooled across all final populations.
+From T12.F04 every profile's persistence samples, taken on the same cadence
+as `births_total`, also carry the run's cumulative applied behavior:
+`typed_eats_total` per food type (applied Eat actions that consumed food),
+`food_density_total` per food type (standing density from that tick's applied
+growth summary), `moves_attempted_total`, `moves_blocked_barrier_total`, and
+`moves_blocked_avoidable_by_reader_state`. Each world-set case observation
+carries the same end-of-run totals plus the fractions they imply: each type's
+share of every applied eat, barrier-blocked moves against attempted moves, and
+avoidable blocked moves against attempted moves by barrier-reader state. All of
+these fields are serde-defaulted; a report stored before T12.F04 is unmeasured,
+not zero.
+
+For `goal-worlds-v1`, a reference whose per-case block differs only in
+`config_digest` is comparable: profile identity for that series excludes the
+case list, so a recipe edit required by the standard-baseline contract never
+discards a completed run. Each reference comparison then carries one entry per
+current case with both digests, `inputs_changed`, `absent_in_reference` when
+the reference never ran that case, and current/reference/percent-delta readings
+for persistence, per-case work counters, typed eat share, blocked moves,
+lineage, memory, drift, neighborhood, and structure. An extinction tick is
+reported as values with a null delta. Per-case entries carry no severity level;
+the profile-total work counters keep the existing regression rule. Every other
+profile difference, and any difference outside the case list, remains a hard
+error.
 There is no mandatory fourth Plains run or three-seed-per-recipe sweep set.
 The new `goal-worlds-v1` series preserves `goal-v1` history and does not
 compare across profile definitions. The short gate profile, its epoch and
@@ -116,11 +140,40 @@ and observation budgets apply to the complete goal profile, not multiplied
 per case. Public `--config` remains sweep-only; built-in goal recipes do not
 permit arbitrary profile overrides.
 
+Saved-world inspection (T12.F04):
+
+```text
+v3-cli world inspect --config <recipe path> --seed <u64> [--png <path>]
+```
+
+Rules:
+- The recipe resolves over the production defaults through the same resolver
+  `run` and the goal cases use: deep merge, ramp validation, normalization,
+  then startup overrides. The goal profile additionally forces its own world
+  size and founder count; the checked-in baseline recipes set neither, so the
+  inspected map is the map that profile runs.
+- The world is seeded and never ticked. Every reading is tick zero.
+- Standard output is exactly one JSON object: recipe path, run seed, world
+  width/height, edge mode, the effective `world_seed` with whether the recipe
+  pinned it, `passable_connectivity`, founders actually placed, and per food
+  type its index, name, effective energy per unit, fertile cells (effective
+  tick-zero fertility above zero on a passable cell), that count as a fraction
+  of every cell, mean fertility over those cells alone, cells holding food, and
+  standing energy (seeded density times effective energy per unit).
+- `--png` writes a two-panel preview: habitat on the left (barriers gray, the
+  first two food types' effective tick-zero fertility blended as intensity) and
+  tick-zero food density on the right, in the same colors. Both panels are
+  downsampled by one integer factor chosen so each panel's longer side is at
+  most 512 px, max-pooling barriers and mean-pooling every other layer.
+- A missing or unreadable recipe, or one the resolver rejects, is a validation
+  error that exits `1` and writes neither the readings nor the preview.
+
 Exit codes:
 - `0`: successful completion (run finished normally).
-- `1`: validation error (invalid arguments, malformed config, constraint
-  violations).
-- `2`: runtime error (unexpected failure during simulation execution).
+- `1`: validation error (malformed config, constraint violations, and other
+  argument checks the command makes itself).
+- `2`: runtime error (unexpected failure during simulation execution), and the
+  clap usage error for an argument that fails to parse at all.
 
 ---
 

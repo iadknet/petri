@@ -386,48 +386,125 @@ proptest! {
 }
 
 #[test]
-fn saved_world_recipes_have_distinct_applied_pressures() {
+fn saved_world_recipes_are_partial_configs_that_pin_their_maps() {
     use v3_core::config::resolve_config;
-    let sources = [
-        include_str!("../../../experiments/worlds/plains.json"),
-        include_str!("../../../experiments/worlds/orchards-in-grassland.json"),
-        include_str!("../../../experiments/worlds/canyon-country.json"),
-        include_str!("../../../experiments/worlds/confluence.json"),
-    ];
-    for (index, source) in sources.iter().enumerate() {
-        let cfg = resolve_config(
-            &SimulationConfig::default(),
-            serde_json::from_str(source).unwrap(),
-        )
-        .unwrap();
-        assert_eq!(cfg.population.initial_creatures, 10_000);
-        assert_eq!(cfg.world.world_seed, None);
-        if index == 1 || index == 3 {
-            let grass = &cfg.world.food.types[0];
-            let fruit = &cfg.world.food.types[1];
-            assert!(fruit.energy_per_unit > grass.energy_per_unit);
-            assert!(fruit.initial_coverage < grass.initial_coverage);
-            assert!(fruit.growth_rate < grass.growth_rate);
-            assert!(fruit.recovery_spawn_rate < grass.recovery_spawn_rate);
-            assert!(fruit.initial_fertility_only);
-            assert_eq!(cfg.world.food.fertility.min_fertility, 0.0);
+    for (name, source) in RECIPES {
+        let patch: serde_json::Value = serde_json::from_str(source).unwrap();
+        let cfg = resolve_config(&SimulationConfig::default(), patch.clone())
+            .unwrap_or_else(|error| panic!("{name} must load: {error}"));
+        // The goal profile applies its own world size and founder count, so a
+        // recipe that set either would be silently overridden.
+        assert_eq!(patch.pointer("/world/width"), None, "{name} sets a width");
+        assert_eq!(patch.pointer("/world/height"), None, "{name} sets a height");
+        assert_eq!(
+            patch.pointer("/population"),
+            None,
+            "{name} sets a population"
+        );
+        assert_eq!(cfg.population.initial_creatures, 10_000, "{name}");
+        assert_eq!(cfg.world.width, 1600, "{name}");
+        if name == "plains" {
+            assert!(cfg.world.terrain.is_empty(), "plains carries no terrain");
+            continue;
         }
-        if index == 0 {
-            assert!(cfg.world.terrain.is_empty());
-        }
-        if index == 2 {
-            assert!(matches!(
-                cfg.world.terrain[0].params,
-                PatternParams::Maze {
-                    corridor_width: 5,
-                    ..
-                }
-            ));
-        }
-        if index == 3 {
-            assert_eq!(cfg.world.edge_mode, v3_core::config::WorldEdgeMode::Bounded);
+        assert!(
+            cfg.world.world_seed.is_some(),
+            "{name} must pin its map so every closure runs the same world"
+        );
+    }
+}
+
+/// Orchards' fruit is the latent niche: richer per unit, confined to patches
+/// of the world rather than spread across it, and quicker to come back inside
+/// those patches than the grass the founders live on. Grass itself must reach
+/// every passable cell, so no lineage is starved by where it happened to land.
+#[test]
+fn orchards_fruit_is_richer_patchier_and_faster_regrowing_than_grass() {
+    let cfg = baseline_config("orchards-in-grassland");
+    let grass = &cfg.world.food.types[0];
+    let fruit = &cfg.world.food.types[1];
+    assert!(
+        fruit.energy_per_unit > grass.energy_per_unit,
+        "fruit {:?} must be richer than grass {:?}",
+        fruit.energy_per_unit,
+        grass.energy_per_unit
+    );
+    assert!(
+        fruit.growth_rate > grass.growth_rate,
+        "fruit {:?} must regrow faster than grass {:?}",
+        fruit.growth_rate,
+        grass.growth_rate
+    );
+    assert!(
+        fruit.initial_fertility_only,
+        "fruit must be confined to its own fertile patches"
+    );
+
+    // Patchiness is a property of the applied map, not of `initial_coverage`:
+    // a fertility-confined type's coverage applies only inside its patches.
+    let sim = seed_baseline_map(cfg);
+    let fertility: Vec<_> = (0..2)
+        .map(|index| {
+            sim.world
+                .food()
+                .effective_fertility_grid(OrdinaryFoodTypeId::new(index), 0)
+        })
+        .collect();
+    let mut fertile = [0u64; 2];
+    let mut passable = 0u64;
+    for y in 0..sim.world.height {
+        for x in 0..sim.world.width {
+            if sim.world.is_barrier(Position::new(x, y)) {
+                continue;
+            }
+            passable += 1;
+            for (index, count) in fertile.iter_mut().enumerate() {
+                *count += u64::from(*fertility[index].get(x, y) > 0.0);
+            }
         }
     }
+    assert_eq!(
+        fertile[0], passable,
+        "grass fertility must be positive on every one of the {passable} passable cells"
+    );
+    assert!(
+        fertile[1] < passable,
+        "fruit reaches {} of {passable} passable cells, so it is not patchy",
+        fertile[1]
+    );
+}
+
+/// Canyon country is a looped landscape, not a maze: nearly every passable
+/// cell stays reachable from every other, while barriers are frequent enough
+/// to block moves often.
+#[test]
+fn canyon_country_is_well_looped_and_substantially_walled() {
+    let sim = seed_baseline_map(baseline_config("canyon-country"));
+    let connectivity = sim.world.passable_connectivity();
+    assert!(
+        connectivity.largest_component_fraction_of_passable >= 0.95,
+        "largest component holds {} of passable cells",
+        connectivity.largest_component_fraction_of_passable
+    );
+    assert!(
+        1.0 - connectivity.passable_fraction >= 0.15,
+        "barriers cover {} of the world",
+        1.0 - connectivity.passable_fraction
+    );
+    assert_eq!(
+        sim.config.world.food.types.len(),
+        1,
+        "canyon country keeps the production one-food substrate"
+    );
+}
+
+/// The composite carries both pressures at once.
+#[test]
+fn confluence_carries_both_foods_bounded_edges_and_terrain() {
+    let cfg = baseline_config("confluence");
+    assert_eq!(cfg.world.food.types.len(), 2);
+    assert_eq!(cfg.world.edge_mode, v3_core::config::WorldEdgeMode::Bounded);
+    assert!(!cfg.world.terrain.is_empty());
 }
 
 /// Explicit one-time feature diagnostic; not a production indicator or a score gate.
@@ -482,97 +559,43 @@ fn food_choice_mutation_diagnostic() {
     println!("food-choice diagnostic: births=1000 seeds=9000..9999 food_types=2 executions_per_genome={} executed_parent_nodes={executed:?} zero_event_births={zero} offspring_with_corresponding_eat_index_change={changed_eat} offspring_selecting_nonprimary_anywhere={nonprimary}",base.execution_count());
 }
 
-/// Full-size tick-zero visual inspection, deliberately outside the ordinary test suite.
-#[test]
-#[ignore = "full-size layout inspection; run explicitly before the single goal measurement"]
-fn inspect_saved_world_layouts() {
-    use std::io::Write;
-    use v3_core::config::resolve_config;
-    for (name, seed, source) in [
-        (
-            "orchards-in-grassland",
-            11,
-            include_str!("../../../experiments/worlds/orchards-in-grassland.json"),
-        ),
-        (
-            "canyon-country",
-            22,
-            include_str!("../../../experiments/worlds/canyon-country.json"),
-        ),
-        (
-            "confluence",
-            33,
-            include_str!("../../../experiments/worlds/confluence.json"),
-        ),
-    ] {
-        let cfg = resolve_config(
-            &SimulationConfig::default(),
-            serde_json::from_str(source).unwrap(),
-        )
-        .unwrap();
-        let sim = seed_simulation(cfg, seed);
-        let mut habitat = [0u64; 4];
-        let mut food_cells = [0u64; 2];
-        let mut barrier_habitat = 0;
-        let mut pixels = Vec::new();
-        for y in 0..sim.world.height {
-            for x in 0..sim.world.width {
-                let pos = Position::new(x, y);
-                let grass = *sim
-                    .world
-                    .food()
-                    .fertility_for_type(OrdinaryFoodTypeId::new(0))
-                    .unwrap()
-                    .get(x, y)
-                    > -1.0;
-                let fruit = sim
-                    .world
-                    .food()
-                    .fertility_for_type(OrdinaryFoodTypeId::new(1))
-                    .is_some_and(|grid| *grid.get(x, y) > -1.0);
-                let barrier = sim.world.is_barrier(pos);
-                if !barrier {
-                    habitat[usize::from(grass) + 2 * usize::from(fruit)] += 1;
-                }
-                barrier_habitat += u64::from(barrier && (grass || fruit));
-                for (idx, count) in food_cells
-                    .iter_mut()
-                    .enumerate()
-                    .take(sim.config.world.food.types.len())
-                {
-                    *count += u64::from(
-                        sim.world
-                            .food_at_type(pos, OrdinaryFoodTypeId::new(idx as u16))
-                            > 0.0,
-                    );
-                }
-                if x % 4 == 2 && y % 4 == 2 {
-                    pixels.extend_from_slice(if barrier {
-                        &[180u8, 184, 195]
-                    } else {
-                        match (grass, fruit) {
-                            (true, true) => &[226, 190, 69],
-                            (true, false) => &[49, 132, 74],
-                            (false, true) => &[231, 108, 42],
-                            (false, false) => &[21, 29, 42],
-                        }
-                    });
-                }
-            }
-        }
-        if sim.config.world.food.types.len() == 2 {
-            assert!(habitat[3] > 0 && habitat[1] > 0 && habitat[2] > 0);
-        }
-        let path = format!("/private/tmp/t12-f04-{name}.ppm");
-        let mut file = std::fs::File::create(&path).unwrap();
-        write!(
-            file,
-            "P6\n{} {}\n255\n",
-            sim.world.width / 4,
-            sim.world.height / 4
-        )
-        .unwrap();
-        file.write_all(&pixels).unwrap();
-        println!("{name} seed={seed} connectivity={} habitats_neither_grass_fruit_overlap={habitat:?} food_cells={food_cells:?} barriers_overlapping_habitat={barrier_habitat} map={path}",serde_json::to_string(&sim.world.passable_connectivity()).unwrap());
-    }
+/// The checked-in recipes, by file stem.
+const RECIPES: [(&str, &str); 4] = [
+    (
+        "plains",
+        include_str!("../../../experiments/worlds/plains.json"),
+    ),
+    (
+        "orchards-in-grassland",
+        include_str!("../../../experiments/worlds/orchards-in-grassland.json"),
+    ),
+    (
+        "canyon-country",
+        include_str!("../../../experiments/worlds/canyon-country.json"),
+    ),
+    (
+        "confluence",
+        include_str!("../../../experiments/worlds/confluence.json"),
+    ),
+];
+
+/// One checked-in recipe resolved over the production defaults.
+fn baseline_config(name: &str) -> SimulationConfig {
+    let (_, source) = RECIPES
+        .iter()
+        .find(|(stem, _)| *stem == name)
+        .unwrap_or_else(|| panic!("{name} must be a checked-in recipe"));
+    v3_core::config::resolve_config(
+        &SimulationConfig::default(),
+        serde_json::from_str(source).unwrap(),
+    )
+    .unwrap()
+}
+
+/// Seed a baseline world's map at production size. The founder count is cut to
+/// one: terrain, fertility, and connectivity come from the pinned world seed
+/// alone, and placing ten thousand founders would only slow the assertion down.
+fn seed_baseline_map(mut cfg: SimulationConfig) -> v3_core::simulation::Simulation {
+    cfg.population.initial_creatures = 1;
+    seed_simulation(cfg, 11)
 }

@@ -12,6 +12,8 @@ use std::time::{Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use v3_core::config::{MutationConfig, SimulationConfig};
+
+use crate::{fraction_or_undefined, six, UNDEFINED};
 use v3_core::creature::founder::founder_genome;
 use v3_core::creature::genome::analysis::functional_complexity;
 use v3_core::neighborhood::{
@@ -388,8 +390,30 @@ pub struct GoalCaseObservation {
     /// Complete final population for this case; absent in the initial F04 report.
     #[serde(default)]
     pub reachable_structure_size_distribution: Option<StructureSizeDistribution>,
+    /// End-of-run per-world behavior for this case.
+    #[serde(flatten)]
+    pub tracking: WorldTracking,
+    /// The fractions derived from `tracking`; every field is empty in reports
+    /// stored before T12.F04 measured them.
+    #[serde(flatten)]
+    pub fractions: TrackedFractions,
     pub mutational_neighborhood: Indicator<MutationalNeighborhood>,
     pub drift_depth: Indicator<DriftDepth>,
+}
+
+/// The rates [`WorldTracking`] implies, derived once so a total and its
+/// fraction can never disagree.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TrackedFractions {
+    /// Each food type's share of every applied Eat.
+    #[serde(default)]
+    pub typed_eat_share: Vec<String>,
+    /// Barrier-blocked moves against every move attempted.
+    #[serde(default)]
+    pub blocked_move_fraction: String,
+    /// Avoidable blocked moves against every move attempted, by reader state.
+    #[serde(default)]
+    pub avoidable_blocked_move_fraction_by_reader_state: ByReaderState<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -420,8 +444,6 @@ pub struct GoalIndicators {
     pub information_integration: String,
     pub reciprocal_interaction: String,
 }
-
-const UNDEFINED: &str = "Undefined";
 
 /// A goal-only indicator is either unavailable for a profile or carries its
 /// versioned per-seed observations. Keeping `Undefined` as the wire value
@@ -885,6 +907,103 @@ pub struct PopulationPersistenceSeed {
     pub samples: Vec<PersistenceSample>,
 }
 
+/// A reading split by whether the acting genome reads the barrier ring.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ByReaderState<T: Default> {
+    pub has_barrier_reader: T,
+    pub no_barrier_reader: T,
+}
+
+/// Cumulative per-world behavior a baseline world is followed by (T12.F04):
+/// what the population ate, how much food stood, and how often it walked into
+/// something. Every field comes from applied simulation behavior, and every one
+/// is serde-defaulted so reports stored before T12.F04 still parse.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct WorldTracking {
+    /// Applied Eat actions by the food type they consumed.
+    #[serde(default)]
+    pub typed_eats_total: Vec<u64>,
+    /// Standing density per food type after the last executed tick's growth.
+    #[serde(default)]
+    pub food_density_total: Vec<String>,
+    /// Move actions executed, blocked or not.
+    #[serde(default)]
+    pub moves_attempted_total: u64,
+    /// Move actions a barrier blocked.
+    #[serde(default)]
+    pub moves_blocked_barrier_total: u64,
+    /// Blocked moves that had a valid alternative target, by reader state.
+    #[serde(default)]
+    pub moves_blocked_avoidable_by_reader_state: ByReaderState<u64>,
+}
+
+impl WorldTracking {
+    /// Read the cumulative counters out of a running simulation.
+    fn observe(sim: &v3_core::simulation::Simulation) -> Self {
+        use v3_core::config::OrdinaryFoodTypeId;
+        use v3_core::simulation::actions::{BarrierReaderState, MoveBlockedCause};
+        let stats = &sim.stats;
+        let avoidable = |state| {
+            stats
+                .move_actions_blocked_avoidable_total_by_reader_state
+                .get(&state)
+                .copied()
+                .unwrap_or(0)
+        };
+        Self {
+            typed_eats_total: (0..sim.config.world.food.types.len())
+                .map(|index| {
+                    stats
+                        .eat_actions_applied_total_by_type
+                        .get(&OrdinaryFoodTypeId::new(index as u16))
+                        .copied()
+                        .unwrap_or(0)
+                })
+                .collect(),
+            food_density_total: stats
+                .last_tick_food_total_density_by_type
+                .iter()
+                .map(|density| six(f64::from(*density)))
+                .collect(),
+            moves_attempted_total: stats.move_actions_attempted_total,
+            moves_blocked_barrier_total: stats
+                .move_actions_blocked_total_by_cause
+                .get(&MoveBlockedCause::Barrier)
+                .copied()
+                .unwrap_or(0),
+            moves_blocked_avoidable_by_reader_state: ByReaderState {
+                has_barrier_reader: avoidable(BarrierReaderState::HasBarrierReader),
+                no_barrier_reader: avoidable(BarrierReaderState::NoBarrierReader),
+            },
+        }
+    }
+
+    /// The rates these totals imply. Each type's eat share is against every
+    /// applied Eat; both blocked-move fractions are against every move
+    /// attempted, so they are comparable to each other.
+    fn fractions(&self) -> TrackedFractions {
+        let eats: u64 = self.typed_eats_total.iter().sum();
+        let attempted = self.moves_attempted_total;
+        let avoidable = &self.moves_blocked_avoidable_by_reader_state;
+        TrackedFractions {
+            typed_eat_share: self
+                .typed_eats_total
+                .iter()
+                .map(|typed| fraction_or_undefined(*typed, eats))
+                .collect(),
+            blocked_move_fraction: fraction_or_undefined(
+                self.moves_blocked_barrier_total,
+                attempted,
+            ),
+            avoidable_blocked_move_fraction_by_reader_state: ByReaderState {
+                has_barrier_reader: fraction_or_undefined(avoidable.has_barrier_reader, attempted),
+                no_barrier_reader: fraction_or_undefined(avoidable.no_barrier_reader, attempted),
+            },
+        }
+    }
+}
+
 /// One persistence sample, taken after `run_tick` on every executed tick that
 /// is a multiple of [`SAMPLE_EVERY_TICKS`] and on the last executed tick.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -894,6 +1013,8 @@ pub struct PersistenceSample {
     pub mean_energy: Option<String>,
     /// Cumulative `reproduction_actions_spawned_total` at this tick.
     pub births_total: u64,
+    #[serde(flatten)]
+    pub tracking: WorldTracking,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1044,9 +1165,45 @@ pub struct Comparison {
 pub struct ReferenceComparison {
     pub path: String,
     pub counters: Vec<CounterComparison>,
+    /// One entry per world in the `goal-worlds-v1` profile; empty for the gate
+    /// and single-config profiles, which have no cases to compare.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cases: Vec<CaseComparison>,
     pub wall_clock: Option<WallClockComparison>,
     pub severe: bool,
 }
+
+/// One world's reading against the same world in a reference report. Per-case
+/// entries carry no severity level: a world set follows each environment's
+/// trajectory, and the profile-total work counters above own the regression
+/// rule.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CaseComparison {
+    pub case: String,
+    /// The reference ran this case from different inputs — an edited recipe or
+    /// a reassigned run seed. Labeled, never an error: a recipe edit is the
+    /// point of a world-set closure.
+    pub inputs_changed: bool,
+    /// The reference report has no case by this name at all.
+    pub absent_in_reference: bool,
+    pub current_digest: String,
+    pub reference_digest: Option<String>,
+    pub readings: Vec<CaseReadingComparison>,
+}
+
+/// One per-case reading, as six-decimal strings so it reads like every other
+/// comparison value in the report.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct CaseReadingComparison {
+    pub name: String,
+    pub current: Option<String>,
+    pub reference: Option<String>,
+    pub percent_delta: Option<String>,
+}
+
+/// Readings whose difference is not a rate: a percent delta on them would be
+/// meaningless, so only the values are reported.
+const VALUE_ONLY_CASE_READINGS: [&str; 1] = ["extinction_tick"];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CounterComparison {
@@ -1093,28 +1250,11 @@ impl std::fmt::Display for ComparisonLevel {
 
 // ── Formatting helpers ───────────────────────────────────────────────────────
 
-fn six(x: f64) -> String {
-    format!("{x:.6}")
-}
-
 fn ratio(numerator: u64, denominator: u64) -> String {
     if denominator == 0 {
         return six(0.0);
     }
     six(numerator as f64 / denominator as f64)
-}
-
-/// A six-decimal fraction against `denominator`, or `Undefined` when
-/// `denominator` is zero — the empty-population/no-applied-trials convention
-/// used by `memory_sensitivity` and the mutational-neighborhood tallies,
-/// distinct from [`ratio`]'s zero-when-empty convention used by the
-/// per-creature-tick counters.
-fn fraction_or_undefined(count: u64, denominator: u64) -> String {
-    if denominator == 0 {
-        UNDEFINED.to_string()
-    } else {
-        six(count as f64 / denominator as f64)
-    }
 }
 
 // ── Per-seed persistence tracking (T01.F11) ─────────────────────────────────
@@ -1165,15 +1305,17 @@ impl PersistenceAccumulator {
         tick.is_multiple_of(SAMPLE_EVERY_TICKS) || tick == self.horizon || population == 0
     }
 
-    /// Record one executed tick. `mean_energy` is evaluated only on sampled
-    /// ticks that still have creatures, keeping the `O(population)` energy sum
-    /// to the predeclared cadence and leaving `null` at extinction.
+    /// Record one executed tick. `mean_energy` and `tracking` are evaluated
+    /// only on sampled ticks — the first keeps the `O(population)` energy sum
+    /// to the predeclared cadence and leaves `null` at extinction, the second
+    /// keeps the per-world counter reads there too.
     fn observe(
         &mut self,
         tick: u64,
         population: u64,
         births_total: u64,
         mean_energy: impl FnOnce() -> f64,
+        tracking: impl FnOnce() -> WorldTracking,
     ) {
         self.population = population;
         self.minimum_population = self.minimum_population.min(population);
@@ -1194,6 +1336,7 @@ impl PersistenceAccumulator {
                 population,
                 mean_energy: (population > 0).then(|| six(mean_energy())),
                 births_total,
+                tracking: tracking(),
             });
         }
     }
@@ -1221,6 +1364,8 @@ impl PersistenceAccumulator {
 struct SeedRun {
     per_seed: PerSeed,
     persistence: PopulationPersistenceSeed,
+    /// The run's final cumulative per-world behavior.
+    tracking: WorldTracking,
     complexities: Vec<u32>,
     goal_observation: Option<GoalObservation>,
     wall_clock_ms: f64,
@@ -1290,6 +1435,7 @@ fn run_one_seed(
                 let total: f64 = sim.creatures.values().map(|c| f64::from(c.energy)).sum();
                 total / population as f64
             },
+            || WorldTracking::observe(&sim),
         );
         if population == 0 {
             break;
@@ -1297,6 +1443,7 @@ fn run_one_seed(
     }
     let wall_clock_ms = millis(start.elapsed().saturating_sub(connectivity_duration));
 
+    let tracking = WorldTracking::observe(&sim);
     let persistence = persistence.finish(seed);
     let complexities: Vec<u32> = sim
         .creatures
@@ -1368,6 +1515,7 @@ fn run_one_seed(
     SeedRun {
         per_seed,
         persistence,
+        tracking,
         complexities,
         goal_observation,
         wall_clock_ms,
@@ -1751,6 +1899,24 @@ fn prepare_goal_case(
     }
 }
 
+/// Sum every executed case or seed run into the profile totals. Each per-case
+/// row is one world in the world-set profile and one seed replicate elsewhere,
+/// so the profile total is always the field-wise sum of the rows the report
+/// carries.
+fn accumulate_totals(per_seed: &[PerSeed]) -> Totals {
+    per_seed.iter().fold(Totals::default(), |mut totals, row| {
+        totals.ticks += row.ticks;
+        totals.creature_ticks += row.creature_ticks;
+        totals.mesh_hops += row.mesh_hops;
+        totals.vm_steps += row.vm_steps;
+        totals.graph_relax_iters += row.graph_relax_iters;
+        totals.plasticity_updates += row.plasticity_updates;
+        totals.actions_applied += row.actions_applied;
+        totals.births += row.births;
+        totals
+    })
+}
+
 fn normalized_totals(totals: &Totals) -> PerCreatureTick {
     PerCreatureTick {
         mesh_hops: Some(ratio(totals.mesh_hops, totals.creature_ticks)),
@@ -1868,7 +2034,6 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
     let mut phase_wall_clock = Vec::with_capacity(params.seeds.len());
     let mut throughput_per_seed = Vec::with_capacity(params.seeds.len());
     let mut pooled_complexities: Vec<u32> = Vec::new();
-    let mut totals = Totals::default();
     let mut population_persistence_per_seed = Vec::with_capacity(params.seeds.len());
     let mut lineage_diversity_per_seed = Vec::with_capacity(params.seeds.len());
     let mut memory_sensitivity_per_seed = Vec::with_capacity(params.seeds.len());
@@ -1930,14 +2095,6 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
             battery,
             params.neighborhood,
         );
-        totals.ticks += run.per_seed.ticks;
-        totals.creature_ticks += run.per_seed.creature_ticks;
-        totals.mesh_hops += run.per_seed.mesh_hops;
-        totals.vm_steps += run.per_seed.vm_steps;
-        totals.graph_relax_iters += run.per_seed.graph_relax_iters;
-        totals.plasticity_updates += run.per_seed.plasticity_updates;
-        totals.actions_applied += run.per_seed.actions_applied;
-        totals.births += run.per_seed.births;
         pooled_complexities.extend(run.complexities.iter().copied());
         wall_clock.push(SeedWallClock {
             seed,
@@ -1973,6 +2130,8 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
                 reachable_structure_size_distribution: Some(structure_size_distribution(
                     run.complexities,
                 )),
+                fractions: run.tracking.fractions(),
+                tracking: run.tracking,
                 mutational_neighborhood: build_mutational_neighborhood_indicator(
                     Some(case.founder),
                     params,
@@ -1985,6 +2144,7 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
         per_seed.push(run.per_seed);
     }
 
+    let totals = accumulate_totals(&per_seed);
     let per_creature_tick = normalized_totals(&totals);
 
     let goal_indicators = assemble_goal_indicators(
@@ -2264,6 +2424,233 @@ fn per_creature_tick_value(pct: &PerCreatureTick, name: &str) -> Option<f64> {
     raw.as_deref().and_then(|s| s.parse::<f64>().ok())
 }
 
+/// Parse a six-decimal report string; `Undefined` reads as unmeasured.
+fn parse_reading(value: &str) -> Option<f64> {
+    value.parse::<f64>().ok()
+}
+
+/// Every reading a world-set comparison follows for one case, in report order.
+/// An absent case, an unmeasured indicator, and a zero denominator all read as
+/// `None` rather than as a zero the delta would then compare against.
+fn case_readings(report: &Report, case_name: &str) -> Vec<(String, Option<f64>)> {
+    let indicators = &report.deterministic.goal_indicators;
+    let Some(observation) = indicators
+        .cases
+        .iter()
+        .find(|entry| entry.case.name == case_name)
+    else {
+        return Vec::new();
+    };
+    let seed = observation.case.seed;
+    let persistence = indicators
+        .population_persistence
+        .per_seed
+        .iter()
+        .find(|row| row.seed == seed);
+    let run = report
+        .deterministic
+        .per_seed
+        .iter()
+        .find(|row| row.seed == seed);
+    let lineage = match &indicators.lineage_diversity {
+        Indicator::Defined(reading) => reading.per_seed.iter().find(|row| row.seed == seed),
+        Indicator::Undefined(_) => None,
+    };
+    let memory = match &indicators.memory_sensitivity {
+        Indicator::Defined(reading) => reading.per_seed.iter().find(|row| row.seed == seed),
+        Indicator::Undefined(_) => None,
+    };
+    let neighborhood = match &observation.mutational_neighborhood {
+        Indicator::Defined(reading) => Some(reading),
+        Indicator::Undefined(_) => None,
+    };
+    let evolved = neighborhood.and_then(|reading| match &reading.evolved {
+        Indicator::Defined(half) => half.per_seed.first(),
+        Indicator::Undefined(_) => None,
+    });
+    let per_creature_tick = |count: fn(&PerSeed) -> u64| {
+        run.and_then(|row| {
+            (row.creature_ticks > 0).then(|| count(row) as f64 / row.creature_ticks as f64)
+        })
+    };
+
+    let mut readings: Vec<(String, Option<f64>)> = vec![
+        (
+            "final_population".into(),
+            persistence.map(|row| row.final_population as f64),
+        ),
+        (
+            "minimum_population".into(),
+            persistence.map(|row| row.minimum_population as f64),
+        ),
+        (
+            "peak_population".into(),
+            persistence.map(|row| row.peak_population as f64),
+        ),
+        (
+            "plateau_population".into(),
+            persistence
+                .and_then(|row| row.plateau_population.as_deref())
+                .and_then(parse_reading),
+        ),
+        ("births".into(), run.map(|row| row.births as f64)),
+        (
+            "mean_energy".into(),
+            persistence
+                .and_then(|row| row.mean_energy.as_deref())
+                .and_then(parse_reading),
+        ),
+        (
+            "extinction_tick".into(),
+            persistence
+                .and_then(|row| row.extinction_tick)
+                .map(|tick| tick as f64),
+        ),
+    ];
+    // The same six counters the profile totals normalize, in the same order, so
+    // a per-case row can never drift from the profile-level counter list.
+    let counts: [fn(&PerSeed) -> u64; COUNTER_NAMES.len()] = [
+        |row| row.mesh_hops,
+        |row| row.vm_steps,
+        |row| row.graph_relax_iters,
+        |row| row.plasticity_updates,
+        |row| row.actions_applied,
+        |row| row.births,
+    ];
+    for (name, count) in COUNTER_NAMES.iter().zip(counts) {
+        readings.push((
+            format!("{name}_per_creature_tick"),
+            per_creature_tick(count),
+        ));
+    }
+    for (index, share) in observation.fractions.typed_eat_share.iter().enumerate() {
+        readings.push((
+            format!("typed_eat_share_type_{index}"),
+            parse_reading(share),
+        ));
+    }
+    let avoidable = &observation
+        .fractions
+        .avoidable_blocked_move_fraction_by_reader_state;
+    readings.extend([
+        (
+            "blocked_move_fraction".to_string(),
+            parse_reading(&observation.fractions.blocked_move_fraction),
+        ),
+        (
+            "avoidable_blocked_move_fraction_has_barrier_reader".to_string(),
+            parse_reading(&avoidable.has_barrier_reader),
+        ),
+        (
+            "avoidable_blocked_move_fraction_no_barrier_reader".to_string(),
+            parse_reading(&avoidable.no_barrier_reader),
+        ),
+        (
+            "lineage_shannon_entropy_nats".to_string(),
+            lineage.and_then(|row| parse_reading(&row.shannon_entropy_nats)),
+        ),
+        (
+            "surviving_founder_clade_count".to_string(),
+            lineage.map(|row| row.surviving_founder_clade_count as f64),
+        ),
+        (
+            "memory_different_from_either_fraction".to_string(),
+            memory.and_then(|row| parse_reading(&row.different_from_either_fraction)),
+        ),
+        (
+            "drift_changed_per_all_births_at_2000".to_string(),
+            match &observation.drift_depth {
+                Indicator::Defined(drift) => drift
+                    .readings
+                    .iter()
+                    .find(|row| row.depth == 2_000)
+                    .and_then(|row| parse_reading(&row.changed_per_all_births)),
+                Indicator::Undefined(_) => None,
+            },
+        ),
+        (
+            "founder_changed_per_all_births".to_string(),
+            neighborhood.and_then(|reading| {
+                parse_reading(&reading.founder.births.any_events.changed_fraction)
+            }),
+        ),
+        (
+            "founder_dead_per_all_births".to_string(),
+            neighborhood.and_then(|reading| {
+                parse_reading(&reading.founder.births.any_events.dead_fraction)
+            }),
+        ),
+        (
+            "evolved_changed_per_all_births".to_string(),
+            evolved.and_then(|row| parse_reading(&row.pooled_births.any_events.changed_fraction)),
+        ),
+        (
+            "evolved_dead_per_all_births".to_string(),
+            evolved.and_then(|row| parse_reading(&row.pooled_births.any_events.dead_fraction)),
+        ),
+        (
+            "reachable_structure_size_median".to_string(),
+            observation
+                .reachable_structure_size_distribution
+                .as_ref()
+                .map(|distribution| f64::from(distribution.median)),
+        ),
+    ]);
+    readings
+}
+
+/// Compare every world in `current` against the same-named world in
+/// `reference`. Empty outside the world-set profile.
+fn compare_cases(current: &Report, reference: &Report) -> Vec<CaseComparison> {
+    if current.deterministic.profile.name != GOAL_WORLD_SET {
+        return Vec::new();
+    }
+    current
+        .deterministic
+        .profile
+        .cases
+        .iter()
+        .map(|case| {
+            let reference_case = reference
+                .deterministic
+                .profile
+                .cases
+                .iter()
+                .find(|other| other.name == case.name);
+            let reference_readings = case_readings(reference, &case.name);
+            let readings = case_readings(current, &case.name)
+                .into_iter()
+                .map(|(name, current_value)| {
+                    let reference_value = reference_readings
+                        .iter()
+                        .find(|(other, _)| *other == name)
+                        .and_then(|(_, value)| *value);
+                    let percent_delta = (!VALUE_ONLY_CASE_READINGS.contains(&name.as_str()))
+                        .then(|| current_value.zip(reference_value))
+                        .flatten()
+                        .and_then(|(current, reference)| percent_delta(current, reference));
+                    CaseReadingComparison {
+                        name,
+                        current: current_value.map(six),
+                        reference: reference_value.map(six),
+                        percent_delta: percent_delta.map(six),
+                    }
+                })
+                .collect();
+            CaseComparison {
+                case: case.name.clone(),
+                inputs_changed: reference_case.is_some_and(|other| {
+                    other.config_digest != case.config_digest || other.seed != case.seed
+                }),
+                absent_in_reference: reference_case.is_none(),
+                current_digest: case.config_digest.clone(),
+                reference_digest: reference_case.map(|other| other.config_digest.clone()),
+                readings,
+            }
+        })
+        .collect()
+}
+
 /// Compare `current` against one stored reference report, returning a
 /// `ReferenceComparison`. Only integer work counters (never wall-clock) can
 /// mark a comparison `severe`.
@@ -2336,9 +2723,26 @@ pub fn compare_against(
     ReferenceComparison {
         path: reference_path.display().to_string(),
         counters,
+        cases: compare_cases(current, reference),
         wall_clock,
         severe: any_severe,
     }
+}
+
+/// The profile block two reports must agree on to be comparable at all.
+///
+/// For the world set the per-case block is excluded: every closure that edits a
+/// recipe changes that case's `config_digest`, and the standard-baseline
+/// contract expects exactly that. Hard-failing on it would discard a ten-minute
+/// run, so a digest change is reported per case as `inputs_changed` and a case
+/// the reference never ran is reported as `absent_in_reference`. World size,
+/// founder count, seeds, ticks, and food coverage still have to match.
+fn comparable_profile(profile: &ProfileBlock) -> ProfileBlock {
+    let mut profile = profile.clone();
+    if profile.name == GOAL_WORLD_SET {
+        profile.cases.clear();
+    }
+    profile
 }
 
 /// Load a reference report from disk and compare `current` against it.
@@ -2356,7 +2760,9 @@ pub fn compare_against_path(
             reference_path.display()
         )
     })?;
-    if reference.deterministic.profile != current.deterministic.profile {
+    if comparable_profile(&reference.deterministic.profile)
+        != comparable_profile(&current.deterministic.profile)
+    {
         return Err(format!(
             "reference {} was generated with a different profile ({:?}) than the \
              current run ({:?}); a work-counter comparison across different world \
@@ -2868,7 +3274,7 @@ mod tests {
         let mut accumulator = PersistenceAccumulator::new(horizon, seeded_population);
         for (index, &population) in populations.iter().enumerate() {
             let tick = index as u64 + 1;
-            accumulator.observe(tick, population, tick, || energy);
+            accumulator.observe(tick, population, tick, || energy, WorldTracking::default);
         }
         accumulator.finish(7)
     }
@@ -3807,5 +4213,441 @@ mod tests {
         changed = recipe.clone();
         changed.config.world.world_seed = Some(u64::MAX);
         assert_ne!(recipe, changed);
+    }
+
+    /// Each world-set case reports the same cumulative behavior a replay of
+    /// that case's own config and seed produces, and every fraction is derived
+    /// from those totals rather than measured separately.
+    #[test]
+    fn world_set_case_tracking_matches_a_replayed_run() {
+        let mut params = goal_profile_params();
+        params.width = 24;
+        params.height = 24;
+        params.founders = 16;
+        params.ticks = 4;
+        params.neighborhood = NeighborhoodSizes::default();
+        params.drift = Default::default();
+        let (report, _) = run_deterministic(&params);
+
+        for (index, case) in report.goal_indicators.cases.iter().enumerate() {
+            let (_, config) = goal_case(&params, index, params.seeds[index]);
+            let mut sim = seed_simulation(config, case.case.seed);
+            for _ in 0..params.ticks {
+                run_tick(&mut sim, &mut None);
+                if sim.creatures.is_empty() {
+                    break;
+                }
+            }
+            let expected = WorldTracking::observe(&sim);
+            assert_eq!(case.tracking, expected, "case {}", case.case.name);
+            assert_eq!(
+                case.tracking.typed_eats_total.len(),
+                case.case.food_type_count,
+                "one eat counter per configured food type"
+            );
+            assert_eq!(
+                case.tracking.food_density_total.len(),
+                case.case.food_type_count
+            );
+            assert_eq!(case.fractions, expected.fractions());
+        }
+    }
+
+    /// The world-set tracking fractions read against the totals they came from.
+    #[test]
+    fn tracking_fractions_divide_eats_by_eats_and_blocks_by_attempts() {
+        let tracking = WorldTracking {
+            typed_eats_total: vec![3, 1],
+            food_density_total: vec![six(1.5)],
+            moves_attempted_total: 8,
+            moves_blocked_barrier_total: 2,
+            moves_blocked_avoidable_by_reader_state: ByReaderState {
+                has_barrier_reader: 1,
+                no_barrier_reader: 3,
+            },
+        };
+        let fractions = tracking.fractions();
+        assert_eq!(fractions.typed_eat_share, vec![six(0.75), six(0.25)]);
+        assert_eq!(fractions.blocked_move_fraction, six(0.25));
+        assert_eq!(
+            fractions.avoidable_blocked_move_fraction_by_reader_state,
+            ByReaderState {
+                has_barrier_reader: six(0.125),
+                no_barrier_reader: six(0.375),
+            }
+        );
+
+        let empty = WorldTracking {
+            typed_eats_total: vec![0, 0],
+            ..WorldTracking::default()
+        }
+        .fractions();
+        assert_eq!(empty.typed_eat_share, vec![UNDEFINED, UNDEFINED]);
+        assert_eq!(empty.blocked_move_fraction, UNDEFINED);
+        assert_eq!(
+            empty.avoidable_blocked_move_fraction_by_reader_state,
+            ByReaderState {
+                has_barrier_reader: UNDEFINED.to_string(),
+                no_barrier_reader: UNDEFINED.to_string(),
+            }
+        );
+    }
+
+    /// Every persistence sample carries the tracking counters as of its tick,
+    /// on the same cadence `births_total` uses, and they never go backwards.
+    #[test]
+    fn persistence_samples_carry_world_tracking_on_the_births_cadence() {
+        let mut params = small_profile("sweep");
+        params.width = 24;
+        params.height = 24;
+        params.founders = 16;
+        params.ticks = SAMPLE_EVERY_TICKS + 5;
+        let (report, _) = run_deterministic(&params);
+        let seed = &report.goal_indicators.population_persistence.per_seed[0];
+        assert_eq!(
+            seed.samples.iter().map(|s| s.tick).collect::<Vec<_>>(),
+            vec![SAMPLE_EVERY_TICKS, params.ticks],
+            "the cadence is every hundredth tick plus the final tick"
+        );
+        let mut previous = 0;
+        for sample in &seed.samples {
+            assert_eq!(sample.tracking.typed_eats_total.len(), 1);
+            assert_eq!(sample.tracking.food_density_total.len(), 1);
+            assert!(
+                sample.tracking.moves_attempted_total >= previous,
+                "move attempts are cumulative"
+            );
+            previous = sample.tracking.moves_attempted_total;
+            assert!(
+                sample.tracking.moves_blocked_barrier_total
+                    <= sample.tracking.moves_attempted_total
+            );
+        }
+        assert!(previous > 0, "a moving population must attempt moves");
+    }
+
+    /// Historical reports predate every tracking field, and a round trip of a
+    /// current report keeps them flat on the wire.
+    #[test]
+    fn tracking_fields_default_when_absent_and_survive_a_round_trip() {
+        let legacy: PersistenceSample = serde_json::from_value(serde_json::json!({
+            "tick": 100, "population": 5, "mean_energy": "1.000000", "births_total": 2
+        }))
+        .expect("a pre-T12.F04 sample must still parse");
+        assert_eq!(legacy.tracking, WorldTracking::default());
+
+        let sample = PersistenceSample {
+            tick: 100,
+            population: 5,
+            mean_energy: None,
+            births_total: 2,
+            tracking: WorldTracking {
+                typed_eats_total: vec![7],
+                food_density_total: vec![six(2.0)],
+                moves_attempted_total: 9,
+                moves_blocked_barrier_total: 1,
+                moves_blocked_avoidable_by_reader_state: ByReaderState {
+                    has_barrier_reader: 0,
+                    no_barrier_reader: 1,
+                },
+            },
+        };
+        let wire = serde_json::to_value(&sample).unwrap();
+        assert_eq!(
+            wire["moves_attempted_total"], 9,
+            "tracking stays flat: {wire}"
+        );
+        let decoded: PersistenceSample = serde_json::from_value(wire).unwrap();
+        assert_eq!(decoded.tracking, sample.tracking);
+    }
+
+    proptest! {
+        /// The profile totals are exactly the field-wise sum of the per-case
+        /// (world-set) or per-seed rows the same report carries.
+        #[test]
+        fn profile_totals_are_the_field_wise_sum_of_every_case_row(
+            rows in proptest::collection::vec(
+                (0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000, 0u64..1000),
+                0..6usize,
+            )
+        ) {
+            let per_seed: Vec<PerSeed> = rows
+                .iter()
+                .enumerate()
+                .map(|(index, row)| PerSeed {
+                    tick_zero_connectivity: None,
+                    seed: index as u64,
+                    ticks: row.0,
+                    creature_ticks: row.1,
+                    mesh_hops: row.2,
+                    vm_steps: row.3,
+                    graph_relax_iters: row.4,
+                    plasticity_updates: row.5,
+                    actions_applied: row.6,
+                    births: row.7,
+                    final_population: 0,
+                    extinction_tick: None,
+                })
+                .collect();
+            let totals = accumulate_totals(&per_seed);
+            prop_assert_eq!(totals.ticks, rows.iter().map(|r| r.0).sum::<u64>());
+            prop_assert_eq!(totals.creature_ticks, rows.iter().map(|r| r.1).sum::<u64>());
+            prop_assert_eq!(totals.mesh_hops, rows.iter().map(|r| r.2).sum::<u64>());
+            prop_assert_eq!(totals.vm_steps, rows.iter().map(|r| r.3).sum::<u64>());
+            prop_assert_eq!(totals.graph_relax_iters, rows.iter().map(|r| r.4).sum::<u64>());
+            prop_assert_eq!(totals.plasticity_updates, rows.iter().map(|r| r.5).sum::<u64>());
+            prop_assert_eq!(totals.actions_applied, rows.iter().map(|r| r.6).sum::<u64>());
+            prop_assert_eq!(totals.births, rows.iter().map(|r| r.7).sum::<u64>());
+        }
+    }
+
+    fn small_world_set_report() -> Report {
+        let mut params = goal_profile_params();
+        params.width = 16;
+        params.height = 16;
+        params.founders = 4;
+        params.ticks = 1;
+        params.neighborhood = NeighborhoodSizes::default();
+        params.drift = Default::default();
+        build_report(&params, "t12-f04-world-set-check")
+    }
+
+    fn case_reading<'a>(comparison: &'a CaseComparison, name: &str) -> &'a CaseReadingComparison {
+        comparison
+            .readings
+            .iter()
+            .find(|reading| reading.name == name)
+            .unwrap_or_else(|| panic!("reading {name} must be compared"))
+    }
+
+    /// A world-set reference whose recipes were edited still compares: the
+    /// changed case is labeled `inputs_changed`, its deltas are computed, and a
+    /// case the reference never ran is recorded absent rather than dropped.
+    #[test]
+    fn world_set_comparison_labels_changed_inputs_and_records_absent_cases() {
+        let mut current = small_world_set_report();
+        let mut reference = current.clone();
+
+        let edited_seed = current.deterministic.profile.cases[1].seed;
+        reference.deterministic.profile.cases[1].config_digest = "sha256:edited".to_string();
+        let population = |report: &mut Report, seed: u64, value: u64, extinction: Option<u64>| {
+            for row in &mut report
+                .deterministic
+                .goal_indicators
+                .population_persistence
+                .per_seed
+            {
+                if row.seed == seed {
+                    row.final_population = value;
+                    row.extinction_tick = extinction;
+                }
+            }
+        };
+        population(&mut current, edited_seed, 200, Some(7));
+        population(&mut reference, edited_seed, 100, Some(3));
+        let dropped = current.deterministic.profile.cases[2].name.clone();
+        reference.deterministic.profile.cases.remove(2);
+        reference.deterministic.goal_indicators.cases.remove(2);
+
+        let path = std::env::temp_dir().join(format!(
+            "t12-f04-world-set-reference-{}.json",
+            std::process::id()
+        ));
+        std::fs::write(&path, report_json_pretty(&reference)).expect("write the reference");
+        let comparison = compare_against_path(&current, &path)
+            .expect("a world-set reference whose case digests differ must still be comparable");
+        let _ = std::fs::remove_file(&path);
+
+        assert_eq!(comparison.cases.len(), 3);
+        assert!(
+            !comparison.cases[0].inputs_changed,
+            "an untouched recipe is not an input change"
+        );
+        assert_eq!(
+            comparison.cases[0].reference_digest.as_deref(),
+            Some(comparison.cases[0].current_digest.as_str())
+        );
+        assert!(!comparison.cases[0].absent_in_reference);
+
+        let edited = &comparison.cases[1];
+        assert!(edited.inputs_changed);
+        assert!(!edited.absent_in_reference);
+        assert_eq!(edited.reference_digest.as_deref(), Some("sha256:edited"));
+        let final_population = case_reading(edited, "final_population");
+        assert_eq!(final_population.current.as_deref(), Some("200.000000"));
+        assert_eq!(final_population.reference.as_deref(), Some("100.000000"));
+        assert_eq!(
+            final_population.percent_delta.as_deref(),
+            Some("100.000000")
+        );
+        let extinction = case_reading(edited, "extinction_tick");
+        assert_eq!(extinction.current.as_deref(), Some("7.000000"));
+        assert_eq!(extinction.reference.as_deref(), Some("3.000000"));
+        assert_eq!(
+            extinction.percent_delta, None,
+            "an extinction tick is a value, not a rate"
+        );
+
+        let absent = &comparison.cases[2];
+        assert_eq!(absent.case, dropped);
+        assert!(absent.absent_in_reference);
+        assert!(!absent.inputs_changed);
+        assert_eq!(absent.reference_digest, None);
+        let reading = case_reading(absent, "final_population");
+        assert!(reading.current.is_some());
+        assert_eq!(reading.reference, None);
+        assert_eq!(reading.percent_delta, None);
+        assert!(
+            !comparison.severe,
+            "a per-case difference never makes a comparison severe by itself"
+        );
+    }
+
+    /// A profile difference that is not the per-case block is still a hard
+    /// error, and a single-config profile records no cases at all.
+    #[test]
+    fn comparison_still_rejects_a_different_world_and_records_no_cases_off_the_world_set() {
+        let current = small_world_set_report();
+        let mut reference = current.clone();
+        reference.deterministic.profile.ticks += 1;
+        let path = std::env::temp_dir().join(format!(
+            "t12-f04-world-set-mismatch-{}.json",
+            std::process::id()
+        ));
+        std::fs::write(&path, report_json_pretty(&reference)).expect("write the reference");
+        let error = compare_against_path(&current, &path).unwrap_err();
+        let _ = std::fs::remove_file(&path);
+        assert!(error.contains("different profile"), "{error}");
+
+        let single = build_report(&small_profile("sweep"), "t12-f04-single-config-check");
+        assert!(
+            compare_against(&single, std::path::Path::new("reference.json"), &single)
+                .cases
+                .is_empty(),
+            "only the world set has cases to compare"
+        );
+    }
+
+    /// Every per-case reading comes from that case's own seed and its own
+    /// observation, is parsed from the report's own strings, and is
+    /// unmeasured — never zero — where its denominator is.
+    #[test]
+    fn case_readings_follow_the_case_seed_and_observation() {
+        let mut report = small_world_set_report();
+        let cases: Vec<(String, u64)> = report
+            .deterministic
+            .profile
+            .cases
+            .iter()
+            .map(|case| (case.name.clone(), case.seed))
+            .collect();
+        let first_seed = cases[0].1;
+
+        // Stamp every row with a value derived from its own seed, so a lookup
+        // that takes some other case's row reads a different number. The first
+        // case runs no creature-ticks, so its normalized counters are
+        // unmeasured rather than a division by zero.
+        for row in &mut report.deterministic.per_seed {
+            row.creature_ticks = if row.seed == first_seed { 0 } else { 10 };
+            row.mesh_hops = row.seed;
+            row.births = row.seed * 2;
+        }
+        for row in &mut report
+            .deterministic
+            .goal_indicators
+            .population_persistence
+            .per_seed
+        {
+            row.final_population = row.seed + 1;
+            row.minimum_population = row.seed;
+            row.peak_population = row.seed + 2;
+            row.plateau_population = Some(six(f64::from(row.seed as u32) / 2.0));
+            row.mean_energy = Some(six(f64::from(row.seed as u32) / 4.0));
+            row.extinction_tick = Some(row.seed + 3);
+        }
+        if let Indicator::Defined(lineage) =
+            &mut report.deterministic.goal_indicators.lineage_diversity
+        {
+            for row in &mut lineage.per_seed {
+                row.surviving_founder_clade_count = row.seed;
+                row.shannon_entropy_nats = six(f64::from(row.seed as u32));
+            }
+        }
+        if let Indicator::Defined(memory) =
+            &mut report.deterministic.goal_indicators.memory_sensitivity
+        {
+            for row in &mut memory.per_seed {
+                row.different_from_either_fraction = six(f64::from(row.seed as u32) / 100.0);
+            }
+        }
+        for observation in &mut report.deterministic.goal_indicators.cases {
+            let seed = observation.case.seed;
+            observation.fractions.typed_eat_share = vec![six(f64::from(seed as u32) / 50.0)];
+            observation.fractions.blocked_move_fraction = six(f64::from(seed as u32) / 200.0);
+            if let Indicator::Defined(drift) = &mut observation.drift_depth {
+                // Two checkpoints with different readings, so selecting the
+                // wrong depth is visible.
+                let mut shallow = drift.readings[0].clone();
+                shallow.depth = 1_000;
+                shallow.changed_per_all_births = six(0.125);
+                let mut deep = drift.readings[0].clone();
+                deep.depth = 2_000;
+                deep.changed_per_all_births = six(f64::from(seed as u32) / 400.0);
+                drift.readings = vec![shallow, deep];
+            }
+        }
+
+        let value = |case: &str, name: &str| {
+            case_readings(&report, case)
+                .into_iter()
+                .find(|(reading, _)| reading == name)
+                .unwrap_or_else(|| panic!("{name} must be a compared reading"))
+                .1
+        };
+        let (second, seed) = (&cases[1].0, cases[1].1);
+        let seeded = f64::from(seed as u32);
+        assert_eq!(value(second, "final_population"), Some(seeded + 1.0));
+        assert_eq!(value(second, "minimum_population"), Some(seeded));
+        assert_eq!(value(second, "peak_population"), Some(seeded + 2.0));
+        assert_eq!(value(second, "plateau_population"), Some(seeded / 2.0));
+        assert_eq!(value(second, "mean_energy"), Some(seeded / 4.0));
+        assert_eq!(value(second, "extinction_tick"), Some(seeded + 3.0));
+        assert_eq!(value(second, "births"), Some(seeded * 2.0));
+        assert_eq!(
+            value(second, "mesh_hops_per_creature_tick"),
+            Some(seeded / 10.0),
+            "a counter is normalized by that case's own creature-ticks"
+        );
+        assert_eq!(
+            value(&cases[0].0, "mesh_hops_per_creature_tick"),
+            None,
+            "no creature-ticks makes a normalized counter unmeasured, not zero"
+        );
+        assert_eq!(value(second, "surviving_founder_clade_count"), Some(seeded));
+        assert_eq!(value(second, "lineage_shannon_entropy_nats"), Some(seeded));
+        assert_eq!(
+            value(second, "memory_different_from_either_fraction"),
+            Some(seeded / 100.0)
+        );
+        assert_eq!(value(second, "typed_eat_share_type_0"), Some(seeded / 50.0));
+        assert_eq!(value(second, "blocked_move_fraction"), Some(seeded / 200.0));
+        assert_eq!(
+            value(second, "drift_changed_per_all_births_at_2000"),
+            Some(seeded / 400.0),
+            "the depth-2,000 checkpoint, not the depth-1,000 one"
+        );
+        assert!(
+            case_readings(&report, "a world no report ran").is_empty(),
+            "an unknown case has no readings at all"
+        );
+    }
+
+    /// `Undefined` is the report's no-denominator value and must not parse as
+    /// a number a delta would then compare against.
+    #[test]
+    fn an_undefined_reading_parses_as_unmeasured() {
+        assert_eq!(parse_reading(&six(0.25)), Some(0.25));
+        assert_eq!(parse_reading(UNDEFINED), None);
+        assert_eq!(parse_reading(""), None);
     }
 }

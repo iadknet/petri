@@ -304,7 +304,15 @@
     const worldEpoch = get(index, 'goal_worlds.epoch_baseline');
     if (worldEpoch) add(worldEpoch, 'goal_worlds');
     (get(index, 'goal_worlds.closed') || []).forEach((p) => add(p, 'goal_worlds'));
-    const reports = await Promise.all(order.map(async (o) => ({ ...o, report: await fetchJson(rel(o.path)) })));
+    // A listed report may not be stored yet — a series whose epoch baseline is
+    // the measurement a feature is still taking. Skip it and say so rather than
+    // failing the whole page.
+    const missing = [];
+    const loaded = await Promise.all(order.map(async (o) => {
+      try { return { ...o, report: await fetchJson(rel(o.path)) }; }
+      catch (e) { missing.push(o.path); return null; }
+    }));
+    const reports = loaded.filter(Boolean);
 
     // Group by feature slug, preserving gate closure order, then any goal-only features.
     const bySlug = new Map();
@@ -322,7 +330,7 @@
       f.date = (get(rep, 'environment.generated_at') || '').slice(0, 10);
       f.label = f.id;
     }
-    return { index, features, reportCount: reports.length };
+    return { index, features, reportCount: reports.length, missing };
   }
 
   // ── Chart primitives ─────────────────────────────────────────────────────
@@ -756,38 +764,279 @@
   };
 
   // ── Rendering ────────────────────────────────────────────────────────────
+  // ── Goal worlds ──────────────────────────────────────────────────────────
+  const worldCase = (rep, world) => (get(rep, 'deterministic.goal_indicators.cases') || [])
+    .find((c) => get(c, 'case.name') === world);
+  const rowBySeed = (rep, path, seed) => {
+    const rows = get(rep, path);
+    return Array.isArray(rows) ? rows.find((r) => r && r.seed === seed) : undefined;
+  };
+  const driftAt = (obs, depth) => {
+    const readings = get(obs, 'drift_depth.readings');
+    if (!Array.isArray(readings)) return NaN;
+    const row = readings.find((r) => num(r.depth) === depth);
+    return row ? num(row.changed_per_all_births) : NaN;
+  };
+  // Closures where a reference reported this world's recipe inputs as changed.
+  const inputsChangedAt = (rep, world) => (get(rep, 'comparison.references') || [])
+    .some((r) => (r.cases || []).some((c) => c.case === world && c.inputs_changed));
+
   function renderWorlds(data, app) {
     const features = data.features.filter((f) => f.goal_worlds);
-    document.getElementById('status').textContent = `${features.length} goal-worlds-v1 reports · one run per environment · historical goal-v1 remains separate`;
-    const g = group('Goal worlds', 'Orchards / 11, Canyon / 22, Confluence / 33. Each is a distinct environment, not a seed replicate. Cross-profile deltas are unavailable.');
-    if (!features.length) g.cards.appendChild(el('p', null, 'No world-set report has been recorded yet.'));
-    for (const f of features) {
-      const report = f.goal_worlds;
-      const closure = (get(data.index, 'goal_worlds.closed') || []).includes(f.paths.goal_worlds) ? 'Closed' : 'Not yet closed';
-      for (const observation of get(report, 'deterministic.goal_indicators.cases') || []) {
-        const info = observation.case;
-        const seed = (get(report, 'deterministic.per_seed') || []).find((s) => s.seed === info.seed) || {};
-        const persistence = (get(report, 'deterministic.goal_indicators.population_persistence.per_seed') || []).find((s) => s.seed === info.seed) || {};
-        const connectivity = seed.tick_zero_connectivity || {};
-        const c = card(`${f.id} · ${info.name}`, `${closure} · Seed ${info.seed} · ${info.recipe_path} · Food types: ${info.food_type_count}`);
+    const closed = get(data.index, 'goal_worlds.closed') || [];
+    const missing = (data.missing || []).length
+      ? ` · ${data.missing.length} listed report not stored yet`
+      : '';
+    document.getElementById('status').textContent =
+      `${features.length} goal-worlds-v1 closures · one run per environment · historical goal-v1 remains separate${missing}`;
+    if (!features.length) {
+      app.appendChild(el('div', 'empty',
+        'No world-set report has been recorded yet. The goal-worlds-v1 series starts at T12.F04.'));
+      document.getElementById('foot').textContent =
+        'goal-worlds-v1 starts at T12.F04. Historical goal-v1 and the unchanged gate remain available in their tabs.';
+      return;
+    }
+
+    const xLabels = features.map((f) => f.label);
+    const xMeta = features.map((f) => {
+      const state = closed.includes(f.paths.goal_worlds) ? 'closed' : 'not yet closed';
+      return `${f.date} · ${state} · ${get(f.goal_worlds, 'environment.git_revision', '').slice(0, 8)}`;
+    });
+
+    const worlds = [];
+    features.forEach((f) => (get(f.goal_worlds, 'deterministic.goal_indicators.cases') || [])
+      .forEach((c) => { const n = get(c, 'case.name'); if (n && !worlds.includes(n)) worlds.push(n); }));
+
+    for (const world of worlds) {
+      // One value per closure for this world; NaN where the closure did not run
+      // it or did not measure the reading.
+      const series = (fn) => features.map((f) => {
+        const rep = f.goal_worlds;
+        const obs = worldCase(rep, world);
+        if (!obs) return NaN;
+        const value = fn(rep, obs, num(get(obs, 'case.seed')));
+        return value === undefined || value === null ? NaN : num(value);
+      });
+      const persistence = (field) => series((rep, obs, seed) => {
+        const row = rowBySeed(rep, 'deterministic.goal_indicators.population_persistence.per_seed', seed);
+        return row ? row[field] : NaN;
+      });
+      const annotations = features
+        .map((f, i) => (inputsChangedAt(f.goal_worlds, world) ? { x: i, label: 'inputs changed' } : null))
+        .filter(Boolean);
+      const latest = features[features.length - 1];
+      const previous = features[features.length - 2];
+      const latestCase = worldCase(latest.goal_worlds, world);
+
+      const g = group(world, latestCase
+        ? `Seed ${get(latestCase, 'case.seed')} · ${get(latestCase, 'case.recipe_path')} · ${get(latestCase, 'case.food_type_count')} food type(s). Charts follow closure order; a marked closure changed this world's recipe inputs.`
+        : 'Not present in the latest closure.');
+
+      // Headline tiles ──
+      {
+        const tiles = el('div', 'tiles');
+        const tile = (label, values, fmtV) => {
+          const v = values[values.length - 1];
+          const p = previous ? values[values.length - 2] : NaN;
+          let d;
+          if (Number.isFinite(v) && Number.isFinite(p) && p !== 0) {
+            const ch = Math.round(((v - p) / Math.abs(p)) * 1000) / 10 || 0;
+            d = `${ch > 0 ? '+' : ''}${ch.toLocaleString(undefined, { maximumFractionDigits: 1 })}% vs ${previous.id}`;
+          } else if (previous && Number.isFinite(v) && !Number.isFinite(p)) d = `not measured in ${previous.id}`;
+          tiles.appendChild(statTile(label, fmtV(v), d));
+        };
+        tile('Final population', persistence('final_population'), (v) => fmt(v, 0));
+        tile('Births', series((rep, obs, seed) => {
+          const row = rowBySeed(rep, 'deterministic.per_seed', seed);
+          return row ? row.births : NaN;
+        }), (v) => fmt(v, 0));
+        tile('Food type 1 share of applied eats', series((rep, obs) => get(obs, 'typed_eat_share.1')), pct);
+        tile('Blocked-move fraction', series((rep, obs) => get(obs, 'blocked_move_fraction')), pct);
+        g.cards.replaceWith(tiles);
+        app.appendChild(g.section);
+        // group() replaced its card grid with the tiles, so rebuild the grid.
+        g.cards = el('div', 'cards');
+        g.section.appendChild(g.cards);
+      }
+
+      // Population trajectory overlay by closure ──
+      {
+        const withSamples = features.filter((f) => {
+          const obs = worldCase(f.goal_worlds, world);
+          if (!obs) return false;
+          const row = rowBySeed(f.goal_worlds, 'deterministic.goal_indicators.population_persistence.per_seed', num(get(obs, 'case.seed')));
+          return row && Array.isArray(row.samples) && row.samples.length > 1;
+        });
+        if (withSamples.length) {
+          const tickSet = new Set();
+          const maps = withSamples.map((f) => {
+            const obs = worldCase(f.goal_worlds, world);
+            const row = rowBySeed(f.goal_worlds, 'deterministic.goal_indicators.population_persistence.per_seed', num(get(obs, 'case.seed')));
+            const mp = new Map();
+            (row.samples || []).forEach((p) => { mp.set(num(p.tick), num(p.population)); tickSet.add(num(p.tick)); });
+            return mp;
+          });
+          const ticksX = [...tickSet].filter(Number.isFinite).sort((a, b) => a - b);
+          g.cards.appendChild(lineChart({
+            title: 'Population trajectory by closure', wide: true, yMin: 0, xTitle: 'tick',
+            sub: 'population_persistence.per_seed[].samples; darker is a later closure, the latest is emphasized',
+            xLabels: ticksX.map(String),
+            series: withSamples.map((f, i) => ({
+              name: f.id,
+              color: ORDINAL_RAMP[Math.round((i * (ORDINAL_RAMP.length - 1)) / Math.max(1, withSamples.length - 1))],
+              emph: i === withSamples.length - 1, dots: i === withSamples.length - 1, endLabel: i === withSamples.length - 1,
+              values: ticksX.map((t) => (maps[i].has(t) ? maps[i].get(t) : NaN)),
+            })),
+          }));
+        }
+      }
+
+      const chart = (opts) => g.cards.appendChild(lineChart(
+        Object.assign({ xLabels, xTipMeta: xMeta, annotations, yMin: 0 }, opts)));
+
+      chart({
+        title: 'Population', sub: 'population_persistence.per_seed[] for this world',
+        series: [
+          { name: 'final', color: 'var(--s1)', values: persistence('final_population') },
+          { name: 'minimum', color: 'var(--s2)', values: persistence('minimum_population') },
+          { name: 'peak', color: 'var(--s3)', values: persistence('peak_population') },
+          { name: 'plateau', color: 'var(--seq-500)', values: persistence('plateau_population') },
+        ],
+      });
+      chart({
+        title: 'Births', sub: 'per_seed[].births for this world',
+        series: [{ name: 'births', color: 'var(--s1)', values: series((rep, obs, seed) => {
+          const row = rowBySeed(rep, 'deterministic.per_seed', seed); return row ? row.births : NaN;
+        }) }],
+      });
+      chart({
+        title: 'Mean energy at the final tick', sub: 'population_persistence.per_seed[].mean_energy',
+        series: [{ name: 'mean energy', color: 'var(--s1)', values: persistence('mean_energy') }],
+      });
+      chart({
+        title: 'Lineage Shannon entropy', sub: 'lineage_diversity.per_seed[].shannon_entropy_nats',
+        series: [{ name: 'nats', color: 'var(--s1)', values: series((rep, obs, seed) => {
+          const row = rowBySeed(rep, 'deterministic.goal_indicators.lineage_diversity.per_seed', seed);
+          return row ? row.shannon_entropy_nats : NaN;
+        }) }],
+      });
+      chart({
+        title: 'Surviving founder clades', sub: 'lineage_diversity.per_seed[].surviving_founder_clade_count',
+        series: [{ name: 'clades', color: 'var(--s2)', values: series((rep, obs, seed) => {
+          const row = rowBySeed(rep, 'deterministic.goal_indicators.lineage_diversity.per_seed', seed);
+          return row ? row.surviving_founder_clade_count : NaN;
+        }) }],
+      });
+      chart({
+        title: 'Memory sensitivity', sub: 'memory_sensitivity.per_seed[].different_from_either_fraction',
+        tipFmt: pct, yFmt: pct,
+        series: [{ name: 'action changes', color: 'var(--s1)', values: series((rep, obs, seed) => {
+          const row = rowBySeed(rep, 'deterministic.goal_indicators.memory_sensitivity.per_seed', seed);
+          return row ? row.different_from_either_fraction : NaN;
+        }) }],
+      });
+      chart({
+        title: 'Temporal memory sensitivity', sub: 'temporal_memory_sensitivity.per_seed[].<component>.different_from_either_fraction',
+        tipFmt: pct, yFmt: pct,
+        series: [['persisted_outputs', 'Persisted outputs'], ['operator_state', 'Operator state'], ['previous_slots', 'Previous slots']]
+          .map(([key, name], i) => ({
+            name, color: `var(--s${i + 1})`,
+            values: series((rep, obs, seed) => {
+              const row = rowBySeed(rep, 'deterministic.goal_indicators.temporal_memory_sensitivity.per_seed', seed);
+              return row ? get(row, `${key}.different_from_either_fraction`) : NaN;
+            }),
+          })),
+      });
+      chart({
+        title: 'Drift depth: changed per all births', sub: 'drift_depth.readings[] at depth 1,000 and 2,000, against the T11.F17 floors',
+        tipFmt: pct, yFmt: pct,
+        refLines: [{ y: 0.0015, label: 'depth-1,000 floor' }, { y: 0.008, label: 'depth-2,000 floor' }],
+        series: [
+          { name: 'depth 1,000', color: 'var(--s1)', values: series((rep, obs) => driftAt(obs, 1000)) },
+          { name: 'depth 2,000', color: 'var(--s2)', values: series((rep, obs) => driftAt(obs, 2000)) },
+        ],
+      });
+      chart({
+        title: 'Mutated births by outcome', sub: 'founder and pooled evolved changed/dead fractions for this world',
+        tipFmt: pct, yFmt: pct,
+        series: [
+          { name: 'founder changed', color: 'var(--s1)', values: series((rep, obs) => get(obs, 'mutational_neighborhood.founder.births.any_events.changed_fraction')) },
+          { name: 'founder dead', color: 'var(--s2)', values: series((rep, obs) => get(obs, 'mutational_neighborhood.founder.births.any_events.dead_fraction')) },
+          { name: 'evolved changed', color: 'var(--s3)', values: series((rep, obs) => get(obs, 'mutational_neighborhood.evolved.per_seed.0.pooled_births.any_events.changed_fraction')) },
+          { name: 'evolved dead', color: 'var(--seq-600)', values: series((rep, obs) => get(obs, 'mutational_neighborhood.evolved.per_seed.0.pooled_births.any_events.dead_fraction')) },
+        ],
+      });
+      chart({
+        title: 'Reachable structure size', sub: 'reachable_structure_size_distribution for this world; the band is p25–p75',
+        series: [{ name: 'median', color: 'var(--s1)', values: series((rep, obs) => get(obs, 'reachable_structure_size_distribution.median')) }],
+        band: {
+          name: 'p25–p75', color: 'var(--s1)',
+          lo: series((rep, obs) => get(obs, 'reachable_structure_size_distribution.p25')),
+          hi: series((rep, obs) => get(obs, 'reachable_structure_size_distribution.p75')),
+        },
+      });
+      {
+        const typeCount = Math.max(1, ...features.map((f) => {
+          const obs = worldCase(f.goal_worlds, world);
+          return obs && Array.isArray(obs.typed_eat_share) ? obs.typed_eat_share.length : 0;
+        }));
+        chart({
+          title: 'Typed eat share', sub: 'applied Eat actions by the food type they consumed, as a share of every applied eat',
+          tipFmt: pct, yFmt: pct, yMax: 1,
+          series: Array.from({ length: typeCount }, (_, i) => ({
+            name: `type ${i}`, color: `var(--s${(i % 3) + 1})`,
+            values: series((rep, obs) => get(obs, `typed_eat_share.${i}`)),
+          })),
+        });
+      }
+      chart({
+        title: 'Blocked moves', sub: 'barrier-blocked and avoidable blocked moves, both against every move attempted',
+        tipFmt: pct, yFmt: pct,
+        series: [
+          { name: 'blocked by barrier', color: 'var(--s1)', values: series((rep, obs) => get(obs, 'blocked_move_fraction')) },
+          { name: 'avoidable, barrier reader', color: 'var(--s2)', values: series((rep, obs) => get(obs, 'avoidable_blocked_move_fraction_by_reader_state.has_barrier_reader')) },
+          { name: 'avoidable, no reader', color: 'var(--s3)', values: series((rep, obs) => get(obs, 'avoidable_blocked_move_fraction_by_reader_state.no_barrier_reader')) },
+        ],
+      });
+      COUNTERS.forEach(([key, name]) => chart({
+        title: `${name} per creature-tick`, sub: `per_seed[].${key} / per_seed[].creature_ticks for this world`,
+        series: [{ name, color: 'var(--s1)', values: series((rep, obs, seed) => {
+          const row = rowBySeed(rep, 'deterministic.per_seed', seed);
+          return row && num(row.creature_ticks) > 0 ? num(row[key]) / num(row.creature_ticks) : NaN;
+        }) }],
+      }));
+      chart({
+        title: 'Wall clock for this world', sub: 'environment.wall_clock_ms_per_seed[] in seconds; comparable only between runs on the same host',
+        series: [{ name: 'seconds', color: 'var(--s1)', values: series((rep, obs, seed) => {
+          const row = rowBySeed(rep, 'environment.wall_clock_ms_per_seed', seed);
+          return row ? num(row.wall_clock_ms) / 1000 : NaN;
+        }) }],
+      });
+
+      // Latest map and identity ──
+      if (latestCase) {
+        const seed = num(get(latestCase, 'case.seed'));
+        const run = rowBySeed(latest.goal_worlds, 'deterministic.per_seed', seed) || {};
+        const connectivity = run.tick_zero_connectivity || {};
+        const c = card(`${world} at ${latest.id}`, 'Tick-zero map and the applied config this closure ran');
         c.card.classList.add('wide');
         c.card.appendChild(table(['Reading', 'Value'], [
-          ['Final population', fmt(seed.final_population)], ['Extinction tick', seed.extinction_tick ?? 'Survived full horizon'],
-          ['Peak population', fmt(persistence.peak_population)], ['Births', fmt(seed.births)],
-          ['Passable fraction', pct(connectivity.passable_fraction)], ['Largest component / passable', pct(connectivity.largest_component_fraction_of_passable)],
-          ['Founder changed fraction', get(observation, 'mutational_neighborhood.founder.births.any_events.changed_fraction') ?? 'Unavailable'],
-          ['Population structure mean', get(observation, 'reachable_structure_size_distribution.mean') ?? 'Unavailable in this report'],
-          ['Population structure median', get(observation, 'reachable_structure_size_distribution.median') ?? 'Unavailable in this report'],
-          ['Config digest', info.config_digest],
+          ['Passable fraction', pct(num(connectivity.passable_fraction))],
+          ['Largest component / passable', pct(num(connectivity.largest_component_fraction_of_passable))],
+          ['Extinction tick', run.extinction_tick ?? 'Survived full horizon'],
+          ['Standing food density per type', (latestCase.food_density_total || []).join(' · ') || 'Not measured in this report'],
+          ['Applied eats per type', (latestCase.typed_eats_total || []).join(' · ') || 'Not measured in this report'],
+          ['Moves attempted', latestCase.moves_attempted_total === undefined ? 'Not measured in this report' : fmt(num(latestCase.moves_attempted_total))],
+          ['Config digest', get(latestCase, 'case.config_digest')],
         ]));
-        const details = el('details'); details.appendChild(el('summary', null, 'Full case neighborhood and drift observations'));
-        details.appendChild(el('pre', null, JSON.stringify(observation, null, 2))); c.card.appendChild(details);
-        const link = el('a', null, 'Complete report, including persistence and memory readings'); link.href = rel(f.paths.goal_worlds); c.card.appendChild(link);
+        const link = el('a', null, 'Complete report for this closure');
+        link.href = rel(latest.paths.goal_worlds);
+        c.card.appendChild(link);
         g.cards.appendChild(c.card);
       }
     }
-    app.appendChild(g.section);
-    document.getElementById('foot').textContent = 'goal-worlds-v1 starts at T12.F04. Historical goal-v1 and the unchanged gate remain available in their tabs.';
+    document.getElementById('foot').textContent =
+      'goal-worlds-v1 starts at T12.F04; each world is a distinct environment, not a seed replicate, so cross-world deltas are not comparable. Historical goal-v1 and the unchanged gate remain available in their tabs.';
   }
 
   function render(data, profile) {

@@ -791,3 +791,92 @@ proptest! {
         prop_assert!(serde_json::to_string(&rates).is_ok());
     }
 }
+
+/// `world inspect` resolves a saved recipe, prints its readings, and writes the
+/// preview where `--png` asks for it. A recipe it cannot read is a validation
+/// error that exits 1 and writes nothing.
+#[test]
+fn world_inspect_prints_readings_writes_a_preview_and_rejects_a_missing_recipe() {
+    let dir = std::env::temp_dir().join(format!("t12-f04-inspect-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).expect("create the isolated working directory");
+    let recipe = dir.join("small.json");
+    std::fs::write(
+        &recipe,
+        r#"{"world": {"width": 24, "height": 16, "world_seed": 5},
+            "population": {"initial_creatures": 3}}"#,
+    )
+    .expect("write the recipe");
+    let png = dir.join("small.png");
+
+    let inspect = |args: &[&std::path::Path]| {
+        let mut command = std::process::Command::new(env!("CARGO_BIN_EXE_v3-cli"));
+        command.args(["world", "inspect", "--seed", "11", "--config"]);
+        command.args(args);
+        command.output().expect("the v3-cli binary must run")
+    };
+
+    let accepted = inspect(&[&recipe, std::path::Path::new("--png"), &png]);
+    assert!(
+        accepted.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&accepted.stderr)
+    );
+    let reading: serde_json::Value =
+        serde_json::from_slice(&accepted.stdout).expect("stdout must be one JSON object");
+    assert_eq!(reading["seed"], 11);
+    assert_eq!(reading["world_seed"], 5);
+    assert_eq!(reading["world_width"], 24);
+    assert_eq!(reading["world_height"], 16);
+    assert_eq!(reading["founders_placed"], 3);
+    assert_eq!(
+        reading["passable_connectivity"]["total_cells"],
+        24 * 16,
+        "the connectivity block is the world's own reading"
+    );
+    assert!(reading["food_types"][0]["food_cells"].as_u64().unwrap() > 0);
+    let preview = std::fs::read(&png).expect("--png must write the preview");
+    assert_eq!(
+        &preview[..8],
+        b"\x89PNG\r\n\x1a\n",
+        "the preview must be a PNG"
+    );
+
+    let missing = dir.join("absent.json");
+    let rejected = inspect(&[&missing]);
+    assert_eq!(
+        rejected.status.code(),
+        Some(1),
+        "a missing recipe is a validation error"
+    );
+    assert!(
+        String::from_utf8_lossy(&rejected.stderr).contains("failed to read config"),
+        "stderr: {}",
+        String::from_utf8_lossy(&rejected.stderr)
+    );
+    assert!(
+        rejected.stdout.is_empty(),
+        "a rejected recipe prints nothing"
+    );
+
+    let unparseable = dir.join("bad.json");
+    std::fs::write(&unparseable, "{ not json").expect("write the broken recipe");
+    let rejected = inspect(&[&unparseable]);
+    assert_eq!(rejected.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&rejected.stderr).contains("invalid config"),
+        "stderr: {}",
+        String::from_utf8_lossy(&rejected.stderr)
+    );
+
+    // A seed that is not a number is rejected by argument parsing, before any
+    // world is built. clap exits 2 for a usage error rather than 1.
+    let bad_seed = std::process::Command::new(env!("CARGO_BIN_EXE_v3-cli"))
+        .args(["world", "inspect", "--seed", "later", "--config"])
+        .arg(&recipe)
+        .output()
+        .expect("the v3-cli binary must run");
+    assert_eq!(bad_seed.status.code(), Some(2), "clap usage errors exit 2");
+    assert!(bad_seed.stdout.is_empty());
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

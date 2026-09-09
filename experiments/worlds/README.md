@@ -1,71 +1,100 @@
 # Baseline worlds
 
-`make bench PROFILE=goal FEATURE=<feature-slug>` runs three environments once
-each: Orchards in grassland / 11, Canyon country / 22, and Confluence / 33.
-Each runs for 2,000 ticks with production founder, energy, mutation and runtime
-policies. Reports belong to `goal-worlds-v1`; historical `goal-v1` reports are
-separate controls, with no cross-profile delta. `plains.json` is `{}` and stays
-loadable as an optional production-default control, not a fourth goal run.
+`make bench PROFILE=goal FEATURE=<feature-slug>` runs the three saved worlds
+below once each: Orchards in grassland with run seed 11, Canyon country with
+22, and Confluence with 33. Each run is 2,000 ticks at 1600² with 10,000
+production founders and production creature policies; the recipes carry only
+environmental differences and pin `world.world_seed`, so the map (terrain and
+fertility) is identical across run seeds and closures while food placement,
+founder placement, and the run RNG still follow the run seed. Reports belong
+to the `goal-worlds-v1` series and compare per world against the previous
+world-set report; a recipe edit is labeled `inputs_changed` in that
+comparison rather than treated as the same world. `plains.json` is `{}`, the
+production default, kept as a loadable control.
 
-All recipes start at 1600 × 1600 and omit the map seed: map and layer generation
-follow each case's run seed, while the existing run RNG handles food/founders.
-The files contain environmental differences only. Load any file with the app's
-Load Recipe control or `cargo run --release -p v3-cli -- run --config <path>`.
-An explicitly requested generic sweep can still use `make bench PROFILE=sweep
-BENCH_ARGS="--config experiments/worlds/confluence.json --seeds 33 --ticks 2000"
-OUT=<report-path>`; it is not additional required closure work.
+Inspect a world (readings as JSON, preview as PNG):
 
-| Recipe | Pressure | Applied tick-zero reading |
-| --- | --- | --- |
-| Plains | Default barrier-free world | Historical goal-v1 control; no new mandatory reading |
-| Orchards in grassland | Fruit pays 12 energy/density versus grass 5, covers 20% of eligible fruit habitat versus grass 54% of passable cells, grows at 0.025 versus 0.09, recovers at 0.002 versus 0.01 attempts/cell/tick | 100% passable; all passable cells connected; fruit initially covers 185,424 / 2,560,000 world cells (7.24%) |
-| Canyon country | Maze with corridor width 5 and wall thickness 2; production food substrate | 71.409% passable; all passable cells connected |
-| Confluence | Bounded edges, three overlapping fBm terrain regions, large zero-minimum fertility blobs, differentiated foods | 74.047% passable; largest component contains 99.879% of passable cells; fruit initially covers 103,211 / 2,560,000 world cells (4.03%) |
+```sh
+cargo run --release -p v3-cli -- world inspect --config experiments/worlds/confluence.json --seed 33 --png experiments/worlds/previews/confluence.png
+```
 
-Coverage is a fraction of eligible cells, not achieved whole-world coverage.
-Fruit's `initial_fertility_only` uses strictly positive effective tick-zero
-fertility; zero minimum and disabled annealing make the large blobs real initial
-patches. Grass shares some fruit habitat and extends beyond it. Orchards has
-788,036 overlapping habitat cells, 1,034,185 grass-only and 139,084 fruit-only.
-Confluence has 380,250 overlapping passable habitat cells, 953,356 grass-only
-and 135,803 fruit-only; 489,858 barrier cells overlap potential food habitat.
-Its terrain cuts across these habitats, producing narrow routes and small
-isolated pockets rather than requiring every cell connected.
+Run one without the goal observations:
 
-The previews sample the applied tick-zero grid every four cells: gray barriers,
-green grass habitat, orange fruit habitat, yellow overlap, dark neither habitat.
-They show potential positive-fertility habitat, not food density or occupancy.
+```sh
+cargo run --release -p v3-cli -- run --config experiments/worlds/canyon-country.json --seed 22 --ticks 2000 --sample-every 100
+```
 
-![Orchards habitat](previews/orchards-in-grassland.png)
-![Canyon terrain and habitat](previews/canyon-country.png)
-![Confluence terrain and habitat](previews/confluence.png)
+## What the substrate can and cannot do (read before editing a recipe)
 
-Regenerate the full-size layout observations and preview PPM files with
-`cargo test -p v3-core --test baseline_worlds inspect_saved_world_layouts --
---ignored --nocapture`. Connectivity uses eight-direction movement with the
-world's actual edge rule, ignores occupancy, and is measured before tick work.
+- Founders eat food type 0 only. The Eat action's type index is an evolvable
+  parameter that the founder emits as 0, and a mutation that changes it was
+  not seen in 1,000 mutant births. A second food type is therefore a latent
+  niche: it shapes nothing until a lineage learns to eat it, and the goal
+  report's typed-eat counter is how that would show.
+- An eaten cell holds zero density and only comes back by spread from a
+  neighbor at or above 80% of max density, or by the recovery spawn below the
+  1% floor. Small fertile patches are grazed to nothing and never return;
+  large fertile patches are inexhaustible. Patch size, not fertility alone,
+  sets the long-run population.
+- Founders are barrier-blind (no barrier input is wired), so a blocked move
+  still costs the move and the tick. With food worth little per bite that
+  margin is what starves them: poor grass on open ground persists, rich grass
+  among barriers persists, poor grass among barriers collapses.
+- The tick-zero standing crop (coverage × density × energy per unit) sets how
+  long the founders' boom lasts; every world booms to the 100,000 cap within
+  100 ticks and crashes as that crop is eaten.
 
-The first [goal report](../../docs/progress/features/t12-f04-baseline-world-set-goal.json)
-was measured at `5f87c8f4`; it is **not yet closed**. All three cases completed
-2,000 ticks without extinction. Final populations were 32,909 / 7 / 39,318;
-minimum populations 10,000 / 7 / 6,661 and plateau populations
-22,674.06 / 19.918 / 35,937.08. Canyon's seven survivors are a fragile
-finite-horizon result, not robust viability; its evolved battery samples all
-seven under the existing min(population, 12) rule.
+## Orchards in grassland (food differentiation, seed 11)
 
-Review found that this initial report retained only the pooled population
-structure distribution. Its missing per-case distributions are unavailable,
-not zero. The original report/reference is preserved; a separately named
-corrected measurement is required to repair that evidence omission.
+Grass is the founders' food: diffuse across 65% of the world at low density
+(0.4), worth 4 energy per unit, regrowing very slowly (growth 0.05 on a
+background fertility of 0.15) except in sixty meadows (fertility up to 2.0,
+radius 40–90) where grazed ground returns quickly. Fruit is the latent rich
+food: 15 energy per unit, placed only inside twenty-four orchards (radius
+50–110, `initial_fertility_only`), regrowing fast within them, edible only by
+a lineage that changes its Eat parameter. What the living population feels
+is the meadow structure: the diffuse grass feeds the boom and is gone; the
+plateau lives on meadows. What the report watches is whether fruit is ever
+eaten.
 
-All cases miss the unchanged depth-2,000 drift floor of 0.008000:
-Orchards and Confluence each measure 12/2,000 (0.006000), Canyon 10/2,000
-(0.005000). Canyon's full drift reading equals T11.F18; two-food cases use a
-different battery context. The single run took 1,047.04 seconds; the documented
-[investigation and full acceptance record](../../docs/specs/roadmap/t12-f04-baseline-world-set.md#performance-and-goal-impact)
-retains the failed floors, while all hard observation timing caps passed.
+## Canyon country (barrier topology, seed 22)
 
-Survival through 2,000 ticks is not proof of long-term viability, evolved food
-specialization, or causal necessity of barrier awareness. This first series
-reading precedes the planned T11 supply repairs; later matching readings name
-that substrate change rather than attributing it to the worlds.
+One whole-world thresholded fBm field (frequency 0.005, threshold 0.02)
+makes rock masses with winding passable channels, about 47% of cells barrier
+and 98% of passable cells in one component, plus a light rubble field
+(3% density, cluster 2) so blocked moves are frequent in the channels too.
+It is well looped, not a maze: Codex's perfect maze was a spanning tree and
+collapsed to seven creatures. The single production food keeps its default
+per-bite value; fertility is forty-five valley meadows (radius 30–70) over a
+0.1 background, because the default 5–15-cell blobs are grazed out and half of
+them sit under rock. The report's blocked-move fraction and its split by
+barrier-reader state are the barrier-awareness readings.
+
+## Confluence (composite, seed 33)
+
+Bounded edges. A canyon massif in the north-east (one fBm field at four
+nested thresholds, 0.02 in the core stepping to 0.32 outward, so rock density
+fades into the plain), an archipelago in the south-west (a coarser field,
+0.0 to 0.3), a jagged ridge line system across the middle, a scattered
+boulder field, and a few rocks everywhere. Both foods from Orchards, with the
+grass richer per bite (density 0.5, 5 energy per unit) because poor grass
+among barriers does not persist, sixty meadows, eighteen orchards, and a
+low-frequency fertility gradient that leaves some regions scarce. Regions
+overlap rather than tile: meadows and orchards fall inside and outside the
+rock, and the ridge crosses both.
+
+## Applied tick-zero readings
+
+Filled from the stored closure report
+(`docs/progress/features/t12-f04-baseline-world-set-goal.json`); regenerate
+the previews with `world inspect` after any recipe edit.
+
+| World | Passable | Largest component / passable | Grass fertile cells | Fruit habitat cells |
+| --- | --- | --- | --- | --- |
+| Orchards in grassland | 100% | 100% | all | 468,253 (18.3%) |
+| Canyon country | 52.7% | 98.1% | 1,349,524 (52.7%) | none |
+| Confluence | 76.6% | 99.5% | 1,961,687 (76.6%) | 208,503 (8.1%) |
+
+![Orchards](previews/orchards-in-grassland.png)
+![Canyon](previews/canyon-country.png)
+![Confluence](previews/confluence.png)

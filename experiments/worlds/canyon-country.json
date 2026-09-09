@@ -1,14 +1,38 @@
 {
   "world": {
+    "world_seed": 2204,
     "terrain": [
       {
         "params": {
-          "pattern_type": "Maze",
-          "corridor_width": 5,
-          "wall_thickness": 2,
-          "open_center_radius": 0
+          "pattern_type": "FbmThreshold",
+          "octaves": 4,
+          "frequency": 0.005,
+          "lacunarity": 2.0,
+          "persistence": 0.5,
+          "threshold": 0.02
         }
+      },
+      {
+        "params": { "pattern_type": "Noise", "density": 0.03, "cluster_size": 2 }
       }
-    ]
+    ],
+    "food": {
+      "fertility": {
+        "min_fertility": 0.0,
+        "max_fertility": 2.0,
+        "layers": [
+          {
+            "weight": 0.05,
+            "algorithm": { "Uniform": { "value": 1.0 } }
+          },
+          {
+            "weight": 1.0,
+            "algorithm": {
+              "PoissonBlobs": { "blob_count": 45, "min_radius": 30, "max_radius": 70, "falloff": 0.5, "seed": null }
+            }
+          }
+        ]
+      }
+    }
   }
 }

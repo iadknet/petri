@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 use std::time::Duration;
 
+use crate::config::OrdinaryFoodTypeId;
 use crate::contracts::WorldInputKey;
 use crate::kernel::FoodGrowthSummary;
 use crate::mutation::{
@@ -232,6 +233,13 @@ pub struct SimStats {
     /// valid.
     pub reproduction_actions_rejected_invalid_target_avoidable_total_by_reader_state:
         HashMap<BarrierReaderState, u64>,
+    /// Move actions the action phase executed, whether or not they moved the
+    /// creature (cumulative). The denominator for every blocked-move fraction.
+    pub move_actions_attempted_total: u64,
+    /// Eat actions that consumed food, keyed by the food type the action named
+    /// (cumulative). A typed Eat that found no food is not counted, so this
+    /// reads which food types the living population actually harvests.
+    pub eat_actions_applied_total_by_type: HashMap<OrdinaryFoodTypeId, u64>,
     /// Fine-grained move blocked breakdown (cumulative).
     pub move_actions_blocked_total_by_cause: HashMap<MoveBlockedCause, u64>,
     /// Move blocked outcomes where at least one adjacent alternative target was valid.
@@ -334,6 +342,10 @@ pub struct SimStats {
     pub last_tick_food_cells_with_type_inhibition: u32,
     /// Total food growth amount suppressed by cross-type inhibition during the Phase 0 food update.
     pub last_tick_food_growth_suppressed_by_type_inhibition: f32,
+    /// Standing density per food type after the Phase 0 food update, indexed by
+    /// [`OrdinaryFoodTypeId`]. Read from the applied growth summary, so it is
+    /// post-growth and pre-action for the tick that just ran.
+    pub last_tick_food_total_density_by_type: Vec<f32>,
 }
 
 const OUTCOME_GENERATION_BUCKET_WIDTH: u64 = 128;
@@ -367,6 +379,7 @@ impl SimStats {
         self.last_tick_food_growth_suppressed_by_occupancy_depletion = 0.0;
         self.last_tick_food_cells_with_type_inhibition = 0;
         self.last_tick_food_growth_suppressed_by_type_inhibition = 0.0;
+        self.last_tick_food_total_density_by_type.clear();
     }
 
     pub fn record_food_growth_summary(&mut self, summary: FoodGrowthSummary) {
@@ -378,6 +391,9 @@ impl SimStats {
         self.last_tick_food_cells_with_type_inhibition = summary.cells_with_type_inhibition;
         self.last_tick_food_growth_suppressed_by_type_inhibition =
             summary.growth_suppressed_by_type_inhibition;
+        self.last_tick_food_total_density_by_type.clear();
+        self.last_tick_food_total_density_by_type
+            .extend(summary.per_type.iter().map(|entry| entry.total_density));
     }
 
     #[must_use]
