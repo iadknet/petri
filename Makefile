@@ -134,6 +134,7 @@ quality-check: ## Check whitespace, shell syntax, ShellCheck, and actionlint.
 	@scripts/quality-check
 	@scripts/bench-wait-test
 	@sh scripts/rust-mutants-test
+	@sh scripts/dev-sh-test
 
 dependency-audit: ## Scan Cargo and npm dependency locks with OSV.
 	@scripts/dependency-audit
