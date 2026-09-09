@@ -723,6 +723,10 @@ fn execute_eat(
         outcome_acc.record_action_result(ctx.id, succeeded);
         if succeeded {
             amount = food_before;
+            *sim.stats
+                .eat_actions_applied_total_by_type
+                .entry(type_idx)
+                .or_insert(0) += 1;
         } else {
             action_result = ActionResult::NoFood;
             debit_failed_action(creature, &sim.config.energy, ctx.failed_action_penalty);
@@ -759,6 +763,7 @@ fn execute_move(
         let from = creature.position;
         let succeeded = apply_move(ctx.id, creature, &mut sim.world, dir, &sim.config);
         sim.stats.last_tick_move += 1;
+        sim.stats.move_actions_attempted_total += 1;
         outcome_acc.record_action_result(ctx.id, succeeded);
         if !succeeded {
             creature.lifetime_blocked_move_count += 1;

@@ -3,6 +3,12 @@
 [progress/index.html](progress/index.html) charts every closure below over
 time: work counters, wall clock, population, lineage, memory sensitivity,
 mutational neighborhood, and indicator coverage, read from the same reports.
+Its Goal worlds tab follows each baseline world separately over closure order —
+population, births, mean energy, lineage, memory, drift against its floors,
+neighborhood, structure, typed eat share, blocked moves, per-case work counters
+and wall clock, plus a population-trajectory overlay by closure — and marks
+every closure where that world's recipe inputs changed. A reading a report did
+not measure is drawn as "not measured", never as zero.
 Browsers block `fetch()` under `file://`, so serve the directory first:
 `python3 -m http.server 8000 --directory docs/progress`, then open
 `http://localhost:8000/`. New closures appear automatically once

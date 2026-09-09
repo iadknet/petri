@@ -6,6 +6,33 @@ use v3_core::simulation::{run_tick, seed_simulation};
 
 pub const PROTOCOL_VERSION: &str = "v3alpha1";
 
+// ── Report formatting ────────────────────────────────────────────────────────
+
+/// The report vocabulary's value for a reading whose denominator is zero:
+/// unmeasurable, and deliberately not the zero a delta would compare against.
+pub(crate) const UNDEFINED: &str = "Undefined";
+
+/// Every fractional reading in a report and in `world inspect` is six decimals.
+pub(crate) fn six(x: f64) -> String {
+    format!("{x:.6}")
+}
+
+/// A six-decimal fraction against `denominator`, or [`UNDEFINED`] when the
+/// denominator is zero.
+pub(crate) fn fraction_or_undefined(count: u64, denominator: u64) -> String {
+    mean_or_undefined(count as f64, denominator)
+}
+
+/// [`fraction_or_undefined`] for a sum that is already a float — a mean over
+/// `count` observations rather than a count against a total.
+pub(crate) fn mean_or_undefined(sum: f64, count: u64) -> String {
+    if count == 0 {
+        UNDEFINED.to_string()
+    } else {
+        six(sum / count as f64)
+    }
+}
+
 /// Error type for CLI simulation runs.
 #[derive(Debug)]
 pub enum RunError {
@@ -215,6 +242,7 @@ fn emit<W: std::io::Write, T: Serialize>(out: &mut W, event: &T) -> Result<(), R
 }
 
 pub mod bench;
+pub mod inspect;
 
 #[cfg(test)]
 mod tests {

@@ -16,6 +16,36 @@ struct Cli {
 enum Commands {
     Run(RunArgs),
     Bench(BenchArgs),
+    /// Saved-world tooling.
+    World(WorldArgs),
+}
+
+#[derive(clap::Args)]
+struct WorldArgs {
+    #[command(subcommand)]
+    command: WorldCommands,
+}
+
+#[derive(clap::Subcommand)]
+enum WorldCommands {
+    /// Print one seeded world's tick-zero readings as JSON, and optionally
+    /// write a downsampled two-panel PNG preview of it.
+    Inspect(InspectArgs),
+}
+
+#[derive(clap::Args)]
+struct InspectArgs {
+    /// Partial world recipe, resolved over the defaults exactly as the goal
+    /// profile resolves its baseline worlds.
+    #[arg(long)]
+    config: std::path::PathBuf,
+    /// Run seed: it places food and founders, and supplies the map seed when
+    /// the recipe pins none.
+    #[arg(long)]
+    seed: u64,
+    /// Write the preview PNG here instead of only printing the readings.
+    #[arg(long)]
+    png: Option<std::path::PathBuf>,
 }
 
 #[derive(clap::ValueEnum, Clone, Copy, Debug, PartialEq, Eq)]
@@ -118,7 +148,38 @@ fn main() {
             }
         }
         Commands::Bench(args) => run_bench(args),
+        Commands::World(args) => match args.command {
+            WorldCommands::Inspect(args) => {
+                if let Err(message) = run_world_inspect(&args, &mut std::io::stdout()) {
+                    eprintln!("validation error: {message}");
+                    std::process::exit(1);
+                }
+            }
+        },
     }
+}
+
+/// Resolve, seed, and read one world, printing its readings as JSON and
+/// writing the preview when `--png` asks for one. Every failure here is an
+/// input problem the caller can fix, so they all read as validation errors.
+fn run_world_inspect(args: &InspectArgs, out: &mut impl std::io::Write) -> Result<(), String> {
+    let recipe_path = args.config.display().to_string();
+    let config = v3_cli::inspect::resolve_baseline_world(read_recipe(&args.config)?, &recipe_path)?;
+    let sim = v3_core::simulation::seed_simulation(config, args.seed);
+    if let Some(path) = &args.png {
+        std::fs::write(path, v3_cli::inspect::render_preview(&sim))
+            .map_err(|error| format!("failed to write preview {}: {error}", path.display()))?;
+    }
+    let reading = v3_cli::inspect::read_world(&sim, &recipe_path, args.seed);
+    let json = serde_json::to_string_pretty(&reading).expect("readings must serialize");
+    writeln!(out, "{json}").map_err(|error| format!("failed to write readings: {error}"))
+}
+
+fn read_recipe(path: &std::path::Path) -> Result<serde_json::Value, String> {
+    let content = std::fs::read_to_string(path)
+        .map_err(|error| format!("failed to read config {}: {error}", path.display()))?;
+    serde_json::from_str(&content)
+        .map_err(|error| format!("invalid config {}: {error}", path.display()))
 }
 
 fn save_config(config: &SimulationConfig, path: &std::path::Path) -> Result<(), String> {
@@ -129,12 +190,7 @@ fn save_config(config: &SimulationConfig, path: &std::path::Path) -> Result<(), 
 
 fn load_config(path: Option<&std::path::Path>) -> Result<SimulationConfig, String> {
     let patch = match path {
-        Some(path) => {
-            let content = std::fs::read_to_string(path)
-                .map_err(|error| format!("failed to read config {}: {error}", path.display()))?;
-            serde_json::from_str(&content)
-                .map_err(|error| format!("invalid config {}: {error}", path.display()))?
-        }
+        Some(path) => read_recipe(path)?,
         None => serde_json::json!({}),
     };
     v3_core::config::resolve_config(&SimulationConfig::default(), patch)
@@ -401,7 +457,7 @@ mod tests {
             .command
         {
             Commands::Bench(args) => args,
-            Commands::Run(_) => panic!("expected the bench subcommand"),
+            Commands::Run(_) | Commands::World(_) => panic!("expected the bench subcommand"),
         }
     }
 

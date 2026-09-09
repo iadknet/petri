@@ -132,6 +132,45 @@ impl FoodResource {
         self.state.fertility_grid(type_idx)
     }
 
+    /// The fertility multiplier food growth applies to `type_idx` at `tick`,
+    /// as a grid over the whole world.
+    ///
+    /// This is the same reading `grow` uses: `1.0` everywhere when fertility is
+    /// disabled or the type has no fertility grid, otherwise the raw layer value
+    /// mapped through the annealed range for `tick`. Callers that want the
+    /// tick-zero habitat (an unrun world's map) pass `0`.
+    #[must_use]
+    pub fn effective_fertility_grid(&self, type_idx: OrdinaryFoodTypeId, tick: u64) -> Grid<f32> {
+        let width = self.state.width();
+        let height = self.state.height();
+        let Some(raw) = self
+            .config
+            .fertility
+            .enabled
+            .then(|| self.fertility_for_type(type_idx))
+            .flatten()
+        else {
+            return Grid::new(width, height, 1.0);
+        };
+        let (min, max) = crate::kernel::fertility::effective_fertility_range(
+            &self.config.annealing,
+            self.config.fertility.min_fertility,
+            self.config.fertility.max_fertility,
+            tick,
+        );
+        let mut grid = Grid::new(width, height, 0.0);
+        for y in 0..height {
+            for x in 0..width {
+                grid.set(
+                    x,
+                    y,
+                    crate::kernel::fertility::map_fertility(*raw.get(x, y), min, max),
+                );
+            }
+        }
+        grid
+    }
+
     #[must_use]
     pub fn occupancy_depletion(&self) -> &Grid<f32> {
         self.occupancy_depletion.grid()

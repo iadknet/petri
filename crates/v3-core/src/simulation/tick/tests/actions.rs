@@ -849,3 +849,150 @@ fn reproduction_resets_reward_credit_including_frozen_tick_base() {
         );
     }
 }
+
+/// A one-node VM genome that eats the named food type: load the type index
+/// into the world-action meta slot the Eat decoder reads, then push and run.
+fn eat_type_genome(type_idx: u16) -> CreatureGenome {
+    CreatureGenome {
+        entry_node_id: NodeId::new(0),
+        nodes: vec![NodeGenome {
+            node_id: NodeId::new(0),
+            input_refs: vec![],
+            backend_def: BackendDef::Vm(VmBackendDef {
+                register_count: 2,
+                constants: vec![f32::from(type_idx)],
+                program: vec![
+                    VmInstruction::LoadConst {
+                        dst: 0,
+                        const_idx: 0,
+                    },
+                    VmInstruction::WriteWorldActionMeta {
+                        slot_idx: 0,
+                        src: 0,
+                    },
+                    VmInstruction::PushAction { action_type: 1 },
+                    VmInstruction::ExecuteActionQueue,
+                ],
+            }),
+            targets: vec![],
+        }],
+    }
+}
+
+/// Give an existing simulation a second food type, keeping the world's food
+/// catalog and the config in step.
+fn add_second_food_type(sim: &mut crate::simulation::Simulation) {
+    let mut second = sim.config.world.food.types[0].clone();
+    second.name = "Fruit".to_string();
+    second.initial_coverage = 0.0;
+    sim.config.world.food.types.push(second);
+    sim.world.reconfigure_food(sim.config.world.food.clone());
+}
+
+#[test]
+fn typed_eat_counters_rise_only_for_the_type_an_applied_eat_consumed() {
+    let pos = Position::new(5, 5);
+    let (mut sim, _id) = make_sim_with_custom_genome(100.0, eat_type_genome(1));
+    add_second_food_type(&mut sim);
+    let fruit = crate::config::OrdinaryFoodTypeId::new(1);
+
+    // No fruit on the cell: the Eat applies no food and counts nothing.
+    run_tick(&mut sim, &mut None);
+    assert!(
+        sim.stats.eat_actions_applied_total_by_type.is_empty(),
+        "an Eat that consumed nothing must not be counted: {:?}",
+        sim.stats.eat_actions_applied_total_by_type
+    );
+
+    sim.world.set_food_type(pos, fruit, 1.0);
+    run_tick(&mut sim, &mut None);
+    assert_eq!(
+        sim.stats
+            .eat_actions_applied_total_by_type
+            .get(&fruit)
+            .copied(),
+        Some(1),
+        "a successful typed Eat is counted against the type it named"
+    );
+    assert_eq!(
+        sim.stats
+            .eat_actions_applied_total_by_type
+            .get(&crate::config::OrdinaryFoodTypeId::default())
+            .copied(),
+        None,
+        "the untouched type stays absent"
+    );
+
+    // The cell is now bare again, so the next tick's Eat adds nothing.
+    run_tick(&mut sim, &mut None);
+    assert_eq!(
+        sim.stats
+            .eat_actions_applied_total_by_type
+            .get(&fruit)
+            .copied(),
+        Some(1)
+    );
+}
+
+#[test]
+fn move_attempts_count_blocked_and_successful_moves_alike() {
+    let genome = vm_program_genome(vec![
+        VmInstruction::PushAction { action_type: 2 },
+        VmInstruction::ExecuteActionQueue,
+    ]);
+    let (mut sim, _id) = make_sim_with_custom_genome(1000.0, genome);
+    sim.world.set_barrier(Position::new(5, 4), true);
+
+    run_tick(&mut sim, &mut None);
+    assert_eq!(sim.stats.move_actions_attempted_total, 1);
+    assert_eq!(
+        sim.stats
+            .move_actions_blocked_total_by_cause
+            .get(&MoveBlockedCause::Barrier)
+            .copied(),
+        Some(1)
+    );
+
+    sim.world.set_barrier(Position::new(5, 4), false);
+    run_tick(&mut sim, &mut None);
+    assert_eq!(
+        sim.stats.move_actions_attempted_total, 2,
+        "a successful move is an attempt too"
+    );
+    assert_eq!(
+        sim.stats
+            .move_actions_blocked_total_by_cause
+            .get(&MoveBlockedCause::Barrier)
+            .copied(),
+        Some(1),
+        "the successful move must not add a blocked count"
+    );
+}
+
+#[test]
+fn per_type_standing_density_matches_the_applied_growth_summary() {
+    let (mut sim, _id) = make_sim_with_custom_genome(100.0, vm_program_genome(vec![]));
+    add_second_food_type(&mut sim);
+    sim.config.world.food.growth_rate = 0.0;
+    sim.world.reconfigure_food(sim.config.world.food.clone());
+    sim.world.set_food_type(
+        Position::new(2, 2),
+        crate::config::OrdinaryFoodTypeId::new(0),
+        0.5,
+    );
+    sim.world.set_food_type(
+        Position::new(3, 3),
+        crate::config::OrdinaryFoodTypeId::new(1),
+        0.25,
+    );
+
+    run_tick(&mut sim, &mut None);
+
+    let expected: Vec<f32> = (0..2)
+        .map(|idx| {
+            sim.world
+                .total_food_by_type(crate::config::OrdinaryFoodTypeId::new(idx))
+        })
+        .collect();
+    assert_eq!(sim.stats.last_tick_food_total_density_by_type, expected);
+}
