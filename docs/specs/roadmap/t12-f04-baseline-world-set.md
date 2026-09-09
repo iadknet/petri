@@ -183,8 +183,9 @@ and the `v3-cli` bench tests.
       tab renders every per-world chart for all three cases with no console
       errors; the implementer's earlier check ran against the first-pass
       report and its placeholders).
-- [ ] `make check` on the final feature code (records the tested commit) and
-      `make check-docs` at closure.
+- [x] `make check` on the final feature code: exit 0 at `9287048c` (the
+      tested commit; every later commit on the branch is documentation and
+      stored reports); `make check-docs` exit 0 on the closure documents.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` after the simplify pass:
       summary line, output path, and every survivor resolved.
 - [x] Reports: `docs/progress/features/t12-f04-baseline-world-set.json`
@@ -805,23 +806,31 @@ series; its budget is the 600 s wall-clock bound above, and the new
 telemetry adds one counter increment per applied eat and per blocked move
 plus a per-type density read already produced by the growth summary.
 
-**Measured, 2026-09-09, at `e6757fa3` on the recording host (Apple M1 Pro,
-eight threads), reports stored under `docs/progress/features/`.**
+**Measured, 2026-09-09, at `9287048c` (the final feature code) on the
+recording host (Apple M1 Pro, eight threads), reports stored under
+`docs/progress/features/`.** An earlier measurement at `e6757fa3` (before
+the review remediation added the per-reader-state barrier-block rate and the
+by-cause totals) read byte-identical persistence, lineage, memory, drift,
+neighborhood and structure values; the final report's comparison block
+compares against that reading (same path, since this feature's report is
+the series epoch) and finds every case `inputs_changed: false` with all
+deterministic readings equal.
 
 Gate (`t12-f04-baseline-world-set.json`): exit 0, `severe=false`; all six
 counters `ok` against both the pinned epoch and T11.F18; wall-clock per
-creature-tick 0.0015873 ms (+1.8% against the epoch, -19.8% against
+creature-tick 0.0013002 ms (-16.64% against the epoch, -34.27% against
 T11.F18). The gate profile and its epoch are unchanged.
 
 Goal (`t12-f04-baseline-world-set-goal.json`, the first `goal-worlds-v1`
-reading, no prior reference): `/usr/bin/time -p make bench PROFILE=goal`
-took **512.69 s** end to end; simulation 498.1 s (Orchards 182.5 s, Canyon
-126.3 s, Confluence 189.2 s); founder observation 120 ms, evolved
-neighborhoods 610 ms total, drift 11.88 s, final-state observation 0.95 s,
-all inside their caps. Profile totals per creature-tick: VM steps 23.34, mesh
-hops 2.248, graph visits 1.029, plasticity 0.047, actions 1.371, births
-0.0186. Every case survived the horizon; every peak is the 100,000 cap at
-tick 61–65 and no case sits there afterwards.
+reading): `/usr/bin/time -p make bench PROFILE=goal` took **474.33 s** end
+to end (512.69 s at the earlier measurement, with review agents sharing the
+host); simulation 460.7 s (Orchards 174.3 s, Canyon 116.8 s, Confluence
+169.6 s); founder observation 111 ms, evolved neighborhoods 457 ms total,
+drift 11.18 s, final-state observation 0.81 s, all inside their caps.
+Profile totals per creature-tick: VM steps 23.34, mesh hops 2.248, graph
+visits 1.029, plasticity 0.047, actions 1.371, births 0.0186. Every case
+survived the horizon; every peak is the 100,000 cap at tick 61–65 and no
+case sits there afterwards.
 
 | Reading | Orchards / 11 | Canyon / 22 | Confluence / 33 |
 | --- | --- | --- | --- |
@@ -831,8 +840,12 @@ tick 61–65 and no case sits there afterwards.
 | Passable; largest component of passable | 100%; 100% | 52.72%; 98.06% | 76.63%; 99.54% |
 | Applied eats type 0 / type 1 (type-1 share) | 7,176,755 / 2,199 (0.031%) | 4,883,443 / – | 5,811,299 / 304,166 (4.97%) |
 | Final standing density type 0 / type 1 | 738,829 / 468,253 | 409,865 / – | 539,023 / 193,724 |
-| Moves attempted; blocked by barrier (fraction) | 20,336,298; 0 (0%) | 16,132,634; 2,426,094 (15.04%) | 19,647,038; 1,492,516 (7.60%) |
-| Avoidable blocked moves of any cause by barrier-reader state, as a share of all move attempts (reader / no reader) | 0.17% / 20.75% | 1.27% / 40.47% | 0.46% / 35.80% |
+| Moves attempted | 20,336,298 | 16,132,634 | 19,647,038 |
+| Blocked by barrier / occupied / world edge | 0 / 4,261,110 / 0 | 2,426,094 / 4,347,239 / 0 | 1,492,516 / 5,606,009 / 95,319 |
+| Barrier-blocked fraction of all moves | 0% | 15.04% | 7.60% |
+| Attempts beside a barrier, reader / no reader | 0 / 0 | 145,582 / 4,524,928 | 25,401 / 2,700,477 |
+| **Barrier-block rate beside a barrier, reader / no reader** | Undefined / Undefined | **58.52% / 51.73%** | **52.75% / 54.77%** |
+| Avoidable blocked moves of any cause by reader state, share of all moves (reader / no reader) | 0.17% / 20.75% | 1.27% / 40.47% | 0.46% / 35.80% |
 | Surviving founder clades; entropy (nats) | 22; 2.360513 | 24; 2.625223 | 14; 0.882285 |
 | Memory sensitivity (different from either) | 0.000113 | 0.000518 | 0.000092 |
 | Drift changed/all births at 1,000 (floor 0.0015) / 2,000 (floor 0.008) | 9/2,000 = 0.0045 / **12/2,000 = 0.006** | 20/2,000 = 0.010 / **10/2,000 = 0.005** | 9/2,000 = 0.0045 / **12/2,000 = 0.006** |
@@ -845,16 +858,17 @@ What the readings say. Orchards' fruit was eaten 2,199 times, so the latent
 niche is touched by mutants at a trace rate; Confluence's fruit share of
 4.97% and its late rise from 7,083 at tick 1,600 to 21,818 at 2,000 with
 entropy collapsing to 0.88 nats over 14 clades are one lineage exploiting
-the rich food, which is the first thing the tracking exists to show.
-Canyon's avoidable blocked moves (any cause, mostly occupancy) attributed
-to genomes with a barrier reader are 1.27% of all move attempts against
-40.47% for the rest; that split reflects how few genomes carry a barrier
-reader, not a per-genome block rate (the barrier-free Orchards reads 20.75%
-on the same field), which the independent review caught. The remediation
-pass adds the true per-reader-state barrier-block rate (barrier blocks with
-a barrier neighbor over attempts with a barrier neighbor), re-measured below. The depth-2,000 drift readings are the substrate's
-(identical to T11.F18 for one food type), below the standing floor, and
-recorded for the user's decision under Notes.
+the rich food, the first thing the tracking exists to show. No barrier
+awareness has evolved by tick 2,000: standing beside rock, genomes that
+carry a barrier reader are blocked as often as those that do not (Canyon
+58.5% against 51.7%, Confluence 52.7% against 54.8%), which is the baseline
+later closures compare against; the any-cause avoidable share (1.27% against
+40.47%) only reflects how few genomes carry a reader and is kept as a
+crowding reading. Occupancy blocks outnumber barrier blocks in every world,
+and Confluence's 95,319 edge blocks are its Bounded edges. The depth-2,000
+drift readings are the substrate's (identical to T11.F18 for one food
+type), below the standing floor, and recorded for the user's decision under
+Notes.
 
 ## Success Criteria
 
