@@ -38,6 +38,8 @@ export function FoodTypesSection({
 					key={`food-type-${index}`}
 					index={index}
 					foodType={foodType}
+					sharedGrowthRate={startupPreset.world.food.shared.growth_rate}
+					sharedRecoveryRate={startupPreset.world.food.shared.recovery_spawn_rate}
 					canRemove={foodTypes.length > 1}
 					onRemove={() => removeFoodType(index)}
 					onChange={(patch) => updateFoodType(index, patch)}

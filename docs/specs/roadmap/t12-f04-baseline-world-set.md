@@ -9,9 +9,9 @@
 
 Plains, orchards in grassland, canyon country, and confluence: creatures can
 encounter foods trading payoff against abundance and return rate, and three
-saved procedural worlds add resource differentiation, barriers, and overlapping
-tick-zero pressures beside the default plains. Stored persistence readings
-identify the actual world and the evolutionary substrate they measured.
+saved procedural worlds replace the goal baseline's three default-world seed
+replicates with one run per environment. Plains remains a loadable control.
+Stored readings identify each world and the evolutionary substrate measured.
 
 ## Non-Goals
 
@@ -20,7 +20,9 @@ identify the actual world and the evolutionary substrate they measured.
 - No seasons, disturbance, new grazing dynamics, manual overlays (T12.F05),
   checkpoints, new recipe format, recipe service, or benchmark runner.
 - No per-type spread/max-density/recovery-floor overrides, erase layers,
-  guaranteed-connectivity generator, dependency upgrades, or epoch re-pin.
+  guaranteed-connectivity generator, dependency upgrades, or gate epoch re-pin.
+- No change to the short gate profile, numerical thresholds or observation
+  budgets; no mandatory fourth plains run or nine-run recipe sweep set.
 
 ## Inputs and Invariants
 
@@ -35,8 +37,10 @@ Use the existing architecture and canonical world/startup/action/CLI contracts.
 Research recheck, 2026-09-09: the
 [world-seeding note](../../strategy/world-seeding-research-2026-09-08.md)
 records the user-selected archetypes and their evidence; this feature does
-not reopen that choice. Extending `FoodTypeConfig`, typed eating, and the
-existing per-type ecology loop is smaller than separate food engines or a
+retains those archetypes. The user corrected the additive reading protocol
+during implementation: three environments replace the goal baseline's three
+seed replicates, while the short gate stays unchanged. Extending
+`FoodTypeConfig`, typed eating, and the existing per-type ecology loop is smaller than separate food engines or a
 nutrition model. Optional fields with ordinary
 [Serde defaults](https://serde.rs/field-attrs.html) preserve the shared fallback.
 Extending `PatternParams` with thresholded existing
@@ -44,8 +48,10 @@ Extending `PatternParams` with thresholded existing
 stored bitmap, or island/corridor framework. The locked
 [noise 0.9.0 Fbm](https://docs.rs/noise/0.9.0/noise/struct.Fbm.html)
 already provides seeded Perlin fBm and octave/frequency/lacunarity/persistence
-controls. Reuse the existing sweep report for persistence and add its missing
-connectivity observation, rather than introducing a parallel experiment format.
+controls. Extend the existing goal profile and report with three named recipe
+cases and connectivity, rather than introducing another experiment runner.
+The earlier research note's additive sweep recommendation is superseded by
+the user's explicit goal-only replacement decision.
 Remaining empirical uncertainty is persistence and evolved barrier/food use;
 unfavorable readings are valid evidence, not a reason to tune production.
 
@@ -128,32 +134,66 @@ Required terrain and world set:
   to support populations. Inspect the generated layout and state which
   pressures overlap. Existing production dynamics stay at their defaults;
   no new treatment is enabled. Do not require all passable cells connected.
-- Use recipe parameters and dimensions to obtain useful worlds. If an initial
-  recipe fails persistence, diagnose its connectivity and allow a bounded
-  recipe-only adjustment preserving its named pressure, then measure that
-  final recipe. Store failed readings if used in the decision. The contract
-  permits a world to remain explicitly failing; do not silently weaken its
-  pressure or alter creature economics to force persistence.
-- Each non-plains final recipe gets an existing sweep report under
-  `docs/progress/sweeps/t12-f04/`, seeds 11/22/33, 2,000 ticks, production
-  founder/policy defaults. Record extinction tick, peak/plateau/final
-  population, births and final mean energy from existing persistence fields.
-  Label persistence per seed as survival through the full horizon; it is not
-  proof of long-term viability. Reuse this closure's single goal run for plains.
-- Add deterministic tick-zero connectivity readings to measured report data
-  for each seed: total/passable cell counts, passable fraction, largest
-  connected passable component cell count and fraction of passable cells.
-  Derive from applied barriers; adjacency is the actual eight-direction Move
-  topology with the world's Wrap/Bounded rule, ignoring temporary creature
-  occupancy. No passable cells means component size and fraction zero.
-  Compute once per seeded world, outside simulation tick work and timed tick
-  measurements. Absent historical fields mean unmeasured, never guessed.
-- Document the live world-set reading protocol in existing roadmap/progress
-  documentation: T02, T04.F03/F04, T06 and T12 closures read the three recipes
-  beside the goal run; other features do not. This user-selected early F04
-  execution precedes the planned T11 repairs. Keep priorities unchanged and
-  label this substrate explicitly; later consumers use the track's paired
-  main-at-start readings when intervening changes would confound attribution.
+- Inspect layouts before measurement and adjust recipe parameters/dimensions
+  only while preserving named pressures. Run the final goal profile once.
+  A world that fails persistence remains explicitly failing; do not silently
+  weaken its pressure, tune creature economics, or repeat the goal run to
+  select a favorable reading. A concrete implementation failure follows the
+  workflow's correction and re-verification rules.
+- Standard `make bench PROFILE=goal` now runs exactly three fixed cases:
+  Orchards in grassland with seed 11, Canyon country with seed 22, and
+  Confluence with seed 33. Each uses its checked-in recipe once, the existing
+  2,000-tick horizon, production founder/policy defaults, and full goal
+  indicators. There are no per-environment seed replicates, mandatory extra
+  sweep reports, or fourth plains run. Generic explicitly requested sweeps
+  retain their existing arbitrary recipe/seed-list support.
+- Extend existing profile/report handling to identify every case by stable
+  name, recipe path, effective config digest and run seed. The config used for
+  seeding and for each founder, drift, memory and evolved observation must be
+  that case's config and food-type count. A single one-food battery must not
+  silently stand in for two-food worlds. Report per-case results; reuse an
+  observation only when all its relevant inputs match and its attribution is
+  explicit. Preserve existing sample/trial counts and mutation floors.
+  Reuse the existing neighborhood/drift result types under named case
+  observations; singular top-level fields are explicitly `Undefined` with
+  a per-case attribution reason for a multi-config goal, not a first-case
+  value. Gate and single-config report behavior remain intact.
+- Record extinction tick, peak/plateau/final population, births and final mean
+  energy from existing persistence fields for each case. Survival means
+  nonextinction through the full horizon, not proof of long-term viability.
+  Store the complete reading in this feature's goal report. Plains' previous
+  reports remain historical controls, not a current unmeasured fourth result.
+- Start a labeled `goal-worlds-v1` series with this first world-set report as
+  its initial reference. Preserve the existing `goal-v1` series, references,
+  reports and acceptance results as history. A different recipe/case profile
+  cannot compare as identical: old-versus-new deltas are unavailable, not
+  zero or an asserted improvement. Subsequent matching world-set reports use
+  the existing comparison thresholds. This is a user-authorized goal-profile
+  definition reset, not a numerical-threshold waiver or a gate epoch re-pin.
+  Existing progress/report consumers must retain access to historical series,
+  distinguish the profile boundary and identify named case observations;
+  a seed-mean curve must not imply that heterogeneous environments are
+  interchangeable replicates. No dashboard redesign is required.
+- Keep `make bench PROFILE=gate` and its ordinary tests unchanged: default
+  world at 128², 256 founders, 75 ticks, 100% coverage, seeds 11/22/33,
+  current founder observation, numerical thresholds and epoch reference.
+  Gate remains the comparable compute control for this implementation.
+- Add deterministic tick-zero connectivity readings for each measured case:
+  total/passable cell counts, passable fraction, largest connected passable
+  component cell count and fraction of passable cells. Derive from applied
+  barriers; adjacency is the actual eight-direction Move topology with the
+  world's Wrap/Bounded rule, ignoring temporary creature occupancy. No
+  passable cells means component size and fraction zero. Compute once per
+  seeded world, outside simulation tick work and existing timed measurements.
+  Absent historical fields mean unmeasured, never guessed.
+- Update the existing CLI/reference/progress documentation for automatic
+  world-set selection by the standard goal command. All features already
+  required to read the goal profile now read the three environments; there
+  is no extra environmental-track-only sweep protocol. This user-selected
+  early F04 execution precedes the planned T11 repairs. Keep roadmap priority
+  order unchanged, label this substrate explicitly, and compare later
+  closures against the preceding matching world-set reading. No extra paired
+  main-at-start full profile is mandated by the retired additive protocol.
 
 ## Implementation Tasks
 
@@ -162,7 +202,8 @@ Required terrain and world set:
 - [ ] Add thresholded fBm through existing pattern machinery; carry food and
   pattern fields through server/frontend and update affected canonical refs.
 - [ ] Add truthful tick-zero report connectivity, compose/inspect the four
-  recipes, and run/store the three production-default persistence sweeps.
+  recipes, and integrate them into the existing goal profile/report as three
+  cases with one production-default run each.
 - [ ] Review the diff for reuse/simplification/efficiency, triage fresh mutation
   survivors, and complete benchmark, review and closure records.
 
@@ -176,7 +217,8 @@ Required terrain and world set:
   zero eligible, disabled fertility, annealing at tick zero, barriers,
   overlapping typed habitats and legacy false behavior. Preserve default
   short-run state/RNG identity against the pre-feature behavior and confirm
-  measured default gate/goal deterministic trajectories remain unchanged.
+  measured default gate deterministic trajectory remains unchanged. No extra
+  old-goal run is required to prove unchanged defaults.
 - [ ] fBm tests cover normalization, threshold direction/boundaries,
   zero/translated/clipped bounds, seed determinism, uniqueness and threshold
   monotonicity with fixed noise parameters. Extend the existing reproducibility
@@ -186,7 +228,10 @@ Required terrain and world set:
   diagonal passage and Wrap versus Bounded edges; property-test count/fraction
   bounds and invariance to occupancy. Reports identify the effective recipe
   digest/path and applied tick-zero map. Recipe smoke tests load all four,
-  check pressure/overlap conditions, and do not run the full sweeps in tests.
+  check pressure/overlap conditions, and do not run the full goal profile in
+  tests. A small production-path fixture proves exactly three distinct recipe
+  configs execute once each with their own observation context; report tests
+  reject cross-profile comparison and preserve historical series records.
 - [ ] Server/frontend tests verify restart-only type edits, inherited shared
   runtime edits, new fields and pattern hydration/requests, optional controls
   and recipe roundtrip. Inspect the rendered edited controls and recipe maps.
@@ -209,14 +254,71 @@ Required terrain and world set:
   store summary/output path/full missed and timeout lists with each survivor
   killed by tests plus fresh rerun, equivalent with reason, or deferred.
 - [ ] Store gate `docs/progress/features/t12-f04-baseline-world-set.json`, goal
-  `docs/progress/features/t12-f04-baseline-world-set-goal.json`, and the three
-  final recipe sweeps. Use `make bench` sequentially with no competing loads.
-  Record report commits, exact commands, persistence/connectivity readings and
-  threshold comparisons; update the existing measured series/progress table.
+  `docs/progress/features/t12-f04-baseline-world-set-goal.json` with all three
+  named cases. Use `make bench` sequentially with no competing loads. Record
+  report commits, exact commands, per-case persistence/connectivity/goal
+  readings and applicable comparisons; update the measured series/progress
+  table while preserving retired series history. Gate profile inputs,
+  thresholds and epoch remain unchanged; all goal timing budgets apply to
+  the complete three-case profile, never separately multiplied per case.
 - [x] Second goal determinism run: Not applicable by the workflow's 2026-09-05
   decision; existing reproducibility and gate two-run tests remain required.
 - [ ] Fresh independent final review, final `make check`, closure
   `make check-docs`, and exact tested/committed-content evidence.
+
+### Implementation verification record (before measurements)
+
+All commands ran in the feature worktree with the workflow PATH prefix. Logs
+are retained under `/private/tmp/t12-f04-*.log` for this execution.
+
+- Red: `cargo test -p v3-core --test baseline_worlds -- --nocapture` rejected
+  the new food fields and FbmThreshold variant before implementation. The
+  pre-feature short-run fingerprint was `13138541837675773035`; the regression
+  retains it. An initial compile-only fixture correction removed access to a
+  private RNG; the dedicated legacy-placement unit test compares RNG state
+  against the original candidate/shuffle algorithm including zero coverage.
+- `cargo test -p v3-core --test viability` ran first before implementation
+  and first after food/ecology edits: both exit 0, 24 tests. Subsequent coherent
+  `cargo check --workspace --all-targets` passed. `cargo clippy --workspace
+  --all-targets -- -D warnings` passed after the assembly simplification.
+- `cargo test -p v3-core --test baseline_worlds --test reproducibility`: 14
+  ordinary behavior/property tests and 3 reproducibility tests passed. The two
+  explicit diagnostics below are intentionally ignored by ordinary suites;
+  both were separately executed successfully, not waived.
+- `cargo test -p v3-core legacy_placement_keeps_candidate_order` passed.
+  `cargo test -p v3-cli` passed all unit, CLI and benchmark tests. After the
+  report-assembly extraction, `cargo test -p v3-cli goal_world_set_executes`
+  passed the three-case production-path fixture again.
+- `cargo test -p v3-server --test server
+  recipe_export_preserves_complete_config_and_large_seeds` passed with food
+  overrides, null inheritance, explicit zero and FbmThreshold in the recipe.
+- `npm test -- src/stores/startupConfig.test.ts
+  src/components/config-panel/startup/FoodTypeCard.test.tsx
+  src/components/config-panel/startup/TerrainSection.test.tsx`: 23 passed.
+  `npx tsc -b` passed. Rendered browser inspection exercised inheritance,
+  reward override, fertile-only placement and the fBm editor. It caught and
+  corrected unreadable float tails in the new shared-value labels. Inspection
+  servers and the isolated browser were stopped afterward.
+- `cargo test -p v3-core --test baseline_worlds
+  food_choice_mutation_diagnostic -- --ignored --nocapture`: exit 0. Production
+  founder/mutation/runtime defaults, Battery::generate(2), 80 executions/genome,
+  executed parent nodes `[0, 1]`, 1,000 fresh births, seeds 9000..9999:
+  **585 zero-event births, 0 offspring with corresponding Eat-index changes,
+  0 offspring selecting non-primary food anywhere**. This is a bounded
+  substrate reading, not evidence of specialization or a favorable-count gate.
+- `cargo test -p v3-core --test baseline_worlds inspect_saved_world_layouts --
+  --ignored --nocapture`: exit 0. Full-size generated maps inspected and saved
+  as previews beside the recipes. The README records exact habitat overlap,
+  whole-world food coverage, connectivity and preview legend. No recipe
+  adjustment or persistence selection run was used.
+- Self-review for reuse/simplification/efficiency: retained Option fallbacks,
+  the original seeding shuffle, existing fBm helper and ecology equations;
+  connectivity is a single barriers-only traversal outside measured tick work.
+  Reused existing goal observation types per case and extracted cohesive
+  observation assembly instead of adding a runner or suppressing the length
+  lint. No speculative abstractions, dependencies or production tuning added.
+- `make roadmap-check` passed on document edits. Full fresh mutation results,
+  final measured gate/goal reports, reviewer and closure evidence remain pending.
 
 ## Performance and Goal Impact
 
@@ -225,22 +327,27 @@ and patchy habitats. These reach creatures through consumed energy, applied
 food growth/placement, passability and existing perception.
 Predeclared cost: three per-type fallback resolutions, reward lookup when
 eating, opt-in startup placement filtering, optional startup fBm work and one
-linear connectivity observation per benchmark seed. Default simulation draws
-and deterministic trajectories must be unchanged. No severe normalized
-compute regression or epoch re-pin is justified in advance. Compare measured
-gate work and wall-clock per creature-tick against the last measured closure
-and pinned epoch; distinguish unmeasured intervening closures. Record all
-dated goal indicators and observation timing, retaining the 10-second founder,
-180-second aggregate evolved-neighborhood and 15-minute investigation limits.
-World-set sweeps are separate readings, not replacements for goal indicators
-or inputs to a composite score. Measurements are pending.
+linear connectivity observation per benchmark case. Default simulation draws
+and trajectories must be unchanged, verified by focused tests and the
+unchanged gate. No severe normalized compute regression or gate epoch re-pin
+is justified in advance. Compare measured gate work and wall-clock per
+creature-tick against the last measured closure and pinned epoch; distinguish
+unmeasured intervening closures. The user-authorized goal definition reset
+starts `goal-worlds-v1`, with unavailable old-profile comparisons. Record
+per-case indicators and truthful observation timing, retaining existing
+mutation floors, the 30-second drift observation cap, 10-second founder,
+180-second aggregate evolved-neighborhood and 15-minute investigation limits
+across the complete profile. No timing/sample threshold is increased to
+accommodate the new environments. The world set is the standard goal baseline,
+with per-case evidence rather than a composite score. Measurements are pending.
 
 ## Success Criteria
 
 - [ ] Foods differ in applied payoff, initial habitat, regrowth and recovery
   through recipes alone while default behavior and inheritance remain intact.
 - [ ] Four named worlds load in app/CLI, faithfully express their pressures,
-  and carry attributable persistence/connectivity readings, including failures.
+  and the standard goal command runs exactly the three non-plains environments
+  once each with attributable full readings, including failures.
 - [ ] Required verification, mutation/review records and exact-content closure
   evidence pass, with T12.F04 Complete on clean main after authorized cleanup.
 
@@ -259,9 +366,30 @@ or inputs to a composite score. Measurements are pending.
   layers. The orchestrator accepted this smallest correction on 2026-09-09;
   it fulfills the roadmap's tick-zero orchard requirement and preserves
   existing behavior. No user intervention or verification waiver implied.
-- User intervention: explicitly selected F04 before its planned priority
-  position. Readings use the current substrate and the existing paired-main
-  fallback; roadmap priorities and prerequisite ownership remain unchanged.
+- User interventions: explicitly selected F04 before its planned priority
+  position; clarified that the standard baseline must be three total runs,
+  one per environment, and approved replacing the goal profile while keeping
+  the short gate unchanged. Roadmap priority order and prerequisite ownership
+  remain unchanged.
+- Requirement correction 2 (advisor consultation 3, 2026-09-09): the original
+  request to replace testing seed replicates was recorded in research note
+  Section 7.5, but its additive recommendation became the track/spec protocol.
+  User clarification restores that intent: Orchards/11, Canyon/22,
+  Confluence/33 replace goal default-world replicates, with a labeled new goal
+  series. The prior nine recipe runs, fourth plains reading and paired-main
+  fallback are removed. Gate inputs/epoch and all numerical thresholds remain.
+  Dependent measurement/profile work paused while documents were serialized;
+  independent food/terrain implementation continued. This corrects requirements
+  and does not waive checks.
+- Advisor consultation 1 accepted existing-component extension and identified
+  default shuffle/draw preservation, unresolved Option inheritance, consistent
+  growth/telemetry formulas and eight-direction connectivity as correctness
+  constraints. No optional framework or adjacent refactor recommended.
+- Advisor consultation 2 accepted a test-only correction after the roundtrip
+  assertion twice compared JSON f64 0.01 with serialized f32
+  0.009999999776482582: deserialize serialized FoodTypeConfig and compare typed
+  f32 fields, preserving Some/None/zero assertions. No production rounding
+  or serialization change is warranted.
 - Readiness self-review (2026-09-09): **Ready after one revision**. P1: 0;
   P2: 2 resolved: require zero minimum fertility for actual orchard patch
   eligibility, and pin the small food-choice diagnostic's corpus/denominators
@@ -272,5 +400,12 @@ or inputs to a composite score. Measurements are pending.
   not an advisor consultation or independent final review.
 - Plan `make roadmap-check` passed before readiness revision (exit 0);
   post-revision validation is recorded at handoff. No code/build/benchmark
-  workloads ran during planning. Advisor consultations: 0 so far;
+  workloads ran during planning. Advisor consultations: 3 so far;
   usage unavailable.
+
+- Advisor consultation 4: a repeated report-function length lint led to a
+  cohesive private GoalIndicatorInputs/assembly helper; advice accepted and
+  Clippy passed. The advisor clarified that unknown-field preservation refers
+  to existing food/config validation, not enum-wide tightening of historical
+  PatternParams. No new pattern validation wrapper or lint waiver was added.
+  Implementer consultations so far: 4; usage unavailable.

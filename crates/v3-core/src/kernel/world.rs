@@ -19,7 +19,69 @@ pub struct WorldState {
     creature_at: Grid<Option<CreatureId>>,
 }
 
+/// Tick-zero passability under the world's actual eight-direction movement topology.
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct PassableConnectivity {
+    pub total_cells: u64,
+    pub passable_cells: u64,
+    pub passable_fraction: f64,
+    pub largest_component_cells: u64,
+    pub largest_component_fraction_of_passable: f64,
+}
+
 impl WorldState {
+    /// Observe barriers only, ignoring temporary creature occupancy.
+    #[must_use]
+    pub fn passable_connectivity(&self) -> PassableConnectivity {
+        let total = usize::from(self.width) * usize::from(self.height);
+        let mut visited = vec![false; total];
+        let mut stack = Vec::new();
+        let mut passable = 0u64;
+        let mut largest = 0u64;
+        for y in 0..self.height {
+            for x in 0..self.width {
+                let index = usize::from(y) * usize::from(self.width) + usize::from(x);
+                let pos = Position::new(x, y);
+                if visited[index] || self.is_barrier(pos) {
+                    continue;
+                }
+                visited[index] = true;
+                stack.push(pos);
+                let mut size = 0u64;
+                while let Some(pos) = stack.pop() {
+                    size += 1;
+                    for dir in Direction::ALL {
+                        if let Some(next) = self.resolve_neighbor(pos, dir) {
+                            let index =
+                                usize::from(next.y) * usize::from(self.width) + usize::from(next.x);
+                            if !visited[index] && !self.is_barrier(next) {
+                                visited[index] = true;
+                                stack.push(next);
+                            }
+                        }
+                    }
+                }
+                passable += size;
+                largest = largest.max(size);
+            }
+        }
+        PassableConnectivity {
+            total_cells: total as u64,
+            passable_cells: passable,
+            passable_fraction: if total == 0 {
+                0.0
+            } else {
+                passable as f64 / total as f64
+            },
+            largest_component_cells: largest,
+            largest_component_fraction_of_passable: if passable == 0 {
+                0.0
+            } else {
+                largest as f64 / passable as f64
+            },
+        }
+    }
+
     /// Create an empty world with no food, no barriers, no creatures.
     pub fn new(width: u16, height: u16, edge_mode: WorldEdgeMode) -> Self {
         Self {
@@ -701,6 +763,7 @@ mod tests {
                 initial_density: 0.5,
                 initial_coverage: 0.5,
                 growth_inhibitor: 0.2,
+                ..FoodTypeConfig::default()
             },
             FoodTypeConfig {
                 name: "Type B".to_string(),
@@ -708,6 +771,7 @@ mod tests {
                 initial_density: 0.5,
                 initial_coverage: 0.5,
                 growth_inhibitor: 0.2,
+                ..FoodTypeConfig::default()
             },
         ];
         w.reconfigure_food(initial.clone());

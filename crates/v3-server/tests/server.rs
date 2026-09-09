@@ -1177,8 +1177,10 @@ async fn patch_config_rejects_food_types_runtime_patch() {
                         "initial_density": 0.8,
                         "initial_coverage": 0.4,
                         "growth_inhibitor": 0.2,
-                        "metabolic_energy_yield": 99.0,
-                        "reproductive_reserve_yield": 88.0
+                        "energy_per_unit": 12.0,
+                        "growth_rate": 0.01,
+                        "recovery_spawn_rate": 0.0,
+                        "initial_fertility_only": true
                     }
                 ]
             }
@@ -3682,7 +3684,9 @@ async fn startup_terrain_partial_override_projects_applied_barriers() {
 async fn recipe_export_preserves_complete_config_and_large_seeds() {
     let state = test_state();
     let a = router(state.clone());
-    let recipe = serde_json::json!({"world":{"world_seed":u64::MAX,"terrain":[{"params":{"pattern_type":"Noise","density":0.2,"cluster_size":1},"seed":u64::MAX}],"food":{"fertility":{"layers":[{"weight":1.0,"algorithm":{"Fbm":{"octaves":2,"frequency":0.1,"lacunarity":2.0,"persistence":0.5,"seed":u64::MAX}}}]}}},"population":{"founder_profile":"forage_first_sparse"},"energy":{"costs":{"move_cost":0.25}}});
+    let mut recipe = serde_json::json!({"world":{"world_seed":u64::MAX,"terrain":[{"params":{"pattern_type":"Noise","density":0.2,"cluster_size":1},"seed":u64::MAX}],"food":{"fertility":{"layers":[{"weight":1.0,"algorithm":{"Fbm":{"octaves":2,"frequency":0.1,"lacunarity":2.0,"persistence":0.5,"seed":u64::MAX}}}]}}},"population":{"founder_profile":"forage_first_sparse"},"energy":{"costs":{"move_cost":0.25}}});
+    recipe["world"]["terrain"][0]["params"] = serde_json::json!({"pattern_type":"FbmThreshold","octaves":4,"frequency":0.02,"lacunarity":2.0,"persistence":0.5,"threshold":0.0});
+    recipe["world"]["food"]["types"] = serde_json::json!([{"name":"Fruit","color":"#f97316","initial_density":1.0,"initial_coverage":0.2,"energy_per_unit":12.0,"growth_rate":null,"recovery_spawn_rate":0.0,"initial_fertility_only":true}]);
     let mut request = recipe.clone();
     request["seed"] = 42.into();
     let (status, startup) = do_request(a.clone(), startup_req(&request.to_string())).await;

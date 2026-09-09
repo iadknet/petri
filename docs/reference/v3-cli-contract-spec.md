@@ -98,6 +98,20 @@ placement retains the passable-cell clamp. Omitted coverage is labeled
 Different recipe digests cannot compare as the same profile. Recipe-free and
 historical reports omit these metadata fields and keep existing comparisons.
 
+From T12.F04, the standard `bench --profile goal` selects three built-in
+recipe cases: Orchards in grassland/11, Canyon country/22 and Confluence/33.
+Each executes once at 2,000 ticks with production creature policies and full
+goal observations, using that case's effective config and food-type count.
+The profile identifies case name, recipe path, effective digest and run seed;
+case-specific neighborhood/drift observations retain that attribution.
+There is no mandatory fourth Plains run or three-seed-per-recipe sweep set.
+The new `goal-worlds-v1` series preserves `goal-v1` history and does not
+compare across profile definitions. The short gate profile, its epoch and
+numerical thresholds remain unchanged. Existing sample sizes, mutation floors
+and observation budgets apply to the complete goal profile, not multiplied
+per case. Public `--config` remains sweep-only; built-in goal recipes do not
+permit arbitrary profile overrides.
+
 Exit codes:
 - `0`: successful completion (run finished normally).
 - `1`: validation error (invalid arguments, malformed config, constraint

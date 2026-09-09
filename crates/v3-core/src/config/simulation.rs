@@ -58,6 +58,18 @@ pub struct FoodTypeConfig {
     pub initial_coverage: f32,
     #[serde(default = "default_growth_inhibitor")]
     pub growth_inhibitor: f32,
+    /// Energy per consumed density unit; None inherits the shared Eat reward.
+    #[serde(default)]
+    pub energy_per_unit: Option<f32>,
+    /// Per-tick growth; None inherits shared growth_rate.
+    #[serde(default)]
+    pub growth_rate: Option<f32>,
+    /// Recovery attempts per world cell per tick; None inherits the shared rate.
+    #[serde(default)]
+    pub recovery_spawn_rate: Option<f32>,
+    /// Seed only passable cells with positive effective tick-zero fertility.
+    #[serde(default)]
+    pub initial_fertility_only: bool,
 }
 
 impl Default for FoodTypeConfig {
@@ -68,6 +80,10 @@ impl Default for FoodTypeConfig {
             initial_density: 1.0,
             initial_coverage: 0.54,
             growth_inhibitor: default_growth_inhibitor(),
+            energy_per_unit: None,
+            growth_rate: None,
+            recovery_spawn_rate: None,
+            initial_fertility_only: false,
         }
     }
 }
@@ -904,6 +920,9 @@ impl SimulationConfig {
 
     /// Apply normalization/fallback for out-of-range values per spec constraints.
     pub fn normalize(&mut self) {
+        for layer in &mut self.world.terrain {
+            layer.params.normalize();
+        }
         normalize_world_food(&mut self.world);
 
         let el = &mut self.energy.lifecycle;
@@ -1099,6 +1118,18 @@ fn normalize_food_types(food: &mut FoodConfig) {
         food_type.initial_density =
             normalize_f32_clamp(food_type.initial_density, 0.0, max_density, max_density);
         food_type.growth_inhibitor = normalize_f32_clamp(food_type.growth_inhibitor, 0.0, 1.0, 0.2);
+        food_type.energy_per_unit = food_type
+            .energy_per_unit
+            .filter(|v| v.is_finite())
+            .map(|v| v.max(0.0));
+        food_type.growth_rate = food_type
+            .growth_rate
+            .filter(|v| v.is_finite())
+            .map(|v| v.clamp(0.0, 1.0));
+        food_type.recovery_spawn_rate = food_type
+            .recovery_spawn_rate
+            .filter(|v| v.is_finite())
+            .map(|v| v.clamp(0.0, 1.0));
     }
 }
 

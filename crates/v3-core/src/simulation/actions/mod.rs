@@ -70,8 +70,15 @@ pub fn apply_typed_eat(
 ) -> bool {
     let food = world.consume_food_type(creature.position, type_idx);
     if food > 0.0 {
-        creature.energy = (creature.energy + food * config.energy.costs.eat_reward_per_food)
-            .clamp(0.0, config.energy.lifecycle.max_energy);
+        let reward = config
+            .world
+            .food
+            .types
+            .get(usize::from(type_idx.get()))
+            .and_then(|food_type| food_type.energy_per_unit)
+            .unwrap_or(config.energy.costs.eat_reward_per_food);
+        creature.energy =
+            (creature.energy + food * reward).clamp(0.0, config.energy.lifecycle.max_energy);
     }
     creature.energy -= config.energy.adjusted_action_cost(
         config.energy.costs.eat_cost,

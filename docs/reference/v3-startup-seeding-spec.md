@@ -79,8 +79,13 @@ Canonical wire-level field schemas for startup are owned by
 `v3-server-api-protocol-spec.md`.
 
 The normalized production food catalog contains one green (`#22c55e`)
-`Primary Food`, initial density `1.0`, coverage `0.54`. Every ordinary food type
-uses the shared live `energy.costs.eat_reward_per_food` reward, default `5.0`.
+`Primary Food`, initial density `1.0`, coverage `0.54`. Food types inherit the shared live
+`energy.costs.eat_reward_per_food` reward (default `5.0`) unless
+`energy_per_unit` overrides it. Growth and recovery likewise inherit shared
+rates unless their optional type fields override them. `initial_fertility_only`
+defaults false; true filters tick-zero placement to positive effective fertility
+(including annealing), before the existing per-type shuffle and coverage count.
+All type fields remain restart-only; shared inherited runtime values remain live.
 
 ---
 

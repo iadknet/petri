@@ -7,6 +7,7 @@ const PATTERNS: { id: PatternType; label: string }[] = [
 	{ id: "Maze", label: "Maze" },
 	{ id: "Spiral", label: "Spiral" },
 	{ id: "Noise", label: "Noise" },
+	{ id: "FbmThreshold", label: "fBm Terrain" },
 	{ id: "ParallelLines", label: "Lines" },
 	{ id: "Star", label: "Star" },
 ];

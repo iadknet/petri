@@ -123,6 +123,10 @@ function clampFinite(value: number, min: number, max: number, fallback: number):
 	return value;
 }
 
+function normalizeOverride(value: number | null | undefined, max: number): number | null {
+	return value == null || !Number.isFinite(value) ? null : Math.min(max, Math.max(0, value));
+}
+
 function normalizeFoodType(
 	type: FoodTypeConfig,
 	index: number,
@@ -135,6 +139,10 @@ function normalizeFoodType(
 		initial_density: clampFinite(type.initial_density, 0, maxDensity, defaults.initial_density),
 		initial_coverage: clampFinite(type.initial_coverage, 0, 1, defaults.initial_coverage),
 		growth_inhibitor: clampFinite(type.growth_inhibitor, 0, 1, defaults.growth_inhibitor),
+		energy_per_unit: normalizeOverride(type.energy_per_unit, Number.MAX_VALUE),
+		growth_rate: normalizeOverride(type.growth_rate, 1),
+		recovery_spawn_rate: normalizeOverride(type.recovery_spawn_rate, 1),
+		initial_fertility_only: type.initial_fertility_only ?? false,
 	};
 }
 

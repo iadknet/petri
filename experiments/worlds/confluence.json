@@ -1,0 +1,121 @@
+{
+  "world": {
+    "edge_mode": "Bounded",
+    "terrain": [
+      {
+        "params": {
+          "pattern_type": "FbmThreshold",
+          "octaves": 4,
+          "frequency": 0.006,
+          "lacunarity": 2.0,
+          "persistence": 0.5,
+          "threshold": 0.08
+        },
+        "bounds": {
+          "x": 80,
+          "y": 100,
+          "width": 800,
+          "height": 800
+        }
+      },
+      {
+        "params": {
+          "pattern_type": "FbmThreshold",
+          "octaves": 4,
+          "frequency": 0.006,
+          "lacunarity": 2.0,
+          "persistence": 0.5,
+          "threshold": 0.08
+        },
+        "bounds": {
+          "x": 660,
+          "y": 200,
+          "width": 800,
+          "height": 800
+        }
+      },
+      {
+        "params": {
+          "pattern_type": "FbmThreshold",
+          "octaves": 4,
+          "frequency": 0.006,
+          "lacunarity": 2.0,
+          "persistence": 0.5,
+          "threshold": 0.08
+        },
+        "bounds": {
+          "x": 390,
+          "y": 720,
+          "width": 800,
+          "height": 800
+        }
+      }
+    ],
+    "food": {
+      "types": [
+        {
+          "name": "Grass",
+          "color": "#22c55e",
+          "initial_density": 1.0,
+          "initial_coverage": 0.54,
+          "growth_inhibitor": 0.2,
+          "energy_per_unit": 5.0,
+          "growth_rate": 0.09,
+          "recovery_spawn_rate": 0.01,
+          "initial_fertility_only": false
+        },
+        {
+          "name": "Fruit",
+          "color": "#f97316",
+          "initial_density": 1.0,
+          "initial_coverage": 0.2,
+          "growth_inhibitor": 0.2,
+          "energy_per_unit": 12.0,
+          "growth_rate": 0.025,
+          "recovery_spawn_rate": 0.002,
+          "initial_fertility_only": true
+        }
+      ],
+      "fertility": {
+        "min_fertility": 0.0,
+        "max_fertility": 2.0,
+        "layers": [
+          {
+            "target": {
+              "SingleType": {
+                "type_idx": 0
+              }
+            },
+            "weight": 1.0,
+            "algorithm": {
+              "PoissonBlobs": {
+                "blob_count": 16,
+                "min_radius": 160,
+                "max_radius": 280,
+                "falloff": 0.5,
+                "seed": null
+              }
+            }
+          },
+          {
+            "target": {
+              "SingleType": {
+                "type_idx": 1
+              }
+            },
+            "weight": 1.0,
+            "algorithm": {
+              "PoissonBlobs": {
+                "blob_count": 9,
+                "min_radius": 120,
+                "max_radius": 210,
+                "falloff": 0.5,
+                "seed": null
+              }
+            }
+          }
+        ]
+      }
+    }
+  }
+}

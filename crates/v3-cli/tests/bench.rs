@@ -625,6 +625,11 @@ fn gate_and_goal_series_select_only_their_own_references() {
         std::fs::write(path, "{}").expect("create reference placeholder");
     }
     let index = bench::BenchmarkSeriesIndex {
+        goal_worlds: Some(bench::SeriesIndex {
+            series: "goal-worlds-v1".to_string(),
+            epoch_baseline: goal_epoch.display().to_string(),
+            closed: vec![],
+        }),
         gate: bench::SeriesIndex {
             series: "gate-v1".to_string(),
             epoch_baseline: gate_epoch.display().to_string(),
@@ -635,7 +640,7 @@ fn gate_and_goal_series_select_only_their_own_references() {
         },
         goal: bench::SeriesIndex {
             series: "goal-v1".to_string(),
-            epoch_baseline: goal_epoch.display().to_string(),
+            epoch_baseline: "historical-goal-reference-must-not-be-selected".to_string(),
             closed: vec![],
         },
     };

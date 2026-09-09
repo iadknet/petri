@@ -213,7 +213,8 @@
 </header>
 <div class="filters">
   <div class="seg" role="group" aria-label="Benchmark profile">
-    <button type="button" data-profile="goal" aria-pressed="true">Goal profile</button>
+    <button type="button" data-profile="goal_worlds" aria-pressed="true">Goal worlds</button>
+    <button type="button" data-profile="goal" aria-pressed="false">Historical goal</button>
     <button type="button" data-profile="gate" aria-pressed="false">Gate profile</button>
   </div>
   <span class="hint" id="status">Loading reports…</span>
@@ -300,13 +301,14 @@
     const add = (p, profile) => { if (!seen.has(p)) { seen.add(p); order.push({ path: p, profile }); } };
     (get(index, 'gate.closed') || []).forEach((p) => add(p, 'gate'));
     (get(index, 'goal.closed') || []).forEach((p) => add(p, 'goal'));
+    (get(index, 'goal_worlds.closed') || []).forEach((p) => add(p, 'goal_worlds'));
     const reports = await Promise.all(order.map(async (o) => ({ ...o, report: await fetchJson(rel(o.path)) })));
 
     // Group by feature slug, preserving gate closure order, then any goal-only features.
     const bySlug = new Map();
     for (const r of reports) {
       const slug = r.report.feature || rel(r.path).replace(/^features\//, '').replace(/(-goal)?\.json$/, '');
-      const prof = get(r.report, 'deterministic.profile.name') || r.profile;
+      const prof = r.profile;
       if (!bySlug.has(slug)) bySlug.set(slug, { slug, id: featureId(slug), gate: null, goal: null, paths: {} });
       const f = bySlug.get(slug);
       f[prof] = r.report;
@@ -314,7 +316,7 @@
     }
     const features = [...bySlug.values()];
     for (const f of features) {
-      const rep = f.gate || f.goal;
+      const rep = f.gate || f.goal || f.goal_worlds;
       f.date = (get(rep, 'environment.generated_at') || '').slice(0, 10);
       f.label = f.id;
     }
@@ -752,9 +754,41 @@
   };
 
   // ── Rendering ────────────────────────────────────────────────────────────
+  function renderWorlds(data, app) {
+    const features = data.features.filter((f) => f.goal_worlds);
+    document.getElementById('status').textContent = `${features.length} goal-worlds-v1 closures · one run per environment · historical goal-v1 remains separate`;
+    const g = group('Goal worlds', 'Orchards / 11, Canyon / 22, Confluence / 33. Each is a distinct environment, not a seed replicate. Cross-profile deltas are unavailable.');
+    if (!features.length) g.cards.appendChild(el('p', null, 'No world-set report has been recorded yet.'));
+    for (const f of features) {
+      const report = f.goal_worlds;
+      for (const observation of get(report, 'deterministic.goal_indicators.cases') || []) {
+        const info = observation.case;
+        const seed = (get(report, 'deterministic.per_seed') || []).find((s) => s.seed === info.seed) || {};
+        const persistence = (get(report, 'deterministic.goal_indicators.population_persistence.per_seed') || []).find((s) => s.seed === info.seed) || {};
+        const connectivity = seed.tick_zero_connectivity || {};
+        const c = card(`${f.id} · ${info.name}`, `Seed ${info.seed} · ${info.recipe_path} · ${info.food_type_count} foods`);
+        c.card.classList.add('wide');
+        c.card.appendChild(table(['Reading', 'Value'], [
+          ['Final population', fmt(seed.final_population)], ['Extinction tick', seed.extinction_tick ?? 'Survived full horizon'],
+          ['Peak population', fmt(persistence.peak_population)], ['Births', fmt(seed.births)],
+          ['Passable fraction', pct(connectivity.passable_fraction)], ['Largest component / passable', pct(connectivity.largest_component_fraction_of_passable)],
+          ['Founder changed fraction', get(observation, 'mutational_neighborhood.founder.births.any_events.changed_fraction') ?? 'Unavailable'],
+          ['Config digest', info.config_digest],
+        ]));
+        const details = el('details'); details.appendChild(el('summary', null, 'Full case neighborhood and drift observations'));
+        details.appendChild(el('pre', null, JSON.stringify(observation, null, 2))); c.card.appendChild(details);
+        const link = el('a', null, 'Complete report, including persistence and memory readings'); link.href = rel(f.paths.goal_worlds); c.card.appendChild(link);
+        g.cards.appendChild(c.card);
+      }
+    }
+    app.appendChild(g.section);
+    document.getElementById('foot').textContent = 'goal-worlds-v1 starts at T12.F04. Historical goal-v1 and the unchanged gate remain available in their tabs.';
+  }
+
   function render(data, profile) {
     const app = document.getElementById('app');
     app.replaceChildren();
+    if (profile === 'goal_worlds') { renderWorlds(data, app); return; }
     const all = data.features;
     const feats = all.filter((f) => f[profile]);
     const xLabels = feats.map((f) => f.label);
@@ -1024,8 +1058,8 @@
 
   // ── Boot ─────────────────────────────────────────────────────────────────
   let DATA = null;
-  let PROFILE = 'goal';
-  try { const saved = localStorage.getItem('petri-progress-profile'); if (saved === 'gate' || saved === 'goal') PROFILE = saved; } catch (e) { /* ignore */ }
+  let PROFILE = 'goal_worlds';
+  try { const saved = localStorage.getItem('petri-progress-profile'); if (saved === 'gate' || saved === 'goal' || saved === 'goal_worlds') PROFILE = saved; } catch (e) { /* ignore */ }
   document.querySelectorAll('.seg button').forEach((b) => {
     b.setAttribute('aria-pressed', b.dataset.profile === PROFILE ? 'true' : 'false');
     b.addEventListener('click', () => {

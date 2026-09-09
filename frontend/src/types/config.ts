@@ -54,6 +54,10 @@ export interface FoodTypeConfig {
 	initial_density: number;
 	initial_coverage: number;
 	growth_inhibitor: number;
+	energy_per_unit?: number | null;
+	growth_rate?: number | null;
+	recovery_spawn_rate?: number | null;
+	initial_fertility_only?: boolean;
 }
 
 export interface StartupFoodRequestLayer {

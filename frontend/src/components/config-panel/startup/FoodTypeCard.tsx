@@ -1,3 +1,4 @@
+import { useConfigStore } from "../../../stores/config.ts";
 import type { FoodTypeConfig } from "../../../types/config.ts";
 import { FieldRow } from "../shared/FieldRow.tsx";
 import type { FieldDef } from "../shared/types.ts";
@@ -5,6 +6,8 @@ import type { FieldDef } from "../shared/types.ts";
 interface FoodTypeCardProps {
 	index: number;
 	foodType: FoodTypeConfig;
+	sharedGrowthRate?: number;
+	sharedRecoveryRate?: number;
 	canRemove: boolean;
 	onRemove: () => void;
 	onChange: (patch: Partial<FoodTypeConfig>) => void;
@@ -45,10 +48,20 @@ function TextControl({
 export function FoodTypeCard({
 	index,
 	foodType,
+	sharedGrowthRate = 0.09,
+	sharedRecoveryRate = 0.01,
 	canRemove,
 	onRemove,
 	onChange,
 }: FoodTypeCardProps) {
+	const sharedReward = useConfigStore(
+		(state) => state.serverConfig?.energy.costs.eat_reward_per_food ?? 5,
+	);
+	const overrides = [
+		["energy_per_unit", "Energy per density unit", sharedReward, undefined],
+		["growth_rate", "Growth per tick", sharedGrowthRate, 1],
+		["recovery_spawn_rate", "Recovery attempts / cell / tick", sharedRecoveryRate, 1],
+	] as const;
 	const densityField: FieldDef = {
 		path: `world.food.types.${index}.initial_density`,
 		label: "Initial Density",
@@ -67,7 +80,8 @@ export function FoodTypeCard({
 		// Keep the card reset value aligned with the production fallback in
 		// `createFoodType`: each configured type starts with 54% coverage.
 		defaultValue: 0.54,
-		tooltip: "Fraction of world cells seeded with this food type",
+		tooltip:
+			"Fraction of eligible passable cells seeded with this food type; fertile-only placement restricts eligibility",
 	};
 	const inhibitorField: FieldDef = {
 		path: `world.food.types.${index}.growth_inhibitor`,
@@ -134,6 +148,54 @@ export function FoodTypeCard({
 				onChange={(_, value) => onChange({ initial_coverage: value })}
 				testId={`startup-field-food-type-${index}-initial-coverage`}
 			/>
+
+			<label className="flex items-center gap-2 text-xs text-slate-300">
+				<input
+					type="checkbox"
+					checked={foodType.initial_fertility_only ?? false}
+					onChange={(event) => onChange({ initial_fertility_only: event.target.checked })}
+					data-testid={`startup-food-type-${index}-fertile-only`}
+				/>
+				Seed only positive-fertility cells
+			</label>
+			<p className="text-xs text-slate-400">
+				Coverage is a fraction of eligible passable cells. Type edits apply on Restart.
+			</p>
+			{overrides.map(([key, label, sharedValue, max]) => {
+				const inherited = foodType[key] == null;
+				const id = `startup-food-type-${index}-${key}`;
+				return (
+					<div key={key} className="flex flex-col gap-1 border-t border-slate-800 pt-2">
+						<label htmlFor={id} className="text-xs text-slate-300">
+							{label}
+						</label>
+						<div className="flex items-center gap-2">
+							<label className="flex items-center gap-1 text-xs text-slate-400">
+								<input
+									type="checkbox"
+									checked={inherited}
+									onChange={(event) =>
+										onChange({ [key]: event.target.checked ? null : sharedValue })
+									}
+									aria-label={`Use shared ${label}`}
+								/>
+								Shared ({Number(sharedValue.toPrecision(6))})
+							</label>
+							<input
+								id={id}
+								type="number"
+								min={0}
+								max={max}
+								step={0.01}
+								value={Number((foodType[key] ?? sharedValue).toPrecision(6))}
+								disabled={inherited}
+								onChange={(event) => onChange({ [key]: event.target.valueAsNumber })}
+								className="min-w-0 w-24 rounded border border-slate-700 bg-slate-800 px-2 py-1 text-xs text-slate-200 disabled:opacity-50"
+							/>
+						</div>
+					</div>
+				);
+			})}
 
 			<FieldRow
 				field={inhibitorField}

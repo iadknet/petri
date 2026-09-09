@@ -33,6 +33,13 @@ pub struct PatternBounds {
 #[non_exhaustive]
 #[serde(tag = "pattern_type")]
 pub enum PatternParams {
+    FbmThreshold {
+        octaves: u32,
+        frequency: f32,
+        lacunarity: f32,
+        persistence: f32,
+        threshold: f32,
+    },
     Maze {
         corridor_width: u8,
         wall_thickness: u8,
@@ -63,6 +70,34 @@ pub enum PatternParams {
     },
 }
 
+impl PatternParams {
+    /// Normalize thresholded fBm parameters at config and runtime boundaries.
+    pub fn normalize(&mut self) {
+        if let Self::FbmThreshold {
+            octaves,
+            frequency,
+            lacunarity,
+            persistence,
+            threshold,
+        } = self
+        {
+            *octaves = (*octaves).clamp(1, 32);
+            for (value, min, max, default) in [
+                (frequency, 0.000001, 1.0, 0.02),
+                (lacunarity, 1.0, 4.0, 2.0),
+                (persistence, 0.0, 1.0, 0.5),
+                (threshold, -1.0, 1.0, 0.0),
+            ] {
+                *value = if value.is_finite() {
+                    value.clamp(min, max)
+                } else {
+                    default
+                };
+            }
+        }
+    }
+}
+
 /// Generate barrier cell positions for a pattern within the given bounds.
 ///
 /// Returns deduplicated `PaintPoint`s, all guaranteed within bounds.
@@ -76,6 +111,39 @@ pub fn generate_pattern(
     }
 
     match params {
+        PatternParams::FbmThreshold { .. } => {
+            let mut normalized = params.clone();
+            normalized.normalize();
+            let PatternParams::FbmThreshold {
+                octaves,
+                frequency,
+                lacunarity,
+                persistence,
+                threshold,
+            } = normalized
+            else {
+                unreachable!()
+            };
+            let width = u32::from(bounds.width).min(65536 - u32::from(bounds.x)) as u16;
+            let height = u32::from(bounds.height).min(65536 - u32::from(bounds.y)) as u16;
+            let grid = crate::kernel::fertility::generate_fbm(
+                width,
+                height,
+                octaves,
+                frequency,
+                lacunarity,
+                persistence,
+                rng.gen(),
+            );
+            grid.iter()
+                .filter_map(|(x, y, value)| {
+                    (*value > threshold).then_some(PaintPoint {
+                        x: bounds.x + x,
+                        y: bounds.y + y,
+                    })
+                })
+                .collect()
+        }
         PatternParams::Maze {
             corridor_width,
             wall_thickness,
