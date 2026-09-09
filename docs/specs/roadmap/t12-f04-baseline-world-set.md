@@ -814,7 +814,9 @@ by-cause totals) read byte-identical persistence, lineage, memory, drift,
 neighborhood and structure values; the final report's comparison block
 compares against that reading (same path, since this feature's report is
 the series epoch) and finds every case `inputs_changed: false` with all
-deterministic readings equal.
+deterministic readings equal. The stored JSON therefore names its own path
+as the reference; the reading it compared against is the goal report
+committed at `948d0bc3`, recoverable with `git show`, not a second file.
 
 Gate (`t12-f04-baseline-world-set.json`): exit 0, `severe=false`; all six
 counters `ok` against both the pinned epoch and T11.F18; wall-clock per
