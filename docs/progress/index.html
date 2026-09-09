@@ -990,9 +990,15 @@
           })),
         });
       }
+      // A cause's share of every move attempted; unmeasured, not zero, on a
+      // report stored before the by-cause totals were carried.
+      const blockedShare = (cause) => series((rep, obs) => {
+        const attempted = num(get(obs, 'moves_attempted_total'));
+        return attempted > 0 ? num(get(obs, `moves_blocked_total_by_cause.${cause}`)) / attempted : NaN;
+      });
       chart({
         title: 'Blocked moves',
-        sub: 'headline: barrier blocks per move made beside a barrier, by reader state — the only moves reading the barrier ring could change. The other three use a different denominator: every move the whole population attempted.',
+        sub: 'headline: barrier blocks per move made beside a barrier, by reader state — the only moves reading the barrier ring could change. The other five use a different denominator: every move the whole population attempted.',
         tipFmt: pct, yFmt: pct,
         series: [
           { name: 'barrier reader, of its moves beside a barrier', color: 'var(--s1)', emph: true, values: series((rep, obs) => get(obs, 'barrier_blocked_fraction_by_reader_state.has_barrier_reader')) },
@@ -1000,6 +1006,8 @@
           { name: 'blocked by barrier, of all moves', color: 'var(--s3)', values: series((rep, obs) => get(obs, 'blocked_move_fraction')) },
           { name: 'avoidable (any cause), barrier reader, of all moves', color: 'var(--seq-500)', values: series((rep, obs) => get(obs, 'avoidable_blocked_share_of_all_moves_by_reader_state.has_barrier_reader')) },
           { name: 'avoidable (any cause), no reader, of all moves', color: 'var(--seq-600)', values: series((rep, obs) => get(obs, 'avoidable_blocked_share_of_all_moves_by_reader_state.no_barrier_reader')) },
+          { name: 'blocked by an occupied cell, of all moves', color: 'var(--seq-300)', values: blockedShare('occupied') },
+          { name: 'blocked at the world edge, of all moves', color: 'var(--seq-400)', values: blockedShare('out_of_bounds') },
         ],
       });
       COUNTERS.forEach(([key, name]) => chart({

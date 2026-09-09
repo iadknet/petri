@@ -968,6 +968,16 @@ pub struct ByReaderState<T: Default> {
     pub no_barrier_reader: T,
 }
 
+/// Blocked move actions split by what blocked them, one field per
+/// [`v3_core::simulation::actions::MoveBlockedCause`] variant.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct MovesBlockedByCause {
+    pub barrier: u64,
+    pub occupied: u64,
+    pub out_of_bounds: u64,
+}
+
 /// Cumulative per-world behavior a baseline world is followed by (T12.F04):
 /// what the population ate, how much food stood, and how often it walked into
 /// something. Every field comes from applied simulation behavior, and every one
@@ -983,9 +993,18 @@ pub struct WorldTracking {
     /// Move actions executed, blocked or not.
     #[serde(default)]
     pub moves_attempted_total: u64,
-    /// Move actions a barrier blocked.
+    /// Move actions a barrier blocked. The `barrier` entry of
+    /// [`WorldTracking::moves_blocked_total_by_cause`], kept under its own key
+    /// because reports stored before that map existed carry only this one.
     #[serde(default)]
     pub moves_blocked_barrier_total: u64,
+    /// Every blocked move by what blocked it, straight from
+    /// `SimStats::move_actions_blocked_total_by_cause`: barriers, an occupied
+    /// target, and the world edge. Their sum is every move the population
+    /// attempted and did not make. Absent — not zeroed — in a report stored
+    /// before these totals were carried.
+    #[serde(default)]
+    pub moves_blocked_total_by_cause: Option<MovesBlockedByCause>,
     /// Blocked moves of any cause — barrier, occupancy, or edge — that had a
     /// valid alternative target, by reader state. Counted over every move the
     /// population made, not only the ones made beside a barrier.
@@ -1017,6 +1036,18 @@ impl WorldTracking {
                 no_barrier_reader: count(BarrierReaderState::NoBarrierReader),
             }
         };
+        let blocked = |cause: MoveBlockedCause| {
+            stats
+                .move_actions_blocked_total_by_cause
+                .get(&cause)
+                .copied()
+                .unwrap_or_default()
+        };
+        let by_cause = MovesBlockedByCause {
+            barrier: blocked(MoveBlockedCause::Barrier),
+            occupied: blocked(MoveBlockedCause::Occupied),
+            out_of_bounds: blocked(MoveBlockedCause::OutOfBounds),
+        };
         Self {
             typed_eats_total: (0..sim.config.world.food.types.len())
                 .map(|index| {
@@ -1033,11 +1064,8 @@ impl WorldTracking {
                 .map(|density| six(f64::from(*density)))
                 .collect(),
             moves_attempted_total: stats.move_actions_attempted_total,
-            moves_blocked_barrier_total: stats
-                .move_actions_blocked_total_by_cause
-                .get(&MoveBlockedCause::Barrier)
-                .copied()
-                .unwrap_or(0),
+            moves_blocked_barrier_total: by_cause.barrier,
+            moves_blocked_total_by_cause: Some(by_cause),
             moves_blocked_avoidable_by_reader_state: by_reader_state(
                 &stats.move_actions_blocked_avoidable_total_by_reader_state,
             ),
@@ -2535,6 +2563,23 @@ fn by_reader_state_readings(
     ]
 }
 
+/// Blocked moves are followed as one total per cause, named for the cause, so
+/// a world that trades barrier blocks for crowding is readable as such.
+fn by_cause_readings(blocked: Option<&MovesBlockedByCause>) -> [(String, Option<f64>); 3] {
+    [
+        ("moves_blocked_barrier_total", blocked.map(|by| by.barrier)),
+        (
+            "moves_blocked_occupied_total",
+            blocked.map(|by| by.occupied),
+        ),
+        (
+            "moves_blocked_out_of_bounds_total",
+            blocked.map(|by| by.out_of_bounds),
+        ),
+    ]
+    .map(|(name, count)| (name.to_string(), count.map(|count| count as f64)))
+}
+
 /// Every reading a world-set comparison follows for one case, in report order.
 /// An absent case, an unmeasured indicator, and a zero denominator all read as
 /// `None` rather than as a zero the delta would then compare against.
@@ -2646,6 +2691,9 @@ fn case_readings(report: &Report, case_name: &str) -> Vec<(String, Option<f64>)>
         &observation
             .fractions
             .avoidable_blocked_share_of_all_moves_by_reader_state,
+    ));
+    readings.extend(by_cause_readings(
+        observation.tracking.moves_blocked_total_by_cause.as_ref(),
     ));
     readings.extend([
         (
@@ -4379,6 +4427,11 @@ mod tests {
             food_density_total: vec![six(1.5)],
             moves_attempted_total: 8,
             moves_blocked_barrier_total: 2,
+            moves_blocked_total_by_cause: Some(MovesBlockedByCause {
+                barrier: 2,
+                occupied: 3,
+                out_of_bounds: 1,
+            }),
             moves_blocked_avoidable_by_reader_state: ByReaderState {
                 has_barrier_reader: 1,
                 no_barrier_reader: 3,
@@ -4460,6 +4513,41 @@ mod tests {
         );
     }
 
+    /// Every blocked-move cause is read from its own key of
+    /// `move_actions_blocked_total_by_cause`, and the kept
+    /// `moves_blocked_barrier_total` is exactly that map's barrier entry, so
+    /// the two can never disagree.
+    #[test]
+    fn observe_reads_each_blocked_move_cause_from_its_own_stats_key() {
+        use v3_core::simulation::actions::MoveBlockedCause::{Barrier, Occupied, OutOfBounds};
+        let params = small_profile("sweep");
+        let mut sim = seed_simulation(build_config(&params), 1);
+        assert_eq!(
+            WorldTracking::observe(&sim).moves_blocked_total_by_cause,
+            Some(MovesBlockedByCause::default()),
+            "a measured run whose creatures never hit a cause reads zero, not absent"
+        );
+        for (cause, count) in [(Barrier, 5), (Occupied, 9), (OutOfBounds, 13)] {
+            sim.stats
+                .move_actions_blocked_total_by_cause
+                .insert(cause, count);
+        }
+
+        let tracking = WorldTracking::observe(&sim);
+        assert_eq!(
+            tracking.moves_blocked_total_by_cause,
+            Some(MovesBlockedByCause {
+                barrier: 5,
+                occupied: 9,
+                out_of_bounds: 13,
+            })
+        );
+        assert_eq!(
+            tracking.moves_blocked_barrier_total, 5,
+            "the kept barrier total is the map's barrier entry"
+        );
+    }
+
     /// Each barrier counter comes from its own stats map under its own
     /// reader-state key. The barrier-block rate's numerator and denominator
     /// are separate measurements, so reading either from the other's map, or
@@ -4536,6 +4624,20 @@ mod tests {
                 sample.tracking.moves_blocked_barrier_total
                     <= sample.tracking.moves_attempted_total
             );
+            let by_cause = sample
+                .tracking
+                .moves_blocked_total_by_cause
+                .as_ref()
+                .expect("a measured sample carries every blocked-move cause");
+            assert_eq!(
+                by_cause.barrier, sample.tracking.moves_blocked_barrier_total,
+                "the kept barrier total and the by-cause barrier entry are one measurement"
+            );
+            assert!(
+                by_cause.barrier + by_cause.occupied + by_cause.out_of_bounds
+                    <= sample.tracking.moves_attempted_total,
+                "every blocked move, of any cause, is one of the moves attempted"
+            );
             let beside = &sample
                 .tracking
                 .move_attempts_with_barrier_neighbor_by_reader_state;
@@ -4576,6 +4678,11 @@ mod tests {
                 food_density_total: vec![six(2.0)],
                 moves_attempted_total: 9,
                 moves_blocked_barrier_total: 1,
+                moves_blocked_total_by_cause: Some(MovesBlockedByCause {
+                    barrier: 1,
+                    occupied: 2,
+                    out_of_bounds: 3,
+                }),
                 moves_blocked_avoidable_by_reader_state: ByReaderState {
                     has_barrier_reader: 0,
                     no_barrier_reader: 1,
@@ -4598,6 +4705,10 @@ mod tests {
         assert_eq!(
             wire["move_attempts_with_barrier_neighbor_by_reader_state"]["has_barrier_reader"], 4,
             "the barrier-block denominator is on the wire under its own key: {wire}"
+        );
+        assert_eq!(
+            wire["moves_blocked_total_by_cause"]["occupied"], 2,
+            "each blocked-move cause is on the wire under its own key: {wire}"
         );
         let decoded: PersistenceSample = serde_json::from_value(wire).unwrap();
         assert_eq!(decoded.tracking, sample.tracking);
@@ -4831,6 +4942,15 @@ mod tests {
         }
         for observation in &mut report.deterministic.goal_indicators.cases {
             let seed = observation.case.seed;
+            // Three different multiples of the seed, so reading one cause's
+            // total under another cause's name is visible. The first case
+            // carries none at all, as a report stored before these totals did.
+            observation.tracking.moves_blocked_total_by_cause =
+                (seed != first_seed).then(|| MovesBlockedByCause {
+                    barrier: seed,
+                    occupied: seed * 3,
+                    out_of_bounds: seed * 5,
+                });
             observation.fractions.typed_eat_share = vec![six(f64::from(seed as u32) / 50.0)];
             observation.fractions.blocked_move_fraction = six(f64::from(seed as u32) / 200.0);
             observation
@@ -4913,6 +5033,20 @@ mod tests {
                 "avoidable_blocked_share_of_all_moves_no_barrier_reader"
             ),
             Some(seeded / 1_100.0)
+        );
+        assert_eq!(value(second, "moves_blocked_barrier_total"), Some(seeded));
+        assert_eq!(
+            value(second, "moves_blocked_occupied_total"),
+            Some(seeded * 3.0)
+        );
+        assert_eq!(
+            value(second, "moves_blocked_out_of_bounds_total"),
+            Some(seeded * 5.0)
+        );
+        assert_eq!(
+            value(&cases[0].0, "moves_blocked_occupied_total"),
+            None,
+            "a report that never carried the by-cause totals is unmeasured, not zero"
         );
         assert_eq!(
             value(second, "drift_changed_per_all_births_at_2000"),

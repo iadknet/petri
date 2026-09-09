@@ -113,6 +113,11 @@ as `births_total`, also carry the run's cumulative applied behavior:
 `typed_eats_total` per food type (applied Eat actions that consumed food),
 `food_density_total` per food type (standing density from that tick's applied
 growth summary), `moves_attempted_total`, `moves_blocked_barrier_total`,
+`moves_blocked_total_by_cause` (every blocked move split by what blocked it —
+`barrier`, `occupied`, `out_of_bounds` — straight from
+`SimStats.move_actions_blocked_total_by_cause`; its `barrier` entry is the same
+measurement as `moves_blocked_barrier_total`, and the object is absent, not
+zeroed, in a report stored before it was carried),
 `moves_blocked_avoidable_by_reader_state`,
 `move_attempts_with_barrier_neighbor_by_reader_state`, and
 `moves_blocked_barrier_with_barrier_neighbor_by_reader_state`. Each world-set
