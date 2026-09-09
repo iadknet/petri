@@ -112,13 +112,41 @@ From T12.F04 every profile's persistence samples, taken on the same cadence
 as `births_total`, also carry the run's cumulative applied behavior:
 `typed_eats_total` per food type (applied Eat actions that consumed food),
 `food_density_total` per food type (standing density from that tick's applied
-growth summary), `moves_attempted_total`, `moves_blocked_barrier_total`, and
-`moves_blocked_avoidable_by_reader_state`. Each world-set case observation
-carries the same end-of-run totals plus the fractions they imply: each type's
-share of every applied eat, barrier-blocked moves against attempted moves, and
-avoidable blocked moves against attempted moves by barrier-reader state. All of
-these fields are serde-defaulted; a report stored before T12.F04 is unmeasured,
-not zero.
+growth summary), `moves_attempted_total`, `moves_blocked_barrier_total`,
+`moves_blocked_avoidable_by_reader_state`,
+`move_attempts_with_barrier_neighbor_by_reader_state`, and
+`moves_blocked_barrier_with_barrier_neighbor_by_reader_state`. Each world-set
+case observation carries the same end-of-run totals plus the fractions they
+imply, each against its own denominator:
+
+- `typed_eat_share[type]` — that type against every applied eat.
+- `blocked_move_fraction` — barrier-blocked moves against every move
+  attempted, over the whole population. A property of the map.
+- `barrier_blocked_fraction_by_reader_state[state]` — the barrier-awareness
+  reading:
+  `moves_blocked_barrier_with_barrier_neighbor_by_reader_state[state]` against
+  `move_attempts_with_barrier_neighbor_by_reader_state[state]`, so the
+  denominator is that state's own moves made from a cell with a neighboring
+  barrier — the only moves at which reading the barrier ring could change
+  anything. The two states are rates and are comparable to each other; a state
+  that never moved beside a barrier reads `Undefined`, and a barrier-free world
+  reports no rate rather than zero.
+- `avoidable_blocked_share_of_all_moves_by_reader_state[state]` — avoidable
+  blocked moves of *any* cause, occupancy and edges included, against every
+  move attempted by *every* genome. A share of all moves, not a per-state rate;
+  the two states are not comparable to each other and neither is a
+  barrier-awareness reading. The superseded first T12.F04 goal report
+  carried this under `avoidable_blocked_move_fraction_by_reader_state`, which
+  reads as unmeasured.
+
+All of these fields are serde-defaulted; a report stored before T12.F04 is
+unmeasured, not zero.
+
+The `goal-worlds-v1` profile runs exactly the checked-in recipes under
+`experiments/worlds/`, one per seed, in the order those recipes are declared;
+each recipe carries its own seed. A world-set profile whose seed list is not
+that list, in that order, is rejected before the run starts rather than pairing
+a world with another world's recipe or dropping one.
 
 For `goal-worlds-v1`, a reference whose per-case block differs only in
 `config_digest` is comparable: profile identity for that series excludes the
@@ -126,8 +154,9 @@ case list, so a recipe edit required by the standard-baseline contract never
 discards a completed run. Each reference comparison then carries one entry per
 current case with both digests, `inputs_changed`, `absent_in_reference` when
 the reference never ran that case, and current/reference/percent-delta readings
-for persistence, per-case work counters, typed eat share, blocked moves,
-lineage, memory, drift, neighborhood, and structure. An extinction tick is
+for persistence, per-case work counters, typed eat share, blocked moves (the
+whole-population share, both per-state barrier-block rates, and both avoidable
+shares), lineage, memory, drift, neighborhood, and structure. An extinction tick is
 reported as values with a null delta. Per-case entries carry no severity level;
 the profile-total work counters keep the existing regression rule. Every other
 profile difference, and any difference outside the case list, remains a hard

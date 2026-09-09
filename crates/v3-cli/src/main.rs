@@ -359,7 +359,13 @@ fn run_bench(args: BenchArgs) {
         }
     });
 
-    let mut report = bench::build_report_with_threads(&params, &feature, threads);
+    let mut report = match bench::build_report_with_threads(&params, &feature, threads) {
+        Ok(report) => report,
+        Err(e) => {
+            eprintln!("error: {e}");
+            std::process::exit(1);
+        }
+    };
 
     let mut reference_paths = args.baseline.clone();
     reference_paths.extend(args.compare.clone());

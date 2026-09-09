@@ -165,7 +165,7 @@ pub fn goal_profile_params() -> ProfileParams {
         width: 1600,
         height: 1600,
         founders: 10_000,
-        seeds: vec![11, 22, 33],
+        seeds: goal_recipe_seeds(),
         ticks: 2_000,
         food_coverage: None,
         neighborhood: NeighborhoodSizes::PRODUCTION,
@@ -175,23 +175,67 @@ pub fn goal_profile_params() -> ProfileParams {
 
 pub const GOAL_WORLD_SET: &str = "goal-worlds-v1";
 
-const GOAL_RECIPES: [(&str, &str, &str); 3] = [
-    (
-        "Orchards in grassland",
-        "experiments/worlds/orchards-in-grassland.json",
-        include_str!("../../../experiments/worlds/orchards-in-grassland.json"),
-    ),
-    (
-        "Canyon country",
-        "experiments/worlds/canyon-country.json",
-        include_str!("../../../experiments/worlds/canyon-country.json"),
-    ),
-    (
-        "Confluence",
-        "experiments/worlds/confluence.json",
-        include_str!("../../../experiments/worlds/confluence.json"),
-    ),
+/// One checked-in baseline world: the recipe the world-set profile runs and
+/// the seed it runs it at. Adding a world to the set is one entry here — the
+/// profile's seed list is derived from these seeds, and a profile that names
+/// any other list is rejected rather than silently mis-paired.
+struct GoalRecipe {
+    name: &'static str,
+    path: &'static str,
+    source: &'static str,
+    seed: u64,
+}
+
+const GOAL_RECIPES: [GoalRecipe; 3] = [
+    GoalRecipe {
+        name: "Orchards in grassland",
+        path: "experiments/worlds/orchards-in-grassland.json",
+        source: include_str!("../../../experiments/worlds/orchards-in-grassland.json"),
+        seed: 11,
+    },
+    GoalRecipe {
+        name: "Canyon country",
+        path: "experiments/worlds/canyon-country.json",
+        source: include_str!("../../../experiments/worlds/canyon-country.json"),
+        seed: 22,
+    },
+    GoalRecipe {
+        name: "Confluence",
+        path: "experiments/worlds/confluence.json",
+        source: include_str!("../../../experiments/worlds/confluence.json"),
+        seed: 33,
+    },
 ];
+
+/// The seeds the checked-in world set runs, in report order.
+fn goal_recipe_seeds() -> Vec<u64> {
+    GOAL_RECIPES.iter().map(|recipe| recipe.seed).collect()
+}
+
+/// The recipe each of a profile's seeds runs: the checked-in world set for
+/// [`GOAL_WORLD_SET`], and nothing at all for every other profile, whose seeds
+/// are replicates of one config.
+///
+/// # Errors
+///
+/// When a world-set profile's seed list is not exactly the seeds its recipes
+/// carry, in their order. Pairing by position would then run a world under
+/// another world's recipe, drop a world the set gained, or index past the
+/// recipe list, so this is a hard error before any run starts.
+fn goal_recipes_for(params: &ProfileParams) -> Result<&'static [GoalRecipe], String> {
+    if params.name != GOAL_WORLD_SET {
+        return Ok(&[]);
+    }
+    let seeds = goal_recipe_seeds();
+    if params.seeds != seeds {
+        return Err(format!(
+            "profile {GOAL_WORLD_SET} runs one checked-in recipe per seed and must name their \
+             seeds in order {seeds:?}, not {:?}",
+            params.seeds
+        ));
+    }
+    Ok(&GOAL_RECIPES)
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GoalCase {
@@ -202,24 +246,23 @@ pub struct GoalCase {
     pub food_type_count: usize,
 }
 
-fn goal_case(params: &ProfileParams, index: usize, seed: u64) -> (GoalCase, SimulationConfig) {
-    let (name, path, source) = GOAL_RECIPES[index];
+fn goal_case(params: &ProfileParams, recipe: &GoalRecipe) -> (GoalCase, SimulationConfig) {
     let config = v3_core::config::resolve_config(
         &SimulationConfig::default(),
-        serde_json::from_str(source).expect("checked-in recipe JSON"),
+        serde_json::from_str(recipe.source).expect("checked-in recipe JSON"),
     )
     .expect("checked-in goal recipe");
     let mut case_params = params.clone();
     case_params.recipe = Some(Recipe {
-        path: path.to_string(),
+        path: recipe.path.to_string(),
         config,
     });
     let config = build_config(&case_params);
     (
         GoalCase {
-            name: name.to_string(),
-            seed,
-            recipe_path: path.to_string(),
+            name: recipe.name.to_string(),
+            seed: recipe.seed,
+            recipe_path: recipe.path.to_string(),
             config_digest: v3_core::config::config_digest(&config),
             food_type_count: config.world.food.types.len(),
         },
@@ -252,18 +295,16 @@ pub fn build_config(params: &ProfileParams) -> SimulationConfig {
     config
 }
 
-fn profile_block(params: &ProfileParams, config: &SimulationConfig) -> ProfileBlock {
+fn profile_block(
+    params: &ProfileParams,
+    config: &SimulationConfig,
+    recipes: &[GoalRecipe],
+) -> ProfileBlock {
     ProfileBlock {
-        cases: if params.name == GOAL_WORLD_SET {
-            params
-                .seeds
-                .iter()
-                .enumerate()
-                .map(|(index, seed)| goal_case(params, index, *seed).0)
-                .collect()
-        } else {
-            Vec::new()
-        },
+        cases: recipes
+            .iter()
+            .map(|recipe| goal_case(params, recipe).0)
+            .collect(),
         recipe_path: params.recipe.as_ref().map(|recipe| recipe.path.clone()),
         config_digest: params
             .recipe
@@ -408,12 +449,24 @@ pub struct TrackedFractions {
     /// Each food type's share of every applied Eat.
     #[serde(default)]
     pub typed_eat_share: Vec<String>,
-    /// Barrier-blocked moves against every move attempted.
+    /// Barrier-blocked moves against every move attempted, over the whole
+    /// population. A property of the map, not of any genome.
     #[serde(default)]
     pub blocked_move_fraction: String,
-    /// Avoidable blocked moves against every move attempted, by reader state.
+    /// The barrier-awareness reading: how often a state's moves *made beside a
+    /// barrier* were blocked by one, denominator
+    /// `move_attempts_with_barrier_neighbor_by_reader_state`. This is a rate
+    /// per reader state, so the two states are comparable to each other, and
+    /// it is `Undefined` for a state that never moved beside a barrier — a
+    /// barrier-free world reports no rate rather than zero.
     #[serde(default)]
-    pub avoidable_blocked_move_fraction_by_reader_state: ByReaderState<String>,
+    pub barrier_blocked_fraction_by_reader_state: ByReaderState<String>,
+    /// Avoidable blocked moves of any cause, including occupancy and edges,
+    /// against every move attempted by *every* genome. The denominator is the
+    /// whole population's moves, so this is a share of all moves rather than a
+    /// per-state rate, and the two states are not comparable to each other.
+    #[serde(default)]
+    pub avoidable_blocked_share_of_all_moves_by_reader_state: ByReaderState<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -933,23 +986,36 @@ pub struct WorldTracking {
     /// Move actions a barrier blocked.
     #[serde(default)]
     pub moves_blocked_barrier_total: u64,
-    /// Blocked moves that had a valid alternative target, by reader state.
+    /// Blocked moves of any cause — barrier, occupancy, or edge — that had a
+    /// valid alternative target, by reader state. Counted over every move the
+    /// population made, not only the ones made beside a barrier.
     #[serde(default)]
     pub moves_blocked_avoidable_by_reader_state: ByReaderState<u64>,
+    /// Move attempts made from a cell that had at least one neighboring
+    /// barrier, by reader state: the only moves at which reading the barrier
+    /// ring could have changed anything, and the denominator of
+    /// [`TrackedFractions::barrier_blocked_fraction_by_reader_state`].
+    #[serde(default)]
+    pub move_attempts_with_barrier_neighbor_by_reader_state: ByReaderState<u64>,
+    /// Of those attempts, the ones a barrier blocked: the numerator of the
+    /// same fraction.
+    #[serde(default)]
+    pub moves_blocked_barrier_with_barrier_neighbor_by_reader_state: ByReaderState<u64>,
 }
 
 impl WorldTracking {
     /// Read the cumulative counters out of a running simulation.
     fn observe(sim: &v3_core::simulation::Simulation) -> Self {
+        use std::collections::HashMap;
         use v3_core::config::OrdinaryFoodTypeId;
         use v3_core::simulation::actions::{BarrierReaderState, MoveBlockedCause};
         let stats = &sim.stats;
-        let avoidable = |state| {
-            stats
-                .move_actions_blocked_avoidable_total_by_reader_state
-                .get(&state)
-                .copied()
-                .unwrap_or(0)
+        let by_reader_state = |counts: &HashMap<BarrierReaderState, u64>| {
+            let count = |state: BarrierReaderState| counts.get(&state).copied().unwrap_or_default();
+            ByReaderState {
+                has_barrier_reader: count(BarrierReaderState::HasBarrierReader),
+                no_barrier_reader: count(BarrierReaderState::NoBarrierReader),
+            }
         };
         Self {
             typed_eats_total: (0..sim.config.world.food.types.len())
@@ -972,20 +1038,29 @@ impl WorldTracking {
                 .get(&MoveBlockedCause::Barrier)
                 .copied()
                 .unwrap_or(0),
-            moves_blocked_avoidable_by_reader_state: ByReaderState {
-                has_barrier_reader: avoidable(BarrierReaderState::HasBarrierReader),
-                no_barrier_reader: avoidable(BarrierReaderState::NoBarrierReader),
-            },
+            moves_blocked_avoidable_by_reader_state: by_reader_state(
+                &stats.move_actions_blocked_avoidable_total_by_reader_state,
+            ),
+            move_attempts_with_barrier_neighbor_by_reader_state: by_reader_state(
+                &stats.move_attempts_with_barrier_neighbor_total_by_reader_state,
+            ),
+            moves_blocked_barrier_with_barrier_neighbor_by_reader_state: by_reader_state(
+                &stats.move_blocked_barrier_with_barrier_neighbor_total_by_reader_state,
+            ),
         }
     }
 
-    /// The rates these totals imply. Each type's eat share is against every
-    /// applied Eat; both blocked-move fractions are against every move
-    /// attempted, so they are comparable to each other.
+    /// The rates these totals imply, each against its own denominator: a
+    /// type's eat share against every applied Eat, `blocked_move_fraction` and
+    /// the avoidable share against every move attempted, and the
+    /// barrier-blocked fraction against that reader state's own attempts made
+    /// beside a barrier. Only the last is a per-state rate.
     fn fractions(&self) -> TrackedFractions {
         let eats: u64 = self.typed_eats_total.iter().sum();
         let attempted = self.moves_attempted_total;
         let avoidable = &self.moves_blocked_avoidable_by_reader_state;
+        let beside = &self.move_attempts_with_barrier_neighbor_by_reader_state;
+        let blocked_beside = &self.moves_blocked_barrier_with_barrier_neighbor_by_reader_state;
         TrackedFractions {
             typed_eat_share: self
                 .typed_eats_total
@@ -996,7 +1071,17 @@ impl WorldTracking {
                 self.moves_blocked_barrier_total,
                 attempted,
             ),
-            avoidable_blocked_move_fraction_by_reader_state: ByReaderState {
+            barrier_blocked_fraction_by_reader_state: ByReaderState {
+                has_barrier_reader: fraction_or_undefined(
+                    blocked_beside.has_barrier_reader,
+                    beside.has_barrier_reader,
+                ),
+                no_barrier_reader: fraction_or_undefined(
+                    blocked_beside.no_barrier_reader,
+                    beside.no_barrier_reader,
+                ),
+            },
+            avoidable_blocked_share_of_all_moves_by_reader_state: ByReaderState {
                 has_barrier_reader: fraction_or_undefined(avoidable.has_barrier_reader, attempted),
                 no_barrier_reader: fraction_or_undefined(avoidable.no_barrier_reader, attempted),
             },
@@ -1878,12 +1963,11 @@ struct PreparedGoalCase {
 
 fn prepare_goal_case(
     params: &ProfileParams,
-    index: usize,
-    seed: u64,
+    recipe: &GoalRecipe,
     founder_ms: &mut f64,
     drift_ms: &mut Option<f64>,
 ) -> PreparedGoalCase {
-    let (case, config) = goal_case(params, index, seed);
+    let (case, config) = goal_case(params, recipe);
     let battery = Battery::generate(config.world.food.types.len());
     let start = Instant::now();
     let founder = compute_founder_neighborhood(&config, &battery, params.neighborhood);
@@ -2026,7 +2110,8 @@ fn assemble_goal_indicators(
 /// Run the deterministic profile (no host/timestamp data) and return the
 /// `Deterministic` block plus the run's wall-clock observations for the
 /// caller to fold into the `environment` block.
-pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) {
+pub fn run_deterministic(params: &ProfileParams) -> Result<(Deterministic, RunTimings), String> {
+    let recipes = goal_recipes_for(params)?;
     let config = build_config(params);
 
     let mut per_seed = Vec::with_capacity(params.seeds.len());
@@ -2069,11 +2154,13 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
     };
 
     for (index, &seed) in params.seeds.iter().enumerate() {
-        let case = world_set.then(|| {
+        // `recipes` is empty off the world set and exactly one entry per seed
+        // on it, so this pairs each seed with its own world and never falls
+        // back to the shared config for a world-set case.
+        let case = recipes.get(index).map(|recipe| {
             prepare_goal_case(
                 params,
-                index,
-                seed,
+                recipe,
                 &mut neighborhood_founder_wall_clock_ms,
                 &mut drift_depth_wall_clock_ms,
             )
@@ -2165,7 +2252,7 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
 
     let deterministic = Deterministic {
         graph_work_definition: "graph_relax_iters: entered nonempty single-evaluation visits, including unaffordable visits (T11.F06); historical deltas cross definitions".to_string(),
-        profile: profile_block(params, &config),
+        profile: profile_block(params, &config, recipes),
         per_seed,
         totals,
         per_creature_tick,
@@ -2182,7 +2269,7 @@ pub fn run_deterministic(params: &ProfileParams) -> (Deterministic, RunTimings) 
         neighborhood_evolved_wall_clock_ms_per_seed,
     };
 
-    (deterministic, timings)
+    Ok((deterministic, timings))
 }
 
 // ── Environment (non-deterministic, informational) ──────────────────────────
@@ -2338,7 +2425,7 @@ fn build_environment(timings: RunTimings, totals: &Totals, threads: usize) -> En
 // ── Report assembly ─────────────────────────────────────────────────────────
 
 /// Build a full report on the rayon global thread pool.
-pub fn build_report(params: &ProfileParams, feature: &str) -> Report {
+pub fn build_report(params: &ProfileParams, feature: &str) -> Result<Report, String> {
     build_report_with_threads(params, feature, None)
 }
 
@@ -2355,9 +2442,9 @@ pub fn build_report_with_threads(
     params: &ProfileParams,
     feature: &str,
     threads: Option<NonZeroUsize>,
-) -> Report {
+) -> Result<Report, String> {
     let run = || (run_deterministic(params), rayon::current_num_threads());
-    let ((deterministic, timings), threads_used) = match threads {
+    let (profile_run, threads_used) = match threads {
         Some(threads) => rayon::ThreadPoolBuilder::new()
             .num_threads(threads.get())
             .build()
@@ -2365,14 +2452,15 @@ pub fn build_report_with_threads(
             .install(run),
         None => run(),
     };
+    let (deterministic, timings) = profile_run?;
     let environment = build_environment(timings, &deterministic.totals, threads_used);
-    Report {
+    Ok(Report {
         schema_version: SCHEMA_VERSION,
         feature: feature.to_string(),
         deterministic,
         environment,
         comparison: Comparison::default(),
-    }
+    })
 }
 
 /// Serialize just the `deterministic` block, with keys sorted (via
@@ -2427,6 +2515,24 @@ fn per_creature_tick_value(pct: &PerCreatureTick, name: &str) -> Option<f64> {
 /// Parse a six-decimal report string; `Undefined` reads as unmeasured.
 fn parse_reading(value: &str) -> Option<f64> {
     value.parse::<f64>().ok()
+}
+
+/// A reader-state fraction is followed as one reading per state, named for the
+/// state, so each is compared against its own history.
+fn by_reader_state_readings(
+    name: &str,
+    fractions: &ByReaderState<String>,
+) -> [(String, Option<f64>); 2] {
+    [
+        (
+            format!("{name}_has_barrier_reader"),
+            parse_reading(&fractions.has_barrier_reader),
+        ),
+        (
+            format!("{name}_no_barrier_reader"),
+            parse_reading(&fractions.no_barrier_reader),
+        ),
+    ]
 }
 
 /// Every reading a world-set comparison follows for one case, in report order.
@@ -2529,21 +2635,22 @@ fn case_readings(report: &Report, case_name: &str) -> Vec<(String, Option<f64>)>
             parse_reading(share),
         ));
     }
-    let avoidable = &observation
-        .fractions
-        .avoidable_blocked_move_fraction_by_reader_state;
+    readings.extend(by_reader_state_readings(
+        "barrier_blocked_fraction",
+        &observation
+            .fractions
+            .barrier_blocked_fraction_by_reader_state,
+    ));
+    readings.extend(by_reader_state_readings(
+        "avoidable_blocked_share_of_all_moves",
+        &observation
+            .fractions
+            .avoidable_blocked_share_of_all_moves_by_reader_state,
+    ));
     readings.extend([
         (
             "blocked_move_fraction".to_string(),
             parse_reading(&observation.fractions.blocked_move_fraction),
-        ),
-        (
-            "avoidable_blocked_move_fraction_has_barrier_reader".to_string(),
-            parse_reading(&avoidable.has_barrier_reader),
-        ),
-        (
-            "avoidable_blocked_move_fraction_no_barrier_reader".to_string(),
-            parse_reading(&avoidable.no_barrier_reader),
         ),
         (
             "lineage_shannon_entropy_nats".to_string(),
@@ -2931,10 +3038,10 @@ mod tests {
     #[test]
     fn goal_case_adds_observation_time_to_zero_accumulators() {
         let mut params = small_profile(GOAL_WORLD_SET);
-        params.seeds = vec![11, 22, 33];
+        params.seeds = goal_recipe_seeds();
         let mut founder_ms = 0.0;
         let mut drift_ms = Some(0.0);
-        let _case = prepare_goal_case(&params, 0, 11, &mut founder_ms, &mut drift_ms);
+        let _case = prepare_goal_case(&params, &GOAL_RECIPES[0], &mut founder_ms, &mut drift_ms);
         assert!(founder_ms > 0.0);
         assert!(drift_ms.unwrap() > 0.0);
     }
@@ -2948,11 +3055,11 @@ mod tests {
         params.ticks = 60;
         params.neighborhood = NeighborhoodSizes::default();
         params.drift = Default::default();
-        let (report, _) = run_deterministic(&params);
+        let (report, _) = run_deterministic(&params).expect("a valid profile");
         let mut expected_cases = Vec::new();
         let mut pooled = Vec::new();
         for (index, case) in report.goal_indicators.cases.iter().enumerate() {
-            let (_, config) = goal_case(&params, index, params.seeds[index]);
+            let (_, config) = goal_case(&params, &GOAL_RECIPES[index]);
             let run = run_one_seed(
                 &config,
                 params.seeds[index],
@@ -2997,7 +3104,7 @@ mod tests {
         params.ticks = 1;
         params.neighborhood = NeighborhoodSizes::default();
         params.drift = Default::default();
-        let (report, timings) = run_deterministic(&params);
+        let (report, timings) = run_deterministic(&params).expect("a valid profile");
         assert_eq!(report.profile.name, "goal-worlds-v1");
         assert_eq!(report.per_seed.len(), 3);
         assert_eq!(
@@ -3026,7 +3133,7 @@ mod tests {
             matches!(report.goal_indicators.drift_depth, Indicator::Undefined(ref reason) if reason == "reported per case")
         );
         for (index, case) in report.goal_indicators.cases.iter().enumerate() {
-            let (expected, config) = goal_case(&params, index, params.seeds[index]);
+            let (expected, config) = goal_case(&params, &GOAL_RECIPES[index]);
             assert_eq!(case.case, expected);
             let seeded = seed_simulation(config.clone(), expected.seed);
             assert_eq!(
@@ -3164,18 +3271,18 @@ mod tests {
             .num_threads(1)
             .build()
             .unwrap()
-            .install(|| run_deterministic(&params).0);
+            .install(|| run_deterministic(&params).expect("a valid profile").0);
         let two = rayon::ThreadPoolBuilder::new()
             .num_threads(2)
             .build()
             .unwrap()
-            .install(|| run_deterministic(&params).0);
+            .install(|| run_deterministic(&params).expect("a valid profile").0);
         assert_eq!(
             serde_json::to_vec(&one).unwrap(),
             serde_json::to_vec(&two).unwrap()
         );
         params.seeds.push(99);
-        let more = run_deterministic(&params).0;
+        let more = run_deterministic(&params).expect("a valid profile").0;
         assert_eq!(
             one.goal_indicators.drift_depth,
             more.goal_indicators.drift_depth
@@ -3184,7 +3291,7 @@ mod tests {
 
     #[test]
     fn drift_is_goal_only_once_and_historical_fields_are_unavailable() {
-        let goal = build_report(&small_profile("goal"), "test");
+        let goal = build_report(&small_profile("goal"), "test").expect("a valid profile");
         let Indicator::Defined(drift) = &goal.deterministic.goal_indicators.drift_depth else {
             panic!("goal drift missing")
         };
@@ -3238,7 +3345,7 @@ mod tests {
         assert_eq!(drift.readings[0].battery_executions, 160);
         assert!(goal.environment.drift_depth_wall_clock_ms.is_some());
         for name in ["gate", "sweep", "synthetic"] {
-            let report = build_report(&small_profile(name), "test");
+            let report = build_report(&small_profile(name), "test").expect("a valid profile");
             assert!(matches!(
                 report.deterministic.goal_indicators.drift_depth,
                 Indicator::Undefined(_)
@@ -3866,7 +3973,8 @@ mod tests {
 
     #[test]
     fn generated_report_with_requested_births_roundtrips_through_outer_indicator() {
-        let report = build_report(&small_profile("gate"), "t11-f04-report-roundtrip");
+        let report = build_report(&small_profile("gate"), "t11-f04-report-roundtrip")
+            .expect("a valid profile");
         let encoded = serde_json::to_string(&report).unwrap();
         let decoded: Report = serde_json::from_str(&encoded).unwrap();
         assert_eq!(
@@ -3959,7 +4067,8 @@ mod tests {
 
     #[test]
     fn goal_indicators_defaults_mutational_neighborhood_to_undefined_when_the_field_is_absent() {
-        let report = build_report(&small_profile("synthetic"), "t11-f01-serde-default-check");
+        let report = build_report(&small_profile("synthetic"), "t11-f01-serde-default-check")
+            .expect("a valid profile");
         let mut value = serde_json::to_value(&report).expect("a report always serializes");
         value["deterministic"]["goal_indicators"]
             .as_object_mut()
@@ -4037,7 +4146,10 @@ mod tests {
                     .num_threads(threads)
                     .build()
                     .unwrap()
-                    .install(|| serde_json::to_vec(&run_deterministic(&params).0).unwrap())
+                    .install(|| {
+                        serde_json::to_vec(&run_deterministic(&params).expect("a valid profile").0)
+                            .unwrap()
+                    })
             };
             assert_eq!(run(1), run(2));
         }
@@ -4065,7 +4177,7 @@ mod tests {
 
     #[test]
     fn historical_mesh_fields_default_to_unmeasured() {
-        let (det, _) = run_deterministic(&small_profile("goal"));
+        let (det, _) = run_deterministic(&small_profile("goal")).expect("a valid profile");
         let Indicator::Defined(neighborhood) = det.goal_indicators.mutational_neighborhood else {
             panic!("goal reading");
         };
@@ -4099,7 +4211,7 @@ mod tests {
 
     #[test]
     fn mutational_neighborhood_is_defined_only_for_the_gate_and_goal_profile_names() {
-        let (gate_det, _) = run_deterministic(&small_profile("gate"));
+        let (gate_det, _) = run_deterministic(&small_profile("gate")).expect("a valid profile");
         let Indicator::Defined(gate_neighborhood) =
             gate_det.goal_indicators.mutational_neighborhood
         else {
@@ -4133,7 +4245,7 @@ mod tests {
             "the evolved half never runs in the gate profile"
         );
 
-        let (goal_det, _) = run_deterministic(&small_profile("goal"));
+        let (goal_det, _) = run_deterministic(&small_profile("goal")).expect("a valid profile");
         let Indicator::Defined(goal_neighborhood) =
             goal_det.goal_indicators.mutational_neighborhood
         else {
@@ -4144,13 +4256,14 @@ mod tests {
             "the evolved half runs in the goal profile"
         );
 
-        let (synthetic_det, _) = run_deterministic(&small_profile("synthetic"));
+        let (synthetic_det, _) =
+            run_deterministic(&small_profile("synthetic")).expect("a valid profile");
         assert!(matches!(
             synthetic_det.goal_indicators.mutational_neighborhood,
             Indicator::Undefined(_)
         ));
 
-        let (sweep_det, _) = run_deterministic(&small_profile("sweep"));
+        let (sweep_det, _) = run_deterministic(&small_profile("sweep")).expect("a valid profile");
         assert!(matches!(
             sweep_det.goal_indicators.mutational_neighborhood,
             Indicator::Undefined(_)
@@ -4159,7 +4272,8 @@ mod tests {
     #[test]
     fn recipe_profile_identifies_final_config_without_fabricating_legacy_metadata() {
         let mut params = small_profile("sweep");
-        let legacy = serde_json::to_value(profile_block(&params, &build_config(&params))).unwrap();
+        let legacy =
+            serde_json::to_value(profile_block(&params, &build_config(&params), &[])).unwrap();
         assert!(legacy.get("recipe_path").is_none());
         assert!(legacy.get("config_digest").is_none());
         let old: ProfileBlock = serde_json::from_value(legacy).unwrap();
@@ -4171,7 +4285,7 @@ mod tests {
         });
         params.food_coverage = None;
         let applied = build_config(&params);
-        let profile = profile_block(&params, &applied);
+        let profile = profile_block(&params, &applied, &[]);
         assert_eq!(profile.recipe_path.as_deref(), Some("world.json"));
         assert_eq!(
             profile.config_digest,
@@ -4183,7 +4297,7 @@ mod tests {
         let sim = seed_simulation(applied.clone(), 1);
         assert_eq!(sim.config.world.world_seed, Some(u64::MAX));
         assert_eq!(sim.config.energy.costs.move_cost, 0.75);
-        let (observed, _) = run_deterministic(&params);
+        let (observed, _) = run_deterministic(&params).expect("a valid profile");
         assert_eq!(observed.profile, profile);
         params
             .recipe
@@ -4193,10 +4307,10 @@ mod tests {
             .energy
             .costs
             .move_cost = 0.5;
-        assert_ne!(profile_block(&params, &build_config(&params)), profile);
+        assert_ne!(profile_block(&params, &build_config(&params), &[]), profile);
         params.food_coverage = Some(2.0);
         assert_eq!(
-            profile_block(&params, &build_config(&params)).food_coverage,
+            profile_block(&params, &build_config(&params), &[]).food_coverage,
             "1.000000"
         );
     }
@@ -4227,10 +4341,10 @@ mod tests {
         params.ticks = 4;
         params.neighborhood = NeighborhoodSizes::default();
         params.drift = Default::default();
-        let (report, _) = run_deterministic(&params);
+        let (report, _) = run_deterministic(&params).expect("a valid profile");
 
         for (index, case) in report.goal_indicators.cases.iter().enumerate() {
-            let (_, config) = goal_case(&params, index, params.seeds[index]);
+            let (_, config) = goal_case(&params, &GOAL_RECIPES[index]);
             let mut sim = seed_simulation(config, case.case.seed);
             for _ in 0..params.ticks {
                 run_tick(&mut sim, &mut None);
@@ -4253,9 +4367,13 @@ mod tests {
         }
     }
 
-    /// The world-set tracking fractions read against the totals they came from.
+    /// The world-set tracking fractions read against the totals they came
+    /// from, and the two reader-state fractions use their own denominators:
+    /// the barrier-block rate is per state, against that state's own attempts
+    /// beside a barrier; the avoidable share is against every move the whole
+    /// population attempted.
     #[test]
-    fn tracking_fractions_divide_eats_by_eats_and_blocks_by_attempts() {
+    fn tracking_fractions_divide_each_reading_by_its_own_denominator() {
         let tracking = WorldTracking {
             typed_eats_total: vec![3, 1],
             food_density_total: vec![six(1.5)],
@@ -4265,12 +4383,28 @@ mod tests {
                 has_barrier_reader: 1,
                 no_barrier_reader: 3,
             },
+            move_attempts_with_barrier_neighbor_by_reader_state: ByReaderState {
+                has_barrier_reader: 4,
+                no_barrier_reader: 16,
+            },
+            moves_blocked_barrier_with_barrier_neighbor_by_reader_state: ByReaderState {
+                has_barrier_reader: 1,
+                no_barrier_reader: 10,
+            },
         };
         let fractions = tracking.fractions();
         assert_eq!(fractions.typed_eat_share, vec![six(0.75), six(0.25)]);
         assert_eq!(fractions.blocked_move_fraction, six(0.25));
         assert_eq!(
-            fractions.avoidable_blocked_move_fraction_by_reader_state,
+            fractions.barrier_blocked_fraction_by_reader_state,
+            ByReaderState {
+                has_barrier_reader: six(0.25),
+                no_barrier_reader: six(0.625),
+            },
+            "each state's barrier blocks against that same state's attempts beside a barrier"
+        );
+        assert_eq!(
+            fractions.avoidable_blocked_share_of_all_moves_by_reader_state,
             ByReaderState {
                 has_barrier_reader: six(0.125),
                 no_barrier_reader: six(0.375),
@@ -4285,10 +4419,90 @@ mod tests {
         assert_eq!(empty.typed_eat_share, vec![UNDEFINED, UNDEFINED]);
         assert_eq!(empty.blocked_move_fraction, UNDEFINED);
         assert_eq!(
-            empty.avoidable_blocked_move_fraction_by_reader_state,
+            empty.barrier_blocked_fraction_by_reader_state,
             ByReaderState {
                 has_barrier_reader: UNDEFINED.to_string(),
                 no_barrier_reader: UNDEFINED.to_string(),
+            },
+            "a state that never moved beside a barrier is unmeasured, not zero"
+        );
+        assert_eq!(
+            empty.avoidable_blocked_share_of_all_moves_by_reader_state,
+            ByReaderState {
+                has_barrier_reader: UNDEFINED.to_string(),
+                no_barrier_reader: UNDEFINED.to_string(),
+            }
+        );
+
+        let barrier_free = WorldTracking {
+            moves_attempted_total: 10,
+            moves_blocked_avoidable_by_reader_state: ByReaderState {
+                has_barrier_reader: 0,
+                no_barrier_reader: 2,
+            },
+            ..WorldTracking::default()
+        }
+        .fractions();
+        assert_eq!(
+            barrier_free.barrier_blocked_fraction_by_reader_state,
+            ByReaderState {
+                has_barrier_reader: UNDEFINED.to_string(),
+                no_barrier_reader: UNDEFINED.to_string(),
+            },
+            "a world without barriers reports no barrier-block rate at all"
+        );
+        assert_eq!(
+            barrier_free
+                .avoidable_blocked_share_of_all_moves_by_reader_state
+                .no_barrier_reader,
+            six(0.2),
+            "the avoidable share still counts blocks of every other cause"
+        );
+    }
+
+    /// Each barrier counter comes from its own stats map under its own
+    /// reader-state key. The barrier-block rate's numerator and denominator
+    /// are separate measurements, so reading either from the other's map, or
+    /// under the other state's key, would misreport barrier awareness.
+    #[test]
+    fn observe_reads_each_barrier_counter_from_its_own_stats_map() {
+        use v3_core::simulation::actions::BarrierReaderState::{HasBarrierReader, NoBarrierReader};
+        let params = small_profile("sweep");
+        let mut sim = seed_simulation(build_config(&params), 1);
+        for (state, attempts, blocked, avoidable) in
+            [(HasBarrierReader, 7, 3, 5), (NoBarrierReader, 11, 2, 13)]
+        {
+            sim.stats
+                .move_attempts_with_barrier_neighbor_total_by_reader_state
+                .insert(state, attempts);
+            sim.stats
+                .move_blocked_barrier_with_barrier_neighbor_total_by_reader_state
+                .insert(state, blocked);
+            sim.stats
+                .move_actions_blocked_avoidable_total_by_reader_state
+                .insert(state, avoidable);
+        }
+
+        let tracking = WorldTracking::observe(&sim);
+        assert_eq!(
+            tracking.move_attempts_with_barrier_neighbor_by_reader_state,
+            ByReaderState {
+                has_barrier_reader: 7,
+                no_barrier_reader: 11,
+            }
+        );
+        assert_eq!(
+            tracking.moves_blocked_barrier_with_barrier_neighbor_by_reader_state,
+            ByReaderState {
+                has_barrier_reader: 3,
+                no_barrier_reader: 2,
+            }
+        );
+        assert_eq!(
+            tracking.moves_blocked_avoidable_by_reader_state,
+            ByReaderState {
+                has_barrier_reader: 5,
+                no_barrier_reader: 13,
             }
         );
     }
@@ -4302,7 +4516,7 @@ mod tests {
         params.height = 24;
         params.founders = 16;
         params.ticks = SAMPLE_EVERY_TICKS + 5;
-        let (report, _) = run_deterministic(&params);
+        let (report, _) = run_deterministic(&params).expect("a valid profile");
         let seed = &report.goal_indicators.population_persistence.per_seed[0];
         assert_eq!(
             seed.samples.iter().map(|s| s.tick).collect::<Vec<_>>(),
@@ -4321,6 +4535,22 @@ mod tests {
             assert!(
                 sample.tracking.moves_blocked_barrier_total
                     <= sample.tracking.moves_attempted_total
+            );
+            let beside = &sample
+                .tracking
+                .move_attempts_with_barrier_neighbor_by_reader_state;
+            let blocked_beside = &sample
+                .tracking
+                .moves_blocked_barrier_with_barrier_neighbor_by_reader_state;
+            assert!(
+                blocked_beside.has_barrier_reader <= beside.has_barrier_reader
+                    && blocked_beside.no_barrier_reader <= beside.no_barrier_reader,
+                "a barrier block beside a barrier is one of that state's attempts beside one"
+            );
+            assert!(
+                beside.has_barrier_reader + beside.no_barrier_reader
+                    <= sample.tracking.moves_attempted_total,
+                "attempts beside a barrier are a subset of every move attempted"
             );
         }
         assert!(previous > 0, "a moving population must attempt moves");
@@ -4350,12 +4580,24 @@ mod tests {
                     has_barrier_reader: 0,
                     no_barrier_reader: 1,
                 },
+                move_attempts_with_barrier_neighbor_by_reader_state: ByReaderState {
+                    has_barrier_reader: 4,
+                    no_barrier_reader: 3,
+                },
+                moves_blocked_barrier_with_barrier_neighbor_by_reader_state: ByReaderState {
+                    has_barrier_reader: 2,
+                    no_barrier_reader: 1,
+                },
             },
         };
         let wire = serde_json::to_value(&sample).unwrap();
         assert_eq!(
             wire["moves_attempted_total"], 9,
             "tracking stays flat: {wire}"
+        );
+        assert_eq!(
+            wire["move_attempts_with_barrier_neighbor_by_reader_state"]["has_barrier_reader"], 4,
+            "the barrier-block denominator is on the wire under its own key: {wire}"
         );
         let decoded: PersistenceSample = serde_json::from_value(wire).unwrap();
         assert_eq!(decoded.tracking, sample.tracking);
@@ -4401,7 +4643,9 @@ mod tests {
         }
     }
 
-    fn small_world_set_report() -> Report {
+    /// The world-set profile shrunk to test size: the same recipes, seeds, and
+    /// per-case machinery, on a world small enough to run in a test.
+    fn small_world_set_params() -> ProfileParams {
         let mut params = goal_profile_params();
         params.width = 16;
         params.height = 16;
@@ -4409,7 +4653,11 @@ mod tests {
         params.ticks = 1;
         params.neighborhood = NeighborhoodSizes::default();
         params.drift = Default::default();
-        build_report(&params, "t12-f04-world-set-check")
+        params
+    }
+
+    fn small_world_set_report() -> Report {
+        build_report(&small_world_set_params(), "t12-f04-world-set-check").expect("a valid profile")
     }
 
     fn case_reading<'a>(comparison: &'a CaseComparison, name: &str) -> &'a CaseReadingComparison {
@@ -4519,7 +4767,8 @@ mod tests {
         let _ = std::fs::remove_file(&path);
         assert!(error.contains("different profile"), "{error}");
 
-        let single = build_report(&small_profile("sweep"), "t12-f04-single-config-check");
+        let single = build_report(&small_profile("sweep"), "t12-f04-single-config-check")
+            .expect("a valid profile");
         assert!(
             compare_against(&single, std::path::Path::new("reference.json"), &single)
                 .cases
@@ -4584,6 +4833,18 @@ mod tests {
             let seed = observation.case.seed;
             observation.fractions.typed_eat_share = vec![six(f64::from(seed as u32) / 50.0)];
             observation.fractions.blocked_move_fraction = six(f64::from(seed as u32) / 200.0);
+            observation
+                .fractions
+                .barrier_blocked_fraction_by_reader_state = ByReaderState {
+                has_barrier_reader: six(f64::from(seed as u32) / 400.0),
+                no_barrier_reader: six(f64::from(seed as u32) / 500.0),
+            };
+            observation
+                .fractions
+                .avoidable_blocked_share_of_all_moves_by_reader_state = ByReaderState {
+                has_barrier_reader: six(f64::from(seed as u32) / 800.0),
+                no_barrier_reader: six(f64::from(seed as u32) / 1_100.0),
+            };
             if let Indicator::Defined(drift) = &mut observation.drift_depth {
                 // Two checkpoints with different readings, so selecting the
                 // wrong depth is visible.
@@ -4632,6 +4893,28 @@ mod tests {
         assert_eq!(value(second, "typed_eat_share_type_0"), Some(seeded / 50.0));
         assert_eq!(value(second, "blocked_move_fraction"), Some(seeded / 200.0));
         assert_eq!(
+            value(second, "barrier_blocked_fraction_has_barrier_reader"),
+            Some(seeded / 400.0)
+        );
+        assert_eq!(
+            value(second, "barrier_blocked_fraction_no_barrier_reader"),
+            Some(seeded / 500.0)
+        );
+        assert_eq!(
+            value(
+                second,
+                "avoidable_blocked_share_of_all_moves_has_barrier_reader"
+            ),
+            Some(seeded / 800.0)
+        );
+        assert_eq!(
+            value(
+                second,
+                "avoidable_blocked_share_of_all_moves_no_barrier_reader"
+            ),
+            Some(seeded / 1_100.0)
+        );
+        assert_eq!(
             value(second, "drift_changed_per_all_births_at_2000"),
             Some(seeded / 400.0),
             "the depth-2,000 checkpoint, not the depth-1,000 one"
@@ -4639,6 +4922,44 @@ mod tests {
         assert!(
             case_readings(&report, "a world no report ran").is_empty(),
             "an unknown case has no readings at all"
+        );
+    }
+
+    /// The world set runs exactly the seeds its recipes carry, in their order,
+    /// so adding a world is one entry in `GOAL_RECIPES`. A profile that names
+    /// other seeds, or the same seeds in another order, is a hard error rather
+    /// than a world silently paired with another world's recipe or dropped.
+    #[test]
+    fn a_world_set_profile_must_name_the_seeds_its_recipes_carry() {
+        assert_eq!(
+            goal_profile_params().seeds,
+            vec![11, 22, 33],
+            "the checked-in case order the stored reports were recorded in"
+        );
+
+        // A test-sized world set, so a guard that fails to fire finishes and
+        // fails an assertion instead of running the real 1600² profile.
+        let mut reordered = small_world_set_params();
+        reordered.seeds = vec![22, 11, 33];
+        let error = run_deterministic(&reordered)
+            .err()
+            .expect("a reordered seed list pairs each world with another world's recipe");
+        assert!(error.contains(GOAL_WORLD_SET), "{error}");
+        assert!(error.contains("22, 11, 33"), "{error}");
+        assert!(error.contains("11, 22, 33"), "{error}");
+
+        let mut short = small_world_set_params();
+        short.seeds.pop();
+        assert!(
+            run_deterministic(&short).is_err(),
+            "a missing seed drops a world instead of running it"
+        );
+
+        let mut other = small_profile("sweep");
+        other.seeds = vec![7, 9];
+        assert!(
+            run_deterministic(&other).is_ok(),
+            "only the world set is tied to the checked-in recipes"
         );
     }
 

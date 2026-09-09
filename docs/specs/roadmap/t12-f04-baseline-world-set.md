@@ -178,9 +178,11 @@ and the `v3-cli` bench tests.
       `inputs_changed: true` and correct deltas; a reference with a different
       case list records the absent case; gate and single-config behavior are
       unchanged (existing tests).
-- [x] Dashboard checked in a browser against the stored report (2026-09-09:
-      the Goal worlds tab renders every per-world chart for all three cases
-      with no console errors).
+- [x] Dashboard checked in a browser against the stored report (orchestrator,
+      2026-09-09, after storing the second-pass goal report: the Goal worlds
+      tab renders every per-world chart for all three cases with no console
+      errors; the implementer's earlier check ran against the first-pass
+      report and its placeholders).
 - [ ] `make check` on the final feature code (records the tested commit) and
       `make check-docs` at closure.
 - [x] Fresh `MUTANTS_ITERATE=0 make rust-mutants` after the simplify pass:
@@ -496,6 +498,167 @@ Every mutant in this pass's own code — `FbmField::new`, `FbmField::sample`,
 `generate_fbm`, `generate_pattern`'s fBm arm, `blend` and `render_preview` — was
 caught, with no test added after the run.
 
+#### Remediation pass
+
+Third implementer pass, 2026-09-09, same worktree, on base `948d0bc3` (a fresh
+agent; earlier passes cannot be resumed here). Three review findings: a true
+barrier-awareness reading, an exact barrier count in `reproducibility.rs`, and
+seeds carried in the goal recipe list. Nothing outside `crates/`,
+`docs/reference/v3-cli-contract-spec.md`, `docs/progress/index.html`, and this
+subsection was touched.
+
+**P1 — the barrier-awareness reading now has a per-state denominator.**
+`avoidable_blocked_move_fraction_by_reader_state` divided avoidable blocks *of
+any cause* by every move *every* genome attempted, so it read 20.75% for
+Orchards' no-reader state in a world with no barriers at all and was never a
+per-state rate. `WorldTracking` now also carries
+`move_attempts_with_barrier_neighbor_by_reader_state` and
+`moves_blocked_barrier_with_barrier_neighbor_by_reader_state`, read straight
+from the `SimStats` maps `tick.rs` already increments, in the persistence
+samples at the existing cadence and in each `GoalCaseObservation`. The derived
+`barrier_blocked_fraction_by_reader_state[state]` is
+`moves_blocked_barrier_with_barrier_neighbor[state]` over
+`move_attempts_with_barrier_neighbor[state]` — that state's own moves made from
+a cell with a neighboring barrier, the only moves at which reading the barrier
+ring could change anything — and is `Undefined` when that denominator is zero,
+so a barrier-free world reports no rate rather than a fabricated zero. The old
+totals are kept and the old fraction is renamed
+`avoidable_blocked_share_of_all_moves_by_reader_state`, with both denominators
+written into the field docs and into
+`docs/reference/v3-cli-contract-spec.md`. The per-case comparison follows all
+four reader-state readings under the new names; the dashboard's "Blocked moves"
+chart takes the two per-state barrier-block rates as its emphasized headline
+series and names each series' denominator, and the "Goal worlds" identity table
+gains the per-state attempts-beside-a-barrier row so an `Undefined` rate is
+readable.
+
+Consequence, recorded rather than hidden: the stored
+`...-goal.json` predates every new field and used the old name for the
+avoidable fraction, so on that report the two headline series and both
+avoidable series read unmeasured, not zero. The orchestrator's re-measurement
+fills them.
+
+Tests. The first two below were written against the old struct and failed to
+compile, which is the red this pass recorded; the other three were extended
+after `observe` and `fractions` landed, to cover the new fields the whole-struct
+and by-name assertions would otherwise have passed over:
+
+- `tracking_fractions_divide_each_reading_by_its_own_denominator` uses distinct
+  numerators and denominators per state (attempts 4/16, blocks 1/10) so a
+  swapped state or a swapped numerator is visible, and asserts the
+  zero-denominator and the barrier-free cases read `Undefined`.
+- `observe_reads_each_barrier_counter_from_its_own_stats_map` stamps three
+  `SimStats` maps with different values under both reader-state keys and
+  asserts `observe` reads each field from its own map and key.
+- `case_readings_follow_the_case_seed_and_observation` stamps all four
+  reader-state fractions with seed-derived values and asserts each compared
+  reading by name.
+- `persistence_samples_carry_world_tracking_on_the_births_cadence` asserts the
+  new counters are subsets of the totals they must be subsets of, on every
+  sample.
+- `tracking_fields_default_when_absent_and_survive_a_round_trip` keeps the
+  pre-T12.F04 sample parsing and pins the new denominator's wire key. Every new
+  field is `#[serde(default)]`; nothing in the report carries
+  `deny_unknown_fields`, so a historical report still parses and the renamed key
+  reads as unmeasured.
+
+**P3 — the exact barrier count.** `reproducibility.rs`'s
+`terrain_is_identical_across_independent_initialization_and_thread_counts` had
+been weakened from `== 2` to `> 2` when the fBm layer landed. It now pins the
+count the fixture actually produces, **117** (read from the failing assertion
+after setting it to 0, then pinned).
+
+**P3 — recipes carry their own seed.** `GOAL_RECIPES` is now
+`[GoalRecipe; 3]` with `name`, `path`, `source`, and `seed`; `goal_case` and
+`prepare_goal_case` take a `&GoalRecipe` and read the seed from it, and
+`goal_profile_params().seeds` is derived from the recipes, so adding a world is
+one entry. `goal_recipes_for` returns the recipe slice for `goal-worlds-v1` and
+an empty slice for every other profile, and errors when a world-set profile's
+seed list is not exactly the recipes' seeds in their order — a hard error, not a
+silent drop or an index panic. It is called once at the top of
+`run_deterministic`, which now returns `Result`, as do `build_report` and
+`build_report_with_threads`; `main.rs` prints `error: {e}` and exits 1 on the
+existing idiom, and tests `.expect("a valid profile")`. Case names, recipe paths, seeds, and order in
+the report are unchanged — pinned by the `[11, 22, 33]` assertion and by the
+existing `report.profile.cases` and replayed-run tests; no test pins report
+bytes across this refactor.
+`a_world_set_profile_must_name_the_seeds_its_recipes_carry` pins
+`goal_profile_params().seeds == [11, 22, 33]` and asserts both a reordered and a
+short seed list error, on a test-sized world set.
+
+**Commands and results** (worktree root, `PATH` prefixed with the petri-tools
+and aqua bin directories; every entry rerun after the mutation remediation):
+
+| Command | Result |
+| --- | --- |
+| `cargo test -p v3-core --test viability` (run first) | ok, 24 passed |
+| `cargo test -p v3-core --test reproducibility` | ok, 3 passed |
+| `cargo test -p v3-core --test baseline_worlds` | ok, 19 passed, 1 ignored |
+| `cargo test -p v3-cli` | ok, 68 lib + 11 `main` + 18 `tests/bench.rs` + 11 `tests/cli.rs` passed |
+| `cargo clippy --workspace --all-targets -- -D warnings` | clean |
+| `cargo fmt --all` | applied |
+| `make check` | exit 0 |
+| `make roadmap-check` | validation passed |
+| `MUTANTS_ITERATE=0 make rust-mutants` | see below |
+
+**Simplification pass.** Run on this pass's diff against `948d0bc3`
+(single-pass inline review; the Agent fan-out is unavailable in this context).
+Applied: the seed-list error message uses the slice's own `{:?}` instead of a
+hand-rolled `join_seeds` helper, which is deleted; `observe`'s three identical
+two-key stats lookups collapse into one `by_reader_state` closure; the four
+reader-state comparison readings collapse into one `by_reader_state_readings`
+helper (which also brought `case_readings` back under the `too_many_lines`
+clippy cap it had crossed); `profile_block`'s new parameter dropped an
+unnecessary `'static` bound; `build_report_with_threads`'s shadowed
+`deterministic` binding renamed to `profile_run`; and the test-sized world-set
+profile extracted to `small_world_set_params`, reused by
+`small_world_set_report`. Skipped: deriving `world_set` from
+`!recipes.is_empty()` — `assemble_goal_indicators` has no recipes in scope, so
+the two sites would have disagreed in form; both keep the direct name test.
+
+**Mutation record (remediation pass).** The first fresh
+`MUTANTS_ITERATE=0 make rust-mutants` of this pass returned
+`325 mutants tested in 22m: 259 caught, 61 unviable, 5 timeouts`, and three of
+those timeouts were in this pass's own code:
+
+| First-run survivor | Resolution |
+| --- | --- |
+| `bench.rs:226:5: replace goal_recipes_for -> Result<&'static[GoalRecipe], String> with Ok(Vec::leak(Vec::new()))` | **killed** — a test gap, not a code fault: `a_world_set_profile_must_name_the_seeds_its_recipes_carry` built its bad profiles from the real `goal_profile_params()`, so a mutant that skipped the guard started a 1600², 2,000-tick run and hit the 120 s test timeout instead of failing. The test now uses `small_world_set_params()`, so the unguarded run finishes and the assertion fails. |
+| `bench.rs:226:20: replace != with == in goal_recipes_for` | **killed** — same test, same cause. |
+| `bench.rs:230:21: replace != with == in goal_recipes_for` | **killed** — same test, same cause. |
+
+Fresh rerun after that test change, against the merge base `c95457d9`, with
+nothing else on the machine:
+
+```
+325 mutants tested in 21m: 262 caught, 61 unviable, 2 timeouts
+```
+
+Output path: `~/.local/share/petri-tools/mutants/t12-f04/mutants.out`
+(`run-mode.txt` records `fresh`). Survivor list, complete — nothing missed by
+every test, and the two survivors are the same pre-existing pair both earlier
+passes deferred:
+
+| Survivor | Resolution |
+| --- | --- |
+| `crates/v3-core/src/kernel/world.rs:57:48: replace && with \|\| in WorldState::passable_connectivity` | **deferred** — timed out at 120 s rather than failing; the mutated visited guard never terminates. See "Notes for AI Agents". |
+| `crates/v3-core/src/kernel/world.rs:57:32: delete ! in WorldState::passable_connectivity` | **deferred** — same guard, same reason. |
+
+No production code was edited to kill a mutant, and no `#[mutants::skip]` or
+`exclude_re` entry was added.
+
+**Dashboard checked in a browser.** `docs/progress` served with
+`python3 -m http.server`; the Goal worlds tab rendered every world group with an
+empty console. The "Blocked moves" card shows all five series with their
+denominators in the legend, and on the stored report only
+`blocked by barrier, of all moves` has data — the four reader-state series and
+the new headline tile read unmeasured, which is the correct reading for a report
+recorded before the fields existed.
+
+**Not run.** `make bench` (either profile): the orchestrator re-measures after
+this pass, so no report under `docs/progress/features/` was regenerated or
+edited here.
+
 ## Performance and Goal Impact
 
 Natural analogs: food profitability against return rate (orchard fruit in
@@ -536,7 +699,7 @@ tick 61–65 and no case sits there afterwards.
 | Applied eats type 0 / type 1 (type-1 share) | 7,176,755 / 2,199 (0.031%) | 4,883,443 / – | 5,811,299 / 304,166 (4.97%) |
 | Final standing density type 0 / type 1 | 738,829 / 468,253 | 409,865 / – | 539,023 / 193,724 |
 | Moves attempted; blocked by barrier (fraction) | 20,336,298; 0 (0%) | 16,132,634; 2,426,094 (15.04%) | 19,647,038; 1,492,516 (7.60%) |
-| Avoidable blocked-move fraction, barrier reader / no reader | 0.17% / 20.75% | 1.27% / 40.47% | 0.46% / 35.80% |
+| Avoidable blocked moves of any cause by barrier-reader state, as a share of all move attempts (reader / no reader) | 0.17% / 20.75% | 1.27% / 40.47% | 0.46% / 35.80% |
 | Surviving founder clades; entropy (nats) | 22; 2.360513 | 24; 2.625223 | 14; 0.882285 |
 | Memory sensitivity (different from either) | 0.000113 | 0.000518 | 0.000092 |
 | Drift changed/all births at 1,000 (floor 0.0015) / 2,000 (floor 0.008) | 9/2,000 = 0.0045 / **12/2,000 = 0.006** | 20/2,000 = 0.010 / **10/2,000 = 0.005** | 9/2,000 = 0.0045 / **12/2,000 = 0.006** |
@@ -550,9 +713,13 @@ niche is touched by mutants at a trace rate; Confluence's fruit share of
 4.97% and its late rise from 7,083 at tick 1,600 to 21,818 at 2,000 with
 entropy collapsing to 0.88 nats over 14 clades are one lineage exploiting
 the rich food, which is the first thing the tracking exists to show.
-Canyon's barrier-reading creatures are blocked avoidably on 1.27% of their
-moves against 40.47% for the rest, the barrier-awareness reading later
-closures compare against. The depth-2,000 drift readings are the substrate's
+Canyon's avoidable blocked moves (any cause, mostly occupancy) attributed
+to genomes with a barrier reader are 1.27% of all move attempts against
+40.47% for the rest; that split reflects how few genomes carry a barrier
+reader, not a per-genome block rate (the barrier-free Orchards reads 20.75%
+on the same field), which the independent review caught. The remediation
+pass adds the true per-reader-state barrier-block rate (barrier blocks with
+a barrier neighbor over attempts with a barrier neighbor), re-measured below. The depth-2,000 drift readings are the substrate's
 (identical to T11.F18 for one food type), below the standing floor, and
 recorded for the user's decision under Notes.
 
@@ -578,6 +745,26 @@ recorded for the user's decision under Notes.
   pass (world-coordinate fBm sampling, preview blending) ran on a fresh
   implementer because this environment exposes no way to message a finished
   agent; both passes' records are under Verification.
+- Independent review at `948d0bc3` (Fable, fresh context): P1 1, P2 2,
+  P3 5. P1: the "avoidable blocked-move fraction by reader state" was
+  described as a per-state barrier-block rate but divides avoidable blocks of
+  any cause by all move attempts (remediated: wording corrected here and in
+  the README; the true per-state barrier-block rate added from the existing
+  barrier-neighbor stats). P2: `docs/progress.md`'s first-pass row linked
+  reports that now hold second-pass readings (fixed: retargeted to the
+  preserved first-pass goal report; the first-pass gate report was
+  overwritten and is recorded as lost). P2: the track roadmap still described
+  the maze Canyon (fixed: dated amendment in the track note, flagged for the
+  user's sign-off). P3s: stale deferred map-change note (resolved above);
+  a weakened `> 2` assertion in `reproducibility.rs` (pinned in remediation);
+  `GOAL_RECIPES` coupled to seed position (seed carried in the tuple with an
+  equal-length assertion in remediation); browser-check attribution (fixed);
+  the `"goal"`/world-set string profile kind threaded as booleans, deferred
+  below. Remediation pass 1 went to a fresh implementer.
+- Deferred P3 (maintainability): the profile kind is still a string compared
+  in several places (`params.name == "goal"`, `world_set` booleans); a
+  `ProfileKind` enum is the smallest refactor before the next profile
+  variant. Pre-existing pattern, not extended in scope here.
 - Recipe screening evidence (orchestrator, `v3-cli run` at 1600² with 10,000
   founders, one run each, population at ticks 100/500/1000 unless noted):
   literal diffuse-only grass (uniform fertility 0.2, growth 0.03) extinct by
@@ -634,13 +821,12 @@ recorded for the user's decision under Notes.
   fresh run on 2026-09-09 (`309 mutants tested in 26m: 256 caught, 51 unviable,
   2 timeouts`): still the only two survivors, still the same lines, and nothing
   missed.
-- Deferred P3 (map change, found 2026-09-09): the follow-up pass's
-  world-coordinate `FbmThreshold` sampling moves Confluence's barrier map (its
-  eight bounded same-seed layers), so `experiments/worlds/previews/confluence.png`
-  and any Confluence reading taken before that change are stale. Orchards and
-  Canyon are unaffected — no terrain and whole-world bounds respectively, verified
-  by identical `world inspect` output. Regenerating the preview and the
-  `experiments/worlds/README.md` readings is the orchestrator's step.
+- Resolved (was a deferred P3, found 2026-09-09): the follow-up pass's
+  world-coordinate `FbmThreshold` sampling moved Confluence's barrier map;
+  all three previews and the README readings were regenerated with
+  `world inspect` at `948d0bc3`, and the goal report was measured after the
+  change. Orchards and Canyon were unaffected (no terrain and whole-world
+  bounds respectively, verified by identical `world inspect` output).
 - Deferred P3 (test wiring, found 2026-09-09): `crates/v3-core/tests/
   mutational_neighborhood.rs` is run by no `make` target, the same gap this
   pass closed for `baseline_worlds.rs`. Left alone here because it belongs to

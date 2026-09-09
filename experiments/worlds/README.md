@@ -67,8 +67,10 @@ It is well looped, not a maze: Codex's perfect maze was a spanning tree and
 collapsed to seven creatures. The single production food keeps its default
 per-bite value; fertility is forty-five valley meadows (radius 30–70) over a
 0.1 background, because the default 5–15-cell blobs are grazed out and half of
-them sit under rock. The report's blocked-move fraction and its split by
-barrier-reader state are the barrier-awareness readings.
+them sit under rock. The report's barrier-blocked move fraction and the
+barrier-block rate split by barrier-reader state (barrier blocks with a
+barrier neighbor over move attempts with a barrier neighbor, per state) are
+the barrier-awareness readings.
 
 ## Confluence (composite, seed 33)
 
@@ -98,8 +100,8 @@ command). Regenerate the previews with `world inspect` after any recipe edit.
 
 Confluence's late rise (7,083 at tick 1,600 to 21,818 at 2,000) came with
 fruit reaching a 5% eat share and lineage entropy falling to 0.88 nats: one
-lineage found the rich food. Canyon's creatures that read a barrier input
-were blocked avoidably on 1.3% of their moves against 40.5% for the rest.
+lineage found the rich food. The per-reader-state barrier-block rates for
+Canyon are recorded in the closure report's tracking block and the spec.
 
 ![Orchards](previews/orchards-in-grassland.png)
 ![Canyon](previews/canyon-country.png)
