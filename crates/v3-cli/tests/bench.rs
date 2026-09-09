@@ -47,7 +47,7 @@ fn tiny_report() -> bench::Report {
         neighborhood: bench::NeighborhoodSizes::default(),
         drift: Default::default(),
     };
-    bench::build_report(&params, "t10-f10-synthetic-check")
+    bench::build_report(&params, "t10-f10-synthetic-check").expect("a valid profile")
 }
 
 /// The tiny sweep profile used by the T01.F11 persistence-field tests: small
@@ -104,8 +104,10 @@ fn gate_profile_deterministic_block_is_byte_identical_across_two_runs() {
         ..bench::gate_profile_params()
     };
 
-    let report_a = bench::build_report(&params, "t10-f10-determinism-check");
-    let report_b = bench::build_report(&params, "t10-f10-determinism-check");
+    let report_a =
+        bench::build_report(&params, "t10-f10-determinism-check").expect("a valid profile");
+    let report_b =
+        bench::build_report(&params, "t10-f10-determinism-check").expect("a valid profile");
 
     let block_a = bench::deterministic_block_json(&report_a);
     let block_b = bench::deterministic_block_json(&report_b);
@@ -150,7 +152,8 @@ fn gate_profile_has_no_severe_regression_against_series_references() {
         drift: Default::default(),
         ..bench::gate_profile_params()
     };
-    let mut report = bench::build_report(&params, "t10-f10-regression-check");
+    let mut report =
+        bench::build_report(&params, "t10-f10-regression-check").expect("a valid profile");
 
     let severe = bench::apply_comparisons(&mut report, &resolved_paths)
         .expect("every declared reference report must exist and parse");
@@ -499,8 +502,10 @@ fn compare_against_path_errors_on_profile_mismatch() {
 fn tiny_sweep_records_persistence_fields_identically_across_two_runs() {
     let params = tiny_sweep_params();
 
-    let report_a = bench::build_report(&params, "t01-f11-persistence-check");
-    let report_b = bench::build_report(&params, "t01-f11-persistence-check");
+    let report_a =
+        bench::build_report(&params, "t01-f11-persistence-check").expect("a valid profile");
+    let report_b =
+        bench::build_report(&params, "t01-f11-persistence-check").expect("a valid profile");
 
     assert_eq!(
         report_a.deterministic.profile.food_coverage, "default",
@@ -557,8 +562,10 @@ fn tiny_sweep_records_persistence_fields_identically_across_two_runs() {
 fn tiny_goal_profile_observations_are_deterministic_and_goal_only() {
     let params = tiny_goal_params();
     let one_thread =
-        bench::build_report_with_threads(&params, "t01-f12-tiny-goal-check", NonZeroUsize::new(1));
-    let default_pool = bench::build_report(&params, "t01-f12-tiny-goal-check");
+        bench::build_report_with_threads(&params, "t01-f12-tiny-goal-check", NonZeroUsize::new(1))
+            .expect("a valid profile");
+    let default_pool =
+        bench::build_report(&params, "t01-f12-tiny-goal-check").expect("a valid profile");
 
     assert_eq!(
         bench::deterministic_block_json(&one_thread),
@@ -594,7 +601,8 @@ fn tiny_goal_profile_observations_are_deterministic_and_goal_only() {
         params.seeds.len()
     );
 
-    let sweep = bench::build_report(&tiny_sweep_params(), "t01-f12-sweep-undefined-check");
+    let sweep = bench::build_report(&tiny_sweep_params(), "t01-f12-sweep-undefined-check")
+        .expect("a valid profile");
     assert!(matches!(
         sweep.deterministic.goal_indicators.lineage_diversity,
         bench::Indicator::Undefined(ref value) if value == "Undefined"
@@ -668,14 +676,16 @@ fn gate_and_goal_series_select_only_their_own_references() {
 /// forced a numeric coverage.
 #[test]
 fn default_food_coverage_round_trips_through_the_profile_comparison() {
-    let current = bench::build_report(&tiny_sweep_params(), "t01-f11-default-coverage-check");
+    let current = bench::build_report(&tiny_sweep_params(), "t01-f11-default-coverage-check")
+        .expect("a valid profile");
     let forced = bench::build_report(
         &bench::ProfileParams {
             food_coverage: Some(1.0),
             ..tiny_sweep_params()
         },
         "t01-f11-forced-coverage-check",
-    );
+    )
+    .expect("a valid profile");
 
     let scratch_path = std::env::temp_dir().join(format!(
         "t01-f11-bench-default-coverage-{}.json",
@@ -713,8 +723,10 @@ fn thread_count_changes_the_environment_but_not_the_deterministic_block() {
         &params,
         "t10-f09-thread-independence-check",
         NonZeroUsize::new(1),
-    );
-    let default_pool = bench::build_report(&params, "t10-f09-thread-independence-check");
+    )
+    .expect("a valid profile");
+    let default_pool =
+        bench::build_report(&params, "t10-f09-thread-independence-check").expect("a valid profile");
 
     assert_eq!(
         bench::deterministic_block_json(&one_thread),

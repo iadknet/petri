@@ -246,12 +246,15 @@ fn terrain_is_identical_across_independent_initialization_and_thread_counts() {
         .unwrap();
     let mut first = one.install(|| seed_simulation(terrain_config(), SEED));
     let mut second = four.install(|| seed_simulation(terrain_config(), SEED));
-    assert!(
+    // The exact count this fixture's barrier layers produce. Pinned rather
+    // than bounded so a terrain change that alters the map cannot pass by
+    // still drawing "some" barriers.
+    assert_eq!(
         world_fingerprint(&first)
             .iter()
             .filter(|cell| cell.0)
-            .count()
-            > 2
+            .count(),
+        117
     );
     for tick in 0..=20 {
         assert_eq!(

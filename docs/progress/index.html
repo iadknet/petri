@@ -851,7 +851,8 @@
           return row ? row.births : NaN;
         }), (v) => fmt(v, 0));
         tile('Food type 1 share of applied eats', series((rep, obs) => get(obs, 'typed_eat_share.1')), pct);
-        tile('Blocked-move fraction', series((rep, obs) => get(obs, 'blocked_move_fraction')), pct);
+        tile('Barrier blocks, share of all moves', series((rep, obs) => get(obs, 'blocked_move_fraction')), pct);
+        tile('Barrier blocks per move beside a barrier, no reader', series((rep, obs) => get(obs, 'barrier_blocked_fraction_by_reader_state.no_barrier_reader')), pct);
         g.cards.replaceWith(tiles);
         app.appendChild(g.section);
         // group() replaced its card grid with the tiles, so rebuild the grid.
@@ -990,12 +991,15 @@
         });
       }
       chart({
-        title: 'Blocked moves', sub: 'barrier-blocked and avoidable blocked moves, both against every move attempted',
+        title: 'Blocked moves',
+        sub: 'headline: barrier blocks per move made beside a barrier, by reader state — the only moves reading the barrier ring could change. The other three use a different denominator: every move the whole population attempted.',
         tipFmt: pct, yFmt: pct,
         series: [
-          { name: 'blocked by barrier', color: 'var(--s1)', values: series((rep, obs) => get(obs, 'blocked_move_fraction')) },
-          { name: 'avoidable, barrier reader', color: 'var(--s2)', values: series((rep, obs) => get(obs, 'avoidable_blocked_move_fraction_by_reader_state.has_barrier_reader')) },
-          { name: 'avoidable, no reader', color: 'var(--s3)', values: series((rep, obs) => get(obs, 'avoidable_blocked_move_fraction_by_reader_state.no_barrier_reader')) },
+          { name: 'barrier reader, of its moves beside a barrier', color: 'var(--s1)', emph: true, values: series((rep, obs) => get(obs, 'barrier_blocked_fraction_by_reader_state.has_barrier_reader')) },
+          { name: 'no reader, of its moves beside a barrier', color: 'var(--s2)', emph: true, values: series((rep, obs) => get(obs, 'barrier_blocked_fraction_by_reader_state.no_barrier_reader')) },
+          { name: 'blocked by barrier, of all moves', color: 'var(--s3)', values: series((rep, obs) => get(obs, 'blocked_move_fraction')) },
+          { name: 'avoidable (any cause), barrier reader, of all moves', color: 'var(--seq-500)', values: series((rep, obs) => get(obs, 'avoidable_blocked_share_of_all_moves_by_reader_state.has_barrier_reader')) },
+          { name: 'avoidable (any cause), no reader, of all moves', color: 'var(--seq-600)', values: series((rep, obs) => get(obs, 'avoidable_blocked_share_of_all_moves_by_reader_state.no_barrier_reader')) },
         ],
       });
       COUNTERS.forEach(([key, name]) => chart({
@@ -1027,6 +1031,9 @@
           ['Standing food density per type', (latestCase.food_density_total || []).join(' · ') || 'Not measured in this report'],
           ['Applied eats per type', (latestCase.typed_eats_total || []).join(' · ') || 'Not measured in this report'],
           ['Moves attempted', latestCase.moves_attempted_total === undefined ? 'Not measured in this report' : fmt(num(latestCase.moves_attempted_total))],
+          ['Move attempts beside a barrier (reader · no reader)', latestCase.move_attempts_with_barrier_neighbor_by_reader_state === undefined
+            ? 'Not measured in this report'
+            : `${fmt(num(get(latestCase, 'move_attempts_with_barrier_neighbor_by_reader_state.has_barrier_reader')))} · ${fmt(num(get(latestCase, 'move_attempts_with_barrier_neighbor_by_reader_state.no_barrier_reader')))}`],
           ['Config digest', get(latestCase, 'case.config_digest')],
         ]));
         const link = el('a', null, 'Complete report for this closure');
