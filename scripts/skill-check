@@ -1,4 +1,19 @@
 #!/bin/sh
+# Scan the curated skill payloads with the Cisco AI Skill Scanner.
+#
+# The scan is expensive — the behavioural and trigger passes plus the O(n^2)
+# overlap check run over every curated file — and `make check` calls it on
+# every completion, so a passing scan records a stamp named after a digest of
+# the scanned tree. A later run whose digest still matches skips the scanner.
+# The digest also covers this script and the installer, so changing the scan
+# flags or the pinned scanner version invalidates every stamp. Symlinks are
+# followed: .claude/skills mirrors .agents/skills through links, and the
+# scanner reads it as a root of its own. Stamps live in
+# the tool root, which CI never restores, so CI always scans.
+#
+# Environment:
+#   PETRI_TOOL_ROOT          scanner and stamp location
+#   PETRI_SKILL_CHECK_CACHE  0 forces a rescan even when the stamp matches
 set -eu
 
 require_tools=0
@@ -7,6 +22,7 @@ if [ "${1:-}" = --require-tools ]; then
   shift
 fi
 
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
 : "${PETRI_TOOL_ROOT:=${XDG_DATA_HOME:-$HOME/.local/share}/petri-tools}"
 scanner=$PETRI_TOOL_ROOT/bin/skill-scanner
 if [ ! -x "$scanner" ]; then
@@ -18,10 +34,50 @@ if [ ! -x "$scanner" ]; then
   exit 0
 fi
 
-roots_found=0
+roots=''
 for skill_root in skills .agents/skills .claude/skills; do
   [ -d "$skill_root" ] || continue
-  roots_found=1
+  roots="$roots $skill_root"
+done
+if [ -z "$roots" ]; then
+  printf 'skill-check: no project skill directories found; nothing to scan.\n'
+  exit 0
+fi
+
+hash_cmd=''
+if command -v shasum >/dev/null 2>&1; then
+  hash_cmd='shasum -a 256'
+elif command -v sha256sum >/dev/null 2>&1; then
+  hash_cmd='sha256sum'
+elif command -v openssl >/dev/null 2>&1; then
+  hash_cmd='openssl dgst -sha256 -r'
+fi
+
+# Only a bare scan is cacheable: extra scanner flags change what the run
+# proves, so they neither read nor write a stamp.
+digest=''
+if [ "$#" -eq 0 ] && [ -n "$hash_cmd" ]; then
+  # shellcheck disable=SC2086 # $hash_cmd and $roots are deliberate word lists.
+  digest=$(
+    {
+      cat "$script_dir/skill-check" "$script_dir/install-skill-scanner" | $hash_cmd
+      find -L $roots -type f -exec $hash_cmd {} +
+    } | LC_ALL=C sort | $hash_cmd | cut -d' ' -f1
+  ) || digest=''
+fi
+
+# A forced run still records its result: the variable suppresses the skip,
+# not the stamp a passing scan has earned.
+stamp_dir=$PETRI_TOOL_ROOT/state/skill-check
+if [ -n "$digest" ] && [ "${PETRI_SKILL_CHECK_CACHE:-1}" != 0 ] && [ -f "$stamp_dir/$digest" ]; then
+  printf 'skill-check: curated skills unchanged since the last passing scan; using cached result.\n'
+  exit 0
+fi
+
+# A failed scan must never leave a stamp behind, and the scanner's own exit
+# status is what `make check` reports.
+for skill_root in $roots; do
+  status=0
   LITELLM_LOCAL_MODEL_COST_MAP=True ORT_DISABLE_TELEMETRY=1 \
     "$scanner" scan-all "$skill_root" \
     --recursive \
@@ -30,9 +86,14 @@ for skill_root in skills .agents/skills .claude/skills; do
     --use-trigger \
     --policy balanced \
     --fail-on-severity high \
-    "$@"
+    "$@" || status=$?
+  if [ "$status" -ne 0 ]; then
+    [ -z "$digest" ] || rm -f "$stamp_dir/$digest"
+    exit "$status"
+  fi
 done
 
-if [ "$roots_found" -eq 0 ]; then
-  printf 'skill-check: no project skill directories found; nothing to scan.\n'
+if [ -n "$digest" ]; then
+  mkdir -p "$stamp_dir"
+  : >"$stamp_dir/$digest"
 fi

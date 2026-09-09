@@ -1,0 +1,99 @@
+#!/bin/sh
+set -eu
+
+script_dir=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+test_root=$(mktemp -d "${TMPDIR:-/tmp}/petri-skill-check-test.XXXXXX")
+trap 'rm -rf "$test_root"' 0
+trap 'exit 130' INT
+trap 'exit 143' HUP TERM
+
+fail() { printf 'skill-check-test: %s\n' "$*" >&2; exit 1; }
+
+fake_root=$test_root/root
+tool_root=$test_root/tool
+skill=$fake_root/.agents/skills/demo/SKILL.md
+mkdir -p "$fake_root/scripts" "$(dirname "$skill")" "$tool_root/bin"
+cp "$script_dir/skill-check" "$script_dir/install-skill-scanner" "$fake_root/scripts/"
+printf 'name: demo\n' >"$skill"
+
+# The stub records every scan so the test can count them, and honours a
+# control file so a failing scan can be simulated.
+cat >"$tool_root/bin/skill-scanner" <<STUB
+#!/bin/sh
+printf '%s\n' "\$*" >>"$test_root/scan-log"
+exit "\$(cat "$test_root/scan-status")"
+STUB
+chmod +x "$tool_root/bin/skill-scanner"
+printf '0\n' >"$test_root/scan-status"
+: >"$test_root/scan-log"
+
+scans() { wc -l <"$test_root/scan-log" | tr -d ' '; }
+run() (
+  cd "$fake_root"
+  PETRI_TOOL_ROOT=$tool_root sh scripts/skill-check "$@" >"$test_root/out" 2>&1
+)
+# The override is assigned inside the subshell: a variable assignment made on
+# a function call persists in the calling shell, which would silently force
+# every later run too.
+forced_run() (
+  cd "$fake_root"
+  PETRI_SKILL_CHECK_CACHE=0 PETRI_TOOL_ROOT=$tool_root sh scripts/skill-check \
+    >"$test_root/out" 2>&1
+)
+
+run || fail 'first run failed'
+[ "$(scans)" = 1 ] || fail "first run scanned $(scans) times, want 1"
+
+run || fail 'cached run failed'
+[ "$(scans)" = 1 ] || fail "unchanged tree rescanned; scans=$(scans)"
+grep -q cached "$test_root/out" || fail 'cached run printed no skip notice'
+
+printf 'name: demo\ndescription: edited\n' >"$skill"
+run || fail 'run after edit failed'
+[ "$(scans)" = 2 ] || fail "edited tree did not rescan; scans=$(scans)"
+
+# A failing scan must not be cached: the next run has to scan again.
+printf 'description: changed again\n' >>"$skill"
+printf '3\n' >"$test_root/scan-status"
+if run; then fail 'failing scan exited 0'; fi
+[ "$(scans)" = 3 ] || fail "failing run did not scan; scans=$(scans)"
+printf '0\n' >"$test_root/scan-status"
+run || fail 'run after failure failed'
+[ "$(scans)" = 4 ] || fail "failure was cached; scans=$(scans)"
+
+forced_run || fail 'forced run failed'
+[ "$(scans)" = 5 ] || fail "PETRI_SKILL_CHECK_CACHE=0 did not force a rescan; scans=$(scans)"
+run || fail 'run after forced rescan failed'
+[ "$(scans)" = 5 ] || fail "forced rescan recorded no stamp; scans=$(scans)"
+
+# Ad-hoc invocations carry extra scanner flags, so they bypass the cache
+# rather than recording a stamp that does not describe a default scan.
+run --json || fail 'run with extra arguments failed'
+[ "$(scans)" = 6 ] || fail "extra arguments used the cache; scans=$(scans)"
+grep -q -- '--json' "$test_root/scan-log" || fail 'extra arguments were not forwarded'
+run || fail 'run after extra arguments failed'
+[ "$(scans)" = 6 ] || fail "extra-argument run invalidated the cache; scans=$(scans)"
+
+# .claude/skills mirrors .agents/skills through symlinks, and the scanner
+# reads it as its own root, so adding or removing a link changes what is
+# scanned even though no regular file did.
+mirror=$fake_root/.claude/skills
+mkdir -p "$mirror"
+ln -s ../../.agents/skills/demo "$mirror/demo"
+run || fail 'run after mirroring failed'
+[ "$(scans)" = 8 ] || fail "new mirror root did not rescan; scans=$(scans)"
+# Removing the link leaves an empty mirror root, so the scanned files match
+# the pre-mirror tree exactly and that earlier stamp still describes them.
+rm "$mirror/demo"
+run || fail 'run after unmirroring failed'
+[ "$(scans)" = 8 ] || fail "unmirrored tree rescanned needlessly; scans=$(scans)"
+grep -q cached "$test_root/out" || fail 'unmirrored run printed no skip notice'
+
+# Pointing the mirror at different content must scan again.
+mkdir -p "$fake_root/.agents/skills/other"
+printf 'name: other\n' >"$fake_root/.agents/skills/other/SKILL.md"
+ln -s ../../.agents/skills/other "$mirror/other"
+run || fail 'run after remirroring failed'
+[ "$(scans)" = 10 ] || fail "new mirror target did not rescan; scans=$(scans)"
+
+printf 'skill-check cache validation passed.\n'

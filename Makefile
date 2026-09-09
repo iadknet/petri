@@ -135,11 +135,12 @@ quality-check: ## Check whitespace, shell syntax, ShellCheck, and actionlint.
 	@scripts/bench-wait-test
 	@sh scripts/rust-mutants-test
 	@sh scripts/dev-sh-test
+	@sh scripts/skill-check-test
 
 dependency-audit: ## Scan Cargo and npm dependency locks with OSV.
 	@scripts/dependency-audit
 
-skill-check: ## Fail on high-severity curated-skill findings.
+skill-check: ## Fail on high-severity curated-skill findings (cached per skill-tree digest).
 	@scripts/skill-check
 
 check: ## Run all project completion checks.
