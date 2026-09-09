@@ -26,7 +26,7 @@ is what later environmental features are read against.
 
 - [x] **T12.F01 — Seeded Terrain in the World Config** — Depends on: None
   - Goal: Bedrock and water. The land has a shape before anything lives on it: barrier terrain is generated from the world config and seed at startup, before food and founders are placed, so where a creature can walk and see is set from tick zero and the same recipe and seed regenerate the same world in any process.
-- [ ] **T12.F02 — World Recipe Save and Load** — Depends on: T12.F01
+- [x] **T12.F02 — World Recipe Save and Load** — Depends on: T12.F01
   - Goal: A world is a file. The effective world config, terrain and seeds included, saves from the app or the CLI and loads back to regenerate the same world, so a baseline is a small recipe in Git rather than a stored map.
 - [ ] **T12.F04 — Baseline World Set** — Depends on: T12.F02
   - Goal: Plains, orchards in grassland, canyon country, and one world where everything meets. Food types first gain their own energy per bite, coverage, regrowth rate, and recovery rate in the world config, with defaults equal to today's shared values, so a rich, rare, slow-returning food and a poor, abundant, quick one can share a world; the named set is then built on that substrate. Three recipes beside the default barrier-free plains: one geared toward food differentiation, one barrier-heavy enough that effective life there requires barrier awareness to evolve, and one composite that puts every tick-zero pressure together in small, overlapping regions. Each is checked in with a persistence reading at production defaults, so later environmental features are read against the same worlds.

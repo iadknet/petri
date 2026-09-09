@@ -1,6 +1,6 @@
 # T12.F02 — World Recipe Save and Load
 
-**Status**: In Progress
+**Status**: Complete
 **Last updated**: 2026-09-08
 **Feature**: T12.F02
 **Track**: [T12 — World Composition and Baseline Worlds](../../roadmaps/t12-world-composition-and-baseline-worlds.md)
@@ -131,7 +131,7 @@ Required behavior:
   profile metadata; cover the config actually passed to seeding.
 - [x] Add app save/load controls using the existing API and startup flow;
   preserve opaque recipe fields/seed precision and refresh applied state.
-- [ ] Update directly affected reference/usage docs, self-review the feature
+- [x] Update directly affected reference/usage docs, self-review the feature
   diff for reuse/simplification/efficiency, triage fresh mutation survivors,
   and record final verification and review evidence.
 
@@ -145,7 +145,9 @@ Required behavior:
   `cargo test -p v3-core --lib recipe_tests` passed 3 tests and
   `cargo check --workspace --all-targets` exited 0 afterward (logs
   `/tmp/t12-f02-core-strengthened.log`, `/tmp/t12-f02-final-compile4.log`).
-  The orchestrator's final committed-code check remains pending.
+  The orchestrator's final `make check` exited 0 on rebased tested code commit
+  `ef4af21f4d8da33af02a0285369888c2c7b3b469` (log
+  `/tmp/t12-f02-orchestrator-final-check.log`).
 - Final fresh `MUTANTS_ITERATE=0 make rust-mutants` exited 0 (2026-09-08):
   `38 mutants tested in 4m: 32 caught, 6 unviable`; `rust-mutants: no survivors`.
   Output: `/Users/istefanek/.local/share/petri-tools/mutants/t12-f02/mutants.out`,
@@ -198,7 +200,7 @@ Required behavior:
 - Focused logs are `/tmp/t12-f02-{core,cli,sweep,server,ui}-*.log`,
   `/tmp/t12-f02-profile-test.log`, `/tmp/t12-f02-default-save-*.log`, and
   `/tmp/t12-f02-frontend-check2.log`. Coherent Rust compile checks passed
-  (`/tmp/t12-f02-final-compile2.log`); final compile/check/mutation evidence follows.
+  (`/tmp/t12-f02-final-compile2.log`); final check/mutation evidence is recorded above.
 
 - Prerequisite audit repair (2026-09-08), before recipe implementation:
   `npm install --save-dev 'vitest@^4.1.11'` in `frontend/` exited 0 after
@@ -250,7 +252,7 @@ Required behavior:
   regression tests do not run a benchmark and remain part of those checks.
 - [x] Second goal determinism run: Not applicable by the workflow's standing
   2026-09-05 decision and this closure's benchmark exception.
-- [ ] `make roadmap-check` on document edits/handoff; orchestrator `make check`
+- [x] `make roadmap-check` on document edits/handoff; orchestrator `make check`
   on final feature code with tested commit recorded; `make check-docs` on
   closure documents. Preserve actual logs and command results.
 
@@ -276,12 +278,12 @@ is verified by code/tests; full trajectory measurement is not claimed.
 
 ## Success Criteria
 
-- [ ] App and CLI recipes preserve the full effective procedural config and
+- [x] App and CLI recipes preserve the full effective procedural config and
   regenerate identical tick-zero state with the same run seed; errors are
   explicit and manual/evolved state is not represented as saved.
-- [ ] CLI run digest and recipe sweep path/digest identify the applied config;
+- [x] CLI run digest and recipe sweep path/digest identify the applied config;
   existing recipe-free behavior and fixed profiles remain intact.
-- [ ] Required tests, fresh mutation triage, independent final review and
+- [x] Required tests, fresh mutation triage, independent final review and
   closure records pass with the benchmark exception accurately represented.
 
 ## Notes for AI Agents
@@ -337,5 +339,22 @@ is verified by code/tests; full trajectory measurement is not claimed.
   the final fresh run found none. No production changes were made to kill mutants.
 - Advisor consultations: 4. Requirement corrections: none; consultation 3
   clarified existing requested-founder semantics. User intervention: the
-  explicit benchmark exception above. Aggregate task usage unavailable.
-  Completion, rebased committed-code verification and integration remain pending.
+  explicit benchmark exception above.
+- Integration preparation: main advanced to
+  `ea23febbb8ff6475115a7f3232649043aae06d07` with the equivalent Vitest repair.
+  The orchestrator rebased successfully; `git diff 2c26c429 HEAD` was empty,
+  preserving the exact reviewed content. Final `make check` passed on rebased
+  code commit `ef4af21f4d8da33af02a0285369888c2c7b3b469` before these
+  documentation-only closure edits. T12 remains In Progress and the master
+  remains Active because the remaining track criteria/features are incomplete.
+  Documentation-only closure `make check-docs` exited 0, log
+  `/tmp/t12-f02-closure-check-docs.log`. Its first attempt stopped because the
+  Complete spec still had unchecked closure boxes; after preparing those boxes,
+  the full documentation check passed without waiving a check. Fast-forward and
+  worktree/branch cleanup follow separately.
+- Task-specific usage snapshot, 2026-09-09T00:01:36Z, aggregated across the four
+  role sessions: input 29,394,567 tokens, including cached input 28,853,888;
+  output 70,034, including reasoning 12,266; total 29,464,601. Uncached input
+  plus output: 610,713. Cached input is a subset of input, and reasoning is a
+  subset of output. This timestamped snapshot excludes subsequent closure
+  turns and is not a final bill; no dollar cost is inferred.
